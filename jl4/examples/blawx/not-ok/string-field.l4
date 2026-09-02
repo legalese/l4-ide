@@ -20,7 +20,12 @@
 --
 -- There is no string option to select and no per-type branch that would emit
 -- one, so this is a hard ceiling in the target, not a gap in the exporter: a
--- string-typed field, parameter or result is refused.
+-- string-typed field, parameter or result is refused. All three positions, and
+-- in all three the same diagnostic — `classifyPred` runs a STRING pre-pass over
+-- the whole signature before it classifies, because the rules-only band
+-- (`PCUndeclared`, total arity <= 2 and not attribute-shaped) builds no
+-- declaration block and so never asks for a value type. The parameter case has
+-- its own fixture next door, `string-param.l4`.
 --
 -- What a user does about it. If the values are a fixed vocabulary — which is
 -- what most legislative "strings" turn out to be — write an enum, and it lowers
@@ -45,8 +50,9 @@
 -- (BLAWX-EXPORT-SPEC §4.7). It is the typed field that has nowhere to go.
 --
 -- Measured 2026-09-02 (spec §11 W2) with `l4 blawx` on this file:
---   in `name`: STRING-sorted field or argument (Blawx): `name` is
---   STRING-sorted, and Blawx's ontology has no string attribute type — …
+--   in `name`: STRING-sorted field or argument (Blawx): `name` has a
+--   STRING-sorted field, parameter or result, and Blawx's ontology has no
+--   string attribute type — …
 
 § `String-typed field`
 

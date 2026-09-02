@@ -221,15 +221,19 @@ spec = do
     -- duration, list, plus the declared categories
     -- (@blawx-blocks.js:5376@ and @:5577-5583@ on the stock v1.6.22-alpha
     -- checkout) -- and @scasp_generator.js@ has no per-type branch that could
-    -- add one. So a string-sorted FIELD is refused, while a string LITERAL in a
-    -- rule body is not: the two halves are pinned separately below, because
-    -- §4.7 used to state the surviving half as though it covered both.
+    -- add one. So a string sort in a SIGNATURE is refused, while a string
+    -- LITERAL in a rule body is not: the two halves are pinned separately
+    -- below, because §4.7 used to state the surviving half as though it
+    -- covered both.
     it "refuses a STRING-sorted field, and says what to write instead" $
       case blawxYaml stringFieldModule of
         Right _  -> expectationFailure "expected a Blawx rejection for a STRING field"
         Left err -> do
           err `shouldSatisfy` Text.isInfixOf "STRING-sorted field or argument (Blawx)"
           err `shouldSatisfy` Text.isInfixOf "no string attribute type"
+          -- the message names all three positions, because as of 2026-09-02
+          -- all three are refused (see the two cases below)
+          err `shouldSatisfy` Text.isInfixOf "STRING-sorted field, parameter or result"
           -- the advice, which is the point of the message: an enum for a fixed
           -- vocabulary, a category for identity
           err `shouldSatisfy` Text.isInfixOf "DECLARE ... IS ONE OF ..."
@@ -243,12 +247,40 @@ spec = do
       hasLine out "blawx_category(player_name)."
       hasLine out "blawx_attribute(player,name,player_name)."
 
+    -- The hole the first cut of this work left open, found by review and
+    -- pinned here. 'classifyPred' only reaches 'valueType' from the arms that
+    -- build a DECLARATION BLOCK; a predicate of total arity <= 2 that is not
+    -- attribute-shaped is 'PCUndeclared' and used to skip the check entirely,
+    -- so this module emitted cleanly (exit 0, @S = zebra.@ in the s(CASP))
+    -- while its arity-3 spelling was refused. The corpus twin is
+    -- `jl4/examples/blawx/not-ok/string-param.l4`.
+    it "refuses a STRING PARAMETER even where the predicate gets no declaration block" $
+      case blawxYaml stringParamModule of
+        Right _  -> expectationFailure "expected a Blawx rejection for a STRING parameter"
+        Left err -> do
+          err `shouldSatisfy` Text.isInfixOf "STRING-sorted field or argument (Blawx)"
+          err `shouldSatisfy` Text.isInfixOf "STRING-sorted field, parameter or result"
+          -- and it is the DERIVED predicate that is named, not a field
+          err `shouldSatisfy` Text.isInfixOf "`throws named`"
+
+    -- The third position, and the one §4.7's own "Admitted" bullet used to be
+    -- an instance of: a nullary constant whose RESULT is a STRING.
+    it "refuses a STRING RESULT on a nullary constant" $
+      case blawxYaml stringResultModule of
+        Right _  -> expectationFailure "expected a Blawx rejection for a STRING result"
+        Left err -> do
+          err `shouldSatisfy` Text.isInfixOf "STRING-sorted field or argument (Blawx)"
+          err `shouldSatisfy` Text.isInfixOf "`the house sign`"
+
     it "still admits a string LITERAL in a rule body, as an atom" $ do
-      -- The half of §4.7 that survives the narrowing. The literal reaches
-      -- the s(CASP) through the program-global string-atom table and is
-      -- compared by unification.
+      -- The half of §4.7 that survives the narrowing. No signature in this
+      -- module is STRING-sorted: `aliases` is a LIST, which Blawx declares as
+      -- its untyped `list` value type without inspecting the element sort, and
+      -- the literal reaches the s(CASP) through the program-global string-atom
+      -- table, compared by unification.
       out <- emitted stringLiteralModule
-      hasLine out "Thehousesign = rock."
+      hasLine out "blawx_attribute(player,aliases,list)."
+      hasLine out "Aliases = [zebra | []]."
 
     it "admits an arity-3 input with no category parameter at all" $ do
       -- Not a defect: Blawx relationship blocks are n-ary over any declared
@@ -351,10 +383,25 @@ spec = do
     , "DECIDE `throws rock` p IF p's throws EQUALS Rock"
     ]
 
-  -- A string LITERAL in a rule body, with no string-sorted field anywhere: the
-  -- nullary constant is `PCUndeclared` (rules only, no declaration block), so
-  -- the literal is the only string in sight and it survives as an atom.
-  stringLiteralModule = Text.unlines
+  -- A STRING PARAMETER on a derived predicate of total arity 2, which gets no
+  -- declaration block at all. Refused since 2026-09-02.
+  stringParamModule = Text.unlines
+    [ "DECLARE Sign IS ONE OF Rock, Paper, Scissors"
+    , ""
+    , "DECLARE Player HAS"
+    , "    throws IS A Sign"
+    , ""
+    , "@export"
+    , "GIVEN p IS A Player"
+    , "      s IS A STRING"
+    , "GIVETH A BOOLEAN"
+    , "DECIDE `throws named` p s IF s EQUALS \"zebra\""
+    ]
+
+  -- A STRING RESULT on a nullary constant. Also `PCUndeclared`, also refused
+  -- since 2026-09-02 -- this is the module §4.7 used to cite as its ADMITTED
+  -- example, which is why the section's two bullets contradicted each other.
+  stringResultModule = Text.unlines
     [ "ASSUME Player IS A TYPE"
     , ""
     , "GIVEN p IS A Player"
@@ -369,6 +416,20 @@ spec = do
     , "DECIDE `qualifies` p IF"
     , "      `is registered` p"
     , "  AND `the house sign` EQUALS \"rock\""
+    ]
+
+  -- A string LITERAL in a rule body, with no STRING anywhere in a signature.
+  -- `LIST OF STRING` is admitted as Blawx's untyped `list` (RSList does not
+  -- inspect its element sort), so this is what a surviving literal looks like
+  -- now that the three signature positions are all closed.
+  stringLiteralModule = Text.unlines
+    [ "DECLARE Player HAS"
+    , "    aliases IS A LIST OF STRING"
+    , ""
+    , "@export"
+    , "GIVEN p IS A Player"
+    , "GIVETH A BOOLEAN"
+    , "DECIDE `known as zebra` p IF p's aliases EQUALS LIST \"zebra\""
     ]
 
   -- Total arity 3, and not one argument is a category.

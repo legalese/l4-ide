@@ -429,48 +429,84 @@ components exist in the target.
 
 ### 4.7 Strings — literals in rule bodies only, never a typed field
 
-**Narrowed 2026-09-02 (§11 W2). This section previously read "`STRING` literals survive as
-atoms, usable for equality only", which is true and was being read as though it covered
-string-typed _fields_ as well. It does not, and it cannot: Blawx v1.6 has no string attribute
-value type.**
+**Narrowed 2026-09-02 (§11 W2), and corrected the same day after review. This section previously
+read "`STRING` literals survive as atoms, usable for equality only", which is true and was being
+read as though it covered string-typed _fields_ as well. It does not, and it cannot: Blawx v1.6
+has no string attribute value type.**
 
 **The ceiling is in the target, and it is a closed list [E].** A declaration block picks its
 attribute's value type from a dropdown, and on the stock checkout
 (`/Volumes/transcend/src/blawx-stock`, `origin/main` at `6a717b1`) that dropdown is written out
 literally as `[["true / false","boolean"], ["number","number"], ["date","date"],
 ["time","time"], ["datetime","datetime"], ["duration","duration"], ['list','list']]`
-(`blawx-blocks.js:5376`). The list the field is _re-populated_ from as categories are declared is
-the same six datatypes concatenated with the declared category names, with `"true / false"` put
-back at the front (`blawx-blocks.js:5577-5583`); the relationship block's per-argument dropdowns
-draw on the same `allTypes` (`:5262`, `:5314`). `scasp_generator.js` adds nothing: R3's
-value-type evidence at `:927-1156` has exactly two branches, `boolean` and not-`boolean`, and
-otherwise passes the dropdown value straight through into
-`blawx_attribute(Cat,Name,Type)` (`:927`). The only occurrence of the word `string` in either
-file is `typeof code == "string"` (`scasp_generator.js:107`). So there is no string option to
-select, and no per-type branch that could emit one.
+(`blawx-blocks.js:5376`). It is re-populated as categories are declared from
+`attributeOptions = [["true / false","boolean"]].concat(allTypes)` (`:5583`, applied to every
+attribute block at `:5596`), where `allTypes` is the literal six-entry `datatypeOptions` array of
+`:5577` concatenated with the declared category names (`:5579`, or `:5581` when there are none).
+The relationship block's per-argument dropdowns are re-populated from that same `allTypes`
+(`:5603`); they are _first built_ from a second literal six-entry array at `:5262` and `:5314`,
+and an earlier draft of this section mis-cited those two lines as the `allTypes` draw. Both
+arrays are string-free, so the conclusion is unchanged and the citation is now the right one.
+`scasp_generator.js` adds nothing: R3's value-type evidence at `:927-1156` has exactly two
+branches, `boolean` and not-`boolean`, and otherwise passes the dropdown value straight through
+into `blawx_attribute(Cat,Name,Type)` (`:927`). So there is no string option to select, and no
+per-type branch that could emit one.
+
+The word `string` does occur in those two files — nine times, `grep -c string blawx-blocks.js
+scasp_generator.js` → `4` and `5` — but never as a value type: four `JSON.stringify` calls
+(`blawx-blocks.js:5280`, `:5428`, `:5430`, `:5494`), and `Blockly.utils.string.wrap`
+(`scasp_generator.js:47`), `function text2math(string)` (`:69`), `switch (string)` (`:70`), the
+message `"Expecting string from statement block "` (`:104`) and `typeof code == "string"`
+(`:107`). It is only the quoted-token form that has a single hit: `grep -cE "'string'|\"string\""`
+→ `0` and `1`, that one being `:107` [E]. An earlier draft of this section stated the loose form
+("the only occurrence of the word `string`") and was false as written.
 
 **What that means, in two halves.**
 
-- **Refused — a `STRING`-sorted field, parameter or result.** `blawxValueType`
-  (`L4.Blawx.Lower`) has a named `RSString` arm as of 2026-09-02, and its message says what to
-  write instead: an enum (`DECLARE … IS ONE OF …`) for a fixed vocabulary, or a category for
-  identity. Measured on `jl4/examples/blawx/not-ok/string-field.l4` (`l4 blawx` on it, exit 1):
-  _"in `name`: STRING-sorted field or argument (Blawx): `name` is STRING-sorted, and Blawx's
+- **Refused — a `STRING` sort anywhere in a lowered predicate's signature: field, parameter _or_
+  result.** `blawxValueType` (`L4.Blawx.Lower`) has a named `RSString` arm, and `classifyPred`
+  runs the signature's `STRING` sorts through it as a pre-pass _before_ classifying, so all three
+  positions give the same named diagnostic. The pre-pass is the load-bearing half: `valueType` is
+  otherwise reached only from the two arms that build a **declaration block** (the attribute arm,
+  and the relationship arm at total arity ≥ 3), and a predicate of total arity ≤ 2 that is not
+  attribute-shaped is `PCUndeclared` — rules only, no block, no value types asked for. Measured
+  before the pre-pass landed: a two-place derived predicate over a `Player` and a `STRING`
+  (``DECIDE `throws named` p s IF s EQUALS "zebra"``) exported at **exit 0**, emitting
+  `according_to(sec_1_section,throws_named,P,S) :- player(P), S = zebra.` with no
+  `blawx_attribute`/`blawx_relationship` line for it at all, while its arity-3 spelling was
+  refused — which is what kept the hole out of sight [E]. The message says what to write instead:
+  an enum (`DECLARE … IS ONE OF …`) for a fixed vocabulary, or a category for identity. Measured
+  2026-09-02 on `jl4/examples/blawx/not-ok/string-field.l4` and
+  `jl4/examples/blawx/not-ok/string-param.l4` (`l4 blawx` on each, **exit 1**; `l4 check` on each,
+  **Check succeeded** — the refusal is the Blawx leg's, not L4's): _"in `name`: STRING-sorted
+  field or argument (Blawx): `name` has a STRING-sorted field, parameter or result, and Blawx's
   ontology has no string attribute type — a declaration block offers boolean, number, date, time,
-  datetime, duration, list and the declared categories, and nothing else…"_. The enum remedy
-  was executed, not assumed: the same module with `name IS A PlayerName` emits
+  datetime, duration, list and the declared categories, and nothing else…"_. The enum remedy was
+  executed, not assumed: the same module with `name IS A PlayerName` emits
   `blawx_category(player_name).` and `blawx_attribute(player,name,player_name).` [E]. (Do not
   name the enum `Name`: `Name` and `name` both mangle to `name` and R3's injectivity check then
   refuses the module for an unrelated-looking reason [E].)
-- **Admitted — a `STRING` literal inside a rule body.** Unchanged: it mangles to an atom through
-  the program-global string-atom table (`stringAtomTable`, R3 mangling, collisions with declared
-  names and with other literals both refused by name), and is usable for equality only. Measured
-  with a probe module whose only string is the literal (a nullary `GIVETH A STRING` constant,
-  which classifies as `PCUndeclared` and so needs no declaration block): the emitted s(CASP)
-  carries `Thehousesign = rock.`, and the fixture re-saves clean under the R12 harness —
-  `blawx-fixpoint-harness: 3 checked, 0 failed` [E]. The probe is pinned as a unit test
+- **Admitted — a `STRING` literal inside a rule body, where no signature is `STRING`-sorted.** It
+  mangles to an atom through the program-global string-atom table (`stringAtomTable`, R3
+  mangling, collisions with declared names and with other literals both refused by name), and is
+  usable for equality only. The probe is now a `LIST OF STRING` field, because that is what a
+  surviving literal looks like once the three signature positions are closed: `RSList` returns
+  Blawx's untyped `list` value type without inspecting its element sort, so
+  `DECLARE Player HAS aliases IS A LIST OF STRING` with
+  ``DECIDE `known as zebra` p IF p's aliases EQUALS LIST "zebra"``
+  exports at exit 0 with `blawx_attribute(player,aliases,list).` and
+  `Aliases = [zebra | []].`, and re-saves clean under the R12 harness —
+  `blawx-fixpoint-harness: 3 checked, 0 failed` [E]. It is pinned as a unit test
   (`BlawxAssumeSpec`, "still admits a string LITERAL in a rule body, as an atom"), not as a
-  corpus seed, because there is no _legal_ text in it.
+  corpus seed, because there is no _legal_ text in it. **The element sort of a list is not
+  checked**, and this section does not claim it is: `LIST OF STRING` is the one place a `STRING`
+  still reaches the ontology, under the `list` type.
+- **Open, and measured rather than fixed:** the literal renders in the Blockly XML as
+  `<block type="object_selector" … objectname="zebra">` with **zero** `object_declaration` blocks
+  in the same document (`grep -c object_declaration` on the probe's `.blawx` → `0`) [E]. It
+  fixpoints clean and reaches s(CASP) correctly, so nothing measurable from here is broken; what
+  is untested is how a live Blawx instance's UI treats an object selector naming an undeclared
+  object. Tracked as §11 **W2-followup**.
 
 All string _computation_ is OUT, as before — the target has no string operations at all.
 
@@ -1503,26 +1539,75 @@ attribute value type to be declared under. **Do.** Verify against `scasp_generat
 to say so and make the diagnostic say "use an enum or a category for identity"; if it does, give
 `classifyPred` the image. Amends §4.7.
 
-**DISCHARGED 2026-09-02.** Measured: **there is no string-valued attribute type in v1.6**, so the
-narrowing branch is the one taken and no image was built. The attribute-type dropdown is written
-out as a literal seven-entry array (`blawx-blocks.js:5376`) and re-populated at runtime from six
-datatypes plus the declared categories (`:5577-5583`, and the relationship block's per-argument
-dropdowns share that `allTypes` at `:5262`/`:5314`); R3's cited generator range has two branches,
-`boolean` and not-`boolean`, and otherwise passes the dropdown value through unexamined into
-`blawx_attribute(Cat,Name,Type)` (`scasp_generator.js:927`); the word `string` occurs in neither
-file except as `typeof code == "string"` (`scasp_generator.js:107`). §4.7 is rewritten to split
-the admitted half (a literal in a rule body) from the refused half (a typed field), with those
-citations. `blawxValueType` grows a named `RSString` arm whose message names the value types that
-do exist and prescribes the enum or the category; the enum remedy was executed rather than
-asserted (`name IS A PlayerName` → `blawx_category(player_name).` +
-`blawx_attribute(player,name,player_name).`). New fixture
-`jl4/examples/blawx/not-ok/string-field.l4` (refuses, exit 1) and three `BlawxAssumeSpec` cases —
-the refusal and its advice, the enum that replaces it, and the surviving literal. Evidence:
-`cabal test jl4-core-test` **424 examples, 0 failures**; all twelve `expected/*.blawx` regenerated
+**DISCHARGED 2026-09-02** (corrected the same day after review — the first cut both overstated
+what the code did and mis-cited two of its measurements). Measured: **there is no string-valued
+attribute type in v1.6**, so the narrowing branch is the one taken and no image was built. The
+attribute-type dropdown is written out as a literal seven-entry array (`blawx-blocks.js:5376`)
+and re-populated from `attributeOptions = [["true / false","boolean"]].concat(allTypes)` (`:5583`,
+applied at `:5596`), where `allTypes` is the literal six-entry `datatypeOptions` of `:5577` plus
+the declared categories (`:5579`/`:5581`); the relationship block's per-argument dropdowns are
+re-populated from that `allTypes` at `:5603`, and are first built from a second literal six-entry
+array at `:5262`/`:5314`. R3's cited generator range has two branches, `boolean` and
+not-`boolean`, and otherwise passes the dropdown value through unexamined into
+`blawx_attribute(Cat,Name,Type)` (`scasp_generator.js:927`). The word `string` occurs nine times
+across the two files (`grep -c string blawx-blocks.js scasp_generator.js` → 4 and 5), never as a
+value type; only the quoted-token form `grep -cE "'string'|\"string\""` has a single hit,
+`scasp_generator.js:107`. §4.7 is
+rewritten to split the admitted half (a literal in a rule body) from the refused half (a `STRING`
+sort in a signature), with those citations.
+
+**What review changed.** The first cut put the refusal in `blawxValueType` only, and wrote
+"refused — a `STRING`-sorted field, parameter or result" in §4.7 and in `doc/exports/blawx.md`.
+That sentence stated more than the code did: `valueType` is reached only from the two arms of
+`classifyPred` that build a declaration block, so a predicate of total arity ≤ 2 that is not
+attribute-shaped (`PCUndeclared`, rules only) skipped the check — a `STRING` **parameter** there
+exported at exit 0, emitting `according_to(sec_1_section,throws_named,P,S) :- player(P), S =
+zebra.` with no declaration line at all, and re-saving clean through Blawx's own generator; and a
+`STRING` **result** on a nullary constant was likewise admitted — indeed the section's own
+"Admitted" bullet was an instance of it, contradicting the bullet above it. `classifyPred` now
+runs a `STRING` pre-pass over the whole signature before classifying, so field, parameter and
+result all give the same named diagnostic. The `STRING`-literal probe was re-cut around a
+`LIST OF STRING` field, since the old probe (a nullary `GIVETH A STRING`) is now correctly
+refused.
+
+`blawxValueType`'s `RSString` arm names the value types that do exist and prescribes the enum or
+the category; the enum remedy was executed rather than asserted (`name IS A PlayerName` →
+`blawx_category(player_name).` + `blawx_attribute(player,name,player_name).`). Two fixtures,
+`jl4/examples/blawx/not-ok/string-field.l4` and `.../string-param.l4` (each `l4 blawx` **exit 1**,
+each `l4 check` **Check succeeded**), and five `BlawxAssumeSpec` cases — the field refusal and its
+advice, the enum that replaces it, the parameter, the result, and the surviving literal.
+Evidence: `cabal test jl4-core-test` **426 examples, 0 failures**; `cabal test l4-cli-test
+--test-options="-m blawx"` **45 examples, 0 failures**; all twelve `expected/*.blawx` regenerated
 byte-identical (`git status --porcelain jl4/examples/blawx/expected/` empty); fixpoint on `rps`
-and `beard` **18 checked, 0 failed**; tier-1 on both **8/8**. Not done, and not asked for: no
-positive corpus seed carries a string literal — the probe lives in the unit test, because a
-string literal with no legal text around it is not a seed.
+and `beard` **18 checked, 0 failed**; tier-1 on both **8/8**; `node etc/check-corpus-goldens.mjs`
+**368 corpus files, all four goldens present**. Not done, and not asked for: no positive corpus
+seed carries a string literal — the probe lives in the unit test, because a string literal with no
+legal text around it is not a seed.
+
+**Two edits this item deliberately did not make**, both in the file's top status paragraph, which
+is one paragraph every §11 item would otherwise rewrite. (a) That paragraph still lists "an
+ontology gap (W2)" among what remains open, in the same tree that marks W2 discharged. (b) Its
+corpus count reads "nineteen `.l4` files … six `not-ok/` refusal fixtures"; `string-param.l4`
+makes it **twenty (twelve seeds, seven `not-ok/`, one `imported/`)**, re-counted 2026-09-02 with
+`ls jl4/examples/blawx/*.l4 jl4/examples/blawx/not-ok/*.l4 jl4/examples/blawx/imported/*.l4`. The
+sentence already tells the reader to re-derive with `ls`, so it is stale-but-self-flagging rather
+than merely false. Both are one-clause fixes for whoever re-cuts that paragraph once §11 drains.
+
+### W2-followup — a string literal renders as an object selector nothing declares
+
+**Measured 2026-09-02**, while probing the surviving half of §4.7. The literal in
+`p's aliases EQUALS LIST "zebra"` reaches the Blockly XML as
+`<block type="object_selector" …><mutation … objectname="zebra"></mutation><field
+name="object_name">zebra</field></block>`, and the same document contains **zero**
+`object_declaration` blocks (`grep -c object_declaration` on the emitted `.blawx` → `0`). **Do
+not read this as a defect yet.** It re-saves clean through Blawx's own generator
+(`blawx-fixpoint-harness: 3 checked, 0 failed`) and the s(CASP) it regenerates carries
+`Aliases = [zebra | []].`, so every oracle available offline agrees. What is untested is a live
+instance's UI: whether an object selector naming an object no declaration block declares renders
+as a usable dropdown, an empty one, or an error. **Do.** Settle it at tier 2, against a running
+Blawx, on the instance §11 W8 rebuilt; if the UI cannot show it,
+either emit an `object_declaration` for each literal in the string-atom table or fall back to a
+plain text field. Amends §4.7.
 
 ### W3 — section numbers follow `§` order, not the source's
 
