@@ -625,7 +625,11 @@ is refused by name rather than half-applied.
 
 A `%` opens a slot only when it delimits a _name_ — a letter or `_` first, a letter, digit or
 `'` last, and nothing but letters, digits, `_`, `-`, `'` and interior spaces between, which is
-the only thing `linearNlg` ever writes there. Any other `%` is a literal percent sign. Without
+what `linearNlg` writes for every parameter whose name has that shape. Any other `%` is a literal
+percent sign — including, as an unfixed limitation measured 2026-09-02, the delimiters `linearNlg`
+puts around a backtick-quoted parameter name carrying punctuation (`` `the person (individual)` ``,
+`` `person, natural` ``): the splitter does not recognise those as a slot and the `@nlg` is refused
+with the slot-structure diagnostic (§11 W4, left open (c)). Without
 that test (added 2026-09-02) a percentage in prose paired with the next percentage into a
 phantom slot, and where the phantom count happened to match the block's arity the sentence was
 mis-cut _silently_: `@nlg 5% a 10% b 15% c 20%` on a two-argument attribute emitted
@@ -886,8 +890,10 @@ object (`blawx-lift/value-variable-in-object-position` — `numerical_constraint
 or an unliftable goal (`blawx-lift/unbound-value`, `blawx-lift/goal-shape`, `blawx-lift/term-shape`
 — `list_demo`); a workspace-level `false :- …` (`blawx-lift/constraint` —
 `logical_constraints`); a conclusion with a constant argument (`blawx-lift/conclusion-shape` —
-`siblings`, `parent(Person,opg)`); an `overrules` the paragraph fold would either dangle or
-activate (`blawx-lift/defeat-target`, `blawx-lift/defeat-fold-unsound`); and the date/event layer,
+`siblings`, `parent(Person,opg)`); an `overrules` or an `inapplicable` gate the paragraph fold would either dangle or
+activate (`blawx-lift/defeat-target`, `blawx-lift/defeat-fold-unsound`; `blawx-lift/applies-target`,
+`blawx-lift/applies-fold-unsound` — the applicability pair since the integration of 2026-09-02, §11 W5
+item 3); and the date/event layer,
 which is refused earlier, at **parse** — `covid_test`, `life_act`, `net30`, `oasa`, and `r34`'s
 three shapes, which is why the classify row above is 10/15 and not 15/15. Abduction is not lifted
 at all: `rps`'s `hypothetical` test declares `#abducible`s and is dropped by name.
@@ -1185,7 +1191,8 @@ clean-law yielding `['sec_1_section']` against workspaces
 mechanism is the character, not the module shape.
 
 Reachability is not theoretical — this corpus encodes UK and Jersey statute by pasting its prose,
-and ten `@export` lines across five seeds already carry U+2014. They survived only because
+and nine `@export` lines across five seeds already carry U+2014 (ten occurrences; one line carries
+two). They survived only because
 `squash` happened to map U+2014 and U+2013 and nothing else. So the fold is now a named table,
 `L4.Blawx.Lower.asciiFold`, covering the punctuation legislation actually contains — en/em dashes
 and the two Unicode hyphens, the curly single and double quotes (a right single quote is the
@@ -1404,7 +1411,9 @@ quirks, the indent leaks and the `'` escaping — not about the NLG string that 
 into them. A different NLG string moves no structure: it appears in the `*_nlg` fact, in the
 `prefix`/`infix`/`postfix` XML fields and inside the 21 templates, and the R12 fixpoint
 regenerates all of them from the same blocks. Measured after the W4 change: `rps.blawx` and
-`beard.blawx` each fixpoint **9/9** against `blawx-stock` (per W9); the four regenerated goldens changed
+`beard.blawx` each fixpointed **9/9** against `blawx-stock` (per W9) at that point — W3's section
+pinning later collapsed them to **8/8** and **7/7**, **15 checked, 0 failed** together, re-measured
+2026-09-02 on the integrated branch; the four regenerated goldens changed
 609 lines in place (173 `beard.blawx`, 154 `beard.pl`, 150 `rps.blawx`, 132 `rps.pl`; no line
 added or removed), and every one of them is a `#pred` template, a `*_nlg` fact or a
 `prefix`/`infix`/`postfix` XML field._
@@ -1758,13 +1767,20 @@ extension doing its job:
   necessary, and `blawx-lift/defeat-target` / `blawx-lift/defeat-fold-unsound` for the refusals.
 - **A free-variable query over an EMPTY universe warns rather than refuses**
   (`blawx-lift/unbound-query-empty-universe`). `beard_tax`'s single test is an interview seed —
-  the Blawx UI asks the user for the facts — so there is nothing for `filter … `all objects``to
-range over and`all objects`is not emitted at all. Refusing would cost the whole document for
-one unanswerable test; the test's provenance line is emitted and the`#EVAL` is not.
-- **Two soundness guards the multi-variable shapes made necessary.** Every object position lifts
-  to the single `GIVEN x`, so a second object variable is now refused
-  (`blawx-lift/multi-object-variable`) rather than silently identified with the first; and a
-  variable bound to a _value_ used in _object_ position is refused by its own name.
+  the Blawx UI asks the user for the facts — so there is nothing for `filter … all objects` to
+  range over, and `all objects` is not emitted at all. Refusing would cost the whole document for
+  one unanswerable test; the test's provenance line is emitted and the `#EVAL` is not.
+- **Soundness guards the multi-variable shapes made necessary** (revised at the integration of
+  2026-09-02). Each object variable lifts to its own binder — the W5b merge removed the earlier
+  `blawx-lift/multi-object-variable` refusal, which guarded a collapse that can no longer happen
+  (§11 W5 integration note, item 2) — and a variable bound to a _value_ used in _object_ position is
+  refused by its own name. The applicability layer has the same paragraph-fold hole as the defeat
+  layer above and is closed the same way, by name: a rule attributed to a paragraph that is
+  `subject to applicability` is refused with `blawx-lift/applies-target` (the paragraph has no
+  applicability rule of its own) or `blawx-lift/applies-fold-unsound` (it has one that is not the
+  parent's), because Blawx's generator asks `blawx_applies(<the rule's own section>, X)` while a fold
+  would ask the parent's — two gates that cannot be reconciled without inventing a body (§11 W5
+  item 3; fixture `jl4/tests-cli/fixtures/blawx-import/paragraph-applies.blawx`).
 
 Measured on this tree, 2026-09-02, all commands run from the worktree:
 
@@ -2091,9 +2107,11 @@ unchanged since #279), against the checkout at `/Volumes/transcend/src/blawx` an
 harnesses. Items are numbered **W1–W9** so later notes can cite them. Each says what was
 measured, what it implies, and which section it amends; the section it amends is **not**
 rewritten here — a W-item is discharged by editing that section and marking the item done, which
-is what the dated DISCHARGED / PARTIAL / BLOCKED notes appended to an item mean. **Landed so
-far: the `beard_tax` half of W5 (see its PARTIAL and REVISED notes, and §8.14's EXECUTED and
-REVISED blocks).** Everything else is as it was written._
+is what the dated DISCHARGED / PARTIAL / BLOCKED notes appended to an item mean. **State after the
+integration of 2026-09-02 (`mengwong/blawx-integrated`): W1, W2, W3(a), W4, W5 (both halves) and
+W9 are discharged and W8's tier-2 numbers are taken; W2-followup, W3(b), W6 and W7 remain open.**
+Each item's own dated note is the record; the status header at the top of the file summarises
+them._
 
 **The target froze while the product moved.** `Lexpedite/blawx` on GitHub has had no commit
 since 2024-11-01 (v1.6.22-alpha), which is what every byte-exactness claim in R10/R12 is about.
@@ -2283,13 +2301,11 @@ seed carries a string literal — the probe lives in the unit test, because a st
 legal text around it is not a seed.
 
 **Two edits this item deliberately did not make**, both in the file's top status paragraph, which
-is one paragraph every §11 item would otherwise rewrite. (a) That paragraph still lists "an
-ontology gap (W2)" among what remains open, in the same tree that marks W2 discharged. (b) Its
-corpus count reads "nineteen `.l4` files … six `not-ok/` refusal fixtures"; `string-param.l4`
-makes it **twenty (twelve seeds, seven `not-ok/`, one `imported/`)**, re-counted 2026-09-02 with
-`ls jl4/examples/blawx/*.l4 jl4/examples/blawx/not-ok/*.l4 jl4/examples/blawx/imported/*.l4`. The
-sentence already tells the reader to re-derive with `ls`, so it is stale-but-self-flagging rather
-than merely false. Both are one-clause fixes for whoever re-cuts that paragraph once §11 drains.
+is one paragraph every §11 item would otherwise rewrite: at the time, that paragraph still listed
+"an ontology gap (W2)" among what remains open, and its corpus count read "nineteen `.l4` files …
+six `not-ok/` refusal fixtures" where `string-param.l4` had made it twenty. Both were corrected when
+the header was re-cut at the integration of 2026-09-02, which re-derives the counts with `ls`
+(twenty-six at that point: twelve seeds, eleven `not-ok/`, three `imported/`).
 
 ### W2-followup — a string literal renders as an object selector nothing declares
 
@@ -2445,7 +2461,8 @@ own field doc claimed were there. Measured this session, each number from a comm
   template, a `*_nlg` fact or a `prefix`/`infix`/`postfix` XML field. The reversal on top of it
   changed **no golden byte at all**.
 - Harnesses, after both changes: fixpoint **18 checked, 0 failed** over `rps.blawx` and
-  `beard.blawx` together, **9 checked, 0 failed** on `rps.blawx` alone
+  `beard.blawx` together at the time, **9 checked, 0 failed** on `rps.blawx` alone (after W3's
+  section pinning merged: **15 checked, 0 failed** together, 8 and 7, re-measured 2026-09-02)
   (`BLAWX_CHECKOUT=/Volumes/transcend/src/blawx-stock`, per W9);
   tier-1 **8/8** over both seeds' `#EVAL` oracles; `l4 blawx --roundtrip` "IR and bytes
   unchanged" on both.
@@ -2463,7 +2480,12 @@ loyalty bonus earned by m` becomes `… by %m%`) and _not_ re-run for the revers
 middle-end carries none — so a category sentence other than `"is a ⟨pretty⟩"` is unreachable;
 nothing in either running example needs one. (b) `BOrderVO` is still never constructed: a
 sentence whose value slot precedes its subject is refused rather than emitted as `vo`, which is
-what Jason's `player` attribute uses. Both are one-field additions when a corpus asks.
+what Jason's `player` attribute uses. (c) A backtick-quoted parameter name with punctuation
+cannot be referenced from `@nlg`: `linearNlg` wraps it in `%…%` unconditionally, the slot grammar
+(§4.9) does not admit it, and the annotation is refused with the slot-structure diagnostic —
+measured 2026-09-02 on `` `the person (individual)` ``, `` `person, natural` `` and
+`` `person: natural` ``. (a) and (b) are one-field additions when a corpus asks; (c) needs the slot
+grammar and `linearNlg` to agree on quoted names.
 
 ### W5 — the import fragment against Blawx's own running examples: 0 of 2
 
@@ -2542,7 +2564,7 @@ A second review finding, latent and fixed in the same change: a value-typed attr
 **default negation** lifted through the positive image, which is only the definedness conjunct
 (the binding having been discharged by substitution). So `attr1(X,V), not attr2(X,V)` read as
 _"attr2 is undefined"_ rather than _"attr2's value differs"_. Under `not` the goal binds nothing,
-so it now lifts to `NOT (attr2 x AND `the attr2 of`x EQUALS`the attr1 of` x)`; an anonymous
+so it now lifts to ``NOT (attr2 x AND `the attr2 of` x EQUALS `the attr1 of` x)``; an anonymous
 value slot still reads as absence, and a value variable that only a negated goal mentions is
 refused (`blawx-lift/unbound-value`), because `valueBindings` scans positive goals only. No
 shipped fixture exhibits it — the evidence is `BlawxLiftSpec`, not a corpus file.
