@@ -243,6 +243,86 @@ jobs:
       - name: Every subject's declared legs are exercised by CI
         run: node etc/check-subject-ci-coverage.mjs
 
+  # ============================================
+  # Repo-wide invariants: unfiltered, no build
+  # ============================================
+  #
+  # THE RULE THIS JOB EXISTS TO ENFORCE: **a paths filter may gate a build; it
+  # must never gate a whole-repo invariant.** A check whose input is a subtree
+  # (the Haskell build, the WASM build, the DMN engines) is correctly filtered
+  # on that subtree. A check that reads the ENTIRE tree — `prettier --check .`,
+  # and link validation, whose targets can be any file in the repo — cannot be
+  # correctly gated on anything, because the file that breaks it is by
+  # definition one the filter did not list.
+  #
+  # Four instances of that mistake are documented in the filters above, each
+  # added after a PR that ran too little:
+  #
+  #   1. `**/*.mjs` + `etc/**` — "a PR touching only them ran ZERO jobs ...
+  #      an unformatted file would merge here and break the next PR that
+  #      happened to touch a .ts file." Written before it recurred twice more.
+  #   2. `specs/**`             — a spec-only PR "never runs test-docs.sh or
+  #      prettier, so a broken link or unformatted file merges silently".
+  #   3. `.claude/**`           — a skill-only PR "ran ZERO jobs".
+  #   4. `paper/**`             — #316, after two files merged via #306 left
+  #      `unstable` prettier-dirty and every open PR failed on files it had
+  #      never touched.
+  #
+  # One instance per new top-level directory, and the list can only grow: the
+  # filters are a denylist maintained by hand against a tree that gains
+  # directories. Widening them again is not the fix.
+  #
+  # Why the mistake is invisible rather than loud: a job skipped by `if:` still
+  # reports a check run, with conclusion `skipped`, and a ruleset accepts a
+  # skipped required check as satisfied. Measured, not assumed — PR #306 merged
+  # with FIVE of the six required checks reporting SKIPPED (TypeScript, Haskell,
+  # WASM, BPMN, DMN); only Nix actually ran. The filters therefore decide not
+  # just what runs but what the ruleset is able to see.
+  #
+  # So, in the words this file already uses for `corpus-goldens` above: "No
+  # filter, no build, no `needs`: it runs on every event precisely because the
+  # thing it checks is which events run what."
+  #
+  # Cost: an `npm ci`, no turbo build. The install is not avoidable — prettier
+  # resolves config per file, and `ts-apps/housing-wizard/package.json` names
+  # `@repo/prettier-config`, so a bare `npx prettier --check .` dies with
+  # "Cannot find package '@repo/prettier-config'" before it checks anything.
+  # Scoping prettier to a subtree to dodge the install would reintroduce
+  # exactly the gap this job closes.
+  repo-wide:
+    name: Repo-Wide Invariants
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # Conditional cache inputs: see the long note in the TypeScript job for
+      # why BOTH have to be turned off on merge_group.
+      - uses: actions/setup-node@v5
+        with:
+          cache-dependency-path: package-lock.json
+          node-version: "24.x"
+          cache: ${{ github.event_name != 'merge_group' && 'npm' || '' }}
+          package-manager-cache: ${{ github.event_name != 'merge_group' }}
+
+      - run: npm ci
+
+      - name: Every file prettier owns is formatted
+        run: npm run format:check
+
+      # Parts 1 and 3 only (links, anchors, orphans). These read link TARGETS
+      # across the whole repo, so a file moved or deleted anywhere can break a
+      # doc link without touching doc/ — which is what makes them a whole-tree
+      # invariant rather than a doc/** one.
+      #
+      # PART 2 (validating each .l4 under doc/ with the l4 CLI) is deliberately
+      # NOT here: its input really is doc/**, and it needs the built binary, so
+      # it stays in the Haskell job where both conditions hold. `--no-l4` makes
+      # that split explicit — without the flag the script now FAILS when the CLI
+      # is absent instead of warning and printing "0 valid", so this job can
+      # never silently become a run that checked nothing.
+      - name: Doc links, anchors and orphans (whole-tree; no l4 build)
+        run: ./doc/test-docs.sh --no-l4
+
   # NO `--allow-skip` HERE, deliberately. The script exits 3 for SKIPPED and 4
   # for BROKEN, and `--allow-skip` turns 3 into 0. On a developer's laptop an
   # absent JDK is a fine reason to skip; in CI it means *this setup* regressed,
