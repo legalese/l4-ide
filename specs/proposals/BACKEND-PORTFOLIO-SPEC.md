@@ -63,14 +63,14 @@ that already has users, semantics, and tooling. Three consequences organise this
 
 ### 1.1 The six families (P2)
 
-| family            | question it answers      | targets                                                                     |
-| ----------------- | ------------------------ | --------------------------------------------------------------------------- |
-| **execution**     | run the law              | OpenFisca, Catala, MLIR/WASM                                                |
-| **interchange**   | hand the law to a system | DMN, BPMN, JSON schema                                                      |
-| **interaction**   | ask the citizen          | DocAssemble, Blawx (front half), web wizards                                |
-| **reasoning**     | query and explain        | swipl, ASP/clingo (s(CASP) dialect), PROLEG, Logical English                |
-| **verification**  | prove or refute the law  | Z3, Alloy, TLA+, NuSMV/nuXmv, UPPAAL, TAPAAL, SPIN, Maude; future Lean, F\* |
-| **documentation** | show the law             | Markdown, NLG/TNR round-trip, ladder diagrams, literate weave, state-graph  |
+| family            | question it answers      | targets                                                                                 |
+| ----------------- | ------------------------ | --------------------------------------------------------------------------------------- |
+| **execution**     | run the law              | OpenFisca, Catala, MLIR/WASM                                                            |
+| **interchange**   | hand the law to a system | DMN, BPMN, JSON schema                                                                  |
+| **interaction**   | ask the citizen          | DocAssemble, Blawx (front half), web wizards                                            |
+| **reasoning**     | query and explain        | swipl, ASP/clingo (s(CASP) dialect), PROLEG, Logical English, ErgoAI (added 2026-09-02) |
+| **verification**  | prove or refute the law  | Z3, Alloy, TLA+, NuSMV/nuXmv, UPPAAL, TAPAAL, SPIN, Maude; future Lean, F\*             |
+| **documentation** | show the law             | Markdown, NLG/TNR round-trip, ladder diagrams, literate weave, state-graph              |
 
 Blawx deliberately straddles interaction and reasoning: its reasoner is s(CASP) (the reasoning
 family's dialect) while its value proposition is the ontology/scenario/NLG front end
@@ -144,9 +144,9 @@ explicit/unknown/unasked input-state trichotomy (`specs/todo/RUNTIME-INPUT-STATE
 
 ### 2.4 Reasoning
 
-| target                                               | state                                                                                                                                                                                                                                                                                                                                                     | owning artifact                                      |
-| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| swipl, ASP/clingo (s(CASP)), PROLEG, Logical English | **s(CASP) SHIPPED (via Blawx); the other three PROPOSED** — #258's shared middle-end `L4.Relational` landed 2026-08-18 (#272), and its first consumer, the Blawx s(CASP) emitter, over 2026-08-19 (`l4 blawx --scasp` dumps the raw program). No swipl, PROLEG or Logical English emitter exists (verified against `origin/unstable`, 2026-08-28) **[E]** | `specs/proposals/LOGIC-PROGRAMMING-BACKENDS-SPEC.md` |
+| target                                                       | state                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | owning artifact                                      |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------- |
+| swipl, ASP/clingo (s(CASP)), PROLEG, Logical English, ErgoAI | **s(CASP) SHIPPED (via Blawx); the other four PROPOSED** (ErgoAI added 2026-09-02 as #258's R5, §1.5/§5.5a: defeasible `\\overrides` by construction, a fourth SUBJECT-TO datapoint) — #258's shared middle-end `L4.Relational` landed 2026-08-18 (#272), and its first consumer, the Blawx s(CASP) emitter, over 2026-08-19 (`l4 blawx --scasp` dumps the raw program). No swipl, PROLEG or Logical English emitter exists (verified against `origin/unstable`, 2026-08-28) **[E]** | `specs/proposals/LOGIC-PROGRAMMING-BACKENDS-SPEC.md` |
 
 PR #258's load-bearing claim: these are not four transpilers but one missing relational lowering
 (ANF + output argument + modes) that, when #258 was written, no code implemented; natural4's
