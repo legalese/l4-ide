@@ -1,0 +1,37 @@
+# Ruling P5-3: a disabled block is skipped, matching the editor and matching
+# Blockly's own Generator.blockToCode, with a warning naming each one. The
+# surviving fact must still classify, so the document imports minus the
+# disabled pair.
+- model: blawx.ruledoc
+  pk: 1
+  fields:
+    ruledoc_name: Disabled
+    rule_text: "Disabled\n\n1. Definition of is human."
+    scasp_encoding: ''
+    tutorial: ''
+    owner: 1
+    published: true
+- model: blawx.workspace
+  pk: 1
+  fields:
+    ruledoc: 1
+    workspace_name: root_section
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="unattributed_fact" id="f000000001" x="40" y="40"><statement name="statements"><block type="new_category_declaration" id="f000000002"><field name="category_name">person</field><field name="prefix"></field><field name="first_element">object</field><field name="postfix">is a person</field></block></statement></block>
+      </xml>
+    scasp_encoding: ''
+- model: blawx.blawxtest
+  pk: 1
+  fields:
+    ruledoc: 1
+    test_name: q1
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="query" id="f000000003" disabled="true" x="0" y="122"><statement name="query"><block type="unary_attribute_selector" id="f000000004"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="is_human" attributetype="boolean"></mutation><field name="prefix"></field><field name="postfix">is human</field><value name="first_element"><block type="object_selector" id="f000000005"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="p1"></mutation><field name="object_name">p1</field></block></value></block></statement></block>
+      <block type="unattributed_fact" id="f000000006" x="40" y="300"><statement name="statements"><block type="object_category" id="f000000007"><value name="object"><block type="object_selector" id="f000000008"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="p1"></mutation><field name="object_name">p1</field></block></value><value name="category"><block type="category_selector" id="f000000009"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="person"></mutation><field name="category_name">person</field></block></value></block></statement></block>
+      </xml>
+    scasp_encoding: ''
+    tutorial: ''
+    view: ''
+    fact_scenario: ''

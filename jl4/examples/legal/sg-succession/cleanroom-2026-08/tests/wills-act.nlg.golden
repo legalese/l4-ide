@@ -1,0 +1,345 @@
+not `falls strictly after` with `JUST` with `YMD` with 1992, 6 and 26 and `YMD` with 1992, 6 and 26
+`falls strictly after` with `JUST` with `YMD` with 1992, 6 and 27 and `YMD` with 1992, 6 and 26
+not `falls strictly after` with `JUST` with `YMD` with 1992, 6 and 25 and `YMD` with 1992, 6 and 26
+not `falls strictly after` with `NOTHING` and `YMD` with 1992, 6 and 26
+not `falls on or after` with `JUST` with `YMD` with 1938, 8 and 28 and `YMD` with 1938, 8 and 29
+`falls on or after` with `JUST` with `YMD` with 1938, 8 and 29 and `YMD` with 1938, 8 and 29
+not `falls on or after` with `NOTHING` and `YMD` with 1938, 8 and 29
+not `was living on` with `the WA Ismail` and `YMD` with 2018, 2 and 20
+`was living on` with `the WA Ismail` and `YMD` with 2018, 2 and 19
+`was living on` with `the WA Jaya` and `YMD` with 2020, 1 and 5
+not `was living on` with `the WA Nirmala` and `YMD` with 2020, 1 and 5
+`is proved to fall strictly before` with `JUST` with `YMD` with 2015, 3 and 1 and `JUST` with `YMD` with 2018, 6 and 6
+not `is proved to fall strictly before` with `JUST` with `YMD` with 2018, 6 and 6 and `JUST` with `YMD` with 2015, 3 and 1
+not `is proved to fall strictly before` with `JUST` with `YMD` with 2015, 3 and 1 and `JUST` with `YMD` with 2015, 3 and 1
+not `is proved to fall strictly before` with `NOTHING` and `JUST` with `YMD` with 2018, 6 and 6
+not `is proved to fall strictly before` with `JUST` with `YMD` with 2015, 3 and 1 and `NOTHING`
+`the twenty-first anniversary of` with `YMD` with 2000, 6 and 1 is equal to `YMD` with 2021, 6 and 1
+`the twenty-first anniversary of` with `YMD` with 2000, 2 and 29 is equal to `YMD` with 2021, 3 and 1
+`six months after` with `YMD` with 2020, 3 and 1 is equal to `YMD` with 2020, 9 and 1
+`six months after` with `YMD` with 2020, 8 and 31 is equal to `YMD` with 2021, 2 and 28
+`six months after` with `YMD` with 2023, 8 and 31 is equal to `YMD` with 2024, 2 and 29
+`six months after` with `YMD` with 2020, 9 and 1 is equal to `YMD` with 2021, 3 and 1
+`the earliest of` with list of `YMD` with 2020, 3 and 1 and `YMD` with 2020, 2 and 1 is equal to `JUST` with `YMD` with 2020, 2 and 1
+`the earliest of` with list of `YMD` with 2020, 2 and 1 is equal to `JUST` with `YMD` with 2020, 2 and 1
+`the earliest of` with `EMPTY` is equal to `NOTHING`
+`the age of the testator when the will was made` with `the will of Amrita` is equal to `21 years of age or over`
+`the age of the testator when the will was made` with `the will of Eugene, made at 19` is equal to `under 21 years of age`
+`the age of the testator when the will was made` with `the will of Amrita, the date of execution not being in evidence` is equal to `not in evidence, the date of birth of the testator or the date of execution of the will not being known`
+`the age of the testator when the will was made` with `the will of Eugene, made on the day before his twenty-first birthday` is equal to `under 21 years of age`
+`the age of the testator when the will was made` with `the will of Eugene, made on his twenty-first birthday` is equal to `21 years of age or over`
+`s 4 — will of infant invalid` with `the will of Eugene, made at 19`
+not `s 4 — will of infant invalid` with `the will of Amrita`
+not `s 4 — will of infant invalid` with `the will of Amrita, the date of execution not being in evidence`
+not `s 4 — the testator is proved to have been 21 years of age or over` with `the will of Amrita, the date of execution not being in evidence`
+`s 4 — the testator is proved to have been 21 years of age or over` with `the will of Amrita`
+`s 4 — the testator is proved to have been 21 years of age or over` with `the will of Eugene, made on his twenty-first birthday`
+not `s 6(2) — the manner of execution` with `the facts about the will of Amrita, executed abroad`
+`s 5(9) — this section applies to the will of this testator` with `the case of a will executed abroad, the testator dying in 2020`
+`s 5(2) — the will is to be treated as properly executed` with `the case of a will executed abroad, the testator dying in 2020`
+not `s 5(3)(a) — a will executed on board a vessel or an aircraft is treated as properly executed` with `the case of a will executed abroad, the testator dying in 2020`
+not `s 5(3)(b)-(d) — the will is treated as properly executed so far only as regards a part of it` with `the case of a will executed abroad, the testator dying in 2020`
+`s 5 — the extent to which the will is treated as properly executed` with `the case of a will executed abroad, the testator dying in 2020` is equal to `treated as properly executed`
+`s 5 — the will is treated as properly executed` with `the case of a will executed abroad, the testator dying in 2020`
+`the will is properly executed` with `the case of a will executed abroad, the testator dying in 2020`
+not `s 5(9) — this section applies to the will of this testator` with `the case of a will executed abroad, the testator dying in 1990`
+`s 5(2) — the will is to be treated as properly executed` with `the case of a will executed abroad, the testator dying in 1990`
+`s 5 — the extent to which the will is treated as properly executed` with `the case of a will executed abroad, the testator dying in 1990` is equal to `not treated as properly executed under section 5`
+not `s 5 — the will is treated as properly executed` with `the case of a will executed abroad, the testator dying in 1990`
+not `the will is properly executed` with `the case of a will executed abroad, the testator dying in 1990`
+not `s 5(2) — the will is to be treated as properly executed` with `the case of a will conforming only to the law of the place where its immovable property is situated`
+not `s 5(3)(a) — a will executed on board a vessel or an aircraft is treated as properly executed` with `the case of a will conforming only to the law of the place where its immovable property is situated`
+`s 5(3)(b)-(d) — the will is treated as properly executed so far only as regards a part of it` with `the case of a will conforming only to the law of the place where its immovable property is situated`
+`s 5 — the extent to which the will is treated as properly executed` with `the case of a will conforming only to the law of the place where its immovable property is situated` is equal to `treated as properly executed so far only as the will disposes of immovable property, revokes a will or a provision, or exercises a power of appointment`
+not `s 5 — the will is treated as properly executed` with `the case of a will conforming only to the law of the place where its immovable property is situated`
+not `the will is properly executed` with `the case of a will conforming only to the law of the place where its immovable property is situated`
+not `s 5(9) — this section applies to the will of this testator` with `the case of a will executed abroad, the date of the death of the testator not being in evidence`
+`s 5 — some connecting factor is made out, leaving aside the commencement in subsection (9)` with `the case of a will executed abroad, the date of the death of the testator not being in evidence`
+not `s 5 — some connecting factor is made out, leaving aside the commencement in subsection (9)` with `the plain case of Amrita`
+not `s 5(9) — this section applies to the will of this testator` with `the case of a testator who died on 26 June 1992`
+`s 5(9) — this section applies to the will of this testator` with `the case of a testator who died on 27 June 1992`
+not `s 5(9) — this section applies to the will of this testator` with `the case of a testator who died on 30 May 1992`
+not `s 5(4) — the will is treated as improperly executed by reason only that its execution was not in accordance with formal requirements contained in the instrument creating the power`
+`s 5(2) — the will is to be treated as properly executed` with `the case of a will conforming only to the law of the testator’s domicile when it was executed`
+`s 5(2) — the will is to be treated as properly executed` with `the case of a will conforming only to the law of the testator’s domicile at his death`
+`s 5(2) — the will is to be treated as properly executed` with `the case of a will conforming only to the law of the place of the testator’s habitual residence`
+`s 5(2) — the will is to be treated as properly executed` with `the case of a will conforming only to the law of the state of the testator’s nationality`
+`s 5 — the extent to which the will is treated as properly executed` with `the case of a will conforming only to the law of the testator’s domicile when it was executed` is equal to `treated as properly executed`
+`s 5 — the extent to which the will is treated as properly executed` with `the case of a will conforming only to the law of the state of the testator’s nationality` is equal to `treated as properly executed`
+not `s 5(2) — the will is to be treated as properly executed` with `the case of a will executed on board a vessel`
+`s 5(3)(a) — a will executed on board a vessel or an aircraft is treated as properly executed` with `the case of a will executed on board a vessel`
+not `s 5(3)(b)-(d) — the will is treated as properly executed so far only as regards a part of it` with `the case of a will executed on board a vessel`
+`s 5 — the extent to which the will is treated as properly executed` with `the case of a will executed on board a vessel` is equal to `treated as properly executed`
+`the formal validity of the will` with `the case of a will executed on board a vessel` is equal to `valid`
+`s 5(3)(b)-(d) — the will is treated as properly executed so far only as regards a part of it` with `the case of a will conforming only to the law by reference to which the will it revokes was properly executed`
+`s 5(3)(b)-(d) — the will is treated as properly executed so far only as regards a part of it` with `the case of a will conforming only to the law governing the essential validity of the power`
+`s 5 — the extent to which the will is treated as properly executed` with `the case of a will conforming only to the law by reference to which the will it revokes was properly executed` is equal to `treated as properly executed so far only as the will disposes of immovable property, revokes a will or a provision, or exercises a power of appointment`
+`s 5 — the extent to which the will is treated as properly executed` with `the case of a will conforming only to the law governing the essential validity of the power` is equal to `treated as properly executed so far only as the will disposes of immovable property, revokes a will or a provision, or exercises a power of appointment`
+`s 5 — the will is treated as properly executed so far as it exercises a power of appointment` with `the case of a will executed abroad, the testator dying in 2020`
+`s 5 — the will is treated as properly executed so far as it exercises a power of appointment` with `the case of a will executed on board a vessel`
+`s 5 — the will is treated as properly executed so far as it exercises a power of appointment` with `the case of a will conforming only to the law governing the essential validity of the power`
+not `s 5 — the will is treated as properly executed so far as it exercises a power of appointment` with `the case of a will conforming only to the law of the place where its immovable property is situated`
+not `s 5 — the will is treated as properly executed so far as it exercises a power of appointment` with `the case of a will executed abroad, the testator dying in 1990`
+`s 6(2) — the manner of execution` with `the facts about the will of Amrita`
+`s 6(1) — the will is in writing and executed in the manner mentioned in subsection (2)` with `the facts about the will of Amrita`
+`executed in the manner required by this Act` with `the facts about the will of Amrita`
+not `s 6(1) — the will is in writing and executed in the manner mentioned in subsection (2)` with `the facts about the will of Amrita, not in writing`
+not `at least 2 of the attesting witnesses subscribed the will in the presence of the testator` with `the will of Amrita, only one witness having subscribed in her presence`
+`at least 2 of the attesting witnesses subscribed the will in the presence of the testator` with `the will of Amrita`
+`at least 2 of the attesting witnesses subscribed the will in the presence of the testator` with `the will of Amrita, a legacy to one of her three witnesses`
+not `s 6(2) — the manner of execution` with `the facts about the will of Amrita, only one witness having subscribed in her presence`
+`at least 2 of the attesting witnesses subscribed the will in the presence of the testator` with `the will of Amrita, the signature never acknowledged before the witnesses`
+`s 6(3) — the will is deemed valid as far as regards the position of the signature` with `the facts about the will of Amrita, the signature never acknowledged before the witnesses`
+not `s 6(2) — the manner of execution` with `the facts about the will of Amrita, the signature never acknowledged before the witnesses`
+not `s 6(1) — the will is in writing and executed in the manner mentioned in subsection (2)` with `the facts about the will of Amrita, the signature never acknowledged before the witnesses`
+`the formal validity of the will` with `the case of a will whose signature was never acknowledged before the witnesses` is equal to `not valid, the will not being in writing or not executed in the manner mentioned in section 6(2), and not being treated as properly executed under section 5`
+`s 6(3) — the will is deemed valid as far as regards the position of the signature` with `the facts about the will of Amrita`
+`s 6(3) — the will is deemed valid as far as regards the position of the signature` with `the facts about the will of Amrita, signed beside the end`
+not `s 6(3) — the will is deemed valid as far as regards the position of the signature` with `the facts about the will of Amrita, signed at the head`
+`s 6(2) — the manner of execution` with `the facts about the will of Amrita, signed beside the end`
+`s 6(1) — the will is in writing and executed in the manner mentioned in subsection (2)` with `the facts about the will of Amrita, signed beside the end`
+not `s 6(2) — the manner of execution` with `the facts about the will of Amrita, signed at the head`
+not `s 6(1) — the will is in writing and executed in the manner mentioned in subsection (2)` with `the facts about the will of Amrita, signed at the head`
+not `s 6(3) — the will is deemed valid as far as regards the position of the signature` with `the facts about the will of Amrita, signed beside the end, the intention not apparent`
+not `s 6(2) — the manner of execution` with `the facts about the will of Amrita, signed beside the end, the intention not apparent`
+not `s 6(1) — the will is in writing and executed in the manner mentioned in subsection (2)` with `the facts about the will of Amrita, signed beside the end, the intention not apparent`
+not `s 6(3) — the will is deemed valid as far as regards the position of the signature` with `the facts about the will of Amrita, the position stated but nobody having signed`
+not `s 6(2) — the manner of execution` with `the facts about the will of Amrita, the position stated but nobody having signed`
+not `s 6(1) — the will is in writing and executed in the manner mentioned in subsection (2)` with `the facts about the will of Amrita, the position stated but nobody having signed`
+`s 6(2) — the manner of execution` with `the facts about the will of Amrita, signed for her by another`
+`s 6(1) — the will is in writing and executed in the manner mentioned in subsection (2)` with `the facts about the will of Amrita, signed for her by another`
+`the formal validity of the will` with `the case of a will signed at the foot for the testator by another at her direction` is equal to `valid`
+not `s 6(3) — the will is deemed valid as far as regards the position of the signature` with `the facts about the will of Amrita, signed for her by another, the intention not apparent`
+`s 6(2) — the manner of execution` with `the facts about the will of Amrita, signed for her by another, the intention not apparent`
+`s 6(1) — the will is in writing and executed in the manner mentioned in subsection (2)` with `the facts about the will of Amrita, signed for her by another, the intention not apparent`
+`the will is duly executed without the attestation of any such person` with `the case of a will signed for the testator by another, the intention not apparent`
+`one or more of the circumstances mentioned in paragraphs (a) to (e) is present` with `the signature among the words of the attestation clause, after a blank space`
+`one or more of the circumstances mentioned in paragraphs (a) to (e) is present` with `the signature beside the end of the will`
+`one or more of the circumstances mentioned in paragraphs (a) to (e) is present` with `the signature at the head of the will, above all the dispositive words`
+not `one or more of the circumstances mentioned in paragraphs (a) to (e) is present` with `the signature in an unremarkable position`
+not `s 6(3)(a)-(e) — the will is affected by any of the enumerated circumstances` with `the signature among the words of the attestation clause, after a blank space`
+not `s 6(3)(a)-(e) — the will is affected by any of the enumerated circumstances` with `the signature in an unremarkable position`
+`s 6(4) — the signature is operative to give effect to the disposition` with `the devise to Ismail` with above the signature
+not `s 6(4) — the signature is operative to give effect to the disposition` with `the devise to Ismail` with below the signature
+not `s 6(4) — the signature is operative to give effect to the disposition` with `the devise to Ismail` with inserted after the signature was made
+`s 7(1) — the appointment made by the will in exercise of a power is invalid for want of execution in the manner required by this Act` with `the case of an appointing will not in writing`
+not `s 7(1) — the appointment made by the will in exercise of a power is invalid for want of execution in the manner required by this Act` with `the case of an appointing will, Amrita marrying Gita in 2018`
+not `s 7(1) — the appointment made by the will in exercise of a power is invalid for want of execution in the manner required by this Act` with `the plain case of Amrita`
+not `s 6(1) — the will is in writing and executed in the manner mentioned in subsection (2)` with `the case of a will not in writing` 's `the will in question`
+not `s 7(1) — the appointment made by the will in exercise of a power is invalid for want of execution in the manner required by this Act` with `the case of a will not in writing`
+not `s 7(1) — the appointment made by the will in exercise of a power is invalid for want of execution in the manner required by this Act` with `the case of an appointing will conforming only to the law governing the essential validity of the power`
+`s 7(1) — the appointment made by the will in exercise of a power is invalid for want of execution in the manner required by this Act` with `the case of an appointing will conforming only to the lex situs of its immovable property`
+`s 5 — the extent to which the will is treated as properly executed` with `the case of an appointing will conforming only to the law governing the essential validity of the power` is equal to `treated as properly executed so far only as the will disposes of immovable property, revokes a will or a provision, or exercises a power of appointment`
+not `s 6(1) — the will is in writing and executed in the manner mentioned in subsection (2)` with `the case of an appointing will conforming only to the law governing the essential validity of the power` 's `the will in question`
+`s 7(2) — the will is, so far as respects the execution and attestation thereof, a valid execution of a power of appointment by will` with `the facts about the will of Amrita`
+not `s 7(2) — the will is, so far as respects the execution and attestation thereof, a valid execution of a power of appointment by will` with `the facts about the will of Amrita, not in writing`
+`s 8 — the will is valid without any other publication thereof` with `the facts about the will of Amrita`
+not `s 8 — the will is valid without any other publication thereof` with `the facts about the will of Amrita, not in writing`
+not `the attesting witness is to be admitted as a witness to prove the execution of the will` with `the will of Amrita, one witness being incompetent` and `Bala attesting, incompetent for a reason outside sections 10(2), 11 and 12`
+`the attesting witness is to be admitted as a witness to prove the execution of the will` with `the will of Amrita, one witness being incompetent` and `Chandra attesting`
+`a person who attests the execution of the will is incompetent to be admitted a witness to prove the execution thereof` with `the will of Amrita, one witness being incompetent`
+not `a person who attests the execution of the will is incompetent to be admitted a witness to prove the execution thereof` with `the will of Amrita`
+not `s 9 — the will is invalid by reason that a person who attests its execution is incompetent to be admitted a witness` with `the will of Amrita, one witness being incompetent`
+not `s 9 — the will is invalid by reason that a person who attests its execution is incompetent to be admitted a witness` with `the will of Amrita`
+not `s 10(2) — the gift is a ground on which the attesting witness is not to be admitted a witness` with `Devi attesting and taking a legacy`
+not `s 10(2) — the gift is a ground on which the attesting witness is not to be admitted a witness` with `Bala attesting`
+`Bala attesting as a creditor whose debt is charged` 's `a creditor, or the wife or husband of a creditor, whose debt is charged on the estate by the will`
+not `Bala attesting` 's `a creditor, or the wife or husband of a creditor, whose debt is charged on the estate by the will`
+not `s 11 — the charge is a ground on which the creditor is not to be admitted a witness` with `Bala attesting as a creditor whose debt is charged`
+not `s 11 — the charge is a ground on which the creditor is not to be admitted a witness` with `Bala attesting`
+not `the attesting witness is an executor appointed by the will` with `the will of Amrita` and `Bala attesting`
+not `s 12 — being an executor of the will is a ground on which the person is not to be admitted a witness` with `the will of Amrita` and `Bala attesting`
+`the attesting witness is an executor appointed by the will` with `the will of Amrita, Bala being both an executor and an attesting witness` and `Bala attesting`
+not `the attesting witness is an executor appointed by the will` with `the will of Amrita, Bala being both an executor and an attesting witness` and `Chandra attesting`
+not `s 12 — being an executor of the will is a ground on which the person is not to be admitted a witness` with `the will of Amrita, Bala being both an executor and an attesting witness` and `Bala attesting`
+`the attesting witness is to be admitted as a witness to prove the execution of the will` with `the will of Amrita, Bala being both an executor and an attesting witness` and `Bala attesting`
+`a person to whom or to whose spouse there is given or made any disposition as is described in subsection (1)` with `Devi attesting and taking a legacy`
+`a person to whom or to whose spouse there is given or made any disposition as is described in subsection (1)` with `Bala attesting, his wife taking a legacy`
+not `a person to whom or to whose spouse there is given or made any disposition as is described in subsection (1)` with `Bala attesting`
+not `the will is duly executed without the attestation of any such person` with `the case of a legacy to one of two witnesses`
+not `s 10(3) — the attestation of such a person is disregarded for the purposes of subsection (1)` with `the case of a legacy to one of two witnesses`
+`s 10(1) — the gift to the attesting witness or to the witness’s wife or husband is utterly null and void` with `the case of a legacy to one of two witnesses` and `Devi attesting and taking a legacy`
+not `s 10(1) — the gift to the attesting witness or to the witness’s wife or husband is utterly null and void` with `the case of a legacy to one of two witnesses` and `Bala attesting`
+`s 10(1) — the disposition is utterly null and void` with `the case of a legacy to one of two witnesses` and `a pecuniary legacy of $10,000 to Devi`
+not `the will is duly executed without the attestation of any such person` with `the case of a legacy to one of two witnesses, the presence limb being proved`
+not `s 10(3) — the attestation of such a person is disregarded for the purposes of subsection (1)` with `the case of a legacy to one of two witnesses, the presence limb being proved`
+`s 10(1) — the disposition is utterly null and void` with `the case of a legacy to one of two witnesses, the presence limb being proved` and `a pecuniary legacy of $10,000 to Devi`
+`at least 2 of the attesting witnesses subscribed the will in the presence of the testator` with `the will of Amrita, a legacy to one of her three witnesses, another subscribing out of her sight`
+not `the will is duly executed without the attestation of any such person` with `the case of a legacy to one of three witnesses, another subscribing out of her sight`
+not `s 10(3) — the attestation of such a person is disregarded for the purposes of subsection (1)` with `the case of a legacy to one of three witnesses, another subscribing out of her sight`
+`s 10(1) — the disposition is utterly null and void` with `the case of a legacy to one of three witnesses, another subscribing out of her sight` and `a pecuniary legacy of $10,000 to Devi`
+not `the will is duly executed without the attestation of any such person` with `the case of a legacy to one of three witnesses, the presence limb not being proved`
+not `s 10(3) — the attestation of such a person is disregarded for the purposes of subsection (1)` with `the case of a legacy to one of three witnesses, the presence limb not being proved`
+`the will is duly executed without the attestation of any such person` with `the case of a legacy to one of three witnesses`
+`s 10(4) — subsection (3) applies to the will of this testator` with `the case of a legacy to one of three witnesses`
+not `s 10(4) — subsection (3) applies to the will of this testator` with `the case of a testator who died on 29 May 1992`
+`s 10(4) — subsection (3) applies to the will of this testator` with `the case of a testator who died on 30 May 1992`
+`s 10(4) — subsection (3) applies to the will of this testator` with `the case of a testator who died on 26 June 1992`
+not `s 5(9) — this section applies to the will of this testator` with `the case of a testator who died on 29 May 1992`
+`s 10(3) — the attestation of such a person is disregarded for the purposes of subsection (1)` with `the case of a legacy to one of three witnesses`
+not `s 10(1) — the disposition is utterly null and void` with `the case of a legacy to one of three witnesses` and `a pecuniary legacy of $10,000 to Devi`
+not `s 10(4) — subsection (3) applies to the will of this testator` with `the case of a legacy to one of three witnesses, the testator dying in 1990`
+not `s 10(3) — the attestation of such a person is disregarded for the purposes of subsection (1)` with `the case of a legacy to one of three witnesses, the testator dying in 1990`
+`s 10(1) — the disposition is utterly null and void` with `the case of a legacy to one of three witnesses, the testator dying in 1990` and `a pecuniary legacy of $10,000 to Devi`
+not `s 10(1) — the disposition is utterly null and void` with `the case of a will charging the estate with a debt owed to a witness` and `a charge on the estate for a debt owed to Bala`
+`a person to whom or to whose spouse there is given or made any disposition as is described in subsection (1)` with `Bala attesting, taking a legacy and a charge for his debt`
+`s 10(1) — the gift to the attesting witness or to the witness’s wife or husband is utterly null and void` with `the case of a will giving its attesting creditor a legacy, a charge and a devise on trust` and `Bala attesting, taking a legacy and a charge for his debt`
+`s 10(1) — the disposition is utterly null and void` with `the case of a will giving its attesting creditor a legacy, a charge and a devise on trust` and `a pecuniary legacy of $10,000 to Bala`
+not `s 10(1) — the disposition is utterly null and void` with `the case of a will giving its attesting creditor a legacy, a charge and a devise on trust` and `a charge on the estate for a debt owed to Bala`
+not `s 10(1) — the disposition is utterly null and void` with `the case of a will giving its attesting creditor a legacy, a charge and a devise on trust` and `a devise to Bala upon trust, not beneficially`
+not `s 10(1) — the disposition is utterly null and void` with `the case of a legacy to one of two witnesses` and `a pecuniary legacy of $10,000 to Chandra`
+not `s 13 — the will has been revoked by marriage` with `the plain case of Amrita`
+`s 13 — the will has been revoked by marriage` with `the case of Amrita marrying Gita in 2018, after the will`
+not `s 13 — the will has been revoked by marriage` with `the case of Amrita marrying Gita in 2010, before the will`
+`the marriage was solemnised after the will was made` with `the will of Amrita` and `a marriage` with `the WA Gita`, `JUST` with `YMD` with 2018, 6 and 6 and `TRUE`
+not `the marriage was solemnised after the will was made` with `the will of Amrita` and `a marriage` with `the WA Gita`, `JUST` with `YMD` with 2010, 1 and 1 and `TRUE`
+`s 13(1) — the will is revoked by the marriage` with `the will of Amrita` and `a marriage` with `the WA Gita`, `JUST` with `YMD` with 2010, 1 and 1 and `TRUE`
+`s 13(1) — the exception for a will made in exercise of a power of appointment` with `the will of Amrita, made in exercise of a power of appointment`
+not `s 13(1) — the exception for a will made in exercise of a power of appointment` with `the will of Amrita`
+not `s 13 — the will has been revoked by marriage` with `the case of an appointing will, Amrita marrying Gita in 2018`
+not `s 13(1) — the exception for a will made in exercise of a power of appointment` with `the will of Amrita, made in exercise of a power, the appointed estate passing in default`
+`s 13 — the will has been revoked by marriage` with `the case of a will made under a power whose appointed estate passes in default, Amrita marrying Gita`
+not `s 13 — the will has been revoked by marriage` with `the case of a will in contemplation of the marriage to Gita, Amrita marrying Gita`
+`s 13 — the will has been revoked by marriage` with `the case of a will in contemplation of the marriage to Gita, Amrita marrying Harun`
+`s 13(2) — the will is expressed to be made in contemplation of this marriage` with `the will of Amrita, in contemplation of her marriage to Gita` and `a marriage` with `the WA Gita`, `JUST` with `YMD` with 2018, 6 and 6 and `TRUE`
+not `s 13(2) — the will is expressed to be made in contemplation of this marriage` with `the will of Amrita, naming Gita but not expressed to be made in contemplation of the marriage` and `a marriage` with `the WA Gita`, `JUST` with `YMD` with 2018, 6 and 6 and `TRUE`
+`s 13 — the will has been revoked by marriage` with `the case of a will naming Gita but not expressed to be made in contemplation, Amrita marrying Gita`
+not `s 13 — the will has been revoked by marriage` with `the case of the will of Rahim, made on 29 August 1938`
+`s 13 — the will has been revoked by marriage` with `the case of the will of Rahim, made on 28 August 1938`
+not `s 14 — the will is revoked by a presumption of an intention on the ground of an alteration in circumstances`
+not `s 15 — the will has been revoked` with `the plain case of Amrita`
+`s 15 — the will has been revoked` with `the case of Amrita marrying Gita in 2018, after the will`
+`s 15 — the will has been revoked` with `the case of a will revoked by a later will`
+`s 15 — the will has been revoked` with `the case of a will revoked by a writing declaring an intention to revoke it`
+`s 15 — the will has been revoked` with `the case of a will burnt by the testator with the intention of revoking it`
+`s 15 — the will has been revoked` with `the case of a will destroyed by another person at the testator’s direction, with the intention of revoking it`
+not `s 15 — the will has been revoked` with `the case of a will burnt by the testator without the intention of revoking it`
+not `s 15 — the will has been revoked` with `the case of a will burnt by a stranger, the testator intending revocation`
+`s 15(d) — the will has been destroyed with the intention of revoking it` with `revoked` with `FALSE`, `FALSE`, `TRUE`, `FALSE` and `TRUE`
+`s 15(d) — the will has been destroyed with the intention of revoking it` with `revoked` with `FALSE`, `FALSE`, `FALSE`, `TRUE` and `TRUE`
+not `s 15(d) — the will has been destroyed with the intention of revoking it` with `revoked` with `FALSE`, `FALSE`, `TRUE`, `FALSE` and `FALSE`
+not `s 15(d) — the will has been destroyed with the intention of revoking it` with `revoked` with `FALSE`, `FALSE`, `FALSE`, `FALSE` and `TRUE`
+not `s 16(1) — the alteration is valid and has effect` with `an obliteration that leaves the earlier words legible, unattested`
+`s 16(1) — the alteration is valid and has effect` with `an obliteration that leaves the earlier words illegible, unattested`
+`s 16(1) — the alteration is valid and has effect` with `an interlineation, the earlier words legible, executed in the like manner as the will`
+`s 16(2) — the will, with such alteration as part thereof, is deemed to be duly executed` with `an interlineation, the earlier words legible, signed in the margin`
+`s 16(2) — the will, with such alteration as part thereof, is deemed to be duly executed` with `an interlineation, the earlier words legible, signed opposite a memorandum`
+not `s 16(2) — the will, with such alteration as part thereof, is deemed to be duly executed` with `an obliteration that leaves the earlier words legible, unattested`
+`s 16(1) — the alteration is valid and has effect` with `an interlineation, the earlier words legible, signed in the margin`
+`s 16(1) — the alteration is valid and has effect` with `an interlineation, the earlier words legible, signed opposite a memorandum`
+`s 17 — the extent of the revival` with `the case of a will re-executed but never revoked` is equal to `not revived`
+`s 17 — the extent of the revival` with `the case of a will revoked by a later will` is equal to `not revived`
+`s 17 — the extent of the revival` with `the case of a will revoked by a later will and then re-executed` is equal to `revived in whole`
+`s 17 — the extent of the revival` with `the case of a will partly revoked, then wholly revoked, then revived by codicil` is equal to `revived, save as to so much thereof as was revoked before the revocation of the whole thereof`
+`s 17 — the extent of the revival` with `the case of the same will, a contrary intention being shown` is equal to `revived in whole`
+`s 17(1) — the will has been revived` with `revived` with `TRUE`, `FALSE`, `FALSE` and `FALSE`
+`s 17(1) — the will has been revived` with `revived` with `FALSE`, `TRUE`, `FALSE` and `FALSE`
+not `s 17(1) — the will has been revived` with `no revival`
+not `s 18 — a conveyance or other act made or done subsequently to the execution of the will prevents its operation` with `the case of a conveyance made after the will, the will standing`
+`s 18 — a conveyance or other act made or done subsequently to the execution of the will prevents its operation` with `the case of a conveyance that is itself the act by which the will is revoked`
+not `s 18 — a conveyance or other act made or done subsequently to the execution of the will prevents its operation` with `the case of a conveyance made after the will, the will having been revoked by a marriage`
+not `s 18 — a conveyance or other act made or done subsequently to the execution of the will prevents its operation` with `the case of Amrita marrying Gita in 2018, after the will`
+`s 15 — the will has been revoked` with `the case of a conveyance made after the will, the will having been revoked by a later will`
+not `s 18 — a conveyance or other act made or done subsequently to the execution of the will prevents its operation` with `the case of a conveyance made after the will, the will having been revoked by a later will`
+not `s 15 — the will has been revoked` with `the case of a conveyance said to be the revoking act, no mode of revocation in section 15 being made out`
+not `s 18 — a conveyance or other act made or done subsequently to the execution of the will prevents its operation` with `the case of a conveyance said to be the revoking act, no mode of revocation in section 15 being made out`
+`s 19 — the time from which the will is construed to speak` with `the plain case of Amrita` is equal to `as if it had been executed immediately before the death of the testator`
+`s 19 — the time from which the will is construed to speak` with `the case of a will showing a contrary intention as to the time from which it speaks` is equal to `otherwise, a contrary intention appearing by the will`
+`s 26 — the devise or bequest shall not lapse` with `the plain case of Amrita` and `a specific devise to Ismail`
+not `s 26 — the devise or bequest shall not lapse` with `the plain case of Amrita` and `a specific devise to Ismail, determinable at his death`
+not `s 26 — the devise or bequest shall not lapse` with `the case of a will showing a contrary intention as to lapse` and `a specific devise to Ismail`
+not `s 26 — the devise or bequest shall not lapse` with `the plain case of Amrita` and `a pecuniary legacy of $10,000 to Devi`
+not `null` with `the donee, so far as he is a child or other issue of the testator` with `the plain case of Amrita` and `a specific devise to Ismail`
+`the donee, so far as he is a child or other issue of the testator` with `the plain case of Amrita` and `a specific devise to Ismail`
+`null` with `the donee, so far as he is a child or other issue of the testator` with `the plain case of Amrita` and `a pecuniary legacy of $10,000 to Devi`
+not `s 26 — the devise or bequest shall not lapse` with `the case of a devise to a reference two of the testator’s children share` and `a specific devise to the reference Yasmin and Zainab share`
+`s 27 — this section applies to the person` with `the WA Farid`
+`s 27 — this section applies to the person` with `the WA Osman`
+not `s 27 — this section applies to the person` with `the WA Amrita`
+`s 27 — this section applies to the person` with `the WA Pak`
+`s 27 — this section applies to the person` with `the WA Quek`
+`s 27 — this section applies to the person` with `the WA Wahid`
+`s 27(1) — the testator may dispose of his personal estate as he might have done before the making of this Act` with `the case of the will of Pak, a mariner at sea`
+`s 27(1) — the testator may dispose of his personal estate as he might have done before the making of this Act` with `the case of the will of Quek, a member of the naval forces`
+`the formal validity of the will` with `the case of the will of Pak, a mariner at sea` is equal to `valid, being the will of a soldier being in actual military service, or of a mariner or seaman being at sea, disposing of his personal estate (section 27(1))`
+`the formal validity of the will` with `the case of the will of Quek, a member of the naval forces` is equal to `valid, being the will of a soldier being in actual military service, or of a mariner or seaman being at sea, disposing of his personal estate (section 27(1))`
+`s 27(1) — the testator may dispose of his personal estate as he might have done before the making of this Act` with `the case of the will of Farid`
+not `s 27(1) — the testator may dispose of his personal estate as he might have done before the making of this Act` with `the case of the will of Farid, the old form not being made out`
+not `s 27(1) — the testator may dispose of his personal estate as he might have done before the making of this Act` with `the plain case of Amrita`
+not `s 27(2) — the testamentary disposition of real estate is valid` with `the case of the will of Farid, the old form not being made out`
+not `s 27 — this section applies to the person` with `the WA Rashid`
+not `s 27(1) — the testator may dispose of his personal estate as he might have done before the making of this Act` with `the case of the informal will of Rashid, a civilian`
+not `s 27(2) — the testamentary disposition of real estate is valid` with `the case of the informal will of Rashid, a civilian`
+not `s 27(3) — the appointment of a guardian of the infant children of the testator is of full force and effect` with `the case of the informal will of Rashid, a civilian`
+`s 27(1) — the testator may dispose of his personal estate as he might have done before the making of this Act` with `the case of the will of Osman`
+`s 27(2) — the testamentary disposition of real estate is valid` with `the case of the will of Farid`
+not `s 27(2) — the testamentary disposition of real estate is valid` with `the case of the will of Osman`
+`s 27(3) — the appointment of a guardian of the infant children of the testator is of full force and effect` with `the case of the will of Farid`
+not `s 27(3) — the appointment of a guardian of the infant children of the testator is of full force and effect` with `the case of the will of Osman`
+`s 27(2) — the testamentary disposition of real estate is valid` with `the case of the will of Wahid, who died on 30 August 1938`
+`s 27(3) — the appointment of a guardian of the infant children of the testator is of full force and effect` with `the case of the will of Wahid, who died on 30 August 1938`
+`s 27(1) — the testator may dispose of his personal estate as he might have done before the making of this Act` with `the case of the will of Farid, appointing no guardian`
+`s 27(2) — the testamentary disposition of real estate is valid` with `the case of the will of Farid, appointing no guardian`
+not `s 27(3) — the appointment of a guardian of the infant children of the testator is of full force and effect` with `the case of the will of Farid, appointing no guardian`
+not `s 27(3) — the appointment of a guardian of the infant children of the testator is of full force and effect` with `the plain case of Amrita`
+`s 27(1) — the testator may dispose of his personal estate as he might have done before the making of this Act` with `the case of the will of Farid, appointing a guardian of a child who is not his`
+`s 27(2) — the testamentary disposition of real estate is valid` with `the case of the will of Farid, appointing a guardian of a child who is not his`
+not `s 27(3) — the appointment of a guardian of the infant children of the testator is of full force and effect` with `the case of the will of Farid, appointing a guardian of a child who is not his`
+`s 27(3) — the appointment of a guardian of the infant children of the testator is of full force and effect` with `the case of the will of Farid, appointing two guardians, one of them of a child who is not his`
+`the references for the guardians whose appointment this Act has made good` with `the case of the will of Farid, appointing two guardians, one of them of a child who is not his` is equal to list of bala
+`the references for the guardians whose appointment this Act has made good` with `the case of the will of Farid` is equal to list of bala
+`the references for the guardians whose appointment this Act has made good` with `the case of the will of Farid, appointing a guardian of a child who is not his` is equal to `EMPTY`
+`the references for the guardians whose appointment this Act has made good` with `the case of the will of Osman` is equal to `EMPTY`
+`the references for the guardians whose appointment this Act has made good` with `the case of the will of Farid, Jaya being an infant concerned in the estate` is equal to list of bala
+`the references for the guardians recorded against the infants concerned in the estate` with `the case of the will of Farid, Jaya being an infant concerned in the estate` is equal to list of bala
+`s 27(3) — the appointment of a guardian of the infant children of the testator is of full force and effect` with `the case of the will of Farid, Jaya being an infant concerned in the estate`
+`the references for the guardians recorded against the infants concerned in the estate` with `the case of the will of Farid` is equal to `EMPTY`
+`the references for the guardians recorded against the infants concerned in the estate` with `the plain case of Amrita` is equal to `EMPTY`
+not `s 28(4) — the grant is to be disregarded` with `no application to rectify has been made` and `the grant of probate made on 1 March 2020`
+`s 28(4) — the grant is to be disregarded` with `no application to rectify has been made` and `the grant limited to settled land made on 1 February 2020`
+`s 28(4) — the grant is to be disregarded` with `an application to rectify, only a grant limited to part of the estate having been made` and `the grant limited to a part of the estate made on 1 February 2020`
+not `s 28(4) — the grant is to be disregarded` with `an application to rectify, a grant of the remainder having also been made` and `the grant limited to a part of the estate made on 1 February 2020`
+`the date on which the grant is made` with `the probate resealed on 1 September 2020, granted on 1 March 2020`
+`the date on which the grant is made` with `the probate resealed on 1 September 2020, granted on 1 March 2020` is equal to `JUST` with `YMD` with 2020, 9 and 1
+`the date on which the grant is made` with `the grant of probate made on 1 March 2020` is equal to `JUST` with `YMD` with 2020, 3 and 1
+`the date on which the grant is made` with `the letters of administration sealed on 1 September 2020, granted on 1 March 2020` is equal to `JUST` with `YMD` with 2020, 3 and 1
+`s 28(2) — the date on which a grant authorising the administration of the testator’s estate is first made` with `an application to rectify made 5 months after the grant`
+`s 28(2) — the date on which a grant authorising the administration of the testator’s estate is first made` with `an application to rectify made 5 months after the grant` is equal to `JUST` with `YMD` with 2020, 3 and 1
+`s 28(2) — the date on which a grant authorising the administration of the testator’s estate is first made` with `an application to rectify, only a grant limited to settled land having been made`
+`s 28(2) — the date on which a grant authorising the administration of the testator’s estate is first made` with `an application to rectify, only a grant limited to settled land having been made` is equal to `NOTHING`
+`s 28(2) — whether the application for rectification is in time` with `no application to rectify has been made` is equal to `no application for an order under subsection (1) has been made`
+`s 28(2) — whether the application for rectification is in time` with `an application to rectify made 5 months after the grant` is equal to `within the time allowed`
+`s 28(2) — whether the application for rectification is in time` with `an application to rectify made 8 months after the grant` is equal to `made later than 6 months after the date on which a grant authorising the administration of the testator’s estate is first made`
+`s 28(2) — whether the application for rectification is in time` with `an application to rectify made 8 months after the grant, with the permission of a court` is equal to `made with the permission of a court`
+`s 28(2) — whether the application for rectification is in time` with `an application to rectify, no grant having been made` is equal to `within the time allowed, no grant authorising the administration of the testator’s estate having yet been made`
+`s 28(2) — whether the application for rectification is in time` with `an application to rectify, only a grant limited to settled land having been made` is equal to `within the time allowed, no grant authorising the administration of the testator’s estate having yet been made`
+`s 28(2) — whether the application for rectification is in time` with `an application to rectify, only a grant limited to part of the estate having been made` is equal to `within the time allowed, no grant authorising the administration of the testator’s estate having yet been made`
+`s 28(2) — whether the application for rectification is in time` with `an application to rectify, a grant of the remainder having also been made` is equal to `made later than 6 months after the date on which a grant authorising the administration of the testator’s estate is first made`
+`s 28(2) — whether the application for rectification is in time` with `an application to rectify made 10 months after a probate that was resealed` is equal to `within the time allowed`
+`s 28(2) — whether the application for rectification is in time` with `an application to rectify made 10 months after letters of administration that were sealed` is equal to `made later than 6 months after the date on which a grant authorising the administration of the testator’s estate is first made`
+`s 28(2) — whether the application for rectification is in time` with `an application to rectify whose date is not in evidence` is equal to `the date of the first such grant, or the date of the application, not being in evidence`
+`s 28(2) — whether the application for rectification is in time` with `an application to rectify, one of the two grants being undated` is equal to `the date of the first such grant, or the date of the application, not being in evidence`
+`s 28(2) — whether the application for rectification is in time` with `an application to rectify whose date is not in evidence, made with the permission of a court` is equal to `made with the permission of a court`
+`s 28(2) — whether the application for rectification is in time` with `an application to rectify made on the last day of the 6 months` is equal to `within the time allowed`
+`s 28(2) — whether the application for rectification is in time` with `an application to rectify made one day after the 6 months` is equal to `made later than 6 months after the date on which a grant authorising the administration of the testator’s estate is first made`
+`s 28(2) — whether the application for rectification is in time` with `an application to rectify made on 28 February 2021, the grant being on 31 August 2020` is equal to `within the time allowed`
+`s 28(2) — whether the application for rectification is in time` with `an application to rectify made on 1 March 2021, the grant being on 31 August 2020` is equal to `made later than 6 months after the date on which a grant authorising the administration of the testator’s estate is first made`
+`the formal validity of the will` with `the plain case of Amrita` is equal to `valid`
+`the formal validity of the will` with `the case of the will of Eugene` is equal to `not valid, being a will made by a person under 21 years of age (section 4)`
+`the formal validity of the will` with `the case of the will of Eugene, made the day before he turned 21` is equal to `not valid, being a will made by a person under 21 years of age (section 4)`
+`the formal validity of the will` with `the case of the will of Eugene, made on the day he turned 21` is equal to `valid`
+`the formal validity of the will` with `the case of a will not in writing` is equal to `not valid, the will not being in writing or not executed in the manner mentioned in section 6(2), and not being treated as properly executed under section 5`
+`the formal validity of the will` with `the case of a will one of whose two witnesses subscribed out of her sight` is equal to `not valid, the will not being in writing or not executed in the manner mentioned in section 6(2), and not being treated as properly executed under section 5`
+`the formal validity of the will` with `the case of a will whose date of execution is not in evidence` is equal to `the age of the testator when the will was made not being in evidence, section 4 cannot be applied`
+`the formal validity of the will` with `the case of a will executed abroad, the testator dying in 2020` is equal to `valid`
+`the formal validity of the will` with `the case of a will executed abroad, the testator dying in 1990` is equal to `not valid, the will not being in writing or not executed in the manner mentioned in section 6(2), and not being treated as properly executed under section 5`
+`the formal validity of the will` with `the case of a will executed abroad, the date of the death of the testator not being in evidence` is equal to `the date of the death of the testator not being in evidence, section 5 cannot be applied`
+`the formal validity of the will` with `the case of a will conforming only to the lex situs, the date of the death of the testator not being in evidence` is equal to `the date of the death of the testator not being in evidence, section 5 cannot be applied`
+`the formal validity of the will` with `the case of a will executed on board a vessel, the date of the death of the testator not being in evidence` is equal to `the date of the death of the testator not being in evidence, section 5 cannot be applied`
+`the formal validity of the will` with `the case of a will conforming to no law outside this Act, the date of the death of the testator not being in evidence` is equal to `not valid, the will not being in writing or not executed in the manner mentioned in section 6(2), and not being treated as properly executed under section 5`
+`the formal validity of the will` with `the case of a will conforming only to the law of the place where its immovable property is situated` is equal to `treated as properly executed so far only as regards a part of the will (section 5(3)(b), (c) or (d)), and not otherwise valid`
+`the formal validity of the will` with `the case of a will signed beside the end rather than at the foot` is equal to `valid`
+`the formal validity of the will` with `the case of a will signed at the head, above all the dispositive words` is equal to `not valid, the will not being in writing or not executed in the manner mentioned in section 6(2), and not being treated as properly executed under section 5`
+`the formal validity of the will` with `the case of the will of Farid` is equal to `valid, being the will of a soldier being in actual military service, or of a mariner or seaman being at sea, disposing of his personal estate (section 27(1))`
+`the formal validity of the will` with `the case of the will of Osman` is equal to `valid, being the will of a soldier being in actual military service, or of a mariner or seaman being at sea, disposing of his personal estate (section 27(1))`
+`the formal validity of the will` with `the case of the will of Farid, the old form not being made out` is equal to `not valid, being a will made by a person under 21 years of age (section 4)`

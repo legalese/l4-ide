@@ -1,0 +1,25 @@
+{
+  "note": [
+    "The six clamp cases, MEASURED 2026-08-05 on Drools/KIE 8.44.0.Final and",
+    "Camunda 8.7.6 (zeebe-dmn): 6/6 on both, zero errors. The same six evaluated",
+    "in L4 through daydate's `add months` / `add years` give the same six answers,",
+    "which is the equivalence the DMN lowering of those two heads depends on.",
+    "",
+    "Read the fourth case carefully: 28 Feb PLUS one year is 28 Feb, NOT 29 Feb.",
+    "Clamping pulls a day BACK to the month end; it never pushes one forward."
+  ],
+  "cases": [
+    {
+      "name": "the clamp, on months and on years",
+      "context": {},
+      "expect": {
+        "jan31_plus_1M": { "$date": "2024-02-29" },
+        "mar31_plus_1M": { "$date": "2024-04-30" },
+        "feb29_plus_4Y": { "$date": "2028-02-29" },
+        "feb28_plus_1Y": { "$date": "2024-02-28" },
+        "jan31_plus_13M": { "$date": "2024-02-29" },
+        "feb29_plus_12M": { "$date": "2025-02-28" }
+      }
+    }
+  ]
+}

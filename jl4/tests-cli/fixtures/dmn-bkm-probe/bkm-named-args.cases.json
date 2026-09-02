@@ -1,0 +1,20 @@
+{
+  "note": [
+    "Cases for bkm-named-args.dmn (probe A2). 2 cases x 3 decisions = 6 value",
+    "checks per engine. named_rev and named_decl_order are constant calls; only",
+    "named_from_input moves with the context, which isolates argument binding",
+    "from input plumbing."
+  ],
+  "cases": [
+    {
+      "name": "A. n = 40",
+      "context": { "n": 40 },
+      "expect": { "named_rev": 1, "named_decl_order": -95, "named_from_input": 60 }
+    },
+    {
+      "name": "B. n = 0",
+      "context": { "n": 0 },
+      "expect": { "named_rev": 1, "named_decl_order": -95, "named_from_input": 100 }
+    }
+  ]
+}

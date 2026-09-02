@@ -1,11 +1,8 @@
 # Install a deployment as an AI agent plugin
 
-Bundle a deployment's rules into a Claude Code / VS Code Chat plugin so an agent can both **read the rules' "Intended use"** (a SKILL.md the model matches by description) and **call the rules as MCP tools**.
+Bundle a deployment's rules into a Claude Code / VS Code (Copilot) plugin so an agent can both **read the rules' "Intended use"** (a SKILL.md the model matches by description) and **call the rules as MCP tools**.
 
-**Audience:** Anyone who wants a deployed ruleset to be discoverable + callable from inside an AI coding agent
 **Prerequisites:** A deployment with a non-empty **Intended use** description ([Exporting Rules for Deployment](../deploying-rules/exporting-rules-for-deployment.md))
-**Time:** 1 minutes
-**Goal:** One-click install the deployment so the agent knows when to use it
 
 ---
 
@@ -20,25 +17,31 @@ Prefer the plugin install over the raw MCP entry whenever you want the agent to 
 A single plugin bundle that contains:
 
 - `SKILL.md` — frontmatter `name` + `description` come from the deployment's **Intended use**; body lists every exported decision with its `@desc`.
-- `.mcp.json` — pre-registers `https://mcp.legalese.cloud/{orgSlug}/{deploymentId}` as the MCP server.
 - `references/schemas.json` — the deployment's function schemas (the same JSON the agent gets from MCP `tools/list`), bundled so it can be inspected offline.
-- `.claude-plugin/plugin.json` — the Claude Code / VS Code Chat plugin manifest.
+- `plugin.json` + `mcp.json` — the [Agent Plugins 1.0](https://agent-plugins.org/specification) manifest pair, read by VS Code (Copilot) and the GitHub Copilot CLI. The MCP entry carries no credential: the spec forbids secrets in headers, so these clients run the endpoint's OAuth flow on first connect.
+- `.claude-plugin/plugin.json` + `.mcp.json` — the same two things in Claude Code's native layout. Its `.mcp.json` pins `Authorization: Bearer ${LEGALESE_TOKEN}`, so one API key covers both the install and the tool calls.
+
+Both manifest pairs ship in every bundle. Each client reads its own and ignores the other, so a single plugin installs unmodified across all three.
 
 Everything is templated deterministically from the deployment's metadata — there is no LLM step. Editing the **Intended use** field in the sidebar and redeploying regenerates the SKILL.md the next time you install.
 
 ## Install
 
-In the L4 VS Code extension, open **Deployments → Integrate → Install as AI agent plugin** and pick a target:
+In the L4 VS Code extension, open the deployment's **Integrate** dialog (Deployments tab → **Integrate**). Its **Install as AI agent skill** section has an **Install as Skill** dropdown to pick a target harness, plus a download button for the raw zip:
 
 ### Add to Claude Code
 
 Writes the skill to `~/.claude/skills/{orgSlug}-{deploymentId}/` and registers the MCP server in `~/.claude.json` under the same name. Restart Claude Code to pick it up.
 
-### Add to VS Code Chat
+### Add to VS Code (Copilot)
 
-Writes the skill to `~/.claude/skills/{orgSlug}-{deploymentId}/` (VS Code Chat reads this path natively per the [Agent Skills spec](https://code.visualstudio.com/docs/copilot/customization/agent-skills)) and adds an entry to VS Code's user-level `mcp.json`. Reload the window to pick it up.
+Writes the skill to `~/.claude/skills/{orgSlug}-{deploymentId}/` (VS Code reads this path natively per the [Agent Skills spec](https://code.visualstudio.com/docs/copilot/customization/agent-skills)) and adds an entry to VS Code's user-level `mcp.json`. Reload the window to pick it up.
 
-### Download Zip (⤓)
+### Add to GitHub Copilot CLI
+
+Writes the skill to `~/.copilot/skills/{orgSlug}-{deploymentId}/` and the MCP server to `~/.copilot/mcp-config.json`. Both honour `COPILOT_HOME` if you have set it. Restart Copilot CLI, or run `/skills reload` in an interactive session, to pick it up.
+
+### Download plugin zip (⤓)
 
 Saves the raw plugin zip to disk. Useful for:
 
@@ -48,13 +51,15 @@ Saves the raw plugin zip to disk. Useful for:
 
 ## Endpoint
 
-The same bundle is also served directly from the MCP host, with two URL aliases:
+The same bundle is also served directly from the MCP host:
 
 ```
 GET https://mcp.legalese.cloud/{orgSlug}/{deploymentId}/.plugin
 ```
 
-Both return identical bytes; pick whichever name reads better in your tooling. Authenticated with the same WorkOS session or API key as the MCP endpoint itself.
+It is authenticated with the same session or API key as the MCP endpoint itself. (The sibling `.skill` route on the same host is a different surface — the skills-CLI / [agentskills.io](https://agentskills.io) discovery format, not the plugin zip; see [the Skills Marketplace](./agent-marketplace.md).)
+
+This endpoint is hosted on Legalese Cloud only — a self-hosted `jl4-service` does not serve `.plugin`, which is why the install section only appears when the extension is connected to Legalese Cloud.
 
 ## Authentication
 
@@ -63,6 +68,6 @@ Authenticate with your Legalese Cloud session or an API key (`Authorization: Bea
 ## Notes
 
 - A deployment **must have an "Intended use" description** before it can be installed as a plugin. Without one the endpoint returns `422` and the install flow surfaces a clear error — a plugin with no description is one the agent will never trigger.
-- The skill folder is shared across Claude Code and VS Code Chat (both read `~/.claude/skills/`), so installing for one target after the other doesn't duplicate files; only the MCP server registration changes.
+- The skill folder is shared across Claude Code and VS Code (both read `~/.claude/skills/`), so installing for one target after the other doesn't duplicate files; only the MCP server registration changes. Copilot CLI reads its own root (`~/.copilot/skills/`) and therefore gets its own copy.
 - Re-installing refreshes the skill in place — no need to uninstall first.
 - Per-deployment names (`{orgSlug}-{deploymentId}`) mean multiple deployments of the same org coexist as separate skills + MCP servers, each scoped to its own ruleset.

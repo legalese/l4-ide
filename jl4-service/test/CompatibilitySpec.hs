@@ -15,6 +15,7 @@ import qualified Data.Map.Strict as Map
 
 import L4.FunctionSchema (Parameter (..), Parameters (..))
 import Compatibility (FnIface (..), detectBreakingChanges)
+import ControlPlane (nextDeploymentVersion, parseVersionCounts)
 
 ------------------------------------------------------------------------
 -- Builders
@@ -22,7 +23,7 @@ import Compatibility (FnIface (..), detectBreakingChanges)
 
 -- | A primitive (scalar) parameter of the given JSON type.
 prim :: Text -> Parameter
-prim t = Parameter t Nothing Nothing [] "" Nothing Nothing Nothing Nothing Nothing
+prim t = Parameter t Nothing Nothing [] "" Nothing Nothing Nothing Nothing Nothing Nothing
 
 -- | A string parameter constrained to an enum.
 enumP :: [Text] -> Parameter
@@ -205,3 +206,25 @@ spec = describe "Compatibility.detectBreakingChanges" do
       let old = fn "f" (ps [] []) "A" (Just (objP [("x", prim "number")] ["x"]))
           new = fn "f" (ps [] []) "B" (Just (objP [] []))
       changes [old] [new] `shouldBe` ["f return type changed from A to B"]
+
+  -- The deployment version is stored as a single MAJOR.BREAKING.RUNNING
+  -- string and bumped by string-editing it on each deploy (no separate
+  -- counter fields). These cover that pure logic.
+  describe "deployment version (ControlPlane.nextDeploymentVersion)" do
+    it "first deploy is {major}.0.0" do
+      nextDeploymentVersion 1 Nothing False `shouldBe` "1.0.0"
+
+    it "non-breaking redeploy bumps only RUNNING" do
+      nextDeploymentVersion 1 (Just "1.0.0") False `shouldBe` "1.0.1"
+
+    it "breaking redeploy bumps BREAKING and RUNNING" do
+      nextDeploymentVersion 1 (Just "1.0.1") True `shouldBe` "1.1.2"
+
+    it "counters never reset across a service major bump" do
+      nextDeploymentVersion 2 (Just "1.1.2") False `shouldBe` "2.1.3"
+
+    it "parses BREAKING/RUNNING out of a version string" do
+      parseVersionCounts "3.4.5" `shouldBe` (4, 5)
+
+    it "treats an empty/garbage version as (0, 0)" do
+      parseVersionCounts "" `shouldBe` (0, 0)

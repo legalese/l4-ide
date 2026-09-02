@@ -1,0 +1,97 @@
+-- The DATE-LITERAL exhibit for the DMN exporter (spec §15.4).
+--
+-- `daydate.l4`:79-100 recommends `YMD y m d` over `Date d m y` for new code,
+-- on two grounds: ISO argument order makes a day/month transposition harder to
+-- WRITE, and `YMD` REFUSES an out-of-range component where `Date` silently
+-- rolls it. For a while the DMN exporter punished exactly that: a module
+-- written the recommended way emitted raw L4 (`YMD OF 1983, 1, 1`) that no
+-- engine can parse, where the same day spelled `Date 1 1 1983` emitted
+-- `date("1983-01-01")`. This module is the regression pin for the repair.
+--
+-- Deliberately one of each POSITION a folded date literal can occupy, because
+-- they are four different code paths off the one recogniser:
+--
+--   * `commencement` / `the appointed day` / `the transition day`
+--        a nullary decision whose BODY is a `YMD` literal -- the boxed literal
+--        expression, i.e. `renderFeelIn`;
+--   * `the regime that applies`
+--        the same three as decision-table CELL endpoints, reached by the
+--        named-constant hop through `tcDateConstants` -- i.e. `constantOf`
+--        never sees a `YMD` node at all, it sees the folded `Day`, which is
+--        why populating that map is part of the fix;
+--   * `the filing fee`
+--        a law-time chain (§15) whose arms are `YMD`-dated: one arm naming a
+--        regime constant and one written as a BARE `YMD` literal, because
+--        those are the two things an inline right-hand side may be and they
+--        reach different code (`constantDay`'s one hop, then the literal
+--        fold). Both must land in a single-column `hitPolicy="UNIQUE"` table
+--        over `RULES_EFFECTIVE_DATE` with half-open interval cells;
+--   * `the anniversary`
+--        the NEGATIVE control, below.
+--
+-- `the appointed day` is 2024-02-29 on purpose. A leap day is the cheapest
+-- proof that the fold consults a calendar rather than range-checking three
+-- numbers, and it is the boundary the cases straddle in `ymd-dates.cases.json`.
+--
+-- THE NEGATIVE CONTROL LIVES NEXT DOOR, in `not-ok/ymd-unfoldable-date.l4`,
+-- and not in this file, for a mechanical reason worth stating: a raw-L4
+-- <literalExpression> body makes zeebe-dmn refuse to parse the WHOLE file
+-- (MEASURED 2026-08-02 on a copy of this exhibit carrying a computed `YMD`:
+-- "PARSE  INVALID: FEEL expression: failed to parse expression
+-- 'YMD OF (1983 PLUS 40), 1, 1'"), so a module that both ships an unfoldable
+-- date and runs on both engines cannot exist. The three refusals this
+-- exhibit's repair must NOT have widened -- a computed component, a component
+-- triple that is not a real calendar day, and a day/month transposition -- are
+-- asserted there, and in `jl4/tests/DmnExport.hs`.
+--
+-- The heading below is load-bearing: `l4 export --to=dmn` with no
+-- `--model-name` takes the model name from the outermost `§`.
+
+IMPORT prelude
+IMPORT daydate
+
+§ `YMD date literals`
+
+-- Required by the rule-version axis: an unpinned `RULES EFFECTIVE DATE` read
+-- resolves to the localized current day, and localization needs a timezone.
+TIMEZONE IS "Asia/Singapore"
+
+@ref British Nationality Act 1981, s 53(2) — commencement
+GIVETH A DATE
+`commencement` MEANS YMD 1983 1 1
+
+-- A leap day, deliberately: `YMD 2024 2 29` is a real date and must fold,
+-- while `YMD 2023 2 29` is not one and must not (see `not-ok/`).
+GIVETH A DATE
+`the appointed day` MEANS YMD 2024 2 29
+
+GIVETH A DATE
+`the transition day` MEANS YMD 2026 1 1
+
+-- The date the CASE is about, as opposed to the date the LAW is about. It is
+-- an ordinary input, so the comparisons below are ordinary decision-table
+-- cells rather than law-time intervals.
+ASSUME `the application date` IS A DATE
+
+GIVETH A STRING
+`the regime that applies` MEANS
+    BRANCH IF `the application date` AT LEAST `the transition day` THEN "transitional"
+           IF `the application date` AT LEAST `the appointed day`  THEN "appointed"
+           IF `the application date` AT LEAST `commencement`       THEN "original"
+           OTHERWISE "pre-commencement"
+
+-- Before commencement there is no fee to answer for, so a rule date earlier
+-- than 1983-01-01 is a curated refusal rather than an answer. Same device, and
+-- the same reasoning, as `gst-rate.l4`'s and the Reg CF corpus's ASSUME floor.
+ASSUME `no fee is prescribed before commencement on 1983-01-01` IS A NUMBER
+
+GIVETH A NUMBER
+`the filing fee` MEANS
+    BRANCH IF `RULES EFFECTIVE DATE` AT LEAST `the transition day` THEN 1000
+           IF `RULES EFFECTIVE DATE` AT LEAST YMD 1983 1 1         THEN 250
+           OTHERWISE `no fee is prescribed before commencement on 1983-01-01`
+
+-- A date driving a number driving a number, so the chain is shown end to end
+-- in a real engine rather than only in the XML.
+GIVETH A NUMBER
+`the fee with surcharge` MEANS `the filing fee` TIMES 2

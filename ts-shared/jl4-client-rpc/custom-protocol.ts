@@ -89,9 +89,36 @@ export type QueryAtom = {
   inputRefs?: { rootUnique: number; path: string[] }[]
 }
 
+/**
+ * What may be TOLD to a user, as opposed to what the function evaluates to.
+ *
+ * These are the ladder's two lamps, on the wire. For a rule stated as a seam
+ * (`scope IMPLIES requirement`), `Complies` and `NotApplicable` are BOTH
+ * `determined === true` — so a client that switches on `determined` will sooner or
+ * later tell someone they complied with a rule that never reached them. Switch on this
+ * instead. See DESIGN §25.3.
+ *
+ * Mirror of `Verdict` in `BooleanDecisionQuery.hs` and `decision-query.ts`.
+ */
+export type Verdict =
+  | 'Undetermined'
+  | 'Holds'
+  | 'Fails'
+  | 'Complies'
+  | 'InBreach'
+  | 'NotApplicable'
+
+export type QueryOutcome = {
+  /** The FUNCTION's truth value. Correct, and not a verdict. */
+  determined: boolean | null
+  /** What may be shown to a user. */
+  verdict: Verdict
+  support: QueryAtom[]
+}
+
 export type QueryImpact = {
-  ifTrue: { determined: boolean | null; support: QueryAtom[] }
-  ifFalse: { determined: boolean | null; support: QueryAtom[] }
+  ifTrue: QueryOutcome
+  ifFalse: QueryOutcome
 }
 
 export type QueryAsk = {
@@ -104,7 +131,15 @@ export type QueryAsk = {
 }
 
 export type QueryPlanResponse = {
+  /** The FUNCTION's truth value. Correct, and NOT a verdict — see {@link Verdict}. */
   determined: boolean | null
+  /** What may be shown to a user. Switch on THIS, not on `determined`. */
+  verdict: Verdict
+  /**
+   * Atoms still worth asking about — computed against the VERDICT, so it can be
+   * non-empty even when `determined` is settled: a met requirement does not tell you
+   * whether the rule bit you, and the scope still does.
+   */
   stillNeeded: QueryAtom[]
   ranked: QueryAtom[]
   inputs: {
@@ -228,3 +263,58 @@ export const GetExportedFunctionsRequestType = makeL4RpcRequestType<
   GetExportedFunctionsParams,
   GetExportedFunctionsResponse
 >('l4/getExportedFunctions')
+
+// ---------------------------------------------------------------------------
+// l4/exportDocument — deterministic L4 → formatted document
+// ---------------------------------------------------------------------------
+
+export interface ExportDocumentParams {
+  verDocId: { uri: string; version: number }
+  /** "html" (default) | "text" | "akn" | "json" */
+  format?: string
+  /** Render imported definitions/rules not referenced by this document. */
+  includeUnused?: boolean
+  numberSections?: boolean
+  numberClauses?: boolean
+  /** Prepend a linked table of contents (HTML). */
+  toc?: boolean
+  /** Module URIs to exclude from the render (deselected imports). */
+  excludeModules?: string[]
+}
+
+export interface ExportDocumentResult {
+  format: string
+  /** The rendered document in the requested format (empty for "json"). */
+  content: string
+  /** The structured document IR (always present). */
+  ir: unknown
+}
+
+export const ExportDocumentRequestType = makeL4RpcRequestType<
+  ExportDocumentParams,
+  ExportDocumentResult
+>('l4/exportDocument')
+
+export interface ExportPlanParams {
+  verDocId: { uri: string; version: number }
+}
+
+export interface ExportPlanModule {
+  /** Module URI — pass back as an `excludeModules` entry to drop it. */
+  uri: string
+  /** Human-readable module label (file name or section title). */
+  label: string
+  isMain: boolean
+  units: unknown[]
+}
+
+export interface ExportPlanResult {
+  mainModule: string
+  modules: ExportPlanModule[]
+}
+
+/** The import/rule tree + reachability that drives the deselect UI. */
+export const ExportPlanRequestType = makeL4RpcRequestType<
+  ExportPlanParams,
+  ExportPlanResult
+>('l4/exportPlan')

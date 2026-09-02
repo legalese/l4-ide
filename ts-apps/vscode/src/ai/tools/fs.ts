@@ -103,22 +103,23 @@ export interface FsReadArgs {
   /** 1-based inclusive start line in the target's text output.
    *  For files this is a source-line number; for directories it's
    *  the position in the sorted entry listing (1 = first entry).
-   *  Default 1. Applied after `pattern` when both are set. */
+   *  Default 1. Applied after `search_keywords` when both are set. */
   startLine?: number
   /** 1-based inclusive end line. Default: read to the end of the
    *  output, capped at `startLine + 499` (500-line ceiling). */
   endLine?: number
-  /** Optional keyword filter. Narrows the output to lines
-   *  matching this pattern — parsed as a case-insensitive regex,
-   *  falls back to literal substring when the regex doesn't
-   *  compile. For files, matching lines are returned with 2 lines
-   *  of surrounding context. For directories, the tree is walked
+  /** Optional keyword filter. One or more keywords separated by
+   *  whitespace; a line is a hit if it matches ANY of them (OR).
+   *  Each keyword is parsed as a case-insensitive regex, falling
+   *  back to a literal substring when the regex doesn't compile.
+   *  For files, matching lines are returned with 2 lines of
+   *  surrounding context. For directories, the tree is walked
    *  recursively (skipping `.git`, `node_modules`, `.DS_Store`)
    *  and file *contents* are grepped — results are emitted as
    *  `<relative-path>:<lineno>: <text>` so the model can jump to
    *  the file with a follow-up `fs__read_file`. Use this to find
    *  a symbol or string anywhere under the workspace. */
-  pattern?: string
+  search_keywords?: string
 }
 
 /** Hard caps per response. Picked so a single call surfaces enough
@@ -193,15 +194,16 @@ const DIR_IGNORES = new Set(['.git', 'node_modules', '.DS_Store'])
  * Read a file (one source line per output line) or list a directory
  * (one entry per output line, `name/` for subdirs, `name` for files,
  * dirs sorted first). Same shape for both so the model learns one
- * rule. Pagination via `startLine`/`endLine`, search via `pattern`.
+ * rule. Pagination via `startLine`/`endLine`, search via
+ * `search_keywords`.
  *
  * Response: a compact header line describing what came back, then
  * the selected lines. Header examples:
- *   [<path> 1-40/40]                                  — full file/dir
- *   [<path> 1-500/2489]                               — paginated (more after line 500)
- *   [<path> pattern="..." matches=3 chunks=2/2]       — file grep
- *   [<path> pattern="..." matches=0]                  — no hits
- *   [<dir>/ pattern="..." matches=12 files=3]         — recursive dir grep
+ *   [<path> 1-40/40]                                   — full file/dir
+ *   [<path> 1-500/2489]                                — paginated (more after line 500)
+ *   [<path> keywords="..." matches=3 chunks=2/2]       — file grep
+ *   [<path> keywords="..." matches=0]                  — no hits
+ *   [<dir>/ keywords="..." matches=12 files=3]         — recursive dir grep
  *
  * For file grep, matching lines are prefixed `>>>` and context
  * lines `   ` so the model can distinguish hits from surroundings;
@@ -224,15 +226,17 @@ export async function fsReadFile(args: FsReadArgs): Promise<string> {
   }
 
   const isDir = stat.isDirectory()
-  const hasPattern = typeof args.pattern === 'string' && args.pattern.length > 0
+  const hasKeywords =
+    typeof args.search_keywords === 'string' &&
+    args.search_keywords.trim().length > 0
 
-  // Directory + pattern → recursive content grep across the whole
+  // Directory + keywords → recursive content grep across the whole
   // subtree. Different code path because we never want to materialise
   // the entire subtree as a flat `lines[]` (would defeat the cap and
   // burn memory on a big repo) — `grepDirRecursive` walks
   // file-by-file and stops once the cap is hit.
-  if (isDir && hasPattern) {
-    return grepDirRecursive(r, args.pattern!)
+  if (isDir && hasKeywords) {
+    return grepDirRecursive(r, args.search_keywords!)
   }
 
   // Materialise the target as a list of lines regardless of kind.
@@ -256,14 +260,14 @@ export async function fsReadFile(args: FsReadArgs): Promise<string> {
     lines = buf.replace(/\r\n/g, '\n').split('\n')
   }
 
-  // Pattern (grep mode) takes precedence — once a pattern is set
+  // Keywords (grep mode) take precedence — once keywords are set
   // the output is keyword-focused and startLine/endLine narrow
   // WITHIN that focus.
-  if (hasPattern) {
+  if (hasKeywords) {
     return grepLines(
       r,
       lines,
-      args.pattern!,
+      args.search_keywords!,
       isDir,
       args.startLine,
       args.endLine
@@ -308,18 +312,40 @@ function sliceLines(
 }
 
 /**
- * Grep mode: filter `lines` down to those matching `pattern`,
+ * Build a line matcher from a whitespace-separated keyword string.
+ * Splits on runs of whitespace, compiles each keyword as a
+ * case-insensitive regex (literal-substring fallback when it doesn't
+ * compile), and returns a predicate that's true when a line matches
+ * ANY keyword (OR semantics). An empty/blank string matches nothing.
+ */
+function buildKeywordMatcher(raw: string): (line: string) => boolean {
+  const keywords = raw.trim().split(/\s+/).filter(Boolean)
+  if (keywords.length === 0) return () => false
+  const tests = keywords.map((kw): ((line: string) => boolean) => {
+    try {
+      const re = new RegExp(kw, 'i')
+      return (line) => re.test(line)
+    } catch {
+      const needle = kw.toLowerCase()
+      return (line) => line.toLowerCase().includes(needle)
+    }
+  })
+  return (line) => tests.some((t) => t(line))
+}
+
+/**
+ * Grep mode: filter `lines` down to those matching `keywords`,
  * then apply the same caps as `sliceLines`. For files, each match
  * carries PATTERN_CONTEXT_LINES of surrounding context (overlapping
  * chunks merged); for directories, matching entries are returned
  * verbatim (context is meaningless for a listing).
  *
  * When `startLine`/`endLine` are also set, they further narrow the
- * pattern's match window to file lines inside that range — lets
+ * keyword match window to file lines inside that range — lets
  * the model search within a specific section.
  *
  * Output:
- *   [<path> pattern="…" matches=N chunks=K/total]
+ *   [<path> keywords="…" matches=N chunks=K/total]
  *   >>> 42: matching line
  *       43: context
  *   ---
@@ -329,7 +355,7 @@ function sliceLines(
 function grepLines(
   r: ResolvedPath,
   lines: string[],
-  patternRaw: string,
+  keywordsRaw: string,
   isDir: boolean,
   startLineRaw: number | undefined,
   endLineRaw: number | undefined
@@ -341,22 +367,15 @@ function grepLines(
       ? clampInt(endLineRaw, rangeStart + 1, total)
       : total
 
-  let matcher: (line: string) => boolean
-  try {
-    const re = new RegExp(patternRaw, 'i')
-    matcher = (line) => re.test(line)
-  } catch {
-    const needle = patternRaw.toLowerCase()
-    matcher = (line) => line.toLowerCase().includes(needle)
-  }
+  const matcher = buildKeywordMatcher(keywordsRaw)
 
   const matchIdx: number[] = []
   for (let i = rangeStart; i < rangeEnd; i++) {
     if (matcher(lines[i]!)) matchIdx.push(i)
   }
-  const patternLabel = JSON.stringify(patternRaw)
+  const keywordsLabel = JSON.stringify(keywordsRaw)
   if (matchIdx.length === 0) {
-    return `[${r.relative} pattern=${patternLabel} matches=0]`
+    return `[${r.relative} keywords=${keywordsLabel} matches=0]`
   }
 
   // Directories have no "context" — just return the matching entries
@@ -370,7 +389,7 @@ function grepLines(
     const shown = body ? body.split('\n').length : 0
     const truncated = shown < matchIdx.length
     const header =
-      `[${r.relative} pattern=${patternLabel} matches=${matchIdx.length}` +
+      `[${r.relative} keywords=${keywordsLabel} matches=${matchIdx.length}` +
       (truncated ? `, shown=${shown}/${matchIdx.length}]` : `]`)
     return `${header}\n${body}`
   }
@@ -426,7 +445,7 @@ function grepLines(
   }
 
   const header =
-    `[${r.relative} pattern=${patternLabel} matches=${matchIdx.length} ` +
+    `[${r.relative} keywords=${keywordsLabel} matches=${matchIdx.length} ` +
     `chunks=${chunksShown}/${chunks.length}` +
     (truncated ? `, truncated]` : `]`)
   return `${header}\n${rendered.join('\n---\n')}`
@@ -457,16 +476,9 @@ function clampInt(n: number, lo: number, hi: number): number {
  */
 async function grepDirRecursive(
   r: ResolvedPath,
-  patternRaw: string
+  keywordsRaw: string
 ): Promise<string> {
-  let matcher: (line: string) => boolean
-  try {
-    const re = new RegExp(patternRaw, 'i')
-    matcher = (line) => re.test(line)
-  } catch {
-    const needle = patternRaw.toLowerCase()
-    matcher = (line) => line.toLowerCase().includes(needle)
-  }
+  const matcher = buildKeywordMatcher(keywordsRaw)
 
   const rows: string[] = []
   const filesWithMatches = new Set<string>()
@@ -531,12 +543,12 @@ async function grepDirRecursive(
     for (let i = subdirs.length - 1; i >= 0; i--) stack.push(subdirs[i]!)
   }
 
-  const patternLabel = JSON.stringify(patternRaw)
+  const keywordsLabel = JSON.stringify(keywordsRaw)
   if (totalMatches === 0) {
-    return `[${r.relative}/ pattern=${patternLabel} matches=0]`
+    return `[${r.relative}/ keywords=${keywordsLabel} matches=0]`
   }
   const header =
-    `[${r.relative}/ pattern=${patternLabel} matches=${totalMatches} ` +
+    `[${r.relative}/ keywords=${keywordsLabel} matches=${totalMatches} ` +
     `files=${filesWithMatches.size}` +
     (truncated ? `, shown=${rows.length}/${totalMatches}]` : `]`)
   return `${header}\n${rows.join('\n')}`
@@ -553,7 +565,112 @@ export interface FsCreateArgs {
  * needs a non-empty `old` snippet to anchor on; without the seed a
  * brand-new (empty) file would have nothing to find.
  */
-export const FS_CREATE_FILE_SEED = '// new file content\n'
+export const FS_CREATE_FILE_SEED = '// new file in progress ...\n'
+
+/**
+ * Placeholder copy dropped into the body of a freshly-created HTML
+ * file. Doubles as the unique anchor the first follow-up
+ * `fs__edit_file` call replaces with real markup.
+ */
+export const FS_CREATE_HTML_SEED = `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>New document</title>
+    <style>
+      body {
+        background-color: white;
+        font-family: serif;
+        font-size: 1rem;
+        color: black;
+        margin: 2rem;
+      }
+    </style>
+  </head>
+  <body>New document in progress ...</body>
+</html>
+`
+
+/** True for files we render in the built-in browser preview rather
+ *  than opening as a source text tab. */
+function isHtmlPath(fsPath: string): boolean {
+  const ext = path.extname(fsPath).toLowerCase()
+  return ext === '.html' || ext === '.htm'
+}
+
+// A single reused webview panel acts as the "built-in browser" for
+// AI-created HTML files. Reused across creates so a new document
+// replaces the previous preview instead of stacking tabs. The
+// save-watcher keeps the rendered page in sync as follow-up
+// `fs__edit_file` calls build the document up (each one saves the
+// buffer, firing onDidSaveTextDocument).
+let htmlPreviewPanel: vscode.WebviewPanel | undefined
+let htmlPreviewUri: vscode.Uri | undefined
+let htmlPreviewWatcher: vscode.Disposable | undefined
+
+/**
+ * Open (or refocus) the built-in browser preview on an HTML file and
+ * point it at `uri`. Renders the file's current contents in a webview
+ * panel beside the chat, and live-refreshes whenever that file is
+ * saved so the user watches the document take shape.
+ */
+async function openHtmlPreview(uri: vscode.Uri): Promise<void> {
+  const title = `Preview: ${path.basename(uri.fsPath)}`
+  if (!htmlPreviewPanel) {
+    htmlPreviewPanel = vscode.window.createWebviewPanel(
+      'l4.htmlPreview',
+      title,
+      // Beside the chat, without stealing focus from the conversation.
+      { viewColumn: vscode.ViewColumn.Active, preserveFocus: true },
+      {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+        localResourceRoots:
+          vscode.workspace.workspaceFolders?.map((f) => f.uri) ?? [],
+      }
+    )
+    htmlPreviewPanel.onDidDispose(() => {
+      htmlPreviewPanel = undefined
+      htmlPreviewUri = undefined
+      htmlPreviewWatcher?.dispose()
+      htmlPreviewWatcher = undefined
+    })
+    // Manual saves (Cmd+S) also refresh — the edit tool path refreshes
+    // explicitly via refreshHtmlPreviewIfShowing, but this keeps the
+    // preview honest for any other writer too.
+    htmlPreviewWatcher = vscode.workspace.onDidSaveTextDocument((doc) =>
+      refreshHtmlPreviewIfShowing(doc.uri)
+    )
+  }
+  htmlPreviewUri = uri
+  htmlPreviewPanel.title = title
+  htmlPreviewPanel.webview.html = await readFileText(uri)
+  htmlPreviewPanel.reveal(vscode.ViewColumn.Active, true)
+}
+
+/** Read a workspace file as UTF-8 text. */
+async function readFileText(uri: vscode.Uri): Promise<string> {
+  const bytes = await vscode.workspace.fs.readFile(uri)
+  return Buffer.from(bytes).toString('utf8')
+}
+
+/**
+ * Reload the built-in browser preview from disk when it is currently
+ * showing `uri`. No-op when the preview panel is closed or pointed at a
+ * different file — so an edit to an HTML file that happens to have a
+ * live preview tab open refreshes it, and an edit to any other file
+ * does nothing.
+ */
+async function refreshHtmlPreviewIfShowing(uri: vscode.Uri): Promise<void> {
+  if (
+    htmlPreviewPanel &&
+    htmlPreviewUri &&
+    uri.toString() === htmlPreviewUri.toString()
+  ) {
+    htmlPreviewPanel.webview.html = await readFileText(uri)
+  }
+}
 
 /**
  * Create a file seeded with FS_CREATE_FILE_SEED. The model fills it
@@ -579,10 +696,15 @@ export async function fsCreateFile(args: FsCreateArgs): Promise<string> {
   // file via its normal didOpen path (otherwise a silent Node write
   // doesn't get didChange/didOpen events, and l4__evaluate can
   // return stale results for a freshly-created file).
+  // HTML files get a full (plain-white) document skeleton so the
+  // built-in browser preview renders a real page from the start;
+  // everything else gets the one-line code seed.
+  const isHtml = isHtmlPath(r.fsPath)
+  const seed = isHtml ? FS_CREATE_HTML_SEED : FS_CREATE_FILE_SEED
   await fs.mkdir(path.dirname(r.fsPath), { recursive: true })
   const edit = new vscode.WorkspaceEdit()
   edit.createFile(r.uri, { overwrite: false })
-  edit.insert(r.uri, new vscode.Position(0, 0), FS_CREATE_FILE_SEED)
+  edit.insert(r.uri, new vscode.Position(0, 0), seed)
   const ok = await vscode.workspace.applyEdit(edit)
   if (!ok) {
     throw new Error(
@@ -593,19 +715,28 @@ export async function fsCreateFile(args: FsCreateArgs): Promise<string> {
   // own fs__read_file / fs.readFile) see the new content immediately.
   const doc = await vscode.workspace.openTextDocument(r.uri)
   if (doc.isDirty) await doc.save()
-  // Surface the new file as a visible tab so the user sees what the
-  // model just created without having to expand the tool-call row and
-  // click. `preserveFocus: true` keeps the cursor wherever the user
-  // was — usually the chat input — instead of stealing focus into the
-  // editor mid-conversation.
-  await vscode.window.showTextDocument(doc, {
-    preview: false,
-    preserveFocus: true,
-  })
+  if (isHtml) {
+    // Open the rendered page in the built-in browser preview rather
+    // than a source tab — and live-refresh it as follow-up edits land.
+    await openHtmlPreview(r.uri)
+  } else {
+    // Surface the new file as a visible tab so the user sees what the
+    // model just created without having to expand the tool-call row and
+    // click. `preserveFocus: true` keeps the cursor wherever the user
+    // was — usually the chat input — instead of stealing focus into the
+    // editor mid-conversation.
+    await vscode.window.showTextDocument(doc, {
+      preview: false,
+      preserveFocus: true,
+    })
+  }
   // Skip the appendL4Diagnostics tail — a freshly-created file has no
   // real content to type-check, and the Edit tool the model uses next
   // will run diagnostics naturally.
-  return `Created ${r.relative} (seeded with "${FS_CREATE_FILE_SEED.trimEnd()}").`
+  const anchor = isHtml
+    ? '\n```html\n' + FS_CREATE_HTML_SEED + '\n```'
+    : '"' + FS_CREATE_FILE_SEED.trimEnd() + '"'
+  return `Created ${r.relative} - seeded with ${anchor}`
 }
 
 export interface FsEditArgs {
@@ -763,6 +894,9 @@ export async function fsEditFile(args: FsEditArgs): Promise<string> {
     )
   }
   if (doc.isDirty) await doc.save()
+  // If this file is an HTML doc currently shown in the built-in browser
+  // preview, reload the rendered page so it tracks the edit.
+  if (isHtmlPath(r.fsPath)) await refreshHtmlPreviewIfShowing(r.uri)
   // `[<path> <start>-<end>]` prefix carries the post-edit line range
   // so the chat row can render it as a muted "Lines 23-45" suffix
   // (matches fs__read_file's surfacing). No `/total` segment here —

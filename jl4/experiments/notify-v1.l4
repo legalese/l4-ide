@@ -1,0 +1,119 @@
+IMPORT prelude
+
+-- NOTIFY v1 — a content-bearing, court-queryable notice via a recipient-qualified
+-- RECORD.
+--
+-- The IRREDUCIBLE CORE is the symmetric WRITE to the existing cross-party READ:
+--
+--     RECORD <recipient>'s <cell> IS <value>      -- the WRITE (this file)
+--     RECALL <recipient>'s <cell>                 -- the READ (STATE-AS-LEDGER M4.5)
+--
+-- The acting party PERFORMS the write, but the value lands in the RECIPIENT's
+-- OWN ledger, keyed by the SAME `partyKeyWHNF` that a cross-party RECALL reads —
+-- so write-key ≡ read-key by construction. NOTIFY is NOT a new keyword, a new
+-- deontic AST node, or a match-hook: it is L4-level sugar/pattern on top of the
+-- recipient-qualified RECORD. The "inbox" is simply the recipient's own ledger.
+--
+-- v1 CAVEATS (honored, not solved here):
+--   * Receipt timing lives in integer-tick space — there is no calendar /
+--     Business-Days layer, so WITHIN counts ticks, not days. Do not read the
+--     tick numbers as dates.
+--   * The body is queried with `contains` (substring). Word-boundary /
+--     prescribed-wording checks are deferred.
+--   * No tamper-resistance: parties are cooperative. The recipient's inbox is the
+--     recipient's own ledger; there is no separate provenance-filtered store.
+
+§ `Parties and the typed notice`
+
+DECLARE Party IS ONE OF
+  Landlord
+  Tenant
+
+-- How a notice was delivered. A small enum, queryable by field projection.
+DECLARE Method IS ONE OF
+  byPost
+  byHand
+  byEmail
+
+-- The typed, content-bearing notice. `body` carries the prose a court would read
+-- and query; `ground` and `method` are particulars projected by field access.
+DECLARE Notice
+  HAS body    IS A STRING
+      ground  IS A NUMBER
+      method  IS A Method
+
+§ `The act: serve a Ground 1 possession notice`
+
+DECLARE Action IS ONE OF
+  serveNotice
+  acknowledge
+
+-- The Landlord MUST serve a possession notice. ON serving it, the notice is
+-- RECORDed into the TENANT's own ledger (the NOTIFY write — the Landlord performs
+-- it, the value lands in the Tenant's inbox). The chain then imposes the Tenant
+-- MUST acknowledge.
+GIVETH DEONTIC Party Action
+possessionProcess MEANS
+  PARTY Landlord
+  MUST serveNotice
+  WITHIN 5
+  HENCE RECORD Tenant's `noticeReceived` IS
+          Notice WITH
+            body   IS "possession may be recovered on Ground 1"
+            ground IS 1
+            method IS byPost
+        HENCE PARTY Tenant
+              MUST acknowledge
+              WITHIN 14
+
+§ `Run the process`
+
+-- The Landlord serves at tick 2; the Tenant acknowledges at tick 6. After the
+-- serve step, the Tenant's own ledger holds the notice (look for the
+-- "Ledger (Tenant)" block in the output: the Assign is stamped source=NOTIFY,
+-- party=Landlord — the Landlord performed it, it landed in the Tenant's inbox).
+#TRACE possessionProcess AT 0 WITH
+  PARTY Landlord DOES serveNotice AT 2
+  PARTY Tenant   DOES acknowledge AT 6
+
+§ `A reader queries the notice the recipient received`
+
+-- A court (or the Tenant's app) reads the notice back from the TENANT's ledger
+-- and asks content questions of it. RECALL yields MAYBE Notice; we project the
+-- body and query it with `contains` (substring), and project the particulars by
+-- field access.
+--
+-- These #EVALs run in per-directive isolated ledgers, so they exercise the
+-- read/query SHAPE (parse, typecheck, project, `contains`) over a freshly served
+-- notice value rather than the trace's ledger. The end-to-end write-then-read
+-- across one shared ledger is proven by the permanent HSpec regression
+-- (RecordLedgerSpec, "NOTIFY v1").
+
+-- The served notice, as a standalone value, so the reader can be exercised.
+servedNotice MEANS
+  Notice WITH
+    body   IS "possession may be recovered on Ground 1"
+    ground IS 1
+    method IS byPost
+
+-- Does the notice's body mention Ground 1? (substring query — `CONTAINS` is the
+-- only real text op in v1: `CONTAINS haystack needle`.)
+GIVEN n IS A Notice
+GIVETH A BOOLEAN
+bodyMentionsGround1 n MEANS CONTAINS (n's body) "Ground 1"
+
+-- A wrong-ground probe: the same body does NOT mention Ground 8.
+GIVEN n IS A Notice
+GIVETH A BOOLEAN
+bodyMentionsGround8 n MEANS CONTAINS (n's body) "Ground 8"
+
+-- TRUE: the body contains the substring "Ground 1".
+#EVAL bodyMentionsGround1 servedNotice
+-- FALSE: it does not contain "Ground 8".
+#EVAL bodyMentionsGround8 servedNotice
+-- Particulars by field projection: the ground number ...
+#EVAL servedNotice's ground
+-- ... and the delivery method.
+#EVAL servedNotice's method
+-- The raw body prose (what a court would read).
+#EVAL servedNotice's body

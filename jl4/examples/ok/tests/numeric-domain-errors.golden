@@ -1,0 +1,13 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+numeric-domain-errors.l4:6:1-16:
+  SQRT expects input greater than or equal to 0
+numeric-domain-errors.l4:7:1-22:
+  TO THE POWER OF produced a non-finite result (overflow, 0 to a negative power, or a negative base raised to a fractional power)
+numeric-domain-errors.l4:8:1-24:
+  TO THE POWER OF produced a non-finite result (overflow, 0 to a negative power, or a negative base raised to a fractional power)
+numeric-domain-errors.l4:9:1-13:
+  2
+numeric-domain-errors.l4:10:1-20:
+  1024

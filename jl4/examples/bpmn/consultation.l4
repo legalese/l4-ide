@@ -1,0 +1,41 @@
+-- The third BPMN fixture, and the only one that draws a CONVERGING parallel
+-- gateway. It exists because without it nothing a user could actually write
+-- demonstrates a conjunction: `offering.l4` and `handover.l4` both decline, for
+-- two different and correct reasons, so a regression that stopped this exporter
+-- drawing joins altogether would have left every golden unchanged.
+--
+-- What makes it joinable is narrow, and worth stating because the boundary is
+-- much tighter than it looks (see "the boundary of what can be joined" in
+-- jl4/tests/BpmnExport.hs):
+--
+--   * every branch is a PERMISSION. An obligation would not do: L4 gives every
+--     MUST a LEST to BREACH whether the drafter writes one or not, so an
+--     obligation branch stops at two places, and a converging parallel gateway
+--     needs all its branches to stop at the same one.
+--   * no branch carries a WITHIN. A deadline on a permission becomes a lapse
+--     timer, which is a second and mutually exclusive way for that branch to
+--     arrive at the join — and a parallel gateway would then wait for both.
+--   * no PROVIDED guard, which would put a condition on an incoming flow of a
+--     parallel gateway. That is a spec violation outright.
+--
+-- So: DO NOT add a deadline to this file to make it more realistic. Doing so
+-- silently converts the suite's only positive join case into a fourth negative
+-- one. That is not hypothetical — it is exactly what happened to `handover.l4`,
+-- whose header used to advertise its RAND as the join exhibit.
+--
+-- A branch may still be a chain, as the Resident's is: what the proof needs is
+-- one unconditional arrival per branch, not one task per branch.
+--
+-- Fixture for `jl4/tests/BpmnExport.hs`.
+
+DECLARE Participant IS ONE OF Resident, Developer, Registrar
+
+DECLARE Submission IS ONE OF
+  `file written comments`
+  `file a response`
+  `publish the record`
+
+`the consultation` MEANS
+      (PARTY Resident MAY `file written comments`
+         HENCE PARTY Registrar MAY `publish the record`)
+  RAND (PARTY Developer MAY `file a response`)

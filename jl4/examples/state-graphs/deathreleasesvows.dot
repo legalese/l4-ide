@@ -13,13 +13,12 @@ digraph {
       ,style=filled
       ,shape=ellipse
       ,fillcolor="#e8f4fd"];
-    1 [label=next
+    1 [label=Fulfilled
       ,fillcolor=white
       ,style=filled
-      ,shape=ellipse
-      ,fillcolor="#ffffff"];
+      ,shape=doublecircle
+      ,fillcolor="#d4edda"];
     0 -> 1 [label="Spouse1 MAY exchange vows"
            ,color="#28a745"
            ,style=solid];
 }
-

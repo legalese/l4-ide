@@ -1,30 +1,47 @@
 # Tutorials - Summary
 
 - [Tutorials Home](README.md)
-- [Tutorial Suggestions](tutorial-suggestions.md)
 
 ## Getting Started
 
 - [Your First L4 File](getting-started/first-l4-file.md)
+- [Using the l4 CLI](getting-started/l4-cli.md)
+- [Testing Your Rules](getting-started/testing-your-rules.md)
+- [Debugging Type Errors](getting-started/debugging-type-errors.md)
+- [Version Control for Rules](getting-started/version-control-for-rules.md)
 - [Encoding Legislation](getting-started/encoding-legislation.md)
 - [Wedding Vows](getting-started/wedding-vows.md)
-- [Common Patterns](getting-started/common-patterns.md)
+
+## Set Operators
+
+- [Sets, and the Two Meanings of "And"](set-operators/sets-and-the-two-ands.md)
+
+## Multi-Temporal Modeling
+
+- [Multi-Temporal Rule Modeling](multi-temporal-modeling/multi-temporal-rule-modeling.md)
 
 ## Deployment
 
 - [Exporting Rules for Deployment](deploying-rules/exporting-rules-for-deployment.md)
 
+## Blawx Bridge
+
+- [Exporting L4 to Blawx (and Importing Back)](blawx/l4-to-blawx.md)
+
 ## Legalese Cloud
 
 - [OpenAI- and Anthropic-Compatible AI APIs](legalese-cloud/openai-compatible-api.md)
 - [MCP Server](legalese-cloud/mcp-server.md)
+- [Using Your Rules from Claude](legalese-cloud/using-rules-from-claude.md)
 - [Install as Agent Plugin](legalese-cloud/agent-plugin.md)
+- [Use Deployed Rules from an AI Agent (MCP)](legalese-cloud/agent-marketplace.md)
 - [WebMCP Embed Script](legalese-cloud/webmcp-embed.md)
 - [RESTful OpenAPI Specification](legalese-cloud/openapi-spec.md)
 
 ## Natural Language
 
 - [Using Infix, Postfix, and Mixfix Functions](natural-language-functions/natural-language-functions.md)
+- [Optimising for Natural Language Generation with @nlg](natural-language-functions/optimising-natural-language-generation.md)
 
 ## LLM Integration
 

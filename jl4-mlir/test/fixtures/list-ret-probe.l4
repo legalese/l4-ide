@@ -1,0 +1,34 @@
+-- Refutation repro for the LIST-typed-return silent-wrong (blocker).
+-- The production decoder unmarshalWithSchema (jl4-runtime.mjs) has no list
+-- case, so a LIST-OF-scalar return shipped raw f64 pointer bits and a record
+-- list field decoded to null — all at supported:true (the cardinal sin).
+-- FIXED (fail-closed): buildExport now refuses any return whose schema
+-- contains an RSList anywhere, so these route to the reference evaluator.
+IMPORT prelude
+
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+DECLARE Bag HAS
+  items IS A LIST OF NUMBER
+  label IS A NUMBER
+
+-- (1) LIST OF NUMBER return
+@export three numbers
+GIVEN n IS A NUMBER
+GIVETH A LIST OF NUMBER
+`three numbers` MEANS LIST n, n PLUS 1, n PLUS 2
+
+-- (2) LIST OF nullary-enum return
+@export three colours
+GIVEN n IS A NUMBER
+GIVETH A LIST OF Colour
+`three colours` MEANS LIST Blue, Green, Red
+
+-- (3) record with a LIST field return
+@export mk bag
+GIVEN n IS A NUMBER
+GIVETH A Bag
+`mk bag` MEANS
+  Bag WITH
+    items IS (LIST n, n PLUS 1, n PLUS 2)
+    label IS n

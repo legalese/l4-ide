@@ -1,0 +1,169 @@
+IMPORT prelude
+IMPORT `housing-act-common`
+IMPORT daydate
+
+§ `Housing Act 1988 — Schedule 2 — Part II — Ground 17 (false statement)`
+
+-- ===========================================================================
+-- GROUND 17 — the "tenancy granted on the strength of a false statement" ground,
+-- inserted into Schedule 2 to the Housing Act 1988 by the Housing Act 1996
+-- (c. 52), s. 102 (in force 28.2.1997; S.I. 1997/225, art. 2; marker F72/F73).
+-- It is one of the DISCRETIONARY grounds in Part II of Schedule 2 ("GROUNDS ON
+-- WHICH COURT MAY ORDER POSSESSION"): where it is made out, the court MAY order
+-- possession (it is not bound to).
+--
+-- HYBRID encoding:
+--   * the constitutive conditions -> predicates carrying the verbatim statute
+--     inline as inert prose; only the operative atoms are lifted;
+--   * the discretionary outcome   -> a guarded deontic clause using MAY (not MUST).
+--
+-- Statutory text encoded:
+--   "The tenant is the person, or one of the persons, to whom the tenancy was
+--    granted and the landlord was induced to grant the tenancy by a false
+--    statement made knowingly or recklessly by—
+--      (a) the tenant, or
+--      (b) a person acting at the tenant's instigation."
+--
+-- STRUCTURE: a top-level CONJUNCTION of three limbs:
+--   LIMB 1 — the tenant is the person, or one of the persons, to whom the tenancy
+--            was granted ("is a grantee");
+--   LIMB 2 — the landlord was induced to grant the tenancy by a false statement
+--            made knowingly or recklessly (the inducement-by-false-statement);
+--   LIMB 3 — that statement was made by (a) the tenant OR (b) a person acting at
+--            the tenant's instigation (a DISJUNCTION over the maker of the
+--            statement).
+--
+-- INTERPRETATION CALLS flagged for the human reviewer:
+--   * The statute reads as a single "and" between LIMB 1 ("the tenant is ... a
+--     grantee") and the rest. The "induced ... by a false statement made knowingly
+--     or recklessly by (a)/(b)" clause is split into LIMB 2 (inducement +
+--     knowingly/recklessly) AND LIMB 3 (the (a)/(b) disjunction over the maker),
+--     because the "by—(a).../(b)..." enumeration grammatically attaches to "made
+--     ... by", identifying who made the statement. Made out =
+--     LIMB 1 AND LIMB 2 AND (a OR b).
+--   * "made knowingly or recklessly" is treated as part of LIMB 2's single
+--     operative atom (the mental-element qualifier on the false statement), not a
+--     separate disjunction, since both knowingly and recklessly are folded into
+--     "induced ... by a false statement made knowingly or recklessly".
+-- ===========================================================================
+
+§§ `Domain model`
+
+-- Actor (Landlord, Tenant, Court) is imported from `housing-act-common`.
+
+DECLARE Ground17Claim HAS
+  -- LIMB 1
+  `the tenant is the person, or one of the persons, to whom the tenancy was granted`  IS A BOOLEAN
+  -- LIMB 2
+  `the landlord was induced to grant the tenancy by a false statement made knowingly or recklessly`  IS A BOOLEAN
+  -- LIMB 3 — the maker of the statement: (a) or (b)
+  `the false statement was made by the tenant`  IS A BOOLEAN                         -- (a)
+  `the false statement was made by a person acting at the tenant's instigation`  IS A BOOLEAN  -- (b)
+
+§§ `Limb 1 — the tenant is a grantee of the tenancy`
+
+GIVEN claim IS A Ground17Claim
+GIVETH A BOOLEAN
+`tenant is a grantee of the tenancy` claim MEANS
+        "The tenant is the person, or one of the persons, to whom the tenancy was granted"
+    ... claim's `the tenant is the person, or one of the persons, to whom the tenancy was granted`
+
+§§ `Limb 2 — the landlord was induced by a false statement made knowingly or recklessly`
+
+GIVEN claim IS A Ground17Claim
+GIVETH A BOOLEAN
+`landlord induced by a false statement` claim MEANS
+        "and the landlord was induced to grant the tenancy by a false statement made knowingly or recklessly"
+    ... claim's `the landlord was induced to grant the tenancy by a false statement made knowingly or recklessly`
+
+§§ `Limb 3 — the statement was made by (a) the tenant OR (b) a person at the tenant's instigation`
+
+GIVEN claim IS A Ground17Claim
+GIVETH A BOOLEAN
+`statement made by the tenant or at the tenant's instigation` claim MEANS
+        "by—"
+    ..  "(a) the tenant, or"
+    ..  claim's `the false statement was made by the tenant`
+    ..  "(b) a person acting at the tenant's instigation."
+    ..  claim's `the false statement was made by a person acting at the tenant's instigation`
+
+§§ `Ground 17 made out — LIMB 1 AND LIMB 2 AND (a OR b)`
+
+GIVEN claim IS A Ground17Claim
+GIVETH A BOOLEAN
+`Ground 17 made out` claim MEANS
+        `tenant is a grantee of the tenancy` claim
+    AND `landlord induced by a false statement` claim
+    AND `statement made by the tenant or at the tenant's instigation` claim
+
+§§ `The discretionary outcome — Court MAY order possession`
+
+-- Action (`order possession`) is imported from `housing-act-common`.
+
+GIVEN claim IS A Ground17Claim
+GIVETH A DEONTIC Actor Action
+`ground 17 possession order` claim MEANS
+    IF   `Ground 17 made out` claim
+    THEN PARTY Court MAY `order possession` WITHIN 30
+    ELSE FULFILLED
+
+§ `Tests`
+
+§§ `Made out — false statement made by the tenant himself (limb (a))`
+
+`claim — statement by tenant` MEANS Ground17Claim WITH
+  `the tenant is the person, or one of the persons, to whom the tenancy was granted`  IS TRUE
+  `the landlord was induced to grant the tenancy by a false statement made knowingly or recklessly`  IS TRUE
+  `the false statement was made by the tenant`  IS TRUE
+  `the false statement was made by a person acting at the tenant's instigation`  IS FALSE
+
+#ASSERT `tenant is a grantee of the tenancy`                              `claim — statement by tenant`
+#ASSERT `landlord induced by a false statement`                          `claim — statement by tenant`
+#ASSERT `statement made by the tenant or at the tenant's instigation`    `claim — statement by tenant`
+#ASSERT `Ground 17 made out`                                             `claim — statement by tenant`
+
+§§ `Made out — false statement made at the tenant's instigation (limb (b))`
+
+`claim — statement at instigation` MEANS Ground17Claim WITH
+  `the tenant is the person, or one of the persons, to whom the tenancy was granted`  IS TRUE
+  `the landlord was induced to grant the tenancy by a false statement made knowingly or recklessly`  IS TRUE
+  `the false statement was made by the tenant`  IS FALSE
+  `the false statement was made by a person acting at the tenant's instigation`  IS TRUE
+
+#ASSERT `statement made by the tenant or at the tenant's instigation` `claim — statement at instigation`
+#ASSERT `Ground 17 made out`                                          `claim — statement at instigation`
+
+§§ `Not made out — tenant is not a grantee (limb 1 fails)`
+
+`claim — not a grantee` MEANS Ground17Claim WITH
+  `the tenant is the person, or one of the persons, to whom the tenancy was granted`  IS FALSE
+  `the landlord was induced to grant the tenancy by a false statement made knowingly or recklessly`  IS TRUE
+  `the false statement was made by the tenant`  IS TRUE
+  `the false statement was made by a person acting at the tenant's instigation`  IS FALSE
+
+#ASSERT NOT `tenant is a grantee of the tenancy` `claim — not a grantee`
+#ASSERT NOT `Ground 17 made out`                 `claim — not a grantee`
+
+§§ `Not made out — landlord was not induced by any false statement (limb 2 fails)`
+
+`claim — no inducement` MEANS Ground17Claim WITH
+  `the tenant is the person, or one of the persons, to whom the tenancy was granted`  IS TRUE
+  `the landlord was induced to grant the tenancy by a false statement made knowingly or recklessly`  IS FALSE
+  `the false statement was made by the tenant`  IS TRUE
+  `the false statement was made by a person acting at the tenant's instigation`  IS FALSE
+
+#ASSERT NOT `landlord induced by a false statement` `claim — no inducement`
+#ASSERT NOT `Ground 17 made out`                     `claim — no inducement`
+
+§§ `Not made out — false statement made by an unconnected third party (neither (a) nor (b))`
+
+-- The inducement is present, but the false statement was made neither by the
+-- tenant nor by anyone acting at the tenant's instigation -> limb 3 fails.
+`claim — third-party statement` MEANS Ground17Claim WITH
+  `the tenant is the person, or one of the persons, to whom the tenancy was granted`  IS TRUE
+  `the landlord was induced to grant the tenancy by a false statement made knowingly or recklessly`  IS TRUE
+  `the false statement was made by the tenant`  IS FALSE
+  `the false statement was made by a person acting at the tenant's instigation`  IS FALSE
+
+#ASSERT NOT `statement made by the tenant or at the tenant's instigation` `claim — third-party statement`
+#ASSERT NOT `Ground 17 made out`                                          `claim — third-party statement`

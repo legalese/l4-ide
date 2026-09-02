@@ -2,7 +2,7 @@ IMPORT datetime
 IMPORT timezone
 IMPORT daydate
 
-SGT
+TIMEZONE IS SGT
 
 -- DateTime constructors
 DECIDE `meeting time` IS Datetime (Date 15 6 2025) (TIME_FROM_HMS 14 30 0)

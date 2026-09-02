@@ -14,12 +14,21 @@ import {
   AiFileOpen,
   AiFileOpenDiff,
   AiGetActiveFileSelection,
+  AiMcpAllSetEnabled,
+  AiMcpServerAction,
+  AiMcpServerAdd,
+  AiMcpServerImport,
+  AiMcpServerSetEnabled,
+  AiMcpServersGet,
+  AiMcpToolSetEnabled,
   AiMentionSearch,
   AiPermissionsGet,
   AiPermissionsSet,
   AiUsageSubscribe,
   AiUsageUnsubscribe,
   type AiChatAttachment,
+  type AiMcpCandidateInfo,
+  type AiMcpServerInfo,
   type AiConversation,
   type AiConversationSummary,
   type AiChatMessage,
@@ -109,6 +118,9 @@ export type UserTurnChip =
       selectionStartLine?: number
       selectionEndLine?: number
     }
+  // A referenced workspace file (an `@`-mention surfaced as a chip),
+  // e.g. the Render tab's L4 source + generated document.
+  | { kind: 'file'; name: string; path: string }
 
 export type AssistantBlock =
   | { kind: 'text'; text: string }
@@ -612,7 +624,8 @@ export function createAiChatStore(
 
   async function send(
     text: string,
-    mentions: AiChatStartParams['mentions'] = []
+    mentions: AiChatStartParams['mentions'] = [],
+    opts: { fileChips?: Array<{ name: string; path: string }> } = {}
   ): Promise<void> {
     const m = getMessenger()
     if (!m || !text.trim()) return
@@ -657,6 +670,12 @@ export function createAiChatStore(
     const turnChips: UserTurnChip[] = []
     for (const att of stagedAttachments) {
       turnChips.push({ kind: att.kind, name: att.name })
+    }
+    // Referenced-file chips (e.g. the Render tab's source + generated
+    // document). The matching `@`-mentions carry the paths to the model;
+    // these chips are the human-visible echo of them.
+    for (const fc of opts.fileChips ?? []) {
+      turnChips.push({ kind: 'file', name: fc.name, path: fc.path })
     }
     if (chipName && chipPath) {
       turnChips.push({
@@ -1625,6 +1644,13 @@ export function createAiChatStore(
       for (const k of Object.keys(pendingQuestionConvByCallId))
         delete pendingQuestionConvByCallId[k]
       void refreshHistory()
+      // The usage tracker is per-user too. Clear it on the auth flip so
+      // the previous account's token count doesn't linger under the new
+      // identity until the next usage poll (up to 30s away). The poll
+      // repopulates it with the new user's real figures.
+      usedToday = 0
+      dailyLimit = 0
+      blockOnOverage = false
     }
   }
 
@@ -1725,6 +1751,13 @@ export function createAiChatStore(
     return pendingDraft
   }
 
+  /** Stage an attachment the caller already assembled (e.g. the Render
+   *  tab's saved drafting-policy file), rather than going through the
+   *  native picker. Mirrors what {@link pickAttachment} does on success. */
+  function attachExternal(att: AiChatAttachment): void {
+    stagedAttachments = [...stagedAttachments, att]
+  }
+
   async function getPermissions(): Promise<
     Record<AiPermissionCategory, AiPermissionValue>
   > {
@@ -1737,6 +1770,7 @@ export function createAiChatStore(
       'l4.evaluate': 'always',
       'l4.refactor': 'always',
       'mcp.l4Rules': 'always',
+      'mcp.vscode': 'ask',
       'meta.askUser': 'always',
     } as Record<AiPermissionCategory, AiPermissionValue>
     if (!m) return empty
@@ -1758,6 +1792,101 @@ export function createAiChatStore(
   ): void {
     const m = getMessenger()
     m?.sendNotification(AiPermissionsSet, HOST_EXTENSION, { category, value })
+  }
+
+  async function getMcpServers(): Promise<{
+    servers: AiMcpServerInfo[]
+    candidates: AiMcpCandidateInfo[]
+    allEnabled: boolean
+  }> {
+    const m = getMessenger()
+    if (!m) return { servers: [], candidates: [], allEnabled: true }
+    try {
+      return await m.sendRequest(
+        AiMcpServersGet,
+        HOST_EXTENSION,
+        undefined as never
+      )
+    } catch {
+      return { servers: [], candidates: [], allEnabled: true }
+    }
+  }
+
+  async function importMcpServer(
+    id: string
+  ): Promise<{ ok: boolean; error?: string }> {
+    const m = getMessenger()
+    if (!m) return { ok: false, error: 'Not connected to the extension.' }
+    try {
+      return await m.sendRequest(AiMcpServerImport, HOST_EXTENSION, { id })
+    } catch (err) {
+      return {
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+      }
+    }
+  }
+
+  function setMcpAllEnabled(enabled: boolean): void {
+    const m = getMessenger()
+    m?.sendNotification(AiMcpAllSetEnabled, HOST_EXTENSION, { enabled })
+  }
+
+  function setMcpServerEnabled(id: string, enabled: boolean): void {
+    const m = getMessenger()
+    m?.sendNotification(AiMcpServerSetEnabled, HOST_EXTENSION, { id, enabled })
+  }
+
+  async function mcpServerAction(
+    id: string,
+    action: 'start' | 'stop' | 'refresh' | 'remove'
+  ): Promise<{ ok: boolean; error?: string }> {
+    const m = getMessenger()
+    if (!m) return { ok: false, error: 'Not connected to the extension.' }
+    try {
+      return await m.sendRequest(AiMcpServerAction, HOST_EXTENSION, {
+        id,
+        action,
+      })
+    } catch (err) {
+      return {
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+      }
+    }
+  }
+
+  function setMcpToolEnabled(
+    serverId: string,
+    toolName: string,
+    enabled: boolean
+  ): void {
+    const m = getMessenger()
+    m?.sendNotification(AiMcpToolSetEnabled, HOST_EXTENSION, {
+      serverId,
+      toolName,
+      enabled,
+    })
+  }
+
+  async function addMcpServer(input: {
+    name: string
+    transport: 'http' | 'sse' | 'stdio'
+    url?: string
+    command?: string
+    bearerToken?: string
+    overwrite?: boolean
+  }): Promise<{ ok: boolean; error?: string; exists?: boolean }> {
+    const m = getMessenger()
+    if (!m) return { ok: false, error: 'Not connected to the extension.' }
+    try {
+      return await m.sendRequest(AiMcpServerAdd, HOST_EXTENSION, input)
+    } catch (err) {
+      return {
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+      }
+    }
   }
 
   /** Pop the extension's native file picker for an attachment. Returns
@@ -1889,6 +2018,13 @@ export function createAiChatStore(
     answerQuestion,
     getPermissions,
     setPermission,
+    getMcpServers,
+    importMcpServer,
+    setMcpServerEnabled,
+    setMcpAllEnabled,
+    mcpServerAction,
+    setMcpToolEnabled,
+    addMcpServer,
     // Actions.
     refreshHistory,
     loadConversation,
@@ -1903,6 +2039,7 @@ export function createAiChatStore(
     setDraft,
     seedDraft,
     getDraft,
+    attachExternal,
     get draftSeedVersion() {
       return draftSeedVersion
     },
@@ -1962,6 +2099,31 @@ export type AiChatStore = {
     category: AiPermissionCategory,
     value: AiPermissionValue
   ) => void
+  getMcpServers: () => Promise<{
+    servers: AiMcpServerInfo[]
+    candidates: AiMcpCandidateInfo[]
+    allEnabled: boolean
+  }>
+  importMcpServer: (id: string) => Promise<{ ok: boolean; error?: string }>
+  setMcpServerEnabled: (id: string, enabled: boolean) => void
+  setMcpAllEnabled: (enabled: boolean) => void
+  mcpServerAction: (
+    id: string,
+    action: 'start' | 'stop' | 'refresh' | 'remove'
+  ) => Promise<{ ok: boolean; error?: string }>
+  setMcpToolEnabled: (
+    serverId: string,
+    toolName: string,
+    enabled: boolean
+  ) => void
+  addMcpServer: (input: {
+    name: string
+    transport: 'http' | 'sse' | 'stdio'
+    url?: string
+    command?: string
+    bearerToken?: string
+    overwrite?: boolean
+  }) => Promise<{ ok: boolean; error?: string; exists?: boolean }>
   refreshHistory: () => Promise<void>
   loadConversation: (id: string) => Promise<void>
   deleteConversation: (id: string) => Promise<void>
@@ -1973,7 +2135,8 @@ export type AiChatStore = {
   ) => void
   send: (
     text: string,
-    mentions?: AiChatStartParams['mentions']
+    mentions?: AiChatStartParams['mentions'],
+    opts?: { fileChips?: Array<{ name: string; path: string }> }
   ) => Promise<void>
   continueTurn: () => void
   abort: () => void
@@ -1982,6 +2145,7 @@ export type AiChatStore = {
   setDraft: (text: string) => void
   seedDraft: (text: string) => void
   getDraft: () => string
+  attachExternal: (att: AiChatAttachment) => void
   readonly draftSeedVersion: number
   searchMentions: (query: string) => Promise<AiMentionCandidate[]>
   approveTool: (

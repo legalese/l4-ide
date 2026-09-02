@@ -1,0 +1,46 @@
+-- NEGATIVE fixture for the future D-CYCLE / D-RECURSIVE checks (spec §6.4.2,
+-- §6.4.5).
+--
+-- p4: the cycle runs THROUGH A WHERE-LOCAL rather than between two top-level
+-- names directly.
+--
+--     `the assessed value`  MEANS `adjusted`
+--                           WHERE `adjusted` MEANS `the review value` PLUS 1
+--     `the review value`    MEANS `the assessed value` MINUS 1
+--
+-- The interesting part is that the local is not a DRG node. Whatever the
+-- exporter does with a WHERE binding -- inline it, hoist it, lift it -- the
+-- cycle it participates in has to survive that transformation or the check
+-- looks at the wrong graph.
+--
+-- On today's tree the emitted DRG IS cyclic here and the report is silent.
+--
+-- Expected after Phase 4: one D-CYCLE (or D-RECURSIVE, once the members
+-- un-lift) over the two top-level names, with the local not listed as a member
+-- because it is not a node.
+--
+-- Its companion cycle-p4-where-local-self.l4 is the case §6.4.5 CONCEDES is
+-- invisible; read the two together.
+--
+--
+-- PROVENANCE OF THIS HEADER. The .l4 source was typechecked (`l4 check`, clean)
+-- when it was written on 2026-07-31, with a prebuilt CLI. The statements above
+-- about what TODAY'S EXPORTER emits and reports are taken from spec
+-- §6.4.2/§6.4.5's table and were NOT re-measured here: that session had no
+-- build. Whoever wires these fixtures into jl4/tests/DmnExport.hs must MEASURE
+-- the expectation rather than transcribe it.
+-- NEVER added to `goldenSubjects`.
+
+IMPORT prelude
+
+§ `cycle through a where local`
+
+GIVETH A NUMBER
+`the assessed value` MEANS
+    `adjusted`
+      WHERE
+        `adjusted` MEANS `the review value` PLUS 1
+
+GIVETH A NUMBER
+`the review value` MEANS
+    `the assessed value` MINUS 1

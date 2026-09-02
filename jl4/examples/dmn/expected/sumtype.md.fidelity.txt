@@ -1,0 +1,31 @@
+fidelity report — dmnmd
+  [D-MD-NODRG] blocking — definitions_sum_types_and_the_data_model
+      dmnmd is a table format, not a graph: the 10 information requirement(s) between these decisions have no markdown form
+      lost: the decision requirements graph; which decision feeds which is invisible
+  [D-MD-NODEFAULT] lossy — decision_is_a_sale
+      dmnmd has no <defaultOutputEntry>, so `is a sale`'s OTHERWISE became a final catch-all row — which overlaps every other rule, so the hit policy had to go from U down to F
+      lost: the order-free reading of a Unique table
+  [D-MD-NOLITERAL] blocking — decision_stated_term
+      `stated term` is a formula (disposal.term_in_years), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision_claim_amount
+      `claim amount` is a formula (c.amount), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-CELLSYNTAX] blocking — decision_capped_at_ten
+      `capped at ten`'s OTHERWISE is `null`, and dmnmd's cell grammar cannot say it (a cell is a number, an integer range, or a bare token), so this table is omitted
+      lost: the whole table
+  [D-MD-NOLITERAL] blocking — decision_grade_is_settled
+      `grade is settled` is a formula (q != null), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision_grade_is_settled_spelled_longhand
+      `grade is settled, spelled longhand` is a formula (if p != null then true else false), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision_claim_payout
+      `claim payout` is a formula (cl_hydrated.doubled_amount), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision_deep
+      `deep` is a formula (true), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOCONTEXT] blocking — hydration_cl
+      `cl` is a boxed context: a record hydrated from its source with 5 component(s), of which the derived ones are computed from earlier siblings. dmnmd has no boxed-context form -- it can say a decision over cases and nothing else -- so this decision is omitted
+      lost: the decision itself, and with it every derived component the tables downstream read through: in the markdown those reads name a decision that is not there

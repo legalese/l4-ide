@@ -1,0 +1,283 @@
+IMPORT prelude
+IMPORT `housing-act-common`
+
+§ `Housing Act 1988 — Schedule 2 — Part I — Ground 1 (original 1988), limbs (a) and (b)`
+
+-- This file encodes the BOTTOM HALF of Ground 1 (the ORIGINAL 1988 version, as
+-- amended by the Civil Partnership Act 2004 — NOT the Renters' Rights Act 2024
+-- replacement, which lives in housing-act-ground-1-amended-2024.l4): the "home
+-- condition", i.e.
+-- the disjunction of limb (a) (prior occupation) and limb (b) (present
+-- requirement), which is the constitutive core that the notice requirement
+-- sits on top of.  The TOP half of Ground 1 — the notice / just-and-equitable
+-- gateway, and the mandatory "Court MUST order possession" outcome — is
+-- carried here as a plain BOOLEAN field (`notice was given`) and a guarded
+-- regulative clause, in the HYBRID style:
+--   * constitutive conditions  -> predicates (GIVEN ... GIVETH A BOOLEAN ... MEANS ...)
+--     carrying the verbatim statute inline as inert prose;
+--   * the mandatory outcome     -> a regulative/deontic clause guarded by the
+--     constitutive condition.
+--
+-- Statutory text encoded (Ground 1, as amended by the Civil Partnership
+-- Act 2004 — which inserted "or his civil partner's" in limb (b)):
+--
+--   Where ... and (in either case) —
+--   (a) at some time before the beginning of the tenancy, the landlord who is
+--       seeking possession or, in the case of joint landlords seeking
+--       possession, at least one of them occupied the dwelling-house as his
+--       only or principal home; or
+--   (b) the landlord who is seeking possession or, in the case of joint
+--       landlords seeking possession, at least one of them requires the
+--       dwelling-house as [F2 his, his spouse's or his civil partner's] only or
+--       principal home and neither the landlord (or, in the case of joint
+--       landlords, any one of them) nor any other person who, as landlord,
+--       derived title under the landlord who gave the notice mentioned in
+--       Ground 1 above acquired the reversion on the tenancy for money or
+--       money's worth.
+
+§§ `Domain model`
+
+-- Actor (Landlord, Tenant, Court) is imported from `housing-act-common`.
+
+-- A Person here is a landlord-side party.  The booleans capture the operative
+-- atoms the statute turns on, per person:
+--   * `occupied as only or principal home before tenancy`  -> limb (a) atom
+--   * `requires as own or spouse or civil partner home`      -> limb (b) first atom
+--   * `acquired reversion for money or money's worth`        -> limb (b) money atom
+DECLARE Person HAS
+  name                                            IS A STRING
+  `occupied as only or principal home before tenancy`   IS A BOOLEAN
+  `requires as own or spouse or civil partner home`     IS A BOOLEAN
+  `acquired reversion for money or money's worth`       IS A BOOLEAN
+
+-- A Claim bundles the facts the court reasons over.
+--   * `landlords`   — the landlord(s) seeking possession ("at least one of them").
+--   * `successors in title` — any other person who, as landlord, derived title
+--     under the landlord who gave the notice (the limb (b) money check ranges
+--     over the landlords AND these successors).
+--   * `notice was given` — the Ground 1 notice gateway, modelled as a plain
+--     BOOLEAN (the trace/ledger version lives on a different branch).
+DECLARE Claim HAS
+  `landlords`                IS A LIST OF Person
+  `successors in title`      IS A LIST OF Person
+  `notice was given`         IS A BOOLEAN
+
+§§ `Limb (a) — prior occupation`
+
+-- (a) at some time before the beginning of the tenancy, the landlord ... or,
+--     in the case of joint landlords ..., at least one of them occupied the
+--     dwelling-house as his only or principal home.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`limb (a) prior occupation` claim MEANS
+        "at some time before the beginning of the tenancy, the landlord who is seeking possession"
+    ... "or, in the case of joint landlords seeking possession, at least one of them"
+    ... "occupied the dwelling-house as his only or principal home"
+    ... any (GIVEN l YIELD l's `occupied as only or principal home before tenancy`)
+            (claim's `landlords`)
+
+§§ `Limb (b) — present requirement`
+
+-- (b) the landlord ... or, in the case of joint landlords ..., at least one of
+--     them requires the dwelling-house as his, his spouse's or his civil
+--     partner's only or principal home
+-- AND neither the landlord (or any one of joint landlords) nor any other
+--     person who, as landlord, derived title under the landlord who gave the
+--     notice acquired the reversion on the tenancy for money or money's worth.
+
+-- First operative atom of (b): the requirement-as-home, ranging over landlords.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`requires as only or principal home` claim MEANS
+        "the landlord who is seeking possession or, in the case of joint landlords seeking possession, at least one of them"
+    ... "requires the dwelling-house as his, his spouse's or his civil partner's only or principal home"
+    ... any (GIVEN l YIELD l's `requires as own or spouse or civil partner home`)
+            (claim's `landlords`)
+
+-- Money atom of (b), stated in the POSITIVE: the reversion-for-value check
+-- ranges over BOTH the landlords AND the successors in title.  TRUE if ANY of
+-- them acquired the reversion for money or money's worth.  The statute's own
+-- NEGATIVE framing ("neither ... nor ... acquired ...") is carried at the
+-- negation site below, where the negation actually is, so the verbatim "neither
+-- ... nor ..." prose sits next to the NOT.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`reversion acquired for value` claim MEANS
+        "any of them acquired the reversion on the tenancy for money or money's worth"
+    ..  ( any (GIVEN p YIELD p's `acquired reversion for money or money's worth`)
+              (claim's `landlords`)
+       OR any (GIVEN p YIELD p's `acquired reversion for money or money's worth`)
+              (claim's `successors in title`) )
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`limb (b) present requirement` claim MEANS
+        `requires as only or principal home` claim
+    AND     "neither the landlord (or, in the case of joint landlords, any one of them)"
+        ... "nor any other person who, as landlord, derived title under the landlord who gave the notice mentioned in Ground 1 above"
+        ... "acquired the reversion on the tenancy for money or money's worth"
+        ... NOT `reversion acquired for value` claim
+
+§§ `The home condition — limb (a) OR limb (b)`
+
+-- "and (in either case) — (a) ... ; or (b) ..."
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`landlord-home condition` claim MEANS
+        `limb (a) prior occupation`   claim
+    ..  `limb (b) present requirement` claim
+
+§§ `Ground 1 (original 1988) made out — notice gateway AND home condition`
+
+-- The full Ground 1 (original 1988) = the notice gateway (modelled as a plain
+-- BOOLEAN here) AND the home condition.  (Per spec the just-and-equitable
+-- dispensation lives with the notice modelling on another branch; here
+-- `notice was given` is the whole gateway.)
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`Ground 1 (original 1988) made out` claim MEANS
+        claim's `notice was given`
+    AND `landlord-home condition` claim
+
+§§ `The mandatory outcome — Court MUST order possession`
+
+-- Action (`order possession`) is imported from `housing-act-common`.
+
+-- Part I grounds are MANDATORY: if Ground 1 is made out the court MUST order
+-- possession.  Guard the deontic outcome by the constitutive condition; if the
+-- ground is not made out, there is (on this ground) nothing the court must do.
+GIVEN claim IS A Claim
+GIVETH A DEONTIC Actor Action
+`ground 1 possession order` claim MEANS
+    IF   `Ground 1 (original 1988) made out` claim
+    THEN PARTY Court MUST `order possession` WITHIN 30
+    ELSE FULFILLED
+
+§ `Tests`
+
+-- A landlord who previously occupied (limb (a) true), gave notice.
+`prior-occupier` MEANS Person WITH
+  name                                            IS "Alice prior-occupier"
+  `occupied as only or principal home before tenancy`   IS TRUE
+  `requires as own or spouse or civil partner home`     IS FALSE
+  `acquired reversion for money or money's worth`       IS FALSE
+
+-- A landlord who now requires the home (limb (b) first atom true), did not buy
+-- the reversion for value.
+`present-requirer` MEANS Person WITH
+  name                                            IS "Bob present-requirer"
+  `occupied as only or principal home before tenancy`   IS FALSE
+  `requires as own or spouse or civil partner home`     IS TRUE
+  `acquired reversion for money or money's worth`       IS FALSE
+
+-- A landlord who now requires the home BUT bought the reversion for value
+-- (defeats limb (b)).
+`requirer-who-bought` MEANS Person WITH
+  name                                            IS "Carol requirer-who-bought"
+  `occupied as only or principal home before tenancy`   IS FALSE
+  `requires as own or spouse or civil partner home`     IS TRUE
+  `acquired reversion for money or money's worth`       IS TRUE
+
+-- A bare landlord with none of the operative atoms (neither limb).
+`bare-landlord` MEANS Person WITH
+  name                                            IS "Dan bare-landlord"
+  `occupied as only or principal home before tenancy`   IS FALSE
+  `requires as own or spouse or civil partner home`     IS FALSE
+  `acquired reversion for money or money's worth`       IS FALSE
+
+-- A successor in title who bought the reversion for value (used to defeat
+-- limb (b) via the successor branch).
+`buying-successor` MEANS Person WITH
+  name                                            IS "Eve buying-successor"
+  `occupied as only or principal home before tenancy`   IS FALSE
+  `requires as own or spouse or civil partner home`     IS FALSE
+  `acquired reversion for money or money's worth`       IS TRUE
+
+§§ `Claim (a)-true — prior occupation`
+
+`claim (a)-true` MEANS Claim WITH
+  `landlords`           IS LIST `prior-occupier`
+  `successors in title` IS EMPTY
+  `notice was given`    IS TRUE
+
+#ASSERT     `limb (a) prior occupation`   `claim (a)-true`
+#ASSERT NOT `limb (b) present requirement` `claim (a)-true`
+#ASSERT     `landlord-home condition`     `claim (a)-true`
+#ASSERT     `Ground 1 (original 1988) made out`           `claim (a)-true`
+
+§§ `Claim (b)-true — present requirement, no purchase for value`
+
+`claim (b)-true` MEANS Claim WITH
+  `landlords`           IS LIST `present-requirer`
+  `successors in title` IS EMPTY
+  `notice was given`    IS TRUE
+
+#ASSERT NOT `limb (a) prior occupation`    `claim (b)-true`
+#ASSERT     `requires as only or principal home` `claim (b)-true`
+#ASSERT NOT `reversion acquired for value` `claim (b)-true`
+#ASSERT     `limb (b) present requirement` `claim (b)-true`
+#ASSERT     `landlord-home condition`      `claim (b)-true`
+#ASSERT     `Ground 1 (original 1988) made out`            `claim (b)-true`
+
+§§ `Claim (b)-fails — required, but reversion bought for value`
+
+-- The landlord requires the home, but a successor in title bought the
+-- reversion for money's worth; the money atom ranges over successors too, so
+-- limb (b) fails and (no limb (a)) the home condition fails.
+`claim (b)-fails-by-purchase` MEANS Claim WITH
+  `landlords`           IS LIST `present-requirer`
+  `successors in title` IS LIST `buying-successor`
+  `notice was given`    IS TRUE
+
+#ASSERT     `requires as only or principal home` `claim (b)-fails-by-purchase`
+#ASSERT     `reversion acquired for value`  `claim (b)-fails-by-purchase`
+#ASSERT NOT `limb (b) present requirement`  `claim (b)-fails-by-purchase`
+#ASSERT NOT `landlord-home condition`       `claim (b)-fails-by-purchase`
+#ASSERT NOT `Ground 1 (original 1988) made out`             `claim (b)-fails-by-purchase`
+
+-- Same defeat, but via a LANDLORD who bought for value (no successors).
+`claim (b)-fails-by-landlord-purchase` MEANS Claim WITH
+  `landlords`           IS LIST `requirer-who-bought`
+  `successors in title` IS EMPTY
+  `notice was given`    IS TRUE
+
+#ASSERT     `reversion acquired for value`  `claim (b)-fails-by-landlord-purchase`
+#ASSERT NOT `limb (b) present requirement`  `claim (b)-fails-by-landlord-purchase`
+#ASSERT NOT `landlord-home condition`       `claim (b)-fails-by-landlord-purchase`
+
+§§ `Claim neither-limb — bare landlord`
+
+`claim neither-limb` MEANS Claim WITH
+  `landlords`           IS LIST `bare-landlord`
+  `successors in title` IS EMPTY
+  `notice was given`    IS TRUE
+
+#ASSERT NOT `limb (a) prior occupation`    `claim neither-limb`
+#ASSERT NOT `limb (b) present requirement` `claim neither-limb`
+#ASSERT NOT `landlord-home condition`      `claim neither-limb`
+#ASSERT NOT `Ground 1 (original 1988) made out`            `claim neither-limb`
+
+§§ `Joint landlords — "at least one of them"`
+
+-- Two landlords; only one previously occupied.  Limb (a) is satisfied because
+-- AT LEAST ONE occupied.
+`claim joint-one-occupied` MEANS Claim WITH
+  `landlords`           IS LIST `prior-occupier`, `bare-landlord`
+  `successors in title` IS EMPTY
+  `notice was given`    IS TRUE
+
+#ASSERT `limb (a) prior occupation`  `claim joint-one-occupied`
+#ASSERT `landlord-home condition`    `claim joint-one-occupied`
+#ASSERT `Ground 1 (original 1988) made out`          `claim joint-one-occupied`
+
+§§ `Notice gateway — home condition met but no notice`
+
+-- Home condition met (limb (a)), but notice was NOT given: Ground 1 not made
+-- out, so the court is under no mandatory duty on this ground.
+`claim no-notice` MEANS Claim WITH
+  `landlords`           IS LIST `prior-occupier`
+  `successors in title` IS EMPTY
+  `notice was given`    IS FALSE
+
+#ASSERT     `landlord-home condition` `claim no-notice`
+#ASSERT NOT `Ground 1 (original 1988) made out`       `claim no-notice`

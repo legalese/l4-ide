@@ -1,0 +1,18 @@
+-- Test: sibling sections defining the same name must STILL be ambiguous.
+--
+-- Lexical scoping only prefers bindings on the current section's ancestry
+-- (same section, parent, ..., top level). Sibling subsections §§ b and §§ c
+-- are NOT on each other's ancestry, and from their common ancestor § a neither
+-- is nearer than the other, so an unqualified reference remains ambiguous.
+-- To disambiguate, the reference must be qualified (a.b.x or a.c.x).
+
+§ a
+-- Referenced directly in § a, the common ancestor of siblings §§ b and §§ c.
+-- (Forward references are allowed by the type checker.)
+#CHECK x
+
+§§ b
+ASSUME x IS A BOOLEAN
+
+§§ c
+ASSUME x IS A NUMBER

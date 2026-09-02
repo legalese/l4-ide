@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1402" height="376" viewBox="0 0 1402 376">
+<rect width="1402" height="376" fill="#ffffff"/>
+<text x="220.0" y="181.7" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#555" font-style="italic">An officer or employee of</text>
+<text x="220.0" y="201.7" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#555" font-style="italic">a corporation shall not</text>
+<rect data-fnid="4" data-value="4" class="lad-box lad-clickable" x="374.0" y="168.0" width="310.2" height="39.6" rx="7" fill="#ffffff" stroke="#777" stroke-width="1.5"/>
+<text data-fnid="4" x="529.1" y="192.8" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#111">`makes improper use of his position`</text>
+<text x="810.8" y="181.7" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#555" font-style="italic">as such an officer</text>
+<text x="810.8" y="201.7" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#555" font-style="italic">or employee,</text>
+<rect data-fnid="8" data-value="8" class="lad-box lad-clickable" x="998.6" y="101.6" width="231.8" height="39.6" rx="7" fill="#ffffff" stroke="#777" stroke-width="1.5"/>
+<text data-fnid="8" x="1114.6" y="126.4" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#111">`an advantage for himself`</text>
+<path class="lad-wire lad-clickable" data-fold="6" d="M 937.4,187.8 C 983.3,187.8 952.7,121.4 998.6,121.4" fill="none" stroke="#777" stroke-width="1.5"/>
+<path class="lad-wire lad-clickable" data-fold="6" d="M 1230.5,121.4 C 1276.4,121.4 1245.8,187.8 1291.8,187.8" fill="none" stroke="#777" stroke-width="1.5"/>
+<rect data-fnid="9" data-value="9" class="lad-box lad-clickable" x="963.4" y="167.2" width="302.4" height="39.6" rx="7" fill="#ffffff" stroke="#777" stroke-width="1.5"/>
+<text data-fnid="9" x="1114.6" y="192.0" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#111">`an advantage for any other person`</text>
+<path class="lad-wire lad-clickable" data-fold="6" d="M 937.4,187.8 C 967.4,187.8 933.4,187.0 963.4,187.0" fill="none" stroke="#777" stroke-width="1.5"/>
+<path class="lad-wire lad-clickable" data-fold="6" d="M 1265.8,187.0 C 1295.8,187.0 1261.8,187.8 1291.8,187.8" fill="none" stroke="#777" stroke-width="1.5"/>
+<text x="1114.6" y="224.6" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#555" font-style="italic">or to cause</text>
+<rect data-fnid="11" data-value="11" class="lad-box lad-clickable" x="983.0" y="234.4" width="263.2" height="39.6" rx="7" fill="#ffffff" stroke="#777" stroke-width="1.5"/>
+<text data-fnid="11" x="1114.6" y="259.2" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#111">`detriment to the corporation`</text>
+<path class="lad-wire lad-clickable" data-fold="6" d="M 937.4,187.8 C 973.9,187.8 946.4,254.2 983.0,254.2" fill="none" stroke="#777" stroke-width="1.5"/>
+<path class="lad-wire lad-clickable" data-fold="6" d="M 1246.2,254.2 C 1282.7,254.2 1255.2,187.8 1291.8,187.8" fill="none" stroke="#777" stroke-width="1.5"/>
+<text data-fnid="6" data-fold="6" class="lad-clickable" x="1114.6" y="87.8" font-family="Georgia, serif" font-size="12.5" text-anchor="middle" fill="#555" font-style="italic">to gain, directly or indirectly, an advantage</text>
+<polyline class="lad-wire lad-clickable" data-fold="2" points="330.0,187.8 374.0,187.8" fill="none" stroke="#777" stroke-width="1.5"/>
+<polyline class="lad-wire lad-clickable" data-fold="2" points="684.2,187.8 728.2,187.8" fill="none" stroke="#777" stroke-width="1.5"/>
+<polyline class="lad-wire lad-clickable" data-fold="2" points="893.4,187.8 937.4,187.8" fill="none" stroke="#777" stroke-width="1.5"/>
+<polyline class="lad-wire lad-clickable" data-fold="2" points="110.0,187.8 330.0,187.8" fill="none" stroke="#777" stroke-width="1.5"/>
+<polyline class="lad-wire lad-clickable" data-fold="2" points="728.2,187.8 893.4,187.8" fill="none" stroke="#777" stroke-width="1.5"/>
+<polyline class="lad-wire" points="70.0,187.8 110.0,187.8" fill="none" stroke="#222" stroke-width="1.5"/>
+<circle cx="70.0" cy="187.8" r="3.5" fill="#222"/>
+<polyline class="lad-wire" points="1291.8,187.8 1331.8,187.8" fill="none" stroke="#222" stroke-width="1.5"/>
+<circle cx="1331.8" cy="187.8" r="3.5" fill="#222"/>
+</svg>

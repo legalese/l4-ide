@@ -7,6 +7,8 @@ L4 ships with a set of core libraries that provide essential functions for commo
 Core libraries are located in the [jl4-core/libraries/](https://github.com/legalese/l4-ide/tree/main/jl4-core/libraries) directory:
 
 - **[prelude](prelude.md)** - Standard functions (automatically imported)
+- **[sets](sets.md)** - Set-theoretic collections: `SET OF a`, UNION/INTERSECT/difference, and the set-aware `PLUS`/`MINUS` overloads (part of the prelude)
+- **[negation-as-failure](negation-as-failure.md)** - NAF combinators (`holds` / `naf` / `presumed`) over `MAYBE BOOLEAN`
 - **[daydate](daydate.md)** - Date calculations and temporal logic
 - **[time](time.md)** - Wall-clock time-of-day operations
 - **[datetime](datetime.md)** - Absolute points in time with timezones
@@ -22,6 +24,9 @@ Core libraries are located in the [jl4-core/libraries/](https://github.com/legal
 - **[llm](llm.md)** - LLM API integration
 
 ---
+
+How `IMPORT` locates a library on disk — and how to work with dev vs prod
+preludes — is covered in [Library Resolution](resolution.md).
 
 ## Using Libraries
 
@@ -131,6 +136,18 @@ Automatically imported. Provides foundational functions for lists, numbers, and 
 
 See [prelude.md](prelude.md) for the complete function list including `sortBy`, `zipWith`, `deleteBy`, `dictUnion`, and more.
 
+### negation-as-failure
+
+Requires: `IMPORT prelude` (imported transitively -- `` IMPORT `negation-as-failure` `` alone is enough)
+
+| Function     | Type                | Description                                        |
+| ------------ | ------------------- | -------------------------------------------------- |
+| `holds p`    | `Maybe Bool → Bool` | Closed-world (NAF); `NOTHING` → `FALSE`            |
+| `naf p`      | `Maybe Bool → Bool` | Negation as failure; succeeds unless provably true |
+| `presumed p` | `Maybe Bool → Bool` | Open-world dual; `NOTHING` → `TRUE`                |
+
+See [negation-as-failure.md](negation-as-failure.md) for the truth table and natural-language rendering notes.
+
 ### math
 
 Requires: `IMPORT prelude`
@@ -160,13 +177,16 @@ Date arithmetic library. ISO 8601 conventions.
 
 **Constructors:**
 
-| Function              | Type                              | Description                    |
-| --------------------- | --------------------------------- | ------------------------------ |
-| `Date day month year` | `NUMBER → NUMBER → NUMBER → DATE` | From d/m/y                     |
-| `Date days`           | `NUMBER → DATE`                   | From serial (days since epoch) |
-| `Year year`           | `NUMBER → DATE`                   | Jan 1 of year                  |
-| `Month month year`    | `NUMBER → NUMBER → DATE`          | 1st of month                   |
-| `Week week year`      | `NUMBER → NUMBER → DATE`          | Monday of ISO week             |
+| Function              | Type                              | Description                               |
+| --------------------- | --------------------------------- | ----------------------------------------- |
+| `YMD year month day`  | `NUMBER → NUMBER → NUMBER → DATE` | From y/m/d — **recommended** for new code |
+| `Date day month year` | `NUMBER → NUMBER → NUMBER → DATE` | From d/m/y                                |
+| `Date days`           | `NUMBER → DATE`                   | From serial (days since epoch)            |
+| `Year year`           | `NUMBER → DATE`                   | Jan 1 of year                             |
+| `Month month year`    | `NUMBER → NUMBER → DATE`          | 1st of month                              |
+| `Week week year`      | `NUMBER → NUMBER → DATE`          | Monday of ISO week                        |
+
+`YMD y m d` builds through `Date d m y` but is deliberately stricter: it bounds-checks by component round-trip, so `YMD 2026 28 7` (a transposition) and `YMD 2023 2 29` (no such leap day) refuse loudly where `Date` rolls silently — a transposed `Date 7 28 2026` is not rejected, it overflows month 28 into 2028-04-07. Prefer `YMD` in new code: ISO 8601 order is harder to transpose, and a transposition that happens anyway is caught instead of computed.
 
 **Queries:**
 
@@ -232,15 +252,33 @@ See [datetime.md](datetime.md) for full documentation.
 
 ### currency
 
-ISO 4217 currency handling. Uses integer minor units (cents) to avoid floating-point issues. Key functions: `Money minorUnits code`, `major to minor units`, `add money`, `multiply money`. Supports USD, EUR, GBP, JPY, SGD, and others.
+ISO 4217 currency handling. Uses integer minor units (cents) to avoid floating-point issues. Key functions: `Money minorUnits code`, `major to minor units`, `add money`, `multiply money`, and the comparison suite (`money equal`, `money greater than`, `money less than`, `money at least`, `money at most`). Supports USD, EUR, GBP, JPY, SGD, and others.
 
 **Status:** Prototype. API may change. See [currency.md](currency.md).
 
 ### legal-persons
 
-Legal entity types, identity documents, and capacity checks. Key functions: `age in years`, `is adult birthDate jurisdictionCode`, `can enter contract`, `is beneficial owner`. Includes corporate entity types and jurisdiction-aware majority age.
+Legal entity types, identity documents, and capacity checks. Key functions: `age in years`, `is adult birthDate jurisdictionCode`, `can enter contract`, `is beneficial owner`. Includes corporate entity types and jurisdiction-aware majority age. Import with `` IMPORT `legal-persons` `` (backticks required).
 
 **Status:** Prototype. API may change. See [legal-persons.md](legal-persons.md).
+
+### jurisdiction
+
+ISO 3166 country and subdivision codes: alpha-2/alpha-3/numeric constants for 20 major countries, US state / Canadian province / UK constituent-country codes, format validators (`is valid ISO 3166-1 alpha-2`, `is valid ISO 3166-1 alpha-3`, `is valid ISO 3166-2`), name lookups, and alpha-2 ↔ alpha-3 conversions returning `EITHER STRING STRING`.
+
+**Status:** Prototype. API may change. See [jurisdiction.md](jurisdiction.md).
+
+### holdings
+
+Debt and equity ownership for cap tables: security/debt type codes, `ownership percentage`, `liquidation preference`, `preferred payout`, `vested shares`, `shares from convertible`, `shares from SAFE`, `accrued interest`, `fully diluted shares`, `post-money valuation`, `pre-money valuation`, and temporal helpers (`is active at`, `has matured`).
+
+**Status:** Prototype. API may change. See [holdings.md](holdings.md).
+
+### excel-date
+
+Excel-compatible date math: serial conversion in the 1900 (with leap-bug handling) and 1904 systems, `ExcelDays`, `DATEDIF`, `ExcelDays360`, `ExcelYearFrac`, `ExcelEDate`/`ExcelEOMonth`, and `ExcelWorkday`/`ExcelNetworkDays`. Import with `` IMPORT `excel-date` `` (backticks required).
+
+See [excel-date.md](excel-date.md).
 
 ---
 

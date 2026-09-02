@@ -1,0 +1,11 @@
+-- Importer-view fixture — the backticked importer.
+--
+-- This sibling is read TEXTUALLY by the exporter's FIXTURE(d) scan when
+-- interp-common.l4 is exported; it is what keeps `statute` alive there.
+-- The backticked IMPORT spelling is the point of the fixture. (The IMPORT
+-- sits before any § heading — after one, it stops resolving.)
+
+IMPORT `interp-common`
+
+GIVETH A NUMBER
+use MEANS statute 5

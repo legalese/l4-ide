@@ -92,6 +92,32 @@ describe n MEANS
   OTHERWISE "many"
 ```
 
+## Exhaustiveness Checking
+
+The typechecker analyzes every CONSIDER expression and emits **warnings** (not errors) for two situations:
+
+- **Missing branches:** the branches do not cover all constructors of the scrutinee's type. The warning lists the uncovered patterns. The program still compiles, but matching an uncovered value raises a runtime error.
+- **Redundant branches:** a branch can never be reached because earlier branches (or an earlier OTHERWISE) already cover everything it could match.
+
+```l4
+DECLARE Status IS ONE OF Active, Suspended, Closed
+
+GIVEN s IS A Status
+describe s MEANS
+  CONSIDER s
+  WHEN Active THEN "running"
+  WHEN Closed THEN "stopped"
+  -- Warning: missing branch for Suspended
+```
+
+Adding the missing constructor branch or an OTHERWISE catch-all silences the warning.
+
+**Primitive-type caveat:** the analysis is skipped when the scrutinee has type NUMBER, STRING, or DATE. These types have effectively infinite value sets, so exhaustiveness cannot be decided by enumerating constructors. Matches on such values are never warned about — include an OTHERWISE branch to avoid runtime failures. BOOLEAN (just TRUE/FALSE) is checked normally; the builtin container types MAYBE, EITHER, and LIST are not yet analysed.
+
+The analysis applies wherever the CONSIDER appears, including inside WHERE- and LET-bound local definitions. Warnings do not stop the file from evaluating — `#EVAL` directives still run.
+
+See [Troubleshooting: Compiler Warnings](../errors/README.md#compiler-warnings) for the warning messages and fixes.
+
 ## Related Keywords
 
 - **[IF](IF.md)** - Simple conditional alternative

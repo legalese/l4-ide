@@ -12,7 +12,8 @@ import Backend.Api (EvalBackend (..), FunctionDeclaration (..))
 import Shared (validateNoSanitizationCollisions)
 import Backend.CodeGen (isDeonticType)
 import L4.FunctionSchema (Parameters (..), Parameter (..), typeToParameter, declaresFromModule)
-import L4.TypeCheck.Types (CheckErrorWithContext (..), CheckError (..))
+import L4.TypeCheck.Types (CheckErrorWithContext (..), CheckError (..), Severity (..))
+import L4.TypeCheck (prettyCheckErrorWithContext, severity)
 import BundleStore (SerializedBundle (..), StoredMetadata (..))
 import Types
 import Control.Monad (forM, unless)
@@ -32,7 +33,7 @@ import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text.Encoding
 import Data.Time (getCurrentTime)
 import L4.Export (ExportedFunction (..), ExportedParam (..), getExportedFunctions, enrichReturnTypes, extractImplicitAssumeParams)
-import L4.Print (prettyLayout)
+import L4.Print (prettyTypeForDisplay)
 import L4.Syntax (Resolved, Declare(..), Type'(..), RawName(..), getActual, rawName, rawNameToText)
 import Logging (Logger, logInfo, logWarn)
 import qualified LSP.L4.Rules as Rules
@@ -83,7 +84,13 @@ compileBundle logger deployId sources = do
           allBundles = concatMap (either (const []) snd . snd) results
           errors = [err | (_, Left err) <- results]
 
-      if null allFunctions && not (null errors)
+      -- Any file that failed to compile (typecheck errors, unsupported
+      -- @export inputs, …) fails the whole deploy. Previously this only
+      -- rejected when NO file produced functions, so a bundle with one broken
+      -- file and one good file would deploy the good half and silently drop
+      -- the error — and a single broken file would deploy a garbage schema
+      -- built from unresolved inference variables.
+      if not (null errors)
         then pure $ Left $ Text.intercalate "\n" errors
         else do
           let fnMap = Map.fromList [(fn.fnImpl.name, fn) | fn <- allFunctions]
@@ -98,9 +105,12 @@ compileBundle logger deployId sources = do
                 , metaVersion = version
                 , metaCreatedAt = now
                 -- compileBundle has no access to the operator-supplied
-                -- description; callers inject it from the multipart field
-                -- (deploy) or persisted StoredMetadata (restart).
+                -- description or the deploy-time version counters; callers
+                -- inject them from the multipart field (deploy) or persisted
+                -- StoredMetadata (restart).
                 , metaDescription = Nothing
+                , metaServiceVersion = ""
+                , metaDeploymentVersion = ""
                 }
 
           unless (null allFunctions) $
@@ -133,6 +143,21 @@ processTypecheckedFile logger deployId filepath content moduleContext
               <> resolvedText fnName <> ")"
           | MkCheckErrorWithContext{kind = ExportFunctionTypeInput fnName paramName} <- tcErrors
           ]
+        -- Genuine type errors that must block the deploy. We deliberately
+        -- tolerate OutOfScopeError: it's repurposed by extractImplicitAssumeParams
+        -- to derive implicit ASSUME parameters, so a clean model with implicit
+        -- ASSUMEs legitimately carries those. Anything else at SError severity
+        -- (e.g. AmbiguousTermError, IncorrectArgsNumberApp) means the module
+        -- didn't typecheck — compiling it anyway yields a garbage schema with
+        -- unresolved inference variables (e.g. a return type of "res184"), which
+        -- then trips the breaking-change check with a baffling message instead
+        -- of surfacing the real error.
+        blockingErrs =
+          [ Text.intercalate " " (prettyCheckErrorWithContext e)
+          | e@MkCheckErrorWithContext{kind} <- tcErrors
+          , severity e == SError
+          , not (isOutOfScope kind)
+          ]
     if not (null exportFnTypeErrs)
       then do
         logWarn logger "Deploy rejected: @export function has FUNCTION-typed input"
@@ -141,6 +166,14 @@ processTypecheckedFile logger deployId filepath content moduleContext
           , ("errors", toJSON exportFnTypeErrs)
           ]
         pure (filepath, Left (Text.intercalate "; " exportFnTypeErrs))
+      else if not (null blockingErrs)
+      then do
+        logWarn logger "Deploy rejected: module has type errors"
+          [ ("deploymentId", toJSON deployId)
+          , ("file", toJSON filepath)
+          , ("errors", toJSON blockingErrs)
+          ]
+        pure (filepath, Left (Text.intercalate "\n" blockingErrs))
       else if null exports
       then pure (filepath, Right ([], []))
       else do
@@ -225,15 +258,34 @@ processTypecheckedFile logger deployId filepath content moduleContext
           ]
         pure (filepath, Right (fns, [bundle]))
 
--- | Rebuild ValidatedFunctions from deserialized CBOR bundles,
--- skipping the expensive typecheck step.
+-- | Rebuild ValidatedFunctions from deserialized CBOR bundles.
 --
--- This is the fast restart path: the Module Resolved, Environment, and
--- EntityInfo are loaded from CBOR, and only the evaluator import environment
--- needs to be rebuilt (which requires the sources).
+-- This is the restart path: the 'ExportedFunction' list and the DECLARE map —
+-- the parts that describe the deployment's API surface — are read straight
+-- back out of @bundle.cbor@ rather than re-derived.
 --
--- Uses a single Shake session for all import environment evaluations,
--- sharing work across the import graph.
+-- == Why the AST is NOT taken from CBOR
+--
+-- 'L4.Instances.Serialise' encodes every 'L4.Annotation.Anno_' as @()@ and
+-- decodes it as 'L4.Annotation.emptyAnno', to keep bundles small. That throws
+-- away the source tokens (which nothing here wants) /and/ the typechecker's
+-- @resolvedInfo@ (which several things do): 'L4.Viz.Ladder.hasBooleanType'
+-- reads the result type of a DECIDE's body off exactly that field, so a
+-- CBOR-rehydrated 'Decide' looks like a non-boolean DECIDE and both
+-- @\/query-plan@ and @\/ladder@ answered 400 for every deployment served by a
+-- process that had restarted since the deploy — while @\/evaluation@, which
+-- needs no type annotations, kept working. That is the sort of divergence a
+-- restart-blind test suite cannot see, so this function no longer has one:
+-- 'typecheckAndEvalBundle' below already runs @Rules.TypeCheck@ over every
+-- bundle file (it has to, to build the evaluator import environments), so a
+-- fully annotated AST is in hand at no extra cost and is simply used. The
+-- module, environment, entity info and DECIDE are then all taken from one
+-- typecheck result, exactly as on the fresh-compile path in
+-- 'processTypecheckedFile' — never mixed across passes, since 'Unique's are
+-- only meaningful within the resolution that minted them.
+--
+-- Uses a single Shake session for all typechecking and import environment
+-- evaluation, sharing work across the import graph.
 buildFromCborBundle
   :: Logger
   -> Text  -- ^ deployment ID for logging
@@ -247,15 +299,17 @@ buildFromCborBundle logger deployId bundles sources storedMeta = do
       bundleFiles = [bundle.sbFilePath | bundle <- bundles, Map.member bundle.sbFilePath sources]
 
   -- Build all import environments in a single Shake session
-  (_errs, _tcMap, evalMap) <- typecheckAndEvalBundle moduleContext bundleFiles
+  (_errs, tcMap, evalMap) <- typecheckAndEvalBundle moduleContext bundleFiles
 
   -- Process each bundle using the shared eval environments
   allFnsWithFile <- fmap concat $ forM bundles $ \bundle -> do
-    let resolvedModule = bundle.sbModule
-        env = bundle.sbEnvironment
-        ei = bundle.sbEntityInfo
+    let filepath = bundle.sbFilePath
+        -- All three together or none of them: see the note above.
+        (resolvedModule, env, ei) = case Map.lookup filepath tcMap of
+          Just (Just tcResult) ->
+            (tcResult.module', tcResult.environment, tcResult.entityInfo)
+          _ -> (bundle.sbModule, bundle.sbEnvironment, bundle.sbEntityInfo)
         exports = bundle.sbExports
-        filepath = bundle.sbFilePath
 
     case Map.lookup filepath sources of
       Nothing -> pure []
@@ -328,6 +382,10 @@ buildFromCborBundle logger deployId bundles sources storedMeta = do
             , metaVersion = version
             , metaCreatedAt = now
             , metaDescription = storedMeta.smDescription
+            -- Version strings are restored from StoredMetadata by the
+            -- caller (DeploymentLoader); default to "" here.
+            , metaServiceVersion = ""
+            , metaDeploymentVersion = ""
             }
 
       logInfo logger "Rebuilt functions from CBOR cache"
@@ -365,13 +423,13 @@ exportToFunction declares implicitParams export =
           ( (typeToParameter declares Set.empty partyTy) { parameterDescription = "The party performing the action" }
           , (typeToParameter declares Set.empty actionTy) { parameterDescription = "The action performed" }
           )
-        _ -> ( Parameter "object" Nothing Nothing [] "The party performing the action" Nothing Nothing Nothing Nothing Nothing
-             , Parameter "object" Nothing Nothing [] "The action performed" Nothing Nothing Nothing Nothing Nothing
+        _ -> ( Parameter "object" Nothing Nothing [] "The party performing the action" Nothing Nothing Nothing Nothing Nothing Nothing
+             , Parameter "object" Nothing Nothing [] "The action performed" Nothing Nothing Nothing Nothing Nothing Nothing
              )
       finalParams = if isDeontic
         then mergedParams
           { parameterMap = mergedParams.parameterMap <> Map.fromList
-              [ ("startTime", Parameter "number" Nothing Nothing [] "Start time for contract simulation" Nothing Nothing Nothing Nothing Nothing)
+              [ ("startTime", Parameter "number" Nothing Nothing [] "Start time for contract simulation" Nothing Nothing Nothing Nothing Nothing Nothing)
               , ("events", Parameter
                   { parameterType = "array"
                   , parameterAlias = Nothing
@@ -389,15 +447,17 @@ exportToFunction declares implicitParams export =
                       , parameterProperties = Just $ Map.fromList
                           [ ("party", partyParam)
                           , ("action", actionParam)
-                          , ("at", Parameter "number" Nothing Nothing [] "Timestamp" Nothing Nothing Nothing Nothing Nothing)
+                          , ("at", Parameter "number" Nothing Nothing [] "Timestamp" Nothing Nothing Nothing Nothing Nothing Nothing)
                           ]
                       , parameterPropertyOrder = Just ["party", "action", "at"]
                       , parameterItems = Nothing
                       , parameterRequired = Just ["party", "action", "at"]
                       , parameterL4Type = Nothing
+                      , parameterDefault = Nothing
                       }
                   , parameterRequired = Nothing
                   , parameterL4Type = Nothing
+                  , parameterDefault = Nothing
                   })
               ]
           , required = mergedParams.required <> ["startTime", "events"]
@@ -435,7 +495,7 @@ parametersFromExport declares params =
 paramToParameter :: Map Text (Declare Resolved) -> ExportedParam -> Parameter
 paramToParameter declares param =
   let p0 = maybe
-              (Parameter "object" Nothing Nothing [] "" Nothing Nothing Nothing Nothing Nothing)
+              (Parameter "object" Nothing Nothing [] "" Nothing Nothing Nothing Nothing Nothing Nothing)
               (typeToParameter declares Set.empty)
               param.paramType
   in p0
@@ -476,6 +536,13 @@ extractDeonticTypeNames _ = Nothing
 resolvedText :: Resolved -> Text
 resolvedText = rawNameToText . rawName . getActual
 
+-- | OutOfScopeError is not a deploy-blocking error: it's how the type checker
+-- reports references the compiler turns into implicit ASSUME parameters (see
+-- 'extractImplicitAssumeParams'). Every other SError-severity kind is genuine.
+isOutOfScope :: CheckError -> Bool
+isOutOfScope OutOfScopeError{} = True
+isOutOfScope _                 = False
+
 -- | Collect all DECLARE entries from a TypeCheckResult and its transitive imports.
 collectAllDeclares :: Rules.TypeCheckResult -> Map Text (Declare Resolved)
 collectAllDeclares tc =
@@ -483,15 +550,17 @@ collectAllDeclares tc =
     <> foldMap collectAllDeclares tc.dependencies
 
 -- | Display the return type of an exported function as a user-facing string.
--- Delegates to 'prettyLayout' so the rendering matches exactly what the LSP
--- reports for the same type (the deploy-sidebar diff compares the two
--- strings). The previous bespoke renderer collapsed @DEONTIC P A@ to just
--- @"DEONTIC"@ and dropped the @OF@ keyword for other parameterized types
--- (e.g. @LIST NUMBER@ instead of @LIST OF NUMBER@), causing spurious
--- "return type changed" warnings on every redeploy.
+-- Delegates to 'prettyTypeForDisplay' so the rendering matches exactly what the
+-- LSP reports for the same type (the deploy-sidebar diff compares the two
+-- strings) AND so residual inference variables render as stable type-variable
+-- names rather than edit-order-dependent ids like @res184@. The previous
+-- bespoke renderer collapsed @DEONTIC P A@ to just @"DEONTIC"@ and dropped the
+-- @OF@ keyword for other parameterized types (e.g. @LIST NUMBER@ instead of
+-- @LIST OF NUMBER@), causing spurious "return type changed" warnings on every
+-- redeploy.
 returnTypeDisplay :: Maybe (Type' Resolved) -> Text
 returnTypeDisplay Nothing = "unknown"
-returnTypeDisplay (Just ty) = prettyLayout ty
+returnTypeDisplay (Just ty) = prettyTypeForDisplay ty
 
 -- | Compute SHA-256 version from sorted source contents.
 computeVersion :: Map FilePath Text -> Text

@@ -1,0 +1,24 @@
+-- Duplex actions: ONE `SendMessage` type carries BOTH directions. By the SVO
+-- subject-first canon the performer is the first actor positionally, so swapping
+-- the actors swaps who bears the obligation — no fixed "agent field" is needed.
+-- Both directions below are coherent and type-check.
+--
+-- Also shows the two construction styles that select the same performer:
+--   * positional `OF`   (subject-first word order)
+--   * prepositional `WITH` (named parameters / thematic roles)
+--
+-- See doc/concepts/legal-modeling/ACTOR-ACTIONS-THEORY.md.
+
+DECLARE Actor IS ONE OF Alice, Bob
+
+DECLARE SendMessage HAS
+  from IS AN Actor
+  to   IS AN Actor
+  body IS A STRING
+
+aliceToBob MEANS SendMessage OF Alice, Bob, "hi"                          -- positional
+bobToAlice MEANS SendMessage WITH from IS Bob, to IS Alice, body IS "yo"  -- prepositional
+
+GIVETH DEONTIC Actor SendMessage
+fwd MEANS PARTY Alice MUST aliceToBob WITHIN 10   -- performer Alice: agrees
+rev MEANS PARTY Bob   MUST bobToAlice WITHIN 10   -- performer Bob: agrees (duplex)

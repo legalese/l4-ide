@@ -1,0 +1,28 @@
+-- An L4 name that lands exactly on a name the generated runtime module exports.
+--
+-- `--package` writes `modules: [.l4runtime]`, which docassemble execs as
+-- `from <pkg>.l4runtime import *` (parse.py:8572 at 1b6678384) into the
+-- interview dict on EVERY assemble pass. The runtime module's `__all__` bounds
+-- which names arrive; it does nothing to stop an interview variable from being
+-- one of them, and the loser is the interview's. Unreserved, this export's goal
+-- variable `l4_source_text` was clobbered by the imported function object --
+-- truthy -- so the PACKAGED artifact asked no question at all and returned the
+-- opposite verdict to the bare one, with the fidelity report saying
+-- "(nothing lost)". That breaks R11 decision 6: the two artifact shapes must
+-- mean the same thing.
+--
+-- Expect the goal variable to be `l4_source_text_`, in BOTH artifact shapes:
+-- the shapes must not disagree about a variable's name either.
+
+DECLARE Filing
+    HAS
+      @desc whether the filing arrived before the deadline
+      `filed on time` IS A BOOLEAN
+
+@export Whether the filing is good
+GIVEN d IS A Filing @desc The filing under assessment
+GIVETH A BOOLEAN
+DECIDE `L4 source text` d IF d's `filed on time`
+
+#EVAL `L4 source text` OF Filing WITH `filed on time` IS FALSE
+-- FALSE

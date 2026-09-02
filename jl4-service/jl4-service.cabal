@@ -66,6 +66,7 @@ library
     Schema
     Shared
     Types
+    Version
     WebMCPPage
 
   build-depends:
@@ -105,6 +106,7 @@ library
     lsp-types,
     optics,
     optparse-applicative,
+    template-haskell,
     text,
     time,
     transformers,
@@ -128,6 +130,7 @@ test-suite jl4-service-test
     CodeGenSpec
     CompatibilitySpec
     DecisionQueryCacheKeySpec
+    DeploymentIdSpec
     IntegrationSpec
     MaybeLiftSpec
     PutGuardSpec
@@ -161,6 +164,7 @@ test-suite jl4-service-test
     quickcheck-instances,
     serialise,
     servant >=0.20.2 && <0.21,
+    servant-server >=0.20.2 && <0.21,
     stm,
     string-interpolate,
     text,

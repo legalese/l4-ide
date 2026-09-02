@@ -1,0 +1,135 @@
+# Intestate Succession Act 1967
+
+## A house rule this corpus learned the hard way
+
+## 1. Does the Act apply?
+
+<!-- l4: decide:the Act applies to the estate of -->
+
+**1.** In relation to a Case “c”, the Act applies to the estate of if it is not the case that c's deceased's Muslim.
+
+<!-- l4: decide:this Act regulates the movables of -->
+
+**2.** In relation to a Case “c”, this Act regulates the movables of means c's deceased's domiciled in Singapore.
+
+<!-- l4: decide:this Act regulates the Singapore immovables of -->
+
+**3.** In relation to a Case “c”, this Act regulates the Singapore immovables of means TRUE.
+
+<!-- l4: decide:the Act's commencement -->
+
+**4.** The Act's commencement means YMD with 1967, 6 and 2.
+
+<!-- l4: decide:the death falls within section 5 -->
+
+**5.** In relation to a Case “c”, the death falls within section 5 means c's deceased's date of death is greater than the Act's commencement.
+
+<!-- l4: decide:the property this Act distributes in -->
+
+**6.** In relation to a Case “c”, the property this Act distributes in means if this Act regulates the movables of with c, then distributable estate of with c; otherwise, the Singapore immovable share of with c.
+
+<!-- l4: decide:the Singapore immovable share of -->
+
+**7.** In relation to a Case “c”, the Singapore immovable share of means if gross estate of with c is greater than 0, then the product of distributable estate of with c and the result of dividing c's estate's immovable property in Singapore by gross estate of with c; otherwise, 0.
+
+## 2. The survivorship facts rules 1-9 turn on
+
+<!-- l4: decide:a survivor stands in the line of -->
+
+**8.** In relation to a Person “p”, a survivor stands in the line of if—
+
+    (a) p's survived the deceased; or
+
+    (b) any with given q then a survivor stands in the line of with q and p's issue.
+
+<!-- l4: decide:the represented stocks among -->
+
+**9.** In relation to a list of Person “people”, the represented stocks among means filter with given p then a survivor stands in the line of with p and people.
+
+<!-- l4: decide:a spouse survives -->
+
+**10.** In relation to a Case “c”, a spouse survives means someone survived among with c's family's surviving spouses.
+
+<!-- l4: decide:issue survive -->
+
+**11.** In relation to a Case “c”, issue survive means any with given p then a survivor stands in the line of with p and c's family's children.
+
+<!-- l4: decide:a parent survives -->
+
+**12.** In relation to a Case “c”, a parent survives means someone survived among with c's family's parents.
+
+<!-- l4: decide:a sibling line is represented -->
+
+**13.** In relation to a Case “c”, a sibling line is represented means any with given p then a survivor stands in the line of with p and c's family's siblings.
+
+<!-- l4: decide:a grandparent survives -->
+
+**14.** In relation to a Case “c”, a grandparent survives means someone survived among with c's family's grandparents.
+
+<!-- l4: decide:an uncle or aunt survives -->
+
+**15.** In relation to a Case “c”, an uncle or aunt survives means someone survived among with c's family's uncles and aunts.
+
+## 3. Dividing a portion within a class
+
+<!-- l4: decide:divide -->
+
+**16.** In relation to a NUMBER “portion”, a list of Person “people” and a STRING “basis”, divide means if count with takers is equal to 0, then EMPTY; otherwise, map with given p then Share where taker is p's name, fraction is the result of dividing portion by count with takers and basis is basis and takers.
+
+For the purposes of this provision—
+
+“takers” means the survivors among with people;
+
+<!-- l4: decide:per stirpes under -->
+
+**17.** In relation to an Interpretation “i”, a NUMBER “portion”, a list of Person “people” and a STRING “basis”, per stirpes under means if count with the represented stocks among with people is equal to 0 then EMPTY if not i's stirpital division starts at the child generation and count with the survivors among with people is equal to 0 then divide _ equally among _ citing _ with portion, the nearest surviving generation among with people and basis otherwise splitting under _ the portion _ among the stocks _ citing _ with i, portion, the represented stocks among with people and basis.
+
+<!-- l4: decide:splitting under -->
+
+**18.** In relation to an Interpretation “i”, a NUMBER “portion”, a list of Person “stocks” and a STRING “basis”, splitting under means concat with map with given p then the stock under _ of _ takes _ citing _ with i, p, the result of dividing portion by count with stocks and basis and stocks.
+
+<!-- l4: decide:the stock under -->
+
+**19.** In relation to an Interpretation “i”, a Person “p”, a NUMBER “portion” and a STRING “basis”, the stock under means if p's survived the deceased, then list of Share where taker is p's name, fraction is portion and basis is basis; otherwise, per stirpes under _ divide _ among _ citing _ with i, portion, p's issue and basis.
+
+<!-- l4: decide:the nearest surviving generation among -->
+
+**20.** In relation to a list of Person “people”, the nearest surviving generation among means if count with people is equal to 0 then EMPTY if count with the survivors among with people is greater than 0 then the survivors among with people otherwise the nearest surviving generation among with concat with map with given p then p's issue and people.
+
+<!-- l4: decide:the spouses of -->
+
+**21.** In relation to a Case “c”, a NUMBER “portion” and a STRING “basis”, the spouses of means divide _ equally among _ citing _ with portion, c's family's surviving spouses and basis.
+
+## 4. Section 7 -- the rules for distribution
+
+<!-- l4: decide:the section 7 shares under -->
+
+**22.** In relation to an Interpretation “i” and a Case “c”, the section 7 shares under means if a spouse survives with c and not issue survive with c and not a parent survives with c then the spouses of _ take _ citing _ with c, 1 and ISA s 7 rule 1 -- spouse takes the whole estate if a spouse survives with c and issue survive with c then append with the spouses of _ take _ citing _ with c, the result of dividing 1 by 2 and ISA s 7 rule 2 -- spouse takes one-half and per stirpes under _ divide _ among _ citing _ with i, the result of dividing 1 by 2, c's family's children and ISA s 7 rule 3 -- issue take one-half per stirpes if a spouse survives with c and not issue survive with c and a parent survives with c then append with the spouses of _ take _ citing _ with c, the result of dividing 1 by 2 and ISA s 7 rule 4 -- spouse takes one-half and divide _ equally among _ citing _ with the result of dividing 1 by 2, c's family's parents and ISA s 7 rule 4 -- the parents take the other half if issue survive with c then per stirpes under _ divide _ among _ citing _ with i, 1, c's family's children and ISA s 7 rule 3 -- issue take the whole estate per stirpes if a parent survives with c then divide _ equally among _ citing _ with 1, c's family's parents and ISA s 7 rule 5 -- the parents take the whole estate if a sibling line is represented with c then per stirpes under _ divide _ among _ citing _ with i, 1, c's family's siblings and ISA s 7 rule 6 -- siblings take, children of deceased siblings by stocks if a grandparent survives with c then divide _ equally among _ citing _ with 1, c's family's grandparents and ISA s 7 rule 7 -- the grandparents take in equal portions if an uncle or aunt survives with c then divide _ equally among _ citing _ with 1, c's family's uncles and aunts and ISA s 7 rule 8 -- the uncles and aunts take in equal portions otherwise list of Share where taker is the Government, fraction is 1 and basis is ISA s 7 rule 9 -- bona vacantia, in default of rules 1 to 8.
+
+## 5. Section 10 -- partial intestacy
+
+<!-- l4: decide:the proportion this Act governs in -->
+
+**23.** In relation to a Case “c”, the proportion this Act governs in means consider the case distinctions of c's will :  when NOTHING has  then 1. when JUST has w then the difference between w's proportion of the estate beneficially disposed of and 1.
+
+## 6. The Act's answer
+
+<!-- l4: decide:the intestate distribution under -->
+
+**24.** In relation to an Interpretation “i” and a Case “c”, the intestate distribution under means if not the Act applies to the estate of with c then Distribution where governed by this Act is FALSE, shares is EMPTY and note is ISA s 2: this Act does not apply to the estate of a Muslim. The estate is governed by Muslim law and the Administration of Muslim Law Act 1966; a faraid distribution is outside this encoding. if not the death falls within section 5 with c then Distribution where governed by this Act is FALSE, shares is EMPTY and note is ISA s 5: the Act distributes the estates of those dying intestate after 2 June 1967. if the proportion this Act governs in with c is equal to 0 then Distribution where governed by this Act is FALSE, shares is EMPTY and note is ISA s 10: the will beneficially disposes of the whole estate, so no part falls to intestacy. otherwise Distribution where governed by this Act is TRUE, shares is the section 7 shares under _ of _ with i and c and note is the reach of this Act over with c.
+
+<!-- l4: decide:the reach of this Act over -->
+
+**25.** In relation to a Case “c”, the reach of this Act over means if this Act regulates the movables of with c, then ISA s 4-5: the deceased was domiciled in Singapore, so this Act regulates the whole Singapore estate.; otherwise, ISA s 4: the deceased was domiciled outside Singapore, so this Act regulates the Singapore IMMOVABLE property only. The movable property is regulated by the law of the domicile and is outside this encoding..
+
+## 7. The orthodox entry points
+
+<!-- l4: decide:the section 7 shares of -->
+
+**26.** In relation to a Case “c”, the section 7 shares of means the section 7 shares under _ of _ with the orthodox reading and c.
+
+<!-- l4: decide:the intestate distribution for -->
+
+**27.** In relation to a Case “c”, the intestate distribution for means the intestate distribution under _ for _ with the orthodox reading and c.
+
+<!-- tnr-coverage: 27 provisions; 0 boolean atoms inlined; 0 directives suppressed -->

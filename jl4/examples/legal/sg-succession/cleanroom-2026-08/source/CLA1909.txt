@@ -1,0 +1,2369 @@
+THE STATUTES OF THE REPUBLIC OF SINGAPORE
+
+
+                     CIVIL LAW ACT 1909
+
+
+
+
+                          2020 REVISED EDITION
+
+           This revised edition incorporates all amendments up to and
+  including 1 December 2021 and comes into operation on 31 December 2021.
+
+
+
+
+                          Prepared and Published by
+                    THE LAW REVISION COMMISSION
+                       UNDER THE AUTHORITY OF
+               THE REVISED EDITION OF THE LAWS ACT 1983
+
+
+
+    Informal Consolidation – version in force from 15/10/2024
+                                                                          2020 Ed.
+
+
+
+                  Civil Law Act 1909
+                      ARRANGEMENT OF SECTIONS
+Section
+    1.    Short title
+    2.    Interpretation
+    3.    Law and equity to be administered concurrently
+    4.    Administration of insolvent estates, and winding up of
+          companies. Bankruptcy rules to prevail
+   5.     Agreement by way of gaming or wagering to be null and void
+   5A.    Abolition of tort of maintenance and champerty
+   5B.    Validity of certain contracts for funding of claims
+   6.     Contracts which must be evidenced in writing
+   7.     Trusts respecting immovable property and disposition of
+          equitable interest
+   8.     Abolition of rule in Bain v Fothergill
+   9.     Continuity of contracts on European Economic and Monetary
+          Union
+  10.     Effect of death on certain causes of action
+  11.     Abolition of right to damages for loss of expectation of life
+  12.     Power of courts of record to award interest on debts and damages
+  13.     Charges and mortgages over choses in action
+  14.     Abolition of husband’s liability for wife’s torts and antenuptial
+          contracts, debts and obligations
+  15.     Entitlement to contribution
+  16.     Assessment of contribution
+  17.     Proceedings against persons jointly liable for same debt or
+          damage
+  18.     Successive actions against liability (jointly or otherwise) for
+          same damage
+  19.     Interpretation and application of sections 15, 16, 17 and 18
+  20.     Right of action for wrongful act causing death
+  21.     Bereavement
+  22.     Assessment of damages
+  23.     Appointments to be valid notwithstanding one or more objects
+          excluded, or only take an unsubstantial share
+  24.     Executor deemed to be trustee for person entitled to residue on
+          intestacy
+
+                                        1
+
+
+          Informal Consolidation – version in force from 15/10/2024
+2020 Ed.                     Civil Law Act 1909                               2
+Section
+  25.      Executor of executor represents original testator
+  26.      Devisee of land not to claim payment of mortgage debt out of
+           movable property
+   27.     Bona vacantia, etc.
+   28.     No person chargeable with rent bona fide paid to holder under
+           defective title
+   29.     Rules to apply to State Courts
+   30.     Presumption of survivorship in regard to claim to property
+   31.     Accumulation of income
+   32.     Fixed perpetuity period of 100 years
+   33.     Powers of appointment
+   34.     Necessity to wait and see
+   35.     Contracts of minors who have attained 18 years of age
+   36.     Legal proceedings and actions by minors who have attained
+           18 years of age
+   37.     Standard of care for medical advice
+           The Schedule — Legal proceedings and actions to which
+                             section 36 applies
+
+
+An Act to consolidate certain provisions of the civil law.
+                                                              [23 July 1909]
+
+Short title
+ 1. This Act is the Civil Law Act 1909.
+
+Interpretation
+ 2. In this Act, unless the context otherwise requires —
+      “court” means the General Division of the High Court;
+      “executor” means the executor or administrator of a deceased
+         person, and includes, as regards any obligation, any person
+         who takes possession of or intermeddles with the property of
+         a deceased person;
+      “will” includes a codicil.
+                                                                       [40/2019]
+
+
+
+
+           Informal Consolidation – version in force from 15/10/2024
+3                          Civil Law Act 1909                           2020 Ed.
+
+Law and equity to be administered concurrently
+ 3. In every civil cause or matter commenced in the court, law and
+equity shall be administered by the court in its original jurisdiction
+and by the Appellate Division of the High Court or the Court of
+Appeal according to the rules following:
+
+Claimants to have equitable relief in claims
+      (a) if any claimant claims to be entitled to any equitable estate
+          or right, or to relief upon any equitable ground against any
+          deed, instrument or contract, or against any right, title or
+          claim whatsoever asserted by any defendant in such cause
+          or matter, or to any relief founded upon a legal right, which
+          before 1 January 1879 could only have been given by the
+          court on its equity side, the court shall give to such
+          claimant such and the same relief, as ought to have been
+          given by the court, on its equity side, in a suit or proceeding
+          for the same, or the like purpose, properly instituted before
+          that date;
+                                                  [Act 25 of 2021 wef 01/04/2022]
+
+Defendants the same in defences
+      (b) if any defendant claims to be entitled to any equitable
+          estate or right, or to relief upon any equitable ground
+          against any deed, instrument or contract, or against any
+          right, title or claim asserted by any claimant in such cause
+          or matter, or alleges any ground of equitable defence to any
+          claim of the claimant in such cause or matter, the court
+          shall give to every equitable estate, right or ground of relief
+          so claimed, and to every equitable defence so alleged, such
+          and the same effect, by way of defence against the claim of
+          such claimant, as the court on its equity side ought to have
+          given, if the same or the like matters had been relied on by
+          way of defence, in any suit or proceeding instituted in the
+          court on its equity side, for the same or the like purpose,
+          before 1 January 1879;
+                                                  [Act 25 of 2021 wef 01/04/2022]
+
+
+
+
+         Informal Consolidation – version in force from 15/10/2024
+2020 Ed.                       Civil Law Act 1909                                  4
+Defendants to have relief against claimants in suit, service and
+effect of service
+           (c) the court may also grant to any defendant, in respect of any
+               equitable estate or right, or other matter of equity, and also
+               in respect of any legal estate, right or title claimed or
+               asserted by him, all such relief against any claimant, as
+               such defendant shall have properly claimed by his
+               pleading, and as the court might have granted in any suit
+               instituted for that purpose, by the same defendant against
+               the same claimant before 1 January 1879 and also all such
+               relief, relating to or connected with the original subject of
+               the cause or matter, and in like manner claimed against any
+               other person, whether already a party to the same cause or
+               matter or not, who has been duly served with notice in
+               writing of such claim, pursuant to the Rules of Court, as
+               might properly have been granted against such person, if
+               he had been made a defendant to a cause, duly instituted by
+               the same defendant for the like purpose; and every person
+               served with any such notice shall thenceforth be deemed a
+               party to such cause or matter, with the same rights, in
+               respect of his defence against such claim, as if he had been
+               duly sued in the ordinary way by such defendant;
+                                                      [Act 25 of 2021 wef 01/04/2022]
+
+Equitable rights appearing incidentally
+       (d) the court shall recognise and take notice of all equitable
+           estates, titles and rights, and all equitable duties and
+           liabilities, appearing incidentally in the course of any cause
+           or matter, in the same manner in which the court on its
+           equity side would have recognised and taken notice of the
+           same, in any suit or proceeding duly instituted therein
+           before 1 January 1879;
+
+Suits not to be restrained by prohibition or injunction
+           (e) no cause or proceeding at any time pending in the court in
+               its original jurisdiction or in the Appellate Division of the
+               High Court or the Court of Appeal, shall be restrained by
+               prohibition or injunction; but every matter of equity on
+
+             Informal Consolidation – version in force from 15/10/2024
+5                         Civil Law Act 1909                        2020 Ed.
+
+          which an injunction against the prosecution of any such
+          cause or proceeding might have been obtained if the Civil
+          Law Ordinance 1878 (IV/1878) had not been passed, either
+          unconditionally or on any terms or conditions, may be
+          relied on by way of defence thereto;
+
+Court may grant stay of proceedings in a summary way
+      (f) nothing in this Act shall disable the court from directing a
+          stay of proceedings in any cause or matter pending before
+          it, if it thinks fit; and any person, whether a party or not to
+          any such cause or matter, who would have been entitled if
+          the Civil Law Ordinance 1878 had not been passed, to
+          apply to the court to restrain the prosecution thereof, or
+          who may be entitled to enforce, by attachment or
+          otherwise, any judgment, decree, rule or order, contrary
+          to which all or any part of the proceedings in such cause or
+          matter may have been taken, may apply to the court, by
+          summons in a summary way, for a stay of proceedings in
+          such cause or matter, either generally, or so far as is
+          necessary for the purpose of justice; and the court shall
+          thereupon make such order as is just;
+
+Subject as above, court to give effect to claims at law, and by
+custom or statute
+      (g) subject to the aforesaid provisions for giving effect to
+          equitable rights and other matters of equity in the manner
+          aforesaid, the said court shall recognise and give effect to
+          all legal claims and demands, and all estates, titles, rights,
+          duties, obligations and liabilities by the common law or by
+          any custom, or created by any law having force in
+          Singapore, in the same manner as the same would have
+          been recognised and given effect to if this Act had not been
+          passed;
+
+
+
+
+        Informal Consolidation – version in force from 15/10/2024
+2020 Ed.                     Civil Law Act 1909                               6
+Court to grant all such remedies as any of the parties are entitled
+to in respect of every legal and equitable claim to avoid
+multiplicity
+       (h) the court in the exercise of its original jurisdiction and the
+           Appellate Division of the High Court or the Court of
+           Appeal, in every cause or matter pending before it, shall
+           grant, either absolutely or on such reasonable terms and
+           conditions as to it seems just, all such remedies whatsoever
+           as any of the parties thereto appear to be entitled to, in
+           respect of any and every legal or equitable claim properly
+           brought forward by them respectively in such cause or
+           matter; so that, as far as possible, all matters so in
+           controversy between the said parties respectively may be
+           completely and finally determined, and all multiplicity of
+           legal proceedings concerning any of such matters avoided.
+                                                              [42/2005; 40/2019]
+
+Administration of insolvent estates, and winding up of
+companies. Bankruptcy rules to prevail
+ 4.—(1) In the administration by any court of the assets of any
+deceased person whose estate proves to be insufficient for the
+payment in full of his debts and liabilities, and in the winding up of
+any company under the Insolvency, Restructuring and Dissolution
+Act 2018 whose assets prove to be insufficient for the payment of its
+debts and liabilities and the costs of winding up, the same rules shall
+prevail and be observed as to the respective rights of secured and
+unsecured creditors, and as to debts and liabilities provable, and as to
+the valuation of annuities and future and contingent liabilities
+respectively, as are in force for the time being under the law of
+bankruptcy with respect to the estates of persons adjudged bankrupt.
+                                                                       [40/2018]
+
+Creditors may come in under decree, or winding up
+ (2) All persons who, in any such case, would be entitled to prove for
+and receive dividends out of the estate of any such deceased person,
+or out of the assets of any such company, may come in under the
+decree or order for the administration of such estate, or under the
+
+
+
+           Informal Consolidation – version in force from 15/10/2024
+7                          Civil Law Act 1909                        2020 Ed.
+
+winding up of such company, and make such claims against the same
+as they may respectively be entitled to by virtue of this Act.
+
+Voluntary waste
+  (3) A tenant for life or lives or a leasehold tenant shall not commit
+voluntary waste; but this subsection shall not apply to any estate or
+tenancy without impeachment of waste, or affect any licence or other
+right to commit waste.
+  (4) A tenant who infringes subsection (3) shall be liable in damages
+to his remainderman or reversioner; and in subsection (3), “leasehold
+tenant” includes a tenant for a term, a tenant under a periodical
+tenancy and a tenant at will.
+
+Estate for life when not to confer right of equitable waste
+  (5) An estate for life without impeachment of waste shall not
+confer, or be deemed to have conferred, upon the tenant for life any
+legal right to commit waste of the description known as equitable
+waste, unless an intention to confer such right expressly appears by
+the instrument creating such estate.
+
+Merger when not to operate
+ (6) There shall not be any merger by operation of law only of any
+estate the beneficial interest in which would not before 23 July 1909
+have been deemed to be merged or extinguished in equity.
+
+Suits for possession of immovable property by mortgagors
+  (7) A mortgagor entitled for the time being to the possession or
+receipt of the rents and profits of any immovable property, as to which
+no notice of his intention to take possession, or to enter into the
+receipt of the rents and profits thereof, has been given by the
+mortgagee, may sue for such possession or for the recovery of such
+rents or profits or to prevent or recover damages in respect of any
+trespass or other wrong relative thereto in his own name only, unless
+the cause of action arises upon a lease or other contract made by him
+jointly with any other person.
+
+
+
+
+         Informal Consolidation – version in force from 15/10/2024
+2020 Ed.                     Civil Law Act 1909                               8
+Assignment of debts and choses in action effectual to pass right
+and remedy
+  (8) Any absolute assignment by writing under the hand of the
+assignor, not purporting to be by way of charge only, of any debt or
+other legal chose in action of which express notice in writing has been
+given to the debtor, trustee or other person from whom the assignor
+would have been entitled to receive or claim such debt or chose in
+action, shall be and be deemed to have been effectual in law, subject
+to all equities which would have been entitled to priority over the
+right of the assignee under the law as it existed before 23 July 1909, to
+pass and transfer the legal right to such debt or chose in action, from
+the date of such notice, and all legal and other remedies for the same,
+and the power to give a good discharge for the same, without the
+concurrence of the assignor.
+
+Stipulations not of essence of contracts to be construed as in
+equity
+ (9) Stipulations in contracts, as to time or otherwise, which would
+not, before 23 July 1909, have been deemed to be or to have become
+of the essence of such contracts in a court of equity, shall receive in all
+cases the same construction and effect as they would have received in
+equity before that date.
+
+Injunctions and receivers granted or appointed by interlocutory
+orders
+ (10) A Mandatory Order or an injunction may be granted or a
+receiver appointed by an interlocutory order of the court, either
+unconditionally or upon such terms and conditions as the court thinks
+just, in all cases in which it appears to the court to be just or
+convenient that such order should be made.
+                                                                       [42/2005]
+
+Interim relief in aid of foreign proceedings
+ (10A) Subject to subsections (10B), (10C) and (10D), a court has
+the power to grant interim relief in aid of proceedings in any civil or
+commercial matter (excluding proceedings arising out of any fiscal,
+monetary or revenue law or measure) which have been or are to be
+
+
+           Informal Consolidation – version in force from 15/10/2024
+9                          Civil Law Act 1909                           2020 Ed.
+
+commenced outside Singapore, if it appears to the court to be just or
+convenient that such order should be made.
+                                                  [Act 25 of 2021 wef 01/04/2022]
+
+ (10B) An order under subsection (10A) may be made either
+unconditionally or upon such terms and conditions as the court
+thinks just.
+                                                  [Act 25 of 2021 wef 01/04/2022]
+
+ (10C) The court may refuse to make an order under subsection
+(10A) if —
+      (a) in the opinion of the court, the fact that the court has no
+          jurisdiction apart from subsection (10A) in relation to the
+          subject matter of the proceedings in question makes it
+          inappropriate for the court to make the order; or
+      (b) the proceedings concerned are not capable of giving rise to
+          a judgment which may be enforced in Singapore.
+                                                  [Act 25 of 2021 wef 01/04/2022]
+
+ (10D) In subsection (10A), “interim relief”, in relation to the court
+before which an application is brought, means interim relief of any
+kind which that court has power to grant in proceedings relating to
+matters within its jurisdiction, other than —
+      (a) a warrant for the arrest of property; or
+      (b) provision for obtaining evidence.
+                                                  [Act 25 of 2021 wef 01/04/2022]
+
+Terms. To prevent waste, etc., when granted
+ (11) If an injunction is asked, either before, or at, or after the
+hearing of any cause or matter, to prevent any threatened or
+apprehended waste or trespass, the injunction may be granted if the
+court thinks fit whether the person against whom the injunction is
+sought is or is not in possession under any claim of title or otherwise,
+or, if out of possession, does or does not claim, a right to do the act
+sought to be restrained under any colour of title, and whether the
+estates claimed by both, or by either of the parties, are legal or
+equitable.
+
+
+
+
+         Informal Consolidation – version in force from 15/10/2024
+2020 Ed.                     Civil Law Act 1909                                10
+Custody and education of minors
+ (12) In questions relating to the custody and education of minors,
+the rules of equity shall prevail.
+                                                                          [7/2009]
+
+Cases of conflict not enumerated, equity to prevail
+ (13) Generally in all matters not particularly mentioned in this
+section, in which there is any conflict or variance between the rules of
+equity and the rules of the common law with reference to the same
+matter, the rules of equity shall prevail.
+
+Agreement by way of gaming or wagering to be null and void
+ 5.—(1) All contracts or agreements, whether by parol or in writing,
+by way of gaming or wagering shall be null and void.
+ (2) No action shall be brought or maintained in the court for
+recovering any sum of money or valuable thing alleged to be won
+upon any wager or which has been deposited in the hands of any
+person to abide the event on which any wager has been made.
+ (3) Subsections (1) and (2) shall not be deemed to apply to any
+subscription or contribution, or agreement to subscribe or contribute,
+for or toward any plate, prize or sum of money to be awarded to the
+winner or winners of any lawful game, sport, pastime or exercise.
+ (3A) Subsections (1) and (2) shall not apply to —
+       (a) a contract for gaming that is conducted under the control or
+           supervision of a person or an organisation that is exempted
+           under section 24 of the repealed Common Gaming Houses
+           Act 1961 from the provisions of that Act in respect of such
+           gaming;
+                                                    [Act 15 of 2022 wef 01/08/2022]
+
+       (b) a contract for betting that is held, promoted, organised,
+           administered or operated by a person or an organisation
+           that is exempted under section 22 of the repealed Betting
+           Act 1960 from the provisions of that Act in respect of such
+           betting, only if the betting takes place under the control or
+           supervision of that person or organisation;
+                                                    [Act 15 of 2022 wef 01/08/2022]
+
+
+
+           Informal Consolidation – version in force from 15/10/2024
+11                         Civil Law Act 1909                           2020 Ed.
+
+     (ba) a contract by way of gaming, wagering or betting using
+          remote communication that is conducted, promoted,
+          organised or administered by —
+             (i) an exempt operator within the meaning of the
+                 repealed Remote Gambling Act 2014; or
+                                                  [Act 15 of 2022 wef 01/08/2022]
+
+            (ii) a person that is exempted under section 40 of that Act
+                 from section 10 or 11 of that Act;
+      (c) a contract for betting that takes place on a totalisator
+          conducted by or on behalf of the Singapore Totalisator
+          Board or a turf club in accordance with an approved
+          scheme;
+                                                  [Act 15 of 2022 wef 01/08/2022]
+
+      (d) a contract to participate in a private lottery promoted or
+          conducted by the holder of a permit granted under section 8
+          of the repealed Private Lotteries Act 2011; and
+                                                      [10/2006; 7/2011; 34/2014]
+                                                  [Act 15 of 2022 wef 01/08/2022]
+
+      (e) a contract by way of gaming, wagering or betting that is
+          conducted, promoted, organised or administered by —
+             (i) a licensee or class licensee within the meaning of the
+                 Gambling Control Act 2022;
+            (ii) a person mentioned in section 18(1)(d) or (f) of the
+                 Gambling Control Act 2022 in the circumstances
+                 described in that section; or
+           (iii) a person who is exempted under section 128 of the
+                 Gambling Control Act 2022 from section 18 of that
+                 Act.
+                                                  [Act 15 of 2022 wef 01/08/2022]
+
+ (3B) In the case of a person or an organisation exempted under
+section 24 of the repealed Common Gaming Houses Act 1961 in
+respect of any gaming conducted for or on behalf of another person or
+organisation, subsection (3A)(a) applies only if the contract is for
+
+
+
+
+         Informal Consolidation – version in force from 15/10/2024
+2020 Ed.                     Civil Law Act 1909                                12
+gaming conducted by that person or organisation for or on behalf of
+that other person or organisation.
+                                                                         [10/2006]
+                                                    [Act 15 of 2022 wef 01/08/2022]
+
+ (3C) Subsection (3A)(a) shall not apply to any gaming conducted
+in premises owned or used by a private body exempted under the
+repealed Common Gaming Houses Act 1961.
+                                                                         [10/2006]
+                                                    [Act 15 of 2022 wef 01/08/2022]
+
+ (3D) In the case of a person or an organisation exempted under
+section 22 of the repealed Betting Act 1960 in respect of any betting
+held, promoted, organised, administered or operated for or on behalf
+of another person or organisation, subsection (3A)(b) applies only if
+the contract is for betting held, promoted, organised, administered or
+operated by that person or organisation for or on behalf of that other
+person or organisation.
+                                                                         [10/2006]
+                                                    [Act 15 of 2022 wef 01/08/2022]
+
+ (3DA) In the case of an exempt operator or person exempted under
+section 40 of the repealed Remote Gambling Act 2014 in respect of
+any gaming, wagering or betting conducted, promoted, organised or
+administered for or on behalf of another person or organisation,
+subsection (3A)(ba) applies only if the contract is for betting
+conducted, promoted, organised or administered by that person or
+organisation for or on behalf of that other person or organisation.
+                                                                         [34/2014]
+                                                    [Act 15 of 2022 wef 01/08/2022]
+
+ (3E) In subsection (3A) —
+      “contract” excludes a contract for or which involves —
+              (a) the lending of any money or other valuable thing for
+                  such gaming or wagering;
+              (b) the extension of any form of credit for such gaming or
+                  wagering; or
+              (c) the giving of security in respect of the act referred to
+                  in paragraph (a) or (b);
+
+
+
+           Informal Consolidation – version in force from 15/10/2024
+13                         Civil Law Act 1909                           2020 Ed.
+
+     “private body” has the same meaning as in any notification made
+        under the repealed Common Gaming Houses Act 1961 which
+        exempts gaming conducted in premises owned or used by a
+        private body;
+                                                  [Act 15 of 2022 wef 01/08/2022]
+
+     “private lottery” has the same meaning as in the repealed Private
+        Lotteries Act 2011;
+                                                  [Act 15 of 2022 wef 01/08/2022]
+
+     “totalisator”, “Singapore Totalisator Board”, “turf club” and
+        “approved scheme” have the same meanings as in the
+        Singapore Totalisator Board Act 1987.
+                                                               [10/2006; 7/2011]
+
+ (4) For the avoidance of doubt, this section shall not affect the
+validity or enforceability of any contract or agreement entered into by
+either or each party by way of business and the making or
+performance of which by any party constitutes an investment activity.
+ (5) For the purposes of subsection (4), “investment activity” means
+any of the following activities:
+      (a) a transaction in relation to a contract or an option for the
+          future delivery of any securities, commodity, currency or
+          financial instrument, whether or not there is any intention
+          of actual delivery of such securities, commodity, currency
+          or financial instrument;
+      (b) a transaction in relation to a contract or an option which is
+          entered into with the intention of settlement of differences
+          in the prices or values of any securities, commodity,
+          currency or financial instrument, whether or not there is
+          any intention of actual delivery of such securities,
+          commodity, currency or financial instrument;
+      (c) a transaction involving the exchange or grant of an option
+          for the exchange of any securities, commodity, currency or
+          financial instrument;
+      (d) a transaction in securities, commodity, currency or
+          financial instrument;
+
+
+         Informal Consolidation – version in force from 15/10/2024
+2020 Ed.                       Civil Law Act 1909                             14
+           (e) a transaction involving the grant of a right or an option
+               relating to an obligation to pay interest or the exchange or
+               grant of an option for the exchange of obligations to pay
+               interest;
+           (f) a transaction in relation to a contract or an option to pay the
+               difference between a pre-agreed interest rate and the rate
+               prevailing as at specified intervals;
+       (g) a transaction in relation to any securities, futures contract
+           or derivative which is listed or traded on any stock
+           exchange, futures exchange or commodities exchange in
+           any country outside Singapore;
+       (h) a transaction in relation to any other derivative including
+           but not limited to any swap, cap, collar, floor and any
+           combination thereof;
+           (i) such other activity as the Minister may by notification
+               prescribe.
+
+Promises to repay sums paid under such contracts to be null and
+void
+ (6) Any promise, express or implied, to pay any person any sum of
+money paid by him under or in respect of any contract or agreement
+rendered null and void by subsections (1) and (2), or to pay any sum
+of money by way of commission, fee, reward or otherwise in respect
+of any such contract or of any services in relation thereto or in
+connection therewith, shall be null and void, and no action shall be
+brought or maintained to recover any such sum of money.
+
+Abolition of tort of maintenance and champerty
+ 5A.—(1) It is declared that no person is, under the law of
+Singapore, liable in tort for any conduct on account of its being
+maintenance or champerty as known to the common law.
+                                                                         [2/2017]
+
+  (2) Subject to section 5B, the abolition of civil liability under the
+law of Singapore for maintenance and champerty does not affect any
+
+
+
+
+             Informal Consolidation – version in force from 15/10/2024
+15                         Civil Law Act 1909                        2020 Ed.
+
+rule of that law as to the cases in which a contract is to be treated as
+contrary to public policy or otherwise illegal.
+                                                                     [2/2017]
+
+Validity of certain contracts for funding of claims
+ 5B.—(1) This section applies only in relation to prescribed dispute
+resolution proceedings.
+                                                                     [2/2017]
+
+  (2) A contract under which a qualifying Third‑Party Funder
+provides funds to any party for the purpose of funding all or part
+of the costs of that party in prescribed dispute resolution proceedings
+is not contrary to public policy or otherwise illegal by reason that it is
+a contract for maintenance or champerty.
+                                                                     [2/2017]
+
+ (3) Every qualifying Third‑Party Funder and funded party must, in
+relation to a third‑party funding contract, comply with and ensure that
+such requirements as may be prescribed under subsection (8) are
+complied with.
+                                                                     [2/2017]
+
+ (4) Where a Third‑Party Funder —
+      (a) ceases to be a qualifying Third‑Party Funder; or
+      (b) fails to comply with any prescribed requirement mentioned
+          in subsection (3),
+the rights of the Third‑Party Funder under or arising out of the
+third‑party funding contract affected by or connected with the
+disqualification or non‑compliance are not enforceable by action or
+other legal proceedings, including arbitration proceedings.
+                                                                     [2/2017]
+
+ (5) A Third‑Party Funder may apply to the court or arbitral tribunal
+for relief against the disability imposed by subsection (4).
+                                                                     [2/2017]
+
+ (6) The court or arbitral tribunal, on being satisfied —
+      (a) that the disqualification or non‑compliance was accidental
+          or due to inadvertence or some other sufficient cause; or
+      (b) that on other grounds it is just and equitable to grant relief,
+
+
+         Informal Consolidation – version in force from 15/10/2024
+2020 Ed.                       Civil Law Act 1909                             16
+may grant such relief either generally, or as respects any third‑party
+funding contract, on such conditions (if any) as the court or arbitral
+tribunal may impose, including (but not limited to) a condition that
+the costs of the application be paid by the Third‑Party Funder.
+                                                                         [2/2017]
+
+ (7) Subsection (4) does not prejudice the rights of any other party as
+against the Third‑Party Funder in respect of a third‑party funding
+contract.
+                                                                         [2/2017]
+
+ (8) The Minister may make regulations necessary or convenient to
+be prescribed for carrying out or giving effect to this section,
+including —
+       (a) prescribing the qualifications and other requirements that a
+           Third‑Party Funder must satisfy or comply with to be a
+           qualifying Third‑Party Funder;
+       (b) prescribing the class or classes or description of dispute
+           resolution proceedings to which this section applies; and
+           (c) governing the provision and manner of third‑party funding
+               including the requirements that the Third‑Party Funder and
+               the funded party must comply with.
+                                                                         [2/2017]
+
+ (9) Any addition, deletion or other variation to the qualifications
+and other requirements of a Third‑Party Funder or the class or classes
+or description of dispute resolution proceedings prescribed under
+subsection (8) does not affect any contract which was entered into
+before the date of commencement of that addition, deletion or
+variation.
+                                                                         [2/2017]
+
+ (10) In this section, unless the context otherwise requires —
+      “arbitral tribunal” or “court” means any arbitral tribunal or court
+         before which proceedings to enforce a right referred to in
+         subsection (4) are commenced or before which an issue
+         relating to subsection (4) arises;
+      “dispute resolution proceedings” means the entire process of
+         resolving or attempting to resolve a dispute between 2 or
+
+
+             Informal Consolidation – version in force from 15/10/2024
+17                         Civil Law Act 1909                        2020 Ed.
+
+        more parties and includes any civil, mediation, conciliation,
+        arbitration or insolvency proceedings;
+     “funded party” means a party to dispute resolution proceedings
+        who enters into an agreement with a Third‑Party Funder for
+        the funding of all or part of the costs of the proceedings and
+        includes a liquidator or judicial manager;
+     “qualifying Third‑Party Funder” means a Third‑Party Funder
+        who satisfies and continues to satisfy such qualifications and
+        other requirements as may be prescribed;
+     “Third‑Party Funder” means a person who carries on the
+       business of funding all or part of the costs of dispute
+       resolution proceedings to which the person is not a party;
+     “third‑party funding contract” means a contract or agreement by
+        a party or potential party to dispute resolution proceedings
+        with a Third‑Party Funder for the funding of all or part of the
+        costs of the proceedings in return for a share or other interest
+        in the proceeds or potential proceeds of the proceedings to
+        which the party or potential party may become entitled.
+                                                                     [2/2017]
+
+Contracts which must be evidenced in writing
+ 6. No action shall be brought against —
+      (a) any executor or administrator upon any special promise to
+          answer damages out of his own estate;
+      (b) any defendant upon any special promise to answer for the
+          debt, default or miscarriage of another person;
+      (c) any person upon any agreement made upon consideration
+          of marriage;
+      (d) any person upon any contract for the sale or other
+          disposition of immovable property, or any interest in
+          such property; or
+      (e) any person upon any agreement that is not to be performed
+          within the space of one year from the making thereof,
+
+
+
+         Informal Consolidation – version in force from 15/10/2024
+2020 Ed.                     Civil Law Act 1909                        18
+unless the promise or agreement upon which such action is brought,
+or some memorandum or note thereof, is in writing and signed by the
+party to be charged therewith or some other person lawfully
+authorised by him.
+
+Trusts respecting immovable property and disposition of
+equitable interest
+ 7.—(1) A declaration of trust respecting any immovable property
+or any interest in such property must be manifested and proved by
+some writing signed by some person who is able to declare such trust
+or by his will.
+  (2) A disposition of an equitable interest or trust subsisting at the
+time of the disposition must be in writing signed by the person
+disposing of the same or by his agent lawfully authorised in writing or
+by will.
+ (3) This section does not affect the creation or operation of
+resulting, implied or constructive trusts.
+
+Abolition of rule in Bain v Fothergill
+ 8. The rule of law known as the rule in Bain v Fothergill is
+abolished in relation to contracts made on or after 1 January 1999.
+
+Continuity of contracts on European Economic and Monetary
+Union
+ 9.—(1) It is declared for the avoidance of doubt that —
+       (a) if a subject or medium of payment of a contract,
+           agreement, deed, security or other instrument is a
+           currency that has been substituted or replaced by the
+           euro, the euro shall be a commercially reasonable
+           substitute and substantial equivalent that may be —
+               (i) used in determining the value of such currency; or
+              (ii) tendered, in each case at the conversion rate
+                   specified in, and otherwise calculated in
+                   accordance with, the applicable regulations adopted
+                   by the Council of the EU;
+
+
+           Informal Consolidation – version in force from 15/10/2024
+19                         Civil Law Act 1909                        2020 Ed.
+
+      (b) if a subject or medium of payment of a contract,
+          agreement, deed, security or instrument is the Ecu, the
+          euro shall be a commercially reasonable substitute and
+          substantial equivalent that may be —
+             (i) used in determining the value of the Ecu; or
+            (ii) tendered, in each case at the conversion rate
+                 specified in, and otherwise calculated in
+                 accordance with, the applicable regulations adopted
+                 by the Council of the EU.
+  (2) It is declared for the avoidance of doubt that to the extent the
+performance of any of the obligations set out in subsection (1) may,
+apart from the introduction of the euro, be made in the currency or
+currencies originally designated in such contract, agreement, deed,
+security or other instrument, such performance may be made in such
+currency or currencies (so long as such currency or currencies remain
+legal tender) or in euro, but not in any other currency, whether or not
+such other currency —
+      (a) has been substituted or replaced by the euro; or
+      (b) is a currency that is considered a denomination of the euro
+          and has a fixed conversion rate with respect to the euro.
+  (3) It is declared for the avoidance of doubt that none of the
+following events shall have the effect of discharging or excusing
+performance under any contract, agreement, deed, security or
+instrument, or give a party the right to unilaterally alter or
+terminate any contract, agreement, deed, security or instrument:
+      (a) the introduction of the euro;
+      (b) the tendering of euros in connection with any obligation in
+          compliance with paragraph (a) or (b) of subsection (1);
+      (c) the determining of the value of any obligation in
+          compliance with paragraph (a) or (b) of subsection (1);
+      (d) the calculating or determining of the subject or medium of
+          payment of a contract, agreement, deed, security or
+          instrument with reference to interest rate or other basis
+          that has been substituted or replaced due to the introduction
+
+
+         Informal Consolidation – version in force from 15/10/2024
+2020 Ed.                       Civil Law Act 1909                        20
+               of the euro and that is a reasonable substitute and
+               substantial equivalent.
+ (4) The provisions of this section shall be subject to any agreement
+between parties with specific reference to or agreement regarding the
+introduction of the euro.
+ (5) Nothing in this section shall be construed so as to affect the
+validity or enforceability of any contract, agreement, deed, security or
+other instrument denominated in whole or in part in a currency
+affected by alteration in circumstances other than the introduction of
+the euro.
+ (6) For the purposes of this section —
+       (a) “euro” means the currency of participating member states
+           of the EU that adopt a single currency in accordance with
+           the treaty on EU signed on 7 February 1992;
+       (b) “introduction of the euro” means the implementation from
+           time to time of economic and monetary union in member
+           states of the EU in accordance with the treaty on EU signed
+           on 7 February 1992;
+           (c) “EU” means the European Union;
+       (d) “Ecu” or “European Currency Unit” means the currency
+           basket that is from time to time used as the unit of account
+           of the European Community as defined in European
+           Council Regulation No. 3320/94;
+           (e) when the euro first becomes the monetary unit of
+               participating member states of the EU, references to the
+               Ecu in a contract, agreement, deed, security or other
+               instrument that also refers to such definition of the Ecu
+               shall be replaced by references to the euro at a rate of one
+               euro to one Ecu; and
+           (f) references to the Ecu in a contract, agreement, deed,
+               security or other instrument without such a definition of the
+               Ecu shall be presumed, unless it is shown that the parties
+               intended otherwise, to be references to the currency basket
+
+
+
+             Informal Consolidation – version in force from 15/10/2024
+21                         Civil Law Act 1909                        2020 Ed.
+
+          that is from time to time used as the unit of account of the
+          European Community.
+
+Effect of death on certain causes of action
+ 10.—(1) Subject to this section, on the death of any person, all
+causes of action subsisting against or vested in him shall survive
+against, or, as the case may be, for the benefit of his estate.
+ (2) Subsection (1) shall not apply to causes of action for defamation
+or seduction or for inducing one spouse to leave or remain apart from
+the other or to any claim for damages on the ground of adultery.
+ (3) Where a cause of action survives as specified under
+subsection (1) for the benefit of the estate of a deceased person,
+the damages recoverable for the benefit of the estate of that person —
+      (a) shall not include —
+             (i) any exemplary damages; and
+            (ii) any damages for loss of income in respect of any
+                 period after that person’s death;
+      (b) in the case of a breach of promise to marry shall be limited
+          to such damage, if any, to the estate of that person as flows
+          from the breach of promise to marry;
+      (c) where the death of that person has been caused by the act or
+          omission which gives rise to the cause of action, shall be
+          calculated without reference to any loss or gain to his estate
+          consequent on his death except that a sum in respect of
+          funeral expenses may be included.
+  (4) Where damage has been suffered by reason of any act or
+omission in respect of which a cause of action would have subsisted
+against any person if that person had not died before or at the same
+time as the damage was suffered, there shall be deemed, for the
+purposes of this section, to have been subsisting against him before
+his death such cause of action in respect of that act or omission as
+would have subsisted if he had died after the damage was suffered.
+ (5) The rights conferred by this section for the benefit of the estates
+of deceased persons shall be in addition to and not in derogation of
+
+
+         Informal Consolidation – version in force from 15/10/2024
+2020 Ed.                     Civil Law Act 1909                         22
+any rights conferred on the dependants of deceased persons by
+section 20 and so much of this section as relates to causes of action
+against the estates of deceased persons shall apply in relation to
+causes of action under that section as applies in relation to other
+causes of action not expressly excepted from the operation of
+subsection (1).
+ (6) In the event of the insolvency of an estate against which
+proceedings are maintainable by virtue of this section, any liability in
+respect of the cause of action in respect of which the proceedings are
+maintainable shall be deemed to be a debt provable in the
+administration of the estate, notwithstanding that it is a demand in
+the nature of unliquidated damages arising otherwise than by a
+contract, promise or breach of trust.
+
+Abolition of right to damages for loss of expectation of life
+  11.—(1) In any action for damages for personal injuries, no
+damages shall be recoverable in respect of any loss of expectation
+of life caused to the injured person by the injuries, except that if the
+injured person’s expectation of life has been reduced by the injuries,
+the court, in assessing damages in respect of pain and suffering
+caused by the injuries, shall take into account any suffering caused or
+likely to be caused to him by awareness that his expectation of life has
+been so reduced.
+ (2) In subsection (1), any reference to damages in respect of loss of
+expectation of life does not include damages in respect of loss of
+income.
+
+Power of courts of record to award interest on debts and
+damages
+ 12.—(1) In any proceedings tried in any court of record for the
+recovery of any debt or damages, the court may, if it thinks fit, order
+that there shall be included in the sum for which judgment is given
+interest at such rate as it thinks fit on the whole or any part of the debt
+or damages for the whole or any part of the period between the date
+when the cause of action arose and the date of the judgment.
+
+
+
+
+           Informal Consolidation – version in force from 15/10/2024
+23                         Civil Law Act 1909                        2020 Ed.
+
+ (2) Nothing in this section —
+      (a) shall authorise the giving of interest upon interest;
+      (b) shall apply in relation to any debt upon which interest is
+          payable as of right whether by virtue of any agreement or
+          otherwise; or
+      (c) shall affect the damages recoverable for the dishonour of a
+          bill of exchange.
+
+Charges and mortgages over choses in action
+  13. For the avoidance of doubt, it is hereby declared that a person
+(the first person) is able to create, and always has been able to create,
+in favour of another person (the second person) a legal or equitable
+charge or mortgage over all or any of the first person’s interest in a
+chose in action enforceable by the first person against the second
+person, and any charge or mortgage so created shall operate neither to
+merge the interest thereby created with, nor to extinguish or release,
+that chose in action.
+
+Abolition of husband’s liability for wife’s torts and antenuptial
+contracts, debts and obligations
+ 14.—(1) Subject to this section, the husband of a married woman
+shall not, by reason only of his being her husband, be liable —
+      (a) in respect of any tort committed by her whether before or
+          after the marriage, or in respect of any contract entered
+          into, or debt or obligation incurred, by her before the
+          marriage; or
+      (b) to be sued or made a party to any legal proceedings brought
+          in respect of any such tort, contract, debt or obligation.
+ (2) For the avoidance of doubt, it is hereby declared that nothing in
+this section —
+      (a) renders the husband of a married woman liable in respect
+          of any contract entered into, or debt or obligation incurred,
+          by her after the marriage in respect of which he would not
+          have been liable if this section had not been enacted;
+
+
+         Informal Consolidation – version in force from 15/10/2024
+2020 Ed.                       Civil Law Act 1909                        24
+       (b) exempts the husband of a married woman from liability in
+           respect of any contract entered into, or debt or obligation
+           (not being a debt or obligation arising out of the
+           commission of a tort) incurred, by her after the marriage
+           in respect of which he would have been liable if this section
+           had not been enacted;
+           (c) prevents a husband and wife from acquiring, holding and
+               disposing of, any property jointly or as tenants in common,
+               or from rendering themselves or being rendered jointly
+               liable in respect of any tort, contract, debt or obligation,
+               and of suing and being sued either in tort or in contract or
+               otherwise, in the like manner as if they were not married;
+       (d) prevents the exercise of any joint power given to a husband
+           and wife.
+
+Entitlement to contribution
+ 15.—(1) Subject to subsections (2) to (5), any person liable in
+respect of any damage suffered by another person may recover
+contribution from any other person liable in respect of the same
+damage (whether jointly with him or otherwise).
+ (2) A person shall be entitled to recover contribution by virtue of
+subsection (1) notwithstanding that he has ceased to be liable in
+respect of the damage in question since the time when the damage
+occurred, provided that he was so liable immediately before he made
+or was ordered or agreed to make the payment in respect of which the
+contribution is sought.
+ (3) A person shall be liable to make contribution by virtue of
+subsection (1) notwithstanding that he has ceased to be liable in
+respect of the damage in question since the time when the damage
+occurred, unless he ceased to be liable by virtue of the expiry of a
+period of limitation or prescriptions which extinguished the right on
+which the claim against him in respect of the damage was based.
+  (4) A person who has made or agreed to make any payment in bona
+fide settlement or compromise of any claim made against him in
+respect of any damage (including a payment into court which has
+been accepted) shall be entitled to recover contribution in accordance
+
+             Informal Consolidation – version in force from 15/10/2024
+25                         Civil Law Act 1909                        2020 Ed.
+
+with this section without regard to whether or not he himself is or ever
+was liable in respect of the damage, provided, however, that he would
+have been liable assuming that the factual basis of the claim against
+him could be established.
+  (5) A judgment given in any action brought in Singapore by or on
+behalf of the person who suffered the damage in question against any
+person from whom contribution is sought under this section shall be
+conclusive in the proceedings for contribution in favour of the person
+from whom the contribution is sought, provided that the judgment in
+his favour rested on a determination of the merits of the claim against
+him in respect of the damage.
+ (6) References in this section to a person’s liability in respect of any
+damage are references to any such liability which has been or could
+be established in an action brought against him in Singapore by or on
+behalf of the person who suffered the damage; but it is immaterial
+whether any issues arising in any such action was or would be
+determined (in accordance with the rules of private international law)
+by reference to the law of a country outside Singapore.
+
+Assessment of contribution
+ 16.—(1) Subject to subsection (3), in any proceedings for
+contribution under section 15, the amount of the contribution
+recoverable from any person shall be such as may be found by the
+court to be just and equitable having regard to the extent of that
+person’s responsibility for the damage in question.
+ (2) Subject to subsection (3), the court shall have power in any such
+proceedings to exempt any person from liability to make
+contribution, or to direct that the contribution to be recovered from
+any person shall amount to a complete indemnity.
+ (3) Where the amount of the damages which have or might have
+been awarded in respect of the damage in question in any action
+brought in Singapore by or on behalf of the person who suffered it
+against the person from whom the contribution is sought was or
+would have been subject to —
+      (a) any limit imposed by or under any written law or by any
+          agreement made before the damage occurred;
+
+         Informal Consolidation – version in force from 15/10/2024
+2020 Ed.                       Civil Law Act 1909                                26
+       (b) any reduction by virtue of section 3 of the Contributory
+           Negligence and Personal Injuries Act 1953; or
+           (c) any corresponding limit or reduction under the law of a
+               country outside Singapore,
+the person from whom the contribution is sought shall not, by virtue
+of any contribution awarded under section 15, be required to pay in
+respect of the damage a greater amount than the amount of those
+damages as so limited or reduced.
+
+Proceedings against persons jointly liable for same debt or
+damage
+ 17. Judgment recovered against any person liable in respect of any
+debt or damage shall not be a bar to an action, or to the continuance of
+an action, against any other person who is (apart from any such bar)
+jointly liable with him in respect of the same debt or damage.
+
+Successive actions against liability (jointly or otherwise) for
+same damage
+  18. If more than one action is brought in respect of any damage by
+or on behalf of the person by whom it was suffered against persons
+liable in respect of the damage (whether jointly or otherwise) the
+claimant shall not be entitled to costs in any of those actions, other
+than that in which judgment is first given, unless the court is of the
+opinion that there was reasonable ground for bringing the action.
+                                                      [Act 25 of 2021 wef 01/04/2022]
+
+Interpretation and application of sections 15, 16, 17 and 18
+ 19.—(1) A person is liable in respect of any damage for the
+purposes of sections 15, 16, 17 and 18 if the person who suffered it (or
+anyone representing his estate or dependants) is entitled to recover
+compensation from him in respect of that damage (whatever the legal
+basis of this liability), whether tort, breach of contract, breach of trust
+or otherwise).
+ (2) References in sections 15, 16, 17 and 18 to an action brought by
+or on behalf of the person who suffered any damage include
+references to an action brought for the benefit of his estate or
+dependants.
+
+             Informal Consolidation – version in force from 15/10/2024
+27                         Civil Law Act 1909                        2020 Ed.
+
+ (3) For the purposes of sections 15, 16, 17 and 18 —
+      (a) “dependants” has the same meaning as in section 20; and
+      (b) except in section 15(5), “action” means an action brought
+          in Singapore.
+ (4) Nothing in sections 15, 16, 17 and 18 shall affect any case where
+the debt in question became due or, as the case may be, the damage in
+question occurred before 1 January 1999.
+ (5) A person shall not be entitled to recover contribution or be liable
+to make contribution in accordance with section 15 by reference to
+any liability based on breach of any obligation assumed by him before
+1 January 1999.
+ (6) The right to recover contribution in accordance with section 15
+supersedes any right, other than an express contractual right, to
+recover contribution (as distinct from indemnity) otherwise than
+under sections 15, 16, 17 and 18 in corresponding circumstances; but
+nothing in sections 15, 16, 17 and 18 shall affect —
+      (a) any express or implied contractual or other right to
+          indemnity; or
+      (b) any express contractual provision regulating or excluding
+          contribution,
+which would be enforceable apart from sections 15, 16, 17 and 18 (or
+render enforceable any agreement for indemnity or contribution
+which would not be enforceable apart from sections 15, 16, 17 and
+18).
+
+Right of action for wrongful act causing death
+ 20.—(1) If death is caused by any wrongful act, neglect or default
+which is such as would (if death has not ensued) have entitled the
+person injured to maintain an action and recover damages in respect
+thereof, the person who would have been liable if death had not
+ensued shall be liable to an action for damages, notwithstanding the
+death of the person injured.
+ (2) Subject to section 21(2), every such action shall be for the
+benefit of the dependants of the person (referred to in this section and
+
+
+         Informal Consolidation – version in force from 15/10/2024
+2020 Ed.                       Civil Law Act 1909                                28
+in sections 21 and 22 as the deceased) whose death has been so
+caused.
+ (3) Every action brought under this section shall be brought by and
+in the name of the executor or administrator of the deceased.
+ (4) If —
+       (a) there is no executor or administrator of the deceased; or
+       (b) no action is brought within 6 months after the death by and
+           in the name of an executor or administrator of the
+           deceased,
+the action may be brought by and in the name of all or any of the
+persons for whose benefit an executor or administrator could have
+brought it.
+ (5) Not more than one action shall lie for or in respect of the same
+subject matter of complaint and every such action shall be brought
+within 3 years after the death of such deceased person.
+ (6) The claimant in every such action brought under this section
+shall be required to deliver to the defendant or his solicitor full
+particulars of the persons for whom and on whose behalf the action is
+brought and of the nature of the claim in respect of which damages are
+sought to be recovered.
+                                                      [Act 25 of 2021 wef 01/04/2022]
+
+ (7) In any action brought under this section, the executor of the
+deceased may insert a claim for and recover any pecuniary loss to the
+estate of the deceased occasioned by such wrongful act, neglect or
+default, which sum when recovered shall be deemed part of the assets
+of the estate of the deceased.
+ (8) In this section, “dependant” means —
+       (a) the wife or husband or former wife of the deceased;
+       (b) any parent, grandparent or great-grandparent of the
+           deceased;
+           (c) any child, grandchild or great-grandchild of the deceased;
+       (d) any person (not being a child of the deceased) who, in the
+           case of any marriage to which the deceased was at any time
+
+
+             Informal Consolidation – version in force from 15/10/2024
+29                         Civil Law Act 1909                           2020 Ed.
+
+          a party, was treated by the deceased as a child of the family
+          in relation to that marriage; and
+      (e) any person who is, or is the issue of, a brother, sister, uncle
+          or aunt of the deceased.
+                                                                        [7/2009]
+
+ (9) In deducing       any     relationship    for    the     purposes        of
+subsection (8) —
+      (a) an adopted person shall be treated as the child of the person
+          or persons by whom he was adopted and not as the child of
+          any other person; and
+      (b) subject to paragraph (a), any relationship by affinity shall
+          be treated as a relationship by consanguinity, any
+          relationship of the half blood as a relationship of the
+          whole blood, and the stepchild of any person as his child
+          and an illegitimate person shall be treated as the legitimate
+          child of his mother and reputed father.
+ (10) In subsection (9)(a), “adopted” means adopted in pursuance of
+an adoption order made under the Adoption of Children Act 2022 or
+any corresponding previous written law or of any adoption
+recognised as valid by the law of Singapore.
+                                                  [Act 20 of 2022 wef 15/10/2024]
+
+ (11) Any reference in this section to injury includes any disease and
+any impairment of a person’s physical or mental condition.
+
+Bereavement
+ 21.—(1) An action under section 20 may consist of or include a
+claim for damages for bereavement.
+ (2) A claim for damages for bereavement shall only be for the
+benefit of such of the following persons as survive the deceased:
+      (a) the wife or husband of the deceased;
+      (b) where there is no spouse by or for whom a claim can be
+          made under paragraph (a), the children of the deceased;
+
+
+
+
+         Informal Consolidation – version in force from 15/10/2024
+2020 Ed.                       Civil Law Act 1909                             30
+           (c) where there is no person by or for whom a claim can be
+               made under paragraph (a) or (b), the parents of the
+               deceased or, if the deceased was illegitimate, his mother;
+       (d) where there is no person by or for whom a claim can be
+           made under paragraph (a), (b) or (c), but the deceased was
+           at the date of his death a minor, any person who during any
+           marriage to which that person was a party treated the
+           deceased as a child of the family in relation to that
+           marriage;
+           (e) where there is no other person by or for whom a claim can
+               be made under this subsection, any brother or sister of the
+               deceased.
+ (3) The right of a person to claim under this section for damages for
+bereavement shall not survive for the benefit of his estate.
+ (4) Subject to subsection (6), the sum to be awarded as damages
+under this section shall be $15,000.
+                                                                         [7/2009]
+
+ (5) Where there is a claim for damages under this section for the
+benefit of 2 or more persons, the sum awarded shall be divided
+equally between them (subject to any deduction falling to be made in
+respect of costs not recovered from the defendant).
+  (6) The Minister may, by order published in the Gazette, substitute
+the sum specified in subsection (4) with such other sum as he thinks
+fit.
+                                                                         [7/2009]
+
+Assessment of damages
+ 22.—(1) In every action brought under section 20, the court may
+award such damages as are proportioned to the losses resulting from
+the death to the dependants respectively except that in assessing the
+damages there shall not be taken into account —
+       (a) any sum paid or payable on the death of the deceased under
+           any contract of assurance or insurance;
+       (b) any sum payable as a result of the death under the Central
+           Provident Fund Act 1953; or
+
+
+             Informal Consolidation – version in force from 15/10/2024
+31                         Civil Law Act 1909                        2020 Ed.
+
+      (c) any pension or gratuity which has been or will or may be
+          paid as a result of the death.
+  (1A) In assessing the damages under subsection (1), the court shall
+take into account any moneys or other benefits which the deceased
+would be likely to have given to the dependants by way of
+maintenance, gift, bequest or devise or which the dependants
+would likely to have received by way of succession from the
+deceased had the deceased lived beyond the date of the wrongful
+death.
+                                                                     [7/2009]
+
+ (2) Where damages are awarded under subsection (1), any costs not
+recovered from the defendant shall be deducted from those damages
+and thereafter those damages shall be divided among the dependants
+in such proportions as has been decided under that subsection.
+ (3) In an action brought under section 20 where there fall to be
+assessed damages payable to a widow in respect of the death of her
+husband, there shall not be taken into account the remarriage of the
+widow or her prospect of remarriage.
+ (3A) In an action brought under section 20, the damages payable to
+a former wife of the deceased shall only be in respect of a subsisting
+maintenance order against the deceased at the time of his death.
+                                                                     [7/2009]
+
+ (4) If the dependants have incurred funeral expenses in respect of
+the deceased, damages may be awarded in respect of those expenses.
+ (5) Money paid into court in satisfaction of a cause of action under
+this Act may be in one sum without specifying any person’s share.
+
+Appointments to be valid notwithstanding one or more objects
+excluded, or only take an unsubstantial share
+ 23.—(1) Where by any deed, will or other instrument a power is
+given to appoint movable or immovable property amongst several
+objects in such manner that no one of the objects of the power can be
+excluded, or some one or more of the objects of the power cannot be
+excluded by the donee of the power from a share of that property, but
+without requiring a substantial share of that property to be given to
+each object of the power or to each object of the power who cannot be
+
+
+         Informal Consolidation – version in force from 15/10/2024
+2020 Ed.                     Civil Law Act 1909                        32
+excluded, no appointment, which has been or is after 23 July 1909
+made in exercise of any such power or authority, shall be invalid on
+the ground that an unsubstantial, illusory or nominal share only is
+thereby appointed, or left unappointed to devolve upon any one or
+more of the objects of the power or on the ground that any object of
+that power has been altogether excluded.
+  (2) Every such appointment shall be valid and effectual
+notwithstanding that any one or more of the objects does or do not
+thereunder, or in default thereof, take more than an unsubstantial,
+illusory or nominal share, and notwithstanding that any one or more
+of the objects does or do not thereunder, or in default thereof, take a
+share or shares of the said property.
+
+Not to affect any deed which declares the amount of the share
+ (3) Nothing in this section shall prejudice or affect any provision in
+any deed, will or other instrument creating any such power as
+aforesaid, which declares the amount of the share or shares from
+which no object of the power shall be excluded.
+
+Not to give any other force to any appointment than the same
+would have had
+ (4) Nothing in this section shall be construed, deemed or taken to
+give any other validity, force or effect to any appointment than such
+appointment would have had if a substantial share of the property
+affected by the power had been thereby appointed, or left
+unappointed.
+
+Executor deemed to be trustee for person entitled to residue on
+intestacy
+  24. When any person dies or has died, having by his will appointed
+any person to be his executor, such executor shall be deemed to be a
+trustee for the person, if any, who would be entitled to the estate in
+case the person died intestate in respect of any residue not expressly
+disposed of, unless it appears by the will that the person so appointed
+executor was intended to take such residue beneficially.
+
+
+
+
+           Informal Consolidation – version in force from 15/10/2024
+33                         Civil Law Act 1909                        2020 Ed.
+
+Executor of executor represents original testator
+  25.—(1) An executor of a sole or last surviving executor of a
+testator is the executor of that testator.
+  (2) Subsection (1) shall not apply to an executor who does not prove
+the will of his testator and, in the case of an executor who on his death
+leaves surviving him some other executor of his testator who
+afterwards proves the will of that testator, it shall cease to apply on
+such probate being granted.
+ (3) So long as the chain of such representation is unbroken, the last
+executor in the chain is the executor of every preceding testator.
+ (4) The chain of such representation is broken by —
+      (a) an intestacy;
+      (b) the failure of a testator to appoint an executor; or
+      (c) the failure to obtain a probate of a will,
+but is not broken by a temporary grant of administration if probate is
+subsequently granted.
+ (5) Every person in the chain of representation to a testator —
+      (a) has the same rights in respect of the estate of that testator as
+          the original executor would have had if living; and
+      (b) is, to the extent to which the estate of that testator has come
+          to his hands, answerable as if he were an original executor.
+
+Devisee of land not to claim payment of mortgage debt out of
+movable property
+ 26.—(1) If any person dies or has died seised of or entitled to any
+estate or interest in any immovable property, which is at the time of
+his death charged with the payment of any sum or sums of money by
+way of mortgage, and such person has not by his will or deed or other
+document signified any contrary or other intention, the devisee to
+whom such immovable property is devised shall not be entitled to
+have the mortgage debt discharged or satisfied out of the movable
+property or any other immovable property of that person.
+
+
+
+         Informal Consolidation – version in force from 15/10/2024
+2020 Ed.                     Civil Law Act 1909                              34
+ (2) The immovable property so charged shall as between the
+different persons claiming through or under the deceased person be
+primarily liable to the payment of all mortgage debts with which the
+same is charged, every part thereof according to its value bearing a
+proportionate part of the mortgage debts charged on the whole
+thereof.
+ (3) In the construction of the will of any person, a general direction
+that the debts of the testator shall be paid out of his personal estate
+shall not be deemed to be a declaration of an intention contrary to or
+other than the rule contained in this section unless such contrary or
+other intention is further declared by words expressly or by necessary
+implication referring to all or some of the testator’s debts or debt
+charged by way of mortgage on any part of his immovable estate.
+ (4) In this section, “mortgage” shall be deemed to extend to any lien
+for unpaid purchase‑money upon any immovable property purchased
+by a testator.
+ (5) Nothing in this section shall affect or diminish any right of the
+mortgagee of such immovable property to obtain full payment or
+satisfaction of his mortgage debt, either out of the estate of the person
+so dying as aforesaid or otherwise.
+
+Bona vacantia, etc.
+ 27.—(1) This section applies —
+       (a) where a right to the estate of any person who dies (whether
+           before, on or after 15 February 2013) intestate without
+           next‑of‑kin has accrued to the Government; or
+       (b) where a right to the property of any person who dies
+           (whether before, on or after 15 February 2013) has accrued
+           to the Government as a result of disposal under such
+           written law as the Minister may, by order published in the
+           Gazette, prescribe for the purposes of this section.
+                                                                       [27/2012]
+
+ (2) Where a right to any estate or property upon the death of a
+person as mentioned in subsection (1) has accrued to the
+Government, such estate, property or part thereof that is not land,
+
+
+           Informal Consolidation – version in force from 15/10/2024
+35                         Civil Law Act 1909                        2020 Ed.
+
+or where such estate or property or part thereof is land and that land is
+sold, its proceeds, shall form part of the Consolidated Fund.
+                                                                     [27/2012]
+
+ (3) If it appears to the Minister that a right to any estate or property
+upon the death of a person as mentioned in subsection (1) has accrued
+to the Government, it shall be lawful for the Minister, upon
+application being made to him or if he considers it reasonable to
+do so, by warrant under his hand —
+      (a) to disclaim and release in whole or in part that right to such
+          estate or property in favour of such person or persons who
+          establish to the satisfaction of the Minister any equitable or
+          moral claim thereto; and
+      (b) to authorise or order the giving, conveyance, transfer, grant
+          or payment, out of the whole or any part of such estate or
+          property or (if sold) its proceeds, in such share, proportion
+          and manner and upon such terms and conditions as the
+          Minister thinks appropriate (whether or not including the
+          payment of moneys) to that person or those persons, as the
+          case may be.
+                                                                     [27/2012]
+
+ (4) Upon a right of the Government being disclaimed and released
+by warrant under subsection (3), the following provisions shall apply:
+      (a) any moneys specified in any such warrant shall, if forming
+          part of the Consolidated Fund, be charged on and paid out
+          of the Consolidated Fund without further authority other
+          than this section;
+      (b) any other movable property specified in the warrant that is
+          the subject of the disclaimer and release shall vest, by
+          virtue of that warrant and without any conveyance,
+          assignment or further assurance, in the person or persons
+          in favour of whom the disclaimer and release is made in
+          such share, proportion and manner as are specified in the
+          warrant; and
+      (c) any warrant ordering the grant or lease of any State land or
+          interest therein shall have the effect of authorising a grant
+          or lease of the land under the State Lands Act 1920 to the
+
+         Informal Consolidation – version in force from 15/10/2024
+2020 Ed.                     Civil Law Act 1909                              36
+            person or persons in favour of whom the disclaimer and
+            release is made in such share, proportion and manner as are
+            specified in the warrant.
+                                                                       [27/2012]
+
+ (5) For the avoidance of doubt, a disclaimer and release by warrant
+under subsection (3) may be made without actual entry into or taking
+of possession of the estate or property in question being first made by
+the Government.
+                                                                       [27/2012]
+
+ (6) Nothing in this section shall affect the disposal of any property
+according to Muslim law.
+                                                                       [27/2012]
+
+No person chargeable with rent bona fide paid to holder under
+defective title
+  28.—(1) No person shall be chargeable with any rents or profits of
+any immovable property which he has bona fide paid over to any
+person of whom he bona fide held the rents or profits notwithstanding
+it afterwards appears that the person to whom such payment was
+made had no right to receive the rents or profits.
+
+Improvements made by bona fide holders
+ (2) If any person erects any building or makes an improvement
+upon any lands held by him bona fide in the belief that he had an
+estate in fee simple or other absolute estate, and that person, his
+executor or assign, or his under‑tenant is evicted from such lands by
+any person having a better title, the person who erected the building
+or made the improvement, his executor or assign, shall be entitled —
+       (a) to have the value of the building or improvement so erected
+           or made during such holding and in such belief estimated
+           and paid or secured to him; or
+       (b) at the option of the person causing the eviction, to purchase
+           the interest of such person in the lands at the value thereof
+           irrespective of the value of the building or improvement.
+
+
+
+
+           Informal Consolidation – version in force from 15/10/2024
+37                          Civil Law Act 1909                           2020 Ed.
+
+Proviso
+ (3) The amount to be paid or secured in respect of such building or
+improvement shall be the estimated value of the building and
+improvement at the time of such eviction.
+
+Double rent or double value on holding over by tenant
+ (4) Every tenant holding over after the determination of his tenancy
+shall be chargeable, at the option of his landlord, with double the
+amount of his rent until possession is given up by him or with double
+the value during the period of detention of the land or premises so
+detained, whether notice to that effect has been given or not.
+
+Subtenant to give notice
+  (5) When any originating claim issued by a landlord against a
+tenant for the recovery of immovable property is served on or comes
+to the knowledge of any subtenant of the claimant’s immediate
+tenant, the subtenant being an occupier of the whole or any part of the
+premises sought to be recovered, he shall forthwith give notice
+thereof to his immediate landlord, under penalty of forfeiting 3 years’
+rack rent of the premises held by the subtenant to the person of whom
+he holds, to be recovered by such person by action in any court having
+jurisdiction.
+                                                   [Act 25 of 2021 wef 01/04/2022]
+
+Rules to apply to State Courts
+ 29. The rules of law enacted in this Act and declared shall with the
+necessary modifications be, and shall, so far as they were already in
+force in Singapore, be deemed to have been, in force in the State
+Courts so far as the matters to which such rules relate are respectively
+cognizable by such courts.
+                                                                         [5/2014]
+
+Presumption of survivorship in regard to claim to property
+ 30. In all cases where 2 or more persons die in circumstances
+rendering it uncertain which of them survived the other or others,
+such deaths shall (subject to any order of the court) for all purposes
+affecting the title to property be presumed to have occurred in order
+
+
+          Informal Consolidation – version in force from 15/10/2024
+2020 Ed.                       Civil Law Act 1909                              38
+of seniority and accordingly the younger shall be deemed to have
+survived the elder.
+
+Accumulation of income
+  31.—(1) Income arising from a settlement or disposition of
+property made on or after 15 December 2004 may, subject to the
+terms of the settlement or disposition to the contrary, be accumulated
+for the duration of the settlement or disposition.
+                                                                         [45/2004]
+
+  (2) Except as otherwise provided in subsection (4), income arising
+from a settlement or disposition of property made before
+15 December 2004 shall not be wholly or partially accumulated for
+any longer period than one of the following, namely:
+       (a) the life of the grantor or settlor;
+       (b) a term of 21 years from the death of the grantor, settlor or
+           testator;
+           (c) the duration of the minority or respective minorities of any
+               person or persons living or en ventre sa mere at the death of
+               the grantor, settlor or testator;
+       (d) the duration of the minority or respective minorities only of
+           any person or persons who under the limitations of the
+           instrument directing the accumulations would, for the time
+           being, if of full age, be entitled to the income directed to be
+           accumulated;
+           (e) a term of 21 years from the date of the making of the
+               disposition; or
+           (f) the duration of the minority or respective minorities of any
+               person or persons in being at the date of the making of the
+               disposition.
+                                                                         [45/2004]
+
+ (3) In every case where any accumulation is directed otherwise than
+in accordance with subsection (2), the direction shall, except as
+otherwise provided in subsection (4), be void, and the income of the
+property directed to be accumulated shall, so long as the same is
+directed to be accumulated contrary to this section, go to and be
+
+
+             Informal Consolidation – version in force from 15/10/2024
+39                         Civil Law Act 1909                        2020 Ed.
+
+received by the person or persons who would have been entitled
+thereto if such accumulation had not been directed.
+                                                                     [45/2004]
+
+ (4) Subsections (2) and (3) do not extend to any provision —
+      (a) for payment of the debts of any grantor, settlor, testator or
+          other person; or
+      (b) for raising portions for —
+             (i) any child, children or remoter issue of any grantor,
+                 settlor or testator; or
+            (ii) any child, children or remoter issue of a person
+                 taking any interest under any settlement or other
+                 disposition directing the accumulations or to whom
+                 any interest is thereby limited,
+and accordingly such provisions may be made as if no statutory
+restrictions on accumulation of income had been imposed.
+                                                                     [45/2004]
+
+Fixed perpetuity period of 100 years
+ 32.—(1) In the rule against perpetuities as is applicable to any
+settlement or disposition of property, the perpetuity period shall be
+100 years or such shorter period as may be specified in the instrument
+by which the settlement or disposition is made.
+                                                                     [45/2004]
+
+ (2) Where any instrument making any settlement or disposition of
+property refers to lives in being or specifies a perpetuity period that
+exceeds 100 years, the perpetuity period shall be deemed to be a
+period of 100 years.
+                                                                     [45/2004]
+
+ (3) This section shall apply in relation to —
+      (a) any instrument made in the exercise of a special power of
+          appointment where the instrument creating the special
+          power of appointment takes effect on or after 15 December
+          2004; and
+
+
+
+
+         Informal Consolidation – version in force from 15/10/2024
+2020 Ed.                     Civil Law Act 1909                              40
+       (b) any other instrument taking effect on or after 15 December
+           2004.
+                                                                       [45/2004]
+
+Powers of appointment
+ 33.—(1) For the purposes of section 32, a power of appointment
+shall be treated as a special power unless —
+       (a) in the instrument creating the power it is expressed to be
+           exercisable by one person only; and
+       (b) it could, at all times during its currency when that person is
+           of full age and capacity, be exercised by him so as
+           immediately to transfer to himself the whole of the interest
+           governed by the power without the consent of any other
+           person or compliance with any other condition, not being a
+           formal condition relating only to the mode of exercise of
+           the power.
+                                                                       [45/2004]
+
+ (2) For the purpose of determining whether a disposition made
+under a power of appointment exercisable by will only is void for
+remoteness, the power shall be treated as a general power where it
+would have fallen to be so treated if exercisable by deed.
+                                                                       [45/2004]
+
+Necessity to wait and see
+ 34.—(1) Where, apart from the provisions of this section, a
+disposition would be invalid as infringing the rule against
+perpetuities, the disposition shall be treated, until such time (if
+any) as it becomes certain that the vesting will occur, if at all, after the
+end of the perpetuity period, as if the disposition were not invalid as
+infringing the rule against perpetuities, and its becoming so certain
+shall not affect the validity of anything previously done in relation to
+the interest disposed of by way of advancement, application of
+intermediate income, or otherwise.
+                                                                       [45/2004]
+
+ (2) Where, apart from the provisions of this section, a disposition
+consisting of the conferring of a general power of appointment would
+be invalid as infringing the rule against perpetuities, the disposition
+
+
+           Informal Consolidation – version in force from 15/10/2024
+41                         Civil Law Act 1909                        2020 Ed.
+
+shall be treated, until such time (if any) as it becomes certain that the
+power will not be exercisable within the perpetuity period, as if the
+disposition were not invalid as infringing the rule against perpetuities.
+                                                                     [45/2004]
+
+ (3) Where, apart from the provisions of this section, a disposition
+consisting of the conferring of any power, option, or other right would
+be invalid as infringing the rule against perpetuities, the disposition
+shall be treated as regards any exercise of the right within the
+perpetuity period as if it were not so invalid and, subject to the
+provisions of this section, shall be treated as invalid as infringing the
+rule against perpetuities only if and so far as the right is not fully
+exercised within that period.
+                                                                     [45/2004]
+
+ (4) This section shall apply only in relation to dispositions made on
+or after 15 December 2004.
+                                                                     [45/2004]
+
+Contracts of minors who have attained 18 years of age
+ 35.—(1) Except as otherwise provided by this section or by any
+other written law, as from 1 March 2009, a contract entered into by a
+minor who has attained the age of 18 years shall have effect as if he
+were of full age.
+                                                                      [7/2009]
+
+ (2) Where a minor has, on 1 March 2009, already attained the age of
+18 years, subsection (1) shall apply to him and to contracts entered
+into by him on and after that day.
+                                                                      [7/2009]
+
+ (3) Subsection (1) shall not affect or alter —
+      (a) a minor’s lack of capacity to enter into contracts arising
+          from reasons other than because of his age; or
+      (b) the application of any provision in any other written law
+          stipulating a requirement as to the attainment of a
+          particular age for the purposes of that written law.
+                                                                      [7/2009]
+
+ (4) The following contracts, if entered into by a minor who has
+attained the age of 18 years, shall not, by virtue of subsection (1),
+have effect as if he were of full age:
+
+
+         Informal Consolidation – version in force from 15/10/2024
+2020 Ed.                       Civil Law Act 1909                             42
+       (a) any contract for the sale, purchase, mortgage, assignment
+           or settlement of any land, other than a contract for a lease
+           of land not exceeding 3 years;
+       (b) any contract for a lease of land for more than 3 years;
+           (c) any contract whereby the minor’s beneficial interest under
+               a trust is sold or otherwise transferred to another person, or
+               pledged as a collateral for any purpose;
+       (d) any contract for the settlement of —
+                 (i) any legal proceedings or action in respect of which
+                     the minor is, pursuant to any written law, considered
+                     to be a person under disability on account of his age;
+                     or
+                (ii) any claim from which any such legal proceedings or
+                     action may arise.
+                                                                         [7/2009]
+
+ (5) Subsection (1) does not entitle —
+       (a) a trustee to pay money or deliver property to a minor who
+           has attained the age of 18 years otherwise than in
+           accordance with the terms of the trust; or
+       (b) a minor who has attained the age of 18 years to enter into a
+           contract whereby a trust is extinguished or the terms of a
+           trust are varied, and any such contract entered into by the
+           minor shall not, by virtue of that subsection, have effect as
+           if the minor were of full age.
+                                                                         [7/2009]
+
+  (6) Nothing in this section shall apply to or affect any contract that
+was made before 1 March 2009, and the law in force immediately
+before that day shall continue to apply in relation to such a contract as
+if this section had not been enacted.
+                                                                         [7/2009]
+
+ (7) Nothing in this section shall limit or affect the rule of law
+whereby a minor is not liable in tort for procuring a contract by means
+of fraudulent representations as to his own age or any other matter.
+                                                                         [7/2009]
+
+
+
+
+             Informal Consolidation – version in force from 15/10/2024
+43                         Civil Law Act 1909                        2020 Ed.
+
+Legal proceedings and actions by minors who have attained
+18 years of age
+ 36.—(1) Notwithstanding any other written law, a minor who has
+attained the age of 18 years and who is not otherwise under any legal
+disability —
+      (a) may, in his own name and without a litigation
+          representative, bring, defend, conduct or intervene in any
+          legal proceeding or action specified in the Schedule as if he
+          were of full age; and
+      (b) shall not be considered to be a person under disability on
+          account of his age for the purpose of any such legal
+          proceeding or action or for the purpose of any written law
+          regulating the limitation of actions.
+                                                                     [7/2009]
+
+ (2) The Minister may, at any time, by order published in the
+Gazette, amend the Schedule.
+                                                                     [7/2009]
+
+Standard of care for medical advice
+ 37.—(1) A healthcare professional meets the standard of care in
+relation to the provision of medical advice to a patient if —
+      (a) subject to subsection (2), the manner in which the
+          healthcare professional acts in the matter (at the time the
+          medical advice is provided) is accepted by a respectable
+          body of medical opinion (called in this section the peer
+          professional opinion) as reasonable professional practice
+          in the circumstances; and
+      (b) the peer professional opinion is logical.
+ (2) In order for the peer professional opinion mentioned in
+subsection (1) to be relied on for the purposes of that subsection,
+the peer professional opinion must —
+      (a) require the healthcare professional to have given (or
+          caused to be given) to the patient —
+             (i) information that a person in the same circumstances
+                 as the patient (which circumstances the healthcare
+
+         Informal Consolidation – version in force from 15/10/2024
+2020 Ed.                         Civil Law Act 1909                                          44
+                    professional knows or ought reasonably to know)
+                    would reasonably require to make an informed
+                    decision about whether to undergo a treatment or
+                    follow a medical advice; and
+              (ii) information that the healthcare professional knows
+                   or ought reasonably to know (in accordance with
+                   subsection (3)) is material to the patient for the
+                   purpose of making an informed decision about
+                   whether to undergo the treatment or follow the
+                   medical advice; and
+.               Explanation. — Sub-paragraph (ii) refers to information which a person
+            in the same circumstances as the patient would not reasonably require to
+            make an informed decision (about whether to undergo a treatment or follow
+            a medical advice), but which is important to the patient, for the patient’s own
+            reason (including an idiosyncratic reason), for the purpose of making an
+            informed decision.
+
+       (b) support the non-provision of any information mentioned in
+           paragraph (a)(i) or (ii) to the patient only where there is
+           reasonable justification for that.
+.                                              Illustrations
+               (a) A (a doctor) decides to perform an emergency life-saving surgery on B
+            (a patient), who is unconscious, to create a temporary airway for B. Without
+            this surgery, B will not be able to breathe and will die. At the material time,
+            there is no person present with legal capacity to make medical decisions on
+            behalf of B, and insufficient time to locate or appoint such a person. A has
+            reasonable justification for not providing information about the surgery to B,
+            or any person with legal capacity to make medical decisions on behalf of B,
+            before performing the surgery.
+               (b) B (a patient) seeks treatment for breast cancer from A (a doctor) and
+            informs A that B would like to proceed with a lumpectomy. B also informs
+            that B had earlier consulted 2 other breast cancer specialists who had advised
+            B of the other treatment options (including their benefits and risks) available
+            to B, and expressly tells A that B does not want to be given this information
+            again. A is satisfied that B appreciates the seriousness of B’s decision to
+            waive B’s right to hear such information. A has reasonable justification for
+            not providing such information to B.
+               (c) A (a doctor) is of the view that it is in the best interests of B (a patient)
+            to undergo a procedure and that informing B about the risks of the procedure
+            would dissuade B from undergoing it. This, by itself, does not give A
+            reasonable justification for not informing B about the risks.
+
+
+           Informal Consolidation – version in force from 15/10/2024
+45                           Civil Law Act 1909                                  2020 Ed.
+
+ (3) In subsection (2)(a)(ii), an assessment as to whether any
+information is material to the patient for the purpose of making an
+informed decision about whether to undergo a treatment or follow a
+medical advice must be based on any specific concern or query the
+patient has in relation to the treatment or medical advice —
+      (a) which the patient expressly communicates to the
+          healthcare professional; or
+.                                          Illustration
+            B (a patient) asks A (B’s doctor) about the risks of influenza vaccination. B
+         expresses a concern to A about side effects of weakness or paralysis after
+         being administered the influenza vaccine (which alludes to the Guillain-
+         Barré syndrome). B is not a high-risk patient for developing Guillain-Barré
+         syndrome from influenza vaccination, and doctors would not ordinarily
+         advise a patient in B’s circumstances about Guillain-Barré syndrome as it is
+         a very rare side effect of the influenza vaccine. However, since B has
+         expressly communicated such a concern to A, information on the risks of
+         Guillain-Barré syndrome is material to B for the purpose of B making an
+         informed decision about whether to receive influenza vaccination.
+
+      (b) which the patient does not expressly communicate to the
+          healthcare professional but which ought to be apparent to
+          the healthcare professional from the patient’s medical
+          records that the healthcare professional has reasonable
+          access to and ought reasonably to review.
+.                                          Illustration
+           Slightly dry skin at the surgery site is a rare but possible consequence of
+         knee replacement surgery. The general medical opinion is that a patient
+         would not reasonably require information about the possibility of dry skin at
+         the surgery site in order to make an informed decision as to whether to
+         undergo knee replacement surgery.
+            B (a patient) consults A (a doctor) on knee replacement surgery. B has an
+         unusual concern that B’s skin should not become dry, but does not expressly
+         communicate this concern to A. A year earlier, B had consulted C (another
+         doctor working in the same hospital as A) on knee replacement surgery but
+         did not proceed with it. B’s medical records containing notes of B’s
+         consultation with C show that B had repeatedly asked C about dry skin and
+         stated that B did not want the skin on B’s knee to feel dry after such surgery.
+         Therefore, it ought to be apparent to A from such medical records of B that
+         information about dry skin being a possible consequence of knee
+         replacement surgery is material to B for the purpose of B making an
+         informed decision about whether to undergo the surgery.
+
+
+        Informal Consolidation – version in force from 15/10/2024
+2020 Ed.                       Civil Law Act 1909                                       46
+ (4) The fact that there are differing professional opinions held by
+other respected healthcare professionals does not, by itself, prevent
+the peer professional opinion mentioned in subsection (1) from being
+relied on for the purpose of that subsection.
+ (5) For the purposes of subsection (1)(b), a peer professional
+opinion is logical where —
+       (a) the body of healthcare professionals holding the opinion
+           has directed its mind to the comparative risks and benefits
+           relating to the matter; and
+       (b) the opinion is internally consistent and does not contradict
+           proven extrinsic facts relevant to the matter.
+ (6) A reference in this section to a patient includes, in the case
+where the patient is under a legal disability, a reference to a person
+with the responsibility for making a decision for the patient having
+regard to medical advice.
+ (7) In this section, “healthcare professional” means an individual
+who practises a profession that provides medical advice, and
+includes —
+       (a) a medical practitioner registered (or deemed to be
+           registered) under the Medical Registration Act 1997*; and
+       (b) a dentist registered (or deemed to be registered), and an
+           oral health therapist registered, under the Dental
+           Registration Act 1999†.
+                                   [*Updated to be consistent with the 2020 Revised Edition]
+                                                           [Act 36 of 2020 wef 01/07/2022]
+                                   [†Updated to be consistent with the 2022 Revised Edition]
+
+
+                               THE SCHEDULE
+                                                                                 Section 36
+
+            LEGAL PROCEEDINGS AND ACTIONS TO WHICH
+                       SECTION 36 APPLIES
+ 1. Any legal proceeding or action arising from or in connection with a contract
+to which the minor is a party and which, by virtue of section 35, has effect as if the
+minor were of full age.
+
+
+
+           Informal Consolidation – version in force from 15/10/2024
+47                            Civil Law Act 1909                           2020 Ed.
+
+                        THE SCHEDULE — continued
+ 2. Any legal proceeding or action arising from or in connection with the minor
+acting as —
+       (a) a director of a company; or
+       (b) a manager of a limited liability partnership.
+ 3. Any legal proceeding or action arising from or in connection with a bill of
+exchange that has been drawn or indorsed —
+       (a) by the minor; or
+       (b) by another person in favour of the minor.
+ 4. Where the minor is registered under the Business Names Registration
+Act 2014 to carry on any business (whether as a sole proprietor or in partnership
+with one or more other persons) —
+       (a) any legal proceeding or action arising from or in connection with his
+           carrying on of such business; or
+       (b) [Deleted by Act 29 of 2014]
+ 5. Where the minor carries on business in Singapore as a limited partnership
+registered under the Limited Partnerships Act 2008 (whether as a general partner
+or a limited partner) —
+       (a) any legal proceeding or action arising from or in connection with his
+           carrying on of such business; or
+       (b) any legal proceeding or action arising from or in connection with his
+           acting as a person responsible for the management of such business (as
+           defined in section 39(2) of that Act).
+                                                       [7/2009; 29/2014; S 192/2009]
+
+
+
+
+          Informal Consolidation – version in force from 15/10/2024
+                         LEGISLATIVE HISTORY
+                          CIVIL LAW ACT 1909
+ This Legislative History is a service provided by the Law Revision Commission
+on a best-efforts basis. It is not part of the Act.
+
+             PICTORIAL OVERVIEW OF PREDECESSOR ACTS
+
+
+
+
+                      LEGISLATIVE HISTORY DETAILS
+                                PART 1
+              PRESUMPTION OF SURVIVORSHIP ORDINANCE
+                  (CHAPTER 31, 1955 REVISED EDITION)
+ 1. Ordinance 22 of 1947 — Presumption of Survivorship Ordinance, 1947
+     Bill                             :   Information not available
+     First, Second and Third          :   Information not available
+     Readings
+     Commencement                     :   12 June 1947
+ 2. 1955 Revised Edition — Presumption of Survivorship Ordinance
+                           (Chapter 31)
+     Operation                        :   1 July 1956
+
+                                 PART 2
+                       CIVIL LAW ORDINANCE, 1878
+                         (ORDINANCE IV OF 1878)
+ 3. Ordinance IV of 1878 — Civil Law Ordinance, 1878
+     Bill                             :   Information not available
+     First Reading                    :   15 March 1878
+     Second Reading                   :   22 March 1878
+
+
+
+            Informal Consolidation – version in force from 15/10/2024
+                                        ii
+   Notice of Amendments             :        30 April 1878
+   Third Reading                    :        7 May 1878
+   Commencement                     :        1 January 1879
+
+                            PART 3
+          PRESUMPTION OF SURVIVORSHIP ORDINANCE, 1950
+                   (M. ORDINANCE 16 OF 1950)
+4. M. Ordinance 16 of 1950 — Presumption of Survivorship Ordinance,
+                             1950
+   Commencement                     :        23 May 1950
+   Application                      :        25 February 1965
+   Note: This Ordinance was extended to Singapore by the Modification of
+         Laws (Presumption of Survivorship) (Extension) Order, 1965
+         (L.N. 66/1965) (G.N. Sp. No. S 78/1965)) on 25 February 1965.
+
+5. L.N. 66/1965 (G.N. Sp. No. S 78/1965) — Modification of Laws
+                                           (Presumption of
+                                           Survivorship) (Extension)
+                                           Order, 1965
+   Commencement                     :        25 February 1965
+   Note: This Order repealed the Presumption of Survivorship Ordinance
+         (Chapter 31, 1955 Revised Edition) and extended the Federation of
+         Malaya Presumption of Survivorship Ordinance, 1950 (M. Ordinance
+         16 of 1950) to Singapore.
+
+                                PART 4
+                          CIVIL LAW ACT 1909
+                        (2020 REVISED EDITION)
+6. Ordinance VIII of 1909 — The Civil Law Ordinance 1909
+   Bill                             :        G.N. No. 648/1909
+   First Reading                    :        11 June 1909
+   Second Reading                   :        18 June 1909
+   Third Reading                    :        9 July 1909
+   Commencement                     :        15 July 1909 (assent)
+                                             23 July 1909 (publication)
+
+
+
+
+          Informal Consolidation – version in force from 15/10/2024
+                                          iii
+ 7. 1920 Revised Edition — Ordinance No. 111 (Civil Law)
+     Operation                        :         28 November 1921
+ 8. 1926 Revised Edition — Ordinance No. 111 (Civil Law)
+     Operation                        :         1 August 1926
+ 9. Ordinance 12 of 1934 — Civil Law (Amendment) Ordinance, 1934
+     Bill                             :         G.N. No. 79/1934
+     First Reading                    :         12 February 1934
+     Second and Third Readings        :         16 April 1934
+     Commencement                     :         1 January 1935
+10. Ordinance 63 of 1935 — Statute Law Revision Ordinance, 1935
+    (Amendments made by section 2 read with paragraph (k) of the First Schedule
+    to the above Act)
+     Bill                             :         G.N. No. 3046/1935
+     First Reading                    :         20 November 1935
+     Second Reading                   :         9 December 1935
+     Notice of Amendments             :         9 December 1935
+     Third Reading                    :         9 December 1935
+     Commencement                     :         31 December 1935 (section 2 read
+                                                with paragraph (k) of the
+                                                First Schedule)
+11. 1936 Revised Edition — Civil Law Ordinance (Chapter 42)
+     Operation                        :         1 September 1936
+12. Ordinance 30 of 1940 — Civil Law (Amendment) Ordinance, 1940
+     Bill                             :         G.N. No. 696/1940
+     First Reading                    :         22 April 1940
+     Second and Third Readings        :         10 June 1940
+     Commencement                     :         1 July 1940
+13. Ordinance 23 of 1955 — Civil Law (Amendment) Ordinance, 1955
+     Bill                             :         19/1955
+     First Reading                    :         21 September 1955
+     Second and Third Readings        :         12 October 1955
+
+
+
+            Informal Consolidation – version in force from 15/10/2024
+                                         iv
+    Commencement                     :        11 November 1955
+14. 1955 Revised Edition — Civil Law Ordinance (Chapter 24)
+    Operation                        :        1 July 1956
+15. Ordinance 8 of 1957 — Civil Law (Amendment) Ordinance, 1957
+    Bill                             :        89/1957
+    First Reading                    :        9 January 1957
+    Second and Third Readings        :        13 February 1957
+    Commencement                     :        1 March 1957
+16. Ordinance 15 of 1959 — Civil Law (Amendment) Ordinance, 1959
+    Bill                             :        193/1959
+    First Reading                    :        21 January 1959
+    Second and Third Readings        :        11 February 1959
+    Commencement                     :        20 February 1959
+17. G.N. No. S 223/1959 — Singapore Constitution (Modification of Laws)
+                          Order, 1959
+    Commencement                     :        3 June 1959
+18. G.N. No. S (N.S.) 178/1959 — Singapore Constitution (Modification of
+                                 Laws) (No. 4) Order, 1959
+    Commencement                     :        20 November 1959
+19. Ordinance 7 of 1962 — Civil Law (Amendment) Ordinance, 1962
+    Bill                             :        164/1961
+    First Reading                    :        20 December 1961
+    Second Reading                   :        15 January 1962
+    Notice of Amendments             :        15 January 1962
+    Third Reading                    :        15 January 1962
+    Commencement                     :        2 February 1962
+20. Ordinance 16 of 1962 — Civil Law (Amendment No. 2) Ordinance, 1962
+    Bill                             :        172/1962
+    First Reading                    :        26 March 1962
+    Second and Third Readings        :        17 April 1962
+    Commencement                     :        27 April 1962
+
+
+           Informal Consolidation – version in force from 15/10/2024
+                                          v
+21. L.N. 155/1965 (G.N. Sp. No. S 73/1965) — Modification of Laws (Civil
+                                             Law) (Singapore) Order,
+                                             1965
+     Commencement                     :       22 April 1965
+22. L.N. 260/1965 (G.N. Sp. No. S 118/1965) — Modification of Laws (Bills of
+                                              Exchange) (Extension)
+                                              Order, 1965
+     Commencement                     :       1 July 1965
+23. Act 5 of 1966 — Civil Law (Amendment) Act, 1966
+     Bill                             :       3/1966
+     First Reading                    :       23 February 1966
+     Second Reading                   :       21 April 1966
+     Notice of Amendments             :       21 April 1966
+     Third Reading                    :       21 April 1966
+     Commencement                     :       16 May 1966
+24. Act 16 of 1968 — Civil Law (Amendment) Act, 1968
+     Bill                             :       22/1968
+     First Reading                    :       15 May 1968
+     Second and Third Readings        :       10 July 1968
+     Commencement                     :       26 July 1968
+25. 1970 Revised Edition — Civil Law Act (Chapter 30)
+     Operation                        :       1 March 1971
+     Note: This Revised Edition incorporated the Presumption of Survivorship
+           Ordinance, 1950 (M. Ordinance 16 of 1950).
+
+26. Act 2 of 1979 — Civil Law (Amendment) Act, 1979
+     Bill                             :       1/1979
+     First Reading                    :       10 January 1979
+     Second Reading                   :       5 March 1979
+     Notice of Amendments             :       5 March 1979
+     Third Reading                    :       5 March 1979
+     Commencement                     :       30 March 1979
+
+
+
+            Informal Consolidation – version in force from 15/10/2024
+                                          vi
+27. Act 24 of 1979 — Civil Law (Amendment No. 2) Act, 1979
+     Bill                             :        25/1979
+     First Reading                    :        7 September 1979
+     Second and Third Readings        :        21 September 1979
+     Commencement                     :        5 October 1979
+28. Act 15 of 1982 — Civil Law (Amendment) Act, 1982
+     Bill                             :        6/1982
+     First Reading                    :        19 March 1982
+     Second and Third Readings        :        27 July 1982
+     Commencement                     :        1 October 1982
+29. 1985 Revised Edition — Civil Law Act (Chapter 43)
+     Operation                        :        30 March 1987
+30. Act 11 of 1987 — Civil Law (Amendment) Act 1987
+     Bill                             :        1/1987
+     First Reading                    :        26 January 1987
+     Second and Third Readings        :        4 March 1987
+     Commencement                     :        1 May 1987
+31. 1988 Revised Edition — Civil Law Act (Chapter 43)
+     Operation                        :        30 April 1988
+32. Act 8 of 1993 — Civil Law (Amendment) Act 1993
+     Bill                             :        1/1993
+     First Reading                    :        18 January 1993
+     Second and Third Readings        :        26 February 1993
+     Commencement                     :        16 April 1993
+33. Act 35 of 1993 — Application of English Law Act 1993
+    (Amendments made by section 6(1) and section 7 read with paragraph 1 of the
+    Second Schedule to the above Act)
+     Bill                             :        26/1993
+     First Reading                    :        30 August 1993
+     Second Reading                   :        12 October 1993
+     Notice of Amendments             :        12 October 1993
+
+
+            Informal Consolidation – version in force from 15/10/2024
+                                          vii
+     Third Reading                    :         12 October 1993
+     Commencement                     :         12 November 1993 (section 6(1) and
+                                                section 7 read with paragraph 1 of the
+                                                Second Schedule)
+34. 1994 Revised Edition — Civil Law Act (Chapter 43)
+     Operation                        :         15 March 1994
+35. Act 7 of 1997 — Statutes (Miscellaneous Amendments) Act 1997
+    (Amendments made by section 7 read with item (5) of the Second Schedule to
+    the above Act)
+     Bill                             :         6/1997
+     First Reading                    :         11 July 1997
+     Second and Third Readings        :         25 August 1997
+     Commencement                     :         1 October 1997 (section 7 read with
+                                                item (5) of the Second Schedule)
+36. Act 45 of 1998 — Civil Law (Amendment) Act 1998
+     Bill                             :         41/1998
+     First Reading                    :         12 October 1998
+     Second and Third Readings        :         26 November 1998
+     Commencement                     :         1 January 1999
+37. 1999 Revised Edition — Civil Law Act (Chapter 43)
+     Operation                        :         1 August 1999
+38. Act 45 of 2004 — Trustees (Amendment) Act 2004
+    (Amendments made by section 24 of the above Act)
+     Bill                             :         43/2004
+     First Reading                    :         21 September 2004
+     Second and Third Readings        :         19 October 2004
+     Commencement                     :         15 December 2004 (section 24)
+39. Act 42 of 2005 — Statutes (Miscellaneous Amendments) (No. 2) Act 2005
+    (Amendments made by section 5 read with item (8) of the First Schedule to
+    the above Act)
+     Bill                             :         30/2005
+     First Reading                    :         17 October 2005
+     Second and Third Readings        :         21 November 2005
+
+
+            Informal Consolidation – version in force from 15/10/2024
+                                          viii
+     Commencement                     :          1 January 2006 (section 5 read with
+                                                 item (8) of the First Schedule)
+40. Act 10 of 2006 — Casino Control Act 2006
+    (Amendments made by section 201 of the above Act)
+     Bill                             :          3/2006
+     First Reading                    :          16 January 2006
+     Second and Third Readings        :          14 February 2006
+     Commencement                     :          2 April 2008 (section 201)
+41. Act 7 of 2009 — Civil Law (Amendment) Act 2009
+     Bill                             :          38/2008
+     First Reading                    :          17 November 2008
+     Second and Third Readings        :          19 January 2009
+     Commencement                     :          1 March 2009 (except item (7)(b) in
+                                                 the Schedule)
+42. G.N. No. S 192/2009 — Civil Law Act (Amendment of Schedule)
+                          Order 2009
+     Commencement                     :          4 May 2009
+43. Act 7 of 2011 — Private Lotteries Act 2011
+    (Amendments made by section 34(1) read with item 3 of the Schedule to the
+    above Act)
+     Bill                             :          2/2011
+     First Reading                    :          10 January 2011
+     Second and Third Readings        :          14 February 2011
+     Commencement                     :          1 April 2011 (section 34(1) read with
+                                                 item 3 of the Schedule)
+44. Act 27 of 2012 — Civil Law (Amendment) Act 2012
+     Bill                             :          25/2012
+     First Reading                    :          10 September 2012
+     Second and Third Readings        :          16 October 2012
+     Commencement                     :          15 February 2013
+
+
+
+
+            Informal Consolidation – version in force from 15/10/2024
+                                          ix
+45. Act 5 of 2014 — Subordinate Courts (Amendment) Act 2014
+    (Amendments made by section 11(9) read with item 3 of the Schedule to the
+    above Act)
+     Bill                             :        26/2013
+     First Reading                    :        11 November 2013
+     Second and Third Readings        :        21 January 2014
+     Commencement                     :        7 March 2014 (section 11(9) read with
+                                               item 3 of the Schedule)
+46. Act 34 of 2014 — Remote Gambling Act 2014
+    (Amendments made by section 43(3) of the above Act)
+     Bill                             :        23/2014
+     First Reading                    :        8 September 2014
+     Second Reading                   :        7 October 2014
+     Notice of Amendments             :        7 October 2014
+     Third Reading                    :        7 October 2014
+     Commencement                     :        2 February 2015 (section 43(3))
+47. Act 29 of 2014 — Business Names Registration Act 2014
+    (Amendments made by section 47 read with item 4 of the Schedule to the
+    above Act)
+     Bill                             :        26/2014
+     First Reading                    :        8 September 2014
+     Second and Third Readings        :        8 October 2014
+     Commencement                     :        3 January 2016 (section 47 read with
+                                               item 4 of the Schedule)
+48. Act 2 of 2017 — Civil Law (Amendment) Act 2017
+     Bill                             :        38/2016
+     First Reading                    :        7 November 2016
+     Second and Third Readings        :        10 January 2017
+     Commencement                     :        1 March 2017
+49. Act 40 of 2018 — Insolvency, Restructuring and Dissolution Act 2018
+    (Amendments made by section 462 of the above Act)
+     Bill                             :        32/2018
+     First Reading                    :        10 September 2018
+
+
+            Informal Consolidation – version in force from 15/10/2024
+                                          x
+     Second and Third Readings        :       1 October 2018
+     Commencement                     :       30 July 2020 (section 462)
+50. Act 40 of 2019 — Supreme Court of Judicature (Amendment) Act 2019
+    (Amendments made by section 28(1) read with item 21 of the Schedule to the
+    above Act)
+     Bill                             :       32/2019
+     First Reading                    :       7 October 2019
+     Second Reading                   :       5 November 2019
+     Notice of Amendments             :       5 November 2019
+     Third Reading                    :       5 November 2019
+     Commencement                     :       2 January 2021 (section 28(1) read
+                                              with item 21 of the Schedule)
+51. 2020 Revised Edition — Civil Law Act 1909
+     Operation                        :       31 December 2021
+52. Act 25 of 2021 — Courts (Civil and Criminal Justice) Reform Act 2021
+     Bill                             :       18/2021
+     First Reading                    :       26 July 2021
+     Second and Third Readings        :       14 September 2021
+     Commencement                     :       1 April 2022
+53. Act 36 of 2020 — Civil Law (Amendment) Act 2020
+     Bill                             :       33/2020
+     First Reading                    :       3 September 2020
+     Second and Third Readings        :       6 October 2020
+     Commencement                     :       1 July 2022
+54. Act 15 of 2022 — Gambling Control Act 2022
+     Bill                             :       6/2022
+     First Reading                    :       14 February 2022
+     Second and Third Readings        :       11 March 2022
+     Commencement                     :       1 August 2022
+
+
+
+
+            Informal Consolidation – version in force from 15/10/2024
+                                             xi
+55. Act 20 of 2022 — Adoption of Children Act 2022
+    (Amendments made by the above Act)
+        Bill                             :        12/2022
+        First Reading                    :        4 April 2022
+        Second and Third Readings        :        9 May 2022
+        Commencement                     :        15 October 2024
+                                     Abbreviations
+.                       (updated on 29 August 2022)
+G.N.                    Gazette Notification
+G.N. Sp.                Gazette Notification (Special Supplement)
+L.A.                    Legislative Assembly
+L.N.                    Legal Notification (Federal/Malaysian)
+M.                      Malaya/Malaysia (including Federated Malay States,
+                        Malayan Union, Federation of Malaya and Federation of
+                        Malaysia)
+Parl.                   Parliament
+S                       Subsidiary Legislation
+S.I.                    Statutory Instrument (United Kingdom)
+S (N.S.)                Subsidiary Legislation (New Series)
+S.S.G.G.                Straits Settlements Government Gazette
+S.S.G.G. (E)            Straits Settlements Government Gazette (Extraordinary)
+
+
+
+
+               Informal Consolidation – version in force from 15/10/2024
+                          COMPARATIVE TABLE
+                          CIVIL LAW ACT 1909
+ This Act has undergone renumbering in the 2020 Revised Edition. This
+Comparative Table is provided to help readers locate the corresponding provisions
+in the last Revised Edition.
+
+               2020 Ed.                                 1999 Ed.
+[Omitted as having had effect]           35—(8)
+
+
+
+
+          Informal Consolidation – version in force from 15/10/2024
+

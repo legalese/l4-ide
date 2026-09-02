@@ -1,0 +1,5 @@
+-- TYPICALLY default values must be literals (compile-time constants).
+
+-- ERROR: not a literal (a compound expression)
+DECLARE Flags HAS
+  x IS A BOOLEAN TYPICALLY (TRUE AND FALSE)

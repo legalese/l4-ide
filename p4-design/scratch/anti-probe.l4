@@ -1,0 +1,35 @@
+DECLARE Effect HAS
+    `is detrimental` IS A BOOLEAN
+    `is of a persistent or continuing nature` IS A BOOLEAN
+    `affects the quality of life of those in the locality` IS A BOOLEAN
+
+DECLARE Conduct HAS
+    effect IS AN Effect
+    `is unreasonable` IS A BOOLEAN
+
+DECLARE Receiver HAS
+    `is an individual aged 16 or over` IS A BOOLEAN
+    `is a body` IS A BOOLEAN
+    conduct IS A Conduct
+
+DECLARE Person HAS
+    `is authorised` IS A BOOLEAN
+
+@export
+GIVEN p IS A Person
+      r IS A Receiver
+GIVETH A BOOLEAN
+DECIDE `may issue a community protection notice` IF
+      p's `is authorised`
+  AND    r's `is an individual aged 16 or over`
+      OR r's `is a body`
+  AND -- it is satisfied on reasonable grounds that
+          -- a.
+              `the effect`'s `is detrimental`
+          AND `the effect`'s `is of a persistent or continuing nature`
+          AND `the effect`'s `affects the quality of life of those in the locality`
+      AND -- b.
+          `the conduct`'s `is unreasonable`
+  WHERE
+    `the conduct` MEANS r's conduct
+    `the effect`  MEANS `the conduct`'s effect

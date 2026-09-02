@@ -1,5 +1,7 @@
 # Module 3: Control Flow
 
+**Prerequisites:** Modules 1–2
+
 In this module, you'll learn how to handle conditional logic, work with lists, and use boolean operators in L4.
 
 ## Learning Objectives
@@ -84,7 +86,7 @@ GIVETH A STRING
 Conditionals are expressions—they can be used anywhere a value is expected:
 
 ```l4
-message MEANS IF isActive THEN "Active" ELSE "Inactive"
+message MEANS IF `is active` THEN "Active" ELSE "Inactive"
 ```
 
 ---
@@ -99,9 +101,11 @@ GIVETH A STRING
 `the status message` MEANS
     CONSIDER status
     WHEN Active THEN "The account is active"
-    WHEN Suspended reason THEN "Suspended: " + reason
+    WHEN Suspended reason THEN "Suspended: " APPEND reason
     WHEN Closed THEN "The account has been closed"
 ```
+
+(`APPEND` joins two strings; it comes from the prelude, so add `IMPORT prelude` at the top of your file.)
 
 ### Pattern Matching on Lists
 
@@ -134,16 +138,16 @@ The pattern `first FOLLOWED BY rest` destructures a list into its head and tail.
 
 ```l4
 -- AND: Both conditions must be true
-DECIDE `the person can vote` IF age >= 18 AND isRegistered
+DECIDE `the person can vote` IF age >= 18 AND `is registered`
 
 -- OR: At least one condition must be true
-DECIDE `the case needs review` IF amount > 10000 OR isHighRisk
+DECIDE `the transaction needs review` IF amount > 10000 OR `is high risk`
 
 -- NOT: Negation
 DECIDE `the person is a minor` IF NOT age >= 18
 
 -- IMPLIES: If first is true, second must be true
-DECIDE `the rule holds` IF hasPermit IMPLIES paidFee
+DECIDE `the rule holds` IF `has a permit` IMPLIES `paid the fee`
 ```
 
 ### Operator Precedence
@@ -193,8 +197,8 @@ status EQUALS "Active"
 name = "Alice"
 
 -- Boolean comparison (often unnecessary)
-isActive EQUALS TRUE    -- same as just: isActive
-isActive EQUALS FALSE   -- same as: NOT isActive
+`is active` EQUALS TRUE    -- same as just: `is active`
+`is active` EQUALS FALSE   -- same as: NOT `is active`
 ```
 
 ---
@@ -212,14 +216,14 @@ empty MEANS EMPTY
 
 ### Common List Functions
 
-| Function | Purpose          | Example           |
-| -------- | ---------------- | ----------------- |
-| `null`   | Is empty?        | `null myList`     |
-| `map`    | Transform each   | `map f myList`    |
-| `filter` | Keep matching    | `filter f myList` |
-| `all`    | All satisfy?     | `all f myList`    |
-| `any`    | Any satisfy?     | `any f myList`    |
-| `elem`   | Check membership | `elem 3 myList`   |
+| Function | Purpose          | Example            |
+| -------- | ---------------- | ------------------ |
+| `null`   | Is empty?        | `null numbers`     |
+| `map`    | Transform each   | `map f numbers`    |
+| `filter` | Keep matching    | `filter f numbers` |
+| `all`    | All satisfy?     | `all f numbers`    |
+| `any`    | Any satisfy?     | `any f numbers`    |
+| `elem`   | Check membership | `elem 3 numbers`   |
 
 ### Using Quantifiers
 
@@ -239,44 +243,33 @@ When passing field access to functions, use parentheses:
 
 ```l4
 -- ❌ Wrong: Parser confusion
-all (GIVEN g YIELD g's age >= 18) charity's governors
+any (GIVEN c YIELD NOT c's `the conviction is spent`) person's `the person's convictions`
 
 -- ✅ Right: Parentheses around the list argument
-all (GIVEN g YIELD g's age >= 18) (charity's governors)
+any (GIVEN c YIELD NOT c's `the conviction is spent`) (person's `the person's convictions`)
 ```
 
 This is one of the most common mistakes in L4!
 
 ---
 
-## Combining Conditions in Legal Rules
-
-```l4
-GIVEN person IS A Person
-      charity IS A `Registered Charity`
-DECIDE `the person can be a governor` IF
-    person's age >= 18
-    AND NOT person's `is bankrupt`
-    AND NOT any (GIVEN c YIELD NOT c's `is spent`) (person's convictions)
-```
-
----
-
 ## Real-World Example: Eligibility Check
+
+Using the `Person` and `Conviction` types from [module-3-examples.l4](module-3-examples.l4):
 
 ```l4
 -- Helper: Check for unspent convictions
 GIVEN person IS A Person
 GIVETH A BOOLEAN
-`the person has an unspent conviction` MEANS
-    any (GIVEN c YIELD c's `is spent` EQUALS FALSE) (person's convictions)
+DECIDE `the person has an unspent conviction` IF
+    any (GIVEN c YIELD c's `the conviction is spent` EQUALS FALSE) (person's `the person's convictions`)
 
 -- Main eligibility rule
 GIVEN person IS A Person
 GIVETH A BOOLEAN
 DECIDE `the person is eligible for the position` IF
-    person's age >= 21
-    AND NOT person's `is bankrupt`
+    person's `the person's age` >= 21
+    AND NOT person's `the person is bankrupt`
     AND NOT `the person has an unspent conviction` person
 ```
 
@@ -299,13 +292,69 @@ GIVETH A STRING
         -- Complete this
 ```
 
+<details>
+<summary>Solution</summary>
+
+```l4
+GIVEN amount IS A NUMBER
+GIVETH A STRING
+`the amount category` MEANS
+    BRANCH
+        IF amount < 100 THEN "small"
+        IF amount < 1000 THEN "medium"
+        OTHERWISE "large"
+
+#EVAL `the amount category` 50
+#EVAL `the amount category` 500
+#EVAL `the amount category` 5000
+```
+
+</details>
+
 ### Exercise 2: List Validation
 
 Write a function that checks if all items in a list of numbers are positive. (Remember to `IMPORT prelude`.)
 
+<details>
+<summary>Solution</summary>
+
+```l4
+IMPORT prelude
+
+GIVEN numbers IS A LIST OF NUMBER
+GIVETH A BOOLEAN
+DECIDE `all numbers are positive` IF
+    all (GIVEN n YIELD n > 0) numbers
+
+#EVAL `all numbers are positive` (LIST 1, 2, 3)
+#EVAL `all numbers are positive` (LIST 1, -2, 3)
+```
+
+</details>
+
 ### Exercise 3: Complex Condition
 
 Write a rule: "A person can purchase alcohol if they are at least 21, have valid ID, and are not on the banned list."
+
+<details>
+<summary>Solution</summary>
+
+```l4
+GIVEN `the person's age` IS A NUMBER
+      `the person has valid ID` IS A BOOLEAN
+      `the person is on the banned list` IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `the person may purchase alcohol` IF
+    `the person's age` >= 21
+    AND `the person has valid ID`
+    AND NOT `the person is on the banned list`
+
+#EVAL `the person may purchase alcohol` 25 TRUE FALSE
+#EVAL `the person may purchase alcohol` 25 TRUE TRUE
+#EVAL `the person may purchase alcohol` 18 TRUE FALSE
+```
+
+</details>
 
 ---
 

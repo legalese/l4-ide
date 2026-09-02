@@ -1,0 +1,65 @@
+-- STATE-AS-LEDGER x T6: the split-poison cache design (smucclaw/l4-ide#914).
+--
+-- WRITES poison the WHNFWhen (temporal-fingerprint) cache: a thunk whose
+-- force APPENDS to the ledger is cached as a plain WHNF (snapshot at first
+-- force), so the RECORD fires exactly once no matter how many temporal
+-- scopes reuse the shared binding. (Without the write-poison, a re-force
+-- under a different scope appended a second `RECORD `x`` row.)
+--
+-- READS snapshot PER TEMPORAL SCOPE: a thunk whose force only RECALLs is
+-- WHNFWhen-cached on the axes the read observed — an unchanged scope
+-- re-serves the first-force value (clause-free programs keep the classic
+-- one-binding-one-value sharing), while a DIFFERENT scope re-forces against
+-- the current ledger and gets its own scope-correct answer (#914 §2B).
+--
+-- Everything here is INTRA-directive on purpose: cross-directive shapes are
+-- masked by the per-directive heap rebuild ('forEachDirectiveFreshHeap').
+--
+-- The test harness pins the clock: JL4_FIXED_NOW = 2025-01-31T15:45:30Z.
+
+TIMEZONE IS "Etc/UTC"
+
+----------------------------------------------------------------------------
+-- Write side: the RECORD fires exactly once per first force
+----------------------------------------------------------------------------
+
+`stamped write` MEANS (RECORD `x` IS 100) PLUS DATE_SERIAL TODAY
+
+-- expected: 0 (one shared binding, one first-force value used twice) and
+-- exactly ONE `RECORD `x`` ledger row.
+-- (un-poisoned: -1857 — override value minus a re-forced ambient value —
+-- and TWO ledger rows)
+#EVAL (`EVAL AS OF SYSTEM TIME` (DATE_FROM_DMY 1 1 2020) `stamped write`) MINUS `stamped write`
+
+----------------------------------------------------------------------------
+-- Read side: a shared RECALL thunk snapshots PER TEMPORAL SCOPE (#914 §2B)
+----------------------------------------------------------------------------
+
+`recall or today` MEANS
+  CONSIDER RECALL `x`
+  WHEN JUST v THEN v
+  WHEN NOTHING THEN DATE_SERIAL TODAY
+
+-- expected: LIST 737789, 7, 7 — the first use forces under AS OF 2020 (cell
+-- `x` unwritten, so the override serial 737789 = DATE_SERIAL of 2020-01-01);
+-- the bare third use is a DIFFERENT temporal scope, so the shared thunk
+-- re-forces against the current ledger and reads the meanwhile-written 7.
+-- (pre-#914 this snapshotted per directive: LIST 737789, 7, 737789)
+#EVAL LIST (`EVAL AS OF SYSTEM TIME` (DATE_FROM_DMY 1 1 2020) `recall or today`), (RECORD `x` IS 7), `recall or today`
+
+----------------------------------------------------------------------------
+-- Control (contract #914 §4): clause-free — same scope, snapshot re-served
+----------------------------------------------------------------------------
+
+`recall or zero` MEANS
+  CONSIDER RECALL `x`
+  WHEN JUST v THEN v
+  WHEN NOTHING THEN 0
+
+-- expected: LIST 0, 7, 0 — with NO clause anywhere, both uses of the shared
+-- binding run in the one ambient scope: the fingerprint matches and the
+-- first-force snapshot is re-served, so the meanwhile-written 7 stays
+-- invisible to the shared thunk. Clause-free programs keep the classic
+-- pre-bitemporal sharing semantics (and this guards against a never-cache
+-- "fix", which would yield LIST 0, 7, 7 here).
+#EVAL LIST `recall or zero`, (RECORD `x` IS 7), `recall or zero`

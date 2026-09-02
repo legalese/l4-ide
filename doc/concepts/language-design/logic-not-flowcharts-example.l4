@@ -1,0 +1,58 @@
+-- Worked example for doc/concepts/language-design/logic-not-flowcharts.md
+--
+-- Class A, paragraph A.3 of the General Permitted Development Order (England) 2015.
+-- The rule is a material conditional, P IMPLIES Q, over two Boolean trees --
+-- not a process, and so not a flowchart.
+
+DECLARE Window
+    HAS `on an upper floor` IS A BOOLEAN
+        `in a wall` IS A BOOLEAN
+        `in a roof slope forming a side elevation` IS A BOOLEAN
+        `obscure-glazed` IS A BOOLEAN
+        `non-opening` IS A BOOLEAN
+        `openable parts at least 1.7m above the floor` IS A BOOLEAN
+
+GIVEN w IS A Window
+`A.3 covers` w MEANS
+        w's `on an upper floor`
+    AND (w's `in a wall` OR w's `in a roof slope forming a side elevation`)
+
+GIVEN w IS A Window
+`A.3 requirement met by` w MEANS
+        w's `obscure-glazed`
+    AND (w's `non-opening` OR w's `openable parts at least 1.7m above the floor`)
+
+GIVEN w IS A Window
+`window complies with A.3` MEANS
+    `A.3 covers` w  IMPLIES  `A.3 requirement met by` w
+
+-- a ground-floor window is untouched by A.3: vacuously compliant
+DECIDE `ground floor window` IS Window WITH
+    `on an upper floor` IS FALSE
+    `in a wall` IS TRUE
+    `in a roof slope forming a side elevation` IS FALSE
+    `obscure-glazed` IS FALSE
+    `non-opening` IS FALSE
+    `openable parts at least 1.7m above the floor` IS FALSE
+
+-- covered, but clear-glazed and openable low down: breach
+DECIDE `bare side window` IS Window WITH
+    `on an upper floor` IS TRUE
+    `in a wall` IS TRUE
+    `in a roof slope forming a side elevation` IS FALSE
+    `obscure-glazed` IS FALSE
+    `non-opening` IS FALSE
+    `openable parts at least 1.7m above the floor` IS FALSE
+
+-- covered, obscure-glazed, openable parts high up: complies
+DECIDE `compliant side window` IS Window WITH
+    `on an upper floor` IS TRUE
+    `in a wall` IS TRUE
+    `in a roof slope forming a side elevation` IS FALSE
+    `obscure-glazed` IS TRUE
+    `non-opening` IS FALSE
+    `openable parts at least 1.7m above the floor` IS TRUE
+
+#EVAL `window complies with A.3` `ground floor window`     -- expect TRUE  (vacuous)
+#EVAL `window complies with A.3` `bare side window`        -- expect FALSE (breach)
+#EVAL `window complies with A.3` `compliant side window`   -- expect TRUE

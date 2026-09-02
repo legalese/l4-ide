@@ -1,0 +1,825 @@
+# Charities (Jersey) Law 2014 — the charity test
+
+## Article 1 and Article 2 — the interpretation provisions the test needs
+
+<!-- l4: decide:Article 1 — the definitions on which the charity test depends -->
+
+**1.** Article 1 — the definitions on which the charity test depends if—
+
+    (a) "charitable purpose" has the meaning given by Article 6;;
+
+    (b) "constitution" has the meaning given by Article 2(4);;
+
+    (c) "governor" in relation to an entity (including a registered charity) has the meaning given by Article 2(7);;
+
+    (d) "Minister" means the Minister for External Relations;; and
+
+    (e) "purpose", in relation to an entity, has the meaning given by Article 2(6);.
+
+<!-- l4: decide:Article 2(4) — constitution -->
+
+**2.** Article 2(4) — constitution if—
+
+    (a) (4) In this Law, unless the context otherwise requires, "constitution" in relation to an entity means –;
+
+    (b) (a) in the case of a trust the terms of the trust;;
+
+    (c) (d) in the case of a foundation, the charter and regulations of the foundation;;
+
+    (d) (e) in the case of a company, the memorandum and articles of association of the company;; and
+
+    (e) (g) in any other case, any instrument or instruments (in whatever form) that establish the entity or give it any powers..
+
+<!-- l4: decide:Article 2(6) — purpose -->
+
+**3.** Article 2(6) — purpose if—
+
+    (a) (6) In this Law, unless the context otherwise requires, "purpose" in relation to an entity means –;
+
+    (b) (c) in the case of a foundation, the objects specified in its charter or its regulations; or; and
+
+    (c) (d) in the case of any other entity, a purpose to which that entity's property may lawfully be applied, other than by virtue of an order of a court, in accordance with the powers of the entity as set out in its constitution (including on its winding up or other termination)..
+
+<!-- l4: decide:Article 2(7) — governor -->
+
+**4.** Article 2(7) — governor if—
+
+    (a) (7) In this Law, unless the context otherwise requires, "governor" in relation to an entity means –;
+
+    (b) (a) in the case of a trust or fidéicommis, a trustee or fidéicommissaire of the trust or fidéicommis;;
+
+    (c) (b) in the case of a foundation, a member of the council of the foundation;;
+
+    (d) (c) in the case of a company, a director of the company;; and
+
+    (e) (e) in any other case, a person who, under the constitution of the entity, has the general control and management of the administration of the entity..
+
+## The ontology
+
+<!-- l4: declare:Purpose -->
+
+**5.** In this Act, “Purpose” means a record consisting of—
+
+    (a) “description”, being a STRING;
+
+    (b) “the prevention or relief of poverty”, being a BOOLEAN;
+
+    (c) “the advancement of education”, being a BOOLEAN;
+
+    (d) “the advancement of religion”, being a BOOLEAN;
+
+    (e) “the advancement of health”, being a BOOLEAN;
+
+    (f) “the prevention or relief of sickness, disease or human suffering”, being a BOOLEAN;
+
+    (g) “the saving of lives”, being a BOOLEAN;
+
+    (h) “the advancement of citizenship or community development”, being a BOOLEAN;
+
+    (i) “rural or urban regeneration”, being a BOOLEAN;
+
+    (j) “the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities”, being a BOOLEAN;
+
+    (k) “the advancement of the arts, heritage, culture or science”, being a BOOLEAN;
+
+    (l) “the advancement of public participation in sport”, being a BOOLEAN;
+
+    (m) “sport that involves physical skill and exertion”, being a BOOLEAN;
+
+    (n) “the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom they are primarily intended”, being a BOOLEAN;
+
+    (o) “primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage”, being a BOOLEAN;
+
+    (p) “available to members of the public at large or to male or female members of the public at large”, being a BOOLEAN;
+
+    (q) “the advancement of human rights, conflict resolution or reconciliation”, being a BOOLEAN;
+
+    (r) “the promotion of religious or racial harmony”, being a BOOLEAN;
+
+    (s) “the promotion of equality and diversity”, being a BOOLEAN;
+
+    (t) “the advancement of environmental protection or improvement”, being a BOOLEAN;
+
+    (u) “the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage”, being a BOOLEAN;
+
+    (v) “the advancement of animal welfare”, being a BOOLEAN;
+
+    (w) “reasonably regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o)”, being a BOOLEAN;
+
+    (x) “the advancement of a philosophical belief (whether or not involving belief in a god)”, being a BOOLEAN;
+
+    (y) “for advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere”, being a BOOLEAN; and
+
+    (z) “purely ancillary or incidental to any of the entity's charitable purposes”, being a BOOLEAN.
+
+<!-- l4: declare:Constitution -->
+
+**6.** In this Act, “Constitution” means a record consisting of—
+
+    (a) “description”, being a STRING;
+
+    (b) “express permission for the entity's activities to be directed or otherwise controlled by a Minister”, being a BOOLEAN;
+
+    (c) “express permission for the entity's activities to be directed or otherwise controlled by a member of the States Assembly”, being a BOOLEAN;
+
+    (d) “express permission for the entity's activities to be directed or otherwise controlled by any equivalent of such a person in another jurisdiction”, being a BOOLEAN;
+
+    (e) “express permission for any of the entity's governors to be a Minister”, being a BOOLEAN;
+
+    (f) “express permission for any of the entity's governors to be a member of the States Assembly”, being a BOOLEAN;
+
+    (g) “express permission for any of the entity's governors to be any equivalent of such a person in another jurisdiction”, being a BOOLEAN; and
+
+    (h) “that permission extended to such a person acting in that capacity”, being a BOOLEAN.
+
+<!-- l4: declare:PublicBenefitFinding -->
+
+**7.** In this Act, “PublicBenefitFinding” means a record consisting of—
+
+    (a) “description”, being a STRING;
+
+    (b) “public benefit in Jersey or elsewhere, to a reasonable degree, provided in giving effect to those purposes”, being a BOOLEAN;
+
+    (c) “public benefit in Jersey or elsewhere, to a reasonable degree, intended to be provided in giving effect to those purposes”, being a BOOLEAN;
+
+    (d) “benefit provided only to one particular natural person or to a group of identified natural persons”, being a BOOLEAN;
+
+    (e) “benefit provided to a section of the public only”, being a BOOLEAN;
+
+    (f) “any condition on obtaining that benefit (including any charge or fee) unduly restrictive”, being a BOOLEAN;
+
+    (g) “regard had to the comparison required by Article 7(2)(a)”, being a BOOLEAN;
+
+    (h) “regard had to the question required by Article 7(2)(b)”, being a BOOLEAN; and
+
+    (i) “a particular charitable purpose presumed to be for the public benefit”, being a BOOLEAN.
+
+<!-- l4: declare:Entity -->
+
+**8.** In this Act, “Entity” means a record consisting of—
+
+    (a) “name”, being a STRING;
+
+    (b) “purposes”, being a list of Purpose;
+
+    (c) “constitution”, being a Constitution;
+
+    (d) “an applicant”, being a BOOLEAN;
+
+    (e) “the public benefit finding”, being a PublicBenefitFinding; and
+
+    (f) “specified in an Order under Article 5(3) disapplying paragraph (2)”, being a BOOLEAN.
+
+## Article 6 — Charitable purposes
+
+<!-- l4: decide:(a) — the prevention or relief of poverty -->
+
+**9.** In relation to a Purpose “purpose”, (a) — the prevention or relief of poverty if—
+
+    (a) (a); and
+
+    (b) purpose's the prevention or relief of poverty.
+
+<!-- l4: decide:(b) — the advancement of education -->
+
+**10.** In relation to a Purpose “purpose”, (b) — the advancement of education if—
+
+    (a) (b); and
+
+    (b) purpose's the advancement of education.
+
+<!-- l4: decide:(c) — the advancement of religion -->
+
+**11.** In relation to a Purpose “purpose”, (c) — the advancement of religion if—
+
+    (a) (c); and
+
+    (b) purpose's the advancement of religion.
+
+<!-- l4: decide:(d) — the advancement of health -->
+
+**12.** In relation to a Purpose “purpose”, (d) — the advancement of health if—
+
+    (a) all of the following apply—
+
+        (i) (d); and
+
+        (ii) purpose's the advancement of health; or
+
+    (b) all of the following apply—
+
+        (i) (2)(a); and
+
+        (ii) purpose's the prevention or relief of sickness, disease or human suffering.
+
+<!-- l4: decide:(e) — the saving of lives -->
+
+**13.** In relation to a Purpose “purpose”, (e) — the saving of lives if—
+
+    (a) (e); and
+
+    (b) purpose's the saving of lives.
+
+<!-- l4: decide:(f) — the advancement of citizenship or community development -->
+
+**14.** In relation to a Purpose “purpose”, (f) — the advancement of citizenship or community development if—
+
+    (a) all of the following apply—
+
+        (i) (f); and
+
+        (ii) purpose's the advancement of citizenship or community development;
+
+    (b) all of the following apply—
+
+        (i) (2)(b)(i); and
+
+        (ii) purpose's rural or urban regeneration; or
+
+    (c) all of the following apply—
+
+        (i) (2)(b)(ii); and
+
+        (ii) purpose's the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities.
+
+<!-- l4: decide:(g) — the advancement of the arts, heritage, culture or science -->
+
+**15.** In relation to a Purpose “purpose”, (g) — the advancement of the arts, heritage, culture or science if—
+
+    (a) (g); and
+
+    (b) purpose's the advancement of the arts, heritage, culture or science.
+
+<!-- l4: decide:(h) — the advancement of public participation in sport -->
+
+**16.** In relation to a Purpose “purpose”, (h) — the advancement of public participation in sport if—
+
+    (a) (h);
+
+    (b) purpose's the advancement of public participation in sport;
+
+    (c) (2)(c); and
+
+    (d) purpose's sport that involves physical skill and exertion.
+
+<!-- l4: decide:(2)(d) — the recreational-facilities restriction is satisfied -->
+
+**17.** In relation to a Purpose “purpose”, (2)(d) — the recreational-facilities restriction is satisfied if—
+
+    (a) (2)(d) paragraph (1)(i) applies only in relation to recreational facilities or activities that are –;
+
+    (b) all of the following apply—
+
+        (i) (i); and
+
+        (ii) purpose's primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage; or
+
+    (c) all of the following apply—
+
+        (i) (ii); and
+
+        (ii) purpose's available to members of the public at large or to male or female members of the public at large.
+
+<!-- l4: decide:(i) — the provision of recreational facilities or activities -->
+
+**18.** In relation to a Purpose “purpose”, (i) — the provision of recreational facilities or activities if—
+
+    (a) (i);
+
+    (b) purpose's the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom they are primarily intended; and
+
+    (c) (2)(d) — the recreational-facilities restriction is satisfied with purpose.
+
+<!-- l4: decide:(j) — the advancement of human rights, conflict resolution or reconciliation -->
+
+**19.** In relation to a Purpose “purpose”, (j) — the advancement of human rights, conflict resolution or reconciliation if—
+
+    (a) (j); and
+
+    (b) purpose's the advancement of human rights, conflict resolution or reconciliation.
+
+<!-- l4: decide:(k) — the promotion of religious or racial harmony -->
+
+**20.** In relation to a Purpose “purpose”, (k) — the promotion of religious or racial harmony if—
+
+    (a) (k); and
+
+    (b) purpose's the promotion of religious or racial harmony.
+
+<!-- l4: decide:(l) — the promotion of equality and diversity -->
+
+**21.** In relation to a Purpose “purpose”, (l) — the promotion of equality and diversity if—
+
+    (a) (l); and
+
+    (b) purpose's the promotion of equality and diversity.
+
+<!-- l4: decide:(m) — the advancement of environmental protection or improvement -->
+
+**22.** In relation to a Purpose “purpose”, (m) — the advancement of environmental protection or improvement if—
+
+    (a) (m); and
+
+    (b) purpose's the advancement of environmental protection or improvement.
+
+<!-- l4: decide:(n) — the relief of those in need -->
+
+**23.** In relation to a Purpose “purpose”, (n) — the relief of those in need if—
+
+    (a) (n);
+
+    (b) purpose's the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage; and
+
+    (c) (2)(e) paragraph (1)(n) includes relief given by the provision of accommodation or care;.
+
+<!-- l4: decide:(o) — the advancement of animal welfare -->
+
+**24.** In relation to a Purpose “purpose”, (o) — the advancement of animal welfare if—
+
+    (a) (o); and
+
+    (b) purpose's the advancement of animal welfare.
+
+<!-- l4: decide:(p) — any other analogous purpose -->
+
+**25.** In relation to a Purpose “purpose”, (p) — any other analogous purpose if—
+
+    (a) all of the following apply—
+
+        (i) (p); and
+
+        (ii) purpose's reasonably regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o); or
+
+    (b) all of the following apply—
+
+        (i) (2)(f); and
+
+        (ii) purpose's the advancement of a philosophical belief (whether or not involving belief in a god).
+
+<!-- l4: decide:the purpose falls within paragraph (1) -->
+
+**26.** In relation to a Purpose “purpose”, the purpose falls within paragraph (1) if—
+
+    (a) (1) For the purposes of this Law, the charitable purposes are –;
+
+    (b) (a) — the prevention or relief of poverty with purpose;
+
+    (c) (b) — the advancement of education with purpose;
+
+    (d) (c) — the advancement of religion with purpose;
+
+    (e) (d) — the advancement of health with purpose;
+
+    (f) (e) — the saving of lives with purpose;
+
+    (g) (f) — the advancement of citizenship or community development with purpose;
+
+    (h) (g) — the advancement of the arts, heritage, culture or science with purpose;
+
+    (i) (h) — the advancement of public participation in sport with purpose;
+
+    (j) (i) — the provision of recreational facilities or activities with purpose;
+
+    (k) (j) — the advancement of human rights, conflict resolution or reconciliation with purpose;
+
+    (l) (k) — the promotion of religious or racial harmony with purpose;
+
+    (m) (l) — the promotion of equality and diversity with purpose;
+
+    (n) (m) — the advancement of environmental protection or improvement with purpose;
+
+    (o) (n) — the relief of those in need with purpose;
+
+    (p) (o) — the advancement of animal welfare with purpose; or
+
+    (q) (p) — any other analogous purpose with purpose.
+
+<!-- l4: decide:(5) — the purpose is excluded as political -->
+
+**27.** In relation to a Purpose “purpose”, (5) — the purpose is excluded as political if—
+
+    (a) (5); and
+
+    (b) purpose's for advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere.
+
+<!-- l4: decide:the purpose is a charitable purpose -->
+
+**28.** In relation to a Purpose “purpose”, the purpose is a charitable purpose if—
+
+    (a) the purpose falls within paragraph (1) with purpose; and
+
+    (b) (5) — the purpose is not excluded as political with purpose.
+
+## Article 7 — Public benefit
+
+<!-- l4: decide:7(3)(b) — the entity benefits only identified natural persons -->
+
+**29.** In relation to an Entity “entity”, 7(3)(b) — the entity benefits only identified natural persons if—
+
+    (a) (3)(b); and
+
+    (b) entity's the public benefit finding's benefit provided only to one particular natural person or to a group of identified natural persons.
+
+<!-- l4: decide:7(2) — the mandatory considerations were had regard to -->
+
+**30.** In relation to an Entity “entity”, 7(2) — the mandatory considerations were had regard to if—
+
+    (a) (2) The person determining the question must have regard to –;
+
+    (b) (a) how any – (i) benefit gained or likely to be gained by members of the entity or any other persons (other than as members of the public), and (ii) disbenefit incurred or likely to be incurred by the public, in consequence of the entity exercising its functions, compares with the benefit gained or likely to be gained by the public in that consequence; and;
+
+    (c) entity's the public benefit finding's regard had to the comparison required by Article 7(2)(a);
+
+    (d) (b) if benefit is, or is likely to be, provided to a section of the public only, whether any condition on obtaining that benefit (including any charge or fee) is unduly restrictive.; and
+
+    (e) 7(2)(b) — the section-of-the-public question was reached with entity.
+
+<!-- l4: decide:7(2)(b) — the section-of-the-public question was reached -->
+
+**31.** In relation to an Entity “entity”, 7(2)(b) — the section-of-the-public question was reached if—
+
+    (a) it is not the case that entity's the public benefit finding's benefit provided to a section of the public only; or
+
+    (b) entity's the public benefit finding's regard had to the question required by Article 7(2)(b).
+
+<!-- l4: decide:7(3)(a) — no charitable purpose was presumed to be for the public benefit -->
+
+**32.** In relation to an Entity “entity”, 7(3)(a) — no charitable purpose was presumed to be for the public benefit if—
+
+    (a) (3)(a); and
+
+    (b) it is not the case that entity's the public benefit finding's a particular charitable purpose presumed to be for the public benefit.
+
+<!-- l4: decide:the public benefit determination was properly made -->
+
+**33.** In relation to an Entity “entity”, the public benefit determination was properly made if—
+
+    (a) 7(2) — the mandatory considerations were had regard to with entity; and
+
+    (b) 7(3)(a) — no charitable purpose was presumed to be for the public benefit with entity.
+
+## Article 5 — The charity test
+
+<!-- l4: decide:the entity has at least one charitable purpose -->
+
+**34.** In relation to an Entity “entity”, the entity has at least one charitable purpose means any with the purpose is a charitable purpose and entity's purposes.
+
+<!-- l4: decide:(ii) — the purpose is purely ancillary or incidental -->
+
+**35.** In relation to an Entity “entity” and a Purpose “purpose”, (ii) — the purpose is purely ancillary or incidental if—
+
+    (a) (ii);
+
+    (b) purpose's purely ancillary or incidental to any of the entity's charitable purposes;
+
+    (c) the entity has at least one charitable purpose with entity; and
+
+    (d) (5) — the purpose is not excluded as political with purpose.
+
+<!-- l4: decide:the purpose is charitable, or purely ancillary or incidental -->
+
+**36.** In relation to an Entity “entity” and a Purpose “purpose”, the purpose is charitable, or purely ancillary or incidental if—
+
+    (a) (i);
+
+    (b) the purpose is a charitable purpose with purpose; or
+
+    (c) (ii) — the purpose is purely ancillary or incidental with entity and purpose.
+
+<!-- l4: decide:5(1)(a) — all of its purposes are charitable or ancillary -->
+
+**37.** In relation to an Entity “entity”, 5(1)(a) — all of its purposes are charitable or ancillary if—
+
+    (a) (a); and
+
+    (b) all with given purpose then the purpose is charitable, or purely ancillary or incidental with entity and purpose and entity's purposes.
+
+<!-- l4: decide:the entity provides or intends to provide public benefit -->
+
+**38.** In relation to an Entity “entity”, the entity provides or intends to provide public benefit if—
+
+    (a) entity's the public benefit finding's public benefit in Jersey or elsewhere, to a reasonable degree, provided in giving effect to those purposes; or
+
+    (b) the applicant's intention limb with entity.
+
+<!-- l4: decide:the applicant's intention limb -->
+
+**39.** In relation to an Entity “entity”, the applicant's intention limb if—
+
+    (a) entity's an applicant; and
+
+    (b) entity's the public benefit finding's public benefit in Jersey or elsewhere, to a reasonable degree, intended to be provided in giving effect to those purposes.
+
+<!-- l4: decide:5(1)(b) — public benefit -->
+
+**40.** In relation to an Entity “entity”, 5(1)(b) — public benefit if—
+
+    (a) (b);
+
+    (b) the entity provides or intends to provide public benefit with entity; and
+
+    (c) it is not the case that 7(3)(b) — the entity benefits only identified natural persons with entity.
+
+<!-- l4: decide:5(2) — direction or control by a listed person is expressly permitted -->
+
+**41.** In relation to an Entity “entity”, 5(2) — direction or control by a listed person is expressly permitted if—
+
+    (a) all of the following apply—
+
+        (i) (a); and
+
+        (ii) entity's constitution's express permission for the entity's activities to be directed or otherwise controlled by a Minister;
+
+    (b) all of the following apply—
+
+        (i) (b); and
+
+        (ii) entity's constitution's express permission for the entity's activities to be directed or otherwise controlled by a member of the States Assembly; or
+
+    (c) all of the following apply—
+
+        (i) (c); and
+
+        (ii) entity's constitution's express permission for the entity's activities to be directed or otherwise controlled by any equivalent of such a person in another jurisdiction.
+
+<!-- l4: decide:5(2) — governorship by a listed person is expressly permitted -->
+
+**42.** In relation to an Entity “entity”, 5(2) — governorship by a listed person is expressly permitted if—
+
+    (a) all of the following apply—
+
+        (i) (a); and
+
+        (ii) entity's constitution's express permission for any of the entity's governors to be a Minister;
+
+    (b) all of the following apply—
+
+        (i) (b); and
+
+        (ii) entity's constitution's express permission for any of the entity's governors to be a member of the States Assembly; or
+
+    (c) all of the following apply—
+
+        (i) (c); and
+
+        (ii) entity's constitution's express permission for any of the entity's governors to be any equivalent of such a person in another jurisdiction.
+
+<!-- l4: decide:5(2) — a listed person is expressly permitted under either mode -->
+
+**43.** In relation to an Entity “entity”, 5(2) — a listed person is expressly permitted under either mode if—
+
+    (a) 5(2) — direction or control by a listed person is expressly permitted with entity; or
+
+    (b) 5(2) — governorship by a listed person is expressly permitted with entity.
+
+<!-- l4: decide:5(2) — the government-control disqualification applies -->
+
+**44.** In relation to an Entity “entity”, 5(2) — the government-control disqualification applies if—
+
+    (a) (2);
+
+    (b) 5(2) — a listed person is expressly permitted under either mode with entity;
+
+    (c) entity's constitution's that permission extended to such a person acting in that capacity;
+
+    (d) (3); and
+
+    (e) it is not the case that entity's specified in an Order under Article 5(3) disapplying paragraph (2).
+
+<!-- l4: decide:the entity meets the charity test -->
+
+**45. export Decide whether an entity meets the charity test in Article 5 of the Charities (Jersey) Law 2014, applying the charitable-purposes heads in Article 6 (including the political-purposes carve-out), the public-benefit rules in Article 7, and the government-control disqualification in Article 5(2).**
+
+In relation to an Entity “entity”, the entity meets the charity test if—
+
+    (a) 5(1)(a) — all of its purposes are charitable or ancillary with entity;
+
+    (b) 5(1)(b) — public benefit with entity; and
+
+    (c) it is not the case that 5(2) — the government-control disqualification applies with entity.
+
+## Scenarios
+
+<!-- l4: decide:a poverty-relief purpose -->
+
+**46.** A poverty-relief purpose means Purpose where description is the prevention and relief of poverty in the Parish of St Helier, the prevention or relief of poverty is TRUE, the advancement of education is FALSE, the advancement of religion is FALSE, the advancement of health is FALSE, the prevention or relief of sickness, disease or human suffering is FALSE, the saving of lives is FALSE, the advancement of citizenship or community development is FALSE, rural or urban regeneration is FALSE, the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities is FALSE, the advancement of the arts, heritage, culture or science is FALSE, the advancement of public participation in sport is FALSE, sport that involves physical skill and exertion is FALSE, the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom they are primarily intended is FALSE, primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage is FALSE, available to members of the public at large or to male or female members of the public at large is FALSE, the advancement of human rights, conflict resolution or reconciliation is FALSE, the promotion of religious or racial harmony is FALSE, the promotion of equality and diversity is FALSE, the advancement of environmental protection or improvement is FALSE, the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage is FALSE, the advancement of animal welfare is FALSE, reasonably regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o) is FALSE, the advancement of a philosophical belief (whether or not involving belief in a god) is FALSE, for advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere is FALSE and purely ancillary or incidental to any of the entity's charitable purposes is FALSE.
+
+<!-- l4: decide:a sickness-prevention purpose -->
+
+**47.** A sickness-prevention purpose means Purpose where description is the prevention of communicable disease, the prevention or relief of poverty is FALSE, the advancement of education is FALSE, the advancement of religion is FALSE, the advancement of health is FALSE, the prevention or relief of sickness, disease or human suffering is TRUE, the saving of lives is FALSE, the advancement of citizenship or community development is FALSE, rural or urban regeneration is FALSE, the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities is FALSE, the advancement of the arts, heritage, culture or science is FALSE, the advancement of public participation in sport is FALSE, sport that involves physical skill and exertion is FALSE, the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom they are primarily intended is FALSE, primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage is FALSE, available to members of the public at large or to male or female members of the public at large is FALSE, the advancement of human rights, conflict resolution or reconciliation is FALSE, the promotion of religious or racial harmony is FALSE, the promotion of equality and diversity is FALSE, the advancement of environmental protection or improvement is FALSE, the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage is FALSE, the advancement of animal welfare is FALSE, reasonably regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o) is FALSE, the advancement of a philosophical belief (whether or not involving belief in a god) is FALSE, for advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere is FALSE and purely ancillary or incidental to any of the entity's charitable purposes is FALSE.
+
+<!-- l4: decide:a spectator-pastime purpose -->
+
+**48.** A spectator-pastime purpose means Purpose where description is the advancement of public participation in competitive pigeon fancying, the prevention or relief of poverty is FALSE, the advancement of education is FALSE, the advancement of religion is FALSE, the advancement of health is FALSE, the prevention or relief of sickness, disease or human suffering is FALSE, the saving of lives is FALSE, the advancement of citizenship or community development is FALSE, rural or urban regeneration is FALSE, the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities is FALSE, the advancement of the arts, heritage, culture or science is FALSE, the advancement of public participation in sport is TRUE, sport that involves physical skill and exertion is FALSE, the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom they are primarily intended is FALSE, primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage is FALSE, available to members of the public at large or to male or female members of the public at large is FALSE, the advancement of human rights, conflict resolution or reconciliation is FALSE, the promotion of religious or racial harmony is FALSE, the promotion of equality and diversity is FALSE, the advancement of environmental protection or improvement is FALSE, the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage is FALSE, the advancement of animal welfare is FALSE, reasonably regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o) is FALSE, the advancement of a philosophical belief (whether or not involving belief in a god) is FALSE, for advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere is FALSE and purely ancillary or incidental to any of the entity's charitable purposes is FALSE.
+
+<!-- l4: decide:a physical-sport purpose -->
+
+**49.** A physical-sport purpose means Purpose where description is the advancement of public participation in island swimming, the prevention or relief of poverty is FALSE, the advancement of education is FALSE, the advancement of religion is FALSE, the advancement of health is FALSE, the prevention or relief of sickness, disease or human suffering is FALSE, the saving of lives is FALSE, the advancement of citizenship or community development is FALSE, rural or urban regeneration is FALSE, the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities is FALSE, the advancement of the arts, heritage, culture or science is FALSE, the advancement of public participation in sport is TRUE, sport that involves physical skill and exertion is TRUE, the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom they are primarily intended is FALSE, primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage is FALSE, available to members of the public at large or to male or female members of the public at large is FALSE, the advancement of human rights, conflict resolution or reconciliation is FALSE, the promotion of religious or racial harmony is FALSE, the promotion of equality and diversity is FALSE, the advancement of environmental protection or improvement is FALSE, the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage is FALSE, the advancement of animal welfare is FALSE, reasonably regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o) is FALSE, the advancement of a philosophical belief (whether or not involving belief in a god) is FALSE, for advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere is FALSE and purely ancillary or incidental to any of the entity's charitable purposes is FALSE.
+
+<!-- l4: decide:a members-only recreation purpose -->
+
+**50.** A members-only recreation purpose means Purpose where description is the provision of a members-only tennis pavilion, the prevention or relief of poverty is FALSE, the advancement of education is FALSE, the advancement of religion is FALSE, the advancement of health is FALSE, the prevention or relief of sickness, disease or human suffering is FALSE, the saving of lives is FALSE, the advancement of citizenship or community development is FALSE, rural or urban regeneration is FALSE, the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities is FALSE, the advancement of the arts, heritage, culture or science is FALSE, the advancement of public participation in sport is FALSE, sport that involves physical skill and exertion is FALSE, the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom they are primarily intended is TRUE, primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage is FALSE, available to members of the public at large or to male or female members of the public at large is FALSE, the advancement of human rights, conflict resolution or reconciliation is FALSE, the promotion of religious or racial harmony is FALSE, the promotion of equality and diversity is FALSE, the advancement of environmental protection or improvement is FALSE, the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage is FALSE, the advancement of animal welfare is FALSE, reasonably regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o) is FALSE, the advancement of a philosophical belief (whether or not involving belief in a god) is FALSE, for advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere is FALSE and purely ancillary or incidental to any of the entity's charitable purposes is FALSE.
+
+<!-- l4: decide:an open recreation purpose -->
+
+**51.** An open recreation purpose means Purpose where description is the provision of a public recreation ground open to all, the prevention or relief of poverty is FALSE, the advancement of education is FALSE, the advancement of religion is FALSE, the advancement of health is FALSE, the prevention or relief of sickness, disease or human suffering is FALSE, the saving of lives is FALSE, the advancement of citizenship or community development is FALSE, rural or urban regeneration is FALSE, the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities is FALSE, the advancement of the arts, heritage, culture or science is FALSE, the advancement of public participation in sport is FALSE, sport that involves physical skill and exertion is FALSE, the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom they are primarily intended is TRUE, primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage is FALSE, available to members of the public at large or to male or female members of the public at large is TRUE, the advancement of human rights, conflict resolution or reconciliation is FALSE, the promotion of religious or racial harmony is FALSE, the promotion of equality and diversity is FALSE, the advancement of environmental protection or improvement is FALSE, the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage is FALSE, the advancement of animal welfare is FALSE, reasonably regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o) is FALSE, the advancement of a philosophical belief (whether or not involving belief in a god) is FALSE, for advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere is FALSE and purely ancillary or incidental to any of the entity's charitable purposes is FALSE.
+
+<!-- l4: decide:a philosophical-belief purpose -->
+
+**52.** A philosophical-belief purpose means Purpose where description is the advancement of secular humanism, the prevention or relief of poverty is FALSE, the advancement of education is FALSE, the advancement of religion is FALSE, the advancement of health is FALSE, the prevention or relief of sickness, disease or human suffering is FALSE, the saving of lives is FALSE, the advancement of citizenship or community development is FALSE, rural or urban regeneration is FALSE, the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities is FALSE, the advancement of the arts, heritage, culture or science is FALSE, the advancement of public participation in sport is FALSE, sport that involves physical skill and exertion is FALSE, the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom they are primarily intended is FALSE, primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage is FALSE, available to members of the public at large or to male or female members of the public at large is FALSE, the advancement of human rights, conflict resolution or reconciliation is FALSE, the promotion of religious or racial harmony is FALSE, the promotion of equality and diversity is FALSE, the advancement of environmental protection or improvement is FALSE, the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage is FALSE, the advancement of animal welfare is FALSE, reasonably regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o) is FALSE, the advancement of a philosophical belief (whether or not involving belief in a god) is TRUE, for advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere is FALSE and purely ancillary or incidental to any of the entity's charitable purposes is FALSE.
+
+<!-- l4: decide:a party-political purpose -->
+
+**53.** A party-political purpose means Purpose where description is the promotion of equality and diversity by securing the election of the Party's candidates, the prevention or relief of poverty is FALSE, the advancement of education is FALSE, the advancement of religion is FALSE, the advancement of health is FALSE, the prevention or relief of sickness, disease or human suffering is FALSE, the saving of lives is FALSE, the advancement of citizenship or community development is FALSE, rural or urban regeneration is FALSE, the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities is FALSE, the advancement of the arts, heritage, culture or science is FALSE, the advancement of public participation in sport is FALSE, sport that involves physical skill and exertion is FALSE, the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom they are primarily intended is FALSE, primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage is FALSE, available to members of the public at large or to male or female members of the public at large is FALSE, the advancement of human rights, conflict resolution or reconciliation is FALSE, the promotion of religious or racial harmony is FALSE, the promotion of equality and diversity is TRUE, the advancement of environmental protection or improvement is FALSE, the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage is FALSE, the advancement of animal welfare is FALSE, reasonably regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o) is FALSE, the advancement of a philosophical belief (whether or not involving belief in a god) is FALSE, for advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere is TRUE and purely ancillary or incidental to any of the entity's charitable purposes is FALSE.
+
+<!-- l4: decide:an ancillary party-political purpose -->
+
+**54.** An ancillary party-political purpose means Purpose where description is campaigning for the Party's candidates, incidental to the relief of poverty, the prevention or relief of poverty is FALSE, the advancement of education is FALSE, the advancement of religion is FALSE, the advancement of health is FALSE, the prevention or relief of sickness, disease or human suffering is FALSE, the saving of lives is FALSE, the advancement of citizenship or community development is FALSE, rural or urban regeneration is FALSE, the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities is FALSE, the advancement of the arts, heritage, culture or science is FALSE, the advancement of public participation in sport is FALSE, sport that involves physical skill and exertion is FALSE, the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom they are primarily intended is FALSE, primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage is FALSE, available to members of the public at large or to male or female members of the public at large is FALSE, the advancement of human rights, conflict resolution or reconciliation is FALSE, the promotion of religious or racial harmony is FALSE, the promotion of equality and diversity is FALSE, the advancement of environmental protection or improvement is FALSE, the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage is FALSE, the advancement of animal welfare is FALSE, reasonably regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o) is FALSE, the advancement of a philosophical belief (whether or not involving belief in a god) is FALSE, for advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere is TRUE and purely ancillary or incidental to any of the entity's charitable purposes is TRUE.
+
+<!-- l4: decide:an ancillary fundraising purpose -->
+
+**55.** An ancillary fundraising purpose means Purpose where description is the operation of a charity shop to fund the relief of poverty, the prevention or relief of poverty is FALSE, the advancement of education is FALSE, the advancement of religion is FALSE, the advancement of health is FALSE, the prevention or relief of sickness, disease or human suffering is FALSE, the saving of lives is FALSE, the advancement of citizenship or community development is FALSE, rural or urban regeneration is FALSE, the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities is FALSE, the advancement of the arts, heritage, culture or science is FALSE, the advancement of public participation in sport is FALSE, sport that involves physical skill and exertion is FALSE, the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom they are primarily intended is FALSE, primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage is FALSE, available to members of the public at large or to male or female members of the public at large is FALSE, the advancement of human rights, conflict resolution or reconciliation is FALSE, the promotion of religious or racial harmony is FALSE, the promotion of equality and diversity is FALSE, the advancement of environmental protection or improvement is FALSE, the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage is FALSE, the advancement of animal welfare is FALSE, reasonably regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o) is FALSE, the advancement of a philosophical belief (whether or not involving belief in a god) is FALSE, for advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere is FALSE and purely ancillary or incidental to any of the entity's charitable purposes is TRUE.
+
+<!-- l4: decide:a purely commercial purpose -->
+
+**56.** A purely commercial purpose means Purpose where description is the carrying on of a wholesale grocery business for profit, the prevention or relief of poverty is FALSE, the advancement of education is FALSE, the advancement of religion is FALSE, the advancement of health is FALSE, the prevention or relief of sickness, disease or human suffering is FALSE, the saving of lives is FALSE, the advancement of citizenship or community development is FALSE, rural or urban regeneration is FALSE, the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities is FALSE, the advancement of the arts, heritage, culture or science is FALSE, the advancement of public participation in sport is FALSE, sport that involves physical skill and exertion is FALSE, the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom they are primarily intended is FALSE, primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage is FALSE, available to members of the public at large or to male or female members of the public at large is FALSE, the advancement of human rights, conflict resolution or reconciliation is FALSE, the promotion of religious or racial harmony is FALSE, the promotion of equality and diversity is FALSE, the advancement of environmental protection or improvement is FALSE, the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage is FALSE, the advancement of animal welfare is FALSE, reasonably regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o) is FALSE, the advancement of a philosophical belief (whether or not involving belief in a god) is FALSE, for advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere is FALSE and purely ancillary or incidental to any of the entity's charitable purposes is FALSE.
+
+<!-- l4: decide:a clean constitution -->
+
+**57.** A clean constitution means Constitution where description is no reservation of control to any public office-holder, express permission for the entity's activities to be directed or otherwise controlled by a Minister is FALSE, express permission for the entity's activities to be directed or otherwise controlled by a member of the States Assembly is FALSE, express permission for the entity's activities to be directed or otherwise controlled by any equivalent of such a person in another jurisdiction is FALSE, express permission for any of the entity's governors to be a Minister is FALSE, express permission for any of the entity's governors to be a member of the States Assembly is FALSE, express permission for any of the entity's governors to be any equivalent of such a person in another jurisdiction is FALSE and that permission extended to such a person acting in that capacity is FALSE.
+
+<!-- l4: decide:a constitution reserving Ministerial direction -->
+
+**58.** A constitution reserving Ministerial direction means Constitution where description is Article 7: the Minister may direct the activities of the trust, express permission for the entity's activities to be directed or otherwise controlled by a Minister is TRUE, express permission for the entity's activities to be directed or otherwise controlled by a member of the States Assembly is FALSE, express permission for the entity's activities to be directed or otherwise controlled by any equivalent of such a person in another jurisdiction is FALSE, express permission for any of the entity's governors to be a Minister is FALSE, express permission for any of the entity's governors to be a member of the States Assembly is FALSE, express permission for any of the entity's governors to be any equivalent of such a person in another jurisdiction is FALSE and that permission extended to such a person acting in that capacity is TRUE.
+
+<!-- l4: decide:a constitution reserving a States Assembly governorship -->
+
+**59.** A constitution reserving a States Assembly governorship means Constitution where description is Article 4: one seat on the council is reserved to a member of the States Assembly, express permission for the entity's activities to be directed or otherwise controlled by a Minister is FALSE, express permission for the entity's activities to be directed or otherwise controlled by a member of the States Assembly is FALSE, express permission for the entity's activities to be directed or otherwise controlled by any equivalent of such a person in another jurisdiction is FALSE, express permission for any of the entity's governors to be a Minister is FALSE, express permission for any of the entity's governors to be a member of the States Assembly is TRUE, express permission for any of the entity's governors to be any equivalent of such a person in another jurisdiction is FALSE and that permission extended to such a person acting in that capacity is TRUE.
+
+<!-- l4: decide:a constitution reserving a foreign-equivalent governorship -->
+
+**60.** A constitution reserving a foreign-equivalent governorship means Constitution where description is Article 4: one seat is reserved to a member of the Guernsey States of Deliberation, express permission for the entity's activities to be directed or otherwise controlled by a Minister is FALSE, express permission for the entity's activities to be directed or otherwise controlled by a member of the States Assembly is FALSE, express permission for the entity's activities to be directed or otherwise controlled by any equivalent of such a person in another jurisdiction is FALSE, express permission for any of the entity's governors to be a Minister is FALSE, express permission for any of the entity's governors to be a member of the States Assembly is FALSE, express permission for any of the entity's governors to be any equivalent of such a person in another jurisdiction is TRUE and that permission extended to such a person acting in that capacity is TRUE.
+
+<!-- l4: decide:a constitution admitting a Minister in a private capacity -->
+
+**61.** A constitution admitting a Minister in a private capacity means Constitution where description is Article 4: a governor who is a Minister serves in a personal capacity and not ex officio, express permission for the entity's activities to be directed or otherwise controlled by a Minister is FALSE, express permission for the entity's activities to be directed or otherwise controlled by a member of the States Assembly is FALSE, express permission for the entity's activities to be directed or otherwise controlled by any equivalent of such a person in another jurisdiction is FALSE, express permission for any of the entity's governors to be a Minister is TRUE, express permission for any of the entity's governors to be a member of the States Assembly is FALSE, express permission for any of the entity's governors to be any equivalent of such a person in another jurisdiction is FALSE and that permission extended to such a person acting in that capacity is FALSE.
+
+<!-- l4: decide:a sound public benefit finding -->
+
+**62.** A sound public benefit finding means PublicBenefitFinding where description is benefit to the public at large, properly determined, public benefit in Jersey or elsewhere, to a reasonable degree, provided in giving effect to those purposes is TRUE, public benefit in Jersey or elsewhere, to a reasonable degree, intended to be provided in giving effect to those purposes is TRUE, benefit provided only to one particular natural person or to a group of identified natural persons is FALSE, benefit provided to a section of the public only is FALSE, any condition on obtaining that benefit (including any charge or fee) unduly restrictive is FALSE, regard had to the comparison required by Article 7(2)(a) is TRUE, regard had to the question required by Article 7(2)(b) is FALSE and a particular charitable purpose presumed to be for the public benefit is FALSE.
+
+<!-- l4: decide:a finding of no public benefit -->
+
+**63.** A finding of no public benefit means PublicBenefitFinding where description is no benefit provided or intended, public benefit in Jersey or elsewhere, to a reasonable degree, provided in giving effect to those purposes is FALSE, public benefit in Jersey or elsewhere, to a reasonable degree, intended to be provided in giving effect to those purposes is FALSE, benefit provided only to one particular natural person or to a group of identified natural persons is FALSE, benefit provided to a section of the public only is FALSE, any condition on obtaining that benefit (including any charge or fee) unduly restrictive is FALSE, regard had to the comparison required by Article 7(2)(a) is TRUE, regard had to the question required by Article 7(2)(b) is FALSE and a particular charitable purpose presumed to be for the public benefit is FALSE.
+
+<!-- l4: decide:a finding of intended but not actual public benefit -->
+
+**64.** A finding of intended but not actual public benefit means PublicBenefitFinding where description is not yet operating; benefit intended, public benefit in Jersey or elsewhere, to a reasonable degree, provided in giving effect to those purposes is FALSE, public benefit in Jersey or elsewhere, to a reasonable degree, intended to be provided in giving effect to those purposes is TRUE, benefit provided only to one particular natural person or to a group of identified natural persons is FALSE, benefit provided to a section of the public only is FALSE, any condition on obtaining that benefit (including any charge or fee) unduly restrictive is FALSE, regard had to the comparison required by Article 7(2)(a) is TRUE, regard had to the question required by Article 7(2)(b) is FALSE and a particular charitable purpose presumed to be for the public benefit is FALSE.
+
+<!-- l4: decide:a finding that benefit reaches only identified individuals -->
+
+**65.** A finding that benefit reaches only identified individuals means PublicBenefitFinding where description is the trust benefits the settlor's four named grandchildren, public benefit in Jersey or elsewhere, to a reasonable degree, provided in giving effect to those purposes is TRUE, public benefit in Jersey or elsewhere, to a reasonable degree, intended to be provided in giving effect to those purposes is TRUE, benefit provided only to one particular natural person or to a group of identified natural persons is TRUE, benefit provided to a section of the public only is TRUE, any condition on obtaining that benefit (including any charge or fee) unduly restrictive is FALSE, regard had to the comparison required by Article 7(2)(a) is TRUE, regard had to the question required by Article 7(2)(b) is TRUE and a particular charitable purpose presumed to be for the public benefit is FALSE.
+
+<!-- l4: decide:a finding with an unduly restrictive fee -->
+
+**66.** A finding with an unduly restrictive fee means PublicBenefitFinding where description is benefit to a section of the public, behind a fee the determiner found unduly restrictive, public benefit in Jersey or elsewhere, to a reasonable degree, provided in giving effect to those purposes is TRUE, public benefit in Jersey or elsewhere, to a reasonable degree, intended to be provided in giving effect to those purposes is TRUE, benefit provided only to one particular natural person or to a group of identified natural persons is FALSE, benefit provided to a section of the public only is TRUE, any condition on obtaining that benefit (including any charge or fee) unduly restrictive is TRUE, regard had to the comparison required by Article 7(2)(a) is TRUE, regard had to the question required by Article 7(2)(b) is TRUE and a particular charitable purpose presumed to be for the public benefit is FALSE.
+
+<!-- l4: decide:a finding made on a presumption -->
+
+**67.** A finding made on a presumption means PublicBenefitFinding where description is public benefit presumed from the advancement of religion, contrary to Article 7(3)(a), public benefit in Jersey or elsewhere, to a reasonable degree, provided in giving effect to those purposes is TRUE, public benefit in Jersey or elsewhere, to a reasonable degree, intended to be provided in giving effect to those purposes is TRUE, benefit provided only to one particular natural person or to a group of identified natural persons is FALSE, benefit provided to a section of the public only is FALSE, any condition on obtaining that benefit (including any charge or fee) unduly restrictive is FALSE, regard had to the comparison required by Article 7(2)(a) is TRUE, regard had to the question required by Article 7(2)(b) is FALSE and a particular charitable purpose presumed to be for the public benefit is TRUE.
+
+<!-- l4: decide:a finding that skipped the section-of-the-public question -->
+
+**68.** A finding that skipped the section-of-the-public question means PublicBenefitFinding where description is benefit to a section of the public only, but Article 7(2)(b) was never asked, public benefit in Jersey or elsewhere, to a reasonable degree, provided in giving effect to those purposes is TRUE, public benefit in Jersey or elsewhere, to a reasonable degree, intended to be provided in giving effect to those purposes is TRUE, benefit provided only to one particular natural person or to a group of identified natural persons is FALSE, benefit provided to a section of the public only is TRUE, any condition on obtaining that benefit (including any charge or fee) unduly restrictive is FALSE, regard had to the comparison required by Article 7(2)(a) is TRUE, regard had to the question required by Article 7(2)(b) is FALSE and a particular charitable purpose presumed to be for the public benefit is FALSE.
+
+<!-- l4: decide:an entity -->
+
+**69.** In relation to a STRING “the name”, a list of Purpose “the purposes”, a Constitution “a constitution”, a BOOLEAN “applicant”, a PublicBenefitFinding “the finding” and a BOOLEAN “an Order”, an entity means Entity where name is the name, purposes is the purposes, constitution is a constitution, an applicant is applicant, the public benefit finding is the finding and specified in an Order under Article 5(3) disapplying paragraph (2) is an Order.
+
+<!-- l4: decide:the St Helier poverty trust -->
+
+**70.** The St Helier poverty trust means an entity with the St Helier poverty trust, list of a poverty-relief purpose, a clean constitution, FALSE, a sound public benefit finding and FALSE.
+
+<!-- l4: decide:the poverty trust with a charity shop -->
+
+**71.** The poverty trust with a charity shop means an entity with the poverty trust with a charity shop, list of a poverty-relief purpose and an ancillary fundraising purpose, a clean constitution, FALSE, a sound public benefit finding and FALSE.
+
+<!-- l4: decide:the charity shop with nothing behind it -->
+
+**72.** The charity shop with nothing behind it means an entity with the charity shop with nothing behind it, list of an ancillary fundraising purpose, a clean constitution, FALSE, a sound public benefit finding and FALSE.
+
+<!-- l4: decide:the poverty trust with a party-political object -->
+
+**73.** The poverty trust with a party-political object means an entity with the poverty trust with a party-political object, list of a poverty-relief purpose and a party-political purpose, a clean constitution, FALSE, a sound public benefit finding and FALSE.
+
+<!-- l4: decide:the poverty trust with incidental campaigning -->
+
+**74.** The poverty trust with incidental campaigning means an entity with the poverty trust with incidental campaigning, list of a poverty-relief purpose and an ancillary party-political purpose, a clean constitution, FALSE, a sound public benefit finding and FALSE.
+
+<!-- l4: decide:the grocery company -->
+
+**75.** The grocery company means an entity with the grocery company, list of a purely commercial purpose, a clean constitution, FALSE, a sound public benefit finding and FALSE.
+
+<!-- l4: decide:the entity with no purposes -->
+
+**76.** The entity with no purposes means an entity with the entity with no purposes, EMPTY, a clean constitution, FALSE, a sound public benefit finding and FALSE.
+
+<!-- l4: decide:the entity with no purposes and no benefit -->
+
+**77.** The entity with no purposes and no benefit means an entity with the entity with no purposes and no benefit, EMPTY, a clean constitution, FALSE, a finding of no public benefit and FALSE.
+
+<!-- l4: decide:the disease-prevention trust -->
+
+**78.** The disease-prevention trust means an entity with the disease-prevention trust, list of a sickness-prevention purpose, a clean constitution, FALSE, a sound public benefit finding and FALSE.
+
+<!-- l4: decide:the pigeon fanciers' association -->
+
+**79.** The pigeon fanciers' association means an entity with the pigeon fanciers' association, list of a spectator-pastime purpose, a clean constitution, FALSE, a sound public benefit finding and FALSE.
+
+<!-- l4: decide:the island swimming association -->
+
+**80.** The island swimming association means an entity with the island swimming association, list of a physical-sport purpose, a clean constitution, FALSE, a sound public benefit finding and FALSE.
+
+<!-- l4: decide:the members-only tennis club -->
+
+**81.** The members-only tennis club means an entity with the members-only tennis club, list of a members-only recreation purpose, a clean constitution, FALSE, a sound public benefit finding and FALSE.
+
+<!-- l4: decide:the public recreation ground trust -->
+
+**82.** The public recreation ground trust means an entity with the public recreation ground trust, list of an open recreation purpose, a clean constitution, FALSE, a sound public benefit finding and FALSE.
+
+<!-- l4: decide:the humanist society -->
+
+**83.** The humanist society means an entity with the humanist society, list of a philosophical-belief purpose, a clean constitution, FALSE, a sound public benefit finding and FALSE.
+
+<!-- l4: decide:the Ministerially directed trust -->
+
+**84.** The Ministerially directed trust means an entity with the Ministerially directed trust, list of a poverty-relief purpose, a constitution reserving Ministerial direction, FALSE, a sound public benefit finding and FALSE.
+
+<!-- l4: decide:the Ministerially directed trust exempted by Order -->
+
+**85.** The Ministerially directed trust exempted by Order means an entity with the Ministerially directed trust exempted by Order, list of a poverty-relief purpose, a constitution reserving Ministerial direction, FALSE, a sound public benefit finding and TRUE.
+
+<!-- l4: decide:the States-governed foundation -->
+
+**86.** The States-governed foundation means an entity with the States-governed foundation, list of a poverty-relief purpose, a constitution reserving a States Assembly governorship, FALSE, a sound public benefit finding and FALSE.
+
+<!-- l4: decide:the Guernsey-governed foundation -->
+
+**87.** The Guernsey-governed foundation means an entity with the Guernsey-governed foundation, list of a poverty-relief purpose, a constitution reserving a foreign-equivalent governorship, FALSE, a sound public benefit finding and FALSE.
+
+<!-- l4: decide:the trust with a Minister in a private capacity -->
+
+**88.** The trust with a Minister in a private capacity means an entity with the trust with a Minister in a private capacity, list of a poverty-relief purpose, a constitution admitting a Minister in a private capacity, FALSE, a sound public benefit finding and FALSE.
+
+<!-- l4: decide:the dormant registered charity -->
+
+**89.** The dormant registered charity means an entity with the dormant registered charity, list of a poverty-relief purpose, a clean constitution, FALSE, a finding of intended but not actual public benefit and FALSE.
+
+<!-- l4: decide:the applicant not yet operating -->
+
+**90.** The applicant not yet operating means an entity with the applicant not yet operating, list of a poverty-relief purpose, a clean constitution, TRUE, a finding of intended but not actual public benefit and FALSE.
+
+<!-- l4: decide:the grandchildren's trust -->
+
+**91.** The grandchildren's trust means an entity with the grandchildren's trust, list of a poverty-relief purpose, a clean constitution, FALSE, a finding that benefit reaches only identified individuals and FALSE.
+
+<!-- l4: decide:the school with an unduly restrictive fee -->
+
+**92.** The school with an unduly restrictive fee means an entity with the school with an unduly restrictive fee, list of a poverty-relief purpose, a clean constitution, FALSE, a finding with an unduly restrictive fee and FALSE.
+
+<!-- l4: decide:the church whose benefit was presumed -->
+
+**93.** The church whose benefit was presumed means an entity with the church whose benefit was presumed, list of a poverty-relief purpose, a clean constitution, FALSE, a finding made on a presumption and FALSE.
+
+<!-- l4: decide:the entity whose determiner skipped 7(2)(b) -->
+
+**94.** The entity whose determiner skipped 7(2)(b) means an entity with the entity whose determiner skipped 7(2)(b), list of a poverty-relief purpose, a clean constitution, FALSE, a finding that skipped the section-of-the-public question and FALSE.
+
+## Assertions
+
+### Article 6(1) — each head, positive and negative
+
+### Article 6(2)(a) — the health widening
+
+### Article 6(2)(c) — the sport gate, exercised both ways
+
+### Article 6(2)(d) — the recreational-facilities gate, exercised both ways
+
+### Article 6(2)(f) — the philosophical-belief deeming into head (p)
+
+### Article 6(5) — the political-purposes carve-out, exercised both ways
+
+### Article 5(1)(a)(ii) — the ancillary limb, and its referential gate (A9)
+
+### Article 5(1)(a) — all of its purposes
+
+### Article 5(1)(b) and Article 7 — public benefit
+
+### Article 7(2) and 7(3)(a) — the determination's own validity (A8)
+
+### Article 5(2) and 5(3) — the government-control carve-out, exercised both ways
+
+### Article 5 — the charity test end to end
+
+<!-- tnr-coverage: 94 provisions; 0 boolean atoms inlined; 102 directives suppressed -->

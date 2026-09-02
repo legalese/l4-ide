@@ -1,0 +1,1272 @@
+IMPORT prelude
+IMPORT `charities-common`
+IMPORT `part-1-interpretation`
+IMPORT `part-3-charity-test`
+
+§ `Charities (Jersey) Law 2014 — Part 8 — Appeals to the Charity Tribunal (Articles 32-36)`
+
+-- ===========================================================================
+-- PART 8 — APPEALS TO THE CHARITY TRIBUNAL. Articles 32 to 36.
+--
+-- Source: Charities (Jersey) Law 2014 (L.41/2014), Official Consolidated
+-- Version, showing the law from 16 October 2025 to Current.
+-- https://www.jerseylaw.je/laws/current/l_41_2014
+--
+-- THE SHAPE OF THE PART:
+--
+--   Art 32   ESTABLISHMENT. 32(1) the tribunal exists; 32(2) its function is to
+--            hear and determine appeals under this Part — a DUTY, so it is in
+--            the regulative layer; 32(3) Schedule 2 makes further provision — no
+--            computable content, carried as an inert-prose stub.
+--
+--   Art 33   THE STANDING TABLE — the heart of the Part. It is a two-column
+--            table: WHO may appeal (the appellant's class) x AGAINST WHICH
+--            decision of the Commissioner. Five rows:
+--
+--              33(1)  an applicant for registration     -> (a) refusal to register
+--                                                          (b) refusal to register in
+--                                                              the restricted section
+--              33(2)  a registered charity              -> (a) deregistration
+--                                                          (b) refusal of Art 12(4) permission
+--                                                          (c) an Art 12(6) requirement
+--                                                          (d) refusal of Art 13(3) approval
+--                                                          (e) refusal to approve an
+--                                                              Art 13(4)(b) amendment
+--              33(3)  a person served with an Art 26    -> the decision to impose a
+--                     notice or a required steps notice    requirement in the notice
+--              33(4)  the Attorney General              -> *** ANY *** decision
+--              33(5)  any OTHER person (defined by      -> the decision to REGISTER an
+--                     NEGATION of the first three)         applicant, and then only on
+--                                                          the 33(5)(a)/(b) grounds, held
+--                                                          AT BOTH TIMES.
+--
+--            Art 33(4) is the widest standing in the Part: the row has NO
+--            constraint on the decision column at all. That is made visible below
+--            — `Article 33(4)` simply does not mention `the decision appealed
+--            against`.
+--
+--   Art 33(5) THE DOUBLE TEMPORAL REQUIREMENT — "on the ground that, AT BOTH the
+--            time of the application AND the time of the appeal — (a) ... or
+--            (b) ...". A conjunction over two times, wrapped around a disjunction
+--            over two grounds. The bracketing is contestable and is the most
+--            interesting thing in the Article: see the INTERPRETATION CALL below.
+--
+--   Art 34   GROUNDS AND POWERS. 34(1) the ground of appeal to the TRIBUNAL:
+--            "wrong OR unreasonable" x "on its merits, the facts OR the law" — a
+--            2 x 3 cross product. 34(2) interim orders and evidence (MAY).
+--            34(3) the powers on determining: (a) an ELECTION between remit /
+--            substitute / dismiss (ROR); (b) costs, a MAY GATED on a finding of
+--            vexatiousness or gross unreasonableness; (c) recommendations (MAY).
+--
+--   Art 35   APPEAL AND REFERENCE TO COURT.
+--            *** THE NARROWING. *** Art 34(1) gives the tribunal a ground with
+--            SIX cells (2 adjectives x 3 dimensions). Art 35(1) gives the court
+--            ONE: "the decision was UNREASONABLE having regard to all the
+--            circumstances of the case". "Wrong" is GONE; and "on its merits, the
+--            facts or the law" is GONE. A tribunal decision may be plainly WRONG
+--            ON THE LAW and yet, if it is not UNREASONABLE in all the
+--            circumstances, disclose no ground of appeal to the court under
+--            35(1). That divergence is made executable in the tests below
+--            (`the appeal that is wrong on the law but not unreasonable`).
+--            The safety valve for a pure point of law is 35(3): the TRIBUNAL — not
+--            the disappointed party — may refer it to the court.
+--
+--   Art 36   FURTHER PROVISION. 36(1) reconsideration is unaffected (inert stub);
+--            36(2) the Minister may prescribe time limits by Order (inert stub —
+--            and the reason every `WITHIN n` in this file is a PLACEHOLDER);
+--            36(3) a substituted decision may be given RETROSPECTIVE effect;
+--            36(4) BUT an act done before the date of the order is not rendered an
+--            OFFENCE merely by the order's operation.
+--            *** THE RHYME. *** Art 36(4) is the same criminal-liability carve-out
+--            on retrospectivity as Art 17(4) (retrospective re-registration under
+--            Part 4). The Law says twice, in two different Parts, that the State
+--            may rewrite the past for every purpose EXCEPT to make a person a
+--            criminal for what was lawful when done. Encoded here; the Art 17(4)
+--            twin lives in the Part 4 file.
+--
+-- ENCODING STYLE — INERT. The verbatim statutory words ride inline as bare
+-- strings (inert: identity of their context — TRUE under AND, FALSE under OR),
+-- with `...` as AND-sugar and `..` as OR-sugar. Layout IS the bracketing. Only
+-- the operative atoms are lifted to BOOLEANs. Read the left margin and you are
+-- reading Part 8.
+--
+-- =========================== INTERPRETATION CALLS ==========================
+--
+-- >>> (1) THE 33(5) BRACKETING — "at both times", over what?
+--     "on the ground that, at both the time of the application and the time of
+--      the appeal — (a) the applicant did not meet the charity test; or (b) ...
+--      that name was undesirable under Article 12(1)."
+--     Two readings:
+--       NARROW / GROUND-WISE:  ((a)@t1 AND (a)@t2)  OR  ((b)@t1 AND (b)@t2)
+--          — ONE ground, which must subsist at both times.
+--       WIDE / TIME-WISE:      ((a)@t1 OR (b)@t1)   AND ((a)@t2 OR (b)@t2)
+--          — SOME ground at each time, and it may be a DIFFERENT ground.
+--     They diverge: an applicant that failed the charity test at application but
+--     passes it now, whose name was innocuous at application but has since become
+--     undesirable, has standing on the WIDE reading and none on the NARROW.
+--     WE ADOPT THE NARROW READING. "the ground" is singular; a ground that
+--     shape-shifts between the two times is not one ground held at both times, it
+--     is two grounds each held at one time — which is precisely what the words
+--     "at both" are there to forbid. BOTH readings are encoded below, and the
+--     divergence is asserted, so a reviewer can see the cost of the choice and
+--     flip it in one line.
+--
+-- >>> (2) THE 33(5)(b) "IF" — condition, or conjunct?
+--     "(b) IF the appellant has an interest in the registered name of the
+--      applicant, that name was undesirable under Article 12(1)."
+--     Read as a material implication ((NOT interest) OR undesirable), an appellant
+--     with NO interest in the name satisfies (b) VACUOUSLY, and so has standing to
+--     appeal ANY registration on a ground it does not even assert. That is absurd:
+--     it would make the "other person" standing in 33(5) unlimited, and would make
+--     limb (a) — the charity test — redundant. So the "if" is read as a
+--     REQUIREMENT OF THE GROUND: (b) = interest AND undesirable-at-both-times.
+--     Encoded as a conjunction. Flagged because it is the opposite of the usual
+--     proviso treatment.
+--
+-- >>> (3) ART 34(1) — the 2 x 3 grid. "wrong or unreasonable on its merits, the
+--     facts or the law" is encoded as a CROSS PRODUCT: (wrong OR unreasonable)
+--     AND (on merits OR on facts OR on law). The alternative is six independent
+--     cells (wrong-on-the-law, unreasonable-on-the-facts, ...). The cross-product
+--     reading is what the grammar says, but it is looser: it admits an appellant
+--     who says "the decision was WRONG (in some way)" and "the complaint is about
+--     THE LAW" without joining the two. Flagged; the grammar wins.
+--
+-- >>> (4) CROSS-PART ATOMS. Article 12 (undesirable names, name changes),
+--     Article 13 (amendment of purposes and public benefit statements),
+--     Article 26 (information notices) and required steps notices (Art 27) are
+--     encoded in OTHER files of this corpus, which this file deliberately does
+--     NOT import (they are being written in parallel). Every reference to them is
+--     LIFTED HERE as a single BOOLEAN atom or a single enum constructor, with a
+--     comment pointing at the Part that owns it. When the corpus is linked, these
+--     atoms are the seams.
+--
+-- >>> (5) TIME LIMITS. Article 36(2) says the Minister "MAY by Order prescribe
+--     time limits within which appeals to the tribunal or court are to be
+--     brought". There is therefore NO NUMBER in the Law. Every `WITHIN n` below is
+--     a REVIEWABLE PLACEHOLDER (28 days for a step of an appeal, 90 for the
+--     determination of one), flagged at each site. Do not read them as law.
+-- ===========================================================================
+
+§§ `Article 32 — Establishment of the Charity Tribunal`
+
+-- 32(1) and 32(3) have no computable content. Carried as labelled inert-prose
+-- stubs so the corpus has no silent gap.
+
+`Article 32(1) — the tribunal is established (INERT; constitutive of the body, not of any test)` MEANS
+        "32(1) There is established a tribunal to be known as the Charity Tribunal."
+
+#EVAL `Article 32(1) — the tribunal is established (INERT; constitutive of the body, not of any test)`
+
+`Article 32(3) — Schedule 2 (INERT STUB; Schedule 2 is not encoded in this corpus)` MEANS
+        "32(3) Schedule 2 makes further provision in respect of the tribunal."
+    ... "[Schedule 2 — membership, tenure, remuneration, procedure and the making of tribunal rules — is not encoded. It bears on the CONSTITUTION of the tribunal, not on the standing, grounds or powers formalized in this file.]"
+
+#EVAL `Article 32(3) — Schedule 2 (INERT STUB; Schedule 2 is not encoded in this corpus)`
+
+§§ `Article 33 — the standing table: the decision column`
+
+-- MODELLING NOTE — WHY A HYBRID: AN ENUM FOR THE DECISION, CHECKBOXES FOR THE
+-- APPELLANT.
+--
+-- The DECISION appealed against is genuinely a RADIO BUTTON: an appeal under this
+-- Part is an appeal against ONE decision of the Commissioner. So it is an ENUM,
+-- and the "statutory tables as DATA" pattern applies: each constructor is a cell
+-- of the decision column, tagged with the sub-paragraph that opens it to appeal.
+--
+-- The APPELLANT's class is NOT a radio button, and an enum would misrepresent the
+-- Law. The classes OVERLAP: a registered charity served with an Article 26 notice
+-- is BOTH a 33(2) appellant AND a 33(3) appellant, and may appeal in either
+-- capacity against the decision proper to that capacity. So the appellant classes
+-- are independent BOOLEAN CHECKBOXES — the same choice, for the same reason, as
+-- Article 2(1)'s sub-paragraphs in `part-1-interpretation.l4`. And 33(5)'s class
+-- is then COMPUTED, by negation, from the other three — which is exactly how the
+-- statute defines it ("A person, OTHER THAN an applicant for registration, a
+-- registered charity, or the Attorney General").
+--
+-- We keep a predicate per statutory paragraph rather than a single row-membership
+-- test, because the paragraphs are not uniform: 33(4) has no decision constraint
+-- at all, and 33(5) carries a whole grounds sub-tree that no other row has. A
+-- uniform table would have to fake those two.
+
+DECLARE CommissionerDecision IS ONE OF
+  -- 33(1) — decisions appealable by an APPLICANT for registration
+  `a decision to refuse to register the applicant`                                              -- 33(1)(a); Art 11(5), Part 4
+  `a decision to refuse to register the applicant in the restricted section of the register`    -- 33(1)(b); Art 8/11, Part 4
+
+  -- 33(2) — decisions appealable by a REGISTERED CHARITY
+  `a decision to deregister the charity`                                                        -- 33(2)(a); Art 16, Part 4
+  `a decision to refuse permission under Article 12(4) to change or add a registered name`      -- 33(2)(b); Art 12(4), Part 4
+  `a decision to require the charity under Article 12(6) to apply to change its registered name`  -- 33(2)(c); Art 12(6), Part 4
+  `a decision to refuse approval under Article 13(3) of a proposed amendment of the charity's purposes`  -- 33(2)(d); Art 13(3), Part 4
+  `a decision to refuse to approve an amendment proposed under Article 13(4)(b) to the registered public benefit statement`  -- 33(2)(e); Art 13(4)(b), Part 4
+
+  -- 33(3) — the decision appealable by a person SERVED with a notice
+  `a decision to impose a requirement contained in a notice under Article 26 or a required steps notice`  -- 33(3); Arts 26-27, Part 7
+
+  -- 33(5) — the decision appealable by ANY OTHER PERSON
+  `a decision to register the applicant`                                                        -- 33(5); Art 11(4), Part 4
+
+  -- The residue. Appealable ONLY by the Attorney General, under 33(4).
+  `any other decision of the Commissioner`                                                      -- 33(4) only
+
+§§ `Article 33 — the standing table: the appellant column, and the grounds`
+
+DECLARE TribunalAppeal HAS
+    appellant                                                       IS A STRING
+
+    -- ---- WHO. The appellant classes. Checkboxes; they overlap. See the note above.
+    `the appellant is an applicant for registration`                IS A BOOLEAN   -- 33(1)
+    `the appellant is a registered charity`                         IS A BOOLEAN   -- 33(2)
+    -- 33(3). CROSS-PART ATOM: "a notice under Article 26" and "a required steps
+    -- notice" (Art 27) are defined in Part 7. Lifted here as one atom.
+    `the Commissioner served on the appellant a notice under Article 26 or a required steps notice`  IS A BOOLEAN   -- 33(3)
+    `the appellant is the Attorney General`                         IS A BOOLEAN   -- 33(4)
+    -- 33(5) needs no flag of its own: its class is the NEGATION of (1), (2) and (4).
+
+    -- ---- AGAINST WHAT.
+    `the decision appealed against`                                 IS A CommissionerDecision
+
+    -- ---- THE 33(5) GROUNDS, at the two times.
+    -- 33(5)(a) is not an atom: it is `NOT (meets the charity test)` — the Part 3
+    -- predicate — applied to the applicant AS IT STOOD at each of the two times.
+    -- So we carry the applicant TWICE. The whole point of the double temporal
+    -- requirement is that these two may differ.
+    `the applicant, as at the time of the application`              IS A CandidateCharity
+    `the applicant, as at the time of the appeal`                   IS A CandidateCharity
+
+    -- 33(5)(b). CROSS-PART ATOM: "undesirable under Article 12(1)" is a disjunction
+    -- (misleading name / offensive / suggests a connection the entity does not have
+    -- / same as or too like an existing registered name, etc.), encoded in
+    -- `part-4-register-and-application.l4`. Lifted here as ONE BOOLEAN per time.
+    `the appellant has an interest in the registered name of the applicant`         IS A BOOLEAN
+    `the registered name was undesirable under Article 12(1), at the time of the application`  IS A BOOLEAN
+    `the registered name was undesirable under Article 12(1), at the time of the appeal`       IS A BOOLEAN
+
+    -- ---- ARTICLE 34(1) — the ground of appeal to the TRIBUNAL. 2 adjectives ...
+    `the decision of the Commissioner was wrong`                    IS A BOOLEAN
+    `the decision of the Commissioner was unreasonable`             IS A BOOLEAN
+    -- ... x 3 dimensions.
+    `the complaint is as to the merits of the decision`             IS A BOOLEAN
+    `the complaint is as to the facts`                              IS A BOOLEAN
+    `the complaint is as to the law`                                IS A BOOLEAN
+
+    -- ---- ARTICLE 34(3)(b) — the gate on the costs power.
+    `the tribunal is satisfied that the appeal was vexatious`                       IS A BOOLEAN
+    `the tribunal is satisfied that the appeal was otherwise grossly unreasonable`  IS A BOOLEAN
+
+    -- ---- ARTICLE 35(1) — the ground of appeal to the COURT. ONE atom. See THE
+    -- NARROWING in the header: no "wrong", no merits/facts/law trichotomy.
+    `the appellant is a party to the appeal to the tribunal`                        IS A BOOLEAN
+    `the decision of the tribunal was unreasonable having regard to all the circumstances of the case`  IS A BOOLEAN
+
+§§ `Article 33(1) — an applicant for registration`
+
+GIVEN a IS A TribunalAppeal
+GIVETH A BOOLEAN
+`Article 33(1) — an applicant's standing` a MEANS
+        "(1) An applicant for registration may appeal against a decision of the Commissioner -"
+    ... a's `the appellant is an applicant for registration`
+    AND     "(a) to refuse to register the applicant; or"
+        ..  a's `the decision appealed against` EQUALS `a decision to refuse to register the applicant`
+        ..  "(b) to refuse to register the applicant in the restricted section of the register."
+        ..  a's `the decision appealed against` EQUALS `a decision to refuse to register the applicant in the restricted section of the register`
+
+§§ `Article 33(2) — a registered charity`
+
+GIVEN a IS A TribunalAppeal
+GIVETH A BOOLEAN
+`Article 33(2) — a registered charity's standing` a MEANS
+        "(2) A registered charity may appeal against a decision of the Commissioner -"
+    ... a's `the appellant is a registered charity`
+    AND     "(a) to deregister the charity;"
+        ..  a's `the decision appealed against` EQUALS `a decision to deregister the charity`
+        ..  "(b) to refuse permission, under Article 12(4), for the charity to change its registered name or add an alternative registered name;"
+        ..  a's `the decision appealed against` EQUALS `a decision to refuse permission under Article 12(4) to change or add a registered name`
+        ..  "(c) to require the charity, under Article 12(6), to apply to change its registered name;"
+        ..  a's `the decision appealed against` EQUALS `a decision to require the charity under Article 12(6) to apply to change its registered name`
+        ..  "(d) to refuse approval, under Article 13(3), of a proposed amendment of the charity's purposes to add or substitute a different charitable purpose; or"
+        ..  a's `the decision appealed against` EQUALS `a decision to refuse approval under Article 13(3) of a proposed amendment of the charity's purposes`
+        ..  "(e) to refuse to approve an amendment, proposed under Article 13(4)(b), to the charity's registered public benefit statement."
+        ..  a's `the decision appealed against` EQUALS `a decision to refuse to approve an amendment proposed under Article 13(4)(b) to the registered public benefit statement`
+
+§§ `Article 33(3) — a person served with an Article 26 notice or a required steps notice`
+
+GIVEN a IS A TribunalAppeal
+GIVETH A BOOLEAN
+`Article 33(3) — a notified person's standing` a MEANS
+        "(3) A person on whom the Commissioner serves a notice under Article 26 or a required steps notice may appeal against the decision of the Commissioner to impose a requirement contained in the notice."
+    ... a's `the Commissioner served on the appellant a notice under Article 26 or a required steps notice`
+    AND a's `the decision appealed against` EQUALS `a decision to impose a requirement contained in a notice under Article 26 or a required steps notice`
+
+§§ `Article 33(4) — the Attorney General: the widest standing in the Part`
+
+-- Look at what is NOT here. Every other row of the table conjoins a constraint on
+-- `the decision appealed against`. This row does not mention the decision at all.
+-- "ANY decision of the Commissioner" means EVERY constructor of
+-- CommissionerDecision — including `any other decision of the Commissioner`, the
+-- residue that no one else may touch. The absence of the conjunct IS the width.
+GIVEN a IS A TribunalAppeal
+GIVETH A BOOLEAN
+`Article 33(4) — the Attorney General's standing` a MEANS
+        "(4) The Attorney General may appeal against any decision of the Commissioner."
+    ... a's `the appellant is the Attorney General`
+
+§§ `Article 33(5) — any other person, and the DOUBLE TEMPORAL REQUIREMENT`
+
+-- The class, by negation. Note which classes the statute names, and which it does
+-- NOT: an Article 26 notice recipient (33(3)) is NOT excluded from 33(5).
+GIVEN a IS A TribunalAppeal
+GIVETH A BOOLEAN
+`Article 33(5) — the appellant is within an excluded class` a MEANS
+        "other than an applicant for registration, a registered charity, or the Attorney General"
+    ..  a's `the appellant is an applicant for registration`
+    ..  a's `the appellant is a registered charity`
+    ..  a's `the appellant is the Attorney General`
+
+-- ---- The two grounds, TIME BY TIME. Four cells, because "at both" needs four.
+
+-- 33(5)(a) at t1. Note: NOT an atom — it is the Part 3 charity test, run against
+-- the applicant AS IT STOOD AT THE APPLICATION.
+GIVEN a IS A TribunalAppeal
+GIVETH A BOOLEAN
+`(5)(a) at the time of the application — the applicant did not meet the charity test` a MEANS
+        "(a) the applicant did not meet the charity test;"
+    ... NOT `meets the charity test` (a's `the applicant, as at the time of the application`)
+
+-- 33(5)(a) at t2. The SAME test, against the applicant AS IT STANDS AT THE APPEAL.
+-- An applicant that has cured its defect in the meantime passes here — and that
+-- alone destroys the ground. This is the whole force of "at both".
+GIVEN a IS A TribunalAppeal
+GIVETH A BOOLEAN
+`(5)(a) at the time of the appeal — the applicant did not meet the charity test` a MEANS
+        "(a) the applicant did not meet the charity test;"
+    ... NOT `meets the charity test` (a's `the applicant, as at the time of the appeal`)
+
+-- 33(5)(b) at t1. >>> INTERPRETATION CALL (2): the "if" is a CONJUNCT, not an
+-- implication. An appellant with no interest in the name does not get this ground
+-- for free.
+GIVEN a IS A TribunalAppeal
+GIVETH A BOOLEAN
+`(5)(b) at the time of the application — the name was undesirable under Article 12(1)` a MEANS
+        "(b) if the appellant has an interest in the registered name of the applicant,"
+    ... a's `the appellant has an interest in the registered name of the applicant`
+    AND "that name was undesirable under Article 12(1)."
+    ... a's `the registered name was undesirable under Article 12(1), at the time of the application`
+
+GIVEN a IS A TribunalAppeal
+GIVETH A BOOLEAN
+`(5)(b) at the time of the appeal — the name was undesirable under Article 12(1)` a MEANS
+        "(b) if the appellant has an interest in the registered name of the applicant,"
+    ... a's `the appellant has an interest in the registered name of the applicant`
+    AND "that name was undesirable under Article 12(1)."
+    ... a's `the registered name was undesirable under Article 12(1), at the time of the appeal`
+
+-- ---- THE BRACKETING. >>> INTERPRETATION CALL (1). Both readings, side by side.
+
+-- NARROW / GROUND-WISE (ADOPTED): ONE ground, subsisting at BOTH times.
+--     ((a)@t1 AND (a)@t2)  OR  ((b)@t1 AND (b)@t2)
+GIVEN a IS A TribunalAppeal
+GIVETH A BOOLEAN
+`Article 33(5) — the ground, at both times (NARROW / ground-wise; ADOPTED)` a MEANS
+        "on the ground that, at both the time of the application and the time of the appeal -"
+    ..      `(5)(a) at the time of the application — the applicant did not meet the charity test` a
+        AND `(5)(a) at the time of the appeal — the applicant did not meet the charity test` a
+    ..      `(5)(b) at the time of the application — the name was undesirable under Article 12(1)` a
+        AND `(5)(b) at the time of the appeal — the name was undesirable under Article 12(1)` a
+
+-- WIDE / TIME-WISE (REJECTED, but encoded so the divergence is executable):
+--     ((a)@t1 OR (b)@t1)  AND  ((a)@t2 OR (b)@t2)
+-- This lets the ground SHAPE-SHIFT between the two times. To adopt it instead,
+-- swap the call in `Article 33(5) — any other person's standing` below.
+GIVEN a IS A TribunalAppeal
+GIVETH A BOOLEAN
+`Article 33(5) — the ground, at both times (WIDE / time-wise; REJECTED)` a MEANS
+        "at the time of the application -"
+    ...     `(5)(a) at the time of the application — the applicant did not meet the charity test` a
+        OR  `(5)(b) at the time of the application — the name was undesirable under Article 12(1)` a
+    AND "and at the time of the appeal -"
+    ...     `(5)(a) at the time of the appeal — the applicant did not meet the charity test` a
+        OR  `(5)(b) at the time of the appeal — the name was undesirable under Article 12(1)` a
+
+GIVEN a IS A TribunalAppeal
+GIVETH A BOOLEAN
+`Article 33(5) — any other person's standing` a MEANS
+        "(5) A person, other than an applicant for registration, a registered charity, or the Attorney General,"
+    ... NOT `Article 33(5) — the appellant is within an excluded class` a
+    AND "may appeal against a decision of the Commissioner to register an applicant,"
+    ... a's `the decision appealed against` EQUALS `a decision to register the applicant`
+    AND `Article 33(5) — the ground, at both times (NARROW / ground-wise; ADOPTED)` a
+
+§§ `Article 33 — STANDING, computed from (appellant class, decision, and the 33(5) grounds)`
+
+GIVEN a IS A TribunalAppeal
+GIVETH A BOOLEAN
+`has standing to appeal to the tribunal` a MEANS
+        "33 Persons who may appeal and decisions that may be appealed"
+    ..  `Article 33(1) — an applicant's standing` a
+    ..  `Article 33(2) — a registered charity's standing` a
+    ..  `Article 33(3) — a notified person's standing` a
+    ..  `Article 33(4) — the Attorney General's standing` a
+    ..  `Article 33(5) — any other person's standing` a
+
+§§ `Article 34(1) — the ground of appeal to the tribunal (the 2 x 3 grid)`
+
+-- >>> INTERPRETATION CALL (3). The grammar is a cross product; we encode a cross
+-- product. Two adjectives, then three dimensions.
+GIVEN a IS A TribunalAppeal
+GIVETH A BOOLEAN
+`Article 34(1) — the ground of appeal to the tribunal` a MEANS
+        "(1) An appeal may be made to the tribunal on the ground that the decision of the Commissioner was -"
+    ...     "wrong"
+        ..  a's `the decision of the Commissioner was wrong`
+        ..  "or unreasonable"
+        ..  a's `the decision of the Commissioner was unreasonable`
+    AND     "on its merits, the facts or the law."
+        ..  a's `the complaint is as to the merits of the decision`
+        ..  a's `the complaint is as to the facts`
+        ..  a's `the complaint is as to the law`
+
+-- A well-founded appeal to the tribunal needs BOTH standing (Art 33) and a ground
+-- (Art 34(1)). Neither does the other's work.
+GIVEN a IS A TribunalAppeal
+GIVETH A BOOLEAN
+`the appeal to the tribunal is competent` a MEANS
+        `has standing to appeal to the tribunal` a
+    AND `Article 34(1) — the ground of appeal to the tribunal` a
+
+§§ `Article 34(3)(b) — the gate on the costs power`
+
+GIVEN a IS A TribunalAppeal
+GIVETH A BOOLEAN
+`Article 34(3)(b) — satisfied that the appeal was vexatious or otherwise grossly unreasonable` a MEANS
+        "(b) award costs if satisfied that the appeal was"
+    ..  "vexatious"
+    ..  a's `the tribunal is satisfied that the appeal was vexatious`
+    ..  "or otherwise grossly unreasonable;"
+    ..  a's `the tribunal is satisfied that the appeal was otherwise grossly unreasonable`
+
+§§ `Article 35(1) — the ground of appeal to the court. THE NARROWING.`
+
+-- Compare with Article 34(1) above, line for line. There, six cells. Here, one.
+-- "Wrong" does not appear. "The merits, the facts or the law" does not appear.
+-- What the court is given is a bare reasonableness review "having regard to all
+-- the circumstances of the case" — and nothing else.
+GIVEN a IS A TribunalAppeal
+GIVETH A BOOLEAN
+`Article 35(1) — the ground of appeal to the court` a MEANS
+        "(1) ... may appeal from the decision of the tribunal to the court on the ground that the decision was unreasonable having regard to all the circumstances of the case."
+    ... a's `the decision of the tribunal was unreasonable having regard to all the circumstances of the case`
+
+-- 35(1) also has its own, much simpler, standing rule: a PARTY to the tribunal
+-- appeal, or the Attorney General. (The AG's width persists into the court.)
+GIVEN a IS A TribunalAppeal
+GIVETH A BOOLEAN
+`Article 35(1) — who may appeal to the court` a MEANS
+        "(1) A party to an appeal to the tribunal, or the Attorney General,"
+    ..  a's `the appellant is a party to the appeal to the tribunal`
+    ..  a's `the appellant is the Attorney General`
+
+GIVEN a IS A TribunalAppeal
+GIVETH A BOOLEAN
+`the appeal to the court is competent` a MEANS
+        `Article 35(1) — who may appeal to the court` a
+    AND `Article 35(1) — the ground of appeal to the court` a
+
+§§ `Article 36(1) and 36(2) — inert-prose stubs (no computable content)`
+
+`Article 36(1) — reconsideration is unaffected (INERT STUB)` MEANS
+        "36(1) Nothing in this Part is to be read as limiting the Commissioner's power to reconsider his or her own decisions or the decisions of his or her staff, whether at the request of any person or on the Commissioner's own motion."
+    ... "[A SAVING, not a rule: it subtracts nothing from, and adds nothing to, the standing, grounds and powers above. It matters for a different reason — it means the appeal routes in this Part are NOT the only route to a changed decision, and so an appellant's failure to establish standing under Article 33 does not leave the appellant without a remedy.]"
+
+#EVAL `Article 36(1) — reconsideration is unaffected (INERT STUB)`
+
+`Article 36(2) — the Minister's Order-making power as to time limits (INERT STUB; the source of every WITHIN placeholder in this file)` MEANS
+        "36(2) The Minister may by Order -"
+    ... "(a) prescribe time limits within which appeals to the tribunal or court are to be brought; and"
+    ... "(b) make such provision as to the giving of notice of decisions by the Commissioner or the tribunal, or of notice of reasons for such decisions, as appears to the Minister to be expedient for the purpose of enabling appeals to be brought within any time limits."
+    ... "[THERE IS NO NUMBER IN THE LAW. Until an Order under this paragraph is made, every deadline in the regulative layer below is a REVIEWABLE PLACEHOLDER, not a rule.]"
+
+#EVAL `Article 36(2) — the Minister's Order-making power as to time limits (INERT STUB; the source of every WITHIN placeholder in this file)`
+
+§§ `Article 36(3) and 36(4) — retrospective substituted decisions, and the criminal carve-out`
+
+-- THE RHYME with Art 17(4). See the header. The State may rewrite the past for
+-- ALL PURPOSES ("is to take effect for all purposes from any date") — except one.
+DECLARE RetrospectiveSubstitution HAS
+    `the act complained of`                                         IS A STRING
+    -- 36(3)
+    `the court or tribunal substituted its decision for another decision`           IS A BOOLEAN
+    `the substituted decision was ordered to take effect from a date before the date of the order`  IS A BOOLEAN
+    -- 36(4)
+    `the act occurred before the date of the order`                                 IS A BOOLEAN
+    `the act would be an offence merely by virtue of the operation of the order`    IS A BOOLEAN
+    -- The control: an act that was ALREADY an offence, order or no order. Art 36(4)
+    -- does not launder that; it only refuses to CREATE an offence.
+    `the act was an offence apart from the operation of the order`                  IS A BOOLEAN
+
+GIVEN o IS A RetrospectiveSubstitution
+GIVETH A BOOLEAN
+`Article 36(3) — the substituted decision was given retrospective effect` o MEANS
+        "(3) If the court or tribunal substitutes its decision for any other decision, it may order that the substituted decision is to take effect for all purposes from any date appearing to the court or tribunal to be appropriate, whether that date is before, on or after the date of the original decision or of the court's or tribunal's own decision."
+    ... o's `the court or tribunal substituted its decision for another decision`
+    AND o's `the substituted decision was ordered to take effect from a date before the date of the order`
+
+GIVEN o IS A RetrospectiveSubstitution
+GIVETH A BOOLEAN
+`Article 36(4) — the criminal-liability carve-out bites` o MEANS
+        "(4) If the court or tribunal makes an order under paragraph (3) that a substituted decision is to take effect from a date before the date of the order,"
+    ... `Article 36(3) — the substituted decision was given retrospective effect` o
+    AND "an act, that occurred before the date of the order,"
+    ... o's `the act occurred before the date of the order`
+    AND "is not rendered an offence merely by virtue of the operation of the order."
+    ... o's `the act would be an offence merely by virtue of the operation of the order`
+
+-- The operative consequence. An act is an offence if it was one anyway; the
+-- retrospective order can never MAKE it one.
+GIVEN o IS A RetrospectiveSubstitution
+GIVETH A BOOLEAN
+`the act is an offence` o MEANS
+        o's `the act was an offence apart from the operation of the order`
+    ..      o's `the act would be an offence merely by virtue of the operation of the order`
+        AND NOT `Article 36(4) — the criminal-liability carve-out bites` o
+
+§ `The regulative layer — Articles 32(2), 34(2), 34(3), 35(1)-(4), 36(3)`
+
+-- The tribunal and the court are given a DUTY (32(2): hear and determine) and a
+-- battery of POWERS (34(2), 34(3), 35(2), 35(3), 35(4), 36(3)). Powers are MAY:
+-- a power not exercised is no breach. The one power that is GATED is the costs
+-- power, Art 34(3)(b) — it arises only on a finding.
+--
+-- The Action enum in `charities-common.l4` covers Parts 3 to 7 and has no
+-- tribunal or court acts. We declare a LOCAL, Part-unique enum rather than adding
+-- constructors to the shared file.
+--
+-- >>> All `WITHIN n` below are REVIEWABLE PLACEHOLDERS. See Art 36(2): the Law
+--     prescribes no time limit; the Minister may. 28 = a step of an appeal;
+--     90 = the determination of one.
+
+DECLARE Part8Action IS ONE OF
+  `hear and determine the appeal`                                                    -- 32(2)
+  `appeal to the tribunal`                                                           -- 33, 34(1)
+  `make such interim order on the appeal as it thinks fit`                           -- 34(2)(a), 35(4)
+  `consider evidence that was put to the Commissioner or accept other evidence`      -- 34(2)(b)
+  `remit the decision to the Commissioner`                                           -- 34(3)(a)
+  `substitute the tribunal's decision for that of the Commissioner`                  -- 34(3)(a)
+  `dismiss the appeal`                                                               -- 34(3)(a), 35(2)
+  `award costs`                                                                      -- 34(3)(b)
+  `make a recommendation to the Commissioner as to the performance of his or her functions`  -- 34(3)(c)
+  `appeal from the decision of the tribunal to the court`                            -- 35(1)
+  `remit the decision to the tribunal or to the Commissioner`                        -- 35(2)
+  `substitute the court's decision for that of the tribunal or that of the Commissioner`  -- 35(2)
+  `refer a point of law to the court`                                                -- 35(3)
+  `give a ruling on the point of law`                                                -- 35(3)
+  `order that the substituted decision take effect from a date before the date of the order`  -- 36(3)
+
+§§ `Article 32(2) — the tribunal's function: a DUTY, and it is owed only where the appeal is competent`
+
+-- NOTE ON STYLE IN THE REGULATIVE LAYER. The inert-string device is a BOOLEAN
+-- device: a bare string rides in a boolean tree as the identity of its context. A
+-- DEONTIC tree is not a boolean tree, so the verbatim prose CANNOT ride inline
+-- here. It rides in `--` comments instead, immediately above the provision it
+-- licenses — the same discipline `part-3-charity-test.l4` adopts for Art 5(6)-(8).
+
+-- "32(2) The function of the tribunal is to hear and determine appeals under this Part."
+GIVEN a IS A TribunalAppeal
+GIVETH A DEONTIC Actor Part8Action
+`Article 32(2) — hear and determine the appeal` a MEANS
+    IF   `has standing to appeal to the tribunal` a
+    THEN PARTY Tribunal MUST `hear and determine the appeal` WITHIN 90   -- PLACEHOLDER; Art 36(2)
+    ELSE FULFILLED   -- no standing: no appeal to determine
+
+§§ `Article 34(2) — the tribunal's interim powers`
+
+-- "34(2) The tribunal may -
+--    (a) make such interim order on an appeal as it thinks fit;
+--    (b) consider evidence that was put to the Commissioner or accept other evidence."
+GIVETH A DEONTIC Actor Part8Action
+`Article 34(2) — interim orders and evidence` MEANS
+        (PARTY Tribunal MAY `make such interim order on the appeal as it thinks fit` WITHIN 90)
+    RAND
+        (PARTY Tribunal MAY `consider evidence that was put to the Commissioner or accept other evidence` WITHIN 90)
+
+§§ `Article 34(3) — the tribunal's powers on determining an appeal`
+
+-- "34(3)(a) remit the decision to the Commissioner, substitute the tribunal's
+--  decision for that of the Commissioner, or dismiss the appeal;"
+-- An ELECTION: remit, OR substitute, OR dismiss. ROR over three UNGUARDED MAYs —
+-- no `ELSE FULFILLED` arm inside the fold (the ROR trap).
+GIVETH A DEONTIC Actor Part8Action
+`Article 34(3)(a) — remit, substitute, or dismiss` MEANS
+        (PARTY Tribunal MAY `remit the decision to the Commissioner` WITHIN 28)
+    ROR (PARTY Tribunal MAY `substitute the tribunal's decision for that of the Commissioner` WITHIN 28)
+    ROR (PARTY Tribunal MAY `dismiss the appeal` WITHIN 28)
+
+-- "34(3)(b) award costs if satisfied that the appeal was vexatious or otherwise
+--  grossly unreasonable;"
+-- A GUARDED MAY. The power to award costs does not exist at large; it comes into
+-- being only on a finding of vexatiousness or gross unreasonableness. Where the
+-- gate is shut there is no permission to award costs at all — hence FULFILLED,
+-- not a standing MAY.
+GIVEN a IS A TribunalAppeal
+GIVETH A DEONTIC Actor Part8Action
+`Article 34(3)(b) — the costs power` a MEANS
+    IF   `Article 34(3)(b) — satisfied that the appeal was vexatious or otherwise grossly unreasonable` a
+    THEN PARTY Tribunal MAY `award costs` WITHIN 28
+    ELSE FULFILLED
+
+-- "34(3)(c) make any recommendation to the Commissioner, as to the performance of
+--  his or her functions in connection with the subject matter of the appeal, that
+--  appears to the tribunal to be called for in the circumstances of the case."
+GIVETH A DEONTIC Actor Part8Action
+`Article 34(3)(c) — recommendations to the Commissioner` MEANS
+    PARTY Tribunal MAY `make a recommendation to the Commissioner as to the performance of his or her functions` WITHIN 28
+
+-- "34(3) On determining an appeal the tribunal may -" (a), (b) and (c), woven.
+GIVEN a IS A TribunalAppeal
+GIVETH A DEONTIC Actor Part8Action
+`Article 34(3) — the tribunal's powers on determining an appeal` a MEANS
+         `Article 34(3)(a) — remit, substitute, or dismiss`
+    RAND `Article 34(3)(b) — the costs power` a
+    RAND `Article 34(3)(c) — recommendations to the Commissioner`
+
+§§ `Article 35 — appeal and reference to the court`
+
+-- "35(1) A party to an appeal to the tribunal, or the Attorney General, may appeal
+--  from the decision of the tribunal to the court on the ground that the decision
+--  was unreasonable having regard to all the circumstances of the case."
+-- The permission to go to the court exists only on the NARROW ground. `Person`
+-- stands for "a party to an appeal to the tribunal"; the Attorney General has a
+-- parallel permission of his own, and needs no party status below.
+GIVEN a IS A TribunalAppeal
+GIVETH A DEONTIC Actor Part8Action
+`Article 35(1) — appeal from the tribunal to the court` a MEANS
+    IF   `the appeal to the court is competent` a
+    THEN     (PARTY Person          MAY `appeal from the decision of the tribunal to the court` WITHIN 28)
+         ROR (PARTY AttorneyGeneral MAY `appeal from the decision of the tribunal to the court` WITHIN 28)
+    ELSE FULFILLED   -- no ground under 35(1): no appeal to the court, however wrong the tribunal was
+
+-- "35(2) The court, on determining the appeal, may remit the decision to the
+--  tribunal or to the Commissioner, substitute the court's decision for that of the
+--  tribunal or that of the Commissioner, or dismiss the appeal."
+GIVETH A DEONTIC Actor Part8Action
+`Article 35(2) — the court's powers on determining the appeal` MEANS
+        (PARTY Court MAY `remit the decision to the tribunal or to the Commissioner` WITHIN 28)
+    ROR (PARTY Court MAY `substitute the court's decision for that of the tribunal or that of the Commissioner` WITHIN 28)
+    ROR (PARTY Court MAY `dismiss the appeal` WITHIN 28)
+
+-- "35(3) The tribunal may refer any point of law to the court for the court to give
+--  a ruling on the point."
+-- THE SAFETY VALVE against the Art 35(1) narrowing. A pure point of law that is not
+-- "unreasonable in all the circumstances" cannot be carried to the court BY THE
+-- PARTY under 35(1) — but the TRIBUNAL may refer it. Note who holds the key: not
+-- the disappointed litigant. The court's ruling, once referred, is a MUST.
+GIVETH A DEONTIC Actor Part8Action
+`Article 35(3) — reference of a point of law` MEANS
+    PARTY Tribunal MAY `refer a point of law to the court` WITHIN 28
+      HENCE PARTY Court MUST `give a ruling on the point of law` WITHIN 90   -- PLACEHOLDER
+
+-- "35(4) The court may make such interim order on an appeal or reference as it
+--  thinks fit."
+GIVETH A DEONTIC Actor Part8Action
+`Article 35(4) — the court's interim power` MEANS
+    PARTY Court MAY `make such interim order on the appeal as it thinks fit` WITHIN 90
+
+§§ `Article 36(3) — the power to give a substituted decision retrospective effect`
+
+-- "36(3) If the court or tribunal substitutes its decision for any other decision,
+--  it may order that the substituted decision is to take effect for all purposes
+--  from any date appearing to the court or tribunal to be appropriate, whether that
+--  date is before, on or after the date of the original decision or of the court's
+--  or tribunal's own decision."
+GIVETH A DEONTIC Actor Part8Action
+`Article 36(3) — retrospective effect of a substituted decision (tribunal)` MEANS
+    PARTY Tribunal MAY `order that the substituted decision take effect from a date before the date of the order` WITHIN 28
+
+GIVETH A DEONTIC Actor Part8Action
+`Article 36(3) — retrospective effect of a substituted decision (court)` MEANS
+    PARTY Court MAY `order that the substituted decision take effect from a date before the date of the order` WITHIN 28
+
+-- ===========================================================================
+§ `Tests — Part 8`
+-- ===========================================================================
+
+§§ `A GIVEN-parameterised constructor for appeals`
+
+-- There is no record-update operator in L4 (`x WITH field IS v` works only on a
+-- TYPE CONSTRUCTOR). TribunalAppeal has 19 fields; spelling a full literal per
+-- scenario would drown the tests. So we expose a constructor and vary only the
+-- operative fields. The two CandidateCharity values come from
+-- `part-3-charity-test.l4`: `Victoria College Trust` MEETS the charity test;
+-- `Victoria College Trust, but campaigning` does NOT (Art 6(5) political purpose).
+
+GIVEN `who: applicant`         IS A BOOLEAN
+      `who: registered charity` IS A BOOLEAN
+      `who: notified`          IS A BOOLEAN
+      `who: AG`                IS A BOOLEAN
+      `what: the decision`     IS A CommissionerDecision
+      `applicant at t1`        IS A CandidateCharity
+      `applicant at t2`        IS A CandidateCharity
+      `interest in the name`   IS A BOOLEAN
+      `name undesirable at t1` IS A BOOLEAN
+      `name undesirable at t2` IS A BOOLEAN
+      `34(1): wrong`           IS A BOOLEAN
+      `34(1): unreasonable`    IS A BOOLEAN
+      `34(1): on the merits`   IS A BOOLEAN
+      `34(1): on the facts`    IS A BOOLEAN
+      `34(1): on the law`      IS A BOOLEAN
+      `34(3)(b): vexatious`    IS A BOOLEAN
+      `34(3)(b): grossly unreasonable`  IS A BOOLEAN
+      `35(1): a party below`   IS A BOOLEAN
+      `35(1): unreasonable in all the circumstances`  IS A BOOLEAN
+GIVETH A TribunalAppeal
+`an appeal` MEANS TribunalAppeal WITH
+    appellant                                                       IS "the appellant"
+    `the appellant is an applicant for registration`                IS `who: applicant`
+    `the appellant is a registered charity`                         IS `who: registered charity`
+    `the Commissioner served on the appellant a notice under Article 26 or a required steps notice`  IS `who: notified`
+    `the appellant is the Attorney General`                         IS `who: AG`
+    `the decision appealed against`                                 IS `what: the decision`
+    `the applicant, as at the time of the application`              IS `applicant at t1`
+    `the applicant, as at the time of the appeal`                   IS `applicant at t2`
+    `the appellant has an interest in the registered name of the applicant`  IS `interest in the name`
+    `the registered name was undesirable under Article 12(1), at the time of the application`  IS `name undesirable at t1`
+    `the registered name was undesirable under Article 12(1), at the time of the appeal`       IS `name undesirable at t2`
+    `the decision of the Commissioner was wrong`                    IS `34(1): wrong`
+    `the decision of the Commissioner was unreasonable`             IS `34(1): unreasonable`
+    `the complaint is as to the merits of the decision`             IS `34(1): on the merits`
+    `the complaint is as to the facts`                              IS `34(1): on the facts`
+    `the complaint is as to the law`                                IS `34(1): on the law`
+    `the tribunal is satisfied that the appeal was vexatious`       IS `34(3)(b): vexatious`
+    `the tribunal is satisfied that the appeal was otherwise grossly unreasonable`  IS `34(3)(b): grossly unreasonable`
+    `the appellant is a party to the appeal to the tribunal`        IS `35(1): a party below`
+    `the decision of the tribunal was unreasonable having regard to all the circumstances of the case`  IS `35(1): unreasonable in all the circumstances`
+
+§§ `Article 33(1) — an applicant refused registration HAS standing`
+
+`the refused applicant` MEANS
+    `an appeal` TRUE FALSE FALSE FALSE
+                `a decision to refuse to register the applicant`
+                `Victoria College Trust, but campaigning` `Victoria College Trust, but campaigning`
+                FALSE FALSE FALSE
+                TRUE FALSE FALSE FALSE TRUE          -- 34(1): wrong, on the law
+                FALSE FALSE
+                FALSE FALSE
+
+#ASSERT `Article 33(1) — an applicant's standing` `the refused applicant`
+#ASSERT `has standing to appeal to the tribunal` `the refused applicant`
+#ASSERT `Article 34(1) — the ground of appeal to the tribunal` `the refused applicant`
+#ASSERT `the appeal to the tribunal is competent` `the refused applicant`
+
+-- The restricted-section limb, 33(1)(b).
+`the applicant refused the restricted section` MEANS
+    `an appeal` TRUE FALSE FALSE FALSE
+                `a decision to refuse to register the applicant in the restricted section of the register`
+                `Victoria College Trust` `Victoria College Trust`
+                FALSE FALSE FALSE
+                FALSE TRUE TRUE FALSE FALSE          -- 34(1): unreasonable, on the merits
+                FALSE FALSE
+                FALSE FALSE
+
+#ASSERT `Article 33(1) — an applicant's standing` `the applicant refused the restricted section`
+#ASSERT `the appeal to the tribunal is competent` `the applicant refused the restricted section`
+
+§§ `Article 33(2) — a registered charity, deregistered, HAS standing`
+
+`the deregistered charity` MEANS
+    `an appeal` FALSE TRUE FALSE FALSE
+                `a decision to deregister the charity`
+                `Victoria College Trust` `Victoria College Trust`
+                FALSE FALSE FALSE
+                TRUE FALSE FALSE TRUE FALSE          -- 34(1): wrong, on the facts
+                FALSE FALSE
+                FALSE FALSE
+
+#ASSERT `Article 33(2) — a registered charity's standing` `the deregistered charity`
+#ASSERT `has standing to appeal to the tribunal` `the deregistered charity`
+
+-- 33(2)(d) — refusal of Art 13(3) approval of an amendment of purposes.
+`the charity refused an amendment of purposes` MEANS
+    `an appeal` FALSE TRUE FALSE FALSE
+                `a decision to refuse approval under Article 13(3) of a proposed amendment of the charity's purposes`
+                `Victoria College Trust` `Victoria College Trust`
+                FALSE FALSE FALSE
+                FALSE TRUE FALSE FALSE TRUE
+                FALSE FALSE
+                FALSE FALSE
+
+#ASSERT `Article 33(2) — a registered charity's standing` `the charity refused an amendment of purposes`
+
+§§ `STANDING DENIED — the appellant class and the decision do not match`
+
+-- A REGISTERED CHARITY purporting to appeal under 33(1)(a) — against a refusal to
+-- register an APPLICANT. It is not an applicant; row 33(1) is not open to it, and
+-- row 33(2) does not contain that decision. The table returns FALSE in every row.
+`the registered charity purporting to appeal a refusal to register` MEANS
+    `an appeal` FALSE TRUE FALSE FALSE
+                `a decision to refuse to register the applicant`     -- a 33(1) decision, not a 33(2) one
+                `Victoria College Trust` `Victoria College Trust`
+                FALSE FALSE FALSE
+                TRUE FALSE FALSE FALSE TRUE
+                FALSE FALSE
+                FALSE FALSE
+
+#ASSERT NOT `Article 33(1) — an applicant's standing` `the registered charity purporting to appeal a refusal to register`
+#ASSERT NOT `Article 33(2) — a registered charity's standing` `the registered charity purporting to appeal a refusal to register`
+#ASSERT NOT `has standing to appeal to the tribunal` `the registered charity purporting to appeal a refusal to register`
+-- It HAS a good Art 34(1) ground. It still cannot be heard: Art 33 and Art 34(1)
+-- are independent, and the ground does not supply the standing.
+#ASSERT `Article 34(1) — the ground of appeal to the tribunal` `the registered charity purporting to appeal a refusal to register`
+#ASSERT NOT `the appeal to the tribunal is competent` `the registered charity purporting to appeal a refusal to register`
+
+§§ `Article 33(3) — a person served with an Article 26 notice`
+
+`the person served with an Article 26 notice` MEANS
+    `an appeal` FALSE FALSE TRUE FALSE
+                `a decision to impose a requirement contained in a notice under Article 26 or a required steps notice`
+                `Victoria College Trust` `Victoria College Trust`
+                FALSE FALSE FALSE
+                FALSE TRUE TRUE FALSE FALSE
+                FALSE FALSE
+                FALSE FALSE
+
+#ASSERT `Article 33(3) — a notified person's standing` `the person served with an Article 26 notice`
+#ASSERT `has standing to appeal to the tribunal` `the person served with an Article 26 notice`
+
+-- THE OVERLAP, made executable — and the reason the appellant classes are
+-- CHECKBOXES, not an enum. A registered charity served with a required steps
+-- notice is BOTH a 33(2) appellant AND a 33(3) appellant. Here it appeals the
+-- notice: 33(3) opens, 33(2) does not (that decision is not in the 33(2) row) —
+-- and it still has standing. An enum could not represent this appellant at all.
+`the registered charity served with a required steps notice` MEANS
+    `an appeal` FALSE TRUE TRUE FALSE
+                `a decision to impose a requirement contained in a notice under Article 26 or a required steps notice`
+                `Victoria College Trust` `Victoria College Trust`
+                FALSE FALSE FALSE
+                TRUE FALSE FALSE TRUE FALSE
+                FALSE FALSE
+                FALSE FALSE
+
+#ASSERT NOT `Article 33(2) — a registered charity's standing` `the registered charity served with a required steps notice`
+#ASSERT `Article 33(3) — a notified person's standing` `the registered charity served with a required steps notice`
+#ASSERT `has standing to appeal to the tribunal` `the registered charity served with a required steps notice`
+
+§§ `Article 33(4) — the Attorney General: standing against ANY decision`
+
+-- Against the residue — a decision no other class may touch at all.
+`the Attorney General, against some other decision` MEANS
+    `an appeal` FALSE FALSE FALSE TRUE
+                `any other decision of the Commissioner`
+                `Victoria College Trust` `Victoria College Trust`
+                FALSE FALSE FALSE
+                TRUE FALSE FALSE FALSE TRUE
+                FALSE FALSE
+                FALSE FALSE
+
+#ASSERT `Article 33(4) — the Attorney General's standing` `the Attorney General, against some other decision`
+#ASSERT `has standing to appeal to the tribunal` `the Attorney General, against some other decision`
+-- No other row opens on that decision. The AG's row is the ONLY one.
+#ASSERT NOT `Article 33(1) — an applicant's standing` `the Attorney General, against some other decision`
+#ASSERT NOT `Article 33(2) — a registered charity's standing` `the Attorney General, against some other decision`
+#ASSERT NOT `Article 33(3) — a notified person's standing` `the Attorney General, against some other decision`
+#ASSERT NOT `Article 33(5) — any other person's standing` `the Attorney General, against some other decision`
+
+-- The AG against a REGISTRATION. Note what the AG does NOT need: the 33(5) grounds.
+-- Here the applicant plainly met the charity test at both times — a third party
+-- would have no ground at all — and the AG's standing is untouched.
+`the Attorney General, against a registration` MEANS
+    `an appeal` FALSE FALSE FALSE TRUE
+                `a decision to register the applicant`
+                `Victoria College Trust` `Victoria College Trust`   -- meets the test at BOTH times
+                FALSE FALSE FALSE
+                FALSE TRUE TRUE FALSE FALSE
+                FALSE FALSE
+                FALSE FALSE
+
+#ASSERT `Article 33(4) — the Attorney General's standing` `the Attorney General, against a registration`
+#ASSERT `has standing to appeal to the tribunal` `the Attorney General, against a registration`
+-- The 33(5) row is doubly shut against the AG: the AG is an EXCLUDED CLASS, and
+-- the grounds fail anyway.
+#ASSERT `Article 33(5) — the appellant is within an excluded class` `the Attorney General, against a registration`
+#ASSERT NOT `Article 33(5) — any other person's standing` `the Attorney General, against a registration`
+
+§§ `Article 33(5) — a third party, and the DOUBLE TEMPORAL REQUIREMENT`
+
+-- (A) THE GOOD 33(5)(a) APPEAL. A rival charity says the applicant should never
+-- have been registered: it did not meet the charity test at the application (its
+-- purposes included party-political campaigning) and it STILL does not. The ground
+-- subsists at both times. Standing established.
+`the rival, on a charity test that failed at both times` MEANS
+    `an appeal` FALSE FALSE FALSE FALSE
+                `a decision to register the applicant`
+                `Victoria College Trust, but campaigning` `Victoria College Trust, but campaigning`
+                FALSE FALSE FALSE
+                TRUE FALSE FALSE FALSE TRUE
+                FALSE FALSE
+                FALSE FALSE
+
+#ASSERT NOT `Article 33(5) — the appellant is within an excluded class` `the rival, on a charity test that failed at both times`
+#ASSERT `(5)(a) at the time of the application — the applicant did not meet the charity test` `the rival, on a charity test that failed at both times`
+#ASSERT `(5)(a) at the time of the appeal — the applicant did not meet the charity test` `the rival, on a charity test that failed at both times`
+#ASSERT `Article 33(5) — the ground, at both times (NARROW / ground-wise; ADOPTED)` `the rival, on a charity test that failed at both times`
+#ASSERT `Article 33(5) — any other person's standing` `the rival, on a charity test that failed at both times`
+#ASSERT `has standing to appeal to the tribunal` `the rival, on a charity test that failed at both times`
+
+-- (B) *** THE KEY NEGATIVE TEST — THE DOUBLE TEMPORAL REQUIREMENT BITES. ***
+-- The SAME rival, the SAME complaint — but by the time of the appeal the applicant
+-- has dropped the political purpose and now MEETS the charity test. The Part 3
+-- predicate returns TRUE against `the applicant, as at the time of the appeal`.
+-- The ground therefore does NOT subsist "at both the time of the application AND
+-- the time of the appeal". STANDING FAILS — even though the applicant was, at the
+-- time it was registered, plainly ineligible. The words "at both" are what makes a
+-- cure retrospectively defeat the challenge. This is the whole Article in one test.
+`the rival, defeated by a cure before the appeal` MEANS
+    `an appeal` FALSE FALSE FALSE FALSE
+                `a decision to register the applicant`
+                `Victoria College Trust, but campaigning`     -- t1: FAILS the charity test
+                `Victoria College Trust`                      -- t2: MEETS it (the political purpose is gone)
+                FALSE FALSE FALSE
+                TRUE FALSE FALSE FALSE TRUE
+                FALSE FALSE
+                FALSE FALSE
+
+#ASSERT `(5)(a) at the time of the application — the applicant did not meet the charity test` `the rival, defeated by a cure before the appeal`
+#ASSERT NOT `(5)(a) at the time of the appeal — the applicant did not meet the charity test` `the rival, defeated by a cure before the appeal`
+#ASSERT NOT `Article 33(5) — the ground, at both times (NARROW / ground-wise; ADOPTED)` `the rival, defeated by a cure before the appeal`
+#ASSERT NOT `Article 33(5) — any other person's standing` `the rival, defeated by a cure before the appeal`
+#ASSERT NOT `has standing to appeal to the tribunal` `the rival, defeated by a cure before the appeal`
+-- Note: the WIDE reading would not save it either — at t2 neither (a) nor (b)
+-- holds. The wide/narrow divergence needs a shape-shifting ground; see (D).
+#ASSERT NOT `Article 33(5) — the ground, at both times (WIDE / time-wise; REJECTED)` `the rival, defeated by a cure before the appeal`
+
+-- (C) THE 33(5)(b) NAME GROUND, and the interest requirement.
+-- A neighbouring charity whose own name the applicant's registered name too closely
+-- resembles. It HAS an interest, and the name was undesirable at both times.
+`the neighbour, on an undesirable name at both times` MEANS
+    `an appeal` FALSE FALSE FALSE FALSE
+                `a decision to register the applicant`
+                `Victoria College Trust` `Victoria College Trust`   -- the charity test is fine: (a) is not the ground
+                TRUE TRUE TRUE                                      -- interest; undesirable at t1 AND t2
+                FALSE TRUE TRUE FALSE FALSE
+                FALSE FALSE
+                FALSE FALSE
+
+#ASSERT NOT `(5)(a) at the time of the application — the applicant did not meet the charity test` `the neighbour, on an undesirable name at both times`
+#ASSERT `(5)(b) at the time of the application — the name was undesirable under Article 12(1)` `the neighbour, on an undesirable name at both times`
+#ASSERT `(5)(b) at the time of the appeal — the name was undesirable under Article 12(1)` `the neighbour, on an undesirable name at both times`
+#ASSERT `Article 33(5) — any other person's standing` `the neighbour, on an undesirable name at both times`
+
+-- The BUSYBODY. Identical facts about the NAME — but this appellant has no interest
+-- in it. >>> INTERPRETATION CALL (2): the "if" is a conjunct, so limb (b) closes.
+-- On the rejected implication reading, (b) would be VACUOUSLY satisfied and this
+-- appellant would have standing to challenge any registration at all.
+`the busybody, with no interest in the name` MEANS
+    `an appeal` FALSE FALSE FALSE FALSE
+                `a decision to register the applicant`
+                `Victoria College Trust` `Victoria College Trust`
+                FALSE TRUE TRUE                                     -- NO interest; name undesirable at both times
+                FALSE TRUE TRUE FALSE FALSE
+                FALSE FALSE
+                FALSE FALSE
+
+#ASSERT NOT `(5)(b) at the time of the application — the name was undesirable under Article 12(1)` `the busybody, with no interest in the name`
+#ASSERT NOT `Article 33(5) — the ground, at both times (NARROW / ground-wise; ADOPTED)` `the busybody, with no interest in the name`
+#ASSERT NOT `Article 33(5) — any other person's standing` `the busybody, with no interest in the name`
+#ASSERT NOT `has standing to appeal to the tribunal` `the busybody, with no interest in the name`
+
+-- (D) *** THE WIDE/NARROW DIVERGENCE, MADE EXECUTABLE. >>> INTERPRETATION CALL (1). ***
+-- A SHAPE-SHIFTING ground. At the application the applicant failed the charity test
+-- (political purpose) but its name was innocuous. By the appeal it has cured its
+-- purposes — but its name has since become undesirable (a rival was registered
+-- under a confusingly similar one).
+--   NARROW (adopted): neither (a) nor (b) subsists at BOTH times.  -> NO standing.
+--   WIDE   (rejected): SOME ground at each time.                   -> standing.
+-- The single scenario on which the whole interpretive choice turns.
+`the rival, with a ground that shape-shifts between the two times` MEANS
+    `an appeal` FALSE FALSE FALSE FALSE
+                `a decision to register the applicant`
+                `Victoria College Trust, but campaigning`     -- t1: FAILS the charity test ((a) holds at t1)
+                `Victoria College Trust`                      -- t2: MEETS it              ((a) fails at t2)
+                TRUE FALSE TRUE                               -- interest; name fine at t1, undesirable at t2
+                TRUE FALSE FALSE FALSE TRUE
+                FALSE FALSE
+                FALSE FALSE
+
+-- (a) holds at t1 only; (b) holds at t2 only.
+#ASSERT `(5)(a) at the time of the application — the applicant did not meet the charity test` `the rival, with a ground that shape-shifts between the two times`
+#ASSERT NOT `(5)(a) at the time of the appeal — the applicant did not meet the charity test` `the rival, with a ground that shape-shifts between the two times`
+#ASSERT NOT `(5)(b) at the time of the application — the name was undesirable under Article 12(1)` `the rival, with a ground that shape-shifts between the two times`
+#ASSERT `(5)(b) at the time of the appeal — the name was undesirable under Article 12(1)` `the rival, with a ground that shape-shifts between the two times`
+
+-- THE DIVERGENCE. The two readings give OPPOSITE answers on the same facts.
+#ASSERT NOT `Article 33(5) — the ground, at both times (NARROW / ground-wise; ADOPTED)` `the rival, with a ground that shape-shifts between the two times`
+#ASSERT     `Article 33(5) — the ground, at both times (WIDE / time-wise; REJECTED)`  `the rival, with a ground that shape-shifts between the two times`
+-- We adopt the narrow reading, so: NO standing.
+#ASSERT NOT `Article 33(5) — any other person's standing` `the rival, with a ground that shape-shifts between the two times`
+#ASSERT NOT `has standing to appeal to the tribunal` `the rival, with a ground that shape-shifts between the two times`
+
+-- (E) A THIRD PARTY APPEALING ON A GROUND OUTSIDE 33(5) ALTOGETHER. The applicant
+-- met the charity test at both times, and no name is in issue. The appellant simply
+-- thinks the Commissioner was wrong on the law. Art 34(1) is satisfied — and it is
+-- worth nothing, because Art 33(5) admits only the (a) and (b) grounds. A third
+-- party has NO general right of appeal against a registration.
+`the third party, on a ground outside 33(5)` MEANS
+    `an appeal` FALSE FALSE FALSE FALSE
+                `a decision to register the applicant`
+                `Victoria College Trust` `Victoria College Trust`   -- meets the test at both times
+                FALSE FALSE FALSE                                   -- no interest, no undesirable name
+                TRUE FALSE FALSE FALSE TRUE                         -- 34(1): wrong, on the law
+                FALSE FALSE
+                FALSE FALSE
+
+#ASSERT `Article 34(1) — the ground of appeal to the tribunal` `the third party, on a ground outside 33(5)`
+#ASSERT NOT `Article 33(5) — the ground, at both times (NARROW / ground-wise; ADOPTED)` `the third party, on a ground outside 33(5)`
+#ASSERT NOT `Article 33(5) — any other person's standing` `the third party, on a ground outside 33(5)`
+#ASSERT NOT `has standing to appeal to the tribunal` `the third party, on a ground outside 33(5)`
+#ASSERT NOT `the appeal to the tribunal is competent` `the third party, on a ground outside 33(5)`
+
+§§ `Article 34(1) — the 2 x 3 grid, and its two ways of failing`
+
+-- An adjective, but no dimension: "the decision was wrong", full stop.
+`wrong, but about nothing` MEANS
+    `an appeal` TRUE FALSE FALSE FALSE
+                `a decision to refuse to register the applicant`
+                `Victoria College Trust` `Victoria College Trust`
+                FALSE FALSE FALSE
+                TRUE FALSE FALSE FALSE FALSE     -- wrong; but not on the merits, the facts, or the law
+                FALSE FALSE
+                FALSE FALSE
+
+#ASSERT `has standing to appeal to the tribunal` `wrong, but about nothing`
+#ASSERT NOT `Article 34(1) — the ground of appeal to the tribunal` `wrong, but about nothing`
+#ASSERT NOT `the appeal to the tribunal is competent` `wrong, but about nothing`
+
+-- A dimension, but no adjective: "this is about the law" — and what of it?
+`about the law, but neither wrong nor unreasonable` MEANS
+    `an appeal` TRUE FALSE FALSE FALSE
+                `a decision to refuse to register the applicant`
+                `Victoria College Trust` `Victoria College Trust`
+                FALSE FALSE FALSE
+                FALSE FALSE FALSE FALSE TRUE     -- on the law; but neither wrong nor unreasonable
+                FALSE FALSE
+                FALSE FALSE
+
+#ASSERT NOT `Article 34(1) — the ground of appeal to the tribunal` `about the law, but neither wrong nor unreasonable`
+
+§§ `Article 34(3)(b) — the costs power arises ONLY on a vexatious appeal`
+
+-- A vexatious appellant: a busybody with no interest in the name, who has been told
+-- so twice, appealing again. Standing fails (limb (b) is shut) and the tribunal
+-- finds the appeal vexatious.
+`the vexatious appeal` MEANS
+    `an appeal` FALSE FALSE FALSE FALSE
+                `a decision to register the applicant`
+                `Victoria College Trust` `Victoria College Trust`
+                FALSE FALSE FALSE
+                TRUE FALSE TRUE FALSE FALSE
+                TRUE FALSE                       -- the tribunal is satisfied the appeal was VEXATIOUS
+                FALSE FALSE
+
+#ASSERT `Article 34(3)(b) — satisfied that the appeal was vexatious or otherwise grossly unreasonable` `the vexatious appeal`
+
+-- The costs power ARISES: the tribunal awards costs on day 14.
+#TRACE `Article 34(3)(b) — the costs power` `the vexatious appeal` AT 0 WITH
+    PARTY Tribunal DOES `award costs` AT 14
+
+-- The SAME power, on an appeal the tribunal does NOT find vexatious: the gate is
+-- shut, the guarded MAY collapses to FULFILLED, and there is no power to award
+-- costs at all. (Contrast an UNGUARDED MAY, which would stand open as a permission.)
+#ASSERT NOT `Article 34(3)(b) — satisfied that the appeal was vexatious or otherwise grossly unreasonable` `the deregistered charity`
+#TRACE `Article 34(3)(b) — the costs power` `the deregistered charity` AT 0 WITH
+    PARTY Tribunal DOES `award costs` AT 14
+
+§§ `Article 35(1) — THE NARROWING, made executable`
+
+-- The tribunal was WRONG ON THE LAW — a perfect Art 34(1) ground, had this been an
+-- appeal to the tribunal. But the appeal now lies to the COURT, and Art 35(1) does
+-- not know the word "wrong", and does not know "the law". It asks ONE question:
+-- was the decision UNREASONABLE having regard to all the circumstances? It was not.
+-- NO APPEAL LIES. The safety valve is Art 35(3) — but the key is in the TRIBUNAL's
+-- hand, not the appellant's.
+`the appeal that is wrong on the law but not unreasonable` MEANS
+    `an appeal` TRUE FALSE FALSE FALSE
+                `a decision to refuse to register the applicant`
+                `Victoria College Trust` `Victoria College Trust`
+                FALSE FALSE FALSE
+                TRUE FALSE FALSE FALSE TRUE      -- 34(1): WRONG, ON THE LAW -> a good tribunal ground
+                FALSE FALSE
+                TRUE FALSE                       -- a party below; but NOT unreasonable in all the circumstances
+
+-- It would have been a competent appeal to the TRIBUNAL...
+#ASSERT `Article 34(1) — the ground of appeal to the tribunal` `the appeal that is wrong on the law but not unreasonable`
+#ASSERT `the appeal to the tribunal is competent` `the appeal that is wrong on the law but not unreasonable`
+-- ...and it is NOT a competent appeal to the COURT. The ground has narrowed.
+#ASSERT `Article 35(1) — who may appeal to the court` `the appeal that is wrong on the law but not unreasonable`
+#ASSERT NOT `Article 35(1) — the ground of appeal to the court` `the appeal that is wrong on the law but not unreasonable`
+#ASSERT NOT `the appeal to the court is competent` `the appeal that is wrong on the law but not unreasonable`
+
+-- The permission to appeal to the court does not arise: the guarded MAY collapses.
+#TRACE `Article 35(1) — appeal from the tribunal to the court` `the appeal that is wrong on the law but not unreasonable` AT 0 WITH
+    PARTY Person DOES `appeal from the decision of the tribunal to the court` AT 14
+
+-- The SAME complaint, but the tribunal's decision WAS unreasonable in all the
+-- circumstances. Now, and only now, the appeal lies.
+`the appeal that is unreasonable in all the circumstances` MEANS
+    `an appeal` TRUE FALSE FALSE FALSE
+                `a decision to refuse to register the applicant`
+                `Victoria College Trust` `Victoria College Trust`
+                FALSE FALSE FALSE
+                TRUE FALSE FALSE FALSE TRUE
+                FALSE FALSE
+                TRUE TRUE                        -- a party below; AND unreasonable in all the circumstances
+
+#ASSERT `Article 35(1) — the ground of appeal to the court` `the appeal that is unreasonable in all the circumstances`
+#ASSERT `the appeal to the court is competent` `the appeal that is unreasonable in all the circumstances`
+
+#TRACE `Article 35(1) — appeal from the tribunal to the court` `the appeal that is unreasonable in all the circumstances` AT 0 WITH
+    PARTY Person DOES `appeal from the decision of the tribunal to the court` AT 14
+
+-- The Attorney General's parallel route to the court (Art 35(1), second limb).
+`the Attorney General's appeal to the court` MEANS
+    `an appeal` FALSE FALSE FALSE TRUE
+                `any other decision of the Commissioner`
+                `Victoria College Trust` `Victoria College Trust`
+                FALSE FALSE FALSE
+                FALSE TRUE TRUE FALSE FALSE
+                FALSE FALSE
+                FALSE TRUE                       -- not a party below; but the AG needs no such thing
+
+#ASSERT `Article 35(1) — who may appeal to the court` `the Attorney General's appeal to the court`
+#ASSERT `the appeal to the court is competent` `the Attorney General's appeal to the court`
+
+#TRACE `Article 35(1) — appeal from the tribunal to the court` `the Attorney General's appeal to the court` AT 0 WITH
+    PARTY AttorneyGeneral DOES `appeal from the decision of the tribunal to the court` AT 20
+
+§§ `The regulative layer, exercised`
+
+-- Art 32(2) — the tribunal hears and determines a competent appeal. The DUTY is
+-- discharged on day 60, inside the 90-day placeholder.
+#TRACE `Article 32(2) — hear and determine the appeal` `the refused applicant` AT 0 WITH
+    PARTY Tribunal DOES `hear and determine the appeal` AT 60
+
+-- The WRONG PARTY acts. The Commissioner may "determine" the appeal all he likes;
+-- the duty is the TRIBUNAL's, and it is not discharged by anyone else. At day 60,
+-- inside the window, the residual is the tribunal's OUTSTANDING duty.
+#TRACE `Article 32(2) — hear and determine the appeal` `the refused applicant` AT 0 WITH
+    PARTY Commissioner DOES `hear and determine the appeal` AT 60   -- the wrong party: the Tribunal's duty stands
+
+-- The tribunal does NOTHING, and the clock runs past the 90-day placeholder (the
+-- day-120 event merely advances time; it is not the tribunal's act). The duty is
+-- MUST, so the missed deadline is a BREACH.
+#TRACE `Article 32(2) — hear and determine the appeal` `the refused applicant` AT 0 WITH
+    PARTY Commissioner DOES `hear and determine the appeal` AT 120
+
+-- No standing, no appeal to determine, no duty. FULFILLED without the tribunal
+-- lifting a finger.
+#TRACE `Article 32(2) — hear and determine the appeal` `the rival, defeated by a cure before the appeal` AT 0 WITH
+    PARTY Tribunal DOES `hear and determine the appeal` AT 60
+
+-- Art 34(2) — the interim powers, both exercised.
+#TRACE `Article 34(2) — interim orders and evidence` AT 0 WITH
+    PARTY Tribunal DOES `make such interim order on the appeal as it thinks fit` AT 10
+    PARTY Tribunal DOES `consider evidence that was put to the Commissioner or accept other evidence` AT 20
+
+-- Art 34(3) — the whole battery, on the vexatious appeal: the tribunal DISMISSES it
+-- (electing the third limb of 34(3)(a)) and AWARDS COSTS (the gate being open).
+-- The residual leaves the 34(3)(c) recommendation power STANDING and unexercised —
+-- which is what a MAY should do: a power not used is not a power lost, and not a breach.
+#TRACE `Article 34(3) — the tribunal's powers on determining an appeal` `the vexatious appeal` AT 0 WITH
+    PARTY Tribunal DOES `dismiss the appeal` AT 7
+    PARTY Tribunal DOES `award costs` AT 7
+
+-- Art 34(3) on a MERITORIOUS appeal: the tribunal SUBSTITUTES its own decision and
+-- recommends a change of practice. No costs: the 34(3)(b) gate is shut.
+#TRACE `Article 34(3) — the tribunal's powers on determining an appeal` `the deregistered charity` AT 0 WITH
+    PARTY Tribunal DOES `substitute the tribunal's decision for that of the Commissioner` AT 21
+    PARTY Tribunal DOES `make a recommendation to the Commissioner as to the performance of his or her functions` AT 21
+
+-- Art 35(2) — the court remits.
+#TRACE `Article 35(2) — the court's powers on determining the appeal` AT 0 WITH
+    PARTY Court DOES `remit the decision to the tribunal or to the Commissioner` AT 14
+
+-- Art 35(3) — THE SAFETY VALVE. The tribunal refers the point of law; the court
+-- must then rule on it. This is the ONLY way the "wrong on the law" complaint of
+-- `the appeal that is wrong on the law but not unreasonable` ever reaches the court.
+#TRACE `Article 35(3) — reference of a point of law` AT 0 WITH
+    PARTY Tribunal DOES `refer a point of law to the court` AT 14
+    PARTY Court    DOES `give a ruling on the point of law` AT 60
+
+-- The tribunal refers, and the court never rules. The reference is a MAY, so
+-- referring was optional — but once referred, the ruling is a MUST. At day 14 the
+-- court's duty is merely OUTSTANDING; the residual shows it standing.
+#TRACE `Article 35(3) — reference of a point of law` AT 0 WITH
+    PARTY Tribunal DOES `refer a point of law to the court` AT 14
+
+-- The same reference, with the clock run out past the court's 90-day placeholder
+-- (the day-200 event merely advances time). The court's MUST is now BREACHED.
+#TRACE `Article 35(3) — reference of a point of law` AT 0 WITH
+    PARTY Tribunal DOES `refer a point of law to the court` AT 14
+    PARTY Commissioner DOES `hear and determine the appeal` AT 200
+
+-- The tribunal declines to refer. MAY: benign omission, no breach, no reference,
+-- and the point of law dies with the tribunal's decision.
+#TRACE `Article 35(3) — reference of a point of law` AT 0 WITH
+    PARTY Commissioner DOES `hear and determine the appeal` AT 14
+
+-- Art 35(4) and 36(3) — the court's interim order, and a retrospective substitution.
+#TRACE `Article 35(4) — the court's interim power` AT 0 WITH
+    PARTY Court DOES `make such interim order on the appeal as it thinks fit` AT 5
+
+#TRACE `Article 36(3) — retrospective effect of a substituted decision (court)` AT 0 WITH
+    PARTY Court DOES `order that the substituted decision take effect from a date before the date of the order` AT 10
+
+§§ `Article 36(4) — the criminal carve-out on retrospectivity (and the Article 17(4) rhyme)`
+
+-- THE CARVE-OUT BITES. The court substitutes a decision REGISTERING an entity, with
+-- effect from a date two years before the order. For every purpose, the entity was
+-- a registered charity throughout those two years. And so, on the face of it, its
+-- governors were bound by the Part 5 duties throughout, and its failures to file
+-- were offences throughout. Article 36(4) forbids exactly that conclusion: an act
+-- done before the date of the ORDER is not rendered an offence MERELY by the
+-- order's operation.
+`the unfiled annual return, before the retrospective order` MEANS RetrospectiveSubstitution WITH
+    `the act complained of`                                         IS "failing to send an annual return during the period now covered by the retrospective registration"
+    `the court or tribunal substituted its decision for another decision`  IS TRUE
+    `the substituted decision was ordered to take effect from a date before the date of the order`  IS TRUE
+    `the act occurred before the date of the order`                 IS TRUE
+    `the act would be an offence merely by virtue of the operation of the order`  IS TRUE
+    `the act was an offence apart from the operation of the order`  IS FALSE
+
+#ASSERT `Article 36(3) — the substituted decision was given retrospective effect` `the unfiled annual return, before the retrospective order`
+#ASSERT `Article 36(4) — the criminal-liability carve-out bites` `the unfiled annual return, before the retrospective order`
+-- The act is retrospectively lawful-for-criminal-purposes. NOT an offence.
+#ASSERT NOT `the act is an offence` `the unfiled annual return, before the retrospective order`
+
+-- THE CONTROL. Article 36(4) is a shield, not a laundry. An act that was ALREADY an
+-- offence apart from the order remains one — the order neither creates nor cures.
+`the fraud, which was an offence anyway` MEANS RetrospectiveSubstitution WITH
+    `the act complained of`                                         IS "obtaining registration by deception"
+    `the court or tribunal substituted its decision for another decision`  IS TRUE
+    `the substituted decision was ordered to take effect from a date before the date of the order`  IS TRUE
+    `the act occurred before the date of the order`                 IS TRUE
+    `the act would be an offence merely by virtue of the operation of the order`  IS FALSE
+    `the act was an offence apart from the operation of the order`  IS TRUE
+
+#ASSERT NOT `Article 36(4) — the criminal-liability carve-out bites` `the fraud, which was an offence anyway`
+#ASSERT `the act is an offence` `the fraud, which was an offence anyway`
+
+-- THE OTHER CONTROL. A PROSPECTIVE substitution — the order takes effect from the
+-- date of the order or later. Art 36(4)'s antecedent (36(3)-retrospectivity) is not
+-- made out, so the carve-out has nothing to bite on; and since the act is one that
+-- would be an offence only by virtue of the order's operation, and the order does
+-- not reach back, the act stands as an offence from the order's date forward.
+`the prospective substitution` MEANS RetrospectiveSubstitution WITH
+    `the act complained of`                                         IS "failing to send an annual return after the order"
+    `the court or tribunal substituted its decision for another decision`  IS TRUE
+    `the substituted decision was ordered to take effect from a date before the date of the order`  IS FALSE
+    `the act occurred before the date of the order`                 IS FALSE
+    `the act would be an offence merely by virtue of the operation of the order`  IS TRUE
+    `the act was an offence apart from the operation of the order`  IS FALSE
+
+#ASSERT NOT `Article 36(3) — the substituted decision was given retrospective effect` `the prospective substitution`
+#ASSERT NOT `Article 36(4) — the criminal-liability carve-out bites` `the prospective substitution`
+#ASSERT `the act is an offence` `the prospective substitution`

@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  PROBE D1. The `camunda` FLAVOR's decisionService shape: a <decisionService>
+  that GROUPS two decisions and is never invoked by anything.
+
+  Section 13.4 row 1 recorded this as EXECUTED, but on an UNCOMMITTED probe that
+  no longer exists. Committing it is how the measurement stops being a claim in
+  a spec and starts being a thing that runs.
+
+      inputData  n
+      decision   step   = n * 2         (encapsulated)
+      decision   total  = step + 1      (output)
+      decisionService `bundle` = { output: total, encapsulated: step, input: n }
+
+  What the two engines are being asked is DIFFERENT, and that asymmetry is the
+  point:
+
+    KIE   : prints `decisionSvcs [bundle]`, and evaluateDecisionService runs it
+             (KieDmnCheck.java:418-430) printing `SVC bundle -> {...}`. That
+             printed context is NEVER compared; only its ERROR messages count.
+             So the KIE assertion here is: 0 error(s), and both member decisions
+             evaluate normally under evaluateAll.
+    Camunda 8 : has NO service leg at all. Its harness does parse() plus
+             evaluateDecisionById per decision, which is, in that harness's own
+             words, "all Camunda 8 offers on the evaluation side". So the
+             assertion is: the presence of a decisionService does not perturb
+             the parse, and both member decisions still evaluate.
+
+  WHAT A FLIP MEANS. If a grouping-only service breaks either engine, then
+  section-as-service (section 2.3) cannot be emitted on the default flavor at all,
+  and the `camunda` flavor loses its only reason to differ from `kie`.
+
+  MEASURED 2026-07-31: 4/4 values on BOTH engines, KIE validator and build
+  clean, Camunda parse clean. KIE prints `decisionSvcs [bundle]` and
+  `SVC bundle -> {n=4, total=9}`; note that the returned context includes the
+  INPUT as well as the output decision, which is worth knowing before anyone
+  writes an assertion against a service's return shape.
+
+-->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="definitions_svc_grouping" name="svc_grouping" namespace="https://legalese.com/l4/dmn/svc_grouping" exporter="hand">
+  <inputData id="input_n" name="n">
+    <variable id="input_n_var" name="n" typeRef="number"/>
+  </inputData>
+  <decision id="decision_step" name="step">
+    <variable id="decision_step_var" name="step" typeRef="number"/>
+    <informationRequirement id="ir_step_n">
+      <requiredInput href="#input_n"/>
+    </informationRequirement>
+    <literalExpression id="decision_step_lit">
+      <text>n * 2</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_total" name="total">
+    <variable id="decision_total_var" name="total" typeRef="number"/>
+    <informationRequirement id="ir_total_step">
+      <requiredDecision href="#decision_step"/>
+    </informationRequirement>
+    <literalExpression id="decision_total_lit">
+      <text>step + 1</text>
+    </literalExpression>
+  </decision>
+  <decisionService id="svc_bundle" name="bundle">
+    <variable id="svc_bundle_var" name="bundle" typeRef="number"/>
+    <outputDecision href="#decision_total"/>
+    <encapsulatedDecision href="#decision_step"/>
+    <inputData href="#input_n"/>
+  </decisionService>
+</definitions>

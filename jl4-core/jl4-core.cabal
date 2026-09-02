@@ -4,6 +4,22 @@ version: 0.1
 build-type: Simple
 tested-with: GHC==9.10.2
 
+-- KEEP THIS ABOVE THE `flag` STANZAS, AND ABOVE EVERY OTHER SECTION.
+--
+-- Cabal ignores package-level fields that appear after the first section, so a
+-- stanza inserted above this line silently disables it. `cabal check` then says
+-- "Ignoring trailing fields after sections: data-files", the sdist ships no .l4
+-- files at all, and because `cabal install` builds from the sdist, every
+-- installed `l4` gets an EMPTY embedded stdlib and answers "Module not found:
+-- prelude". `cabal build` keeps working, because GHC's cwd for an inplace build
+-- is this directory and the TH splice's cwd fallback finds libraries/ anyway —
+-- which is why the two disagreed, and why nobody noticed for months.
+--
+-- That is not hypothetical: it is what happened between 61653b0e (which
+-- inserted `flag safe-mode` here) and this commit. See the CI step that runs
+-- `cabal check` and greps `cabal sdist --list-only`.
+data-files: libraries/*.l4
+
 flag safe-mode
   description: Disable FETCH/POST builtins (for WASM builds). When enabled, HTTP operations return errors.
   default: False
@@ -13,8 +29,6 @@ flag serialise-support
   description: Enable Serialise instances for AST types (for jl4-service CBOR caching). Disable for WASM builds where cborg doesn't compile.
   default: True
   manual: True
-
-data-files: libraries/*.l4
 
 common defaults
   default-language: GHC2021
@@ -55,7 +69,9 @@ library
     graphviz,
     logict,
     lsp-types,
-    megaparsec,
+    -- >=9.7: the lexer's ditto (^) column metric is display width, which the
+    -- Text stream instance only provides from 9.7.0 (Text.Megaparsec.Unicode).
+    megaparsec >=9.7,
     mtl,
     optics,
     optics-core,
@@ -94,21 +110,50 @@ library
     Base.Text
     Paths_jl4_core
     L4.Annotation
+    L4.Blawx.IR
+    L4.Blawx.Lower
+    L4.Blawx.Emit
+    L4.Blawx.EmitXml
+    L4.Blawx.Xml
+    L4.Blawx.Blocks
+    L4.Blawx.Parse
+    L4.Blawx.Lift
+    L4.Bpmn.IR
+    L4.Bpmn.Lower
+    L4.Bpmn.Emit
+    L4.Bpmn.Wiring
+    L4.Catala.IR
+    L4.Catala.Lower
+    L4.Catala.Emit
+    L4.Catala.Equivalence
     L4.Citations
     L4.Desugar
     L4.Diagnostic
     L4.DirectiveFilter
+    L4.Dmn.Analysis
+    L4.Dmn.IR
+    L4.Dmn.Lower
+    L4.Dmn.Emit
+    L4.Dmn.Markdown
+    L4.Docassemble.IR
+    L4.Docassemble.Lower
+    L4.Docassemble.Emit
     L4.Evaluate.Operators
     L4.Evaluate.ValueLazy
+    L4.Evaluate.ValueLazyJSON
+    L4.Evaluate.Ledger
     L4.EvaluateLazy
     L4.EvaluateLazy.Machine
     L4.EvaluateLazy.ContractFrame
+    L4.EvaluateLazy.Exceptions
     L4.EvaluateLazy.GraphViz2
     L4.EvaluateLazy.GraphVizOptions
     L4.EvaluateLazy.Trace
     L4.StateGraph
     L4.ExactPrint
     L4.Export
+    L4.Export.Document
+    L4.Export.Render
     L4.FunctionSchema
     L4.FindDefinition
     L4.FindReferences
@@ -118,6 +163,12 @@ library
     L4.Mixfix
     L4.Names
     L4.Nlg
+    L4.OpenFisca.IR
+    L4.OpenFisca.Lower
+    L4.OpenFisca.Emit
+    L4.Relational.IR
+    L4.Relational.Lower
+    L4.Relational.Debug
     L4.Parser
     L4.Parser.Anno
     L4.Parser.MixfixRegistry
@@ -125,6 +176,7 @@ library
     L4.Parser.SrcSpan
     L4.ParserCombinators
     L4.Print
+    L4.Print.Columnar
     L4.Syntax
     L4.TNR
     L4.TemporalContext
@@ -142,9 +194,11 @@ library
     L4.Utils.Ratio
     L4.Crypto.SHA1
     L4.Crypto.UUID5
+    L4.Viz.GuardedRows
     L4.Viz.Ladder
     L4.Viz.VizExpr
     L4.Import.Resolution
+    L4.Interchange.Fidelity
     L4.Instances.Serialise
     L4.API
     L4.API.VirtualFS
@@ -160,17 +214,46 @@ test-suite jl4-core-test
     Paths_jl4_core
     ImportResolutionSpec
     TemporalContextSpec
+    UnifySpec
     MixfixParserSpec
+    EventExactPrintSpec
+    FormatFidelitySpec
+    PatternMatchParserSpec
+    BulletParserSpec
     UUID5Spec
     ExportValidationSpec
+    CatalaLowerSpec
     NumberLiteralSpec
     DirectiveRenameSpec
+    DirectiveAmbiguitySpec
+    ResolutionCascadeSpec
+    RefAnnotationSpec
+    TracePostprocessSpec
+    EdgeCrashSpec
+    PrintRoundtripSpec
+    LedgerSubstrateSpec
+    LedgerThunkCacheSpec
+    RecordLedgerSpec
+    LedgerRenderingSpec
+    M4PartyLedgerSpec
+    M45ReadSpec
+    M5DeonticSequencingSpec
+    BitemporalSubstrateSpec
+    BitemporalRecallSpec
+    TraceOrderingSpec
+    StateGraphSpec
+    RelationalSpec
+    BlawxAssumeSpec
+    BlawxImportImageSpec
+    BlawxLiftSpec
+    BlawxParseSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:
     base,
     bytestring,
     containers,
+    deepseq,
     hspec,
     jl4-core,
     text,

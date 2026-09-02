@@ -1,0 +1,8 @@
+`EVAL UNDER RULES EFFECTIVE AT` with `Date` with 1, 6 and 2023 and `GST rate`
+`EVAL UNDER RULES EFFECTIVE AT` with `Date` with 1, 7 and 2024 and `GST rate`
+`EVAL UNDER RULES EFFECTIVE AT` with `Date` with 1, 6 and 2023 and `GST rate`
+`GST rate`
+`EVAL UNDER RULES EFFECTIVE AT` with `Date` with 1, 6 and 2023 and `GST payable on` with 1000
+`EVAL UNDER RULES EFFECTIVE AT` with `Date` with 1, 7 and 2024 and `GST payable on` with 1000
+`VALUE AT` with `Date` with 1, 6 and 2023 and given `d` then `GST rate`
+`VALUE AT` with `Date` with 1, 7 and 2024 and given `d` then `GST rate`

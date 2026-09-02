@@ -1,0 +1,21 @@
+`count nodes` with `sample`
+`depth` with `sample`
+`render outline` with `body scheme` and `sample`
+`render outline` with `default scheme` and `amended`
+`render outline` with `default scheme` and `amended bumping`
+`render outline` with `default scheme` and `renumbered`
+`render outline` with `body scheme` and `definitions`
+`depth` with `item` with solo is equal to 1
+`count nodes` with `sample` is equal to 6
+`depth` with `sample` is equal to 3
+`marker for` with `UpperAlpha` and 3 is equal to C
+`marker for` with `LowerAlpha` and 1 is equal to a
+`marker for` with `LowerRoman` and 4 is equal to iv
+`marker for` with `Decimal` and 2 is equal to 2
+`roman` with 2024 is equal to MMXXIV
+`roman` with 49 is equal to XLIX
+`render outline` with `body scheme` and `sample` is equal to list of Tenant's covenants, a	pay the Rent when due, b	keep the interior in good repair, b.i	fair wear and tear excepted, b.ii	damage by insured risks excepted and c	not assign or sublet without the Landlord's consent
+`render outline` with `default scheme` and `amended` is equal to list of Clauses, 1	Payment, 2b	Late payment and 2	Delivery
+`render outline` with `default scheme` and `amended bumping` is equal to list of Clauses, 1	Payment, 2b	Late payment and 3	Delivery
+`render outline` with `default scheme` and `renumbered` is equal to list of Recitals, 1	Recital one, 2	Recital two, 7	Recital seven and 8	Recital eight
+`render outline` with `body scheme` and `definitions` is equal to list of Definitions, a	Affiliate, b	Business Day, c	Confidential Information, d	Effective Date, e	Intellectual Property and f	Territory

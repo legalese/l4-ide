@@ -1,0 +1,15 @@
+IMPORT prelude
+-- PHASE A exactprint guard + R1 baseline: a flat deontic HENCE chain whose middle
+-- steps are RECORD writes. Before the fix `l4 format` truncated the chain after
+-- the first RECORD's value. This is the reference the block forms must equal.
+
+DECLARE Person IS ONE OF P
+DECLARE Act IS ONE OF serve
+
+flatChain MEANS
+  PARTY P
+  MUST serve
+  WITHIN 10
+  HENCE RECORD `a` IS TRUE
+  HENCE RECORD `b` IS FALSE
+  HENCE PARTY P MUST serve WITHIN 20

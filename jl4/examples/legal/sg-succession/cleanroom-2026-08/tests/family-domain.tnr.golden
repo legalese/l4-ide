@@ -1,0 +1,587 @@
+# Singapore family and succession — the shared ontology
+
+## Money, shares and periodical sums — three units, deliberately not one
+
+<!-- l4: declare:Money -->
+
+**1.** In this Act, “Money” means a NUMBER.
+
+<!-- l4: declare:Share -->
+
+**2.** In this Act, “Share” means a NUMBER.
+
+<!-- l4: declare:Period of a periodical sum -->
+
+**3.** In this Act, “Period of a periodical sum” means one of the following—
+
+    (a) “weekly”;
+
+    (b) “monthly”; or
+
+    (c) “other periodical”.
+
+<!-- l4: declare:A periodical sum -->
+
+**4.** In this Act, “A periodical sum” means a record consisting of—
+
+    (a) “the sum”, being a Money; and
+
+    (b) “the period”, being a Period of a periodical sum.
+
+## The court
+
+<!-- l4: declare:Court -->
+
+**5.** In this Act, “Court” means one of the following—
+
+    (a) “the General Division of the High Court”; or
+
+    (b) “a Family Court”.
+
+<!-- l4: declare:The court that made the grant -->
+
+**6.** In this Act, “The court that made the grant” means one of the following—
+
+    (a) “a court within the meaning of these Acts”, having a “the court” (a Court); or
+
+    (b) “a District Court, the grant having been made before 1 January 2015”.
+
+## A person — living or dead, and when
+
+<!-- l4: declare:Vital status -->
+
+**7.** In this Act, “Vital status” means one of the following—
+
+    (a) “living”;
+
+    (b) “died on”, having a “the date of death” (a DATE); or
+
+    (c) “dead, the date of death not known”.
+
+<!-- l4: declare:Person -->
+
+**8.** In this Act, “Person” means a record consisting of—
+
+    (a) “name”, being a STRING;
+
+    (b) “the reference for this person”, being a STRING;
+
+    (c) “date of birth”, being an optional DATE;
+
+    (d) “vital status”, being a Vital status;
+
+    (e) “children”, being a list of Child;
+
+    (f) “at the date of the death only conceived in the womb but subsequently born alive”, being a BOOLEAN;
+
+    (g) “money or other property given, paid or settled by the intestate during his life to or for the advancement of the person”, being a Money;
+
+    (h) “the date on which the person attains the age of majority”, being an optional DATE;
+
+    (i) “a soldier being in actual military service”, being a BOOLEAN;
+
+    (j) “a mariner or seaman being at sea”, being a BOOLEAN;
+
+    (k) “a member of any naval or marine forces so circumstanced that if he were a soldier he would be in actual military service”, being a BOOLEAN;
+
+    (l) “so desires that letters of administration be granted to such person as the court thinks fit”, being a BOOLEAN;
+
+    (m) “lacks mental capacity (within the meaning of the Mental Capacity Act 2008) to make decisions with respect to the management and administration of the person's property and affairs”, being a BOOLEAN;
+
+    (n) “absent from Singapore”, being a BOOLEAN; and
+
+    (o) “willing to act”, being a BOOLEAN.
+
+<!-- l4: declare:Child -->
+
+**9.** In this Act, “Child” means a record consisting of—
+
+    (a) “the child”, being a Person;
+
+    (b) “a legitimate child of the person whose child he is”, being a BOOLEAN; and
+
+    (c) “adopted by that person by virtue of an order of court under any written law for the time being in force in Singapore, Malaysia or Brunei Darussalam”, being a BOOLEAN.
+
+## The family of the deceased
+
+<!-- l4: declare:Blood tie -->
+
+**10.** In this Act, “Blood tie” means one of the following—
+
+    (a) “of the whole blood”; or
+
+    (b) “of the half blood”.
+
+<!-- l4: declare:Collateral relative -->
+
+**11.** In this Act, “Collateral relative” means a record consisting of—
+
+    (a) “the relative”, being a Person; and
+
+    (b) “of the whole blood or of the half blood”, being a Blood tie.
+
+<!-- l4: declare:Marriage -->
+
+**12.** In this Act, “Marriage” means a record consisting of—
+
+    (a) “the spouse”, being a Person;
+
+    (b) “the date of the solemnisation of the marriage”, being an optional DATE; and
+
+    (c) “subsisting at the death of the deceased, in the sense of not dissolved or annulled before the death”, being a BOOLEAN.
+
+<!-- l4: declare:Family -->
+
+**13.** In this Act, “Family” means a record consisting of—
+
+    (a) “the marriages of the deceased”, being a list of Marriage;
+
+    (b) “the father of the deceased”, being an optional Person;
+
+    (c) “the mother of the deceased”, being an optional Person;
+
+    (d) “the brothers and sisters of the deceased”, being a list of Collateral relative;
+
+    (e) “the grandparents of the deceased”, being a list of Person; and
+
+    (f) “the uncles and aunts of the deceased”, being a list of Collateral relative.
+
+## Who can hold and who can take — individuals, the Public Trustee, a trust company, the Government
+
+<!-- l4: declare:Person or corporation -->
+
+**14.** In this Act, “Person or corporation” means one of the following—
+
+    (a) “an individual”, having a “the individual” (a Person);
+
+    (b) “the Public Trustee”;
+
+    (c) “a corporation licensed as a trust company under the Trust Companies Act 2005”, having a “the name of the corporation” (a STRING); or
+
+    (d) “the Government”.
+
+## An infant, and the guardianship of an infant
+
+<!-- l4: declare:Kind of guardianship -->
+
+**15.** In this Act, “Kind of guardianship” means one of the following—
+
+    (a) “guardian of the person of the infant”;
+
+    (b) “guardian of the property of the infant”; or
+
+    (c) “guardian of the person and property of the infant”.
+
+<!-- l4: declare:How the guardian was appointed -->
+
+**16.** In this Act, “How the guardian was appointed” means one of the following—
+
+    (a) “guardian by virtue of surviving the other parent”;
+
+    (b) “appointed by the father by deed”;
+
+    (c) “appointed by the father by will”;
+
+    (d) “appointed by the mother by deed”;
+
+    (e) “appointed by the mother by will”;
+
+    (f) “appointed by the court to act jointly with the surviving parent”;
+
+    (g) “appointed by the court where the infant has no parent”; or
+
+    (h) “appointed by the court in place of a removed guardian”.
+
+<!-- l4: declare:Alone or jointly -->
+
+**17.** In this Act, “Alone or jointly” means one of the following—
+
+    (a) “alone”; or
+
+    (b) “jointly with”, having a “the references for the persons with whom he acts jointly” (a list of STRING).
+
+<!-- l4: declare:Guardian -->
+
+**18.** In this Act, “Guardian” means a record consisting of—
+
+    (a) “the guardian”, being a Person;
+
+    (b) “the reference for the infant”, being a STRING;
+
+    (c) “how the guardian was appointed”, being a How the guardian was appointed;
+
+    (d) “of the person or of the property”, being a Kind of guardianship;
+
+    (e) “alone or jointly”, being an Alone or jointly;
+
+    (f) “refuses to act”, being a BOOLEAN;
+
+    (g) “the mother or father objects to his so acting”, being a BOOLEAN;
+
+    (h) “considers that the mother or father is unfit to have the custody of the infant”, being a BOOLEAN;
+
+    (i) “removed from his guardianship by the court”, being a BOOLEAN;
+
+    (j) “has given security”, being a BOOLEAN;
+
+    (k) “the court has otherwise ordered as to security”, being a BOOLEAN;
+
+    (l) “has sold, mortgaged, exchanged, or otherwise parted with the possession of any of the movable or immovable property of the infant”, being a BOOLEAN;
+
+    (m) “has leased land belonging to the infant”, being a BOOLEAN;
+
+    (n) “the term of the lease, in years”, being an optional NUMBER;
+
+    (o) “has the permission of the court to deal with the property of the infant”, being a BOOLEAN;
+
+    (p) “has given a good discharge for a legacy or other capital moneys payable to or receivable by the infant”, being a BOOLEAN;
+
+    (q) “the court has otherwise ordered as to giving a good discharge”, being a BOOLEAN;
+
+    (r) “the provision made out of the income of the property of the infant for his maintenance and education”, being an A periodical sum; and
+
+    (s) “has the permission of the court to apply a sum exceeding $100 per month”, being a BOOLEAN.
+
+<!-- l4: declare:Infant -->
+
+**19.** In this Act, “Infant” means a record consisting of—
+
+    (a) “the infant”, being a Person;
+
+    (b) “the father of the infant”, being an optional Person;
+
+    (c) “the mother of the infant”, being an optional Person;
+
+    (d) “the guardians of the infant”, being a list of Guardian;
+
+    (e) “some other person has parental rights with respect to him”, being a BOOLEAN;
+
+    (f) “the income of the property of the infant”, being a Money;
+
+    (g) “the capital of the property of the infant”, being a Money; and
+
+    (h) “of an age to express an independent opinion”, being a BOOLEAN.
+
+## A will, its witnesses and its executors
+
+<!-- l4: declare:Attesting witness -->
+
+**20.** In this Act, “Attesting witness” means a record consisting of—
+
+    (a) “the witness”, being a Person;
+
+    (b) “subscribed the will in the presence of the testator”, being a BOOLEAN;
+
+    (c) “incompetent to be admitted a witness to prove the execution thereof, otherwise than by reason of sections 10(2), 11 and 12”, being a BOOLEAN;
+
+    (d) “given or made a beneficial devise, legacy, estate, interest, gift or appointment by the will, other than and except charges and directions for the payment of any debt”, being a BOOLEAN;
+
+    (e) “the wife or husband of the witness given or made such a beneficial devise, legacy, estate, interest, gift or appointment”, being a BOOLEAN; and
+
+    (f) “a creditor, or the wife or husband of a creditor, whose debt is charged on the estate by the will”, being a BOOLEAN.
+
+<!-- l4: declare:Mode of appointment -->
+
+**21.** In this Act, “Mode of appointment” means one of the following—
+
+    (a) “express”; or
+
+    (b) “implied”.
+
+<!-- l4: declare:Executor appointed by a will -->
+
+**22.** In this Act, “Executor appointed by a will” means a record consisting of—
+
+    (a) “the executor”, being a Person;
+
+    (b) “the appointment, express or implied”, being a Mode of appointment;
+
+    (c) “legally incapable of acting as such, otherwise than under section 21(1) or section 22(1)”, being a BOOLEAN;
+
+    (d) “has renounced the right to act as such”, being a BOOLEAN;
+
+    (e) “appeared and extracted probate”, being a BOOLEAN; and
+
+    (f) “has administered all the estate of the deceased”, being a BOOLEAN.
+
+<!-- l4: declare:Kind of disposition -->
+
+**23.** In this Act, “Kind of disposition” means one of the following—
+
+    (a) “a universal gift”;
+
+    (b) “a residuary gift”;
+
+    (c) “a specific devise or bequest”;
+
+    (d) “a pecuniary legacy”;
+
+    (e) “an appointment by will under a power”; or
+
+    (f) “a charge or direction for the payment of a debt”.
+
+<!-- l4: declare:Disposition -->
+
+**24.** In this Act, “Disposition” means a record consisting of—
+
+    (a) “the donee”, being a Person or corporation;
+
+    (b) “the kind of disposition”, being a Kind of disposition;
+
+    (c) “the value of the disposition”, being a Money;
+
+    (d) “beneficial”, being a BOOLEAN; and
+
+    (e) “not determinable at or before the death of the donee”, being a BOOLEAN.
+
+<!-- l4: declare:Life interest -->
+
+**25.** In this Act, “Life interest” means a record consisting of—
+
+    (a) “the life tenant”, being a Person; and
+
+    (b) “the value of the property in which the life interest subsists”, being a Money.
+
+<!-- l4: declare:Will -->
+
+**26.** In this Act, “Will” means a record consisting of—
+
+    (a) “the testator”, being a Person;
+
+    (b) “the date of execution”, being an optional DATE;
+
+    (c) “in writing”, being a BOOLEAN;
+
+    (d) “signed at the foot or end thereof by the testator”, being a BOOLEAN;
+
+    (e) “signed at the foot or end thereof by some other person in his presence and by his direction”, being a BOOLEAN;
+
+    (f) “the signature made or acknowledged by the testator as the signature to his will or codicil in the presence of 2 or more witnesses present at the same time”, being a BOOLEAN;
+
+    (g) “apparent on the face of the will that the testator intended to give effect by such his signature to the writing signed as his will”, being a BOOLEAN;
+
+    (h) “the attesting witnesses”, being a list of Attesting witness;
+
+    (i) “the executors appointed by the will”, being a list of Executor appointed by a will;
+
+    (j) “the guardians of infant children appointed by the will”, being a list of Guardian;
+
+    (k) “the dispositions made by the will”, being a list of Disposition;
+
+    (l) “expressed to be made in contemplation of a marriage”, being a BOOLEAN;
+
+    (m) “the reference for the person with whom the marriage contemplated was to be solemnised”, being an optional STRING;
+
+    (n) “made in exercise of a power of appointment”, being a BOOLEAN;
+
+    (o) “the estate thereby appointed would not in default of such appointment pass to his or her heir, executor or administrator or the person entitled under the Intestate Succession Act 1967”, being a BOOLEAN;
+
+    (p) “the life interests arising under the will”, being a list of Life interest;
+
+    (q) “it appears by the will that the personal representative is entitled to take that part beneficially”, being a BOOLEAN; and
+
+    (r) “the codicils”, being a list of Will.
+
+## The estate
+
+<!-- l4: declare:Creditor -->
+
+**27.** In this Act, “Creditor” means a record consisting of—
+
+    (a) “the creditor”, being a Person or corporation;
+
+    (b) “the debt”, being a Money;
+
+    (c) “secured”, being a BOOLEAN; and
+
+    (d) “residing in Singapore”, being a BOOLEAN.
+
+<!-- l4: declare:Estate -->
+
+**28.** In this Act, “Estate” means a record consisting of—
+
+    (a) “the value of the movable property situated in Singapore”, being a Money;
+
+    (b) “the value of the immovable property situated in Singapore”, being a Money;
+
+    (c) “the value of the movable property situated outside Singapore”, being a Money;
+
+    (d) “the value of the immovable property situated outside Singapore”, being a Money;
+
+    (e) “the value of any property which the deceased possessed or was entitled to as trustee and not beneficially, situated in Singapore”, being a Money;
+
+    (f) “the value of any property which the deceased possessed or was entitled to as trustee and not beneficially, situated outside Singapore”, being a Money;
+
+    (g) “the value of any moneys payable by an appointed insurer pursuant to the Dependants’ Protection Insurance Scheme or any other equivalent scheme maintained by the Central Provident Fund Board”, being a Money;
+
+    (h) “the value of the property administered by the Public Trustee”, being a Money;
+
+    (i) “the amount of the funds in court directed to be paid, transferred or delivered to him”, being a Money;
+
+    (j) “the value of land settled previously to the death of the deceased”, being a Money;
+
+    (k) “the trustees of the settlement”, being a list of Person or corporation;
+
+    (l) “the value of the interest in property which at the time of his death is charged with the payment of money”, being a Money;
+
+    (m) “the amount of the charge on that interest”, being a Money;
+
+    (n) “the deceased has by will, deed or other document signified a contrary or other intention”, being a BOOLEAN;
+
+    (o) “the debts and liabilities of the deceased”, being a Money;
+
+    (p) “the funeral, testamentary and administration expenses”, being a Money;
+
+    (q) “the creditors of the deceased”, being a list of Creditor;
+
+    (r) “fully administered”, being a BOOLEAN; and
+
+    (s) “the value of the property beneficially disposed of by the will”, being a Money.
+
+## Grants of probate and letters of administration
+
+<!-- l4: declare:Kind of grant -->
+
+**29.** In this Act, “Kind of grant” means one of the following—
+
+    (a) “probate”;
+
+    (b) “letters of administration”; or
+
+    (c) “letters of administration with the will annexed”.
+
+<!-- l4: declare:Limitation on the grant -->
+
+**30.** In this Act, “Limitation on the grant” means one of the following—
+
+    (a) “not limited”;
+
+    (b) “limited to settled land or to trust property”;
+
+    (c) “a grant that does not permit the distribution of the testator’s estate”;
+
+    (d) “limited to a part only of the testator’s estate”, having a “the part of the estate to which the grant is limited” (a STRING); or
+
+    (e) “limited in some other way”, having a “the terms of the limitation” (a STRING).
+
+<!-- l4: declare:Capacity in which the grant is made -->
+
+**31.** In this Act, “Capacity in which the grant is made” means one of the following—
+
+    (a) “as executor”;
+
+    (b) “as administrator”;
+
+    (c) “as a duly authorised attorney of an absent person”;
+
+    (d) “as the guardian of the person and property of the infant”; or
+
+    (e) “as the person to whom the care of the estate of the person who lacks mental capacity has been lawfully committed”.
+
+<!-- l4: declare:Grantee -->
+
+**32.** In this Act, “Grantee” means a record consisting of—
+
+    (a) “the grantee”, being a Person or corporation;
+
+    (b) “the capacity in which the grant is made”, being a Capacity in which the grant is made; and
+
+    (c) “the reference for the person for whose use and benefit the grant is made”, being an optional STRING.
+
+<!-- l4: declare:What became of the application -->
+
+**33.** In this Act, “What became of the application” means one of the following—
+
+    (a) “still pending”;
+
+    (b) “proceeded with”;
+
+    (c) “not proceeded with”;
+
+    (d) “withdrawn”; or
+
+    (e) “refused”.
+
+<!-- l4: declare:Probate application -->
+
+**34.** In this Act, “Probate application” means a record consisting of—
+
+    (a) “the applicant”, being a Person or corporation;
+
+    (b) “the grant applied for”, being a Kind of grant;
+
+    (c) “the date of the application”, being an optional DATE; and
+
+    (d) “what became of the application”, being a What became of the application.
+
+<!-- l4: declare:Grant -->
+
+**35.** In this Act, “Grant” means a record consisting of—
+
+    (a) “the kind of grant”, being a Kind of grant;
+
+    (b) “the grantees”, being a list of Grantee;
+
+    (c) “the date of the grant”, being an optional DATE;
+
+    (d) “the limitation”, being a Limitation on the grant;
+
+    (e) “the court that made the grant”, being a The court that made the grant;
+
+    (f) “the exception subject to which the grant is made”, being an optional STRING;
+
+    (g) “expired by effluxion of time or by the happening of the event or contingency on which it was limited”, being a BOOLEAN;
+
+    (h) “revoked”, being a BOOLEAN;
+
+    (i) “has given such security as is lawfully required to be furnished”, being a BOOLEAN;
+
+    (j) “has been extracted”, being a BOOLEAN;
+
+    (k) “sealed under section 47(1) of the Probate and Administration Act 1934”, being a BOOLEAN; and
+
+    (l) “the date of the sealing”, being an optional DATE.
+
+## The deceased — one record, four views
+
+<!-- l4: declare:Deceased person -->
+
+**36.** In this Act, “Deceased person” means a record consisting of—
+
+    (a) “the deceased”, being a Person;
+
+    (b) “the family”, being a Family;
+
+    (c) “the estate”, being an Estate;
+
+    (d) “the will”, being an optional Will;
+
+    (e) “domiciled in Singapore at the time of his death”, being a BOOLEAN;
+
+    (f) “carried on business or resided in Singapore within 12 months of his death”, being a BOOLEAN;
+
+    (g) “a Muslim”, being a BOOLEAN;
+
+    (h) “the grants made in respect of the estate”, being a list of Grant;
+
+    (i) “the probate applications made in respect of the estate”, being a list of Probate application;
+
+    (j) “a next of kin, creditor or other person has appeared and made out a claim to letters of administration”, being a BOOLEAN; and
+
+    (k) “the infants concerned in the estate”, being a list of Infant.
+
+## What anyone is entitled to
+
+<!-- l4: declare:Entitlement -->
+
+**37.** In this Act, “Entitlement” means a record consisting of—
+
+    (a) “the person entitled”, being a Person or corporation; and
+
+    (b) “the fraction of the property distributable under this Act”, being a Share.
+
+## What is deliberately NOT declared here, and why
+
+## What adversarial review changed, and what it did not
+
+<!-- tnr-coverage: 37 provisions; 0 boolean atoms inlined; 0 directives suppressed -->

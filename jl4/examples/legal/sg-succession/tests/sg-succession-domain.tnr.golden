@@ -1,0 +1,167 @@
+# Singapore succession — the shared domain
+
+## Persons, and the recursion the ISA needs
+
+<!-- l4: declare:Person -->
+
+**1.** In this Act, “Person” means a record consisting of—
+
+    (a) “name”, being a STRING;
+
+    (b) “survived the deceased”, being a BOOLEAN; and
+
+    (c) “issue”, being a list of Person.
+
+## The deceased
+
+<!-- l4: declare:Deceased -->
+
+**2.** In this Act, “Deceased” means a record consisting of—
+
+    (a) “name”, being a STRING;
+
+    (b) “date of death”, being a DATE;
+
+    (c) “domiciled in Singapore”, being a BOOLEAN; and
+
+    (d) “Muslim”, being a BOOLEAN.
+
+## The family
+
+<!-- l4: declare:Family -->
+
+**3.** In this Act, “Family” means a record consisting of—
+
+    (a) “surviving spouses”, being a list of Person;
+
+    (b) “children”, being a list of Person;
+
+    (c) “parents”, being a list of Person;
+
+    (d) “siblings”, being a list of Person;
+
+    (e) “grandparents”, being a list of Person; and
+
+    (f) “uncles and aunts”, being a list of Person.
+
+## The estate
+
+<!-- l4: declare:Estate -->
+
+**4.** In this Act, “Estate” means a record consisting of—
+
+    (a) “immovable property in Singapore”, being a NUMBER;
+
+    (b) “movable property in Singapore”, being a NUMBER;
+
+    (c) “funeral, testamentary and administration expenses”, being a NUMBER; and
+
+    (d) “debts and liabilities”, being a NUMBER.
+
+## The will
+
+<!-- l4: declare:Will -->
+
+**5.** In this Act, “Will” means a record consisting of—
+
+    (a) “in writing”, being a BOOLEAN;
+
+    (b) “signed at the foot or end by the testator”, being a BOOLEAN;
+
+    (c) “number of attesting witnesses”, being a NUMBER;
+
+    (d) “witnesses present at the same time”, being a BOOLEAN;
+
+    (e) “witnesses subscribed in the testator's presence”, being a BOOLEAN;
+
+    (f) “testator's age at execution”, being a NUMBER;
+
+    (g) “soldier in actual military service or mariner at sea”, being a BOOLEAN;
+
+    (h) “married after execution”, being a BOOLEAN;
+
+    (i) “expressed to be made in contemplation of that marriage”, being a BOOLEAN;
+
+    (j) “revoked by a later will, writing or destruction”, being a BOOLEAN;
+
+    (k) “proportion of the estate beneficially disposed of”, being a NUMBER; and
+
+    (l) “an executor is appointed, and able and willing to act”, being a BOOLEAN.
+
+## The case
+
+<!-- l4: declare:Case -->
+
+**6.** In this Act, “Case” means a record consisting of—
+
+    (a) “deceased”, being a Deceased;
+
+    (b) “family”, being a Family;
+
+    (c) “estate”, being an Estate; and
+
+    (d) “will”, being an optional Will.
+
+## Interpretation — the materialised forks
+
+<!-- l4: declare:Interpretation -->
+
+**7.** In this Act, “Interpretation” means a record consisting of—
+
+    (a) “stirpital division starts at the child generation”, being a BOOLEAN; and
+
+    (b) “a sibling's children take per stirpes”, being a BOOLEAN.
+
+<!-- l4: decide:the orthodox reading -->
+
+**8.** The orthodox reading means Interpretation where stirpital division starts at the child generation is TRUE and a sibling's children take per stirpes is TRUE.
+
+<!-- l4: decide:the per capita reading -->
+
+**9.** The per capita reading means Interpretation where stirpital division starts at the child generation is FALSE and a sibling's children take per stirpes is TRUE.
+
+## Outcomes
+
+<!-- l4: declare:Share -->
+
+**10.** In this Act, “Share” means a record consisting of—
+
+    (a) “taker”, being a STRING;
+
+    (b) “fraction”, being a NUMBER; and
+
+    (c) “basis”, being a STRING.
+
+<!-- l4: declare:Distribution -->
+
+**11.** In this Act, “Distribution” means a record consisting of—
+
+    (a) “governed by this Act”, being a BOOLEAN;
+
+    (b) “shares”, being a list of Share; and
+
+    (c) “note”, being a STRING.
+
+## Helpers over the ontology
+
+<!-- l4: decide:gross estate of -->
+
+**12.** In relation to a Case “c”, gross estate of means the sum of c's estate's immovable property in Singapore and c's estate's movable property in Singapore.
+
+<!-- l4: decide:distributable estate of -->
+
+**13.** In relation to a Case “c”, distributable estate of means the difference between c's estate's debts and liabilities and the difference between c's estate's funeral, testamentary and administration expenses and gross estate of with c.
+
+<!-- l4: decide:the estate is solvent -->
+
+**14.** In relation to a Case “c”, the estate is solvent means gross estate of with c is at least the sum of c's estate's funeral, testamentary and administration expenses and c's estate's debts and liabilities.
+
+<!-- l4: decide:the survivors among -->
+
+**15.** In relation to a list of Person “people”, the survivors among means filter with given p then p's survived the deceased and people.
+
+<!-- l4: decide:someone survived among -->
+
+**16.** In relation to a list of Person “people”, someone survived among means any with given p then p's survived the deceased and people.
+
+<!-- tnr-coverage: 16 provisions; 0 boolean atoms inlined; 0 directives suppressed -->

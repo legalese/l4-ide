@@ -14,12 +14,17 @@ module L4.Viz.VizExpr
   , ID(..)
   , UBoolValue(..)
   , Unique
+    -- * TYPICALLY priors
+  , boolPriorsFromBody
+  , typicallyTrueWeight
+  , typicallyFalseWeight
   ) where
 
 import Base
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Types as Aeson
-import Data.Aeson ((.=), (.:))
+import Data.Aeson ((.=), (.:), (.:?))
+import qualified Data.Map.Strict as Map
 
 -- | Versioned document identifier.
 -- Serializes identically to LSP's VersionedTextDocumentIdentifier.
@@ -95,11 +100,24 @@ instance Aeson.FromJSON InertContext where
     t -> fail $ "Unknown InertContext: " <> show t
 
 -- | Intermediate representation for boolean expressions in the visualizer.
+--
+-- 'Implies' is the SEAM between a rule's scope and its requirement (ladder DESIGN
+-- §25). It is deliberately NOT sugar for @Or [Not scope, requirement]@: that
+-- expansion is truth-functionally perfect and shape-destroying, and it cannot
+-- distinguish the two cases a reader most needs distinguished — a window the rule
+-- never reached (N\/A) from one that complies. Both make @NOT P OR Q@ true. The
+-- ladder therefore keeps the connective and draws it, with two sinks.
+--
+-- Consumers that only care about the Boolean FUNCTION (question ordering, BDD
+-- compilation) are free to read it classically; consumers that draw a PICTURE are
+-- not. See 'L4.Viz.Ladder.translateExpr', which peels the seam off before handing
+-- either side to 'L4.Transform.simplify' (whose whole job is to eliminate it).
 data IRExpr
   = And ID [IRExpr]
   | Or ID [IRExpr]
   | Not ID IRExpr
-  | UBoolVar ID Name UBoolValue Bool Text  -- ^ id name value canInline atomId
+  | Implies ID IRExpr IRExpr Text          -- ^ id scope requirement seam
+  | UBoolVar ID Name UBoolValue Bool Text (Maybe Bool)  -- ^ id name value canInline atomId typically
   | App ID Name [IRExpr] Text              -- ^ id fnName args atomId
   | TrueE ID Name
   | FalseE ID Name
@@ -111,8 +129,10 @@ instance Aeson.ToJSON IRExpr where
     And uid args -> Aeson.object ["$type" .= ("And" :: Text), "id" .= uid, "args" .= args]
     Or uid args -> Aeson.object ["$type" .= ("Or" :: Text), "id" .= uid, "args" .= args]
     Not uid negand -> Aeson.object ["$type" .= ("Not" :: Text), "id" .= uid, "negand" .= negand]
-    UBoolVar uid name value canInline atomId -> Aeson.object
-      ["$type" .= ("UBoolVar" :: Text), "id" .= uid, "name" .= name, "value" .= value, "canInline" .= canInline, "atomId" .= atomId]
+    Implies uid scope requirement seam -> Aeson.object
+      ["$type" .= ("Implies" :: Text), "id" .= uid, "scope" .= scope, "requirement" .= requirement, "seam" .= seam]
+    UBoolVar uid name value canInline atomId typically -> Aeson.object
+      ["$type" .= ("UBoolVar" :: Text), "id" .= uid, "name" .= name, "value" .= value, "canInline" .= canInline, "atomId" .= atomId, "typically" .= typically]
     App uid fnName args atomId -> Aeson.object
       ["$type" .= ("App" :: Text), "id" .= uid, "fnName" .= fnName, "args" .= args, "atomId" .= atomId]
     TrueE uid name -> Aeson.object ["$type" .= ("TrueE" :: Text), "id" .= uid, "name" .= name]
@@ -126,7 +146,8 @@ instance Aeson.FromJSON IRExpr where
       "And"      -> And <$> o .: "id" <*> o .: "args"
       "Or"       -> Or <$> o .: "id" <*> o .: "args"
       "Not"      -> Not <$> o .: "id" <*> o .: "negand"
-      "UBoolVar" -> UBoolVar <$> o .: "id" <*> o .: "name" <*> o .: "value" <*> o .: "canInline" <*> o .: "atomId"
+      "Implies"  -> Implies <$> o .: "id" <*> o .: "scope" <*> o .: "requirement" <*> (fromMaybe "IMPLIES" <$> o .:? "seam")
+      "UBoolVar" -> UBoolVar <$> o .: "id" <*> o .: "name" <*> o .: "value" <*> o .: "canInline" <*> o .: "atomId" <*> o .:? "typically"
       "App"      -> App <$> o .: "id" <*> o .: "fnName" <*> o .: "args" <*> o .: "atomId"
       "TrueE"    -> TrueE <$> o .: "id" <*> o .: "name"
       "FalseE"   -> FalseE <$> o .: "id" <*> o .: "name"
@@ -157,3 +178,33 @@ instance Aeson.FromJSON UBoolValue where
     "TrueV"    -> pure TrueV
     "UnknownV" -> pure UnknownV
     t -> fail $ "Unknown UBoolValue: " <> show t
+
+-- | Soft prior weights for a boolean atom's @TYPICALLY@ presumption (question-
+-- ordering spec §4 / §6.1): soft (0.9 / 0.1), not hard (1 / 0), so a presumed
+-- atom sinks to the end of the ask-order yet is still asked if it would flip the
+-- outcome. Kept identical to the TS @TYPICALLY_TRUE_WEIGHT@ / @TYPICALLY_FALSE_WEIGHT@.
+typicallyTrueWeight, typicallyFalseWeight :: Double
+typicallyTrueWeight = 0.9
+typicallyFalseWeight = 0.1
+
+-- | The single shared extraction on the Haskell side (question-ordering spec §8,
+-- "build once"): walk a viz body and read each 'UBoolVar''s @typically@ field
+-- into a per-atom prior @P(atom = TRUE)@, keyed by name unique. Only boolean
+-- binders carry @typically@ (the ladder builder never sets it for numeric/string
+-- defaults), so this simply trusts that field. Mirror of the TS @typicallyBridge@
+-- weights. Absent atoms are prior-free (0.5) downstream.
+boolPriorsFromBody :: IRExpr -> Map.Map Unique Double
+boolPriorsFromBody = Map.fromList . go
+ where
+  go :: IRExpr -> [(Unique, Double)]
+  go = \case
+    UBoolVar _ nm _ _ _ (Just b) ->
+      [(nm.unique, if b then typicallyTrueWeight else typicallyFalseWeight)]
+    UBoolVar{} -> []
+    And _ xs   -> concatMap go xs
+    Or _ xs    -> concatMap go xs
+    Not _ x    -> go x
+    -- The seam is not a barrier: an atom's prior is a fact about the atom, and
+    -- the atoms of a rule live on BOTH sides of the implication.
+    Implies _ p q _ -> go p <> go q
+    _          -> []

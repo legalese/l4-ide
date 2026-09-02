@@ -1,0 +1,85 @@
+IMPORT prelude
+
+§ `Housing Act 1988 — Schedule 2 — Ground 1, as an operative tenancy contract`
+
+-- The point of this file: write the tenancy as the parties LIVE it (signed at t0,
+-- run forward), and let the court's eventual "must possession be ordered?" fall out
+-- as a residual of the same forward trace. The Ground 1 notice is heeded at signing;
+-- its consequence — MANDATORY possession (Court MUST) vs DISCRETIONARY (Court MAY
+-- dispense, then order) — shows up as a change of MODALITY in the residual contract.
+
+DECLARE Actor IS ONE OF Landlord, Tenant, Court
+
+DECLARE Action IS ONE OF
+  `give the Ground 1 notice`
+  `pay the rent`
+  `apply to the court for possession`
+  `dispense with the notice requirement`
+  `order possession`
+
+§§ `The court decision — modality flips on whether notice was given`
+
+-- MUST defaults to  HENCE FULFILLED LEST BREACH  (mandatory: refusal would breach).
+-- MAY  defaults to  omission ⇒ FULFILLED          (discretionary: declining is no breach).
+GIVEN noticeGiven IS A BOOLEAN
+GIVETH A DEONTIC Actor Action
+`court decision` noticeGiven MEANS
+    IF   noticeGiven
+    THEN PARTY Court
+         MUST `order possession`
+         WITHIN 30
+    ELSE PARTY Court
+         MAY `dispense with the notice requirement`
+         WITHIN 30
+         HENCE PARTY Court
+               MUST `order possession`
+               WITHIN 30
+
+§§ `The rent spine — the obligation the tenant lives, month to month`
+
+GIVEN monthsLeft IS A NUMBER
+GIVETH A DEONTIC Actor Action
+`rent spine` monthsLeft MEANS
+    IF   monthsLeft GREATER THAN 0
+    THEN PARTY Tenant
+         MUST `pay the rent`
+         WITHIN 30
+         HENCE `rent spine` (monthsLeft MINUS 1)
+    ELSE FULFILLED
+
+§§ `The possession route — latent, activates when the landlord applies`
+
+GIVEN noticeGiven IS A BOOLEAN
+GIVETH A DEONTIC Actor Action
+`possession route` noticeGiven MEANS
+    PARTY Landlord
+    MAY `apply to the court for possession`
+    WITHIN 3650
+    HENCE `court decision` noticeGiven
+
+§§ `The operative agreement — rent spine RAND the latent possession route`
+
+GIVEN noticeGiven IS A BOOLEAN
+GIVETH A DEONTIC Actor Action
+`tenancy agreement` noticeGiven MEANS
+    `rent spine` 2
+    RAND
+    `possession route` noticeGiven
+
+§ `Two test-like traces — identical but for the notice`
+
+-- TRACE A — landlord GAVE the Ground 1 notice (noticeGiven = TRUE).
+-- Rent is paid, the landlord applies; residual should be:  PARTY Court MUST order possession.
+#TRACE `tenancy agreement` TRUE AT 0 WITH
+    PARTY Tenant   DOES `pay the rent` AT 30
+    PARTY Tenant   DOES `pay the rent` AT 60
+    PARTY Landlord DOES `apply to the court for possession` AT 400
+
+-- TRACE B — landlord did NOT give the notice (noticeGiven = FALSE).
+-- Same payments, same application; residual should be:
+--   PARTY Court MAY dispense ... HENCE PARTY Court MUST order possession.
+-- i.e. "it depends" — possession now hinges on the court's discretionary MAY.
+#TRACE `tenancy agreement` FALSE AT 0 WITH
+    PARTY Tenant   DOES `pay the rent` AT 30
+    PARTY Tenant   DOES `pay the rent` AT 60
+    PARTY Landlord DOES `apply to the court for possession` AT 400

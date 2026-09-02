@@ -1,0 +1,96 @@
+{
+  "_comment": [
+    "The regcf subject sidecar. Everything the pipeline needs to know about",
+    "THIS body of law lives here; everything about the pipeline itself lives in",
+    "etc/go/. Validated by etc/go/lib/subject.mjs, which refuses unknown keys",
+    "and missing files. Free-prose idiosyncrasies live in NOTES.md, which no",
+    "script reads. All paths are repo-root-relative.",
+    "",
+    "The three sections below are named for WHAT THEY ARE, not for which pass",
+    "produced them (ruling R2/R3). 'natlang_sources' is the fetched legal text and",
+    "the sweep's findings; 'comparison' holds the declarations that exist only to",
+    "relate two encodings; 'encodings' holds ADDITIONAL encodings of the same law,",
+    "keyed by an id that names the OCCASION ('cleanroom-2026-08'), never its",
+    "position in a sequence. Their paths' EXISTENCE is optional: producing them is",
+    "agent work, and the stages report SKIPPED with a named reason until they",
+    "appear. An additional encoding's modules may not name a committed module --",
+    "SPEC.md section 8's diff compares the two, so an additional module that IS the",
+    "committed one makes that comparison an identity.",
+    "",
+    "An additional encoding's 'checks' floors measure THAT ENCODING, never the",
+    "committed one. min_assertions 39 = assertions_total from 'l4 run",
+    "--json' results[] over regcf-denovo.l4, the figure p6-tests compares against",
+    "(the source text carries 40 '#ASSERT' strings; the 40th is prose in a",
+    "comment at regcf-denovo.l4:3590). min_dated_arms 0 = the population under",
+    "p3-check's matcher: the module routes rule-date logic through a helper",
+    "abstraction over YMD constants, which that matcher cannot see -- NOTES.md",
+    "has the census. A 0 floor makes p3-check report the sub-check NOT CHECKED",
+    "rather than vacuously green."
+  ],
+  "id": "regcf",
+  "display_name": "SEC Regulation Crowdfunding",
+  "citation": "17 CFR Part 227",
+  "source_url": "https://www.ecfr.gov/current/title-17/chapter-II/part-227",
+  "encoding": {
+    "main": "jl4/examples/legal/regcf/regcf.l4",
+    "wizard": "jl4/examples/legal/regcf/regcf-wizard.l4"
+  },
+  "checks": {
+    "min_dated_arms": 2,
+    "min_assertions": 20
+  },
+  "natlang_sources": {
+    "bundle": "jl4/examples/legal/regcf/denovo/source-bundle.json",
+    "register": "jl4/examples/legal/regcf/denovo/external-modifications.json"
+  },
+  "comparison": {
+    "fork_register": "jl4/examples/legal/regcf/denovo/fork-register.json",
+    "surface_map": "jl4/examples/legal/regcf/denovo/surface-map.json"
+  },
+  "encodings": {
+    "cleanroom-2026-08": {
+      "modules": ["jl4/examples/legal/regcf/denovo/regcf-denovo.l4"],
+      "checks": {
+        "min_dated_arms": 0,
+        "min_assertions": 39
+      }
+    }
+  },
+  "explainer": {
+    "dir": "etc/go/subjects/regcf/explainer"
+  },
+  "legs": {
+    "p7-dmn": {
+      "golden": "jl4/examples/dmn/expected/regcf-corpus.dmn",
+      "fidelity_golden": "jl4/examples/dmn/expected/regcf-corpus.fidelity.txt",
+      "cases": "jl4/examples/dmn/regcf-corpus.cases.json",
+      "engine_baseline": "jl4/examples/dmn/expected/regcf-corpus.engine-baseline.txt"
+    },
+    "p7-dmn-md": {
+      "golden": "jl4/examples/dmn/expected/regcf-corpus.dmn.md",
+      "fidelity_golden": "jl4/examples/dmn/expected/regcf-corpus.md.fidelity.txt"
+    },
+    "p7-bpmn": {
+      "expected_dir": "jl4/examples/bpmn/expected",
+      "rules": {
+        "advertising restriction": "regcf-advertising",
+        "ongoing reporting obligation": "regcf-reporting",
+        "resale restriction": "regcf-resale"
+      }
+    },
+    "p7-ladder": {
+      "npm_dir": "ts-shared/ladder-svg",
+      "npm_script": "demo:regcf",
+      "demo_entry": "ts-shared/ladder-svg/demo/regcf.ts",
+      "figures_dir": "jl4/examples/legal/regcf/figures"
+    },
+    "p7-lts": {},
+    "p7-mcp": {},
+    "p7-tnr": {
+      "golden": "jl4/examples/legal/regcf/tests/regcf.nlg.golden",
+      "wizard_golden": "jl4/examples/legal/regcf/tests/regcf-wizard.nlg.golden"
+    },
+    "p7-wizard": {},
+    "p7-akn": {}
+  }
+}

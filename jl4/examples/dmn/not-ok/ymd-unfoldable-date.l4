@@ -1,0 +1,52 @@
+-- NEGATIVE fixture for the `YMD` date-literal fold (spec §15.4).
+--
+-- `YMD y m d` over three integer literals that name a real calendar day folds
+-- to `date("YYYY-MM-DD")`; see `jl4/examples/dmn/ymd-dates.l4`, which is the
+-- positive exhibit. This file pins the two shapes the fold must still REFUSE,
+-- because widening beyond them is how a date nobody wrote gets into an
+-- artifact:
+--
+--   * `the anniversary`  -- a COMPUTED component. `1983 PLUS 40` is not an
+--     integer literal, so there is nothing to fold; evaluating it would be the
+--     exporter running the program. Same treatment `Date 1 (month PLUS 6) year`
+--     already gets, which is the idiom date arithmetic is written in.
+--   * `the impossible day` -- components that do not name a real calendar day.
+--     2023 was not a leap year, so L4 evaluation of `YMD 2023 2 29` stops at
+--     `daydate.l4`'s deliberate ASSUME bottom: there IS no day, so there is
+--     nothing honest to emit. (Compare `ymd-dates.l4`'s `the appointed day`,
+--     `YMD 2024 2 29`, which is a real day and does fold.) This is the same
+--     refusal `dated-chain-rolling-date.l4` pins for the lenient `Date`, from
+--     the other side: `Date` rolls and the exporter declines to replicate the
+--     roll; `YMD` refuses and the exporter declines to invent a day.
+--   * `the transposed day` -- `YMD 2026 28 7` is a day/month transposition,
+--     which is exactly what the ISO argument order exists to make visible. It
+--     is the same refusal as the line above and is here because a fold that
+--     range-checked `m` and `d` independently, or that read the arguments in
+--     `Date`'s little-endian order, would silently accept it as 2026-07-28.
+--
+-- Every one of the three stays a raw-L4 <literalExpression> and a Blocking
+-- D-LITERALEXPR, which is what the positive exhibit's `ymd-dates.fidelity.txt`
+-- must NOT say about any of its own decisions.
+--
+-- NEVER added to `goldenSubjects`. Asserted from jl4/tests/DmnExport.hs.
+--
+-- It is also why the negative control is not inside `ymd-dates.l4`: a raw-L4
+-- literal body makes zeebe-dmn refuse to parse the WHOLE file (MEASURED
+-- 2026-08-02 on a copy of the exhibit carrying `the anniversary`:
+-- "PARSE  INVALID: FEEL expression: failed to parse expression
+-- 'YMD OF (1983 PLUS 40), 1, 1'"), so a module that both ships an unfoldable
+-- date and runs on both engines cannot exist.
+
+IMPORT prelude
+IMPORT daydate
+
+§ `unfoldable YMD dates`
+
+GIVETH A DATE
+`the anniversary` MEANS YMD (1983 PLUS 40) 1 1
+
+GIVETH A DATE
+`the impossible day` MEANS YMD 2023 2 29
+
+GIVETH A DATE
+`the transposed day` MEANS YMD 2026 28 7

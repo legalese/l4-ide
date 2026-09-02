@@ -1,0 +1,18 @@
+-- The dates rejection fixture (BLAWX-EXPORT-SPEC §"Dates"): Blawx v1 rejects
+-- any DATE-sorted field or argument with a named diagnostic — `dates (Blawx
+-- v1)` — pointing at specs/todo/DATE-LIBRARY-SPEC.md, whose R-D1/R-D4 record
+-- the eventual convention (functor-wrapped integer POSIX seconds, UTC
+-- midnight). The decision below never touches the date field, so the module
+-- clears the relational middle-end (the field lowers as an opaque sort with a
+-- fidelity note) and the rejection is the Blawx classifier's own. No #EVAL:
+-- constructing a DATE literal is beside the point, and the rejection is at
+-- the declaration.
+
+DECLARE Contract HAS
+    signed IS A DATE
+    amount IS A NUMBER
+
+@export
+GIVEN c IS A Contract
+GIVETH A BOOLEAN
+DECIDE `is large` IF c's amount GREATER THAN 100000

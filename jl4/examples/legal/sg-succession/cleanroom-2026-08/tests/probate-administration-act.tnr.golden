@@ -1,0 +1,2341 @@
+# Probate and Administration Act 1934 — the grant machinery
+
+## Section 2 — Interpretation
+
+<!-- l4: decide:s 2 — the definitions the grant machinery reads -->
+
+**1.** S 2 — the definitions the grant machinery reads if—
+
+    (a) “prescribed form” means the form prescribed by rules made under any law for the time being in force relating to the courts;;
+
+    (b) “probate action” means a cause or matter in which a probate application is contested by any person, and includes any application to alter or revoke the grant of any probate or letters of administration;;
+
+    (c) “probate application” means an application for a grant of probate or letters of administration, and “probate applicant” shall be construed accordingly;;
+
+    (d) “Public Trustee” means the Public Trustee appointed under the Public Trustee Act 1915 and includes a Deputy Public Trustee and an Assistant Public Trustee appointed under that Act;;
+
+    (e) “registrar” means the registrar of the Family Justice Courts;; and
+
+    (f) “will” includes any codicil or other testamentary document..
+
+## The further facts on which the grant machinery turns
+
+<!-- l4: declare:The further facts on which the grant machinery turns -->
+
+**2.** In this Act, “The further facts on which the grant machinery turns” means a record consisting of—
+
+    (a) “the administrator is entitled to the whole of the estate after payment of the debts”, being a BOOLEAN;
+
+    (b) “the Family Court thinks fit to require such security”, being a BOOLEAN;
+
+    (c) “there is danger that the property may be wasted”, being a BOOLEAN;
+
+    (d) “it appears that such appointment would not be a sufficient protection for the estate”, being a BOOLEAN; and
+
+    (e) “the Public Trustee has by writing signed by him declared that he undertakes to administer such property”, being a BOOLEAN.
+
+## Reading the shared ontology — the helpers the sections below share
+
+<!-- l4: decide:the individual in -->
+
+**3.** In relation to a Person or corporation “pc”, the individual in means consider the case distinctions of pc :  when an individual has p then JUST with p. in any other case NOTHING.
+
+<!-- l4: decide:an individual, within the meaning of section 6(2) -->
+
+**4.** In relation to a Person or corporation “pc”, an individual, within the meaning of section 6(2) means isJust with the individual in with pc.
+
+<!-- l4: decide:s 6(6) — a trust corporation -->
+
+**5.** In relation to a Person or corporation “pc”, s 6(6) — a trust corporation means consider the case distinctions of pc :  when the Public Trustee has  then TRUE. when a corporation licensed as a trust company under the Trust Companies Act 2005 has n then TRUE. in any other case FALSE.
+
+<!-- l4: decide:is the individual whose reference is -->
+
+**6.** In relation to a Person or corporation “pc” and a STRING “the reference”, is the individual whose reference is means consider the case distinctions of pc :  when an individual has p then p's the reference for this person is equal to the reference. in any other case FALSE.
+
+<!-- l4: decide:has died -->
+
+**7.** In relation to a Person “p”, has died means consider the case distinctions of p's vital status :  when living has  then FALSE. in any other case TRUE.
+
+<!-- l4: decide:the date of death of -->
+
+**8.** In relation to a Person “p”, the date of death of means consider the case distinctions of p's vital status :  when died on has d then JUST with d. in any other case NOTHING.
+
+<!-- l4: decide:survives -->
+
+**9.** In relation to a Person “a” and a Person “b”, survives means consider the case distinctions of a's vital status :  when living has  then TRUE. when dead, the date of death not known has  then FALSE. when died on has da then consider the case distinctions of b's vital status :  when died on has db then _ is after _ with da and db. in any other case FALSE.
+
+<!-- l4: decide:is an infant on -->
+
+**10.** In relation to a Person “p” and a DATE “the date”, is an infant on means consider the case distinctions of p's the date on which the person attains the age of majority :  when NOTHING has  then FALSE. when JUST has m then _ is before _ with the date and m.
+
+<!-- l4: decide:a “child” within the meaning of section 3 of the Intestate Succession Act 1967 -->
+
+**11.** In relation to a Child “c”, a “child” within the meaning of section 3 of the Intestate Succession Act 1967 if—
+
+    (a) c's a legitimate child of the person whose child he is; or
+
+    (b) c's adopted by that person by virtue of an order of court under any written law for the time being in force in Singapore, Malaysia or Brunei Darussalam.
+
+<!-- l4: decide:the descendants of -->
+
+**12.** In relation to a Person “p”, the descendants of means concat with map with the child and his descendants and p's children.
+
+<!-- l4: decide:the child and his descendants -->
+
+**13.** In relation to a Child “c”, the child and his descendants means if a “child” within the meaning of section 3 of the Intestate Succession Act 1967 with c, then c's the child followed by the descendants of with c's the child; otherwise, EMPTY.
+
+<!-- l4: decide:the next of kin of the deceased -->
+
+**14.** In relation to a Deceased person “d”, the next of kin of the deceased means filter with given p then _ survives _ with p and d's the deceased and the classes from which the next of kin are drawn with d.
+
+<!-- l4: decide:the classes from which the next of kin are drawn -->
+
+**15.** In relation to a Deceased person “d”, the classes from which the next of kin are drawn means concat with list of the descendants of with d's the deceased, maybeToList with d's the family's the father of the deceased, maybeToList with d's the family's the mother of the deceased, map with given r then r's the relative and d's the family's the brothers and sisters of the deceased, concat with map with given r then the descendants of with r's the relative and d's the family's the brothers and sisters of the deceased, d's the family's the grandparents of the deceased and map with given r then r's the relative and d's the family's the uncles and aunts of the deceased.
+
+<!-- l4: decide:a marriage leaving a husband or widow -->
+
+**16.** In relation to a Deceased person “d” and a Marriage “m”, a marriage leaving a husband or widow if—
+
+    (a) m's subsisting at the death of the deceased, in the sense of not dissolved or annulled before the death; and
+
+    (b) _ survives _ with m's the spouse and d's the deceased.
+
+<!-- l4: decide:the husband or widow of the deceased -->
+
+**17.** In relation to a Deceased person “d”, the husband or widow of the deceased means map with given m then m's the spouse and filter with given m then a marriage leaving a husband or widow with d and m and d's the family's the marriages of the deceased.
+
+<!-- l4: decide:the value of the property in Singapore -->
+
+**18.** In relation to an Estate “e”, the value of the property in Singapore means the sum of e's the value of the movable property situated in Singapore and e's the value of the immovable property situated in Singapore.
+
+<!-- l4: decide:a personal representative -->
+
+**19.** In relation to a Grantee “gr”, a personal representative if—
+
+    (a) gr's the capacity in which the grant is made is equal to as executor; or
+
+    (b) gr's the capacity in which the grant is made is equal to as administrator.
+
+<!-- l4: decide:the personal representatives of the estate -->
+
+**20.** In relation to a Deceased person “d”, the personal representatives of the estate means filter with given gr then a personal representative with gr and concat with map with given g then g's the grantees and filter with given g then not g's revoked and d's the grants made in respect of the estate.
+
+<!-- l4: decide:the personal representatives of the estate still living -->
+
+**21.** In relation to a Deceased person “d”, the personal representatives of the estate still living means filter with given gr then not this grantee has died with gr and the personal representatives of the estate with d.
+
+## Part 2 — Renunciation
+
+<!-- l4: decide:s 5(1) — the person so renouncing is precluded from applying thereafter for probate or letters of administration -->
+
+**22.** In relation to a BOOLEAN “the person has renounced, whether expressly under section 3 or constructively under section 4”, s 5(1) — the person so renouncing is precluded from applying thereafter for probate or letters of administration means the person has renounced, whether expressly under section 3 or constructively under section 4.
+
+<!-- l4: decide:s 5(1) — precluded from applying thereafter for probate or letters of administration -->
+
+**23.** In relation to an Executor appointed by a will “x”, s 5(1) — precluded from applying thereafter for probate or letters of administration means s 5(1) — the person so renouncing is precluded from applying thereafter for probate or letters of administration with x's has renounced the right to act as such.
+
+# Part 3 — Grant of probate or letters of administration
+
+## Section 6 — Provisions as to number of personal representatives
+
+<!-- l4: decide:s 6(1) — granted to more than 4 persons in respect of the same property -->
+
+**24.** In relation to a Grant “g”, s 6(1) — granted to more than 4 persons in respect of the same property means count with g's the grantees is greater than 4.
+
+<!-- l4: decide:s 6(2) — there is a minority -->
+
+**25.** In relation to a Deceased person “d” and a DATE “the date”, s 6(2) — there is a minority means any with given i then _ is an infant on _ with i's the infant and the date and d's the infants concerned in the estate.
+
+<!-- l4: decide:s 6(2) — a life interest arises under the will -->
+
+**26.** In relation to a Deceased person “d”, s 6(2) — a life interest arises under the will means consider the case distinctions of d's the will :  when NOTHING has  then FALSE. when JUST has w then not null with w's the life interests arising under the will.
+
+<!-- l4: decide:s 6(2) — the requirement as to the grantees is engaged -->
+
+**27.** In relation to a Deceased person “d” and a DATE “the date”, s 6(2) — the requirement as to the grantees is engaged if—
+
+    (a) if there is a minority or if a life interest arises under the will,;
+
+    (b) s 6(2) — there is a minority with d and the date; or
+
+    (c) s 6(2) — a life interest arises under the will with d.
+
+<!-- l4: decide:s 6(2) — granted either to a trust corporation, with or without an individual, or to not less than 2 individuals -->
+
+**28.** In relation to a Grant “g”, s 6(2) — granted either to a trust corporation, with or without an individual, or to not less than 2 individuals if—
+
+    (a) either to a trust corporation, with or without an individual,;
+
+    (b) any with given gr then s 6(6) — a trust corporation with gr's the grantee and g's the grantees; or
+
+    (c) count with filter with given gr then an individual, within the meaning of section 6(2) with gr's the grantee and g's the grantees is at least 2.
+
+<!-- l4: decide:s 6(2) — the grant is one of the grants section 6(2) governs -->
+
+**29.** In relation to a Grant “g”, s 6(2) — the grant is one of the grants section 6(2) governs if—
+
+    (a) g's the kind of grant is equal to letters of administration; or
+
+    (b) g's the kind of grant is equal to letters of administration with the will annexed.
+
+<!-- l4: decide:s 6(2) — the grant complies with section 6(2) -->
+
+**30.** In relation to a Deceased person “d”, a Grant “g” and a DATE “the date”, s 6(2) — the grant complies with section 6(2) if—
+
+    (a) it is not the case that—
+
+        (i) s 6(2) — the grant is one of the grants section 6(2) governs with g; and
+
+        (ii) s 6(2) — the requirement as to the grantees is engaged with d and the date; or
+
+    (b) s 6(2) — granted either to a trust corporation, with or without an individual, or to not less than 2 individuals with g.
+
+<!-- l4: decide:s 6(3) — prima facie evidence of a minority or life interest (not encoded) -->
+
+**31.** S 6(3) — prima facie evidence of a minority or life interest (not encoded) means The court in granting letters of administration may act on such prima facie evidence, furnished by the applicant or any other person, as to whether or not there is a minority or life interest, as may be prescribed by rules made under any written law for the time being in force relating to the courts..
+
+<!-- l4: decide:s 6(4) — a life interest subsists -->
+
+**32.** In relation to a Deceased person “d”, s 6(4) — a life interest subsists means consider the case distinctions of d's the will :  when NOTHING has  then FALSE. when JUST has w then any with given li then not has died with li's the life tenant and w's the life interests arising under the will.
+
+<!-- l4: decide:s 6(4) — this person is a beneficiary -->
+
+**33.** In relation to a Deceased person “d” and a Person “p”, s 6(4) — this person is a beneficiary means consider the case distinctions of d's the will :  when JUST has w then not null with filter with given dp then dp's beneficial and the dispositions to this person with d and p's the reference for this person or any with given li then li's the life tenant's the reference for this person is equal to p's the reference for this person and w's the life interests arising under the will. when NOTHING has  then s 18(4)(a) — one of the husband or widow or next of kin with d and p's the reference for this person.
+
+<!-- l4: decide:s 6(4) — there is a minority of a beneficiary -->
+
+**34.** In relation to a Deceased person “d” and a DATE “the date”, s 6(4) — there is a minority of a beneficiary means any with given i then _ is an infant on _ with i's the infant and the date and s 6(4) — this person is a beneficiary with d and i's the infant and d's the infants concerned in the estate.
+
+<!-- l4: decide:s 6(4) — the window in which the court may appoint an additional personal representative -->
+
+**35.** In relation to a Deceased person “d” and a DATE “the date”, s 6(4) — the window in which the court may appoint an additional personal representative if—
+
+    (a) If there is only one personal representative (not being a trust corporation);
+
+    (b) count with the personal representatives of the estate still living with d is equal to 1;
+
+    (c) all with given gr then not s 6(6) — a trust corporation with gr's the grantee and the personal representatives of the estate still living with d;
+
+    (d) then, during the minority of a beneficiary or the subsistence of a life interest;
+
+    (e) any of the following applies—
+
+        (i) s 6(4) — there is a minority of a beneficiary with d and the date; or
+
+        (ii) s 6(4) — a life interest subsists with d;
+
+    (f) and until the estate is fully administered,; and
+
+    (g) it is not the case that d's the estate's fully administered.
+
+<!-- l4: decide:s 6(5) — this section applies to the grant -->
+
+**36.** In relation to a Grant “g”, s 6(5) — this section applies to the grant means consider the case distinctions of g's the date of the grant :  when NOTHING has  then FALSE. when JUST has dg then _ is after _ with dg and YMD with 1935, 1 and 1.
+
+## Section 8 — Grant of probate
+
+<!-- l4: decide:s 8(1) — probate may be granted to this person as an executor appointed by a will -->
+
+**37.** In relation to a Deceased person “d” and a STRING “the reference”, s 8(1) — probate may be granted to this person as an executor appointed by a will means consider the case distinctions of d's the will :  when NOTHING has  then FALSE. when JUST has w then any with given x then x's the executor's the reference for this person is equal to the reference and w's the executors appointed by the will.
+
+<!-- l4: decide:s 8(3) — probate may be granted to one or more of the persons so appointed, subject to section 6 -->
+
+**38.** In relation to a Deceased person “d” and a Grant “g”, s 8(3) — probate may be granted to one or more of the persons so appointed, subject to section 6 if—
+
+    (a) Subject to section 6,;
+
+    (b) it is not the case that s 6(1) — granted to more than 4 persons in respect of the same property with g;
+
+    (c) where more than one person is appointed an executor by a will,;
+
+    (d) count with the executors appointed by the will of the deceased with d is greater than 1;
+
+    (e) probate may be granted to one or more of the persons so appointed,;
+
+    (f) all with given gr then s 8(1) — probate may be granted to this person as an executor appointed by a will with d and the reference of the grantee with gr and g's the grantees; and
+
+    (g) without prejudice to a subsequent application by another or others of them for further grant or grants..
+
+<!-- l4: decide:the reference of the grantee -->
+
+**39.** In relation to a Grantee “gr”, the reference of the grantee means consider the case distinctions of the individual in with gr's the grantee :  when JUST has p then p's the reference for this person. when NOTHING has  then.
+
+## Sections 9 to 11 — where the will is lost, destroyed, or proved abroad
+
+<!-- l4: declare:The probate that may be granted where the will cannot be produced -->
+
+**40.** In this Act, “The probate that may be granted where the will cannot be produced” means one of the following—
+
+    (a) “no probate may be granted under section 9”;
+
+    (b) “probate of that copy or draft, limited until the original is admitted to probate”; or
+
+    (c) “probate of the contents of the will, limited until the original is admitted to probate”.
+
+<!-- l4: decide:s 9 — probate of copy or draft, or of contents -->
+
+**41.** In relation to a BOOLEAN “a will has been lost or mislaid after the death of the testator”, a BOOLEAN “a will cannot for any sufficient reason be produced”, a BOOLEAN “a copy or draft thereof is produced”, a BOOLEAN “it appears that the copy or draft is identical in terms with the original” and a BOOLEAN “the contents of the will can be sufficiently established”, s 9 — probate of copy or draft, or of contents means if not a will has been lost or mislaid after the death of the testator or a will cannot for any sufficient reason be produced then no probate may be granted under section 9 if a copy or draft thereof is produced and it appears that the copy or draft is identical in terms with the original then probate of that copy or draft, limited until the original is admitted to probate if not a copy or draft thereof is produced and the contents of the will can be sufficiently established then probate of the contents of the will, limited until the original is admitted to probate otherwise no probate may be granted under section 9.
+
+<!-- l4: decide:s 10 — probate may be granted of a copy or draft thereof, or of the contents thereof -->
+
+**42.** In relation to a BOOLEAN “a will has been destroyed”, a BOOLEAN “the will was destroyed by the act or with the consent of the testator” and a BOOLEAN “the copy, draft or contents can be sufficiently established”, s 10 — probate may be granted of a copy or draft thereof, or of the contents thereof if—
+
+    (a) Where a will has been destroyed,;
+
+    (b) a will has been destroyed;
+
+    (c) otherwise than by the act or with the consent of the testator,;
+
+    (d) it is not the case that the will was destroyed by the act or with the consent of the testator;
+
+    (e) if they can be sufficiently established.; and
+
+    (f) the copy, draft or contents can be sufficiently established.
+
+<!-- l4: decide:s 11 — administration with copy annexed of authenticated copy of will proved abroad -->
+
+**43.** In relation to a BOOLEAN “a will has been proved and deposited in a court of competent jurisdiction situated beyond the limits of Singapore” and a BOOLEAN “a properly authenticated copy of the will is produced”, s 11 — administration with copy annexed of authenticated copy of will proved abroad means if a will has been proved and deposited in a court of competent jurisdiction situated beyond the limits of Singapore and a properly authenticated copy of the will is produced, then list of probate and letters of administration with the will annexed; otherwise, EMPTY.
+
+## Sections 12 and 16 — a codicil propounded after a grant
+
+<!-- l4: declare:The consequence of a codicil propounded after a grant -->
+
+**44.** In this Act, “The consequence of a codicil propounded after a grant” means one of the following—
+
+    (a) “nothing follows under section 12”;
+
+    (b) “separate probate may be granted of the codicil”; or
+
+    (c) “the probate shall be revoked, and a new probate shall be granted of the will and codicil together”.
+
+<!-- l4: decide:s 12 — codicil propounded after probate -->
+
+**45.** In relation to a BOOLEAN “a codicil of the will is propounded after probate has been granted” and a BOOLEAN “the codicil expressly or impliedly revokes the appointment of any executor to whom probate has been granted”, s 12 — codicil propounded after probate means if not a codicil of the will is propounded after probate has been granted then nothing follows under section 12 if the codicil expressly or impliedly revokes the appointment of any executor to whom probate has been granted then the probate shall be revoked, and a new probate shall be granted of the will and codicil together otherwise separate probate may be granted of the codicil.
+
+<!-- l4: decide:s 16 — codicil propounded after grant of letters of administration -->
+
+**46.** In relation to a BOOLEAN “a codicil of the will is propounded after letters of administration with the will annexed have been granted” and a BOOLEAN “the codicil expressly or impliedly revokes the appointment of any executor to whom the grant has been made”, s 16 — codicil propounded after grant of letters of administration means s 12 — codicil propounded after probate with a codicil of the will is propounded after letters of administration with the will annexed have been granted and the codicil expressly or impliedly revokes the appointment of any executor to whom the grant has been made.
+
+## Section 13 — Letters of administration with the will annexed, on failure of executors
+
+<!-- l4: decide:s 13(1)(a) — no executor is appointed by a will -->
+
+**47.** In relation to a Will “w”, s 13(1)(a) — no executor is appointed by a will means null with w's the executors appointed by the will.
+
+<!-- l4: decide:s 13(1)(b) — this executor is legally incapable of acting as such -->
+
+**48.** In relation to an Executor appointed by a will “x” and a DATE “the date”, s 13(1)(b) — this executor is legally incapable of acting as such if—
+
+    (a) x's legally incapable of acting as such, otherwise than under section 21(1) or section 22(1);
+
+    (b) _ is an infant on _ with x's the executor and the date; or
+
+    (c) x's the executor's lacks mental capacity (within the meaning of the Mental Capacity Act 2008) to make decisions with respect to the management and administration of the person's property and affairs.
+
+<!-- l4: decide:s 13(1)(b) — this executor is disqualified -->
+
+**49.** In relation to an Executor appointed by a will “x” and a DATE “the date”, s 13(1)(b) — this executor is disqualified if—
+
+    (a) s 13(1)(b) — this executor is legally incapable of acting as such with x and the date; or
+
+    (b) x's has renounced the right to act as such.
+
+<!-- l4: decide:s 13(1)(b) — the executors are legally incapable of acting as such, or have renounced the right to act as such -->
+
+**50.** In relation to a Will “w” and a DATE “the date”, s 13(1)(b) — the executors are legally incapable of acting as such, or have renounced the right to act as such means all with given x then s 13(1)(b) — this executor is disqualified with x and the date and w's the executors appointed by the will.
+
+<!-- l4: decide:s 13(1)(c) — no executor survives the testator -->
+
+**51.** In relation to a Will “w”, s 13(1)(c) — no executor survives the testator if it is not the case that any with given x then _ survives _ with x's the executor and w's the testator and w's the executors appointed by the will.
+
+<!-- l4: decide:this grantee is this executor, taking as executor -->
+
+**52.** In relation to a Grantee “gr” and an Executor appointed by a will “x”, this grantee is this executor, taking as executor if—
+
+    (a) _ is the individual whose reference is _ with gr's the grantee and x's the executor's the reference for this person; and
+
+    (b) gr's the capacity in which the grant is made is equal to as executor.
+
+<!-- l4: decide:the grant was made in this executor's lifetime -->
+
+**53.** In relation to a Grant “g” and an Executor appointed by a will “x”, the grant was made in this executor's lifetime means consider the case distinctions of the date of death of with x's the executor :  when NOTHING has  then not has died with x's the executor. when JUST has dx then consider the case distinctions of g's the date of the grant :  when NOTHING has  then FALSE. when JUST has dg then not _ is after _ with dg and dx.
+
+<!-- l4: decide:s 13(1)(d) — this executor obtained probate -->
+
+**54.** In relation to a Deceased person “d” and an Executor appointed by a will “x”, s 13(1)(d) — this executor obtained probate means any with given g then a grant of probate obtained by this executor in his lifetime with g and x and d's the grants made in respect of the estate.
+
+<!-- l4: decide:a grant of probate obtained by this executor in his lifetime -->
+
+**55.** In relation to a Grant “g” and an Executor appointed by a will “x”, a grant of probate obtained by this executor in his lifetime if—
+
+    (a) g's the kind of grant is equal to probate;
+
+    (b) it is not the case that g's revoked;
+
+    (c) any with given gr then this grantee is this executor, taking as executor with gr and x and g's the grantees; and
+
+    (d) the grant was made in this executor's lifetime with g and x.
+
+<!-- l4: decide:s 13(1)(d) — this executor died before obtaining probate or before having administered all the estate of the deceased -->
+
+**56.** In relation to a Deceased person “d” and an Executor appointed by a will “x”, s 13(1)(d) — this executor died before obtaining probate or before having administered all the estate of the deceased if—
+
+    (a) has died with x's the executor; and
+
+    (b) any of the following applies—
+
+        (i) it is not the case that s 13(1)(d) — this executor obtained probate with d and x; or
+
+        (ii) x's does not have administered all the estate of the deceased.
+
+<!-- l4: decide:s 13(1)(d) — all the executors die before obtaining probate or before having administered all the estate of the deceased -->
+
+**57.** In relation to a Deceased person “d” and a Will “w”, s 13(1)(d) — all the executors die before obtaining probate or before having administered all the estate of the deceased means all with given x then s 13(1)(d) — this executor died before obtaining probate or before having administered all the estate of the deceased with d and x and w's the executors appointed by the will.
+
+<!-- l4: decide:s 13(1)(e) — the executors appointed by any will do not appear and extract probate -->
+
+**58.** In relation to a Will “w”, s 13(1)(e) — the executors appointed by any will do not appear and extract probate means all with given x then not x's appeared and extracted probate and w's the executors appointed by the will.
+
+<!-- l4: decide:s 13(1) — letters of administration with the will annexed may be granted on failure of executors -->
+
+**59.** In relation to a Deceased person “d”, a Will “w” and a DATE “the date”, s 13(1) — letters of administration with the will annexed may be granted on failure of executors if—
+
+    (a) (a) no executor is appointed by a will;;
+
+    (b) s 13(1)(a) — no executor is appointed by a will with w;
+
+    (c) (b) the executor or all the executors appointed by will are legally incapable of acting as such, or have renounced the right to act as such;;
+
+    (d) s 13(1)(b) — the executors are legally incapable of acting as such, or have renounced the right to act as such with w and the date;
+
+    (e) (c) no executor survives the testator;;
+
+    (f) s 13(1)(c) — no executor survives the testator with w;
+
+    (g) (d) all the executors die before obtaining probate or before having administered all the estate of the deceased; or;
+
+    (h) s 13(1)(d) — all the executors die before obtaining probate or before having administered all the estate of the deceased with d and w;
+
+    (i) (e) the executors appointed by any will do not appear and extract probate,; or
+
+    (j) s 13(1)(e) — the executors appointed by any will do not appear and extract probate with w.
+
+<!-- l4: declare:The rung of the class having a prior right to a grant under section 13(1) -->
+
+**60.** In this Act, “The rung of the class having a prior right to a grant under section 13(1)” means one of the following—
+
+    (a) “a universal or residuary legatee”;
+
+    (b) “a legal personal representative of a deceased universal or residuary legatee”;
+
+    (c) “such person or persons, being beneficiaries under the will, as would have been entitled to a grant of letters of administration if the deceased had died intestate”;
+
+    (d) “a legatee having a beneficial interest”; or
+
+    (e) “a creditor of the deceased”.
+
+<!-- l4: decide:the dispositions to this person -->
+
+**61.** In relation to a Deceased person “d” and a STRING “the reference”, the dispositions to this person means consider the case distinctions of d's the will :  when NOTHING has  then EMPTY. when JUST has w then filter with given dp then _ is the individual whose reference is _ with dp's the donee and the reference and w's the dispositions made by the will.
+
+<!-- l4: decide:s 13(2)(a) — a universal or residuary legatee -->
+
+**62.** In relation to a Deceased person “d” and a STRING “the reference”, s 13(2)(a) — a universal or residuary legatee means any with given dp then a universal or residuary gift with dp and the dispositions to this person with d and the reference.
+
+<!-- l4: decide:a universal or residuary gift -->
+
+**63.** In relation to a Disposition “dp”, a universal or residuary gift if—
+
+    (a) dp's the kind of disposition is equal to a universal gift; or
+
+    (b) dp's the kind of disposition is equal to a residuary gift.
+
+<!-- l4: decide:s 13(2)(d) — a legatee having a beneficial interest -->
+
+**64.** In relation to a Deceased person “d” and a STRING “the reference”, s 13(2)(d) — a legatee having a beneficial interest means any with given dp then dp's beneficial and the dispositions to this person with d and the reference.
+
+<!-- l4: decide:s 13(2)(e) — a creditor of the deceased -->
+
+**65.** In relation to a Deceased person “d” and a STRING “the reference”, s 13(2)(e) — a creditor of the deceased means any with given c then _ is the individual whose reference is _ with c's the creditor and the reference and d's the estate's the creditors of the deceased.
+
+<!-- l4: decide:s 13(2)(c) — a beneficiary under the will who would have been entitled to a grant on intestacy -->
+
+**66.** In relation to a Deceased person “d” and a STRING “the reference”, s 13(2)(c) — a beneficiary under the will who would have been entitled to a grant on intestacy if—
+
+    (a) being beneficiaries under the will,;
+
+    (b) it is not the case that null with filter with given dp then dp's beneficial and the dispositions to this person with d and the reference;
+
+    (c) as would have been entitled to a grant of letters of administration if the deceased had died intestate; and
+
+    (d) s 18(4)(a) — one of the husband or widow or next of kin with d and the reference.
+
+<!-- l4: decide:s 13(2) — the rung of the prior-right class in which this person stands -->
+
+**67.** In relation to a Deceased person “d”, a STRING “the reference” and a BOOLEAN “the person is a legal personal representative of a deceased universal or residuary legatee”, s 13(2) — the rung of the prior-right class in which this person stands means if s 13(2)(a) — a universal or residuary legatee with d and the reference then JUST with a universal or residuary legatee if the person is a legal personal representative of a deceased universal or residuary legatee then JUST with a legal personal representative of a deceased universal or residuary legatee if s 13(2)(c) — a beneficiary under the will who would have been entitled to a grant on intestacy with d and the reference then JUST with such person or persons, being beneficiaries under the will, as would have been entitled to a grant of letters of administration if the deceased had died intestate if s 13(2)(d) — a legatee having a beneficial interest with d and the reference then JUST with a legatee having a beneficial interest if s 13(2)(e) — a creditor of the deceased with d and the reference then JUST with a creditor of the deceased otherwise NOTHING.
+
+## Sections 14, 15, 17, 19 and 20 — grants to attorneys, and limited grants
+
+<!-- l4: decide:another executor within Singapore willing to act -->
+
+**68.** In relation to an Executor appointed by a will “x” and an Executor appointed by a will “y”, another executor within Singapore willing to act if—
+
+    (a) y's the executor's the reference for this person is not equal to x's the executor's the reference for this person;
+
+    (b) it is not the case that y's the executor's absent from Singapore; and
+
+    (c) y's the executor's willing to act.
+
+<!-- l4: decide:s 14 — letters of administration with the will annexed may be granted to a duly authorised attorney of the absent executor -->
+
+**69.** In relation to a Will “w” and an Executor appointed by a will “x”, s 14 — letters of administration with the will annexed may be granted to a duly authorised attorney of the absent executor if—
+
+    (a) Where an executor appointed by a will is absent from Singapore,;
+
+    (b) x's the executor's absent from Singapore;
+
+    (c) and there is no other executor within Singapore willing to act,; and
+
+    (d) it is not the case that any with given y then another executor within Singapore willing to act with x and y and w's the executors appointed by the will.
+
+<!-- l4: decide:s 14 — the limitation on a grant to the attorney of an absent executor -->
+
+**70.** S 14 — the limitation on a grant to the attorney of an absent executor means limited in some other way with limited until he obtains probate for himself, and in the meantime to any purpose to which the attorney’s authority is limited.
+
+<!-- l4: decide:s 15 — letters of administration with the will annexed may be granted to the attorney of an absent person entitled -->
+
+**71.** In relation to a Deceased person “d”, a Will “w”, a Person “p”, a BOOLEAN “the person is a legal personal representative of a deceased universal or residuary legatee” and a DATE “the date”, s 15 — letters of administration with the will annexed may be granted to the attorney of an absent person entitled if—
+
+    (a) Where any person to whom letters of administration with the will annexed might be granted under section 13;
+
+    (b) s 13(1) — letters of administration with the will annexed may be granted on failure of executors with d, w and the date;
+
+    (c) isJust with s 13(2) — the rung of the prior-right class in which this person stands with d, p's the reference for this person and the person is a legal personal representative of a deceased universal or residuary legatee;
+
+    (d) is absent from Singapore,; and
+
+    (e) p's absent from Singapore.
+
+<!-- l4: decide:s 17 — letters of administration may be granted, limited until the will is produced -->
+
+**72.** In relation to a BOOLEAN “no will of the deceased is forthcoming” and a BOOLEAN “there is reason to believe that there is a will in existence”, s 17 — letters of administration may be granted, limited until the will is produced if—
+
+    (a) no will of the deceased is forthcoming; and
+
+    (b) there is reason to believe that there is a will in existence.
+
+<!-- l4: decide:s 17 — the limitation on a grant until the will is produced -->
+
+**73.** S 17 — the limitation on a grant until the will is produced means limited in some other way with limited until the will or an authenticated copy thereof is produced.
+
+<!-- l4: decide:s 19 — letters of administration may be granted to an authorised attorney of the absent person -->
+
+**74.** In relation to a Deceased person “d” and a Person “p”, s 19 — letters of administration may be granted to an authorised attorney of the absent person if—
+
+    (a) Where a person entitled to letters of administration in case of intestacy is absent from Singapore,;
+
+    (b) s 18(4)(a) — one of the husband or widow or next of kin with d and p's the reference for this person;
+
+    (c) p's absent from Singapore;
+
+    (d) and no person equally entitled is willing to act,; and
+
+    (e) any with given q then a person equally entitled who is not willing to act with p and q and the persons entitled under section 18(4)(a) with d.
+
+<!-- l4: decide:a person equally entitled who is willing to act -->
+
+**75.** In relation to a Person “p” and a Person “q”, a person equally entitled who is willing to act if—
+
+    (a) q's the reference for this person is not equal to p's the reference for this person; and
+
+    (b) q's willing to act.
+
+<!-- l4: decide:s 19 — the limitation on a grant to the attorney of an absent person entitled -->
+
+**76.** S 19 — the limitation on a grant to the attorney of an absent person entitled means limited in some other way with limited until he obtains a grant to himself.
+
+<!-- l4: decide:s 20 — letters of administration may be granted pending a probate action -->
+
+**77.** In relation to a BOOLEAN “a probate action is pending”, s 20 — letters of administration may be granted pending a probate action means a probate action is pending.
+
+<!-- l4: decide:s 20 — the limitation on a grant pending a probate action -->
+
+**78.** S 20 — the limitation on a grant pending a probate action means a grant that does not permit the distribution of the testator’s estate.
+
+## Section 18 — Letters of administration on intestacy
+
+<!-- l4: decide:s 18(1) — the person has died intestate -->
+
+**79.** In relation to a Deceased person “d”, s 18(1) — the person has died intestate means isNothing with d's the will.
+
+<!-- l4: decide:s 18(2) — letters of administration may be granted to the trustees of the settlement -->
+
+**80.** In relation to a Deceased person “d”, s 18(2) — letters of administration may be granted to the trustees of the settlement if—
+
+    (a) in regard to land settled previously to the death of the deceased,;
+
+    (b) d's the estate's the value of land settled previously to the death of the deceased is greater than 0;
+
+    (c) letters of administration may be granted to the trustees of the settlement.; and
+
+    (d) it is not the case that null with d's the estate's the trustees of the settlement.
+
+<!-- l4: decide:the persons entitled under section 18(4)(a) -->
+
+**81.** In relation to a Deceased person “d”, the persons entitled under section 18(4)(a) means concat with list of the husband or widow of the deceased with d and the next of kin of the deceased with d.
+
+<!-- l4: decide:s 18(4)(a) — one of the husband or widow or next of kin -->
+
+**82.** In relation to a Deceased person “d” and a STRING “the reference”, s 18(4)(a) — one of the husband or widow or next of kin means any with given p then p's the reference for this person is equal to the reference and the persons entitled under section 18(4)(a) with d.
+
+<!-- l4: decide:s 18(4)(b) — such persons apply for letters of administration -->
+
+**83.** In relation to a Deceased person “d”, s 18(4)(b) — such persons apply for letters of administration means any with given a then an application by one of the section 18(4)(a) persons with d and a and d's the probate applications made in respect of the estate.
+
+<!-- l4: decide:an application by one of the section 18(4)(a) persons -->
+
+**84.** In relation to a Deceased person “d” and a Probate application “a”, an application by one of the section 18(4)(a) persons means any with given p then _ is the individual whose reference is _ with a's the applicant and p's the reference for this person and the persons entitled under section 18(4)(a) with d.
+
+<!-- l4: decide:s 18(4)(c) — no such person applies, and letters of administration may be granted to a creditor of the deceased -->
+
+**85.** In relation to a Deceased person “d”, s 18(4)(c) — no such person applies, and letters of administration may be granted to a creditor of the deceased if it is not the case that s 18(4)(b) — such persons apply for letters of administration with d.
+
+<!-- l4: decide:s 18(4)(d)(i) — the next of kin, or the greater number of such next of kin, so desire -->
+
+**86.** In relation to a Deceased person “d”, s 18(4)(d)(i) — the next of kin, or the greater number of such next of kin, so desire if—
+
+    (a) it is not the case that null with the next of kin of the deceased with d; and
+
+    (b) the product of count with filter with given p then p's so desires that letters of administration be granted to such person as the court thinks fit and the next of kin of the deceased with d and 2 is greater than count with the next of kin of the deceased with d.
+
+<!-- l4: decide:s 18(4)(d)(ii) — no next of kin or creditor or other person appears and makes out a claim to letters of administration -->
+
+**87.** In relation to a Deceased person “d”, s 18(4)(d)(ii) — no next of kin or creditor or other person appears and makes out a claim to letters of administration if d's a next of kin, creditor or other person does not have appeared and made out a claim to letters of administration.
+
+<!-- l4: decide:s 18(4)(d) — letters of administration may be granted to such person as the court thinks fit -->
+
+**88.** In relation to a Deceased person “d”, s 18(4)(d) — letters of administration may be granted to such person as the court thinks fit if—
+
+    (a) (i) the next of kin of any person dying intestate, or the greater number of such next of kin, so desire; or;
+
+    (b) s 18(4)(d)(i) — the next of kin, or the greater number of such next of kin, so desire with d;
+
+    (c) (ii) no next of kin or creditor or other person appears and makes out a claim to letters of administration,; or
+
+    (d) s 18(4)(d)(ii) — no next of kin or creditor or other person appears and makes out a claim to letters of administration with d.
+
+<!-- l4: declare:A class to which letters of administration may be granted under section 18(4) -->
+
+**89.** In this Act, “A class to which letters of administration may be granted under section 18(4)” means one of the following—
+
+    (a) “the husband or widow or next of kin or any of them”;
+
+    (b) “a creditor of the deceased, no such person having applied”; or
+
+    (c) “such person as the court thinks fit”.
+
+<!-- l4: decide:s 18(4) — the classes to which letters of administration may be granted -->
+
+**90.** In relation to a Deceased person “d”, s 18(4) — the classes to which letters of administration may be granted means concat with list of if not null with the persons entitled under section 18(4)(a) with d then list of the husband or widow or next of kin or any of them else EMPTY, if s 18(4)(c) — no such person applies, and letters of administration may be granted to a creditor of the deceased with d and not null with d's the estate's the creditors of the deceased then list of a creditor of the deceased, no such person having applied else EMPTY and if s 18(4)(d) — letters of administration may be granted to such person as the court thinks fit with d then list of such person as the court thinks fit else EMPTY.
+
+<!-- l4: decide:s 18(5) — a law making special provision regarding the estates of persons of a particular religion or race is in evidence -->
+
+**91.** In relation to a Deceased person “d”, s 18(5) — a law making special provision regarding the estates of persons of a particular religion or race is in evidence if—
+
+    (a) Nothing in this section shall affect any law by which special provision is made regarding the estates of persons of a particular religion or race.; and
+
+    (b) d's a Muslim.
+
+## Section 21 — Infants
+
+<!-- l4: decide:s 21(1) — no probate or letters of administration shall be granted to a person while he is an infant -->
+
+**92.** In relation to a Person “p” and a DATE “the date”, s 21(1) — no probate or letters of administration shall be granted to a person while he is an infant means _ is an infant on _ with p and the date.
+
+<!-- l4: decide:s 21(2) — this infant would, but for his infancy, be entitled to probate or letters of administration -->
+
+**93.** In relation to a Deceased person “d”, an Infant “i” and a DATE “the date”, s 21(2) — this infant would, but for his infancy, be entitled to probate or letters of administration if—
+
+    (a) _ is an infant on _ with i's the infant and the date; and
+
+    (b) any of the following applies—
+
+        (i) s 8(1) — probate may be granted to this person as an executor appointed by a will with d and i's the infant's the reference for this person; or
+
+        (ii) s 18(4)(a) — one of the husband or widow or next of kin with d and i's the infant's the reference for this person.
+
+<!-- l4: decide:the infant executors or persons so entitled -->
+
+**94.** In relation to a Deceased person “d” and a DATE “the date”, the infant executors or persons so entitled means filter with given i then s 21(2) — this infant would, but for his infancy, be entitled to probate or letters of administration with d, i and the date and d's the infants concerned in the estate.
+
+<!-- l4: decide:is this guardian of the person and property of the infant -->
+
+**95.** In relation to a Grantee “gr” and a Guardian “gu”, is this guardian of the person and property of the infant if—
+
+    (a) gu's of the person or of the property is equal to guardian of the person and property of the infant;
+
+    (b) it is not the case that gu's removed from his guardianship by the court; and
+
+    (c) _ is the individual whose reference is _ with gr's the grantee and gu's the guardian's the reference for this person.
+
+<!-- l4: decide:s 21(2) — this grant is made to the guardian of the person and property of an infant so entitled -->
+
+**96.** In relation to a Deceased person “d”, a Grantee “gr” and a DATE “the date”, s 21(2) — this grant is made to the guardian of the person and property of an infant so entitled if—
+
+    (a) gr's the capacity in which the grant is made is equal to as the guardian of the person and property of the infant; and
+
+    (b) consider the case distinctions of gr's the reference for the person for whose use and benefit the grant is made :  when NOTHING has  then FALSE. when JUST has r then any with given i then i's the infant's the reference for this person is equal to r and s 21(2) — this infant would, but for his infancy, be entitled to probate or letters of administration with d, i and the date and any with given gu then _ is this guardian of the person and property of the infant _ with gr and gu and i's the guardians of the infant and d's the infants concerned in the estate.
+
+<!-- l4: decide:s 21(2) — letters of administration may be granted to the guardian of the person and property of the infant -->
+
+**97.** In relation to a Deceased person “d”, a Grant “g” and a DATE “the date”, s 21(2) — letters of administration may be granted to the guardian of the person and property of the infant if—
+
+    (a) Where an infant would, but for his infancy, be entitled to probate or letters of administration,;
+
+    (b) it is not the case that null with the infant executors or persons so entitled with d and the date;
+
+    (c) letters of administration with or without the will annexed may, subject to section 6(1), be granted;
+
+    (d) any of the following applies—
+
+        (i) g's the kind of grant is equal to letters of administration; or
+
+        (ii) g's the kind of grant is equal to letters of administration with the will annexed;
+
+    (e) it is not the case that s 6(1) — granted to more than 4 persons in respect of the same property with g;
+
+    (f) to the guardian of the person and property of the infant,;
+
+    (g) any with given gr then s 21(2) — this grant is made to the guardian of the person and property of an infant so entitled with d, gr and the date and g's the grantees;
+
+    (h) limited until the infant obtains a grant to himself.; and
+
+    (i) g's the limitation is equal to s 21 — the limitation on a grant made under subsection (2) with d and the date.
+
+<!-- l4: decide:s 21(3) — there are 2 or more infant executors or persons so entitled -->
+
+**98.** In relation to a Deceased person “d” and a DATE “the date”, s 21(3) — there are 2 or more infant executors or persons so entitled means count with the infant executors or persons so entitled with d and the date is at least 2.
+
+<!-- l4: decide:s 21 — the limitation on a grant made under subsection (2) -->
+
+**99.** In relation to a Deceased person “d” and a DATE “the date”, s 21 — the limitation on a grant made under subsection (2) means if s 21(3) — there are 2 or more infant executors or persons so entitled with d and the date, then limited in some other way with limited until any of them obtains a grant; otherwise, limited in some other way with limited until the infant obtains a grant to himself.
+
+## Section 22 — Persons who lack mental capacity
+
+<!-- l4: decide:s 22(1) — no probate or letters of administration are to be granted to a person who lacks mental capacity -->
+
+**100.** In relation to a Person “p”, s 22(1) — no probate or letters of administration are to be granted to a person who lacks mental capacity means p's lacks mental capacity (within the meaning of the Mental Capacity Act 2008) to make decisions with respect to the management and administration of the person's property and affairs.
+
+<!-- l4: decide:s 22(2) — this person would, if he or she did not lack mental capacity, be entitled to probate or letters of administration -->
+
+**101.** In relation to a Deceased person “d” and a Person “p”, s 22(2) — this person would, if he or she did not lack mental capacity, be entitled to probate or letters of administration if—
+
+    (a) s 22(1) — no probate or letters of administration are to be granted to a person who lacks mental capacity with p; and
+
+    (b) any of the following applies—
+
+        (i) s 8(1) — probate may be granted to this person as an executor appointed by a will with d and p's the reference for this person; or
+
+        (ii) s 18(4)(a) — one of the husband or widow or next of kin with d and p's the reference for this person.
+
+<!-- l4: decide:s 22(2) — the limitation on a grant made for the use and benefit of a person who lacks mental capacity -->
+
+**102.** S 22(2) — the limitation on a grant made for the use and benefit of a person who lacks mental capacity means limited in some other way with until that person ceases to lack mental capacity and obtains a grant to himself or herself.
+
+## Sections 23 to 27 — limited grants, accrual, exception and expiry
+
+<!-- l4: decide:s 23 — letters of administration limited to trust property may be granted -->
+
+**103.** In relation to a Deceased person “d” and a DATE “the date”, s 23 — letters of administration limited to trust property may be granted if—
+
+    (a) Where a person dies, leaving property in which he had no beneficial interest on his own account,;
+
+    (b) the sum of d's the estate's the value of any property which the deceased possessed or was entitled to as trustee and not beneficially, situated in Singapore and d's the estate's the value of any property which the deceased possessed or was entitled to as trustee and not beneficially, situated outside Singapore is greater than 0;
+
+    (c) and does not leave a representative who is able and willing to act,; and
+
+    (d) s 23 — the deceased leaves a representative who is not able and willing to act with d and the date.
+
+<!-- l4: decide:s 23 — the deceased leaves a representative who is able and willing to act -->
+
+**104.** In relation to a Deceased person “d” and a DATE “the date”, s 23 — the deceased leaves a representative who is able and willing to act if—
+
+    (a) any with given gr then a representative willing to act with gr and the personal representatives of the estate with d; or
+
+    (b) any with given x then an executor whose appointment stands and who is willing to act with x and the date and the executors appointed by the will of the deceased with d.
+
+<!-- l4: decide:an executor whose appointment stands and who is willing to act -->
+
+**105.** In relation to an Executor appointed by a will “x” and a DATE “the date”, an executor whose appointment stands and who is willing to act if—
+
+    (a) it is not the case that has died with x's the executor;
+
+    (b) s 13(1)(b) — this executor is not disqualified with x and the date; and
+
+    (c) x's the executor's willing to act.
+
+<!-- l4: decide:the executors appointed by the will of the deceased -->
+
+**106.** In relation to a Deceased person “d”, the executors appointed by the will of the deceased means consider the case distinctions of d's the will :  when NOTHING has  then EMPTY. when JUST has w then w's the executors appointed by the will.
+
+<!-- l4: decide:a representative willing to act -->
+
+**107.** In relation to a Grantee “gr”, a representative willing to act means consider the case distinctions of the individual in with gr's the grantee :  when JUST has p then not has died with p and p's willing to act. when NOTHING has  then TRUE.
+
+<!-- l4: decide:s 23 — the limitation on a grant of trust property -->
+
+**108.** S 23 — the limitation on a grant of trust property means limited to settled land or to trust property.
+
+<!-- l4: decide:s 24 — the limitation on a grant to collect and preserve property -->
+
+**109.** S 24 — the limitation on a grant to collect and preserve property means a grant that does not permit the distribution of the testator’s estate.
+
+<!-- l4: declare:To whom the representation of the estate accrues on the death of one of several personal representatives -->
+
+**110.** In this Act, “To whom the representation of the estate accrues on the death of one of several personal representatives” means one of the following—
+
+    (a) “section 25(1) does not apply”;
+
+    (b) “the representation of the estate accrues to the surviving executor or executors”;
+
+    (c) “the representation of the estate accrues to the surviving administrator or administrators”; or
+
+    (d) “the representation does not accrue, this being a case to which section 6 applies”.
+
+<!-- l4: decide:s 25(1) — death of one of several executors or administrators -->
+
+**111.** In relation to a Deceased person “d”, a Grant “g” and a DATE “the date”, s 25(1) — death of one of several executors or administrators means if not count with g's the grantees is greater than 1 and any with given gr then this grantee has died with gr and g's the grantees then section 25(1) does not apply if g's the kind of grant is equal to probate then the representation of the estate accrues to the surviving executor or executors if s 6(2) — the requirement as to the grantees is engaged with d and the date then the representation does not accrue, this being a case to which section 6 applies otherwise the representation of the estate accrues to the surviving administrator or administrators.
+
+<!-- l4: decide:this grantee has died -->
+
+**112.** In relation to a Grantee “gr”, this grantee has died means consider the case distinctions of the individual in with gr's the grantee :  when JUST has p then has died with p. when NOTHING has  then FALSE.
+
+<!-- l4: decide:s 25(2) — letters of administration may be granted in respect of any estate not fully administered -->
+
+**113.** In relation to a Deceased person “d” and a Grant “g”, s 25(2) — letters of administration may be granted in respect of any estate not fully administered if—
+
+    (a) On the death of an administrator,;
+
+    (b) any with given gr then gr's the capacity in which the grant is made is equal to as administrator and this grantee has died with gr and g's the grantees;
+
+    (c) letters of administration may be granted in respect of any estate not fully administered; and
+
+    (d) it is not the case that d's the estate's fully administered.
+
+<!-- l4: decide:s 26(2) — a further grant may be made of the part of the estate excepted -->
+
+**114.** In relation to a Grant “g”, s 26(2) — a further grant may be made of the part of the estate excepted means isJust with g's the exception subject to which the grant is made.
+
+<!-- l4: decide:s 27 — letters of administration shall be granted to those persons to whom original grants might have been made -->
+
+**115.** In relation to a Deceased person “d” and a Grant “g”, s 27 — letters of administration shall be granted to those persons to whom original grants might have been made if—
+
+    (a) When a limited grant;
+
+    (b) g's the limitation is not equal to not limited;
+
+    (c) has expired by effluxion of time or the happening of the event or contingency on which it was limited,;
+
+    (d) g's expired by effluxion of time or by the happening of the event or contingency on which it was limited;
+
+    (e) and there is still some part of the deceased’s estate unadministered,; and
+
+    (f) it is not the case that d's the estate's fully administered.
+
+# Part 5 — Security
+
+<!-- l4: declare:The security required on a grant -->
+
+**116.** In this Act, “The security required on a grant” means one of the following—
+
+    (a) “no security is required”;
+
+    (b) “security by bond in the prescribed form by the grantee and 2 sureties”, having a “the amount of the bond” (a Money); or
+
+    (c) “security by bond in the prescribed form by the grantee, sureties being dispensed with”, having a “the amount of the bond” (a Money).
+
+<!-- l4: decide:s 29(2) — the amount at which the estate within the jurisdiction is sworn -->
+
+**117.** In relation to a Deceased person “d”, s 29(2) — the amount at which the estate within the jurisdiction is sworn means the difference between sum with map with given c then c's the debt and filter with given c then c's secured and d's the estate's the creditors of the deceased and the value of the property in Singapore with d's the estate.
+
+<!-- l4: decide:s 29(4) — this grantee is the Public Trustee -->
+
+**118.** In relation to a Grantee “gr”, s 29(4) — this grantee is the Public Trustee means gr's the grantee is equal to the Public Trustee.
+
+<!-- l4: decide:s 29(8)(a) — the person for whose use and benefit the grant is made is an infant -->
+
+**119.** In relation to a Deceased person “d”, a Grantee “gr” and a DATE “the date”, s 29(8)(a) — the person for whose use and benefit the grant is made is an infant means consider the case distinctions of gr's the reference for the person for whose use and benefit the grant is made :  when NOTHING has  then FALSE. when JUST has r then any with given i then i's the infant's the reference for this person is equal to r and _ is an infant on _ with i's the infant and the date and d's the infants concerned in the estate.
+
+<!-- l4: decide:s 29(8) — this grantee of letters of administration from a Family Court shall not be required to give security -->
+
+**120.** In relation to a Deceased person “d”, a Grant “g”, a Grantee “gr”, a The further facts on which the grant machinery turns “f” and a DATE “the date”, s 29(8) — this grantee of letters of administration from a Family Court shall not be required to give security if—
+
+    (a) A grantee of letters of administration from a Family Court;
+
+    (b) any of the following applies—
+
+        (i) g's the kind of grant is equal to letters of administration; or
+
+        (ii) g's the kind of grant is equal to letters of administration with the will annexed;
+
+    (c) the grant was made by a Family Court with g;
+
+    (d) shall not be required to give security for the due administration of the estate unless —; and
+
+    (e) none of the following applies—
+
+        (i) (a) the person for whose use and benefit the grant is made is an infant; or;
+
+        (ii) s 29(8)(a) — the person for whose use and benefit the grant is made is an infant with d, gr and the date;
+
+        (iii) (b) the Family Court thinks fit to require such security.; or
+
+        (iv) f's the Family Court thinks fit to require such security.
+
+<!-- l4: decide:the grant was made by a Family Court -->
+
+**121.** In relation to a Grant “g”, the grant was made by a Family Court means consider the case distinctions of g's the court that made the grant :  when a court within the meaning of these Acts has c then c is equal to a Family Court. in any other case FALSE.
+
+<!-- l4: decide:s 29 — the security ordinarily required of this grantee -->
+
+**122.** In relation to a Deceased person “d”, a Grant “g”, a Grantee “gr”, a The further facts on which the grant machinery turns “f” and a DATE “the date”, s 29 — the security ordinarily required of this grantee means if not g's the kind of grant is equal to letters of administration or g's the kind of grant is equal to letters of administration with the will annexed then no security is required if s 29(4) — this grantee is the Public Trustee with gr then no security is required if s 29(8) — this grantee of letters of administration from a Family Court shall not be required to give security with d, g, gr, f and the date then no security is required if f's the administrator is entitled to the whole of the estate after payment of the debts then security by bond in the prescribed form by the grantee, sureties being dispensed with with s 29(2) — the amount at which the estate within the jurisdiction is sworn with d otherwise security by bond in the prescribed form by the grantee and 2 sureties with s 29(2) — the amount at which the estate within the jurisdiction is sworn with d.
+
+<!-- l4: decide:security is lawfully required of some grantee -->
+
+**123.** In relation to a Deceased person “d”, a Grant “g”, a The further facts on which the grant machinery turns “f” and a DATE “the date”, security is lawfully required of some grantee means any with given gr then security is lawfully required of this grantee with d, g, gr, f and the date and g's the grantees.
+
+<!-- l4: decide:security is lawfully required of this grantee -->
+
+**124.** In relation to a Deceased person “d”, a Grant “g”, a Grantee “gr”, a The further facts on which the grant machinery turns “f” and a DATE “the date”, security is lawfully required of this grantee means consider the case distinctions of s 29 — the security ordinarily required of this grantee with d, g, gr, f and the date :  when no security is required has  then FALSE. in any other case TRUE.
+
+<!-- l4: decide:s 30 — letters of administration are granted to a creditor -->
+
+**125.** In relation to a Deceased person “d” and a Grant “g”, s 30 — letters of administration are granted to a creditor if—
+
+    (a) any of the following applies—
+
+        (i) g's the kind of grant is equal to letters of administration; or
+
+        (ii) g's the kind of grant is equal to letters of administration with the will annexed; and
+
+    (b) any with given gr then s 13(2)(e) — a creditor of the deceased with d and the reference of the grantee with gr and g's the grantees.
+
+# Part 8 — District Courts
+
+<!-- l4: decide:ss 34 and 36 — repealed, and therefore not encoded -->
+
+**126.** Ss 34 and 36 — repealed, and therefore not encoded if—
+
+    (a) 34. [Repealed by Act 27 of 2014]; and
+
+    (b) 36. [Repealed by Act 27 of 2014].
+
+<!-- l4: decide:s 35(1) — the saving in section 35(1) applies to this grant -->
+
+**127.** In relation to a Deceased person “d” and a Grant “g”, s 35(1) — the saving in section 35(1) applies to this grant if—
+
+    (a) No probate or letters of administration granted by a District Court before 1 January 2015;
+
+    (b) g's the court that made the grant is equal to a District Court, the grant having been made before 1 January 2015;
+
+    (c) shall be invalid by reason of the assets and effects of the deceased being subsequently found to be of a value which exceeds $3 million.; and
+
+    (d) the value of the whole estate with d's the estate is greater than 3000000.
+
+<!-- l4: decide:the value of the whole estate -->
+
+**128.** In relation to an Estate “e”, the value of the whole estate means the sum of the sum of the sum of e's the value of the movable property situated in Singapore and e's the value of the immovable property situated in Singapore and e's the value of the movable property situated outside Singapore and e's the value of the immovable property situated outside Singapore.
+
+# Part 11 — General
+
+## Section 55 — Grant to the Public Trustee in cases of delay
+
+<!-- l4: decide:s 55(1)(a) — six months have expired from the death and no application has been made -->
+
+**129.** In relation to a Deceased person “d” and a DATE “the date”, s 55(1)(a) — six months have expired from the death and no application has been made if—
+
+    (a) six months have expired from the death with d and the date; and
+
+    (b) null with d's the probate applications made in respect of the estate.
+
+<!-- l4: decide:six months have expired from the death -->
+
+**130.** In relation to a Deceased person “d” and a DATE “the date”, six months have expired from the death means consider the case distinctions of the date of death of with d's the deceased :  when NOTHING has  then FALSE. when JUST has dd then _ is before _ with add months with dd and 6 and the date.
+
+<!-- l4: decide:s 55(1)(b) — an application made within the 6 months has not been proceeded with, or has been withdrawn or refused -->
+
+**131.** In relation to a Deceased person “d”, s 55(1)(b) — an application made within the 6 months has not been proceeded with, or has been withdrawn or refused means any with given a then an application within the six months that came to nothing with d and a and d's the probate applications made in respect of the estate.
+
+<!-- l4: decide:an application within the six months that came to nothing -->
+
+**132.** In relation to a Deceased person “d” and a Probate application “a”, an application within the six months that came to nothing if—
+
+    (a) the application was made within 6 months of the death with d and a; and
+
+    (b) any of the following applies—
+
+        (i) has not within that period been proceeded with,;
+
+        (ii) a's what became of the application is equal to not proceeded with;
+
+        (iii) or has been withdrawn;
+
+        (iv) a's what became of the application is equal to withdrawn;
+
+        (v) or refused; or
+
+        (vi) a's what became of the application is equal to refused.
+
+<!-- l4: decide:the application was made within 6 months of the death -->
+
+**133.** In relation to a Deceased person “d” and a Probate application “a”, the application was made within 6 months of the death means consider the case distinctions of a's the date of the application :  when NOTHING has  then FALSE. when JUST has da then consider the case distinctions of the date of death of with d's the deceased :  when NOTHING has  then FALSE. when JUST has dd then not _ is after _ with da and add months with dd and 6.
+
+<!-- l4: decide:s 55(1)(c) — the grantee neglects within one month of the date of the grant to give such security as he is lawfully required to furnish -->
+
+**134.** In relation to a Deceased person “d”, a Grant “g”, a The further facts on which the grant machinery turns “f” and a DATE “the date”, s 55(1)(c) — the grantee neglects within one month of the date of the grant to give such security as he is lawfully required to furnish if—
+
+    (a) where any person, who has received a grant of letters of administration with or without the will annexed,;
+
+    (b) any of the following applies—
+
+        (i) g's the kind of grant is equal to letters of administration; or
+
+        (ii) g's the kind of grant is equal to letters of administration with the will annexed;
+
+    (c) to give such security as he is lawfully required to furnish;
+
+    (d) security is lawfully required of some grantee with d, g, f and the date;
+
+    (e) g's has given such security as is not lawfully required to be furnished;
+
+    (f) neglects within one month of the date of the grant; and
+
+    (g) one month has expired from the date of the grant with g and the date.
+
+<!-- l4: decide:one month has expired from the date of the grant -->
+
+**135.** In relation to a Grant “g” and a DATE “the date”, one month has expired from the date of the grant means consider the case distinctions of g's the date of the grant :  when NOTHING has  then FALSE. when JUST has dg then _ is before _ with add months with dg and 1 and the date.
+
+<!-- l4: decide:s 55(1)(d) — a receiver may be appointed under section 39, but the appointment would not be a sufficient protection -->
+
+**136.** In relation to a Deceased person “d” and a The further facts on which the grant machinery turns “f”, s 55(1)(d) — a receiver may be appointed under section 39, but the appointment would not be a sufficient protection if—
+
+    (a) Where any person dies leaving property within Singapore;
+
+    (b) the value of the property in Singapore with d's the estate is greater than 0;
+
+    (c) that there is danger that the property may be wasted,;
+
+    (d) f's there is danger that the property may be wasted;
+
+    (e) but it appears that such appointment would not be a sufficient protection for the estate;; and
+
+    (f) f's it appears that such appointment would not be a sufficient protection for the estate.
+
+<!-- l4: decide:s 55(1)(e) — an administrator has failed to extract the grant of letters of administration -->
+
+**137.** In relation to a Deceased person “d”, s 55(1)(e) — an administrator has failed to extract the grant of letters of administration means any with given g then a grant of letters of administration that has not been extracted with g and d's the grants made in respect of the estate.
+
+<!-- l4: decide:a grant of letters of administration that has not been extracted -->
+
+**138.** In relation to a Grant “g”, a grant of letters of administration that has not been extracted if—
+
+    (a) any of the following applies—
+
+        (i) g's the kind of grant is equal to letters of administration; or
+
+        (ii) g's the kind of grant is equal to letters of administration with the will annexed; and
+
+    (b) g's does not have been extracted.
+
+<!-- l4: decide:s 55(1)(f) — six months have elapsed since the death of a last surviving executor or administrator, and no application has been made -->
+
+**139.** In relation to a Deceased person “d” and a DATE “the date”, s 55(1)(f) — six months have elapsed since the death of a last surviving executor or administrator, and no application has been made if—
+
+    (a) it is not the case that null with the personal representatives of the estate with d;
+
+    (b) all with given gr then this grantee has died with gr and the personal representatives of the estate with d;
+
+    (c) six months have elapsed since the last of the representatives died with d and the date; and
+
+    (d) null with d's the probate applications made in respect of the estate.
+
+<!-- l4: decide:six months have elapsed since the last of the representatives died -->
+
+**140.** In relation to a Deceased person “d” and a DATE “the date”, six months have elapsed since the last of the representatives died means all with given gr then six months have elapsed since this grantee died with gr and the date and the personal representatives of the estate with d.
+
+<!-- l4: decide:six months have elapsed since this grantee died -->
+
+**141.** In relation to a Grantee “gr” and a DATE “the date”, six months have elapsed since this grantee died means consider the case distinctions of the individual in with gr's the grantee :  when NOTHING has  then FALSE. when JUST has p then consider the case distinctions of the date of death of with p :  when NOTHING has  then FALSE. when JUST has dp then _ is before _ with add months with dp and 6 and the date.
+
+<!-- l4: decide:s 55(1) — letters of administration may be granted to the Public Trustee in a case of delay -->
+
+**142.** In relation to a Deceased person “d”, a Grant “g”, a The further facts on which the grant machinery turns “f” and a DATE “the date”, s 55(1) — letters of administration may be granted to the Public Trustee in a case of delay if—
+
+    (a) (a) where, after the expiration of 6 months from the death of a deceased person, no application has been made for probate or letters of administration to his estate;;
+
+    (b) s 55(1)(a) — six months have expired from the death and no application has been made with d and the date;
+
+    (c) (b) where any such application, though made within the said 6 months, has not within that period been proceeded with, or has been withdrawn or refused;;
+
+    (d) s 55(1)(b) — an application made within the 6 months has not been proceeded with, or has been withdrawn or refused with d;
+
+    (e) (c) where any person, who has received a grant of letters of administration with or without the will annexed, neglects within one month of the date of the grant to give such security as he is lawfully required to furnish;;
+
+    (f) s 55(1)(c) — the grantee neglects within one month of the date of the grant to give such security as he is lawfully required to furnish with d, g, f and the date;
+
+    (g) (d) where a receiver may be appointed under section 39, but it appears that such appointment would not be a sufficient protection for the estate;;
+
+    (h) s 55(1)(d) — a receiver may be appointed under section 39, but the appointment would not be a sufficient protection with d and f;
+
+    (i) (e) where an administrator has failed to extract the grant of letters of administration; or;
+
+    (j) s 55(1)(e) — an administrator has failed to extract the grant of letters of administration with d;
+
+    (k) (f) where after the death of a last surviving executor or administrator of a deceased person’s estate 6 months have elapsed and no application for the representation of the estate has been made,; or
+
+    (l) s 55(1)(f) — six months have elapsed since the death of a last surviving executor or administrator, and no application has been made with d and the date.
+
+<!-- l4: decide:s 55(2) — the six-month periods do not prevent the Public Trustee from applying sooner -->
+
+**143.** S 55(2) — the six-month periods do not prevent the Public Trustee from applying sooner means Nothing in this section shall be construed so as to prevent the Public Trustee from applying for or being granted letters of administration of the estate of a deceased person with or without the will annexed before the expiration of a period of 6 months of the death of the deceased..
+
+## Section 56(2) — the $500 route where no administration has been taken out
+
+<!-- l4: decide:s 56(2) — the assets of the deceased, including the funds directed to be paid -->
+
+**144.** In relation to a Deceased person “d”, s 56(2) — the assets of the deceased, including the funds directed to be paid means the sum of the value of the whole estate with d's the estate and d's the estate's the amount of the funds in court directed to be paid, transferred or delivered to him.
+
+<!-- l4: decide:the persons named in section 56(2) -->
+
+**145.** In relation to a Deceased person “d”, the persons named in section 56(2) means concat with list of the husband or widow of the deceased with d and filter with given p then _ survives _ with p and d's the deceased and concat with list of map with given c then c's the child and d's the deceased's children, maybeToList with d's the family's the father of the deceased, maybeToList with d's the family's the mother of the deceased and map with given r then r's the relative and d's the family's the brothers and sisters of the deceased.
+
+<!-- l4: decide:s 56(2) — the funds may be paid to this person on a declaration in the prescribed form -->
+
+**146.** In relation to a Deceased person “d” and a STRING “the reference”, s 56(2) — the funds may be paid to this person on a declaration in the prescribed form if—
+
+    (a) If no administration has been taken out to the estate of such deceased person;
+
+    (b) null with d's the grants made in respect of the estate;
+
+    (c) who has died intestate,;
+
+    (d) s 18(1) — the person has died intestate with d;
+
+    (e) and whose assets do not exceed $500, including the amount of the funds directed to be so paid, transferred or delivered to him,;
+
+    (f) s 56(2) — the assets of the deceased, including the funds directed to be paid with d is at most 500;
+
+    (g) the funds may be paid, transferred or delivered to the person who, being a widower, widow, child, father, mother, brother or sister of the deceased,; and
+
+    (h) any with given p then p's the reference for this person is equal to the reference and the persons named in section 56(2) with d.
+
+## Section 62 — Administration by the Public Trustee
+
+<!-- l4: decide:s 62(2)(b) — the deceased died on or after 17 September 2005 -->
+
+**147.** In relation to a Deceased person “d”, s 62(2)(b) — the deceased died on or after 17 September 2005 means consider the case distinctions of the date of death of with d's the deceased :  when NOTHING has  then FALSE. when JUST has dd then not _ is before _ with dd and YMD with 2005, 9 and 17.
+
+<!-- l4: decide:s 62 — the value of the property in Singapore for the purposes of section 62 -->
+
+**148.** In relation to a Deceased person “d”, s 62 — the value of the property in Singapore for the purposes of section 62 means the difference between if s 62(2)(b) — the deceased died on or after 17 September 2005 with d then d's the estate's the value of any moneys payable by an appointed insurer pursuant to the Dependants’ Protection Insurance Scheme or any other equivalent scheme maintained by the Central Provident Fund Board else 0 and the difference between d's the estate's the value of any property which the deceased possessed or was entitled to as trustee and not beneficially, situated in Singapore and the value of the property in Singapore with d's the estate.
+
+<!-- l4: decide:s 62(1) — the Public Trustee may declare that he undertakes to administer the property -->
+
+**149.** In relation to a Deceased person “d”, s 62(1) — the Public Trustee may declare that he undertakes to administer the property if—
+
+    (a) Where any person dies leaving property in Singapore not exceeding $50,000 in value (without deduction for debts),;
+
+    (b) s 62 — the value of the property in Singapore for the purposes of section 62 with d is at most 50000;
+
+    (c) after satisfying himself that no application for letters of administration is pending,; and
+
+    (d) it is not the case that any with given a then a pending application for letters of administration with a and d's the probate applications made in respect of the estate.
+
+<!-- l4: decide:a pending application for letters of administration -->
+
+**150.** In relation to a Probate application “a”, a pending application for letters of administration if—
+
+    (a) any of the following applies—
+
+        (i) a's the grant applied for is equal to letters of administration; or
+
+        (ii) a's the grant applied for is equal to letters of administration with the will annexed; and
+
+    (b) a's what became of the application is equal to still pending.
+
+<!-- l4: decide:s 62(3) — the Public Trustee is empowered to administer the property as though letters of administration had been granted to him -->
+
+**151.** In relation to a The further facts on which the grant machinery turns “f”, s 62(3) — the Public Trustee is empowered to administer the property as though letters of administration had been granted to him means f's the Public Trustee has by writing signed by him declared that he undertakes to administer such property.
+
+## Section 63 — Payment for a minor’s maintenance out of property held by the Public Trustee
+
+<!-- l4: declare:The payments the Public Trustee may make for a minor’s maintenance under section 63 -->
+
+**152.** In this Act, “The payments the Public Trustee may make for a minor’s maintenance under section 63” means one of the following—
+
+    (a) “no payment may be made under section 63”;
+
+    (b) “payments of the whole or such part of the income and capital money of such property as may in all the circumstances be reasonable”; or
+
+    (c) “payments of capital money to the extent of $25,000”.
+
+<!-- l4: decide:s 63(1) — the property is held upon trust for a person during whose minority payments may be made -->
+
+**153.** In relation to a Deceased person “d” and a DATE “the date”, s 63(1) — the property is held upon trust for a person during whose minority payments may be made means any with given i then _ is an infant on _ with i's the infant and the date and d's the infants concerned in the estate.
+
+<!-- l4: decide:s 63 — the payments the Public Trustee may make -->
+
+**154.** In relation to a Deceased person “d” and a DATE “the date”, s 63 — the payments the Public Trustee may make means if not s 63(1) — the property is held upon trust for a person during whose minority payments may be made with d and the date then no payment may be made under section 63 if d's the estate's the value of the property administered by the Public Trustee is at most 25000 then payments of the whole or such part of the income and capital money of such property as may in all the circumstances be reasonable if d's the estate's the value of the property administered by the Public Trustee is at most 50000 then payments of capital money to the extent of $25,000 otherwise no payment may be made under section 63.
+
+## Section 64(1) — the $10,000 exemption from notice of distribution
+
+<!-- l4: decide:s 64(1) — the total value of the property administered by the Public Trustee -->
+
+**155.** In relation to a Deceased person “d”, s 64(1) — the total value of the property administered by the Public Trustee means the difference between d's the estate's the value of any property which the deceased possessed or was entitled to as trustee and not beneficially, situated outside Singapore and the difference between d's the estate's the value of any property which the deceased possessed or was entitled to as trustee and not beneficially, situated in Singapore and d's the estate's the value of the property administered by the Public Trustee.
+
+<!-- l4: decide:s 64(1) — it shall not be necessary for the Public Trustee to give notice of his intention to distribute the estate -->
+
+**156.** In relation to a Deceased person “d”, s 64(1) — it shall not be necessary for the Public Trustee to give notice of his intention to distribute the estate means s 64(1) — the total value of the property administered by the Public Trustee with d is at most 10000.
+
+# The Act’s own “shall” and “may” — the deontic outcomes
+
+<!-- l4: declare:A party under the Probate and Administration Act -->
+
+**157.** In this Act, “A party under the Probate and Administration Act” means one of the following—
+
+    (a) “the court”;
+
+    (b) “the registrar”; or
+
+    (c) “the grantee”.
+
+<!-- l4: declare:An act under the Probate and Administration Act -->
+
+**158.** In this Act, “An act under the Probate and Administration Act” means one of the following—
+
+    (a) “take an oath in the prescribed form, faithfully to administer the estate and to account for the same”;
+
+    (b) “give security for the due administration of the estate”;
+
+    (c) “revoke the probate and grant a new probate of the will and codicil together”;
+
+    (d) “grant letters of administration to those persons to whom original grants might have been made”; or
+
+    (e) “grant letters of administration with or without the will annexed to the Public Trustee”.
+
+<!-- l4: decide:s 28(2) — the grantee is the Public Trustee or a trust company -->
+
+**159.** In relation to a Person or corporation “pc”, s 28(2) — the grantee is the Public Trustee or a trust company means consider the case distinctions of pc :  when the Public Trustee has  then TRUE. when a corporation licensed as a trust company under the Trust Companies Act 2005 has n then TRUE. in any other case FALSE.
+
+<!-- l4: decide:s 28 — the grantee shall take an oath -->
+
+**160.** In relation to a Grantee “gr”, s 28 — the grantee shall take an oath means if s 28(2) — the grantee is the Public Trustee or a trust company with gr's the grantee, then FULFILLED; otherwise, the grantee must take an oath in the prescribed form, faithfully to administer the estate and to account for the same..
+
+<!-- l4: decide:s 29(7) — the grantee shall give security for the due administration of the estate -->
+
+**161.** In relation to a BOOLEAN “security is required”, s 29(7) — the grantee shall give security for the due administration of the estate means if security is required, then the grantee must give security for the due administration of the estate, within 30. Failing which, the court may grant letters of administration with or without the will annexed to the Public Trustee, within 30..; otherwise, FULFILLED.
+
+<!-- l4: decide:s 12(2) — the probate shall be revoked and a new probate granted -->
+
+**162.** In relation to a The consequence of a codicil propounded after a grant “the consequence”, s 12(2) — the probate shall be revoked and a new probate granted means if the consequence is equal to the probate shall be revoked, and a new probate shall be granted of the will and codicil together, then the court must revoke the probate and grant a new probate of the will and codicil together.; otherwise, FULFILLED.
+
+<!-- l4: decide:s 27 — letters of administration shall be granted -->
+
+**163.** In relation to a Deceased person “d” and a Grant “g”, s 27 — letters of administration shall be granted means if s 27 — letters of administration shall be granted to those persons to whom original grants might have been made with d and g, then the court must grant letters of administration to those persons to whom original grants might have been made.; otherwise, FULFILLED.
+
+# What is NOT encoded, and why
+
+# Where this Act reaches into the other three
+
+# Ambiguity register
+
+# Worked examples
+
+<!-- l4: decide:the date of the hearing -->
+
+**164.** The date of the hearing means YMD with 2026, 1 and 1.
+
+## Constructors
+
+<!-- l4: decide:a PAA person in full -->
+
+**165.** In relation to a STRING “the name”, a STRING “the reference”, a Vital status “the vital status”, an optional DATE “the date of majority”, a list of Child “the children of the person”, a BOOLEAN “does lack mental capacity”, a BOOLEAN “is absent from Singapore”, a BOOLEAN “is willing to act” and a BOOLEAN “does so desire”, a PAA person in full means Person where name is the name, the reference for this person is the reference, date of birth is NOTHING, vital status is the vital status, children is the children of the person, at the date of the death only conceived in the womb but subsequently born alive is FALSE, money or other property given, paid or settled by the intestate during his life to or for the advancement of the person is 0, the date on which the person attains the age of majority is the date of majority, a soldier being in actual military service is FALSE, a mariner or seaman being at sea is FALSE, a member of any naval or marine forces so circumstanced that if he were a soldier he would be in actual military service is FALSE, so desires that letters of administration be granted to such person as the court thinks fit is does so desire, lacks mental capacity (within the meaning of the Mental Capacity Act 2008) to make decisions with respect to the management and administration of the person's property and affairs is does lack mental capacity, absent from Singapore is is absent from Singapore and willing to act is is willing to act.
+
+<!-- l4: decide:a PAA adult -->
+
+**166.** In relation to a STRING “the name” and a STRING “the reference”, a PAA adult means a PAA person in full with the name, the reference, living, JUST with YMD with 2005, 1 and 1, EMPTY, FALSE, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:a PAA minor -->
+
+**167.** In relation to a STRING “the name” and a STRING “the reference”, a PAA minor means a PAA person in full with the name, the reference, living, JUST with YMD with 2032, 6 and 1, EMPTY, FALSE, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:a PAA person of unknown age -->
+
+**168.** In relation to a STRING “the name” and a STRING “the reference”, a PAA person of unknown age means a PAA person in full with the name, the reference, living, NOTHING, EMPTY, FALSE, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:a PAA legitimate child -->
+
+**169.** In relation to a Person “p”, a PAA legitimate child means Child where the child is p, a legitimate child of the person whose child he is is TRUE and adopted by that person by virtue of an order of court under any written law for the time being in force in Singapore, Malaysia or Brunei Darussalam is FALSE.
+
+<!-- l4: decide:a PAA adopted child -->
+
+**170.** In relation to a Person “p”, a PAA adopted child means Child where the child is p, a legitimate child of the person whose child he is is FALSE and adopted by that person by virtue of an order of court under any written law for the time being in force in Singapore, Malaysia or Brunei Darussalam is TRUE.
+
+<!-- l4: decide:a PAA child neither legitimate nor adopted -->
+
+**171.** In relation to a Person “p”, a PAA child neither legitimate nor adopted means Child where the child is p, a legitimate child of the person whose child he is is FALSE and adopted by that person by virtue of an order of court under any written law for the time being in force in Singapore, Malaysia or Brunei Darussalam is FALSE.
+
+<!-- l4: decide:a PAA marriage to -->
+
+**172.** In relation to a Person “p” and a BOOLEAN “subsisting”, a PAA marriage to means Marriage where the spouse is p, the date of the solemnisation of the marriage is JUST with YMD with 1990, 5 and 1 and subsisting at the death of the deceased, in the sense of not dissolved or annulled before the death is subsisting.
+
+<!-- l4: decide:a PAA family -->
+
+**173.** In relation to a list of Marriage “the marriages” and a list of Collateral relative “the siblings”, a PAA family means Family where the marriages of the deceased is the marriages, the father of the deceased is NOTHING, the mother of the deceased is NOTHING, the brothers and sisters of the deceased is the siblings, the grandparents of the deceased is EMPTY and the uncles and aunts of the deceased is EMPTY.
+
+<!-- l4: decide:a PAA sibling of the whole blood -->
+
+**174.** In relation to a Person “p”, a PAA sibling of the whole blood means Collateral relative where the relative is p and of the whole blood or of the half blood is of the whole blood.
+
+<!-- l4: decide:a PAA executor -->
+
+**175.** In relation to a Person “p”, a BOOLEAN “is incapable otherwise”, a BOOLEAN “has renounced”, a BOOLEAN “has extracted probate” and a BOOLEAN “has administered the estate”, a PAA executor means Executor appointed by a will where the executor is p, the appointment, express or implied is express, legally incapable of acting as such, otherwise than under section 21(1) or section 22(1) is is incapable otherwise, has renounced the right to act as such is has renounced, appeared and extracted probate is has extracted probate and has administered all the estate of the deceased is has administered the estate.
+
+<!-- l4: decide:a PAA gift to -->
+
+**176.** In relation to a Person “p”, a Kind of disposition “the kind”, a Money “the value” and a BOOLEAN “is beneficial”, a PAA gift to means Disposition where the donee is an individual with p, the kind of disposition is the kind, the value of the disposition is the value, beneficial is is beneficial and not determinable at or before the death of the donee is TRUE.
+
+<!-- l4: decide:a PAA life interest to -->
+
+**177.** In relation to a Person “p”, a PAA life interest to means Life interest where the life tenant is p and the value of the property in which the life interest subsists is 10000.
+
+<!-- l4: decide:a PAA will of -->
+
+**178.** In relation to a Person “t”, a list of Executor appointed by a will “the executors”, a list of Disposition “the dispositions” and a list of Life interest “the life interests”, a PAA will of means Will where the testator is t, the date of execution is JUST with YMD with 2020, 3 and 1, in writing is TRUE, signed at the foot or end thereof by the testator is TRUE, signed at the foot or end thereof by some other person in his presence and by his direction is FALSE, the signature made or acknowledged by the testator as the signature to his will or codicil in the presence of 2 or more witnesses present at the same time is TRUE, apparent on the face of the will that the testator intended to give effect by such his signature to the writing signed as his will is TRUE, the attesting witnesses is EMPTY, the executors appointed by the will is the executors, the guardians of infant children appointed by the will is EMPTY, the dispositions made by the will is the dispositions, expressed to be made in contemplation of a marriage is FALSE, the reference for the person with whom the marriage contemplated was to be solemnised is NOTHING, made in exercise of a power of appointment is FALSE, the estate thereby appointed would not in default of such appointment pass to his or her heir, executor or administrator or the person entitled under the Intestate Succession Act 1967 is FALSE, the life interests arising under the will is the life interests, it appears by the will that the personal representative is entitled to take that part beneficially is FALSE and the codicils is EMPTY.
+
+<!-- l4: decide:a PAA grantee -->
+
+**179.** In relation to a Person or corporation “pc”, a Capacity in which the grant is made “the capacity” and an optional STRING “for whose benefit”, a PAA grantee means Grantee where the grantee is pc, the capacity in which the grant is made is the capacity and the reference for the person for whose use and benefit the grant is made is for whose benefit.
+
+<!-- l4: decide:a PAA grant -->
+
+**180.** In relation to a Kind of grant “the kind”, a list of Grantee “the grantees of this grant”, an optional DATE “the date of this grant”, a Limitation on the grant “the limitation of this grant”, a The court that made the grant “the granting court”, a BOOLEAN “security has been given”, a BOOLEAN “has been taken out” and a BOOLEAN “it has expired”, a PAA grant means Grant where the kind of grant is the kind, the grantees is the grantees of this grant, the date of the grant is the date of this grant, the limitation is the limitation of this grant, the court that made the grant is the granting court, the exception subject to which the grant is made is NOTHING, expired by effluxion of time or by the happening of the event or contingency on which it was limited is it has expired, revoked is FALSE, has given such security as is lawfully required to be furnished is security has been given, has been extracted is has been taken out, sealed under section 47(1) of the Probate and Administration Act 1934 is FALSE and the date of the sealing is NOTHING.
+
+<!-- l4: decide:a PAA guardian -->
+
+**181.** In relation to a Person “p”, a STRING “the reference for the infant of whom he is guardian”, a How the guardian was appointed “how he was appointed”, a Kind of guardianship “of the person or of the property, or both” and a BOOLEAN “has been removed”, a PAA guardian means Guardian where the guardian is p, the reference for the infant is the reference for the infant of whom he is guardian, how the guardian was appointed is how he was appointed, of the person or of the property is of the person or of the property, or both, alone or jointly is alone, refuses to act is FALSE, the mother or father objects to his so acting is FALSE, considers that the mother or father is unfit to have the custody of the infant is FALSE, removed from his guardianship by the court is has been removed, has given security is FALSE, the court has otherwise ordered as to security is FALSE, has sold, mortgaged, exchanged, or otherwise parted with the possession of any of the movable or immovable property of the infant is FALSE, has leased land belonging to the infant is FALSE, the term of the lease, in years is NOTHING, has the permission of the court to deal with the property of the infant is FALSE, has given a good discharge for a legacy or other capital moneys payable to or receivable by the infant is FALSE, the court has otherwise ordered as to giving a good discharge is FALSE, the provision made out of the income of the property of the infant for his maintenance and education is A periodical sum where the sum is 0 and the period is monthly and has the permission of the court to apply a sum exceeding $100 per month is FALSE.
+
+<!-- l4: decide:a PAA infant concerned in the estate, with guardians -->
+
+**182.** In relation to a Person “p” and a list of Guardian “the guardians”, a PAA infant concerned in the estate, with guardians means Infant where the infant is p, the father of the infant is NOTHING, the mother of the infant is NOTHING, the guardians of the infant is the guardians, some other person has parental rights with respect to him is FALSE, the income of the property of the infant is 0, the capital of the property of the infant is 0 and of an age to express an independent opinion is FALSE.
+
+<!-- l4: decide:a PAA infant concerned in the estate -->
+
+**183.** In relation to a Person “p”, a PAA infant concerned in the estate means a PAA infant concerned in the estate, with guardians with p and EMPTY.
+
+<!-- l4: decide:a PAA creditor -->
+
+**184.** In relation to a Person “p”, a Money “the amount” and a BOOLEAN “is secured”, a PAA creditor means Creditor where the creditor is an individual with p, the debt is the amount, secured is is secured and residing in Singapore is TRUE.
+
+<!-- l4: decide:a PAA estate -->
+
+**185.** In relation to a Money “movable in Singapore”, a Money “trustee property in Singapore”, a Money “insurance moneys”, a Money “administered by the Public Trustee”, a Money “funds in court”, a list of Creditor “the creditors” and a BOOLEAN “is fully administered”, a PAA estate means Estate where the value of the movable property situated in Singapore is movable in Singapore, the value of the immovable property situated in Singapore is 0, the value of the movable property situated outside Singapore is 0, the value of the immovable property situated outside Singapore is 0, the value of any property which the deceased possessed or was entitled to as trustee and not beneficially, situated in Singapore is trustee property in Singapore, the value of any property which the deceased possessed or was entitled to as trustee and not beneficially, situated outside Singapore is 0, the value of any moneys payable by an appointed insurer pursuant to the Dependants’ Protection Insurance Scheme or any other equivalent scheme maintained by the Central Provident Fund Board is insurance moneys, the value of the property administered by the Public Trustee is administered by the Public Trustee, the amount of the funds in court directed to be paid, transferred or delivered to him is funds in court, the value of land settled previously to the death of the deceased is 0, the trustees of the settlement is EMPTY, the value of the interest in property which at the time of his death is charged with the payment of money is 0, the amount of the charge on that interest is 0, the deceased has by will, deed or other document signified a contrary or other intention is FALSE, the debts and liabilities of the deceased is 0, the funeral, testamentary and administration expenses is 0, the creditors of the deceased is the creditors, fully administered is is fully administered and the value of the property beneficially disposed of by the will is 0.
+
+<!-- l4: decide:a PAA application by -->
+
+**186.** In relation to a Person or corporation “a”, a Kind of grant “the kind applied for”, an optional DATE “the date applied” and a What became of the application “the outcome”, a PAA application by means Probate application where the applicant is a, the grant applied for is the kind applied for, the date of the application is the date applied and what became of the application is the outcome.
+
+<!-- l4: decide:a PAA deceased person -->
+
+**187.** In relation to a Person “p”, a Family “f”, an Estate “e”, an optional Will “w”, a list of Grant “the grants”, a list of Probate application “the applications”, a list of Infant “the infants” and a BOOLEAN “a claim has been made out”, a PAA deceased person means Deceased person where the deceased is p, the family is f, the estate is e, the will is w, domiciled in Singapore at the time of his death is TRUE, carried on business or resided in Singapore within 12 months of his death is TRUE, a Muslim is FALSE, the grants made in respect of the estate is the grants, the probate applications made in respect of the estate is the applications, a next of kin, creditor or other person has appeared and made out a claim to letters of administration is a claim has been made out and the infants concerned in the estate is the infants.
+
+<!-- l4: decide:the further facts, nothing being made out -->
+
+**188.** The further facts, nothing being made out means The further facts on which the grant machinery turns where the administrator is entitled to the whole of the estate after payment of the debts is FALSE, the Family Court thinks fit to require such security is FALSE, there is danger that the property may be wasted is FALSE, it appears that such appointment would not be a sufficient protection for the estate is FALSE and the Public Trustee has by writing signed by him declared that he undertakes to administer such property is FALSE.
+
+## Scenario A — an intestacy, with a surviving spouse and an infant child
+
+<!-- l4: decide:Tan Ah Kow -->
+
+**189.** Tan Ah Kow means a PAA person in full with Tan Ah Kow, tan, died on with YMD with 2025, 1 and 15, JUST with YMD with 1975, 1 and 1, list of a PAA legitimate child with Tan Wei and a PAA legitimate child with Tan Xin, FALSE, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:Lim Mei Ling -->
+
+**190.** Lim Mei Ling means a PAA adult with Lim Mei Ling and lim.
+
+<!-- l4: decide:Tan Wei -->
+
+**191.** Tan Wei means a PAA adult with Tan Wei and wei.
+
+<!-- l4: decide:Tan Xin -->
+
+**192.** Tan Xin means a PAA minor with Tan Xin and xin.
+
+<!-- l4: decide:Public Trustee as grantee -->
+
+**193.** Public Trustee as grantee means the Public Trustee.
+
+<!-- l4: decide:Acme Trust Company -->
+
+**194.** Acme Trust Company means a corporation licensed as a trust company under the Trust Companies Act 2005 with Acme Trust Company Pte Ltd.
+
+<!-- l4: decide:the estate of Tan Ah Kow -->
+
+**195.** The estate of Tan Ah Kow means a PAA estate with 120000, 0, 0, 0, 0, EMPTY and FALSE.
+
+<!-- l4: decide:Tan Ah Kow’s family -->
+
+**196.** Tan Ah Kow’s family means a PAA family with list of a PAA marriage to with Lim Mei Ling and TRUE and EMPTY.
+
+<!-- l4: decide:the Tan intestacy -->
+
+**197.** The Tan intestacy means a PAA deceased person with Tan Ah Kow, Tan Ah Kow’s family, the estate of Tan Ah Kow, NOTHING, EMPTY, EMPTY, list of a PAA infant concerned in the estate with Tan Xin and FALSE.
+
+<!-- l4: decide:Tan Feng, the son of Tan Bao -->
+
+**198.** Tan Feng, the son of Tan Bao means a PAA adult with Tan Feng and feng.
+
+<!-- l4: decide:Tan Bao, whose own son is legitimate -->
+
+**199.** Tan Bao, whose own son is legitimate means a PAA person in full with Tan Bao, bao, living, JUST with YMD with 2005, 1 and 1, list of a PAA legitimate child with Tan Feng, the son of Tan Bao, FALSE, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:Tan Hui, adopted by order of court -->
+
+**200.** Tan Hui, adopted by order of court means a PAA adult with Tan Hui and hui.
+
+<!-- l4: decide:Tan Ah Kow, one child unadopted and illegitimate and one adopted -->
+
+**201.** Tan Ah Kow, one child unadopted and illegitimate and one adopted means a PAA person in full with Tan Ah Kow, tan, died on with YMD with 2025, 1 and 15, JUST with YMD with 1975, 1 and 1, list of a PAA child neither legitimate nor adopted with Tan Bao, whose own son is legitimate and a PAA adopted child with Tan Hui, adopted by order of court, FALSE, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:the Tan intestacy, one child unadopted and illegitimate and one adopted -->
+
+**202.** The Tan intestacy, one child unadopted and illegitimate and one adopted means a PAA deceased person with Tan Ah Kow, one child unadopted and illegitimate and one adopted, a PAA family with EMPTY and EMPTY, the estate of Tan Ah Kow, NOTHING, EMPTY, EMPTY, EMPTY and FALSE.
+
+<!-- l4: decide:Tan Ah Kow, the same child being legitimate -->
+
+**203.** Tan Ah Kow, the same child being legitimate means a PAA person in full with Tan Ah Kow, tan, died on with YMD with 2025, 1 and 15, JUST with YMD with 1975, 1 and 1, list of a PAA legitimate child with Tan Bao, whose own son is legitimate, FALSE, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:the Tan intestacy, the same child being legitimate -->
+
+**204.** The Tan intestacy, the same child being legitimate means a PAA deceased person with Tan Ah Kow, the same child being legitimate, a PAA family with EMPTY and EMPTY, the estate of Tan Ah Kow, NOTHING, EMPTY, EMPTY, EMPTY and FALSE.
+
+<!-- l4: decide:Tan Ah Kow, the infant daughter neither legitimate nor adopted -->
+
+**205.** Tan Ah Kow, the infant daughter neither legitimate nor adopted means a PAA person in full with Tan Ah Kow, tan, died on with YMD with 2025, 1 and 15, JUST with YMD with 1975, 1 and 1, list of a PAA child neither legitimate nor adopted with Tan Xin, FALSE, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:the Tan intestacy, the infant daughter neither legitimate nor adopted -->
+
+**206.** The Tan intestacy, the infant daughter neither legitimate nor adopted means a PAA deceased person with Tan Ah Kow, the infant daughter neither legitimate nor adopted, a PAA family with EMPTY and EMPTY, the estate of Tan Ah Kow, NOTHING, EMPTY, EMPTY, list of a PAA infant concerned in the estate with Tan Xin and FALSE.
+
+<!-- l4: decide:Lim Mei Ling, predeceasing her husband -->
+
+**207.** Lim Mei Ling, predeceasing her husband means a PAA person in full with Lim Mei Ling, lim, died on with YMD with 2024, 3 and 1, JUST with YMD with 2005, 1 and 1, EMPTY, FALSE, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:Tan Ah Kow’s family, the wife having predeceased him -->
+
+**208.** Tan Ah Kow’s family, the wife having predeceased him means a PAA family with list of a PAA marriage to with Lim Mei Ling, predeceasing her husband and TRUE and EMPTY.
+
+<!-- l4: decide:the Tan intestacy, the wife having predeceased -->
+
+**209.** The Tan intestacy, the wife having predeceased means a PAA deceased person with Tan Ah Kow, Tan Ah Kow’s family, the wife having predeceased him, the estate of Tan Ah Kow, NOTHING, EMPTY, EMPTY, list of a PAA infant concerned in the estate with Tan Xin and FALSE.
+
+<!-- l4: decide:Tan Ah Kow’s family, the marriage dissolved -->
+
+**210.** Tan Ah Kow’s family, the marriage dissolved means a PAA family with list of a PAA marriage to with Lim Mei Ling and FALSE and EMPTY.
+
+<!-- l4: decide:the Tan intestacy, the marriage dissolved -->
+
+**211.** The Tan intestacy, the marriage dissolved means a PAA deceased person with Tan Ah Kow, Tan Ah Kow’s family, the marriage dissolved, the estate of Tan Ah Kow, NOTHING, EMPTY, EMPTY, list of a PAA infant concerned in the estate with Tan Xin and FALSE.
+
+<!-- l4: decide:Tan Wei, predeceasing his father -->
+
+**212.** Tan Wei, predeceasing his father means a PAA person in full with Tan Wei, wei, died on with YMD with 2024, 3 and 1, JUST with YMD with 2005, 1 and 1, EMPTY, FALSE, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:Tan Xin, so desiring -->
+
+**213.** Tan Xin, so desiring means a PAA person in full with Tan Xin, xin, living, JUST with YMD with 2032, 6 and 1, EMPTY, FALSE, FALSE, TRUE and TRUE.
+
+<!-- l4: decide:Tan Ah Kow, the son having predeceased him -->
+
+**214.** Tan Ah Kow, the son having predeceased him means a PAA person in full with Tan Ah Kow, tan, died on with YMD with 2025, 1 and 15, JUST with YMD with 1975, 1 and 1, list of a PAA legitimate child with Tan Wei, predeceasing his father and a PAA legitimate child with Tan Xin, so desiring, FALSE, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:the Tan intestacy, the son having predeceased -->
+
+**215.** The Tan intestacy, the son having predeceased means a PAA deceased person with Tan Ah Kow, the son having predeceased him, Tan Ah Kow’s family, the estate of Tan Ah Kow, NOTHING, EMPTY, EMPTY, list of a PAA infant concerned in the estate with Tan Xin, so desiring and FALSE.
+
+<!-- l4: decide:the Tan intestacy, with a creditor -->
+
+**216.** The Tan intestacy, with a creditor means a PAA deceased person with Tan Ah Kow, Tan Ah Kow’s family, a PAA estate with 120000, 0, 0, 0, 0, list of a PAA creditor with Chan Kok Wai, 9000 and FALSE and FALSE, NOTHING, EMPTY, EMPTY, list of a PAA infant concerned in the estate with Tan Xin and FALSE.
+
+<!-- l4: decide:Tan Ah Kow, unmarried, his only child having predeceased him -->
+
+**217.** Tan Ah Kow, unmarried, his only child having predeceased him means a PAA person in full with Tan Ah Kow, tan, died on with YMD with 2025, 1 and 15, JUST with YMD with 1975, 1 and 1, list of a PAA legitimate child with Tan Wei, predeceasing his father, FALSE, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:the Tan intestacy, nobody surviving to take -->
+
+**218.** The Tan intestacy, nobody surviving to take means a PAA deceased person with Tan Ah Kow, unmarried, his only child having predeceased him, a PAA family with EMPTY and EMPTY, the estate of Tan Ah Kow, NOTHING, EMPTY, EMPTY, EMPTY and FALSE.
+
+<!-- l4: decide:the Tan intestacy, the widow having applied -->
+
+**219.** The Tan intestacy, the widow having applied means a PAA deceased person with Tan Ah Kow, Tan Ah Kow’s family, the estate of Tan Ah Kow, NOTHING, EMPTY, list of a PAA application by with an individual with Lim Mei Ling, letters of administration, JUST with YMD with 2025, 3 and 1 and still pending, list of a PAA infant concerned in the estate with Tan Xin and TRUE.
+
+<!-- l4: decide:Tan Wei, so desiring -->
+
+**220.** Tan Wei, so desiring means a PAA person in full with Tan Wei, wei, living, JUST with YMD with 2005, 1 and 1, EMPTY, FALSE, FALSE, TRUE and TRUE.
+
+<!-- l4: decide:Tan Ah Kow, the children so desiring -->
+
+**221.** Tan Ah Kow, the children so desiring means a PAA person in full with Tan Ah Kow, tan, died on with YMD with 2025, 1 and 15, JUST with YMD with 1975, 1 and 1, list of a PAA legitimate child with Tan Wei, so desiring and a PAA legitimate child with Tan Xin, so desiring, FALSE, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:the Tan intestacy, the children so desiring -->
+
+**222.** The Tan intestacy, the children so desiring means a PAA deceased person with Tan Ah Kow, the children so desiring, Tan Ah Kow’s family, the estate of Tan Ah Kow, NOTHING, EMPTY, EMPTY, list of a PAA infant concerned in the estate with Tan Xin, so desiring and FALSE.
+
+<!-- l4: decide:Tan Ah Kow, one child so desiring -->
+
+**223.** Tan Ah Kow, one child so desiring means a PAA person in full with Tan Ah Kow, tan, died on with YMD with 2025, 1 and 15, JUST with YMD with 1975, 1 and 1, list of a PAA legitimate child with Tan Wei and a PAA legitimate child with Tan Xin, so desiring, FALSE, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:the Tan intestacy, one child so desiring -->
+
+**224.** The Tan intestacy, one child so desiring means a PAA deceased person with Tan Ah Kow, one child so desiring, Tan Ah Kow’s family, the estate of Tan Ah Kow, NOTHING, EMPTY, EMPTY, list of a PAA infant concerned in the estate with Tan Xin, so desiring and FALSE.
+
+<!-- l4: decide:the Tan intestacy, the children so desiring, a claim having been made out -->
+
+**225.** The Tan intestacy, the children so desiring, a claim having been made out means a PAA deceased person with Tan Ah Kow, the children so desiring, Tan Ah Kow’s family, the estate of Tan Ah Kow, NOTHING, EMPTY, EMPTY, list of a PAA infant concerned in the estate with Tan Xin, so desiring and TRUE.
+
+<!-- l4: decide:the Tan intestacy, nobody desiring, a claim having been made out -->
+
+**226.** The Tan intestacy, nobody desiring, a claim having been made out means a PAA deceased person with Tan Ah Kow, Tan Ah Kow’s family, the estate of Tan Ah Kow, NOTHING, EMPTY, EMPTY, list of a PAA infant concerned in the estate with Tan Xin and TRUE.
+
+## Scenario A — sections 6 and 21 over the same estate
+
+<!-- l4: decide:a grant to the widow alone -->
+
+**227.** A grant to the widow alone means a PAA grant with letters of administration, list of a PAA grantee with an individual with Lim Mei Ling, as administrator and NOTHING, JUST with YMD with 2025, 6 and 1, not limited, a court within the meaning of these Acts with the General Division of the High Court, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:a grant to the widow and the son -->
+
+**228.** A grant to the widow and the son means a PAA grant with letters of administration, list of a PAA grantee with an individual with Lim Mei Ling, as administrator and NOTHING and a PAA grantee with an individual with Tan Wei, as administrator and NOTHING, JUST with YMD with 2025, 6 and 1, not limited, a court within the meaning of these Acts with the General Division of the High Court, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:a grant to the widow and a trust company -->
+
+**229.** A grant to the widow and a trust company means a PAA grant with letters of administration, list of a PAA grantee with an individual with Lim Mei Ling, as administrator and NOTHING and a PAA grantee with Acme Trust Company, as administrator and NOTHING, JUST with YMD with 2025, 6 and 1, not limited, a court within the meaning of these Acts with the General Division of the High Court, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:a grant to four persons -->
+
+**230.** A grant to four persons means a PAA grant with letters of administration, list of a PAA grantee with an individual with Lim Mei Ling, as administrator and NOTHING, a PAA grantee with an individual with Tan Wei, as administrator and NOTHING, a PAA grantee with an individual with a PAA adult with A and a, as administrator and NOTHING and a PAA grantee with an individual with a PAA adult with B and b, as administrator and NOTHING, JUST with YMD with 2025, 6 and 1, not limited, a court within the meaning of these Acts with the General Division of the High Court, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:a grant to five persons -->
+
+**231.** A grant to five persons means a PAA grant with letters of administration, list of a PAA grantee with an individual with Lim Mei Ling, as administrator and NOTHING, a PAA grantee with an individual with Tan Wei, as administrator and NOTHING, a PAA grantee with an individual with a PAA adult with A and a, as administrator and NOTHING, a PAA grantee with an individual with a PAA adult with B and b, as administrator and NOTHING and a PAA grantee with an individual with a PAA adult with C and c, as administrator and NOTHING, JUST with YMD with 2025, 6 and 1, not limited, a court within the meaning of these Acts with the General Division of the High Court, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:the Tan intestacy, the widow having taken a grant -->
+
+**232.** The Tan intestacy, the widow having taken a grant means a PAA deceased person with Tan Ah Kow, Tan Ah Kow’s family, the estate of Tan Ah Kow, NOTHING, list of a grant to the widow alone, EMPTY, list of a PAA infant concerned in the estate with Tan Xin and FALSE.
+
+<!-- l4: decide:the Tan intestacy, two administrators having taken a grant -->
+
+**233.** The Tan intestacy, two administrators having taken a grant means a PAA deceased person with Tan Ah Kow, Tan Ah Kow’s family, the estate of Tan Ah Kow, NOTHING, list of a grant to the widow and the son, EMPTY, list of a PAA infant concerned in the estate with Tan Xin and FALSE.
+
+<!-- l4: decide:the Tan intestacy, fully administered -->
+
+**234.** The Tan intestacy, fully administered means a PAA deceased person with Tan Ah Kow, Tan Ah Kow’s family, a PAA estate with 120000, 0, 0, 0, 0, EMPTY and TRUE, NOTHING, list of a grant to the widow alone, EMPTY, list of a PAA infant concerned in the estate with Tan Xin and FALSE.
+
+<!-- l4: decide:a grant to a trust company alone -->
+
+**235.** A grant to a trust company alone means a PAA grant with letters of administration, list of a PAA grantee with Acme Trust Company, as administrator and NOTHING, JUST with YMD with 2025, 6 and 1, not limited, a court within the meaning of these Acts with the General Division of the High Court, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:the Tan intestacy, a trust company having taken a grant -->
+
+**236.** The Tan intestacy, a trust company having taken a grant means a PAA deceased person with Tan Ah Kow, Tan Ah Kow’s family, the estate of Tan Ah Kow, NOTHING, list of a grant to a trust company alone, EMPTY, list of a PAA infant concerned in the estate with Tan Xin and FALSE.
+
+<!-- l4: decide:the Tan intestacy, one of two administrators having died -->
+
+**237.** The Tan intestacy, one of two administrators having died means a PAA deceased person with Tan Ah Kow, Tan Ah Kow’s family, the estate of Tan Ah Kow, NOTHING, list of letters to two administrators, one having died, EMPTY, list of a PAA infant concerned in the estate with Tan Xin and FALSE.
+
+<!-- l4: decide:a grant made on 1 January 1935 -->
+
+**238.** A grant made on 1 January 1935 means a PAA grant with letters of administration, list of a PAA grantee with an individual with Lim Mei Ling, as administrator and NOTHING, JUST with YMD with 1935, 1 and 1, not limited, a court within the meaning of these Acts with the General Division of the High Court, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:a grant made on 2 January 1935 -->
+
+**239.** A grant made on 2 January 1935 means a PAA grant with letters of administration, list of a PAA grantee with an individual with Lim Mei Ling, as administrator and NOTHING, JUST with YMD with 1935, 1 and 2, not limited, a court within the meaning of these Acts with the General Division of the High Court, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:a grant of no recorded date -->
+
+**240.** A grant of no recorded date means a PAA grant with letters of administration, list of a PAA grantee with an individual with Lim Mei Ling, as administrator and NOTHING, NOTHING, not limited, a court within the meaning of these Acts with the General Division of the High Court, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:the widow, guardian of the person and property of Tan Xin -->
+
+**241.** The widow, guardian of the person and property of Tan Xin means a PAA guardian with Lim Mei Ling, xin, guardian by virtue of surviving the other parent, guardian of the person and property of the infant and FALSE.
+
+<!-- l4: decide:the widow, guardian of the property of Tan Xin only -->
+
+**242.** The widow, guardian of the property of Tan Xin only means a PAA guardian with Lim Mei Ling, xin, guardian by virtue of surviving the other parent, guardian of the property of the infant and FALSE.
+
+<!-- l4: decide:the widow, since removed from her guardianship of Tan Xin -->
+
+**243.** The widow, since removed from her guardianship of Tan Xin means a PAA guardian with Lim Mei Ling, xin, guardian by virtue of surviving the other parent, guardian of the person and property of the infant and TRUE.
+
+<!-- l4: decide:the Tan intestacy, the widow being guardian of the infant -->
+
+**244.** The Tan intestacy, the widow being guardian of the infant means a PAA deceased person with Tan Ah Kow, Tan Ah Kow’s family, the estate of Tan Ah Kow, NOTHING, EMPTY, EMPTY, list of a PAA infant concerned in the estate, with guardians with Tan Xin and list of the widow, guardian of the person and property of Tan Xin and FALSE.
+
+<!-- l4: decide:the Tan intestacy, the widow being guardian of the property only -->
+
+**245.** The Tan intestacy, the widow being guardian of the property only means a PAA deceased person with Tan Ah Kow, Tan Ah Kow’s family, the estate of Tan Ah Kow, NOTHING, EMPTY, EMPTY, list of a PAA infant concerned in the estate, with guardians with Tan Xin and list of the widow, guardian of the property of Tan Xin only and FALSE.
+
+<!-- l4: decide:the Tan intestacy, the widow having been removed from her guardianship -->
+
+**246.** The Tan intestacy, the widow having been removed from her guardianship means a PAA deceased person with Tan Ah Kow, Tan Ah Kow’s family, the estate of Tan Ah Kow, NOTHING, EMPTY, EMPTY, list of a PAA infant concerned in the estate, with guardians with Tan Xin and list of the widow, since removed from her guardianship of Tan Xin and FALSE.
+
+<!-- l4: decide:a grant to the widow as guardian, limited until the infant obtains a grant -->
+
+**247.** A grant to the widow as guardian, limited until the infant obtains a grant means a PAA grant with letters of administration, list of a PAA grantee with an individual with Lim Mei Ling, as the guardian of the person and property of the infant and JUST with xin, JUST with YMD with 2025, 6 and 1, limited in some other way with limited until the infant obtains a grant to himself, a court within the meaning of these Acts with the General Division of the High Court, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:a grant to the widow as guardian, not limited -->
+
+**248.** A grant to the widow as guardian, not limited means a PAA grant with letters of administration, list of a PAA grantee with an individual with Lim Mei Ling, as the guardian of the person and property of the infant and JUST with xin, JUST with YMD with 2025, 6 and 1, not limited, a court within the meaning of these Acts with the General Division of the High Court, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:a grant to the widow as administrator, limited until the infant obtains a grant -->
+
+**249.** A grant to the widow as administrator, limited until the infant obtains a grant means a PAA grant with letters of administration, list of a PAA grantee with an individual with Lim Mei Ling, as administrator and JUST with xin, JUST with YMD with 2025, 6 and 1, limited in some other way with limited until the infant obtains a grant to himself, a court within the meaning of these Acts with the General Division of the High Court, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:a grant to the widow as guardian, for the use and benefit of the adult son -->
+
+**250.** A grant to the widow as guardian, for the use and benefit of the adult son means a PAA grant with letters of administration, list of a PAA grantee with an individual with Lim Mei Ling, as the guardian of the person and property of the infant and JUST with wei, JUST with YMD with 2025, 6 and 1, limited in some other way with limited until the infant obtains a grant to himself, a court within the meaning of these Acts with the General Division of the High Court, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:the son, guardian of the person and property of Tan Xin -->
+
+**251.** The son, guardian of the person and property of Tan Xin means a PAA guardian with Tan Wei, xin, appointed by the court where the infant has no parent, guardian of the person and property of the infant and FALSE.
+
+<!-- l4: decide:the Tan intestacy, the son being guardian of the infant -->
+
+**252.** The Tan intestacy, the son being guardian of the infant means a PAA deceased person with Tan Ah Kow, Tan Ah Kow’s family, the estate of Tan Ah Kow, NOTHING, EMPTY, EMPTY, list of a PAA infant concerned in the estate, with guardians with Tan Xin and list of the son, guardian of the person and property of Tan Xin and FALSE.
+
+<!-- l4: decide:a grant to the widow as guardian and four others -->
+
+**253.** A grant to the widow as guardian and four others means a PAA grant with letters of administration, list of a PAA grantee with an individual with Lim Mei Ling, as the guardian of the person and property of the infant and JUST with xin, a PAA grantee with an individual with Tan Wei, as administrator and NOTHING, a PAA grantee with an individual with a PAA adult with A and a, as administrator and NOTHING, a PAA grantee with an individual with a PAA adult with B and b, as administrator and NOTHING and a PAA grantee with an individual with a PAA adult with C and c, as administrator and NOTHING, JUST with YMD with 2025, 6 and 1, limited in some other way with limited until the infant obtains a grant to himself, a court within the meaning of these Acts with the General Division of the High Court, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:a grant to the widow as guardian and three others -->
+
+**254.** A grant to the widow as guardian and three others means a PAA grant with letters of administration, list of a PAA grantee with an individual with Lim Mei Ling, as the guardian of the person and property of the infant and JUST with xin, a PAA grantee with an individual with Tan Wei, as administrator and NOTHING, a PAA grantee with an individual with a PAA adult with A and a, as administrator and NOTHING and a PAA grantee with an individual with a PAA adult with B and b, as administrator and NOTHING, JUST with YMD with 2025, 6 and 1, limited in some other way with limited until the infant obtains a grant to himself, a court within the meaning of these Acts with the General Division of the High Court, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:probate to the widow as guardian, limited until the infant obtains a grant -->
+
+**255.** Probate to the widow as guardian, limited until the infant obtains a grant means a PAA grant with probate, list of a PAA grantee with an individual with Lim Mei Ling, as the guardian of the person and property of the infant and JUST with xin, JUST with YMD with 2025, 6 and 1, limited in some other way with limited until the infant obtains a grant to himself, a court within the meaning of these Acts with the General Division of the High Court, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:Goh, guardian of the person and property of the infant executor -->
+
+**256.** Goh, guardian of the person and property of the infant executor means a PAA guardian with Goh Siew Lan, ngwj, appointed by the father by will, guardian of the person and property of the infant and FALSE.
+
+<!-- l4: decide:letters with the will annexed to Goh as guardian of the infant executor -->
+
+**257.** Letters with the will annexed to Goh as guardian of the infant executor means a PAA grant with letters of administration with the will annexed, list of a PAA grantee with an individual with Goh Siew Lan, as the guardian of the person and property of the infant and JUST with ngwj, JUST with YMD with 2025, 6 and 1, limited in some other way with limited until the infant obtains a grant to himself, a court within the meaning of these Acts with the General Division of the High Court, TRUE, TRUE and FALSE.
+
+<!-- l4: decide:the Ong testacy, an infant executor with a guardian, Goh administering -->
+
+**258.** The Ong testacy, an infant executor with a guardian, Goh administering means a PAA deceased person with Ong Bee Hoon, Ong Bee Hoon’s family, the estate of Ong Bee Hoon, JUST with the will appointing an infant executor, list of letters with the will annexed to Goh as guardian of the infant executor, EMPTY, list of a PAA infant concerned in the estate, with guardians with Ng Wei Jie, an infant executor and list of Goh, guardian of the person and property of the infant executor and FALSE.
+
+<!-- l4: decide:Tan Xin’s infant brother -->
+
+**259.** Tan Xin’s infant brother means a PAA minor with Tan Yong and yong.
+
+<!-- l4: decide:Tan Ah Kow, with two infant children -->
+
+**260.** Tan Ah Kow, with two infant children means a PAA person in full with Tan Ah Kow, tan, died on with YMD with 2025, 1 and 15, JUST with YMD with 1975, 1 and 1, list of a PAA legitimate child with Tan Xin and a PAA legitimate child with Tan Xin’s infant brother, FALSE, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:the Tan intestacy, two infants entitled -->
+
+**261.** The Tan intestacy, two infants entitled means a PAA deceased person with Tan Ah Kow, with two infant children, Tan Ah Kow’s family, the estate of Tan Ah Kow, NOTHING, EMPTY, EMPTY, list of a PAA infant concerned in the estate with Tan Xin and a PAA infant concerned in the estate with Tan Xin’s infant brother and FALSE.
+
+<!-- l4: decide:the Tan intestacy, two infants entitled, the widow being guardian of one -->
+
+**262.** The Tan intestacy, two infants entitled, the widow being guardian of one means a PAA deceased person with Tan Ah Kow, with two infant children, Tan Ah Kow’s family, the estate of Tan Ah Kow, NOTHING, EMPTY, EMPTY, list of a PAA infant concerned in the estate, with guardians with Tan Xin and list of the widow, guardian of the person and property of Tan Xin and a PAA infant concerned in the estate with Tan Xin’s infant brother and FALSE.
+
+<!-- l4: decide:a grant to the widow as guardian, limited until any of them obtains a grant -->
+
+**263.** A grant to the widow as guardian, limited until any of them obtains a grant means a PAA grant with letters of administration, list of a PAA grantee with an individual with Lim Mei Ling, as the guardian of the person and property of the infant and JUST with xin, JUST with YMD with 2025, 6 and 1, limited in some other way with limited until any of them obtains a grant, a court within the meaning of these Acts with the General Division of the High Court, FALSE, TRUE and FALSE.
+
+## Scenario A — section 19, the attorney of an absent person entitled
+
+<!-- l4: decide:Lim Mei Ling, abroad -->
+
+**264.** Lim Mei Ling, abroad means a PAA person in full with Lim Mei Ling, lim, living, JUST with YMD with 2005, 1 and 1, EMPTY, FALSE, TRUE, TRUE and FALSE.
+
+<!-- l4: decide:Tan Wei, unwilling -->
+
+**265.** Tan Wei, unwilling means a PAA person in full with Tan Wei, wei, living, JUST with YMD with 2005, 1 and 1, EMPTY, FALSE, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:Tan Xin, unwilling -->
+
+**266.** Tan Xin, unwilling means a PAA person in full with Tan Xin, xin, living, JUST with YMD with 2032, 6 and 1, EMPTY, FALSE, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:a stranger abroad -->
+
+**267.** A stranger abroad means a PAA person in full with Stranger, str, living, JUST with YMD with 2005, 1 and 1, EMPTY, FALSE, TRUE, TRUE and FALSE.
+
+<!-- l4: decide:Tan Ah Kow, the children unwilling -->
+
+**268.** Tan Ah Kow, the children unwilling means a PAA person in full with Tan Ah Kow, tan, died on with YMD with 2025, 1 and 15, JUST with YMD with 1975, 1 and 1, list of a PAA legitimate child with Tan Wei, unwilling and a PAA legitimate child with Tan Xin, unwilling, FALSE, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:Tan Ah Kow’s family, the widow abroad -->
+
+**269.** Tan Ah Kow’s family, the widow abroad means a PAA family with list of a PAA marriage to with Lim Mei Ling, abroad and TRUE and EMPTY.
+
+<!-- l4: decide:the Tan intestacy, the widow abroad and the children unwilling -->
+
+**270.** The Tan intestacy, the widow abroad and the children unwilling means a PAA deceased person with Tan Ah Kow, the children unwilling, Tan Ah Kow’s family, the widow abroad, the estate of Tan Ah Kow, NOTHING, EMPTY, EMPTY, list of a PAA infant concerned in the estate with Tan Xin, unwilling and FALSE.
+
+<!-- l4: decide:the Tan intestacy, the widow abroad -->
+
+**271.** The Tan intestacy, the widow abroad means a PAA deceased person with Tan Ah Kow, Tan Ah Kow’s family, the widow abroad, the estate of Tan Ah Kow, NOTHING, EMPTY, EMPTY, list of a PAA infant concerned in the estate with Tan Xin and FALSE.
+
+<!-- l4: decide:Lim Mei Ling, abroad and unwilling -->
+
+**272.** Lim Mei Ling, abroad and unwilling means a PAA person in full with Lim Mei Ling, lim, living, JUST with YMD with 2005, 1 and 1, EMPTY, FALSE, TRUE, FALSE and FALSE.
+
+<!-- l4: decide:a stranger abroad and unwilling -->
+
+**273.** A stranger abroad and unwilling means a PAA person in full with Stranger, str, living, JUST with YMD with 2005, 1 and 1, EMPTY, FALSE, TRUE, FALSE and FALSE.
+
+<!-- l4: decide:Tan Ah Kow’s family, the widow abroad and unwilling -->
+
+**274.** Tan Ah Kow’s family, the widow abroad and unwilling means a PAA family with list of a PAA marriage to with Lim Mei Ling, abroad and unwilling and TRUE and EMPTY.
+
+<!-- l4: decide:the Tan intestacy, nobody entitled being willing to act -->
+
+**275.** The Tan intestacy, nobody entitled being willing to act means a PAA deceased person with Tan Ah Kow, the children unwilling, Tan Ah Kow’s family, the widow abroad and unwilling, the estate of Tan Ah Kow, NOTHING, EMPTY, EMPTY, list of a PAA infant concerned in the estate with Tan Xin, unwilling and FALSE.
+
+## Scenario A — section 18(5), and section 20
+
+<!-- l4: decide:the Tan intestacy, the deceased being a Muslim -->
+
+**276.** The Tan intestacy, the deceased being a Muslim means Deceased person where the deceased is Tan Ah Kow, the family is Tan Ah Kow’s family, the estate is the estate of Tan Ah Kow, the will is NOTHING, domiciled in Singapore at the time of his death is TRUE, carried on business or resided in Singapore within 12 months of his death is TRUE, a Muslim is TRUE, the grants made in respect of the estate is EMPTY, the probate applications made in respect of the estate is EMPTY, a next of kin, creditor or other person has appeared and made out a claim to letters of administration is FALSE and the infants concerned in the estate is list of a PAA infant concerned in the estate with Tan Xin.
+
+## Scenario B — a testacy, and the five limbs of section 13(1)
+
+<!-- l4: decide:Ong Bee Hoon -->
+
+**277.** Ong Bee Hoon means a PAA person in full with Ong Bee Hoon, ong, died on with YMD with 2025, 1 and 15, JUST with YMD with 1970, 1 and 1, EMPTY, FALSE, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:Chan Kok Wai -->
+
+**278.** Chan Kok Wai means a PAA adult with Chan Kok Wai and chan.
+
+<!-- l4: decide:Goh Siew Lan -->
+
+**279.** Goh Siew Lan means a PAA adult with Goh Siew Lan and goh.
+
+<!-- l4: decide:Chan, abroad -->
+
+**280.** Chan, abroad means a PAA person in full with Chan Kok Wai, chan, living, JUST with YMD with 2005, 1 and 1, EMPTY, FALSE, TRUE, TRUE and FALSE.
+
+<!-- l4: decide:Goh, abroad -->
+
+**281.** Goh, abroad means a PAA person in full with Goh Siew Lan, goh, living, JUST with YMD with 2005, 1 and 1, EMPTY, FALSE, TRUE, TRUE and FALSE.
+
+<!-- l4: decide:Goh, unwilling -->
+
+**282.** Goh, unwilling means a PAA person in full with Goh Siew Lan, goh, living, JUST with YMD with 2005, 1 and 1, EMPTY, FALSE, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:Chan, lacking capacity -->
+
+**283.** Chan, lacking capacity means a PAA person in full with Chan Kok Wai, chan, living, JUST with YMD with 2005, 1 and 1, EMPTY, TRUE, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:a stranger lacking capacity -->
+
+**284.** A stranger lacking capacity means a PAA person in full with Stranger, str, living, JUST with YMD with 2005, 1 and 1, EMPTY, TRUE, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:Chan, predeceasing the testator -->
+
+**285.** Chan, predeceasing the testator means a PAA person in full with Chan Kok Wai, chan, died on with YMD with 2024, 6 and 1, JUST with YMD with 2005, 1 and 1, EMPTY, FALSE, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:Chan, dying after the testator -->
+
+**286.** Chan, dying after the testator means a PAA person in full with Chan Kok Wai, chan, died on with YMD with 2025, 6 and 1, JUST with YMD with 2005, 1 and 1, EMPTY, FALSE, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:Goh, dying after the testator -->
+
+**287.** Goh, dying after the testator means a PAA person in full with Goh Siew Lan, goh, died on with YMD with 2025, 6 and 1, JUST with YMD with 2005, 1 and 1, EMPTY, FALSE, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:the estate of Ong Bee Hoon -->
+
+**288.** The estate of Ong Bee Hoon means a PAA estate with 400000, 0, 0, 0, 0, EMPTY and FALSE.
+
+<!-- l4: decide:Ong Bee Hoon’s family -->
+
+**289.** Ong Bee Hoon’s family means a PAA family with EMPTY and EMPTY.
+
+<!-- l4: decide:the Ong estate with -->
+
+**290.** In relation to an optional Will “w” and a list of Grant “the grants”, the Ong estate with means a PAA deceased person with Ong Bee Hoon, Ong Bee Hoon’s family, the estate of Ong Bee Hoon, w, the grants, EMPTY, EMPTY and FALSE.
+
+<!-- l4: decide:the will appointing no executor -->
+
+**291.** The will appointing no executor means a PAA will of with Ong Bee Hoon, EMPTY, EMPTY and EMPTY.
+
+<!-- l4: decide:the will whose executors are disqualified -->
+
+**292.** The will whose executors are disqualified means a PAA will of with Ong Bee Hoon, list of a PAA executor with Chan Kok Wai, TRUE, FALSE, FALSE and FALSE and a PAA executor with Goh Siew Lan, FALSE, TRUE, FALSE and FALSE, EMPTY and EMPTY.
+
+<!-- l4: decide:the will whose sole executor lacks mental capacity -->
+
+**293.** The will whose sole executor lacks mental capacity means a PAA will of with Ong Bee Hoon, list of a PAA executor with Chan, lacking capacity, FALSE, FALSE, FALSE and FALSE, EMPTY and EMPTY.
+
+<!-- l4: decide:the will one of whose executors is disqualified -->
+
+**294.** The will one of whose executors is disqualified means a PAA will of with Ong Bee Hoon, list of a PAA executor with Chan Kok Wai, TRUE, FALSE, FALSE and FALSE and a PAA executor with Goh Siew Lan, FALSE, FALSE, FALSE and FALSE, EMPTY and EMPTY.
+
+<!-- l4: decide:the will whose executor predeceased the testator -->
+
+**295.** The will whose executor predeceased the testator means a PAA will of with Ong Bee Hoon, list of a PAA executor with Chan, predeceasing the testator, FALSE, FALSE, FALSE and FALSE, EMPTY and EMPTY.
+
+<!-- l4: decide:the will whose executor died after the testator -->
+
+**296.** The will whose executor died after the testator means a PAA will of with Ong Bee Hoon, list of a PAA executor with Chan, dying after the testator, FALSE, FALSE, TRUE and TRUE, EMPTY and EMPTY.
+
+<!-- l4: decide:the will whose executor died having proved but not administered -->
+
+**297.** The will whose executor died having proved but not administered means a PAA will of with Ong Bee Hoon, list of a PAA executor with Chan, dying after the testator, FALSE, FALSE, TRUE and FALSE, EMPTY and EMPTY.
+
+<!-- l4: decide:the will whose executors have not extracted probate -->
+
+**298.** The will whose executors have not extracted probate means a PAA will of with Ong Bee Hoon, list of a PAA executor with Chan Kok Wai, FALSE, FALSE, FALSE and FALSE and a PAA executor with Goh Siew Lan, FALSE, FALSE, FALSE and FALSE, EMPTY and EMPTY.
+
+<!-- l4: decide:the will whose executors have all extracted probate -->
+
+**299.** The will whose executors have all extracted probate means a PAA will of with Ong Bee Hoon, list of a PAA executor with Chan Kok Wai, FALSE, FALSE, TRUE and TRUE and a PAA executor with Goh Siew Lan, FALSE, FALSE, TRUE and TRUE, EMPTY and EMPTY.
+
+<!-- l4: decide:a grant of probate to Chan, in his lifetime -->
+
+**300.** A grant of probate to Chan, in his lifetime means a PAA grant with probate, list of a PAA grantee with an individual with Chan, dying after the testator, as executor and NOTHING, JUST with YMD with 2025, 3 and 1, not limited, a court within the meaning of these Acts with the General Division of the High Court, TRUE, TRUE and FALSE.
+
+<!-- l4: decide:a grant of probate to Chan, since revoked -->
+
+**301.** A grant of probate to Chan, since revoked means Grant where the kind of grant is probate, the grantees is list of a PAA grantee with an individual with Chan, dying after the testator, as executor and NOTHING, the date of the grant is JUST with YMD with 2025, 3 and 1, the limitation is not limited, the court that made the grant is a court within the meaning of these Acts with the General Division of the High Court, the exception subject to which the grant is made is NOTHING, expired by effluxion of time or by the happening of the event or contingency on which it was limited is FALSE, revoked is TRUE, has given such security as is lawfully required to be furnished is TRUE, has been extracted is TRUE, sealed under section 47(1) of the Probate and Administration Act 1934 is FALSE and the date of the sealing is NOTHING.
+
+<!-- l4: decide:a grant of probate to Goh, in Chan’s lifetime -->
+
+**302.** A grant of probate to Goh, in Chan’s lifetime means a PAA grant with probate, list of a PAA grantee with an individual with Goh Siew Lan, as executor and NOTHING, JUST with YMD with 2025, 3 and 1, not limited, a court within the meaning of these Acts with the General Division of the High Court, TRUE, TRUE and FALSE.
+
+<!-- l4: decide:a grant to Chan as administrator, in his lifetime -->
+
+**303.** A grant to Chan as administrator, in his lifetime means a PAA grant with probate, list of a PAA grantee with an individual with Chan, dying after the testator, as administrator and NOTHING, JUST with YMD with 2025, 3 and 1, not limited, a court within the meaning of these Acts with the General Division of the High Court, TRUE, TRUE and FALSE.
+
+<!-- l4: decide:a grant of probate to Chan, made after his death -->
+
+**304.** A grant of probate to Chan, made after his death means a PAA grant with probate, list of a PAA grantee with an individual with Chan, dying after the testator, as executor and NOTHING, JUST with YMD with 2025, 8 and 1, not limited, a court within the meaning of these Acts with the General Division of the High Court, TRUE, TRUE and FALSE.
+
+<!-- l4: decide:the will whose executors are disqualified, both having proved -->
+
+**305.** The will whose executors are disqualified, both having proved means a PAA will of with Ong Bee Hoon, list of a PAA executor with Chan Kok Wai, TRUE, FALSE, TRUE and TRUE and a PAA executor with Goh Siew Lan, FALSE, TRUE, TRUE and TRUE, EMPTY and EMPTY.
+
+## Scenario B — sections 8, 13(2), 14, 15, 12 and 16
+
+<!-- l4: decide:a grant of probate to Chan alone -->
+
+**306.** A grant of probate to Chan alone means a PAA grant with probate, list of a PAA grantee with an individual with Chan Kok Wai, as executor and NOTHING, JUST with YMD with 2025, 6 and 1, not limited, a court within the meaning of these Acts with the General Division of the High Court, TRUE, TRUE and FALSE.
+
+<!-- l4: decide:a grant of probate to a stranger -->
+
+**307.** A grant of probate to a stranger means a PAA grant with probate, list of a PAA grantee with an individual with a PAA adult with Stranger and str, as executor and NOTHING, JUST with YMD with 2025, 6 and 1, not limited, a court within the meaning of these Acts with the General Division of the High Court, TRUE, TRUE and FALSE.
+
+<!-- l4: decide:the will appointing five executors -->
+
+**308.** The will appointing five executors means a PAA will of with Ong Bee Hoon, list of a PAA executor with Chan Kok Wai, FALSE, FALSE, FALSE and FALSE, a PAA executor with Goh Siew Lan, FALSE, FALSE, FALSE and FALSE, a PAA executor with a PAA adult with A and a, FALSE, FALSE, FALSE and FALSE, a PAA executor with a PAA adult with B and b, FALSE, FALSE, FALSE and FALSE and a PAA executor with a PAA adult with C and c, FALSE, FALSE, FALSE and FALSE, EMPTY and EMPTY.
+
+<!-- l4: decide:probate to four of the five executors -->
+
+**309.** Probate to four of the five executors means a PAA grant with probate, list of a PAA grantee with an individual with Chan Kok Wai, as executor and NOTHING, a PAA grantee with an individual with Goh Siew Lan, as executor and NOTHING, a PAA grantee with an individual with a PAA adult with A and a, as executor and NOTHING and a PAA grantee with an individual with a PAA adult with B and b, as executor and NOTHING, JUST with YMD with 2025, 6 and 1, not limited, a court within the meaning of these Acts with the General Division of the High Court, TRUE, TRUE and FALSE.
+
+<!-- l4: decide:probate to all five executors -->
+
+**310.** Probate to all five executors means a PAA grant with probate, list of a PAA grantee with an individual with Chan Kok Wai, as executor and NOTHING, a PAA grantee with an individual with Goh Siew Lan, as executor and NOTHING, a PAA grantee with an individual with a PAA adult with A and a, as executor and NOTHING, a PAA grantee with an individual with a PAA adult with B and b, as executor and NOTHING and a PAA grantee with an individual with a PAA adult with C and c, as executor and NOTHING, JUST with YMD with 2025, 6 and 1, not limited, a court within the meaning of these Acts with the General Division of the High Court, TRUE, TRUE and FALSE.
+
+<!-- l4: decide:the will with a residue and a legacy -->
+
+**311.** The will with a residue and a legacy means a PAA will of with Ong Bee Hoon, list of a PAA executor with Chan Kok Wai, FALSE, FALSE, FALSE and FALSE, list of a PAA gift to with Chan Kok Wai, a residuary gift, 300000 and TRUE and a PAA gift to with Goh Siew Lan, a pecuniary legacy, 20000 and TRUE and EMPTY.
+
+<!-- l4: decide:the estate of Ong Bee Hoon, with a creditor -->
+
+**312.** The estate of Ong Bee Hoon, with a creditor means a PAA estate with 400000, 0, 0, 0, 0, list of a PAA creditor with Lim Mei Ling, 5000 and FALSE and FALSE.
+
+<!-- l4: decide:the Ong testacy with a creditor -->
+
+**313.** The Ong testacy with a creditor means a PAA deceased person with Ong Bee Hoon, Ong Bee Hoon’s family, the estate of Ong Bee Hoon, with a creditor, JUST with the will with a residue and a legacy, EMPTY, EMPTY, EMPTY and FALSE.
+
+<!-- l4: decide:Ong Li Ping -->
+
+**314.** Ong Li Ping means a PAA adult with Ong Li Ping and ping.
+
+<!-- l4: decide:Ong Bee Hoon, with a daughter -->
+
+**315.** Ong Bee Hoon, with a daughter means a PAA person in full with Ong Bee Hoon, ong, died on with YMD with 2025, 1 and 15, JUST with YMD with 1970, 1 and 1, list of a PAA legitimate child with Ong Li Ping, FALSE, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:the will giving the daughter a legacy -->
+
+**316.** The will giving the daughter a legacy means a PAA will of with Ong Bee Hoon, with a daughter, list of a PAA executor with Chan Kok Wai, FALSE, FALSE, FALSE and FALSE, list of a PAA gift to with Chan Kok Wai, a residuary gift, 300000 and TRUE and a PAA gift to with Ong Li Ping, a pecuniary legacy, 20000 and TRUE and EMPTY.
+
+<!-- l4: decide:the Ong testacy, the daughter taking a legacy -->
+
+**317.** The Ong testacy, the daughter taking a legacy means a PAA deceased person with Ong Bee Hoon, with a daughter, Ong Bee Hoon’s family, the estate of Ong Bee Hoon, JUST with the will giving the daughter a legacy, EMPTY, EMPTY, EMPTY and FALSE.
+
+<!-- l4: decide:the will with a residue and a legacy to the creditor -->
+
+**318.** The will with a residue and a legacy to the creditor means a PAA will of with Ong Bee Hoon, list of a PAA executor with Chan Kok Wai, FALSE, FALSE, FALSE and FALSE, list of a PAA gift to with Chan Kok Wai, a residuary gift, 300000 and TRUE and a PAA gift to with Lim Mei Ling, a pecuniary legacy, 20000 and TRUE and EMPTY.
+
+<!-- l4: decide:the Ong testacy, the creditor also taking a legacy -->
+
+**319.** The Ong testacy, the creditor also taking a legacy means a PAA deceased person with Ong Bee Hoon, Ong Bee Hoon’s family, the estate of Ong Bee Hoon, with a creditor, JUST with the will with a residue and a legacy to the creditor, EMPTY, EMPTY, EMPTY and FALSE.
+
+<!-- l4: decide:the will whose executor is abroad, the other unwilling -->
+
+**320.** The will whose executor is abroad, the other unwilling means a PAA will of with Ong Bee Hoon, list of a PAA executor with Chan, abroad, FALSE, FALSE, FALSE and FALSE and a PAA executor with Goh, unwilling, FALSE, FALSE, FALSE and FALSE, EMPTY and EMPTY.
+
+<!-- l4: decide:the will whose executor is abroad, the other willing -->
+
+**321.** The will whose executor is abroad, the other willing means a PAA will of with Ong Bee Hoon, list of a PAA executor with Chan, abroad, FALSE, FALSE, FALSE and FALSE and a PAA executor with Goh Siew Lan, FALSE, FALSE, FALSE and FALSE, EMPTY and EMPTY.
+
+<!-- l4: decide:the will whose sole executor is abroad -->
+
+**322.** The will whose sole executor is abroad means a PAA will of with Ong Bee Hoon, list of a PAA executor with Chan, abroad, FALSE, FALSE, FALSE and FALSE, EMPTY and EMPTY.
+
+<!-- l4: decide:the will whose sole executor is within Singapore -->
+
+**323.** The will whose sole executor is within Singapore means a PAA will of with Ong Bee Hoon, list of a PAA executor with Chan Kok Wai, FALSE, FALSE, FALSE and FALSE, EMPTY and EMPTY.
+
+<!-- l4: decide:the will whose executors are both abroad -->
+
+**324.** The will whose executors are both abroad means a PAA will of with Ong Bee Hoon, list of a PAA executor with Chan, abroad, FALSE, FALSE, FALSE and FALSE and a PAA executor with Goh, abroad, FALSE, FALSE, FALSE and FALSE, EMPTY and EMPTY.
+
+<!-- l4: decide:the will with a residue, the executor having extracted probate -->
+
+**325.** The will with a residue, the executor having extracted probate means a PAA will of with Ong Bee Hoon, list of a PAA executor with Chan Kok Wai, FALSE, FALSE, TRUE and TRUE, list of a PAA gift to with Goh, abroad, a residuary gift, 300000 and TRUE and EMPTY.
+
+<!-- l4: decide:the Ong testacy whose executor has proved -->
+
+**326.** The Ong testacy whose executor has proved means the Ong estate with with JUST with the will with a residue, the executor having extracted probate and EMPTY.
+
+<!-- l4: decide:Lim Mei Ling, lacking capacity -->
+
+**327.** Lim Mei Ling, lacking capacity means a PAA person in full with Lim Mei Ling, lim, living, JUST with YMD with 2005, 1 and 1, EMPTY, TRUE, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:Tan Ah Kow’s family, the widow lacking capacity -->
+
+**328.** Tan Ah Kow’s family, the widow lacking capacity means a PAA family with list of a PAA marriage to with Lim Mei Ling, lacking capacity and TRUE and EMPTY.
+
+<!-- l4: decide:the Tan intestacy, the widow lacking capacity -->
+
+**329.** The Tan intestacy, the widow lacking capacity means a PAA deceased person with Tan Ah Kow, Tan Ah Kow’s family, the widow lacking capacity, the estate of Tan Ah Kow, NOTHING, EMPTY, EMPTY, list of a PAA infant concerned in the estate with Tan Xin and FALSE.
+
+## Scenario B — a life interest, and section 6(4)'s narrower minority
+
+<!-- l4: decide:the will with a life interest to Goh -->
+
+**330.** The will with a life interest to Goh means a PAA will of with Ong Bee Hoon, list of a PAA executor with Chan Kok Wai, FALSE, TRUE, FALSE and FALSE, list of a PAA gift to with Chan Kok Wai, a residuary gift, 300000 and TRUE and list of a PAA life interest to with Goh Siew Lan.
+
+<!-- l4: decide:the will with a life interest that has fallen in -->
+
+**331.** The will with a life interest that has fallen in means a PAA will of with Ong Bee Hoon, list of a PAA executor with Chan Kok Wai, FALSE, TRUE, FALSE and FALSE, list of a PAA gift to with Chan Kok Wai, a residuary gift, 300000 and TRUE and list of a PAA life interest to with Goh, dying after the testator.
+
+<!-- l4: decide:letters with the will annexed to Chan alone -->
+
+**332.** Letters with the will annexed to Chan alone means a PAA grant with letters of administration with the will annexed, list of a PAA grantee with an individual with Chan Kok Wai, as administrator and NOTHING, JUST with YMD with 2025, 6 and 1, not limited, a court within the meaning of these Acts with the General Division of the High Court, TRUE, TRUE and FALSE.
+
+<!-- l4: decide:the Ong testacy with a life interest -->
+
+**333.** The Ong testacy with a life interest means the Ong estate with with JUST with the will with a life interest to Goh and EMPTY.
+
+<!-- l4: decide:the Ong testacy with a life interest, Chan administering -->
+
+**334.** The Ong testacy with a life interest, Chan administering means the Ong estate with with JUST with the will with a life interest to Goh and list of letters with the will annexed to Chan alone.
+
+<!-- l4: decide:the Ong testacy, the life tenant having died -->
+
+**335.** The Ong testacy, the life tenant having died means the Ong estate with with JUST with the will with a life interest that has fallen in and EMPTY.
+
+<!-- l4: decide:Ng Wei Jie, an infant executor -->
+
+**336.** Ng Wei Jie, an infant executor means a PAA minor with Ng Wei Jie and ngwj.
+
+<!-- l4: decide:the will appointing an infant executor -->
+
+**337.** The will appointing an infant executor means a PAA will of with Ong Bee Hoon, list of a PAA executor with Ng Wei Jie, an infant executor, FALSE, FALSE, FALSE and FALSE, list of a PAA gift to with Chan Kok Wai, a residuary gift, 300000 and TRUE and EMPTY.
+
+<!-- l4: decide:the Ong testacy, an infant executor, Chan administering -->
+
+**338.** The Ong testacy, an infant executor, Chan administering means a PAA deceased person with Ong Bee Hoon, Ong Bee Hoon’s family, the estate of Ong Bee Hoon, JUST with the will appointing an infant executor, list of letters with the will annexed to Chan alone, EMPTY, list of a PAA infant concerned in the estate with Ng Wei Jie, an infant executor and FALSE.
+
+<!-- l4: decide:Ong Li Ping, an infant -->
+
+**339.** Ong Li Ping, an infant means a PAA minor with Ong Li Ping and ping.
+
+<!-- l4: decide:the will charging a debt in the infant daughter’s favour -->
+
+**340.** The will charging a debt in the infant daughter’s favour means a PAA will of with Ong Bee Hoon, list of a PAA executor with Chan Kok Wai, FALSE, TRUE, FALSE and FALSE, list of a PAA gift to with Chan Kok Wai, a residuary gift, 300000 and TRUE and a PAA gift to with Ong Li Ping, an infant, a charge or direction for the payment of a debt, 20000 and FALSE and EMPTY.
+
+<!-- l4: decide:the will giving the infant daughter a beneficial legacy -->
+
+**341.** The will giving the infant daughter a beneficial legacy means a PAA will of with Ong Bee Hoon, list of a PAA executor with Chan Kok Wai, FALSE, TRUE, FALSE and FALSE, list of a PAA gift to with Chan Kok Wai, a residuary gift, 300000 and TRUE and a PAA gift to with Ong Li Ping, an infant, a pecuniary legacy, 20000 and TRUE and EMPTY.
+
+<!-- l4: decide:the Ong testacy, the infant daughter taking only a charge, Chan administering -->
+
+**342.** The Ong testacy, the infant daughter taking only a charge, Chan administering means a PAA deceased person with Ong Bee Hoon, Ong Bee Hoon’s family, the estate of Ong Bee Hoon, JUST with the will charging a debt in the infant daughter’s favour, list of letters with the will annexed to Chan alone, EMPTY, list of a PAA infant concerned in the estate with Ong Li Ping, an infant and FALSE.
+
+<!-- l4: decide:the Ong testacy, the infant daughter taking a beneficial legacy, Chan administering -->
+
+**343.** The Ong testacy, the infant daughter taking a beneficial legacy, Chan administering means a PAA deceased person with Ong Bee Hoon, Ong Bee Hoon’s family, the estate of Ong Bee Hoon, JUST with the will giving the infant daughter a beneficial legacy, list of letters with the will annexed to Chan alone, EMPTY, list of a PAA infant concerned in the estate with Ong Li Ping, an infant and FALSE.
+
+## Scenario B — sections 25 and 27
+
+<!-- l4: decide:a grant of probate to Chan and Goh, Goh having died -->
+
+**344.** A grant of probate to Chan and Goh, Goh having died means a PAA grant with probate, list of a PAA grantee with an individual with Chan Kok Wai, as executor and NOTHING and a PAA grantee with an individual with Goh, dying after the testator, as executor and NOTHING, JUST with YMD with 2025, 3 and 1, not limited, a court within the meaning of these Acts with the General Division of the High Court, TRUE, TRUE and FALSE.
+
+<!-- l4: decide:letters to two administrators, one having died -->
+
+**345.** Letters to two administrators, one having died means a PAA grant with letters of administration, list of a PAA grantee with an individual with Lim Mei Ling, as administrator and NOTHING and a PAA grantee with an individual with Chan, dying after the testator, as administrator and NOTHING, JUST with YMD with 2025, 3 and 1, not limited, a court within the meaning of these Acts with the General Division of the High Court, TRUE, TRUE and FALSE.
+
+<!-- l4: decide:letters to a sole administrator, since deceased -->
+
+**346.** Letters to a sole administrator, since deceased means a PAA grant with letters of administration, list of a PAA grantee with an individual with Chan, dying after the testator, as administrator and NOTHING, JUST with YMD with 2025, 3 and 1, not limited, a court within the meaning of these Acts with the General Division of the High Court, TRUE, TRUE and FALSE.
+
+<!-- l4: decide:an expired limited grant -->
+
+**347.** An expired limited grant means a PAA grant with letters of administration, list of a PAA grantee with an individual with Lim Mei Ling, as administrator and NOTHING, JUST with YMD with 2025, 3 and 1, limited in some other way with limited until the infant obtains a grant to himself, a court within the meaning of these Acts with the General Division of the High Court, TRUE, TRUE and TRUE.
+
+<!-- l4: decide:a limited grant that has not expired -->
+
+**348.** A limited grant that has not expired means a PAA grant with letters of administration, list of a PAA grantee with an individual with Lim Mei Ling, as administrator and NOTHING, JUST with YMD with 2025, 3 and 1, limited in some other way with limited until the infant obtains a grant to himself, a court within the meaning of these Acts with the General Division of the High Court, TRUE, TRUE and FALSE.
+
+<!-- l4: decide:an unlimited grant recorded as expired -->
+
+**349.** An unlimited grant recorded as expired means a PAA grant with letters of administration, list of a PAA grantee with an individual with Lim Mei Ling, as administrator and NOTHING, JUST with YMD with 2025, 3 and 1, not limited, a court within the meaning of these Acts with the General Division of the High Court, TRUE, TRUE and TRUE.
+
+## Scenario C — the Public Trustee’s small-estate powers, and the thresholds
+
+<!-- l4: decide:Wong Ah Moi -->
+
+**350.** Wong Ah Moi means a PAA person in full with Wong Ah Moi, wong, died on with YMD with 2025, 2 and 10, JUST with YMD with 1980, 1 and 1, list of a PAA legitimate child with Wong Siew Kim, FALSE, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:Wong Siew Kim -->
+
+**351.** Wong Siew Kim means a PAA minor with Wong Siew Kim and kim.
+
+<!-- l4: decide:Wong Ah Moi, dying in 2000 -->
+
+**352.** Wong Ah Moi, dying in 2000 means a PAA person in full with Wong Ah Moi, wong, died on with YMD with 2000, 2 and 10, JUST with YMD with 1980, 1 and 1, list of a PAA legitimate child with Wong Siew Kim, FALSE, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:Wong Ah Moi, dying on 17 September 2005 -->
+
+**353.** Wong Ah Moi, dying on 17 September 2005 means a PAA person in full with Wong Ah Moi, wong, died on with YMD with 2005, 9 and 17, JUST with YMD with 1980, 1 and 1, list of a PAA legitimate child with Wong Siew Kim, FALSE, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:Wong Ah Moi, dying on 16 September 2005 -->
+
+**354.** Wong Ah Moi, dying on 16 September 2005 means a PAA person in full with Wong Ah Moi, wong, died on with YMD with 2005, 9 and 16, JUST with YMD with 1980, 1 and 1, list of a PAA legitimate child with Wong Siew Kim, FALSE, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:the Wong family -->
+
+**355.** The Wong family means a PAA family with EMPTY and EMPTY.
+
+<!-- l4: decide:the Wong estate of -->
+
+**356.** In relation to a Person “p”, an Estate “e” and a list of Probate application “the applications”, the Wong estate of means a PAA deceased person with p, the Wong family, e, NOTHING, EMPTY, the applications, list of a PAA infant concerned in the estate with Wong Siew Kim and FALSE.
+
+<!-- l4: decide:the further facts, the Public Trustee having declared -->
+
+**357.** The further facts, the Public Trustee having declared means The further facts on which the grant machinery turns where the administrator is entitled to the whole of the estate after payment of the debts is FALSE, the Family Court thinks fit to require such security is FALSE, there is danger that the property may be wasted is FALSE, it appears that such appointment would not be a sufficient protection for the estate is FALSE and the Public Trustee has by writing signed by him declared that he undertakes to administer such property is TRUE.
+
+<!-- l4: decide:a family with grandparents -->
+
+**358.** In relation to a list of Marriage “the marriages”, a list of Collateral relative “the siblings” and a list of Person “the grandparents”, a family with grandparents means Family where the marriages of the deceased is the marriages, the father of the deceased is NOTHING, the mother of the deceased is NOTHING, the brothers and sisters of the deceased is the siblings, the grandparents of the deceased is the grandparents and the uncles and aunts of the deceased is EMPTY.
+
+<!-- l4: decide:Wong Ah Kong, a grandfather -->
+
+**359.** Wong Ah Kong, a grandfather means a PAA adult with Wong Ah Kong and kong.
+
+<!-- l4: decide:the Wong estate, with a grandfather -->
+
+**360.** The Wong estate, with a grandfather means a PAA deceased person with Wong Ah Moi, a family with grandparents with EMPTY, EMPTY and list of Wong Ah Kong, a grandfather, a PAA estate with 200, 0, 0, 0, 250, EMPTY and FALSE, NOTHING, EMPTY, EMPTY, list of a PAA infant concerned in the estate with Wong Siew Kim and FALSE.
+
+<!-- l4: decide:Wong Siew Kim, predeceasing his mother -->
+
+**361.** Wong Siew Kim, predeceasing his mother means a PAA person in full with Wong Siew Kim, kim, died on with YMD with 2024, 1 and 1, JUST with YMD with 2032, 6 and 1, EMPTY, FALSE, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:Wong Ah Moi, her child having predeceased her -->
+
+**362.** Wong Ah Moi, her child having predeceased her means a PAA person in full with Wong Ah Moi, wong, died on with YMD with 2025, 2 and 10, JUST with YMD with 1980, 1 and 1, list of a PAA legitimate child with Wong Siew Kim, predeceasing his mother, FALSE, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:the Wong estate, the child having predeceased -->
+
+**363.** The Wong estate, the child having predeceased means a PAA deceased person with Wong Ah Moi, her child having predeceased her, the Wong family, a PAA estate with 200, 0, 0, 0, 250, EMPTY and FALSE, NOTHING, EMPTY, EMPTY, EMPTY and FALSE.
+
+<!-- l4: decide:a grant to the Public Trustee of the Wong estate -->
+
+**364.** A grant to the Public Trustee of the Wong estate means a PAA grant with letters of administration, list of a PAA grantee with Public Trustee as grantee, as administrator and NOTHING, JUST with YMD with 2025, 6 and 1, not limited, a court within the meaning of these Acts with the General Division of the High Court, TRUE, TRUE and FALSE.
+
+<!-- l4: decide:the Wong estate, administration having been taken out -->
+
+**365.** The Wong estate, administration having been taken out means a PAA deceased person with Wong Ah Moi, the Wong family, a PAA estate with 200, 0, 0, 0, 250, EMPTY and FALSE, NOTHING, list of a grant to the Public Trustee of the Wong estate, EMPTY, list of a PAA infant concerned in the estate with Wong Siew Kim and FALSE.
+
+<!-- l4: decide:the will of Wong Ah Moi -->
+
+**366.** The will of Wong Ah Moi means a PAA will of with Wong Ah Moi, list of a PAA executor with Chan Kok Wai, FALSE, FALSE, FALSE and FALSE, list of a PAA gift to with Wong Siew Kim, a residuary gift, 450 and TRUE and EMPTY.
+
+<!-- l4: decide:the Wong estate, the deceased having left a will -->
+
+**367.** The Wong estate, the deceased having left a will means a PAA deceased person with Wong Ah Moi, the Wong family, a PAA estate with 200, 0, 0, 0, 250, EMPTY and FALSE, JUST with the will of Wong Ah Moi, EMPTY, EMPTY, list of a PAA infant concerned in the estate with Wong Siew Kim and FALSE.
+
+## Scenario C — section 29, the security on a grant
+
+<!-- l4: decide:the Tan estate, with a mortgage debt -->
+
+**368.** The Tan estate, with a mortgage debt means a PAA deceased person with Tan Ah Kow, Tan Ah Kow’s family, a PAA estate with 120000, 0, 0, 0, 0, list of a PAA creditor with Chan Kok Wai, 20000 and TRUE and a PAA creditor with Goh Siew Lan, 7000 and FALSE and FALSE, NOTHING, EMPTY, EMPTY, list of a PAA infant concerned in the estate with Tan Xin and FALSE.
+
+<!-- l4: decide:the widow as administrator -->
+
+**369.** The widow as administrator means a PAA grantee with an individual with Lim Mei Ling, as administrator and NOTHING.
+
+<!-- l4: decide:the Public Trustee as administrator -->
+
+**370.** The Public Trustee as administrator means a PAA grantee with Public Trustee as grantee, as administrator and NOTHING.
+
+<!-- l4: decide:the widow as guardian of the infant -->
+
+**371.** The widow as guardian of the infant means a PAA grantee with an individual with Lim Mei Ling, as the guardian of the person and property of the infant and JUST with xin.
+
+<!-- l4: decide:the further facts, the administrator taking the whole -->
+
+**372.** The further facts, the administrator taking the whole means The further facts on which the grant machinery turns where the administrator is entitled to the whole of the estate after payment of the debts is TRUE, the Family Court thinks fit to require such security is FALSE, there is danger that the property may be wasted is FALSE, it appears that such appointment would not be a sufficient protection for the estate is FALSE and the Public Trustee has by writing signed by him declared that he undertakes to administer such property is FALSE.
+
+<!-- l4: decide:a grant to the Public Trustee and the widow -->
+
+**373.** A grant to the Public Trustee and the widow means a PAA grant with letters of administration, list of a PAA grantee with Public Trustee as grantee, as administrator and NOTHING and a PAA grantee with an individual with Lim Mei Ling, as administrator and NOTHING, JUST with YMD with 2025, 6 and 1, not limited, a court within the meaning of these Acts with the General Division of the High Court, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:a Family Court grant to the widow -->
+
+**374.** A Family Court grant to the widow means a PAA grant with letters of administration, list of a PAA grantee with an individual with Lim Mei Ling, as administrator and NOTHING, JUST with YMD with 2025, 6 and 1, not limited, a court within the meaning of these Acts with a Family Court, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:a Family Court grant for the use and benefit of the infant -->
+
+**375.** A Family Court grant for the use and benefit of the infant means a PAA grant with letters of administration, list of a PAA grantee with an individual with Lim Mei Ling, as the guardian of the person and property of the infant and JUST with xin, JUST with YMD with 2025, 6 and 1, limited in some other way with limited until the infant obtains a grant to himself, a court within the meaning of these Acts with a Family Court, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:the further facts, the Family Court requiring security -->
+
+**376.** The further facts, the Family Court requiring security means The further facts on which the grant machinery turns where the administrator is entitled to the whole of the estate after payment of the debts is FALSE, the Family Court thinks fit to require such security is TRUE, there is danger that the property may be wasted is FALSE, it appears that such appointment would not be a sufficient protection for the estate is FALSE and the Public Trustee has by writing signed by him declared that he undertakes to administer such property is FALSE.
+
+<!-- l4: decide:a Family Court grant with the will annexed to Chan -->
+
+**377.** A Family Court grant with the will annexed to Chan means a PAA grant with letters of administration with the will annexed, list of a PAA grantee with an individual with Chan Kok Wai, as administrator and NOTHING, JUST with YMD with 2025, 6 and 1, not limited, a court within the meaning of these Acts with a Family Court, FALSE, TRUE and FALSE.
+
+## Scenario C — section 55, the six cases of delay
+
+<!-- l4: decide:the Tan intestacy, an application refused -->
+
+**378.** The Tan intestacy, an application refused means a PAA deceased person with Tan Ah Kow, Tan Ah Kow’s family, the estate of Tan Ah Kow, NOTHING, EMPTY, list of a PAA application by with an individual with Lim Mei Ling, letters of administration, JUST with YMD with 2025, 3 and 1 and refused, list of a PAA infant concerned in the estate with Tan Xin and FALSE.
+
+<!-- l4: decide:the Tan intestacy, an application refused on the last day -->
+
+**379.** The Tan intestacy, an application refused on the last day means a PAA deceased person with Tan Ah Kow, Tan Ah Kow’s family, the estate of Tan Ah Kow, NOTHING, EMPTY, list of a PAA application by with an individual with Lim Mei Ling, letters of administration, JUST with YMD with 2025, 7 and 15 and refused, list of a PAA infant concerned in the estate with Tan Xin and FALSE.
+
+<!-- l4: decide:the Tan intestacy, an application refused a day late -->
+
+**380.** The Tan intestacy, an application refused a day late means a PAA deceased person with Tan Ah Kow, Tan Ah Kow’s family, the estate of Tan Ah Kow, NOTHING, EMPTY, list of a PAA application by with an individual with Lim Mei Ling, letters of administration, JUST with YMD with 2025, 7 and 16 and refused, list of a PAA infant concerned in the estate with Tan Xin and FALSE.
+
+<!-- l4: decide:the Tan intestacy, an application not proceeded with -->
+
+**381.** The Tan intestacy, an application not proceeded with means a PAA deceased person with Tan Ah Kow, Tan Ah Kow’s family, the estate of Tan Ah Kow, NOTHING, EMPTY, list of a PAA application by with an individual with Lim Mei Ling, letters of administration, JUST with YMD with 2025, 3 and 1 and not proceeded with, list of a PAA infant concerned in the estate with Tan Xin and FALSE.
+
+<!-- l4: decide:the Tan intestacy, an application withdrawn -->
+
+**382.** The Tan intestacy, an application withdrawn means a PAA deceased person with Tan Ah Kow, Tan Ah Kow’s family, the estate of Tan Ah Kow, NOTHING, EMPTY, list of a PAA application by with an individual with Lim Mei Ling, letters of administration, JUST with YMD with 2025, 3 and 1 and withdrawn, list of a PAA infant concerned in the estate with Tan Xin and FALSE.
+
+<!-- l4: decide:the Tan intestacy, an application proceeded with -->
+
+**383.** The Tan intestacy, an application proceeded with means a PAA deceased person with Tan Ah Kow, Tan Ah Kow’s family, the estate of Tan Ah Kow, NOTHING, EMPTY, list of a PAA application by with an individual with Lim Mei Ling, letters of administration, JUST with YMD with 2025, 3 and 1 and proceeded with, list of a PAA infant concerned in the estate with Tan Xin and FALSE.
+
+<!-- l4: decide:a grant to the widow, the security given -->
+
+**384.** A grant to the widow, the security given means a PAA grant with letters of administration, list of a PAA grantee with an individual with Lim Mei Ling, as administrator and NOTHING, JUST with YMD with 2025, 6 and 1, not limited, a court within the meaning of these Acts with the General Division of the High Court, TRUE, TRUE and FALSE.
+
+<!-- l4: decide:letters with the will annexed to the widow, the security not given -->
+
+**385.** Letters with the will annexed to the widow, the security not given means a PAA grant with letters of administration with the will annexed, list of a PAA grantee with an individual with Lim Mei Ling, as administrator and NOTHING, JUST with YMD with 2025, 6 and 1, not limited, a court within the meaning of these Acts with the General Division of the High Court, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:a grant of probate to Chan, the security not given -->
+
+**386.** A grant of probate to Chan, the security not given means a PAA grant with probate, list of a PAA grantee with an individual with Chan Kok Wai, as executor and NOTHING, JUST with YMD with 2025, 6 and 1, not limited, a court within the meaning of these Acts with the General Division of the High Court, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:the further facts, a receiver being insufficient -->
+
+**387.** The further facts, a receiver being insufficient means The further facts on which the grant machinery turns where the administrator is entitled to the whole of the estate after payment of the debts is FALSE, the Family Court thinks fit to require such security is FALSE, there is danger that the property may be wasted is TRUE, it appears that such appointment would not be a sufficient protection for the estate is TRUE and the Public Trustee has by writing signed by him declared that he undertakes to administer such property is FALSE.
+
+<!-- l4: decide:the further facts, a danger of waste only -->
+
+**388.** The further facts, a danger of waste only means The further facts on which the grant machinery turns where the administrator is entitled to the whole of the estate after payment of the debts is FALSE, the Family Court thinks fit to require such security is FALSE, there is danger that the property may be wasted is TRUE, it appears that such appointment would not be a sufficient protection for the estate is FALSE and the Public Trustee has by writing signed by him declared that he undertakes to administer such property is FALSE.
+
+<!-- l4: decide:the further facts, a receiver insufficient but no danger of waste -->
+
+**389.** The further facts, a receiver insufficient but no danger of waste means The further facts on which the grant machinery turns where the administrator is entitled to the whole of the estate after payment of the debts is FALSE, the Family Court thinks fit to require such security is FALSE, there is danger that the property may be wasted is FALSE, it appears that such appointment would not be a sufficient protection for the estate is TRUE and the Public Trustee has by writing signed by him declared that he undertakes to administer such property is FALSE.
+
+<!-- l4: decide:the Tan intestacy, nothing in Singapore -->
+
+**390.** The Tan intestacy, nothing in Singapore means a PAA deceased person with Tan Ah Kow, Tan Ah Kow’s family, a PAA estate with 0, 0, 0, 0, 0, EMPTY and FALSE, NOTHING, EMPTY, EMPTY, EMPTY and FALSE.
+
+<!-- l4: decide:a grant to the widow, not extracted -->
+
+**391.** A grant to the widow, not extracted means a PAA grant with letters of administration, list of a PAA grantee with an individual with Lim Mei Ling, as administrator and NOTHING, JUST with YMD with 2025, 6 and 1, not limited, a court within the meaning of these Acts with the General Division of the High Court, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:the Tan intestacy, the grant not extracted -->
+
+**392.** The Tan intestacy, the grant not extracted means a PAA deceased person with Tan Ah Kow, Tan Ah Kow’s family, the estate of Tan Ah Kow, NOTHING, list of a grant to the widow, not extracted, EMPTY, list of a PAA infant concerned in the estate with Tan Xin and FALSE.
+
+<!-- l4: decide:a grant of probate not extracted -->
+
+**393.** A grant of probate not extracted means a PAA grant with probate, list of a PAA grantee with an individual with Chan Kok Wai, as executor and NOTHING, JUST with YMD with 2025, 6 and 1, not limited, a court within the meaning of these Acts with the General Division of the High Court, TRUE, FALSE and FALSE.
+
+<!-- l4: decide:letters with the will annexed to Chan, not extracted -->
+
+**394.** Letters with the will annexed to Chan, not extracted means a PAA grant with letters of administration with the will annexed, list of a PAA grantee with an individual with Chan Kok Wai, as administrator and NOTHING, JUST with YMD with 2025, 6 and 1, not limited, a court within the meaning of these Acts with the General Division of the High Court, TRUE, FALSE and FALSE.
+
+<!-- l4: decide:Lim Mei Ling, deceased -->
+
+**395.** Lim Mei Ling, deceased means a PAA person in full with Lim Mei Ling, lim, died on with YMD with 2025, 6 and 1, JUST with YMD with 2005, 1 and 1, EMPTY, FALSE, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:a grant to the widow, since deceased -->
+
+**396.** A grant to the widow, since deceased means a PAA grant with letters of administration, list of a PAA grantee with an individual with Lim Mei Ling, deceased, as administrator and NOTHING, JUST with YMD with 2025, 3 and 1, not limited, a court within the meaning of these Acts with the General Division of the High Court, TRUE, TRUE and FALSE.
+
+<!-- l4: decide:the Tan intestacy, the administrator having died -->
+
+**397.** The Tan intestacy, the administrator having died means a PAA deceased person with Tan Ah Kow, Tan Ah Kow’s family, the estate of Tan Ah Kow, NOTHING, list of a grant to the widow, since deceased, EMPTY, list of a PAA infant concerned in the estate with Tan Xin and FALSE.
+
+<!-- l4: decide:the Tan intestacy, the administrator having died, an application made -->
+
+**398.** The Tan intestacy, the administrator having died, an application made means a PAA deceased person with Tan Ah Kow, Tan Ah Kow’s family, the estate of Tan Ah Kow, NOTHING, list of a grant to the widow, since deceased, list of a PAA application by with an individual with Tan Wei, letters of administration, JUST with YMD with 2025, 12 and 15 and still pending, list of a PAA infant concerned in the estate with Tan Xin and FALSE.
+
+<!-- l4: decide:the Tan intestacy, the grant not extracted, an application proceeded with -->
+
+**399.** The Tan intestacy, the grant not extracted, an application proceeded with means a PAA deceased person with Tan Ah Kow, Tan Ah Kow’s family, the estate of Tan Ah Kow, NOTHING, list of a grant to the widow, not extracted, list of a PAA application by with an individual with Lim Mei Ling, letters of administration, JUST with YMD with 2025, 3 and 1 and proceeded with, list of a PAA infant concerned in the estate with Tan Xin and FALSE.
+
+<!-- l4: decide:Tan Ah Kow, the date of death not known -->
+
+**400.** Tan Ah Kow, the date of death not known means a PAA person in full with Tan Ah Kow, tan, dead, the date of death not known, JUST with YMD with 1975, 1 and 1, list of a PAA legitimate child with Tan Wei and a PAA legitimate child with Tan Xin, FALSE, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:the Tan intestacy, the date of death not known, the administrator having died -->
+
+**401.** The Tan intestacy, the date of death not known, the administrator having died means a PAA deceased person with Tan Ah Kow, the date of death not known, Tan Ah Kow’s family, the estate of Tan Ah Kow, NOTHING, list of a grant to the widow, since deceased, EMPTY, list of a PAA infant concerned in the estate with Tan Xin and FALSE.
+
+## Scenario D — sections 18(2), 23, 26, 30, 35(1) and 5(1)
+
+<!-- l4: decide:the Tan estate, with settled land -->
+
+**402.** The Tan estate, with settled land means a PAA deceased person with Tan Ah Kow, Tan Ah Kow’s family, Estate where the value of the movable property situated in Singapore is 120000, the value of the immovable property situated in Singapore is 0, the value of the movable property situated outside Singapore is 0, the value of the immovable property situated outside Singapore is 0, the value of any property which the deceased possessed or was entitled to as trustee and not beneficially, situated in Singapore is 30000, the value of any property which the deceased possessed or was entitled to as trustee and not beneficially, situated outside Singapore is 0, the value of any moneys payable by an appointed insurer pursuant to the Dependants’ Protection Insurance Scheme or any other equivalent scheme maintained by the Central Provident Fund Board is 0, the value of the property administered by the Public Trustee is 0, the amount of the funds in court directed to be paid, transferred or delivered to him is 0, the value of land settled previously to the death of the deceased is 80000, the trustees of the settlement is list of an individual with Chan Kok Wai, the value of the interest in property which at the time of his death is charged with the payment of money is 0, the amount of the charge on that interest is 0, the deceased has by will, deed or other document signified a contrary or other intention is FALSE, the debts and liabilities of the deceased is 0, the funeral, testamentary and administration expenses is 0, the creditors of the deceased is list of a PAA creditor with Goh Siew Lan, 4000 and FALSE, fully administered is FALSE and the value of the property beneficially disposed of by the will is 0, NOTHING, EMPTY, EMPTY, list of a PAA infant concerned in the estate with Tan Xin and FALSE.
+
+<!-- l4: decide:the Tan estate, with settled land and no trustees -->
+
+**403.** The Tan estate, with settled land and no trustees means a PAA deceased person with Tan Ah Kow, Tan Ah Kow’s family, Estate where the value of the movable property situated in Singapore is 120000, the value of the immovable property situated in Singapore is 0, the value of the movable property situated outside Singapore is 0, the value of the immovable property situated outside Singapore is 0, the value of any property which the deceased possessed or was entitled to as trustee and not beneficially, situated in Singapore is 30000, the value of any property which the deceased possessed or was entitled to as trustee and not beneficially, situated outside Singapore is 0, the value of any moneys payable by an appointed insurer pursuant to the Dependants’ Protection Insurance Scheme or any other equivalent scheme maintained by the Central Provident Fund Board is 0, the value of the property administered by the Public Trustee is 0, the amount of the funds in court directed to be paid, transferred or delivered to him is 0, the value of land settled previously to the death of the deceased is 80000, the trustees of the settlement is EMPTY, the value of the interest in property which at the time of his death is charged with the payment of money is 0, the amount of the charge on that interest is 0, the deceased has by will, deed or other document signified a contrary or other intention is FALSE, the debts and liabilities of the deceased is 0, the funeral, testamentary and administration expenses is 0, the creditors of the deceased is EMPTY, fully administered is FALSE and the value of the property beneficially disposed of by the will is 0, NOTHING, EMPTY, EMPTY, EMPTY and FALSE.
+
+<!-- l4: decide:the Tan estate, with trustees but no settled land -->
+
+**404.** The Tan estate, with trustees but no settled land means a PAA deceased person with Tan Ah Kow, Tan Ah Kow’s family, Estate where the value of the movable property situated in Singapore is 120000, the value of the immovable property situated in Singapore is 0, the value of the movable property situated outside Singapore is 0, the value of the immovable property situated outside Singapore is 0, the value of any property which the deceased possessed or was entitled to as trustee and not beneficially, situated in Singapore is 30000, the value of any property which the deceased possessed or was entitled to as trustee and not beneficially, situated outside Singapore is 0, the value of any moneys payable by an appointed insurer pursuant to the Dependants’ Protection Insurance Scheme or any other equivalent scheme maintained by the Central Provident Fund Board is 0, the value of the property administered by the Public Trustee is 0, the amount of the funds in court directed to be paid, transferred or delivered to him is 0, the value of land settled previously to the death of the deceased is 0, the trustees of the settlement is list of an individual with Chan Kok Wai, the value of the interest in property which at the time of his death is charged with the payment of money is 0, the amount of the charge on that interest is 0, the deceased has by will, deed or other document signified a contrary or other intention is FALSE, the debts and liabilities of the deceased is 0, the funeral, testamentary and administration expenses is 0, the creditors of the deceased is EMPTY, fully administered is FALSE and the value of the property beneficially disposed of by the will is 0, NOTHING, EMPTY, EMPTY, EMPTY and FALSE.
+
+<!-- l4: decide:the estate holding trust property -->
+
+**405.** The estate holding trust property means a PAA estate with 0, 30000, 0, 0, 0, EMPTY and FALSE.
+
+<!-- l4: decide:the will whose executor is willing -->
+
+**406.** The will whose executor is willing means a PAA will of with Ong Bee Hoon, list of a PAA executor with Chan Kok Wai, FALSE, FALSE, FALSE and FALSE, EMPTY and EMPTY.
+
+<!-- l4: decide:the will whose executor has renounced -->
+
+**407.** The will whose executor has renounced means a PAA will of with Ong Bee Hoon, list of a PAA executor with Chan Kok Wai, FALSE, TRUE, FALSE and FALSE, EMPTY and EMPTY.
+
+<!-- l4: decide:the will whose executor is unwilling -->
+
+**408.** The will whose executor is unwilling means a PAA will of with Ong Bee Hoon, list of a PAA executor with Goh, unwilling, FALSE, FALSE, FALSE and FALSE, EMPTY and EMPTY.
+
+<!-- l4: decide:the Ong estate holding trust property, no representative -->
+
+**409.** The Ong estate holding trust property, no representative means a PAA deceased person with Ong Bee Hoon, Ong Bee Hoon’s family, the estate holding trust property, NOTHING, EMPTY, EMPTY, EMPTY and FALSE.
+
+<!-- l4: decide:the Ong estate holding trust property, an executor standing -->
+
+**410.** The Ong estate holding trust property, an executor standing means a PAA deceased person with Ong Bee Hoon, Ong Bee Hoon’s family, the estate holding trust property, JUST with the will whose executor is willing, EMPTY, EMPTY, EMPTY and FALSE.
+
+<!-- l4: decide:the Ong estate holding trust property, the executor having renounced -->
+
+**411.** The Ong estate holding trust property, the executor having renounced means a PAA deceased person with Ong Bee Hoon, Ong Bee Hoon’s family, the estate holding trust property, JUST with the will whose executor has renounced, EMPTY, EMPTY, EMPTY and FALSE.
+
+<!-- l4: decide:the Ong estate holding trust property, the executor unwilling -->
+
+**412.** The Ong estate holding trust property, the executor unwilling means a PAA deceased person with Ong Bee Hoon, Ong Bee Hoon’s family, the estate holding trust property, JUST with the will whose executor is unwilling, EMPTY, EMPTY, EMPTY and FALSE.
+
+<!-- l4: decide:the Ong estate holding trust property, the executor having predeceased -->
+
+**413.** The Ong estate holding trust property, the executor having predeceased means a PAA deceased person with Ong Bee Hoon, Ong Bee Hoon’s family, the estate holding trust property, JUST with the will whose executor predeceased the testator, EMPTY, EMPTY, EMPTY and FALSE.
+
+<!-- l4: decide:the Ong estate holding trust property, the executor having died -->
+
+**414.** The Ong estate holding trust property, the executor having died means a PAA deceased person with Ong Bee Hoon, Ong Bee Hoon’s family, the estate holding trust property, JUST with the will whose executor died after the testator, EMPTY, EMPTY, EMPTY and FALSE.
+
+<!-- l4: decide:the Ong estate holding trust property, the administrator having died -->
+
+**415.** The Ong estate holding trust property, the administrator having died means a PAA deceased person with Ong Bee Hoon, Ong Bee Hoon’s family, the estate holding trust property, NOTHING, list of letters to a sole administrator, since deceased, EMPTY, EMPTY and FALSE.
+
+<!-- l4: decide:the Ong estate holding trust property, an administrator standing -->
+
+**416.** The Ong estate holding trust property, an administrator standing means a PAA deceased person with Ong Bee Hoon, Ong Bee Hoon’s family, the estate holding trust property, NOTHING, list of letters with the will annexed to Chan alone, EMPTY, EMPTY and FALSE.
+
+<!-- l4: decide:a grant excepting part of the estate -->
+
+**417.** A grant excepting part of the estate means Grant where the kind of grant is letters of administration, the grantees is list of a PAA grantee with an individual with Lim Mei Ling, as administrator and NOTHING, the date of the grant is JUST with YMD with 2025, 6 and 1, the limitation is not limited, the court that made the grant is a court within the meaning of these Acts with the General Division of the High Court, the exception subject to which the grant is made is JUST with the immovable property situated outside Singapore, expired by effluxion of time or by the happening of the event or contingency on which it was limited is FALSE, revoked is FALSE, has given such security as is lawfully required to be furnished is TRUE, has been extracted is TRUE, sealed under section 47(1) of the Probate and Administration Act 1934 is FALSE and the date of the sealing is NOTHING.
+
+<!-- l4: decide:letters of administration to the creditor Lim -->
+
+**418.** Letters of administration to the creditor Lim means a PAA grant with letters of administration, list of a PAA grantee with an individual with Lim Mei Ling, as administrator and NOTHING, JUST with YMD with 2025, 6 and 1, not limited, a court within the meaning of these Acts with the General Division of the High Court, TRUE, TRUE and FALSE.
+
+<!-- l4: decide:letters with the will annexed to the creditor Lim -->
+
+**419.** Letters with the will annexed to the creditor Lim means a PAA grant with letters of administration with the will annexed, list of a PAA grantee with an individual with Lim Mei Ling, as administrator and NOTHING, JUST with YMD with 2025, 6 and 1, not limited, a court within the meaning of these Acts with the General Division of the High Court, TRUE, TRUE and FALSE.
+
+<!-- l4: decide:probate to the creditor Lim -->
+
+**420.** Probate to the creditor Lim means a PAA grant with probate, list of a PAA grantee with an individual with Lim Mei Ling, as executor and NOTHING, JUST with YMD with 2025, 6 and 1, not limited, a court within the meaning of these Acts with the General Division of the High Court, TRUE, TRUE and FALSE.
+
+<!-- l4: decide:a District Court grant made in 2014 -->
+
+**421.** A District Court grant made in 2014 means a PAA grant with letters of administration, list of a PAA grantee with an individual with Lim Mei Ling, as administrator and NOTHING, JUST with YMD with 2014, 6 and 1, not limited, a District Court, the grant having been made before 1 January 2015, TRUE, TRUE and FALSE.
+
+<!-- l4: decide:the Tan estate, worth more than three million -->
+
+**422.** The Tan estate, worth more than three million means a PAA deceased person with Tan Ah Kow, Tan Ah Kow’s family, a PAA estate with 4000000, 0, 0, 0, 0, EMPTY and FALSE, NOTHING, EMPTY, EMPTY, EMPTY and FALSE.
+
+<!-- l4: decide:the Tan estate, worth exactly three million -->
+
+**423.** The Tan estate, worth exactly three million means a PAA deceased person with Tan Ah Kow, Tan Ah Kow’s family, a PAA estate with 3000000, 0, 0, 0, 0, EMPTY and FALSE, NOTHING, EMPTY, EMPTY, EMPTY and FALSE.
+
+<!-- l4: decide:the Tan estate, worth a dollar more than three million -->
+
+**424.** The Tan estate, worth a dollar more than three million means a PAA deceased person with Tan Ah Kow, Tan Ah Kow’s family, a PAA estate with 3000001, 0, 0, 0, 0, EMPTY and FALSE, NOTHING, EMPTY, EMPTY, EMPTY and FALSE.
+
+## The deontic outcomes, exercised
+
+## Three limbs the inert prose quotes — asserted before they were tested
+
+<!-- l4: decide:a Family Court grant of probate to Chan -->
+
+**425.** A Family Court grant of probate to Chan means a PAA grant with probate, list of a PAA grantee with an individual with Chan Kok Wai, as executor and NOTHING, JUST with YMD with 2025, 6 and 1, not limited, a court within the meaning of these Acts with a Family Court, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:the will charging a debt in the daughter’s favour -->
+
+**426.** The will charging a debt in the daughter’s favour means a PAA will of with Ong Bee Hoon, with a daughter, list of a PAA executor with Chan Kok Wai, FALSE, FALSE, FALSE and FALSE, list of a PAA gift to with Chan Kok Wai, a residuary gift, 300000 and TRUE and a PAA gift to with Ong Li Ping, a charge or direction for the payment of a debt, 20000 and FALSE and EMPTY.
+
+<!-- l4: decide:the Ong testacy, the will charging a debt in the daughter’s favour -->
+
+**427.** The Ong testacy, the will charging a debt in the daughter’s favour means a PAA deceased person with Ong Bee Hoon, with a daughter, Ong Bee Hoon’s family, the estate of Ong Bee Hoon, JUST with the will charging a debt in the daughter’s favour, EMPTY, EMPTY, EMPTY and FALSE.
+
+<!-- tnr-coverage: 427 provisions; 0 boolean atoms inlined; 443 directives suppressed -->

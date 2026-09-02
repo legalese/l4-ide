@@ -1,0 +1,16 @@
+---
+config:
+  railroad:
+    nonTerminalFill: "#ffffff"
+    nonTerminalStroke: "#222222"
+    nonTerminalTextColor: "#111111"
+    terminalFill: "transparent"
+    terminalStroke: "transparent"
+    terminalTextColor: "#888888"
+    lineColor: "#8a8a8a"
+    markerFill: "#222222"
+    strokeWidth: 1.5
+    fontSize: 15
+---
+railroad-beta
+in_force_notice_binds_renewals_only = choice(sequence(terminal("for a period of five (5) years"), nonterminal("initial term is running")), sequence(terminal("and thereafter for successive terms"), nonterminal("a renewal term is running"), nonterminal("NOT one year notice has been given")));

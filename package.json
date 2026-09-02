@@ -18,15 +18,20 @@
   },
   "devDependencies": {
     "husky": "^9.1.7",
+    "lint-staged": "^15.5.0",
     "prettier": "3.4.2",
     "turbo": "^2.3.3",
     "typescript": "^5.7.3"
+  },
+  "lint-staged": {
+    "*": "prettier --write --ignore-unknown"
   },
   "packageManager": "npm@11.11.0",
   "engines": {
     "node": ">=24"
   },
   "overrides": {
-    "vite": "6.0.7"
+    "vite": "6.4.2",
+    "marked": "14.0.0"
   }
 }

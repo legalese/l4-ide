@@ -1,0 +1,46 @@
+-- Regression: a fixity-declared operator chain must re-associate whether its
+-- operands are literals or bare identifiers. Identifier operands parse to a
+-- DIFFERENT flat shape than literals — `a OP b OP c` becomes an operand-head
+-- App `App a [Var OP, b, Var OP, c]` (juxtaposition), not the operator-head
+-- `App OP [a, b, Var OP, c]` that literals produce. Re-association must handle
+-- both. (The original fixity implementation only handled the operator-head
+-- shape, so chains over identifier operands — the common case for named
+-- values, and for the prelude's own set operators — silently failed to
+-- re-associate.)
+
+@infixl 6
+GIVEN p IS A NUMBER
+      q IS A NUMBER
+GIVETH A NUMBER
+p joinL q MEANS p + q
+
+@infixl 7
+GIVEN p IS A NUMBER
+      q IS A NUMBER
+GIVETH A NUMBER
+p meetL q MEANS p * q
+
+GIVETH A NUMBER
+aa MEANS 1
+
+GIVETH A NUMBER
+bb MEANS 2
+
+GIVETH A NUMBER
+cc MEANS 3
+
+-- identifier operands, same operator: (aa joinL bb) joinL cc = 6
+#EVAL aa joinL bb joinL cc
+
+-- identifier operands, mixed precedence: aa joinL (bb meetL cc) = 1 + 6 = 7
+#EVAL aa joinL bb meetL cc
+
+-- parenthesized controls agree
+#EVAL (aa joinL bb) joinL cc
+#EVAL aa joinL (bb meetL cc)
+
+-- the tighter grouping is a different value, reachable only with parens
+#EVAL (aa joinL bb) meetL cc
+
+-- mixing identifier and literal operands in one chain
+#EVAL aa joinL 2 meetL cc

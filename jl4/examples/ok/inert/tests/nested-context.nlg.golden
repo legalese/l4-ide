@@ -1,0 +1,20 @@
+`and containing or` with `TRUE` and `TRUE`
+`and containing or` with `TRUE` and `FALSE`
+`and containing or` with `FALSE` and `TRUE`
+`or containing and` with `TRUE` and `FALSE`
+`or containing and` with `FALSE` and `TRUE`
+`or containing and` with `FALSE` and `FALSE`
+`deeply nested` with `TRUE`, `FALSE` and `TRUE`
+`deeply nested` with `TRUE`, `FALSE` and `FALSE`
+`multiple scaffolds` with `TRUE` and `TRUE`
+`multiple scaffolds` with `TRUE` and `FALSE`
+`multiple scaffolds` with `FALSE` and `TRUE`
+`triple nesting` with `TRUE`, `FALSE` and `FALSE`
+`triple nesting` with `FALSE`, `TRUE` and `TRUE`
+`triple nesting` with `FALSE`, `TRUE` and `FALSE`
+`triple nesting` with `FALSE`, `FALSE` and `TRUE`
+`adjacent scaffolds` with `TRUE` and `TRUE`
+`adjacent scaffolds` with `TRUE` and `FALSE`
+`adjacent scaffolds` with `FALSE` and `TRUE`
+`mixed scaffolds in or` with `TRUE` and `TRUE`
+`mixed scaffolds in or` with `TRUE` and `FALSE`

@@ -1,0 +1,17 @@
+{
+  "note": [
+    "Cases for collide-svc-svc.dmn (probe E6). 1 case x 2 decisions = 2 value",
+    "checks. Neither decision depends on the collision, so a failure here is",
+    "the engine reacting to the duplicate name and nothing else. The KIE `SVC",
+    "twin -> {...}` lines, printed but never compared, are where the by-name",
+    "resolution shows itself: left = 8 and right = 120 are far apart, so which",
+    "service the two by-name calls reached is legible by eye."
+  ],
+  "cases": [
+    {
+      "name": "A. n = 4",
+      "context": { "n": 4 },
+      "expect": { "left": 8, "right": 120 }
+    }
+  ]
+}

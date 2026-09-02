@@ -1,0 +1,18 @@
+-- Named rejection: a regulative (deontic) rule has no relational image.
+--
+-- A Horn clause says what HOLDS; it has no vocabulary for what a party MUST do,
+-- by when, or what happens when they do not. Collapsing an obligation to the
+-- boolean "the obligation is in force" is precisely the loss the relational
+-- middle-end refuses to make silently, so this is a batch LowerError with the
+-- constructor-keyed kind LEDeontic rather than a fidelity note.
+
+DECLARE Person IS ONE OF Alice, Bob
+
+DECLARE Action IS ONE OF
+  smoke
+
+@export
+`no smoking` MEANS
+  PARTY Alice
+  SHANT smoke
+  WITHIN 30

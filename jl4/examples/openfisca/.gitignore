@@ -1,0 +1,3 @@
+# Python bytecode from importing emitted/golden modules during round-trip checks
+__pycache__/
+*.pyc

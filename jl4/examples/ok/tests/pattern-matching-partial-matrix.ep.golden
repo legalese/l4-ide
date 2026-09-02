@@ -1,0 +1,22 @@
+-- =============================================================================
+-- Clause-matrix exhaustiveness (DMN-EXPORT-PROGRAM-MODEL-SPEC §14.7, OPEN-6):
+-- the §14.7 probe, verbatim. A two-clause pattern-matching group over a
+-- three-constructor enum is partial at source level; the desugared tree hides
+-- this (every synthetic CONSIDER is OTHERWISE-total or suppressed), so the
+-- checker analyses the SOURCE clause matrix as a unit and must warn here,
+-- at the real clause-head hull, naming the missing `Blue` clause as a
+-- pasteable DECIDE line. (Warnings are non-fatal, so this file lives in ok/
+-- and the golden pins the warning text; the @nonexhaustive'd twin pins its
+-- absence.)
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE `two clause partial` Red   IS 1
+DECIDE `two clause partial` Green IS 2
+
+-- #EVAL only over the covered constructors: `two clause partial` Blue is a
+-- runtime NonExhaustivePatterns error — which is exactly what the warning
+-- above is about.
+#EVAL `two clause partial` Red    -- 1
+#EVAL `two clause partial` Green  -- 2

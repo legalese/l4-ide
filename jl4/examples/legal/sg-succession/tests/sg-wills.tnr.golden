@@ -1,0 +1,415 @@
+# Wills Act 1838
+
+## The house rule, restated because it bites hardest here
+
+## 1. Section 4 -- Will of infant invalid
+
+<!-- l4: decide:the will is made by a person under 21 years of age -->
+
+**1.** In relation to a Will “w”, the will is made by a person under 21 years of age means w's testator's age at execution is less than 21.
+
+## 2. Section 6 -- Mode of execution
+
+<!-- l4: decide:the will is in writing and executed in the manner mentioned in subsection (2) -->
+
+**2.** In relation to a Will “w”, the will is in writing and executed in the manner mentioned in subsection (2) if—
+
+    (a) w's in writing; and
+
+    (b) the will is executed in the manner mentioned in subsection (2) with w.
+
+<!-- l4: decide:the will is signed at the foot or end thereof by the testator -->
+
+**3.** In relation to a Will “w”, the will is signed at the foot or end thereof by the testator means w's signed at the foot or end by the testator.
+
+<!-- l4: decide:the signature was made or acknowledged in the presence of 2 or more witnesses present at the same time -->
+
+**4.** In relation to a Will “w”, the signature was made or acknowledged in the presence of 2 or more witnesses present at the same time if—
+
+    (a) w's number of attesting witnesses is at least 2; and
+
+    (b) w's witnesses present at the same time.
+
+<!-- l4: decide:those witnesses subscribed the will in the presence of the testator -->
+
+**5.** In relation to a Will “w”, those witnesses subscribed the will in the presence of the testator means w's witnesses subscribed in the testator's presence.
+
+<!-- l4: decide:the will is executed in the manner mentioned in subsection (2) -->
+
+**6.** In relation to a Will “w”, the will is executed in the manner mentioned in subsection (2) means the will _ is executed in the manner mentioned in subsection (2) counting _ with w and witnesses.
+
+For the purposes of this provision—
+
+“witnesses” means w's number of attesting witnesses;
+
+<!-- l4: decide:the will -->
+
+**7.** In relation to a Will “w” and a NUMBER “witnesses”, the will if—
+
+    (a) the will is signed at the foot or end thereof by the testator with w;
+
+    (b) witnesses is at least 2;
+
+    (c) w's witnesses present at the same time; and
+
+    (d) those witnesses subscribed the will in the presence of the testator with w.
+
+<!-- l4: decide:the position of the signature does not affect the validity of the will -->
+
+**8.** In relation to a Will “w”, the position of the signature does not affect the validity of the will means TRUE.
+
+## 3. Section 10 -- Gifts to an attesting witness, or to that witness's spouse
+
+<!-- l4: declare:Gift to an attesting witness -->
+
+**9.** In this Act, “Gift to an attesting witness” means a record consisting of—
+
+    (a) “the gift is utterly null and void”, being a BOOLEAN;
+
+    (b) “the will remains valid”, being a BOOLEAN; and
+
+    (c) “explanation”, being a STRING.
+
+<!-- l4: decide:the date subsection (3) runs from -->
+
+**10.** The date subsection (3) runs from means YMD with 1992, 5 and 29.
+
+<!-- l4: decide:the testator died after 29 May 1992 in -->
+
+**11.** In relation to a Case “c”, the testator died after 29 May 1992 in means c's deceased's date of death is greater than the date subsection (3) runs from.
+
+<!-- l4: decide:the will -->
+
+**12.** In relation to a Will “w” and a NUMBER “interested attestors”, the will if—
+
+    (a) w's in writing; and
+
+    (b) the will _ is executed in the manner mentioned in subsection (2) counting _ with w and remaining.
+
+For the purposes of this provision—
+
+“remaining” means the difference between interested attestors and w's number of attesting witnesses;
+
+<!-- l4: decide:the gift to -->
+
+**13.** In relation to a NUMBER “interested attestors”, a Will “w” and a Case “c”, the gift to means if interested attestors is at most 0 then Gift to an attesting witness where the gift is utterly null and void is FALSE, the will remains valid is the will is formally valid with w and explanation is WA 1838 s 10 does not arise: no attesting witness of this will, and no spouse of one, takes a beneficial gift under it. if the testator died after 29 May 1992 in with c and the will _ is duly executed without the attestation of _ with w and interested attestors then Gift to an attesting witness where the gift is utterly null and void is FALSE, the will remains valid is the will is formally valid with w and explanation is WA 1838 s 10(3): the gift stands. The will is duly executed without the attestation of the witnesses who take under it, so their attestation is disregarded and s 10(1) does not bite. s 10(4) applies s 10(3) to the will of any person dying after 29 May 1992. otherwise Gift to an attesting witness where the gift is utterly null and void is TRUE, the will remains valid is the will is formally valid with w and explanation is WA 1838 s 10(1): the gift to the attesting witness, or to that witness's spouse, is utterly null and void so far as concerns that person. The will itself is unaffected -- s 10(2) still admits the witness to prove it -- so everything else in the will takes effect and the failed gift falls into residue or intestacy..
+
+<!-- l4: decide:the position on gifts to attesting witnesses in -->
+
+**14.** In relation to a Case “c” and a NUMBER “interested attestors”, the position on gifts to attesting witnesses in means consider the case distinctions of c's will :  when NOTHING has  then there being no will, no gift to an attesting witness arises. when JUST has w then the gift to _ attesting witnesses under the will _ in _ with interested attestors, w and c.
+
+<!-- l4: decide:there being no will, no gift to an attesting witness arises -->
+
+**15.** There being no will, no gift to an attesting witness arises means Gift to an attesting witness where the gift is utterly null and void is FALSE, the will remains valid is FALSE and explanation is There is no will, so WA 1838 s 10 has nothing to bite on. The estate passes on intestacy under the Intestate Succession Act 1967..
+
+## 4. Section 13 -- Will to be revoked by marriage except in certain cases
+
+<!-- l4: decide:the will is expressed to be made in contemplation of that marriage -->
+
+**16.** In relation to a Will “w”, the will is expressed to be made in contemplation of that marriage means w's expressed to be made in contemplation of that marriage.
+
+<!-- l4: decide:the will is revoked by the marriage of the testator -->
+
+**17.** In relation to a Will “w”, the will is revoked by the marriage of the testator if—
+
+    (a) w's married after execution; and
+
+    (b) the will is not expressed to be made in contemplation of that marriage with w.
+
+## 5. Section 14 -- No will to be revoked by presumption from altered circumstances
+
+<!-- l4: decide:revocation by presumption of an intention on the ground of an alteration in circumstances -->
+
+**18.** Revocation by presumption of an intention on the ground of an alteration in circumstances means FALSE.
+
+## 6. Section 15 -- Revocation of will or codicil
+
+<!-- l4: decide:the will has been revoked -->
+
+**19.** In relation to a Will “w”, the will has been revoked if—
+
+    (a) the will is revoked by the marriage of the testator with w;
+
+    (b) w's revoked by a later will, writing or destruction; or
+
+    (c) revocation by presumption of an intention on the ground of an alteration in circumstances.
+
+## 7. Section 17 -- Revival of revoked will
+
+<!-- l4: decide:the revoked will -->
+
+**20.** In relation to a Will “w” and a BOOLEAN “re-executed, or revived by a codicil showing an intention to revive”, the revoked will if—
+
+    (a) the will has been revoked with w; and
+
+    (b) re-executed, or revived by a codicil showing an intention to revive.
+
+<!-- l4: decide:the will -->
+
+**21.** In relation to a Will “w” and a BOOLEAN “revived”, the will if—
+
+    (a) the will has been revoked with w; and
+
+    (b) the revoked will _ is not revived by _ with w and revived.
+
+## 8. Section 27 -- Saving as to wills of soldiers and mariners
+
+<!-- l4: decide:the testator is a soldier in actual military service, or a mariner or seaman at sea -->
+
+**22.** In relation to a Will “w”, the testator is a soldier in actual military service, or a mariner or seaman at sea means w's soldier in actual military service or mariner at sea.
+
+<!-- l4: decide:the saving in section 27 applies to -->
+
+**23.** In relation to a Will “w”, the saving in section 27 applies to means the testator is a soldier in actual military service, or a mariner or seaman at sea with w.
+
+<!-- l4: decide:the date subsection 27(2) runs from -->
+
+**24.** The date subsection 27(2) runs from means YMD with 1938, 8 and 29.
+
+<!-- l4: decide:the privileged will extends to real estate in -->
+
+**25.** In relation to a Case “c”, the privileged will extends to real estate in means c's deceased's date of death is greater than the date subsection 27(2) runs from.
+
+## 9. The Act's answer -- is there an operative will?
+
+<!-- l4: decide:the will is formally valid -->
+
+**26.** In relation to a Will “w”, the will is formally valid means if the saving in section 27 applies to with w then TRUE if the will is made by a person under 21 years of age with w then FALSE otherwise the will is in writing and executed in the manner mentioned in subsection (2) with w.
+
+<!-- l4: decide:why the will is not formally valid -->
+
+**27.** In relation to a Will “w”, why the will is not formally valid means if the will is made by a person under 21 years of age with w then WA 1838 s 4: no will made by any person under 21 years of age is valid. The testator was under 21 when the will was made, and was not a soldier in actual military service or a mariner at sea, so the saving in s 27 does not apply. if not w's in writing then WA 1838 s 6(1): no will is valid unless it is in writing. This will was not in writing, and the testator was not a soldier in actual military service or a mariner at sea, so the saving in s 27 does not apply. if not the will is signed at the foot or end thereof by the testator with w then WA 1838 s 6(2): every will must be signed at the foot or end by the testator, or by some other person in his presence and by his direction. This will was not. if w's number of attesting witnesses is less than 2 then WA 1838 s 6(2): the testator's signature must be made or acknowledged in the presence of 2 or more witnesses. This will has fewer than 2 attesting witnesses. if not w's witnesses present at the same time then WA 1838 s 6(2): the 2 or more witnesses must be present AT THE SAME TIME when the testator signs or acknowledges his signature. These witnesses were not, so the will fails however many of them there were. if not those witnesses subscribed the will in the presence of the testator with w then WA 1838 s 6(2): the witnesses must subscribe the will in the presence of the testator. These witnesses did not. otherwise WA 1838 s 4 and s 6: the will does not satisfy the Act's requirements as to capacity and execution..
+
+<!-- l4: decide:the will is formally valid in -->
+
+**28.** In relation to a Case “c”, the will is formally valid in means consider the case distinctions of c's will :  when NOTHING has  then FALSE. when JUST has w then the will is formally valid with w.
+
+<!-- l4: decide:the will has been revoked in -->
+
+**29.** In relation to a Case “c”, the will has been revoked in means consider the case distinctions of c's will :  when NOTHING has  then FALSE. when JUST has w then the will has been revoked with w.
+
+<!-- l4: declare:Testamentary position -->
+
+**30.** In this Act, “Testamentary position” means a record consisting of—
+
+    (a) “there is an operative will”, being a BOOLEAN;
+
+    (b) “valid under sections 4, 6 and 27”, being a BOOLEAN;
+
+    (c) “revoked under sections 13 to 15”, being a BOOLEAN;
+
+    (d) “revived under section 17”, being a BOOLEAN;
+
+    (e) “the proportion of the estate the will disposes of”, being a NUMBER; and
+
+    (f) “explanation”, being a STRING.
+
+<!-- l4: decide:the position where there is no will -->
+
+**31.** The position where there is no will means Testamentary position where there is an operative will is FALSE, valid under sections 4, 6 and 27 is FALSE, revoked under sections 13 to 15 is FALSE, revived under section 17 is FALSE, the proportion of the estate the will disposes of is 0 and explanation is There is no will. The Wills Act 1838 has no application, and the whole estate passes on intestacy under the Intestate Succession Act 1967..
+
+<!-- l4: decide:the position on the will -->
+
+**32.** In relation to a Will “w”, a Case “c” and a BOOLEAN “revived”, the position on the will means if not the will is formally valid with w then Testamentary position where there is an operative will is FALSE, valid under sections 4, 6 and 27 is FALSE, revoked under sections 13 to 15 is the will has been revoked with w, revived under section 17 is FALSE, the proportion of the estate the will disposes of is 0 and explanation is why the will is not formally valid with w if the will _ is revoked, revival being _ with w and revived then Testamentary position where there is an operative will is FALSE, valid under sections 4, 6 and 27 is TRUE, revoked under sections 13 to 15 is TRUE, revived under section 17 is FALSE, the proportion of the estate the will disposes of is 0 and explanation is why the will has been revoked with w if the will has been revoked with w then Testamentary position where there is an operative will is TRUE, valid under sections 4, 6 and 27 is TRUE, revoked under sections 13 to 15 is TRUE, revived under section 17 is TRUE, the proportion of the estate the will disposes of is w's proportion of the estate beneficially disposed of and explanation is why the revived will is operative with w otherwise Testamentary position where there is an operative will is TRUE, valid under sections 4, 6 and 27 is TRUE, revoked under sections 13 to 15 is FALSE, revived under section 17 is FALSE, the proportion of the estate the will disposes of is w's proportion of the estate beneficially disposed of and explanation is why the will is operative _ in _ with w and c.
+
+<!-- l4: decide:the position on the will -->
+
+**33.** In relation to a Will “w” and a Case “c”, the position on the will means the position on the will _ in _ revival being _ with w, c and FALSE.
+
+<!-- l4: decide:why the will has been revoked -->
+
+**34.** In relation to a Will “w”, why the will has been revoked means if the will is revoked by the marriage of the testator with w then WA 1838 s 13(1): every will is revoked by the testator's marriage. This will was made before a marriage and was not expressed to be made in contemplation of that marriage, so the marriage revoked it and the estate passes on intestacy. Nothing had to be done to the document: it was revoked by operation of law on the day of the wedding. if w's revoked by a later will, writing or destruction then WA 1838 s 15(b)-(d): the will was revoked by a later will or codicil duly executed, by a writing declaring an intention to revoke it and executed as a will, or by the testator burning, tearing or otherwise destroying it with the intention of revoking it. otherwise WA 1838 s 15: the will has been revoked..
+
+<!-- l4: decide:why the revived will is operative -->
+
+**35.** In relation to a Will “w”, why the revived will is operative means if the will is revoked by the marriage of the testator with w then WA 1838 s 13(1) and s 17(1): the testator's marriage revoked this will, but it has since been revived -- by its re-execution, or by a codicil executed in the manner this Act requires and showing an intention to revive it. Those are the only two ways: s 17(1) says no revoked will shall be revived 'otherwise than' by one of them. The will is operative again and disposes of the estate on its own terms; the estate does not pass on intestacy. if w's revoked by a later will, writing or destruction then WA 1838 s 15(b)-(d) and s 17(1): the will was revoked -- by a later will or codicil, by a writing declaring an intention to revoke it, or by being burnt, torn or otherwise destroyed with the intention of revoking it -- but it has since been revived, by its re-execution or by a codicil executed in the manner this Act requires and showing an intention to revive it. Note what would NOT have revived it: destroying the later revoking instrument does nothing, because s 17(1) closes the list at those two ways. The will is operative again. otherwise WA 1838 s 17(1): the will was revoked and has since been revived, by its re-execution or by a codicil executed in the manner this Act requires and showing an intention to revive it. It is operative again..
+
+<!-- l4: decide:why the will is operative -->
+
+**36.** In relation to a Will “w” and a Case “c”, why the will is operative means if the saving in section 27 applies to with w and the privileged will extends to real estate in with c then WA 1838 s 27: the testator was a soldier in actual military service, or a mariner or seaman at sea, so he could dispose of his personal estate as he might have done before this Act -- without writing, signature or witnesses -- and even though under 21. Because he died after 29 August 1938, s 27(2) makes the disposition good for real estate as well. The will has not been revoked under s 13 or s 15 and is operative. if the saving in section 27 applies to with w then WA 1838 s 27(1): the testator was a soldier in actual military service, or a mariner or seaman at sea, so he could dispose of his PERSONAL estate as he might have done before this Act, and even though under 21. He died on or before 29 August 1938, so s 27(2) does not extend the saving to real estate. The will has not been revoked under s 13 or s 15. otherwise WA 1838 s 4 and s 6: the testator was 21 or over, the will is in writing and signed at the foot or end, the signature was made or acknowledged before 2 or more witnesses present at the same time, and those witnesses subscribed in the testator's presence. The will has not been revoked under s 13 or s 15, so it is operative..
+
+<!-- l4: decide:the testamentary position in -->
+
+**37.** In relation to a Case “c” and a BOOLEAN “revived”, the testamentary position in means consider the case distinctions of c's will :  when NOTHING has  then the position where there is no will. when JUST has w then the position on the will _ in _ revival being _ with w, c and revived.
+
+<!-- l4: decide:the testamentary position in -->
+
+**38.** In relation to a Case “c”, the testamentary position in means the testamentary position in _ revival being _ with c and FALSE.
+
+## 10. Fixtures for the assertions
+
+<!-- l4: decide:a will with -->
+
+**39.** In relation to a NUMBER “age”, a NUMBER “witnesses”, a BOOLEAN “writing”, a BOOLEAN “signed”, a BOOLEAN “together”, a BOOLEAN “subscribed”, a BOOLEAN “privileged”, a BOOLEAN “married”, a BOOLEAN “contemplation” and a BOOLEAN “revoked”, a will with means Will where in writing is writing, signed at the foot or end by the testator is signed, number of attesting witnesses is witnesses, witnesses present at the same time is together, witnesses subscribed in the testator's presence is subscribed, testator's age at execution is age, soldier in actual military service or mariner at sea is privileged, married after execution is married, expressed to be made in contemplation of that marriage is contemplation, revoked by a later will, writing or destruction is revoked, proportion of the estate beneficially disposed of is 1 and an executor is appointed, and able and willing to act is TRUE.
+
+<!-- l4: decide:a properly executed will -->
+
+**40.** A properly executed will means a will with with 40, 2, TRUE, TRUE, TRUE, TRUE, FALSE, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:a will made by a person under 21 -->
+
+**41.** A will made by a person under 21 means a will with with 20, 2, TRUE, TRUE, TRUE, TRUE, FALSE, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:a soldier's nuncupative will made under 21 -->
+
+**42.** A soldier's nuncupative will made under 21 means a will with with 20, 0, FALSE, FALSE, FALSE, FALSE, TRUE, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:a will attested by only one witness -->
+
+**43.** A will attested by only one witness means a will with with 40, 1, TRUE, TRUE, TRUE, TRUE, FALSE, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:a will whose two witnesses were not present at the same time -->
+
+**44.** A will whose two witnesses were not present at the same time means a will with with 40, 2, TRUE, TRUE, FALSE, TRUE, FALSE, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:a will not in writing -->
+
+**45.** A will not in writing means a will with with 40, 2, FALSE, TRUE, TRUE, TRUE, FALSE, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:a will the testator never signed -->
+
+**46.** A will the testator never signed means a will with with 40, 2, TRUE, FALSE, TRUE, TRUE, FALSE, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:a will whose witnesses subscribed out of the testator's presence -->
+
+**47.** A will whose witnesses subscribed out of the testator's presence means a will with with 40, 2, TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:a will followed by the testator's marriage -->
+
+**48.** A will followed by the testator's marriage means a will with with 40, 2, TRUE, TRUE, TRUE, TRUE, FALSE, TRUE, FALSE and FALSE.
+
+<!-- l4: decide:a will expressed to be made in contemplation of that marriage -->
+
+**49.** A will expressed to be made in contemplation of that marriage means a will with with 40, 2, TRUE, TRUE, TRUE, TRUE, FALSE, TRUE, TRUE and FALSE.
+
+<!-- l4: decide:a will the testator tore up -->
+
+**50.** A will the testator tore up means a will with with 40, 2, TRUE, TRUE, TRUE, TRUE, FALSE, FALSE, FALSE and TRUE.
+
+<!-- l4: decide:a will attested by three witnesses -->
+
+**51.** A will attested by three witnesses means a will with with 40, 3, TRUE, TRUE, TRUE, TRUE, FALSE, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:a family that need not be filled in -->
+
+**52.** A family that need not be filled in means Family where surviving spouses is EMPTY, children is EMPTY, parents is EMPTY, siblings is EMPTY, grandparents is EMPTY and uncles and aunts is EMPTY.
+
+<!-- l4: decide:an estate that need not be filled in -->
+
+**53.** An estate that need not be filled in means Estate where immovable property in Singapore is 500000, movable property in Singapore is 100000, funeral, testamentary and administration expenses is 20000 and debts and liabilities is 30000.
+
+<!-- l4: decide:a modern date of death -->
+
+**54.** A modern date of death means YMD with 2026, 3 and 1.
+
+<!-- l4: decide:a date of death before the 1938 amendment -->
+
+**55.** A date of death before the 1938 amendment means YMD with 1930, 1 and 1.
+
+<!-- l4: decide:a testator dying on -->
+
+**56.** In relation to a DATE “died on”, a testator dying on means Deceased where name is the testator, date of death is died on, domiciled in Singapore is TRUE and Muslim is FALSE.
+
+<!-- l4: decide:a death on -->
+
+**57.** In relation to a DATE “died on” and a Will “w”, a death on means Case where deceased is a testator dying on with died on, family is a family that need not be filled in, estate is an estate that need not be filled in and will is JUST with w.
+
+<!-- l4: decide:a modern death leaving the will -->
+
+**58.** In relation to a Will “w”, a modern death leaving the will means a death on _ leaving the will _ with a modern date of death and w.
+
+<!-- l4: decide:a modern death leaving no will at all -->
+
+**59.** A modern death leaving no will at all means Case where deceased is a testator dying on with a modern date of death, family is a family that need not be filled in, estate is an estate that need not be filled in and will is NOTHING.
+
+<!-- l4: decide:a modern death leaving a properly executed will -->
+
+**60.** A modern death leaving a properly executed will means a modern death leaving the will with a properly executed will.
+
+<!-- l4: decide:a modern death leaving a soldier's nuncupative will -->
+
+**61.** A modern death leaving a soldier's nuncupative will means a modern death leaving the will with a soldier's nuncupative will made under 21.
+
+<!-- l4: decide:a 1930 death leaving a soldier's nuncupative will -->
+
+**62.** A 1930 death leaving a soldier's nuncupative will means a death on _ leaving the will _ with a date of death before the 1938 amendment and a soldier's nuncupative will made under 21.
+
+<!-- l4: decide:a modern death leaving a will attested by three witnesses -->
+
+**63.** A modern death leaving a will attested by three witnesses means a modern death leaving the will with a will attested by three witnesses.
+
+<!-- l4: decide:a 1930 death leaving a will attested by three witnesses -->
+
+**64.** A 1930 death leaving a will attested by three witnesses means a death on _ leaving the will _ with a date of death before the 1938 amendment and a will attested by three witnesses.
+
+<!-- l4: decide:a modern death leaving a will revoked by marriage -->
+
+**65.** A modern death leaving a will revoked by marriage means a modern death leaving the will with a will followed by the testator's marriage.
+
+<!-- l4: decide:a modern death leaving an under-21 will -->
+
+**66.** A modern death leaving an under-21 will means a modern death leaving the will with a will made by a person under 21.
+
+<!-- l4: decide:a modern death leaving a will the testator tore up -->
+
+**67.** A modern death leaving a will the testator tore up means a modern death leaving the will with a will the testator tore up.
+
+<!-- l4: decide:the position on an ordinary will -->
+
+**68.** The position on an ordinary will means the testamentary position in with a modern death leaving a properly executed will.
+
+<!-- l4: decide:the position where there was no will -->
+
+**69.** The position where there was no will means the testamentary position in with a modern death leaving no will at all.
+
+<!-- l4: decide:the position on a will revoked by marriage -->
+
+**70.** The position on a will revoked by marriage means the testamentary position in with a modern death leaving a will revoked by marriage.
+
+<!-- l4: decide:the position on an under-21 will -->
+
+**71.** The position on an under-21 will means the testamentary position in with a modern death leaving an under-21 will.
+
+<!-- l4: decide:the position on a soldier's will -->
+
+**72.** The position on a soldier's will means the testamentary position in with a modern death leaving a soldier's nuncupative will.
+
+<!-- l4: decide:the position on a will revoked by marriage and afterwards revived -->
+
+**73.** The position on a will revoked by marriage and afterwards revived means the testamentary position in _ revival being _ with a modern death leaving a will revoked by marriage and TRUE.
+
+<!-- l4: decide:the position on a torn-up will afterwards revived -->
+
+**74.** The position on a torn-up will afterwards revived means the testamentary position in _ revival being _ with a modern death leaving a will the testator tore up and TRUE.
+
+<!-- l4: decide:the position on an under-21 will said to have been revived -->
+
+**75.** The position on an under-21 will said to have been revived means the testamentary position in _ revival being _ with a modern death leaving an under-21 will and TRUE.
+
+<!-- l4: decide:the position on an ordinary will said to have been revived -->
+
+**76.** The position on an ordinary will said to have been revived means the testamentary position in _ revival being _ with a modern death leaving a properly executed will and TRUE.
+
+<!-- l4: decide:the gift where no attesting witness takes -->
+
+**77.** The gift where no attesting witness takes means the gift to _ attesting witnesses under the will _ in _ with 0, a will attested by three witnesses and a modern death leaving a will attested by three witnesses.
+
+<!-- l4: decide:the gift where one of three witnesses takes -->
+
+**78.** The gift where one of three witnesses takes means the gift to _ attesting witnesses under the will _ in _ with 1, a will attested by three witnesses and a modern death leaving a will attested by three witnesses.
+
+<!-- l4: decide:the gift where two of three witnesses take -->
+
+**79.** The gift where two of three witnesses take means the gift to _ attesting witnesses under the will _ in _ with 2, a will attested by three witnesses and a modern death leaving a will attested by three witnesses.
+
+<!-- l4: decide:the gift where one of two witnesses takes -->
+
+**80.** The gift where one of two witnesses takes means the gift to _ attesting witnesses under the will _ in _ with 1, a properly executed will and a modern death leaving a properly executed will.
+
+<!-- l4: decide:the gift where one of three witnesses takes, the testator dying in 1930 -->
+
+**81.** The gift where one of three witnesses takes, the testator dying in 1930 means the gift to _ attesting witnesses under the will _ in _ with 1, a will attested by three witnesses and a 1930 death leaving a will attested by three witnesses.
+
+## 11. Assertions
+
+<!-- tnr-coverage: 81 provisions; 0 boolean atoms inlined; 62 directives suppressed -->

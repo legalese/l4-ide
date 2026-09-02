@@ -1,11 +1,11 @@
 {
-  "totalFiles": 438,
+  "totalFiles": 432,
   "buckets": {
-    "clean": 35,
-    "no-exports": 349,
-    "has-unsupported": 2,
+    "clean": 36,
+    "no-exports": 342,
     "typecheck-fail": 51,
-    "lower-fail": 1
+    "lower-fail": 1,
+    "has-unsupported": 2
   },
   "typecheckErrorClasses": {
     "parse-error": 22,
@@ -14,12 +14,19 @@
     "ambiguous": 2
   },
   "unsupportedReasonHistogram": {
-    "REGULATIVE (deontic) construct not supported by the WASM backend": 2
+    "ad-hoc overload collision: multiple definitions of tax_on at arity 3 share one WASM symbol and cannot be disambiguated by the WASM backend": 1,
+    "CONSIDER pattern constructor RIGHT could not be resolved to an enum tag by the WASM backend": 1,
+    "CONSIDER pattern constructor LEFT could not be resolved to an enum tag by the WASM backend": 1
   },
   "unsupportedFunctionsByReason": {
-    "REGULATIVE (deontic) construct not supported by the WASM backend": [
-      "jl4/examples/legal/ceo-performance-award.l4::Eligible-Service-Requirement",
-      "ts-apps/jl4-web/src/generated/ceo-performance-award.l4::Eligible-Service-Requirement"
+    "ad-hoc overload collision: multiple definitions of tax_on at arity 3 share one WASM symbol and cannot be disambiguated by the WASM backend": [
+      "jl4/examples/ok/mixfix-garden-path.l4::tax-on"
+    ],
+    "CONSIDER pattern constructor RIGHT could not be resolved to an enum tag by the WASM backend": [
+      "jl4/experiments/thailand-cosmetics/orchestrator.l4::evaluateClaim"
+    ],
+    "CONSIDER pattern constructor LEFT could not be resolved to an enum tag by the WASM backend": [
+      "jl4/experiments/thailand-cosmetics/orchestrator.l4::evaluateClaim"
     ]
   },
   "perFile": [
@@ -519,6 +526,21 @@
       "functions": 6
     },
     {
+      "file": "jl4-mlir/test/fixtures/deontic-breach.l4",
+      "outcome": "clean",
+      "functions": 1
+    },
+    {
+      "file": "jl4-mlir/test/fixtures/deontic-sale.l4",
+      "outcome": "clean",
+      "functions": 1
+    },
+    {
+      "file": "jl4-mlir/test/fixtures/deontic-seatbelt.l4",
+      "outcome": "clean",
+      "functions": 1
+    },
+    {
       "file": "jl4-mlir/test/fixtures/intrinsics-probe.l4",
       "outcome": "clean",
       "functions": 7
@@ -580,11 +602,8 @@
     },
     {
       "file": "jl4/examples/legal/ceo-performance-award.l4",
-      "outcome": "has-unsupported",
-      "functions": 1,
-      "unsupported": {
-        "Eligible-Service-Requirement": "REGULATIVE (deontic) construct not supported by the WASM backend"
-      }
+      "outcome": "clean",
+      "functions": 1
     },
     {
       "file": "jl4/examples/legal/directive-showcase.l4",
@@ -1326,8 +1345,11 @@
     },
     {
       "file": "jl4/examples/ok/mixfix-garden-path.l4",
-      "outcome": "clean",
-      "functions": 1
+      "outcome": "has-unsupported",
+      "functions": 1,
+      "unsupported": {
+        "tax-on": "ad-hoc overload collision: multiple definitions of tax_on at arity 3 share one WASM symbol and cannot be disambiguated by the WASM backend"
+      }
     },
     {
       "file": "jl4/examples/ok/mixfix-multiline.l4",
@@ -2171,8 +2193,11 @@
     },
     {
       "file": "jl4/experiments/thailand-cosmetics/orchestrator.l4",
-      "outcome": "clean",
-      "functions": 1
+      "outcome": "has-unsupported",
+      "functions": 1,
+      "unsupported": {
+        "evaluateClaim": "CONSIDER pattern constructor RIGHT could not be resolved to an enum tag by the WASM backend; CONSIDER pattern constructor LEFT could not be resolved to an enum tag by the WASM backend"
+      }
     },
     {
       "file": "jl4/experiments/thailand-cosmetics/prelude.l4",
@@ -2250,54 +2275,6 @@
       "outcome": "typecheck-fail",
       "errorClass": "other",
       "error": ["  Typecheck completed with errors"]
-    },
-    {
-      "file": "ts-apps/jl4-web/src/generated/anti-social.l4",
-      "outcome": "no-exports",
-      "functions": 0
-    },
-    {
-      "file": "ts-apps/jl4-web/src/generated/british-citizen-act.l4",
-      "outcome": "no-exports",
-      "functions": 0
-    },
-    {
-      "file": "ts-apps/jl4-web/src/generated/ceo-performance-award.l4",
-      "outcome": "has-unsupported",
-      "functions": 1,
-      "unsupported": {
-        "Eligible-Service-Requirement": "REGULATIVE (deontic) construct not supported by the WASM backend"
-      }
-    },
-    {
-      "file": "ts-apps/jl4-web/src/generated/directive-showcase.l4",
-      "outcome": "no-exports",
-      "functions": 0
-    },
-    {
-      "file": "ts-apps/jl4-web/src/generated/empty.l4",
-      "outcome": "no-exports",
-      "functions": 0
-    },
-    {
-      "file": "ts-apps/jl4-web/src/generated/imaginary-alcohol-act.l4",
-      "outcome": "no-exports",
-      "functions": 0
-    },
-    {
-      "file": "ts-apps/jl4-web/src/generated/ny-environmental-7.3.l4",
-      "outcome": "no-exports",
-      "functions": 0
-    },
-    {
-      "file": "ts-apps/jl4-web/src/generated/promissory-note.l4",
-      "outcome": "no-exports",
-      "functions": 0
-    },
-    {
-      "file": "ts-apps/vscode/static/skills/writing-l4-rules/assets/example-parking.l4",
-      "outcome": "clean",
-      "functions": 1
     }
   ]
 }

@@ -1,0 +1,117 @@
+{
+  "__doc__": [
+    "PENDING curated cases for ceo-performance-award::Eligible-Service-Requirement (ledger #8).",
+    "This file is intentionally NOT named `.cases.json` so the parity harness does",
+    "NOT auto-load it: the function currently REFUSES on the WASM backend",
+    "(supported:false), so a live curated cell would produce zero real comparisons",
+    "and trip the harness's partial-corpus-collapse guard (parity-harness.mjs:503).",
+    "When the two backend gaps below are fixed, rename this file to",
+    "`ceo-performance-award.cases.json` to gate the fix.",
+    "",
+    "Gaps that must land first (see specs/todo/mlir-parity-fixes.md ledger #8):",
+    "  (1) DEONTIC contract extraction (Schema.hs exprToGuard) must represent an",
+    "      IF guard that is a helper-call application, e.g. `Forfeiture Applies` s;",
+    "      today it returns Nothing so extractDeonticContract bails and the export",
+    "      refuses at schema-build time.",
+    "  (2) PROVIDED guards on an action (deontonToContract drops action.provided)",
+    "      and EXACTLY action arguments must be captured, else interpretation is",
+    "      silently wrong.",
+    "",
+    "Reference note on event-replay cases: fulfilled / breach-by-deadline /",
+    "wrong-action sequences for THIS contract require fielded actions such as",
+    "`maintain eligible service status` <Service Status>, `vest immediately`",
+    "<Reason>, `forfeit unvested shares` <Reason>. jl4-service's own events codegen",
+    "(jl4-service/src/Backend/CodeGen.hs:431 fnLiteralToL4ExprWithType) renders a",
+    "fielded action as `Award Action` WITH <ctor> IS ... — which is a type error for",
+    "a sum-type-with-fields constructor — so those sequences cannot currently be",
+    "encoded even against the reference. The cases below therefore use empty event",
+    "streams, which return the INITIAL obligation node; they still cross all three",
+    "top-level IF branches (Forfeiture / ImmediateVesting / maintain-service) and",
+    "each `expectedReference` was captured live from jl4-service (deploy + evaluate,",
+    "trace=none, with prelude/daydate/date-compat bundled).",
+    "A complete future fix must ADD fielded-action fulfilled/breach/order-sensitive",
+    "sequences once gap (2) + the jl4-service action encoding both land."
+  ],
+  "Eligible-Service-Requirement": [
+    {
+      "__branch": "maintain-service (Termination NOTHING, in eligible service, before performance end) -> MUST maintain, LEST forfeit",
+      "expectedReference": {"OBLIGATION": {"action": "`maintain eligible service status` `Service Status`", "deadline": "`Date to days` OF (`Performance End Date` MINUS (`award state`'s `Current Date`))", "modal": "MUST", "party": "`Elon Musk`"}},
+      "arguments": {
+        "award state": {
+          "Musk Service Status": "Chief Executive Officer",
+          "Current Date": "2025-09-03",
+          "Performance Metrics": {"Current Market Cap": 3000000000000, "Six Month Avg Market Cap": 2800000000000, "Thirty Day Avg Market Cap": 2900000000000, "One Year Avg Market Cap": 2700000000000, "Tesla Vehicles Delivered": 25000000, "Active FSD Subscriptions": 12000000, "Bots Delivered": 1800000, "Robotaxis In Operation": 1100000, "Current Adjusted EBITDA": 60000000000, "Outstanding Shares": 3000000000, "Last Closing Price": 400, "Per Share Consideration": 450},
+          "Earned Tranches": [], "Earned Dates": [], "CEO Succession Framework": true,
+          "Termination Reason": null, "Covered Event Occurred": false, "Covered Event Type": null,
+          "HSR Waiting Period Expired": true, "Shareholder Approval Received": true
+        }
+      },
+      "startTime": 0,
+      "events": []
+    },
+    {
+      "__branch": "immediate-vesting via Without Cause -> MAY vest immediately (no deadline)",
+      "expectedReference": {"OBLIGATION": {"action": "`vest immediately` EXACTLY `Immediate Vesting Reason` OF `award state`", "deadline": null, "modal": "MAY", "party": "`Elon Musk`"}},
+      "arguments": {
+        "award state": {
+          "Musk Service Status": "Not In Eligible Service",
+          "Current Date": "2027-09-03",
+          "Performance Metrics": {"Current Market Cap": 3000000000000, "Six Month Avg Market Cap": 2800000000000, "Thirty Day Avg Market Cap": 2900000000000, "One Year Avg Market Cap": 2700000000000, "Tesla Vehicles Delivered": 25000000, "Active FSD Subscriptions": 12000000, "Bots Delivered": 1800000, "Robotaxis In Operation": 1100000, "Current Adjusted EBITDA": 60000000000, "Outstanding Shares": 3000000000, "Last Closing Price": 400, "Per Share Consideration": 450},
+          "Earned Tranches": [], "Earned Dates": [], "CEO Succession Framework": true,
+          "Termination Reason": "Without Cause", "Covered Event Occurred": false, "Covered Event Type": null,
+          "HSR Waiting Period Expired": true, "Shareholder Approval Received": true
+        }
+      },
+      "startTime": 0,
+      "events": []
+    },
+    {
+      "__branch": "immediate-vesting via Change In Control -> MAY vest immediately (order note: Forfeiture is checked BEFORE ImmediateVesting; a Change-In-Control state is NOT a forfeiture so it falls to the MAY branch)",
+      "expectedReference": {"OBLIGATION": {"action": "`vest immediately` EXACTLY `Immediate Vesting Reason` OF `award state`", "deadline": null, "modal": "MAY", "party": "`Elon Musk`"}},
+      "arguments": {
+        "award state": {
+          "Musk Service Status": "Chief Executive Officer",
+          "Current Date": "2027-09-03",
+          "Performance Metrics": {"Current Market Cap": 3000000000000, "Six Month Avg Market Cap": 2800000000000, "Thirty Day Avg Market Cap": 2900000000000, "One Year Avg Market Cap": 2700000000000, "Tesla Vehicles Delivered": 25000000, "Active FSD Subscriptions": 12000000, "Bots Delivered": 1800000, "Robotaxis In Operation": 1100000, "Current Adjusted EBITDA": 60000000000, "Outstanding Shares": 3000000000, "Last Closing Price": 400, "Per Share Consideration": 450},
+          "Earned Tranches": [], "Earned Dates": [], "CEO Succession Framework": true,
+          "Termination Reason": "Change In Control", "Covered Event Occurred": false, "Covered Event Type": null,
+          "HSR Waiting Period Expired": true, "Shareholder Approval Received": true
+        }
+      },
+      "startTime": 0,
+      "events": []
+    },
+    {
+      "__branch": "forfeiture via For Cause -> MUST forfeit (highest-priority branch; wins even though metrics are high)",
+      "expectedReference": {"OBLIGATION": {"action": "`forfeit unvested shares` EXACTLY `Forfeiture Reason` OF `award state`", "deadline": null, "modal": "MUST", "party": "`Elon Musk`"}},
+      "arguments": {
+        "award state": {
+          "Musk Service Status": "Chief Executive Officer",
+          "Current Date": "2027-09-03",
+          "Performance Metrics": {"Current Market Cap": 3000000000000, "Six Month Avg Market Cap": 2800000000000, "Thirty Day Avg Market Cap": 2900000000000, "One Year Avg Market Cap": 2700000000000, "Tesla Vehicles Delivered": 25000000, "Active FSD Subscriptions": 12000000, "Bots Delivered": 1800000, "Robotaxis In Operation": 1100000, "Current Adjusted EBITDA": 60000000000, "Outstanding Shares": 3000000000, "Last Closing Price": 400, "Per Share Consideration": 450},
+          "Earned Tranches": [], "Earned Dates": [], "CEO Succession Framework": true,
+          "Termination Reason": "For Cause", "Covered Event Occurred": false, "Covered Event Type": null,
+          "HSR Waiting Period Expired": true, "Shareholder Approval Received": true
+        }
+      },
+      "startTime": 0,
+      "events": []
+    },
+    {
+      "__branch": "forfeiture via NOTHING termination + not in eligible service -> MUST forfeit (exercises the CONSIDER WHEN NOTHING sub-branch of Forfeiture Applies)",
+      "expectedReference": {"OBLIGATION": {"action": "`forfeit unvested shares` EXACTLY `Forfeiture Reason` OF `award state`", "deadline": null, "modal": "MUST", "party": "`Elon Musk`"}},
+      "arguments": {
+        "award state": {
+          "Musk Service Status": "Not In Eligible Service",
+          "Current Date": "2025-09-03",
+          "Performance Metrics": {"Current Market Cap": 3000000000000, "Six Month Avg Market Cap": 2800000000000, "Thirty Day Avg Market Cap": 2900000000000, "One Year Avg Market Cap": 2700000000000, "Tesla Vehicles Delivered": 25000000, "Active FSD Subscriptions": 12000000, "Bots Delivered": 1800000, "Robotaxis In Operation": 1100000, "Current Adjusted EBITDA": 60000000000, "Outstanding Shares": 3000000000, "Last Closing Price": 400, "Per Share Consideration": 450},
+          "Earned Tranches": [], "Earned Dates": [], "CEO Succession Framework": true,
+          "Termination Reason": null, "Covered Event Occurred": false, "Covered Event Type": null,
+          "HSR Waiting Period Expired": true, "Shareholder Approval Received": true
+        }
+      },
+      "startTime": 0,
+      "events": []
+    }
+  ]
+}

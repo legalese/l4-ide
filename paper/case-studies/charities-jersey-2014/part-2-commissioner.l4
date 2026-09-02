@@ -1,0 +1,580 @@
+IMPORT prelude
+IMPORT `charities-common`
+
+§ `Charities (Jersey) Law 2014 — Part 2 — Jersey Charity Commissioner (Articles 3-4)`
+
+-- ===========================================================================
+-- PART 2 — THE JERSEY CHARITY COMMISSIONER. Articles 3 and 4.
+--
+-- Source: Charities (Jersey) Law 2014 (L.41/2014), Official Consolidated
+-- Version, showing the law from 16 October 2025 to Current.
+-- https://www.jerseylaw.je/laws/current/l_41_2014
+--
+-- THE SHAPE OF PART 2 — one stub, one list, one gated power, one carve-out,
+-- and one qualified duty:
+--
+--   Art 3     ESTABLISHMENT. Purely constitutive-by-fiat: "There is established
+--             a corporation sole". Nothing to compute. Carried as a labelled
+--             INERT-PROSE STUB so the corpus has no silent gap. NO operative logic.
+--
+--   Art 4(1)  THE GENERAL FUNCTIONS — a DISJUNCTION, (a) to (g), defining what
+--             counts as a function of the Commissioner (limb (g) is an open
+--             catch-all: "any other function conferred ... by any other
+--             enactment"). The same seven limbs are ALSO the Commissioner's
+--             DUTIES, and so appear a second time in the regulative layer as a
+--             RAND-woven bundle of MUSTs. The list does double duty because the
+--             Law makes it do double duty: Art 4(2) hangs the incidental power
+--             off "the performance of any of his or her functions".
+--
+--   Art 4(2)  THE INCIDENTAL POWER — a permission GATED on the act being
+--             "calculated to facilitate, or ... conducive or incidental to" the
+--             performance of a function, MINUS a CARVE-OUT: the parenthetical
+--             "(other than acting as a governor of a charity or of an entity with
+--             charitable purposes)". The carve-out is a genuine PROHIBITION and is
+--             surfaced as one (SHANT) in the regulative layer.
+--
+--   Art 4(3)  THE PARTICULAR POWERS — (a), (b), (c), conferred "in particular,
+--             without prejudice to the generality of his or her powers". An
+--             INDEPENDENT route to permission: they do not have to pass the 4(2)
+--             conducive/incidental gate.
+--
+--   Art 4(4)  THE MANNER-OF-PERFORMANCE DUTY — a QUALIFIED duty: "the Commissioner
+--             MUST, so far appears to him or her to be reasonably practicable,
+--             seek to act in a way that (a) ... and (b) ...". A conjunction of
+--             (a) and (b), behind a self-judging gate.
+--
+-- ENCODING STYLE — INERT: verbatim statute inline as bare strings (identity of
+-- their context — TRUE under AND, FALSE under OR), `...` = AND-sugar, `..` =
+-- OR-sugar, layout IS the bracketing. Only the operative atoms are lifted to
+-- BOOLEANs. Read the left margin and you are reading Part 2.
+--
+-- Part 2 regulates acts that are NOT in `charities-common`'s Action enum, so a
+-- LOCAL enum `Part2Action` is declared here (as instructed: do not extend the
+-- shared enum), and the deontics are typed `GIVETH A DEONTIC Actor Part2Action`.
+--
+-- -------------------------------------------------------------------------
+-- INTERPRETATION CALLS — every one of them, flagged.
+--
+-- >>> (1) THE SCOPE OF THE GOVERNOR CARVE-OUT. The words "(other than acting as
+--     a governor of a charity or of an entity with charitable purposes)" sit
+--     INSIDE Article 4(2), and nowhere else. Read strictly, they qualify only
+--     the 4(2) general incidental power, and NOT the three 4(3) powers, which
+--     are conferred "without prejudice to the generality of his or her powers".
+--     We encode the strict reading: `Article 4(2) — the act is within the general
+--     incidental power` carries the NOT; `Article 4(3) — one of the particular
+--     powers` does not. NOTHING TURNS ON IT on the present text — each of
+--     4(3)(a)-(c) is an information / advice / assistance power, and none of them
+--     could be the act of acting as a governor — but the drafting would permit a
+--     future Art 4(3) limb to escape the carve-out. We flag rather than patch.
+--     The regulative layer nevertheless states the carve-out as an UNCONDITIONAL
+--     `SHANT`, which is the reading a court would surely reach.
+--
+-- >>> (2) "so far appears to him or her to be reasonably practicable" (Art 4(4)).
+--     TWO problems, both faithfully carried.
+--       (i)  The consolidated text reads "so far appears" — the word "as" is
+--            MISSING from the official consolidation. We reproduce the text
+--            verbatim (sic) and read it as "so far AS appears".
+--       (ii) "SO FAR AS ... practicable" is a DEGREE qualifier, not a binary gate;
+--            a deontic is binary. We model it as a gate on a single BOOLEAN,
+--            `it appears to the Commissioner to be reasonably practicable to seek
+--            to act in that way`. Note that the qualifier is SELF-JUDGING
+--            ("appears to HIM OR HER"), which on the orthodox administrative-law
+--            reading makes the duty reviewable only for irrationality — so a
+--            boolean the Commissioner sets is, in fact, the right shape.
+--
+-- >>> (3) ARTICLE 4(4)(b) — THE ELIDED NOUN. "(b) is proportionate as to the
+--     burdens imposed on, and supports the development of registered charities."
+--     The trailing noun phrase "registered charities" is shared by two conjuncts:
+--     "proportionate as to the burdens imposed on [registered charities]" AND
+--     "supports the development of [registered charities]". We read it as a
+--     CONJUNCTION of two limbs sharing that object, and lift both.
+--
+-- >>> (4) DEADLINES. Article 4 gives NO deadline for ANY of the general functions.
+--     They are CONTINUOUS, standing functions, not one-shot acts. A deontic needs
+--     a number, so every `WITHIN 365` below is a REVIEWABLE PLACEHOLDER for
+--     "continuously / on an ongoing basis" — an annual review period, chosen to
+--     make the trace executable and NOTHING MORE. Do not read precision into it
+--     that the statute does not have.
+-- ===========================================================================
+
+§§ `Article 3 — Establishment of Jersey Charity Commissioner (INERT-PROSE STUB)`
+
+-- Article 3 is constitutive BY FIAT. It brings a legal person into existence; it
+-- states no condition, imposes no duty, and confers no power. There is nothing to
+-- compute. Deliberate STUB so the in-order corpus has no silent gap: the verbatim
+-- text, carried inert, with NO operative outcome and NO deontic.
+--
+-- Schedule 1 (appointment, term, removal, staff, funding, annual report) is a
+-- separate slice of the corpus; Art 3(2) is the pointer to it.
+GIVETH A BOOLEAN
+`Article 3 — establishment of the Jersey Charity Commissioner (STUB)` MEANS
+        "3 Establishment of Jersey Charity Commissioner"
+    ... "(1) There is established a corporation sole to be known as the Jersey Charity Commissioner."
+    ... "(2) Schedule 1 makes further provision in respect of the Commissioner."
+
+#EVAL `Article 3 — establishment of the Jersey Charity Commissioner (STUB)`
+
+§§ `Article 4(1) — the general functions of the Commissioner`
+
+-- The seven limbs, as CHECKBOX flags rather than an enum: Art 4(1)(a) alone
+-- confers TWO functions (administer the test; operate the register), and a single
+-- act of the Commissioner will routinely answer to several limbs at once — e.g.
+-- publishing guidance on the duties of governors is both (d) and, in substance,
+-- part of (b). An enum could not represent that overlap.
+DECLARE ClaimedCommissionerFunction HAS
+    description                                                     IS A STRING
+    `(a) to administer the charity test under Part 3, and to operate the charity register under Part 4`  IS A BOOLEAN
+    `(b) to supervise the compliance of charity governors with their duties under Part 5`  IS A BOOLEAN
+    `(c) to seek to enforce the requirements of Part 6 as to use of terms restricted by or under that Part`  IS A BOOLEAN
+    `(d) to publish and maintain guidance on the operation of this Law, including guidance on the duties of governors and guidance on the charity test under Article 5(4)`  IS A BOOLEAN
+    `(e) to assist other persons to discharge, in relation to registered charities and entities with charitable purposes, any function of such a person under any enactment or law`  IS A BOOLEAN
+    `(f) generally to encourage, facilitate and monitor compliance of registered charities with this Law and any enactment under this Law`  IS A BOOLEAN
+    `(g) any other function conferred on the Commissioner by this Law or by any other enactment`  IS A BOOLEAN
+
+GIVEN f IS A ClaimedCommissionerFunction
+GIVETH A BOOLEAN
+`Article 4(1) — is a general function of the Commissioner` f MEANS
+        "(1) The general functions of the Commissioner are -"
+    ..  "(a) to administer the charity test under Part 3, and to operate the charity register under Part 4;"
+    ..  f's `(a) to administer the charity test under Part 3, and to operate the charity register under Part 4`
+    ..  "(b) to supervise the compliance of charity governors with their duties under Part 5;"
+    ..  f's `(b) to supervise the compliance of charity governors with their duties under Part 5`
+    ..  "(c) to seek to enforce the requirements of Part 6 as to use of terms restricted by or under that Part;"
+    ..  f's `(c) to seek to enforce the requirements of Part 6 as to use of terms restricted by or under that Part`
+    ..  "(d) to publish and maintain guidance on the operation of this Law, including guidance on the duties of governors and guidance on the charity test under Article 5(4);"
+    ..  f's `(d) to publish and maintain guidance on the operation of this Law, including guidance on the duties of governors and guidance on the charity test under Article 5(4)`
+    ..  "(e) to assist other persons (including the Attorney General, the court, the Bailiff, the Comptroller and the JFSC) to discharge, in relation to registered charities and entities with charitable purposes, any function of such a person under any enactment or law, particularly by giving information about registered charities and other entities under Part 7;"
+    ..  f's `(e) to assist other persons to discharge, in relation to registered charities and entities with charitable purposes, any function of such a person under any enactment or law`
+    ..  "(f) generally to encourage, facilitate and monitor compliance of registered charities with this Law and any enactment under this Law; and"
+    ..  f's `(f) generally to encourage, facilitate and monitor compliance of registered charities with this Law and any enactment under this Law`
+    ..  "(g) any other function conferred on the Commissioner by this Law or by any other enactment."
+    ..  f's `(g) any other function conferred on the Commissioner by this Law or by any other enactment`
+    -- Limb (g) IS a disjunct (unlike a catch-all "is other" checkbox, which would
+    -- be deliberately omitted): the statute expressly EXTENDS the definition to
+    -- any function conferred elsewhere. An act that answers to none of (a)-(g) is
+    -- not a function of the Commissioner at all.
+
+§§ `Article 4(2) and 4(3) — the Commissioner's powers, and the governor carve-out`
+
+DECLARE CommissionerProposedAct HAS
+    description                                                     IS A STRING
+
+    -- Article 4(2) — the chapeau test, and the parenthetical carve-out.
+    `is calculated to facilitate, or is conducive or incidental to, the performance of any of the Commissioner's functions`  IS A BOOLEAN
+    `is the act of acting as a governor of a charity or of an entity with charitable purposes`  IS A BOOLEAN
+
+    -- Article 4(3) — the three particular powers.
+    `(3)(a) providing information to the public about the system of registration of charities, including information about the difference between charities and bodies with charitable purposes, about the advantages of donating to registered charities, and by way of model constitutions`  IS A BOOLEAN
+    `(3)(b) advising the Minister as to the nature of charities in Jersey and as to the merits of any proposal for further regulation of charities`  IS A BOOLEAN
+    `(3)(c) assisting a body in a jurisdiction other than Jersey, equivalent to the Commissioner or to the Attorney General, the court, the Comptroller or the JFSC, in the performance of that body's functions under the law of that jurisdiction`  IS A BOOLEAN
+
+-- The 4(2) general power. Note the shape: a POSITIVE gate MINUS a carve-out.
+-- The carve-out is what makes this more than a truism, and it is the only thing in
+-- Article 4 that the Commissioner is forbidden to do.
+GIVEN a IS A CommissionerProposedAct
+GIVETH A BOOLEAN
+`Article 4(2) — the act is within the general incidental power` a MEANS
+        "(2) The Commissioner may do anything"
+    ... "that is calculated to facilitate, or is conducive or incidental to, the performance of any of his or her functions."
+    ... a's `is calculated to facilitate, or is conducive or incidental to, the performance of any of the Commissioner's functions`
+    AND "(other than acting as a governor of a charity or of an entity with charitable purposes)"
+    ... NOT a's `is the act of acting as a governor of a charity or of an entity with charitable purposes`
+
+-- The 4(3) particular powers. "without prejudice to the generality of his or her
+-- powers" — so these are an INDEPENDENT route: they need not pass the 4(2) gate.
+-- See INTERPRETATION CALL (1): the governor carve-out is NOT replicated here.
+GIVEN a IS A CommissionerProposedAct
+GIVETH A BOOLEAN
+`Article 4(3) — one of the particular powers` a MEANS
+        "(3) The Commissioner may in particular, without prejudice to the generality of his or her powers -"
+    ..  "(a) provide information to the public about the system of registration of charities, including information about the difference between charities and bodies with charitable purposes, information about the advantages of donating to entities that are registered as charities, and information by way of model constitutions;"
+    ..  a's `(3)(a) providing information to the public about the system of registration of charities, including information about the difference between charities and bodies with charitable purposes, about the advantages of donating to registered charities, and by way of model constitutions`
+    ..  "(b) advise the Minister as to the nature of charities in Jersey and as to the merits of any proposal for further regulation of charities;"
+    ..  a's `(3)(b) advising the Minister as to the nature of charities in Jersey and as to the merits of any proposal for further regulation of charities`
+    ..  "(c) assist a body in any jurisdiction other than Jersey, that is equivalent to the Commissioner, or to the Attorney General, the court, the Comptroller or the JFSC, in the performance of that body's functions under the law of that jurisdiction."
+    ..  a's `(3)(c) assisting a body in a jurisdiction other than Jersey, equivalent to the Commissioner or to the Attorney General, the court, the Comptroller or the JFSC, in the performance of that body's functions under the law of that jurisdiction`
+
+GIVEN a IS A CommissionerProposedAct
+GIVETH A BOOLEAN
+`Article 4 — the Commissioner may do the act` a MEANS
+        `Article 4(2) — the act is within the general incidental power` a
+    ..  `Article 4(3) — one of the particular powers` a
+
+§§ `Article 4(4) — the manner in which the Commissioner must seek to act`
+
+DECLARE CommissionerConduct HAS
+    description                                                     IS A STRING
+
+    -- The self-judging gate. See INTERPRETATION CALL (2).
+    `it appears to the Commissioner to be reasonably practicable to seek to act in that way`  IS A BOOLEAN
+
+    -- Article 4(4)(a)
+    `protects public trust and confidence in registered charities`   IS A BOOLEAN
+    `(a)(i) is compatible with the encouragement of all forms of charitable giving`  IS A BOOLEAN
+    `(a)(ii) is compatible with the encouragement of voluntary participation in the work of registered charities`  IS A BOOLEAN
+
+    -- Article 4(4)(b). See INTERPRETATION CALL (3): the elided shared object.
+    `is proportionate as to the burdens imposed on registered charities`  IS A BOOLEAN
+    `supports the development of registered charities`               IS A BOOLEAN
+
+GIVEN c IS A CommissionerConduct
+GIVETH A BOOLEAN
+`Article 4(4)(a) — protects public trust, compatibly with encouraging giving and participation` c MEANS
+        "(a) protects public trust and confidence in registered charities, and is compatible with the encouragement of -"
+    ... c's `protects public trust and confidence in registered charities`
+    AND "(i) all forms of charitable giving, and"
+    ... c's `(a)(i) is compatible with the encouragement of all forms of charitable giving`
+    AND "(ii) voluntary participation in the work of registered charities; and"
+    ... c's `(a)(ii) is compatible with the encouragement of voluntary participation in the work of registered charities`
+
+GIVEN c IS A CommissionerConduct
+GIVETH A BOOLEAN
+`Article 4(4)(b) — proportionate as to burdens, and supports development` c MEANS
+        "(b) is proportionate as to the burdens imposed on, and supports the development of registered charities."
+    ... c's `is proportionate as to the burdens imposed on registered charities`
+    AND c's `supports the development of registered charities`
+
+-- The CONTENT of the duty: what "acting in a way that ..." actually requires.
+-- (a) and (b) are joined by "and": a conjunction.
+GIVEN c IS A CommissionerConduct
+GIVETH A BOOLEAN
+`Article 4(4) — the conduct is of the required kind` c MEANS
+        "(4) In performing his or her functions, the Commissioner must, so far appears to him or her to be reasonably practicable, seek to act in a way that -"
+    ... `Article 4(4)(a) — protects public trust, compatibly with encouraging giving and participation` c
+    AND `Article 4(4)(b) — proportionate as to burdens, and supports development` c
+
+-- The duty BITES only where the gate is open. See INTERPRETATION CALL (2).
+GIVEN c IS A CommissionerConduct
+GIVETH A BOOLEAN
+`Article 4(4) — the duty bites and is complied with` c MEANS
+        "so far appears to him or her to be reasonably practicable" -- (sic: 'as' is missing in the official consolidation)
+    ..  NOT c's `it appears to the Commissioner to be reasonably practicable to seek to act in that way`
+    ..  "seek to act in a way that - (a) ... and (b) ..."
+    ..  `Article 4(4) — the conduct is of the required kind` c
+    -- A material implication, in OR-sugar: (NOT gate) OR content. Vacuously
+    -- satisfied where it does NOT appear to the Commissioner to be reasonably
+    -- practicable to seek to act in that way.
+
+§§ `Part 2 — the regulative layer`
+
+-- The acts Part 2 regulates. NOT in `charities-common`'s Action enum, so declared
+-- locally with a Part-unique name, per the corpus convention.
+DECLARE Part2Action IS ONE OF
+  -- Article 4(1) — the general functions, as DUTIES
+  `administer the charity test under Part 3`                        -- 4(1)(a)
+  `operate the charity register under Part 4`                       -- 4(1)(a)
+  `supervise the compliance of charity governors with their duties under Part 5`  -- 4(1)(b)
+  `seek to enforce the requirements of Part 6 as to use of restricted terms`      -- 4(1)(c)
+  `publish and maintain guidance on the operation of this Law`      -- 4(1)(d)
+  `assist other persons to discharge their functions in relation to charities`    -- 4(1)(e)
+  `encourage, facilitate and monitor compliance of registered charities with this Law`  -- 4(1)(f)
+  `discharge any other function conferred by this Law or by any other enactment`  -- 4(1)(g)
+
+  -- Article 4(2) and 4(3) — the POWERS, and the one thing that is forbidden
+  `do anything conducive or incidental to the performance of the Commissioner's functions`  -- 4(2)
+  `act as a governor of a charity or of an entity with charitable purposes`       -- 4(2), carved out
+  `provide information to the public about the system of registration of charities`  -- 4(3)(a)
+  `advise the Minister as to the nature of charities and the merits of proposals for further regulation`  -- 4(3)(b)
+  `assist an equivalent body in a jurisdiction other than Jersey`   -- 4(3)(c)
+
+  -- Article 4(4) — the manner-of-performance duty
+  `seek to act in a way that satisfies Article 4(4)`
+
+-- Article 4(1) — the seven functions, woven in PARALLEL. RAND, not ROR: the
+-- Commissioner does not get to ELECT which of his or her functions to discharge.
+-- Every `WITHIN 365` is the REVIEWABLE PLACEHOLDER of INTERPRETATION CALL (4):
+-- the statute gives no deadline because these are continuous functions.
+GIVETH A DEONTIC Actor Part2Action
+`Article 4(1) — the general functions, as duties on the Commissioner` MEANS
+        (PARTY Commissioner MUST `administer the charity test under Part 3` WITHIN 365)
+    RAND
+        (PARTY Commissioner MUST `operate the charity register under Part 4` WITHIN 365)
+    RAND
+        (PARTY Commissioner MUST `supervise the compliance of charity governors with their duties under Part 5` WITHIN 365)
+    RAND
+        (PARTY Commissioner MUST `seek to enforce the requirements of Part 6 as to use of restricted terms` WITHIN 365)
+    RAND
+        (PARTY Commissioner MUST `publish and maintain guidance on the operation of this Law` WITHIN 365)
+    RAND
+        (PARTY Commissioner MUST `assist other persons to discharge their functions in relation to charities` WITHIN 365)
+    RAND
+        (PARTY Commissioner MUST `encourage, facilitate and monitor compliance of registered charities with this Law` WITHIN 365)
+    RAND
+        (PARTY Commissioner MUST `discharge any other function conferred by this Law or by any other enactment` WITHIN 365)
+
+-- Article 4(2) — the general incidental POWER: a MAY, gated on the act passing the
+-- conducive/incidental test AND not being the act of acting as a governor. MAY's
+-- benign-omission default is exactly right: not exercising a power is not a breach.
+GIVEN a IS A CommissionerProposedAct
+GIVETH A DEONTIC Actor Part2Action
+`Article 4(2) — the general incidental power` a MEANS
+    IF   `Article 4(2) — the act is within the general incidental power` a
+    THEN PARTY Commissioner MAY `do anything conducive or incidental to the performance of the Commissioner's functions` WITHIN 365
+    ELSE FULFILLED
+
+-- Article 4(2)'s parenthetical, surfaced as the PROHIBITION it is. The statute
+-- expresses it as an exception carved out of a power; but an act excepted from the
+-- only power that could authorise it, and expressly named, is forbidden. SHANT:
+-- performing the act IS the breach. Unconditional — see INTERPRETATION CALL (1).
+GIVETH A DEONTIC Actor Part2Action
+`Article 4(2) — the Commissioner shall not act as a governor` MEANS
+    PARTY Commissioner SHANT `act as a governor of a charity or of an entity with charitable purposes` WITHIN 365
+
+-- Article 4(3) — the three particular powers, expressly conferred. Permissions, so
+-- MAY; woven with RAND because they are three standing powers, not a choice among
+-- three (an ROR would say the Commissioner must pick exactly one, which is wrong).
+GIVETH A DEONTIC Actor Part2Action
+`Article 4(3) — the particular powers` MEANS
+        (PARTY Commissioner MAY `provide information to the public about the system of registration of charities` WITHIN 365)
+    RAND
+        (PARTY Commissioner MAY `advise the Minister as to the nature of charities and the merits of proposals for further regulation` WITHIN 365)
+    RAND
+        (PARTY Commissioner MAY `assist an equivalent body in a jurisdiction other than Jersey` WITHIN 365)
+
+-- Article 4(4) — the QUALIFIED duty. The gate is the Commissioner's own view of
+-- what is reasonably practicable; where it is closed, the duty is vacuous.
+GIVEN c IS A CommissionerConduct
+GIVETH A DEONTIC Actor Part2Action
+`Article 4(4) — the qualified duty as to the manner of performance` c MEANS
+    IF   c's `it appears to the Commissioner to be reasonably practicable to seek to act in that way`
+    THEN PARTY Commissioner MUST `seek to act in a way that satisfies Article 4(4)` WITHIN 365
+    ELSE FULFILLED
+
+§ `Tests — Part 2`
+
+§§ `Article 4(1) — what is, and is not, a function of the Commissioner`
+
+`operating the charity register` MEANS ClaimedCommissionerFunction WITH
+    description                                                     IS "maintaining the register under Part 4"
+    `(a) to administer the charity test under Part 3, and to operate the charity register under Part 4`  IS TRUE
+    `(b) to supervise the compliance of charity governors with their duties under Part 5`  IS FALSE
+    `(c) to seek to enforce the requirements of Part 6 as to use of terms restricted by or under that Part`  IS FALSE
+    `(d) to publish and maintain guidance on the operation of this Law, including guidance on the duties of governors and guidance on the charity test under Article 5(4)`  IS FALSE
+    `(e) to assist other persons to discharge, in relation to registered charities and entities with charitable purposes, any function of such a person under any enactment or law`  IS FALSE
+    `(f) generally to encourage, facilitate and monitor compliance of registered charities with this Law and any enactment under this Law`  IS FALSE
+    `(g) any other function conferred on the Commissioner by this Law or by any other enactment`  IS FALSE
+
+#ASSERT `Article 4(1) — is a general function of the Commissioner` `operating the charity register`
+
+-- Limb (g) is the open catch-all: a function conferred by SOME OTHER enactment is
+-- still a function of the Commissioner, even though none of (a)-(f) describes it.
+`a function conferred by the Proceeds of Crime (Supervisory Bodies) Law` MEANS ClaimedCommissionerFunction WITH
+    description                                                     IS "a function conferred by another enactment entirely"
+    `(a) to administer the charity test under Part 3, and to operate the charity register under Part 4`  IS FALSE
+    `(b) to supervise the compliance of charity governors with their duties under Part 5`  IS FALSE
+    `(c) to seek to enforce the requirements of Part 6 as to use of terms restricted by or under that Part`  IS FALSE
+    `(d) to publish and maintain guidance on the operation of this Law, including guidance on the duties of governors and guidance on the charity test under Article 5(4)`  IS FALSE
+    `(e) to assist other persons to discharge, in relation to registered charities and entities with charitable purposes, any function of such a person under any enactment or law`  IS FALSE
+    `(f) generally to encourage, facilitate and monitor compliance of registered charities with this Law and any enactment under this Law`  IS FALSE
+    `(g) any other function conferred on the Commissioner by this Law or by any other enactment`  IS TRUE
+
+#ASSERT `Article 4(1) — is a general function of the Commissioner` `a function conferred by the Proceeds of Crime (Supervisory Bodies) Law`
+
+-- The negative case: an act that answers to none of (a)-(g). Investing the
+-- Commissioner's own funds on the stock market is nobody's idea of a Part 2
+-- function, and (g) does not save it because no enactment confers it.
+`speculating on the stock market` MEANS ClaimedCommissionerFunction WITH
+    description                                                     IS "trading equities for the Commissioner's own account"
+    `(a) to administer the charity test under Part 3, and to operate the charity register under Part 4`  IS FALSE
+    `(b) to supervise the compliance of charity governors with their duties under Part 5`  IS FALSE
+    `(c) to seek to enforce the requirements of Part 6 as to use of terms restricted by or under that Part`  IS FALSE
+    `(d) to publish and maintain guidance on the operation of this Law, including guidance on the duties of governors and guidance on the charity test under Article 5(4)`  IS FALSE
+    `(e) to assist other persons to discharge, in relation to registered charities and entities with charitable purposes, any function of such a person under any enactment or law`  IS FALSE
+    `(f) generally to encourage, facilitate and monitor compliance of registered charities with this Law and any enactment under this Law`  IS FALSE
+    `(g) any other function conferred on the Commissioner by this Law or by any other enactment`  IS FALSE
+
+#ASSERT NOT `Article 4(1) — is a general function of the Commissioner` `speculating on the stock market`
+
+§§ `Article 4(2) and 4(3) — the powers, and the governor carve-out`
+
+-- A plain incidental act: renting an office. Conducive to the performance of the
+-- functions; not the act of acting as a governor. Within the 4(2) general power.
+`renting an office` MEANS CommissionerProposedAct WITH
+    description                                                     IS "taking a lease of premises at Union Street"
+    `is calculated to facilitate, or is conducive or incidental to, the performance of any of the Commissioner's functions`  IS TRUE
+    `is the act of acting as a governor of a charity or of an entity with charitable purposes`  IS FALSE
+    `(3)(a) providing information to the public about the system of registration of charities, including information about the difference between charities and bodies with charitable purposes, about the advantages of donating to registered charities, and by way of model constitutions`  IS FALSE
+    `(3)(b) advising the Minister as to the nature of charities in Jersey and as to the merits of any proposal for further regulation of charities`  IS FALSE
+    `(3)(c) assisting a body in a jurisdiction other than Jersey, equivalent to the Commissioner or to the Attorney General, the court, the Comptroller or the JFSC, in the performance of that body's functions under the law of that jurisdiction`  IS FALSE
+
+#ASSERT `Article 4(2) — the act is within the general incidental power` `renting an office`
+#ASSERT NOT `Article 4(3) — one of the particular powers` `renting an office`
+#ASSERT `Article 4 — the Commissioner may do the act` `renting an office`
+
+-- >>> THE CARVE-OUT, MADE EXECUTABLE. Accepting a trusteeship of a charity would
+--     be highly conducive to supervising charities — and it is precisely the thing
+--     Article 4(2) forbids. The chapeau limb is TRUE; the carve-out knocks it out.
+`accepting a trusteeship of a registered charity` MEANS CommissionerProposedAct WITH
+    description                                                     IS "the Commissioner joins the board of a registered charity"
+    `is calculated to facilitate, or is conducive or incidental to, the performance of any of the Commissioner's functions`  IS TRUE
+    `is the act of acting as a governor of a charity or of an entity with charitable purposes`  IS TRUE
+    `(3)(a) providing information to the public about the system of registration of charities, including information about the difference between charities and bodies with charitable purposes, about the advantages of donating to registered charities, and by way of model constitutions`  IS FALSE
+    `(3)(b) advising the Minister as to the nature of charities in Jersey and as to the merits of any proposal for further regulation of charities`  IS FALSE
+    `(3)(c) assisting a body in a jurisdiction other than Jersey, equivalent to the Commissioner or to the Attorney General, the court, the Comptroller or the JFSC, in the performance of that body's functions under the law of that jurisdiction`  IS FALSE
+
+#ASSERT NOT `Article 4(2) — the act is within the general incidental power` `accepting a trusteeship of a registered charity`
+#ASSERT NOT `Article 4 — the Commissioner may do the act` `accepting a trusteeship of a registered charity`
+
+-- A 4(3)(c) power exercised on an act that would FAIL the 4(2) gate: helping the
+-- Guernsey registrar is not obviously "conducive or incidental to" the performance
+-- of any JERSEY function. It does not need to be: 4(3) confers it directly,
+-- "without prejudice to the generality of his or her powers".
+`assisting the Guernsey Registrar of Charities` MEANS CommissionerProposedAct WITH
+    description                                                     IS "helping an equivalent body in another jurisdiction"
+    `is calculated to facilitate, or is conducive or incidental to, the performance of any of the Commissioner's functions`  IS FALSE
+    `is the act of acting as a governor of a charity or of an entity with charitable purposes`  IS FALSE
+    `(3)(a) providing information to the public about the system of registration of charities, including information about the difference between charities and bodies with charitable purposes, about the advantages of donating to registered charities, and by way of model constitutions`  IS FALSE
+    `(3)(b) advising the Minister as to the nature of charities in Jersey and as to the merits of any proposal for further regulation of charities`  IS FALSE
+    `(3)(c) assisting a body in a jurisdiction other than Jersey, equivalent to the Commissioner or to the Attorney General, the court, the Comptroller or the JFSC, in the performance of that body's functions under the law of that jurisdiction`  IS TRUE
+
+#ASSERT NOT `Article 4(2) — the act is within the general incidental power` `assisting the Guernsey Registrar of Charities`
+#ASSERT `Article 4(3) — one of the particular powers` `assisting the Guernsey Registrar of Charities`
+#ASSERT `Article 4 — the Commissioner may do the act` `assisting the Guernsey Registrar of Charities`
+
+-- An act that is neither conducive nor a named 4(3) power: no power to do it.
+`sponsoring a football team` MEANS CommissionerProposedAct WITH
+    description                                                     IS "buying the shirts for St Helier FC"
+    `is calculated to facilitate, or is conducive or incidental to, the performance of any of the Commissioner's functions`  IS FALSE
+    `is the act of acting as a governor of a charity or of an entity with charitable purposes`  IS FALSE
+    `(3)(a) providing information to the public about the system of registration of charities, including information about the difference between charities and bodies with charitable purposes, about the advantages of donating to registered charities, and by way of model constitutions`  IS FALSE
+    `(3)(b) advising the Minister as to the nature of charities in Jersey and as to the merits of any proposal for further regulation of charities`  IS FALSE
+    `(3)(c) assisting a body in a jurisdiction other than Jersey, equivalent to the Commissioner or to the Attorney General, the court, the Comptroller or the JFSC, in the performance of that body's functions under the law of that jurisdiction`  IS FALSE
+
+#ASSERT NOT `Article 4 — the Commissioner may do the act` `sponsoring a football team`
+
+§§ `Article 4(4) — the manner-of-performance duty`
+
+`a proportionate registration process` MEANS CommissionerConduct WITH
+    description                                                     IS "a light-touch annual return"
+    `it appears to the Commissioner to be reasonably practicable to seek to act in that way`  IS TRUE
+    `protects public trust and confidence in registered charities`   IS TRUE
+    `(a)(i) is compatible with the encouragement of all forms of charitable giving`  IS TRUE
+    `(a)(ii) is compatible with the encouragement of voluntary participation in the work of registered charities`  IS TRUE
+    `is proportionate as to the burdens imposed on registered charities`  IS TRUE
+    `supports the development of registered charities`               IS TRUE
+
+#ASSERT `Article 4(4)(a) — protects public trust, compatibly with encouraging giving and participation` `a proportionate registration process`
+#ASSERT `Article 4(4)(b) — proportionate as to burdens, and supports development` `a proportionate registration process`
+#ASSERT `Article 4(4) — the conduct is of the required kind` `a proportionate registration process`
+#ASSERT `Article 4(4) — the duty bites and is complied with` `a proportionate registration process`
+
+-- The crushing compliance regime: it protects public trust magnificently, and it
+-- is compatible with encouraging giving and participation — but it is NOT
+-- proportionate as to the burdens it imposes. Limb (b) fails, so 4(4) fails.
+-- This is the whole point of Article 4(4)(b): trust-protection is not a trump.
+`a crushing compliance regime` MEANS CommissionerConduct WITH
+    description                                                     IS "quarterly audited accounts from every parish jumble sale"
+    `it appears to the Commissioner to be reasonably practicable to seek to act in that way`  IS TRUE
+    `protects public trust and confidence in registered charities`   IS TRUE
+    `(a)(i) is compatible with the encouragement of all forms of charitable giving`  IS TRUE
+    `(a)(ii) is compatible with the encouragement of voluntary participation in the work of registered charities`  IS TRUE
+    `is proportionate as to the burdens imposed on registered charities`  IS FALSE
+    `supports the development of registered charities`               IS FALSE
+
+#ASSERT `Article 4(4)(a) — protects public trust, compatibly with encouraging giving and participation` `a crushing compliance regime`
+#ASSERT NOT `Article 4(4)(b) — proportionate as to burdens, and supports development` `a crushing compliance regime`
+#ASSERT NOT `Article 4(4) — the conduct is of the required kind` `a crushing compliance regime`
+#ASSERT NOT `Article 4(4) — the duty bites and is complied with` `a crushing compliance regime`
+
+-- >>> THE SELF-JUDGING GATE, MADE EXECUTABLE. The SAME defective conduct, but now
+--     it does NOT appear to the Commissioner to be reasonably practicable to seek
+--     to act in the Article 4(4) way. The duty is vacuously satisfied. That is a
+--     genuine feature of the drafting, not an artefact of the encoding: "so far
+--     [as] appears TO HIM OR HER" hands the Commissioner the key to his own cage.
+`a crushing compliance regime, not reasonably practicable to soften` MEANS CommissionerConduct WITH
+    description                                                     IS "the same regime, where the Commissioner says a lighter touch is not practicable"
+    `it appears to the Commissioner to be reasonably practicable to seek to act in that way`  IS FALSE
+    `protects public trust and confidence in registered charities`   IS TRUE
+    `(a)(i) is compatible with the encouragement of all forms of charitable giving`  IS TRUE
+    `(a)(ii) is compatible with the encouragement of voluntary participation in the work of registered charities`  IS TRUE
+    `is proportionate as to the burdens imposed on registered charities`  IS FALSE
+    `supports the development of registered charities`               IS FALSE
+
+#ASSERT NOT `Article 4(4) — the conduct is of the required kind` `a crushing compliance regime, not reasonably practicable to soften`
+#ASSERT `Article 4(4) — the duty bites and is complied with` `a crushing compliance regime, not reasonably practicable to soften`
+
+-- The edge case inside limb (a): trust IS protected, but at the cost of chilling
+-- volunteering. (a) is a conjunction of three, so one FALSE conjunct sinks it.
+`a naming-and-shaming regime` MEANS CommissionerConduct WITH
+    description                                                     IS "publishing the names of every governor under investigation"
+    `it appears to the Commissioner to be reasonably practicable to seek to act in that way`  IS TRUE
+    `protects public trust and confidence in registered charities`   IS TRUE
+    `(a)(i) is compatible with the encouragement of all forms of charitable giving`  IS TRUE
+    `(a)(ii) is compatible with the encouragement of voluntary participation in the work of registered charities`  IS FALSE
+    `is proportionate as to the burdens imposed on registered charities`  IS TRUE
+    `supports the development of registered charities`               IS TRUE
+
+#ASSERT NOT `Article 4(4)(a) — protects public trust, compatibly with encouraging giving and participation` `a naming-and-shaming regime`
+#ASSERT `Article 4(4)(b) — proportionate as to burdens, and supports development` `a naming-and-shaming regime`
+#ASSERT NOT `Article 4(4) — the conduct is of the required kind` `a naming-and-shaming regime`
+#ASSERT NOT `Article 4(4) — the duty bites and is complied with` `a naming-and-shaming regime`
+
+§§ `The Part 2 duties and powers, exercised`
+
+-- Article 4(1): a Commissioner who discharges every one of the seven functions
+-- within the (placeholder) year. The RAND weave resolves to FULFILLED.
+#TRACE `Article 4(1) — the general functions, as duties on the Commissioner` AT 0 WITH
+    PARTY Commissioner DOES `administer the charity test under Part 3` AT 30
+    PARTY Commissioner DOES `operate the charity register under Part 4` AT 30
+    PARTY Commissioner DOES `supervise the compliance of charity governors with their duties under Part 5` AT 60
+    PARTY Commissioner DOES `seek to enforce the requirements of Part 6 as to use of restricted terms` AT 90
+    PARTY Commissioner DOES `publish and maintain guidance on the operation of this Law` AT 120
+    PARTY Commissioner DOES `assist other persons to discharge their functions in relation to charities` AT 150
+    PARTY Commissioner DOES `encourage, facilitate and monitor compliance of registered charities with this Law` AT 180
+    PARTY Commissioner DOES `discharge any other function conferred by this Law or by any other enactment` AT 210
+
+-- The idle Commissioner: the register is operated, and NOTHING else, all year. The
+-- act at day 400 carries the clock PAST the (placeholder) deadline, so the seven
+-- untouched duties fall due and the RAND weave resolves to BREACH. RAND means every
+-- thread must be fulfilled. (Contrast an ROR, which would have been discharged by
+-- the single act — and which is why RAND is the right weave here.)
+#TRACE `Article 4(1) — the general functions, as duties on the Commissioner` AT 0 WITH
+    PARTY Commissioner DOES `operate the charity register under Part 4` AT 30
+    PARTY Commissioner DOES `operate the charity register under Part 4` AT 400
+
+-- Article 4(2), the carve-out: the Commissioner takes a seat on a charity's board.
+-- SHANT — doing the act IS the breach.
+#TRACE `Article 4(2) — the Commissioner shall not act as a governor` AT 0 WITH
+    PARTY Commissioner DOES `act as a governor of a charity or of an entity with charitable purposes` AT 100
+
+-- The same prohibition, obeyed: the Commissioner simply never does it, and the clock
+-- runs out (the day-400 act carries us past the prohibition's window). SHANT
+-- refrained -> FULFILLED.
+#TRACE `Article 4(2) — the Commissioner shall not act as a governor` AT 0 WITH
+    PARTY Commissioner DOES `operate the charity register under Part 4` AT 400
+
+-- Article 4(2), the gated power: renting an office is within the general incidental
+-- power, and the Commissioner exercises it.
+#TRACE `Article 4(2) — the general incidental power` `renting an office` AT 0 WITH
+    PARTY Commissioner DOES `do anything conducive or incidental to the performance of the Commissioner's functions` AT 45
+
+-- The power NOT exercised, and the window runs out. MAY's benign omission:
+-- FULFILLED, no breach. A power unused is not a power abused.
+#TRACE `Article 4(2) — the general incidental power` `renting an office` AT 0 WITH
+    PARTY Commissioner DOES `operate the charity register under Part 4` AT 400
+
+-- Article 4(3): all three particular powers exercised.
+#TRACE `Article 4(3) — the particular powers` AT 0 WITH
+    PARTY Commissioner DOES `provide information to the public about the system of registration of charities` AT 30
+    PARTY Commissioner DOES `advise the Minister as to the nature of charities and the merits of proposals for further regulation` AT 60
+    PARTY Commissioner DOES `assist an equivalent body in a jurisdiction other than Jersey` AT 90
+
+-- Article 4(4): the gate is OPEN and the Commissioner seeks to act in the required
+-- way, in time.
+#TRACE `Article 4(4) — the qualified duty as to the manner of performance` `a proportionate registration process` AT 0 WITH
+    PARTY Commissioner DOES `seek to act in a way that satisfies Article 4(4)` AT 200
+
+-- The gate is open and the Commissioner does NOT so act; the window runs out.
+-- MUST, omitted past the deadline -> BREACH.
+#TRACE `Article 4(4) — the qualified duty as to the manner of performance` `a crushing compliance regime` AT 0 WITH
+    PARTY Commissioner DOES `operate the charity register under Part 4` AT 400
+
+-- >>> The gate is SHUT (it does not appear to the Commissioner to be reasonably
+--     practicable). The duty never arises: FULFILLED, on identical defective facts
+--     and an IDENTICAL event stream. Compare the trace immediately above: same
+--     conduct, same omission, same clock — and the opposite legal outcome. The only
+--     difference is the Commissioner's own opinion of what is practicable. That is
+--     INTERPRETATION CALL (2) made executable: a self-judging qualifier hands the
+--     duty-bearer the key to his own cage.
+#TRACE `Article 4(4) — the qualified duty as to the manner of performance` `a crushing compliance regime, not reasonably practicable to soften` AT 0 WITH
+    PARTY Commissioner DOES `operate the charity register under Part 4` AT 400

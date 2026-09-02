@@ -1,0 +1,10 @@
+§ EvalTraceFixture
+
+-- Regression fixture for `l4 trace` output-path handling (target T11).
+-- Has a real #EVALTRACE directive so `l4 trace` actually emits a file.
+
+GIVEN x IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE doubleNot x IS NOT NOT x
+
+#EVALTRACE doubleNot TRUE

@@ -160,4 +160,28 @@ export class ROBDD {
     go(id)
     return vars
   }
+
+  /**
+   * Probability that the function rooted at `id` evaluates TRUE under an
+   * independent model where variable `v` is true with weight `weights[v]`
+   * (default 0.5). This is a model count in probability space; because it
+   * recurses only on variables that actually appear, it is automatically
+   * correct for reduced diagrams that skip variables.
+   */
+  prob(id: BddNodeId, weights?: ReadonlyMap<number, number>): number {
+    const memo = new Map<BddNodeId, number>()
+    const go = (nId: BddNodeId): number => {
+      if (nId === ROBDD.FALSE) return 0
+      if (nId === ROBDD.TRUE) return 1
+      const cached = memo.get(nId)
+      if (cached !== undefined) return cached
+      const node = this.getNode(nId)
+      if (node.kind === 'terminal') return node.value
+      const w = weights?.get(node.var) ?? 0.5
+      const res = (1 - w) * go(node.low) + w * go(node.high)
+      memo.set(nId, res)
+      return res
+    }
+    return go(id)
+  }
 }

@@ -1,0 +1,1573 @@
+# Guardianship of Infants Act 1934
+
+## The infant, and the age this Act does not fix
+
+<!-- l4: decide:the person is an infant on the date in question -->
+
+**1.** In relation to a Person “person” and a DATE “the date in question”, the person is an infant on the date in question means consider the case distinctions of person's the date on which the person attains the age of majority :  when NOTHING has  then NOTHING. when JUST has the date of majority then JUST with Day with the date in question is less than Day with the date of majority.
+
+<!-- l4: decide:the date on which the person attains the age of majority, computed from the date of birth -->
+
+**2.** In relation to a Person “person” and a NUMBER “the age of majority, in years”, the date on which the person attains the age of majority, computed from the date of birth means consider the case distinctions of person's date of birth :  when NOTHING has  then NOTHING. when JUST has the date of birth then JUST with Date with DATE_DAY with the date of birth, DATE_MONTH with the date of birth and the sum of DATE_YEAR with the date of birth and the age of majority, in years.
+
+## Helpers -- facts the Act reads, in the shape the ontology stores them
+
+<!-- l4: decide:the person is dead -->
+
+**3.** In relation to a Person “person”, the person is dead means consider the case distinctions of person's vital status :  when living has  then FALSE. when died on has the date of death then TRUE. when dead, the date of death not known has  then TRUE.
+
+<!-- l4: decide:the person remains alive -->
+
+**4.** In relation to a Person “person”, the person remains alive if the person is not dead with person.
+
+<!-- l4: decide:the parent is in evidence and has died -->
+
+**5.** In relation to an optional Person “parent”, the parent is in evidence and has died means consider the case distinctions of parent :  when NOTHING has  then FALSE. when JUST has p then the person is dead with p.
+
+<!-- l4: decide:the parent is in evidence and remains alive -->
+
+**6.** In relation to an optional Person “parent”, the parent is in evidence and remains alive means consider the case distinctions of parent :  when NOTHING has  then FALSE. when JUST has p then the person remains alive with p.
+
+<!-- l4: decide:the parent is not in evidence -->
+
+**7.** In relation to an optional Person “parent”, the parent is not in evidence means isNothing with parent.
+
+<!-- l4: decide:the reference for the guardian -->
+
+**8.** In relation to a Guardian “guardian”, the reference for the guardian means guardian's the guardian's the reference for this person.
+
+<!-- l4: decide:the guardian is dead or refuses to act -->
+
+**9.** In relation to a Guardian “guardian”, the guardian is dead or refuses to act if—
+
+    (a) the person is dead with guardian's the guardian; or
+
+    (b) guardian's refuses to act.
+
+<!-- l4: decide:the guardian has been removed from his guardianship by the court -->
+
+**10.** In relation to a Guardian “guardian”, the guardian has been removed from his guardianship by the court means guardian's removed from his guardianship by the court.
+
+<!-- l4: decide:the guardian is able and willing to act and has not been removed -->
+
+**11.** In relation to a Guardian “guardian”, the guardian is able and willing to act and has not been removed if—
+
+    (a) the guardian is not dead or refuses to act with guardian; and
+
+    (b) the guardian does not have been removed from his guardianship by the court with guardian.
+
+<!-- l4: decide:a guardian of the property of the infant -->
+
+**12.** In relation to a Guardian “guardian”, a guardian of the property of the infant means consider the case distinctions of guardian's of the person or of the property :  when guardian of the person of the infant has  then FALSE. when guardian of the property of the infant has  then TRUE. when guardian of the person and property of the infant has  then TRUE.
+
+<!-- l4: decide:a guardian of the person of the infant -->
+
+**13.** In relation to a Guardian “guardian”, a guardian of the person of the infant means consider the case distinctions of guardian's of the person or of the property :  when guardian of the person of the infant has  then TRUE. when guardian of the property of the infant has  then FALSE. when guardian of the person and property of the infant has  then TRUE.
+
+<!-- l4: decide:appointed by the father by deed or will under section 7(1) -->
+
+**14.** In relation to a Guardian “guardian”, appointed by the father by deed or will under section 7(1) means consider the case distinctions of guardian's how the guardian was appointed :  when appointed by the father by deed has  then TRUE. when appointed by the father by will has  then TRUE. in any other case FALSE.
+
+<!-- l4: decide:appointed by the mother by deed or will under section 7(2) -->
+
+**15.** In relation to a Guardian “guardian”, appointed by the mother by deed or will under section 7(2) means consider the case distinctions of guardian's how the guardian was appointed :  when appointed by the mother by deed has  then TRUE. when appointed by the mother by will has  then TRUE. in any other case FALSE.
+
+<!-- l4: decide:appointed by a parent by deed or will under section 7(1) or (2) -->
+
+**16.** In relation to a Guardian “guardian”, appointed by a parent by deed or will under section 7(1) or (2) if—
+
+    (a) appointed by the father by deed or will under section 7(1) with guardian; or
+
+    (b) appointed by the mother by deed or will under section 7(2) with guardian.
+
+<!-- l4: decide:a person appointed by the court -->
+
+**17.** In relation to a Guardian “guardian”, a person appointed by the court means consider the case distinctions of guardian's how the guardian was appointed :  when appointed by the court to act jointly with the surviving parent has  then TRUE. when appointed by the court where the infant has no parent has  then TRUE. when appointed by the court in place of a removed guardian has  then TRUE. in any other case FALSE.
+
+## 1. Short title
+
+<!-- l4: decide:the short title of this Act -->
+
+**18.** The short title of this Act means Guardianship of Infants Act 1934.
+
+## 2. Interpretation
+
+<!-- l4: declare:Forum -->
+
+**19.** In this Act, “Forum” means one of the following—
+
+    (a) “the General Division of the High Court or a Family Court”, having a “which of them” (a Court);
+
+    (b) “a District Court”; or
+
+    (c) “a Magistrate's Court”.
+
+<!-- l4: decide:the forum is a court within the meaning of section 2 -->
+
+**20.** In relation to a Forum “forum”, the forum is a court within the meaning of section 2 means consider the case distinctions of forum :  when the General Division of the High Court or a Family Court has c then TRUE. when a District Court has  then FALSE. when a Magistrate's Court has  then FALSE.
+
+## 3. Welfare of infant to be paramount consideration
+
+<!-- l4: declare:A question in proceedings before a court -->
+
+**21.** In this Act, “A question in proceedings before a court” means one of the following—
+
+    (a) “the custody of an infant”;
+
+    (b) “the upbringing of an infant”;
+
+    (c) “the administration of any property belonging to or held in trust for an infant”;
+
+    (d) “the application of the income thereof”; or
+
+    (e) “a question of some other kind”.
+
+<!-- l4: decide:the question is one of those section 3 names -->
+
+**22.** In relation to an A question in proceedings before a court “question”, the question is one of those section 3 names means consider the case distinctions of question :  when a question of some other kind has  then FALSE. in any other case TRUE.
+
+<!-- l4: decide:section 3 reaches proceedings before the forum -->
+
+**23.** In relation to a Forum “forum”, section 3 reaches proceedings before the forum means consider the case distinctions of forum :  when the General Division of the High Court or a Family Court has c then TRUE. when a District Court has  then TRUE. when a Magistrate's Court has  then TRUE.
+
+<!-- l4: decide:section 3 governs the deciding of the question -->
+
+**24.** In relation to a Forum “forum” and an A question in proceedings before a court “question”, section 3 governs the deciding of the question if—
+
+    (a) Where in any proceedings before any court;
+
+    (b) section 3 reaches proceedings before the forum with forum;
+
+    (c) the custody or upbringing of an infant or the administration of any property belonging to or held in trust for an infant or the application of the income thereof is in question,; and
+
+    (d) the question is one of those section 3 names with question.
+
+<!-- l4: declare:The standing of the parents under section 3 -->
+
+**25.** In this Act, “The standing of the parents under section 3” means one of the following—
+
+    (a) “neither the father nor the mother is deemed to have any right or claim superior to that of the other”; or
+
+    (b) “the welfare of the infant otherwise requires, and to that extent the deeming rule in section 3 does not apply”.
+
+<!-- l4: decide:the standing of the father and the mother in deciding the question -->
+
+**26.** In relation to a Forum “forum”, an A question in proceedings before a court “question” and a BOOLEAN “such welfare otherwise requires”, the standing of the father and the mother in deciding the question means if not section 3 governs the deciding of the question with forum and question then NOTHING if such welfare otherwise requires then JUST with the welfare of the infant otherwise requires, and to that extent the deeming rule in section 3 does not apply otherwise JUST with neither the father nor the mother is deemed to have any right or claim superior to that of the other.
+
+## 4. Equal right of mother to apply to court
+
+<!-- l4: decide:the mother has the like powers of applying to the court in respect of the matter -->
+
+**27.** In relation to a BOOLEAN “the matter affects the infant” and a BOOLEAN “the father possesses the power of applying to the court in respect of the matter”, the mother has the like powers of applying to the court in respect of the matter if—
+
+    (a) the matter affects the infant; and
+
+    (b) the father possesses the power of applying to the court in respect of the matter.
+
+## 5. Power of court to make, discharge or amend orders for custody and maintenance of infants
+
+## 5A. Enforcement of child access order
+
+<!-- l4: declare:A breach of an access order -->
+
+**28.** In this Act, “A breach of an access order” means a record consisting of—
+
+    (a) “the reference for X, the person given access to the child by the access order”, being a STRING;
+
+    (b) “the reference for Y, the person required by the order to give X access to the child”, being a STRING;
+
+    (c) “the court makes an order under section 5 giving X access to a child”, being a BOOLEAN; and
+
+    (d) “the order is breached by Y”, being a BOOLEAN.
+
+<!-- l4: decide:section 5A applies -->
+
+**29.** In relation to an A breach of an access order “breach”, section 5A applies if—
+
+    (a) (a) the court makes an order under section 5 (called in this section the access order) giving a person (X) access to a child; and;
+
+    (b) breach's the court makes an order under section 5 giving X access to a child;
+
+    (c) (b) the order is breached by the person (Y) who is required by the order to give X access to the child.; and
+
+    (d) breach's the order is breached by Y.
+
+<!-- l4: decide:X may apply to the court to enforce the access order against Y -->
+
+**30.** In relation to an A breach of an access order “breach”, X may apply to the court to enforce the access order against Y means section 5A applies with breach.
+
+<!-- l4: declare:A sentence under section 5A(3)(e) -->
+
+**31.** In this Act, “A sentence under section 5A(3)(e)” means a record consisting of—
+
+    (a) “the fine imposed, in dollars”, being an optional Money; and
+
+    (b) “the term of imprisonment imposed, in months”, being an optional NUMBER.
+
+<!-- l4: decide:the sentence is one the court may pass under section 5A(3)(e) -->
+
+**32.** In relation to an A sentence under section 5A(3)(e) “sentence”, the sentence is one the court may pass under section 5A(3)(e) if—
+
+    (a) a fine or imprisonment or both was imposed;
+
+    (b) the fine does not exceed $20,000; and
+
+    (c) the term of imprisonment does not exceed 12 months.
+
+For the purposes of this provision—
+
+“a fine or imprisonment or both was imposed” means isJust with sentence's the fine imposed, in dollars or isJust with sentence's the term of imprisonment imposed, in months;
+
+“the fine does not exceed $20,000” means consider the case distinctions of sentence's the fine imposed, in dollars :  when NOTHING has  then TRUE. when JUST has f then f is at most 20000;
+
+“the term of imprisonment does not exceed 12 months” means consider the case distinctions of sentence's the term of imprisonment imposed, in months :  when NOTHING has  then TRUE. when JUST has t then t is at most 12;
+
+<!-- l4: decide:the order under section 5A(3)(a) is within section 5A(4) -->
+
+**33.** In relation to a NUMBER “the additional access ordered under section 5A(3)(a)” and a NUMBER “the access to which X is entitled under the access order”, the order under section 5A(3)(a) is within section 5A(4) means the additional access ordered under section 5A(3)(a) is at most the access to which X is entitled under the access order.
+
+<!-- l4: decide:the court may return to the question subsequently without X having to make a fresh application -->
+
+**34.** In relation to a BOOLEAN “the court, in making an order under subsection (3)(a), (b), (c) or (d) in respect of the breach, has reserved the question whether Y should also be sentenced under subsection (3)(e)”, the court may return to the question subsequently without X having to make a fresh application means the court, in making an order under subsection (3)(a), (b), (c) or (d) in respect of the breach, has reserved the question whether Y should also be sentenced under subsection (3)(e).
+
+<!-- l4: declare:What X has done in respect of the breach -->
+
+**35.** In this Act, “What X has done in respect of the breach” means one of the following—
+
+    (a) “neither”;
+
+    (b) “made an application under subsection (2)”;
+
+    (c) “brought proceedings to punish Y for contempt of court in respect of that breach”; or
+
+    (d) “both made an application under subsection (2) and brought proceedings for contempt”.
+
+<!-- l4: decide:X has kept within the election permitted by section 5A(6) -->
+
+**36.** In relation to a What X has done in respect of the breach “what X has done”, X has kept within the election permitted by section 5A(6) means consider the case distinctions of what X has done :  when both made an application under subsection (2) and brought proceedings for contempt has  then FALSE. in any other case TRUE.
+
+<!-- l4: declare:A step taken by a Family Court in respect of an access order made by the General Division of the High Court -->
+
+**37.** In this Act, “A step taken by a Family Court in respect of an access order made by the General Division of the High Court” means one of the following—
+
+    (a) “enforcement in accordance with section 5A”; or
+
+    (b) “variation of the order”.
+
+<!-- l4: decide:a Family Court has power to take the step -->
+
+**38.** In relation to an A step taken by a Family Court in respect of an access order made by the General Division of the High Court “step”, a Family Court has power to take the step means consider the case distinctions of step :  when enforcement in accordance with section 5A has  then TRUE. when variation of the order has  then FALSE.
+
+## 6. Rights of surviving parent as to guardianship
+
+<!-- l4: decide:the mother is guardian of the infant under section 6(1) -->
+
+**39.** In relation to an Infant “infant”, the mother is guardian of the infant under section 6(1) if—
+
+    (a) On the death of the father of an infant,;
+
+    (b) the parent is in evidence and has died with infant's the father of the infant;
+
+    (c) the mother, if surviving,; and
+
+    (d) the parent is in evidence and remains alive with infant's the mother of the infant.
+
+<!-- l4: decide:the father is guardian of the infant under section 6(2) -->
+
+**40.** In relation to an Infant “infant”, the father is guardian of the infant under section 6(2) if—
+
+    (a) On the death of the mother of an infant,;
+
+    (b) the parent is in evidence and has died with infant's the mother of the infant;
+
+    (c) the father, if surviving,; and
+
+    (d) the parent is in evidence and remains alive with infant's the father of the infant.
+
+<!-- l4: decide:the guardians appointed by the father -->
+
+**41.** In relation to an Infant “infant”, the guardians appointed by the father means filter with given g then appointed by the father by deed or will under section 7(1) with g and not the guardian has been removed from his guardianship by the court with g and infant's the guardians of the infant.
+
+<!-- l4: decide:the guardians appointed by the mother -->
+
+**42.** In relation to an Infant “infant”, the guardians appointed by the mother means filter with given g then appointed by the mother by deed or will under section 7(2) with g and not the guardian has been removed from his guardianship by the court with g and infant's the guardians of the infant.
+
+<!-- l4: decide:the guardians appointed by the father who are able and willing to act -->
+
+**43.** In relation to an Infant “infant”, the guardians appointed by the father who are able and willing to act means filter with the guardian is able and willing to act and has not been removed and the guardians appointed by the father with infant.
+
+<!-- l4: decide:the guardians appointed by the mother who are able and willing to act -->
+
+**44.** In relation to an Infant “infant”, the guardians appointed by the mother who are able and willing to act means filter with the guardian is able and willing to act and has not been removed and the guardians appointed by the mother with infant.
+
+<!-- l4: decide:the parent has been removed from his guardianship by the court under section 10 -->
+
+**45.** In relation to an Infant “infant” and an optional Person “parent”, the parent has been removed from his guardianship by the court under section 10 means consider the case distinctions of parent :  when NOTHING has  then FALSE. when JUST has p then any with given g then he holds by virtue of surviving the other parent with g and g's the guardian's the reference for this person is equal to p's the reference for this person and the guardian has been removed from his guardianship by the court with g and infant's the guardians of the infant.
+
+<!-- l4: decide:the mother holds the guardianship section 6(1) gives her -->
+
+**46.** In relation to an Infant “infant”, the mother holds the guardianship section 6(1) gives her if—
+
+    (a) the mother is guardian of the infant under section 6(1) with infant; and
+
+    (b) the parent does not have been removed from his guardianship by the court under section 10 with infant and infant's the mother of the infant.
+
+<!-- l4: decide:the father holds the guardianship section 6(2) gives him -->
+
+**47.** In relation to an Infant “infant”, the father holds the guardianship section 6(2) gives him if—
+
+    (a) the father is guardian of the infant under section 6(2) with infant; and
+
+    (b) the parent does not have been removed from his guardianship by the court under section 10 with infant and infant's the father of the infant.
+
+<!-- l4: decide:the mother is guardian either alone or jointly with any guardian appointed by the father -->
+
+**48.** In relation to an Infant “infant”, the mother is guardian either alone or jointly with any guardian appointed by the father means if not the mother holds the guardianship section 6(1) gives her with infant then NOTHING if count with the guardians appointed by the father who are able and willing to act with infant is equal to 0 then JUST with alone otherwise JUST with jointly with with map with the reference for the guardian and the guardians appointed by the father who are able and willing to act with infant.
+
+<!-- l4: decide:the father is guardian either alone or jointly with any guardian appointed by the mother -->
+
+**49.** In relation to an Infant “infant”, the father is guardian either alone or jointly with any guardian appointed by the mother means if not the father holds the guardianship section 6(2) gives him with infant then NOTHING if count with the guardians appointed by the mother who are able and willing to act with infant is equal to 0 then JUST with alone otherwise JUST with jointly with with map with the reference for the guardian and the guardians appointed by the mother who are able and willing to act with infant.
+
+<!-- l4: decide:the court may appoint a guardian to act jointly with the mother under section 6(1) -->
+
+**50.** In relation to an Infant “infant”, the court may appoint a guardian to act jointly with the mother under section 6(1) if—
+
+    (a) the mother holds the guardianship section 6(1) gives her with infant; and
+
+    (b) any of the following applies—
+
+        (i) When no guardian has been appointed by the father;
+
+        (ii) count with the guardians appointed by the father with infant is equal to 0;
+
+        (iii) or if the guardian or guardians appointed by the father is or are dead or refuses or refuse to act,; or
+
+        (iv) all with the guardian is dead or refuses to act and the guardians appointed by the father with infant.
+
+<!-- l4: decide:the court may appoint a guardian to act jointly with the father under section 6(2) -->
+
+**51.** In relation to an Infant “infant”, the court may appoint a guardian to act jointly with the father under section 6(2) if—
+
+    (a) the father holds the guardianship section 6(2) gives him with infant; and
+
+    (b) any of the following applies—
+
+        (i) When no guardian has been appointed by the mother;
+
+        (ii) count with the guardians appointed by the mother with infant is equal to 0;
+
+        (iii) or if the guardian or guardians appointed by the mother is or are dead or refuses or refuse to act,; or
+
+        (iv) all with the guardian is dead or refuses to act and the guardians appointed by the mother with infant.
+
+<!-- l4: decide:the infant has no parent -->
+
+**52.** In relation to an Infant “infant”, the infant has no parent if—
+
+    (a) the parent is in evidence and has died with infant's the father of the infant; and
+
+    (b) the parent is in evidence and has died with infant's the mother of the infant.
+
+<!-- l4: decide:the infant has no guardian of the person -->
+
+**53.** In relation to an Infant “infant”, the infant has no guardian of the person if—
+
+    (a) no guardian of the person;
+
+    (b) no parent is guardian of the infant by force of section 6; and
+
+    (c) no person recorded as a guardian of his person acts as one.
+
+For the purposes of this provision—
+
+“no parent is guardian of the infant by force of section 6” means count with the surviving parent who is guardian under section 6 with infant is equal to 0;
+
+“no person recorded as a guardian of his person acts as one” means count with filter with given g then a guardian of the person of the infant with g and the standing is one in which he acts as guardian of the infant with the standing of the guardian under this Act with g and infant and infant's the guardians of the infant is equal to 0;
+
+<!-- l4: decide:the court may appoint an applicant to be the guardian of the infant under section 6(3) -->
+
+**54.** In relation to an Infant “infant”, the court may appoint an applicant to be the guardian of the infant under section 6(3) if—
+
+    (a) Where an infant has no parent,;
+
+    (b) the infant has no parent with infant;
+
+    (c) no guardian of the person;
+
+    (d) the infant has no guardian of the person with infant;
+
+    (e) and no other person having parental rights with respect to him,; and
+
+    (f) infant's some other person does not have parental rights with respect to him.
+
+## 7. Power of father and mother to appoint testamentary guardians
+
+### 7(1)-(2). Who may appoint, and from when the appointment operates
+
+<!-- l4: decide:the parent by whom the guardian was appointed -->
+
+**55.** In relation to a Guardian “guardian” and an Infant “infant”, the parent by whom the guardian was appointed means consider the case distinctions of guardian's how the guardian was appointed :  when appointed by the father by deed has  then infant's the father of the infant. when appointed by the father by will has  then infant's the father of the infant. when appointed by the mother by deed has  then infant's the mother of the infant. when appointed by the mother by will has  then infant's the mother of the infant. in any other case NOTHING.
+
+<!-- l4: decide:the other parent, the mother or father as the case may be -->
+
+**56.** In relation to a Guardian “guardian” and an Infant “infant”, the other parent, the mother or father as the case may be means consider the case distinctions of guardian's how the guardian was appointed :  when appointed by the father by deed has  then infant's the mother of the infant. when appointed by the father by will has  then infant's the mother of the infant. when appointed by the mother by deed has  then infant's the father of the infant. when appointed by the mother by will has  then infant's the father of the infant. in any other case NOTHING.
+
+<!-- l4: decide:the appointment under section 7(1) or (2) has taken effect -->
+
+**57.** In relation to a Guardian “guardian” and an Infant “infant”, the appointment under section 7(1) or (2) has taken effect if—
+
+    (a) appointed by a parent by deed or will under section 7(1) or (2) with guardian; and
+
+    (b) the parent is in evidence and has died with the parent by whom the guardian was appointed with guardian and infant.
+
+### 7(3). Joint action with the surviving parent, unless that parent objects
+
+<!-- l4: decide:the guardian so appointed acts jointly with the mother or father under section 7(3) -->
+
+**58.** In relation to a Guardian “guardian” and an Infant “infant”, the guardian so appointed acts jointly with the mother or father under section 7(3) if—
+
+    (a) the appointment under section 7(1) or (2) has taken effect with guardian and infant;
+
+    (b) so long as the mother or father remains alive,;
+
+    (c) the parent is in evidence and remains alive with the other parent, the mother or father as the case may be with guardian and infant;
+
+    (d) unless the mother or father objects to his so acting.; and
+
+    (e) it is not the case that guardian's the mother or father objects to his so acting.
+
+### 7(4). Application to the court, and what follows from each order
+
+<!-- l4: decide:the guardian may apply to the court under section 7(4) -->
+
+**59.** In relation to a Guardian “guardian” and an Infant “infant”, the guardian may apply to the court under section 7(4) if—
+
+    (a) Any guardian so appointed;
+
+    (b) the appointment under section 7(1) or (2) has taken effect with guardian and infant;
+
+    (c) so long as the mother or father remains alive,;
+
+    (d) the parent is in evidence and remains alive with the other parent, the mother or father as the case may be with guardian and infant; and
+
+    (e) any of the following applies—
+
+        (i) If the mother or father so objects,;
+
+        (ii) guardian's the mother or father objects to his so acting;
+
+        (iii) or if the guardian so appointed as aforesaid considers that the mother or father is unfit to have the custody of the infant,; or
+
+        (iv) guardian's considers that the mother or father is unfit to have the custody of the infant.
+
+<!-- l4: declare:The order the court may make under section 7(4) -->
+
+**60.** In this Act, “The order the court may make under section 7(4)” means one of the following—
+
+    (a) “the court refuses to make any order”;
+
+    (b) “the court orders that the guardian so appointed shall act jointly with the mother or father”; or
+
+    (c) “the court orders that he shall be sole guardian of the infant”.
+
+<!-- l4: declare:Who is guardian after an order under section 7(4) -->
+
+**61.** In this Act, “Who is guardian after an order under section 7(4)” means one of the following—
+
+    (a) “the mother or father remains sole guardian”;
+
+    (b) “the guardian so appointed acts jointly with the mother or father”; or
+
+    (c) “the guardian so appointed is sole guardian of the infant”.
+
+<!-- l4: decide:who is guardian after the order under section 7(4) -->
+
+**62.** In relation to a The order the court may make under section 7(4) “order”, who is guardian after the order under section 7(4) means consider the case distinctions of order :  when the court refuses to make any order has  then the mother or father remains sole guardian. when the court orders that the guardian so appointed shall act jointly with the mother or father has  then the guardian so appointed acts jointly with the mother or father. when the court orders that he shall be sole guardian of the infant has  then the guardian so appointed is sole guardian of the infant.
+
+<!-- l4: decide:the court may make the further orders under section 7(4) as to custody, access and maintenance -->
+
+**63.** In relation to a The order the court may make under section 7(4) “order”, the court may make the further orders under section 7(4) as to custody, access and maintenance means consider the case distinctions of order :  when the court orders that he shall be sole guardian of the infant has  then TRUE. in any other case FALSE.
+
+### 7(5). Guardians appointed by both parents act jointly after the second death
+
+<!-- l4: decide:guardians are appointed by both parents -->
+
+**64.** In relation to an Infant “infant”, guardians are appointed by both parents if—
+
+    (a) count with the guardians appointed by the father who are able and willing to act with infant is at least 1; and
+
+    (b) count with the guardians appointed by the mother who are able and willing to act with infant is at least 1.
+
+<!-- l4: decide:section 7(5) is engaged -->
+
+**65.** In relation to an Infant “infant”, section 7(5) is engaged if—
+
+    (a) Where guardians are appointed by both parents,;
+
+    (b) guardians are appointed by both parents with infant;
+
+    (c) the guardians so appointed shall after the death of the surviving parent act jointly.; and
+
+    (d) the infant has no parent with infant.
+
+<!-- l4: decide:the guardians who act jointly under section 7(5) -->
+
+**66.** In relation to an Infant “infant”, the guardians who act jointly under section 7(5) means if not section 7(5) is engaged with infant, then EMPTY; otherwise, map with the reference for the guardian and append with the guardians appointed by the father who are able and willing to act with infant and the guardians appointed by the mother who are able and willing to act with infant.
+
+### 7(6). The court's appointee after the death of the parent he was appointed to act with
+
+<!-- l4: decide:the date of death of the person, if known -->
+
+**67.** In relation to a Person “person”, the date of death of the person, if known means consider the case distinctions of person's vital status :  when living has  then NOTHING. when died on has the date of death then JUST with the date of death. when dead, the date of death not known has  then NOTHING.
+
+<!-- l4: decide:the later of the two deaths -->
+
+**68.** In relation to a Person “the first person” and a Person “the second person”, the later of the two deaths means consider the case distinctions of the date of death of the person, if known with the first person :  when NOTHING has  then NOTHING. when JUST has the first date then consider the case distinctions of the date of death of the person, if known with the second person :  when NOTHING has  then NOTHING. when JUST has the second date then if Day with the first date is greater than Day with the second date then JUST with the first person if Day with the second date is greater than Day with the first date then JUST with the second person otherwise NOTHING.
+
+<!-- l4: decide:the parent who survived the other -->
+
+**69.** In relation to an Infant “infant”, the parent who survived the other means consider the case distinctions of infant's the father of the infant :  when NOTHING has  then NOTHING. when JUST has the father then consider the case distinctions of infant's the mother of the infant :  when NOTHING has  then NOTHING. when JUST has the mother then if the person remains alive with the father and the person is dead with the mother then JUST with the father if the person remains alive with the mother and the person is dead with the father then JUST with the mother if the person is dead with the father and the person is dead with the mother then the later of the two deaths with the father and the mother otherwise NOTHING.
+
+<!-- l4: decide:the person is the father of the infant -->
+
+**70.** In relation to a Person “person” and an Infant “infant”, the person is the father of the infant means consider the case distinctions of infant's the father of the infant :  when NOTHING has  then FALSE. when JUST has f then f's the reference for this person is equal to person's the reference for this person.
+
+<!-- l4: decide:the person is the mother of the infant -->
+
+**71.** In relation to a Person “person” and an Infant “infant”, the person is the mother of the infant means consider the case distinctions of infant's the mother of the infant :  when NOTHING has  then FALSE. when JUST has m then m's the reference for this person is equal to person's the reference for this person.
+
+<!-- l4: decide:the guardians appointed by the parent who survived the other, who are able and willing to act -->
+
+**72.** In relation to an Infant “infant”, the guardians appointed by the parent who survived the other, who are able and willing to act means consider the case distinctions of the parent who survived the other with infant :  when NOTHING has  then EMPTY. when JUST has the surviving parent then if the person is the father of the infant with the surviving parent and infant then the guardians appointed by the father who are able and willing to act with infant else the guardians appointed by the mother who are able and willing to act with infant.
+
+<!-- l4: decide:the reference for the parent who survived the other -->
+
+**73.** In relation to an Infant “infant”, the reference for the parent who survived the other means the reference for the parent, if in evidence with the parent who survived the other with infant.
+
+<!-- l4: decide:the references for the guardians appointed by the parent who survived the other -->
+
+**74.** In relation to an Infant “infant”, the references for the guardians appointed by the parent who survived the other means map with the reference for the guardian and the guardians appointed by the parent who survived the other, who are able and willing to act with infant.
+
+### The composition: what standing each person has, and who the guardians are
+
+<!-- l4: declare:The standing of a guardian under this Act -->
+
+**75.** In this Act, “The standing of a guardian under this Act” means one of the following—
+
+    (a) “he has been removed from his guardianship by the court”;
+
+    (b) “he is dead or refuses to act”;
+
+    (c) “whether he acts, and with whom, cannot be determined on the facts recorded”;
+
+    (d) “he continues to act after the death of the surviving parent, but which parent survived, and so whom he acts jointly with, cannot be determined on the facts recorded”;
+
+    (e) “the appointment has not taken effect, the parent who appointed him being alive”;
+
+    (f) “he acts jointly with the mother or father, as the case may be”;
+
+    (g) “the mother or father objects to his so acting, and he does not act jointly”;
+
+    (h) “after the death of the surviving parent the guardians appointed by both parents act jointly”;
+
+    (i) “after the death of the surviving parent he acts as guardian of the infant”;
+
+    (j) “he acts jointly with the surviving parent, the court having appointed him to do so”;
+
+    (k) “he continues to act after the death of the surviving parent, jointly with the guardian appointed by that parent”;
+
+    (l) “he continues to act after the death of the surviving parent”;
+
+    (m) “he acts as guardian of the infant, the infant having no parent”;
+
+    (n) “he acts as guardian in place of a guardian removed by the court”;
+
+    (o) “he is guardian by virtue of surviving the other parent”; or
+
+    (p) “section 6 does not make him guardian by virtue of surviving the other parent”.
+
+<!-- l4: decide:the standing of a guardian appointed by a parent by deed or will -->
+
+**76.** In relation to a Guardian “guardian” and an Infant “infant”, the standing of a guardian appointed by a parent by deed or will means if the parent is not in evidence with the parent by whom the guardian was appointed with guardian and infant or the parent is not in evidence with the other parent, the mother or father as the case may be with guardian and infant then whether he acts, and with whom, cannot be determined on the facts recorded if not the parent is in evidence and has died with the parent by whom the guardian was appointed with guardian and infant then the appointment has not taken effect, the parent who appointed him being alive if the parent is in evidence and remains alive with the other parent, the mother or father as the case may be with guardian and infant then if guardian's the mother or father objects to his so acting then the mother or father objects to his so acting, and he does not act jointly else he acts jointly with the mother or father, as the case may be if section 7(5) is engaged with infant then after the death of the surviving parent the guardians appointed by both parents act jointly otherwise after the death of the surviving parent he acts as guardian of the infant.
+
+<!-- l4: decide:the standing of a guardian appointed by the court to act jointly with the surviving parent -->
+
+**77.** In relation to a Guardian “guardian” and an Infant “infant”, the standing of a guardian appointed by the court to act jointly with the surviving parent means consider the case distinctions of the parent who survived the other with infant :  when NOTHING has  then if the infant has no parent with infant then he continues to act after the death of the surviving parent, but which parent survived, and so whom he acts jointly with, cannot be determined on the facts recorded else whether he acts, and with whom, cannot be determined on the facts recorded. when JUST has the surviving parent then if the person remains alive with the surviving parent then he acts jointly with the surviving parent, the court having appointed him to do so if count with the guardians appointed by the parent who survived the other, who are able and willing to act with infant is at least 1 then he continues to act after the death of the surviving parent, jointly with the guardian appointed by that parent otherwise he continues to act after the death of the surviving parent.
+
+<!-- l4: decide:the standing of a parent who holds by virtue of surviving the other parent -->
+
+**78.** In relation to a Guardian “guardian” and an Infant “infant”, the standing of a parent who holds by virtue of surviving the other parent means if the mother is guardian of the infant under section 6(1) with infant and the person is the mother of the infant with guardian's the guardian and infant then he is guardian by virtue of surviving the other parent if the father is guardian of the infant under section 6(2) with infant and the person is the father of the infant with guardian's the guardian and infant then he is guardian by virtue of surviving the other parent otherwise section 6 does not make him guardian by virtue of surviving the other parent.
+
+<!-- l4: decide:the standing of the guardian under this Act -->
+
+**79.** In relation to a Guardian “guardian” and an Infant “infant”, the standing of the guardian under this Act means if the guardian has been removed from his guardianship by the court with guardian then he has been removed from his guardianship by the court if the guardian is dead or refuses to act with guardian then he is dead or refuses to act otherwise the standing according to how the guardian was appointed with guardian and infant.
+
+<!-- l4: decide:the standing according to how the guardian was appointed -->
+
+**80.** In relation to a Guardian “guardian” and an Infant “infant”, the standing according to how the guardian was appointed means consider the case distinctions of guardian's how the guardian was appointed :  when guardian by virtue of surviving the other parent has  then the standing of a parent who holds by virtue of surviving the other parent with guardian and infant. when appointed by the father by deed has  then the standing of a guardian appointed by a parent by deed or will with guardian and infant. when appointed by the father by will has  then the standing of a guardian appointed by a parent by deed or will with guardian and infant. when appointed by the mother by deed has  then the standing of a guardian appointed by a parent by deed or will with guardian and infant. when appointed by the mother by will has  then the standing of a guardian appointed by a parent by deed or will with guardian and infant. when appointed by the court to act jointly with the surviving parent has  then the standing of a guardian appointed by the court to act jointly with the surviving parent with guardian and infant. when appointed by the court where the infant has no parent has  then he acts as guardian of the infant, the infant having no parent. when appointed by the court in place of a removed guardian has  then he acts as guardian in place of a guardian removed by the court.
+
+<!-- l4: decide:the standing is one in which he acts as guardian of the infant -->
+
+**81.** In relation to a The standing of a guardian under this Act “standing”, the standing is one in which he acts as guardian of the infant means consider the case distinctions of standing :  when he has been removed from his guardianship by the court has  then FALSE. when he is dead or refuses to act has  then FALSE. when whether he acts, and with whom, cannot be determined on the facts recorded has  then FALSE. when he continues to act after the death of the surviving parent, but which parent survived, and so whom he acts jointly with, cannot be determined on the facts recorded has  then TRUE. when the appointment has not taken effect, the parent who appointed him being alive has  then FALSE. when the mother or father objects to his so acting, and he does not act jointly has  then FALSE. when section 6 does not make him guardian by virtue of surviving the other parent has  then FALSE. in any other case TRUE.
+
+<!-- l4: decide:he holds by virtue of surviving the other parent -->
+
+**82.** In relation to a Guardian “guardian”, he holds by virtue of surviving the other parent means consider the case distinctions of guardian's how the guardian was appointed :  when guardian by virtue of surviving the other parent has  then TRUE. in any other case FALSE.
+
+<!-- l4: decide:the reference for the parent, if in evidence -->
+
+**83.** In relation to an optional Person “parent”, the reference for the parent, if in evidence means consider the case distinctions of parent :  when NOTHING has  then EMPTY. when JUST has p then list of p's the reference for this person.
+
+<!-- l4: decide:the surviving parent who is guardian under section 6 -->
+
+**84.** In relation to an Infant “infant”, the surviving parent who is guardian under section 6 means if the mother holds the guardianship section 6(1) gives her with infant then the reference for the parent, if in evidence with infant's the mother of the infant if the father holds the guardianship section 6(2) gives him with infant then the reference for the parent, if in evidence with infant's the father of the infant otherwise EMPTY.
+
+<!-- l4: decide:the reference for the guardian if he acts as guardian of the infant -->
+
+**85.** In relation to a Guardian “guardian” and an Infant “infant”, the reference for the guardian if he acts as guardian of the infant means if the standing is one in which he acts as guardian of the infant with the standing of the guardian under this Act with guardian and infant, then JUST with the reference for the guardian with guardian; otherwise, NOTHING.
+
+<!-- l4: decide:the persons who are guardians of the infant -->
+
+**86.** In relation to an Infant “infant”, the persons who are guardians of the infant means append with the surviving parent who is guardian under section 6 with infant and mapMaybe with given g then the reference for the guardian if he acts as guardian of the infant with g and infant and filter with given g then not he holds by virtue of surviving the other parent with g and infant's the guardians of the infant.
+
+## 8. Dispute between joint guardians
+
+<!-- l4: decide:the guardian acts jointly with one or more other persons -->
+
+**87.** In relation to a Guardian “guardian”, the guardian acts jointly with one or more other persons means consider the case distinctions of guardian's alone or jointly :  when alone has  then FALSE. when jointly with has the references then count with the references is at least 1.
+
+<!-- l4: decide:2 or more persons act as joint guardians of the infant -->
+
+**88.** In relation to an Infant “infant”, 2 or more persons act as joint guardians of the infant means any with given g then the guardian acts jointly with one or more other persons with g and the standing is one in which he acts as guardian of the infant with the standing of the guardian under this Act with g and infant and infant's the guardians of the infant.
+
+<!-- l4: decide:any of them may apply to the court for its direction under section 8 -->
+
+**89.** In relation to an Infant “infant” and a BOOLEAN “they are unable to agree on a question affecting the welfare of the infant”, any of them may apply to the court for its direction under section 8 if—
+
+    (a) 2 or more persons act as joint guardians of the infant with infant; and
+
+    (b) they are unable to agree on a question affecting the welfare of the infant.
+
+## 9. Enforcement of orders for payment of money
+
+<!-- l4: declare:An application to attach a pension or income under section 9(1) -->
+
+**90.** In this Act, “An application to attach a pension or income under section 9(1)” means a record consisting of—
+
+    (a) “the court has made an order under this Act for payment of money”, being a BOOLEAN;
+
+    (b) “there is a pension or income payable to the person against whom the order was made”, being a BOOLEAN;
+
+    (c) “the pension or income is capable of being attached”, being a BOOLEAN; and
+
+    (d) “the person by whom the pension or income is payable has been given an opportunity of being heard”, being a BOOLEAN.
+
+<!-- l4: decide:the court has power under section 9(1) to order the attachment -->
+
+**91.** In relation to an An application to attach a pension or income under section 9(1) “application”, the court has power under section 9(1) to order the attachment if—
+
+    (a) When the court has made any order under this Act for payment of money,;
+
+    (b) application's the court has made an order under this Act for payment of money;
+
+    (c) in any case where there is any pension or income payable to the person against whom the order was made;
+
+    (d) application's there is a pension or income payable to the person against whom the order was made;
+
+    (e) and capable of being attached,;
+
+    (f) application's the pension or income is capable of being attached;
+
+    (g) after giving the person by whom the pension or income is payable an opportunity of being heard,; and
+
+    (h) application's the person by whom the pension or income is payable has been given an opportunity of being heard.
+
+<!-- l4: decide:the further order is an authority to the person by whom the pension or income is payable to make the payment so ordered -->
+
+**92.** In relation to a BOOLEAN “the court has made the further order attaching the pension or income”, the further order is an authority to the person by whom the pension or income is payable to make the payment so ordered means the court has made the further order attaching the pension or income.
+
+<!-- l4: decide:the receipt is a good discharge to the person by whom the pension or income is payable -->
+
+**93.** In relation to a BOOLEAN “the court has made the further order attaching the pension or income” and a BOOLEAN “the person to whom the payment is ordered to be made has given a receipt for the payment”, the receipt is a good discharge to the person by whom the pension or income is payable if—
+
+    (a) the court has made the further order attaching the pension or income; and
+
+    (b) the person to whom the payment is ordered to be made has given a receipt for the payment.
+
+## 10. Removal of guardian
+
+## 11. Matters to be considered
+
+<!-- l4: declare:A matter the court must consider under section 11 -->
+
+**94.** In this Act, “A matter the court must consider under section 11” means one of the following—
+
+    (a) “the wishes of the parent or both of them, as the case may be”; or
+
+    (b) “the wishes of the infant”.
+
+<!-- l4: decide:the infant has a parent or parents -->
+
+**95.** In relation to an Infant “infant”, the infant has a parent or parents if—
+
+    (a) the parent is in evidence and remains alive with infant's the father of the infant; or
+
+    (b) the parent is in evidence and remains alive with infant's the mother of the infant.
+
+<!-- l4: decide:the matters the court must consider under section 11 -->
+
+**96.** In relation to an Infant “infant”, the matters the court must consider under section 11 means append with paragraph (a), if the infant has a parent or parents and paragraph (b), if the infant is of an age to express an independent opinion.
+
+For the purposes of this provision—
+
+“paragraph (a), if the infant has a parent or parents” means if the infant has a parent or parents with infant, then list of the wishes of the parent or both of them, as the case may be; otherwise, EMPTY;
+
+“paragraph (b), if the infant is of an age to express an independent opinion” means if infant's of an age to express an independent opinion, then list of the wishes of the infant; otherwise, EMPTY;
+
+## 11A. Court to have regard to advice of welfare officers, etc.
+
+## 12. Variation of trusts for maintenance of infant
+
+## 13. Production of infant
+
+## 14. Placing infant in custody of guardian
+
+## 15. Security to be given
+
+<!-- l4: decide:the guardian must give security under section 15(1) -->
+
+**97.** In relation to a Guardian “guardian”, the guardian must give security under section 15(1) if—
+
+    (a) Where a person appointed by the court is the guardian of an infant’s property,;
+
+    (b) a person appointed by the court with guardian;
+
+    (c) a guardian of the property of the infant with guardian;
+
+    (d) he shall unless the court otherwise orders, give security; and
+
+    (e) guardian's the court does not have otherwise ordered as to security.
+
+<!-- l4: decide:the guardian has not given the security section 15(1) requires -->
+
+**98.** In relation to a Guardian “guardian”, the guardian has not given the security section 15(1) requires if—
+
+    (a) the guardian must give security under section 15(1) with guardian; and
+
+    (b) guardian's does not have given security.
+
+## 16. Limitation of guardian's powers
+
+<!-- l4: decide:the guardian has leased land belonging to the infant for a term exceeding one year -->
+
+**99.** In relation to a Guardian “guardian”, the guardian has leased land belonging to the infant for a term exceeding one year if—
+
+    (a) guardian's has leased land belonging to the infant; and
+
+    (b) the term of the lease exceeds one year.
+
+For the purposes of this provision—
+
+“the term of the lease exceeds one year” means consider the case distinctions of guardian's the term of the lease, in years :  when NOTHING has  then FALSE. when JUST has the term then the term is greater than 1;
+
+<!-- l4: decide:the guardian has done a thing section 16(1) forbids -->
+
+**100.** In relation to a Guardian “guardian”, the guardian has done a thing section 16(1) forbids if—
+
+    (a) (a) sell, mortgage, exchange, or otherwise part with the possession of any of the movable or immovable property of the infant; or;
+
+    (b) guardian's has sold, mortgaged, exchanged, or otherwise parted with the possession of any of the movable or immovable property of the infant;
+
+    (c) (b) lease any land belonging to the infant for a term exceeding one year.; or
+
+    (d) the guardian has leased land belonging to the infant for a term exceeding one year with guardian.
+
+<!-- l4: decide:the guardian has contravened section 16(1) -->
+
+**101.** In relation to a Guardian “guardian”, the guardian has contravened section 16(1) if—
+
+    (a) A guardian of the property of an infant;
+
+    (b) a guardian of the property of the infant with guardian;
+
+    (c) the guardian has done a thing section 16(1) forbids with guardian;
+
+    (d) shall not, without the permission of the court; and
+
+    (e) guardian's does not have the permission of the court to deal with the property of the infant.
+
+<!-- l4: decide:the disposal is one that may be declared void under section 16(2) -->
+
+**102.** In relation to a Guardian “guardian”, the disposal is one that may be declared void under section 16(2) means the guardian has contravened section 16(1) with guardian.
+
+<!-- l4: decide:section 16(3) forbids the court to permit the dealing -->
+
+**103.** In relation to a BOOLEAN “it is necessary or advisable in the interests of the infant”, section 16(3) forbids the court to permit the dealing if it is not necessary or advisable in the interests of the infant.
+
+## 17. Guardian may not give discharge for capital property
+
+<!-- l4: decide:section 17 denies the guardian power to give a good discharge -->
+
+**104.** In relation to a Guardian “guardian”, section 17 denies the guardian power to give a good discharge if—
+
+    (a) A guardian of the property of an infant;
+
+    (b) a guardian of the property of the infant with guardian;
+
+    (c) shall not, unless in any case the court otherwise orders, be empowered to give a good discharge for any legacy or other capital moneys payable to or receivable by an infant.; and
+
+    (d) guardian's the court does not have otherwise ordered as to giving a good discharge.
+
+<!-- l4: decide:the discharge the guardian purported to give is not a good discharge -->
+
+**105.** In relation to a Guardian “guardian”, the discharge the guardian purported to give is not a good discharge if—
+
+    (a) section 17 denies the guardian power to give a good discharge with guardian; and
+
+    (b) guardian's has given a good discharge for a legacy or other capital moneys payable to or receivable by the infant.
+
+## 18. Guardian may support infant out of income
+
+<!-- l4: declare:Whether the provision exceeds the cap in section 18(1) -->
+
+**106.** In this Act, “Whether the provision exceeds the cap in section 18(1)” means one of the following—
+
+    (a) “the sum applied does not exceed $100 per month”;
+
+    (b) “the sum applied exceeds $100 per month”; or
+
+    (c) “the period of the sum applied is neither weekly nor monthly, and the Act supplies no conversion to a monthly rate”.
+
+<!-- l4: decide:whether the provision exceeds the sum applicable without the permission of the court -->
+
+**107.** In relation to an A periodical sum “provision”, whether the provision exceeds the sum applicable without the permission of the court means consider the case distinctions of provision's the period :  when monthly has  then if provision's the sum is greater than 100 then the sum applied exceeds $100 per month else the sum applied does not exceed $100 per month. when weekly has  then if the product of provision's the sum and the result of dividing 52 by 12 is greater than 100 then the sum applied exceeds $100 per month else the sum applied does not exceed $100 per month. when other periodical has  then the period of the sum applied is neither weekly nor monthly, and the Act supplies no conversion to a monthly rate.
+
+<!-- l4: decide:the guardian has applied a sum exceeding $100 per month without the permission of the court -->
+
+**108.** In relation to a Guardian “guardian”, the guardian has applied a sum exceeding $100 per month without the permission of the court if—
+
+    (a) a guardian of the property of the infant with guardian;
+
+    (b) the sum applied exceeds the cap; and
+
+    (c) guardian's does not have the permission of the court to apply a sum exceeding $100 per month.
+
+For the purposes of this provision—
+
+“the sum applied exceeds the cap” means consider the case distinctions of whether the provision exceeds the sum applicable without the permission of the court with guardian's the provision made out of the income of the property of the infant for his maintenance and education :  when the sum applied exceeds $100 per month has  then TRUE. in any other case FALSE;
+
+<!-- l4: decide:the court may order provision to be made out of the capital of the infant's property under section 18(2) -->
+
+**109.** In relation to a BOOLEAN “the income of the infant's property in the hands of the guardian is insufficient for such purpose” and a BOOLEAN “money is required for the infant's advancement”, the court may order provision to be made out of the capital of the infant's property under section 18(2) if—
+
+    (a) the income of the infant's property in the hands of the guardian is insufficient for such purpose; or
+
+    (b) money is required for the infant's advancement.
+
+<!-- l4: decide:the guardian may of his own motion make provision out of the capital of the infant's property -->
+
+**110.** The guardian may of his own motion make provision out of the capital of the infant's property means FALSE.
+
+## 19. Special order in case of small estate
+
+## 20. Application for opinion, etc.
+
+<!-- l4: decide:the guardian may apply to the court for its opinion, advice or direction under section 20 -->
+
+**111.** In relation to a Guardian “guardian”, an Infant “infant” and a BOOLEAN “the question respects the management or administration of the property of the infant”, the guardian may apply to the court for its opinion, advice or direction under section 20 if—
+
+    (a) Any guardian;
+
+    (b) the standing is one in which he acts as guardian of the infant with the standing of the guardian under this Act with guardian and infant;
+
+    (c) on any question respecting the management or administration of the infant’s property.; and
+
+    (d) the question respects the management or administration of the property of the infant.
+
+## 21. Exception for money paid into a District Court
+
+<!-- l4: declare:Money to which this Act might apply -->
+
+**112.** In this Act, “Money to which this Act might apply” means one of the following—
+
+    (a) “money paid into a District Court to the credit of an infant in any action or proceeding in a District Court”;
+
+    (b) “money in a District Court ordered to be transferred to the credit of an infant”; or
+
+    (c) “money of neither kind described in section 21”.
+
+<!-- l4: declare:Whether this Act applies to the money -->
+
+**113.** In this Act, “Whether this Act applies to the money” means one of the following—
+
+    (a) “nothing in this Act applies to the money, and the same shall be dealt with according to the Rules of Court”; or
+
+    (b) “this Act applies to the money”.
+
+<!-- l4: decide:whether this Act applies to the money -->
+
+**114.** In relation to a Money to which this Act might apply “money” and a BOOLEAN “the court otherwise orders”, whether this Act applies to the money means if the court otherwise orders, then this Act applies to the money; otherwise, consider the case distinctions of money :  when money of neither kind described in section 21 has  then this Act applies to the money. in any other case nothing in this Act applies to the money, and the same shall be dealt with according to the Rules of Court.
+
+## The Act as a whole -- the infant it presupposes, and the record it reads
+
+<!-- l4: declare:Whether this Act has an infant to govern -->
+
+**115.** In this Act, “Whether this Act has an infant to govern” means one of the following—
+
+    (a) “the person is an infant on that date, and the guardians of the infant are”, having a “the references for the guardians” (a list of STRING);
+
+    (b) “the person has attained the age of majority on that date, so this Act has no infant to govern”; or
+
+    (c) “whether the person is an infant on that date cannot be determined, the date on which he attains the age of majority not being in evidence”.
+
+<!-- l4: decide:who are the guardians of the infant, if this Act has an infant to govern -->
+
+**116.** In relation to an Infant “infant” and a DATE “the date in question”, who are the guardians of the infant, if this Act has an infant to govern means consider the case distinctions of the person is an infant on the date in question with infant's the infant and the date in question :  when NOTHING has  then whether the person is an infant on that date cannot be determined, the date on which he attains the age of majority not being in evidence. when JUST has he is an infant on that date then if he is an infant on that date then the person is an infant on that date, and the guardians of the infant are with the persons who are guardians of the infant with infant else the person has attained the age of majority on that date, so this Act has no infant to govern.
+
+<!-- l4: decide:every guardian recorded for this infant is recorded against this infant -->
+
+**117.** In relation to an Infant “infant”, every guardian recorded for this infant is recorded against this infant means all with given g then g's the reference for the infant is equal to infant's the infant's the reference for this person and infant's the guardians of the infant.
+
+## Worked facts
+
+<!-- l4: decide:a GIA person -->
+
+**118.** In relation to a STRING “the name of the person”, a STRING “the reference”, a Vital status “the vital status”, an optional DATE “the day of birth” and an optional DATE “the day of majority”, a GIA person means Person where name is the name of the person, the reference for this person is the reference, date of birth is the day of birth, vital status is the vital status, children is EMPTY, at the date of the death only conceived in the womb but subsequently born alive is FALSE, money or other property given, paid or settled by the intestate during his life to or for the advancement of the person is 0, the date on which the person attains the age of majority is the day of majority, a soldier being in actual military service is FALSE, a mariner or seaman being at sea is FALSE, a member of any naval or marine forces so circumstanced that if he were a soldier he would be in actual military service is FALSE, so desires that letters of administration be granted to such person as the court thinks fit is FALSE, lacks mental capacity (within the meaning of the Mental Capacity Act 2008) to make decisions with respect to the management and administration of the person's property and affairs is FALSE, absent from Singapore is FALSE and willing to act is TRUE.
+
+<!-- l4: decide:no GIA provision -->
+
+**119.** No GIA provision means A periodical sum where the sum is 0 and the period is monthly.
+
+<!-- l4: decide:a GIA guardian, in the ordinary case -->
+
+**120.** In relation to a Person “the appointee”, a STRING “the infant referred to”, a How the guardian was appointed “the route of appointment”, a Kind of guardianship “the kind of guardianship”, an Alone or jointly “acting alone or jointly”, a BOOLEAN “refusing to act”, a BOOLEAN “objected to by the parent” and a BOOLEAN “removed by the court”, a GIA guardian, in the ordinary case means Guardian where the guardian is the appointee, the reference for the infant is the infant referred to, how the guardian was appointed is the route of appointment, of the person or of the property is the kind of guardianship, alone or jointly is acting alone or jointly, refuses to act is refusing to act, the mother or father objects to his so acting is objected to by the parent, considers that the mother or father is unfit to have the custody of the infant is FALSE, removed from his guardianship by the court is removed by the court, has given security is FALSE, the court has otherwise ordered as to security is FALSE, has sold, mortgaged, exchanged, or otherwise parted with the possession of any of the movable or immovable property of the infant is FALSE, has leased land belonging to the infant is FALSE, the term of the lease, in years is NOTHING, has the permission of the court to deal with the property of the infant is FALSE, has given a good discharge for a legacy or other capital moneys payable to or receivable by the infant is FALSE, the court has otherwise ordered as to giving a good discharge is FALSE, the provision made out of the income of the property of the infant for his maintenance and education is no GIA provision and has the permission of the court to apply a sum exceeding $100 per month is FALSE.
+
+<!-- l4: decide:a GIA guardian, on the two limbs of section 7(4) -->
+
+**121.** In relation to a Person “the appointee”, a STRING “the infant referred to”, a How the guardian was appointed “the route of appointment”, a BOOLEAN “objected to by the parent” and a BOOLEAN “considering the parent unfit”, a GIA guardian, on the two limbs of section 7(4) means Guardian where the guardian is the appointee, the reference for the infant is the infant referred to, how the guardian was appointed is the route of appointment, of the person or of the property is guardian of the person and property of the infant, alone or jointly is alone, refuses to act is FALSE, the mother or father objects to his so acting is objected to by the parent, considers that the mother or father is unfit to have the custody of the infant is considering the parent unfit, removed from his guardianship by the court is FALSE, has given security is FALSE, the court has otherwise ordered as to security is FALSE, has sold, mortgaged, exchanged, or otherwise parted with the possession of any of the movable or immovable property of the infant is FALSE, has leased land belonging to the infant is FALSE, the term of the lease, in years is NOTHING, has the permission of the court to deal with the property of the infant is FALSE, has given a good discharge for a legacy or other capital moneys payable to or receivable by the infant is FALSE, the court has otherwise ordered as to giving a good discharge is FALSE, the provision made out of the income of the property of the infant for his maintenance and education is no GIA provision and has the permission of the court to apply a sum exceeding $100 per month is FALSE.
+
+<!-- l4: decide:a GIA guardian of the property of the infant, in a property case -->
+
+**122.** In relation to a Person “the appointee”, a STRING “the infant referred to”, a How the guardian was appointed “the route of appointment”, a BOOLEAN “security given”, a BOOLEAN “security dispensed with”, a BOOLEAN “parted with possession”, a BOOLEAN “land leased”, an optional NUMBER “the term in years”, a BOOLEAN “permission to deal”, a BOOLEAN “discharge purportedly given”, a BOOLEAN “discharge otherwise ordered”, an A periodical sum “the provision applied” and a BOOLEAN “permission to exceed the cap”, a GIA guardian of the property of the infant, in a property case means Guardian where the guardian is the appointee, the reference for the infant is the infant referred to, how the guardian was appointed is the route of appointment, of the person or of the property is guardian of the property of the infant, alone or jointly is alone, refuses to act is FALSE, the mother or father objects to his so acting is FALSE, considers that the mother or father is unfit to have the custody of the infant is FALSE, removed from his guardianship by the court is FALSE, has given security is security given, the court has otherwise ordered as to security is security dispensed with, has sold, mortgaged, exchanged, or otherwise parted with the possession of any of the movable or immovable property of the infant is parted with possession, has leased land belonging to the infant is land leased, the term of the lease, in years is the term in years, has the permission of the court to deal with the property of the infant is permission to deal, has given a good discharge for a legacy or other capital moneys payable to or receivable by the infant is discharge purportedly given, the court has otherwise ordered as to giving a good discharge is discharge otherwise ordered, the provision made out of the income of the property of the infant for his maintenance and education is the provision applied and has the permission of the court to apply a sum exceeding $100 per month is permission to exceed the cap.
+
+<!-- l4: decide:a GIA infant -->
+
+**123.** In relation to a Person “the child”, an optional Person “the father, if in evidence”, an optional Person “the mother, if in evidence”, a list of Guardian “the guardians”, a BOOLEAN “another person has parental rights” and a BOOLEAN “of an age to express an opinion”, a GIA infant means Infant where the infant is the child, the father of the infant is the father, if in evidence, the mother of the infant is the mother, if in evidence, the guardians of the infant is the guardians, some other person has parental rights with respect to him is another person has parental rights, the income of the property of the infant is 12000, the capital of the property of the infant is 250000 and of an age to express an independent opinion is of an age to express an opinion.
+
+### The people
+
+<!-- l4: decide:Tan Boon Huat, the father -->
+
+**124.** Tan Boon Huat, the father means a GIA person with Tan Boon Huat, father, died on with YMD with 2020, 3 and 4, NOTHING and NOTHING.
+
+<!-- l4: decide:Tan Boon Huat, still living -->
+
+**125.** Tan Boon Huat, still living means a GIA person with Tan Boon Huat, father, living, NOTHING and NOTHING.
+
+<!-- l4: decide:Tan Boon Huat, died undated -->
+
+**126.** Tan Boon Huat, died undated means a GIA person with Tan Boon Huat, father, dead, the date of death not known, NOTHING and NOTHING.
+
+<!-- l4: decide:Tan Boon Huat, died first -->
+
+**127.** Tan Boon Huat, died first means a GIA person with Tan Boon Huat, father, died on with YMD with 2018, 2 and 2, NOTHING and NOTHING.
+
+<!-- l4: decide:Lai Peng, the mother -->
+
+**128.** Lai Peng, the mother means a GIA person with Lai Peng, mother, living, NOTHING and NOTHING.
+
+<!-- l4: decide:Lai Peng, died second -->
+
+**129.** Lai Peng, died second means a GIA person with Lai Peng, mother, died on with YMD with 2024, 11 and 11, NOTHING and NOTHING.
+
+<!-- l4: decide:Wei Ming, the infant -->
+
+**130.** Wei Ming, the infant means a GIA person with Wei Ming, infant, living, JUST with YMD with 2012, 7 and 19 and JUST with YMD with 2033, 7 and 19.
+
+<!-- l4: decide:Wei Ming, majority date not in evidence -->
+
+**131.** Wei Ming, majority date not in evidence means a GIA person with Wei Ming, infant, living, JUST with YMD with 2012, 7 and 19 and NOTHING.
+
+<!-- l4: decide:Lim Kok Wah, appointed by the father -->
+
+**132.** Lim Kok Wah, appointed by the father means a GIA person with Lim Kok Wah, lim, living, NOTHING and NOTHING.
+
+<!-- l4: decide:Lim Kok Wah, dead -->
+
+**133.** Lim Kok Wah, dead means a GIA person with Lim Kok Wah, lim, died on with YMD with 2021, 5 and 5, NOTHING and NOTHING.
+
+<!-- l4: decide:Siti, appointed by the mother -->
+
+**134.** Siti, appointed by the mother means a GIA person with Siti, siti, living, NOTHING and NOTHING.
+
+<!-- l4: decide:Rajan, appointed by the court -->
+
+**135.** Rajan, appointed by the court means a GIA person with Rajan, rajan, living, NOTHING and NOTHING.
+
+<!-- l4: decide:Rajan, dead -->
+
+**136.** Rajan, dead means a GIA person with Rajan, rajan, died on with YMD with 2023, 6 and 6, NOTHING and NOTHING.
+
+<!-- l4: decide:Chandra, also appointed by the father -->
+
+**137.** Chandra, also appointed by the father means a GIA person with Chandra, chandra, living, NOTHING and NOTHING.
+
+<!-- l4: decide:Lai Peng, died before the father -->
+
+**138.** Lai Peng, died before the father means a GIA person with Lai Peng, mother, died on with YMD with 2019, 1 and 1, NOTHING and NOTHING.
+
+<!-- l4: decide:Lai Peng, died the same day as the father -->
+
+**139.** Lai Peng, died the same day as the father means a GIA person with Lai Peng, mother, died on with YMD with 2018, 2 and 2, NOTHING and NOTHING.
+
+### The guardians
+
+<!-- l4: decide:Lim, appointed by the father by will, acting jointly with the mother -->
+
+**140.** Lim, appointed by the father by will, acting jointly with the mother means a GIA guardian, in the ordinary case with Lim Kok Wah, appointed by the father, infant, appointed by the father by will, guardian of the person and property of the infant, jointly with with list of mother, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:Lim, appointed by the father by will, the mother objecting -->
+
+**141.** Lim, appointed by the father by will, the mother objecting means a GIA guardian, in the ordinary case with Lim Kok Wah, appointed by the father, infant, appointed by the father by will, guardian of the person and property of the infant, alone, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:Lim, appointed by the father by will, refusing to act -->
+
+**142.** Lim, appointed by the father by will, refusing to act means a GIA guardian, in the ordinary case with Lim Kok Wah, appointed by the father, infant, appointed by the father by will, guardian of the person and property of the infant, alone, TRUE, FALSE and FALSE.
+
+<!-- l4: decide:Lim, appointed by the father by will, removed by the court -->
+
+**143.** Lim, appointed by the father by will, removed by the court means a GIA guardian, in the ordinary case with Lim Kok Wah, appointed by the father, infant, appointed by the father by will, guardian of the person and property of the infant, alone, FALSE, FALSE and TRUE.
+
+<!-- l4: decide:Siti, appointed by the mother by deed, acting jointly with Lim -->
+
+**144.** Siti, appointed by the mother by deed, acting jointly with Lim means a GIA guardian, in the ordinary case with Siti, appointed by the mother, infant, appointed by the mother by deed, guardian of the person and property of the infant, jointly with with list of lim, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:Siti, appointed by the mother by will -->
+
+**145.** Siti, appointed by the mother by will means a GIA guardian, in the ordinary case with Siti, appointed by the mother, infant, appointed by the mother by will, guardian of the person and property of the infant, alone, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:Rajan, appointed by the court to act jointly with the surviving parent -->
+
+**146.** Rajan, appointed by the court to act jointly with the surviving parent means a GIA guardian, in the ordinary case with Rajan, appointed by the court, infant, appointed by the court to act jointly with the surviving parent, guardian of the person and property of the infant, jointly with with list of siti, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:Rajan, appointed by the court where the infant has no parent -->
+
+**147.** Rajan, appointed by the court where the infant has no parent means a GIA guardian, in the ordinary case with Rajan, appointed by the court, infant, appointed by the court where the infant has no parent, guardian of the person of the infant, alone, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:Lim, acting jointly with Siti -->
+
+**148.** Lim, acting jointly with Siti means a GIA guardian, in the ordinary case with Lim Kok Wah, appointed by the father, infant, appointed by the father by will, guardian of the person and property of the infant, jointly with with list of siti, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:Chandra, appointed by the father by will -->
+
+**149.** Chandra, appointed by the father by will means a GIA guardian, in the ordinary case with Chandra, also appointed by the father, infant, appointed by the father by will, guardian of the person and property of the infant, jointly with with list of mother, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:Lim, appointed by the father by deed -->
+
+**150.** Lim, appointed by the father by deed means a GIA guardian, in the ordinary case with Lim Kok Wah, appointed by the father, infant, appointed by the father by deed, guardian of the person and property of the infant, jointly with with list of mother, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:Lim, appointed by the father by deed, considering the mother unfit -->
+
+**151.** Lim, appointed by the father by deed, considering the mother unfit means a GIA guardian, on the two limbs of section 7(4) with Lim Kok Wah, appointed by the father, infant, appointed by the father by deed, FALSE and TRUE.
+
+<!-- l4: decide:Lim, appointed by the father by will, objecting and considering the mother unfit -->
+
+**152.** Lim, appointed by the father by will, objecting and considering the mother unfit means a GIA guardian, on the two limbs of section 7(4) with Lim Kok Wah, appointed by the father, infant, appointed by the father by will, TRUE and TRUE.
+
+<!-- l4: decide:Rajan, appointed by the court, objecting and considering the parent unfit -->
+
+**153.** Rajan, appointed by the court, objecting and considering the parent unfit means a GIA guardian, on the two limbs of section 7(4) with Rajan, appointed by the court, infant, appointed by the court where the infant has no parent, TRUE and TRUE.
+
+<!-- l4: decide:Lim, appointed by the father by will, dead -->
+
+**154.** Lim, appointed by the father by will, dead means a GIA guardian, in the ordinary case with Lim Kok Wah, dead, infant, appointed by the father by will, guardian of the person and property of the infant, alone, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:Lim, appointed by the father by will, recorded as acting jointly with nobody -->
+
+**155.** Lim, appointed by the father by will, recorded as acting jointly with nobody means a GIA guardian, in the ordinary case with Lim Kok Wah, appointed by the father, infant, appointed by the father by will, guardian of the person and property of the infant, jointly with with EMPTY, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:Rajan, appointed by the court where the infant has no parent, dead -->
+
+**156.** Rajan, appointed by the court where the infant has no parent, dead means a GIA guardian, in the ordinary case with Rajan, dead, infant, appointed by the court where the infant has no parent, guardian of the person of the infant, alone, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:Rajan, appointed by the court where the infant has no parent, refusing to act -->
+
+**157.** Rajan, appointed by the court where the infant has no parent, refusing to act means a GIA guardian, in the ordinary case with Rajan, appointed by the court, infant, appointed by the court where the infant has no parent, guardian of the person of the infant, alone, TRUE, FALSE and FALSE.
+
+<!-- l4: decide:Siti, appointed by the court in place of a removed guardian -->
+
+**158.** Siti, appointed by the court in place of a removed guardian means a GIA guardian, in the ordinary case with Siti, appointed by the mother, infant, appointed by the court in place of a removed guardian, guardian of the person and property of the infant, alone, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:the mother, her guardianship under section 6(1) recorded -->
+
+**159.** The mother, her guardianship under section 6(1) recorded means a GIA guardian, in the ordinary case with Lai Peng, the mother, infant, guardian by virtue of surviving the other parent, guardian of the person and property of the infant, alone, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:the mother, removed from her guardianship by the court -->
+
+**160.** The mother, removed from her guardianship by the court means a GIA guardian, in the ordinary case with Lai Peng, the mother, infant, guardian by virtue of surviving the other parent, guardian of the person and property of the infant, alone, FALSE, FALSE and TRUE.
+
+<!-- l4: decide:the father, his guardianship under section 6(2) recorded -->
+
+**161.** The father, his guardianship under section 6(2) recorded means a GIA guardian, in the ordinary case with Tan Boon Huat, still living, infant, guardian by virtue of surviving the other parent, guardian of the person and property of the infant, alone, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:the father, removed from his guardianship by the court -->
+
+**162.** The father, removed from his guardianship by the court means a GIA guardian, in the ordinary case with Tan Boon Huat, still living, infant, guardian by virtue of surviving the other parent, guardian of the person and property of the infant, alone, FALSE, FALSE and TRUE.
+
+<!-- l4: decide:the father, removed from his guardianship, having since died -->
+
+**163.** The father, removed from his guardianship, having since died means a GIA guardian, in the ordinary case with Tan Boon Huat, the father, infant, guardian by virtue of surviving the other parent, guardian of the person and property of the infant, alone, FALSE, FALSE and TRUE.
+
+<!-- l4: decide:Siti, appointed by the mother by will, removed by the court -->
+
+**164.** Siti, appointed by the mother by will, removed by the court means a GIA guardian, in the ordinary case with Siti, appointed by the mother, infant, appointed by the mother by will, guardian of the person and property of the infant, alone, FALSE, FALSE and TRUE.
+
+<!-- l4: decide:Siti, appointed by the mother by will, refusing to act -->
+
+**165.** Siti, appointed by the mother by will, refusing to act means a GIA guardian, in the ordinary case with Siti, appointed by the mother, infant, appointed by the mother by will, guardian of the person and property of the infant, alone, TRUE, FALSE and FALSE.
+
+<!-- l4: decide:Lim, wrongly recorded as guardian by virtue of surviving the other parent -->
+
+**166.** Lim, wrongly recorded as guardian by virtue of surviving the other parent means a GIA guardian, in the ordinary case with Lim Kok Wah, appointed by the father, infant, guardian by virtue of surviving the other parent, guardian of the person and property of the infant, alone, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:a guardian of the property with a three-year term noted but no lease granted -->
+
+**167.** A guardian of the property with a three-year term noted but no lease granted means a GIA guardian of the property of the infant, in a property case with Rajan, appointed by the court, infant, appointed by the court where the infant has no parent, TRUE, FALSE, FALSE, FALSE, JUST with 3, FALSE, FALSE, FALSE, no GIA provision and FALSE.
+
+<!-- l4: decide:Lim, appointed by the father by will, removed by the court and since dead -->
+
+**168.** Lim, appointed by the father by will, removed by the court and since dead means a GIA guardian, in the ordinary case with Lim Kok Wah, dead, infant, appointed by the father by will, guardian of the person and property of the infant, alone, FALSE, FALSE and TRUE.
+
+<!-- l4: decide:Lim, appointed by the father by will, recorded against a different infant -->
+
+**169.** Lim, appointed by the father by will, recorded against a different infant means a GIA guardian, in the ordinary case with Lim Kok Wah, appointed by the father, some other infant, appointed by the father by will, guardian of the person and property of the infant, jointly with with list of mother, FALSE, FALSE and FALSE.
+
+### The infants
+
+<!-- l4: decide:Wei Ming, the father having died leaving a testamentary guardian -->
+
+**170.** Wei Ming, the father having died leaving a testamentary guardian means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, the father, JUST with Lai Peng, the mother, list of Lim, appointed by the father by will, acting jointly with the mother, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, the mother objecting to the testamentary guardian -->
+
+**171.** Wei Ming, the mother objecting to the testamentary guardian means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, the father, JUST with Lai Peng, the mother, list of Lim, appointed by the father by will, the mother objecting, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, the testamentary guardian refusing to act -->
+
+**172.** Wei Ming, the testamentary guardian refusing to act means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, the father, JUST with Lai Peng, the mother, list of Lim, appointed by the father by will, refusing to act, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, the father having appointed no guardian -->
+
+**173.** Wei Ming, the father having appointed no guardian means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, the father, JUST with Lai Peng, the mother, EMPTY, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, guardians appointed by both parents, both parents dead -->
+
+**174.** Wei Ming, guardians appointed by both parents, both parents dead means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, died first, JUST with Lai Peng, died second, list of Lim, acting jointly with Siti and Siti, appointed by the mother by deed, acting jointly with Lim, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, both parents dead, only the father having appointed a guardian -->
+
+**175.** Wei Ming, both parents dead, only the father having appointed a guardian means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, died first, JUST with Lai Peng, died second, list of Lim, appointed by the father by will, acting jointly with the mother, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, the court's appointee surviving the mother who appointed a guardian -->
+
+**176.** Wei Ming, the court's appointee surviving the mother who appointed a guardian means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, died first, JUST with Lai Peng, died second, list of Rajan, appointed by the court to act jointly with the surviving parent and Siti, appointed by the mother by will, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, the court's appointee surviving the mother who appointed nobody -->
+
+**177.** Wei Ming, the court's appointee surviving the mother who appointed nobody means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, died first, JUST with Lai Peng, died second, list of Rajan, appointed by the court to act jointly with the surviving parent, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, the court's appointee acting with the living mother -->
+
+**178.** Wei Ming, the court's appointee acting with the living mother means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, died first, JUST with Lai Peng, the mother, list of Rajan, appointed by the court to act jointly with the surviving parent, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, an orphan with no guardian and nobody with parental rights -->
+
+**179.** Wei Ming, an orphan with no guardian and nobody with parental rights means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, died first, JUST with Lai Peng, died second, EMPTY, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, the mother dead and the father not in evidence -->
+
+**180.** Wei Ming, the mother dead and the father not in evidence means a GIA infant with Wei Ming, the infant, NOTHING, JUST with Lai Peng, died second, EMPTY, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, an orphan but another person has parental rights -->
+
+**181.** Wei Ming, an orphan but another person has parental rights means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, died first, JUST with Lai Peng, died second, EMPTY, TRUE and TRUE.
+
+<!-- l4: decide:Wei Ming, an orphan with a court-appointed guardian of the person -->
+
+**182.** Wei Ming, an orphan with a court-appointed guardian of the person means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, died first, JUST with Lai Peng, died second, list of Rajan, appointed by the court where the infant has no parent, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, the testamentary guardian having been removed -->
+
+**183.** Wei Ming, the testamentary guardian having been removed means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, the father, JUST with Lai Peng, the mother, list of Lim, appointed by the father by will, removed by the court, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, the father having appointed two guardians, one of them dead -->
+
+**184.** Wei Ming, the father having appointed two guardians, one of them dead means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, the father, JUST with Lai Peng, the mother, list of Lim, appointed by the father by will, dead and Chandra, appointed by the father by will, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, both parents alive, the father having appointed a guardian by will -->
+
+**185.** Wei Ming, both parents alive, the father having appointed a guardian by will means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, still living, JUST with Lai Peng, the mother, list of Lim, appointed by the father by will, acting jointly with the mother, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, both parents dead but one death undated -->
+
+**186.** Wei Ming, both parents dead but one death undated means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, died undated, JUST with Lai Peng, died second, list of Rajan, appointed by the court to act jointly with the surviving parent, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, too young to express an independent opinion -->
+
+**187.** Wei Ming, too young to express an independent opinion means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, the father, JUST with Lai Peng, the mother, EMPTY, FALSE and FALSE.
+
+<!-- l4: decide:Wei Ming, an orphan too young to express an independent opinion -->
+
+**188.** Wei Ming, an orphan too young to express an independent opinion means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, died first, JUST with Lai Peng, died second, EMPTY, FALSE and FALSE.
+
+<!-- l4: decide:Wei Ming, the mother having died leaving a testamentary guardian -->
+
+**189.** Wei Ming, the mother having died leaving a testamentary guardian means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, still living, JUST with Lai Peng, died second, list of Siti, appointed by the mother by will, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, the mother having died having appointed no guardian -->
+
+**190.** Wei Ming, the mother having died having appointed no guardian means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, still living, JUST with Lai Peng, died second, EMPTY, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, an orphan whose only guardian of the person has died -->
+
+**191.** Wei Ming, an orphan whose only guardian of the person has died means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, died first, JUST with Lai Peng, died second, list of Rajan, appointed by the court where the infant has no parent, dead, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, an orphan whose only guardian of the person refuses to act -->
+
+**192.** Wei Ming, an orphan whose only guardian of the person refuses to act means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, died first, JUST with Lai Peng, died second, list of Rajan, appointed by the court where the infant has no parent, refusing to act, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, the mother removed and a guardian appointed in her place -->
+
+**193.** Wei Ming, the mother removed and a guardian appointed in her place means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, the father, JUST with Lai Peng, the mother, list of the mother, removed from her guardianship by the court and Siti, appointed by the court in place of a removed guardian, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, the mother's guardianship under section 6(1) recorded -->
+
+**194.** Wei Ming, the mother's guardianship under section 6(1) recorded means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, the father, JUST with Lai Peng, the mother, list of the mother, her guardianship under section 6(1) recorded, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, both parents alive with the mother's guardianship recorded -->
+
+**195.** Wei Ming, both parents alive with the mother's guardianship recorded means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, still living, JUST with Lai Peng, the mother, list of the mother, her guardianship under section 6(1) recorded, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, the father's guardianship under section 6(2) recorded -->
+
+**196.** Wei Ming, the father's guardianship under section 6(2) recorded means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, still living, JUST with Lai Peng, died second, list of the father, his guardianship under section 6(2) recorded, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, the father removed from his guardianship by the court -->
+
+**197.** Wei Ming, the father removed from his guardianship by the court means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, still living, JUST with Lai Peng, died second, list of the father, removed from his guardianship by the court, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, the court's appointee acting with the living father -->
+
+**198.** Wei Ming, the court's appointee acting with the living father means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, still living, JUST with Lai Peng, died second, list of Rajan, appointed by the court to act jointly with the surviving parent, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, the mother's testamentary guardian having been removed -->
+
+**199.** Wei Ming, the mother's testamentary guardian having been removed means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, still living, JUST with Lai Peng, died second, list of Siti, appointed by the mother by will, removed by the court, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, the father removed and since dead, the mother now holding -->
+
+**200.** Wei Ming, the father removed and since dead, the mother now holding means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, the father, JUST with Lai Peng, the mother, list of the father, removed from his guardianship, having since died, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, the court's appointee surviving the father who appointed a guardian -->
+
+**201.** Wei Ming, the court's appointee surviving the father who appointed a guardian means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, the father, JUST with Lai Peng, died before the father, list of Rajan, appointed by the court to act jointly with the surviving parent and Lim, appointed by the father by will, acting jointly with the mother, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, the father dead and the mother not in evidence -->
+
+**202.** Wei Ming, the father dead and the mother not in evidence means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, the father, NOTHING, EMPTY, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, the mother's testamentary guardian refusing to act -->
+
+**203.** Wei Ming, the mother's testamentary guardian refusing to act means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, still living, JUST with Lai Peng, died second, list of Siti, appointed by the mother by will, refusing to act, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, a stranger recorded on the parent route, the mother surviving -->
+
+**204.** Wei Ming, a stranger recorded on the parent route, the mother surviving means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, the father, JUST with Lai Peng, the mother, list of Lim, wrongly recorded as guardian by virtue of surviving the other parent, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, a stranger recorded on the parent route, the father surviving -->
+
+**205.** Wei Ming, a stranger recorded on the parent route, the father surviving means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, still living, JUST with Lai Peng, died second, list of Lim, wrongly recorded as guardian by virtue of surviving the other parent, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, the testamentary guardian removed and since dead -->
+
+**206.** Wei Ming, the testamentary guardian removed and since dead means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, the father, JUST with Lai Peng, the mother, list of Lim, appointed by the father by will, removed by the court and since dead, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, both parents dead on the same day -->
+
+**207.** Wei Ming, both parents dead on the same day means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, died first, JUST with Lai Peng, died the same day as the father, list of Rajan, appointed by the court to act jointly with the surviving parent, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, the mother dead and the father not in evidence, with a court-appointed guardian -->
+
+**208.** Wei Ming, the mother dead and the father not in evidence, with a court-appointed guardian means a GIA infant with Wei Ming, the infant, NOTHING, JUST with Lai Peng, died second, list of Rajan, appointed by the court to act jointly with the surviving parent, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, the father not in evidence, the mother dead having appointed a guardian -->
+
+**209.** Wei Ming, the father not in evidence, the mother dead having appointed a guardian means a GIA infant with Wei Ming, the infant, NOTHING, JUST with Lai Peng, died second, list of Siti, appointed by the mother by will, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, the father having appointed a guardian by deed -->
+
+**210.** Wei Ming, the father having appointed a guardian by deed means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, the father, JUST with Lai Peng, the mother, list of Lim, appointed by the father by deed, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, the guardian considering the mother unfit -->
+
+**211.** Wei Ming, the guardian considering the mother unfit means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, the father, JUST with Lai Peng, the mother, list of Lim, appointed by the father by deed, considering the mother unfit, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, the guardian recorded as acting jointly with nobody -->
+
+**212.** Wei Ming, the guardian recorded as acting jointly with nobody means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, the father, JUST with Lai Peng, the mother, list of Lim, appointed by the father by will, recorded as acting jointly with nobody, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, both parents dead and the father's only appointee dead -->
+
+**213.** Wei Ming, both parents dead and the father's only appointee dead means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, died first, JUST with Lai Peng, died second, list of Lim, appointed by the father by will, dead and Siti, appointed by the mother by will, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, both parents having appointed a guardian, the mother still alive -->
+
+**214.** Wei Ming, both parents having appointed a guardian, the mother still alive means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, the father, JUST with Lai Peng, the mother, list of Lim, appointed by the father by will, acting jointly with the mother and Siti, appointed by the mother by will, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, both parents alive and the appointee pressing both limbs of section 7(4) -->
+
+**215.** Wei Ming, both parents alive and the appointee pressing both limbs of section 7(4) means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, still living, JUST with Lai Peng, the mother, list of Lim, appointed by the father by will, objecting and considering the mother unfit, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, both parents dead and the appointee pressing both limbs of section 7(4) -->
+
+**216.** Wei Ming, both parents dead and the appointee pressing both limbs of section 7(4) means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, died first, JUST with Lai Peng, died second, list of Lim, appointed by the father by will, objecting and considering the mother unfit, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, an orphan whose court-appointed guardian presses both limbs of section 7(4) -->
+
+**217.** Wei Ming, an orphan whose court-appointed guardian presses both limbs of section 7(4) means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, died first, JUST with Lai Peng, died second, list of Rajan, appointed by the court, objecting and considering the parent unfit, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, majority date not in evidence, the father having died leaving a testamentary guardian -->
+
+**218.** Wei Ming, majority date not in evidence, the father having died leaving a testamentary guardian means a GIA infant with Wei Ming, majority date not in evidence, JUST with Tan Boon Huat, the father, JUST with Lai Peng, the mother, list of Lim, appointed by the father by will, acting jointly with the mother, FALSE and TRUE.
+
+<!-- l4: decide:Wei Ming, a guardian recorded against a different infant -->
+
+**219.** Wei Ming, a guardian recorded against a different infant means a GIA infant with Wei Ming, the infant, JUST with Tan Boon Huat, the father, JUST with Lai Peng, the mother, list of Lim, appointed by the father by will, recorded against a different infant, FALSE and TRUE.
+
+### Guardians of the property, for sections 15 to 18
+
+<!-- l4: decide:a GIA monthly provision of $80 -->
+
+**220.** A GIA monthly provision of $80 means A periodical sum where the sum is 80 and the period is monthly.
+
+<!-- l4: decide:a GIA monthly provision of $100 -->
+
+**221.** A GIA monthly provision of $100 means A periodical sum where the sum is 100 and the period is monthly.
+
+<!-- l4: decide:a GIA monthly provision of $101 -->
+
+**222.** A GIA monthly provision of $101 means A periodical sum where the sum is 101 and the period is monthly.
+
+<!-- l4: decide:a GIA monthly provision of $150 -->
+
+**223.** A GIA monthly provision of $150 means A periodical sum where the sum is 150 and the period is monthly.
+
+<!-- l4: decide:a GIA weekly provision of $20 -->
+
+**224.** A GIA weekly provision of $20 means A periodical sum where the sum is 20 and the period is weekly.
+
+<!-- l4: decide:a GIA weekly provision of $23 -->
+
+**225.** A GIA weekly provision of $23 means A periodical sum where the sum is 23 and the period is weekly.
+
+<!-- l4: decide:a GIA weekly provision of $24 -->
+
+**226.** A GIA weekly provision of $24 means A periodical sum where the sum is 24 and the period is weekly.
+
+<!-- l4: decide:a GIA weekly provision of $30 -->
+
+**227.** A GIA weekly provision of $30 means A periodical sum where the sum is 30 and the period is weekly.
+
+<!-- l4: decide:a GIA provision of $90 on some other period -->
+
+**228.** A GIA provision of $90 on some other period means A periodical sum where the sum is 90 and the period is other periodical.
+
+<!-- l4: decide:a court-appointed guardian of the property who has done nothing -->
+
+**229.** A court-appointed guardian of the property who has done nothing means a GIA guardian of the property of the infant, in a property case with Rajan, appointed by the court, infant, appointed by the court where the infant has no parent, FALSE, FALSE, FALSE, FALSE, NOTHING, FALSE, FALSE, FALSE, no GIA provision and FALSE.
+
+<!-- l4: decide:a court-appointed guardian of the property who has given security -->
+
+**230.** A court-appointed guardian of the property who has given security means a GIA guardian of the property of the infant, in a property case with Rajan, appointed by the court, infant, appointed by the court where the infant has no parent, TRUE, FALSE, FALSE, FALSE, NOTHING, FALSE, FALSE, FALSE, no GIA provision and FALSE.
+
+<!-- l4: decide:a court-appointed guardian of the property excused security by the court -->
+
+**231.** A court-appointed guardian of the property excused security by the court means a GIA guardian of the property of the infant, in a property case with Rajan, appointed by the court, infant, appointed by the court where the infant has no parent, FALSE, TRUE, FALSE, FALSE, NOTHING, FALSE, FALSE, FALSE, no GIA provision and FALSE.
+
+<!-- l4: decide:a testamentary guardian of the property -->
+
+**232.** A testamentary guardian of the property means a GIA guardian of the property of the infant, in a property case with Lim Kok Wah, appointed by the father, infant, appointed by the father by will, FALSE, FALSE, FALSE, FALSE, NOTHING, FALSE, FALSE, FALSE, no GIA provision and FALSE.
+
+<!-- l4: decide:a guardian of the property who sold without permission -->
+
+**233.** A guardian of the property who sold without permission means a GIA guardian of the property of the infant, in a property case with Rajan, appointed by the court, infant, appointed by the court where the infant has no parent, TRUE, FALSE, TRUE, FALSE, NOTHING, FALSE, FALSE, FALSE, no GIA provision and FALSE.
+
+<!-- l4: decide:a guardian of the property who sold with permission -->
+
+**234.** A guardian of the property who sold with permission means a GIA guardian of the property of the infant, in a property case with Rajan, appointed by the court, infant, appointed by the court where the infant has no parent, TRUE, FALSE, TRUE, FALSE, NOTHING, TRUE, FALSE, FALSE, no GIA provision and FALSE.
+
+<!-- l4: decide:a guardian of the property who granted a one-year lease -->
+
+**235.** A guardian of the property who granted a one-year lease means a GIA guardian of the property of the infant, in a property case with Rajan, appointed by the court, infant, appointed by the court where the infant has no parent, TRUE, FALSE, FALSE, TRUE, JUST with 1, FALSE, FALSE, FALSE, no GIA provision and FALSE.
+
+<!-- l4: decide:a guardian of the property who granted a three-year lease -->
+
+**236.** A guardian of the property who granted a three-year lease means a GIA guardian of the property of the infant, in a property case with Rajan, appointed by the court, infant, appointed by the court where the infant has no parent, TRUE, FALSE, FALSE, TRUE, JUST with 3, FALSE, FALSE, FALSE, no GIA provision and FALSE.
+
+<!-- l4: decide:a guardian of the property who granted a lease of unrecorded term -->
+
+**237.** A guardian of the property who granted a lease of unrecorded term means a GIA guardian of the property of the infant, in a property case with Rajan, appointed by the court, infant, appointed by the court where the infant has no parent, TRUE, FALSE, FALSE, TRUE, NOTHING, FALSE, FALSE, FALSE, no GIA provision and FALSE.
+
+<!-- l4: decide:a guardian of the property who gave a discharge with no order of the court -->
+
+**238.** A guardian of the property who gave a discharge with no order of the court means a GIA guardian of the property of the infant, in a property case with Rajan, appointed by the court, infant, appointed by the court where the infant has no parent, TRUE, FALSE, FALSE, FALSE, NOTHING, FALSE, TRUE, FALSE, no GIA provision and FALSE.
+
+<!-- l4: decide:a guardian of the property who gave a discharge the court had authorised -->
+
+**239.** A guardian of the property who gave a discharge the court had authorised means a GIA guardian of the property of the infant, in a property case with Rajan, appointed by the court, infant, appointed by the court where the infant has no parent, TRUE, FALSE, FALSE, FALSE, NOTHING, FALSE, TRUE, TRUE, no GIA provision and FALSE.
+
+<!-- l4: decide:a guardian of the property applying $80 a month -->
+
+**240.** A guardian of the property applying $80 a month means a GIA guardian of the property of the infant, in a property case with Rajan, appointed by the court, infant, appointed by the court where the infant has no parent, TRUE, FALSE, FALSE, FALSE, NOTHING, FALSE, FALSE, FALSE, a GIA monthly provision of $80 and FALSE.
+
+<!-- l4: decide:a guardian of the property applying $150 a month without permission -->
+
+**241.** A guardian of the property applying $150 a month without permission means a GIA guardian of the property of the infant, in a property case with Rajan, appointed by the court, infant, appointed by the court where the infant has no parent, TRUE, FALSE, FALSE, FALSE, NOTHING, FALSE, FALSE, FALSE, a GIA monthly provision of $150 and FALSE.
+
+<!-- l4: decide:a guardian of the property applying $150 a month with permission -->
+
+**242.** A guardian of the property applying $150 a month with permission means a GIA guardian of the property of the infant, in a property case with Rajan, appointed by the court, infant, appointed by the court where the infant has no parent, TRUE, FALSE, FALSE, FALSE, NOTHING, FALSE, FALSE, FALSE, a GIA monthly provision of $150 and TRUE.
+
+<!-- l4: decide:a guardian of the person only, who has parted with possession -->
+
+**243.** A guardian of the person only, who has parted with possession means Guardian where the guardian is Rajan, appointed by the court, the reference for the infant is infant, how the guardian was appointed is appointed by the court where the infant has no parent, of the person or of the property is guardian of the person of the infant, alone or jointly is alone, refuses to act is FALSE, the mother or father objects to his so acting is FALSE, considers that the mother or father is unfit to have the custody of the infant is FALSE, removed from his guardianship by the court is FALSE, has given security is TRUE, the court has otherwise ordered as to security is FALSE, has sold, mortgaged, exchanged, or otherwise parted with the possession of any of the movable or immovable property of the infant is TRUE, has leased land belonging to the infant is FALSE, the term of the lease, in years is NOTHING, has the permission of the court to deal with the property of the infant is FALSE, has given a good discharge for a legacy or other capital moneys payable to or receivable by the infant is TRUE, the court has otherwise ordered as to giving a good discharge is FALSE, the provision made out of the income of the property of the infant for his maintenance and education is a GIA monthly provision of $150 and has the permission of the court to apply a sum exceeding $100 per month is FALSE.
+
+## Exercising the rules on the facts
+
+### The age of majority is an input, not a fact of this Act
+
+### Section 1 -- short title
+
+### Section 2 -- "court" means the General Division of the High Court or a Family Court
+
+### Section 3 -- the gate, and "any court"
+
+### Section 4 -- the mother's parity of standing
+
+### Section 6 -- the surviving parent
+
+### Section 6(3) -- the three-limbed gate, each limb closed on its own
+
+### Section 10 read into section 6 -- a removed parent is not a guardian
+
+### Section 7 -- the composition
+
+### Which standings are standings in which he acts -- all sixteen members
+
+### Section 8 -- joint guardians who cannot agree
+
+### Section 9 -- attachment of a pension or income
+
+<!-- l4: decide:an application to attach, everything in place -->
+
+**244.** An application to attach, everything in place means An application to attach a pension or income under section 9(1) where the court has made an order under this Act for payment of money is TRUE, there is a pension or income payable to the person against whom the order was made is TRUE, the pension or income is capable of being attached is TRUE and the person by whom the pension or income is payable has been given an opportunity of being heard is TRUE.
+
+<!-- l4: decide:an application to attach, with no order for payment of money -->
+
+**245.** An application to attach, with no order for payment of money means An application to attach a pension or income under section 9(1) where the court has made an order under this Act for payment of money is FALSE, there is a pension or income payable to the person against whom the order was made is TRUE, the pension or income is capable of being attached is TRUE and the person by whom the pension or income is payable has been given an opportunity of being heard is TRUE.
+
+<!-- l4: decide:an application to attach, with no pension or income -->
+
+**246.** An application to attach, with no pension or income means An application to attach a pension or income under section 9(1) where the court has made an order under this Act for payment of money is TRUE, there is a pension or income payable to the person against whom the order was made is FALSE, the pension or income is capable of being attached is FALSE and the person by whom the pension or income is payable has been given an opportunity of being heard is TRUE.
+
+<!-- l4: decide:an application to attach, no pension payable but such pensions attachable -->
+
+**247.** An application to attach, no pension payable but such pensions attachable means An application to attach a pension or income under section 9(1) where the court has made an order under this Act for payment of money is TRUE, there is a pension or income payable to the person against whom the order was made is FALSE, the pension or income is capable of being attached is TRUE and the person by whom the pension or income is payable has been given an opportunity of being heard is TRUE.
+
+<!-- l4: decide:an application to attach a pension not capable of being attached -->
+
+**248.** An application to attach a pension not capable of being attached means An application to attach a pension or income under section 9(1) where the court has made an order under this Act for payment of money is TRUE, there is a pension or income payable to the person against whom the order was made is TRUE, the pension or income is capable of being attached is FALSE and the person by whom the pension or income is payable has been given an opportunity of being heard is TRUE.
+
+<!-- l4: decide:an application to attach, the payer not yet heard -->
+
+**249.** An application to attach, the payer not yet heard means An application to attach a pension or income under section 9(1) where the court has made an order under this Act for payment of money is TRUE, there is a pension or income payable to the person against whom the order was made is TRUE, the pension or income is capable of being attached is TRUE and the person by whom the pension or income is payable has been given an opportunity of being heard is FALSE.
+
+### Section 11 -- which matters the court must consider
+
+### Section 15 -- security
+
+### Section 16 -- limitation of the guardian's powers
+
+### Section 17 -- the discharge for capital moneys
+
+### Section 18 -- maintenance out of income, and the cap
+
+### Section 20 -- application for the court's opinion
+
+### Section 5A -- enforcement of a child access order
+
+<!-- l4: decide:a breach of the access order -->
+
+**250.** A breach of the access order means A breach of an access order where the reference for X, the person given access to the child by the access order is X, the reference for Y, the person required by the order to give X access to the child is Y, the court makes an order under section 5 giving X access to a child is TRUE and the order is breached by Y is TRUE.
+
+<!-- l4: decide:an access order that has not been breached -->
+
+**251.** An access order that has not been breached means A breach of an access order where the reference for X, the person given access to the child by the access order is X, the reference for Y, the person required by the order to give X access to the child is Y, the court makes an order under section 5 giving X access to a child is TRUE and the order is breached by Y is FALSE.
+
+<!-- l4: decide:no access order at all -->
+
+**252.** No access order at all means A breach of an access order where the reference for X, the person given access to the child by the access order is X, the reference for Y, the person required by the order to give X access to the child is Y, the court makes an order under section 5 giving X access to a child is FALSE and the order is breached by Y is FALSE.
+
+<!-- l4: decide:a breach recorded of an access order that was never made -->
+
+**253.** A breach recorded of an access order that was never made means A breach of an access order where the reference for X, the person given access to the child by the access order is X, the reference for Y, the person required by the order to give X access to the child is Y, the court makes an order under section 5 giving X access to a child is FALSE and the order is breached by Y is TRUE.
+
+<!-- l4: decide:a fine of $20,000 -->
+
+**254.** A fine of $20,000 means A sentence under section 5A(3)(e) where the fine imposed, in dollars is JUST with 20000 and the term of imprisonment imposed, in months is NOTHING.
+
+<!-- l4: decide:a fine of $20,001 -->
+
+**255.** A fine of $20,001 means A sentence under section 5A(3)(e) where the fine imposed, in dollars is JUST with 20001 and the term of imprisonment imposed, in months is NOTHING.
+
+<!-- l4: decide:a fine of $25,000 -->
+
+**256.** A fine of $25,000 means A sentence under section 5A(3)(e) where the fine imposed, in dollars is JUST with 25000 and the term of imprisonment imposed, in months is NOTHING.
+
+<!-- l4: decide:imprisonment for 12 months -->
+
+**257.** Imprisonment for 12 months means A sentence under section 5A(3)(e) where the fine imposed, in dollars is NOTHING and the term of imprisonment imposed, in months is JUST with 12.
+
+<!-- l4: decide:imprisonment for 13 months -->
+
+**258.** Imprisonment for 13 months means A sentence under section 5A(3)(e) where the fine imposed, in dollars is NOTHING and the term of imprisonment imposed, in months is JUST with 13.
+
+<!-- l4: decide:imprisonment for 18 months -->
+
+**259.** Imprisonment for 18 months means A sentence under section 5A(3)(e) where the fine imposed, in dollars is NOTHING and the term of imprisonment imposed, in months is JUST with 18.
+
+<!-- l4: decide:a fine of $5,000 and 6 months -->
+
+**260.** A fine of $5,000 and 6 months means A sentence under section 5A(3)(e) where the fine imposed, in dollars is JUST with 5000 and the term of imprisonment imposed, in months is JUST with 6.
+
+<!-- l4: decide:a fine of $25,000 and 6 months -->
+
+**261.** A fine of $25,000 and 6 months means A sentence under section 5A(3)(e) where the fine imposed, in dollars is JUST with 25000 and the term of imprisonment imposed, in months is JUST with 6.
+
+<!-- l4: decide:neither a fine nor imprisonment -->
+
+**262.** Neither a fine nor imprisonment means A sentence under section 5A(3)(e) where the fine imposed, in dollars is NOTHING and the term of imprisonment imposed, in months is NOTHING.
+
+### Section 21 -- money paid into a District Court
+
+### The Act as a whole -- the gate, and the integrity of the record
+
+## Where this Act joins the other three
+
+## Sections not encoded, and why
+
+## Ambiguities: where two readings of the text both survive
+
+## Where the shared ontology stopped short
+
+<!-- tnr-coverage: 262 provisions; 0 boolean atoms inlined; 404 directives suppressed -->

@@ -1,6 +1,10 @@
 # Specification: TNR Generation and Round-Tripping
 
-**Status:** Draft
+**Status:** Draft. Phase 1 (renderer, `l4 tnr`, `.tnr.golden`) is built on this
+branch and has never merged; the branch was merged up to `unstable` on
+2026-09-02. §3.6 is **proposed, not built** — nothing in it has been measured.
+§10 records that `unstable` grew a second module-level renderer while this
+branch sat; which one survives is undecided.
 **Branch:** `nlg-roundtrip`
 **Related:** `specs/done/DESC-ANNOTATION-SPEC.md`, `specs/todo/REF-ANNOTATION-SPEC.md`, `jl4-core/src/L4/Nlg.hs`
 
@@ -13,7 +17,7 @@ Prototype output is Markdown; production output is `.docx` with proper
 paragraph styles.
 
 The second half of the roadmap is **round-tripping**: humans edit the TNR
-version, the L4 updates in response, and the *next* generation of the TNR from
+version, the L4 updates in response, and the _next_ generation of the TNR from
 the updated L4 is as similar as possible to the previous generation, modulo
 the edits. This is a bidirectional-transformation ("lens") problem and we
 adopt the lens laws as our correctness criteria.
@@ -29,7 +33,7 @@ the concrete artifact those hand-waves are missing.
 
 The TNR layer must respect that premise absolutely:
 
-- **English is a view; L4 is the model.** The TNR document is a *projection*
+- **English is a view; L4 is the model.** The TNR document is a _projection_
   of the L4, never an alternative source of semantics. Any agent answering
   questions about the rules calls the reasoner (via MCP / `jl4-service`),
   not its own reading of the generated prose.
@@ -43,13 +47,13 @@ The TNR layer must respect that premise absolutely:
 
 ### 1.1 Annotation mechanisms already in the language
 
-| Annotation | Syntax | Attaches to | Status |
-| --- | --- | --- | --- |
-| NLG hint | `@nlg text with %var%` (line) / `[inline]` / `<<block>>` | `Name` nodes, by source position | ✅ implemented; resolved through typecheck (`NlgMap` in `TypeCheck/Types.hs`) |
-| Description | `@desc text` (leading or inline) | declarations, `GIVEN` params, record fields | ✅ implemented (`DescMap`) |
-| Citation | `@ref "Section 4(1)(a)"`, `@ref url …`, `@ref-map`, `@ref-src` | lexed & collected; **not yet attached to AST** | 🟡 see `REF-ANNOTATION-SPEC.md`; TODO at `Parser.hs:216-218` |
-| Export | `@export [default] desc` | `DECIDE` functions | ✅ implemented (`L4/Export.hs`) |
-| Section | `§`/`§§`/… headings with names | module structure | ✅ nesting depth = heading level |
+| Annotation  | Syntax                                                         | Attaches to                                    | Status                                                                        |
+| ----------- | -------------------------------------------------------------- | ---------------------------------------------- | ----------------------------------------------------------------------------- |
+| NLG hint    | `@nlg text with %var%` (line) / `[inline]` / `<<block>>`       | `Name` nodes, by source position               | ✅ implemented; resolved through typecheck (`NlgMap` in `TypeCheck/Types.hs`) |
+| Description | `@desc text` (leading or inline)                               | declarations, `GIVEN` params, record fields    | ✅ implemented (`DescMap`)                                                    |
+| Citation    | `@ref "Section 4(1)(a)"`, `@ref url …`, `@ref-map`, `@ref-src` | lexed & collected; **not yet attached to AST** | 🟡 see `REF-ANNOTATION-SPEC.md`; TODO at `Parser.hs:216-218`                  |
+| Export      | `@export [default] desc`                                       | `DECIDE` functions                             | ✅ implemented (`L4/Export.hs`)                                               |
+| Section     | `§`/`§§`/… headings with names                                 | module structure                               | ✅ nesting depth = heading level                                              |
 
 Key plumbing facts:
 
@@ -69,10 +73,10 @@ nodes** (`#EVAL` etc.) into `.nlg.golden` files. Consequences:
 
 - `imaginary-alcohol-act.nlg.golden` is empty (no directives in the file).
 - `ny-environmental-7.3.nlg.golden` reads like word salad:
-  `executing contract `Example Filing` at `Day` with `Jul` with 19 and 2025 …`
+  `executing contract `Example Filing`at`Day`with`Jul` with 19 and 2025 …`
 
 **There is no module-level document renderer.** Nothing walks `DECLARE`,
-`ASSUME`, `DECIDE`, sections, and deontic rules to produce a *document*. The
+`ASSUME`, `DECIDE`, sections, and deontic rules to produce a _document_. The
 `LinTree` type is token-level only; the TODO at `Nlg.hs:25-28` already wishes
 for "a 'Doc' type… like GF, a typed LinTree that performs pre-analysis steps".
 This spec is that Doc type, plus the house style to render it.
@@ -93,7 +97,7 @@ later):
   Nested `OR` within `AND` drops one tabulation level (paragraphs →
   subparagraphs).
 - **Deontics:** `PARTY p MUST a WITHIN d HENCE h LEST l` renders as
-  "*p* must *a* \[within / no later than *d*\]. If *p* fails to do so, *l*."
+  "_p_ must _a_ \[within / no later than _d_\]. If _p_ fails to do so, _l_."
   `MUSTNT` → "must not"; `MAY` → "may".
 - **Definitions:** `DECLARE`/`ASSUME`d types and terms collect into an
   interpretation section: "In this Act, unless the context otherwise
@@ -131,15 +135,15 @@ Target TNR (Markdown prototype):
 
 (1) The person must not sell alcohol if—
 
-   (a) the person is a body corporate;
+(a) the person is a body corporate;
 
-   (b) the person engages in business for profit;
+(b) the person engages in business for profit;
 
-   (c) it is not the case that the person is a public house;
+(c) it is not the case that the person is a public house;
 
-   (d) it is not the case that the person is a hotel; and
+(d) it is not the case that the person is a hotel; and
 
-   (e) the person—
+(e) the person—
 
       (i) has an unspent conviction for fraud;
 
@@ -159,7 +163,7 @@ Observations driving design:
 - Paragraph (e) shows **subject factoring**: the three disjuncts share the
   prefix "the person", which is hoisted. v1 may do this only via explicit
   hints; automatic common-prefix factoring is a v2 nicety.
-- Source comments in the file contain the *original* statutory text, giving us
+- Source comments in the file contain the _original_ statutory text, giving us
   immediate human evaluation: does our output read like what Matt sent?
 
 ### 2.3 Architecture
@@ -242,7 +246,7 @@ Golden tests: `foo.tnr.golden` alongside the existing `.nlg.golden` files in
   coverage report; CI fails on unanchored/uncovered nodes.
 - **No invented semantics:** prose for connectives comes only from the fixed
   house-style table (and/or/not/if/must/may…) and from author annotations.
-  The renderer never paraphrases beyond its table — LLMs are *not* in the
+  The renderer never paraphrases beyond its table — LLMs are _not_ in the
   v1 generation path (they enter in round-trip ingestion, §3.4, where
   output is validated).
 
@@ -268,7 +272,7 @@ hint patches committed into the L4 source**:
 4. a human accepts; the hints are committed; the deterministic renderer
    replays them forever.
 
-*The GPU drafts the phrasing once; the CPU replays it forever.* Fluency
+_The GPU drafts the phrasing once; the CPU replays it forever._ Fluency
 compounds in source control — diffable, reviewable, stable across
 regenerations — rather than being re-rolled per render. Mechanically this is
 the Class A round-trip path (§3.3) running in self-edit mode.
@@ -325,15 +329,15 @@ Each rendered block embeds a stable identifier linking it to its L4 node:
 `l4 ingest foo.md --against foo.l4` aligns edited blocks to anchors and
 classifies each change:
 
-| Class | Example | Action |
-| --- | --- | --- |
-| **A. Wording-only** | "body corporate" → "corporate body"; rephrased but logically identical | Update/insert `@nlg` / `@desc` annotations in the `.l4`. Fully automatic. |
-| **B. Semantic** | a condition added/struck; threshold changed; "and" → "or" | Propose an L4 patch (LLM-assisted), then **validate**: typecheck + existing `#EVAL`/`#CHECK` regressions. Present logic-level diff to a human for confirmation. Tests that intentionally change behavior must be updated consciously. |
-| **C. Unalignable** | anchor destroyed; block deleted or wholesale rewritten; new free-floating prose | Flag for interactive re-formalization; never silently guess. |
+| Class               | Example                                                                         | Action                                                                                                                                                                                                                                |
+| ------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A. Wording-only** | "body corporate" → "corporate body"; rephrased but logically identical          | Update/insert `@nlg` / `@desc` annotations in the `.l4`. Fully automatic.                                                                                                                                                             |
+| **B. Semantic**     | a condition added/struck; threshold changed; "and" → "or"                       | Propose an L4 patch (LLM-assisted), then **validate**: typecheck + existing `#EVAL`/`#CHECK` regressions. Present logic-level diff to a human for confirmation. Tests that intentionally change behavior must be updated consciously. |
+| **C. Unalignable**  | anchor destroyed; block deleted or wholesale rewritten; new free-floating prose | Flag for interactive re-formalization; never silently guess.                                                                                                                                                                          |
 
 The Class A / Class B distinction is the heart of the design: most editorial
 passes over legislation are wording passes, and those must round-trip into
-*annotations* — leaving the logic untouched and the regeneration trivially
+_annotations_ — leaving the logic untouched and the regeneration trivially
 stable. Only genuinely semantic edits touch the rule bodies.
 
 ### 3.4 Surgical L4 updates (exact-printing)
@@ -352,26 +356,145 @@ at the `.l4` level and keeps `git diff` on the L4 side as small as the edit.
 - Edits inside Word that destroy bookmarks degrade to Class C.
 - Multi-file modules: v1 round-trips a single `.l4` ↔ single document.
 
+### 3.6 Losslessness: the cleanroom round-trip (proposed 2026-09-02, not built)
+
+The lens laws in §3.1 do not answer the question this project keeps being
+asked — _is the TNR a lossless view of the L4?_ — and it is worth being exact
+about why, because the prototype's own results look as if they do.
+
+`put` takes the source `l4` as an argument. GetPut therefore says that
+re-ingesting an unedited document **changes nothing**, which is stability, and
+holds trivially whenever the source is in hand. The live prototype (§9,
+2026-06-11) goes further: the whole L4 is handed to the LLM as context on every
+ingest. That is the right design for an editing lens and it says nothing about
+whether the prose _alone_ carries the meaning.
+
+Nor is the answer "compare the generated prose with the original statute". That
+measures the composed pipeline, human ingest then `get`, and three things sit
+between the number and the claim:
+
+- **echo leakage** — `get` reads `@nlg`, `@desc` and section names, which were
+  typed in by someone looking at the statute. High textual fidelity can come
+  entirely from those annotations while the logic under them is wrong; the more
+  annotation, the less the comparison says.
+- **paraphrase penalty** — a lossless IR rendered in a different house style
+  scores badly. Fidelity is neither necessary nor sufficient.
+- **no localisation** — original-vs-generated cannot say whether the ingest
+  dropped a qualifier or the renderer did.
+
+This repo has already ruled the same way twice on the nearest analogues:
+`CLAUDE.md` §3.2.1 ("re-parsing is not re-meaning": the `prettyLayout`
+round-trip was green while `l4 batch` silently re-associated a boolean) and
+`specs/todo/single-instruction-demo/DENOVO-DIFF-ORACLE.md` §2 ("behavioural
+first, textual second"). Meaning is measured by evaluation over fact patterns,
+not by string comparison.
+
+#### The property
+
+Let `get : L4 → TNR` be the renderer, with anchors **off** (an anchor carries
+the qualified name of its node, which is a hint no reader of the printed statute
+would have). Let `reencode : TNR → L4` be an encoder that sees the prose and
+**nothing else** — not the source `.l4`, not the original statute, not this
+repo's corpus. Then
+
+```
+l4  ≡_B  reencode (get l4)
+```
+
+where `≡_B` is agreement over a shared fact battery, measured pairwise on
+declared decision pairs. That is exactly what the §8 diff oracle
+(`etc/go/lib/denovo-diff.mjs`) measures between the committed corpus and a de
+novo encoding, and it is reused here unchanged: the left side is the corpus
+module, the right side is the re-encoding, the surface map declares which
+decision on the left pairs with which on the right, and `run` reports an
+agreement count plus a minimised witness for every divergence. The oracle never
+triages; the dispositions below are the reviewer's.
+
+Note what this does and does not measure. It measures whether **TNR is a
+faithful view of the L4**. It does _not_ measure whether the L4 is faithful to
+the statute — that is the diff oracle's own G2 question, statute → two
+independent encodings, and it stays separate. The composed claim in the
+executive summary, that the whole path from legacy text through L4 and back is
+meaning-preserving, needs **both** measurements, and neither substitutes for
+the other.
+
+Echo leakage does not inflate this number. A re-encoder that reads an `@nlg`
+phrase back off the page is reading exactly what a human reader of the printed
+instrument would read; if that phrase is enough to recover the decision, the
+prose carried the meaning, which is the claim.
+
+#### The bar
+
+The charities cleanroom (PR #201, `jl4/examples/legal/charities-cleanroom/`,
+`COMPARISON.md`) is the only two-encodings measurement on record: two
+independent encodings _from the same statute_ agreed on 21,221 of 21,420 battery
+rows (99.07%), and the 199 divergences reduced to four root causes, one of which
+was an unrecorded interpretive fork in our own corpus.
+
+A re-encoding _from generated prose_ is held to that bar as a floor, not a
+target. The TNR is one step closer to the L4 than the statute is, so agreement
+should be **higher**; if it is lower, the generated prose is lossier than the
+statute it stands in for, and that is the finding. Above the floor, the
+interesting output is not the rate but the **witness list**: each divergence
+names a place where the prose lost something the L4 had.
+
+#### Procedure
+
+Split as ORCHESTRATOR.md §2.1 splits everything — scripts own facts, the skill
+owns judgement:
+
+| step         | who             | detail                                                                                                                                                                                                                                                                                                                                                                              |
+| ------------ | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. render    | script          | `l4 tnr --no-anchors FILE > FILE.tnr.md` (or whichever `get` survives §10, with its block ids suppressed)                                                                                                                                                                                                                                                                           |
+| 2. re-encode | cleanroom agent | driven by the `writing-l4-rules` skill, handed **only** the `.tnr.md`; its tool log is audited afterwards the way the charities cleanroom's was — zero reads of the source `.l4`, the corpus, or the statute. Plug `drafting-patterns.md`'s corpus citation first (it leaked Part 6 of the charities corpus last time).                                                             |
+| 3. pair      | reviewer        | write the surface map. Names will differ; that is the point. The battery and the pairing conventions are the oracle's existing ones.                                                                                                                                                                                                                                                |
+| 4. measure   | script          | `node etc/go/lib/denovo-diff.mjs run --map MAP.json`. Exit 0 or 1 is a measurement; 2 or 4 is a broken harness, never a finding about either side.                                                                                                                                                                                                                                  |
+| 5. triage    | reviewer        | each witness is one of: **renderer defect** (the prose under-determines what the L4 fixes — fix `get`, or add the missing hint kind to §2.4); **encoder error** (the prose was sufficient and the agent misread it — discard, but count); **house-style gap** (the prose is ambiguous in a way the statute itself would be — an `@nlg` or connective-table finding, recorded here). |
+
+#### What the oracle cannot see
+
+Inherited from the oracle's own Limits, and not to be worked around silently:
+
+- an enum-typed input cannot be fed across an import boundary (measured
+  2026-08-05, recorded in the Reg CF surface map); decisions that take an
+  `Interpretation` record are outside the pairing;
+- deontic and temporal rules are not decisions; the oracle evaluates `DECIDE`s.
+  A deontic body's round-trip needs an LTS comparison, which is out of scope for
+  v1 and should be said so in the run receipt rather than counted as agreement;
+- `ASSUME`-shaped modules do not evaluate at all.
+
+#### Pilot and exit criterion
+
+Pilot on `imaginary-alcohol-act.l4` first (small, propositional, statute in the
+comments — so the _textual_ comparison can be run beside it as a foil and its
+disagreement with the behavioural number recorded), then on
+`charities-cleanroom/charity-test.l4`, whose 2,115-row battery and surface map
+already exist and need only their right side re-pointed.
+
+Exit: **one measured run on one subject**, with the agreement rate, the witness
+list and a disposition for every witness written into §9 of this spec. Until
+that entry exists, every sentence in this section is a proposal.
+
 ## 4. Pilot Corpus
 
-| File | Why |
-| --- | --- |
+| File                                          | Why                                                                                                                       |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | `jl4/examples/legal/imaginary-alcohol-act.l4` | Original statutory text in comments → direct human comparison; pure propositional structure; the north-star golden (§2.2) |
-| `jl4/examples/legal/british-citizen-act.l4` | Real legislation; deep AND/OR nesting; function application (`father of p`) stresses linearization |
-| `jl4/examples/legal/ny-environmental-7.3.l4` | Real regulation; deontics (`PARTY/MUST/WITHIN/HENCE`); `@ref` URL citations |
-| `jl4/examples/legal/promissory-note.l4` | Contract (not statute) — tests that house style is pluggable; chained obligations |
-| `doc/reference/syntax/annotation-example.l4` | Exercises every annotation form |
+| `jl4/examples/legal/british-citizen-act.l4`   | Real legislation; deep AND/OR nesting; function application (`father of p`) stresses linearization                        |
+| `jl4/examples/legal/ny-environmental-7.3.l4`  | Real regulation; deontics (`PARTY/MUST/WITHIN/HENCE`); `@ref` URL citations                                               |
+| `jl4/examples/legal/promissory-note.l4`       | Contract (not statute) — tests that house style is pluggable; chained obligations                                         |
+| `doc/reference/syntax/annotation-example.l4`  | Exercises every annotation form                                                                                           |
 
 ## 5. Phasing
 
-| Phase | Deliverable | Exit criterion |
-| --- | --- | --- |
-| **1. TNR/MD renderer** | `L4.TNR` Doc IR + Markdown backend + `l4 tnr` + `.tnr.golden` harness | `imaginary-alcohol-act.tnr.golden` judged faithful & readable against the in-comment original; coverage report clean on pilot corpus |
-| **2. Hints & polish** | negation hints, whole-rule overrides, definitions section, `@ref` cites (after REF-ANNOTATION-SPEC); deterministic subject-factoring; **AI gloss pass** (§2.6) proposing `@nlg` patches gated by back-translation + goldens | british-citizen-act and ny-environmental renders pass review |
-| **3. docx backend** | pandoc JSON writer + `tnr-reference.docx` styles | opens in Word with correct paragraph styles |
-| **4. Round-trip: Class A** | anchor alignment, wording-edit detection, surgical `@nlg`/`@desc` updates; GetPut + idempotence property tests | edit-a-phrase → regen produces minimal diff, `.l4` diff touches only annotations |
-| **5. Round-trip: Class B/C** | LLM-assisted semantic patch proposal + typecheck/#EVAL validation gate + human confirmation UX | demo: strike a condition in Word, confirm proposed L4 change, regen stable |
-| **6. Web playground** (§6.1) | split-pane jl4-web: L4 editor left, live TNR render right; later TNR-side editing via the ingestion path | edit L4 in browser → only the corresponding TNR block changes |
+| Phase                        | Deliverable                                                                                                                                                                                                                 | Exit criterion                                                                                                                       |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| **1. TNR/MD renderer**       | `L4.TNR` Doc IR + Markdown backend + `l4 tnr` + `.tnr.golden` harness                                                                                                                                                       | `imaginary-alcohol-act.tnr.golden` judged faithful & readable against the in-comment original; coverage report clean on pilot corpus |
+| **2. Hints & polish**        | negation hints, whole-rule overrides, definitions section, `@ref` cites (after REF-ANNOTATION-SPEC); deterministic subject-factoring; **AI gloss pass** (§2.6) proposing `@nlg` patches gated by back-translation + goldens | british-citizen-act and ny-environmental renders pass review                                                                         |
+| **3. docx backend**          | pandoc JSON writer + `tnr-reference.docx` styles                                                                                                                                                                            | opens in Word with correct paragraph styles                                                                                          |
+| **4. Round-trip: Class A**   | anchor alignment, wording-edit detection, surgical `@nlg`/`@desc` updates; GetPut + idempotence property tests                                                                                                              | edit-a-phrase → regen produces minimal diff, `.l4` diff touches only annotations                                                     |
+| **5. Round-trip: Class B/C** | LLM-assisted semantic patch proposal + typecheck/#EVAL validation gate + human confirmation UX                                                                                                                              | demo: strike a condition in Word, confirm proposed L4 change, regen stable                                                           |
+| **6. Web playground** (§6.1) | split-pane jl4-web: L4 editor left, live TNR render right; later TNR-side editing via the ingestion path                                                                                                                    | edit L4 in browser → only the corresponding TNR block changes                                                                        |
 
 ## 6. Delivery Vehicle: Agent Skill
 
@@ -381,7 +504,7 @@ call it `l4-tnr` or fold it into the l4 skill as a workflow.
 
 This is not just packaging; it resolves the Phase 5 architecture. The
 "LLM-assisted" steps in round-tripping do **not** require embedding an LLM in
-the toolchain — the agent *is* the LLM in the loop, and the deterministic CLI
+the toolchain — the agent _is_ the LLM in the loop, and the deterministic CLI
 provides its guardrails:
 
 ```
@@ -393,7 +516,7 @@ l4 check    typecheck, #EVAL      ←→  run validation gate, iterate
 exact-print surgical edits        ←→  apply Class A edits mechanically
 ```
 
-The skill encodes the *workflow*: render → hand to human → ingest edits →
+The skill encodes the _workflow_: render → hand to human → ingest edits →
 classify → auto-apply Class A → for Class B, propose an L4 patch, run
 `l4 check` and the `#EVAL` regressions, show the human a logic-level diff,
 apply on confirmation → regenerate → verify minimal diff. Every
@@ -435,24 +558,28 @@ Markdown pane on the right — the **prototype TNR**. Sequencing:
   - coverage: no L4 declaration without an anchor in the output.
 - **Human eval:** side-by-side of generated TNR vs. original statutory text
   for the alcohol act and british-citizen-act.
+- **Losslessness (§3.6):** the cleanroom round-trip measured by the diff
+  oracle. Run by hand, not in CI — it needs an agent in the loop and a
+  reviewer to triage — and its result is recorded in §9, not asserted by a
+  test.
 
 ## 8. Open Questions — provisionally resolved (2026-06-10)
 
-1. **Negation-hint syntax** — *deferred to Phase 2.* v1 negates atoms with a
+1. **Negation-hint syntax** — _deferred to Phase 2._ v1 negates atoms with a
    conservative copula/auxiliary swap (" is " → " is not ", " has " →
    " does not have ", likewise are/have, first occurrence only) and falls
    back to the clumsy-but-faithful "it is not the case that …". On the
    alcohol act this already yields "the person is not a public house".
-2. **`#EVAL`s** — *strictly suppressed* in v1; counted in the trailing
+2. **`#EVAL`s** — _strictly suppressed_ in v1; counted in the trailing
    `tnr-coverage` comment so suppression is visible, not silent. An
    explanatory-notes appendix can come later.
-3. **House style** — *hardcoded Commonwealth* for v1, but every connective /
+3. **House style** — _hardcoded Commonwealth_ for v1, but every connective /
    lead-in / marker string lives in one place (`L4.TNR`'s house-style
    helpers) so making it data-driven later is mechanical.
-4. **Anchor visibility** — *hidden HTML comments*, on by default,
+4. **Anchor visibility** — _hidden HTML comments_, on by default,
    `--no-anchors` to suppress. Robustness against comment-stripping editors
    is a docx-era problem (see 5).
-5. **Docx round-trip markers** — *deferred to Phase 3* (bookmarks vs.
+5. **Docx round-trip markers** — _deferred to Phase 3_ (bookmarks vs.
    content controls vs. fuzzy-match sidecar).
 
 ## 9. Status
@@ -495,3 +622,61 @@ Markdown pane on the right — the **prototype TNR**. Sequencing:
   export (`/api/akn`) added; all six demo instruments well-formed per
   xmllint. Latency: `claude -p` varies 10–90s; tiered model escalation
   (haiku→sonnet) is the obvious untried lever.
+- **2026-09-02** — branch merged up to `unstable` (1,293 commits of drift;
+  two add/add conflicts in `jl4/app/Main.hs` and `jl4/tests/Main.hs`, both
+  wiring). The legal corpus has grown from 8 files to 26 since the fork, so
+  the `tnr` harness now wants 18 new goldens. §3.6 written; **not run**.
+  Finding recorded as §10.
+
+## 10. The second renderer (finding, 2026-09-02)
+
+While this branch sat unmerged, `unstable` grew a second module-level document
+renderer: `L4.Export.Document` (the IR) and `L4.Export.Render` (text, HTML,
+Akoma Ntoso), commit `2bb2b6d5` of 2026-06-14, three days after this branch's
+last commit. It is the code behind the VS Code **Render** pane (custom LSP
+request `l4/exportDocument`, `ts-shared/jl4-client-rpc/custom-protocol.ts`),
+behind `l4 render`, and behind `jl4-lsp`'s export plan. It has no spec of its
+own; four other specs cite its line numbers. Both renderers share
+`L4.Nlg.simpleLinearizer` for leaf phrases; the duplication is the document
+walk, sectioning, definitions handling and connective house style.
+
+A third surface borrows the name: `l4 nlg` and the go orchestrator's
+`p7-tnr.sh` call themselves the "TNR / NLG leg" but linearize directives only.
+They are not a document renderer and should not be read as one.
+
+|                | `L4.TNR` (this branch)                                                  | `L4.Export.Document` + `Render` (`unstable`)                          |
+| -------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| lines          | 690                                                                     | 1,633 + 649                                                           |
+| output         | Markdown, Coode tabulation                                              | text, HTML, AKN, JSON IR, plan                                        |
+| block identity | hidden `<!-- l4: … -->` anchors, designed as round-trip identity (§3.2) | per-block `id` / AKN `eId`, `<sort>_<n>_<module>`, designed for links |
+| extras         | coverage tally; negative-universal rewrite; `.tnr.golden`               | imports checklist; unused-definition pruning; numbering knobs         |
+| wired into     | `l4 tnr`, jl4-test                                                      | VS Code Render pane, `l4 render`, jl4-lsp                             |
+| spec           | this file                                                               | none                                                                  |
+
+**Side-by-side, measured 2026-09-02** on the merged tree, both binaries from
+one build. On `imaginary-alcohol-act.l4` (propositional, statute in the
+comments): `l4 tnr --no-anchors` gives three numbered provisions in Coode
+tabulation, the first as "No person may sell alcohol who— (a) is a body
+corporate; … (e) has— (i) …; or (iii) …", 41 lines, reading as the statute
+reads. `l4 render --format text` gives an "Assumptions" list of fourteen
+bullets of the form "The person is a body corporate is assumed to be given",
+then each rule as "X means: all of the following are true:" with negation
+rendered "the person is a public house is false" and a negated conjunction as
+one run-on line, 58 lines. On `ny-environmental-7.3.l4` (records, deontics,
+fixtures) **neither** renderer copes: both emit the deontic body as a single
+run-on line, and both render the example fixtures as provisions. So the two
+are not duplicates of one strength. `L4.TNR` has the legislative house style
+for propositional rules — tabulation, subject elision, the negative-universal
+rewrite, atom inlining — and `Export.Document`/`Render` has the plumbing —
+imports, reachability, HTML/AKN, LSP wiring. Deontics and record-shaped rules
+are open on both sides (this spec's Phase 2 worklist, §9).
+
+**Undecided.** The obvious resolution is to retire `L4.TNR` as a renderer and
+fold what only it has — Coode tabulation as a selectable house style, the
+negative-universal rewrite, the coverage report, and anchor-as-round-trip-
+identity — into `Export.Document`/`Render`, keeping this spec for what only it
+records: the lens laws (§3.1), the edit classes (§3.3) and the losslessness
+property (§3.6), all of which are renderer-independent. That is a
+recommendation, not a ruling; it is made without a side-by-side of the two
+renderers on the same corpus, which is the evidence it needs. Whichever `get`
+survives, §3.6 applies to it unchanged.

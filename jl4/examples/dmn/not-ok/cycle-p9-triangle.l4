@@ -1,0 +1,46 @@
+-- NEGATIVE fixture for the future D-CYCLE check (spec §6.4.2, §6.3.7), and the
+-- one that DISTINGUISHES A REAL SCC ROUTINE FROM A PAIRWISE BACK-EDGE CHECK.
+--
+-- p9: a 3-cycle among nullary decides.
+--
+--     `stage one`   reads `stage two`
+--     `stage two`   reads `stage three`
+--     `stage three` reads `stage one`
+--
+-- No two of the three form a cycle on their own. A detector that looked for
+-- "does X reach back to X in one hop", or that walked edges pairwise, finds
+-- nothing here while finding p2 and p7 easily. Only a genuine strongly
+-- connected components pass reports it, and it must report it ONCE, over an SCC
+-- of size 3, naming all three members -- not three times, and not as three
+-- two-member findings.
+--
+-- On today's tree the emitted DRG IS cyclic here and the report is ADVISORY
+-- ONLY.
+--
+-- Expected after Phase 4: exactly ONE D-CYCLE, |SCC| = 3, listing name AND id
+-- of all three members, range = Nothing.
+--
+--
+-- PROVENANCE OF THIS HEADER. The .l4 source was typechecked (`l4 check`, clean)
+-- when it was written on 2026-07-31, with a prebuilt CLI. The statements above
+-- about what TODAY'S EXPORTER emits and reports are taken from spec
+-- §6.4.2/§6.4.5's table and were NOT re-measured here: that session had no
+-- build. Whoever wires these fixtures into jl4/tests/DmnExport.hs must MEASURE
+-- the expectation rather than transcribe it.
+-- NEVER added to `goldenSubjects`.
+
+IMPORT prelude
+
+§ `three cycle`
+
+GIVETH A NUMBER
+`stage one` MEANS
+    `stage two` PLUS 1
+
+GIVETH A NUMBER
+`stage two` MEANS
+    `stage three` PLUS 1
+
+GIVETH A NUMBER
+`stage three` MEANS
+    `stage one` PLUS 1

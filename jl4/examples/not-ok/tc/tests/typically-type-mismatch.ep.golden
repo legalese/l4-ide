@@ -1,0 +1,21 @@
+-- TYPICALLY default values must type-check against the annotated type.
+
+-- ERROR: BOOLEAN field with NUMBER default
+DECLARE BadConfig HAS
+  enabled IS A BOOLEAN TYPICALLY 42
+
+-- ERROR: NUMBER field with STRING default
+DECLARE BadConfig2 HAS
+  n IS A NUMBER TYPICALLY "foo"
+
+-- ERROR: STRING field with BOOLEAN default
+DECLARE BadConfig3 HAS
+  s IS A STRING TYPICALLY TRUE
+
+-- ERROR: ASSUME with mismatched default
+ASSUME `applicable law` IS A STRING TYPICALLY 42
+
+-- ERROR: GIVEN parameter with mismatched default
+GIVEN married IS A BOOLEAN TYPICALLY 7
+GIVETH A BOOLEAN
+DECIDE `bad given` IF married

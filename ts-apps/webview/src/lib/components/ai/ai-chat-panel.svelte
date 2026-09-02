@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onDestroy } from 'svelte'
   import type { Messenger } from 'vscode-messenger-webview'
+  import { HOST_EXTENSION } from 'vscode-messenger-common'
   import {
     AiActiveFile,
     AiAuthStatus,
@@ -16,6 +17,9 @@
     AiChatToolCall,
     AiChatTurnSpawn,
     AiUsageUpdate,
+    RequestOpenUrl,
+    RequestSidebarLogin,
+    type AiChatAttachment,
   } from 'jl4-client-rpc'
   import { createAiChatStore } from '$lib/stores/ai-chat.svelte'
   import { aiPrefs } from '$lib/stores/ai-prefs.svelte'
@@ -25,11 +29,13 @@
   import ConversationHistory from './conversation-history.svelte'
   import SettingsPanel from './settings-panel.svelte'
   import DeploymentBanner from './deployment-banner.svelte'
+  import CloudUpsell from '../cloud-upsell.svelte'
 
   let {
     messenger,
     visible,
     deploymentChatRequest = null,
+    refineRequest = null,
   }: {
     messenger: InstanceType<typeof Messenger> | null
     visible: boolean
@@ -42,6 +48,20 @@
       /** The deployment's "Intended use" metadata, surfaced in the
        *  empty-state of the fresh deployment chat. */
       intendedUse?: string
+      nonce: number
+    } | null
+    /** Set by the Render tab's "Refine with Legalese AI" flow after a
+     *  deterministic render: starts a fresh conversation seeded with a
+     *  prompt, the L4 source + generated file surfaced as `@`-mention
+     *  chips, and (optionally) the drafting-policy file attached, then
+     *  submits it. The `nonce` makes repeat refinements re-trigger the
+     *  effect. */
+    refineRequest?: {
+      prompt: string
+      attachment: AiChatAttachment | null
+      /** Files to reference — shown as chips and passed as file
+       *  mentions so the agent can read them via its fs tools. */
+      files: Array<{ name: string; path: string }>
       nonce: number
     } | null
   } = $props()
@@ -58,6 +78,29 @@
     if (!req || req.nonce === lastDeploymentNonce) return
     lastDeploymentNonce = req.nonce
     store.startDeploymentChat(req.deploymentId, req.apiBaseUrl, req.intendedUse)
+  })
+
+  // Honour a "Refine with Legalese AI" request from the Render tab:
+  // open a fresh conversation, attach the drafting policy (if any), and
+  // submit the seeded prompt so the agent starts reading the files and
+  // reworking the document right away. The active-file chip is forced
+  // off — the prompt names both files explicitly, so the editor's
+  // current file would just be redundant (often duplicate) context.
+  let lastRefineNonce = -1
+  $effect(() => {
+    const req = refineRequest
+    if (!req || req.nonce === lastRefineNonce) return
+    lastRefineNonce = req.nonce
+    store.newConversation()
+    store.setIncludeActiveFile(false)
+    if (req.attachment) store.attachExternal(req.attachment)
+    // File mentions carry the paths to the model (via the extension's
+    // <mention-context>); fileChips render them as chips on the bubble.
+    const mentions = req.files.map((f) => ({
+      kind: 'file' as const,
+      label: f.path,
+    }))
+    void store.send(req.prompt, mentions, { fileChips: req.files })
   })
 
   // The jl4-service connection is independent of Legalese AI
@@ -155,6 +198,14 @@
     settingsOpen = true
   }
 
+  function signIn(): void {
+    messenger?.sendNotification(
+      RequestSidebarLogin,
+      HOST_EXTENSION,
+      undefined as never
+    )
+  }
+
   // Retry asks the server to run another turn against the existing
   // conversation state — no duplicated user message. The user's
   // original prompt is already persisted on disk from the aborted
@@ -177,14 +228,9 @@
 
 <div class="ai-panel">
   {#if showUnauth}
-    <!-- Mirrors the Deployments tab empty-state (same element shape,
-         class names and hint text styling) so the two tabs read the
-         same when signed-out. Consistency beats cleverness here. -->
-    <div class="empty-state">
-      <p class="hint">
-        Sign in with Legalese Cloud to start composing rules with AI.
-      </p>
-    </div>
+    <!-- Mirrors the Deployments tab signed-out state — both render the
+         shared Legalese Cloud promo so the two tabs read the same. -->
+    <CloudUpsell context="ai" onSignIn={signIn} />
   {:else}
     {#if showEmptyState}
       <EmptyState
@@ -231,6 +277,15 @@
     {#if store.deploymentBinding}
       <DeploymentBanner
         deploymentId={store.deploymentBinding.deploymentId}
+        onOpenInBrowser={() => {
+          // apiBaseUrl is always https://ai.legalese.cloud/{org}/{dep};
+          // the public chat UI is the same path on the chat. subdomain.
+          const url = store.deploymentBinding!.apiBaseUrl.replace(
+            'https://ai.legalese.cloud',
+            'https://chat.legalese.cloud'
+          )
+          messenger?.sendNotification(RequestOpenUrl, HOST_EXTENSION, { url })
+        }}
         onClose={() => store.newConversation()}
       />
     {/if}
@@ -253,29 +308,5 @@
     height: 100%;
     min-height: 0;
     box-sizing: border-box;
-  }
-
-  /* Mirror the Deployments tab's empty-state styling verbatim so the
-     two tabs look identical when the user is signed out. Height is
-     fixed at 40vh (matching the Deployments tab) so the hint line
-     sits at ~20vh from the top instead of centered across the full
-     panel height — that vertical anchor is what makes the two tabs
-     feel interchangeable at a glance. Kept as an AI-tab-local copy
-     because Svelte CSS is component-scoped; extracting to a global
-     sheet would drag in every page's `.empty-state` at once. */
-  .empty-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 40vh;
-    text-align: center;
-    color: var(--vscode-descriptionForeground);
-  }
-
-  .empty-state .hint {
-    font-size: 0.95em;
-    line-height: 1.2;
-    max-width: 200px;
   }
 </style>

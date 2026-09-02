@@ -1,0 +1,13 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+basic.l4:48:1-23:
+  TRUE
+basic.l4:49:1-25:
+  TRUE
+basic.l4:50:1-19:
+  TRUE
+basic.l4:51:1-21:
+  TRUE
+basic.l4:52:1-19:
+  <function>

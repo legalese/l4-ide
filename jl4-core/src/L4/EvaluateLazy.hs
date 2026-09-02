@@ -17,46 +17,60 @@ module L4.EvaluateLazy
 , prettyEvalException
 , prettyEvalDirectiveResult
 , prettyEvalDirectiveResultWithFields
+, postprocessTrace
+, safePostprocessTrace
+, tracePostprocessFailed
+, prettyLedger
+  -- * Ledger substrate (M0). Exposed for the test suite; not part of the
+  -- stable public API.
+, Eval
+, tellEvent
+, currentLedger
+, currentStore
+, runEvalAction
+, evalExprForLedger
+, evalExprForLedgerWithEnv
+, moduleEnvForLedger
 )
 where
 
 import Base
 import qualified Base.DList as DList
 import qualified Base.Map as Map
-import qualified Base.Set as Set
 import qualified Base.Text as Text
 import L4.EvaluateLazy.Machine
 import L4.EvaluateLazy.Trace
+import L4.Evaluate.Ledger
+  ( EventRoute (..)
+  , Ledger
+  , LedgerEvent (..)
+  , LedgerStore (..)
+  , Path
+  , Provenance (..)
+  , emptyStore
+  )
 import L4.Evaluate.ValueLazy
+import L4.Evaluate.ValueLazyJSON () -- ToJSON instances for NF/Value/ReasonForBreach (batch --json)
 import L4.Parser.SrcSpan (SrcRange)
 import L4.Annotation
 import L4.Print
 import L4.Syntax
 import L4.TypeCheck.Types (EntityInfo)
-import L4.TemporalContext (EvalClause, TemporalContext, applyEvalClauses, initialTemporalContext)
+import L4.TemporalContext (EvalClause, TemporalContext, applyEvalClauses, initialTemporalContext, noReads)
 import L4.TracePolicy (TracePolicy)
 
-import Control.Concurrent
+import Control.Exception (throwIO, try, evaluate, ErrorCall)
 import Data.Time (UTCTime, getCurrentTime)
 import qualified Data.Time.Format.ISO8601 as ISO8601
 import System.Environment (lookupEnv)
 import qualified Data.Aeson as Aeson
 
 -----------------------------------------------------------------------------
--- The Eval monad and the required types for the monad
+-- Configuration for running evaluations.
+--
+-- The Eval monad itself (and the machine state) lives in
+-- 'L4.EvaluateLazy.Machine'; this module provides the high-level driver.
 -----------------------------------------------------------------------------
-data EvalState =
-  MkEvalState
-    { moduleUri  :: !NormalizedUri
-    , stack      :: !(IORef Stack)
-    , supply     :: !(IORef Int)   -- used for uniques and addresses
-    , evalTrace  :: !(Maybe (IORef (DList EvalTraceAction)))
-    , entityInfo :: !EntityInfo    -- type information for constructors/records
-    , evalTime   :: !UTCTime
-    , temporalContext :: !(IORef TemporalContext)
-    , tracePolicy :: !TracePolicy  -- controls trace collection and output
-    , safeMode   :: !Bool          -- when True, HTTP operations return errors
-    }
 
 data EvalConfig = EvalConfig
   { evalTime :: !(Maybe UTCTime)
@@ -87,37 +101,46 @@ readFixedNowEnv = do
   menv <- lookupEnv "JL4_FIXED_NOW"
   pure $ menv >>= parseFixedNow . Text.pack
 
-newtype Eval a = MkEval (EvalState -> IO (Either EvalException a))
-  deriving (Functor, Applicative, Monad, MonadError EvalException, MonadReader EvalState, MonadIO)
-    via ExceptT EvalException (ReaderT EvalState IO)
-
------------------------------------------------------------------------------
--- Helper functions for the Eval Monad
------------------------------------------------------------------------------
-
-step :: Eval Int
-step = do
-  i <- readRef (.supply)
-  writeRef (.supply) $! i + 1
-  pure i
-
-newUnique :: Eval Unique
-newUnique = do
-  i <- step
-  u <- asks (.moduleUri)
-  pure (MkUnique 'e' i u)
-
-readRef :: (EvalState -> IORef a) -> Eval a
-readRef r = asks r >>= liftIO . readIORef
-
-writeRef :: (EvalState -> IORef a) -> a -> Eval ()
-writeRef r !x = asks r >>= liftIO . flip writeIORef x
-
-getTemporalContext :: Eval TemporalContext
-getTemporalContext = readRef (.temporalContext)
-
+-- | The previous temporal context is restored afterwards.
 setTemporalContext :: TemporalContext -> Eval ()
-setTemporalContext = writeRef (.temporalContext)
+setTemporalContext = putTemporalContext
+
+-----------------------------------------------------------------------------
+-- STATE-AS-LEDGER: test seams over the ledger ops defined in
+-- 'L4.EvaluateLazy.Machine'. The real ledger logic lives in Machine.hs (so the
+-- backward frame arms can reach it without an import cycle); these thin
+-- wrappers keep the historical names the test suite imports.
+-----------------------------------------------------------------------------
+
+-- | Append an event to the acting party's own ledger (a @RECORD@). Kept for the
+-- test seam and any caller that knows it wants the own ledger.
+tellEvent :: LedgerEvent -> Eval ()
+tellEvent = tellEventRouted RouteOwn
+
+-- | Read the current ledger as seen by a @RECALL@ (the current party's own log).
+-- Retained name for the test suite / public API.
+currentLedger :: Eval Ledger
+currentLedger = currentLedgerEval
+
+-- | Read the whole per-party store (own ledgers + official record). Used by
+-- 'nfDirective' to capture the full state and by the test suite.
+currentStore :: Eval LedgerStore
+currentStore = readEvalRef (.envLedger)
+
+-- | Run an action with a freshly-empty ledger, restoring the caller's ledger
+-- afterwards. This is what guarantees ledger isolation between top-level
+-- directives: each #EVAL / #ASSERT / #TRACE evaluates against its own empty
+-- event log, so assignments cannot leak from one directive into the next.
+--
+-- We follow the same save/swap/restore idiom as 'captureTrace' and
+-- 'withEvalClauses': swap in a fresh IORef via 'local' for the duration of the
+-- action. Because we hand the action a brand-new IORef, the caller's ledger is
+-- left completely untouched, even on exceptions.
+withFreshLedger :: Eval a -> Eval a
+withFreshLedger m = do
+  fresh      <- liftIO (newIORef emptyStore)
+  freshParty <- liftIO (newIORef Nothing)
+  local (\s -> s { envLedger = fresh, currentParty = freshParty }) m
 
 -- | Apply runtime EVAL clauses for the duration of an action,
 -- restoring the previous temporal context afterwards.
@@ -125,134 +148,9 @@ withEvalClauses :: [EvalClause] -> Eval a -> Eval a
 withEvalClauses clauses action = do
   original <- getTemporalContext
   setTemporalContext (applyEvalClauses clauses original)
-  result <-
-    action `catchError` \e -> do
-      setTemporalContext original
-      throwError e
+  result <- tryEval action
   setTemporalContext original
-  pure result
-
-pushFrame :: (EvalException -> Eval ()) -> Frame -> Eval ()
-pushFrame k frame = do
-  s <- readRef (.stack)
-  if s.size == maximumStackSize
-    then k $ UserEvalException StackOverflow
-    else writeRef (.stack) (over #frames (frame :) s)
-
--- | Pops a stack frame (if any are left) and calls the continuation on it.
-withPoppedFrame :: (Maybe Frame -> Eval a) -> Eval a
-withPoppedFrame k = do
-  traceEval Pop
-  stack <- readRef (.stack)
-  case stack.frames of
-    []       -> k Nothing
-    (f : fs) -> do
-      writeRef (.stack) (MkStack { size = stack.size - 1, frames = fs })
-      k (Just f)
-
--- | For the time being, exceptions are always fatal. But we could
--- in principle have exception we can recover from ...
-exception :: (EvalException -> Eval a) -> EvalException -> Eval a
-exception k exc =
-  withPoppedFrame $ \ case
-    Nothing -> throwError exc
-    Just _f -> k exc
-
-
-tryEval :: Eval a -> Eval (Either EvalException a)
-tryEval = tryError
-
-lookupAndUpdateRef :: Reference -> (Thunk -> (Thunk, a)) -> Eval a
-lookupAndUpdateRef rf f =
-  liftIO $
-    atomicModifyIORef' rf.pointer f
-
-updateRef :: Reference -> Thunk -> Eval ()
-updateRef rf a = lookupAndUpdateRef rf $ const (a, ())
-
-newReference :: Eval Reference
-newReference = do
-  address <- newAddress
-  reference <- liftIO (myThreadId >>= newIORef . blackhole)
-  pure (MkReference address reference)
-
-blackhole :: ThreadId -> Thunk
-blackhole tid =
-  Unevaluated (Set.singleton tid) (error "blackhole") Map.empty
-
-
-
------------------------------------------------------------------------------
--- The Stack of the machine
------------------------------------------------------------------------------
-
-data Stack =
-  MkStack
-    { size   :: !Int
-    , frames :: [Frame]
-    }
-  deriving stock (Generic, Show)
-
-emptyStack :: Stack
-emptyStack = MkStack 0 []
-
-newAddress :: Eval Address
-newAddress = do
-  i <- step
-  u <- asks (.moduleUri)
-  pure (MkAddress u i)
-
-interpMachine :: Machine a -> Eval a
-interpMachine = \ case
-  Config a -> pure a
-  Exception e -> do
-    traceEval (Exit (Left e))
-    exception (interpMachine . Exception) e
-  Allocate' alloc -> case alloc of
-    Recursive expr env -> do
-      rf <- newReference
-      let env' = env rf
-      updateRef rf $ Unevaluated Set.empty expr env'
-      traceEval (Alloc expr rf)
-      pure (rf, env')
-    Value whnf -> do
-      rf <- newReference
-      updateRef rf $ WHNF whnf
-      -- we don't trace this because it is used for allocating values in the initial environment which would be misleading in the trace
-      pure rf
-    PreAllocation r -> do
-      rf <- newReference
-      traceEval (AllocPre r rf)
-      pure (getUnique r, rf)
-  WithPoppedFrame k ->
-    withPoppedFrame (interpMachine . k)
-  PokeThunk rf k -> do
-    tid <- liftIO myThreadId
-    conf <- lookupAndUpdateRef rf (k tid)
-    interpMachine $ pure conf
-  GetEvalTime ->
-    asks (.evalTime)
-  GetTracePolicy ->
-    asks (.tracePolicy)
-  GetSafeMode ->
-    asks (.safeMode)
-  Bind act k -> interpMachine act >>= interpMachine . k
-  LiftIO m -> liftIO m >>= interpMachine . pure
-  PushFrame f -> do
-    traceEval Push
-    pushFrame (interpMachine . Exception) f
-  NewUnique -> newUnique
-  GetEntityInfo -> asks (.entityInfo)
-  GetTemporalContext -> getTemporalContext
-  PutTemporalContext ctx -> setTemporalContext ctx
-  GetModuleUri -> asks (.moduleUri)
-
-traceEval :: EvalTraceAction -> Eval ()
-traceEval ta = do
-  mtr <- asks (.evalTrace)
-  case mtr of
-    Nothing -> pure ()
-    Just tr -> liftIO (modifyIORef' tr (`DList.snoc` ta))
+  either (liftIO . throwIO) pure result
 
 -- | For the given eval action, enable tracing and accumulate a trace.
 --
@@ -276,21 +174,21 @@ runConfig :: Config -> Eval WHNF
 runConfig = \ case
   ForwardMachine env expr -> do
     traceEval (Enter expr)
-    next <- interpMachine (forwardExpr env expr)
+    next <- forwardExpr env expr
     runConfig next
   MatchBranchesMachine scrutinee env branches -> do
-    next <- interpMachine (matchBranches scrutinee env branches)
+    next <- matchBranches scrutinee env branches
     runConfig next
   MatchPatternMachine r env pat -> do
-    next <- interpMachine (matchPattern r env pat)
+    next <- matchPattern r env pat
     runConfig next
   BackwardMachine whnf -> do
     traceEval (Exit (Right whnf))
-    next <- interpMachine (backward whnf)
+    next <- backward whnf
     runConfig next
   EvalRefMachine r -> do
     traceEval (SetRef r)
-    next <- interpMachine (evalRef r)
+    next <- evalRef r
     runConfig next
   DoneMachine whnf ->
     pure whnf
@@ -298,7 +196,19 @@ runConfig = \ case
 -- | Evaluate an EVAL directive. For this, we evaluate to normal form,
 -- not just WHNF.
 nfDirective :: EvalDirective -> Eval EvalDirectiveResult
-nfDirective (MkEvalDirective r traced isAssert expr env) = do
+nfDirective (MkEvalDirective r traced isAssert expr env) = withFreshLedger $ do
+  -- T6: open a fresh, directive-local context-read span. (Exceptional
+  -- unwinding closes spans as it pops UpdateThunk frames — see
+  -- 'unwindFrame' — but a successful directive legitimately leaves its own
+  -- reads in the root accumulator; spans are directive-local, so clear it.)
+  _ <- swapCtxReads noReads
+  -- Snapshot the ambient temporal context and restore it unconditionally
+  -- after the directive. 'unwindFrame' already restores saved contexts
+  -- frame by frame during exceptional unwinding; this directive boundary is
+  -- the belt-and-braces layer guaranteeing that no temporal override active
+  -- during THIS directive can leak into subsequent directives, whatever the
+  -- unwind path.
+  ambientCtx <- getTemporalContext
   (v, mt) <-
     if traced
       then second Just <$> do
@@ -308,8 +218,21 @@ nfDirective (MkEvalDirective r traced isAssert expr env) = do
       else fmap (, Nothing) $ tryEval $ do
         whnf <- runConfig $ ForwardMachine env expr
         nf whnf
+  -- T6: restore the ambient temporal context unconditionally after the
+  -- directive (belt-and-braces; independent of the ledger/trace snapshots below).
+  putTemporalContext ambientCtx
+  finalTrace <- case mt of
+    Nothing      -> pure Nothing
+    Just actions -> Just <$> liftIO (safePostprocessTrace actions)
+  -- STATE-AS-LEDGER M2/M4: snapshot the per-directive ledger STORE (per-party
+  -- own ledgers + the official record) BEFORE 'withFreshLedger' restores the
+  -- caller's (empty) store and discards this one. This is the directive's whole
+  -- event log — the RECORD 'Assign's per party plus the COMMIT/ATTEST 'Assign's
+  -- in the official record. D5 (keep-on-breach) falls out for free: 'tellEvent'
+  -- is an append and 'ValBreached' does not roll back, so any pre-breach
+  -- 'Assign' is already in here.
+  directiveLedger <- currentStore
   let
-    finalTrace = postprocessTrace <$> mt
     v' =
       if isAssert
         then Assertion
@@ -317,7 +240,27 @@ nfDirective (MkEvalDirective r traced isAssert expr env) = do
             Right (MkNF (ValBool True)) -> True
             _                           -> False
         else Reduction v
-  pure (MkEvalDirectiveResult r v' finalTrace)
+  pure (MkEvalDirectiveResult r v' finalTrace directiveLedger)
+
+-- | 'postprocessTrace', guarded so it can never escape an exception: if trace
+-- post-processing throws (e.g. a malformed action sequence produced by an
+-- unbalanced push/pop), degrade to a one-node fallback trace instead of letting
+-- an ErrorCall abort the surrounding evaluation and discard the already-computed
+-- #EVAL result (see T7). Catches 'ErrorCall' specifically — not 'SomeException'
+-- — so asynchronous exceptions (request cancellation, timeouts) still propagate.
+safePostprocessTrace :: [EvalTraceAction] -> IO EvalTrace
+safePostprocessTrace actions = do
+  r <- try (evaluate (force (postprocessTrace actions)))
+  pure $ case r of
+    Right t               -> t
+    Left (_ :: ErrorCall) -> tracePostprocessFailed
+
+-- | Fallback substituted for a trace when post-processing it fails. Keeps the
+-- directive's result intact and degrades only the trace to a single marker
+-- node, instead of letting the failure abort the surrounding evaluation.
+tracePostprocessFailed :: EvalTrace
+tracePostprocessFailed =
+  Trace Nothing [] (Right (MkNF (ValString "trace unavailable (internal error during trace post-processing)")))
 
 postprocessTrace :: [EvalTraceAction] -> EvalTrace
 postprocessTrace actions =
@@ -339,6 +282,13 @@ data EvalDirectiveResult =
     { range  :: Maybe SrcRange -- ^ of the (L)EVAL / DEONTIC directive
     , result :: EvalDirectiveValue
     , trace  :: Maybe EvalTrace
+    , ledger :: !LedgerStore
+      -- ^ STATE-AS-LEDGER M2/M4: the event store this directive produced (each
+      -- party's own RECORD 'Assign's plus the official COMMIT/ATTEST 'Assign's),
+      -- captured before 'withFreshLedger' discarded the per-directive store.
+      -- Newest-last within each ledger. Empty for a directive that wrote nothing
+      -- (pure reads / ordinary expressions) — rendered as nothing in that case
+      -- so reads do not clutter the output.
     }
   deriving stock (Generic, Show)
   deriving anyclass NFData
@@ -355,12 +305,80 @@ prettyEvalDirectiveValue (Assertion False)      = "assertion failed"
 prettyEvalDirectiveValue (Reduction (Left exc)) = Text.unlines (prettyEvalException exc)
 prettyEvalDirectiveValue (Reduction (Right v))  = prettyLayout v
 
+-- | STATE-AS-LEDGER M2/M4: render the per-party store a directive produced, as
+-- labelled sections. Returns the empty 'Text' when the directive wrote nothing,
+-- so that pure reads / ordinary expressions are not cluttered.
+--
+-- Each non-empty own ledger renders as a @Ledger (<party>):@ block (the
+-- anonymous own ledger, from a top-level @RECORD@, renders as a bare @Ledger:@
+-- block), and a non-empty official record renders as an @Official record:@
+-- block. One row per 'Assign', oldest-first (each ledger is newest-last as a
+-- 'DList', and 'toList' yields oldest-first — the order the writes happened):
+--
+-- > Ledger (Alice):
+-- >   RECORD `freezing point of water` IS 273.15   [party=Alice, source=RECORD, at=...]
+-- > Official record:
+-- >   COMMIT `fp` IS 273.15   [party=Court, source=COMMIT, at=...]
+prettyLedger :: LedgerStore -> Text
+prettyLedger store =
+  Text.concat (ownBlocks <> [officialBlock])
+  where
+    ownBlocks =
+      [ renderBlock (ownHeader party) led
+      | (party, led) <- Map.toList store.ownLedgers
+      , not (null (DList.toList led))
+      ]
+    officialBlock = renderBlock "Official record" store.officialLedger
+
+    -- The anonymous own ledger (top-level RECORD, empty party key) has no party
+    -- name, so it renders as a bare "Ledger:" header.
+    ownHeader party
+      | Text.null party = "Ledger"
+      | otherwise       = "Ledger (" <> party <> ")"
+
+    renderBlock header led =
+      case DList.toList led of
+        []     -> Text.empty
+        events -> "\n" <> header <> ":\n" <> Text.intercalate "\n" (map prettyLedgerEvent events)
+
+prettyLedgerEvent :: LedgerEvent -> Text
+prettyLedgerEvent (Assign path val prov) =
+  "  " <> verb <> " " <> renderPath path <> " IS " <> prettyLayout val
+    <> "   " <> renderProvenance prov
+  where
+    -- The provenance source distinguishes RECORD (own ledger) from
+    -- COMMIT/ATTEST (official record); echo it as the surface verb.
+    verb = case prov.source of
+      "COMMIT" -> "COMMIT"
+      _        -> "RECORD"
+
+-- | Render a cell 'Path' back to its backtick surface form, e.g.
+-- @`freezing point of water`@. M1/M1.5 cells are single-segment; nested
+-- segments (a later milestone) join with @'s@ to mirror the genitive read.
+renderPath :: Path -> Text
+renderPath segs = Text.intercalate "'s " (map (\s -> "`" <> s <> "`") segs)
+
+renderProvenance :: Provenance -> Text
+renderProvenance prov =
+  "[" <> Text.intercalate ", " (catMaybes [partyField, sourceField, atField, vtField]) <> "]"
+  where
+    partyField  = if Text.null prov.party then Nothing else Just ("party=" <> prov.party)
+    sourceField = Just ("source=" <> prov.source)
+    -- the transaction stamp, rendered exactly as the pre-bitemporal free-form
+    -- position was (ISO-8601 of the root eval clock) — goldens are stable
+    atField     = Just ("at=" <> formatUTCTimeIso prov.txTime)
+    -- the valid-from stamp appears ONLY when a fact time was explicitly
+    -- asserted at the write (an enclosing EVAL UNDER VALID TIME); a
+    -- contemporaneous write renders as before
+    vtField     = ("vt=" <>) . Text.pack . ISO8601.iso8601Show <$> prov.vtFrom
+
 -- | Prints the results but not the range of an eval directive, including
--- the trace if present.
+-- the trace if present, and the ledger section if the directive wrote anything.
 --
 prettyEvalDirectiveResult :: EvalDirectiveResult -> Text
-prettyEvalDirectiveResult (MkEvalDirectiveResult _range res mtrace) =
+prettyEvalDirectiveResult (MkEvalDirectiveResult _range res mtrace led) =
    prettyEvalDirectiveValue res
+   <> prettyLedger led
    <> case mtrace of
         Nothing -> Text.empty
         Just t  -> "\n─────\n" <> prettyLayout t
@@ -368,8 +386,9 @@ prettyEvalDirectiveResult (MkEvalDirectiveResult _range res mtrace) =
 -- | Like 'prettyEvalDirectiveResult' but uses named-field syntax (WITH / IS)
 -- for constructors whose field names are provided.
 prettyEvalDirectiveResultWithFields :: ConstructorFieldNames -> EvalDirectiveResult -> Text
-prettyEvalDirectiveResultWithFields fields (MkEvalDirectiveResult _range res mtrace) =
+prettyEvalDirectiveResultWithFields fields (MkEvalDirectiveResult _range res mtrace led) =
    prettyEvalDirectiveValueWithFields fields res
+   <> prettyLedger led
    <> case mtrace of
         Nothing -> Text.empty
         Just t  -> "\n─────\n" <> prettyLayout t
@@ -379,7 +398,7 @@ prettyEvalDirectiveResultWithFields fields (MkEvalDirectiveResult _range res mtr
 -- ----------------------------------------------------------------------------
 
 instance Aeson.ToJSON EvalDirectiveResult where
-  toJSON (MkEvalDirectiveResult _range res _trace) = Aeson.object
+  toJSON (MkEvalDirectiveResult _range res _trace _ledger) = Aeson.object
     [ "result" Aeson..= res
     , "trace"  Aeson..= Aeson.Null
     ]
@@ -473,36 +492,136 @@ evalAndNF d r = do
 --
 execEvalModuleWithEnv :: EvalConfig -> EntityInfo -> Environment -> Module Resolved -> IO (Environment, [EvalDirectiveResult])
 execEvalModuleWithEnv evalConfig entityInfo env m@(MkModule _ moduleUri _) = do
-  case evalModuleAndDirectives env m of
-    MkEval f -> do
-      stack     <- newIORef emptyStack
-      supply    <- newIORef 0
-      actualTime <- resolveEvalTime evalConfig
-      let temporalCtx = initialTemporalContext actualTime
-      temporalContext <- newIORef temporalCtx
-      let evalTrace = Nothing
-      r <- f MkEvalState {moduleUri, stack, supply, evalTrace, entityInfo, evalTime = actualTime, temporalContext, tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode}
-      case r of
-        Left exc -> do
-          hPutStrLn stderr $ "Eval failure in module: " <> show moduleUri
-          traverse_ (hPutStrLn stderr . Text.unpack) (prettyEvalException exc)
-          -- exceptions at the top-level are unusual; after all, we don't actually
-          -- force any evaluation here, and we catch exceptions for eval directives
-          pure (emptyEnvironment, [])
-        Right result -> pure result
+  st0 <- mkInitialEvalState evalConfig entityInfo moduleUri
+  r <- try (runEval st0 (evalModuleAndDirectives env m))
+  case r of
+    Left exc -> do
+      hPutStrLn stderr $ "Eval failure in module: " <> show moduleUri
+      traverse_ (hPutStrLn stderr . Text.unpack) (prettyEvalException exc)
+      -- exceptions at the top-level are unusual; after all, we don't actually
+      -- force any evaluation here, and we catch exceptions for eval directives
+      pure (emptyEnvironment, [])
+    Right result -> pure result
+
+mkInitialEvalState :: EvalConfig -> EntityInfo -> NormalizedUri -> IO EvalState
+mkInitialEvalState evalConfig entityInfo moduleUri = do
+  stack     <- newIORef emptyStack
+  supply    <- newIORef 0
+  actualTime <- resolveEvalTime evalConfig
+  let temporalCtx = initialTemporalContext actualTime
+  temporalContext <- newIORef temporalCtx
+  ctxReads <- newIORef noReads
+  let evalTrace = Nothing
+  reofferedEvents <- newIORef mempty
+  envLedger    <- newIORef emptyStore
+  currentParty <- newIORef Nothing
+  pure MkEvalState {moduleUri, stack, supply, evalTrace, envLedger, currentParty, entityInfo, evalTime = actualTime, temporalContext, ctxReads, tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode, reofferedEvents}
+
+-- | Build a minimal 'EvalState' and run an 'Eval' action against it, catching
+-- evaluation exceptions at the boundary.
+--
+-- This is a test seam for exercising the ledger substrate (and other 'Eval'
+-- effects) end-to-end through the monad, without standing up a full module
+-- evaluation. Like the real entry points, it initializes the ledger EMPTY
+-- (routed through 'mkInitialEvalState', so there is a single construction site).
+--
+-- Not part of the stable public API; exposed for the test suite only.
+runEvalAction :: EvalConfig -> Eval a -> IO (Either EvalException a)
+runEvalAction evalConfig action = do
+  st0 <- mkInitialEvalState evalConfig mempty (toNormalizedUri (Uri "test:runEvalAction"))
+  try (runEval st0 action)
+
+-- | Forward-evaluate a single 'Expr Resolved' to 'WHNF' in the empty
+-- environment, as an 'Eval' action. This is the test seam that lets the
+-- ledger-write path (M1 @RECORD@/@COMMIT@/@ATTEST@) be exercised end-to-end:
+-- run this, then observe the ledger with 'currentLedger' in the same action.
+--
+-- Not part of the stable public API; exposed for the test suite only.
+evalExprForLedger :: Expr Resolved -> Eval WHNF
+evalExprForLedger expr = runConfig (ForwardMachine emptyEnvironment expr)
+
+-- | As 'evalExprForLedger', but evaluate the expression against a SUPPLIED
+-- environment (so a directive expr that references a top-level binding — e.g. a
+-- party constructor named in a NOTIFY @RECORD q's …@ recipient — resolves at
+-- runtime). The companion 'moduleEnvForLedger' builds such an environment from a
+-- module. Like 'evalExprForLedger', this does NOT wrap the evaluation in
+-- 'withFreshLedger', so a sequence of these in ONE 'runEvalAction' shares one
+-- ledger — the seam a cross-party WRITE/READ test needs.
+--
+-- Not part of the stable public API; exposed for the test suite only.
+evalExprForLedgerWithEnv :: Environment -> Expr Resolved -> Eval WHNF
+evalExprForLedgerWithEnv env expr = runConfig (ForwardMachine env expr)
+
+-- | Build the runtime environment a module's directives evaluate against (the
+-- module's top-level bindings combined with the initial/prelude environment),
+-- WITHOUT running any directive. Used with 'evalExprForLedgerWithEnv' so a test
+-- can sequence several directive exprs against one shared ledger while still
+-- resolving top-level references (constructors, defs).
+--
+-- Not part of the stable public API; exposed for the test suite only.
+moduleEnvForLedger :: Environment -> Module Resolved -> Eval Environment
+moduleEnvForLedger env m = do
+  ienv <- initialEnvironment
+  let baseEnv = env <> ienv
+  (moduleEnv, _directives) <- evalModule baseEnv m
+  pure (moduleEnv <> baseEnv)
 
 -- TODO: This currently allocates the initial environment once per module.
 -- This isn't a big deal, but can we somehow do this only once per program,
 -- for example by passing this in from the outside?
 evalModuleAndDirectives :: Environment -> Module Resolved -> Eval (Environment, [EvalDirectiveResult])
 evalModuleAndDirectives env m = do
-  (env', directives) <- interpMachine do
-    ienv <- initialEnvironment
-    evalModule (env <> ienv) m
-  results <- traverse nfDirective directives
+  ienv <- initialEnvironment
+  let baseEnv = env <> ienv
+  -- First pass: get env' (the module's exported bindings) and the directive
+  -- count/order for the return value.
+  (env', directives0) <- evalModule baseEnv m
+  -- STATE-AS-LEDGER CAF ISOLATION: re-thunk the top-level heap per directive so a
+  -- nullary top-level definition that is forced (and memoized in its shared
+  -- Reference IORef) in directive N is Unevaluated again in directive N+1. This is
+  -- the heap analog of 'withFreshLedger': each directive evaluates the top-level
+  -- defs against fresh References, so an effectful read (RECALL) inside a CAF is
+  -- re-run against that directive's own (isolated) ledger instead of returning a
+  -- value cached from whichever directive forced it first. See 'forEachDirectiveFreshHeap'.
+  results <- forEachDirectiveFreshHeap (\_ -> pure ()) baseEnv m (length directives0)
   -- NOTE: We are only returning the new definitions of this module, not any imports.
   -- Depending on future export semantics, this may have to change.
   pure (env', results)
+
+-- | Run every directive of a module against its OWN freshly-allocated top-level
+-- heap. We re-run 'evalModule' once per directive: each pass re-'preAllocate's a
+-- fresh set of top-level References (all 'Unevaluated') and re-writes the body
+-- thunks into them, then we normal-form just the i-th directive from THAT pass.
+--
+-- Why this is correct and minimal:
+--   * Top-level definitions are stored as shared 'Reference' IORefs that the lazy
+--     evaluator overwrites in place to 'WHNF' on first force (standard
+--     lazy-sharing memoization). That memoization is unsound for a nullary def
+--     whose body performs an effectful read ('RECALL'), because its WHNF is not a
+--     pure function of the source — it depends on the per-directive ledger that
+--     'withFreshLedger' (correctly) resets. Re-thunking discards the stale WHNF.
+--   * 'evalModule' forces nothing (it only allocates References and writes
+--     thunks), so re-running it per directive is side-effect-free except for heap
+--     allocation and supply/address bumps; pure CAFs simply recompute (cheap).
+--   * 'nfDirective' still wraps each evaluation in 'withFreshLedger', so ledger
+--     isolation is unchanged.
+--
+-- The @prepare@ hook lets a caller (the JSON entry point) write extra bindings
+-- (ASSUME'd variables) into each fresh pass's combined environment before the
+-- directive is evaluated.
+forEachDirectiveFreshHeap
+  :: (Environment -> Eval ())     -- ^ per-pass preparation over the fresh combined env (e.g. JSON writes)
+  -> Environment                  -- ^ base env (imports <> initial environment), allocated once
+  -> Module Resolved
+  -> Int                          -- ^ number of directives (from the first pass)
+  -> Eval [EvalDirectiveResult]
+forEachDirectiveFreshHeap prepare baseEnv m n =
+  for [0 .. n - 1] $ \i -> do
+    (moduleEnv, dirs) <- evalModule baseEnv m  -- fresh preAllocate => fresh IORefs => Unevaluated CAFs
+    prepare (moduleEnv <> baseEnv)
+    case drop i dirs of
+      (d : _) -> nfDirective d
+      []      -> error "forEachDirectiveFreshHeap: directive index out of range (evalModule produced fewer directives than the first pass)"
 
 -- | Evaluate module with JSON input bindings for batch processing.
 -- JSON keys are matched to ASSUME'd L4 variables by name.
@@ -510,34 +629,27 @@ evalModuleAndDirectives env m = do
 -- then write JSON values into the References for ASSUME'd variables.
 evalModuleAndDirectivesWithJSON :: Aeson.Value -> Environment -> Module Resolved -> Eval (Environment, [EvalDirectiveResult])
 evalModuleAndDirectivesWithJSON json env m = do
-  (env', directives) <- interpMachine do
-    ienv <- initialEnvironment
-    (moduleEnv, dirs) <- evalModule (env <> ienv) m
-    -- Now write JSON values into the pre-allocated References
-    -- The combined environment includes both the initial env and the moduleEnv
-    let combinedEnv = moduleEnv <> env <> ienv
-    writeJSONToReferences json combinedEnv
-    pure (moduleEnv, dirs)
-  results <- traverse nfDirective directives
-  pure (env', results)
+  ienv <- initialEnvironment
+  let baseEnv = env <> ienv
+  -- First pass: get moduleEnv (exports) and the directive count for the return value.
+  (moduleEnv, dirs0) <- evalModule baseEnv m
+  -- Same CAF-isolation rebuild as 'evalModuleAndDirectives', but the per-pass
+  -- 'prepare' hook re-applies the JSON ASSUME bindings to EACH fresh heap's
+  -- combined environment — otherwise the freshly re-thunked References would lack
+  -- the JSON-provided values.
+  results <- forEachDirectiveFreshHeap (writeJSONToReferences json) baseEnv m (length dirs0)
+  pure (moduleEnv, results)
 
 execEvalModuleWithJSON :: EvalConfig -> EntityInfo -> Aeson.Value -> Module Resolved -> IO (Environment, [EvalDirectiveResult])
 execEvalModuleWithJSON evalConfig entityInfo json m@(MkModule _ moduleUri _) = do
-  case evalModuleAndDirectivesWithJSON json emptyEnvironment m of
-    MkEval f -> do
-      stack <- newIORef emptyStack
-      supply <- newIORef 0
-      actualTime <- resolveEvalTime evalConfig
-      let temporalCtx = initialTemporalContext actualTime
-      temporalContext <- newIORef temporalCtx
-      let evalTrace = Nothing
-      r <- f MkEvalState {moduleUri, stack, supply, evalTrace, entityInfo, evalTime = actualTime, temporalContext, tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode}
-      case r of
-        Left exc -> do
-          hPutStrLn stderr $ "Eval failure in module: " <> show moduleUri
-          traverse_ (hPutStrLn stderr . Text.unpack) (prettyEvalException exc)
-          pure (emptyEnvironment, [])
-        Right result -> pure result
+  st0 <- mkInitialEvalState evalConfig entityInfo moduleUri
+  r <- try (runEval st0 (evalModuleAndDirectivesWithJSON json emptyEnvironment m))
+  case r of
+    Left exc -> do
+      hPutStrLn stderr $ "Eval failure in module: " <> show moduleUri
+      traverse_ (hPutStrLn stderr . Text.unpack) (prettyEvalException exc)
+      pure (emptyEnvironment, [])
+    Right result -> pure result
 
 {- | Evaluate an expression in the context of a module and initial environment.
 

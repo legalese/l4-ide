@@ -138,7 +138,7 @@ topDeclDocs depth acc = \case
 -- clauses inside provisions; rendering them again as definitions would be
 -- noise. Everything else becomes an undefined-term entry.
 assumeDocs :: Acc -> Assume Resolved -> (Acc, [Block])
-assumeDocs acc (MkAssume _ (MkTypeSig _ (MkGivenSig _ givens) _) (MkAppForm _ name _args _) mty)
+assumeDocs acc (MkAssume _ (MkTypeSig _ (MkGivenSig _ givens) _) (MkAppForm _ name _args _) mty _mTypically)
   | null givens, isBooleanType mty =
       (acc{inlinedAtoms = acc.inlinedAtoms + 1}, [])
   | otherwise =
@@ -240,7 +240,7 @@ localDeclText :: LocalDecl Resolved -> Text
 localDeclText = \case
   LocalDecide _ (MkDecide _ _ (MkAppForm _ name _ _) e) ->
     "\x201C" <> resolvedText name <> "\x201D means " <> proseExpr e <> ";"
-  LocalAssume _ (MkAssume _ _ (MkAppForm _ name _ _) mty) ->
+  LocalAssume _ (MkAssume _ _ (MkAppForm _ name _ _) mty _mTypically) ->
     "\x201C"
       <> resolvedText name
       <> "\x201D denotes "
@@ -275,7 +275,7 @@ declareDoc d@(MkDeclare _ _ (MkAppForm _ name _args _) tydecl) n =
     SynonymDecl _ ty ->
       ("In this Act, " <> quoted <> " means " <> typeText ty <> ".", Nothing)
 
-  fieldTab (MkTypedName _ fname fty _mcomputed) =
+  fieldTab (MkTypedName _ fname fty _mTypically _mcomputed) =
     TLeaf $
       "\x201C"
         <> resolvedText fname
@@ -294,7 +294,7 @@ declareDoc d@(MkDeclare _ _ (MkAppForm _ name _args _) tydecl) n =
               <> commaAnd
                 [ articleFor (resolvedText fn)
                     <> " \x201C" <> resolvedText fn <> "\x201D (" <> typeText ft <> ")"
-                | MkTypedName _ fn ft _ <- cfields
+                | MkTypedName _ fn ft _ _ <- cfields
                 ]
 
 ----------------------------------------------------------------------------
@@ -632,7 +632,7 @@ resolvedText :: Resolved -> Text
 resolvedText = flatLinTree . linearize
 
 givenText :: OptionallyTypedName Resolved -> Text
-givenText (MkOptionallyTypedName _ n mty) =
+givenText (MkOptionallyTypedName _ n mty _mTypically) =
   case mty of
     Just ty -> typeText ty <> " \x201C" <> resolvedText n <> "\x201D"
     Nothing -> "\x201C" <> resolvedText n <> "\x201D"

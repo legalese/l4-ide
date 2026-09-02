@@ -18,7 +18,7 @@ import Data.Ratio (numerator, denominator)
 import GHC.TypeLits (Symbol)
 import Language.LSP.Protocol.Types as LSP
 import L4.Parser.SrcSpan (SrcPos(..), SrcRange(..))
-import L4.Print (prettyLayout, ConstructorFieldNames)
+import L4.Print (prettyLayout, prettyTypeForDisplay, ConstructorFieldNames)
 import L4.Annotation (Anno_(..))
 import L4.Syntax (getActual, Declare, Decide(..), AppForm(..), Resolved)
 
@@ -138,10 +138,10 @@ evalDirectiveToResult
   -> SrcRange
   -> EL.EvalDirectiveResult
   -> DirectiveResult
-evalDirectiveToResult fields dirType rng (EL.MkEvalDirectiveResult _range res mtrace) =
+evalDirectiveToResult fields dirType rng evalRes@(EL.MkEvalDirectiveResult _range res _mtrace _led) =
   DirectiveResult
     { directiveType = dirType
-    , prettyText = EL.prettyEvalDirectiveResultWithFields fields (EL.MkEvalDirectiveResult _range res mtrace)
+    , prettyText = EL.prettyEvalDirectiveResultWithFields fields evalRes
     , success = case res of
         EL.Assertion b        -> Just b
         EL.Reduction (Right _) -> Just True
@@ -270,10 +270,10 @@ evalDirectiveToUpdateItem
   -> (Int -> Int -> Text)   -- ^ slice raw source lines, inclusive 1-indexed [startLine, endLine]
   -> EL.EvalDirectiveResult
   -> Maybe DirectiveUpdateItem
-evalDirectiveToUpdateItem fields getLines (EL.MkEvalDirectiveResult (Just rng@(MkSrcRange (MkSrcPos startLine colNo) (MkSrcPos endLine _) _ _)) res mtrace) =
+evalDirectiveToUpdateItem fields getLines evalRes@(EL.MkEvalDirectiveResult (Just (MkSrcRange (MkSrcPos startLine colNo) (MkSrcPos endLine _) _ _)) res _mtrace _led) =
   Just DirectiveUpdateItem
     { directiveId = Text.pack (show startLine) <> ":" <> Text.pack (show colNo)
-    , prettyText  = EL.prettyEvalDirectiveResultWithFields fields (EL.MkEvalDirectiveResult (Just rng) res mtrace)
+    , prettyText  = EL.prettyEvalDirectiveResultWithFields fields evalRes
     , success     = case res of
         EL.Assertion b         -> Just b
         EL.Reduction (Right _) -> Just True
@@ -380,6 +380,7 @@ exportedFunctionToSummary declares ef =
               , parameterItems = Nothing
               , parameterRequired = Nothing
               , parameterL4Type = Nothing
+              , parameterDefault = Nothing
               }
             Just ty -> FSchema.typeToParameter declares Set.empty ty
           desc = case ep.paramDescription of
@@ -390,12 +391,20 @@ exportedFunctionToSummary declares ef =
     paramPairs = map mkParam ef.exportParams
     params = FSchema.MkParameters
       { parameterMap = Map.fromList paramPairs
-      , required = map fst paramPairs
+      -- Only non-optional params are required. Mirrors jl4-service's
+      -- Compiler.parametersFromExport; marking every param required here
+      -- made the deploy sidebar's breaking-change diff report optional
+      -- params (e.g. MAYBE-typed object inputs) as "now required" on
+      -- every redeploy, since the deployed schema correctly omits them.
+      , required = [ep.paramName | ep <- ef.exportParams, ep.paramRequired]
       }
 
+    -- Use prettyTypeForDisplay (not plain prettyLayout) so residual inference
+    -- variables normalise to stable names; this must match jl4-service's
+    -- returnTypeDisplay since the deploy sidebar diffs the two strings.
     retType = case ef.exportReturnType of
       Nothing -> "unknown"
-      Just ty -> prettyLayout ty
+      Just ty -> prettyTypeForDisplay ty
 
     -- Deontic detection: check if return type pretty-prints as containing "DEONTIC"
     isDeontic' = "DEONTIC" `Text.isInfixOf` Text.toUpper retType

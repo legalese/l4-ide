@@ -9,7 +9,7 @@ import Codec.Serialise (Serialise)
 #endif
 import qualified Optics
 import L4.Annotation (HasSrcRange(..), HasAnno(..), AnnoExtra, AnnoToken, emptyAnno)
-import L4.Lexer (PosToken)
+import L4.Lexer (PosToken, FixityDirection)
 import L4.Parser.SrcSpan (SrcRange(..), SrcPos)
 import L4.Syntax
 import L4.TypeCheck.With
@@ -18,6 +18,7 @@ import L4.Mixfix (MixfixInfo(..))
 import qualified Base.Set as Set
 
 import Control.Applicative
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Generics.SOP as SOP
 import Optics.Core (gplate, traverseOf, (%), (?~))
@@ -56,6 +57,16 @@ data CheckState =
     , scopeMap     :: !ScopeMap
     , nlgMap       :: !NlgMap
     , descMap      :: !DescMap
+    , constBodies  :: !(Map Unique (Expr Resolved))
+      -- ^ Bodies of top-level nullary @DECIDE@/@MEANS@ constants, captured as
+      -- they are checked. Used by the rung-3 value-level actor-agreement check
+      -- to recover an action constant's actor field from its definition.
+    , sectionPaths :: !(Map Unique [NonEmpty Text])
+    -- ^ For each defined 'Unique', the section stack (path from the module root
+    -- down to the innermost enclosing section) at the point it was registered.
+    -- Absence means the binding is top-level (empty section path). Used by
+    -- 'resolveTerm'' and 'resolveType' to prefer the nearest enclosing section
+    -- when resolving unqualified names (lexical scoping / shadowing).
     }
   deriving stock (Generic)
 
@@ -91,18 +102,67 @@ data CheckError =
     -- ^ Error in mixfix pattern matching (function name, error details)
   | CyclicComputedFields Name [Name]
     -- ^ Circular dependency between computed fields (record name, cycle of field names)
+  | CyclicTypeSynonyms [Name]
+    -- ^ Circular dependency between type synonym declarations (cycle members)
   | SuppliedComputedField Name
     -- ^ Tried to supply a computed field in a record constructor (field name)
   | ExportFunctionTypeInput Resolved Resolved
     -- ^ An @export-decorated DECIDE has a function-typed input (GIVEN or
     -- referenced ASSUME). Arguments: exported-function name, offending
     -- parameter/assume name.
+  | RegulativeActorMismatch Resolved Resolved Resolved
+    -- ^ A regulative @PARTY p MUST a@ (or a @PARTY p DOES a@ event) binds a
+    -- party to an action belonging to a different actor. In a value-actor
+    -- @DEONTIC PartyT ActionT@ contract, an action's actor is the field of its
+    -- record whose value is a constructor of @PartyT@. Arguments: the
+    -- obligated/acting party, the action's own actor, the action name.
+  | TypicallyValueNotALiteral Name
+    -- ^ The TYPICALLY default value must be a literal (a compile-time
+    -- constant): a number or string literal, or a nullary constructor.
+  | TypicallyRequiresType Name
+    -- ^ A TYPICALLY default was written on a binder with no explicit type, so
+    -- the default cannot be type-checked. Require an explicit type annotation.
+  | TypicallyOnTypeVariable Name
+    -- ^ A TYPICALLY default was written on a TYPE variable / type binder, where
+    -- a default value is meaningless.
+  | FixityAnnotationMalformed (Maybe SrcRange) Text
+    -- ^ The payload of a fixity annotation ('@infixl' \/ '@infixr' \/
+    -- '@infix') is not an integer between 1 and 9. Carries the annotation's
+    -- source range and the raw payload text.
+  | FixityConflict RawName [(Int, FixityDirection)]
+    -- ^ At a use site, the binary operator has several fixity declarations in
+    -- scope (e.g. via conflicting imports) that disagree. Carries the
+    -- operator and the distinct conflicting fixities.
+  | FixityReassociationClash (Maybe SrcRange) (RawName, Int, FixityDirection) (RawName, Int, FixityDirection)
+    -- ^ An unparenthesized operator chain mixes operators of equal precedence
+    -- whose associativity does not determine a grouping: mixed left/right
+    -- associativity, or a non-associative ('@infix') operator chained at the
+    -- same level. Carries the chain's range and both operators with their
+    -- fixities.
+  | SuspiciousBinderPattern Resolved Resolved
+    -- ^ A CONSIDER branch pattern is a fresh binder (matching everything)
+    -- whose name closely resembles a constructor of the scrutinee's type
+    -- that no other branch covers — very likely a misspelled constructor.
+    -- Severity 'SInfo': a hint, never blocking (legitimate catch-all names
+    -- can trip the distance check). Arguments: the binder, the resembled
+    -- constructor.
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
 data CheckWarning
   = PatternMatchRedundant [Branch Resolved]
   | PatternMatchesMissing [BranchLhs Resolved]
+  | PatternClausesMissing SrcRange Name [[Pattern Resolved]]
+    -- ^ A multi-clause DECIDE\/MEANS pattern-matching group does not cover
+    -- all cases ('L4.TypeCheck.checkClauseMatrix'). Carries the hull of the
+    -- clause-head ranges (the warning anchor — never @\<no location\>@), the
+    -- group's head name for display, and one row per missing clause: one
+    -- pattern per argument column, wildcard columns pre-substituted with the
+    -- column's GIVEN name so the renderer is dumb.
+  | FixityIgnoredNonBinary RawName (Maybe SrcRange)
+    -- ^ A fixity annotation was attached to a definition that is not a plain
+    -- binary infix operator (pattern @_ op _@); the annotation is ignored.
+    -- Carries the definition's name and the annotation's source range.
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
@@ -147,13 +207,16 @@ data ExpectationContext =
   | ExpectRegulativeContractContext -- when invoking a contract directive
   | ExpectRegulativeEventContext -- check an event expr
   | ExpectRegulativeProvidedContext -- the provided clauses are predicates on the variables bound by the pattern
+  | ExpectPartyActionAgreementContext -- a PARTY may only be obligated to perform its own (actor-indexed) actions
   | ExpectAssertContext -- assertions should be Boolean
   | ExpectPostUrlContext -- URL argument of POST
   | ExpectPostHeadersContext -- headers argument of POST
   | ExpectPostBodyContext -- body argument of POST
   | ExpectConcatArgumentContext -- argument of CONCAT
   | ExpectAsStringArgumentContext -- argument of AS STRING
+  | ExpectTypicallyValueContext Name -- TYPICALLY value must match the declared type
   | ExpectBreachReasonContext -- reason argument of BREACH
+  | ExpectRecordCellContext -- cell (path) argument of RECORD/COMMIT/ATTEST
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
@@ -180,6 +243,35 @@ data CheckErrorContext =
 data Severity = SWarn | SError | SInfo
   deriving stock (Eq, Show)
 
+-- | THE canonical severity mapping for checker diagnostics — the one place
+-- that decides what blocks ('SError'), what warns ('SWarn'), and what is
+-- informational only ('SInfo'). Candidate viability during type-directed
+-- disambiguation ('viableCandidate', used by 'prune'\/'orElse'\/'softprune')
+-- and the diagnostic renderers all key off this single definition.
+severity :: CheckErrorWithContext -> Severity
+severity (MkCheckErrorWithContext e _) =
+  case e of
+    CheckInfo {}               -> SInfo
+    CheckWarning {}            -> SWarn
+    SuspiciousBinderPattern {} -> SInfo
+    _                          -> SError
+
+-- | Is this candidate still viable? Only 'SError'-severity diagnostics fail
+-- a candidate. Warnings and hints attached along the way must NOT influence
+-- name resolution: with a purely structural test (any diagnostic = failure),
+-- a mere exhaustiveness warning inside one branch of a type-directed
+-- disambiguation knocks out the correct candidate and resolution collapses
+-- into spurious ambiguity or out-of-scope errors — and silencing the warning
+-- (e.g. via @nonexhaustive) would change what a name resolves to.
+--
+-- The walk stops at the first fatal diagnostic, so rejected candidates cost
+-- no more than under the old structural test whenever their first
+-- diagnostic is already fatal (the common case).
+viableCandidate :: With CheckErrorWithContext a -> Bool
+viableCandidate = \ case
+  Plain _  -> True
+  With e w -> severity e /= SError && viableCandidate w
+
 instance HasSrcRange CheckErrorWithContext where
   rangeOf (MkCheckErrorWithContext e ctx) = rangeOf e <|> rangeOf ctx
 
@@ -197,6 +289,14 @@ instance HasSrcRange CheckError where
   rangeOf (InconsistentNameInSignature n _) = rangeOf n
   rangeOf (InconsistentNameInAppForm n _)   = rangeOf n
   rangeOf (CheckInfo _ mr)                  = mr
+  rangeOf (RegulativeActorMismatch p _ _)   = rangeOf p
+  rangeOf (FixityAnnotationMalformed mr _)  = mr
+  rangeOf (FixityReassociationClash mr _ _) = mr
+  rangeOf (CheckWarning (FixityIgnoredNonBinary _ mr)) = mr
+  -- The clause-head hull anchors the warning; it wins over the enclosing
+  -- WhileCheckingDecide context range via @rangeOf e <|> rangeOf ctx@ above.
+  rangeOf (CheckWarning (PatternClausesMissing r _ _)) = Just r
+  rangeOf (SuspiciousBinderPattern b _)     = rangeOf b
   rangeOf _                                 = Nothing
 
 -- | A token in a mixfix pattern, representing either a keyword (part of the function name)
@@ -362,11 +462,79 @@ data CheckEnv =
     -- ^ Map from record type RawName to set of computed field RawNames.
     -- Used to produce better error messages when a user tries to supply
     -- a computed field in a record constructor.
+    , cyclicSynonyms       :: !(Set RawName)
+    -- ^ Primary names of type synonyms found to be cyclic at declaration
+    -- time. Their bodies are quarantined (installed as bodyless
+    -- 'KnownType's) so that synonym expansion never touches them — a
+    -- cyclic synonym has no finite expansion, and expanding one can
+    -- blow up exponentially before the expansion fuel runs out.
+    , inNonexhaustiveDecide      :: !Bool
+    -- ^ Are we checking the body of a definition its author decorated
+    -- @\@nonexhaustive@ (deliberately not defined for all inputs)? If so, the
+    -- non-exhaustive-CONSIDER warning is suppressed; redundancy warnings
+    -- stay active. Set via 'local' in @inferDecide@.
     , errorContext         :: !CheckErrorContext
     , sectionStack         :: ![NonEmpty Text]
+    , localBindings        :: !(Set Unique)
+    -- ^ Uniques of the lexical LOCAL bindings currently in scope: function
+    -- parameters, WHERE\/LET bindings, pattern variables, and type variables.
+    -- These are introduced during body inference (via 'extendKnownMany') as
+    -- opposed to section- or top-level module bindings (introduced via
+    -- 'extendKnownGlobalMany'). Locals take ABSOLUTE priority over any
+    -- section\/top-level\/imported binding of the same name during resolution
+    -- (lexical shadowing), so we must track them explicitly: they are absent
+    -- from 'sectionPaths', which otherwise conflates them with top-level and
+    -- imported bindings.
     }
   deriving stock (Eq, Generic, Show)
   deriving anyclass (NFData)
+
+-- | Extend a module's accumulated 'CheckEnv' with the public surface of one
+-- imported (already type-checked) module. This is THE import-boundary merge:
+-- both the batch import resolution (@L4.Import.Resolution@) and the LSP
+-- build rule (@LSP.L4.Rules@) go through it, so their semantics cannot
+-- drift apart again. (They once did: one site silently left-biased
+-- conflicting 'entityInfo' entries, the other @assert@ed equality — an
+-- assert GHC compiles out at @-O@, so the two sites merely LOOKED
+-- different. The by-equality variant also paid a deep structural 'Eq' per
+-- colliding key, and collisions are the norm: every dependency's
+-- 'entityInfo' embeds the builtins and its own transitive imports.)
+--
+-- Colliding 'entityInfo' keys are unioned left-biased. This is safe
+-- because a 'Unique' embeds its defining module and each module is
+-- type-checked once per session, so a key arriving via two import paths
+-- (builtins, diamond dependencies) always carries identical copies of the
+-- same entry.
+--
+-- Precondition: the imported 'EntityInfo' has already been zonked (had its
+-- module's final substitution applied), so no inference variables leak
+-- across the boundary.
+--
+-- The by-'SrcRange' frame-local maps ('functionTypeSigs', 'declTypeSigs',
+-- 'declareDeclarations', 'assumeDeclarations') are deliberately reset:
+-- their readers only ever look up syntax nodes of the module currently
+-- being checked. 'computedFields' is reset too because it is keyed by
+-- 'RawName' and unioning it across modules could conflate same-named
+-- record types; the cost is error-message quality only (see the notes in
+-- the exhaustiveness design doc).
+unionImportedCheckEnv :: CheckEnv -> Environment -> EntityInfo -> MixfixRegistry -> CheckEnv
+unionImportedCheckEnv accEnv depEnvironment depEntityInfo depMixfixRegistry =
+  MkCheckEnv
+    { moduleUri = accEnv.moduleUri
+    , environment = Map.unionWith List.union accEnv.environment depEnvironment
+    , entityInfo = Map.union accEnv.entityInfo depEntityInfo
+    , functionTypeSigs = Map.empty
+    , declTypeSigs = Map.empty
+    , declareDeclarations = Map.empty
+    , assumeDeclarations = Map.empty
+    , mixfixRegistry = unionMixfixRegistry accEnv.mixfixRegistry depMixfixRegistry
+    , computedFields = Map.empty
+    , cyclicSynonyms = mempty
+    , inNonexhaustiveDecide = False
+    , errorContext = None
+    , sectionStack = []
+    , localBindings = Set.empty
+    }
 
 newtype SectionNames =
   MkSectionNames
@@ -528,6 +696,92 @@ ambiguousType n xs = do
   u <- newUnique
   pure (OutOfScope u n)
 
+-- | Is this 'Resolved' the sentinel that 'outOfScope', 'ambiguousTerm' and
+-- 'ambiguousType' mint to make progress after a name-resolution failure?
+--
+-- Such a sentinel is only ever created *after* the corresponding
+-- 'OutOfScopeError' \/ 'AmbiguousTermError' \/ 'AmbiguousTypeError' has been
+-- reported, and its 'Unique' is deliberately never registered in the
+-- 'EntityInfo'. Anything we subsequently derive from it is therefore known
+-- garbage, and diagnostics about that garbage are cascade, not news.
+isOutOfScope :: Resolved -> Bool
+isOutOfScope OutOfScope{} = True
+isOutOfScope _            = False
+
+-- | Every 'Resolved' occurring in head (type constructor \/ type variable)
+-- position within a type, outermost first.
+--
+-- Deliberately hand-written rather than derived via @gplate@: we want exactly
+-- the names the type is *built from*, not whatever 'Resolved's may additionally
+-- be squirrelled away inside 'Anno' payloads.
+typeHeads :: Type' Resolved -> [Resolved]
+typeHeads (Type _)        = []
+typeHeads (TyApp _ n ts)  = n : concatMap typeHeads ts
+typeHeads (Fun _ onts t)  =
+  concatMap (typeHeads . optionallyNamedTypeType) onts ++ typeHeads t
+typeHeads (Forall _ _ t)  = typeHeads t
+typeHeads (InfVar _ _ _)  = []
+
+-- | Does this type mention a name-resolution failure sentinel anywhere?
+-- Such a type is poisoned: we do not know what it was supposed to be.
+mentionsOutOfScope :: Type' Resolved -> Bool
+mentionsOutOfScope = any isOutOfScope . typeHeads
+
+-- | Are these two types the same once every name-resolution sentinel is read as
+-- a wildcard matching anything?
+--
+-- This is the test for \"the mismatch between them is /caused by/ a resolution
+-- failure\", and it is much stronger than \"one of them /mentions/ a resolution
+-- failure somewhere\" — which is all 'mentionsOutOfScope' can say, being a
+-- whole-type predicate. A single poisoned sub-term is not licence to delete a
+-- diagnostic whose actual discrepancy lies between two types we did resolve:
+--
+-- @
+--   GIVEN xs IS A LIST OF Typo   -- Typo undeclared: LIST OF ⊥
+--   GIVETH A NUMBER
+--   h MEANS xs
+-- @
+--
+-- reports both the undeclared @Typo@ /and/ NUMBER-versus-LIST, and the latter
+-- is a genuine second defect: it survives verbatim once @Typo@ is declared. So
+-- @NUMBER@ vs @LIST OF ⊥@ is not compatible here (the heads differ, and neither
+-- head is a sentinel), whereas @⊥@ vs @Verdict@, @LIST OF ⊥@ vs
+-- @LIST OF NUMBER@ and @FUNCTION FROM ⊥ TO NUMBER@ vs
+-- @FUNCTION FROM Verdict TO NUMBER@ all are.
+--
+-- Conservative in the direction that matters: anything we cannot show to be
+-- pure fallout (differing arities, differing shapes, 'Forall's we do not
+-- alpha-rename) compares unequal, and the diagnostic is kept.
+sameModuloOutOfScope :: Type' Resolved -> Type' Resolved -> Bool
+sameModuloOutOfScope t1 t2
+  | poisonedHead t1 || poisonedHead t2 = True
+  | otherwise = case (t1, t2) of
+      (Type _, Type _) -> True
+      (TyApp _ r1 as1, TyApp _ r2 as2) ->
+        getUnique r1 == getUnique r2
+          && length as1 == length as2
+          && and (zipWith sameModuloOutOfScope as1 as2)
+      (Fun _ onts1 res1, Fun _ onts2 res2) ->
+        length onts1 == length onts2
+          && and
+               ( zipWith
+                   sameModuloOutOfScope
+                   (optionallyNamedTypeType <$> onts1)
+                   (optionallyNamedTypeType <$> onts2)
+               )
+          && sameModuloOutOfScope res1 res2
+      (Forall _ vs1 body1, Forall _ vs2 body2) ->
+        length vs1 == length vs2 && sameModuloOutOfScope body1 body2
+      (InfVar _ _ i1, InfVar _ _ i2) -> i1 == i2
+      _ -> False
+  where
+    -- Only a 'TyApp' can be headed by a sentinel: 'outOfScope' \/
+    -- 'ambiguousType' hand back a 'Resolved', and the only way one enters a
+    -- type is in type-constructor position.
+    poisonedHead :: Type' Resolved -> Bool
+    poisonedHead (TyApp _ r _) = isOutOfScope r
+    poisonedHead _             = False
+
 -- ----------------------------------------------------------------------------
 -- Info Map
 -- ----------------------------------------------------------------------------
@@ -591,13 +845,189 @@ lookupRawNameInEnvironment rn = do
 
   pure candidates
 
+-- | Record, for each given 'Unique', the section path (the current
+-- 'sectionStack') at which it was registered. This is what enables
+-- lexical (nearest-enclosing-section) resolution of unqualified names.
+--
+-- Top-level bindings (empty section path) are not recorded: their absence
+-- from the map is interpreted as the empty path by 'sectionProximity'.
+recordSectionPath :: [NonEmpty Text] -> [Unique] -> Check ()
+recordSectionPath []    _  = pure ()
+recordSectionPath path us =
+  modifying' #sectionPaths $ \m ->
+    foldl' (\acc u -> Map.insert u path acc) m us
+
+-- | How "close" a candidate binding's section path is to the section in which
+-- an unqualified reference occurs.
+--
+-- Returns @Just 0@ when the candidate is defined in the very same section,
+-- @Just 1@ for the immediately enclosing parent section, and so on. Top-level
+-- bindings (empty candidate path) are ancestors of every section, at a distance
+-- equal to the current nesting depth.
+--
+-- Returns 'Nothing' when the candidate is not on the current section's ancestry
+-- chain (e.g. a sibling section, a cousin, or an imported binding). Such
+-- candidates are not brought into lexical scope by this proximity mechanism.
+sectionProximity :: [NonEmpty Text] -> [NonEmpty Text] -> Maybe Int
+sectionProximity current candidate
+  | candidate `List.isPrefixOf` current = Just (length current - length candidate)
+  | otherwise                           = Nothing
+
+-- | Filter a set of viable resolution candidates down to those in the nearest
+-- enclosing section, implementing lexical scoping with shadowing.
+--
+-- Given the current module URI, the current section stack, a map of each
+-- candidate's defining section path, and the viable candidates (each tagged
+-- with its 'Unique'):
+--
+--   * IMPORTED candidates (whose 'Unique' belongs to another module) are never
+--     ranked by proximity and are never eliminated: they remain co-equal
+--     viable candidates. This preserves spec §5.5 — a same-typed collision
+--     between an import and a local section binding stays ambiguous rather than
+--     being silently shadowed — and keeps cross-module overloads (e.g. the
+--     builtin comparison operators) available for type-directed resolution.
+--   * Among the CURRENT module's candidates: if any lie on the current
+--     section's ancestry (same section, parent, ..., top level), keep only
+--     those at the /minimum/ proximity (the nearest enclosing section), and
+--     drop farther ancestors and off-ancestry siblings. Ties at the same
+--     proximity are left for the caller to disambiguate (type-directed
+--     'choose', else ambiguity error). Imported candidates are always retained
+--     alongside the nearest ancestors.
+--   * If no current-module candidate lies on the ancestry, fall back to /all/
+--     viable candidates, preserving the pre-existing flat-scope behaviour.
+--
+-- The 'Unique' of each kept candidate is returned alongside it so that callers
+-- can de-duplicate (the same candidate can be surfaced from several type
+-- groups; see 'selectByProximityPerType').
+selectByProximity
+  :: forall a
+   . NormalizedUri
+  -> [NonEmpty Text]
+  -> Map Unique [NonEmpty Text]
+  -> [(Unique, a)]
+  -> [(Unique, a)]
+selectByProximity curUri current paths viable =
+  case ancestors of
+    [] -> viable
+    _  ->
+      let nearest = minimum (fmap (\(_, _, d) -> d) ancestors)
+      in [ (u, a) | (u, a, d) <- ancestors, d == nearest ] ++ imports
+  where
+    isImport :: Unique -> Bool
+    isImport u = u.moduleUri /= curUri
+
+    -- Candidates from other modules: never filtered out by proximity.
+    imports :: [(Unique, a)]
+    imports = [ (u, a) | (u, a) <- viable, isImport u ]
+
+    -- Current-module candidates that sit on the current section's ancestry,
+    -- tagged with their proximity distance.
+    ancestors :: [(Unique, a, Int)]
+    ancestors =
+      [ (u, a, d)
+      | (u, a) <- viable
+      , not (isImport u)
+      , Just d <- [sectionProximity current (Map.findWithDefault [] u paths)]
+      ]
+
+-- | An annotation-insensitive skeleton of a 'Type'' Resolved', used purely as a
+-- grouping key when deciding which resolution candidates are "the same type".
+--
+-- Structural equality on 'Type'' Resolved' cannot be used directly because it
+-- includes source annotations, so e.g. two @NUMBER@ occurrences at different
+-- locations would compare unequal. This skeleton keys type constructors by the
+-- 'Unique' of their head and drops all annotations, so it treats two @NUMBER@s
+-- as equal while keeping genuinely different types (@STRING@, @MAYBE NUMBER@,
+-- ...) distinct — exactly what overload-preserving shadowing needs.
+data TypeKey
+  = TyKType
+  | TyKApp Unique [TypeKey]
+  | TyKFun [TypeKey] TypeKey
+  | TyKForall Int TypeKey
+  | TyKInfVar Int
+  deriving stock (Eq, Show)
+
+typeKey :: Type' Resolved -> TypeKey
+typeKey = \ case
+  Type _        -> TyKType
+  TyApp _ r ts  -> TyKApp (getUnique r) (typeKey <$> ts)
+  Fun _ onts t  -> TyKFun (typeKey . optionallyNamedTypeType <$> onts) (typeKey t)
+  Forall _ ns t -> TyKForall (length ns) (typeKey t)
+  InfVar _ _ i  -> TyKInfVar i
+
+-- | Whether a 'TypeKey' is an unresolved inference variable (a wildcard for
+-- the purpose of proximity-first resolution; see 'selectByProximityPerType').
+isInfVarKey :: TypeKey -> Bool
+isInfVarKey (TyKInfVar _) = True
+isInfVarKey _             = False
+
+-- | Stable grouping by an equality key (first-seen order preserved, both for
+-- the groups and within each group). Small candidate lists, so the quadratic
+-- cost is irrelevant.
+groupByKey :: forall k a. Eq k => (a -> k) -> [a] -> [(k, [a])]
+groupByKey key = foldl' insertItem []
+  where
+    insertItem :: [(k, [a])] -> a -> [(k, [a])]
+    insertItem acc x =
+      let k = key x
+      in case List.lookup k acc of
+           Just _  -> [ (k', if k' == k then xs <> [x] else xs) | (k', xs) <- acc ]
+           Nothing -> acc <> [(k, [x])]
+
+-- | Apply 'selectByProximity' within each group of candidates that share the
+-- same type (or, for types, the same kind), then take the union (de-duplicated
+-- by 'Unique').
+--
+-- Grouping by type is what lets genuinely distinct overloads coexist across
+-- sections: a concrete-typed binding only ever shadows another binding of the
+-- /same/ type. Type-directed resolution ('choose') therefore still ranges over
+-- every concrete overload regardless of where it is defined, while same-typed
+-- bindings obey lexical scoping and resolve to the nearest enclosing section.
+-- This is required by the standard library, whose comparison operators have
+-- NUMBER\/STRING\/BOOLEAN\/MAYBE overloads spread across sibling subsections.
+--
+-- The cross-type proximity interaction needed by forward references (spec §5.3;
+-- see 'resolveTerm'') is handled by the caller BEFORE this function, so this is
+-- deliberately a straightforward per-type-group application of
+-- 'selectByProximity'.
+selectByProximityPerType
+  :: forall k a. Eq k
+  => NormalizedUri
+  -> [NonEmpty Text]
+  -> Map Unique [NonEmpty Text]
+  -> [(k, Unique, a)]
+  -> [a]
+selectByProximityPerType curUri current paths cands =
+  dedupByUnique kept
+  where
+    kept :: [(Unique, a)]
+    kept =
+      concatMap (\(_, g) -> selectByProximity curUri current paths [ (u, a) | (_, u, a) <- g ])
+                (groupByKey (\(k, _, _) -> k) cands)
+
+    dedupByUnique :: [(Unique, a)] -> [a]
+    dedupByUnique = go Set.empty
+      where
+        go _    []            = []
+        go seen ((u, a) : xs)
+          | u `Set.member` seen = go seen xs
+          | otherwise           = a : go (Set.insert u seen) xs
+
+-- | Section proximity of a CURRENT-MODULE ancestor 'Unique'; 'Nothing' for
+-- imports (a different module URI) and for off-ancestry (sibling\/cousin)
+-- same-module candidates.
+ancestorProximity :: NormalizedUri -> [NonEmpty Text] -> Map Unique [NonEmpty Text] -> Unique -> Maybe Int
+ancestorProximity curUri current paths u
+  | u.moduleUri /= curUri = Nothing
+  | otherwise             = sectionProximity current (Map.findWithDefault [] u paths)
+
 isTopLevelBindingInSection :: Unique -> Section Resolved -> Bool
 isTopLevelBindingInSection u (MkSection _a  _mn _maka decls) = any (elem u . map getUnique . relevantResolveds) decls
   where
   relevantResolveds = \ case
     Declare _ (MkDeclare _ _ af _) -> appFormHeads af
     Decide _ (MkDecide _ _ af _) -> appFormHeads af
-    Assume _ (MkAssume _ _ af _) -> appFormHeads af
+    Assume _ (MkAssume _ _ af _ _) -> appFormHeads af
     Directive _ _ -> []
     Import _ _ -> []
     Timezone _ _ -> []
@@ -606,27 +1036,271 @@ isTopLevelBindingInSection u (MkSection _a  _mn _maka decls) = any (elem u . map
     Section _ (MkSection _ mr maka decls') -> toResolved mr <> toResolved maka <> foldMap relevantResolveds decls'
 
 resolveTerm' :: (TermKind -> Bool) -> Name -> Check (Resolved, Type' Resolved)
-resolveTerm' p n = do
+resolveTerm' p n = resolveTermFiltered False p (const True) n pure
+
+-- | Does an in-scope lexical local take absolute priority over a same-named
+-- record selector \/ data constructor at this occurrence?
+--
+-- See the @candidates0@ filter in 'resolveTermFiltered' and the rationale on
+-- 'resolveProjectionLabel'.
+data LocalShadowing
+  = LocalsShadowAll
+    -- ^ ordinary occurrence: a local shadows every same-named binding.
+  | LocalsSpareSelectors
+    -- ^ projection-label occurrence (@base's l@): a local shadows same-named
+    -- VALUE bindings, but selectors and constructors stay in the running.
+  deriving stock (Eq, Show)
+
+-- | Resolve the LABEL of a record projection @base's l@ (smucclaw\/l4-ide#930).
+--
+-- Identical to 'resolveTerm' except for 'LocalsSpareSelectors'. The label
+-- position is the one place where an in-scope local of that name is definitely
+-- not what the author meant: @'s@ desugars to an application of the label to
+-- the base, so the label is always a function, and a local that happens to
+-- share a field's name (the corpus house style threads a record as one @GIVEN@
+-- parameter, and the clitic idiom names the parameter after the field) is not.
+--
+-- Why this is scoped to the label position rather than fixed once in
+-- 'resolveTermFiltered' for every occurrence: sparing selectors\/constructors
+-- everywhere makes a BARE occurrence of such a name ambiguous rather than
+-- local, and that is a real regression — measured on this tree, it breaks
+-- @jl4\/examples\/ok\/pattern-matching-wildcard-shadow.l4@ (a @WHEN active@
+-- pattern binder against the same-typed @active@ constructor — same
+-- 'typeKey', so type-direction cannot discriminate), @jl4\/experiments\/dogs.l4@
+-- and @jl4\/experiments\/environmental-quality-review-act-7.l4@ (locals named
+-- after computed selectors). Locals must keep winning absolutely at bare
+-- occurrences; only the label position changes.
+--
+-- The price, stated because the corpus does not pay it and so no measurement
+-- will surface it: a local that IS a function of the selector's exact type at
+-- a label was previously resolved (to the local) and is now AMBIGUOUS —
+-- @GIVEN amount IS A FUNCTION FROM Money TO NUMBER@ over a @Money@ with an
+-- @amount@ field, at @m's amount@, has two candidates in one 'typeKey' group.
+-- Accepted: that source is genuinely ambiguous. Recorded in
+-- @specs\/done\/SECTION-LEXICAL-SCOPING-SPEC.md@ §12 FIX A′.
+resolveProjectionLabel :: Name -> Check (Resolved, Type' Resolved)
+resolveProjectionLabel n =
+  resolveTermFilteredIn LocalsSpareSelectors False (const True) (const True) n pure
+
+-- | Continuation-passing overload resolution with a candidate pre-filter
+-- (smucclaw\/l4-ide#929).
+--
+-- This is 'resolveTerm'' with two extra capabilities, both byte-neutral on
+-- every program whose resolution behaviour they do not speed up:
+--
+--  1. A /viability/ predicate over each candidate's (fully substituted)
+--     declared type. In the multi-candidate arm, candidates the predicate
+--     rejects are dropped from the type-directed 'choose' fork. Callers must
+--     only reject candidates that are DEFINITELY incompatible with the call
+--     site (see 'appCandidateFilter' in "L4.TypeCheck"): sibling branches of
+--     '<|>' start from the same entry state ('Alternative' above), so
+--     removing a branch that can only fail cannot perturb any surviving
+--     branch's minted uniques, bindings, or error chain. The 'ambiguousTerm'
+--     fallback is still built from the UNFILTERED candidate list, so
+--     ambiguity diagnostics enumerate every candidate exactly as before.
+--
+--  2. The rest of the caller's computation is passed in as a continuation
+--     so that the fork can decide, per candidate and AFTER the continuation
+--     has run, whether the fallback branch is reachable at all — see
+--     'forkWithLazyFallback'. Passing @pure@ recovers the original
+--     behaviour exactly: @(m1 '<|>' m2) '>>=' f@ distributes to
+--     @(m1 '>>=' f) '<|>' (m2 '>>=' f)@ in this monad (bind concatenates
+--     per-branch outcome lists in order), so threading the continuation
+--     through the fork is observationally identical to sequencing after it.
+--
+-- The single-candidate and out-of-scope arms are untouched (in particular, a
+-- single candidate is never filtered: its failures must surface exactly as
+-- today).
+--
+-- The leading 'Bool' says whether an Error-severity diagnostic was already
+-- emitted for this application node BEFORE resolution (e.g. 'FixityConflict'
+-- or 'MixfixMatchErrorCheck' in the App preamble). When set, the ambiguity
+-- fallback is appended unconditionally — see 'forkWithLazyFallback' for why
+-- the one-success skip is unsound in that case.
+resolveTermFiltered
+  :: Bool
+  -> (TermKind -> Bool)
+  -> (Type' Resolved -> Bool)
+  -> Name
+  -> ((Resolved, Type' Resolved) -> Check r)
+  -> Check r
+resolveTermFiltered = resolveTermFilteredIn LocalsShadowAll
+
+-- | 'resolveTermFiltered' with the local-shadowing policy made explicit; see
+-- 'LocalShadowing' and 'resolveProjectionLabel'.
+resolveTermFilteredIn
+  :: LocalShadowing
+  -> Bool
+  -> (TermKind -> Bool)
+  -> (Type' Resolved -> Bool)
+  -> Name
+  -> ((Resolved, Type' Resolved) -> Check r)
+  -> Check r
+resolveTermFilteredIn shadowing preambleErr p viab n kont = do
   options <- lookupRawNameInEnvironment (rawName n)
-  case mapMaybe proc options of
+  -- Lexical scoping: among the viable candidates, prefer those defined in the
+  -- nearest enclosing section (see 'selectByProximity'). Only fall through to
+  -- type-directed 'choose'/ambiguity once proximity can no longer discriminate.
+  current <- asks (.sectionStack)
+  curUri  <- asks (.moduleUri)
+  locals  <- asks (.localBindings)
+  paths <- use #sectionPaths
+  viable <- catMaybes <$> traverse proc options
+  -- In-scope lexical LOCAL bindings (function parameters, WHERE\/LET bindings,
+  -- pattern variables) take ABSOLUTE priority over any section-, top-level- or
+  -- import-defined binding of the same name. Without this, a parameter would be
+  -- silently shadowed by an enclosing section binding (section proximity 0 wins
+  -- over a local, which carries no section path). If any candidate is a local,
+  -- restrict resolution to the locals before section-proximity ranking.
+  --
+  -- EXCEPT at a projection-label occurrence ('LocalsSpareSelectors',
+  -- smucclaw\/l4-ide#930), where the restriction additionally keeps record
+  -- selectors and data constructors: at the @l@ of @base's l@ a local can never
+  -- be what the author meant, and dropping the selector there is what made
+  -- @amount's amount@ resolve the label to the @GIVEN amount IS A Money@
+  -- parameter and report \"trying to apply amount ... of type Money to 1
+  -- argument\". See 'resolveProjectionLabel' for why this is NOT done at
+  -- ordinary occurrences.
+  let localCandidates = [ c | c@(_, _, u, _) <- viable, u `Set.member` locals ]
+      isKept (_, isVal, u, _) = u `Set.member` locals || case shadowing of
+        LocalsShadowAll      -> False
+        LocalsSpareSelectors -> not isVal
+      candidates0
+        | null localCandidates = viable
+        | otherwise            = filter isKept viable
+      -- FIX B (spec §5.3: proximity dominates type-direction). A same-module
+      -- value binding whose type is still an unresolved 'InfVar' is a forward
+      -- reference to a not-yet-inferred un-annotated DECIDE. Because it lands in
+      -- a different 'typeKey' group than a same-named concrete ancestor, per-type
+      -- grouping alone would never compare the two by proximity, yielding a
+      -- spurious order-dependent ambiguity. So, up front: if the nearest
+      -- current-module VALUE-binding ancestor is such a wildcard, it lexically
+      -- shadows every strictly-farther current-module VALUE-binding ancestor of
+      -- the same name, regardless of type.
+      --
+      -- We restrict this to VALUE bindings (Computable\/Local\/Assumed) on BOTH
+      -- ends: record selectors and data constructors live in a separate
+      -- (projection\/pattern) namespace and must never be shadowed by, nor act
+      -- as, a same-named value forward reference — e.g. a @WHERE@ binding named
+      -- like a field it projects. Imports (no ancestry proximity) are never
+      -- shadowed here, preserving import\/local ambiguity (spec §5.5). A wildcard
+      -- can only be a current-module forward reference (imports are already
+      -- fully typed), so this never perturbs cross-module overloads.
+      prox u = ancestorProximity curUri current paths u
+      wildValueAncestorProx =
+        case [ d | (k, isVal, u, _) <- candidates0
+                 , isVal, isInfVarKey k, Just d <- [prox u] ] of
+          [] -> Nothing
+          ds -> Just (minimum ds)
+      keepCand (_, isVal, u, _) =
+        case (wildValueAncestorProx, prox u) of
+          (Just w, Just d) | isVal -> d <= w
+          _                        -> True
+      candidates = [ (k, u, a) | (k, _isVal, u, a) <- filter keepCand candidates0 ]
+  case selectByProximityPerType curUri current paths candidates of
     [] -> do
       v <- fresh (rawName n)
       n' <- setAnnResolvedType v Nothing n
       rn <- outOfScope n' v
-      pure (rn, v)
-    [x] -> x
-    xs -> choose xs <|> do
-      v <- fresh (rawName n)
-      n' <- setAnnResolvedType v Nothing n
-      xs' <- sequenceA xs
-      rn <- ambiguousTerm n' xs'
-      pure (rn, v)
+      kont (rn, v)
+    [(_t, x)] -> x >>= kont
+    xs ->
+      let
+        kept = [ x | (t', x) <- xs, viab t' ]
+        fallback = do
+          v <- fresh (rawName n)
+          n' <- setAnnResolvedType v Nothing n
+          xs' <- sequenceA (snd <$> xs)
+          rn <- ambiguousTerm n' xs'
+          pure (rn, v)
+      in
+        forkWithLazyFallback preambleErr kept fallback kont
   where
-    proc :: (Unique, Name, CheckEntity) -> Maybe (Check (Resolved, Type' Resolved))
-    proc (u, o, KnownTerm t tk) | p tk = Just $ do
-      n' <-  setAnnResolvedType t (Just tk) n
-      pure (Ref n' u o, t)
-    proc _                             = Nothing
+    -- Group by the declared type (via its annotation-insensitive 'typeKey') so
+    -- that same-typed bindings shadow lexically while distinct overloads remain
+    -- visible for type-directed resolution. We apply the current substitution
+    -- first so that inference variables introduced during signature scanning are
+    -- resolved to concrete types before we compare them. The 'Bool' records
+    -- whether this is a value binding (as opposed to a selector\/constructor),
+    -- which governs forward-reference shadowing (see above). The fully
+    -- substituted type is returned alongside each candidate's action so that
+    -- the viability pre-filter can inspect it without re-running 'applySubst'.
+    proc :: (Unique, Name, CheckEntity) -> Check (Maybe (TypeKey, Bool, Unique, (Type' Resolved, Check (Resolved, Type' Resolved))))
+    proc (u, o, KnownTerm t tk) | p tk = do
+      t' <- applySubst t
+      pure $ Just . (typeKey t', isValueBinding tk, u,) . (t',) $ do
+        n' <-  setAnnResolvedType t (Just tk) n
+        pure (Ref n' u o, t)
+    proc _                             = pure Nothing
+
+-- | Fork over the (pre-filtered) overload candidates, appending the
+-- 'ambiguousTerm' fallback branch only when it is observable.
+--
+-- Today's shape @('choose' xs '<|>' fallback) '>>=' kont@ runs the fallback
+-- branch unconditionally, and the fallback re-checks every argument of the
+-- application against fresh inference variables ('matchFunTy''s 'InfVar'
+-- case), which — combined with the per-candidate argument re-checking — is
+-- what makes overloaded-operator chains exponential (#929). But the fallback
+-- branch's outcomes are only ever /surfaced/ when the candidates produce
+-- zero successes ('prune'\/'softprune' surface the LAST failure candidate,
+-- which is fallback-derived) or two or more successes ('prune' surfaces the
+-- curated ambiguity error, again fallback-derived, and 'softprune' passes
+-- the whole list upward). With EXACTLY ONE success, every consumer discards
+-- the failure candidates: 'softprune'\/'prune' keep only the success, and
+-- 'orElse'\/'orElseKeepAll' pass through a candidate set whose failures are
+-- likewise never surfaced downstream (a failure's error chain is permanent,
+-- so no continuation can promote it to a success, and fallback-derived
+-- outcomes always sit after candidate-derived ones, so a candidate failure
+-- is never the surfaced last element). The fallback branch always fails (it
+-- 'addError's before doing anything else), so it can never change the
+-- success count. Skipping it in the one-success case is therefore
+-- byte-invisible — and, because the decision is made after running only the
+-- candidate branches, the fallback's expensive argument re-checking is never
+-- forced on the happy path.
+--
+-- CAVEAT (the @preambleErr@ flag): the skip is byte-invisible ONLY when no
+-- Error-severity diagnostic was emitted for this node before the fork. This
+-- function counts successes on its LOCAL outcomes — @runCheck@ from the
+-- state at the fork — but a diagnostic emitted in the caller's preamble
+-- (e.g. 'FixityConflict' before falling through to flat application
+-- inference, or a partial-mixfix 'MixfixMatchErrorCheck') is prefixed onto
+-- EVERY branch by the enclosing bind, outside this function's view, and
+-- 'softprune'\/'prune' classify successes WITH that prefix. A locally-Plain
+-- outcome is then a failure upstream: with zero upstream successes the old
+-- shape surfaced the LAST outcome, the fallback's curated ambiguity error —
+-- so skipping the fallback would silently swap that error for the
+-- erstwhile-success candidate. Callers must pass @preambleErr = True@
+-- whenever such a diagnostic preceded the fork; the fallback is then
+-- appended unconditionally, restoring the pre-skip behaviour byte-for-byte.
+--
+-- The one-success test must run AFTER the caller's continuation (the
+-- candidate branches can still fail inside 'matchFunTy'), which is why this
+-- takes the continuation explicitly rather than composing with '>>='.
+forkWithLazyFallback :: forall a r. Bool -> [Check a] -> Check a -> (a -> Check r) -> Check r
+forkWithLazyFallback preambleErr cands fallback kont =
+  MkCheck $ \ e s ->
+    let
+      ks = runCheck (choose cands >>= kont) e s
+
+      isSuccess (Plain _, _)  = True
+      isSuccess (With _ _, _) = False
+    in
+      case filter isSuccess ks of
+        [_] | not preambleErr -> ks
+        _                     -> ks ++ runCheck (fallback >>= kont) e s
+
+-- | Whether a 'TermKind' names a value in the ordinary term namespace (as
+-- opposed to a record selector or data constructor, which are reached through
+-- projection\/pattern syntax). Only value bindings participate in
+-- forward-reference lexical shadowing (see 'resolveTerm'').
+isValueBinding :: TermKind -> Bool
+isValueBinding = \ case
+  Computable       -> True
+  Local            -> True
+  Assumed          -> True
+  Selector         -> False
+  ComputedSelector -> False
+  Constructor      -> False
 
 resolveTerm :: Name -> Check (Resolved, Type' Resolved)
 resolveTerm = resolveTerm' (const True)
@@ -690,15 +1364,30 @@ type ToResolved = Optics.GPlate Resolved
 toResolved :: ToResolved a => a -> [Resolved]
 toResolved = Optics.toListOf Optics.gplate
 
--- | Should never return 'Nothing' if our system is OK.
+-- | Look up the entity a 'Resolved' refers to.
+--
+-- Returns 'Nothing' for an 'OutOfScope' sentinel *without* complaining: those
+-- 'Unique's are minted fresh by 'outOfScope' \/ 'ambiguousTerm' \/
+-- 'ambiguousType' and are deliberately never registered in the 'EntityInfo', so
+-- a miss is expected error recovery after an already-reported name-resolution
+-- failure — not an invariant violation. Reporting 'MissingEntityInfo' for them
+-- turned every unresolved or ambiguous name into a spurious "this is an error
+-- in this system and should be reported as a bug" (issue #920).
+--
+-- For every other 'Resolved' a miss really is an internal invariant violation
+-- ('extendEnv' registers 'environment' and 'entityInfo' together, so every
+-- 'Ref' \/ 'Def' unique has an entry), and we keep reporting it. After this
+-- change, 'MissingEntityInfo' means what its message claims.
 getEntityInfo :: Resolved -> Check (Maybe CheckEntity)
 getEntityInfo r = do
   ei <- asks (.entityInfo)
   case Map.lookup (getUnique r) ei of
-    Nothing       -> do
-      addError (MissingEntityInfo r)
-      pure Nothing
     Just (_n, ce) -> pure (Just ce)
+    Nothing
+      | isOutOfScope r -> pure Nothing
+      | otherwise      -> do
+          addError (MissingEntityInfo r)
+          pure Nothing
 
 -- | Given a substitution from uniques to types, substitute
 -- all occurrences of the given uniques. There's no scoping
@@ -780,13 +1469,31 @@ orElse m1 m2 = do
   MkCheck $ \ e s ->
     let
       candidates = runCheck m1 e s
+    in
+      case filter (viableCandidate . fst) candidates of
+        [] -> runCheck m2 e s
+        xs -> xs
+
+-- | Like 'orElse', but when the first computation has at least one success,
+-- return its ENTIRE candidate set — successes and error candidates alike —
+-- rather than only the successes. The error candidates matter downstream:
+-- 'prune' surfaces e.g. @ambiguousTerm@'s curated error when multiple
+-- successes coexist, and filtering to successes-only would degrade that to
+-- an internal ambiguity error. Use this variant when wrapping a computation
+-- that already carries its own ambiguity reporting (e.g. whole-application
+-- inference); with at least one success it is observationally identity.
+orElseKeepAll :: Check a -> Check a -> Check a
+orElseKeepAll m1 m2 = do
+  MkCheck $ \ e s ->
+    let
+      candidates = runCheck m1 e s
 
       isSuccess (Plain _, _)  = True
       isSuccess (With _ _, _) = False
     in
-      case filter isSuccess candidates of
-        [] -> runCheck m2 e s
-        xs -> xs
+      if any isSuccess candidates
+        then candidates
+        else runCheck m2 e s
 
 -- | Allow the subcomputation to have at most one result.
 --
@@ -804,34 +1511,31 @@ prune m = do
       candidates :: [(With CheckErrorWithContext a, CheckState)]
       candidates = runCheck m s env
 
-      proc []                    = [] -- should never occur
-      proc [a]                   = [a]
-      proc ((Plain a, s')  : cs) = procPlain (Plain a, s') cs
-      proc ((With e x, s') : cs) = procWith (With e x, s') cs
+      proc []       = [] -- should never occur
+      proc [a]      = [a]
+      proc (a : cs)
+        | viableCandidate (fst a) = procViable a cs
+        | otherwise               = procFailed a cs
 
-      -- We have a success, we don't want a second one
-      procPlain a []                   = [a]
-      procPlain a ((With _ _, _) : cs) = procPlain a cs
-      procPlain a cs
-        | plain = [first (With (MkCheckErrorWithContext InternalAmbiguityError ctx)) a]
-        -- NOTE: in the case of ambiguity errors, the ambiguity error will always occurs as
-        -- the last element in the list
-        | otherwise = [last cs]
-        where
-          plain = allPlain $ map fst cs
+      -- We have a (possibly warning-carrying) success, we don't want a second one
+      procViable a []       = [a]
+      procViable a (c : cs)
+        | viableCandidate (fst c) =
+            if all (viableCandidate . fst) cs
+              then [first (With (MkCheckErrorWithContext InternalAmbiguityError ctx)) a]
+              -- NOTE: in the case of ambiguity errors, the ambiguity error will always occur as
+              -- the last element in the list
+              else [last (c : cs)]
+        | otherwise = procViable a cs
 
       -- We have a failure, we're still looking for a success, and prefer the last failure
-      procWith a []                    = [a]
-      procWith _ ((Plain a, s')  : cs) = procPlain (Plain a, s') cs
-      procWith _ ((With e x, s') : cs) = procWith (With e x, s') cs
+      procFailed a []       = [a]
+      procFailed _ (c : cs)
+        | viableCandidate (fst c) = procViable c cs
+        | otherwise               = procFailed c cs
 
     in
       proc candidates
-
-allPlain :: [With e a] -> Bool
-allPlain = all \case
-  Plain{} -> True
-  With {} -> False
 
 -- | Prune to one result if there's a clearly best one at this point,
 -- but don't force it.
@@ -843,20 +1547,23 @@ softprune m = do
       candidates :: [(With CheckErrorWithContext a, CheckState)]
       candidates = runCheck m s env
 
-      proc []                    = [] -- should never occur
-      proc [a]                   = [a]
-      proc ((Plain a, s')  : cs) = procPlain (Plain a, s') cs
-      proc ((With e x, s') : cs) = procWith (With e x, s') cs
+      proc []       = [] -- should never occur
+      proc [a]      = [a]
+      proc (a : cs)
+        | viableCandidate (fst a) = procViable a cs
+        | otherwise               = procFailed a cs
 
       -- We have a success, we don't want a second one
-      procPlain a []                    = [a]
-      procPlain _ ((Plain _, _)  : _cs) = candidates
-      procPlain a ((With _ _, _) :  cs) = procPlain a cs
+      procViable a []       = [a]
+      procViable a (c : cs)
+        | viableCandidate (fst c) = candidates
+        | otherwise               = procViable a cs
 
       -- We have a failure, we're still looking for a success, and prefer the last failure
-      procWith a []                     = [a]
-      procWith _ ((Plain a, s')  : cs)  = procPlain (Plain a, s') cs
-      procWith _ ((With e x, s') : cs)  = procWith (With e x, s') cs
+      procFailed a []       = [a]
+      procFailed _ (c : cs)
+        | viableCandidate (fst c) = procViable c cs
+        | otherwise               = procFailed c cs
 
     in
       proc candidates
@@ -881,10 +1588,31 @@ extendKnown :: CheckInfo -> Check a -> Check a
 extendKnown ci =
   extendKnownMany [ci]
 
--- | Make many 'CheckInfo's known for the given scope.
+-- | Make many 'CheckInfo's known for the given scope, marking them as lexical
+-- LOCAL bindings (parameters, WHERE\/LET, pattern variables, type variables).
+-- Locals take absolute priority over section\/top-level\/imported bindings of
+-- the same name during resolution. Use 'extendKnownGlobalMany' instead for
+-- section- and module-level bindings (which must obey section proximity rather
+-- than shadow unconditionally).
 extendKnownMany :: [CheckInfo] -> Check a -> Check a
 extendKnownMany cis = do
+  local (markLocalBindings cis . extendEnv cis)
+
+-- | Like 'extendKnownMany', but does NOT mark the bindings as locals. Used for
+-- section- and top-level module bindings, whose relative precedence is governed
+-- by section proximity ('selectByProximity'), not by unconditional lexical
+-- shadowing.
+extendKnownGlobalMany :: [CheckInfo] -> Check a -> Check a
+extendKnownGlobalMany cis = do
   local (extendEnv cis)
+
+-- | Record the 'Unique's of the given 'CheckInfo's as in-scope lexical locals.
+markLocalBindings :: [CheckInfo] -> CheckEnv -> CheckEnv
+markLocalBindings cis env =
+  env { localBindings = foldl' insertCi env.localBindings cis }
+  where
+    insertCi :: Set Unique -> CheckInfo -> Set Unique
+    insertCi acc ci = foldl' (\s r -> Set.insert (getUnique r) s) acc ci.names
 
 -- | Extend the scope of the 'CheckEnv' with all '[CheckInfo]'.
 extendEnv :: [CheckInfo] -> CheckEnv -> CheckEnv
@@ -907,7 +1635,10 @@ extendEnv cis env =
     , assumeDeclarations = e.assumeDeclarations
     , mixfixRegistry = e.mixfixRegistry
     , computedFields = e.computedFields
+    , cyclicSynonyms = e.cyclicSynonyms
+    , inNonexhaustiveDecide = e.inNonexhaustiveDecide
     , sectionStack = e.sectionStack
+    , localBindings = e.localBindings
     }
     where
       u :: Unique

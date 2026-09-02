@@ -1,0 +1,15 @@
+IMPORT prelude
+
+§ `Bare EQUALS on two SETs is deliberately ambiguous`
+
+-- The builtin __EQUALS__ (FOR ALL A) and the prelude's SET overload both
+-- match SET operands, and the checker has no specificity preference, so
+-- this errors rather than silently applying order-sensitive structural
+-- equality. The blessed spelling is `set equals`.
+--
+-- If this test ever starts PASSING, the checker has gained a specificity
+-- rule; move this #EVAL into ok/set-operators-overloads.l4 (expected TRUE)
+-- and celebrate: bare EQUALS on sets has become extensional
+-- (SET-OPERATORS-SPEC §D6's original intent).
+
+#EVAL (setFromList (LIST 2, 1, 1)) EQUALS (setFromList (LIST 1, 2))

@@ -13,7 +13,7 @@ digraph {
       ,style=filled
       ,shape=ellipse
       ,fillcolor="#e8f4fd"];
-    1 [label="ActorCompany OF startup must Equity Financing Transaction ..."
+    1 [label="ActorCompany OF startup must SAFE.L4 Internals.Datatype Infrastructure.Equity Financing Transaction ..."
       ,fillcolor=white
       ,style=filled
       ,shape=ellipse
@@ -28,17 +28,16 @@ digraph {
       ,style=filled
       ,shape=doublecircle
       ,fillcolor="#f8d7da"];
-    0 -> 1 [label="ActorCompany OF startup MUST Convert SAFE ... IF issue EQUALS (`Cap Table Entry` OF (`SAFE investment`'s Holder), (Security WITH Instrument IS \"Preference Shares\"\n                                                                                Name IS \"Class A (converted from SAFE)\"\n                                                                                Quantity IS Shares OF numShares, `SAFE Purchase Amount`))"
+    0 -> 1 [label="ActorCompany OF startup MUST SAFE.L4 Internals.Datatype Infrastructure.Convert SAFE ... IF issue EQUALS (`Cap Table Entry` OF (`SAFE investment`'s Holder), (Security WITH Instrument IS \"Preference Shares\"\n                                                                                Name IS \"Class A (converted from SAFE)\"\n                                                                                Quantity IS Shares OF numShares, `SAFE Purchase Amount`))"
            ,color="#28a745"
            ,style=solid];
-    0 -> 3 [label=timeout
+    0 -> 3 [label="unreachable: no WITHIN"
            ,color="#dc3545"
            ,style=dashed];
-    1 -> 2 [label="ActorCompany OF startup MUST Equity Financing Transaction ... IF all OF (GIVEN eft IS eft164 YIELD ((eft's security)'s Instrument) EQUALS \"Preference Shares\"), efts"
+    1 -> 2 [label="ActorCompany OF startup MUST SAFE.L4 Internals.Datatype Infrastructure.Equity Financing Transaction ... IF all OF (GIVEN eft IS eft164 YIELD ((eft's security)'s Instrument) EQUALS \"Preference Shares\"), efts"
            ,color="#28a745"
            ,style=solid];
-    1 -> 3 [label=timeout
+    1 -> 3 [label="unreachable: no WITHIN"
            ,color="#dc3545"
            ,style=dashed];
 }
-

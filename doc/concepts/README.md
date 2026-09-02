@@ -22,9 +22,10 @@ Unlike reference docs (which tell you **what** things are) or tutorials (which s
 The philosophy and principles behind L4's design
 
 - **[Principles](language-design/principles.md)** - Core design principles of L4
+- **[Flowcharts, Decision Tables, and Real Logic](language-design/logic-not-flowcharts.md)** - Why L4 is a language with derived diagrams, not a flowchart or decision-table builder
 - **[Linguistic Syntax](language-design/linguistic-syntax.md)** - How L4 borrows from natural language linguistics
 
-**Key Ideas:** Human-readable code, legal text fidelity, accessibility for non-programmers
+**Key Ideas:** Human-readable code, legal text fidelity, accessibility for non-programmers, diagrams as views not substrate
 
 _More topics planned: Layout Sensitivity, Scope_
 
@@ -35,10 +36,12 @@ _More topics planned: Layout Sensitivity, Scope_
 Representing legal concepts in code
 
 - **[Regulative Rules](legal-modeling/regulative-rules.md)** - Obligations, permissions, prohibitions
+- **[Constitutive vs Regulative Rules](legal-modeling/constitutive-vs-regulative.md)** - Definitions vs duties, and why L4 separates them at the type level
+- **[Default Reasoning and Exceptions](legal-modeling/default-reasoning.md)** - Defeasibility, UNLESS, and encoding general-rule-plus-exception structure
 
-**Key Ideas:** Deontic modalities, legal rules as code, contract patterns
+**Key Ideas:** Deontic modalities, legal rules as code, contract patterns, defeasibility
 
-_More topics planned: Deontic Logic, Contract Composition, Constitutive vs Regulative_
+_More topics planned: Deontic Logic, Contract Composition_
 
 ---
 
@@ -47,10 +50,31 @@ _More topics planned: Deontic Logic, Contract Composition, Constitutive vs Regul
 How L4's type system works
 
 - **[Algebraic Types](type-system/algebraic-types.md)** - Sum types and product types
+- **[Exhaustiveness](type-system/exhaustiveness.md)** - Totality as a legal-safety property: every case of a determination handled
 
 **Key Ideas:** Type safety, algebraic data types, functional programming influence
 
 _More topics planned: Maybe and Nothing, Type Inference_
+
+---
+
+### 🧩 Neighbours
+
+Deep dives into neighbouring rules-as-code systems, for L4 readers
+
+- **[Blawx and s(CASP)](neighbours/blawx-and-scasp.md)** - Jason Morris's block-based rules-as-code tool and the goal-directed answer set programming underneath it: justification trees, two negations, abducibles, and the according_to/holds/defeated defeat triple
+
+**Key Ideas:** s(CASP), negation as failure vs classical negation, abduction, defeasibility, the L4↔Blawx bridge
+
+---
+
+### 🖋️ Reviewing
+
+Who checks an encoding against the law, and what their sign-off means
+
+- **[Reviewing Encoded Law](reviewing/reviewing-encoded-law.md)** - The `⟨law⟩: go` pipeline end to end, and the HG1 seat: the one judgement no machine is permitted to make
+
+**Key Ideas:** Human gates, detached signatures bound to content, inert style as the review artifact, fidelity reports, interpretation forks
 
 ---
 
@@ -70,11 +94,3 @@ _More topics planned: Maybe and Nothing, Type Inference_
 
 - Concepts provide vocabulary for discussing L4 design
 - Reference concepts when proposing changes or new features
-
----
-
-## Further Reading
-
-### Academic Papers
-
-- Coming soon: Links to papers on L4's theoretical foundations

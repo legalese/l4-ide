@@ -1,6 +1,19 @@
 # Module 0: Introduction to L4
 
+**Prerequisites:** none
+
 Welcome to L4! This module introduces you to the language and helps you get started.
+
+## Learning Objectives
+
+By the end of this module, you will be able to:
+
+- Explain what L4 is and what it is designed for
+- Recognize the main building blocks of an L4 file
+- Set up an L4 environment (VS Code, web editor, or command line)
+- Create and run your first L4 file
+
+---
 
 ## What is L4?
 
@@ -147,7 +160,7 @@ L4 code mirrors the structure of legal text. A section in legislation becomes a 
 
 ### 3. Strong Typing
 
-Types catch errors early. If a function expects a `Date`, you can't pass it a `STRING`.
+Types catch errors early. If a function expects a `DATE`, you can't pass it a `STRING`.
 
 ### 4. Functional Style
 

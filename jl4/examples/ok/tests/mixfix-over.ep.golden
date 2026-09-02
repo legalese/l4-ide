@@ -50,30 +50,30 @@ testMapPrefix MEANS map double testList
 
 -- Test 2: Using over in infix form (new!)
 -- Note: Parentheses around the function prevent it from being parsed as a function application
-testOverInfix MEANS `over` (double) testList
+testOverInfix MEANS (double) `over` testList
 
-#EVAL `over` (double) testList
+#EVAL (double) `over` testList
 
 -- Test 3: Chaining - since `over` returns a list, we can chain
 -- In Haskell: addOne <$> (double <$> [1,2,3])
-testChained MEANS `over` (addOne) (`over` (double) testList)
+testChained MEANS (addOne) `over` ((double) `over` testList)
 
-#EVAL `over` (addOne) (`over` (double) testList)
+#EVAL (addOne) `over` ((double) `over` testList)
 
 -- Test 4: With square function
-testSquare MEANS `over` (square) testList
+testSquare MEANS (square) `over` testList
 
-#EVAL `over` (square) testList
+#EVAL (square) `over` testList
 
 -- Test 5: Empty list case
-testEmpty MEANS `over` (double) EMPTY
+testEmpty MEANS (double) `over` EMPTY
 
-#EVAL `over` (double) EMPTY
+#EVAL (double) `over` EMPTY
 
 -- Test 6: Single element list
-testSingle MEANS `over` (double) (LIST 42)
+testSingle MEANS (double) `over` (LIST 42)
 
-#EVAL `over` (double) (LIST 42)
+#EVAL (double) `over` (LIST 42)
 
 -- Test 7: Prefix syntax still works
 testOverPrefix MEANS `over` square testList

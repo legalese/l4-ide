@@ -2,12 +2,20 @@ name: PR Checks
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, unstable]
+  push:
+    branches: [main, unstable]
+  # Required so these checks report against the merge queue's speculative
+  # commit. Without a merge_group trigger, queued PRs sit in AWAITING_CHECKS
+  # forever because the required contexts never run for the merge group.
+  merge_group:
 
-# Only run one check per PR to save resources
+# Only run one check per PR to save resources. Key the group on a per-run
+# identifier for merge_group (the speculative head SHA) so queue entries never
+# cancel each other, and only cancel superseded runs for pull_request pushes.
 concurrency:
-  group: pr-checks-${{ github.ref }}
-  cancel-in-progress: true
+  group: pr-checks-${{ github.event.merge_group.head_sha || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # ============================================
@@ -22,28 +30,655 @@ jobs:
       haskell: ${{ steps.filter.outputs.haskell }}
       typescript: ${{ steps.filter.outputs.typescript }}
       docs: ${{ steps.filter.outputs.docs }}
+      mlir: ${{ steps.filter.outputs.mlir }}
+      dmn: ${{ steps.filter.outputs.dmn }}
+      bpmn: ${{ steps.filter.outputs.bpmn }}
+      go: ${{ steps.filter.outputs.go }}
     steps:
+      # For merge_group AND push, paths-filter diffs base_sha..head_sha via git,
+      # so the repo must be checked out with history. Without this, push events
+      # error at the paths-filter step, all downstream jobs skip, and the Haskell
+      # job never runs on a push to unstable — which is what warms the shared
+      # base-branch cache (see the cache-maintenance note in the haskell job).
+      # (pull_request uses the GitHub API and needs no checkout.)
+      - uses: actions/checkout@v5
+        if: github.event_name == 'merge_group' || github.event_name == 'push'
+        with:
+          fetch-depth: 0
       - uses: dorny/paths-filter@v4
         id: filter
         with:
           filters: |
+            # `.github/workflows/pr-checks.yml` appears in five filters below,
+            # for the reason the mlir one has always given: this file IS the
+            # definition of those jobs, so a change to it must re-run them or it
+            # merges unmeasured. That was not academic — the merge-queue cache
+            # fix for smucclaw/l4-ide#911 edits the cache steps of the haskell,
+            # typescript, dmn-engines and bpmn jobs, and on the filters as they
+            # stood NONE of those four jobs would have run on the PR that made
+            # the edit. `prettier --check .` lives in the typescript job, so the
+            # workflow file's own formatting gate was unreachable from a
+            # workflow-only PR too.
+            #
+            # The price is that a workflow-only PR now costs a full Haskell
+            # build + WASM build. That is the same trade the `.mjs`, `etc/**`
+            # and `.claude/**` entries below already bought, each after a PR
+            # that ran zero jobs.
             haskell:
               - '**/*.hs'
               - '**/*.cabal'
               - 'cabal.project'
               - 'cabal.project.local'
               - 'jl4-core/libraries/**'
+              - '.github/workflows/pr-checks.yml'
             typescript:
               - '**/*.ts'
               - '**/*.tsx'
               - '**/*.js'
+              # '**/*.js' does NOT match '.mjs'. etc/ is full of .mjs checkers
+              # and, before this entry, a PR touching only them ran ZERO jobs —
+              # including the typescript job that hosts `prettier --check .`,
+              # so even the format gate on those files was unreachable and an
+              # unformatted file would merge here and break the next PR that
+              # happened to touch a .ts file.
+              - '**/*.mjs'
+              - 'etc/**'
               - '**/*.svelte'
               - 'package.json'
               - 'package-lock.json'
               - 'ts-apps/**'
               - 'ts-shared/**'
+              # Hosts `prettier --check .`, which is the only gate on this
+              # file's own formatting. See the note on the haskell filter.
+              - '.github/workflows/pr-checks.yml'
+            # The BPMN interchange checkers and their fixtures. Kept as its own
+            # filter so the (zero-dependency, node-only) soundness gate runs
+            # when a fixture changes, which no other filter would catch:
+            # prettier's .prettierignore excludes jl4/ entirely.
+            bpmn:
+              - 'etc/check-bpmn-*'
+              - 'etc/validate-bpmn.mjs'
+              - 'etc/kie/**'
+              - 'jl4/examples/bpmn/**'
+              - 'jl4-core/src/L4/Bpmn/**'
+              # The DMN side is IN this filter since the BPMN->DMN wiring landed
+              # (PROCESS-TRACK.md 8.3). check-bpmn-dmn-refs.mjs resolves every
+              # businessRuleTask against jl4/examples/dmn/expected/*.dmn, and the
+              # ids it resolves against are minted in L4/Dmn/Lower.hs — so a
+              # rename on either could dangle a reference in a PR that touches no
+              # BPMN file at all, and without these lines nothing would notice.
+              - 'jl4/examples/dmn/expected/**'
+              - 'jl4-core/src/L4/Dmn/**'
+              # See the note on the haskell filter.
+              - '.github/workflows/pr-checks.yml'
+            # specs/** must trigger doc checks too: a spec-only PR that skips
+            # both this filter and 'haskell' never runs test-docs.sh or
+            # prettier, so a broken link or unformatted file merges silently.
             docs:
               - 'doc/**'
+              - 'specs/**'
+              # paper/** for the same reason, learned the same way. PR #306
+              # merged two unformatted markdown files under
+              # paper/political-economy/ WITHOUT ever running `format:check`,
+              # because paper/** matched no filter — not this one and not
+              # 'typescript'. `prettier --check .` then failed on every
+              # subsequent PR into unstable, naming files their authors had
+              # not touched. FOURTH instance of this bug class in this file —
+              # see the '**/*.mjs' note above (a PR touching only .mjs files
+              # "ran ZERO jobs ... an unformatted file would merge here and
+              # break the next PR that happened to touch a .ts file"), the
+              # specs/** note above, and the .claude/** note below. Once per
+              # new top-level directory, which is the tell that the filter is
+              # the wrong mechanism for a whole-repo check rather than that
+              # the filter keeps being written wrong.
+              # Verified before widening that the other 22 markdown files
+              # under paper/ are prettier-clean, so this adds coverage without
+              # turning CI red. (The .tex/.bib/Makefile/.pdf files there are
+              # untouched: `prettier --check .` skips extensions it has no
+              # parser for.)
+              - 'paper/**'
+            # The `go` orchestrator, and the skill that is its entry point.
+            # `.claude/**` matches NO other filter — not 'typescript' (which does
+            # carry etc/**) and not 'docs' (doc/** + specs/**) — so before this
+            # entry a skill-only PR ran ZERO jobs: unformatted, with its command
+            # table free to drift away from etc/go/go.sh unnoticed. The skill and
+            # the driver are one unit and are gated as one.
+            go:
+              - 'etc/go/**'
+              # ALL skills, not just the pipeline one. Narrowed to
+              # running-the-l4-pipeline, this filter left every other skill
+              # ungated: on 2026-08-09 writing-l4-rules was still exhibiting a
+              # corpus defect repaired that same day as the live present state,
+              # and nothing would have run on a PR that touched only it.
+              # Verified before widening that `.claude/skills/**/*.md` is
+              # prettier-clean, so this adds coverage without turning CI red.
+              - '.claude/skills/**'
+              - 'specs/todo/single-instruction-demo/**'
+            mlir:
+              - 'jl4-mlir/**'
+              # Re-trigger the mlir jobs when the jobs themselves change (e.g.
+              # tuning these steps, or flipping jl4-mlir-parity-full's
+              # continue-on-error) so a workflow-only PR can self-validate.
+              - '.github/workflows/pr-checks.yml'
+            # The DMN artifacts and the two engine harnesses that read them. A
+            # change to the emitter shows up under 'haskell' as well, but the
+            # goldens themselves are .dmn/.json and the harnesses are Java and
+            # shell, none of which any other filter matches — and it is exactly
+            # a hand-edited golden that most needs an engine to look at it.
+            dmn:
+              - 'jl4-core/src/L4/Dmn/**'
+              - 'jl4/examples/dmn/**'
+              # The corpus SOURCE, for every subject whose sidecar declares a
+              # p7-dmn leg: since such a corpus gates on both engines (R12/R13),
+              # an edit to it must reach them directly, not only transitively
+              # through a forced golden regen under dmn/expected.
+              #
+              # A `paths:` filter is static YAML and cannot be derived from the
+              # sidecars, so this list is MAINTAINED BY HAND and CHECKED by
+              # etc/check-subject-ci-coverage.mjs, which fails naming the exact
+              # line to add when a subject declares p7-dmn and its encoding
+              # directory matches nothing here. Add the directory, do not
+              # broaden to `jl4/examples/legal/**` — that would run both Java
+              # engines on every corpus edit in the repo, including subjects
+              # with no DMN leg at all.
+              - 'jl4/examples/legal/regcf/**'
+              - 'etc/kie-dmn-check/**'
+              - 'etc/camunda-dmn-check/**'
+              - 'etc/validate-dmn.mjs'
+              # The XSD sequence-order pair and the law-time date probe:
+              # hand-written fixtures, not goldens, so nothing else here matches
+              # them.
+              - 'jl4/tests-cli/fixtures/dmn-xsd-order/**'
+              - 'jl4/tests-cli/fixtures/dmn-date-probe/**'
+              # The date-arithmetic clamp pair: likewise hand-written, and the
+              # thing it gates is an equivalence between daydate and FEEL, so a
+              # change to EITHER side should run it.
+              - 'jl4/tests-cli/fixtures/dmn-date-arith/**'
+              - 'jl4-core/libraries/daydate.l4'
+              # The engine-intersection triple: likewise hand-written.
+              - 'jl4/tests-cli/fixtures/dmn-engine-intersection/**'
+              # See the note on the haskell filter.
+              - '.github/workflows/pr-checks.yml'
+
+  # ============================================
+  # BPMN interchange: soundness gate over the emitted fixtures
+  # ============================================
+  # Deliberately its own job, and deliberately tiny. `etc/check-bpmn-soundness*`
+  # is pure Node with no dependencies and no network, so this needs neither
+  # `npm ci` nor a Haskell toolchain and cannot be blocked by lockfile drift.
+  #
+  # `etc/check-bpmn-kie.sh` (the jBPM second opinion) IS run here now. It was
+  # held back on cost — ~44 MB of jars from Maven Central — which the cache
+  # below reduces to a one-off per pom change. The artifacts are the community
+  # jBPM/Drools releases on **Maven Central** (`repo.maven.apache.org`); the pom
+  # declares no `<repositories>`, so nothing is fetched from Red Hat's own
+  # repository or from a GitHub URL, and every version is hard-pinned
+  # (`jbpm.version`, and the dependency *plugin* too, so `dependency:*` cannot
+  # resolve "whatever is newest today"). That pinning is what makes the cache
+  # key stable.
+  #
+  # No `needs`, no `if`, no paths filter — deliberately. This check exists BECAUSE
+  # the filters cannot see the failure it catches: a `.l4` added under
+  # jl4/examples/ matches no filter, so the Haskell job does not run, so the PR
+  # that ships a corpus without its goldens is green and the golden suite goes red
+  # on somebody else's branch instead. That happened twice in one day (PR #202,
+  # the BNA; PR #212, the Jersey charities cleanroom). Node-only, ~1 s, no build.
+  corpus-goldens:
+    name: Corpus Goldens Present
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24.x"
+      - name: Every corpus .l4 ships its four goldens
+        run: node etc/check-corpus-goldens.mjs
+
+      # Same reasoning as the job above, one level up: the filters cannot see
+      # THIS failure either. A subject that declares a leg CI gates, but whose
+      # corpus directory no `paths:` filter matches, simply never triggers the
+      # job -- so the leg reports nothing, and reporting nothing looks exactly
+      # like passing. No filter, no build, no `needs`: it runs on every event
+      # precisely because the thing it checks is which events run what.
+      - name: Every subject's declared legs are exercised by CI
+        run: node etc/check-subject-ci-coverage.mjs
+
+  # NO `--allow-skip` HERE, deliberately. The script exits 3 for SKIPPED and 4
+  # for BROKEN, and `--allow-skip` turns 3 into 0. On a developer's laptop an
+  # absent JDK is a fine reason to skip; in CI it means *this setup* regressed,
+  # which is precisely what we want to hear about. Exit 4 is unsilenceable by
+  # design and stays that way.
+  go:
+    name: Go Orchestrator
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      # No `cache:` here, but setup-node@v5 caches anyway: `package-manager-cache`
+      # defaults to true and auto-detects npm. That is where most of the 28
+      # `node-cache-*` entries came from. See the long note in the TypeScript job.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24.x"
+          package-manager-cache: ${{ github.event_name != 'merge_group' }}
+
+      # Proves the status lattice can still say no: every status producible, PASS
+      # rejected with a null, failing, or WEAK oracle, a BROKEN receipt unable to
+      # yield a COMPLETE run, and every way of editing the journal caught by
+      # the chain. Without this the lattice is one small edit from collapsing to
+      # PASS/FAIL, and nothing would notice. --with-driver is deliberately NOT
+      # passed: it needs a prebuilt `l4`, which this job does not build.
+      - name: Self-test (the lattice must still be able to refuse)
+        run: node etc/go/selftest.mjs
+
+      # The `l4 run` workaround exists only because a failed #ASSERT exits 0.
+      # This mutates a real captured envelope ten ways to prove the checker can
+      # be red — a checker whose only observed behaviour is OK is
+      # indistinguishable from one that has been quietly broken.
+      - name: Self-test (the assertion checker must still be able to fail)
+        run: node etc/go/lib/assert-report.selftest.mjs
+
+      # A skill that documents a command the driver does not dispatch is worse
+      # than no skill, because the reader believes it. Compared in BOTH
+      # directions, plus the one-file discipline that stops references/ growing a
+      # second, staler copy of the usage.
+      - name: The skill and the driver must agree
+        run: node etc/go/check-skill-drift.mjs
+
+      # Every phase script must be syntactically valid and must answer --inputs
+      # without side effects. A phase script that cannot be parsed fails the run
+      # at dispatch time with a shell error rather than a receipt.
+      - name: Every phase script parses
+        run: |
+          for f in etc/go/*.sh etc/go/phases/*.sh etc/go/lib/*.sh; do
+            bash -n "$f" || { echo "::error::$f does not parse"; exit 1; }
+          done
+
+      # The driver must be able to describe itself without a binary, a run
+      # directory, or a network. If `plan` needs any of those, resumability and
+      # dry-running are both broken.
+      #
+      # EVERY subject, not one: this step used to call `plan` bare, which worked
+      # only while exactly one sidecar existed -- go.sh defaults to the sole
+      # subject and refuses once there are two, so adding sg-succession turned
+      # this step red for a reason that had nothing to do with the change that
+      # tripped it. Enumerating from `subject.mjs --list` fixes that failure and
+      # buys the check a subject-independence property it did not have: a new
+      # sidecar whose `plan` cannot be printed fails here, on the PR that adds
+      # it, instead of on the next person's branch.
+      - name: The driver can describe itself with no L4 and no run dir
+        run: |
+          etc/go/go.sh help > /dev/null
+          subjects=$(node etc/go/lib/subject.mjs --list)
+          [ -n "$subjects" ] || { echo "::error::no subjects discovered"; exit 1; }
+          for s in $subjects; do
+            echo "--- plan --subject $s"
+            etc/go/go.sh plan --subject "$s" --encoding primary > /tmp/plan-$s-primary.txt
+            grep -q 'p0-preflight' /tmp/plan-$s-primary.txt
+            grep -q 'entry points that exist and refuse' /tmp/plan-$s-primary.txt
+            grep -q 'p9-explain' /tmp/plan-$s-primary.txt
+            # THE ENCODING ID IS ASKED FOR, NEVER HARD-CODED HERE. A subject's
+            # additional encoding is named in its own sidecar, and a workflow
+            # holding its own copy of that answer is the drift this file's
+            # subject enumeration above already refuses. `undeclared` is the
+            # third case and is what a subject declaring none resolves to.
+            enc=$(node etc/go/lib/subject.mjs "$s" --encodings | head -1)
+            enc=${enc:-undeclared}
+            etc/go/go.sh plan --subject "$s" --encoding "$enc" > /tmp/plan-$s-deposit.txt
+            grep -q 'p1-ingest' /tmp/plan-$s-deposit.txt
+            grep -q 'NOT WIRED' /tmp/plan-$s-deposit.txt
+            grep -q 'does NOT mean a de novo run happened' /tmp/plan-$s-deposit.txt
+            echo "ok $s: the primary and deposit paths both plan (deposit encoding: $enc)"
+          done
+          # A bare `plan` must still be a loud refusal, not a silent pick among
+          # several -- a run about an unnamed body of law is the thing the
+          # requirement exists to prevent.
+          if etc/go/go.sh plan > /tmp/plan-bare.txt 2>&1; then
+            n=$(printf '%s\n' $subjects | wc -l)
+            [ "$n" = "1" ] || { echo "::error::bare plan succeeded with $n subjects"; exit 1; }
+          else
+            grep -q 'subject is required' /tmp/plan-bare.txt \
+              || { echo "::error::bare plan failed without naming the reason"; cat /tmp/plan-bare.txt; exit 1; }
+            echo "ok a bare plan refuses and names --subject"
+          fi
+
+      # Every stage that is STILL scaffolded must refuse with exit 3 and name its
+      # blocker. A stage that exits 0 while doing nothing is the failure this
+      # whole design exists to prevent.
+      #
+      # p1-ingest, p2-sweep, p3-encode, p4-forks and p5-gate left this list: they
+      # are real stages now, each validating a deposit an agent produced, and
+      # their three outcomes (absent -> SKIPPED, invalid -> DEGRADED naming the
+      # rule, valid -> PASS) are exercised in etc/go/selftest.mjs, which this job
+      # already runs. Removing them here without that coverage would have deleted
+      # the only check they had.
+      #
+      # p8-verify left it the same way, one PR later: `l4 verify` landed, so it is
+      # an implemented stage and has the NEXT step's contract instead. A stage may
+      # leave this list only by being implemented — never by being made quieter.
+      - name: Every still-scaffolded stage refuses loudly
+        run: |
+          for s in p10-publish; do
+            out=$(bash "etc/go/phases/$s.sh" 2>&1) && { echo "::error::$s exited 0; a scaffolded stage must refuse"; exit 1; }
+            rc=$?
+            [ "$rc" = "3" ] || { echo "::error::$s exited $rc, expected 3"; exit 1; }
+            echo "$out" | grep -q 'BLOCKER' || { echo "::error::$s refused without naming a blocker"; exit 1; }
+            echo "ok $s refuses with exit 3 and names its blocker"
+          done
+
+      # An implemented stage has the opposite failure mode: not "exits 0 doing
+      # nothing" but "runs somewhere it cannot be measured". Launched outside the
+      # driver it has no run directory, no journal and no artifact hashes, so it
+      # must decline and say who launches it — and it must never exit 0. This job
+      # has no `l4` binary, which is precisely the environment that would tempt a
+      # stage into a vacuous success.
+      - name: An implemented stage declines to run outside the driver
+        run: |
+          for s in p8-verify; do
+            out=$(bash "etc/go/phases/$s.sh" 2>&1) && { echo "::error::$s exited 0 outside the driver"; exit 1; }
+            rc=$?
+            [ "$rc" != "0" ] || { echo "::error::$s exited 0"; exit 1; }
+            echo "$out" | grep -q 'go.sh' || { echo "::error::$s declined without naming the driver"; exit 1; }
+            echo "ok $s declines with exit $rc and names the driver"
+          done
+
+      # The report template may not carry a typed number. This is the mechanical
+      # form of the drift that put "114 blocking, 46 lossy, 18 advisory" into
+      # PROJECTIONS.md against an exporter that emits different figures.
+      # A number typed into the template is a claim with no evidence behind it,
+      # and it is how PROJECTIONS.md came to state a fidelity heading, a per-code
+      # table and two line counts that its own artifacts contradicted. (No count
+      # is given: this comment and two others once gave three different ones.) The
+      # renderer refuses such a template with 'TEMPLATE DEFECT' before it reads
+      # any journal at all, so an empty run directory is enough to reach the
+      # check — and the SECOND assertion proves the check was actually reached,
+      # rather than the renderer having bailed out earlier for another reason.
+      - name: The report template carries no transcribed measurement
+        run: |
+          mkdir -p /tmp/empty-run
+          printf '' > /tmp/empty-run/journal.ndjson
+          out=$(node etc/go/report/render-report.mjs /tmp/empty-run 2>&1) || true
+          echo "$out" | grep -q 'TEMPLATE DEFECT' && { echo "::error::$out"; exit 1; }
+          echo "$out" | grep -q 'no run_begin' || {
+            echo "::error::expected the renderer to get past the template check and refuse the empty journal; it said: $out"
+            exit 1
+          }
+          echo "ok the template contains no literal measurement, and the renderer refuses a runless journal"
+
+      # The SAME check for the explainer's template, and it needs its own step:
+      # the leg above names render-report.mjs by path, so a sibling template
+      # gets no coverage from it. Same two assertions, for the same reason —
+      # the second proves the digit check was actually reached.
+      - name: The explainer template carries no transcribed measurement
+        run: |
+          mkdir -p /tmp/empty-run
+          printf '' > /tmp/empty-run/journal.ndjson
+          out=$(node etc/go/report/render-explainer.mjs /tmp/empty-run 2>&1) || true
+          echo "$out" | grep -q 'TEMPLATE DEFECT' && { echo "::error::$out"; exit 1; }
+          echo "$out" | grep -q 'no run_begin' || {
+            echo "::error::expected the explainer renderer to get past the template check and refuse the empty journal; it said: $out"
+            exit 1
+          }
+          echo "ok the explainer template contains no literal measurement, and the renderer refuses a runless journal"
+
+      # Every figure in the shipped narrative must still resolve against the
+      # source line it cites. This is the check that stops the explainer from
+      # becoming a second place where numbers are typed: it re-reads every cited
+      # line, and it goes red when the corpus moves underneath the prose.
+      - name: Every citation in the shipped narrative resolves
+        run: |
+          node - <<'EOF'
+          import("./etc/go/lib/narrative.mjs").then(async (n) => {
+            const { readFileSync, readdirSync, existsSync } = await import("node:fs");
+            const { resolve } = await import("node:path");
+            let total = 0, unresolved = 0, lint = 0;
+            for (const sub of readdirSync("etc/go/subjects")) {
+              const dir = resolve("etc/go/subjects", sub, "explainer");
+              if (!existsSync(dir)) continue;
+              for (const f of readdirSync(dir).filter((f) => f.endsWith(".md"))) {
+                const text = readFileSync(resolve(dir, f), "utf8");
+                for (const p of n.lintNarrative(text)) {
+                  lint++;
+                  console.log(`::error file=${dir}/${f},line=${p.line}::[${p.code}] ${p.message}`);
+                }
+                const r = n.resolveCitations(text, {
+                  resolveSrc: (p) => (existsSync(resolve(p)) ? resolve(p) : null),
+                  resolveArt: () => null,
+                });
+                total += r.total;
+                for (const c of r.findings) {
+                  // An `art:` citation names a RUN artifact and cannot resolve
+                  // outside a run; everything else must.
+                  if (c.code === "C-ARTIFACT-UNKNOWN") continue;
+                  unresolved++;
+                  console.log(`::error file=${dir}/${f}::[${c.code}] ${c.target} — ${c.detail}`);
+                }
+              }
+            }
+            console.log(`narrative: ${total} citation(s) checked, ${unresolved} unresolved, ${lint} lint finding(s)`);
+            process.exit(unresolved + lint === 0 ? 0 : 1);
+          });
+          EOF
+
+      # Provenance drift is a PROMPT TO RE-READ, not a defect, so this warns and
+      # does not block. The blocking check is the one above: a source that moved
+      # far enough to break a citation fails the build. A source that moved
+      # without breaking one means somebody should re-read the paragraph, and
+      # making that fatal would block every unrelated corpus PR and teach people
+      # to re-bless without reading — which is the one thing the provenance
+      # record exists to prevent.
+      - name: Narrative provenance is in step with its sources
+        run: |
+          for s in $(node etc/go/lib/subject.mjs --list); do
+            out=$(node etc/go/lib/narrative-provenance.mjs "$s" --check 2>&1) || true
+            echo "$out"
+            echo "$out" | grep -qE 'drifted, 0 narrative' && continue
+            echo "::warning::narrative provenance for '$s' has drifted; re-read the affected sections, then: node etc/go/lib/narrative-provenance.mjs $s --bless"
+          done
+
+  bpmn:
+    name: BPMN Soundness
+    needs: changes
+    if: needs.changes.outputs.bpmn == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      # No `cache:` here, but setup-node@v5 caches anyway: `package-manager-cache`
+      # defaults to true and auto-detects npm. That is where most of the 28
+      # `node-cache-*` entries came from. See the long note in the TypeScript job.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24.x"
+          package-manager-cache: ${{ github.event_name != 'merge_group' }}
+
+      # Proves the gate can still FAIL, by asserting every fixture in
+      # jl4/examples/bpmn/unsound/ is caught on the specific property it exists
+      # to exercise — and that every fixture in sound/ is NOT flagged, because a
+      # gate that invents defects is as broken as one that misses them. A checker
+      # whose only observed behaviour is "PASS" is indistinguishable from one
+      # that has been quietly broken.
+      - name: Self-test (the gate must still be able to fail, and to pass)
+        run: node etc/check-bpmn-soundness.selftest.mjs
+
+      # Same argument, one level up. The jBPM baseline comparator below is the
+      # only thing standing between "expected/ has four known findings" and
+      # "expected/ has any number of findings and nobody notices", so it gets
+      # the same treatment: mutate a real transcript eight ways and assert it
+      # objects, then two ways and assert it does NOT.
+      - name: Self-test the jBPM baseline comparator
+        run: node etc/check-bpmn-kie-baseline.selftest.mjs
+
+      # Same argument again, for the BPMN->DMN resolver. Its only observed
+      # behaviour over the goldens is "OK" — no emitted file has a dangling
+      # reference — so without this it is indistinguishable from a resolver that
+      # says OK unconditionally. It breaks the real emitted pair six ways and
+      # asserts the objection, then twice more and asserts the silence.
+      - name: Self-test the BPMN->DMN reference resolver
+        run: node etc/check-bpmn-dmn-refs.selftest.mjs
+
+      # The gate itself, over the emitted goldens.
+      - name: Soundness-check the emitted BPMN
+        run: node etc/check-bpmn-soundness.mjs jl4/examples/bpmn/expected/*.bpmn
+
+      # PROCESS-TRACK.md 8.3's own gate: does every businessRuleTask name a
+      # decision the sibling emitted DMN actually declares? A dangling reference
+      # is the one defect this linkage can have that a reader cannot see — the
+      # diagram draws, the file parses, the delegation silently does nothing —
+      # so it is a hard error here and never a warning.
+      #
+      # The .dmn argument is required, not optional: handed no model, every
+      # reference would be unresolvable and reporting "0 of 0 checked, OK" is how
+      # a narrowed glob turns a gate into decoration. The script exits 2 rather
+      # than pass vacuously.
+      - name: Do the BPMN businessRuleTasks resolve in the emitted DMN?
+        run: |
+          node etc/check-bpmn-dmn-refs.mjs \
+            jl4/examples/bpmn/expected/*.bpmn \
+            jl4/examples/dmn/expected/regcf-corpus.dmn
+
+      # K4: will Camunda Modeler open these? bpmn-moddle is what bpmn-js parses
+      # with. Pinned, and never added to package.json or the lockfile.
+      - name: Validate against bpmn-moddle (the K4 acceptance signal)
+        run: npx --yes --package=bpmn-moddle@10 node etc/validate-bpmn.mjs jl4/examples/bpmn/expected/*.bpmn jl4/examples/bpmn/sound/*.bpmn
+
+      # The independent second opinion. jBPM shares no code with bpmn-js, so its
+      # agreement that a diagram deadlocks is evidence our own token semantics
+      # are right rather than merely self-consistent.
+      #
+      # JDK 17: the harness accepts 11+, but the pinned stack is not happy on the
+      # newest JDKs, and an unpinned `java` has already once produced a stale
+      # JDK 14 that failed in a way which read as a diagram defect.
+      #
+      # That stack is jbpm-bpmn2 / jbpm-flow-builder / drools-compiler, ALL at
+      # 7.74.1.Final (etc/kie/pom.xml). It is NOT the 8.44.0.Final used by the
+      # DMN harnesses below: 8.44.0.Final is real for kie-dmn and does not exist
+      # for org.jbpm:jbpm-bpmn2. Different product lines; do not harmonise them.
+      # The harness prints the version it observed off its own classpath, so the
+      # banner in the log is the authority, not this comment.
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # Keyed on every pom under etc/, so the DMN engine harnesses share this
+      # cache the moment they land rather than needing their own entry.
+      #
+      # ---- why merge_group never SAVES a cache in this workflow --------------
+      # GitHub scopes cache reads to {the run's own ref, the default branch},
+      # plus the base branch for pull_request only. A merge_group run's own ref
+      # is `gh-readonly-queue/unstable/pr-N-<sha>`, which GitHub deletes when the
+      # queue entry finishes — so anything a queue run writes is unreadable by
+      # every other run, including the push that lands the very same commit.
+      # Measured 2026-08-02 over the repo's 73 live cache entries: 53 of them,
+      # 5.58 GB, sat in gh-readonly-queue refs, and 44 had last_accessed ==
+      # created — written once, never read. Against a 10 GB cap the store was at
+      # 10.65 GB and LRU-evicting continuously, which is the same mechanism the
+      # prune step in the Haskell job below exists to fight (it once cost the
+      # repo 40-minute PRs). The base caches that smucclaw/l4-ide#911's fix
+      # protects live in that same 10 GB. (The merge queue no longer depends
+      # on any of them — since 2026-08-09 it warms from an artifact; see the
+      # Haskell job's warm-start note.)
+      #
+      # So: restore on every event, save on every event EXCEPT merge_group.
+      # pull_request keeps saving — refs/pull/N/merge IS readable by later runs
+      # of the same PR — and push keeps refreshing the shared base cache.
+      # Nothing is skipped and no job does less work; the only thing removed is
+      # a write with no reader.
+      - name: Restore the pinned engine jars
+        uses: actions/cache/restore@v4
+        id: l4-engines-m2
+        with:
+          path: ~/.cache/l4-engines/repo
+          key: l4-engines-m2-${{ runner.os }}-${{ hashFiles('etc/**/pom.xml') }}
+
+      # `$HOME`, not `~`: an `env:` value is not shell-expanded, so `~` would
+      # reach Maven literally as `-Dmaven.repo.local=~/...` and create a
+      # directory called `~` in the checkout — while `actions/cache` above DOES
+      # expand `~`. The two would silently point at different places and the
+      # cache would miss on every run while appearing to work.
+      # Split deliberately, because the two fixture sets have different contracts
+      # and collapsing them would either block the repo or hide a regression.
+      #
+      #   sound/     MUST be clean. Measured exit 0 today. A finding here is a
+      #              regression and fails the build.
+      #   expected/  is real exporter output, and the harness reports
+      #              `RESULT: 4 file(s) with findings.` today — measured exit 1.
+      #              All four are jBPM COMPILE rejections, not liveness defects:
+      #
+      #                handover.bpmn           axis A4: an L4 name inside a
+      #                                        <bpmn:condition> on a CONDITIONAL
+      #                                        BOUNDARY EVENT (`grace period`,
+      #                                        line 44) declared as a formal
+      #                                        expression; Drools parses it as
+      #                                        DRL and refuses. NOT a
+      #                                        conditionExpression — this file
+      #                                        has zero of those, as the element
+      #                                        table in bpmn/README.md says; an
+      #                                        earlier version of this comment
+      #                                        named the wrong element
+      #                regcf-advertising.bpmn  A4's defect class, on a gateway guard
+      #                regcf-resale.bpmn       A4's defect class, on a gateway guard
+      #                regcf-reporting.bpmn    `Unknown gateway direction: Mixed` —
+      #                                        the renewal loop makes that gateway
+      #                                        genuinely mixed (2 in, 3 out), which
+      #                                        BPMN 2.0 §10.5.2 permits and jBPM
+      #                                        does not implement
+      #
+      #              offering.bpmn is NOT among them: it logs an ABORTED-via-
+      #              error-end, which the harness annotates "a modelled terminal
+      #              state, not a liveness defect" and does not count. An earlier
+      #              version of this comment said expected/ reported ONE finding
+      #              and named offering.bpmn — wrong on both halves.
+      #
+      #              Exit 1 is therefore EXPECTED on expected/ and cannot itself
+      #              be the gate. What gates it is etc/bpmn-kie-baseline.txt,
+      #              compared below.
+      #
+      # The list above is a summary for a human reader. It is NOT the assertion —
+      # etc/bpmn-kie-baseline.txt is, and it is machine-compared every run. Until
+      # 2026-07-28 there was no such file, exit 1 was tolerated unconditionally,
+      # and a fifth rejected golden (or a regression turning a clean golden into
+      # a rejected one) would have landed green. The comparator closes both that
+      # and the coverage half: a file the baseline names but the run never
+      # reached now fails, so a narrowed glob can no longer pass by doing less.
+      - name: Second opinion — does an independent engine agree? (jBPM/KIE)
+        run: |
+          export L4_KIE_CACHE="$HOME/.cache/l4-engines"
+
+          echo "::group::sound/ — must be clean"
+          etc/check-bpmn-kie.sh jl4/examples/bpmn/sound/*.bpmn
+          echo "::endgroup::"
+
+          echo "::group::expected/ — real exporter output"
+          set +e
+          etc/check-bpmn-kie.sh jl4/examples/bpmn/expected/*.bpmn | tee kie-expected.log
+          rc=${PIPESTATUS[0]}
+          set -e
+          echo "::endgroup::"
+
+          # 0 and 1 are both verdicts, and which one it is carries no information
+          # the baseline does not carry better: the comparator reads the
+          # transcript. 2/3/4 mean no verdict was reached, so there is nothing to
+          # compare and the baseline must not be consulted — a SKIPPED run whose
+          # empty transcript "matched" would be the original bug wearing a hat.
+          case "$rc" in
+            0 | 1) ;;
+            *) echo "::error::jBPM check exited $rc — 2=usage, 3=SKIPPED (nothing was checked), 4=BROKEN (toolchain present, harness failed)."
+               exit "$rc" ;;
+          esac
+
+          node etc/check-bpmn-kie-baseline.mjs kie-expected.log
+
+      # `!cancelled()` reproduces `actions/cache`'s post-step behaviour exactly,
+      # including its save-on-failure: the ONLY thing this change removes is the
+      # write no run can read.
+      - name: Save the pinned engine jars
+        uses: actions/cache/save@v4
+        if: ${{ !cancelled() && github.event_name != 'merge_group' && steps.l4-engines-m2.outputs.cache-hit != 'true' }}
+        with:
+          path: ~/.cache/l4-engines/repo
+          key: ${{ steps.l4-engines-m2.outputs.cache-primary-key }}
 
   # ============================================
   # TypeScript: Lint, Format, Build & Test (combined)
@@ -51,7 +686,11 @@ jobs:
   typescript:
     name: TypeScript Checks
     needs: changes
-    if: needs.changes.outputs.typescript == 'true'
+    # format:check runs `prettier --check .` over the WHOLE repo, not just
+    # ts/js/svelte files, so a doc/specs-only PR must still trigger this job
+    # or a markdown formatting break merges undetected (see the docs-filter
+    # comment above).
+    if: needs.changes.outputs.typescript == 'true' || needs.changes.outputs.docs == 'true'
     runs-on: ubuntu-latest
     container:
       image: ubuntu:24.04
@@ -64,12 +703,35 @@ jobs:
         run: git config --global --add safe.directory $GITHUB_WORKSPACE
       - uses: actions/checkout@v5
 
+      # `cache:` is set to npm on every event EXCEPT merge_group — see "why
+      # merge_group never SAVES a cache in this workflow" in the BPMN job above.
+      # setup-node has no save-only switch, so the input itself is conditional;
+      # an empty `cache:` disables its caching entirely, which is exactly what a
+      # merge_group run wants. It loses nothing: no `node-cache-*` entry exists
+      # in main's scope, so a queue run's npm restore has never hit — measured
+      # `npm cache is not found` on merge_group run 30760823299 — after which it
+      # wrote 111 MB into its own doomed ref. 28 such entries were live on
+      # 2026-08-02, 1.89 GB, 20 of them never read once.
+      #
+      # BOTH inputs have to be turned off, and this is the only setup-node in
+      # the file that needs both. setup-node@v5's restore is:
+      #
+      #   if (cache && isCacheFeatureAvailable()) { restoreCache(cache, …) }
+      #   else if (resolvedPackageManager && packagemanagercache) { restoreCache(…) }
+      #
+      # `cache: npm` alone reaches the first branch; leaving `cache` empty falls
+      # through to the second, where `package-manager-cache` defaults to TRUE and
+      # auto-detects npm anyway. Disabling only one of the two does nothing —
+      # which is what the first cut of this change did, caught by the resolved
+      # inputs GitHub echoes into the log (`package-manager-cache: true`) rather
+      # than by reading the action.
       - name: Use Node.js
         uses: actions/setup-node@v5
         with:
           cache-dependency-path: package-lock.json
           node-version: "24.x"
-          cache: npm
+          cache: ${{ github.event_name != 'merge_group' && 'npm' || '' }}
+          package-manager-cache: ${{ github.event_name != 'merge_group' }}
 
       - run: npm ci
       - run: npm run build
@@ -86,6 +748,11 @@ jobs:
     needs: changes
     if: needs.changes.outputs.haskell == 'true' || needs.changes.outputs.docs == 'true'
     runs-on: ubuntu-latest
+    # actions: write lets the push-only "Prune superseded Haskell caches" step
+    # delete stale cache entries so the repo stays under GitHub's 10 GB cache cap.
+    permissions:
+      contents: read
+      actions: write
     container:
       image: ubuntu:24.04
     env:
@@ -127,26 +794,144 @@ jobs:
           cabal-version: "latest"
           cabal-update: true
 
+      # ---- Merge-queue warm start (artifact route, 2026-08-09) ---------------
+      # GitHub scopes cache READS to {the run's own ref, the default branch},
+      # plus the base branch for pull_request events only. A merge_group run's
+      # own ref is the ephemeral gh-readonly-queue/... ref, and our queue
+      # targets `unstable`, which is NOT the default branch — so the fresh
+      # push-to-unstable caches saved at the foot of this job are structurally
+      # invisible to every queue entry, and the cache API offers no escape that
+      # does not involve a workflow running ON main (measured: a cache saved by
+      # a tag-triggered run is scoped to refs/tags/<tag>, which is in nobody's
+      # read set; GitHub's documented scoping — this specific case is not
+      # locally measured). The previous escape, cache-warmup.yml's cron on
+      # main, died when main deleted it (8917dc3f); its frozen mq-warmup-*
+      # entries were dropped from the restore-keys below in the same change as
+      # this block, because a stale cache that still prefix-matches would
+      # overwrite the fresh store this block extracts.
+      #
+      # ARTIFACTS are not ref-scoped. The push-to-unstable run of this very job
+      # uploads its cabal store + dist-newstyle as `mq-warmup-haskell` (foot of
+      # this job); each queue entry downloads the newest one from a successful
+      # push and unpacks it. The cache restores below are SKIPPED outright on
+      # merge_group — not merely expected to miss: a push to MAIN saves the
+      # same pr-checks-* keys into default-branch scope, which merge_group CAN
+      # read, and that restore would extract main's stale store over the warm
+      # start (mixed package.db = a red queue entry, the worst outcome
+      # available). Each Haskell-building landing re-warms the artifact
+      # (docs-only landings upload nothing and the locator walks back up to 15
+      # pushes; the artifact lands at the END of the push run, so under a busy
+      # queue entry N+1 is typically warmed by N-1's landing). Freshness still
+      # tracks dependency drift, which the 6-hourly cron never did. Every
+      # producer and consumer step is best-effort (`continue-on-error`) — any
+      # failure means a cold build for a queue entry, never a red check. The
+      # round-trip is deliberately unkeyed on cabal-version (`latest` above):
+      # producer and consumer derive the store path from the same setup output
+      # in the same container, and a cabal release between them degrades to a
+      # cold or partially-warm build, never an error. Storage is free (public
+      # repo); retention 7 days does the cleanup no delete step has to.
+      - name: Locate the newest merge-queue warm-up artifact
+        id: warmup
+        if: github.event_name == 'merge_group'
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const runs = await github.rest.actions.listWorkflowRuns({
+              owner: context.repo.owner, repo: context.repo.repo,
+              workflow_id: 'pr-checks.yml', branch: 'unstable',
+              event: 'push', status: 'success', per_page: 15,
+            });
+            for (const run of runs.data.workflow_runs) {
+              const arts = await github.rest.actions.listWorkflowRunArtifacts({
+                owner: context.repo.owner, repo: context.repo.repo, run_id: run.id,
+              });
+              const art = arts.data.artifacts.find(
+                (a) => a.name === 'mq-warmup-haskell' && !a.expired,
+              );
+              if (art) {
+                const ageDays = (Date.now() - Date.parse(art.created_at)) / 86400000;
+                core.info(`warm start: ${art.name} from run ${run.id} (${run.head_sha.slice(0, 7)}), ${Math.round(art.size_in_bytes / 1048576)} MB, ${ageDays.toFixed(1)} d old`);
+                if (ageDays > 7)
+                  core.warning(`The newest warm-up artifact is ${ageDays.toFixed(0)} days old. Pushes to unstable upload a fresh one on every green haskell job; check the recent push runs of pr-checks.yml.`);
+                core.setOutput('run-id', String(run.id));
+                core.setOutput('found', 'true');
+                return;
+              }
+            }
+            core.setOutput('found', 'false');
+            core.warning('No mq-warmup-haskell artifact on any of the last 15 successful pushes to unstable; this queue entry cold-builds (~28 min). The push path of this job uploads the artifact — check whether recent pushes skipped the haskell job or failed.');
+
+      - name: Download the warm-up artifact
+        id: warmup-download
+        if: github.event_name == 'merge_group' && steps.warmup.outputs.found == 'true'
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: mq-warmup-haskell
+          run-id: ${{ steps.warmup.outputs.run-id }}
+          github-token: ${{ github.token }}
+          path: /tmp/mq-warmup
+
+      # A partial extraction is worse than none — cabal trusts what it finds —
+      # so each tar cleans its own target on failure.
+      - name: Unpack the warm start
+        if: github.event_name == 'merge_group' && steps.warmup-download.outcome == 'success'
+        continue-on-error: true
+        env:
+          STORE: ${{ steps.setup.outputs.cabal-store }}
+        run: |
+          mkdir -p "$(dirname "$STORE")"
+          tar -xf /tmp/mq-warmup/cabal-store.tar -C "$(dirname "$STORE")" || { rm -rf "$STORE"; echo "::warning::cabal-store unpack failed; cold-building dependencies"; }
+          tar -xf /tmp/mq-warmup/dist-newstyle.tar || { rm -rf dist-newstyle; echo "::warning::dist-newstyle unpack failed; cold-building first-party packages"; }
+          rm -rf /tmp/mq-warmup
+
       # Restore caches BEFORE configure so cabal can plan incrementally
       # on top of existing build state rather than starting fresh.
+      #
+      # Both restore steps are gated OFF merge_group: the warm-start artifact
+      # is a queue entry's only input, and the reason is in the warm-start note
+      # above — a main push saves these same pr-checks-* keys into
+      # default-branch scope, which merge_group CAN read, and that restore
+      # would extract main's stale store over the warm start. Skipped steps
+      # yield empty outputs, so the push-only prune and save steps below, and
+      # the `cache-hit != 'true'` install gate — true on merge_group, where
+      # installing over the warm store is a seconds-long no-op — all behave.
+      # The measured cost of the scope rule this design routes around,
+      # 2026-08-02, all three events within 31 minutes of each other and all
+      # asking for the identical key `pr-checks-Linux-ghc-9.10.2-dist-14bfce8b…`:
+      #
+      #   merge_group  (pr-197)  `Cache not found for input keys: …`   build 514.9 s
+      #   pull_request (#206)    `Cache restored from key: …`          build  16.1 s
+      #   push         (unstable) `Cache restored from key: …`         build  19.1 s
+      #
+      # …i.e. ~8 min per queued PR spent rebuilding what was sitting in a cache
+      # the run was not allowed to read — now supplied by the warm-start
+      # artifact instead.
       - name: Restore cached build artifacts
         uses: actions/cache/restore@v5
         id: build-cache
+        if: github.event_name != 'merge_group'
         with:
           path: dist-newstyle
           key: pr-checks-${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version }}-dist-${{ hashFiles('**/*.hs', '**/*.cabal') }}
           restore-keys: |
             pr-checks-${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version }}-dist-
 
+      # Also gated off merge_group, same reason as above. On pull_request and
+      # push it works as it always has; the warm-start artifact, not a cache
+      # key, is what makes queue entries warm.
       - name: Restore cached dependencies
         uses: actions/cache/restore@v5
         id: deps-cache
+        if: github.event_name != 'merge_group'
         env:
           key: pr-checks-${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version }}-cabal-${{ steps.setup.outputs.cabal-version }}
         with:
           path: ${{ steps.setup.outputs.cabal-store }}
           key: ${{ env.key }}-plan-${{ hashFiles('**/*.cabal', 'cabal.project') }}
-          restore-keys: ${{ env.key }}-
+          restore-keys: |
+            ${{ env.key }}-
 
       - name: Configure the build
         run: |
@@ -154,26 +939,44 @@ jobs:
           cabal configure --enable-tests --disable-documentation
           cabal build all --dry-run
 
+      # Guards the defect where `data-files` in jl4-core.cabal was silently
+      # disabled by a `flag` stanza inserted above it. Cabal ignores
+      # package-level fields that appear after the first section, warns ONCE,
+      # and then caches the parse -- so the warning vanished and nobody saw it
+      # for months. The consequence was invisible in CI and fatal downstream:
+      # the sdist shipped no .l4 files, so every `cabal install` produced an
+      # `l4` with an EMPTY embedded stdlib, answering "Module not found:
+      # prelude" for every IMPORT.
+      #
+      # Nothing else here can catch it. `cabal build`/`cabal test` build
+      # jl4-core INPLACE, where the TH splice's cwd fallback finds libraries/
+      # anyway, and the test step additionally sets JL4_LIBRARY_PATH, which
+      # disables the embedded tier outright. The isolation needed is along the
+      # BUILD axis; the sdist shows it cheaply, without building anything.
+      - name: The sdist must carry the standard library
+        run: |
+          ( cd jl4-core && cabal check ) 2>&1 | tee /tmp/cabal-check.txt || true
+          if grep -q 'parser-warning' /tmp/cabal-check.txt; then
+            echo "::error::cabal check reported a parser warning for jl4-core. A package-level"
+            echo "::error::field is probably being ignored because a section was inserted above it."
+            exit 1
+          fi
+          cabal sdist jl4-core --list-only > /tmp/sdist.txt
+          if ! grep -q 'libraries/prelude\.l4' /tmp/sdist.txt; then
+            echo "::error::jl4-core's sdist contains no libraries/prelude.l4, so cabal install"
+            echo "::error::would produce an l4 binary with an empty embedded stdlib."
+            echo "::error::Check that data-files in jl4-core.cabal precedes every section."
+            sed -n '1,40p' /tmp/sdist.txt
+            exit 1
+          fi
+          echo "sdist carries $(grep -c '\.l4$' /tmp/sdist.txt) .l4 files"
+
       - name: Install dependencies
         if: steps.deps-cache.outputs.cache-hit != 'true'
         run: cabal build all --only-dependencies
 
-      - name: Save cached dependencies
-        uses: actions/cache/save@v5
-        if: steps.deps-cache.outputs.cache-hit != 'true'
-        with:
-          path: ${{ steps.setup.outputs.cabal-store }}
-          key: ${{ steps.deps-cache.outputs.cache-primary-key }}
-
       - name: Build
         run: cabal build all
-
-      - name: Save cached build artifacts
-        uses: actions/cache/save@v5
-        if: success() && steps.build-cache.outputs.cache-hit != 'true'
-        with:
-          path: dist-newstyle
-          key: ${{ steps.build-cache.outputs.cache-primary-key }}
 
       - name: Run tests
         run: cabal test all
@@ -182,6 +985,616 @@ jobs:
 
       - name: Run documentation tests
         run: ./doc/test-docs.sh
+
+      # ---- Cache maintenance (base-branch push only) --------------------------
+      # PR and merge_group runs are pure cache CONSUMERS: they RESTORE the base
+      # cache (steps above) but never SAVE. Only a push to a base branch
+      # (unstable/main) refreshes the shared cache. This is what keeps the repo
+      # under GitHub's 10 GB cache cap: previously every PR/queue run wrote a
+      # fresh ~330 MB dist + ~150 MB cabal cache under a per-commit key, and that
+      # churn LRU-evicted the base cache that PRs need — so PRs cold-built (~40
+      # min). GitHub also scopes cache reads to {own ref, base, default}, so only
+      # a cache saved here on refs/heads/unstable is inheritable by PRs into it.
+      #
+      # The prune runs AFTER build+test (invisible to them) and deletes the
+      # superseded entries of each family so the fresh save below is the sole
+      # survivor — the dist/cabal cache families self-limit to one entry each.
+      - name: Prune superseded Haskell caches
+        if: github.event_name == 'push'
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const os = '${{ runner.os }}';
+            const ghc = '${{ steps.setup.outputs.ghc-version }}';
+            const prefixes = [
+              `pr-checks-${os}-ghc-${ghc}-dist-`,
+              `pr-checks-${os}-ghc-${ghc}-cabal-`,
+            ];
+            // Never delete THIS run's primary keys: on an exact cache-hit the
+            // Save step is skipped, so pruning them would lose a good cache.
+            const keep = new Set([
+              '${{ steps.build-cache.outputs.cache-primary-key }}',
+              '${{ steps.deps-cache.outputs.cache-primary-key }}',
+            ]);
+            const caches = await github.paginate(
+              github.rest.actions.getActionsCacheList,
+              { owner: context.repo.owner, repo: context.repo.repo, per_page: 100 },
+            );
+            let freed = 0;
+            for (const c of caches) {
+              if (prefixes.some((p) => c.key.startsWith(p)) && !keep.has(c.key)) {
+                core.info(`Deleting superseded cache ${c.key} (${Math.round(c.size_in_bytes / 1048576)} MB, ref ${c.ref})`);
+                try {
+                  await github.rest.actions.deleteActionsCacheById({
+                    owner: context.repo.owner, repo: context.repo.repo, cache_id: c.id,
+                  });
+                  freed += c.size_in_bytes;
+                } catch (e) {
+                  core.warning(`  failed to delete ${c.key}: ${e.message}`);
+                }
+              }
+            }
+            core.info(`Freed ${Math.round(freed / 1048576)} MB before saving the fresh base cache.`);
+
+      - name: Save cached dependencies
+        uses: actions/cache/save@v5
+        if: github.event_name == 'push' && steps.deps-cache.outputs.cache-hit != 'true'
+        with:
+          path: ${{ steps.setup.outputs.cabal-store }}
+          key: ${{ steps.deps-cache.outputs.cache-primary-key }}
+
+      - name: Save cached build artifacts
+        uses: actions/cache/save@v5
+        if: github.event_name == 'push' && steps.build-cache.outputs.cache-hit != 'true'
+        with:
+          path: dist-newstyle
+          key: ${{ steps.build-cache.outputs.cache-primary-key }}
+
+      # ---- Merge-queue warm-up artifact (push to unstable only) --------------
+      # The consumer half is the warm-start block after "Set up GHC". This half
+      # runs only after build+test went green — a failing push never warms the
+      # queue — and only on unstable, whose queue is the consumer; a main push
+      # uploading under the same name would waste storage warming nobody.
+      # Plain tar, no compression: upload-artifact compresses the whole
+      # artifact itself, and double-compressing ~500 MB just burns push-run
+      # minutes. retention-days 7 keeps a quiet week warm; storage is free on a
+      # public repo, and expiry does the cleanup no delete step has to.
+      - name: Package the warm-up artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/unstable'
+        continue-on-error: true
+        env:
+          STORE: ${{ steps.setup.outputs.cabal-store }}
+        run: |
+          mkdir -p /tmp/mq-warmup
+          tar -cf /tmp/mq-warmup/cabal-store.tar -C "$(dirname "$STORE")" "$(basename "$STORE")"
+          tar -cf /tmp/mq-warmup/dist-newstyle.tar dist-newstyle
+
+      - name: Upload the warm-up artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/unstable'
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: mq-warmup-haskell
+          path: /tmp/mq-warmup/
+          retention-days: 7
+
+  # ============================================
+  # DMN: both engines, over the committed goldens
+  # ============================================
+  #
+  # THE POINT OF THIS JOB IS THAT IT CANNOT SKIP. Both harnesses skip loudly and
+  # exit 0 when the toolchain is missing, which is right on a laptop and wrong in
+  # CI; KIE_CHECK_REQUIRED / CAMUNDA_CHECK_REQUIRED turn every one of those paths
+  # into exit 1. If the JDKs or Maven are not there, this job fails rather than
+  # quietly reporting green.
+  #
+  # It runs the scripts DIRECTLY rather than through `cabal test l4-cli-test`
+  # with L4_DMN_ENGINE_CHECK=1. The two do the same check on the same file, but
+  # the script route needs no GHC, so this stays a small Java job instead of a
+  # second full Haskell build. The hspec leg in jl4/tests-cli/Main.hs remains the
+  # developer-facing entry point (one command, same harnesses); neither pretends
+  # to be the other.
+  #
+  # Two JDKs, on purpose: KIE/Drools 8.x is measured on 17, and zeebe-dmn 8.7.x
+  # is compiled to class file 65 and needs 21+. They also must not share a
+  # classpath — feel-engine 1.19.x-scala-shaded (Camunda 7) and 1.18.3 (Camunda
+  # 8) collide — which is why there are two directories under etc/.
+  dmn-engines:
+    name: DMN Engine Checks (KIE + Camunda)
+    needs: changes
+    if: needs.changes.outputs.dmn == 'true' || needs.changes.outputs.haskell == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up JDK 17 (KIE/Drools)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up JDK 21 (Camunda 8 / zeebe-dmn)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      # Restore/save split, not `actions/cache`, so the save can be skipped on
+      # merge_group. See "why merge_group never saves" at the l4-engines-m2 step
+      # in the BPMN job above: a queue run writes into its own ephemeral
+      # gh-readonly-queue/... ref, which is deleted with the queue entry, so the
+      # entry is unreadable the moment it exists. Measured on merge_group run
+      # 30760823299: `Cache not found for input keys: dmn-engines-m2-…` at
+      # 18:18:57 followed by `Cache saved with key: dmn-engines-m2-…` at
+      # 18:20:14 — 51 MB written into a scope with no reader.
+      - name: Restore the Maven repository
+        uses: actions/cache/restore@v5
+        id: dmn-m2
+        with:
+          path: ~/.m2/repository
+          key: dmn-engines-m2-${{ hashFiles('etc/kie-dmn-check/pom.xml', 'etc/camunda-dmn-check/pom.xml') }}
+          restore-keys: |
+            dmn-engines-m2-
+
+      - name: Drools/KIE 8.44.0.Final
+        env:
+          KIE_CHECK_REQUIRED: "1"
+          KIE_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
+        run: |
+          set -euo pipefail
+          ./etc/kie-dmn-check/run.sh \
+            jl4/examples/dmn/expected/reg-cf.dmn \
+            --cases jl4/examples/dmn/reg-cf.cases.json | tee kie.log
+          # The harness prints VERDICT only when it actually ran, so grepping for
+          # it is what stops "exited 0 and did nothing" reading as a pass.
+          #
+          # The VERSION is part of the pattern on purpose. The banner reports the
+          # version it OBSERVED off the classpath, so pinning it here is what
+          # makes the log evidence about which engine looked at the file.
+          #
+          # `value(s) as expected` is the part that is not a liveness claim.
+          # `25/25 SUCCEEDED` says every decision ran; only this says each one
+          # answered what jl4/examples/dmn/reg-cf.cases.json says it must.
+          grep -q 'KIE 8.44.0.Final VERDICT: .*0 error(s), 0 warning(s), 25/25 decision(s) SUCCEEDED, 25/25 value(s) as expected, 15/15 service output value(s) as expected' kie.log
+
+      - name: Camunda 8.7.6 (zeebe-dmn)
+        env:
+          CAMUNDA_CHECK_REQUIRED: "1"
+          CAMUNDA_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_21_X64 }}
+        run: |
+          set -euo pipefail
+          ./etc/camunda-dmn-check/run.sh \
+            jl4/examples/dmn/expected/reg-cf.dmn \
+            --cases jl4/examples/dmn/reg-cf.cases.json | tee camunda.log
+          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT: .*1 parsed, 0 error(s), 25/25 decision(s) evaluated, 25/25 value(s) as expected' camunda.log
+
+      # The CORPUS leg (R12/R13, DMN-EXPORT-PROGRAM-MODEL-SPEC.md §15.12/§16):
+      # the whole 70-decision Reg CF corpus, built and value-checked on both
+      # engines. This is deliverable R0's gate — "the execution is the exhibit"
+      # — and its counts are pinned to the LOCALLY MEASURED verdict lines
+      # (2026-08-09), not to round numbers. 22 cases x 70 decisions = 1540:
+      # the base world, the 15 dated cases relocating the rule-date-rebinding
+      # fixtures R12 dropped from the artifact (spec §15.12.1), the 4 seed
+      # cases that close the total-assets and restricted-period leaves the §8
+      # diff oracle reported inert, THE LEAP CASE, and THE ESCHEAT CASE.
+      # Earlier pins on this same artifact read
+      # '21 case(s) ... 1449/1449 ... 315/315' (2026-08-05, while Rule
+      # 501(a)(4) was one ~300-character boolean),
+      # '20 case(s) ... 1340/1340 ... 280/280' (2026-08-03,
+      # while Rule 501(a)'s "one year" was the constant 365),
+      # '16 case(s) ... 1072/1072 ... 224/224' (2026-08-02, before the seeds)
+      # and '1 case(s) ... 67/67' (81ece880); before R12/R13 the file was
+      # VALID 16 error(s) on KIE and PARSE INVALID on Camunda.
+      #
+      # 67 -> 69 and 20 -> 21 on 2026-08-05, when the resale restriction became
+      # a calendar anniversary instead of a flat 365 days. The two decisions are
+      # the anniversary and the deadline computed from it; the case is the one
+      # the constant got WRONG — day 365 of a holding spanning 29 Feb 2024,
+      # which the flat count permitted and the calendar refuses. It is gated
+      # HERE, on engines we do not control, because that is what R0 means.
+      #
+      # The KIE pin includes the service clause on purpose: 315/315 is the
+      # decision-service sweep VALUE-checking every declared outputDecision
+      # (fed its inputDecisions' computed values; 7 services, 15 outputs, per
+      # case), and "0 warning(s)" counts runtime WARNs too since 81ece880 —
+      # both were blind spots before.
+      #
+      # regcf-corpus.cases.json's expect block is SYMMETRIC with the model's
+      # decision population (70/70 both ways, in every case), so a decision
+      # added to the corpus without a pin, or a pin left behind by a dropped
+      # decision, fails here rather than passing silently.
+      # EVERY subject that declares a p7-dmn leg, not one named in this file.
+      #
+      # This step used to name `regcf-corpus.dmn`, `regcf-corpus.cases.json` and
+      # two exact verdict strings inline, which made the engine gate structurally
+      # single-subject: a second subject declaring a p7-dmn leg had nowhere to
+      # put its goldens or its expected verdicts, so it would have been exercised
+      # by nothing and nothing would have said so. The sidecars already carry
+      # every path this needs; the workflow now reads them (`subject.mjs --ci`)
+      # instead of keeping a second copy of the answer under one subject's name.
+      # The verdicts moved to a committed baseline beside each golden, the same
+      # shape etc/bpmn-kie-baseline.txt already uses.
+      #
+      # A subject declaring p7-dmn with no engine_baseline is a FAILURE, not a
+      # skip: declaring the leg is the claim that this corpus is engine-checked,
+      # and a leg exercised by nothing that reports nothing is the exact silence
+      # this pipeline exists to prevent. etc/check-subject-ci-coverage.mjs says
+      # so before the job even builds.
+      - name: Every DMN-declaring subject -- both engines, end to end (R12/R13)
+        env:
+          KIE_CHECK_REQUIRED: "1"
+          KIE_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
+          CAMUNDA_CHECK_REQUIRED: "1"
+          CAMUNDA_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_21_X64 }}
+        run: |
+          set -euo pipefail
+          ran=0
+          while IFS=$'\t' read -r id golden cases baseline; do
+            [ -n "$id" ] || continue
+            echo "::group::$id -- KIE + Camunda over $golden"
+            ran=$((ran + 1))
+
+            ./etc/kie-dmn-check/run.sh "$golden" --cases "$cases" | tee "kie-$id.log"
+            ./etc/camunda-dmn-check/run.sh "$golden" --cases "$cases" | tee "camunda-$id.log"
+
+            # Fixed-substring match, one baseline line at a time, against the
+            # union of both logs -- so a line naming either engine finds its own
+            # output and the file does not have to encode which log is which.
+            cat "kie-$id.log" "camunda-$id.log" > "engines-$id.log"
+            while IFS= read -r want; do
+              case "$want" in ''|'#'*) continue ;; esac
+              grep -qF -- "$want" "engines-$id.log" || {
+                echo "::error::$id: no engine printed the baseline line from $baseline"
+                echo "  expected: $want"
+                exit 1
+              }
+            done < "$baseline"
+            echo "ok $id: every line of $baseline was printed"
+            echo "::endgroup::"
+          done < <(node etc/go/lib/subject.mjs --ci | node -e '
+            let s = "";
+            process.stdin.on("data", (d) => (s += d)).on("end", () => {
+              for (const subj of JSON.parse(s)) {
+                const dmn = subj.legs["p7-dmn"];
+                if (!dmn) continue;
+                process.stdout.write(
+                  [subj.id, dmn.golden, dmn.cases, dmn.engine_baseline].join("\t") + "\n",
+                );
+              }
+            });
+          ')
+          [ "$ran" -gt 0 ] || { echo "::error::no subject declares a p7-dmn leg; this job should not have run"; exit 1; }
+          echo "checked $ran subject(s) against both engines"
+
+      # The LAW-TIME legs (DMN-EXPORT-PROGRAM-MODEL-SPEC.md §15).
+      #
+      # What these add that the reg-cf steps above cannot: the SAME model
+      # answering DIFFERENTLY for different rule dates, driven only by half-open
+      # date intervals on a UNIQUE decision table. Ten rule dates x six
+      # decisions = 60, and seven of the ten exist purely to pin the
+      # closed-low/open-high convention: a day-of/day-before pair on EACH of the
+      # table's three seams, plus a date well before commencement. Straddling
+      # only the newest seam (which an earlier version did) would have let an
+      # off-by-one on the middle interval or on the floor row pass green.
+      #
+      # THE COUNT WAS 70 UNTIL PHASE 5, and shrank for a structural reason, not
+      # because coverage was dropped: `the_rules_in_force_include` emitted as a
+      # <decision> before and emits as a <businessKnowledgeModel> now. A BKM is
+      # INVOKED, not evaluated, so it no longer appears in either engine's
+      # decision tally -- seven decisions per case became six.
+      #
+      # What that costs, stated plainly: nothing here value-checks
+      # `the_rules_in_force_include`'s own result any more. Its correctness now
+      # rides on the decisions that invoke it still matching their expected
+      # values. That is weaker than checking it head-on, and it is an accepted
+      # trade (Meng, 2026-08-02). If it ever needs pinning directly again, give
+      # it a thin wrapper decision rather than reverting the BKM.
+      - name: Law time -- the dated-regime exhibit (KIE + Camunda)
+        env:
+          KIE_CHECK_REQUIRED: "1"
+          KIE_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
+          CAMUNDA_CHECK_REQUIRED: "1"
+          CAMUNDA_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_21_X64 }}
+        run: |
+          set -euo pipefail
+          ./etc/kie-dmn-check/run.sh \
+            jl4/examples/dmn/expected/gst-rate.dmn \
+            --cases jl4/examples/dmn/gst-rate.cases.json | tee kie-gst.log
+          grep -q 'KIE 8.44.0.Final VERDICT: .*0 error(s), 0 warning(s), 60/60 decision(s) SUCCEEDED, 60/60 value(s) as expected' kie-gst.log
+
+          ./etc/camunda-dmn-check/run.sh \
+            jl4/examples/dmn/expected/gst-rate.dmn \
+            --cases jl4/examples/dmn/gst-rate.cases.json | tee camunda-gst.log
+          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT: .*1 parsed, 0 error(s), 60/60 decision(s) evaluated, 60/60 value(s) as expected' camunda-gst.log
+
+      # The DATE-LITERAL leg (spec §15.4.1). Not redundant with the step above:
+      # gst-rate.l4 spells every date `Date d m y`, so nothing there would
+      # notice `YMD y m d` regressing back to raw L4 -- which is what it used to
+      # emit, for the constructor daydate.l4 RECOMMENDS. Eight cases x six
+      # decisions = 48, and the counts are pinned to the LOCALLY MEASURED
+      # verdict lines (2026-08-02).
+      #
+      # Two independent date axes, both fed: `the_application_date` (ordinary
+      # decision-table cells) and `RULES_EFFECTIVE_DATE` (law-time intervals),
+      # moved together in cases A-G to straddle both tables' seams and pulled
+      # apart in case H, so a lowering that confused the two fails there.
+      #
+      # The negative control -- a `YMD` that must NOT fold -- is deliberately
+      # not in this artifact and cannot be: a raw-L4 <literalExpression> makes
+      # zeebe-dmn refuse to parse the whole file. It lives in
+      # jl4/examples/dmn/not-ok/ymd-unfoldable-date.l4 and is asserted from
+      # jl4/tests/DmnExport.hs instead.
+      - name: Law time -- the date-literal exhibit (KIE + Camunda)
+        env:
+          KIE_CHECK_REQUIRED: "1"
+          KIE_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
+          CAMUNDA_CHECK_REQUIRED: "1"
+          CAMUNDA_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_21_X64 }}
+        run: |
+          set -euo pipefail
+          ./etc/kie-dmn-check/run.sh \
+            jl4/examples/dmn/expected/ymd-dates.dmn \
+            --cases jl4/examples/dmn/ymd-dates.cases.json | tee kie-ymd.log
+          grep -q 'KIE 8.44.0.Final VERDICT: 1 file(s), 8 case(s), 0 error(s), 0 warning(s), 48/48 decision(s) SUCCEEDED, 48/48 value(s) as expected, 16/16 service output value(s) as expected' kie-ymd.log
+
+          ./etc/camunda-dmn-check/run.sh \
+            jl4/examples/dmn/expected/ymd-dates.dmn \
+            --cases jl4/examples/dmn/ymd-dates.cases.json | tee camunda-ymd.log
+          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT: 1 file(s), 8 case(s), 1 parsed, 0 error(s), 48/48 decision(s) evaluated, 48/48 value(s) as expected' camunda-ymd.log
+
+      # The hand-written probe PAIR (spec §15.6). Not redundant with the step
+      # above: the emitter cannot produce an <annotationEntry> carrying an @id,
+      # so only a fixture can ask whether Xerces objects to one.
+      #
+      # And the POSITIVE ALONE IS NOT EVIDENCE. A valid file validating is
+      # equally consistent with Xerces ignoring <annotation>/<annotationEntry>
+      # entirely, which is exactly the failure this step claims to exclude. So
+      # the negative sibling runs here too, with `!` on both engines. Same
+      # rationale, and the same construction, as the xsd-order pair below.
+      - name: Law time -- the hand-written date-axis probe (KIE + Camunda)
+        env:
+          KIE_CHECK_REQUIRED: "1"
+          KIE_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
+          CAMUNDA_CHECK_REQUIRED: "1"
+          CAMUNDA_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_21_X64 }}
+        run: |
+          set -euo pipefail
+          probe=jl4/tests-cli/fixtures/dmn-date-probe
+
+          ./etc/kie-dmn-check/run.sh \
+            "$probe/date-axis.dmn" --cases "$probe/date-axis.cases.json" | tee kie-date-probe.log
+          grep -q 'XSD    valid' kie-date-probe.log
+          grep -q 'KIE 8.44.0.Final VERDICT: .*0 error(s), 0 warning(s), 6/6 decision(s) SUCCEEDED, 6/6 value(s) as expected' kie-date-probe.log
+
+          ./etc/camunda-dmn-check/run.sh \
+            "$probe/date-axis.dmn" --cases "$probe/date-axis.cases.json" | tee camunda-date-probe.log
+          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT: .*1 parsed, 0 error(s), 6/6 decision(s) evaluated, 6/6 value(s) as expected' camunda-date-probe.log
+
+          # The NEGATIVE control: the same model with an @id on each
+          # <annotationEntry>. tRuleAnnotation is not a tDMNElement, so the
+          # attribute is schema-invalid and both harnesses must come back red.
+          # `&& rc=0 || rc=$?` is what keeps `set -e` from ending the step on the
+          # very exit code being asserted (same device as the xsd-order pair).
+          ./etc/kie-dmn-check/run.sh \
+            "$probe/date-axis-badannotation.dmn" \
+            --cases "$probe/date-axis.cases.json" > kie-date-negative.log 2>&1 && rc=0 || rc=$?
+          cat kie-date-negative.log
+          if [ "$rc" -eq 0 ]; then
+            echo "::error::the schema gate ACCEPTED an <annotationEntry> carrying an @id"
+            exit 1
+          fi
+          # Not just "exited non-zero": a harness that died before running also
+          # exits non-zero. The banner says it ran; the schema rule says it
+          # failed for the reason this fixture exists.
+          grep -q 'KIE 8.44.0.Final VERDICT' kie-date-negative.log
+          grep -q 'XSD    INVALID' kie-date-negative.log
+          grep -q "cvc-complex-type.3.2.2: Attribute 'id' is not allowed to appear in element 'annotationEntry'" kie-date-negative.log
+          # MEASURED, and the reason the negative earns its keep: Drools BUILDS
+          # the file anyway and answers every case correctly, so the schema leg
+          # is the only thing objecting.
+          grep -q 'BUILD  clean' kie-date-negative.log
+
+          ./etc/camunda-dmn-check/run.sh \
+            "$probe/date-axis-badannotation.dmn" \
+            --cases "$probe/date-axis.cases.json" > camunda-date-negative.log 2>&1 && rc=0 || rc=$?
+          cat camunda-date-negative.log
+          if [ "$rc" -eq 0 ]; then
+            echo "::error::Camunda ACCEPTED an <annotationEntry> carrying an @id"
+            exit 1
+          fi
+          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT' camunda-date-negative.log
+          grep -q 'PARSE  INVALID' camunda-date-negative.log
+
+      # The DATE ARITHMETIC pair (added 2026-08-05). The step above settled date
+      # LITERALS and date COMPARISONS; this one settles date ARITHMETIC, which is
+      # what an anniversary needs and what Reg CF's Rule 501(a) now uses.
+      #
+      # WHAT IS ACTUALLY BEING GATED is an EQUIVALENCE, not a feature: daydate's
+      # `add months`/`add years` CLAMP the day to the target month's last day,
+      # the exporter lowers them to FEEL's `date + duration(...)`, and that is
+      # sound only if FEEL clamps the same way. DMN 1.3's own formula does NOT
+      # clamp -- it preserves the day component, which for 29 February plus one
+      # year names a date that does not exist -- so the spec text and the engines
+      # had to be treated as disagreeing until measured. They clamp, on months
+      # and years alike, and agree with L4 on all six cases. If this goes red the
+      # two lowering arms in jl4-core/src/L4/Dmn/Lower.hs are unsound and the
+      # corpus's exported resale restriction has drifted from its own #ASSERTs.
+      #
+      # THE NEGATIVE IS NOT DECORATION. It is the reason the corpus writes
+      # `add years` rather than rebuilding the date from its components:
+      # `date(2025, 2, 29)` is not a date, and neither engine clamps or rolls it.
+      # Three implementations, three answers -- L4's lenient `Date` rolls to
+      # 1 March, FEEL's `date(y+1,m,d)` is null, FEEL's duration clamps to
+      # 28 February -- which is why the idiom is fixed in the library instead of
+      # left to whoever writes the next anniversary.
+      - name: Date arithmetic -- the clamp equivalence, and its negative (KIE + Camunda)
+        env:
+          KIE_CHECK_REQUIRED: "1"
+          KIE_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
+          CAMUNDA_CHECK_REQUIRED: "1"
+          CAMUNDA_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_21_X64 }}
+        run: |
+          set -euo pipefail
+          arith=jl4/tests-cli/fixtures/dmn-date-arith
+
+          ./etc/kie-dmn-check/run.sh \
+            "$arith/clamp.dmn" --cases "$arith/clamp.cases.json" | tee kie-date-arith.log
+          grep -q 'KIE 8.44.0.Final VERDICT: .*0 error(s), 0 warning(s), 6/6 decision(s) SUCCEEDED, 6/6 value(s) as expected' kie-date-arith.log
+
+          ./etc/camunda-dmn-check/run.sh \
+            "$arith/clamp.dmn" --cases "$arith/clamp.cases.json" | tee camunda-date-arith.log
+          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT: .*1 parsed, 0 error(s), 6/6 decision(s) evaluated, 6/6 value(s) as expected' camunda-date-arith.log
+
+          # The NEGATIVE control, same `&& rc=0 || rc=$?` device as above.
+          ./etc/kie-dmn-check/run.sh \
+            "$arith/reconstruct-refused.dmn" \
+            --cases "$arith/reconstruct-refused.cases.json" > kie-arith-negative.log 2>&1 && rc=0 || rc=$?
+          cat kie-arith-negative.log
+          if [ "$rc" -eq 0 ]; then
+            echo "::error::KIE produced a clamped anniversary from date(y + 1, m, d); the reconstruction refusal no longer holds"
+            exit 1
+          fi
+          grep -q 'KIE 8.44.0.Final VERDICT' kie-arith-negative.log
+          # The CONTROL in the same file must still pass, so the red isolates to
+          # the reconstruction rather than to anything about the fixture.
+          grep -q 'anniv_duration .*SUCCEEDED .*2025-02-28' kie-arith-negative.log
+
+          ./etc/camunda-dmn-check/run.sh \
+            "$arith/reconstruct-refused.dmn" \
+            --cases "$arith/reconstruct-refused.cases.json" > camunda-arith-negative.log 2>&1 && rc=0 || rc=$?
+          cat camunda-arith-negative.log
+          if [ "$rc" -eq 0 ]; then
+            echo "::error::Camunda produced a clamped anniversary from date(y + 1, m, d); the reconstruction refusal no longer holds"
+            exit 1
+          fi
+          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT' camunda-arith-negative.log
+          grep -q 'anniv_duration .*2025-02-28' camunda-arith-negative.log
+
+      # The negative control for the placement rule (DMN-EXPORT-PROGRAM-MODEL-SPEC.md
+      # §4.3, §9). Every other step above asserts that a gate stays GREEN, which
+      # on its own is not evidence that the gate is wired to anything: an
+      # emitter that misordered <itemDefinition> would have sailed through all
+      # of them. The two fixtures hold the same lines and differ only in where
+      # that block sits.
+      #
+      # It is a KIE step because KIE's leg 1 is the Xerces one; the pair is also
+      # measured on Camunda from jl4/tests-cli, which rejects it at parse.
+      - name: XSD sequence-order gate (positive + negative control)
+        env:
+          KIE_CHECK_REQUIRED: "1"
+          KIE_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
+        run: |
+          set -euo pipefail
+          fixtures=jl4/tests-cli/fixtures/dmn-xsd-order
+
+          ./etc/kie-dmn-check/run.sh \
+            "$fixtures/M1-itemdef-before-inputdata.dmn" \
+            --cases "$fixtures/M1-itemdef.cases.json" | tee xsd-order-ok.log
+          grep -q 'KIE 8.44.0.Final VERDICT: .*0 error(s), 0 warning(s), 2/2 decision(s) SUCCEEDED, 2/2 value(s) as expected' xsd-order-ok.log
+
+          # The negative golden MUST come back red. `&& rc=0 || rc=$?` is what
+          # keeps `set -e` from ending the step on the very exit code being
+          # asserted.
+          ./etc/kie-dmn-check/run.sh \
+            "$fixtures/M1-itemdef-after-inputdata.dmn" \
+            --cases "$fixtures/M1-itemdef.cases.json" > xsd-order-bad.log 2>&1 && rc=0 || rc=$?
+          cat xsd-order-bad.log
+          if [ "$rc" -eq 0 ]; then
+            echo "::error::the schema gate ACCEPTED a DMN file whose <itemDefinition> follows its <inputData>"
+            exit 1
+          fi
+          # Not just "exited non-zero": a harness that died before running also
+          # exits non-zero. The banner is what says it ran, and the schema rule
+          # is what says it failed for the reason this fixture exists.
+          grep -q 'KIE 8.44.0.Final VERDICT' xsd-order-bad.log
+          grep -q 'cvc-complex-type.2.4.a' xsd-order-bad.log
+
+      # The engine-INTERSECTION triple (DMN-EXPORT-PROGRAM-MODEL-SPEC.md §6,
+      # measured 2026-07-30). One per-element predicate spelled three ways:
+      # inline in a FEEL quantifier, as a decision table in a boxed-context
+      # entry, and as the same table in a BKM. The measured fact this step
+      # keeps true: KIE takes all three; zeebe-dmn takes the inline and BKM
+      # forms and CANNOT PARSE the boxed-context one, although it is
+      # schema-valid DMN 1.3 — so the only two-engine spelling of an
+      # ANALYZABLE (tabular) per-element predicate is the BKM.
+      #
+      # The negative leg is a deliberate tripwire for engine upgrades: the day
+      # a zeebe-dmn bump learns to parse the boxed-context file, this step
+      # goes red HERE, with the message below. That red is good news — the
+      # engine intersection has widened. Flip the leg to a positive control,
+      # update the fixture's own header and the §6 measured note, and
+      # reconsider whether BKM emission is still the only portable route.
+      - name: Engine-intersection triple (BKM portable; boxed-context pinned unparseable)
+        env:
+          KIE_CHECK_REQUIRED: "1"
+          KIE_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
+          CAMUNDA_CHECK_REQUIRED: "1"
+          CAMUNDA_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_21_X64 }}
+        run: |
+          set -euo pipefail
+          fixtures=jl4/tests-cli/fixtures/dmn-engine-intersection
+
+          # KIE: all three, with warning counts pinned. The boxed-context
+          # file's ONE warning is MISSING_TYPE_REF on the context-bound
+          # function — the validator asking for the type Spouse -> boolean,
+          # which DMN's type language cannot spell. A finding, not noise.
+          ./etc/kie-dmn-check/run.sh \
+            "$fixtures/spouse-inline.dmn" \
+            --cases "$fixtures/spouse.cases.json" | tee kie-inline.log
+          grep -q 'KIE 8.44.0.Final VERDICT: .*0 error(s), 0 warning(s), 5/5 decision(s) SUCCEEDED, 5/5 value(s) as expected' kie-inline.log
+
+          ./etc/kie-dmn-check/run.sh \
+            "$fixtures/spouse-context-table.dmn" \
+            --cases "$fixtures/spouse.cases.json" | tee kie-ctx.log
+          grep -q 'KIE 8.44.0.Final VERDICT: .*0 error(s), 1 warning(s), 5/5 decision(s) SUCCEEDED, 5/5 value(s) as expected' kie-ctx.log
+          grep -q 'MISSING_TYPE_REF' kie-ctx.log
+
+          ./etc/kie-dmn-check/run.sh \
+            "$fixtures/spouse-bkm-table.dmn" \
+            --cases "$fixtures/spouse.cases.json" | tee kie-bkm.log
+          grep -q 'KIE 8.44.0.Final VERDICT: .*0 error(s), 0 warning(s), 5/5 decision(s) SUCCEEDED, 5/5 value(s) as expected' kie-bkm.log
+
+          # Camunda: inline and BKM green...
+          ./etc/camunda-dmn-check/run.sh \
+            "$fixtures/spouse-inline.dmn" \
+            --cases "$fixtures/spouse.cases.json" | tee cam-inline.log
+          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT: .*1 parsed, 0 error(s), 5/5 decision(s) evaluated, 5/5 value(s) as expected' cam-inline.log
+
+          ./etc/camunda-dmn-check/run.sh \
+            "$fixtures/spouse-bkm-table.dmn" \
+            --cases "$fixtures/spouse.cases.json" | tee cam-bkm.log
+          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT: .*1 parsed, 0 error(s), 5/5 decision(s) evaluated, 5/5 value(s) as expected' cam-bkm.log
+
+          # ...and the boxed-context file MUST come back red, at parse, for
+          # the reason this fixture exists. `&& rc=0 || rc=$?` keeps `set -e`
+          # from ending the step on the very exit code being asserted.
+          ./etc/camunda-dmn-check/run.sh \
+            "$fixtures/spouse-context-table.dmn" \
+            --cases "$fixtures/spouse.cases.json" > cam-ctx.log 2>&1 && rc=0 || rc=$?
+          cat cam-ctx.log
+          if [ "$rc" -eq 0 ]; then
+            echo "::error::zeebe-dmn now PARSES a decision table inside a boxed-context entry. This is GOOD NEWS from an engine upgrade, not a regression — the two-engine intersection has widened. Flip this leg to a positive control, update jl4/tests-cli/fixtures/dmn-engine-intersection/spouse-context-table.dmn's header and the DMN-EXPORT-PROGRAM-MODEL-SPEC.md §6 measured note, and reconsider whether BKM emission is still the only portable route to an analyzable per-element predicate."
+            exit 1
+          fi
+          # Not just "exited non-zero": a harness that died before running
+          # also exits non-zero. The banner says it ran; the parse message
+          # says it failed for the pinned reason.
+          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT' cam-ctx.log
+          grep -q 'expected literal expression' cam-ctx.log
+
+      - name: dmn-moddle (DMN 1.3 metamodel)
+        run: npx --yes --package=dmn-moddle node etc/validate-dmn.mjs
+
+      # `!cancelled()` reproduces `actions/cache`'s post-step behaviour exactly,
+      # including its save-on-failure: the ONLY thing this change removes is the
+      # write no run can read.
+      - name: Save the Maven repository
+        uses: actions/cache/save@v5
+        if: ${{ !cancelled() && github.event_name != 'merge_group' && steps.dmn-m2.outputs.cache-hit != 'true' }}
+        with:
+          path: ~/.m2/repository
+          key: ${{ steps.dmn-m2.outputs.cache-primary-key }}
 
   # ============================================
   # WASM Build & Test (only when Haskell changes)
@@ -224,8 +1637,18 @@ jobs:
           wasm32-wasi-ghc --version
           wasm32-wasi-cabal --version
 
-      - name: Cache WASM dependencies
-        uses: actions/cache@v5
+      # Restore/save split so the save can skip merge_group — see "why
+      # merge_group never SAVES a cache in this workflow" in the BPMN job above.
+      # This family was by far the worst offender: 9 gh-readonly-queue entries,
+      # 3.05 GB, 9 of 9 never read once.
+      #
+      # The `~/.ghc-wasm` toolchain cache above is deliberately left as
+      # `actions/cache`: its key is version-only, so a merge_group run restores
+      # the main-scoped entry EXACTLY, and an exact hit makes the post-save a
+      # no-op already. There is nothing to gate.
+      - name: Restore WASM dependencies
+        uses: actions/cache/restore@v5
+        id: wasm-deps
         with:
           path: |
             ~/.ghc-wasm/.cabal/store
@@ -299,6 +1722,236 @@ jobs:
           echo "- **GHC WASM:** ${{ env.GHC_WASM_VERSION }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Binary Size:** ${WASM_SIZE_MB} MB" >> $GITHUB_STEP_SUMMARY
           echo "- **Status:** All tests passed" >> $GITHUB_STEP_SUMMARY
+
+      # `!cancelled()` reproduces `actions/cache`'s post-step behaviour exactly,
+      # including its save-on-failure: the ONLY thing this change removes is the
+      # write no run can read.
+      - name: Save WASM dependencies
+        uses: actions/cache/save@v5
+        if: ${{ !cancelled() && github.event_name != 'merge_group' && steps.wasm-deps.outputs.cache-hit != 'true' }}
+        with:
+          path: |
+            ~/.ghc-wasm/.cabal/store
+            dist-newstyle
+          key: ${{ steps.wasm-deps.outputs.cache-primary-key }}
+
+  # ============================================
+  # TIER 1 — cheap, ALWAYS-ON pure parity-gate unit test (REQUIRED)
+  # No LLVM, no GHC, no service, no npm. Guards gate semantics every PR.
+  # ============================================
+  jl4-mlir-parity-gate-unit:
+    name: jl4-mlir Parity Gate (pure unit)
+    needs: changes
+    if: needs.changes.outputs.mlir == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      # No `cache:` here, but setup-node@v5 caches anyway: `package-manager-cache`
+      # defaults to true and auto-detects npm. That is where most of the 28
+      # `node-cache-*` entries came from. See the long note in the TypeScript job.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24.x"
+          package-manager-cache: ${{ github.event_name != 'merge_group' }}
+      - name: Pure parity-gate classify + verdict semantics
+        run: node jl4-mlir/scripts/parity-gate.test.mjs
+      - name: Other jl4-mlir pure node tests (untested in CI today)
+        run: |
+          set -e
+          for f in jl4-mlir/runtime/*.test.mjs jl4-mlir/scripts/*.test.mjs; do
+            case "$f" in */parity-gate.test.mjs) continue;; esac
+            echo "== $f =="; node "$f"
+          done
+      # Corpus-collapse backstop (ALWAYS enforced, no toolchain). The heavy
+      # differential harness (Tier 2) is continue-on-error until the LLVM/MLIR
+      # + GHC toolchain is proven green, so it does not yet block a PR. This
+      # cheap check catches the corpus-collapse modes that don't need the
+      # toolchain — a fixture deleted/emptied, or a deontic *.cases.json
+      # renamed/dropped/emptied — so the degenerate-vacuous window can't
+      # silently persist while Tier 2 is advisory.
+      - name: Corpus fixtures exist and are non-empty
+        run: |
+          set -e
+          fail=0
+          for f in test datetime-probe list-probe either-probe deontic-sale deontic-seatbelt deontic-breach; do
+            p="jl4-mlir/test/fixtures/$f.l4"
+            if [ ! -s "$p" ]; then echo "MISSING/EMPTY fixture: $p" >&2; fail=1; fi
+          done
+          # datetime-probe.cases.json guards the DATE-arithmetic ABI fix
+          # (date - date, date + n); without it those collapse to skip and the
+          # fix could silently regress.
+          if [ ! -s "jl4-mlir/test/fixtures/datetime-probe.cases.json" ]; then
+            echo "MISSING/EMPTY cases sidecar: jl4-mlir/test/fixtures/datetime-probe.cases.json" >&2; fail=1
+          fi
+          # list-probe.cases.json guards the lambda-lifted-local-helper symbol
+          # collision: every arity-2 `go` in the prelude (sum, product, count,
+          # reverse, ...) once collapsed to ONE body, so `sum` returned the list
+          # LENGTH. Trivial inputs mask it (sum[1,1,1] == count[1,1,1] == 3), so
+          # these cases must keep their branch-separating values.
+          if [ ! -s "jl4-mlir/test/fixtures/list-probe.cases.json" ]; then
+            echo "MISSING/EMPTY cases sidecar: jl4-mlir/test/fixtures/list-probe.cases.json" >&2; fail=1
+          fi
+          # either-probe.cases.json guards the EITHER (LEFT/RIGHT) CONSIDER fix:
+          # EITHER a b is a payload-carrying builtin ADT, not a nullary enum, so
+          # its RIGHT/LEFT constructor patterns used to refuse. The cases cross
+          # LEFT vs RIGHT and use payload values distinct from the 0/1 tag, so a
+          # tag-resolution or slot-0-vs-slot-1 payload regression diverges.
+          if [ ! -s "jl4-mlir/test/fixtures/either-probe.cases.json" ]; then
+            echo "MISSING/EMPTY cases sidecar: jl4-mlir/test/fixtures/either-probe.cases.json" >&2; fail=1
+          fi
+          # desc.{l4,cases.json} guards the bare-head-param fix (enrichParamTypes):
+          # an unannotated DECIDE param defaulted to {"type":"object"} in the
+          # schema and factorial returned 1 for EVERY input. factorial(0)==
+          # factorial(1)==1 masks it, so the 5/6 cases must stay.
+          for p in jl4/examples/ok/desc.l4 jl4/examples/ok/desc.cases.json; do
+            if [ ! -s "$p" ]; then echo "MISSING/EMPTY: $p" >&2; fail=1; fi
+          done
+          # Each deontic fixture MUST keep a non-empty curated cases.json, else
+          # every deontic fn silently degrades to skip-no-cases at harness time.
+          for f in deontic-sale deontic-seatbelt deontic-breach; do
+            p="jl4-mlir/test/fixtures/$f.cases.json"
+            if [ ! -s "$p" ]; then echo "MISSING/EMPTY cases sidecar: $p" >&2; fail=1; continue; fi
+            node -e "const c=require('./$p'); const n=Object.values(c).reduce((a,v)=>a+(Array.isArray(v)?v.length:0),0); if(n<1){console.error('cases sidecar has zero cases: $p');process.exit(1);} console.log('$p: '+n+' curated cases');"
+          done
+          if [ "$fail" != "0" ]; then echo 'corpus-collapse: fixture/sidecar check failed' >&2; exit 1; fi
+
+  # ============================================
+  # TIER 2 — heavy full differential parity harness (BEST-EFFORT first)
+  # Compiles to wasm via LLVM/MLIR, spawns jl4-service, diffs both.
+  # continue-on-error until toolchain + IR compat proven green; then flip to false.
+  # ============================================
+  jl4-mlir-parity-full:
+    name: jl4-mlir Full Parity Harness
+    needs: [changes, jl4-mlir-parity-gate-unit]
+    if: needs.changes.outputs.mlir == 'true'
+    runs-on: ubuntu-24.04
+    continue-on-error: true # flip to false once stable to make required
+    env:
+      LC_ALL: C.UTF-8
+      LANG: C.UTF-8
+      JL4_LIBRARY_PATH: ${{ github.workspace }}/jl4-core/libraries
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: true
+      # --- LLVM/MLIR toolchain (version-pinned; symlinked to unsuffixed names) ---
+      - name: Install LLVM/MLIR + wasm-ld + zip
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl gnupg lsb-release software-properties-common ca-certificates zip
+          curl -fsSL https://apt.llvm.org/llvm.sh -o llvm.sh && chmod +x llvm.sh
+          # LLVM 22 matches the proven dev toolchain: jl4-mlir's README and
+          # FEATURE-PARITY-PLAN document the pass pipeline running unmodified on
+          # Homebrew llvm@22, and the parity harness was confirmed 20/20
+          # byte-identical end-to-end locally on LLVM 22.1.7. Matching the major
+          # version minimises MLIR textual-IR / pass-name drift risk.
+          sudo ./llvm.sh 22
+          sudo apt-get install -y mlir-22-tools libmlir-22-dev lld-22 llvm-22
+          # apt.llvm.org packaging puts some binaries in /usr/bin/<tool>-22 and
+          # others only under /usr/lib/llvm-22/bin/<tool>. Probe both so a
+          # packaging-path change fails LOUD (set -e on a missing tool) rather
+          # than silently degrading to an all-compile-fail run.
+          set -e
+          link() {
+            local tool="$1" dst="$2"
+            for cand in "/usr/bin/$tool-22" "/usr/lib/llvm-22/bin/$tool" "/usr/bin/$tool"; do
+              if [ -x "$cand" ]; then sudo ln -sf "$cand" "$dst"; return 0; fi
+            done
+            echo "ERROR: could not locate $tool for LLVM 22 (checked /usr/bin/$tool-22, /usr/lib/llvm-22/bin/$tool, /usr/bin/$tool)" >&2
+            return 1
+          }
+          link mlir-opt       /usr/local/bin/mlir-opt
+          link mlir-translate /usr/local/bin/mlir-translate
+          link llc            /usr/local/bin/llc
+          link wasm-ld        /usr/local/bin/wasm-ld
+          mlir-opt --version && mlir-translate --version && llc --version && wasm-ld --version
+      # --- GHC / cabal (mirror the haskell job's system deps) ---
+      - name: Install Haskell system deps
+        run: |
+          sudo apt-get install -y build-essential libffi-dev libffi8 libgmp-dev libgmp10 \
+            libncurses-dev pkg-config zlib1g-dev liblzma-dev xz-utils
+      - uses: haskell-actions/setup@v2
+        id: setup
+        with:
+          ghc-version: "9.10.2"
+          cabal-version: "latest"
+          cabal-update: true
+      - name: Update git submodules
+        run: git submodule update --init
+      # KNOWN DEAD, ON EVERY EVENT — measured, left alone deliberately, do not
+      # "fix" it by pattern-matching the Haskell job. Two independent faults:
+      #
+      #  1. `actions/cache` derives a cache VERSION from the paths AND the
+      #     compression method, and matches key+version. The Haskell job runs in
+      #     `container: ubuntu:24.04`, which has no zstd, so it writes
+      #     `cache.tgz`; this job runs on the bare host, which has zstd, so it
+      #     asks for `cache.tzst`. Same key, different version, never a hit. In
+      #     pull_request run 30750827575 the Haskell job restored
+      #     `pr-checks-Linux-ghc-9.10.2-cabal-3.16.1.0-plan-5cc1953c…` at
+      #     13:54:37 while this job, seven seconds earlier, logged `Cache not
+      #     found for input keys: …-cabal-88349c09…, …-cabal-`.
+      #  2. The primary key below omits the `-${cabal-version}-plan-` segment the
+      #     Haskell job saves under, so it could not be an exact hit even at the
+      #     same version.
+      #
+      # Cost: `Build native jl4-mlir + jl4-service` cold-builds every run — 1583 s
+      # on pull_request, 1688 s on merge_group. Installing zstd in the Haskell
+      # container would unify (1) in one line, at the price of re-versioning
+      # every `pr-checks-*` entry at once (one cold rebuild per family as they
+      # re-key). Until 2026-08-09 that also threatened the merge queue's warm
+      # caches; the queue now warms from an artifact, not from any cache (see
+      # the Haskell job's warm-start note), so the re-version is safe for the
+      # queue and this unification is unblocked whenever someone wants the win.
+      - name: Restore cabal store cache
+        uses: actions/cache/restore@v5
+        with:
+          path: ${{ steps.setup.outputs.cabal-store }}
+          key: pr-checks-${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version }}-cabal-${{ hashFiles('**/*.cabal','cabal.project') }}
+          restore-keys: pr-checks-${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version }}-cabal-
+      - name: Restore dist-newstyle cache
+        uses: actions/cache/restore@v5
+        with:
+          path: dist-newstyle
+          key: pr-checks-${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version }}-dist-${{ hashFiles('**/*.hs','**/*.cabal') }}
+          restore-keys: pr-checks-${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version }}-dist-
+      - name: Build native jl4-mlir + jl4-service
+        run: |
+          cabal update
+          cabal build jl4-mlir jl4-service
+      # No `cache:` here, but setup-node@v5 caches anyway: `package-manager-cache`
+      # defaults to true and auto-detects npm. That is where most of the 28
+      # `node-cache-*` entries came from. See the long note in the TypeScript job.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24.x"
+          package-manager-cache: ${{ github.event_name != 'merge_group' }}
+      # --- run the harness with EXPLICIT in-repo corpus (default list is broken) ---
+      - name: Run differential parity harness
+        run: |
+          node jl4-mlir/scripts/parity-harness.mjs \
+            --out jl4-mlir/parity-report \
+            jl4-mlir/test/fixtures/test.l4 \
+            jl4-mlir/test/fixtures/datetime-probe.l4 \
+            jl4-mlir/test/fixtures/list-probe.l4 \
+            jl4-mlir/test/fixtures/either-probe.l4 \
+            jl4/examples/ok/desc.l4 \
+            jl4-mlir/test/fixtures/deontic-sale.l4 \
+            jl4-mlir/test/fixtures/deontic-seatbelt.l4 \
+            jl4-mlir/test/fixtures/deontic-breach.l4
+      - name: Append parity matrix to job summary
+        if: always()
+        run: |
+          if [ -f jl4-mlir/parity-report/parity.txt ]; then
+            { echo '## jl4-mlir Parity Matrix'; echo '```'; cat jl4-mlir/parity-report/parity.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload parity report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jl4-mlir-parity-report
+          path: jl4-mlir/parity-report/
+          if-no-files-found: warn
+          retention-days: 14
 
   # ============================================
   # Nix Flake Check

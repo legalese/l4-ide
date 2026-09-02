@@ -281,13 +281,13 @@ l4EvalDirective source line col directiveType =
       (_env, results) <- EL.execEvalModuleWithEnv evalConfig result.tcdEntityInfo importEnv result.tcdModule
       let conFields = extractConstructorFieldNames result.tcdEntityInfo
           targetPos = MkSrcPos line col
-          matchesPos (EL.MkEvalDirectiveResult rng _ _) = fmap (.start) rng == Just targetPos
+          matchesPos (EL.MkEvalDirectiveResult rng _ _ _) = fmap (.start) rng == Just targetPos
           matchingResult = List.find matchesPos results
       case matchingResult of
         Nothing ->
           pure $ encodeJson $ Aeson.object
             [ "error" .= ("No directive result found at the given position" :: Text) ]
-        Just (EL.MkEvalDirectiveResult mRange res _mtrace) ->
+        Just (EL.MkEvalDirectiveResult mRange res _mtrace _ledger) ->
           -- `range` mirrors the LSP-server shape: 1-indexed SrcPos
           -- objects {line, column}. The WASM eval path never lacks
           -- a range in practice (we matched on it above), but we
@@ -793,7 +793,7 @@ tokenToSemanticType tok = case tok.payload of
   -- Literals
   TLiterals (TIntLit _ _) -> Just 4      -- Numbers (type index 4)
   TLiterals (TRationalLit _ _) -> Just 4 -- Numbers (type index 4)
-  TLiterals (TStringLit _) -> Just 5     -- Strings (type index 5)
+  TLiterals (TStringLit _ _) -> Just 5   -- Strings (type index 5)
   
   -- Operators (type index 6)
   TOperators _ -> Just 6

@@ -1,0 +1,12 @@
+-- Fixture for `l4 export`'s "nothing of that kind here" refusals.
+--
+-- A module of bare DECLAREs typechecks clean but has neither a decision the DMN
+-- exporter could tabulate nor a regulative rule the BPMN exporter could draw.
+-- Both targets must say so and exit non-zero rather than emit an empty
+-- <definitions> that opens as a blank canvas.
+
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+DECLARE Widget
+  HAS colour IS A Colour
+      weight IS A NUMBER

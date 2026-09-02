@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="388" height="245" viewBox="0 0 388 245">
+<rect width="388" height="245" fill="#ffffff"/>
+<rect data-fnid="4" data-value="4" class="lad-box lad-clickable" x="136.0" y="70.0" width="35.8" height="39.6" rx="7" fill="#ffffff" stroke="#777" stroke-width="1.5"/>
+<text data-fnid="4" x="153.9" y="94.8" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#111">a</text>
+<path class="lad-wire lad-clickable" data-fold="3" d="M 110.0,122.6 C 140.0,122.6 106.0,89.8 136.0,89.8" fill="none" stroke="#777" stroke-width="1.5"/>
+<path class="lad-wire lad-clickable" data-fold="3" d="M 171.8,89.8 C 201.8,89.8 167.8,122.6 197.8,122.6" fill="none" stroke="#777" stroke-width="1.5"/>
+<rect data-fnid="5" data-value="5" class="lad-box lad-clickable" x="136.0" y="135.6" width="35.8" height="39.6" rx="7" fill="#ffffff" stroke="#777" stroke-width="1.5"/>
+<text data-fnid="5" x="153.9" y="160.4" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#111">b</text>
+<path class="lad-wire lad-clickable" data-fold="3" d="M 110.0,122.6 C 140.0,122.6 106.0,155.4 136.0,155.4" fill="none" stroke="#777" stroke-width="1.5"/>
+<path class="lad-wire lad-clickable" data-fold="3" d="M 171.8,155.4 C 201.8,155.4 167.8,122.6 197.8,122.6" fill="none" stroke="#777" stroke-width="1.5"/>
+<rect data-fnid="6" data-value="6" class="lad-box lad-clickable" x="241.8" y="102.8" width="35.8" height="39.6" rx="7" fill="#ffffff" stroke="#777" stroke-width="1.5"/>
+<text data-fnid="6" x="259.8" y="127.6" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#111">c</text>
+<polyline class="lad-wire lad-clickable" data-fold="2" points="197.8,122.6 241.8,122.6" fill="none" stroke="#777" stroke-width="1.5"/>
+<polyline class="lad-wire" points="70.0,122.6 110.0,122.6" fill="none" stroke="#222" stroke-width="1.5"/>
+<circle cx="70.0" cy="122.6" r="3.5" fill="#222"/>
+<polyline class="lad-wire" points="277.7,122.6 317.7,122.6" fill="none" stroke="#222" stroke-width="1.5"/>
+<circle cx="317.7" cy="122.6" r="3.5" fill="#222"/>
+</svg>

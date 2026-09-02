@@ -1,0 +1,19 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+temporal-thunk-leak-iterators.l4:29:1-106:
+  JUST OF (DATE OF 1, 1, 2020)
+temporal-thunk-leak-iterators.l4:32:1-23:
+  DATE OF 31, 1, 2025
+temporal-thunk-leak-iterators.l4:46:1-68:
+  JUST OF (DATE OF 10, 1, 2025)
+temporal-thunk-leak-iterators.l4:49:1-23:
+  739646
+temporal-thunk-leak-iterators.l4:63:1-121:
+  JUST OF (DATE OF 15, 6, 2020)
+temporal-thunk-leak-iterators.l4:66:1-23:
+  739646
+temporal-thunk-leak-iterators.l4:77:1-23:
+  739646
+temporal-thunk-leak-iterators.l4:86:1-115:
+  JUST OF (DATE OF 15, 6, 2020)

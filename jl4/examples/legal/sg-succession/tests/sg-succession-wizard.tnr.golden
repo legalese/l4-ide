@@ -1,0 +1,61 @@
+# Singapore succession — the deployable façade
+
+## Building the corpus's records from flat counts
+
+<!-- l4: decide:the -->
+
+**1.** In relation to a NUMBER “howMany” and a STRING “label”, the means replicate with howMany and Person where name is label, survived the deceased is TRUE and issue is EMPTY.
+
+<!-- l4: decide:the -->
+
+**2.** In relation to a NUMBER “howManyStocks” and a NUMBER “childrenPerStock”, the means replicate with howManyStocks and Person where name is a grandchild, survived the deceased is FALSE and issue is the _ survivors called _ with childrenPerStock and a grandchild.
+
+## The question a person actually asks
+
+<!-- l4: declare:Succession answer -->
+
+**3.** In this Act, “Succession answer” means a record consisting of—
+
+    (a) “the law that applies”, being a STRING;
+
+    (b) “what to do next”, being a STRING;
+
+    (c) “the estate at death”, being a NUMBER;
+
+    (d) “left after debts and expenses”, being a NUMBER;
+
+    (e) “divided by this Act”, being a NUMBER;
+
+    (f) “who takes, and how much”, being a list of Share;
+
+    (g) “note”, being a STRING; and
+
+    (h) “the family shape is fully described”, being a BOOLEAN.
+
+<!-- l4: decide:the succession answer -->
+
+**4. export What happens to the estate when someone dies without a will**
+
+In relation to a BOOLEAN “the deceased was Muslim”, a BOOLEAN “the deceased lived in Singapore”, a NUMBER “surviving spouses”, a NUMBER “surviving children”, a NUMBER “children who died first”, a NUMBER “children of each child who died”, a NUMBER “surviving parents”, a NUMBER “surviving brothers and sisters”, a NUMBER “surviving grandparents”, a NUMBER “surviving uncles and aunts”, a NUMBER “value of the home in Singapore”, a NUMBER “value of everything else”, a NUMBER “debts, funeral and legal costs”, a NUMBER “year of death”, a NUMBER “month of death” and a NUMBER “day of death”, the succession answer means Succession answer where the law that applies is the Act governing the distribution in with theCase, what to do next is what happens next in with theCase, the estate at death is gross estate of with theCase, left after debts and expenses is distributable estate of with theCase, divided by this Act is the property this Act distributes in with theCase, who takes, and how much is answer's shares, note is answer's note and the family shape is fully described is shapeIsSimple.
+
+For the purposes of this provision—
+
+“answer” means the intestate distribution for with theCase;
+
+“shapeIsSimple” means children who died first is equal to 0 or children of each child who died is greater than 0;
+
+“theCase” means Case where deceased is Deceased where name is the deceased, date of death is YMD with year of death, month of death and day of death, domiciled in Singapore is the deceased lived in Singapore and Muslim is the deceased was Muslim, family is Family where surviving spouses is the _ survivors called _ with surviving spouses and the spouse, children is append with the _ survivors called _ with surviving children and a child and the _ predeceased children each leaving _ with children who died first and children of each child who died, parents is the _ survivors called _ with surviving parents and a parent, siblings is the _ survivors called _ with surviving brothers and sisters and a brother or sister, grandparents is the _ survivors called _ with surviving grandparents and a grandparent and uncles and aunts is the _ survivors called _ with surviving uncles and aunts and an uncle or aunt, estate is Estate where immovable property in Singapore is value of the home in Singapore, movable property in Singapore is value of everything else, funeral, testamentary and administration expenses is debts, funeral and legal costs and debts and liabilities is 0 and will is NOTHING;
+
+## A boolean decision, so the ladder and query-plan routes are reachable
+
+<!-- l4: decide:the Act decides this estate -->
+
+**5. export Does the Intestate Succession Act decide who inherits**
+
+In relation to a BOOLEAN “the deceased was Muslim” and a BOOLEAN “the deceased left a valid will”, the Act decides this estate if—
+
+    (a) it is not the case that the deceased was Muslim; and
+
+    (b) it is not the case that the deceased left a valid will.
+
+<!-- tnr-coverage: 5 provisions; 0 boolean atoms inlined; 0 directives suppressed -->

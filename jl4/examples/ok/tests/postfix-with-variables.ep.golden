@@ -10,7 +10,7 @@ GIVEN n IS A NUMBER
 n squared MEANS n * n
 
 -- TEST 1: Postfix works with literals (this works)
-test1 MEANS squared
+test1 MEANS 5 squared
 
 #EVAL test1
 -- Expected: 25
@@ -50,7 +50,7 @@ test2_workaround2 MEANS `squared` x2
 -- WORKAROUND 2: Use parentheses around the expression
 test3_workaround MEANS
   LET y BE 5
-  IN squared
+  IN (y) squared
 
 #EVAL test3_workaround
 -- Expected: 25

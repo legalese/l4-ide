@@ -1,0 +1,863 @@
+# Singapore family and succession — whole families, carried through all four Acts
+
+## What this corpus can and cannot say
+
+<!-- l4: declare:What this corpus can say about the distribution of an estate -->
+
+**1.** In this Act, “What this corpus can say about the distribution of an estate” means one of the following—
+
+    (a) “the Intestate Succession Act 1967 governs the distribution, and its rules have been applied”;
+
+    (b) “nothing in the Intestate Succession Act 1967 applies to this estate, and no other Act in this corpus distributes it”;
+
+    (c) “the Intestate Succession Act 1967 applies to the estate but has no effect on these facts”;
+
+    (d) “the deceased was domiciled outside Singapore and left no immovable property here, so section 4(1) sends the distribution of his movable property to the law of his domicile, and no Act in this corpus is that law”;
+
+    (e) “the deceased was domiciled in Singapore and was possessed beneficially of no property situated here, so section 4(1) names the law of Singapore and section 5 reaches no property to distribute”; or
+
+    (f) “the death is not proved to be after 2 June 1967, so section 5 does not reach this estate, and no other Act in this corpus distributes it”.
+
+<!-- l4: decide:what this corpus can say about the distribution of the estate -->
+
+**2.** In relation to a Deceased person “the deceased person”, what this corpus can say about the distribution of the estate means if not this Act applies to the estate with the deceased person then nothing in the Intestate Succession Act 1967 applies to this estate, and no other Act in this corpus distributes it if this Act has effect in respect of the estate with the deceased person then the Intestate Succession Act 1967 governs the distribution, and its rules have been applied if not section 3 — an “intestate” within the meaning of this Act with the deceased person then the Intestate Succession Act 1967 applies to the estate but has no effect on these facts if not section 5 — the person dies intestate after 2 June 1967 with the deceased person then the death is not proved to be after 2 June 1967, so section 5 does not reach this estate, and no other Act in this corpus distributes it if not section 5(a) — domiciled in Singapore and possessed beneficially of property situated in Singapore with the deceased person or section 5(b) — domiciled outside Singapore and possessed beneficially of immovable property situated in Singapore with the deceased person and not section 4(1) — the law of the country of domicile is the law of Singapore with the deceased person then the deceased was domiciled outside Singapore and left no immovable property here, so section 4(1) sends the distribution of his movable property to the law of his domicile, and no Act in this corpus is that law if not section 5(a) — domiciled in Singapore and possessed beneficially of property situated in Singapore with the deceased person or section 5(b) — domiciled outside Singapore and possessed beneficially of immovable property situated in Singapore with the deceased person and section 4(1) — the law of the country of domicile is the law of Singapore with the deceased person then the deceased was domiciled in Singapore and was possessed beneficially of no property situated here, so section 4(1) names the law of Singapore and section 5 reaches no property to distribute otherwise the Intestate Succession Act 1967 applies to the estate but has no effect on these facts.
+
+<!-- l4: decide:the guardians the Guardianship of Infants Act counts, for whom the case file holds a record -->
+
+**3.** In relation to an Infant “the infant concerned in the estate”, the guardians the Guardianship of Infants Act counts, for whom the case file holds a record means filter with given the guardian then elem with the reference for the guardian with the guardian and the persons who are guardians of the infant with the infant concerned in the estate and the infant concerned in the estate's the guardians of the infant.
+
+<!-- l4: decide:the guardians the Guardianship of Infants Act counts, for whom the case file holds no record -->
+
+**4.** In relation to an Infant “the infant concerned in the estate”, the guardians the Guardianship of Infants Act counts, for whom the case file holds no record means filter with given the reference then not elem with the reference and map with the reference for the guardian and the infant concerned in the estate's the guardians of the infant and the persons who are guardians of the infant with the infant concerned in the estate.
+
+<!-- l4: declare:Whether a guardian could give a good discharge for the infant’s share -->
+
+**5.** In this Act, “Whether a guardian could give a good discharge for the infant’s share” means one of the following—
+
+    (a) “a guardian whom the Guardianship of Infants Act counts could give a good discharge for the infant’s share”;
+
+    (b) “no guardian whom the Guardianship of Infants Act counts could give a good discharge for the infant’s share”; or
+
+    (c) “the Guardianship of Infants Act counts as guardian a person for whom the case file records no kind of guardianship, so section 17 cannot be asked about him”.
+
+<!-- l4: decide:whether some guardian of this infant could give a good discharge for the infant’s share -->
+
+**6.** In relation to an Infant “the infant concerned in the estate”, whether some guardian of this infant could give a good discharge for the infant’s share means if any with given the guardian then not section 17 denies the guardian power to give a good discharge with the guardian and the guardians the Guardianship of Infants Act counts, for whom the case file holds a record with the infant concerned in the estate then a guardian whom the Guardianship of Infants Act counts could give a good discharge for the infant’s share if not null with the guardians the Guardianship of Infants Act counts, for whom the case file holds no record with the infant concerned in the estate then the Guardianship of Infants Act counts as guardian a person for whom the case file records no kind of guardianship, so section 17 cannot be asked about him otherwise no guardian whom the Guardianship of Infants Act counts could give a good discharge for the infant’s share.
+
+## Constructors — one record, four Acts
+
+<!-- l4: decide:a person in the case file, in full -->
+
+**7.** In relation to a STRING “the name of the person”, a STRING “the reference”, an optional DATE “when he was born”, an optional DATE “when he attains the age of majority”, a Vital status “whether he is living”, a list of Child “his children”, a BOOLEAN “he is a soldier being in actual military service”, a BOOLEAN “he is a mariner or seaman being at sea”, a BOOLEAN “he is so circumstanced”, a BOOLEAN “he lacks mental capacity”, a BOOLEAN “he is absent from Singapore”, a BOOLEAN “he is willing to act” and a BOOLEAN “he so desires”, a person in the case file, in full means Person where name is the name of the person, the reference for this person is the reference, date of birth is when he was born, vital status is whether he is living, children is his children, at the date of the death only conceived in the womb but subsequently born alive is FALSE, money or other property given, paid or settled by the intestate during his life to or for the advancement of the person is 0, the date on which the person attains the age of majority is when he attains the age of majority, a soldier being in actual military service is he is a soldier being in actual military service, a mariner or seaman being at sea is he is a mariner or seaman being at sea, a member of any naval or marine forces so circumstanced that if he were a soldier he would be in actual military service is he is so circumstanced, so desires that letters of administration be granted to such person as the court thinks fit is he so desires, lacks mental capacity (within the meaning of the Mental Capacity Act 2008) to make decisions with respect to the management and administration of the person's property and affairs is he lacks mental capacity, absent from Singapore is he is absent from Singapore and willing to act is he is willing to act.
+
+<!-- l4: decide:a person in the case file -->
+
+**8.** In relation to a STRING “the name of the person”, a STRING “the reference”, an optional DATE “when he was born”, an optional DATE “when he attains the age of majority”, a Vital status “whether he is living” and a list of Child “his children”, a person in the case file means a person in the case file, in full with the name of the person, the reference, when he was born, when he attains the age of majority, whether he is living, his children, FALSE, FALSE, FALSE, FALSE, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:twenty-one years after -->
+
+**9.** In relation to a DATE “when he was born”, twenty-one years after means JUST with Date with DATE_DAY with when he was born, DATE_MONTH with when he was born and the sum of DATE_YEAR with when he was born and 21.
+
+<!-- l4: decide:a legitimate child in the case file -->
+
+**10.** In relation to a Person “the offspring”, a legitimate child in the case file means Child where the child is the offspring, a legitimate child of the person whose child he is is TRUE and adopted by that person by virtue of an order of court under any written law for the time being in force in Singapore, Malaysia or Brunei Darussalam is FALSE.
+
+<!-- l4: decide:a child in the case file neither legitimate nor adopted -->
+
+**11.** In relation to a Person “the offspring”, a child in the case file neither legitimate nor adopted means Child where the child is the offspring, a legitimate child of the person whose child he is is FALSE and adopted by that person by virtue of an order of court under any written law for the time being in force in Singapore, Malaysia or Brunei Darussalam is FALSE.
+
+<!-- l4: decide:a marriage in the case file -->
+
+**12.** In relation to a Person “the other party”, an optional DATE “when it was solemnised” and a BOOLEAN “it subsists”, a marriage in the case file means Marriage where the spouse is the other party, the date of the solemnisation of the marriage is when it was solemnised and subsisting at the death of the deceased, in the sense of not dissolved or annulled before the death is it subsists.
+
+<!-- l4: decide:a family in the case file -->
+
+**13.** In relation to a list of Marriage “the marriages”, an optional Person “the father” and an optional Person “the mother”, a family in the case file means Family where the marriages of the deceased is the marriages, the father of the deceased is the father, the mother of the deceased is the mother, the brothers and sisters of the deceased is EMPTY, the grandparents of the deceased is EMPTY and the uncles and aunts of the deceased is EMPTY.
+
+<!-- l4: decide:an estate in the case file, with creditors -->
+
+**14.** In relation to a Money “movable property in Singapore”, a Money “immovable property in Singapore”, a Money “the expenses of due administration”, a Money “the debts and liabilities”, a Money “the value beneficially disposed of by the will” and a list of Creditor “the creditors”, an estate in the case file, with creditors means Estate where the value of the movable property situated in Singapore is movable property in Singapore, the value of the immovable property situated in Singapore is immovable property in Singapore, the value of the movable property situated outside Singapore is 0, the value of the immovable property situated outside Singapore is 0, the value of any property which the deceased possessed or was entitled to as trustee and not beneficially, situated in Singapore is 0, the value of any property which the deceased possessed or was entitled to as trustee and not beneficially, situated outside Singapore is 0, the value of any moneys payable by an appointed insurer pursuant to the Dependants’ Protection Insurance Scheme or any other equivalent scheme maintained by the Central Provident Fund Board is 0, the value of the property administered by the Public Trustee is 0, the amount of the funds in court directed to be paid, transferred or delivered to him is 0, the value of land settled previously to the death of the deceased is 0, the trustees of the settlement is EMPTY, the value of the interest in property which at the time of his death is charged with the payment of money is 0, the amount of the charge on that interest is 0, the deceased has by will, deed or other document signified a contrary or other intention is FALSE, the debts and liabilities of the deceased is the debts and liabilities, the funeral, testamentary and administration expenses is the expenses of due administration, the creditors of the deceased is the creditors, fully administered is FALSE and the value of the property beneficially disposed of by the will is the value beneficially disposed of by the will.
+
+<!-- l4: decide:an estate in the case file -->
+
+**15.** In relation to a Money “movable property in Singapore”, a Money “immovable property in Singapore”, a Money “the expenses of due administration”, a Money “the debts and liabilities” and a Money “the value beneficially disposed of by the will”, an estate in the case file means an estate in the case file, with creditors with movable property in Singapore, immovable property in Singapore, the expenses of due administration, the debts and liabilities, the value beneficially disposed of by the will and EMPTY.
+
+<!-- l4: decide:a creditor in the case file -->
+
+**16.** In relation to a Person “the person owed”, a Money “the amount owed” and a BOOLEAN “it is secured”, a creditor in the case file means Creditor where the creditor is an individual with the person owed, the debt is the amount owed, secured is it is secured and residing in Singapore is TRUE.
+
+<!-- l4: decide:a guardian in the case file -->
+
+**17.** In relation to a Person “the appointee”, a STRING “the reference for the infant”, a How the guardian was appointed “how he was appointed”, a Kind of guardianship “of the person or of the property”, an Alone or jointly “alone, or jointly with”, a BOOLEAN “he has been removed by the court”, a BOOLEAN “he purported to give a discharge” and a BOOLEAN “the court has otherwise ordered as to the discharge”, a guardian in the case file means Guardian where the guardian is the appointee, the reference for the infant is the reference for the infant, how the guardian was appointed is how he was appointed, of the person or of the property is of the person or of the property, alone or jointly is alone, or jointly with, refuses to act is FALSE, the mother or father objects to his so acting is FALSE, considers that the mother or father is unfit to have the custody of the infant is FALSE, removed from his guardianship by the court is he has been removed by the court, has given security is TRUE, the court has otherwise ordered as to security is FALSE, has sold, mortgaged, exchanged, or otherwise parted with the possession of any of the movable or immovable property of the infant is FALSE, has leased land belonging to the infant is FALSE, the term of the lease, in years is NOTHING, has the permission of the court to deal with the property of the infant is FALSE, has given a good discharge for a legacy or other capital moneys payable to or receivable by the infant is he purported to give a discharge, the court has otherwise ordered as to giving a good discharge is the court has otherwise ordered as to the discharge, the provision made out of the income of the property of the infant for his maintenance and education is A periodical sum where the sum is 0 and the period is monthly and has the permission of the court to apply a sum exceeding $100 per month is FALSE.
+
+<!-- l4: decide:a guardian in the case file whom the surviving parent objects to -->
+
+**18.** In relation to a Person “the appointee”, a STRING “the reference for the infant”, a How the guardian was appointed “how he was appointed” and a Kind of guardianship “of the person or of the property”, a guardian in the case file whom the surviving parent objects to means Guardian where the guardian is the appointee, the reference for the infant is the reference for the infant, how the guardian was appointed is how he was appointed, of the person or of the property is of the person or of the property, alone or jointly is alone, refuses to act is FALSE, the mother or father objects to his so acting is TRUE, considers that the mother or father is unfit to have the custody of the infant is FALSE, removed from his guardianship by the court is FALSE, has given security is TRUE, the court has otherwise ordered as to security is FALSE, has sold, mortgaged, exchanged, or otherwise parted with the possession of any of the movable or immovable property of the infant is FALSE, has leased land belonging to the infant is FALSE, the term of the lease, in years is NOTHING, has the permission of the court to deal with the property of the infant is FALSE, has given a good discharge for a legacy or other capital moneys payable to or receivable by the infant is FALSE, the court has otherwise ordered as to giving a good discharge is FALSE, the provision made out of the income of the property of the infant for his maintenance and education is A periodical sum where the sum is 0 and the period is monthly and has the permission of the court to apply a sum exceeding $100 per month is FALSE.
+
+<!-- l4: decide:an infant in the case file -->
+
+**19.** In relation to a Person “the child”, an optional Person “the father, if in evidence”, an optional Person “the mother, if in evidence”, a list of Guardian “his guardians” and a Money “the capital of his property”, an infant in the case file means Infant where the infant is the child, the father of the infant is the father, if in evidence, the mother of the infant is the mother, if in evidence, the guardians of the infant is his guardians, some other person has parental rights with respect to him is FALSE, the income of the property of the infant is 0, the capital of the property of the infant is the capital of his property and of an age to express an independent opinion is FALSE.
+
+<!-- l4: decide:a grantee in the case file -->
+
+**20.** In relation to a Person or corporation “the person or corporation”, a Capacity in which the grant is made “the capacity” and an optional STRING “for whose use and benefit”, a grantee in the case file means Grantee where the grantee is the person or corporation, the capacity in which the grant is made is the capacity and the reference for the person for whose use and benefit the grant is made is for whose use and benefit.
+
+<!-- l4: decide:a grant in the case file -->
+
+**21.** In relation to a Kind of grant “what kind”, a list of Grantee “the grantees”, an optional DATE “when it was made” and a Limitation on the grant “the limitation on it”, a grant in the case file means Grant where the kind of grant is what kind, the grantees is the grantees, the date of the grant is when it was made, the limitation is the limitation on it, the court that made the grant is a court within the meaning of these Acts with the General Division of the High Court, the exception subject to which the grant is made is NOTHING, expired by effluxion of time or by the happening of the event or contingency on which it was limited is FALSE, revoked is FALSE, has given such security as is lawfully required to be furnished is TRUE, has been extracted is TRUE, sealed under section 47(1) of the Probate and Administration Act 1934 is FALSE and the date of the sealing is NOTHING.
+
+<!-- l4: decide:a deceased person in the case file, in full -->
+
+**22.** In relation to a Person “the person who died”, a Family “his family”, an Estate “his estate”, an optional Will “his will”, a BOOLEAN “he was a Muslim”, a BOOLEAN “he was domiciled in Singapore”, a list of Grant “the grants” and a list of Infant “the infants concerned in the estate”, a deceased person in the case file, in full means Deceased person where the deceased is the person who died, the family is his family, the estate is his estate, the will is his will, domiciled in Singapore at the time of his death is he was domiciled in Singapore, carried on business or resided in Singapore within 12 months of his death is TRUE, a Muslim is he was a Muslim, the grants made in respect of the estate is the grants, the probate applications made in respect of the estate is EMPTY, a next of kin, creditor or other person has appeared and made out a claim to letters of administration is FALSE and the infants concerned in the estate is the infants concerned in the estate.
+
+<!-- l4: decide:a deceased person in the case file -->
+
+**23.** In relation to a Person “the person who died”, a Family “his family”, an Estate “his estate”, an optional Will “his will”, a BOOLEAN “he was a Muslim”, a list of Grant “the grants” and a list of Infant “the infants concerned in the estate”, a deceased person in the case file means a deceased person in the case file, in full with the person who died, his family, his estate, his will, he was a Muslim, TRUE, the grants and the infants concerned in the estate.
+
+<!-- l4: decide:the Wills Act case of -->
+
+**24.** In relation to a Deceased person “the deceased person” and an A will, with the facts about it that only this Act asks “the will and its further facts”, the Wills Act case of means a case with the deceased person, the will and its further facts, FALSE, NOTHING, FALSE and FALSE.
+
+## Reading the answers — helpers that decide nothing
+
+<!-- l4: decide:the fraction taken by the person whose reference is -->
+
+**25.** In relation to a list of Entitlement “the entitlements” and a STRING “the reference”, the fraction taken by the person whose reference is means sum with map with given the entitlement then the entitlement's the fraction of the property distributable under this Act and filter with given the entitlement then the reference for the person entitled with the entitlement's the person entitled is equal to JUST with the reference and the entitlements.
+
+<!-- l4: decide:the sum taken under the Intestate Succession Act by the person whose reference is -->
+
+**26.** In relation to a Deceased person “the deceased person” and a STRING “the reference”, the sum taken under the Intestate Succession Act by the person whose reference is means the product of the fraction taken by the person whose reference is with the persons entitled to succeed beneficially, and their shares with the deceased person and the reference and the property of which every share under section 7 is a fraction with the deceased person.
+
+## The joins, as expressions
+
+<!-- l4: decide:the capital moneys of this infant that no guardian may give a good discharge for -->
+
+**27.** In relation to a Deceased person “the deceased person” and an Infant “the infant concerned in the estate”, the capital moneys of this infant that no guardian may give a good discharge for means if whether some guardian of this infant could give a good discharge for the infant’s share with the infant concerned in the estate is equal to a guardian whom the Guardianship of Infants Act counts could give a good discharge for the infant’s share, then 0; otherwise, the sum taken under the Intestate Succession Act by the person whose reference is with the deceased person and the infant concerned in the estate's the infant's the reference for this person.
+
+<!-- l4: decide:the Guardianship of Infants Act counts this grantee as a guardian of the infant for whose use the grant is made -->
+
+**28.** In relation to a Deceased person “the deceased person” and a Grantee “the grantee”, the Guardianship of Infants Act counts this grantee as a guardian of the infant for whose use the grant is made means consider the case distinctions of the grantee's the reference for the person for whose use and benefit the grant is made :  when NOTHING has  then FALSE. when JUST has the reference for the infant then any with given the infant then the infant's the infant's the reference for this person is equal to the reference for the infant and any with given the reference for a guardian then _ is the individual whose reference is _ with the grantee's the grantee and the reference for a guardian and the persons who are guardians of the infant with the infant and the deceased person's the infants concerned in the estate.
+
+<!-- l4: decide:the grantees taking as the guardian of the person and property of the infant -->
+
+**29.** In relation to a Grant “the grant”, the grantees taking as the guardian of the person and property of the infant means filter with given the grantee then the grantee's the capacity in which the grant is made is equal to as the guardian of the person and property of the infant and the grant's the grantees.
+
+<!-- l4: declare:Whether section 21(2) and the Guardianship of Infants Act agree about this grant -->
+
+**30.** In this Act, “Whether section 21(2) and the Guardianship of Infants Act agree about this grant” means one of the following—
+
+    (a) “both Acts are satisfied: the Probate Act opens section 21(2) and the Guardianship of Infants Act counts the grantee as a guardian of the infant”;
+
+    (b) “the Probate and Administration Act opens section 21(2) on this grant, and the Guardianship of Infants Act does not count the grantee as a guardian of the infant”;
+
+    (c) “the Guardianship of Infants Act counts the grantee as a guardian of the infant, and the Probate and Administration Act does not open section 21(2) on this grant”; or
+
+    (d) “neither Act is satisfied on this grant”.
+
+<!-- l4: decide:whether section 21(2) and the Guardianship of Infants Act agree about this grant -->
+
+**31.** In relation to a Deceased person “the deceased person”, a Grant “the grant” and a DATE “the date”, whether section 21(2) and the Guardianship of Infants Act agree about this grant means if s 21(2) — letters of administration may be granted to the guardian of the person and property of the infant with the deceased person, the grant and the date and the Guardianship Act counts every grantee taking as guardian then both Acts are satisfied: the Probate Act opens section 21(2) and the Guardianship of Infants Act counts the grantee as a guardian of the infant if s 21(2) — letters of administration may be granted to the guardian of the person and property of the infant with the deceased person, the grant and the date then the Probate and Administration Act opens section 21(2) on this grant, and the Guardianship of Infants Act does not count the grantee as a guardian of the infant if the Guardianship Act counts every grantee taking as guardian then the Guardianship of Infants Act counts the grantee as a guardian of the infant, and the Probate and Administration Act does not open section 21(2) on this grant otherwise neither Act is satisfied on this grant.
+
+For the purposes of this provision—
+
+“the Guardianship Act counts every grantee taking as guardian” means not null with the grantees taking as the guardian of the person and property of the infant with the grant and all with given the grantee then the Guardianship of Infants Act counts this grantee as a guardian of the infant for whose use the grant is made with the deceased person and the grantee and the grantees taking as the guardian of the person and property of the infant with the grant;
+
+<!-- l4: decide:the guardian holds under an appointment made by a parent by will -->
+
+**32.** In relation to a Guardian “the guardian”, the guardian holds under an appointment made by a parent by will means consider the case distinctions of the guardian's how the guardian was appointed :  when appointed by the father by will has  then TRUE. when appointed by the mother by will has  then TRUE. in any other case FALSE.
+
+<!-- l4: decide:every testamentary guardian the Guardianship of Infants Act counts holds under an appointment the Wills Act has made good -->
+
+**33.** In relation to an A case under this Act “the will, put to the Wills Act” and an Infant “the infant concerned in the estate”, every testamentary guardian the Guardianship of Infants Act counts holds under an appointment the Wills Act has made good means all with given the guardian then elem with the reference for the guardian with the guardian and the references for the guardians whose appointment this Act has made good with the will, put to the Wills Act and filter with the guardian holds under an appointment made by a parent by will and the guardians the Guardianship of Infants Act counts, for whom the case file holds a record with the infant concerned in the estate.
+
+<!-- l4: decide:the Wills Act leaves this will operative -->
+
+**34.** In relation to an A case under this Act “the will, put to the Wills Act”, the Wills Act leaves this will operative if—
+
+    (a) any of the following applies—
+
+        (i) the formal validity of the will with the will, put to the Wills Act is equal to valid; or
+
+        (ii) the formal validity of the will with the will, put to the Wills Act is equal to valid, being the will of a soldier being in actual military service, or of a mariner or seaman being at sea, disposing of his personal estate (section 27(1)); and
+
+    (b) s 15 — the will does not have been revoked with the will, put to the Wills Act.
+
+<!-- l4: declare:Whether the case file agrees with the Wills Act about the will -->
+
+**35.** In this Act, “Whether the case file agrees with the Wills Act about the will” means one of the following—
+
+    (a) “the Wills Act leaves this will operative, and the case file holds it”;
+
+    (b) “the Wills Act leaves no operative will, and the case file has struck it out”;
+
+    (c) “the Wills Act leaves no operative will, and the case file still holds it, so the other three Acts answer as though it stood”; or
+
+    (d) “the Wills Act leaves this will operative, and the case file has struck it out, so the other three Acts answer as though there were none”.
+
+<!-- l4: decide:whether the case file agrees with the Wills Act about the will -->
+
+**36.** In relation to a Deceased person “the case file” and an A case under this Act “the will, put to the Wills Act”, whether the case file agrees with the Wills Act about the will means if the Wills Act leaves this will operative with the will, put to the Wills Act and isJust with the case file's the will then the Wills Act leaves this will operative, and the case file holds it if the Wills Act leaves this will operative with the will, put to the Wills Act then the Wills Act leaves this will operative, and the case file has struck it out, so the other three Acts answer as though there were none if isJust with the case file's the will then the Wills Act leaves no operative will, and the case file still holds it, so the other three Acts answer as though it stood otherwise the Wills Act leaves no operative will, and the case file has struck it out.
+
+<!-- l4: decide:the Wills Act has left no operative will and the Intestate Succession Act still reads one -->
+
+**37.** In relation to a Deceased person “the case file” and an A case under this Act “the will, put to the Wills Act”, the Wills Act has left no operative will and the Intestate Succession Act still reads one if—
+
+    (a) it is not the case that the Wills Act leaves this will operative with the will, put to the Wills Act; and
+
+    (b) it is not the case that section 3 — an “intestate” within the meaning of this Act with the case file.
+
+<!-- l4: decide:the Wills Act has left no operative will and the Probate Act still routes to probate -->
+
+**38.** In relation to a Deceased person “the case file” and an A case under this Act “the will, put to the Wills Act”, the Wills Act has left no operative will and the Probate Act still routes to probate if—
+
+    (a) it is not the case that the Wills Act leaves this will operative with the will, put to the Wills Act; and
+
+    (b) s 18(1) — the person does not have died intestate with the case file.
+
+<!-- l4: decide:the further facts, the section 29(5) antecedent taken from the Intestate Succession Act -->
+
+**39.** In relation to a Deceased person “the deceased person”, the further facts, the section 29(5) antecedent taken from the Intestate Succession Act means The further facts on which the grant machinery turns where the administrator is entitled to the whole of the estate after payment of the debts is one person takes the whole of the property distributable under this Act with the deceased person, the Family Court thinks fit to require such security is FALSE, there is danger that the property may be wasted is FALSE, it appears that such appointment would not be a sufficient protection for the estate is FALSE and the Public Trustee has by writing signed by him declared that he undertakes to administer such property is FALSE.
+
+<!-- l4: decide:the two Acts agree whether this person is an infant on this date -->
+
+**40.** In relation to a Person “the person” and a DATE “the date”, the two Acts agree whether this person is an infant on this date means the person is an infant on the date in question with the person and the date is equal to JUST with _ is an infant on _ with the person and the date.
+
+<!-- l4: decide:the two modules agree whether this child is a “child” within the meaning of section 3 -->
+
+**41.** In relation to a Child “the relation”, the two modules agree whether this child is a “child” within the meaning of section 3 means section 3 — a “child” within the meaning of this Act with the relation is equal to a “child” within the meaning of section 3 of the Intestate Succession Act 1967 with the relation.
+
+<!-- l4: decide:the two modules agree about every child of this deceased -->
+
+**42.** In relation to a Deceased person “the deceased person”, the two modules agree about every child of this deceased means all with the two modules agree whether this child is a “child” within the meaning of section 3 and the deceased person's the deceased's children.
+
+# Scenario 1 — the intestacy with an infant child
+
+## Scenario 1 — the people, the estate and the grant
+
+<!-- l4: decide:the day letters of administration are applied for -->
+
+**43.** The day letters of administration are applied for means YMD with 2026, 1 and 15.
+
+<!-- l4: decide:Meera Sivakumar -->
+
+**44.** Meera Sivakumar means a person in the case file with Meera Sivakumar, meera, JUST with YMD with 1968, 7 and 22, twenty-one years after with YMD with 1968, 7 and 22, living and EMPTY.
+
+<!-- l4: decide:Arjun Sivakumar -->
+
+**45.** Arjun Sivakumar means a person in the case file with Arjun Sivakumar, arjun, JUST with YMD with 2000, 4 and 10, twenty-one years after with YMD with 2000, 4 and 10, living and EMPTY.
+
+<!-- l4: decide:Divya Sivakumar -->
+
+**46.** Divya Sivakumar means a person in the case file with Divya Sivakumar, divya, JUST with YMD with 2012, 11 and 2, twenty-one years after with YMD with 2012, 11 and 2, living and EMPTY.
+
+<!-- l4: decide:Sivakumar Ramanathan -->
+
+**47.** Sivakumar Ramanathan means a person in the case file with Sivakumar Ramanathan, sivakumar, JUST with YMD with 1965, 2 and 10, twenty-one years after with YMD with 1965, 2 and 10, died on with YMD with 2025, 3 and 15 and list of a legitimate child in the case file with Arjun Sivakumar and a legitimate child in the case file with Divya Sivakumar.
+
+<!-- l4: decide:Meera, guardian of Divya by virtue of surviving the father -->
+
+**48.** Meera, guardian of Divya by virtue of surviving the father means a guardian in the case file with Meera Sivakumar, divya, guardian by virtue of surviving the other parent, guardian of the person and property of the infant, alone, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:Meera, having purported to discharge Divya’s share -->
+
+**49.** Meera, having purported to discharge Divya’s share means a guardian in the case file with Meera Sivakumar, divya, guardian by virtue of surviving the other parent, guardian of the person and property of the infant, alone, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:Meera, the court having authorised the discharge -->
+
+**50.** Meera, the court having authorised the discharge means a guardian in the case file with Meera Sivakumar, divya, guardian by virtue of surviving the other parent, guardian of the person and property of the infant, alone, FALSE, TRUE and TRUE.
+
+<!-- l4: decide:Meera, since removed from her guardianship by the court -->
+
+**51.** Meera, since removed from her guardianship by the court means a guardian in the case file with Meera Sivakumar, divya, guardian by virtue of surviving the other parent, guardian of the person and property of the infant, alone, TRUE, FALSE and FALSE.
+
+<!-- l4: decide:Divya, an infant concerned in the estate, the mother holding -->
+
+**52.** In relation to a Guardian “the mother’s guardianship”, Divya, an infant concerned in the estate, the mother holding means an infant in the case file with Divya Sivakumar, JUST with Sivakumar Ramanathan, JUST with Meera Sivakumar, list of the mother’s guardianship and 250000.
+
+<!-- l4: decide:the estate of Sivakumar Ramanathan -->
+
+**53.** The estate of Sivakumar Ramanathan means an estate in the case file with 700000, 500000, 200000, 0 and 0.
+
+<!-- l4: decide:the family of Sivakumar Ramanathan -->
+
+**54.** The family of Sivakumar Ramanathan means a family in the case file with list of a marriage in the case file with Meera Sivakumar, JUST with YMD with 1994, 6 and 4 and TRUE, NOTHING and NOTHING.
+
+<!-- l4: decide:the grant to the widow and the son -->
+
+**55.** The grant to the widow and the son means a grant in the case file with letters of administration, list of a grantee in the case file with an individual with Meera Sivakumar, as the guardian of the person and property of the infant and JUST with divya and a grantee in the case file with an individual with Arjun Sivakumar, as administrator and NOTHING, JUST with YMD with 2026, 1 and 15 and limited in some other way with limited until the infant obtains a grant to himself.
+
+<!-- l4: decide:the grant to the widow alone -->
+
+**56.** The grant to the widow alone means a grant in the case file with letters of administration, list of a grantee in the case file with an individual with Meera Sivakumar, as the guardian of the person and property of the infant and JUST with divya, JUST with YMD with 2026, 1 and 15 and limited in some other way with limited until the infant obtains a grant to himself.
+
+<!-- l4: decide:the grant to the son alone -->
+
+**57.** The grant to the son alone means a grant in the case file with letters of administration, list of a grantee in the case file with an individual with Arjun Sivakumar, as administrator and NOTHING, JUST with YMD with 2026, 1 and 15 and not limited.
+
+<!-- l4: decide:the Sivakumar intestacy, with -->
+
+**58.** In relation to a Guardian “the mother’s guardianship” and a list of Grant “the grants”, the Sivakumar intestacy, with means a deceased person in the case file with Sivakumar Ramanathan, the family of Sivakumar Ramanathan, the estate of Sivakumar Ramanathan, NOTHING, FALSE, the grants and list of Divya, an infant concerned in the estate, the mother holding with the mother’s guardianship.
+
+<!-- l4: decide:the Sivakumar intestacy -->
+
+**59.** The Sivakumar intestacy means the Sivakumar intestacy, with with Meera, guardian of Divya by virtue of surviving the father and list of the grant to the widow and the son.
+
+<!-- l4: decide:Divya as an infant concerned in the estate -->
+
+**60.** Divya as an infant concerned in the estate means Divya, an infant concerned in the estate, the mother holding with Meera, guardian of Divya by virtue of surviving the father.
+
+## Scenario 1, step 1 — is there an operative will? (Wills Act 1838)
+
+## Scenario 1, step 2 — who takes, and in what shares? (Intestate Succession Act 1967 s 7)
+
+## Scenario 1, step 3 — who may take the grant? (Probate and Administration Act 1934 ss 6, 18, 21)
+
+## Scenario 1, step 4 — who is the infant's guardian? (Guardianship of Infants Act 1934 ss 6, 10)
+
+<!-- l4: decide:Divya, her mother having been removed from the guardianship -->
+
+**61.** Divya, her mother having been removed from the guardianship means Divya, an infant concerned in the estate, the mother holding with Meera, since removed from her guardianship by the court.
+
+<!-- l4: decide:the Sivakumar intestacy, the widow having been removed from the guardianship -->
+
+**62.** The Sivakumar intestacy, the widow having been removed from the guardianship means the Sivakumar intestacy, with with Meera, since removed from her guardianship by the court and list of the grant to the widow and the son.
+
+<!-- l4: decide:Divya, no Guardian record having been made for her mother -->
+
+**63.** Divya, no Guardian record having been made for her mother means an infant in the case file with Divya Sivakumar, JUST with Sivakumar Ramanathan, JUST with Meera Sivakumar, EMPTY and 250000.
+
+<!-- l4: decide:the Sivakumar intestacy, no record having been made for the widow -->
+
+**64.** The Sivakumar intestacy, no record having been made for the widow means a deceased person in the case file with Sivakumar Ramanathan, the family of Sivakumar Ramanathan, the estate of Sivakumar Ramanathan, NOTHING, FALSE, list of the grant to the widow and the son and list of Divya, no Guardian record having been made for her mother.
+
+<!-- l4: decide:Rajan Ramanathan -->
+
+**65.** Rajan Ramanathan means a person in the case file with Rajan Ramanathan, rajan, JUST with YMD with 1970, 5 and 5, twenty-one years after with YMD with 1970, 5 and 5, living and EMPTY.
+
+<!-- l4: decide:Rajan, appointed guardian of Divya by her father’s will, the widow objecting -->
+
+**66.** Rajan, appointed guardian of Divya by her father’s will, the widow objecting means a guardian in the case file whom the surviving parent objects to with Rajan Ramanathan, divya, appointed by the father by will and guardian of the person and property of the infant.
+
+<!-- l4: decide:Divya, her uncle appointed by the will and her mother objecting -->
+
+**67.** Divya, her uncle appointed by the will and her mother objecting means an infant in the case file with Divya Sivakumar, JUST with Sivakumar Ramanathan, JUST with Meera Sivakumar, list of Meera, guardian of Divya by virtue of surviving the father and Rajan, appointed guardian of Divya by her father’s will, the widow objecting and 250000.
+
+<!-- l4: decide:the grant to the uncle as guardian -->
+
+**68.** The grant to the uncle as guardian means a grant in the case file with letters of administration, list of a grantee in the case file with an individual with Rajan Ramanathan, as the guardian of the person and property of the infant and JUST with divya, JUST with YMD with 2026, 1 and 15 and limited in some other way with limited until the infant obtains a grant to himself.
+
+<!-- l4: decide:the Sivakumar intestacy, the uncle appointed and the widow objecting -->
+
+**69.** The Sivakumar intestacy, the uncle appointed and the widow objecting means a deceased person in the case file with Sivakumar Ramanathan, the family of Sivakumar Ramanathan, the estate of Sivakumar Ramanathan, NOTHING, FALSE, list of the grant to the uncle as guardian and list of Divya, her uncle appointed by the will and her mother objecting.
+
+## Scenario 1, step 5 — can the guardian give a good discharge? (Guardianship of Infants Act 1934 s 17)
+
+<!-- l4: decide:Divya, the court having authorised the discharge -->
+
+**70.** Divya, the court having authorised the discharge means Divya, an infant concerned in the estate, the mother holding with Meera, the court having authorised the discharge.
+
+<!-- l4: decide:Meera, removed by the court, the court having authorised a discharge -->
+
+**71.** Meera, removed by the court, the court having authorised a discharge means a guardian in the case file with Meera Sivakumar, divya, guardian by virtue of surviving the other parent, guardian of the person and property of the infant, alone, TRUE, FALSE and TRUE.
+
+<!-- l4: decide:Divya, her mother removed but authorised to discharge -->
+
+**72.** Divya, her mother removed but authorised to discharge means Divya, an infant concerned in the estate, the mother holding with Meera, removed by the court, the court having authorised a discharge.
+
+<!-- l4: decide:the Sivakumar intestacy, the court having authorised the discharge -->
+
+**73.** The Sivakumar intestacy, the court having authorised the discharge means the Sivakumar intestacy, with with Meera, the court having authorised the discharge and list of the grant to the widow and the son.
+
+# Scenario 2 — the will that fails, and what takes over
+
+## Scenario 2A — a will bad for want of execution (Wills Act 1838 s 6)
+
+<!-- l4: decide:Anthony Alphonso -->
+
+**74.** Anthony Alphonso means a person in the case file with Anthony Alphonso, anthony, JUST with YMD with 1955, 3 and 12, twenty-one years after with YMD with 1955, 3 and 12, living and EMPTY.
+
+<!-- l4: decide:Marianne Alphonso -->
+
+**75.** Marianne Alphonso means a person in the case file with Marianne Alphonso, marianne, JUST with YMD with 1985, 8 and 1, twenty-one years after with YMD with 1985, 8 and 1, living and EMPTY.
+
+<!-- l4: decide:Josephine Alphonso -->
+
+**76.** Josephine Alphonso means a person in the case file with Josephine Alphonso, josephine, JUST with YMD with 1988, 2 and 14, twenty-one years after with YMD with 1988, 2 and 14, living and EMPTY.
+
+<!-- l4: decide:Chiam Lai Fong -->
+
+**77.** Chiam Lai Fong means a person in the case file with Chiam Lai Fong, laifong, JUST with YMD with 1958, 1 and 30, twenty-one years after with YMD with 1958, 1 and 30, died on with YMD with 2024, 9 and 4 and list of a legitimate child in the case file with Marianne Alphonso and a legitimate child in the case file with Josephine Alphonso.
+
+<!-- l4: decide:the will of Chiam Lai Fong, the signature never acknowledged before the witnesses -->
+
+**78.** The will of Chiam Lai Fong, the signature never acknowledged before the witnesses means a will, in full with Chiam Lai Fong, JUST with YMD with 2015, 5 and 20, TRUE, TRUE, FALSE, FALSE, list of an attesting witness with Marianne Alphonso, TRUE, FALSE, FALSE, FALSE and FALSE and an attesting witness with Josephine Alphonso, TRUE, FALSE, FALSE, FALSE and FALSE, list of a gift with Marianne Alphonso, a residuary gift, 800000, TRUE and TRUE, EMPTY, FALSE, NOTHING, FALSE, FALSE, TRUE and list of an executor appointed by the will with Anthony Alphonso.
+
+<!-- l4: decide:the family of Chiam Lai Fong -->
+
+**79.** The family of Chiam Lai Fong means a family in the case file with list of a marriage in the case file with Anthony Alphonso, JUST with YMD with 1983, 12 and 3 and TRUE, NOTHING and NOTHING.
+
+<!-- l4: decide:the estate of Chiam Lai Fong, the will counted -->
+
+**80.** The estate of Chiam Lai Fong, the will counted means an estate in the case file with 800000, 0, 0, 0 and 800000.
+
+<!-- l4: decide:the estate of Chiam Lai Fong, the will disregarded -->
+
+**81.** The estate of Chiam Lai Fong, the will disregarded means an estate in the case file with 800000, 0, 0, 0 and 0.
+
+<!-- l4: decide:the Chiam estate, the will in the record -->
+
+**82.** The Chiam estate, the will in the record means a deceased person in the case file with Chiam Lai Fong, the family of Chiam Lai Fong, the estate of Chiam Lai Fong, the will counted, JUST with the will of Chiam Lai Fong, the signature never acknowledged before the witnesses, FALSE, EMPTY and EMPTY.
+
+<!-- l4: decide:the Chiam estate, the will struck out -->
+
+**83.** The Chiam estate, the will struck out means a deceased person in the case file with Chiam Lai Fong, the family of Chiam Lai Fong, the estate of Chiam Lai Fong, the will disregarded, NOTHING, FALSE, EMPTY and EMPTY.
+
+<!-- l4: decide:the Chiam will, put to the Wills Act -->
+
+**84.** The Chiam will, put to the Wills Act means the Wills Act case of with the Chiam estate, the will in the record and the plain facts about with the will of Chiam Lai Fong, the signature never acknowledged before the witnesses.
+
+## Scenario 2B — a will revoked by marriage (Wills Act 1838 s 13)
+
+<!-- l4: decide:Carmen Pereira -->
+
+**85.** Carmen Pereira means a person in the case file with Carmen Pereira, carmen, JUST with YMD with 1975, 9 and 9, twenty-one years after with YMD with 1975, 9 and 9, living and EMPTY.
+
+<!-- l4: decide:Vanessa Pereira -->
+
+**86.** Vanessa Pereira means a person in the case file with Vanessa Pereira, vanessa, JUST with YMD with 1998, 4 and 17, twenty-one years after with YMD with 1998, 4 and 17, living and EMPTY.
+
+<!-- l4: decide:Lucas Pereira -->
+
+**87.** Lucas Pereira means a person in the case file with Lucas Pereira, lucas, JUST with YMD with 1970, 6 and 15, twenty-one years after with YMD with 1970, 6 and 15, died on with YMD with 2025, 2 and 20 and list of a legitimate child in the case file with Vanessa Pereira.
+
+<!-- l4: decide:the will of Lucas Pereira, made in 2012 -->
+
+**88.** The will of Lucas Pereira, made in 2012 means a will, in full with Lucas Pereira, JUST with YMD with 2012, 3 and 8, TRUE, TRUE, FALSE, TRUE, list of an attesting witness with Marianne Alphonso, TRUE, FALSE, FALSE, FALSE and FALSE and an attesting witness with Josephine Alphonso, TRUE, FALSE, FALSE, FALSE and FALSE, list of a gift with Vanessa Pereira, a residuary gift, 600000, TRUE and TRUE, EMPTY, FALSE, NOTHING, FALSE, FALSE, TRUE and EMPTY.
+
+<!-- l4: decide:the family of Lucas Pereira, having married Carmen in 2018 -->
+
+**89.** The family of Lucas Pereira, having married Carmen in 2018 means a family in the case file with list of a marriage in the case file with Carmen Pereira, JUST with YMD with 2018, 11 and 11 and TRUE, NOTHING and NOTHING.
+
+<!-- l4: decide:the family of Lucas Pereira, having married Carmen in 2009 -->
+
+**90.** The family of Lucas Pereira, having married Carmen in 2009 means a family in the case file with list of a marriage in the case file with Carmen Pereira, JUST with YMD with 2009, 1 and 5 and TRUE, NOTHING and NOTHING.
+
+<!-- l4: decide:the estate of Lucas Pereira, the will counted -->
+
+**91.** The estate of Lucas Pereira, the will counted means an estate in the case file with 600000, 0, 0, 0 and 600000.
+
+<!-- l4: decide:the estate of Lucas Pereira, the will disregarded -->
+
+**92.** The estate of Lucas Pereira, the will disregarded means an estate in the case file with 600000, 0, 0, 0 and 0.
+
+<!-- l4: decide:the Pereira estate, the will in the record -->
+
+**93.** The Pereira estate, the will in the record means a deceased person in the case file with Lucas Pereira, the family of Lucas Pereira, having married Carmen in 2018, the estate of Lucas Pereira, the will counted, JUST with the will of Lucas Pereira, made in 2012, FALSE, EMPTY and EMPTY.
+
+<!-- l4: decide:the Pereira estate, the will struck out -->
+
+**94.** The Pereira estate, the will struck out means a deceased person in the case file with Lucas Pereira, the family of Lucas Pereira, having married Carmen in 2018, the estate of Lucas Pereira, the will disregarded, NOTHING, FALSE, EMPTY and EMPTY.
+
+<!-- l4: decide:the Pereira estate, the marriage having preceded the will -->
+
+**95.** The Pereira estate, the marriage having preceded the will means a deceased person in the case file with Lucas Pereira, the family of Lucas Pereira, having married Carmen in 2009, the estate of Lucas Pereira, the will counted, JUST with the will of Lucas Pereira, made in 2012, FALSE, EMPTY and EMPTY.
+
+<!-- l4: decide:the Pereira will, put to the Wills Act -->
+
+**96.** The Pereira will, put to the Wills Act means the Wills Act case of with the Pereira estate, the will in the record and the plain facts about with the will of Lucas Pereira, made in 2012.
+
+<!-- l4: decide:the Pereira will, the marriage having preceded it, put to the Wills Act -->
+
+**97.** The Pereira will, the marriage having preceded it, put to the Wills Act means the Wills Act case of with the Pereira estate, the marriage having preceded the will and the plain facts about with the will of Lucas Pereira, made in 2012.
+
+# Scenario 3 — the privileged will that appoints a guardian
+
+## Scenario 3 — the soldier, his son, and the two appointments
+
+<!-- l4: decide:Adam Iskandar -->
+
+**98.** Adam Iskandar means a person in the case file with Adam Iskandar, adam, JUST with YMD with 2024, 2 and 20, twenty-one years after with YMD with 2024, 2 and 20, living and EMPTY.
+
+<!-- l4: decide:Zarina Iskandar -->
+
+**99.** Zarina Iskandar means a person in the case file with Zarina Iskandar, zarina, JUST with YMD with 1996, 5 and 5, twenty-one years after with YMD with 1996, 5 and 5, living and EMPTY.
+
+<!-- l4: decide:Nadhirah Kamarudin -->
+
+**100.** Nadhirah Kamarudin means a person in the case file with Nadhirah Kamarudin, nadhirah, JUST with YMD with 1990, 10 and 10, twenty-one years after with YMD with 1990, 10 and 10, living and EMPTY.
+
+<!-- l4: decide:Aisyah Kamarudin -->
+
+**101.** Aisyah Kamarudin means a person in the case file with Aisyah Kamarudin, aisyah, JUST with YMD with 2004, 7 and 1, twenty-one years after with YMD with 2004, 7 and 1, living and list of a legitimate child in the case file with Adam Iskandar.
+
+<!-- l4: decide:Aisyah Kamarudin, having died after the father -->
+
+**102.** Aisyah Kamarudin, having died after the father means a person in the case file with Aisyah Kamarudin, aisyah, JUST with YMD with 2004, 7 and 1, twenty-one years after with YMD with 2004, 7 and 1, died on with YMD with 2025, 12 and 1 and list of a legitimate child in the case file with Adam Iskandar.
+
+<!-- l4: decide:Danial Iskandar -->
+
+**103.** Danial Iskandar means a person in the case file, in full with Danial Iskandar, danial, JUST with YMD with 2005, 10 and 3, twenty-one years after with YMD with 2005, 10 and 3, died on with YMD with 2025, 6 and 10, list of a legitimate child in the case file with Adam Iskandar, TRUE, FALSE, FALSE, FALSE, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:Zarina, appointed guardian of Adam by his father’s will -->
+
+**104.** Zarina, appointed guardian of Adam by his father’s will means a guardian in the case file with Zarina Iskandar, adam, appointed by the father by will, guardian of the person and property of the infant, alone, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:Nadhirah, appointed guardian of Adam by his mother’s will -->
+
+**105.** Nadhirah, appointed guardian of Adam by his mother’s will means a guardian in the case file with Nadhirah Kamarudin, adam, appointed by the mother by will, guardian of the person and property of the infant, alone, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:the will of Danial Iskandar, written on operations -->
+
+**106.** The will of Danial Iskandar, written on operations means a will, in full with Danial Iskandar, JUST with YMD with 2025, 1 and 15, TRUE, TRUE, FALSE, FALSE, EMPTY, list of a gift with Adam Iskandar, a residuary gift, 40000, TRUE and TRUE, list of Zarina, appointed guardian of Adam by his father’s will, FALSE, NOTHING, FALSE, FALSE, TRUE and EMPTY.
+
+<!-- l4: decide:Adam, an infant concerned in his father’s estate -->
+
+**107.** In relation to an optional Person “the mother” and a list of Guardian “the guardians of Adam”, Adam, an infant concerned in his father’s estate means an infant in the case file with Adam Iskandar, JUST with Danial Iskandar, the mother, the guardians of Adam and 40000.
+
+<!-- l4: decide:the estate of Danial Iskandar -->
+
+**108.** The estate of Danial Iskandar means an estate in the case file with 40000, 0, 0, 0 and 40000.
+
+<!-- l4: decide:the family of Danial Iskandar -->
+
+**109.** The family of Danial Iskandar means a family in the case file with EMPTY, NOTHING and NOTHING.
+
+<!-- l4: decide:the Iskandar estate -->
+
+**110.** The Iskandar estate means a deceased person in the case file with Danial Iskandar, the family of Danial Iskandar, the estate of Danial Iskandar, JUST with the will of Danial Iskandar, written on operations, FALSE, EMPTY and list of Adam, an infant concerned in his father’s estate with JUST with Aisyah Kamarudin and list of Zarina, appointed guardian of Adam by his father’s will.
+
+<!-- l4: decide:the Iskandar will, put to the Wills Act -->
+
+**111.** The Iskandar will, put to the Wills Act means the Wills Act case of with the Iskandar estate and the facts about a will with the will of Danial Iskandar, written on operations, no conformity to any law outside this Act, not revoked in any of those ways, no revival, FALSE, FALSE, FALSE, FALSE and TRUE.
+
+## Scenario 3, step 1 — the Wills Act saves the will and the appointment
+
+## Scenario 3, step 2 — what the Guardianship of Infants Act does with the appointment
+
+<!-- l4: decide:Adam, his mother surviving -->
+
+**112.** Adam, his mother surviving means Adam, an infant concerned in his father’s estate with JUST with Aisyah Kamarudin and list of Zarina, appointed guardian of Adam by his father’s will.
+
+<!-- l4: decide:Adam, both parents dead, each having appointed a guardian -->
+
+**113.** Adam, both parents dead, each having appointed a guardian means Adam, an infant concerned in his father’s estate with JUST with Aisyah Kamarudin, having died after the father and list of Zarina, appointed guardian of Adam by his father’s will and Nadhirah, appointed guardian of Adam by his mother’s will.
+
+## Scenario 3, step 3 — the Wills Act's verdict, put to the Guardianship Act
+
+<!-- l4: decide:Danial Iskandar, had he not been a soldier -->
+
+**114.** Danial Iskandar, had he not been a soldier means a person in the case file with Danial Iskandar, danial, JUST with YMD with 2005, 10 and 3, twenty-one years after with YMD with 2005, 10 and 3, died on with YMD with 2025, 6 and 10 and list of a legitimate child in the case file with Adam Iskandar.
+
+<!-- l4: decide:the will of Danial Iskandar, had he not been a soldier -->
+
+**115.** The will of Danial Iskandar, had he not been a soldier means a will, in full with Danial Iskandar, had he not been a soldier, JUST with YMD with 2025, 1 and 15, TRUE, TRUE, FALSE, FALSE, EMPTY, list of a gift with Adam Iskandar, a residuary gift, 40000, TRUE and TRUE, list of Zarina, appointed guardian of Adam by his father’s will, FALSE, NOTHING, FALSE, FALSE, TRUE and EMPTY.
+
+<!-- l4: decide:Adam, his mother surviving, his father not having been a soldier -->
+
+**116.** Adam, his mother surviving, his father not having been a soldier means an infant in the case file with Adam Iskandar, JUST with Danial Iskandar, had he not been a soldier, JUST with Aisyah Kamarudin, list of Zarina, appointed guardian of Adam by his father’s will and 40000.
+
+<!-- l4: decide:the Iskandar estate, he not having been a soldier -->
+
+**117.** The Iskandar estate, he not having been a soldier means a deceased person in the case file with Danial Iskandar, had he not been a soldier, the family of Danial Iskandar, the estate of Danial Iskandar, JUST with the will of Danial Iskandar, had he not been a soldier, FALSE, EMPTY and list of Adam, his mother surviving, his father not having been a soldier.
+
+<!-- l4: decide:the Iskandar will, he not having been a soldier, put to the Wills Act -->
+
+**118.** The Iskandar will, he not having been a soldier, put to the Wills Act means the Wills Act case of with the Iskandar estate, he not having been a soldier and the facts about a will with the will of Danial Iskandar, had he not been a soldier, no conformity to any law outside this Act, not revoked in any of those ways, no revival, FALSE, FALSE, FALSE, FALSE and TRUE.
+
+## Scenario 3, step 4 — the guardian the Act names and the file cannot describe
+
+<!-- l4: decide:Danial Iskandar, in the counterfactual in which he lived -->
+
+**119.** Danial Iskandar, in the counterfactual in which he lived means a person in the case file with Danial Iskandar, danial, JUST with YMD with 2005, 10 and 3, twenty-one years after with YMD with 2005, 10 and 3, living and list of a legitimate child in the case file with Adam Iskandar.
+
+<!-- l4: decide:Zarina, appointed by a living father, the court having authorised a discharge -->
+
+**120.** Zarina, appointed by a living father, the court having authorised a discharge means a guardian in the case file with Zarina Iskandar, adam, appointed by the father by will, guardian of the person and property of the infant, alone, FALSE, FALSE and TRUE.
+
+<!-- l4: decide:Adam, his father living and the appointment by will already made -->
+
+**121.** Adam, his father living and the appointment by will already made means an infant in the case file with Adam Iskandar, JUST with Danial Iskandar, in the counterfactual in which he lived, JUST with Aisyah Kamarudin, list of Zarina, appointed by a living father, the court having authorised a discharge and 40000.
+
+# Scenario 4 — the Muslim estate: where the corpus must stop
+
+## Scenario 4 — the family, and the four answers
+
+<!-- l4: decide:Rohani Sulaiman -->
+
+**122.** Rohani Sulaiman means a person in the case file with Rohani Sulaiman, rohani, JUST with YMD with 1980, 4 and 4, twenty-one years after with YMD with 1980, 4 and 4, living and EMPTY.
+
+<!-- l4: decide:Hafiz Faizal -->
+
+**123.** Hafiz Faizal means a person in the case file with Hafiz Faizal, hafiz, JUST with YMD with 2001, 3 and 3, twenty-one years after with YMD with 2001, 3 and 3, living and EMPTY.
+
+<!-- l4: decide:Sofea Faizal -->
+
+**124.** Sofea Faizal means a person in the case file with Sofea Faizal, sofea, JUST with YMD with 2010, 12 and 12, twenty-one years after with YMD with 2010, 12 and 12, living and EMPTY.
+
+<!-- l4: decide:Muhammad Faizal -->
+
+**125.** Muhammad Faizal means a person in the case file with Muhammad Faizal, faizal, JUST with YMD with 1978, 1 and 1, twenty-one years after with YMD with 1978, 1 and 1, died on with YMD with 2025, 8 and 2 and list of a legitimate child in the case file with Hafiz Faizal and a legitimate child in the case file with Sofea Faizal.
+
+<!-- l4: decide:Rohani, guardian of Sofea by virtue of surviving the father -->
+
+**126.** Rohani, guardian of Sofea by virtue of surviving the father means a guardian in the case file with Rohani Sulaiman, sofea, guardian by virtue of surviving the other parent, guardian of the person and property of the infant, alone, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:Sofea, an infant concerned in the estate -->
+
+**127.** Sofea, an infant concerned in the estate means an infant in the case file with Sofea Faizal, JUST with Muhammad Faizal, JUST with Rohani Sulaiman, list of Rohani, guardian of Sofea by virtue of surviving the father and 0.
+
+<!-- l4: decide:the family of Muhammad Faizal -->
+
+**128.** The family of Muhammad Faizal means a family in the case file with list of a marriage in the case file with Rohani Sulaiman, JUST with YMD with 1999, 8 and 8 and TRUE, NOTHING and NOTHING.
+
+<!-- l4: decide:the estate of Muhammad Faizal -->
+
+**129.** The estate of Muhammad Faizal means an estate in the case file with 900000, 0, 0, 0 and 0.
+
+<!-- l4: decide:the Faizal estate -->
+
+**130.** The Faizal estate means a deceased person in the case file with Muhammad Faizal, the family of Muhammad Faizal, the estate of Muhammad Faizal, NOTHING, TRUE, EMPTY and list of Sofea, an infant concerned in the estate.
+
+<!-- l4: decide:the Faizal estate, the deceased not being a Muslim -->
+
+**131.** The Faizal estate, the deceased not being a Muslim means a deceased person in the case file with Muhammad Faizal, the family of Muhammad Faizal, the estate of Muhammad Faizal, NOTHING, FALSE, EMPTY and list of Sofea, an infant concerned in the estate.
+
+<!-- l4: decide:the will of Muhammad Faizal -->
+
+**132.** The will of Muhammad Faizal means a will, in full with Muhammad Faizal, JUST with YMD with 2020, 5 and 5, TRUE, TRUE, FALSE, TRUE, list of an attesting witness with Marianne Alphonso, TRUE, FALSE, FALSE, FALSE and FALSE and an attesting witness with Josephine Alphonso, TRUE, FALSE, FALSE, FALSE and FALSE, list of a gift with Hafiz Faizal, a residuary gift, 900000, TRUE and TRUE, EMPTY, FALSE, NOTHING, FALSE, FALSE, TRUE and EMPTY.
+
+<!-- l4: decide:the Faizal estate, a will having been left -->
+
+**133.** The Faizal estate, a will having been left means a deceased person in the case file with Muhammad Faizal, the family of Muhammad Faizal, an estate in the case file with 900000, 0, 0, 0 and 900000, JUST with the will of Muhammad Faizal, TRUE, EMPTY and list of Sofea, an infant concerned in the estate.
+
+<!-- l4: decide:the Faizal will, put to the Wills Act -->
+
+**134.** The Faizal will, put to the Wills Act means the Wills Act case of with the Faizal estate, a will having been left and the plain facts about with the will of Muhammad Faizal.
+
+## Scenario 4B — the two other stops, which the Intestate Succession Act states itself
+
+<!-- l4: decide:Chandran Nair -->
+
+**135.** Chandran Nair means a person in the case file with Chandran Nair, chandran, JUST with YMD with 1955, 6 and 6, twenty-one years after with YMD with 1955, 6 and 6, died on with YMD with 2025, 7 and 7 and list of a legitimate child in the case file with Kiran Devan.
+
+<!-- l4: decide:the Nair estate, domiciled in Malaysia with only movables here -->
+
+**136.** The Nair estate, domiciled in Malaysia with only movables here means a deceased person in the case file, in full with Chandran Nair, a family in the case file with EMPTY, NOTHING and NOTHING, an estate in the case file with 700000, 0, 0, 0 and 0, NOTHING, FALSE, FALSE, EMPTY and EMPTY.
+
+<!-- l4: decide:the Nair estate, domiciled in Malaysia with land here -->
+
+**137.** The Nair estate, domiciled in Malaysia with land here means a deceased person in the case file, in full with Chandran Nair, a family in the case file with EMPTY, NOTHING and NOTHING, an estate in the case file with 700000, 300000, 0, 0 and 0, NOTHING, FALSE, FALSE, EMPTY and EMPTY.
+
+<!-- l4: decide:the Nair estate, the same man domiciled in Singapore with nothing here -->
+
+**138.** The Nair estate, the same man domiciled in Singapore with nothing here means a deceased person in the case file, in full with Chandran Nair, a family in the case file with EMPTY, NOTHING and NOTHING, an estate in the case file with 0, 0, 0, 0 and 0, NOTHING, FALSE, TRUE, EMPTY and EMPTY.
+
+<!-- l4: decide:Tan Boon Hock -->
+
+**139.** Tan Boon Hock means a person in the case file with Tan Boon Hock, boonhock, JUST with YMD with 1900, 1 and 1, twenty-one years after with YMD with 1900, 1 and 1, died on with YMD with 1960, 3 and 15 and list of a legitimate child in the case file with Kiran Devan.
+
+<!-- l4: decide:the Tan Boon Hock estate, the death predating the Act -->
+
+**140.** The Tan Boon Hock estate, the death predating the Act means a deceased person in the case file with Tan Boon Hock, a family in the case file with EMPTY, NOTHING and NOTHING, an estate in the case file with 100000, 0, 0, 0 and 0, NOTHING, FALSE, EMPTY and EMPTY.
+
+# Scenario 5 — where the four Acts disagree, and where one of them runs out
+
+## Scenario 5A — one silence, three shapes: the age that is not in evidence
+
+<!-- l4: decide:Gerald Menon, whose age is nowhere in evidence -->
+
+**141.** Gerald Menon, whose age is nowhere in evidence means a person in the case file with Gerald Menon, gerald, NOTHING, NOTHING, living and EMPTY.
+
+<!-- l4: decide:Gerald Menon, guardian of nobody -->
+
+**142.** Gerald Menon, guardian of nobody means a guardian in the case file with Gerald Menon, whose age is nowhere in evidence, gerald, appointed by the court where the infant has no parent, guardian of the person and property of the infant, alone, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:Gerald Menon, put forward as an infant -->
+
+**143.** Gerald Menon, put forward as an infant means an infant in the case file with Gerald Menon, whose age is nowhere in evidence, NOTHING, NOTHING, EMPTY and 0.
+
+<!-- l4: decide:the will of Gerald Menon, undated -->
+
+**144.** The will of Gerald Menon, undated means a will, in full with Gerald Menon, whose age is nowhere in evidence, NOTHING, TRUE, TRUE, FALSE, TRUE, list of an attesting witness with Marianne Alphonso, TRUE, FALSE, FALSE, FALSE and FALSE and an attesting witness with Josephine Alphonso, TRUE, FALSE, FALSE, FALSE and FALSE, list of a gift with Marianne Alphonso, a residuary gift, 1000, TRUE and TRUE, EMPTY, FALSE, NOTHING, FALSE, FALSE, TRUE and EMPTY.
+
+<!-- l4: decide:the Menon estate -->
+
+**145.** The Menon estate means a deceased person in the case file with Gerald Menon, whose age is nowhere in evidence, a family in the case file with EMPTY, NOTHING and NOTHING, an estate in the case file with 1000, 0, 0, 0 and 1000, JUST with the will of Gerald Menon, undated, FALSE, EMPTY and list of Gerald Menon, put forward as an infant.
+
+<!-- l4: decide:the Menon will, put to the Wills Act -->
+
+**146.** The Menon will, put to the Wills Act means the Wills Act case of with the Menon estate and the plain facts about with the will of Gerald Menon, undated.
+
+## Scenario 5B — the Probate Act's flat class against the Intestate Succession Act's ladder
+
+<!-- l4: decide:Ramanathan Pillai -->
+
+**147.** Ramanathan Pillai means a person in the case file with Ramanathan Pillai, ramanathan, JUST with YMD with 1940, 1 and 1, twenty-one years after with YMD with 1940, 1 and 1, living and EMPTY.
+
+<!-- l4: decide:Kamatchi Pillai -->
+
+**148.** Kamatchi Pillai means a person in the case file with Kamatchi Pillai, kamatchi, JUST with YMD with 1943, 6 and 6, twenty-one years after with YMD with 1943, 6 and 6, living and EMPTY.
+
+<!-- l4: decide:the family of Sivakumar Ramanathan, his parents surviving -->
+
+**149.** The family of Sivakumar Ramanathan, his parents surviving means a family in the case file with list of a marriage in the case file with Meera Sivakumar, JUST with YMD with 1994, 6 and 4 and TRUE, JUST with Ramanathan Pillai and JUST with Kamatchi Pillai.
+
+<!-- l4: decide:the Sivakumar intestacy, his parents surviving -->
+
+**150.** The Sivakumar intestacy, his parents surviving means a deceased person in the case file with Sivakumar Ramanathan, the family of Sivakumar Ramanathan, his parents surviving, the estate of Sivakumar Ramanathan, NOTHING, FALSE, list of the grant to the widow and the son and list of Divya as an infant concerned in the estate.
+
+## Scenario 5C — the debts nobody reads
+
+<!-- l4: decide:the estate of Sivakumar Ramanathan, owing $900,000 -->
+
+**151.** The estate of Sivakumar Ramanathan, owing $900,000 means an estate in the case file with 700000, 500000, 200000, 900000 and 0.
+
+<!-- l4: decide:the Sivakumar intestacy, owing $900,000 -->
+
+**152.** The Sivakumar intestacy, owing $900,000 means a deceased person in the case file with Sivakumar Ramanathan, the family of Sivakumar Ramanathan, the estate of Sivakumar Ramanathan, owing $900,000, NOTHING, FALSE, list of the grant to the widow and the son and list of Divya as an infant concerned in the estate.
+
+<!-- l4: decide:Lim Wei Sheng, the mortgagee -->
+
+**153.** Lim Wei Sheng, the mortgagee means a person in the case file with Lim Wei Sheng, weisheng, JUST with YMD with 1960, 3 and 3, twenty-one years after with YMD with 1960, 3 and 3, living and EMPTY.
+
+<!-- l4: decide:the estate of Sivakumar Ramanathan, $300,000 of it secured by mortgage -->
+
+**154.** The estate of Sivakumar Ramanathan, $300,000 of it secured by mortgage means an estate in the case file, with creditors with 700000, 500000, 200000, 300000, 0 and list of a creditor in the case file with Lim Wei Sheng, the mortgagee, 300000 and TRUE.
+
+<!-- l4: decide:the estate of Sivakumar Ramanathan, $300,000 of it unsecured -->
+
+**155.** The estate of Sivakumar Ramanathan, $300,000 of it unsecured means an estate in the case file, with creditors with 700000, 500000, 200000, 300000, 0 and list of a creditor in the case file with Lim Wei Sheng, the mortgagee, 300000 and FALSE.
+
+<!-- l4: decide:the Sivakumar intestacy, a mortgagee having proved -->
+
+**156.** The Sivakumar intestacy, a mortgagee having proved means a deceased person in the case file with Sivakumar Ramanathan, the family of Sivakumar Ramanathan, the estate of Sivakumar Ramanathan, $300,000 of it secured by mortgage, NOTHING, FALSE, list of the grant to the widow and the son and list of Divya as an infant concerned in the estate.
+
+<!-- l4: decide:the Sivakumar intestacy, an unsecured creditor having proved -->
+
+**157.** The Sivakumar intestacy, an unsecured creditor having proved means a deceased person in the case file with Sivakumar Ramanathan, the family of Sivakumar Ramanathan, the estate of Sivakumar Ramanathan, $300,000 of it unsecured, NOTHING, FALSE, list of the grant to the widow and the son and list of Divya as an infant concerned in the estate.
+
+## Scenario 5D — one fact under two names: the administrator who "is entitled to the whole"
+
+<!-- l4: decide:the widow as grantee -->
+
+**158.** The widow as grantee means a grantee in the case file with an individual with Meera Sivakumar, as the guardian of the person and property of the infant and JUST with divya.
+
+<!-- l4: decide:the further facts, the administrator swearing he takes the whole -->
+
+**159.** The further facts, the administrator swearing he takes the whole means The further facts on which the grant machinery turns where the administrator is entitled to the whole of the estate after payment of the debts is TRUE, the Family Court thinks fit to require such security is FALSE, there is danger that the property may be wasted is FALSE, it appears that such appointment would not be a sufficient protection for the estate is FALSE and the Public Trustee has by writing signed by him declared that he undertakes to administer such property is FALSE.
+
+<!-- l4: decide:Kiran as grantee -->
+
+**160.** Kiran as grantee means a grantee in the case file with an individual with Kiran Devan, as administrator and NOTHING.
+
+<!-- l4: decide:the grant of letters of administration to Kiran -->
+
+**161.** The grant of letters of administration to Kiran means a grant in the case file with letters of administration, list of Kiran as grantee, JUST with YMD with 2026, 3 and 1 and not limited.
+
+## Scenario 5E — a row the audit called a disagreement, which no longer is one
+
+<!-- l4: decide:Kiran Devan -->
+
+**162.** Kiran Devan means a person in the case file with Kiran Devan, kiran, JUST with YMD with 1995, 2 and 2, twenty-one years after with YMD with 1995, 2 and 2, living and EMPTY.
+
+<!-- l4: decide:Nithya Devan -->
+
+**163.** Nithya Devan means a person in the case file with Nithya Devan, nithya, JUST with YMD with 1997, 3 and 3, twenty-one years after with YMD with 1997, 3 and 3, living and EMPTY.
+
+<!-- l4: decide:Priyanka Devan -->
+
+**164.** Priyanka Devan means a person in the case file with Priyanka Devan, priyanka, JUST with YMD with 1970, 7 and 7, twenty-one years after with YMD with 1970, 7 and 7, died on with YMD with 2025, 4 and 1 and list of a legitimate child in the case file with Kiran Devan and a child in the case file neither legitimate nor adopted with Nithya Devan.
+
+<!-- l4: decide:the Devan intestacy -->
+
+**165.** The Devan intestacy means a deceased person in the case file with Priyanka Devan, a family in the case file with EMPTY, NOTHING and NOTHING, an estate in the case file with 400000, 0, 0, 0 and 0, NOTHING, FALSE, EMPTY and EMPTY.
+
+## Scenario 5F — the field that decides whether section 17 bites, and nothing computes it
+
+<!-- l4: decide:Meera, recorded as guardian of the person only -->
+
+**166.** Meera, recorded as guardian of the person only means a guardian in the case file with Meera Sivakumar, divya, guardian by virtue of surviving the other parent, guardian of the person of the infant, alone, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:Divya, her mother recorded as guardian of the person only -->
+
+**167.** Divya, her mother recorded as guardian of the person only means Divya, an infant concerned in the estate, the mother holding with Meera, recorded as guardian of the person only.
+
+<!-- l4: decide:the Sivakumar intestacy, the widow being guardian of the person only -->
+
+**168.** The Sivakumar intestacy, the widow being guardian of the person only means the Sivakumar intestacy, with with Meera, recorded as guardian of the person only and list of the grant to the widow and the son.
+
+# Scenario 6 — the testate estate whose executor is a child
+
+<!-- l4: decide:Grace Sim -->
+
+**169.** Grace Sim means a person in the case file with Grace Sim, grace, JUST with YMD with 1974, 2 and 2, twenty-one years after with YMD with 1974, 2 and 2, living and EMPTY.
+
+<!-- l4: decide:Ethan Sim -->
+
+**170.** Ethan Sim means a person in the case file with Ethan Sim, ethan, JUST with YMD with 2008, 9 and 9, twenty-one years after with YMD with 2008, 9 and 9, living and EMPTY.
+
+<!-- l4: decide:Bernard Sim -->
+
+**171.** Bernard Sim means a person in the case file with Bernard Sim, bernard, JUST with YMD with 1970, 11 and 11, twenty-one years after with YMD with 1970, 11 and 11, died on with YMD with 2025, 5 and 5 and list of a legitimate child in the case file with Ethan Sim.
+
+<!-- l4: decide:Grace, guardian of Ethan by virtue of surviving the father -->
+
+**172.** Grace, guardian of Ethan by virtue of surviving the father means a guardian in the case file with Grace Sim, ethan, guardian by virtue of surviving the other parent, guardian of the person and property of the infant, alone, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:Grace, the court having authorised her to discharge the legacy -->
+
+**173.** Grace, the court having authorised her to discharge the legacy means a guardian in the case file with Grace Sim, ethan, guardian by virtue of surviving the other parent, guardian of the person and property of the infant, alone, FALSE, FALSE and TRUE.
+
+<!-- l4: decide:Ethan, an infant concerned in the estate -->
+
+**174.** In relation to a Guardian “the mother’s guardianship”, Ethan, an infant concerned in the estate means an infant in the case file with Ethan Sim, JUST with Bernard Sim, JUST with Grace Sim, list of the mother’s guardianship and 600000.
+
+<!-- l4: decide:Ethan as an infant concerned in the estate -->
+
+**175.** Ethan as an infant concerned in the estate means Ethan, an infant concerned in the estate with Grace, guardian of Ethan by virtue of surviving the father.
+
+<!-- l4: decide:Ethan Sim, appointed sole executor -->
+
+**176.** Ethan Sim, appointed sole executor means a PAA executor with Ethan Sim, FALSE, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:the will of Bernard Sim -->
+
+**177.** The will of Bernard Sim means a will, in full with Bernard Sim, JUST with YMD with 2021, 6 and 1, TRUE, TRUE, FALSE, TRUE, list of an attesting witness with Marianne Alphonso, TRUE, FALSE, FALSE, FALSE and FALSE and an attesting witness with Josephine Alphonso, TRUE, FALSE, FALSE, FALSE and FALSE, list of a gift with Ethan Sim, a residuary gift, 600000, TRUE and TRUE, EMPTY, FALSE, NOTHING, FALSE, FALSE, TRUE and list of Ethan Sim, appointed sole executor.
+
+<!-- l4: decide:the grant with the will annexed to Grace and a trust company -->
+
+**178.** The grant with the will annexed to Grace and a trust company means a grant in the case file with letters of administration with the will annexed, list of a grantee in the case file with an individual with Grace Sim, as the guardian of the person and property of the infant and JUST with ethan and a grantee in the case file with Acme Trust Company, as administrator and NOTHING, JUST with YMD with 2026, 2 and 2 and limited in some other way with limited until the infant obtains a grant to himself.
+
+<!-- l4: decide:the Sim testacy -->
+
+**179.** The Sim testacy means a deceased person in the case file with Bernard Sim, a family in the case file with list of a marriage in the case file with Grace Sim, JUST with YMD with 1999, 4 and 4 and TRUE, NOTHING and NOTHING, an estate in the case file with 600000, 0, 0, 0 and 600000, JUST with the will of Bernard Sim, FALSE, list of the grant with the will annexed to Grace and a trust company and list of Ethan as an infant concerned in the estate.
+
+<!-- l4: decide:the Sim will, put to the Wills Act -->
+
+**180.** The Sim will, put to the Wills Act means the Wills Act case of with the Sim testacy and the plain facts about with the will of Bernard Sim.
+
+<!-- l4: decide:the day the Sim grant is applied for -->
+
+**181.** The day the Sim grant is applied for means YMD with 2026, 2 and 2.
+
+<!-- l4: decide:Ethan, no Guardian record having been made for his mother -->
+
+**182.** Ethan, no Guardian record having been made for his mother means an infant in the case file with Ethan Sim, JUST with Bernard Sim, JUST with Grace Sim, EMPTY and 600000.
+
+<!-- l4: decide:the Sim testacy, no record having been made for the mother -->
+
+**183.** The Sim testacy, no record having been made for the mother means a deceased person in the case file with Bernard Sim, a family in the case file with list of a marriage in the case file with Grace Sim, JUST with YMD with 1999, 4 and 4 and TRUE, NOTHING and NOTHING, an estate in the case file with 600000, 0, 0, 0 and 600000, JUST with the will of Bernard Sim, FALSE, list of the grant with the will annexed to Grace and a trust company and list of Ethan, no Guardian record having been made for his mother.
+
+<!-- l4: decide:Ethan, the court having authorised the discharge of his legacy -->
+
+**184.** Ethan, the court having authorised the discharge of his legacy means Ethan, an infant concerned in the estate with Grace, the court having authorised her to discharge the legacy.
+
+# The joins, audited — what each one turned out to be
+
+# Hand-offs that could not be made
+
+# What is deliberately not asserted, and why
+
+# Conventions in this file
+
+<!-- tnr-coverage: 184 provisions; 0 boolean atoms inlined; 352 directives suppressed -->

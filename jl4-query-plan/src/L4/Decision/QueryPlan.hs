@@ -10,6 +10,7 @@ module L4.Decision.QueryPlan (
   QueryInput (..),
   QueryAsk (..),
   QueryPlanResponse (..),
+  BDQ.Verdict (..),
   atomIdByUnique,
   queryPlan,
 ) where
@@ -94,6 +95,10 @@ data CachedDecisionQuery = CachedDecisionQuery
   , varDepsByUnique :: !(IntMap IntSet)
   , varInputRefsByUnique :: !(IntMap (Set InputRef))
   , compiled :: !(BDQ.CompiledDecisionQuery Int)
+  , priorsByUnique :: !(Map Int Double)
+    -- ^ Per-atom prior @P(atom = TRUE)@ from boolean @TYPICALLY@ defaults, keyed
+    -- by atom unique. Absent atoms are prior-free (0.5). Feeds the info-gain
+    -- question ordering; built once from the ladder's @typically@ fields.
   }
 
 data QueryAtom = QueryAtom
@@ -121,6 +126,9 @@ instance ToJSON QueryAtom where
 
 data QueryOutcome = QueryOutcome
   { determined :: !(Maybe Bool)
+  -- ^ The FUNCTION's truth value. Correct, and NOT a verdict.
+  , verdict :: !BDQ.Verdict
+  -- ^ What may be shown to a user. Switch on this, not on 'determined'.
   , support :: ![QueryAtom]
   }
   deriving stock (Show, Read, Ord, Eq, Generic)
@@ -173,7 +181,16 @@ instance ToJSON QueryAsk where
 
 data QueryPlanResponse = QueryPlanResponse
   { determined :: !(Maybe Bool)
+  -- ^ The FUNCTION's truth value: what @NOT scope OR requirement@ comes to. Correct,
+  -- and NOT something to show a user — see 'verdict'.
+  , verdict :: !BDQ.Verdict
+  -- ^ What may be TOLD to a user, and the field a wizard should switch on. For a rule
+  -- stated as a seam, 'BDQ.Complies' and 'BDQ.NotApplicable' are BOTH
+  -- @determined = Just True@, so a UI that reads 'determined' alone will sooner or
+  -- later tell someone they complied with a rule that never reached them (§25.3).
   , stillNeeded :: ![QueryAtom]
+  -- ^ Atoms still worth asking about — computed against the VERDICT, so it can be
+  -- non-empty even when 'determined' is settled (see 'BDQ.supportIdxOf').
   , ranked :: ![QueryAtom]
   , inputs :: ![QueryInput]
   , asks :: ![QueryAsk]
@@ -254,10 +271,24 @@ queryPlan name paramsByUnique cached flattenedLabelBindings =
     atomIdByUniqueMap :: Map Int Text
     atomIdByUniqueMap = atomIdByUnique name paramsByUnique cached
 
-    uniqueByAtomId :: Map Text Int
-    uniqueByAtomId =
-      Map.fromList
-        [ (aid, u)
+    -- | The inverse of 'atomIdByUniqueMap', kept ONE-TO-MANY on purpose.
+    --
+    -- An atomId is a hash of (function, label, input refs) — it names a
+    -- QUESTION, not an occurrence. Two occurrences of one compound leaf get
+    -- fresh @unique@s from 'L4.Viz.Ladder.leafFromExpr' but identical labels and
+    -- identical ref closures, so they are twins under one atomId: one question,
+    -- two BDD variables.
+    --
+    -- This used to be a @Map.fromList@, which is last-wins. A user who answered
+    -- that question bound exactly one twin and the other stayed unknown forever
+    -- — so a decision that the answer settles outright stayed Undetermined, and
+    -- the wizard kept asking a question it had already been told the answer to.
+    -- Keeping the whole list is what makes answering a question reach every
+    -- occurrence of it.
+    uniquesByAtomId :: Map Text [Int]
+    uniquesByAtomId =
+      Map.fromListWith (<>)
+        [ (aid, [u])
         | (u, aid) <- Map.toList atomIdByUniqueMap
         ]
 
@@ -351,7 +382,7 @@ queryPlan name paramsByUnique cached flattenedLabelBindings =
       Map.lookup k labelToUniques
         <|> Map.lookup ("`" <> k <> "`") labelToUniques  -- Try with backticks if key has spaces
         <|> (pure <$> parseUniqueKey k)
-        <|> (pure <$> Map.lookup k uniqueByAtomId)
+        <|> Map.lookup k uniquesByAtomId
 
     -- Apply boolean bindings to atoms by:
     -- - exact label match (including dotted keys)
@@ -370,7 +401,7 @@ queryPlan name paramsByUnique cached flattenedLabelBindings =
           | (k, b) <- flattenedLabelBindings
           ]
 
-    res = BDQ.queryDecision cached.compiled knownBindings
+    res = BDQ.queryDecision cached.compiled cached.priorsByUnique knownBindings
 
     atomOf :: Int -> QueryAtom
     atomOf u =
@@ -384,46 +415,66 @@ queryPlan name paramsByUnique cached flattenedLabelBindings =
     atomsOfSet :: Set Int -> [QueryAtom]
     atomsOfSet s = map atomOf (Set.toList s)
 
+    -- Information gain (bits) about the outcome from asking this atom, under the
+    -- TYPICALLY priors. Subsumes the old hand-rolled "+2 if it determines the
+    -- outcome, plus normalized support-shrink" proxy: a determining atom drives a
+    -- branch to a terminal, so its entropy is 0 and its gain is maximal.
     impactScoreFor :: Int -> Double
-    impactScoreFor atomUniq =
-      let
-        byUnique =
-          Maybe.fromMaybe
-            (0, False)
-            ( do
-                vi <- Map.lookup atomUniq res.impact
-                let
-                  impacts =
-                    [ (vi.ifTrue.determined, vi.ifTrue.support)
-                    , (vi.ifFalse.determined, vi.ifFalse.support)
-                    ]
-                  canDetermine = any (\(d, _s) -> d /= Nothing) impacts
-                  shrink =
-                    sum
-                      [ fromIntegral (Set.size res.support - Set.size s)
-                      | (_d, s) <- impacts
-                      ]
-                pure (shrink, canDetermine)
-            )
-       in (if snd byUnique then 2 else 0) + fst byUnique / max 1 (fromIntegral (Set.size res.support))
+    impactScoreFor atomUniq = Map.findWithDefault 0 atomUniq res.scores
 
     impactJson :: Map Int QueryImpact
     impactJson =
       Map.map
         ( \vi ->
             QueryImpact
-              { ifTrue = QueryOutcome vi.ifTrue.determined (atomsOfSet vi.ifTrue.support)
-              , ifFalse = QueryOutcome vi.ifFalse.determined (atomsOfSet vi.ifFalse.support)
+              { ifTrue = QueryOutcome vi.ifTrue.determined vi.ifTrue.verdict (atomsOfSet vi.ifTrue.support)
+              , ifFalse = QueryOutcome vi.ifFalse.determined vi.ifFalse.verdict (atomsOfSet vi.ifFalse.support)
               }
         )
         res.impact
 
+    -- | Impact keyed by atomId, i.e. BY QUESTION.
+    --
+    -- For the ordinary case — one atomId, one unique — this is exactly the
+    -- per-variable impact 'BDQ.queryDecision' already computed, unchanged.
+    --
+    -- For a twin group it cannot be, and using either twin's entry would be a
+    -- lie in the direction that matters: a binding keyed by this atomId now
+    -- reaches EVERY twin (see 'uniquesByAtomId'), so the honest answer to "what
+    -- happens if I answer this question true" is the outcome with all of the
+    -- group's variables set, not one of them. Answering a question is one move,
+    -- and its impact must be the impact of that move.
+    --
+    -- Costs two extra BDD restrictions per group of size > 1 and nothing at all
+    -- otherwise, so single-atom models keep both their old numbers and their old
+    -- runtime. An entry is emitted only for a group at least one of whose
+    -- members the decision still turns on — for a singleton that is exactly the
+    -- old @Map.member u impactJson@ guard, so a model without twins keeps the
+    -- same keys and the same values it had before.
+    impactOfGroup :: [Int] -> Maybe QueryImpact
+    impactOfGroup us =
+      case us of
+        [] -> Nothing
+        [u] -> Map.lookup u impactJson
+        _ | not (any (`Map.member` impactJson) us) -> Nothing
+        _ ->
+          let
+            outcomeWith :: Bool -> QueryOutcome
+            outcomeWith b =
+              let r =
+                    BDQ.queryDecision
+                      cached.compiled
+                      cached.priorsByUnique
+                      (knownBindings <> Map.fromList [(u, b) | u <- us])
+               in QueryOutcome r.determined r.verdict (atomsOfSet r.support)
+           in Just (QueryImpact (outcomeWith True) (outcomeWith False))
+
     impactByAtomIdJson :: Map Text QueryImpact
     impactByAtomIdJson =
       Map.fromList
-        [ (atomIdByUniqueMap Map.! u, imp)
-        | (u, imp) <- Map.toList impactJson
-        , Map.member u atomIdByUniqueMap
+        [ (aid, imp)
+        | (aid, us) <- Map.toList uniquesByAtomId
+        , Just imp <- [impactOfGroup (List.nub us)]
         ]
 
     atomParamDeps :: Int -> [Int]
@@ -570,9 +621,11 @@ queryPlan name paramsByUnique cached flattenedLabelBindings =
     noteTxt =
       "StillNeeded/ranked are boolean atoms from ladder visualization; these may be derived predicates rather than original user inputs. Bindings are matched by atom label (including dotted labels for nested fields), atom unique (as a decimal string), or atomId (a stable UUIDv5 derived from function name, atom label, and input refs). `inputs` ranks function parameters using a simple dependency-based heuristic."
         <> " `asks` ranks askable keys; for record parameters this includes projected field paths discovered via `Proj`."
+        <> " Report `verdict`, not `determined`: when the rule is stated as a seam (`scope IMPLIES requirement`), `Complies` and `NotApplicable` are BOTH `determined = true`, and telling a user they complied with a rule that never reached them is a category error, not a rounding error."
    in
     QueryPlanResponse
       { determined = res.determined
+      , verdict = res.verdict
       , stillNeeded = atomsOfSet res.support
       , ranked = map atomOf res.ranked
       , inputs = inputsRanked

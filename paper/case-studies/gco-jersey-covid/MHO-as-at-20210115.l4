@@ -1,0 +1,180 @@
+IMPORT daydate
+
+§ `Covid-19 (Mental Health) (Jersey) Order 2020 - as at 15 January 2021`
+-- Official consolidation showing the law as at 15 January 2021.
+-- Source page: https://www.jerseylaw.je/laws/current/ro_166_2020_20210115
+-- (That jerseylaw slug serves THIS Mental Health instrument, not Gathering Control.)
+-- Instrument and making: table of legislation history cites R&O.166/2020, 23 December 2020.
+-- In force as amended by R&O.177/2020 (in force 31 December 2020).
+-- Parent: Mental Health (Jersey) Law 2016 (chapter 20.650); Covid-19 (Enabling Provisions) (Jersey) Law 2020.
+-- ENCODING SCOPE: operative timing (Art.1) and the period-extension rule (Art.2). Arts.3-5 on
+-- approved practitioners / SOAD lists and Art.6 capacity orders are administrative instructional
+-- clauses; they are modelled as boolean facts where a downstream check needs them.
+
+§§ `1 Citation, commencement and expiry - domain model`
+
+DECLARE ApplicationKind IS ONE OF
+    `Minister application under Article 9 or 10 of the Mental Health Law for admission under Article 6, 7 or 7A`
+    `approved social worker application under Article 15 of the Mental Health Law for admission under Article 6, 7 or 7A as applied by Article 14`
+    `approved social worker application under Article 24 of the Mental Health Law for emergency treatment under Part 4`
+    `other application`
+
+DECLARE MentalHealthEpisode HAS
+    `application kind`                                                             IS A ApplicationKind
+    `is an application by the Minister under Article 9 or 10 for admission under Article 6, 7 or 7A` IS A BOOLEAN
+        MEANS `application kind` EQUALS `Minister application under Article 9 or 10 of the Mental Health Law for admission under Article 6, 7 or 7A`
+    `is an application by an approved social worker under Article 15 for admission under Article 6, 7 or 7A as applied by Article 14` IS A BOOLEAN
+        MEANS `application kind` EQUALS `approved social worker application under Article 15 of the Mental Health Law for admission under Article 6, 7 or 7A as applied by Article 14`
+    `is an application by an approved social worker under Article 24 for emergency treatment under Part 4` IS A BOOLEAN
+        MEANS `application kind` EQUALS `approved social worker application under Article 24 of the Mental Health Law for emergency treatment under Part 4`
+    `patient is received into long-term care under Article 15 of the Mental Health Law` IS A BOOLEAN
+    `concerns a report of an approved social worker or the discharge of a patient from long-term care under Article 18 of the Mental Health Law` IS A BOOLEAN
+
+§§ `1 Citation, commencement and expiry`
+
+-- Art.1(2)/(3): Order remains in force until end of 30 April 2021 unless earlier revoked.
+-- Art.1(4): "end of" a day means midnight at the end of that day.
+-- Art.1(5): power to make under enables-provisions Law s.2 (start before making, if not before enabling Law).
+
+`the Order expires at the end of` MEANS Date 30 4 2021
+
+GIVEN asOf IS A DATE @desc Date against which to test whether this Order is still in force
+GIVETH A BOOLEAN
+DECIDE `the Order remains in force as of` asOf IF
+    asOf AT MOST `the Order expires at the end of`
+
+§§ `2 Extension of time periods under Mental Health Law`
+
+`the standard 14 day period under the Mental Health Law` MEANS 14
+`the extended period under this Order` MEANS 28
+
+GIVEN e IS A MentalHealthEpisode
+GIVETH A BOOLEAN
+DECIDE `Article 2(1) application attracts the extended period` e IF
+        e's `is an application by the Minister under Article 9 or 10 for admission under Article 6, 7 or 7A`
+    OR  e's `is an application by an approved social worker under Article 15 for admission under Article 6, 7 or 7A as applied by Article 14`
+    OR  e's `is an application by an approved social worker under Article 24 for emergency treatment under Part 4`
+
+GIVEN e IS A MentalHealthEpisode
+GIVETH A BOOLEAN
+DECIDE `Article 2(2) long-term care period attracts the extended period` e IF
+        e's `patient is received into long-term care under Article 15 of the Mental Health Law`
+    AND e's `concerns a report of an approved social worker or the discharge of a patient from long-term care under Article 18 of the Mental Health Law`
+
+GIVEN e IS A MentalHealthEpisode
+GIVETH A BOOLEAN
+DECIDE `the extended 28 day period applies` e IF
+        `Article 2(1) application attracts the extended period` e
+    OR  `Article 2(2) long-term care period attracts the extended period` e
+
+GIVEN e IS A MentalHealthEpisode
+GIVETH A NUMBER
+DECIDE `applicable period in days under this Order` e IS
+    IF `the extended 28 day period applies` e
+    THEN `the extended period under this Order`
+    ELSE `the standard 14 day period under the Mental Health Law`
+
+§§ `3 to 5 Lists and SOAD arrangements - fact hooks`
+-- Arts.3-5 are administrative directions to the Minister and approved practitioners about
+-- maintaining lists of approved practitioners / SOADs and making them available. They are
+-- not case-level prohibitions. Encoded as facts a compliance check can require.
+
+DECLARE PractitionerListStatus HAS
+    `Minister has established a list of approved practitioners under Article 16 for the purposes of the Mental Health Law` IS A BOOLEAN
+    `Minister has established a list of second opinion approved doctors under Article 16 for the purposes of the Mental Health Law` IS A BOOLEAN
+    `the list or lists of approved practitioners are kept up to date` IS A BOOLEAN
+    `the list or lists of second opinion approved doctors are kept up to date` IS A BOOLEAN
+    `an approved practitioner requesting a copy of a list is provided with one` IS A BOOLEAN
+
+GIVEN s IS A PractitionerListStatus
+GIVETH A BOOLEAN
+DECIDE `Articles 3 to 5 list arrangements are met` s IF
+        s's `Minister has established a list of approved practitioners under Article 16 for the purposes of the Mental Health Law`
+    AND s's `Minister has established a list of second opinion approved doctors under Article 16 for the purposes of the Mental Health Law`
+    AND s's `the list or lists of approved practitioners are kept up to date`
+    AND s's `the list or lists of second opinion approved doctors are kept up to date`
+    AND s's `an approved practitioner requesting a copy of a list is provided with one`
+
+§§ `exported decisions`
+
+@export Whether the Covid-19 (Mental Health) (Jersey) Order 2020 remains in force as of a given date (expires at the end of 30 April 2021)
+GIVEN asOf IS A DATE @desc ISO date to test, e.g. 2021-04-30 still in force; 2021-05-01 not
+GIVETH A BOOLEAN
+DECIDE `Order remains in force as of` IF
+    `the Order remains in force as of` asOf
+
+@export Whether the 28-day extended period under Article 2 of this Order replaces the Mental Health Law 14-day period for this episode
+GIVEN e IS A MentalHealthEpisode @desc Episode / application facts: application kind and Art.18 long-term care flags
+GIVETH A BOOLEAN
+DECIDE `extended period applies to episode` IF
+    `the extended 28 day period applies` e
+
+@export The number of days that apply to this episode under the Order (28 if extended, otherwise the Mental Health Law's 14)
+GIVEN e IS A MentalHealthEpisode @desc Episode / application facts: application kind and Art.18 long-term care flags
+GIVETH A NUMBER
+DECIDE `applicable period in days` IS
+    `applicable period in days under this Order` e
+
+@export Whether the Minister's Art.3-5 list and SOAD arrangements are all in place
+GIVEN s IS A PractitionerListStatus @desc Status of approved-practitioner and SOAD lists under Arts.3-5
+GIVETH A BOOLEAN
+DECIDE `list arrangements are complete` IF
+    `Articles 3 to 5 list arrangements are met` s
+
+§§ `test cases - as at 15 January 2021`
+
+`minister admission application` MEANS MentalHealthEpisode WITH
+    `application kind`                                                                                                     IS `Minister application under Article 9 or 10 of the Mental Health Law for admission under Article 6, 7 or 7A`
+    `patient is received into long-term care under Article 15 of the Mental Health Law`                                    IS FALSE
+    `concerns a report of an approved social worker or the discharge of a patient from long-term care under Article 18 of the Mental Health Law` IS FALSE
+
+`ASW Article 15 admission application` MEANS MentalHealthEpisode WITH
+    `application kind`                                                                                                     IS `approved social worker application under Article 15 of the Mental Health Law for admission under Article 6, 7 or 7A as applied by Article 14`
+    `patient is received into long-term care under Article 15 of the Mental Health Law`                                    IS FALSE
+    `concerns a report of an approved social worker or the discharge of a patient from long-term care under Article 18 of the Mental Health Law` IS FALSE
+
+`ASW Article 24 emergency application` MEANS MentalHealthEpisode WITH
+    `application kind`                                                                                                     IS `approved social worker application under Article 24 of the Mental Health Law for emergency treatment under Part 4`
+    `patient is received into long-term care under Article 15 of the Mental Health Law`                                    IS FALSE
+    `concerns a report of an approved social worker or the discharge of a patient from long-term care under Article 18 of the Mental Health Law` IS FALSE
+
+`other non-extended application` MEANS MentalHealthEpisode WITH
+    `application kind`                                                                                                     IS `other application`
+    `patient is received into long-term care under Article 15 of the Mental Health Law`                                    IS FALSE
+    `concerns a report of an approved social worker or the discharge of a patient from long-term care under Article 18 of the Mental Health Law` IS FALSE
+
+`Art 18 long-term care report episode` MEANS MentalHealthEpisode WITH
+    `application kind`                                                                                                     IS `other application`
+    `patient is received into long-term care under Article 15 of the Mental Health Law`                                    IS TRUE
+    `concerns a report of an approved social worker or the discharge of a patient from long-term care under Article 18 of the Mental Health Law` IS TRUE
+
+`lists complete` MEANS PractitionerListStatus WITH
+    `Minister has established a list of approved practitioners under Article 16 for the purposes of the Mental Health Law` IS TRUE
+    `Minister has established a list of second opinion approved doctors under Article 16 for the purposes of the Mental Health Law` IS TRUE
+    `the list or lists of approved practitioners are kept up to date`                                                      IS TRUE
+    `the list or lists of second opinion approved doctors are kept up to date`                                             IS TRUE
+    `an approved practitioner requesting a copy of a list is provided with one`                                            IS TRUE
+
+`lists missing SOAD update` MEANS PractitionerListStatus WITH
+    `Minister has established a list of approved practitioners under Article 16 for the purposes of the Mental Health Law` IS TRUE
+    `Minister has established a list of second opinion approved doctors under Article 16 for the purposes of the Mental Health Law` IS TRUE
+    `the list or lists of approved practitioners are kept up to date`                                                      IS TRUE
+    `the list or lists of second opinion approved doctors are kept up to date`                                             IS FALSE
+    `an approved practitioner requesting a copy of a list is provided with one`                                            IS TRUE
+
+#ASSERT `Order remains in force as of` (Date 15 1 2021)
+#ASSERT `Order remains in force as of` (Date 30 4 2021)
+#ASSERT NOT (`Order remains in force as of` (Date 1 5 2021))
+
+#ASSERT `extended period applies to episode` `minister admission application`
+#ASSERT `extended period applies to episode` `ASW Article 15 admission application`
+#ASSERT `extended period applies to episode` `ASW Article 24 emergency application`
+#ASSERT NOT (`extended period applies to episode` `other non-extended application`)
+#ASSERT `extended period applies to episode` `Art 18 long-term care report episode`
+
+#ASSERT `applicable period in days` `minister admission application` EQUALS 28
+#ASSERT `applicable period in days` `other non-extended application` EQUALS 14
+#ASSERT `applicable period in days` `Art 18 long-term care report episode` EQUALS 28
+
+#ASSERT `list arrangements are complete` `lists complete`
+#ASSERT NOT (`list arrangements are complete` `lists missing SOAD update`)

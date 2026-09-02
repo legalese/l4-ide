@@ -1,0 +1,68 @@
+-- The Phase 5 BKM exhibit (DMN-EXPORT-PROGRAM-MODEL-SPEC.md §6.2): one module
+-- holding, deliberately, one of each shape the emission must carry —
+--
+--   * a MULTI-PARAMETER tier-2 callee (`weighted sum`, arity 2), applied with
+--     distinct argument shapes by a computed field and by another BKM;
+--   * a BKM→BKM CHAIN (`boosted` calls `weighted sum`): the
+--     knowledgeRequirement edge lives on the CALLING BKM (probe C1), never
+--     hoisted to `case one`/`case two`;
+--   * a BKM call INSIDE A HYDRATOR (§4.4 × §6.2, probes B1/B2): `Pay`'s
+--     computed `total` becomes a boxed-context entry invoking the BKM with
+--     earlier sibling entries as arguments;
+--   * a λ-LIFTED CLOSURE (`adjusted` reads the module-level `baseline`):
+--     measured 2026-08-01, a BKM body may read nothing beyond its parameters
+--     (KIE refuses an unshadowed environment read at compile; Camunda answers
+--     — the engines DISAGREE, so the lift is the only portable spelling), so
+--     `baseline` becomes an extra formalParameter supplied at every call site
+--     as `baseline: baseline`.
+--
+-- The two flavors emit byte-identical XML for this module (BKM emission is
+-- ungated, §13.3; nothing here invokes a §), which the flavor-divergence test
+-- in jl4/tests/DmnExport.hs asserts. The §-invocation half of the flavor
+-- split lives in svc.l4, its own exhibit, precisely because an invocable §
+-- makes the camunda flavor's golden unloadable on its own engine.
+--
+-- Engine cases: bkm.cases.json — run through BOTH engines by l4-cli-test
+-- under L4_DMN_ENGINE_CHECK=1.
+
+IMPORT prelude
+
+§ `BKM exhibit`
+
+DECLARE Pay HAS
+    base  IS A NUMBER
+    bonus IS A NUMBER
+    total IS A NUMBER MEANS `weighted sum` base bonus
+
+ASSUME pay IS A Pay
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+`weighted sum` a b MEANS a TIMES 2 PLUS b
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+`boosted` x MEANS `weighted sum` x 1 PLUS 1
+
+GIVETH A NUMBER
+`case one` MEANS `boosted` 10
+
+GIVETH A NUMBER
+`case two` MEANS `boosted` 20
+
+GIVETH A NUMBER
+`pay check` MEANS pay's total PLUS 3
+
+GIVETH A NUMBER
+`baseline` MEANS 7
+
+GIVEN y IS A NUMBER
+GIVETH A NUMBER
+`adjusted` y MEANS y PLUS `baseline`
+
+GIVETH A NUMBER
+`adj one` MEANS `adjusted` 1
+
+GIVETH A NUMBER
+`adj two` MEANS `adjusted` 2

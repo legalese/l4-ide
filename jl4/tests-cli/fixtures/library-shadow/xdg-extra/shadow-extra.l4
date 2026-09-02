@@ -1,0 +1,6 @@
+-- A module that is NOT part of the embedded stdlib, used by the
+-- LIBRARY-RESOLUTION-SHADOW CLI tests to exercise the Option E content gate
+-- without the embedded copy in play: the tests plant a second copy of this
+-- module in a fabricated XDG store, byte-identical (must stay silent) or
+-- differing (must warn).
+`extra marker` MEANS TRUE

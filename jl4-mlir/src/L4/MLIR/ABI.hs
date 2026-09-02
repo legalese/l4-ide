@@ -27,7 +27,14 @@
 --
 -- The encoding is deliberately *not* NaN-boxing — it's simpler:
 --
---   * __NUMBER__ — the 'f64' value directly (identity)
+--   * __NUMBER__ — /not/ the numeric value itself. NUMBERs are
+--     arbitrary-precision rationals, so each one is interned in a
+--     per-call rational pool maintained by the runtime
+--     (@__l4_rat_parse@ / @__l4_rat_add@ / …); the value crossing the
+--     ABI is the integer /handle/ (the pool index) reinterpreted as an
+--     'f64'. Arithmetic must go through the @__l4_rat_*@ builtins, not
+--     native @arith.addf@ etc. (Historically NUMBER was the raw f64
+--     value, hence the old "identity" claim — that is no longer true.)
 --   * __BOOLEAN__ — 0.0 for @FALSE@, 1.0 for @TRUE@
 --   * __ENUM tag (i32)__ — bit-preserving cast through i64
 --   * __Pointers__ (STRING, record, list, MAYBE) — the WASM 32-bit

@@ -5,7 +5,7 @@ IMPORT prelude
 IMPORT `mixfix-cross-module-binary-def`
 
 -- Binary mixfix call - works cross-module
-DECIDE test_binary IS `is eligible for` "Alice" "Welfare"
+DECIDE test_binary IS "Alice" `is eligible for` "Welfare"
 
 #EVAL test_binary
 #CHECK test_binary

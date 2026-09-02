@@ -1,0 +1,40 @@
+{
+  "note": [
+    "Engine cases for the §-INVOCATION exhibit (svc.l4, spec §2.3/§13.5).",
+    "KIE-FLAVOR ONLY: these cases drive svc.kie.dmn through the KIE harness.",
+    "The camunda golden (svc.dmn) is deliberately UNLOADABLE on Camunda 8 —",
+    "`special case` stays raw L4 on that flavor, and zeebe-dmn rejects raw-L4",
+    "literal expressions at parse() — which the MustFail leg in",
+    "jl4/tests-cli/Main.hs asserts with the parse failure named.",
+    "",
+    "special_case pins the SERVICE invocation: its rendered body is",
+    "`special_assessment(p: 150, q: 5) + base_charge`, so its value (195) is",
+    "computed THROUGH the decisionService with the arguments bound per call —",
+    "while special_rate (the standalone decision, evaluated against the",
+    "global p and q these cases also bind) answers from the globals. The two",
+    "answering DIFFERENTLY in one case (B: 5 vs 195) is exactly the evidence",
+    "that the invocation carries its own bindings."
+  ],
+  "cases": [
+    {
+      "name": "A. globals above the floor",
+      "context": { "p": 150, "q": 5 },
+      "expect": {
+        "base_charge": 40,
+        "assessment_floor": 100,
+        "special_rate": 155,
+        "special_case": 195
+      }
+    },
+    {
+      "name": "B. globals below the floor; the invocation still binds 150/5",
+      "context": { "p": 7, "q": 2 },
+      "expect": {
+        "base_charge": 40,
+        "assessment_floor": 100,
+        "special_rate": 5,
+        "special_case": 195
+      }
+    }
+  ]
+}

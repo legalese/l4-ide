@@ -1,0 +1,128 @@
+{
+  "_comment": [
+    "The sg-succession subject sidecar. FOUR Singapore Acts, encoded as ONE",
+    "subject against one shared ontology, because they are four views of one",
+    "event -- a death in a family -- and they share their nouns. See NOTES.md",
+    "for why that is not four subjects, and for the L4 traps this corpus paid",
+    "for.",
+    "",
+    "THE SUBJECT IS FOUR ACTS; THE PRIMARY ENCODING COVERS THREE. The",
+    "Guardianship of Infants Act 1934 was added to the subject on 2026-08-26",
+    "and is encoded only in 'cleanroom-2026-08'. Read 'encoding' (singular, the",
+    "committed corpus) as the Wills / Intestate Succession / Probate trio and",
+    "nothing more; a reader who takes the widened display_name as a claim about",
+    "the committed modules would be wrong, which is why this paragraph is here",
+    "and not in a commit message.",
+    "",
+    "'encoding.modules' is listed IN DEPENDENCY ORDER: the domain module",
+    "declares the types the three Act modules import, sg-succession composes",
+    "them, and the case suite exercises the composition.",
+    "",
+    "'checks.min_dated_arms' is 0 ON PURPOSE, for both encodings. Neither",
+    "carries a rule-version axis: each states the law as at its source bundle's",
+    "in-force date and has no 'RULES EFFECTIVE DATE' arms at all. A 0 floor",
+    "makes p3-check report the temporal-closure sub-check NOT CHECKED rather",
+    "than vacuously green over an empty matched set. Raise it the day a corpus",
+    "gains dated arms; never lower a floor to make a run pass.",
+    "",
+    "'checks.min_assertions' is 178 for the committed encoding = the",
+    "assertions_total that 'l4 run --json' reports across its module set.",
+    "The floor exists because 'no failed assertion' is satisfied vacuously by",
+    "an empty results[].",
+    "",
+    "RE-MEASURED 2026-08-20, per module, via etc/go/lib/assert-report.mjs over",
+    "`l4 run --json` envelopes: sg-wills 62 + sg-paa 79 + sg-succession-cases 37",
+    "= 178, with 0 failed. The other four modules contribute none -- including",
+    "sg-isa, whose section 7 distribution rules are exercised entirely from",
+    "sg-succession-cases.l4 rather than in place.",
+    "",
+    "This comment previously read '131 = ... (sg-wills 39 + sg-paa 55 + cases",
+    "37)', which was both stale against the declared 178 AND wrong in its own",
+    "arithmetic for the corpus as it then stood. It was left behind when the",
+    "corpus grew; the declared floor was updated and the sentence explaining it",
+    "was not, which is the drift that makes a comment worse than no comment.",
+    "",
+    "FLOORS TRAVEL WITH THEIR ENCODING, structurally: encodings.<id>.checks",
+    "sits inside the encoding it measures, so the committed floor of 178 can",
+    "never be applied to the cleanroom deposit and the cleanroom's 1789 can",
+    "never be applied to the committed corpus, which would let it shrink",
+    "unnoticed.",
+    "",
+    "'encodings.cleanroom-2026-08.checks.min_assertions' is 1907, MEASURED",
+    "2026-08-26 with assert-report.mjs over `l4 run --json` for all six modules:",
+    "wills-act 341 + intestate-succession-act 381 +",
+    "probate-administration-act 429 + guardianship-of-infants-act 404 +",
+    "family-cases 352 = 1907, 0 failed; family-domain contributes none, being",
+    "types only. The same 1907 appears in the committed .golden files.",
+    "",
+    "family-cases was 234 when this corpus was first deposited and is 352 now:",
+    "the joins rebuild replaced eleven claimed cross-Act compositions that were",
+    "adjacency -- two single-Act assertions standing side by side -- with five",
+    "that a break-the-upstream-Act mutation actually detects, and relabelled the",
+    "rest honestly as cross-checks, duplicates or blocked. RAISE THIS FLOOR when",
+    "the corpus grows; never lower it to make a run pass.",
+    "",
+    "'natlang_sources' and 'comparison' now point at the CLEANROOM registers,",
+    "which cover four Acts as retrieved on 26 Aug 2026 and supersede the",
+    "three-Act ones under denovo/ (retrieved 18 Aug 2026). Those files are left",
+    "on disk as the record of what was deposited then; they are no longer",
+    "declared, and the fork register that replaced them says so in its own note",
+    "-- the two are not versions of each other, because they describe forks in",
+    "two independently written encodings.",
+    "",
+    "'comparison.surface_map' is declared before it exists, which the deposit",
+    "contract allows: p8-diff reports SKIPPED naming the missing path rather",
+    "than pretending the comparison was made."
+  ],
+  "id": "sg-succession",
+  "display_name": "Singapore family and succession — Wills, Intestate Succession, Probate and Administration, Guardianship of Infants",
+  "citation": "Wills Act 1838; Intestate Succession Act 1967; Probate and Administration Act 1934; Guardianship of Infants Act 1934 (Singapore)",
+  "source_url": "https://sso.agc.gov.sg/Act/ISA1967",
+  "encoding": {
+    "main": "jl4/examples/legal/sg-succession/sg-succession.l4",
+    "wizard": "jl4/examples/legal/sg-succession/sg-succession-wizard.l4",
+    "modules": [
+      "jl4/examples/legal/sg-succession/sg-succession-domain.l4",
+      "jl4/examples/legal/sg-succession/sg-wills.l4",
+      "jl4/examples/legal/sg-succession/sg-isa.l4",
+      "jl4/examples/legal/sg-succession/sg-paa.l4",
+      "jl4/examples/legal/sg-succession/sg-succession.l4",
+      "jl4/examples/legal/sg-succession/sg-succession-cases.l4",
+      "jl4/examples/legal/sg-succession/sg-succession-wizard.l4"
+    ]
+  },
+  "checks": {
+    "min_dated_arms": 0,
+    "min_assertions": 178
+  },
+  "natlang_sources": {
+    "bundle": "jl4/examples/legal/sg-succession/cleanroom-2026-08/source-bundle.json",
+    "register": "jl4/examples/legal/sg-succession/cleanroom-2026-08/external-modifications.json"
+  },
+  "comparison": {
+    "fork_register": "jl4/examples/legal/sg-succession/cleanroom-2026-08/fork-register.json",
+    "surface_map": "jl4/examples/legal/sg-succession/cleanroom-2026-08/surface-map.json"
+  },
+  "legs": {
+    "p7-lts": {},
+    "p7-akn": {},
+    "p7-wizard": {},
+    "p7-mcp": {}
+  },
+  "encodings": {
+    "cleanroom-2026-08": {
+      "modules": [
+        "jl4/examples/legal/sg-succession/cleanroom-2026-08/family-domain.l4",
+        "jl4/examples/legal/sg-succession/cleanroom-2026-08/wills-act.l4",
+        "jl4/examples/legal/sg-succession/cleanroom-2026-08/intestate-succession-act.l4",
+        "jl4/examples/legal/sg-succession/cleanroom-2026-08/probate-administration-act.l4",
+        "jl4/examples/legal/sg-succession/cleanroom-2026-08/guardianship-of-infants-act.l4",
+        "jl4/examples/legal/sg-succession/cleanroom-2026-08/family-cases.l4"
+      ],
+      "checks": {
+        "min_dated_arms": 0,
+        "min_assertions": 1907
+      }
+    }
+  }
+}

@@ -1,12 +1,13 @@
 <script lang="ts">
   import type { RenderedToolCall } from '$lib/stores/ai-chat.svelte'
   import { colorize } from '@repo/l4-highlight'
-  import { AiToolRenderMeta, type FunctionParameter } from 'jl4-client-rpc'
-  import type { Messenger } from 'vscode-messenger-webview'
   import {
+    AiToolRenderMeta,
     renderArgumentsAsL4,
     renderJsonAsL4,
-  } from '$lib/utils/render-l4-value'
+    type FunctionParameter,
+  } from 'jl4-client-rpc'
+  import type { Messenger } from 'vscode-messenger-webview'
 
   /**
    * Tools exposed by the l4-rules MCP server fall into two buckets.
@@ -162,6 +163,17 @@
         running: mcpLabel,
         settled: mcpLabel,
         target: ruleTarget,
+        click: null,
+      }
+    }
+    if (name.startsWith('vsmcp__')) {
+      // Tools funneled from the user's VS Code MCP servers. The wire
+      // name is `vsmcp__<server>_<tool>` (sanitized); showing the part
+      // after the prefix is the most recognizable form we have here.
+      return {
+        running: 'MCP',
+        settled: 'MCP',
+        target: name.slice('vsmcp__'.length),
         click: null,
       }
     }
@@ -374,7 +386,7 @@
    *
    * Result header formats (set by tools/fs.ts):
    *   read slice:       `[<path> <start>-<end>/<total>]…`
-   *   read pattern hit: `[<path> pattern="…" matches=N chunks=K/M]` (skipped)
+   *   read keyword hit: `[<path> keywords="…" matches=N chunks=K/M]` (skipped)
    *   edit snippet:     `[<path> <start>-<end>] Edited …`
    *   edit whole-file:  `[<path> 1-N/N] Wrote …` (skipped via total rule)
    *
@@ -455,10 +467,11 @@
       <span class="dot pulsating" aria-hidden="true"></span>
       <span class="action">{label}</span>
       {#if view.target}
-        <span class="target plain">{view.target}</span>
-      {/if}
-      {#if readLineSuffix}
-        <span class="read-range">({readLineSuffix})</span>
+        <span class="target plain"
+          >{view.target}{#if readLineSuffix}<span class="read-range"
+              >({readLineSuffix})</span
+            >{/if}</span
+        >
       {/if}
     {:else}
       <!-- Leading chevron acts as the expand handle. Same glyph
@@ -508,14 +521,18 @@
               ? 'Click to open applied diff'
               : 'Click to open the file'}
             onclick={onTargetClick}
-            onkeydown={onTargetKeydown}>{view.target}</button
+            onkeydown={onTargetKeydown}
+            >{view.target}{#if readLineSuffix}<span class="read-range"
+                >({readLineSuffix})</span
+              >{/if}</button
           >
         {:else}
-          <span class="target plain">{view.target}</span>
+          <span class="target plain"
+            >{view.target}{#if readLineSuffix}<span class="read-range"
+                >({readLineSuffix})</span
+              >{/if}</span
+          >
         {/if}
-      {/if}
-      {#if readLineSuffix}
-        <span class="read-range">({readLineSuffix})</span>
       {/if}
     {/if}
   </div>
@@ -644,6 +661,9 @@
     font-family: var(--vscode-editor-font-family, monospace);
     font-size: 0.92em;
     text-decoration: none;
+    /* Slightly looser than the default to give the filename (and any
+       wrapped lines) a touch more breathing room — ~1px over normal. */
+    line-height: 14px;
   }
   .target-btn {
     background: transparent;
@@ -658,9 +678,15 @@
      filename stays the visual anchor and the range reads as
      metadata. */
   .read-range {
+    /* inline-block so the parent .target-btn's hover underline does not
+       propagate across the range (text-decoration doesn't cross into an
+       atomic inline box) — only the filename gets underlined on hover. */
+    display: inline-block;
+    margin-left: 4px;
     color: var(--vscode-descriptionForeground);
     font-family: var(--vscode-editor-font-family, monospace);
     font-size: 0.85em;
+    text-decoration: none;
   }
   .target-btn:hover {
     text-decoration: underline;

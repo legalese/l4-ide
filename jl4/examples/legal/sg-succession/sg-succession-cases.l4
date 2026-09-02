@@ -1,0 +1,309 @@
+IMPORT prelude
+IMPORT daydate
+IMPORT `sg-succession-domain`
+IMPORT `sg-isa`
+
+§ `Singapore succession — scenario cases`
+
+-- ===========================================================================
+-- THE SCENARIO SUITE.
+--
+-- Two jobs, kept deliberately separate:
+--
+--   1. ORDINARY SCENARIOS -- the shapes an end-user tool actually meets:
+--      house or no house, spouse or no spouse, children or none. These assert
+--      what the Act gives.
+--
+--   2. FORK WITNESSES -- one named case per fork the register records as
+--      having an OBSERVABLE divergence. Each witness asserts that the two
+--      readings give DIFFERENT answers, so the register's claim is executable
+--      rather than asserted. A witness that stopped diverging would fail here,
+--      which is the point: it would mean the fork had quietly closed.
+--
+-- Every case fixes an exact expected fraction. L4 numbers are exact rationals,
+-- so `1/3` really is a third and the totals below are exact, not rounded.
+-- ===========================================================================
+
+
+§§ `Constructors`
+
+GIVEN n IS A STRING
+GIVETH A Person
+`surviving` n MEANS Person WITH `name` IS n, `survived the deceased` IS TRUE, `issue` IS EMPTY
+
+GIVEN n    IS A STRING
+      kids IS A LIST OF Person
+GIVETH A Person
+`predeceased` n `leaving` kids MEANS
+    Person WITH `name` IS n, `survived the deceased` IS FALSE, `issue` IS kids
+
+-- A Singapore-domiciled, non-Muslim intestate with a $900,000 flat and
+-- $100,000 in the bank, no debts. The estate figures matter only where the
+-- s 4 movable/immovable split is in play; the share fractions do not depend
+-- on them.
+GIVEN sp IS A LIST OF Person
+      ch IS A LIST OF Person
+      pa IS A LIST OF Person
+      sb IS A LIST OF Person
+GIVETH A Case
+`an intestate leaving` sp ch pa sb MEANS
+  Case WITH
+      `deceased` IS (Deceased WITH `name` IS "the deceased"
+                              , `date of death` IS YMD 2026 1 15
+                              , `domiciled in Singapore` IS TRUE
+                              , `Muslim` IS FALSE)
+    , `family` IS (Family WITH `surviving spouses` IS sp
+                          , `children` IS ch
+                          , `parents` IS pa
+                          , `siblings` IS sb
+                          , `grandparents` IS EMPTY
+                          , `uncles and aunts` IS EMPTY)
+    , `estate` IS (Estate WITH `immovable property in Singapore` IS 900000
+                          , `movable property in Singapore` IS 100000
+                          , `funeral, testamentary and administration expenses` IS 0
+                          , `debts and liabilities` IS 0)
+    , `will` IS NOTHING
+
+
+§§ `Reading a distribution`
+
+GIVEN shares IS A LIST OF Share
+GIVETH A NUMBER
+`the total of` shares MEANS sum (map (GIVEN s YIELD s's `fraction`) shares)
+
+GIVEN who    IS A STRING
+      shares IS A LIST OF Share
+GIVETH A NUMBER
+`the share of` who `in` shares MEANS
+    sum (map (GIVEN s YIELD s's `fraction`)
+             (filter (GIVEN s YIELD (s's `taker` EQUALS who)) shares))
+
+
+§§ `1. The ordinary scenarios`
+
+-- SPOUSE, NO CHILDREN, NO PARENTS -> rule 1, the spouse takes everything.
+`widow alone` MEANS `an intestate leaving` (LIST `surviving` "Wife") EMPTY EMPTY EMPTY
+#ASSERT (`the share of` "Wife" `in` (`the section 7 shares of` `widow alone`)) EQUALS 1
+#ASSERT (`the total of` (`the section 7 shares of` `widow alone`)) EQUALS 1
+
+-- SPOUSE AND TWO CHILDREN -> rule 2 gives the spouse a half, rule 3 splits the
+-- other half between the children: 1/2, 1/4, 1/4.
+`widow and two children` MEANS
+    `an intestate leaving` (LIST `surviving` "Wife")
+                           (LIST (`surviving` "Ann"), (`surviving` "Ben")) EMPTY EMPTY
+#ASSERT (`the share of` "Wife" `in` (`the section 7 shares of` `widow and two children`)) EQUALS (1 DIVIDED BY 2)
+#ASSERT (`the share of` "Ann"  `in` (`the section 7 shares of` `widow and two children`)) EQUALS (1 DIVIDED BY 4)
+#ASSERT (`the share of` "Ben"  `in` (`the section 7 shares of` `widow and two children`)) EQUALS (1 DIVIDED BY 4)
+#ASSERT (`the total of` (`the section 7 shares of` `widow and two children`)) EQUALS 1
+
+-- SPOUSE AND PARENTS, NO CHILDREN -> rule 4: a half to the spouse, a half
+-- between the parents. This is the case the `NOT` precedence bug got wrong:
+-- written without parentheses, rule 1 fired and the widow took everything.
+`widow and two parents` MEANS
+    `an intestate leaving` (LIST `surviving` "Wife") EMPTY
+                           (LIST (`surviving` "Mum"), (`surviving` "Dad")) EMPTY
+#ASSERT (`the share of` "Wife" `in` (`the section 7 shares of` `widow and two parents`)) EQUALS (1 DIVIDED BY 2)
+#ASSERT (`the share of` "Mum"  `in` (`the section 7 shares of` `widow and two parents`)) EQUALS (1 DIVIDED BY 4)
+#ASSERT (`the total of` (`the section 7 shares of` `widow and two parents`)) EQUALS 1
+
+-- THREE CHILDREN, NO SPOUSE -> rule 3, a third each. The exact-rational check:
+-- three thirds are exactly one, not 0.9999999999999999.
+`three children` MEANS
+    `an intestate leaving` EMPTY
+        (LIST (`surviving` "Ann"), (`surviving` "Ben"), (`surviving` "Cal")) EMPTY EMPTY
+#ASSERT (`the share of` "Ann" `in` (`the section 7 shares of` `three children`)) EQUALS (1 DIVIDED BY 3)
+#ASSERT (`the total of` (`the section 7 shares of` `three children`)) EQUALS 1
+
+-- REPRESENTATION: one child survives, one predeceased leaving two children of
+-- their own. The survivor takes a half; the two grandchildren split the other
+-- half by stocks, a quarter each -- NOT a third each.
+`one child survives, one left grandchildren` MEANS
+    `an intestate leaving` EMPTY
+        (LIST (`surviving` "Ann")
+            , (`predeceased` "Ben" `leaving` (LIST (`surviving` "Gia"), (`surviving` "Gus"))))
+        EMPTY EMPTY
+#ASSERT (`the share of` "Ann" `in` (`the section 7 shares of` `one child survives, one left grandchildren`)) EQUALS (1 DIVIDED BY 2)
+#ASSERT (`the share of` "Gia" `in` (`the section 7 shares of` `one child survives, one left grandchildren`)) EQUALS (1 DIVIDED BY 4)
+#ASSERT (`the total of` (`the section 7 shares of` `one child survives, one left grandchildren`)) EQUALS 1
+
+-- AN EXTINCT LINE IS NOT A STOCK. A child who predeceased leaving nobody does
+-- not hold a share for anyone: the whole estate goes to the surviving child.
+`one child survives, one died childless` MEANS
+    `an intestate leaving` EMPTY
+        (LIST (`surviving` "Ann"), (`predeceased` "Ben" `leaving` EMPTY)) EMPTY EMPTY
+#ASSERT (`the share of` "Ann" `in` (`the section 7 shares of` `one child survives, one died childless`)) EQUALS 1
+
+-- NOBODY AT ALL -> rule 9, bona vacantia.
+`no relatives` MEANS `an intestate leaving` EMPTY EMPTY EMPTY EMPTY
+#ASSERT (`the share of` "the Government" `in` (`the section 7 shares of` `no relatives`)) EQUALS 1
+
+-- SIBLINGS ONLY -> rule 6.
+`two siblings` MEANS
+    `an intestate leaving` EMPTY EMPTY EMPTY
+        (LIST (`surviving` "Sis"), (`surviving` "Bro"))
+#ASSERT (`the share of` "Sis" `in` (`the section 7 shares of` `two siblings`)) EQUALS (1 DIVIDED BY 2)
+#ASSERT (`the total of` (`the section 7 shares of` `two siblings`)) EQUALS 1
+
+
+§§ `2. Fork witnesses`
+
+-- WITNESS FOR F1 -- `all children predeceased, uneven stocks`.
+-- Both children predeceased. Ann left two children, Ben left one.
+--   R1 (stirpital, the orthodox reading): the estate splits into two stocks,
+--      so Ann's two take 1/4 each and Ben's one takes 1/2.
+--   R2 (per capita at the nearest surviving generation): all three take 1/3.
+-- The register records this divergence as observable; these assertions are
+-- what makes that claim checkable.
+`all children predeceased, uneven stocks` MEANS
+    `an intestate leaving` EMPTY
+        (LIST (`predeceased` "Ann" `leaving` (LIST (`surviving` "Gia"), (`surviving` "Gus")))
+            , (`predeceased` "Ben" `leaving` (LIST (`surviving` "Hal"))))
+        EMPTY EMPTY
+
+`F1 under R1` MEANS `the section 7 shares under` `the orthodox reading` `of` `all children predeceased, uneven stocks`
+`F1 under R2` MEANS `the section 7 shares under` `the per capita reading` `of` `all children predeceased, uneven stocks`
+
+#ASSERT (`the share of` "Gia" `in` `F1 under R1`) EQUALS (1 DIVIDED BY 4)
+#ASSERT (`the share of` "Hal" `in` `F1 under R1`) EQUALS (1 DIVIDED BY 2)
+#ASSERT (`the share of` "Gia" `in` `F1 under R2`) EQUALS (1 DIVIDED BY 3)
+#ASSERT (`the share of` "Hal" `in` `F1 under R2`) EQUALS (1 DIVIDED BY 3)
+-- the divergence itself, asserted rather than described
+#ASSERT NOT ((`the share of` "Hal" `in` `F1 under R1`) EQUALS (`the share of` "Hal" `in` `F1 under R2`))
+-- and both readings still distribute the whole estate
+#ASSERT (`the total of` `F1 under R1`) EQUALS 1
+#ASSERT (`the total of` `F1 under R2`) EQUALS 1
+
+-- WITNESS FOR F3 -- `deceased sibling with deceased child`.
+-- Rule 6 says "children of deceased brothers or sisters", where rule 3's
+-- proviso says "descendants". Under R1 (the helper recurses to the remotest
+-- degree) a deceased nephew is represented by his own child; under R2 --
+-- reading rule 6's "children" as a stop -- he is not. The encoding takes R1,
+-- so this case asserts what R1 gives and names the difference.
+`deceased sibling with deceased child` MEANS
+    `an intestate leaving` EMPTY EMPTY EMPTY
+        (LIST (`surviving` "Sis")
+            , (`predeceased` "Bro" `leaving`
+                 (LIST (`predeceased` "Nephew" `leaving` (LIST (`surviving` "Grandniece"))))))
+#ASSERT (`the share of` "Sis"        `in` (`the section 7 shares of` `deceased sibling with deceased child`)) EQUALS (1 DIVIDED BY 2)
+#ASSERT (`the share of` "Grandniece" `in` (`the section 7 shares of` `deceased sibling with deceased child`)) EQUALS (1 DIVIDED BY 2)
+
+-- WITNESS FOR F6 -- `half blood and whole blood siblings`.
+-- THIS CASE DOCUMENTS A KNOWN GAP, and asserts the WRONG answer on purpose.
+-- ISA s 6(b) ranks half-blood relations "immediately after those of the whole
+-- blood related to him in the same degree", which on the live reading (R1)
+-- means the half-blood sibling takes NOTHING while a whole-blood sibling is
+-- represented. The encoding does not implement that ordering: it divides the
+-- `siblings` list equally. So this asserts 1/2 and 1/2, which is reading R2.
+-- The assertion is here so the gap is executable and cannot be forgotten;
+-- when s 6(b) is encoded, this assertion MUST change to 1 and 0, and the fork
+-- register entry F6 must move from `open` to `resolved`.
+`half blood and whole blood siblings` MEANS
+    `an intestate leaving` EMPTY EMPTY EMPTY
+        (LIST (`surviving` "WholeBloodSis"), (`surviving` "HalfBloodBro"))
+#ASSERT (`the share of` "HalfBloodBro" `in` (`the section 7 shares of` `half blood and whole blood siblings`)) EQUALS (1 DIVIDED BY 2)
+
+-- WITNESS FOR F5 -- `foreign domicile, Singapore house only`.
+-- ISA s 4: a deceased domiciled abroad has only their Singapore IMMOVABLE
+-- property regulated by this Act. The $900,000 flat is in; the $100,000 in the
+-- bank is not, and the encoding says so rather than quietly distributing it.
+`foreign domicile, Singapore house only` MEANS
+  Case WITH
+      `deceased` IS (Deceased WITH `name` IS "the deceased"
+                              , `date of death` IS YMD 2026 1 15
+                              , `domiciled in Singapore` IS FALSE
+                              , `Muslim` IS FALSE)
+    , `family` IS (Family WITH `surviving spouses` IS (LIST `surviving` "Wife")
+                          , `children` IS EMPTY, `parents` IS EMPTY, `siblings` IS EMPTY
+                          , `grandparents` IS EMPTY, `uncles and aunts` IS EMPTY)
+    , `estate` IS (Estate WITH `immovable property in Singapore` IS 900000
+                          , `movable property in Singapore` IS 100000
+                          , `funeral, testamentary and administration expenses` IS 0
+                          , `debts and liabilities` IS 0)
+    , `will` IS NOTHING
+-- the Act still governs, and still gives the widow the whole of what it reaches
+#ASSERT (`the intestate distribution for` `foreign domicile, Singapore house only`)'s `governed by this Act`
+-- but what it reaches is the flat alone, not the bank account
+#ASSERT (`the property this Act distributes in` `foreign domicile, Singapore house only`) EQUALS 900000
+#ASSERT (`distributable estate of` `foreign domicile, Singapore house only`) EQUALS 1000000
+
+-- WITNESS FOR F2 -- `illegitimate child not a child under s 3`.
+-- The encoding cannot see legitimacy: membership of `children` IS the s 3
+-- determination, made by whoever supplies the facts. This case shows the
+-- consequence, which is why F2 is in the register: the same human being,
+-- entered or not entered, moves the whole estate.
+`child entered` MEANS
+    `an intestate leaving` EMPTY (LIST `surviving` "the child") EMPTY (LIST `surviving` "Sis")
+`child not entered` MEANS
+    `an intestate leaving` EMPTY EMPTY EMPTY (LIST `surviving` "Sis")
+#ASSERT (`the share of` "the child" `in` (`the section 7 shares of` `child entered`)) EQUALS 1
+#ASSERT (`the share of` "Sis"       `in` (`the section 7 shares of` `child not entered`)) EQUALS 1
+
+-- WITNESS FOR F4 -- `partial intestacy, half disposed`.
+-- ISA s 10: where a will disposes of part only, this Act governs the rest.
+-- The encoding models "the rest" as a proportion of value.
+`partial intestacy, half disposed` MEANS
+  Case WITH
+      `deceased` IS (Deceased WITH `name` IS "the deceased"
+                              , `date of death` IS YMD 2026 1 15
+                              , `domiciled in Singapore` IS TRUE
+                              , `Muslim` IS FALSE)
+    , `family` IS (Family WITH `surviving spouses` IS (LIST `surviving` "Wife")
+                          , `children` IS EMPTY, `parents` IS EMPTY, `siblings` IS EMPTY
+                          , `grandparents` IS EMPTY, `uncles and aunts` IS EMPTY)
+    , `estate` IS (Estate WITH `immovable property in Singapore` IS 900000
+                          , `movable property in Singapore` IS 100000
+                          , `funeral, testamentary and administration expenses` IS 0
+                          , `debts and liabilities` IS 0)
+    , `will` IS (JUST (Will WITH `in writing` IS TRUE
+                            , `signed at the foot or end by the testator` IS TRUE
+                            , `number of attesting witnesses` IS 2
+                            , `witnesses present at the same time` IS TRUE
+                            , `witnesses subscribed in the testator's presence` IS TRUE
+                            , `testator's age at execution` IS 55
+                            , `soldier in actual military service or mariner at sea` IS FALSE
+                            , `married after execution` IS FALSE
+                            , `expressed to be made in contemplation of that marriage` IS FALSE
+                            , `revoked by a later will, writing or destruction` IS FALSE
+                            , `proportion of the estate beneficially disposed of` IS (1 DIVIDED BY 2)
+                            , `an executor is appointed, and able and willing to act` IS TRUE))
+#ASSERT (`the proportion this Act governs in` `partial intestacy, half disposed`) EQUALS (1 DIVIDED BY 2)
+
+
+§§ `3. The Act's own boundaries`
+
+-- ISA s 2: a Muslim estate is not this Act's business at all, and the encoding
+-- refuses rather than answering. For an end-user tool this is the difference
+-- between "we cannot help you here" and a confidently wrong distribution.
+`a Muslim intestate` MEANS
+  Case WITH
+      `deceased` IS (Deceased WITH `name` IS "the deceased"
+                              , `date of death` IS YMD 2026 1 15
+                              , `domiciled in Singapore` IS TRUE
+                              , `Muslim` IS TRUE)
+    , `family` IS (Family WITH `surviving spouses` IS (LIST `surviving` "Wife")
+                          , `children` IS EMPTY, `parents` IS EMPTY, `siblings` IS EMPTY
+                          , `grandparents` IS EMPTY, `uncles and aunts` IS EMPTY)
+    , `estate` IS (Estate WITH `immovable property in Singapore` IS 900000
+                          , `movable property in Singapore` IS 100000
+                          , `funeral, testamentary and administration expenses` IS 0
+                          , `debts and liabilities` IS 0)
+    , `will` IS NOTHING
+#ASSERT NOT ((`the intestate distribution for` `a Muslim intestate`)'s `governed by this Act`)
+#ASSERT (count ((`the intestate distribution for` `a Muslim intestate`)'s `shares`)) EQUALS 0
+
+-- ISA s 5: the Act reaches deaths after 2 June 1967 and no earlier.
+`a death in 1960` MEANS
+  Case WITH
+      `deceased` IS (Deceased WITH `name` IS "the deceased"
+                              , `date of death` IS YMD 1960 5 1
+                              , `domiciled in Singapore` IS TRUE
+                              , `Muslim` IS FALSE)
+    , `family` IS (Family WITH `surviving spouses` IS (LIST `surviving` "Wife")
+                          , `children` IS EMPTY, `parents` IS EMPTY, `siblings` IS EMPTY
+                          , `grandparents` IS EMPTY, `uncles and aunts` IS EMPTY)
+    , `estate` IS (Estate WITH `immovable property in Singapore` IS 900000
+                          , `movable property in Singapore` IS 100000
+                          , `funeral, testamentary and administration expenses` IS 0
+                          , `debts and liabilities` IS 0)
+    , `will` IS NOTHING
+#ASSERT NOT ((`the intestate distribution for` `a death in 1960`)'s `governed by this Act`)

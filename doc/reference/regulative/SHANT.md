@@ -13,6 +13,8 @@ PARTY partyName SHANT action WITHIN deadline
 
 SHANT expresses a legal prohibition - something a party must NOT do. If the party performs the forbidden action, breach occurs.
 
+**Synonym:** `MUST NOT` parses to exactly the same prohibition as SHANT, so `PARTY Employee MUST NOT disclose` and `PARTY Employee SHANT disclose` are interchangeable. Use whichever mirrors the source text.
+
 ## Examples
 
 **Example file:** [shant-example.l4](shant-example.l4)
@@ -53,6 +55,10 @@ limitedGambling MEANS
 - Prohibition is **maintained** when the party does NOT perform the action
 - Prohibition is **breached** when the party performs the forbidden action
 - LEST consequences trigger on breach
+
+## Performer Rule
+
+When using the **value-actor encoding**, `PARTY p SHANT a` requires that `p` is the **performer** of action `a`, just as with MUST and MAY. The check fires at compile time. See **[Actors, Actions, and Agreement](../../concepts/legal-modeling/actors-and-actions.md)** for the full rules.
 
 ## Related Keywords
 

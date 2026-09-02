@@ -1,0 +1,19 @@
+-- Fixture for the `l4 run` crashed-#EVAL exit-code rule (ruled by Meng
+-- 2026-08-01): a directive that CRASHES during evaluation must exit non-zero.
+--
+-- This file must TYPECHECK (so the run is not failed by a type error instead —
+-- which would make the test pass for the wrong reason) and must THROW when the
+-- directive is evaluated. `@nonexhaustive` silences the exhaustiveness warning
+-- the oracle would otherwise emit, leaving a CONSIDER with no NOTHING branch;
+-- evaluating it against NOTHING reaches no branch and raises the runtime
+-- non-exhaustive-match exception.
+§ EvalCrashFixture
+
+@nonexhaustive
+GIVEN mx IS A MAYBE NUMBER
+GIVETH A NUMBER
+unwrap mx MEANS
+  CONSIDER mx
+  WHEN JUST n THEN n
+
+#EVAL unwrap NOTHING

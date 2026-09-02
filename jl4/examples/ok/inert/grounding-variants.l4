@@ -1,0 +1,168 @@
+-- Fixture for the two EPISTEMIC knobs in the ladder visualizer:
+--
+--   * grounding        — how to read an atom nobody answered:
+--                        'show what's known' (Kleene) / closed world / open world
+--   * respect defaults — whether the TYPICALLY presumptions below are in play at all
+--
+-- The point of the file is that ONE GLOBAL SETTING IS THE WRONG SHAPE, and the first
+-- two decisions demonstrate why by disagreeing about which reading is safe.
+-- NEGATION-AS-FAILURE-SPEC.md assigns them by polarity: `presumed` (open world) for a
+-- PERMISSION, `holds` (closed world) for discharging an OBLIGATION. Flip the radio
+-- between these two and watch each one become dangerous in turn.
+--
+-- Nothing here evaluates: every atom is an uninterpreted ASSUME or a GIVEN parameter,
+-- which is exactly what we want — a screenful of genuinely UNANSWERED atoms is the
+-- input the grounding knob exists to interpret.
+
+IMPORT prelude
+
+-- Atoms nobody has answered.
+--
+-- Deliberately NOT under a `§` section: a name declared inside one is reported to the
+-- visualizer fully qualified ("… (qualified at section X)"), which lands verbatim in the
+-- box label and makes every leaf unreadably wide.
+
+ASSUME `a prohibition notice is in force` IS A BOOLEAN
+ASSUME `the visitor holds a valid pass`   IS A BOOLEAN
+ASSUME `the site is a restricted area`    IS A BOOLEAN
+
+ASSUME `the return was filed`             IS A BOOLEAN
+ASSUME `the levy was paid`                IS A BOOLEAN
+ASSUME `an extension was granted`         IS A BOOLEAN
+
+ASSUME `the premises are residential`     IS A BOOLEAN
+ASSUME `smoke alarms are fitted`          IS A BOOLEAN
+ASSUME `the escape route is clear`        IS A BOOLEAN
+
+
+-- == 1. A PERMISSION — whose two atoms want OPPOSITE readings ==
+
+-- The sharpest argument against a single global switch, and it is visible inside ONE rule.
+-- Neither reading is safe here, because the two atoms have opposite polarity:
+--
+--   * `a prohibition notice is in force` sits under a NOT, so reading it FALSE (closed
+--     world) is the GENEROUS move — it declines to bar a visitor nobody has actually
+--     barred. Open world invents a prohibition and locks them out.
+--   * `the visitor holds a valid pass` is a positive precondition, so reading it FALSE is
+--     the STRICT move, and open world is what invents the pass.
+--
+-- So closed world is right for one atom and wrong for the other, in the same conjunction.
+-- That is why NEGATION-AS-FAILURE-SPEC.md puts `holds`/`presumed` at the USE SITE: the
+-- drafter chooses per atom, and this knob can only ever supply a house default for the
+-- atoms nobody chose for.
+DECIDE `may enter the site` IF
+        NOT `a prohibition notice is in force`
+    AND     `the visitor holds a valid pass`
+
+
+-- == 2. AN OBLIGATION — closed world is the safe reading ==
+
+-- Exactly inverted. An unproven filing is NOT a filing: nobody discharges a duty by
+-- failing to mention it. Open world here manufactures compliance out of silence, which
+-- is the single most expensive mistake this picture can make.
+DECIDE `has discharged the reporting duty` IF
+            `the return was filed`
+        AND `the levy was paid`
+    OR      `an extension was granted`
+
+
+-- == 3. A SEAM — scope ⇒ requirement, so the two lamps engage ==
+
+-- Watch the LAMPS, not the wires (DESIGN §25.4). With grounding off, both lamps stay
+-- dark and that is honest: undetermined. Closed world reads the unanswered scope as
+-- out-of-scope and the note says N/A "on this reading" — never as a plain finding.
+-- Open world puts the case in scope and then decides the requirement, which is how a
+-- single knob can walk you from "we don't know" to "in breach" with no new facts.
+DECIDE `rule 7 is satisfied` IF
+    `the premises are residential`
+        IMPLIES
+            `smoke alarms are fitted`
+        AND `the escape route is clear`
+
+
+-- == 4. DEFAULTS — the other axis ==
+
+-- `respect defaults` off demotes each TYPICALLY from a value to a mere mark: the box
+-- stays fine-dashed and keeps its tag (so you can still see WHERE a presumption was
+-- available) while the value it supplied disappears. Answer: how much of this verdict
+-- was resting on presumptions rather than facts?
+--
+-- Turn defaults OFF and grounding to CLOSED and every leaf here reads
+-- "assumed false (typically off)" — both things that happened to it, named.
+GIVEN
+  `the applicant is of age`     IS A BOOLEAN TYPICALLY TRUE
+  `the applicant is bankrupt`   IS A BOOLEAN TYPICALLY FALSE
+  `a guarantor has signed`      IS A BOOLEAN TYPICALLY FALSE
+  `the deposit has cleared`     IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `the tenancy may proceed` IF
+        `the applicant is of age`
+    AND NOT `the applicant is bankrupt`
+    AND `the deposit has cleared`
+    AND `a guarantor has signed`
+
+
+-- == 5. Brute permutations ==
+
+-- No story, just coverage: every combinator the kernel draws, over atoms that are all
+-- unanswered, so each radio setting has something of every shape to act on.
+-- (Mixed provenance in `perm4` is the interesting one: a presumption and an assumption
+-- meeting on the same rung, which must stay visually distinguishable — amber for what
+-- the SOURCE presumed, slate-blue for what the READER assumed.)
+
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+      r IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `perm1 — pure series` IF
+        p
+    AND q
+    AND r
+
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+      r IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `perm2 — pure parallel` IF
+        p
+    OR  q
+    OR  r
+
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+      r IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `perm3 — negation over a group` IF
+    NOT     p
+        AND q
+    OR      r
+
+GIVEN p IS A BOOLEAN TYPICALLY TRUE
+      q IS A BOOLEAN
+      r IS A BOOLEAN TYPICALLY FALSE
+GIVETH A BOOLEAN
+DECIDE `perm4 — presumed and assumed on one rung` IF
+        p
+    AND q
+    AND NOT r
+
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+      r IS A BOOLEAN
+      s IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `perm5 — sum of products` IF
+            p
+        AND q
+    OR      r
+        AND s
+
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `perm6 — seam with a compound scope` IF
+            p
+        AND q
+    IMPLIES
+            NOT p
+        OR  q

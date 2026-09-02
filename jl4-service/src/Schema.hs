@@ -26,6 +26,7 @@ import qualified L4.Decision.QueryPlan as QP
 import qualified LSP.L4.Viz.VizExpr as VizExpr
 import Servant
 import Servant.OpenApi
+import qualified Version
 
 type ServerName = Text
 
@@ -35,7 +36,7 @@ serverOpenApi serverName =
   annotateGraphVizParams $
     toOpenApi (Proxy :: Proxy Api)
       & info . title .~ "JL4 Multi-Tenant Decision Service API"
-      & info . version .~ "1.0"
+      & info . version .~ Version.serviceVersion
       & info . description ?~ "Multi-tenant API for deploying and evaluating JL4 functions"
       & servers .~ Maybe.maybeToList ((\sName -> Server sName mempty mempty) <$> serverName)
  where
@@ -67,6 +68,7 @@ type DeploymentRoutesForSchema =
   :<|> "functions" :> Capture "name" Text :> "evaluation" :> Header "X-L4-Trace" Text :> QueryParam "trace" TraceLevel :> QueryParam "graphviz" Bool :> ReqBody '[JSON] FnArguments :> Post '[JSON] SimpleResponse
   :<|> "functions" :> Capture "name" Text :> "evaluation" :> "batch" :> Header "X-L4-Trace" Text :> QueryParam "trace" TraceLevel :> QueryParam "graphviz" Bool :> ReqBody '[JSON] BatchRequest :> Post '[JSON] BatchResponse
   :<|> "functions" :> Capture "name" Text :> "query-plan" :> ReqBody '[JSON] FnArguments :> Post '[JSON] QueryPlanResponse
+  :<|> "functions" :> Capture "name" Text :> "ladder" :> Get '[JSON] VizExpr.RenderAsLadderInfo
   :<|> "functions" :> Capture "name" Text :> "state-graphs" :> Get '[JSON] StateGraphListResponse
   :<|> "functions" :> Capture "name" Text :> "state-graphs" :> Capture "graphName" Text :> Get '[PlainText] Text
   :<|> "openapi.json" :> Get '[JSON] DeploymentMetadata
@@ -154,6 +156,7 @@ instance ToSchema VizExpr.RenderAsLadderInfo where
 
 instance ToSchema QP.InputRef
 instance ToSchema QueryAtom
+instance ToSchema QP.Verdict
 instance ToSchema QueryOutcome
 instance ToSchema QueryImpact
 instance ToSchema QueryInput

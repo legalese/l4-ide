@@ -163,6 +163,123 @@ export const GetSidebarExportedFunctions: RequestType<
   method: 'getSidebarExportedFunctions',
 }
 
+/** Render tab asks the extension to render the active file and open a preview.
+ *  The extension resolves the active L4 document, calls the LSP
+ *  `l4/exportDocument`, and opens the result (HTML in a webview panel; AKN/text
+ *  in a new editor). */
+export interface RenderPreviewParams {
+  /** "html" (default) | "text" | "akn" */
+  format: string
+  includeUnused: boolean
+  numberSections: boolean
+  numberClauses: boolean
+  toc: boolean
+  /** Module URIs the user deselected in the imports checklist. */
+  excludeModules?: string[]
+  /** Whether to surface the rendered document in an editor/browser
+   *  tab. Defaults to true. The Render tab sets this to false when it
+   *  is about to hand the render off to Legalese AI for refinement —
+   *  the deterministic output is an intermediate artifact there, so
+   *  popping it open would just clutter the workspace. */
+  openInEditor?: boolean
+}
+
+/** An imported module the active file pulls in, for the Render-tab
+ *  include/exclude checklist. */
+export interface SidebarImportedFile {
+  /** Module URI — round-tripped as an `excludeModules` entry. */
+  uri: string
+  /** Display label (file name or section title). */
+  label: string
+}
+
+/** Render tab asks the extension for the active file's imported modules.
+ *  The extension resolves the active L4 document and calls the LSP
+ *  `l4/exportPlan`, returning the non-main modules. */
+export const GetSidebarImportedFiles: RequestType<
+  void,
+  { files: SidebarImportedFile[] }
+> = {
+  method: 'getSidebarImportedFiles',
+}
+
+export interface RenderPreviewResponse {
+  success: boolean
+  /** The document title, echoed for the sidebar status line. */
+  title?: string
+  /** Absolute path of the file written next to the .l4 (when on disk). */
+  savedPath?: string
+  error?: string
+}
+
+export const RequestRenderPreview: RequestType<
+  RenderPreviewParams,
+  RenderPreviewResponse
+> = {
+  method: 'requestRenderPreview',
+}
+
+/** Render tab asks the extension for a live in-tab HTML preview of the
+ *  active file. Unlike {@link RequestRenderPreview}, this never writes a
+ *  file to disk and never opens an editor/webview panel — the rendered
+ *  HTML is returned to the sidebar webview, which displays it inline in an
+ *  iframe (`srcdoc`). The render reflects the in-memory (unsaved) buffer,
+ *  so the preview tracks edits as the user types. */
+export interface RenderInlineParams {
+  numberSections: boolean
+  numberClauses: boolean
+  toc: boolean
+  includeUnused: boolean
+  /** Module URIs the user deselected in the imports tray. */
+  excludeModules?: string[]
+}
+
+export interface RenderInlineResponse {
+  success: boolean
+  /** Full HTML document, ready to drop into an iframe `srcdoc`. */
+  html?: string
+  /** The document title, echoed for the sidebar. */
+  title?: string
+  error?: string
+}
+
+export const RequestRenderInline: RequestType<
+  RenderInlineParams,
+  RenderInlineResponse
+> = {
+  method: 'requestRenderInline',
+}
+
+/** Render tab asks the extension to export the active file in a chosen
+ *  format and persist it to a user-chosen location. The extension renders
+ *  the content, shows a native Save dialog (defaulting next to the .l4
+ *  source with the format's extension), and writes the file there. */
+export interface RenderSaveParams {
+  /** "html" | "akn" | "text" | "json" | "plan" */
+  format: string
+  numberSections: boolean
+  numberClauses: boolean
+  toc: boolean
+  includeUnused: boolean
+  excludeModules?: string[]
+}
+
+export interface RenderSaveResponse {
+  success: boolean
+  /** Absolute path the user saved to (omitted when canceled). */
+  savedPath?: string
+  /** True when the user dismissed the Save dialog. */
+  canceled?: boolean
+  error?: string
+}
+
+export const RequestRenderSave: RequestType<
+  RenderSaveParams,
+  RenderSaveResponse
+> = {
+  method: 'requestRenderSave',
+}
+
 /** Connection status response from extension to sidebar */
 export interface GetSidebarConnectionStatusResponse {
   serviceUrl: string
@@ -373,24 +490,71 @@ export const RequestOpenExtensionSettings: NotificationType<void> = {
   method: 'requestOpenExtensionSettings',
 }
 
-/** Sidebar asks extension to add L4 tools (MCP server + skill) to Claude Code */
-export const RequestAddL4ToolsToClaudeCode: NotificationType<void> = {
-  method: 'requestAddL4ToolsToClaudeCode',
+/**
+ * Local AI harnesses the extension can install the L4 Rules into. Each maps
+ * to a config-file writer on the extension side. Claude Code and the GitHub
+ * Copilot CLI additionally support the full plugin (skill + discovery MCP)
+ * through their own CLIs, which the marketplace install prefers, falling back
+ * to the config writer. `download-zip` is a per-deployment-only pseudo-target
+ * handled separately.
+ */
+export type Harness =
+  | 'claude-code'
+  | 'vscode'
+  | 'copilot-cli'
+  | 'cursor'
+  | 'windsurf'
+  | 'cline'
+  | 'claude-desktop'
+
+/** Display order + labels for the install dropdowns (rendered by the webview).
+ *  This is the single source of truth for harness display names — the
+ *  extension derives its toast labels from it rather than restating them. */
+export const HARNESSES: ReadonlyArray<{ id: Harness; label: string }> = [
+  { id: 'claude-code', label: 'Claude Code' },
+  { id: 'vscode', label: 'VS Code (Copilot)' },
+  { id: 'copilot-cli', label: 'GitHub Copilot CLI' },
+  { id: 'cursor', label: 'Cursor' },
+  { id: 'windsurf', label: 'Windsurf' },
+  { id: 'cline', label: 'Cline' },
+  { id: 'claude-desktop', label: 'Claude Desktop' },
+]
+
+/**
+ * Sidebar asks the extension to install the global gateway "skills
+ * marketplace" into a harness: the account-wide rules MCP server
+ * (`mcp.legalese.cloud`, org resolved from auth) — and, for Claude Code, the
+ * `rules@legalese-cloud` plugin (marketplace + skill) via its CLI when
+ * available. Org scope comes from the user's sign-in, so no token is baked in.
+ */
+export const RequestInstallMarketplace: NotificationType<{ harness: Harness }> =
+  {
+    method: 'requestInstallMarketplace',
+  }
+
+/**
+ * Sidebar asks the extension to save the global gateway "skills marketplace"
+ * plugin (the org-agnostic discovery skill + account-wide rules MCP) as a zip
+ * on disk — the download counterpart of `RequestInstallMarketplace`. The
+ * extension templates the bundle locally (no network) and shows a Save dialog.
+ */
+export const RequestDownloadMarketplaceSkill: NotificationType<void> = {
+  method: 'requestDownloadMarketplaceSkill',
 }
 
 /**
- * Sidebar asks extension to install a specific deployment as a Claude Code
- * plugin or a VS Code Chat MCP server. The extension downloads the plugin
- * bundle from `mcp.legalese.cloud/{slug}/{deploymentId}/.skill` using the
- * user's session token, then writes the relevant config for the chosen
- * target (skill folder + ~/.claude.json for Claude Code; per-deployment
- * entry in VS Code's user-level mcp.json for VS Code Chat).
+ * Sidebar asks the extension to install a specific deployment into a harness.
+ * The extension downloads the plugin bundle from
+ * `mcp.legalese.cloud/{slug}/{deploymentId}/.plugin` using the user's session
+ * token, writes the agent skill (where the harness reads one) and the
+ * per-deployment MCP server entry into that harness's config. `download-zip`
+ * saves the raw bundle instead.
  *
- * Cloud mode only — both targets reference the hosted MCP URL.
+ * Cloud mode only — every target references the hosted MCP URL.
  */
 export const RequestInstallDeploymentSkill: NotificationType<{
   deploymentId: string
-  target: 'claude-code' | 'vscode-chat' | 'download-zip'
+  target: Harness | 'download-zip'
 }> = {
   method: 'requestInstallDeploymentSkill',
 }
@@ -807,6 +971,7 @@ export type AiPermissionCategory =
   | 'l4.evaluate'
   | 'l4.refactor'
   | 'mcp.l4Rules'
+  | 'mcp.vscode'
   | 'meta.askUser'
 
 export type AiPermissionValue = 'never' | 'ask' | 'always'
@@ -828,6 +993,128 @@ export const AiPermissionsSet: NotificationType<{
   method: 'aiPermissionsSet',
 }
 
+/** One tool of an MCP server, with its own enable toggle. */
+export interface AiMcpToolInfo {
+  name: string
+  description?: string
+  enabled: boolean
+}
+
+/** One of OUR MCP servers, as shown in the sidebar's "MCP servers"
+ *  settings section. The extension runs these itself (http/sse/stdio,
+ *  with its own OAuth client for protected servers). */
+export interface AiMcpServerInfo {
+  id: string
+  name: string
+  /** `http` / `sse` / `stdio` when known. */
+  transport?: string
+  /** URL or command line, for display. */
+  detail?: string
+  enabled: boolean
+  /** Connection state of the extension's own client. `unauthorized`
+   *  means the server wants an OAuth sign-in — Start in the server
+   *  menu runs the browser flow. */
+  status: 'connected' | 'connecting' | 'error' | 'stopped' | 'unauthorized'
+  /** Human-readable connection failure, when status === 'error'. */
+  error?: string
+  tools: AiMcpToolInfo[]
+}
+
+/** An MCP server registered in VS Code's mcp.json that is NOT ours
+ *  yet — offered (toggled off) below our list. Toggling it on imports
+ *  a copy of its config into our list. */
+export interface AiMcpCandidateInfo {
+  id: string
+  name: string
+  transport?: string
+  detail?: string
+}
+
+/** Webview asks for the current MCP server list. `candidates` are
+ *  VS Code-registered servers offered for import; `allEnabled` is the
+ *  master switch shown atop the list when several servers exist. */
+export const AiMcpServersGet: RequestType<
+  void,
+  {
+    servers: AiMcpServerInfo[]
+    candidates: AiMcpCandidateInfo[]
+    allEnabled: boolean
+  }
+> = {
+  method: 'aiMcpServersGet',
+}
+
+/** Webview imports a VS Code-registered server: its config is copied
+ *  into our list (the mcp.json entry is untouched) and the server is
+ *  started. */
+export const AiMcpServerImport: RequestType<
+  { id: string },
+  { ok: boolean; error?: string }
+> = {
+  method: 'aiMcpServerImport',
+}
+
+/** Webview flips the master switch: off hides every MCP server's
+ *  tools from Legalese AI and drops the connections; on reconnects
+ *  the enabled servers. */
+export const AiMcpAllSetEnabled: NotificationType<{ enabled: boolean }> = {
+  method: 'aiMcpAllSetEnabled',
+}
+
+/** Webview toggles one MCP server on/off for Legalese AI. Persisted in
+ *  VSCode configuration under `legaleseAi.mcp.disabledServers`. */
+export const AiMcpServerSetEnabled: NotificationType<{
+  id: string
+  enabled: boolean
+}> = {
+  method: 'aiMcpServerSetEnabled',
+}
+
+/** Webview runs a state action on one server (three-dot menu):
+ *  start/refresh reconnects the extension's client (running the OAuth
+ *  browser flow when the server requires it), stop drops it, remove
+ *  deletes the entry from OUR list only (mcp.json is untouched). */
+export const AiMcpServerAction: RequestType<
+  { id: string; action: 'start' | 'stop' | 'refresh' | 'remove' },
+  { ok: boolean; error?: string }
+> = {
+  method: 'aiMcpServerAction',
+}
+
+/** Webview toggles a single tool of a server on/off for Legalese AI.
+ *  Persisted under `legaleseAi.mcp.disabledTools`. */
+export const AiMcpToolSetEnabled: NotificationType<{
+  serverId: string
+  toolName: string
+  enabled: boolean
+}> = {
+  method: 'aiMcpToolSetEnabled',
+}
+
+/** Webview adds a new MCP server to OUR list (the extension runs it
+ *  itself; VS Code's mcp.json is not involved). Returns `ok: false`
+ *  with a human-readable `error` on validation failure; a name
+ *  collision additionally sets `exists: true` so the UI can offer to
+ *  replace the entry (confirmed resubmit carries `overwrite: true`). */
+export const AiMcpServerAdd: RequestType<
+  {
+    name: string
+    transport: 'http' | 'sse' | 'stdio'
+    /** For http/sse servers. */
+    url?: string
+    /** For stdio servers: full command line. */
+    command?: string
+    /** Optional bearer token for http/sse servers, stored as an
+     *  `Authorization: Bearer …` header on the mcp.json entry. */
+    bearerToken?: string
+    /** Replace an existing same-name entry (user confirmed). */
+    overwrite?: boolean
+  },
+  { ok: boolean; error?: string; exists?: boolean }
+> = {
+  method: 'aiMcpServerAdd',
+}
+
 /** Chat-panel UI preferences. Persisted on the extension side via
  *  `vscode.workspace.getConfiguration` under `legaleseAi.<key>`, so
  *  Settings Sync carries them across machines — same mechanism as
@@ -835,6 +1122,11 @@ export const AiPermissionsSet: NotificationType<{
  *  webview store, and a key mapping in the extension handler. */
 export interface AiPreferences {
   showReasoning: boolean
+  /** Free-text methodology the user wants the model to follow. When
+   *  non-empty, it's injected as a `<methodology>` system message just
+   *  before the first user prompt of a new (non-deployment)
+   *  conversation. Empty string means "no methodology". */
+  methodology: string
 }
 
 /** Webview asks for all current preference values. */

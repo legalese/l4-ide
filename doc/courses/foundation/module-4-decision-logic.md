@@ -1,5 +1,7 @@
 # Module 4: Decision Logic
 
+**Prerequisites:** Modules 1–3
+
 In this module, you'll learn how to encode **constitutive rules** - legal rules that determine facts, classifications, and eligibility.
 
 ## Learning Objectives
@@ -20,7 +22,7 @@ By the end of this module, you will be able to:
 
 Legal systems contain two types of rules:
 
-**Regulative rules** (Module 1 and 5) specify what parties **must**, **may**, or **must not** do:
+**Regulative rules** (Modules 1 and 6) specify what parties **must**, **may**, or **must not** do:
 
 - "The applicant **must** submit documentation **within** 30 days"
 - "The landlord **may** terminate the lease if rent is unpaid"
@@ -70,18 +72,13 @@ In L4, you **must** make these dependencies explicit:
 ```l4
 GIVEN `the applicant` IS A Person
       `the jurisdiction` IS A STRING
-      `today` IS A DATE
 GIVETH A BOOLEAN
 DECIDE `the applicant is eligible` IF
     `the applicant is a resident of the jurisdiction`
     WHERE
-        GIVEN person IS A Person
-              jurisdiction IS A STRING
-              currentDate IS A DATE
-        GIVETH A BOOLEAN
         `the applicant is a resident of the jurisdiction` MEANS
-            person's `country of residence` == jurisdiction
-            AND person's `years of residence` >= 5
+            `the applicant`'s `country of residence` EQUALS `the jurisdiction`
+            AND `the applicant`'s `years of residence` >= 5
 ```
 
 Notice how the helper decision `is a resident of` **also** declares its dependencies. You can't hide information - if a decision needs something, you must pass it explicitly.
@@ -99,7 +96,7 @@ This explicit dependency tracking has a **huge benefit for legal reasoning**:
 -- ✅ Clear: Eligibility depends on these specific factors
 GIVEN `the person` IS A Person
       `the application date` IS A DATE
-      `the jurisdiction rules` IS A RuleSet
+      `the jurisdiction rules` IS A `Rule Set`
 GIVETH A BOOLEAN
 DECIDE `the person is eligible` IF ...
 ```
@@ -124,7 +121,7 @@ DECIDE `qualifies for benefit` IF
     AND ...
     WHERE
         GIVEN person IS A Person
-              currentDate IS A DATE  -- Sub-decision needs it too!
+              `the current date` IS A DATE  -- Sub-decision needs it too!
         GIVETH A BOOLEAN
         `is eligible` MEANS ...
 ```
@@ -267,10 +264,12 @@ GIVEN `the principal` IS A NUMBER
       `the years` IS A NUMBER
 GIVETH A NUMBER
 `the compound interest` MEANS
-    `the principal` * (`the growth factor` ^ `the years`)
+    `the principal` * EXPONENT `the growth factor` `the years`
     WHERE
         `the growth factor` MEANS 1 + `the annual rate`
 ```
+
+(`EXPONENT base power` is L4's built-in exponentiation function.)
 
 **Benefits:**
 
@@ -291,7 +290,7 @@ GIVETH A NUMBER
     (`the compound factor` - 1)
     WHERE
         `the monthly rate` MEANS `the annual rate` / 12
-        `the compound factor` MEANS (1 + `the monthly rate`) ^ `the term in months`
+        `the compound factor` MEANS EXPONENT (1 + `the monthly rate`) `the term in months`
 ```
 
 ---
@@ -300,27 +299,33 @@ GIVETH A NUMBER
 
 ### Example 1: Benefit Eligibility
 
+From [module-4-examples.l4](module-4-examples.l4):
+
 ```l4
 DECLARE Person HAS
     name IS A STRING
     age IS A NUMBER
     citizenship IS A STRING
+    `annual income` IS A NUMBER
     `criminal record` IS A BOOLEAN
-    `years of residence` IS A NUMBER
 
 GIVEN `the applicant` IS A Person
 GIVETH A BOOLEAN
-DECIDE `the applicant is eligible for housing benefit` IF
+DECIDE `the applicant is eligible for benefit` IF
     `the applicant is a qualifying resident`
     AND `the applicant is of age`
+    AND `the applicant meets income threshold`
     AND NOT `the applicant is disqualified`
     WHERE
         `the applicant is a qualifying resident` MEANS
-            `the applicant`'s citizenship == "citizen"
-            OR `the applicant`'s `years of residence` >= 5
+            `the applicant`'s citizenship = "citizen"
 
         `the applicant is of age` MEANS
             `the applicant`'s age >= 21
+            AND `the applicant`'s age < 65
+
+        `the applicant meets income threshold` MEANS
+            `the applicant`'s `annual income` < 30000
 
         `the applicant is disqualified` MEANS
             `the applicant`'s `criminal record`
@@ -342,46 +347,79 @@ GIVETH A NUMBER
     `tax on first bracket` + `tax on second bracket` + `tax on third bracket`
     WHERE
         `tax on first bracket` MEANS
-            `the amount in first bracket` * 0.10
+            `amount in first bracket` * 0.10
 
         `tax on second bracket` MEANS
-            `the amount in second bracket` * 0.20
+            `amount in second bracket` * 0.20
 
         `tax on third bracket` MEANS
-            `the amount in third bracket` * 0.30
+            `amount in third bracket` * 0.30
 
-        `the amount in first bracket` MEANS
-            IF `the income` <= 10000
-            THEN `the income`
-            ELSE 10000
+        `amount in first bracket` MEANS
+            BRANCH
+                IF `the income` <= 10000 THEN `the income`
+                OTHERWISE 10000
 
-        `the amount in second bracket` MEANS
-            IF `the income` <= 10000
-            THEN 0
-            ELSE IF `the income` <= 50000
-            THEN `the income` - 10000
-            ELSE 40000
+        `amount in second bracket` MEANS
+            BRANCH
+                IF `the income` <= 10000 THEN 0
+                IF `the income` <= 50000 THEN `the income` - 10000
+                OTHERWISE 40000
 
-        `the amount in third bracket` MEANS
-            IF `the income` <= 50000
-            THEN 0
-            ELSE `the income` - 50000
+        `amount in third bracket` MEANS
+            BRANCH
+                IF `the income` <= 50000 THEN 0
+                OTHERWISE `the income` - 50000
+```
+
+### Optional Values with MAYBE
+
+Legal data is often incomplete: a contract may or may not have a termination date; notice may or may not have been given. L4 models "a value that might be absent" with the **MAYBE** type:
+
+- `MAYBE DATE` means "a date, or nothing"
+- `NOTHING` is the value when it's absent
+- `JUST value` wraps a value when it's present
+
+You inspect a MAYBE with `CONSIDER`, handling both cases:
+
+```l4
+CONSIDER `the contract`'s `the termination date`
+WHEN NOTHING THEN TRUE                 -- no termination date: contract is open-ended
+WHEN JUST `the end date` THEN ...      -- there is one: use `the end date`
+```
+
+The type system forces you to say what happens in **both** cases—no "null pointer" surprises, and no silently ignored edge case.
+
+### Working with Dates
+
+L4 has a built-in `DATE` type. With `IMPORT daydate`, you can construct dates as `Date day month year` (for example, `Date 15 4 2024`) and compare them directly with `<`, `>=`, and so on.
+
+To count the days between two dates, convert them to serial day numbers with `DATE_SERIAL`:
+
+```l4
+GIVEN `the first date` IS A DATE
+      `the second date` IS A DATE
+GIVETH A NUMBER
+`the days between` MEANS
+    DATE_SERIAL `the second date` - DATE_SERIAL `the first date`
 ```
 
 ### Example 3: Contract Clause Interpretation
 
+Putting MAYBE and dates together (from [module-4-examples.l4](module-4-examples.l4)):
+
 ```l4
 DECLARE Contract HAS
-    `effective date` IS A DATE
-    `termination date` IS A MAYBE DATE
-    `notice period in days` IS A NUMBER
+    `the effective date` IS A DATE
+    `the termination date` IS A MAYBE DATE
+    `the notice period in days` IS A NUMBER
 
-DECLARE Party HAS
-    name IS A STRING
-    `notice given on` IS A MAYBE DATE
+DECLARE `Contract Party` HAS
+    `the party's name` IS A STRING
+    `notice was given on` IS A MAYBE DATE
 
 GIVEN `the contract` IS A Contract
-      `the party` IS A Party
+      `the party` IS A `Contract Party`
       `today` IS A DATE
 GIVETH A BOOLEAN
 DECIDE `the party may terminate` IF
@@ -389,18 +427,26 @@ DECIDE `the party may terminate` IF
     AND `the party has given sufficient notice`
     WHERE
         `the contract is active` MEANS
-            `today` >= `the contract`'s `effective date`
-            AND CONSIDER `the contract`'s `termination date`
-                WHEN Nothing THEN True
-                WHEN Just d THEN `today` < d
+            `today` >= `the contract`'s `the effective date`
+            AND CONSIDER `the contract`'s `the termination date`
+                WHEN NOTHING THEN TRUE
+                WHEN JUST `the end date` THEN `today` < `the end date`
 
         `the party has given sufficient notice` MEANS
-            CONSIDER `the party`'s `notice given on`
-            WHEN Nothing THEN False
-            WHEN Just noticeDate THEN
-                `days since notice` >= `the contract`'s `notice period in days`
-                WHERE
-                    `days since notice` MEANS `today` - noticeDate
+            CONSIDER `the party`'s `notice was given on`
+            WHEN NOTHING THEN FALSE
+            WHEN JUST `the notice date` THEN
+                `the days between` `the notice date` `today` >= `the contract`'s `the notice period in days`
+```
+
+Try it with the test data from the examples file:
+
+```l4
+`the open-ended contract` MEANS Contract (Date 1 1 2024) NOTHING 30
+`the party with notice` MEANS `Contract Party` "Acme Ltd" (JUST (Date 1 3 2024))
+
+#EVAL `the party may terminate` `the open-ended contract` `the party with notice` (Date 15 4 2024)
+-- Result: TRUE
 ```
 
 ---
@@ -463,6 +509,21 @@ DECIDE `qualifies for senior discount` IF
     -- Your code here
 ```
 
+<details>
+<summary>Solution</summary>
+
+```l4
+GIVEN `the person's age` IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `qualifies for senior discount` IF
+    `the person's age` >= 65
+
+#EVAL `qualifies for senior discount` 70
+#EVAL `qualifies for senior discount` 50
+```
+
+</details>
+
 ### Exercise 2: Multi-Condition Eligibility
 
 A person qualifies for a student loan if they:
@@ -473,6 +534,30 @@ A person qualifies for a student loan if they:
 
 Write the decision logic.
 
+<details>
+<summary>Solution</summary>
+
+```l4
+GIVEN `the applicant's age` IS A NUMBER
+      `the applicant is enrolled in an accredited institution` IS A BOOLEAN
+      `the applicant has prior loan defaults` IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `the applicant qualifies for a student loan` IF
+    `the applicant is of eligible age`
+    AND `the applicant is enrolled in an accredited institution`
+    AND NOT `the applicant has prior loan defaults`
+    WHERE
+        `the applicant is of eligible age` MEANS
+            `the applicant's age` >= 18
+            AND `the applicant's age` <= 35
+
+#EVAL `the applicant qualifies for a student loan` 25 TRUE FALSE
+#EVAL `the applicant qualifies for a student loan` 40 TRUE FALSE
+#EVAL `the applicant qualifies for a student loan` 25 TRUE TRUE
+```
+
+</details>
+
 ### Exercise 3: Tax Bracket Classification
 
 Write a decision that classifies income into tax brackets:
@@ -480,6 +565,25 @@ Write a decision that classifies income into tax brackets:
 - Income < $10,000: "exempt"
 - Income $10,000-$50,000: "standard"
 - Income > $50,000: "higher rate"
+
+<details>
+<summary>Solution</summary>
+
+```l4
+GIVEN `the income` IS A NUMBER
+GIVETH A STRING
+DECIDE `the tax bracket` IS
+    BRANCH
+        IF `the income` < 10000 THEN "exempt"
+        IF `the income` <= 50000 THEN "standard"
+        OTHERWISE "higher rate"
+
+#EVAL `the tax bracket` 5000
+#EVAL `the tax bracket` 30000
+#EVAL `the tax bracket` 80000
+```
+
+</details>
 
 ### Exercise 4: Calculation with WHERE
 
@@ -490,6 +594,30 @@ Write a computation for net income that:
 - Subtracts itemized deductions
 
 Use WHERE to break down the calculation clearly.
+
+<details>
+<summary>Solution</summary>
+
+```l4
+GIVEN `the gross income` IS A NUMBER
+      `the itemized deductions` IS A NUMBER
+GIVETH A NUMBER
+`the net income` MEANS
+    `the gross income` - `the standard deduction` - `the itemized deductions`
+    WHERE
+        `the standard deduction` MEANS
+            IF `the calculated deduction` >= 1000
+            THEN `the calculated deduction`
+            ELSE 1000
+
+        `the calculated deduction` MEANS
+            `the gross income` * 0.10
+
+#EVAL `the net income` 100000 5000
+#EVAL `the net income` 8000 500
+```
+
+</details>
 
 ---
 
@@ -529,14 +657,14 @@ DECIDE `the person is eligible` IF
 ```l4
 -- ❌ Wrong: Everything inline, hard to read
 `the result` MEANS
-    (x * 0.1 + y * 0.2) / (1 + r)^n
+    (x * 0.1 + y * 0.2) / EXPONENT (1 + r) n
 
 -- ✅ Right: Break down with WHERE
 `the result` MEANS
     `the combined amount` / `the discount factor`
     WHERE
         `the combined amount` MEANS x * 0.1 + y * 0.2
-        `the discount factor` MEANS (1 + r)^n
+        `the discount factor` MEANS EXPONENT (1 + r) n
 ```
 
 ### 4. Wrong DECIDE vs MEANS Choice
@@ -600,17 +728,6 @@ DECIDE `the net amount` IS gross - deductions
 
 ## What's Next?
 
-In [Module 5: Regulative Rules](module-5-regulative.md), you'll learn how to combine constitutive rules (decision logic) with regulative rules (obligations, permissions, prohibitions) to model complete legal workflows.
+In [Module 5: Functions](module-5-functions.md), you'll go deeper into the machinery behind decision logic: reusable functions, recursion, and higher-order functions like `map` and `filter` that let you apply decisions across whole lists of cases.
 
-You'll see how decision logic determines **when** obligations apply:
-
-```l4
--- Decision logic determines eligibility
-DECIDE `the person is eligible` IF ...
-
--- Regulative rule creates obligation based on decision
-PARTY `the government`
-MUST `pay the benefit`
-TO `the person`
-IF `the person is eligible`
-```
+After that, [Module 6: Regulative Rules](module-6-regulative.md) shows how to combine constitutive rules (decision logic) with regulative rules (obligations, permissions, prohibitions) to model complete legal workflows.

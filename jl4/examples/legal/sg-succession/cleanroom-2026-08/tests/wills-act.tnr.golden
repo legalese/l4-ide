@@ -1,0 +1,2157 @@
+# Wills Act 1838 — formal validity, revocation, revival and the privileged will
+
+## Section 1 — Short title
+
+<!-- l4: decide:s 1 — short title -->
+
+**1.** S 1 — short title means This Act is the Wills Act 1838..
+
+## Section 2 — Interpretation
+
+<!-- l4: decide:s 2 — interpretation -->
+
+**2.** S 2 — interpretation if—
+
+    (a) “internal law”, in relation to any territory or state, means the law which would apply in a case where no question of the law in force in any other territory or state arose;;
+
+    (b) “personal estate” shall extend to leasehold estates and other chattels real, and also to moneys, shares of Government and other funds, securities for money, not being real estates, debts, choses in action, rights, credits, goods and all other property whatsoever which by law devolves upon the executor or administrator, and to any share or interest therein;;
+
+    (c) “real estate” shall extend to messuages, lands, rents and hereditaments, whether corporeal, incorporeal or personal, and to any undivided share thereof and to any estate, right or interest, other than a chattel interest, therein;;
+
+    (d) “state” means a territory or group of territories having its own law of nationality;; and
+
+    (e) “will” includes a testament and an appointment by will or by writing in the nature of a will in exercise of a power and also a disposition by will and testament and any other testamentary disposition..
+
+## The facts this Act asks that the shared ontology does not carry
+
+<!-- l4: declare:Conformity of the execution of a will to a law outside this Act -->
+
+**3.** In this Act, “Conformity of the execution of a will to a law outside this Act” means a record consisting of—
+
+    (a) “the execution of the will conformed to the internal law in force in the territory where it was executed”, being a BOOLEAN;
+
+    (b) “the execution of the will conformed to the internal law in force in the territory where the testator was domiciled at the time when the will was executed”, being a BOOLEAN;
+
+    (c) “the execution of the will conformed to the internal law in force in the territory where the testator was domiciled at the time of his death”, being a BOOLEAN;
+
+    (d) “the execution of the will conformed to the internal law in force in the territory where the testator habitually resided at either of the times referred to in paragraph (b)”, being a BOOLEAN;
+
+    (e) “the execution of the will conformed to the internal law in force in the state of which the testator was a national at either of the times referred to in paragraph (b)”, being a BOOLEAN;
+
+    (f) “the will was executed on board a vessel or an aircraft of any description, and the execution of the will conformed to the internal law in force in the territory with which, having regard to its registration (if any) and other relevant circumstances, the vessel or aircraft may be taken to have been most closely connected”, being a BOOLEAN;
+
+    (g) “so far as the will disposes of immovable property, its execution conformed to the internal law in force in the territory where the property was situated”, being a BOOLEAN;
+
+    (h) “so far as the will revokes a will which under this Act would be treated as properly executed, or revokes a provision which under this Act would be treated as comprised in a properly executed will, the execution of the later will conformed to any law by reference to which the revoked will or provision would be treated as properly executed”, being a BOOLEAN; and
+
+    (i) “so far as the will exercises a power of appointment, the execution of the will conformed to the law governing the essential validity of the power”, being a BOOLEAN.
+
+<!-- l4: declare:The position of the signature -->
+
+**4.** In this Act, “The position of the signature” means a record consisting of—
+
+    (a) “there is a signature of the testator, or of a person signing for him in his presence and by his direction”, being a BOOLEAN;
+
+    (b) “the signature of the testator, or of the person signing for him as mentioned in subsection (2), is so placed at or after, or following, or under, or beside, or opposite to the end of the will”, being a BOOLEAN;
+
+    (c) “the signature does not follow and is not immediately after the foot or end of the will”, being a BOOLEAN;
+
+    (d) “a blank space intervenes between the concluding word of the will and the signature”, being a BOOLEAN;
+
+    (e) “the signature is placed among the words of the testimonium clause or of the clause of attestation, or follows or is after or under the clause of attestation, either with or without a blank space intervening, or follows or is after, or under, or beside the names or one of the names of the subscribing witnesses”, being a BOOLEAN;
+
+    (f) “the signature is on a side or page or other portion of the paper or papers containing the will whereon no clause or paragraph or disposing part of the will is written above the signature”, being a BOOLEAN; and
+
+    (g) “there appears to be sufficient space on or at the bottom of the preceding side or page or other portion of the same paper on which the will is written to contain the signature”, being a BOOLEAN.
+
+<!-- l4: declare:A disposition, and where it stands in relation to the signature -->
+
+**5.** In this Act, “A disposition, and where it stands in relation to the signature” means a record consisting of—
+
+    (a) “the disposition”, being a Disposition;
+
+    (b) “underneath or following the signature”, being a BOOLEAN; and
+
+    (c) “inserted after the signature was made”, being a BOOLEAN.
+
+<!-- l4: declare:The ways in which a will may have been revoked -->
+
+**6.** In this Act, “The ways in which a will may have been revoked” means a record consisting of—
+
+    (a) “revoked by another will or codicil executed in the manner by this Act required”, being a BOOLEAN;
+
+    (b) “revoked by some writing declaring an intention to revoke it, and executed in the manner in which a will is by this Act required to be executed”, being a BOOLEAN;
+
+    (c) “burnt, torn, or otherwise destroyed by the testator”, being a BOOLEAN;
+
+    (d) “burnt, torn, or otherwise destroyed by some person in his presence and by his direction”, being a BOOLEAN; and
+
+    (e) “destroyed with the intention of revoking it”, being a BOOLEAN.
+
+<!-- l4: declare:An alteration made in a will after its execution -->
+
+**7.** In this Act, “An alteration made in a will after its execution” means a record consisting of—
+
+    (a) “the words or effect of the will before the alteration are apparent”, being a BOOLEAN;
+
+    (b) “the alteration is executed in the like manner as by this Act is required for the execution of the will”, being a BOOLEAN;
+
+    (c) “the signature of the testator and the subscription of the witnesses are made in the margin or on some other part of the will opposite or near to the alteration”, being a BOOLEAN; and
+
+    (d) “the signature of the testator and the subscription of the witnesses are made at the foot or end of or opposite to a memorandum referring to the alteration and written at the end or some other part of the will”, being a BOOLEAN.
+
+<!-- l4: declare:The revival of a revoked will -->
+
+**8.** In this Act, “The revival of a revoked will” means a record consisting of—
+
+    (a) “revived by the re-execution thereof”, being a BOOLEAN;
+
+    (b) “revived by a codicil executed in the manner required by this Act and showing an intention to revive the will or codicil”, being a BOOLEAN;
+
+    (c) “partly revoked, and afterwards wholly revoked”, being a BOOLEAN; and
+
+    (d) “an intention to the contrary is shown”, being a BOOLEAN.
+
+<!-- l4: declare:A will, with the facts about it that only this Act asks -->
+
+**9.** In this Act, “A will, with the facts about it that only this Act asks” means a record consisting of—
+
+    (a) “the will”, being a Will;
+
+    (b) “the position of the signature”, being a The position of the signature;
+
+    (c) “the conformity of its execution to a law outside this Act”, being a Conformity of the execution of a will to a law outside this Act;
+
+    (d) “the ways in which it has been revoked”, being a The ways in which a will may have been revoked;
+
+    (e) “its revival”, being a The revival of a revoked will;
+
+    (f) “the signature was made or acknowledged by the testator as the signature to his will or codicil in the presence of 2 or more witnesses present at the same time, counting only witnesses to whom and to whose wife or husband no such disposition is given or made”, being a BOOLEAN;
+
+    (g) “a conveyance or other act has been made or done subsequently to its execution, of or relating to any real or personal estate therein comprised”, being a BOOLEAN;
+
+    (h) “that conveyance or other act is an act by which the will is revoked as aforesaid”, being a BOOLEAN;
+
+    (i) “a contrary intention appears by the will as to the time from which it speaks”, being a BOOLEAN;
+
+    (j) “a contrary intention appears by the will as to the lapse of a devise or bequest to a child or other issue”, being a BOOLEAN; and
+
+    (k) “made in such manner and form that if the disposition had been a disposition of personal estate made by that person it would have been valid”, being a BOOLEAN.
+
+<!-- l4: declare:A case under this Act -->
+
+**10.** In this Act, “A case under this Act” means a record consisting of—
+
+    (a) “the deceased”, being a Deceased person;
+
+    (b) “the will in question”, being an A will, with the facts about it that only this Act asks;
+
+    (c) “an application for an order under section 28(1) has been made”, being a BOOLEAN;
+
+    (d) “the date of that application”, being an optional DATE;
+
+    (e) “a court has given permission for the application to be made after the end of that period”, being a BOOLEAN; and
+
+    (f) “a grant limited to the remainder of the testator’s estate has previously been made or is made at the same time”, being a BOOLEAN.
+
+## Helpers — dates, survivorship and descent
+
+<!-- l4: decide:the will under consideration -->
+
+**11.** In relation to an A case under this Act “the case”, the will under consideration means the case's the will in question's the will.
+
+<!-- l4: decide:the testator of the will under consideration -->
+
+**12.** In relation to an A case under this Act “the case”, the testator of the will under consideration means the will under consideration with the case's the testator.
+
+<!-- l4: decide:the date of the death of -->
+
+**13.** In relation to a Person “the person”, the date of the death of means consider the case distinctions of the person's vital status :  when living has  then NOTHING. when died on has the date of death then JUST with the date of death. when dead, the date of death not known has  then NOTHING.
+
+<!-- l4: decide:falls strictly after -->
+
+**14.** In relation to an optional DATE “the date” and a DATE “the day fixed by the Act”, falls strictly after means consider the case distinctions of the date :  when NOTHING has  then FALSE. when JUST has the day then Day with the day is greater than Day with the day fixed by the Act.
+
+<!-- l4: decide:falls on or after -->
+
+**15.** In relation to an optional DATE “the date” and a DATE “the day fixed by the Act”, falls on or after means consider the case distinctions of the date :  when NOTHING has  then FALSE. when JUST has the day then Day with the day is at least Day with the day fixed by the Act.
+
+<!-- l4: decide:is proved to fall strictly before -->
+
+**16.** In relation to an optional DATE “the earlier” and an optional DATE “the later”, is proved to fall strictly before means consider the case distinctions of the earlier :  when NOTHING has  then FALSE. when JUST has the first day then consider the case distinctions of the later :  when NOTHING has  then FALSE. when JUST has the second day then Day with the first day is less than Day with the second day.
+
+<!-- l4: decide:the twenty-first anniversary of -->
+
+**17.** In relation to a DATE “the date of birth”, the twenty-first anniversary of means Date with DATE_DAY with the date of birth, DATE_MONTH with the date of birth and the sum of DATE_YEAR with the date of birth and 21.
+
+<!-- l4: decide:six months after -->
+
+**18.** In relation to a DATE “the date”, six months after means add months with the date and 6.
+
+<!-- l4: decide:the earliest of -->
+
+**19.** In relation to a list of DATE “the dates”, the earliest of means consider the case distinctions of the dates :  when EMPTY has  then NOTHING. when the first is followed by the rest then consider the case distinctions of the earliest of with the rest :  when NOTHING has  then JUST with the first. when JUST has the other then if Day with the first is at most Day with the other then JUST with the first else JUST with the other.
+
+<!-- l4: decide:was living on -->
+
+**20.** In relation to a Person “the person” and a DATE “the day”, was living on means consider the case distinctions of the person's vital status :  when living has  then TRUE. when died on has the date of death then Day with the date of death is greater than Day with the day. when dead, the date of death not known has  then FALSE.
+
+<!-- l4: decide:the descendants bearing the reference -->
+
+**21.** In relation to a Person “the ancestor” and a STRING “the reference”, the descendants bearing the reference means concat with map with given the relation then if the relation's the child's the reference for this person is equal to the reference then list of the relation's the child else the descendants bearing the reference with the relation's the child and the reference and the ancestor's children.
+
+<!-- l4: decide:some descendant was living on -->
+
+**22.** In relation to a Person “the ancestor” and a DATE “the day”, some descendant was living on means any with given the relation then was living on with the relation's the child and the day or some descendant was living on with the relation's the child and the day and the ancestor's children.
+
+<!-- l4: decide:the reference for the donee -->
+
+**23.** In relation to a Person or corporation “the donee”, the reference for the donee means consider the case distinctions of the donee :  when an individual has the individual then the individual's the reference for this person. in any other case.
+
+## Section 4 — Will of infant invalid
+
+<!-- l4: declare:Whether the testator had attained 21 years of age when the will was made -->
+
+**24.** In this Act, “Whether the testator had attained 21 years of age when the will was made” means one of the following—
+
+    (a) “under 21 years of age”;
+
+    (b) “21 years of age or over”; or
+
+    (c) “not in evidence, the date of birth of the testator or the date of execution of the will not being known”.
+
+<!-- l4: decide:the age of the testator when the will was made -->
+
+**25.** In relation to a Will “the will”, the age of the testator when the will was made means consider the case distinctions of the will's the testator's date of birth :  when NOTHING has  then not in evidence, the date of birth of the testator or the date of execution of the will not being known. when JUST has the date of birth then consider the case distinctions of the will's the date of execution :  when NOTHING has  then not in evidence, the date of birth of the testator or the date of execution of the will not being known. when JUST has the date of execution then if Day with the date of execution is less than Day with the twenty-first anniversary of with the date of birth then under 21 years of age else 21 years of age or over.
+
+<!-- l4: decide:s 4 — will of infant invalid -->
+
+**26.** In relation to a Will “the will”, s 4 — will of infant invalid if—
+
+    (a) No will made by any person under 21 years of age shall be valid.; and
+
+    (b) the age of the testator when the will was made with the will is equal to under 21 years of age.
+
+<!-- l4: decide:s 4 — the testator is proved to have been 21 years of age or over -->
+
+**27.** In relation to a Will “the will”, s 4 — the testator is proved to have been 21 years of age or over means the age of the testator when the will was made with the will is equal to 21 years of age or over.
+
+## Section 5 — Rules as to formal validity
+
+<!-- l4: decide:s 5(2) — the will is to be treated as properly executed -->
+
+**28.** In relation to an A case under this Act “the case”, s 5(2) — the will is to be treated as properly executed if—
+
+    (a) A will shall be treated as properly executed if its execution conformed to the internal law in force —;
+
+    (b) all of the following apply—
+
+        (i) (a); and
+
+        (ii) the connecting factors's the execution of the will conformed to the internal law in force in the territory where it was executed;
+
+    (c) all of the following apply—
+
+        (i) (b)(i); and
+
+        (ii) the connecting factors's the execution of the will conformed to the internal law in force in the territory where the testator was domiciled at the time when the will was executed;
+
+    (d) all of the following apply—
+
+        (i) (b)(ii); and
+
+        (ii) the connecting factors's the execution of the will conformed to the internal law in force in the territory where the testator was domiciled at the time of his death;
+
+    (e) all of the following apply—
+
+        (i) (c); and
+
+        (ii) the connecting factors's the execution of the will conformed to the internal law in force in the territory where the testator habitually resided at either of the times referred to in paragraph (b); or
+
+    (f) all of the following apply—
+
+        (i) (d); and
+
+        (ii) the connecting factors's the execution of the will conformed to the internal law in force in the state of which the testator was a national at either of the times referred to in paragraph (b).
+
+For the purposes of this provision—
+
+“the connecting factors” means the case's the will in question's the conformity of its execution to a law outside this Act;
+
+<!-- l4: decide:s 5(3)(a) — a will executed on board a vessel or an aircraft is treated as properly executed -->
+
+**29.** In relation to an A case under this Act “the case”, s 5(3)(a) — a will executed on board a vessel or an aircraft is treated as properly executed if—
+
+    (a) Without prejudice to subsection (2), the following shall be treated as properly executed:;
+
+    (b) (a); and
+
+    (c) the case's the will in question's the conformity of its execution to a law outside this Act's the will was executed on board a vessel or an aircraft of any description, and the execution of the will conformed to the internal law in force in the territory with which, having regard to its registration (if any) and other relevant circumstances, the vessel or aircraft may be taken to have been most closely connected.
+
+<!-- l4: decide:s 5(3)(b)-(d) — the will is treated as properly executed so far only as regards a part of it -->
+
+**30.** In relation to an A case under this Act “the case”, s 5(3)(b)-(d) — the will is treated as properly executed so far only as regards a part of it if—
+
+    (a) Without prejudice to subsection (2), the following shall be treated as properly executed:;
+
+    (b) all of the following apply—
+
+        (i) (b); and
+
+        (ii) the connecting factors's so far as the will disposes of immovable property, its execution conformed to the internal law in force in the territory where the property was situated;
+
+    (c) all of the following apply—
+
+        (i) (c); and
+
+        (ii) the connecting factors's so far as the will revokes a will which under this Act would be treated as properly executed, or revokes a provision which under this Act would be treated as comprised in a properly executed will, the execution of the later will conformed to any law by reference to which the revoked will or provision would be treated as properly executed; or
+
+    (d) all of the following apply—
+
+        (i) (d); and
+
+        (ii) the connecting factors's so far as the will exercises a power of appointment, the execution of the will conformed to the law governing the essential validity of the power.
+
+For the purposes of this provision—
+
+“the connecting factors” means the case's the will in question's the conformity of its execution to a law outside this Act;
+
+<!-- l4: decide:s 5(4) — the will is treated as improperly executed by reason only that its execution was not in accordance with formal requirements contained in the instrument creating the power -->
+
+**31.** S 5(4) — the will is treated as improperly executed by reason only that its execution was not in accordance with formal requirements contained in the instrument creating the power if—
+
+    (a) A will so far as it exercises a power of appointment shall not be treated as improperly executed by reason only that its execution was not in accordance with any formal requirements contained in the instrument creating the power.; and
+
+    (b) FALSE.
+
+<!-- l4: decide:s 5(9) — this section applies to the will of this testator -->
+
+**32.** In relation to an A case under this Act “the case”, s 5(9) — this section applies to the will of this testator if—
+
+    (a) This section shall not apply to a will of a testator who died before 26 June 1992 and shall apply to a will of a testator who dies after that date whether the will was executed before or after that date.; and
+
+    (b) falls strictly after with the date of the death of with the testator of the will under consideration with the case and YMD with 1992, 6 and 26.
+
+<!-- l4: decide:s 5 — some connecting factor is made out, leaving aside the commencement in subsection (9) -->
+
+**33.** In relation to an A case under this Act “the case”, s 5 — some connecting factor is made out, leaving aside the commencement in subsection (9) if—
+
+    (a) s 5(2) — the will is to be treated as properly executed with the case;
+
+    (b) s 5(3)(a) — a will executed on board a vessel or an aircraft is treated as properly executed with the case; or
+
+    (c) s 5(3)(b)-(d) — the will is treated as properly executed so far only as regards a part of it with the case.
+
+<!-- l4: declare:The extent to which the will is treated as properly executed under section 5 -->
+
+**34.** In this Act, “The extent to which the will is treated as properly executed under section 5” means one of the following—
+
+    (a) “not treated as properly executed under section 5”;
+
+    (b) “treated as properly executed”; or
+
+    (c) “treated as properly executed so far only as the will disposes of immovable property, revokes a will or a provision, or exercises a power of appointment”.
+
+<!-- l4: decide:s 5 — the extent to which the will is treated as properly executed -->
+
+**35.** In relation to an A case under this Act “the case”, s 5 — the extent to which the will is treated as properly executed means if not s 5(9) — this section applies to the will of this testator with the case then not treated as properly executed under section 5 if s 5(2) — the will is to be treated as properly executed with the case or s 5(3)(a) — a will executed on board a vessel or an aircraft is treated as properly executed with the case then treated as properly executed if s 5(3)(b)-(d) — the will is treated as properly executed so far only as regards a part of it with the case then treated as properly executed so far only as the will disposes of immovable property, revokes a will or a provision, or exercises a power of appointment otherwise not treated as properly executed under section 5.
+
+<!-- l4: decide:s 5 — the will is treated as properly executed -->
+
+**36.** In relation to an A case under this Act “the case”, s 5 — the will is treated as properly executed if—
+
+    (a) This section shall take effect notwithstanding any other provisions of this Act.; and
+
+    (b) s 5 — the extent to which the will is treated as properly executed with the case is equal to treated as properly executed.
+
+<!-- l4: decide:s 5 — the will is treated as properly executed so far as it exercises a power of appointment -->
+
+**37.** In relation to an A case under this Act “the case”, s 5 — the will is treated as properly executed so far as it exercises a power of appointment if—
+
+    (a) This section shall take effect notwithstanding any other provisions of this Act.;
+
+    (b) Without prejudice to subsection (2), the following shall be treated as properly executed:;
+
+    (c) (d) a will so far as it exercises a power of appointment, if the execution of the will conformed to the law governing the essential validity of the power.;
+
+    (d) s 5(9) — this section applies to the will of this testator with the case; and
+
+    (e) any of the following applies—
+
+        (i) s 5(2) — the will is to be treated as properly executed with the case;
+
+        (ii) s 5(3)(a) — a will executed on board a vessel or an aircraft is treated as properly executed with the case; or
+
+        (iii) the case's the will in question's the conformity of its execution to a law outside this Act's so far as the will exercises a power of appointment, the execution of the will conformed to the law governing the essential validity of the power.
+
+## Section 6 — Mode of execution
+
+<!-- l4: decide:at least 2 of the attesting witnesses subscribed the will in the presence of the testator -->
+
+**38.** In relation to a Will “the will”, at least 2 of the attesting witnesses subscribed the will in the presence of the testator means count with filter with given the attesting witness then the attesting witness's subscribed the will in the presence of the testator and the will's the attesting witnesses is at least 2.
+
+<!-- l4: decide:s 6(3) — the will is deemed valid as far as regards the position of the signature -->
+
+**39.** In relation to an A will, with the facts about it that only this Act asks “the will and its further facts”, s 6(3) — the will is deemed valid as far as regards the position of the signature if—
+
+    (a) Every will shall, as far only as regards the position of the signature of the testator, or of the person signing for him as mentioned in subsection (2), be deemed to be valid under this section if the signature shall be so placed at or after, or following, or under, or beside, or opposite to the end of the will, that it shall be apparent on the face of the will that the testator intended to give effect by such his signature to the writing signed as his will;;
+
+    (b) the position's there is a signature of the testator, or of a person signing for him in his presence and by his direction;
+
+    (c) the position's the signature of the testator, or of the person signing for him as mentioned in subsection (2), is so placed at or after, or following, or under, or beside, or opposite to the end of the will; and
+
+    (d) the will and its further facts's the will's apparent on the face of the will that the testator intended to give effect by such his signature to the writing signed as his will.
+
+For the purposes of this provision—
+
+“the position” means the will and its further facts's the position of the signature;
+
+<!-- l4: decide:s 6(2) — the manner of execution -->
+
+**40.** In relation to an A will, with the facts about it that only this Act asks “the will and its further facts”, s 6(2) — the manner of execution if—
+
+    (a) Every will shall be signed at the foot or end thereof by the testator, or by some other person in his presence and by his direction,;
+
+    (b) any of the following applies—
+
+        (i) the instrument's signed at the foot or end thereof by the testator;
+
+        (ii) the instrument's signed at the foot or end thereof by some other person in his presence and by his direction; or
+
+        (iii) s 6(3) — the will is deemed valid as far as regards the position of the signature with the will and its further facts;
+
+    (c) and the signature shall be made or acknowledged by the testator as the signature to his will or codicil in the presence of 2 or more witnesses present at the same time,;
+
+    (d) the instrument's the signature made or acknowledged by the testator as the signature to his will or codicil in the presence of 2 or more witnesses present at the same time;
+
+    (e) and those witnesses shall subscribe the will in the presence of the testator,;
+
+    (f) at least 2 of the attesting witnesses subscribed the will in the presence of the testator with the instrument;
+
+    (g) but no form of attestation shall be necessary.; and
+
+    (h) TRUE.
+
+For the purposes of this provision—
+
+“the instrument” means the will and its further facts's the will;
+
+<!-- l4: decide:s 6(1) — the will is in writing and executed in the manner mentioned in subsection (2) -->
+
+**41.** In relation to an A will, with the facts about it that only this Act asks “the will and its further facts”, s 6(1) — the will is in writing and executed in the manner mentioned in subsection (2) if—
+
+    (a) No will shall be valid unless it is in writing and executed in the manner mentioned in subsection (2).;
+
+    (b) the will and its further facts's the will's in writing; and
+
+    (c) s 6(2) — the manner of execution with the will and its further facts.
+
+<!-- l4: decide:one or more of the circumstances mentioned in paragraphs (a) to (e) is present -->
+
+**42.** In relation to a The position of the signature “the position”, one or more of the circumstances mentioned in paragraphs (a) to (e) is present if—
+
+    (a) all of the following apply—
+
+        (i) (a); and
+
+        (ii) the position's the signature does not follow and is not immediately after the foot or end of the will;
+
+    (b) all of the following apply—
+
+        (i) (b); and
+
+        (ii) the position's a blank space intervenes between the concluding word of the will and the signature;
+
+    (c) all of the following apply—
+
+        (i) (c); and
+
+        (ii) the position's the signature is placed among the words of the testimonium clause or of the clause of attestation, or follows or is after or under the clause of attestation, either with or without a blank space intervening, or follows or is after, or under, or beside the names or one of the names of the subscribing witnesses;
+
+    (d) all of the following apply—
+
+        (i) (d); and
+
+        (ii) the position's the signature is on a side or page or other portion of the paper or papers containing the will whereon no clause or paragraph or disposing part of the will is written above the signature; or
+
+    (e) all of the following apply—
+
+        (i) (e); and
+
+        (ii) the position's there appears to be sufficient space on or at the bottom of the preceding side or page or other portion of the same paper on which the will is written to contain the signature.
+
+<!-- l4: decide:s 6(3)(a)-(e) — the will is affected by any of the enumerated circumstances -->
+
+**43.** In relation to a The position of the signature “the position”, s 6(3)(a)-(e) — the will is affected by any of the enumerated circumstances if—
+
+    (a) and no such will shall be affected by the circumstance —;
+
+    (b) one or more of the circumstances mentioned in paragraphs (a) to (e) is present with the position;
+
+    (c) The enumeration of the circumstances under subsection (3) shall not restrict the generality of that subsection;; and
+
+    (d) FALSE.
+
+<!-- l4: decide:s 6(4) — the signature is operative to give effect to the disposition -->
+
+**44.** In relation to an A disposition, and where it stands in relation to the signature “the disposition and its position”, s 6(4) — the signature is operative to give effect to the disposition if—
+
+    (a) but no signature under this Act shall be operative to give effect to any disposition or direction which is underneath or which follows it, nor shall it give effect to any disposition or direction inserted after the signature shall be made.; and
+
+    (b) none of the following applies—
+
+        (i) the disposition and its position's underneath or following the signature; or
+
+        (ii) the disposition and its position's inserted after the signature was made.
+
+## The will is properly executed — s 5 or s 6
+
+<!-- l4: decide:the will is properly executed -->
+
+**45.** In relation to an A case under this Act “the case”, the will is properly executed if—
+
+    (a) s 5 — the will is treated as properly executed with the case; or
+
+    (b) s 6(1) — the will is in writing and executed in the manner mentioned in subsection (2) with the case's the will in question.
+
+## Section 7 — Execution of appointment by will
+
+<!-- l4: decide:s 7(1) — the appointment made by the will in exercise of a power is invalid for want of execution in the manner required by this Act -->
+
+**46.** In relation to an A case under this Act “the case”, s 7(1) — the appointment made by the will in exercise of a power is invalid for want of execution in the manner required by this Act if—
+
+    (a) No appointment made by will, in exercise of any power, shall be valid, unless the will is executed in the manner required by this Act.;
+
+    (b) the will under consideration with the case's made in exercise of a power of appointment;
+
+    (c) s 6(1) — the will is not in writing and executed in the manner mentioned in subsection (2) with the case's the will in question; and
+
+    (d) s 5 — the will is not treated as properly executed so far as it exercises a power of appointment with the case.
+
+<!-- l4: decide:s 7(2) — the will is, so far as respects the execution and attestation thereof, a valid execution of a power of appointment by will -->
+
+**47.** In relation to an A will, with the facts about it that only this Act asks “the will and its further facts”, s 7(2) — the will is, so far as respects the execution and attestation thereof, a valid execution of a power of appointment by will if—
+
+    (a) Every will executed in the manner required by this Act shall, so far as respects the execution and attestation thereof, be a valid execution of a power of appointment by will, notwithstanding that it shall have been expressly required that a will made in exercise of that power should be executed with some additional or other form of execution or solemnity.; and
+
+    (b) s 6(1) — the will is in writing and executed in the manner mentioned in subsection (2) with the will and its further facts.
+
+## Section 8 — Publication of will not necessary
+
+<!-- l4: decide:s 8 — the will is valid without any other publication thereof -->
+
+**48.** In relation to an A will, with the facts about it that only this Act asks “the will and its further facts”, s 8 — the will is valid without any other publication thereof if—
+
+    (a) Every will executed in the manner required by this Act shall be valid without any other publication thereof.; and
+
+    (b) s 6(1) — the will is in writing and executed in the manner mentioned in subsection (2) with the will and its further facts.
+
+## Sections 9, 10(2), 11 and 12 — the competency of an attesting witness
+
+<!-- l4: decide:the attesting witness is to be admitted as a witness to prove the execution of the will -->
+
+**49.** In relation to a Will “the will” and an Attesting witness “the witness”, the attesting witness is to be admitted as a witness to prove the execution of the will if it is not the case that the witness's incompetent to be admitted a witness to prove the execution thereof, otherwise than by reason of sections 10(2), 11 and 12.
+
+<!-- l4: decide:a person who attests the execution of the will is incompetent to be admitted a witness to prove the execution thereof -->
+
+**50.** In relation to a Will “the will”, a person who attests the execution of the will is incompetent to be admitted a witness to prove the execution thereof means any with given the attesting witness then not the attesting witness is to be admitted as a witness to prove the execution of the will with the will and the attesting witness and the will's the attesting witnesses.
+
+<!-- l4: decide:s 9 — the will is invalid by reason that a person who attests its execution is incompetent to be admitted a witness -->
+
+**51.** In relation to a Will “the will”, s 9 — the will is invalid by reason that a person who attests its execution is incompetent to be admitted a witness if—
+
+    (a) If any person who attests the execution of a will shall, at the time of the execution thereof or at any time afterwards, be incompetent to be admitted a witness to prove the execution thereof, the will shall not on that account be invalid.;
+
+    (b) a person who attests the execution of the will is incompetent to be admitted a witness to prove the execution thereof with the will; and
+
+    (c) FALSE.
+
+<!-- l4: decide:a person to whom or to whose spouse there is given or made any disposition as is described in subsection (1) -->
+
+**52.** In relation to an Attesting witness “the witness”, a person to whom or to whose spouse there is given or made any disposition as is described in subsection (1) if—
+
+    (a) the witness's given or made a beneficial devise, legacy, estate, interest, gift or appointment by the will, other than and except charges and directions for the payment of any debt; or
+
+    (b) the witness's the wife or husband of the witness given or made such a beneficial devise, legacy, estate, interest, gift or appointment.
+
+<!-- l4: decide:s 10(2) — the gift is a ground on which the attesting witness is not to be admitted a witness -->
+
+**53.** In relation to an Attesting witness “the witness”, s 10(2) — the gift is a ground on which the attesting witness is not to be admitted a witness if—
+
+    (a) The attesting witness referred to in subsection (1) shall be admitted as a witness to prove the execution of the will or to prove the validity or invalidity thereof, notwithstanding the devise, legacy, estate, interest, gift or appointment mentioned in the will.;
+
+    (b) a person to whom or to whose spouse there is given or made any disposition as is described in subsection (1) with the witness; and
+
+    (c) FALSE.
+
+<!-- l4: decide:s 11 — the charge is a ground on which the creditor is not to be admitted a witness -->
+
+**54.** In relation to an Attesting witness “the witness”, s 11 — the charge is a ground on which the creditor is not to be admitted a witness if—
+
+    (a) In case by any will any real or personal estate shall be charged with any debt, and any creditor, or the wife or husband of any creditor, whose debt is so charged, shall attest the execution of the will, the creditor notwithstanding the charge shall be admitted a witness to prove the execution of the will or to prove the validity or invalidity thereof.;
+
+    (b) the witness's a creditor, or the wife or husband of a creditor, whose debt is charged on the estate by the will; and
+
+    (c) FALSE.
+
+<!-- l4: decide:the attesting witness is an executor appointed by the will -->
+
+**55.** In relation to a Will “the will” and an Attesting witness “the witness”, the attesting witness is an executor appointed by the will means any with given the executor then the executor's the executor's the reference for this person is equal to the witness's the witness's the reference for this person and the will's the executors appointed by the will.
+
+<!-- l4: decide:s 12 — being an executor of the will is a ground on which the person is not to be admitted a witness -->
+
+**56.** In relation to a Will “the will” and an Attesting witness “the witness”, s 12 — being an executor of the will is a ground on which the person is not to be admitted a witness if—
+
+    (a) No person shall, on account of his being an executor of a will, be incompetent to be admitted a witness to prove the execution of the will or to prove the validity or invalidity thereof.;
+
+    (b) the attesting witness is an executor appointed by the will with the will and the witness; and
+
+    (c) FALSE.
+
+## Section 10 — Gifts to attesting witness or to wife or husband of attesting witness to be void
+
+<!-- l4: decide:s 10(4) — subsection (3) applies to the will of this testator -->
+
+**57.** In relation to an A case under this Act “the case”, s 10(4) — subsection (3) applies to the will of this testator if—
+
+    (a) Subsection (3) shall apply to the will of any person dying after 29 May 1992, whether executed before or after 29 May 1992.; and
+
+    (b) falls strictly after with the date of the death of with the testator of the will under consideration with the case and YMD with 1992, 5 and 29.
+
+<!-- l4: decide:the will is duly executed without the attestation of any such person -->
+
+**58.** In relation to an A case under this Act “the case”, the will is duly executed without the attestation of any such person if—
+
+    (a) the will under consideration with the case's in writing;
+
+    (b) any of the following applies—
+
+        (i) the will under consideration with the case's signed at the foot or end thereof by the testator;
+
+        (ii) the will under consideration with the case's signed at the foot or end thereof by some other person in his presence and by his direction; or
+
+        (iii) s 6(3) — the will is deemed valid as far as regards the position of the signature with the case's the will in question;
+
+    (c) the case's the will in question's the signature was made or acknowledged by the testator as the signature to his will or codicil in the presence of 2 or more witnesses present at the same time, counting only witnesses to whom and to whose wife or husband no such disposition is given or made; and
+
+    (d) count with filter with given the attesting witness then not a person to whom or to whose spouse there is given or made any disposition as is described in subsection (1) with the attesting witness and the attesting witness's subscribed the will in the presence of the testator and the will under consideration with the case's the attesting witnesses is at least 2.
+
+<!-- l4: decide:s 10(3) — the attestation of such a person is disregarded for the purposes of subsection (1) -->
+
+**59.** In relation to an A case under this Act “the case”, s 10(3) — the attestation of such a person is disregarded for the purposes of subsection (1) if—
+
+    (a) The attestation of a will by a person to whom or to whose spouse there is given or made any disposition as is described in subsection (1) shall be disregarded for the purposes of that subsection if the will is duly executed without his attestation and without that of any other such person.;
+
+    (b) s 10(4) — subsection (3) applies to the will of this testator with the case; and
+
+    (c) the will is duly executed without the attestation of any such person with the case.
+
+<!-- l4: decide:s 10(1) — the gift to the attesting witness or to the witness’s wife or husband is utterly null and void -->
+
+**60.** In relation to an A case under this Act “the case” and an Attesting witness “the witness”, s 10(1) — the gift to the attesting witness or to the witness’s wife or husband is utterly null and void if—
+
+    (a) If any person attests the execution of any will to whom or to whose wife or husband any beneficial devise, legacy, estate, interest, gift or appointment of or affecting any real or personal estate, other than and except charges and directions for the payment of any debt, shall be thereby given or made, the devise, legacy, estate, interest, gift or appointment shall, so far only as concerns the person attesting the execution of the will, or the wife or husband of that person, or any person claiming under that person or wife or husband, be utterly null and void.;
+
+    (b) a person to whom or to whose spouse there is given or made any disposition as is described in subsection (1) with the witness; and
+
+    (c) s 10(3) — the attestation of such a person is not disregarded for the purposes of subsection (1) with the case.
+
+<!-- l4: decide:s 10(1) — the disposition is utterly null and void -->
+
+**61.** In relation to an A case under this Act “the case” and a Disposition “the disposition”, s 10(1) — the disposition is utterly null and void if—
+
+    (a) any beneficial devise, legacy, estate, interest, gift or appointment of or affecting any real or personal estate, other than and except charges and directions for the payment of any debt;
+
+    (b) the disposition's beneficial;
+
+    (c) the disposition is not a charge or direction for the payment of a debt; and
+
+    (d) any with given the attesting witness then the attesting witness's the witness's the reference for this person is equal to the reference for the donee with the disposition's the donee and s 10(1) — the gift to the attesting witness or to the witness’s wife or husband is utterly null and void with the case and the attesting witness and the will under consideration with the case's the attesting witnesses.
+
+For the purposes of this provision—
+
+“the disposition is a charge or direction for the payment of a debt” means consider the case distinctions of the disposition's the kind of disposition :  when a charge or direction for the payment of a debt has  then TRUE. in any other case FALSE;
+
+## Section 13 — Will to be revoked by marriage except in certain cases
+
+<!-- l4: decide:s 13(1) — the exception for a will made in exercise of a power of appointment -->
+
+**62.** In relation to a Will “the will”, s 13(1) — the exception for a will made in exercise of a power of appointment if—
+
+    (a) except a will made in exercise of a power of appointment, when the real or personal estate thereby appointed would not in default of such appointment pass to his or her heir, executor or administrator or the person entitled under the Intestate Succession Act 1967.;
+
+    (b) the will's made in exercise of a power of appointment; and
+
+    (c) the will's the estate thereby appointed would not in default of such appointment pass to his or her heir, executor or administrator or the person entitled under the Intestate Succession Act 1967.
+
+<!-- l4: decide:s 13(1) — the will is revoked by the marriage -->
+
+**63.** In relation to a Will “the will” and a Marriage “the marriage”, s 13(1) — the will is revoked by the marriage if—
+
+    (a) Every will made by a man or woman shall be revoked by his or her marriage,; and
+
+    (b) it is not the case that s 13(1) — the exception for a will made in exercise of a power of appointment with the will.
+
+<!-- l4: decide:the marriage was solemnised after the will was made -->
+
+**64.** In relation to a Will “the will” and a Marriage “the marriage”, the marriage was solemnised after the will was made means is proved to fall strictly before with the will's the date of execution and the marriage's the date of the solemnisation of the marriage.
+
+<!-- l4: decide:s 13(2) — the will is expressed to be made in contemplation of this marriage -->
+
+**65.** In relation to a Will “the will” and a Marriage “the marriage”, s 13(2) — the will is expressed to be made in contemplation of this marriage if—
+
+    (a) Notwithstanding subsection (1), where a will made on or after 29 August 1938 is expressed to be made in contemplation of a marriage, the will shall not be revoked by the solemnisation of the marriage contemplated; and this subsection shall apply notwithstanding that the marriage contemplated may be the first, second or subsequent marriage of a person lawfully practising polygamy.;
+
+    (b) falls on or after with the will's the date of execution and YMD with 1938, 8 and 29;
+
+    (c) the will's expressed to be made in contemplation of a marriage; and
+
+    (d) the marriage contemplated is this marriage.
+
+For the purposes of this provision—
+
+“the marriage contemplated is this marriage” means consider the case distinctions of the will's the reference for the person with whom the marriage contemplated was to be solemnised :  when NOTHING has  then FALSE. when JUST has the intended then the intended is equal to the marriage's the spouse's the reference for this person;
+
+<!-- l4: decide:s 13 — the will is revoked by this marriage -->
+
+**66.** In relation to a Will “the will” and a Marriage “the marriage”, s 13 — the will is revoked by this marriage if—
+
+    (a) s 13(1) — the will is revoked by the marriage with the will and the marriage;
+
+    (b) the marriage was solemnised after the will was made with the will and the marriage; and
+
+    (c) s 13(2) — the will is not expressed to be made in contemplation of this marriage with the will and the marriage.
+
+<!-- l4: decide:s 13 — the will has been revoked by marriage -->
+
+**67.** In relation to an A case under this Act “the case”, s 13 — the will has been revoked by marriage means any with given the marriage then s 13 — the will is revoked by this marriage with the will under consideration with the case and the marriage and the case's the deceased's the family's the marriages of the deceased.
+
+## Section 14 — No will to be revoked by presumption from altered circumstances
+
+<!-- l4: decide:s 14 — the will is revoked by a presumption of an intention on the ground of an alteration in circumstances -->
+
+**68.** S 14 — the will is revoked by a presumption of an intention on the ground of an alteration in circumstances if—
+
+    (a) No will shall be revoked by any presumption of an intention on the ground of an alteration in circumstances.; and
+
+    (b) FALSE.
+
+## Section 15 — Revocation of will or codicil
+
+<!-- l4: decide:s 15(d) — the will has been destroyed with the intention of revoking it -->
+
+**69.** In relation to a The ways in which a will may have been revoked “the ways”, s 15(d) — the will has been destroyed with the intention of revoking it if—
+
+    (a) by the burning, tearing, or otherwise destroying the will by the testator, or by some person in his presence and by his direction, with the intention of revoking it.;
+
+    (b) any of the following applies—
+
+        (i) the ways's burnt, torn, or otherwise destroyed by the testator; or
+
+        (ii) the ways's burnt, torn, or otherwise destroyed by some person in his presence and by his direction; and
+
+    (c) the ways's destroyed with the intention of revoking it.
+
+<!-- l4: decide:s 15 — the will has been revoked -->
+
+**70.** In relation to an A case under this Act “the case”, s 15 — the will has been revoked if—
+
+    (a) No will or codicil, or any part thereof, shall be revoked otherwise than —;
+
+    (b) all of the following apply—
+
+        (i) (a); and
+
+        (ii) s 13 — the will has been revoked by marriage with the case;
+
+    (c) all of the following apply—
+
+        (i) (b); and
+
+        (ii) the ways's revoked by another will or codicil executed in the manner by this Act required;
+
+    (d) all of the following apply—
+
+        (i) (c); and
+
+        (ii) the ways's revoked by some writing declaring an intention to revoke it, and executed in the manner in which a will is by this Act required to be executed; or
+
+    (e) all of the following apply—
+
+        (i) (d); and
+
+        (ii) s 15(d) — the will has been destroyed with the intention of revoking it with the ways.
+
+For the purposes of this provision—
+
+“the ways” means the case's the will in question's the ways in which it has been revoked;
+
+## Section 16 — Effect of obliteration, interlineation or alteration
+
+<!-- l4: decide:s 16(2) — the will, with such alteration as part thereof, is deemed to be duly executed -->
+
+**71.** In relation to an An alteration made in a will after its execution “the alteration”, s 16(2) — the will, with such alteration as part thereof, is deemed to be duly executed if—
+
+    (a) A will referred to in subsection (1), with such alteration as part thereof, shall be deemed to be duly executed if the signature of the testator and the subscription of the witnesses be made in the margin or on some other part of the will opposite or near to the alteration or at the foot or end of or opposite to a memorandum referring to the alteration and written at the end or some other part of the will.;
+
+    (b) the alteration's the signature of the testator and the subscription of the witnesses are made in the margin or on some other part of the will opposite or near to the alteration; or
+
+    (c) the alteration's the signature of the testator and the subscription of the witnesses are made at the foot or end of or opposite to a memorandum referring to the alteration and written at the end or some other part of the will.
+
+<!-- l4: decide:s 16(1) — the alteration is valid and has effect -->
+
+**72.** In relation to an An alteration made in a will after its execution “the alteration”, s 16(1) — the alteration is valid and has effect if—
+
+    (a) No obliteration, interlineation or other alteration made in any will after the execution thereof shall be valid or have any effect except so far as the words or effect of the will before such alteration shall not be apparent, unless the alteration shall be executed in the like manner as by this Act is required for the execution of the will.;
+
+    (b) the alteration's the words or effect of the will before the alteration are not apparent;
+
+    (c) the alteration's the alteration is executed in the like manner as by this Act is required for the execution of the will; or
+
+    (d) s 16(2) — the will, with such alteration as part thereof, is deemed to be duly executed with the alteration.
+
+## Section 17 — Revival of revoked will
+
+<!-- l4: declare:The extent of the revival -->
+
+**73.** In this Act, “The extent of the revival” means one of the following—
+
+    (a) “not revived”;
+
+    (b) “revived, save as to so much thereof as was revoked before the revocation of the whole thereof”; or
+
+    (c) “revived in whole”.
+
+<!-- l4: decide:s 17(1) — the will has been revived -->
+
+**74.** In relation to a The revival of a revoked will “the revival”, s 17(1) — the will has been revived if—
+
+    (a) No will or codicil, or any part thereof, which shall be in any manner revoked, shall be revived otherwise than by the re-execution thereof, or by a codicil executed in the manner required by this Act and showing an intention to revive the will or codicil.;
+
+    (b) the revival's revived by the re-execution thereof; or
+
+    (c) the revival's revived by a codicil executed in the manner required by this Act and showing an intention to revive the will or codicil.
+
+<!-- l4: decide:s 17 — the extent of the revival -->
+
+**75.** In relation to an A case under this Act “the case”, s 17 — the extent of the revival means if not s 15 — the will has been revoked with the case then not revived if not s 17(1) — the will has been revived with the revival then not revived if the revival's partly revoked, and afterwards wholly revoked and not the revival's an intention to the contrary is shown then revived, save as to so much thereof as was revoked before the revocation of the whole thereof otherwise revived in whole.
+
+For the purposes of this provision—
+
+“the revival” means the case's the will in question's its revival;
+
+## Section 18 — Subsequent conveyance or other acts not to prevent operation of will
+
+<!-- l4: decide:s 18 — a conveyance or other act made or done subsequently to the execution of the will prevents its operation -->
+
+**76.** In relation to an A case under this Act “the case”, s 18 — a conveyance or other act made or done subsequently to the execution of the will prevents its operation if—
+
+    (a) No conveyance or other act made or done subsequently to the execution of a will of or relating to any real or personal estate therein comprised, except an act by which the will shall be revoked as aforesaid, shall prevent the operation of the will with respect to the estate or interest in the real or personal estate as the testator shall have power to dispose of by will at the time of his death.;
+
+    (b) the case's the will in question's a conveyance or other act has been made or done subsequently to its execution, of or relating to any real or personal estate therein comprised;
+
+    (c) the case's the will in question's that conveyance or other act is an act by which the will is revoked as aforesaid; and
+
+    (d) any of the following applies—
+
+        (i) the ways's revoked by another will or codicil executed in the manner by this Act required;
+
+        (ii) the ways's revoked by some writing declaring an intention to revoke it, and executed in the manner in which a will is by this Act required to be executed; or
+
+        (iii) s 15(d) — the will has been destroyed with the intention of revoking it with the ways.
+
+For the purposes of this provision—
+
+“the ways” means the case's the will in question's the ways in which it has been revoked;
+
+## Section 19 — Will to be construed to speak from death of testator
+
+<!-- l4: declare:The time from which the will speaks -->
+
+**77.** In this Act, “The time from which the will speaks” means one of the following—
+
+    (a) “as if it had been executed immediately before the death of the testator”; or
+
+    (b) “otherwise, a contrary intention appearing by the will”.
+
+<!-- l4: decide:s 19 — the time from which the will is construed to speak -->
+
+**78.** In relation to an A case under this Act “the case”, s 19 — the time from which the will is construed to speak means if the case's the will in question's a contrary intention appears by the will as to the time from which it speaks, then otherwise, a contrary intention appearing by the will; otherwise, as if it had been executed immediately before the death of the testator.
+
+## Section 26 — Gifts to children or other issue who leave issue living at testator’s death not to lapse
+
+<!-- l4: decide:the donee, so far as he is a child or other issue of the testator -->
+
+**79.** In relation to an A case under this Act “the case” and a Disposition “the disposition”, the donee, so far as he is a child or other issue of the testator means the descendants bearing the reference with the testator of the will under consideration with the case and the reference for the donee with the disposition's the donee.
+
+<!-- l4: decide:s 26 — the devise or bequest shall not lapse -->
+
+**80.** In relation to an A case under this Act “the case” and a Disposition “the disposition”, s 26 — the devise or bequest shall not lapse if—
+
+    (a) Where any person being a child or other issue of the testator to whom any real or personal estate shall be devised or bequeathed for any estate or interest not determinable at or before the death of that person shall die in the lifetime of the testator leaving issue, and any such issue of that person shall be living at the time of the death of the testator, that devise or bequest shall not lapse, but shall take effect as if the death of that person had happened immediately after the death of the testator, unless a contrary intention shall appear by the will.;
+
+    (b) it is not the case that null with the donee as issue;
+
+    (c) the disposition's not determinable at or before the death of the donee;
+
+    (d) the same person died in the lifetime of the testator, left issue, and some such issue was living at the testator’s death; and
+
+    (e) it is not the case that the case's the will in question's a contrary intention appears by the will as to the lapse of a devise or bequest to a child or other issue.
+
+For the purposes of this provision—
+
+“the donee as issue” means the donee, so far as he is a child or other issue of the testator with the case and the disposition;
+
+“the same person died in the lifetime of the testator, left issue, and some such issue was living at the testator’s death” means consider the case distinctions of the date of the death of with the testator of the will under consideration with the case :  when NOTHING has  then FALSE. when JUST has the day of the death of the testator then any with given the person then is proved to fall strictly before with the date of the death of with the person and JUST with the day of the death of the testator and not null with the person's children and some descendant was living on with the person and the day of the death of the testator and the donee as issue;
+
+## Section 27 — Saving as to wills of soldiers and mariners
+
+<!-- l4: decide:s 27 — this section applies to the person -->
+
+**81.** In relation to a Person “the person”, s 27 — this section applies to the person if—
+
+    (a) Notwithstanding anything in this Act, any soldier being in actual military service, or any mariner or seaman being at sea,;
+
+    (b) the person's a soldier being in actual military service;
+
+    (c) the person's a mariner or seaman being at sea;
+
+    (d) This section shall extend to any member of any naval or marine forces not only when he is at sea but also when he is so circumstanced that if he were a soldier he would be in actual military service within the meaning of this section.; or
+
+    (e) the person's a member of any naval or marine forces so circumstanced that if he were a soldier he would be in actual military service.
+
+<!-- l4: decide:s 27(1) — the testator may dispose of his personal estate as he might have done before the making of this Act -->
+
+**82.** In relation to an A case under this Act “the case”, s 27(1) — the testator may dispose of his personal estate as he might have done before the making of this Act if—
+
+    (a) Notwithstanding anything in this Act, any soldier being in actual military service, or any mariner or seaman being at sea, may dispose of his personal estate as he might have done before the making of this Act and may do so even though under 21 years of age.;
+
+    (b) s 27 — this section applies to the person with the testator of the will under consideration with the case; and
+
+    (c) the case's the will in question's made in such manner and form that if the disposition had been a disposition of personal estate made by that person it would have been valid.
+
+<!-- l4: decide:s 27(2) — the testamentary disposition of real estate is valid -->
+
+**83.** In relation to an A case under this Act “the case”, s 27(2) — the testamentary disposition of real estate is valid if—
+
+    (a) A testamentary disposition of any real estate made by a person to whom this section applies, and who dies after 29 August 1938 shall, notwithstanding that the person making the disposition was at the time of making it under 21 years of age or that the disposition has not been made in such manner or form as was on 29 August 1938 required by law, be valid in any case where the person making the disposition was of such age and the disposition has been made in such manner and form that if the disposition had been a disposition of personal estate made by that person it would have been valid.;
+
+    (b) s 27 — this section applies to the person with the testator of the will under consideration with the case;
+
+    (c) falls strictly after with the date of the death of with the testator of the will under consideration with the case and YMD with 1938, 8 and 29; and
+
+    (d) the case's the will in question's made in such manner and form that if the disposition had been a disposition of personal estate made by that person it would have been valid.
+
+<!-- l4: decide:the appointment is of a guardian of a child of the testator -->
+
+**84.** In relation to an A case under this Act “the case” and a Guardian “the appointment”, the appointment is of a guardian of a child of the testator means any with given the relation then the relation's the child's the reference for this person is equal to the appointment's the reference for the infant and the testator of the will under consideration with the case's children.
+
+<!-- l4: decide:s 27(3) — the appointments contained in the will that are of full force and effect -->
+
+**85.** In relation to an A case under this Act “the case”, s 27(3) — the appointments contained in the will that are of full force and effect means if falls strictly after with the date of the death of with the testator of the will under consideration with the case and YMD with 1938, 8 and 29 and s 27(1) — the testator may dispose of his personal estate as he might have done before the making of this Act with the case or s 27(2) — the testamentary disposition of real estate is valid with the case, then filter with given the appointment then the appointment is of a guardian of a child of the testator with the case and the appointment and the will under consideration with the case's the guardians of infant children appointed by the will; otherwise, EMPTY.
+
+<!-- l4: decide:s 27(3) — the appointment of a guardian of the infant children of the testator is of full force and effect -->
+
+**86.** In relation to an A case under this Act “the case”, s 27(3) — the appointment of a guardian of the infant children of the testator is of full force and effect if—
+
+    (a) Where any person dies after 29 August 1938 having made a will which is, or which, if it had been a disposition of property, would have been rendered valid by this section, any appointment contained in that will of any person as guardian of the infant children of the testator shall be of full force and effect.; and
+
+    (b) null with s 27(3) — the appointments contained in the will that are not of full force and effect with the case.
+
+<!-- l4: decide:the references for the guardians whose appointment this Act has made good -->
+
+**87.** In relation to an A case under this Act “the case”, the references for the guardians whose appointment this Act has made good means map with given the appointment then the appointment's the guardian's the reference for this person and s 27(3) — the appointments contained in the will that are of full force and effect with the case.
+
+<!-- l4: decide:the references for the guardians recorded against the infants concerned in the estate -->
+
+**88.** In relation to an A case under this Act “the case”, the references for the guardians recorded against the infants concerned in the estate means map with given the appointment then the appointment's the guardian's the reference for this person and concat with map with given the infant then the infant's the guardians of the infant and the case's the deceased's the infants concerned in the estate.
+
+## Section 28 — Rectification of will: the time within which an application must be made
+
+<!-- l4: decide:the grant is limited to settled land or to trust property -->
+
+**89.** In relation to a Grant “the grant”, the grant is limited to settled land or to trust property means consider the case distinctions of the grant's the limitation :  when limited to settled land or to trust property has  then TRUE. in any other case FALSE.
+
+<!-- l4: decide:the grant does not permit the distribution of the testator’s estate -->
+
+**90.** In relation to a Grant “the grant”, the grant does not permit the distribution of the testator’s estate means consider the case distinctions of the grant's the limitation :  when a grant that does not permit the distribution of the testator’s estate has  then TRUE. in any other case FALSE.
+
+<!-- l4: decide:the grant is limited to a part only of the testator’s estate -->
+
+**91.** In relation to a Grant “the grant”, the grant is limited to a part only of the testator’s estate means consider the case distinctions of the grant's the limitation :  when limited to a part only of the testator’s estate has the part then TRUE. in any other case FALSE.
+
+<!-- l4: decide:s 28(4) — the grant is to be disregarded -->
+
+**92.** In relation to an A case under this Act “the case” and a Grant “the grant”, s 28(4) — the grant is to be disregarded if—
+
+    (a) The following grants are to be disregarded when considering, for the purposes of this section, when a grant authorising the administration of the testator’s estate is first made:;
+
+    (b) all of the following apply—
+
+        (i) (a); and
+
+        (ii) the grant is limited to settled land or to trust property with the grant;
+
+    (c) all of the following apply—
+
+        (i) (b); and
+
+        (ii) the grant does not permit the distribution of the testator’s estate with the grant; or
+
+    (d) all of the following apply—
+
+        (i) (c);
+
+        (ii) the grant is limited to a part only of the testator’s estate with the grant; and
+
+        (iii) the case's a grant limited to the remainder of the testator’s estate has previously been made or is not made at the same time.
+
+<!-- l4: decide:the date on which the grant is made -->
+
+**93.** In relation to a Grant “the grant”, the date on which the grant is made means if the grant's sealed under section 47(1) of the Probate and Administration Act 1934 and the grant is a probate or letters of administration with the will annexed, then the grant's the date of the sealing; otherwise, the grant's the date of the grant.
+
+For the purposes of this provision—
+
+“the grant is a probate or letters of administration with the will annexed” means consider the case distinctions of the grant's the kind of grant :  when probate has  then TRUE. when letters of administration with the will annexed has  then TRUE. in any other case FALSE;
+
+<!-- l4: decide:the grants that are not to be disregarded -->
+
+**94.** In relation to an A case under this Act “the case”, the grants that are not to be disregarded means filter with given the grant then not s 28(4) — the grant is to be disregarded with the case and the grant and the case's the deceased's the grants made in respect of the estate.
+
+<!-- l4: decide:s 28(2) — the date on which a grant authorising the administration of the testator’s estate is first made -->
+
+**95.** In relation to an A case under this Act “the case”, s 28(2) — the date on which a grant authorising the administration of the testator’s estate is first made means the earliest of with mapMaybe with the date on which the grant is made and the grants that are not to be disregarded with the case.
+
+<!-- l4: declare:Whether an application for rectification is within the time allowed by section 28(2) -->
+
+**96.** In this Act, “Whether an application for rectification is within the time allowed by section 28(2)” means one of the following—
+
+    (a) “no application for an order under subsection (1) has been made”;
+
+    (b) “within the time allowed, no grant authorising the administration of the testator’s estate having yet been made”;
+
+    (c) “within the time allowed”;
+
+    (d) “made with the permission of a court”;
+
+    (e) “the date of the first such grant, or the date of the application, not being in evidence”; or
+
+    (f) “made later than 6 months after the date on which a grant authorising the administration of the testator’s estate is first made”.
+
+<!-- l4: decide:s 28(2) — whether the application for rectification is in time -->
+
+**97.** In relation to an A case under this Act “the case”, s 28(2) — whether the application for rectification is in time means if not the case's an application for an order under section 28(1) has been made then no application for an order under subsection (1) has been made if null with the grants that are not to be disregarded with the case then within the time allowed, no grant authorising the administration of the testator’s estate having yet been made if every grant that is not to be disregarded is dated and the application was made no later than 6 months after that date then within the time allowed if the case's a court has given permission for the application to be made after the end of that period then made with the permission of a court if the dates are not all in evidence then the date of the first such grant, or the date of the application, not being in evidence otherwise made later than 6 months after the date on which a grant authorising the administration of the testator’s estate is first made.
+
+For the purposes of this provision—
+
+“the first grant” means s 28(2) — the date on which a grant authorising the administration of the testator’s estate is first made with the case;
+
+“every grant that is not to be disregarded is dated” means all with given the grant then isJust with the date on which the grant is made with the grant and the grants that are not to be disregarded with the case;
+
+“the dates are not all in evidence” means not isJust with the first grant or not every grant that is not to be disregarded is dated or not isJust with the case's the date of that application;
+
+“the application was made no later than 6 months after that date” means consider the case distinctions of the first grant :  when NOTHING has  then FALSE. when JUST has the day of the grant then consider the case distinctions of the case's the date of that application :  when NOTHING has  then FALSE. when JUST has the day of the application then Day with the day of the application is at most Day with six months after with the day of the grant;
+
+## Formal validity, all together
+
+<!-- l4: declare:The formal validity of the will -->
+
+**98.** In this Act, “The formal validity of the will” means one of the following—
+
+    (a) “valid”;
+
+    (b) “valid, being the will of a soldier being in actual military service, or of a mariner or seaman being at sea, disposing of his personal estate (section 27(1))”;
+
+    (c) “not valid, being a will made by a person under 21 years of age (section 4)”;
+
+    (d) “not valid, the will not being in writing or not executed in the manner mentioned in section 6(2), and not being treated as properly executed under section 5”;
+
+    (e) “treated as properly executed so far only as regards a part of the will (section 5(3)(b), (c) or (d)), and not otherwise valid”;
+
+    (f) “the age of the testator when the will was made not being in evidence, section 4 cannot be applied”; or
+
+    (g) “the date of the death of the testator not being in evidence, section 5 cannot be applied”.
+
+<!-- l4: decide:the formal validity of the will -->
+
+**99.** In relation to an A case under this Act “the case”, the formal validity of the will means if s 27(1) — the testator may dispose of his personal estate as he might have done before the making of this Act with the case then valid, being the will of a soldier being in actual military service, or of a mariner or seaman being at sea, disposing of his personal estate (section 27(1)) if s 4 — will of infant invalid with the will under consideration with the case then not valid, being a will made by a person under 21 years of age (section 4) if not s 4 — the testator is proved to have been 21 years of age or over with the will under consideration with the case then the age of the testator when the will was made not being in evidence, section 4 cannot be applied if the will is properly executed with the case then valid if the date of the death of the testator is not in evidence and s 5 — some connecting factor is made out, leaving aside the commencement in subsection (9) with the case then the date of the death of the testator not being in evidence, section 5 cannot be applied if s 5 — the extent to which the will is treated as properly executed with the case is equal to treated as properly executed so far only as the will disposes of immovable property, revokes a will or a provision, or exercises a power of appointment then treated as properly executed so far only as regards a part of the will (section 5(3)(b), (c) or (d)), and not otherwise valid otherwise not valid, the will not being in writing or not executed in the manner mentioned in section 6(2), and not being treated as properly executed under section 5.
+
+For the purposes of this provision—
+
+“the date of the death of the testator is not in evidence” means not isJust with the date of the death of with the testator of the will under consideration with the case;
+
+## Worked facts — constructors
+
+<!-- l4: decide:a WA person, in full -->
+
+**100.** In relation to a STRING “the person’s name”, a STRING “the reference”, an optional DATE “when the person was born”, a Vital status “whether the person is living”, a list of Child “the person’s children”, a BOOLEAN “in actual military service”, a BOOLEAN “at sea” and a BOOLEAN “so circumstanced”, a WA person, in full means Person where name is the person’s name, the reference for this person is the reference, date of birth is when the person was born, vital status is whether the person is living, children is the person’s children, at the date of the death only conceived in the womb but subsequently born alive is FALSE, money or other property given, paid or settled by the intestate during his life to or for the advancement of the person is 0, the date on which the person attains the age of majority is NOTHING, a soldier being in actual military service is in actual military service, a mariner or seaman being at sea is at sea, a member of any naval or marine forces so circumstanced that if he were a soldier he would be in actual military service is so circumstanced, so desires that letters of administration be granted to such person as the court thinks fit is FALSE, lacks mental capacity (within the meaning of the Mental Capacity Act 2008) to make decisions with respect to the management and administration of the person's property and affairs is FALSE, absent from Singapore is FALSE and willing to act is TRUE.
+
+<!-- l4: decide:a WA person -->
+
+**101.** In relation to a STRING “the person’s name”, a STRING “the reference”, an optional DATE “when the person was born”, a Vital status “whether the person is living”, a list of Child “the person’s children” and a BOOLEAN “in actual military service”, a WA person means a WA person, in full with the person’s name, the reference, when the person was born, whether the person is living, the person’s children, in actual military service, FALSE and FALSE.
+
+<!-- l4: decide:a WA legitimate child -->
+
+**102.** In relation to a Person “the offspring”, a WA legitimate child means Child where the child is the offspring, a legitimate child of the person whose child he is is TRUE and adopted by that person by virtue of an order of court under any written law for the time being in force in Singapore, Malaysia or Brunei Darussalam is FALSE.
+
+<!-- l4: decide:an attesting witness -->
+
+**103.** In relation to a Person “the person who attested”, a BOOLEAN “he subscribed in the presence of the testator”, a BOOLEAN “he is otherwise incompetent”, a BOOLEAN “he took a beneficial gift”, a BOOLEAN “his wife or husband took a beneficial gift” and a BOOLEAN “he is a creditor whose debt is charged”, an attesting witness means Attesting witness where the witness is the person who attested, subscribed the will in the presence of the testator is he subscribed in the presence of the testator, incompetent to be admitted a witness to prove the execution thereof, otherwise than by reason of sections 10(2), 11 and 12 is he is otherwise incompetent, given or made a beneficial devise, legacy, estate, interest, gift or appointment by the will, other than and except charges and directions for the payment of any debt is he took a beneficial gift, the wife or husband of the witness given or made such a beneficial devise, legacy, estate, interest, gift or appointment is his wife or husband took a beneficial gift and a creditor, or the wife or husband of a creditor, whose debt is charged on the estate by the will is he is a creditor whose debt is charged.
+
+<!-- l4: decide:a gift -->
+
+**104.** In relation to a Person “the person who takes”, a Kind of disposition “what kind of gift”, a Money “the value”, a BOOLEAN “it is beneficial” and a BOOLEAN “it is not determinable at or before his death”, a gift means Disposition where the donee is an individual with the person who takes, the kind of disposition is what kind of gift, the value of the disposition is the value, beneficial is it is beneficial and not determinable at or before the death of the donee is it is not determinable at or before his death.
+
+<!-- l4: decide:a guardian appointed by the father by will -->
+
+**105.** In relation to a Person “the person appointed” and a STRING “the reference for the child”, a guardian appointed by the father by will means Guardian where the guardian is the person appointed, the reference for the infant is the reference for the child, how the guardian was appointed is appointed by the father by will, of the person or of the property is guardian of the person and property of the infant, alone or jointly is alone, refuses to act is FALSE, the mother or father objects to his so acting is FALSE, considers that the mother or father is unfit to have the custody of the infant is FALSE, removed from his guardianship by the court is FALSE, has given security is TRUE, the court has otherwise ordered as to security is FALSE, has sold, mortgaged, exchanged, or otherwise parted with the possession of any of the movable or immovable property of the infant is FALSE, has leased land belonging to the infant is FALSE, the term of the lease, in years is NOTHING, has the permission of the court to deal with the property of the infant is FALSE, has given a good discharge for a legacy or other capital moneys payable to or receivable by the infant is FALSE, the court has otherwise ordered as to giving a good discharge is FALSE, the provision made out of the income of the property of the infant for his maintenance and education is A periodical sum where the sum is 0 and the period is monthly and has the permission of the court to apply a sum exceeding $100 per month is FALSE.
+
+<!-- l4: decide:a marriage -->
+
+**106.** In relation to a Person “the other party”, an optional DATE “when it was solemnised” and a BOOLEAN “it subsists”, a marriage means Marriage where the spouse is the other party, the date of the solemnisation of the marriage is when it was solemnised and subsisting at the death of the deceased, in the sense of not dissolved or annulled before the death is it subsists.
+
+<!-- l4: decide:a family with the marriages -->
+
+**107.** In relation to a list of Marriage “the marriages”, a family with the marriages means Family where the marriages of the deceased is the marriages, the father of the deceased is NOTHING, the mother of the deceased is NOTHING, the brothers and sisters of the deceased is EMPTY, the grandparents of the deceased is EMPTY and the uncles and aunts of the deceased is EMPTY.
+
+<!-- l4: decide:an estate of no recorded value -->
+
+**108.** An estate of no recorded value means Estate where the value of the movable property situated in Singapore is 0, the value of the immovable property situated in Singapore is 0, the value of the movable property situated outside Singapore is 0, the value of the immovable property situated outside Singapore is 0, the value of any property which the deceased possessed or was entitled to as trustee and not beneficially, situated in Singapore is 0, the value of any property which the deceased possessed or was entitled to as trustee and not beneficially, situated outside Singapore is 0, the value of any moneys payable by an appointed insurer pursuant to the Dependants’ Protection Insurance Scheme or any other equivalent scheme maintained by the Central Provident Fund Board is 0, the value of the property administered by the Public Trustee is 0, the amount of the funds in court directed to be paid, transferred or delivered to him is 0, the value of land settled previously to the death of the deceased is 0, the trustees of the settlement is EMPTY, the value of the interest in property which at the time of his death is charged with the payment of money is 0, the amount of the charge on that interest is 0, the deceased has by will, deed or other document signified a contrary or other intention is FALSE, the debts and liabilities of the deceased is 0, the funeral, testamentary and administration expenses is 0, the creditors of the deceased is EMPTY, fully administered is FALSE and the value of the property beneficially disposed of by the will is 0.
+
+<!-- l4: decide:a will, in full -->
+
+**109.** In relation to a Person “the maker of the will”, an optional DATE “the date it was executed”, a BOOLEAN “it is in writing”, a BOOLEAN “the maker signed at the foot or end”, a BOOLEAN “another signed at the foot or end for him”, a BOOLEAN “the signature was acknowledged before 2 or more witnesses”, a list of Attesting witness “the witnesses”, a list of Disposition “the gifts”, a list of Guardian “the guardians appointed by it”, a BOOLEAN “it is expressed to be made in contemplation of a marriage”, an optional STRING “the reference for the intended spouse”, a BOOLEAN “it is made in exercise of a power of appointment”, a BOOLEAN “the appointed estate would not pass in default”, a BOOLEAN “the testator’s intention is apparent on the face of it” and a list of Executor appointed by a will “the executors it appoints”, a will, in full means Will where the testator is the maker of the will, the date of execution is the date it was executed, in writing is it is in writing, signed at the foot or end thereof by the testator is the maker signed at the foot or end, signed at the foot or end thereof by some other person in his presence and by his direction is another signed at the foot or end for him, the signature made or acknowledged by the testator as the signature to his will or codicil in the presence of 2 or more witnesses present at the same time is the signature was acknowledged before 2 or more witnesses, apparent on the face of the will that the testator intended to give effect by such his signature to the writing signed as his will is the testator’s intention is apparent on the face of it, the attesting witnesses is the witnesses, the executors appointed by the will is the executors it appoints, the guardians of infant children appointed by the will is the guardians appointed by it, the dispositions made by the will is the gifts, expressed to be made in contemplation of a marriage is it is expressed to be made in contemplation of a marriage, the reference for the person with whom the marriage contemplated was to be solemnised is the reference for the intended spouse, made in exercise of a power of appointment is it is made in exercise of a power of appointment, the estate thereby appointed would not in default of such appointment pass to his or her heir, executor or administrator or the person entitled under the Intestate Succession Act 1967 is the appointed estate would not pass in default, the life interests arising under the will is EMPTY, it appears by the will that the personal representative is entitled to take that part beneficially is FALSE and the codicils is EMPTY.
+
+<!-- l4: decide:a will -->
+
+**110.** In relation to a Person “the maker of the will”, an optional DATE “the date it was executed”, a BOOLEAN “it is in writing”, a BOOLEAN “the maker signed at the foot or end”, a BOOLEAN “the signature was acknowledged before 2 or more witnesses”, a list of Attesting witness “the witnesses”, a list of Disposition “the gifts”, a list of Guardian “the guardians appointed by it”, a BOOLEAN “it is expressed to be made in contemplation of a marriage”, an optional STRING “the reference for the intended spouse”, a BOOLEAN “it is made in exercise of a power of appointment” and a BOOLEAN “the appointed estate would not pass in default”, a will means a will, in full with the maker of the will, the date it was executed, it is in writing, the maker signed at the foot or end, FALSE, the signature was acknowledged before 2 or more witnesses, the witnesses, the gifts, the guardians appointed by it, it is expressed to be made in contemplation of a marriage, the reference for the intended spouse, it is made in exercise of a power of appointment, the appointed estate would not pass in default, TRUE and EMPTY.
+
+<!-- l4: decide:an executor appointed by the will -->
+
+**111.** In relation to a Person “the person appointed”, an executor appointed by the will means Executor appointed by a will where the executor is the person appointed, the appointment, express or implied is express, legally incapable of acting as such, otherwise than under section 21(1) or section 22(1) is FALSE, has renounced the right to act as such is FALSE, appeared and extracted probate is TRUE and has administered all the estate of the deceased is FALSE.
+
+<!-- l4: decide:the execution conforming thus -->
+
+**112.** In relation to a BOOLEAN “(2)(a)”, a BOOLEAN “(2)(b)(i)”, a BOOLEAN “(2)(b)(ii)”, a BOOLEAN “(2)(c)”, a BOOLEAN “(2)(d)”, a BOOLEAN “(3)(a)”, a BOOLEAN “(3)(b)”, a BOOLEAN “(3)(c)” and a BOOLEAN “(3)(d)”, the execution conforming thus means Conformity of the execution of a will to a law outside this Act where the execution of the will conformed to the internal law in force in the territory where it was executed is (2)(a), the execution of the will conformed to the internal law in force in the territory where the testator was domiciled at the time when the will was executed is (2)(b)(i), the execution of the will conformed to the internal law in force in the territory where the testator was domiciled at the time of his death is (2)(b)(ii), the execution of the will conformed to the internal law in force in the territory where the testator habitually resided at either of the times referred to in paragraph (b) is (2)(c), the execution of the will conformed to the internal law in force in the state of which the testator was a national at either of the times referred to in paragraph (b) is (2)(d), the will was executed on board a vessel or an aircraft of any description, and the execution of the will conformed to the internal law in force in the territory with which, having regard to its registration (if any) and other relevant circumstances, the vessel or aircraft may be taken to have been most closely connected is (3)(a), so far as the will disposes of immovable property, its execution conformed to the internal law in force in the territory where the property was situated is (3)(b), so far as the will revokes a will which under this Act would be treated as properly executed, or revokes a provision which under this Act would be treated as comprised in a properly executed will, the execution of the later will conformed to any law by reference to which the revoked will or provision would be treated as properly executed is (3)(c) and so far as the will exercises a power of appointment, the execution of the will conformed to the law governing the essential validity of the power is (3)(d).
+
+<!-- l4: decide:no conformity to any law outside this Act -->
+
+**113.** No conformity to any law outside this Act means the execution conforming thus with FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:conformity to the internal law of the territory where it was executed -->
+
+**114.** Conformity to the internal law of the territory where it was executed means the execution conforming thus with TRUE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:conformity to the internal law of the testator’s domicile when the will was executed -->
+
+**115.** Conformity to the internal law of the testator’s domicile when the will was executed means the execution conforming thus with FALSE, TRUE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:conformity to the internal law of the testator’s domicile at his death -->
+
+**116.** Conformity to the internal law of the testator’s domicile at his death means the execution conforming thus with FALSE, FALSE, TRUE, FALSE, FALSE, FALSE, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:conformity to the internal law of the territory of the testator’s habitual residence -->
+
+**117.** Conformity to the internal law of the territory of the testator’s habitual residence means the execution conforming thus with FALSE, FALSE, FALSE, TRUE, FALSE, FALSE, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:conformity to the internal law of the state of the testator’s nationality -->
+
+**118.** Conformity to the internal law of the state of the testator’s nationality means the execution conforming thus with FALSE, FALSE, FALSE, FALSE, TRUE, FALSE, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:conformity to the internal law of the territory the vessel is most closely connected with -->
+
+**119.** Conformity to the internal law of the territory the vessel is most closely connected with means the execution conforming thus with FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:conformity to the internal law of the territory where the immovable property is situated -->
+
+**120.** Conformity to the internal law of the territory where the immovable property is situated means the execution conforming thus with FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, FALSE and FALSE.
+
+<!-- l4: decide:conformity to the law by reference to which the revoked will would be properly executed -->
+
+**121.** Conformity to the law by reference to which the revoked will would be properly executed means the execution conforming thus with FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:conformity to the law governing the essential validity of the power -->
+
+**122.** Conformity to the law governing the essential validity of the power means the execution conforming thus with FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE and TRUE.
+
+<!-- l4: decide:revoked -->
+
+**123.** In relation to a BOOLEAN “by a later will or codicil”, a BOOLEAN “by a writing declaring an intention”, a BOOLEAN “destroyed by the testator”, a BOOLEAN “destroyed by another at his direction” and a BOOLEAN “with the animus”, revoked means The ways in which a will may have been revoked where revoked by another will or codicil executed in the manner by this Act required is by a later will or codicil, revoked by some writing declaring an intention to revoke it, and executed in the manner in which a will is by this Act required to be executed is by a writing declaring an intention, burnt, torn, or otherwise destroyed by the testator is destroyed by the testator, burnt, torn, or otherwise destroyed by some person in his presence and by his direction is destroyed by another at his direction and destroyed with the intention of revoking it is with the animus.
+
+<!-- l4: decide:not revoked in any of those ways -->
+
+**124.** Not revoked in any of those ways means revoked with FALSE, FALSE, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:revived -->
+
+**125.** In relation to a BOOLEAN “by re-execution”, a BOOLEAN “by a codicil showing an intention to revive”, a BOOLEAN “partly and then wholly revoked” and a BOOLEAN “a contrary intention is shown”, revived means The revival of a revoked will where revived by the re-execution thereof is by re-execution, revived by a codicil executed in the manner required by this Act and showing an intention to revive the will or codicil is by a codicil showing an intention to revive, partly revoked, and afterwards wholly revoked is partly and then wholly revoked and an intention to the contrary is shown is a contrary intention is shown.
+
+<!-- l4: decide:no revival -->
+
+**126.** No revival means revived with FALSE, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:the signature placed so that -->
+
+**127.** In relation to a BOOLEAN “there is such a signature at all”, a BOOLEAN “so placed at or after, or following, or under, or beside, or opposite to the end”, a BOOLEAN “(a)”, a BOOLEAN “(b)”, a BOOLEAN “(c)”, a BOOLEAN “(d)” and a BOOLEAN “(e)”, the signature placed so that means The position of the signature where there is a signature of the testator, or of a person signing for him in his presence and by his direction is there is such a signature at all, the signature of the testator, or of the person signing for him as mentioned in subsection (2), is so placed at or after, or following, or under, or beside, or opposite to the end of the will is so placed at or after, or following, or under, or beside, or opposite to the end, the signature does not follow and is not immediately after the foot or end of the will is (a), a blank space intervenes between the concluding word of the will and the signature is (b), the signature is placed among the words of the testimonium clause or of the clause of attestation, or follows or is after or under the clause of attestation, either with or without a blank space intervening, or follows or is after, or under, or beside the names or one of the names of the subscribing witnesses is (c), the signature is on a side or page or other portion of the paper or papers containing the will whereon no clause or paragraph or disposing part of the will is written above the signature is (d) and there appears to be sufficient space on or at the bottom of the preceding side or page or other portion of the same paper on which the will is written to contain the signature is (e).
+
+<!-- l4: decide:the signature in an unremarkable position -->
+
+**128.** The signature in an unremarkable position means the signature placed so that with TRUE, TRUE, FALSE, FALSE, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:the signature among the words of the attestation clause, after a blank space -->
+
+**129.** The signature among the words of the attestation clause, after a blank space means the signature placed so that with TRUE, TRUE, FALSE, TRUE, TRUE, FALSE and FALSE.
+
+<!-- l4: decide:the signature beside the end of the will -->
+
+**130.** The signature beside the end of the will means the signature placed so that with TRUE, TRUE, TRUE, FALSE, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:the signature at the head of the will, above all the dispositive words -->
+
+**131.** The signature at the head of the will, above all the dispositive words means the signature placed so that with TRUE, FALSE, FALSE, FALSE, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:the position stated as beside the end, though nobody signed the will -->
+
+**132.** The position stated as beside the end, though nobody signed the will means the signature placed so that with FALSE, TRUE, TRUE, FALSE, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:the facts about a will, in full -->
+
+**133.** In relation to a Will “the instrument”, a The position of the signature “where the signature is”, a Conformity of the execution of a will to a law outside this Act “the conformity facts”, a The ways in which a will may have been revoked “the revocation facts”, a The revival of a revoked will “the revival facts”, a BOOLEAN “duly executed counting only the disinterested witnesses”, a BOOLEAN “a subsequent conveyance or other act”, a BOOLEAN “that conveyance being the act by which the will is revoked”, a BOOLEAN “a contrary intention as to the time from which it speaks”, a BOOLEAN “a contrary intention as to lapse” and a BOOLEAN “it would have been valid as an informal disposition of personal estate”, the facts about a will, in full means A will, with the facts about it that only this Act asks where the will is the instrument, the position of the signature is where the signature is, the conformity of its execution to a law outside this Act is the conformity facts, the ways in which it has been revoked is the revocation facts, its revival is the revival facts, the signature was made or acknowledged by the testator as the signature to his will or codicil in the presence of 2 or more witnesses present at the same time, counting only witnesses to whom and to whose wife or husband no such disposition is given or made is duly executed counting only the disinterested witnesses, a conveyance or other act has been made or done subsequently to its execution, of or relating to any real or personal estate therein comprised is a subsequent conveyance or other act, that conveyance or other act is an act by which the will is revoked as aforesaid is that conveyance being the act by which the will is revoked, a contrary intention appears by the will as to the time from which it speaks is a contrary intention as to the time from which it speaks, a contrary intention appears by the will as to the lapse of a devise or bequest to a child or other issue is a contrary intention as to lapse and made in such manner and form that if the disposition had been a disposition of personal estate made by that person it would have been valid is it would have been valid as an informal disposition of personal estate.
+
+<!-- l4: decide:the facts about a will -->
+
+**134.** In relation to a Will “the instrument”, a Conformity of the execution of a will to a law outside this Act “the conformity facts”, a The ways in which a will may have been revoked “the revocation facts”, a The revival of a revoked will “the revival facts”, a BOOLEAN “duly executed counting only the disinterested witnesses”, a BOOLEAN “a subsequent conveyance or other act”, a BOOLEAN “a contrary intention as to the time from which it speaks”, a BOOLEAN “a contrary intention as to lapse” and a BOOLEAN “it would have been valid as an informal disposition of personal estate”, the facts about a will means the facts about a will, in full with the instrument, the signature placed so that with there is a signature, there is a signature, FALSE, FALSE, FALSE, FALSE and FALSE, the conformity facts, the revocation facts, the revival facts, duly executed counting only the disinterested witnesses, a subsequent conveyance or other act, FALSE, a contrary intention as to the time from which it speaks, a contrary intention as to lapse and it would have been valid as an informal disposition of personal estate.
+
+For the purposes of this provision—
+
+“there is a signature” means the instrument's signed at the foot or end thereof by the testator or the instrument's signed at the foot or end thereof by some other person in his presence and by his direction;
+
+<!-- l4: decide:the plain facts about -->
+
+**135.** In relation to a Will “the instrument”, the plain facts about means the facts about a will with the instrument, no conformity to any law outside this Act, not revoked in any of those ways, no revival, FALSE, FALSE, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:a WA grant -->
+
+**136.** In relation to a Kind of grant “what kind”, an optional DATE “the date”, a Limitation on the grant “the limitation of the grant”, a BOOLEAN “it was sealed under section 47(1)” and an optional DATE “the date it was sealed”, a WA grant means Grant where the kind of grant is what kind, the grantees is EMPTY, the date of the grant is the date, the limitation is the limitation of the grant, the court that made the grant is a court within the meaning of these Acts with the General Division of the High Court, the exception subject to which the grant is made is NOTHING, expired by effluxion of time or by the happening of the event or contingency on which it was limited is FALSE, revoked is FALSE, has given such security as is lawfully required to be furnished is TRUE, has been extracted is TRUE, sealed under section 47(1) of the Probate and Administration Act 1934 is it was sealed under section 47(1) and the date of the sealing is the date it was sealed.
+
+<!-- l4: decide:a WA infant concerned in the estate -->
+
+**137.** In relation to a Person “the infant child”, an optional Person “the father of the child” and a list of Guardian “the guardians”, a WA infant concerned in the estate means Infant where the infant is the infant child, the father of the infant is the father of the child, the mother of the infant is NOTHING, the guardians of the infant is the guardians, some other person has parental rights with respect to him is FALSE, the income of the property of the infant is 0, the capital of the property of the infant is 0 and of an age to express an independent opinion is FALSE.
+
+<!-- l4: decide:a WA deceased person, with the infants concerned in the estate -->
+
+**138.** In relation to a Person “the person who died”, a Family “the family of the deceased”, an optional Will “the will of the deceased”, a list of Grant “the grants” and a list of Infant “the infants”, a WA deceased person, with the infants concerned in the estate means Deceased person where the deceased is the person who died, the family is the family of the deceased, the estate is an estate of no recorded value, the will is the will of the deceased, domiciled in Singapore at the time of his death is TRUE, carried on business or resided in Singapore within 12 months of his death is TRUE, a Muslim is FALSE, the grants made in respect of the estate is the grants, the probate applications made in respect of the estate is EMPTY, a next of kin, creditor or other person has appeared and made out a claim to letters of administration is FALSE and the infants concerned in the estate is the infants.
+
+<!-- l4: decide:a WA deceased person -->
+
+**139.** In relation to a Person “the person who died”, a Family “the family of the deceased”, an optional Will “the will of the deceased” and a list of Grant “the grants”, a WA deceased person means a WA deceased person, with the infants concerned in the estate with the person who died, the family of the deceased, the will of the deceased, the grants and EMPTY.
+
+<!-- l4: decide:a case -->
+
+**140.** In relation to a Deceased person “the deceased person”, an A will, with the facts about it that only this Act asks “the will and its further facts”, a BOOLEAN “an application has been made”, an optional DATE “the date of the application”, a BOOLEAN “permission has been given” and a BOOLEAN “a grant of the remainder”, a case means A case under this Act where the deceased is the deceased person, the will in question is the will and its further facts, an application for an order under section 28(1) has been made is an application has been made, the date of that application is the date of the application, a court has given permission for the application to be made after the end of that period is permission has been given and a grant limited to the remainder of the testator’s estate has previously been made or is made at the same time is a grant of the remainder.
+
+## Worked facts — the people, the wills and the cases
+
+<!-- l4: decide:the WA Jaya -->
+
+**141.** The WA Jaya means a WA person with Jaya, jaya, JUST with YMD with 2005, 9 and 9, living, EMPTY and FALSE.
+
+<!-- l4: decide:the WA Ismail -->
+
+**142.** The WA Ismail means a WA person with Ismail, ismail, JUST with YMD with 1975, 7 and 11, died on with YMD with 2018, 2 and 20, list of a WA legitimate child with the WA Jaya and FALSE.
+
+<!-- l4: decide:the WA Amrita -->
+
+**143.** The WA Amrita means a WA person with Amrita, amrita, JUST with YMD with 1950, 4 and 2, died on with YMD with 2020, 1 and 5, list of a WA legitimate child with the WA Ismail and FALSE.
+
+<!-- l4: decide:the WA Bala -->
+
+**144.** The WA Bala means a WA person with Bala, bala, NOTHING, living, EMPTY and FALSE.
+
+<!-- l4: decide:the WA Chandra -->
+
+**145.** The WA Chandra means a WA person with Chandra, chandra, NOTHING, living, EMPTY and FALSE.
+
+<!-- l4: decide:the WA Devi -->
+
+**146.** The WA Devi means a WA person with Devi, devi, NOTHING, living, EMPTY and FALSE.
+
+<!-- l4: decide:the WA Gita -->
+
+**147.** The WA Gita means a WA person with Gita, gita, NOTHING, living, EMPTY and FALSE.
+
+<!-- l4: decide:the WA Harun -->
+
+**148.** The WA Harun means a WA person with Harun, harun, NOTHING, living, EMPTY and FALSE.
+
+<!-- l4: decide:the WA Suri -->
+
+**149.** The WA Suri means a WA person with Suri, suri, NOTHING, living, EMPTY and FALSE.
+
+<!-- l4: decide:the WA Eugene -->
+
+**150.** The WA Eugene means a WA person with Eugene, eugene, JUST with YMD with 2000, 6 and 1, died on with YMD with 2023, 4 and 4, EMPTY and FALSE.
+
+<!-- l4: decide:the WA Farid -->
+
+**151.** The WA Farid means a WA person with Farid, farid, JUST with YMD with 2004, 1 and 1, died on with YMD with 2023, 5 and 5, list of a WA legitimate child with the WA Jaya and TRUE.
+
+<!-- l4: decide:the WA Kamala -->
+
+**152.** The WA Kamala means a WA person with Kamala, kamala, JUST with YMD with 1930, 1 and 1, died on with YMD with 1990, 3 and 3, EMPTY and FALSE.
+
+<!-- l4: decide:the WA Nirmala -->
+
+**153.** The WA Nirmala means a WA person with Nirmala, nirmala, JUST with YMD with 1950, 2 and 2, dead, the date of death not known, EMPTY and FALSE.
+
+<!-- l4: decide:the WA Osman -->
+
+**154.** The WA Osman means a WA person with Osman, osman, JUST with YMD with 1915, 1 and 1, died on with YMD with 1938, 8 and 29, list of a WA legitimate child with the WA Suri and TRUE.
+
+<!-- l4: decide:the WA Rahim -->
+
+**155.** The WA Rahim means a WA person with Rahim, rahim, JUST with YMD with 1900, 1 and 1, died on with YMD with 1975, 6 and 6, EMPTY and FALSE.
+
+<!-- l4: decide:the WA Pak -->
+
+**156.** The WA Pak means a WA person, in full with Pak, pak, JUST with YMD with 2004, 3 and 3, died on with YMD with 2023, 6 and 6, list of a WA legitimate child with the WA Suri, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:the WA Quek -->
+
+**157.** The WA Quek means a WA person, in full with Quek, quek, JUST with YMD with 2004, 4 and 4, died on with YMD with 2023, 7 and 7, list of a WA legitimate child with the WA Suri, FALSE, FALSE and TRUE.
+
+<!-- l4: decide:the WA Salmah -->
+
+**158.** The WA Salmah means a WA person with Salmah, salmah, JUST with YMD with 1930, 1 and 1, died on with YMD with 1992, 5 and 29, EMPTY and FALSE.
+
+<!-- l4: decide:the WA Tariq -->
+
+**159.** The WA Tariq means a WA person with Tariq, tariq, JUST with YMD with 1930, 1 and 1, died on with YMD with 1992, 5 and 30, EMPTY and FALSE.
+
+<!-- l4: decide:the WA Usha -->
+
+**160.** The WA Usha means a WA person with Usha, usha, JUST with YMD with 1930, 1 and 1, died on with YMD with 1992, 6 and 26, EMPTY and FALSE.
+
+<!-- l4: decide:the WA Vikram -->
+
+**161.** The WA Vikram means a WA person with Vikram, vikram, JUST with YMD with 1930, 1 and 1, died on with YMD with 1992, 6 and 27, EMPTY and FALSE.
+
+<!-- l4: decide:the WA Wahid -->
+
+**162.** The WA Wahid means a WA person with Wahid, wahid, JUST with YMD with 1915, 1 and 1, died on with YMD with 1938, 8 and 30, list of a WA legitimate child with the WA Suri and TRUE.
+
+<!-- l4: decide:the WA Aisha -->
+
+**163.** The WA Aisha means a WA person with Aisha, aisha, NOTHING, living, EMPTY and FALSE.
+
+<!-- l4: decide:the WA Zainab -->
+
+**164.** The WA Zainab means a WA person with Zainab, zahra, NOTHING, living, list of a WA legitimate child with the WA Aisha and FALSE.
+
+<!-- l4: decide:the WA Yasmin -->
+
+**165.** The WA Yasmin means a WA person with Yasmin, zahra, NOTHING, died on with YMD with 2018, 2 and 20, EMPTY and FALSE.
+
+<!-- l4: decide:the WA Rashid -->
+
+**166.** The WA Rashid means a WA person with Rashid, rashid, JUST with YMD with 1990, 5 and 5, died on with YMD with 2023, 8 and 8, list of a WA legitimate child with the WA Suri and FALSE.
+
+<!-- l4: decide:the WA Zubaida -->
+
+**167.** The WA Zubaida means a WA person with Zubaida, zubaida, JUST with YMD with 1950, 4 and 2, died on with YMD with 2020, 1 and 5, list of a WA legitimate child with the WA Yasmin and a WA legitimate child with the WA Zainab and FALSE.
+
+<!-- l4: decide:Bala attesting -->
+
+**168.** Bala attesting means an attesting witness with the WA Bala, TRUE, FALSE, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:Chandra attesting -->
+
+**169.** Chandra attesting means an attesting witness with the WA Chandra, TRUE, FALSE, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:Devi attesting -->
+
+**170.** Devi attesting means an attesting witness with the WA Devi, TRUE, FALSE, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:Chandra attesting out of the testator’s sight -->
+
+**171.** Chandra attesting out of the testator’s sight means an attesting witness with the WA Chandra, FALSE, FALSE, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:Bala attesting, incompetent for a reason outside sections 10(2), 11 and 12 -->
+
+**172.** Bala attesting, incompetent for a reason outside sections 10(2), 11 and 12 means an attesting witness with the WA Bala, TRUE, TRUE, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:Devi attesting and taking a legacy -->
+
+**173.** Devi attesting and taking a legacy means an attesting witness with the WA Devi, TRUE, FALSE, TRUE, FALSE and FALSE.
+
+<!-- l4: decide:Bala attesting, his wife taking a legacy -->
+
+**174.** Bala attesting, his wife taking a legacy means an attesting witness with the WA Bala, TRUE, FALSE, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:Bala attesting as a creditor whose debt is charged -->
+
+**175.** Bala attesting as a creditor whose debt is charged means an attesting witness with the WA Bala, TRUE, FALSE, FALSE, FALSE and TRUE.
+
+<!-- l4: decide:Bala attesting, taking a legacy and a charge for his debt -->
+
+**176.** Bala attesting, taking a legacy and a charge for his debt means an attesting witness with the WA Bala, TRUE, FALSE, TRUE, FALSE and TRUE.
+
+<!-- l4: decide:a pecuniary legacy of $10,000 to Devi -->
+
+**177.** A pecuniary legacy of $10,000 to Devi means a gift with the WA Devi, a pecuniary legacy, 10000, TRUE and TRUE.
+
+<!-- l4: decide:a specific devise to Ismail -->
+
+**178.** A specific devise to Ismail means a gift with the WA Ismail, a specific devise or bequest, 100000, TRUE and TRUE.
+
+<!-- l4: decide:a specific devise to Ismail, determinable at his death -->
+
+**179.** A specific devise to Ismail, determinable at his death means a gift with the WA Ismail, a specific devise or bequest, 100000, TRUE and FALSE.
+
+<!-- l4: decide:a charge on the estate for a debt owed to Bala -->
+
+**180.** A charge on the estate for a debt owed to Bala means a gift with the WA Bala, a charge or direction for the payment of a debt, 5000, TRUE and FALSE.
+
+<!-- l4: decide:a pecuniary legacy of $10,000 to Chandra -->
+
+**181.** A pecuniary legacy of $10,000 to Chandra means a gift with the WA Chandra, a pecuniary legacy, 10000, TRUE and TRUE.
+
+<!-- l4: decide:a pecuniary legacy of $10,000 to Bala -->
+
+**182.** A pecuniary legacy of $10,000 to Bala means a gift with the WA Bala, a pecuniary legacy, 10000, TRUE and TRUE.
+
+<!-- l4: decide:a devise to Bala upon trust, not beneficially -->
+
+**183.** A devise to Bala upon trust, not beneficially means a gift with the WA Bala, a specific devise or bequest, 50000, FALSE and TRUE.
+
+<!-- l4: decide:a specific devise to the reference Yasmin and Zainab share -->
+
+**184.** A specific devise to the reference Yasmin and Zainab share means a gift with the WA Zainab, a specific devise or bequest, 100000, TRUE and TRUE.
+
+<!-- l4: decide:no marriages -->
+
+**185.** No marriages means a family with the marriages with EMPTY.
+
+<!-- l4: decide:married Gita in 2018, after the will -->
+
+**186.** Married Gita in 2018, after the will means a family with the marriages with list of a marriage with the WA Gita, JUST with YMD with 2018, 6 and 6 and TRUE.
+
+<!-- l4: decide:married Gita in 2010, before the will -->
+
+**187.** Married Gita in 2010, before the will means a family with the marriages with list of a marriage with the WA Gita, JUST with YMD with 2010, 1 and 1 and TRUE.
+
+<!-- l4: decide:married Harun in 2019, after the will -->
+
+**188.** Married Harun in 2019, after the will means a family with the marriages with list of a marriage with the WA Harun, JUST with YMD with 2019, 1 and 1 and TRUE.
+
+<!-- l4: decide:married Gita in 1940, after the will -->
+
+**189.** Married Gita in 1940, after the will means a family with the marriages with list of a marriage with the WA Gita, JUST with YMD with 1940, 1 and 1 and TRUE.
+
+<!-- l4: decide:the will of Amrita -->
+
+**190.** The will of Amrita means a will with the WA Amrita, JUST with YMD with 2015, 3 and 1, TRUE, TRUE, TRUE, list of Bala attesting and Chandra attesting, list of a specific devise to Ismail, EMPTY, FALSE, NOTHING, FALSE and FALSE.
+
+<!-- l4: decide:the will of Amrita, not in writing -->
+
+**191.** The will of Amrita, not in writing means a will with the WA Amrita, JUST with YMD with 2015, 3 and 1, FALSE, TRUE, TRUE, list of Bala attesting and Chandra attesting, list of a specific devise to Ismail, EMPTY, FALSE, NOTHING, FALSE and FALSE.
+
+<!-- l4: decide:the will of Amrita, only one witness having subscribed in her presence -->
+
+**192.** The will of Amrita, only one witness having subscribed in her presence means a will with the WA Amrita, JUST with YMD with 2015, 3 and 1, TRUE, TRUE, TRUE, list of Bala attesting and Chandra attesting out of the testator’s sight, list of a specific devise to Ismail, EMPTY, FALSE, NOTHING, FALSE and FALSE.
+
+<!-- l4: decide:the will of Amrita, one witness being incompetent -->
+
+**193.** The will of Amrita, one witness being incompetent means a will with the WA Amrita, JUST with YMD with 2015, 3 and 1, TRUE, TRUE, TRUE, list of Bala attesting, incompetent for a reason outside sections 10(2), 11 and 12 and Chandra attesting, list of a specific devise to Ismail, EMPTY, FALSE, NOTHING, FALSE and FALSE.
+
+<!-- l4: decide:the will of Amrita, the date of execution not being in evidence -->
+
+**194.** The will of Amrita, the date of execution not being in evidence means a will with the WA Amrita, NOTHING, TRUE, TRUE, TRUE, list of Bala attesting and Chandra attesting, list of a specific devise to Ismail, EMPTY, FALSE, NOTHING, FALSE and FALSE.
+
+<!-- l4: decide:the will of Amrita, executed abroad -->
+
+**195.** The will of Amrita, executed abroad means a will with the WA Amrita, JUST with YMD with 2015, 3 and 1, TRUE, FALSE, FALSE, EMPTY, list of a specific devise to Ismail, EMPTY, FALSE, NOTHING, FALSE and FALSE.
+
+<!-- l4: decide:the will of Kamala, executed abroad -->
+
+**196.** The will of Kamala, executed abroad means a will with the WA Kamala, JUST with YMD with 1985, 3 and 1, TRUE, FALSE, FALSE, EMPTY, EMPTY, EMPTY, FALSE, NOTHING, FALSE and FALSE.
+
+<!-- l4: decide:the will of Eugene, made at 19 -->
+
+**197.** The will of Eugene, made at 19 means a will with the WA Eugene, JUST with YMD with 2019, 6 and 1, TRUE, TRUE, TRUE, list of Bala attesting and Chandra attesting, EMPTY, EMPTY, FALSE, NOTHING, FALSE and FALSE.
+
+<!-- l4: decide:the will of Eugene, made on the day before his twenty-first birthday -->
+
+**198.** The will of Eugene, made on the day before his twenty-first birthday means a will with the WA Eugene, JUST with YMD with 2021, 5 and 31, TRUE, TRUE, TRUE, list of Bala attesting and Chandra attesting, EMPTY, EMPTY, FALSE, NOTHING, FALSE and FALSE.
+
+<!-- l4: decide:the will of Eugene, made on his twenty-first birthday -->
+
+**199.** The will of Eugene, made on his twenty-first birthday means a will with the WA Eugene, JUST with YMD with 2021, 6 and 1, TRUE, TRUE, TRUE, list of Bala attesting and Chandra attesting, EMPTY, EMPTY, FALSE, NOTHING, FALSE and FALSE.
+
+<!-- l4: decide:the will of Amrita, a legacy to one of her two witnesses -->
+
+**200.** The will of Amrita, a legacy to one of her two witnesses means a will with the WA Amrita, JUST with YMD with 2015, 3 and 1, TRUE, TRUE, TRUE, list of Devi attesting and taking a legacy and Bala attesting, list of a pecuniary legacy of $10,000 to Devi, EMPTY, FALSE, NOTHING, FALSE and FALSE.
+
+<!-- l4: decide:the will of Amrita, a legacy to one of her three witnesses -->
+
+**201.** The will of Amrita, a legacy to one of her three witnesses means a will with the WA Amrita, JUST with YMD with 2015, 3 and 1, TRUE, TRUE, TRUE, list of Devi attesting and taking a legacy, Bala attesting and Chandra attesting, list of a pecuniary legacy of $10,000 to Devi, EMPTY, FALSE, NOTHING, FALSE and FALSE.
+
+<!-- l4: decide:the will of Kamala, a legacy to one of her three witnesses -->
+
+**202.** The will of Kamala, a legacy to one of her three witnesses means a will with the WA Kamala, JUST with YMD with 1985, 3 and 1, TRUE, TRUE, TRUE, list of Devi attesting and taking a legacy, Bala attesting and Chandra attesting, list of a pecuniary legacy of $10,000 to Devi, EMPTY, FALSE, NOTHING, FALSE and FALSE.
+
+<!-- l4: decide:the will of Amrita, charging the estate with a debt owed to a witness -->
+
+**203.** The will of Amrita, charging the estate with a debt owed to a witness means a will with the WA Amrita, JUST with YMD with 2015, 3 and 1, TRUE, TRUE, TRUE, list of Bala attesting as a creditor whose debt is charged and Chandra attesting, list of a charge on the estate for a debt owed to Bala, EMPTY, FALSE, NOTHING, FALSE and FALSE.
+
+<!-- l4: decide:the will of Amrita, made in exercise of a power of appointment -->
+
+**204.** The will of Amrita, made in exercise of a power of appointment means a will with the WA Amrita, JUST with YMD with 2015, 3 and 1, TRUE, TRUE, TRUE, list of Bala attesting and Chandra attesting, list of a specific devise to Ismail, EMPTY, FALSE, NOTHING, TRUE and TRUE.
+
+<!-- l4: decide:the will of Amrita, made in exercise of a power of appointment, not in writing -->
+
+**205.** The will of Amrita, made in exercise of a power of appointment, not in writing means a will with the WA Amrita, JUST with YMD with 2015, 3 and 1, FALSE, TRUE, TRUE, list of Bala attesting and Chandra attesting, list of a specific devise to Ismail, EMPTY, FALSE, NOTHING, TRUE and TRUE.
+
+<!-- l4: decide:the will of Amrita, not signed at the foot or end -->
+
+**206.** The will of Amrita, not signed at the foot or end means a will with the WA Amrita, JUST with YMD with 2015, 3 and 1, TRUE, FALSE, TRUE, list of Bala attesting and Chandra attesting, list of a specific devise to Ismail, EMPTY, FALSE, NOTHING, FALSE and FALSE.
+
+<!-- l4: decide:the will of Amrita, in contemplation of her marriage to Gita -->
+
+**207.** The will of Amrita, in contemplation of her marriage to Gita means a will with the WA Amrita, JUST with YMD with 2015, 3 and 1, TRUE, TRUE, TRUE, list of Bala attesting and Chandra attesting, list of a specific devise to Ismail, EMPTY, TRUE, JUST with gita, FALSE and FALSE.
+
+<!-- l4: decide:the guardian Farid appointed of his child Jaya -->
+
+**208.** The guardian Farid appointed of his child Jaya means a guardian appointed by the father by will with the WA Bala and jaya.
+
+<!-- l4: decide:the will of Farid -->
+
+**209.** The will of Farid means a will with the WA Farid, JUST with YMD with 2023, 2 and 2, FALSE, FALSE, FALSE, EMPTY, EMPTY, list of the guardian Farid appointed of his child Jaya, FALSE, NOTHING, FALSE and FALSE.
+
+<!-- l4: decide:the will of Farid, appointing a guardian of a child who is not his -->
+
+**210.** The will of Farid, appointing a guardian of a child who is not his means a will with the WA Farid, JUST with YMD with 2023, 2 and 2, FALSE, FALSE, FALSE, EMPTY, EMPTY, list of a guardian appointed by the father by will with the WA Chandra and suri, FALSE, NOTHING, FALSE and FALSE.
+
+<!-- l4: decide:the will of Farid, appointing two guardians, one of them of a child who is not his -->
+
+**211.** The will of Farid, appointing two guardians, one of them of a child who is not his means a will with the WA Farid, JUST with YMD with 2023, 2 and 2, FALSE, FALSE, FALSE, EMPTY, EMPTY, list of the guardian Farid appointed of his child Jaya and a guardian appointed by the father by will with the WA Chandra and suri, FALSE, NOTHING, FALSE and FALSE.
+
+<!-- l4: decide:the will of Osman -->
+
+**212.** The will of Osman means a will with the WA Osman, JUST with YMD with 1938, 8 and 1, FALSE, FALSE, FALSE, EMPTY, EMPTY, list of a guardian appointed by the father by will with the WA Bala and suri, FALSE, NOTHING, FALSE and FALSE.
+
+<!-- l4: decide:the will of Nirmala, executed abroad -->
+
+**213.** The will of Nirmala, executed abroad means a will with the WA Nirmala, JUST with YMD with 2015, 3 and 1, TRUE, FALSE, FALSE, EMPTY, EMPTY, EMPTY, FALSE, NOTHING, FALSE and FALSE.
+
+<!-- l4: decide:the will of Rahim, made on 28 August 1938 in contemplation of his marriage to Gita -->
+
+**214.** The will of Rahim, made on 28 August 1938 in contemplation of his marriage to Gita means a will with the WA Rahim, JUST with YMD with 1938, 8 and 28, TRUE, TRUE, TRUE, list of Bala attesting and Chandra attesting, EMPTY, EMPTY, TRUE, JUST with gita, FALSE and FALSE.
+
+<!-- l4: decide:the will of Rahim, made on 29 August 1938 in contemplation of his marriage to Gita -->
+
+**215.** The will of Rahim, made on 29 August 1938 in contemplation of his marriage to Gita means a will with the WA Rahim, JUST with YMD with 1938, 8 and 29, TRUE, TRUE, TRUE, list of Bala attesting and Chandra attesting, EMPTY, EMPTY, TRUE, JUST with gita, FALSE and FALSE.
+
+<!-- l4: decide:the will of Amrita, the signature never acknowledged before the witnesses -->
+
+**216.** The will of Amrita, the signature never acknowledged before the witnesses means a will with the WA Amrita, JUST with YMD with 2015, 3 and 1, TRUE, TRUE, FALSE, list of Bala attesting and Chandra attesting, list of a specific devise to Ismail, EMPTY, FALSE, NOTHING, FALSE and FALSE.
+
+<!-- l4: decide:the will of Amrita, Bala being both an executor and an attesting witness -->
+
+**217.** The will of Amrita, Bala being both an executor and an attesting witness means a will, in full with the WA Amrita, JUST with YMD with 2015, 3 and 1, TRUE, TRUE, FALSE, TRUE, list of Bala attesting and Chandra attesting, list of a specific devise to Ismail, EMPTY, FALSE, NOTHING, FALSE, FALSE, TRUE and list of an executor appointed by the will with the WA Bala.
+
+<!-- l4: decide:the will of Amrita, not signed at the foot or end, the intention not apparent -->
+
+**218.** The will of Amrita, not signed at the foot or end, the intention not apparent means a will, in full with the WA Amrita, JUST with YMD with 2015, 3 and 1, TRUE, FALSE, FALSE, TRUE, list of Bala attesting and Chandra attesting, list of a specific devise to Ismail, EMPTY, FALSE, NOTHING, FALSE, FALSE, FALSE and EMPTY.
+
+<!-- l4: decide:the will of Amrita, whose attesting creditor takes a legacy, a charge and a devise on trust -->
+
+**219.** The will of Amrita, whose attesting creditor takes a legacy, a charge and a devise on trust means a will with the WA Amrita, JUST with YMD with 2015, 3 and 1, TRUE, TRUE, TRUE, list of Bala attesting, taking a legacy and a charge for his debt and Chandra attesting, list of a pecuniary legacy of $10,000 to Bala, a charge on the estate for a debt owed to Bala and a devise to Bala upon trust, not beneficially, EMPTY, FALSE, NOTHING, FALSE and FALSE.
+
+<!-- l4: decide:the will of Amrita, a legacy to one of her three witnesses, another subscribing out of her sight -->
+
+**220.** The will of Amrita, a legacy to one of her three witnesses, another subscribing out of her sight means a will with the WA Amrita, JUST with YMD with 2015, 3 and 1, TRUE, TRUE, TRUE, list of Devi attesting and taking a legacy, Bala attesting and Chandra attesting out of the testator’s sight, list of a pecuniary legacy of $10,000 to Devi, EMPTY, FALSE, NOTHING, FALSE and FALSE.
+
+<!-- l4: decide:the will of Amrita, signed at the foot for her by another at her direction -->
+
+**221.** The will of Amrita, signed at the foot for her by another at her direction means a will, in full with the WA Amrita, JUST with YMD with 2015, 3 and 1, TRUE, FALSE, TRUE, TRUE, list of Bala attesting and Chandra attesting, list of a specific devise to Ismail, EMPTY, FALSE, NOTHING, FALSE, FALSE, TRUE and EMPTY.
+
+<!-- l4: decide:the will of Amrita, signed at the foot for her by another, the intention not apparent on its face -->
+
+**222.** The will of Amrita, signed at the foot for her by another, the intention not apparent on its face means a will, in full with the WA Amrita, JUST with YMD with 2015, 3 and 1, TRUE, FALSE, TRUE, TRUE, list of Bala attesting and Chandra attesting, list of a specific devise to Ismail, EMPTY, FALSE, NOTHING, FALSE, FALSE, FALSE and EMPTY.
+
+<!-- l4: decide:the will of Amrita, made in exercise of a power, the appointed estate passing in default -->
+
+**223.** The will of Amrita, made in exercise of a power, the appointed estate passing in default means a will with the WA Amrita, JUST with YMD with 2015, 3 and 1, TRUE, TRUE, TRUE, list of Bala attesting and Chandra attesting, list of a specific devise to Ismail, EMPTY, FALSE, NOTHING, TRUE and FALSE.
+
+<!-- l4: decide:the will of Amrita, naming Gita but not expressed to be made in contemplation of the marriage -->
+
+**224.** The will of Amrita, naming Gita but not expressed to be made in contemplation of the marriage means a will with the WA Amrita, JUST with YMD with 2015, 3 and 1, TRUE, TRUE, TRUE, list of Bala attesting and Chandra attesting, list of a specific devise to Ismail, EMPTY, FALSE, JUST with gita, FALSE and FALSE.
+
+<!-- l4: decide:the will of Farid, appointing no guardian -->
+
+**225.** The will of Farid, appointing no guardian means a will with the WA Farid, JUST with YMD with 2023, 2 and 2, FALSE, FALSE, FALSE, EMPTY, EMPTY, EMPTY, FALSE, NOTHING, FALSE and FALSE.
+
+<!-- l4: decide:an ordinary will made by -->
+
+**226.** In relation to a Person “the maker of the will”, an ordinary will made by means a will with the maker of the will, JUST with YMD with 1985, 3 and 1, TRUE, TRUE, TRUE, list of Devi attesting and taking a legacy, Bala attesting and Chandra attesting, list of a pecuniary legacy of $10,000 to Devi, EMPTY, FALSE, NOTHING, FALSE and FALSE.
+
+<!-- l4: decide:the will of Zubaida, devising to the reference two of her children share -->
+
+**227.** The will of Zubaida, devising to the reference two of her children share means a will with the WA Zubaida, JUST with YMD with 2015, 3 and 1, TRUE, TRUE, TRUE, list of Bala attesting and Chandra attesting, list of a specific devise to the reference Yasmin and Zainab share, EMPTY, FALSE, NOTHING, FALSE and FALSE.
+
+<!-- l4: decide:a plain case -->
+
+**228.** In relation to a Person “the person who died”, a Family “the family of the deceased” and a Will “the instrument”, a plain case means a case with a WA deceased person with the person who died, the family of the deceased, JUST with the instrument and EMPTY, the plain facts about with the instrument, FALSE, NOTHING, FALSE and FALSE.
+
+<!-- l4: decide:a case with -->
+
+**229.** In relation to a Person “the person who died”, a Family “the family of the deceased”, an A will, with the facts about it that only this Act asks “the will and its further facts” and a list of Grant “the grants”, a case with means a case with a WA deceased person with the person who died, the family of the deceased, JUST with the will and its further facts's the will and the grants, the will and its further facts, FALSE, NOTHING, FALSE and FALSE.
+
+## Worked facts — the alterations, the signature positions and the grants
+
+<!-- l4: decide:an alteration -->
+
+**230.** In relation to a BOOLEAN “the earlier words are apparent”, a BOOLEAN “it is executed in the like manner”, a BOOLEAN “signed in the margin” and a BOOLEAN “signed opposite a memorandum”, an alteration means An alteration made in a will after its execution where the words or effect of the will before the alteration are apparent is the earlier words are apparent, the alteration is executed in the like manner as by this Act is required for the execution of the will is it is executed in the like manner, the signature of the testator and the subscription of the witnesses are made in the margin or on some other part of the will opposite or near to the alteration is signed in the margin and the signature of the testator and the subscription of the witnesses are made at the foot or end of or opposite to a memorandum referring to the alteration and written at the end or some other part of the will is signed opposite a memorandum.
+
+<!-- l4: decide:an obliteration that leaves the earlier words legible, unattested -->
+
+**231.** An obliteration that leaves the earlier words legible, unattested means an alteration with TRUE, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:an obliteration that leaves the earlier words illegible, unattested -->
+
+**232.** An obliteration that leaves the earlier words illegible, unattested means an alteration with FALSE, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:an interlineation, the earlier words legible, signed in the margin -->
+
+**233.** An interlineation, the earlier words legible, signed in the margin means an alteration with TRUE, FALSE, TRUE and FALSE.
+
+<!-- l4: decide:an interlineation, the earlier words legible, signed opposite a memorandum -->
+
+**234.** An interlineation, the earlier words legible, signed opposite a memorandum means an alteration with TRUE, FALSE, FALSE and TRUE.
+
+<!-- l4: decide:an interlineation, the earlier words legible, executed in the like manner as the will -->
+
+**235.** An interlineation, the earlier words legible, executed in the like manner as the will means an alteration with TRUE, TRUE, FALSE and FALSE.
+
+<!-- l4: decide:the devise to Ismail -->
+
+**236.** In relation to a STRING “where it stands”, the devise to Ismail means A disposition, and where it stands in relation to the signature where the disposition is a specific devise to Ismail, underneath or following the signature is where it stands is equal to below the signature and inserted after the signature was made is where it stands is equal to inserted after the signature was made.
+
+<!-- l4: decide:the grant of probate made on 1 March 2020 -->
+
+**237.** The grant of probate made on 1 March 2020 means a WA grant with probate, JUST with YMD with 2020, 3 and 1, not limited, FALSE and NOTHING.
+
+<!-- l4: decide:the grant of probate made on 31 August 2020 -->
+
+**238.** The grant of probate made on 31 August 2020 means a WA grant with probate, JUST with YMD with 2020, 8 and 31, not limited, FALSE and NOTHING.
+
+<!-- l4: decide:a grant of probate whose date is not in evidence -->
+
+**239.** A grant of probate whose date is not in evidence means a WA grant with probate, NOTHING, not limited, FALSE and NOTHING.
+
+<!-- l4: decide:the grant limited to settled land made on 1 February 2020 -->
+
+**240.** The grant limited to settled land made on 1 February 2020 means a WA grant with letters of administration with the will annexed, JUST with YMD with 2020, 2 and 1, limited to settled land or to trust property, FALSE and NOTHING.
+
+<!-- l4: decide:the grant limited to a part of the estate made on 1 February 2020 -->
+
+**241.** The grant limited to a part of the estate made on 1 February 2020 means a WA grant with letters of administration with the will annexed, JUST with YMD with 2020, 2 and 1, limited to a part only of the testator’s estate with the Malaysian assets, FALSE and NOTHING.
+
+<!-- l4: decide:the probate resealed on 1 September 2020, granted on 1 March 2020 -->
+
+**242.** The probate resealed on 1 September 2020, granted on 1 March 2020 means a WA grant with probate, JUST with YMD with 2020, 3 and 1, not limited, TRUE and JUST with YMD with 2020, 9 and 1.
+
+<!-- l4: decide:the letters of administration sealed on 1 September 2020, granted on 1 March 2020 -->
+
+**243.** The letters of administration sealed on 1 September 2020, granted on 1 March 2020 means a WA grant with letters of administration, JUST with YMD with 2020, 3 and 1, not limited, TRUE and JUST with YMD with 2020, 9 and 1.
+
+## Worked facts — the cases
+
+<!-- l4: decide:the plain case of Amrita -->
+
+**244.** The plain case of Amrita means a plain case with the WA Amrita, no marriages and the will of Amrita.
+
+<!-- l4: decide:the case of a will not in writing -->
+
+**245.** The case of a will not in writing means a plain case with the WA Amrita, no marriages and the will of Amrita, not in writing.
+
+<!-- l4: decide:the case of a will one of whose two witnesses subscribed out of her sight -->
+
+**246.** The case of a will one of whose two witnesses subscribed out of her sight means a plain case with the WA Amrita, no marriages and the will of Amrita, only one witness having subscribed in her presence.
+
+<!-- l4: decide:the case of a will one of whose witnesses is incompetent -->
+
+**247.** The case of a will one of whose witnesses is incompetent means a plain case with the WA Amrita, no marriages and the will of Amrita, one witness being incompetent.
+
+<!-- l4: decide:the case of a will whose date of execution is not in evidence -->
+
+**248.** The case of a will whose date of execution is not in evidence means a plain case with the WA Amrita, no marriages and the will of Amrita, the date of execution not being in evidence.
+
+<!-- l4: decide:the case of the will of Eugene -->
+
+**249.** The case of the will of Eugene means a plain case with the WA Eugene, no marriages and the will of Eugene, made at 19.
+
+<!-- l4: decide:the case of the will of Eugene, made the day before he turned 21 -->
+
+**250.** The case of the will of Eugene, made the day before he turned 21 means a plain case with the WA Eugene, no marriages and the will of Eugene, made on the day before his twenty-first birthday.
+
+<!-- l4: decide:the case of the will of Eugene, made on the day he turned 21 -->
+
+**251.** The case of the will of Eugene, made on the day he turned 21 means a plain case with the WA Eugene, no marriages and the will of Eugene, made on his twenty-first birthday.
+
+<!-- l4: decide:the case of an appointing will not in writing -->
+
+**252.** The case of an appointing will not in writing means a plain case with the WA Amrita, no marriages and the will of Amrita, made in exercise of a power of appointment, not in writing.
+
+<!-- l4: decide:the case of the will of Rahim, made on 28 August 1938 -->
+
+**253.** The case of the will of Rahim, made on 28 August 1938 means a plain case with the WA Rahim, married Gita in 1940, after the will and the will of Rahim, made on 28 August 1938 in contemplation of his marriage to Gita.
+
+<!-- l4: decide:the case of the will of Rahim, made on 29 August 1938 -->
+
+**254.** The case of the will of Rahim, made on 29 August 1938 means a plain case with the WA Rahim, married Gita in 1940, after the will and the will of Rahim, made on 29 August 1938 in contemplation of his marriage to Gita.
+
+<!-- l4: decide:the case of a will charging the estate with a debt owed to a witness -->
+
+**255.** The case of a will charging the estate with a debt owed to a witness means a plain case with the WA Amrita, no marriages and the will of Amrita, charging the estate with a debt owed to a witness.
+
+<!-- l4: decide:the case of a legacy to one of two witnesses -->
+
+**256.** The case of a legacy to one of two witnesses means a plain case with the WA Amrita, no marriages and the will of Amrita, a legacy to one of her two witnesses.
+
+<!-- l4: decide:the case of a legacy to one of three witnesses -->
+
+**257.** The case of a legacy to one of three witnesses means a case with with the WA Amrita, no marriages, the facts about a will with the will of Amrita, a legacy to one of her three witnesses, no conformity to any law outside this Act, not revoked in any of those ways, no revival, TRUE, FALSE, FALSE, FALSE and FALSE and EMPTY.
+
+<!-- l4: decide:the case of a legacy to one of three witnesses, the testator dying in 1990 -->
+
+**258.** The case of a legacy to one of three witnesses, the testator dying in 1990 means a case with with the WA Kamala, no marriages, the facts about a will with the will of Kamala, a legacy to one of her three witnesses, no conformity to any law outside this Act, not revoked in any of those ways, no revival, TRUE, FALSE, FALSE, FALSE and FALSE and EMPTY.
+
+<!-- l4: decide:the case of a will executed abroad, the testator dying in 2020 -->
+
+**259.** The case of a will executed abroad, the testator dying in 2020 means a case with with the WA Amrita, no marriages, the facts about a will with the will of Amrita, executed abroad, conformity to the internal law of the territory where it was executed, not revoked in any of those ways, no revival, FALSE, FALSE, FALSE, FALSE and FALSE and EMPTY.
+
+<!-- l4: decide:the case of a will executed abroad, the testator dying in 1990 -->
+
+**260.** The case of a will executed abroad, the testator dying in 1990 means a case with with the WA Kamala, no marriages, the facts about a will with the will of Kamala, executed abroad, conformity to the internal law of the territory where it was executed, not revoked in any of those ways, no revival, FALSE, FALSE, FALSE, FALSE and FALSE and EMPTY.
+
+<!-- l4: decide:the case of a will executed abroad, the date of the death of the testator not being in evidence -->
+
+**261.** The case of a will executed abroad, the date of the death of the testator not being in evidence means a case with with the WA Nirmala, no marriages, the facts about a will with the will of Nirmala, executed abroad, conformity to the internal law of the territory where it was executed, not revoked in any of those ways, no revival, FALSE, FALSE, FALSE, FALSE and FALSE and EMPTY.
+
+<!-- l4: decide:the case of a will conforming only to the law of the place where its immovable property is situated -->
+
+**262.** The case of a will conforming only to the law of the place where its immovable property is situated means a case with with the WA Amrita, no marriages, the facts about a will with the will of Amrita, executed abroad, conformity to the internal law of the territory where the immovable property is situated, not revoked in any of those ways, no revival, FALSE, FALSE, FALSE, FALSE and FALSE and EMPTY.
+
+<!-- l4: decide:the case of Amrita marrying Gita in 2018, after the will -->
+
+**263.** The case of Amrita marrying Gita in 2018, after the will means a plain case with the WA Amrita, married Gita in 2018, after the will and the will of Amrita.
+
+<!-- l4: decide:the case of Amrita marrying Gita in 2010, before the will -->
+
+**264.** The case of Amrita marrying Gita in 2010, before the will means a plain case with the WA Amrita, married Gita in 2010, before the will and the will of Amrita.
+
+<!-- l4: decide:the case of an appointing will, Amrita marrying Gita in 2018 -->
+
+**265.** The case of an appointing will, Amrita marrying Gita in 2018 means a plain case with the WA Amrita, married Gita in 2018, after the will and the will of Amrita, made in exercise of a power of appointment.
+
+<!-- l4: decide:the case of a will in contemplation of the marriage to Gita, Amrita marrying Gita -->
+
+**266.** The case of a will in contemplation of the marriage to Gita, Amrita marrying Gita means a plain case with the WA Amrita, married Gita in 2018, after the will and the will of Amrita, in contemplation of her marriage to Gita.
+
+<!-- l4: decide:the case of a will in contemplation of the marriage to Gita, Amrita marrying Harun -->
+
+**267.** The case of a will in contemplation of the marriage to Gita, Amrita marrying Harun means a plain case with the WA Amrita, married Harun in 2019, after the will and the will of Amrita, in contemplation of her marriage to Gita.
+
+<!-- l4: decide:the facts about the will of Amrita -->
+
+**268.** The facts about the will of Amrita means the plain facts about with the will of Amrita.
+
+<!-- l4: decide:the facts about the will of Amrita, not in writing -->
+
+**269.** The facts about the will of Amrita, not in writing means the plain facts about with the will of Amrita, not in writing.
+
+<!-- l4: decide:the facts about the will of Amrita, only one witness having subscribed in her presence -->
+
+**270.** The facts about the will of Amrita, only one witness having subscribed in her presence means the plain facts about with the will of Amrita, only one witness having subscribed in her presence.
+
+<!-- l4: decide:the facts about the will of Amrita, executed abroad -->
+
+**271.** The facts about the will of Amrita, executed abroad means the plain facts about with the will of Amrita, executed abroad.
+
+<!-- l4: decide:the facts about the will of Amrita, a legacy to one of her three witnesses -->
+
+**272.** The facts about the will of Amrita, a legacy to one of her three witnesses means the plain facts about with the will of Amrita, a legacy to one of her three witnesses.
+
+<!-- l4: decide:the facts about a will, the signature being placed thus -->
+
+**273.** In relation to a Will “the instrument” and a The position of the signature “where the signature is”, the facts about a will, the signature being placed thus means the facts about a will, in full with the instrument, where the signature is, no conformity to any law outside this Act, not revoked in any of those ways, no revival, FALSE, FALSE, FALSE, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:the facts about the will of Amrita, signed beside the end -->
+
+**274.** The facts about the will of Amrita, signed beside the end means the facts about a will, the signature being placed thus with the will of Amrita, not signed at the foot or end and the signature beside the end of the will.
+
+<!-- l4: decide:the facts about the will of Amrita, signed at the head -->
+
+**275.** The facts about the will of Amrita, signed at the head means the facts about a will, the signature being placed thus with the will of Amrita, not signed at the foot or end and the signature at the head of the will, above all the dispositive words.
+
+<!-- l4: decide:the case of a will signed beside the end rather than at the foot -->
+
+**276.** The case of a will signed beside the end rather than at the foot means a case with with the WA Amrita, no marriages, the facts about the will of Amrita, signed beside the end and EMPTY.
+
+<!-- l4: decide:the case of a will signed at the head, above all the dispositive words -->
+
+**277.** The case of a will signed at the head, above all the dispositive words means a case with with the WA Amrita, no marriages, the facts about the will of Amrita, signed at the head and EMPTY.
+
+<!-- l4: decide:the facts about the will of Amrita, signed beside the end, the intention not apparent -->
+
+**278.** The facts about the will of Amrita, signed beside the end, the intention not apparent means the facts about a will, the signature being placed thus with the will of Amrita, not signed at the foot or end, the intention not apparent and the signature beside the end of the will.
+
+<!-- l4: decide:the facts about the will of Amrita, the position stated but nobody having signed -->
+
+**279.** The facts about the will of Amrita, the position stated but nobody having signed means the facts about a will, the signature being placed thus with the will of Amrita, not signed at the foot or end and the position stated as beside the end, though nobody signed the will.
+
+<!-- l4: decide:the case of a will signed beside the end, the intention not apparent on its face -->
+
+**280.** The case of a will signed beside the end, the intention not apparent on its face means a case with with the WA Amrita, no marriages, the facts about the will of Amrita, signed beside the end, the intention not apparent and EMPTY.
+
+<!-- l4: decide:the case of a will nobody signed, the position being stated as beside the end -->
+
+**281.** The case of a will nobody signed, the position being stated as beside the end means a case with with the WA Amrita, no marriages, the facts about the will of Amrita, the position stated but nobody having signed and EMPTY.
+
+<!-- l4: decide:the facts about the will of Amrita, the signature never acknowledged before the witnesses -->
+
+**282.** The facts about the will of Amrita, the signature never acknowledged before the witnesses means the plain facts about with the will of Amrita, the signature never acknowledged before the witnesses.
+
+<!-- l4: decide:the case of a will whose signature was never acknowledged before the witnesses -->
+
+**283.** The case of a will whose signature was never acknowledged before the witnesses means a case with with the WA Amrita, no marriages, the facts about the will of Amrita, the signature never acknowledged before the witnesses and EMPTY.
+
+<!-- l4: decide:the facts about the will of Amrita, signed for her by another -->
+
+**284.** The facts about the will of Amrita, signed for her by another means the plain facts about with the will of Amrita, signed at the foot for her by another at her direction.
+
+<!-- l4: decide:the case of a will signed at the foot for the testator by another at her direction -->
+
+**285.** The case of a will signed at the foot for the testator by another at her direction means a case with with the WA Amrita, no marriages, the facts about the will of Amrita, signed for her by another and EMPTY.
+
+<!-- l4: decide:the facts about the will of Amrita, signed for her by another, the intention not apparent -->
+
+**286.** The facts about the will of Amrita, signed for her by another, the intention not apparent means the plain facts about with the will of Amrita, signed at the foot for her by another, the intention not apparent on its face.
+
+<!-- l4: decide:the case of a will signed for the testator by another, the intention not apparent -->
+
+**287.** The case of a will signed for the testator by another, the intention not apparent means a case with with the WA Amrita, no marriages, the facts about a will with the will of Amrita, signed at the foot for her by another, the intention not apparent on its face, no conformity to any law outside this Act, not revoked in any of those ways, no revival, TRUE, FALSE, FALSE, FALSE and FALSE and EMPTY.
+
+<!-- l4: decide:the case of a legacy to one of three witnesses, the presence limb not being proved -->
+
+**288.** The case of a legacy to one of three witnesses, the presence limb not being proved means a plain case with the WA Amrita, no marriages and the will of Amrita, a legacy to one of her three witnesses.
+
+<!-- l4: decide:the case of a will made under a power whose appointed estate passes in default, Amrita marrying Gita -->
+
+**289.** The case of a will made under a power whose appointed estate passes in default, Amrita marrying Gita means a plain case with the WA Amrita, married Gita in 2018, after the will and the will of Amrita, made in exercise of a power, the appointed estate passing in default.
+
+<!-- l4: decide:the case of a will naming Gita but not expressed to be made in contemplation, Amrita marrying Gita -->
+
+**290.** The case of a will naming Gita but not expressed to be made in contemplation, Amrita marrying Gita means a plain case with the WA Amrita, married Gita in 2018, after the will and the will of Amrita, naming Gita but not expressed to be made in contemplation of the marriage.
+
+<!-- l4: decide:the facts about the will of Amrita, Bala being both an executor and an attesting witness -->
+
+**291.** The facts about the will of Amrita, Bala being both an executor and an attesting witness means the plain facts about with the will of Amrita, Bala being both an executor and an attesting witness.
+
+<!-- l4: decide:the case of a will giving its attesting creditor a legacy, a charge and a devise on trust -->
+
+**292.** The case of a will giving its attesting creditor a legacy, a charge and a devise on trust means a plain case with the WA Amrita, no marriages and the will of Amrita, whose attesting creditor takes a legacy, a charge and a devise on trust.
+
+<!-- l4: decide:the case of a legacy to one of two witnesses, the presence limb being proved -->
+
+**293.** The case of a legacy to one of two witnesses, the presence limb being proved means a case with with the WA Amrita, no marriages, the facts about a will with the will of Amrita, a legacy to one of her two witnesses, no conformity to any law outside this Act, not revoked in any of those ways, no revival, TRUE, FALSE, FALSE, FALSE and FALSE and EMPTY.
+
+<!-- l4: decide:the case of a legacy to one of three witnesses, another subscribing out of her sight -->
+
+**294.** The case of a legacy to one of three witnesses, another subscribing out of her sight means a case with with the WA Amrita, no marriages, the facts about a will with the will of Amrita, a legacy to one of her three witnesses, another subscribing out of her sight, no conformity to any law outside this Act, not revoked in any of those ways, no revival, TRUE, FALSE, FALSE, FALSE and FALSE and EMPTY.
+
+<!-- l4: decide:the case of a will executed abroad, conforming thus -->
+
+**295.** In relation to a Conformity of the execution of a will to a law outside this Act “the conformity facts”, the case of a will executed abroad, conforming thus means a case with with the WA Amrita, no marriages, the facts about a will with the will of Amrita, executed abroad, the conformity facts, not revoked in any of those ways, no revival, FALSE, FALSE, FALSE, FALSE and FALSE and EMPTY.
+
+<!-- l4: decide:the case of a will conforming only to the law of the testator’s domicile when it was executed -->
+
+**296.** The case of a will conforming only to the law of the testator’s domicile when it was executed means the case of a will executed abroad, conforming thus with conformity to the internal law of the testator’s domicile when the will was executed.
+
+<!-- l4: decide:the case of a will conforming only to the law of the testator’s domicile at his death -->
+
+**297.** The case of a will conforming only to the law of the testator’s domicile at his death means the case of a will executed abroad, conforming thus with conformity to the internal law of the testator’s domicile at his death.
+
+<!-- l4: decide:the case of a will conforming only to the law of the place of the testator’s habitual residence -->
+
+**298.** The case of a will conforming only to the law of the place of the testator’s habitual residence means the case of a will executed abroad, conforming thus with conformity to the internal law of the territory of the testator’s habitual residence.
+
+<!-- l4: decide:the case of a will conforming only to the law of the state of the testator’s nationality -->
+
+**299.** The case of a will conforming only to the law of the state of the testator’s nationality means the case of a will executed abroad, conforming thus with conformity to the internal law of the state of the testator’s nationality.
+
+<!-- l4: decide:the case of a will executed on board a vessel -->
+
+**300.** The case of a will executed on board a vessel means the case of a will executed abroad, conforming thus with conformity to the internal law of the territory the vessel is most closely connected with.
+
+<!-- l4: decide:the case of a will conforming only to the law by reference to which the will it revokes was properly executed -->
+
+**301.** The case of a will conforming only to the law by reference to which the will it revokes was properly executed means the case of a will executed abroad, conforming thus with conformity to the law by reference to which the revoked will would be properly executed.
+
+<!-- l4: decide:the case of a will conforming only to the law governing the essential validity of the power -->
+
+**302.** The case of a will conforming only to the law governing the essential validity of the power means the case of a will executed abroad, conforming thus with conformity to the law governing the essential validity of the power.
+
+<!-- l4: decide:the case of an appointing will conforming only to the law governing the essential validity of the power -->
+
+**303.** The case of an appointing will conforming only to the law governing the essential validity of the power means a case with with the WA Amrita, no marriages, the facts about a will with the will of Amrita, made in exercise of a power of appointment, not in writing, conformity to the law governing the essential validity of the power, not revoked in any of those ways, no revival, FALSE, FALSE, FALSE, FALSE and FALSE and EMPTY.
+
+<!-- l4: decide:the case of an appointing will conforming only to the lex situs of its immovable property -->
+
+**304.** The case of an appointing will conforming only to the lex situs of its immovable property means a case with with the WA Amrita, no marriages, the facts about a will with the will of Amrita, made in exercise of a power of appointment, not in writing, conformity to the internal law of the territory where the immovable property is situated, not revoked in any of those ways, no revival, FALSE, FALSE, FALSE, FALSE and FALSE and EMPTY.
+
+<!-- l4: decide:the plain case of a testator dying thus -->
+
+**305.** In relation to a Person “the person who died”, the plain case of a testator dying thus means a plain case with the person who died, no marriages and an ordinary will made by with the person who died.
+
+<!-- l4: decide:the case of a testator who died on 29 May 1992 -->
+
+**306.** The case of a testator who died on 29 May 1992 means the plain case of a testator dying thus with the WA Salmah.
+
+<!-- l4: decide:the case of a testator who died on 30 May 1992 -->
+
+**307.** The case of a testator who died on 30 May 1992 means the plain case of a testator dying thus with the WA Tariq.
+
+<!-- l4: decide:the case of a testator who died on 26 June 1992 -->
+
+**308.** The case of a testator who died on 26 June 1992 means the plain case of a testator dying thus with the WA Usha.
+
+<!-- l4: decide:the case of a testator who died on 27 June 1992 -->
+
+**309.** The case of a testator who died on 27 June 1992 means the plain case of a testator dying thus with the WA Vikram.
+
+<!-- l4: decide:the case of a will conforming only to the lex situs, the date of the death of the testator not being in evidence -->
+
+**310.** The case of a will conforming only to the lex situs, the date of the death of the testator not being in evidence means a case with with the WA Nirmala, no marriages, the facts about a will with the will of Nirmala, executed abroad, conformity to the internal law of the territory where the immovable property is situated, not revoked in any of those ways, no revival, FALSE, FALSE, FALSE, FALSE and FALSE and EMPTY.
+
+<!-- l4: decide:the case of a will executed on board a vessel, the date of the death of the testator not being in evidence -->
+
+**311.** The case of a will executed on board a vessel, the date of the death of the testator not being in evidence means a case with with the WA Nirmala, no marriages, the facts about a will with the will of Nirmala, executed abroad, conformity to the internal law of the territory the vessel is most closely connected with, not revoked in any of those ways, no revival, FALSE, FALSE, FALSE, FALSE and FALSE and EMPTY.
+
+<!-- l4: decide:the case of a will conforming to no law outside this Act, the date of the death of the testator not being in evidence -->
+
+**312.** The case of a will conforming to no law outside this Act, the date of the death of the testator not being in evidence means a case with with the WA Nirmala, no marriages, the facts about a will with the will of Nirmala, executed abroad, no conformity to any law outside this Act, not revoked in any of those ways, no revival, FALSE, FALSE, FALSE, FALSE and FALSE and EMPTY.
+
+<!-- l4: decide:the case of a devise to a reference two of the testator’s children share -->
+
+**313.** The case of a devise to a reference two of the testator’s children share means a plain case with the WA Zubaida, no marriages and the will of Zubaida, devising to the reference two of her children share.
+
+<!-- l4: decide:the case of Amrita’s will, revoked and revived thus -->
+
+**314.** In relation to a The ways in which a will may have been revoked “the revocation facts” and a The revival of a revoked will “the revival facts”, the case of Amrita’s will, revoked and revived thus means a case with with the WA Amrita, no marriages, the facts about a will with the will of Amrita, no conformity to any law outside this Act, the revocation facts, the revival facts, FALSE, FALSE, FALSE, FALSE and FALSE and EMPTY.
+
+<!-- l4: decide:the case of a will burnt by the testator without the intention of revoking it -->
+
+**315.** The case of a will burnt by the testator without the intention of revoking it means the case of Amrita’s will, revoked and revived thus with revoked with FALSE, FALSE, TRUE, FALSE and FALSE and no revival.
+
+<!-- l4: decide:the case of a will burnt by the testator with the intention of revoking it -->
+
+**316.** The case of a will burnt by the testator with the intention of revoking it means the case of Amrita’s will, revoked and revived thus with revoked with FALSE, FALSE, TRUE, FALSE and TRUE and no revival.
+
+<!-- l4: decide:the case of a will burnt by a stranger, the testator intending revocation -->
+
+**317.** The case of a will burnt by a stranger, the testator intending revocation means the case of Amrita’s will, revoked and revived thus with revoked with FALSE, FALSE, FALSE, FALSE and TRUE and no revival.
+
+<!-- l4: decide:the case of a will revoked by a later will -->
+
+**318.** The case of a will revoked by a later will means the case of Amrita’s will, revoked and revived thus with revoked with TRUE, FALSE, FALSE, FALSE and FALSE and no revival.
+
+<!-- l4: decide:the case of a will revoked by a writing declaring an intention to revoke it -->
+
+**319.** The case of a will revoked by a writing declaring an intention to revoke it means the case of Amrita’s will, revoked and revived thus with revoked with FALSE, TRUE, FALSE, FALSE and FALSE and no revival.
+
+<!-- l4: decide:the case of a will destroyed by another person at the testator’s direction, with the intention of revoking it -->
+
+**320.** The case of a will destroyed by another person at the testator’s direction, with the intention of revoking it means the case of Amrita’s will, revoked and revived thus with revoked with FALSE, FALSE, FALSE, TRUE and TRUE and no revival.
+
+<!-- l4: decide:the case of a will revoked by a later will and then re-executed -->
+
+**321.** The case of a will revoked by a later will and then re-executed means the case of Amrita’s will, revoked and revived thus with revoked with TRUE, FALSE, FALSE, FALSE and FALSE and revived with TRUE, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:the case of a will re-executed but never revoked -->
+
+**322.** The case of a will re-executed but never revoked means the case of Amrita’s will, revoked and revived thus with not revoked in any of those ways and revived with TRUE, FALSE, FALSE and FALSE.
+
+<!-- l4: decide:the case of a will partly revoked, then wholly revoked, then revived by codicil -->
+
+**323.** The case of a will partly revoked, then wholly revoked, then revived by codicil means the case of Amrita’s will, revoked and revived thus with revoked with TRUE, FALSE, FALSE, FALSE and FALSE and revived with FALSE, TRUE, TRUE and FALSE.
+
+<!-- l4: decide:the case of the same will, a contrary intention being shown -->
+
+**324.** The case of the same will, a contrary intention being shown means the case of Amrita’s will, revoked and revived thus with revoked with TRUE, FALSE, FALSE, FALSE and FALSE and revived with FALSE, TRUE, TRUE and TRUE.
+
+<!-- l4: decide:the case of Amrita’s will and a conveyance made after it -->
+
+**325.** In relation to a Family “the family of the deceased”, a The ways in which a will may have been revoked “the revocation facts” and a BOOLEAN “the conveyance is itself the revoking act”, the case of Amrita’s will and a conveyance made after it means a case with with the WA Amrita, the family of the deceased, the facts about a will, in full with the will of Amrita, the signature in an unremarkable position, no conformity to any law outside this Act, the revocation facts, no revival, FALSE, TRUE, the conveyance is itself the revoking act, FALSE, FALSE and FALSE and EMPTY.
+
+<!-- l4: decide:the case of a conveyance made after the will, the will standing -->
+
+**326.** The case of a conveyance made after the will, the will standing means the case of Amrita’s will and a conveyance made after it with no marriages, not revoked in any of those ways and FALSE.
+
+<!-- l4: decide:the case of a conveyance that is itself the act by which the will is revoked -->
+
+**327.** The case of a conveyance that is itself the act by which the will is revoked means the case of Amrita’s will and a conveyance made after it with no marriages, revoked with FALSE, TRUE, FALSE, FALSE and FALSE and TRUE.
+
+<!-- l4: decide:the case of a conveyance made after the will, the will having been revoked by a marriage -->
+
+**328.** The case of a conveyance made after the will, the will having been revoked by a marriage means the case of Amrita’s will and a conveyance made after it with married Gita in 2018, after the will, not revoked in any of those ways and FALSE.
+
+<!-- l4: decide:the case of a conveyance made after the will, the will having been revoked by a later will -->
+
+**329.** The case of a conveyance made after the will, the will having been revoked by a later will means the case of Amrita’s will and a conveyance made after it with no marriages, revoked with TRUE, FALSE, FALSE, FALSE and FALSE and FALSE.
+
+<!-- l4: decide:the case of a conveyance said to be the revoking act, no mode of revocation in section 15 being made out -->
+
+**330.** The case of a conveyance said to be the revoking act, no mode of revocation in section 15 being made out means the case of Amrita’s will and a conveyance made after it with no marriages, not revoked in any of those ways and TRUE.
+
+<!-- l4: decide:the case of a will showing a contrary intention as to the time from which it speaks -->
+
+**331.** The case of a will showing a contrary intention as to the time from which it speaks means a case with with the WA Amrita, no marriages, the facts about a will with the will of Amrita, no conformity to any law outside this Act, not revoked in any of those ways, no revival, FALSE, FALSE, TRUE, FALSE and FALSE and EMPTY.
+
+<!-- l4: decide:the case of a will showing a contrary intention as to lapse -->
+
+**332.** The case of a will showing a contrary intention as to lapse means a case with with the WA Amrita, no marriages, the facts about a will with the will of Amrita, no conformity to any law outside this Act, not revoked in any of those ways, no revival, FALSE, FALSE, FALSE, TRUE and FALSE and EMPTY.
+
+<!-- l4: decide:the case of the will of Farid -->
+
+**333.** The case of the will of Farid means a case with with the WA Farid, no marriages, the facts about a will with the will of Farid, no conformity to any law outside this Act, not revoked in any of those ways, no revival, FALSE, FALSE, FALSE, FALSE and TRUE and EMPTY.
+
+<!-- l4: decide:the case of the will of Osman -->
+
+**334.** The case of the will of Osman means a case with with the WA Osman, no marriages, the facts about a will with the will of Osman, no conformity to any law outside this Act, not revoked in any of those ways, no revival, FALSE, FALSE, FALSE, FALSE and TRUE and EMPTY.
+
+<!-- l4: decide:the case of the will of Farid, the old form not being made out -->
+
+**335.** The case of the will of Farid, the old form not being made out means a case with with the WA Farid, no marriages, the facts about a will with the will of Farid, no conformity to any law outside this Act, not revoked in any of those ways, no revival, FALSE, FALSE, FALSE, FALSE and FALSE and EMPTY.
+
+<!-- l4: decide:the case of an informal will made by -->
+
+**336.** In relation to a Person “the privileged testator” and an optional DATE “the date it was written”, the case of an informal will made by means a case with with the privileged testator, no marriages, the facts about a will with a will with the privileged testator, the date it was written, FALSE, FALSE, FALSE, EMPTY, EMPTY, list of a guardian appointed by the father by will with the WA Bala and suri, FALSE, NOTHING, FALSE and FALSE, no conformity to any law outside this Act, not revoked in any of those ways, no revival, FALSE, FALSE, FALSE, FALSE and TRUE and EMPTY.
+
+<!-- l4: decide:the case of the informal will of Rashid, a civilian -->
+
+**337.** The case of the informal will of Rashid, a civilian means the case of an informal will made by with the WA Rashid and JUST with YMD with 2023, 2 and 2.
+
+<!-- l4: decide:the case of the will of Pak, a mariner at sea -->
+
+**338.** The case of the will of Pak, a mariner at sea means the case of an informal will made by with the WA Pak and JUST with YMD with 2023, 2 and 2.
+
+<!-- l4: decide:the case of the will of Quek, a member of the naval forces -->
+
+**339.** The case of the will of Quek, a member of the naval forces means the case of an informal will made by with the WA Quek and JUST with YMD with 2023, 3 and 3.
+
+<!-- l4: decide:the case of the will of Wahid, who died on 30 August 1938 -->
+
+**340.** The case of the will of Wahid, who died on 30 August 1938 means the case of an informal will made by with the WA Wahid and JUST with YMD with 1938, 8 and 1.
+
+<!-- l4: decide:the case of the will of Farid, appointing no guardian -->
+
+**341.** The case of the will of Farid, appointing no guardian means a case with with the WA Farid, no marriages, the facts about a will with the will of Farid, appointing no guardian, no conformity to any law outside this Act, not revoked in any of those ways, no revival, FALSE, FALSE, FALSE, FALSE and TRUE and EMPTY.
+
+<!-- l4: decide:the case of the will of Farid, appointing a guardian of a child who is not his -->
+
+**342.** The case of the will of Farid, appointing a guardian of a child who is not his means a case with with the WA Farid, no marriages, the facts about a will with the will of Farid, appointing a guardian of a child who is not his, no conformity to any law outside this Act, not revoked in any of those ways, no revival, FALSE, FALSE, FALSE, FALSE and TRUE and EMPTY.
+
+<!-- l4: decide:the case of the will of Farid, appointing two guardians, one of them of a child who is not his -->
+
+**343.** The case of the will of Farid, appointing two guardians, one of them of a child who is not his means a case with with the WA Farid, no marriages, the facts about a will with the will of Farid, appointing two guardians, one of them of a child who is not his, no conformity to any law outside this Act, not revoked in any of those ways, no revival, FALSE, FALSE, FALSE, FALSE and TRUE and EMPTY.
+
+<!-- l4: decide:the case of the will of Farid, Jaya being an infant concerned in the estate -->
+
+**344.** The case of the will of Farid, Jaya being an infant concerned in the estate means a case with a WA deceased person, with the infants concerned in the estate with the WA Farid, no marriages, JUST with the will of Farid, EMPTY and list of a WA infant concerned in the estate with the WA Jaya, JUST with the WA Farid and list of the guardian Farid appointed of his child Jaya, the facts about a will with the will of Farid, no conformity to any law outside this Act, not revoked in any of those ways, no revival, FALSE, FALSE, FALSE, FALSE and TRUE, FALSE, NOTHING, FALSE and FALSE.
+
+<!-- l4: decide:the rectification case -->
+
+**345.** In relation to a list of Grant “the grants”, a BOOLEAN “an application”, an optional DATE “the date of the application”, a BOOLEAN “permission” and a BOOLEAN “a grant of the remainder”, the rectification case means a case with a WA deceased person with the WA Amrita, no marriages, JUST with the will of Amrita and the grants, the facts about a will with the will of Amrita, no conformity to any law outside this Act, not revoked in any of those ways, no revival, FALSE, FALSE, FALSE, FALSE and FALSE, an application, the date of the application, permission and a grant of the remainder.
+
+<!-- l4: decide:no application to rectify has been made -->
+
+**346.** No application to rectify has been made means the rectification case with list of the grant of probate made on 1 March 2020, FALSE, NOTHING, FALSE and FALSE.
+
+<!-- l4: decide:an application to rectify made 5 months after the grant -->
+
+**347.** An application to rectify made 5 months after the grant means the rectification case with list of the grant of probate made on 1 March 2020, TRUE, JUST with YMD with 2020, 8 and 1, FALSE and FALSE.
+
+<!-- l4: decide:an application to rectify made 8 months after the grant -->
+
+**348.** An application to rectify made 8 months after the grant means the rectification case with list of the grant of probate made on 1 March 2020, TRUE, JUST with YMD with 2020, 11 and 1, FALSE and FALSE.
+
+<!-- l4: decide:an application to rectify made 8 months after the grant, with the permission of a court -->
+
+**349.** An application to rectify made 8 months after the grant, with the permission of a court means the rectification case with list of the grant of probate made on 1 March 2020, TRUE, JUST with YMD with 2020, 11 and 1, TRUE and FALSE.
+
+<!-- l4: decide:an application to rectify, no grant having been made -->
+
+**350.** An application to rectify, no grant having been made means the rectification case with EMPTY, TRUE, JUST with YMD with 2020, 8 and 1, FALSE and FALSE.
+
+<!-- l4: decide:an application to rectify, only a grant limited to settled land having been made -->
+
+**351.** An application to rectify, only a grant limited to settled land having been made means the rectification case with list of the grant limited to settled land made on 1 February 2020, TRUE, JUST with YMD with 2020, 11 and 1, FALSE and FALSE.
+
+<!-- l4: decide:an application to rectify, only a grant limited to part of the estate having been made -->
+
+**352.** An application to rectify, only a grant limited to part of the estate having been made means the rectification case with list of the grant limited to a part of the estate made on 1 February 2020, TRUE, JUST with YMD with 2020, 11 and 1, FALSE and FALSE.
+
+<!-- l4: decide:an application to rectify, a grant of the remainder having also been made -->
+
+**353.** An application to rectify, a grant of the remainder having also been made means the rectification case with list of the grant limited to a part of the estate made on 1 February 2020, TRUE, JUST with YMD with 2020, 11 and 1, FALSE and TRUE.
+
+<!-- l4: decide:an application to rectify made 10 months after a probate that was resealed -->
+
+**354.** An application to rectify made 10 months after a probate that was resealed means the rectification case with list of the probate resealed on 1 September 2020, granted on 1 March 2020, TRUE, JUST with YMD with 2021, 1 and 1, FALSE and FALSE.
+
+<!-- l4: decide:an application to rectify made 10 months after letters of administration that were sealed -->
+
+**355.** An application to rectify made 10 months after letters of administration that were sealed means the rectification case with list of the letters of administration sealed on 1 September 2020, granted on 1 March 2020, TRUE, JUST with YMD with 2021, 1 and 1, FALSE and FALSE.
+
+<!-- l4: decide:an application to rectify whose date is not in evidence -->
+
+**356.** An application to rectify whose date is not in evidence means the rectification case with list of the grant of probate made on 1 March 2020, TRUE, NOTHING, FALSE and FALSE.
+
+<!-- l4: decide:an application to rectify made on the last day of the 6 months -->
+
+**357.** An application to rectify made on the last day of the 6 months means the rectification case with list of the grant of probate made on 1 March 2020, TRUE, JUST with YMD with 2020, 9 and 1, FALSE and FALSE.
+
+<!-- l4: decide:an application to rectify made one day after the 6 months -->
+
+**358.** An application to rectify made one day after the 6 months means the rectification case with list of the grant of probate made on 1 March 2020, TRUE, JUST with YMD with 2020, 9 and 2, FALSE and FALSE.
+
+<!-- l4: decide:an application to rectify made on 28 February 2021, the grant being on 31 August 2020 -->
+
+**359.** An application to rectify made on 28 February 2021, the grant being on 31 August 2020 means the rectification case with list of the grant of probate made on 31 August 2020, TRUE, JUST with YMD with 2021, 2 and 28, FALSE and FALSE.
+
+<!-- l4: decide:an application to rectify made on 1 March 2021, the grant being on 31 August 2020 -->
+
+**360.** An application to rectify made on 1 March 2021, the grant being on 31 August 2020 means the rectification case with list of the grant of probate made on 31 August 2020, TRUE, JUST with YMD with 2021, 3 and 1, FALSE and FALSE.
+
+<!-- l4: decide:an application to rectify whose date is not in evidence, made with the permission of a court -->
+
+**361.** An application to rectify whose date is not in evidence, made with the permission of a court means the rectification case with list of the grant of probate made on 1 March 2020, TRUE, NOTHING, TRUE and FALSE.
+
+<!-- l4: decide:an application to rectify, one of the two grants being undated -->
+
+**362.** An application to rectify, one of the two grants being undated means the rectification case with list of a grant of probate whose date is not in evidence and the grant of probate made on 1 March 2020, TRUE, JUST with YMD with 2020, 8 and 1, FALSE and FALSE.
+
+## Running the rules on the facts
+
+## What is NOT encoded, and why
+
+## The ambiguity register
+
+## Where this Act joins the other three
+
+## Where the shared ontology stopped short
+
+<!-- tnr-coverage: 362 provisions; 0 boolean atoms inlined; 345 directives suppressed -->

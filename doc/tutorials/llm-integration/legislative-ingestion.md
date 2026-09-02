@@ -2,10 +2,7 @@
 
 Use LLMs to help encode legislation in L4.
 
-**Audience:** Legal engineers, legislative drafters  
-**Prerequisites:** [LLM Getting Started](llm-getting-started.md), intermediate L4 knowledge  
-**Time:** 30 minutes  
-**Goal:** Learn a workflow for LLM-assisted legislation encoding
+**Prerequisites:** [LLM Getting Started](llm-getting-started.md), intermediate L4 knowledge
 
 ---
 
@@ -59,6 +56,12 @@ Break legislation into manageable chunks. Each chunk should be:
 - Self-contained (one concept)
 - Referenced by section/article number
 - Small enough for LLM context
+
+Segment inert passages — recitals, preambles, purpose clauses — _separately_
+from operative rules, and flag them as such. They gate no decision and compute
+nothing, so they're encoded as a `hierarchy` outline rather than a `DECIDE` or
+`ASSUME`. See
+[Encoding Legislation → Carry Inert Text](../getting-started/encoding-legislation.md#2-carry-inert-text--recitals-preambles-purpose-clauses).
 
 ### Example Legislation
 
@@ -236,6 +239,7 @@ cabal run l4 -- check charity-test.l4
 
 - [ ] Types match legislation definitions
 - [ ] Rules capture all conditions
+- [ ] Inert text (recitals, preambles) is carried as an outline, not dropped
 - [ ] Cross-references are correct
 - [ ] Edge cases are handled
 - [ ] Code compiles without errors

@@ -92,5 +92,20 @@
   (add-to-list 'eglot-server-programs
                '(l4-mode . ("jl4-lsp"))))
 
+;;; Layout sensitivity
+
+;; L4 is whitespace-significant, so nothing should silently reindent it.
+;; Emacs Prelude advises `yank' and `yank-pop' to run `indent-region' over
+;; freshly-pasted text in any `prog-mode' derivative (see the "indent" advice
+;; in Prelude's `prelude-editor.el').  Since `l4-mode' derives from
+;; `prog-mode' and defines no `indent-line-function', that fallback copies
+;; the previous line's indentation over the yanked region and destroys its
+;; leading whitespace.  Prelude's escape hatch is to declare the mode
+;; indentation-sensitive, alongside python-mode and yaml-mode.
+(when (boundp 'prelude-indent-sensitive-modes)
+  (add-to-list 'prelude-indent-sensitive-modes 'l4-mode))
+(with-eval-after-load 'prelude-editor
+  (add-to-list 'prelude-indent-sensitive-modes 'l4-mode))
+
 (provide 'l4-mode)
 ;;; l4-mode.el ends here

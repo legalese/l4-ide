@@ -1,0 +1,267 @@
+IMPORT prelude
+IMPORT `housing-act-common`
+IMPORT daydate
+
+§ `Housing Act 1988 — Schedule 2 — Part I — Ground 1 (amended; Renters' Rights Act 2025)`
+
+-- The amended Ground 1, as substituted by the Renters' Rights Act 2025 (c. 26)
+-- (commencement 1.5.2026 for specified purposes). The original 1988 Ground 1 lives
+-- in housing-act-ground-1-limbs.l4. This version: NO notice requirement, NO
+-- reversion-for-value carve-out; instead a 1-year minimum-tenancy condition and an
+-- EXPANDED family list of qualifying occupiers.
+--
+-- HYBRID encoding: constitutive conditions -> predicates carrying the verbatim
+-- statute inline as inert prose; the mandatory outcome -> a guarded deontic clause.
+--
+-- Statutory text encoded:
+--   The current tenancy began at least 1 year before the relevant date and the
+--   landlord who is seeking possession requires the dwelling-house as the only or
+--   principal home of any of the following—
+--   (a) the landlord;
+--   (b) the landlord's spouse or civil partner or a person with whom the landlord
+--       lives as if they were married or in a civil partnership;
+--   (c) the landlord's— (i) parent; (ii) grandparent; (iii) sibling; (iv) child;
+--       (v) grandchild;
+--   (d) a child or grandchild of a person mentioned in paragraph (b).
+--   In the case of joint landlords seeking possession, references to "the landlord"
+--   in this ground are to be read as references to at least one of those joint
+--   landlords.
+--   When calculating whether the current tenancy began at least 1 year before the
+--   relevant date, both— (a) the day when the current tenancy began, and (b) the
+--   relevant date,— must be included in the calculation.
+
+§§ `Domain model — the relationship as a relation ON THE OCCUPIER`
+
+-- Actor (Landlord, Tenant, Court) is imported from `housing-act-common`.
+
+-- The prospective occupier (resident). The relationship the occupier bears to the
+-- landlord is modelled as a RELATION ON THE OCCUPIER: a set of independent boolean
+-- flags an input layer can simply CHECKBOX (tick one or more). "the landlord" reads,
+-- per the joint-landlords rule, as "at least one of the joint landlords". An occupier
+-- who is none of the (a)-(d) list ticks `is other` (and does not qualify).
+DECLARE Occupier HAS
+    name                                                  IS A STRING
+    `is the landlord`                                     IS A BOOLEAN   -- (a)
+    `is the landlord's spouse, civil partner or cohabitant`  IS A BOOLEAN   -- (b)
+    `is the landlord's parent`                            IS A BOOLEAN   -- (c)(i)
+    `is the landlord's grandparent`                       IS A BOOLEAN   -- (c)(ii)
+    `is the landlord's sibling`                           IS A BOOLEAN   -- (c)(iii)
+    `is the landlord's child`                             IS A BOOLEAN   -- (c)(iv)
+    `is the landlord's grandchild`                        IS A BOOLEAN   -- (c)(v)
+    `is a child or grandchild of the landlord's partner`  IS A BOOLEAN   -- (d)
+    `is other`                                            IS A BOOLEAN   -- none of the (a)-(d) list
+
+DECLARE Claim HAS
+    `proposed occupier`   IS AN Occupier
+    `the landlord requires the dwelling-house as the occupier's only or principal home`  IS A BOOLEAN
+    `tenancy began`       IS A DATE
+    `relevant date`       IS A DATE
+
+§§ `The qualifying-occupier requirement — the (a)-(d) list, as a predicate on the occupier`
+
+-- A predicate OVER THE OCCUPIER: do they stand in one of the (a)-(d) relationships to
+-- the landlord? Each disjunct just reads the corresponding checkbox flag. `is other`
+-- is deliberately NOT in the disjunction, so an occupier off the list yields FALSE.
+GIVEN occupier IS AN Occupier
+GIVETH A BOOLEAN
+`is a qualifying occupier` occupier MEANS
+        "(a) the landlord;"                                                              ... occupier's `is the landlord`
+    ..  "(b) the landlord's spouse or civil partner or a person with whom the landlord lives as if they were married or in a civil partnership;"
+                                                                                         ... occupier's `is the landlord's spouse, civil partner or cohabitant`
+    ..  "(c) the landlord's— (i) parent;"                                                ... occupier's `is the landlord's parent`
+    ..  "(ii) grandparent;"                                                              ... occupier's `is the landlord's grandparent`
+    ..  "(iii) sibling;"                                                                 ... occupier's `is the landlord's sibling`
+    ..  "(iv) child;"                                                                    ... occupier's `is the landlord's child`
+    ..  "(v) grandchild;"                                                                ... occupier's `is the landlord's grandchild`
+    ..  "(d) a child or grandchild of a person mentioned in paragraph (b)."             ... occupier's `is a child or grandchild of the landlord's partner`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`qualifying-occupier requirement` claim MEANS
+        "the landlord who is seeking possession requires the dwelling-house as the only or principal home of any of the following"
+    ... "(in the case of joint landlords, references to the landlord are to at least one of those joint landlords)"
+    ...     claim's `the landlord requires the dwelling-house as the occupier's only or principal home`
+    AND `is a qualifying occupier` (claim's `proposed occupier`)
+
+§§ `The 1-year condition — inclusive day-counting`
+
+-- "The current tenancy began at least 1 year before the relevant date", counting BOTH
+-- endpoints. We measure the inclusive elapsed span and compare it against a one-year
+-- window derived from the actual dates (so it is leap-year-correct). This simplifies
+-- to: relevantDate is on or after (tenancyBegan + 1 calendar year).
+GIVEN claim IS A Claim
+GIVETH A NUMBER
+`inclusive days from tenancy start to relevant date` claim MEANS
+    (Day (claim's `relevant date`) MINUS Day (claim's `tenancy began`)) PLUS 1
+
+GIVEN claim IS A Claim
+GIVETH A NUMBER
+`inclusive days in one year from tenancy start` claim MEANS
+    (Day (`one year after tenancy start` claim) MINUS Day (claim's `tenancy began`)) PLUS 1
+    WHERE
+        GIVEN c IS A Claim
+        GIVETH A DATE
+        `one year after tenancy start` c MEANS
+            Date (DATE_DAY   (c's `tenancy began`))
+                 (DATE_MONTH (c's `tenancy began`))
+                 (DATE_YEAR  (c's `tenancy began`) PLUS 1)
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`current tenancy began at least 1 year before the relevant date` claim MEANS
+        "The current tenancy began at least 1 year before the relevant date"
+    ... "(both the day when the current tenancy began and the relevant date must be included in the calculation)"
+    ... `inclusive days from tenancy start to relevant date` claim
+            AT LEAST `inclusive days in one year from tenancy start` claim
+
+§§ `Ground 1 (amended 2025) made out — 1-year condition AND occupier requirement`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`Ground 1 (amended 2025) made out` claim MEANS
+        `current tenancy began at least 1 year before the relevant date` claim
+    AND `qualifying-occupier requirement` claim
+
+§§ `The mandatory outcome — Court MUST order possession`
+
+-- Action (`order possession`) is imported from `housing-act-common`.
+
+GIVEN claim IS A Claim
+GIVETH A DEONTIC Actor Action
+`ground 1 (amended 2025) possession order` claim MEANS
+    IF   `Ground 1 (amended 2025) made out` claim
+    THEN PARTY Court MUST `order possession` WITHIN 30
+    ELSE FULFILLED
+
+§ `Tests`
+
+§§ `Occupiers — one checkbox ticked each (and one "other")`
+
+-- A base occupier with every relationship flag FALSE; the named occupiers below tick
+-- exactly one. (Record literals must give every field, so we spell them out.)
+`occupier — the landlord` MEANS Occupier WITH
+  name IS "the landlord"
+  `is the landlord`                                     IS TRUE
+  `is the landlord's spouse, civil partner or cohabitant`  IS FALSE
+  `is the landlord's parent`                            IS FALSE
+  `is the landlord's grandparent`                       IS FALSE
+  `is the landlord's sibling`                           IS FALSE
+  `is the landlord's child`                             IS FALSE
+  `is the landlord's grandchild`                        IS FALSE
+  `is a child or grandchild of the landlord's partner`  IS FALSE
+  `is other`                                            IS FALSE
+
+`occupier — the partner` MEANS Occupier WITH
+  name IS "the partner"
+  `is the landlord`                                     IS FALSE
+  `is the landlord's spouse, civil partner or cohabitant`  IS TRUE
+  `is the landlord's parent`                            IS FALSE
+  `is the landlord's grandparent`                       IS FALSE
+  `is the landlord's sibling`                           IS FALSE
+  `is the landlord's child`                             IS FALSE
+  `is the landlord's grandchild`                        IS FALSE
+  `is a child or grandchild of the landlord's partner`  IS FALSE
+  `is other`                                            IS FALSE
+
+`occupier — a sibling` MEANS Occupier WITH
+  name IS "a sibling"
+  `is the landlord`                                     IS FALSE
+  `is the landlord's spouse, civil partner or cohabitant`  IS FALSE
+  `is the landlord's parent`                            IS FALSE
+  `is the landlord's grandparent`                       IS FALSE
+  `is the landlord's sibling`                           IS TRUE
+  `is the landlord's child`                             IS FALSE
+  `is the landlord's grandchild`                        IS FALSE
+  `is a child or grandchild of the landlord's partner`  IS FALSE
+  `is other`                                            IS FALSE
+
+`occupier — partner's grandchild` MEANS Occupier WITH
+  name IS "partner's grandchild"
+  `is the landlord`                                     IS FALSE
+  `is the landlord's spouse, civil partner or cohabitant`  IS FALSE
+  `is the landlord's parent`                            IS FALSE
+  `is the landlord's grandparent`                       IS FALSE
+  `is the landlord's sibling`                           IS FALSE
+  `is the landlord's child`                             IS FALSE
+  `is the landlord's grandchild`                        IS FALSE
+  `is a child or grandchild of the landlord's partner`  IS TRUE
+  `is other`                                            IS FALSE
+
+`occupier — other` MEANS Occupier WITH
+  name IS "a friend"
+  `is the landlord`                                     IS FALSE
+  `is the landlord's spouse, civil partner or cohabitant`  IS FALSE
+  `is the landlord's parent`                            IS FALSE
+  `is the landlord's grandparent`                       IS FALSE
+  `is the landlord's sibling`                           IS FALSE
+  `is the landlord's child`                             IS FALSE
+  `is the landlord's grandchild`                        IS FALSE
+  `is a child or grandchild of the landlord's partner`  IS FALSE
+  `is other`                                            IS TRUE
+
+-- The (a)-(d) list bites: qualifying occupiers qualify; "other" does not.
+#ASSERT     `is a qualifying occupier` `occupier — the landlord`
+#ASSERT     `is a qualifying occupier` `occupier — the partner`
+#ASSERT     `is a qualifying occupier` `occupier — a sibling`
+#ASSERT     `is a qualifying occupier` `occupier — partner's grandchild`
+#ASSERT NOT `is a qualifying occupier` `occupier — other`
+
+§§ `Dates`
+
+`relevant date 2025`          MEANS January 1 2025
+`tenancy began exactly 1yr`   MEANS January 1 2024   -- exactly 1 year before -> satisfied
+`tenancy began 1 day short`   MEANS January 2 2024   -- one day short -> not satisfied
+`tenancy began well over 1yr` MEANS June 1 2023
+
+§§ `Ground made out — occupier qualifies, requirement asserted, tenancy long enough`
+
+`claim — qualifying` MEANS Claim WITH
+  `proposed occupier`                                                                 IS `occupier — a sibling`
+  `the landlord requires the dwelling-house as the occupier's only or principal home` IS TRUE
+  `tenancy began`                                                                     IS `tenancy began well over 1yr`
+  `relevant date`                                                                     IS `relevant date 2025`
+
+#ASSERT `qualifying-occupier requirement`  `claim — qualifying`
+#ASSERT `Ground 1 (amended 2025) made out` `claim — qualifying`
+
+§§ `Not made out — occupier off the list`
+
+`claim — other occupier` MEANS Claim WITH
+  `proposed occupier`                                                                 IS `occupier — other`
+  `the landlord requires the dwelling-house as the occupier's only or principal home` IS TRUE
+  `tenancy began`                                                                     IS `tenancy began well over 1yr`
+  `relevant date`                                                                     IS `relevant date 2025`
+
+#ASSERT NOT `qualifying-occupier requirement`  `claim — other occupier`
+#ASSERT NOT `Ground 1 (amended 2025) made out` `claim — other occupier`
+
+§§ `Not made out — landlord requires nothing`
+
+`claim — no requirement` MEANS Claim WITH
+  `proposed occupier`                                                                 IS `occupier — the partner`
+  `the landlord requires the dwelling-house as the occupier's only or principal home` IS FALSE
+  `tenancy began`                                                                     IS `tenancy began well over 1yr`
+  `relevant date`                                                                     IS `relevant date 2025`
+
+#ASSERT NOT `qualifying-occupier requirement`  `claim — no requirement`
+#ASSERT NOT `Ground 1 (amended 2025) made out` `claim — no requirement`
+
+§§ `The 1-year boundary (inclusive counting)`
+
+`claim — exactly 1yr` MEANS Claim WITH
+  `proposed occupier`                                                                 IS `occupier — the landlord`
+  `the landlord requires the dwelling-house as the occupier's only or principal home` IS TRUE
+  `tenancy began`                                                                     IS `tenancy began exactly 1yr`
+  `relevant date`                                                                     IS `relevant date 2025`
+
+#ASSERT `current tenancy began at least 1 year before the relevant date` `claim — exactly 1yr`
+#ASSERT `Ground 1 (amended 2025) made out`                               `claim — exactly 1yr`
+
+`claim — 1 day short` MEANS Claim WITH
+  `proposed occupier`                                                                 IS `occupier — the landlord`
+  `the landlord requires the dwelling-house as the occupier's only or principal home` IS TRUE
+  `tenancy began`                                                                     IS `tenancy began 1 day short`
+  `relevant date`                                                                     IS `relevant date 2025`
+
+#ASSERT NOT `current tenancy began at least 1 year before the relevant date` `claim — 1 day short`
+#ASSERT NOT `Ground 1 (amended 2025) made out`                               `claim — 1 day short`

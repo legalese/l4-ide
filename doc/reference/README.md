@@ -52,6 +52,15 @@ Structural rules and special syntax patterns:
 - **Directives:** `#EVAL`, `#TRACE`, `#CHECK`, `#ASSERT`
 - **Special Syntax:** Ditto (`^`), Asyndetic (`...`, `..`)
 
+#### [Query Planning](query-planning/README.md)
+
+Turning a Boolean decision into an interactive question-and-answer wizard:
+
+- **[Query Planner](query-planning/README.md):** determinability, question
+  ordering, and the roadmap toward information-gain ordering with priors
+- **[Binary Decision Diagrams (ROBDD)](query-planning/robdd.md):** the canonical
+  Boolean-function substrate the planner is built on
+
 ### [Libraries](libraries/README.md)
 
 Core libraries shipped with L4:

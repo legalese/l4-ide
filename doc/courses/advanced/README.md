@@ -13,8 +13,6 @@ This course covers advanced techniques for modeling complex legal systems:
 
 **Prerequisites:** Completion of the [Foundation Course](../foundation/README.md)
 
-**Time:** Approximately 4-6 hours total
-
 ---
 
 ## Modules
@@ -28,8 +26,6 @@ Model complete legislative frameworks.
 - Handling cross-references
 - Building from a real example: charity regulation
 
-**Time:** 90 minutes
-
 ---
 
 ### [Module A2: Cross-Cutting Concerns](module-a2-cross-cutting.md)
@@ -40,8 +36,6 @@ Patterns that span multiple rules.
 - Notice requirements
 - Appeal procedures
 - Grace periods and escalation
-
-**Time:** 60 minutes
 
 ---
 
@@ -54,8 +48,6 @@ Advanced contract modeling.
 - Penalty structures
 - Real-world example: promissory note
 
-**Time:** 60 minutes
-
 ---
 
 ### [Module A4: Production Patterns](module-a4-production.md)
@@ -66,8 +58,6 @@ Patterns for robust, maintainable code.
 - Testing strategies
 - Common debugging patterns
 - Integration considerations
-
-**Time:** 45 minutes
 
 ---
 
@@ -83,9 +73,14 @@ Foundation Course ──► Module A1 ──► Module A2 ──► Module A3 �
 
 ## Example Code
 
-All examples from this course are based on real files:
+Each module ships with a complete, validated example file:
 
-- `jl4/experiments/charities/` - Jersey Charities Law encoding
+- [module-a1-regulatory-examples.l4](module-a1-regulatory-examples.l4) - Charity registration scheme
+- [module-a2-cross-cutting-examples.l4](module-a2-cross-cutting-examples.l4) - Timing, notices, appeals, escalation
+- [module-a3-contracts-examples.l4](module-a3-contracts-examples.l4) - Loan contract with recursive obligations
+
+Related real-world encodings in the repository:
+
 - `jl4/examples/legal/promissory-note.l4` - Complete loan agreement
 - `jl4/examples/legal/` - Other real-world examples
 

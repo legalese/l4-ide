@@ -1,0 +1,1261 @@
+# Probate and Administration Act 1934
+
+## 0. What this Act adds to the shared ontology
+
+<!-- l4: declare:Applicant -->
+
+**1.** In this Act, “Applicant” means a record consisting of—
+
+    (a) “name”, being a STRING;
+
+    (b) “has renounced the right to such grant”, being a BOOLEAN;
+
+    (c) “the Public Trustee”, being a BOOLEAN;
+
+    (d) “a corporation licensed as a trust company under the Trust Companies Act 2005”, being a BOOLEAN;
+
+    (e) “an infant”, being a BOOLEAN;
+
+    (f) “lacks mental capacity”, being a BOOLEAN;
+
+    (g) “an executor appointed by the will”, being a BOOLEAN;
+
+    (h) “legally incapable of acting as such”, being a BOOLEAN;
+
+    (i) “survives the testator”, being a BOOLEAN;
+
+    (j) “died before obtaining probate or before having administered all the estate of the deceased”, being a BOOLEAN;
+
+    (k) “appears and extracts probate”, being a BOOLEAN;
+
+    (l) “a universal or residuary legatee”, being a BOOLEAN;
+
+    (m) “a legal personal representative of a deceased universal or residuary legatee”, being a BOOLEAN;
+
+    (n) “a beneficiary under the will who would have been entitled to a grant of letters of administration if the deceased had died intestate”, being a BOOLEAN;
+
+    (o) “a legatee having a beneficial interest”, being a BOOLEAN;
+
+    (p) “a creditor of the deceased”, being a BOOLEAN;
+
+    (q) “the husband or widow or next of kin”, being a BOOLEAN; and
+
+    (r) “an applicant for the grant”, being a BOOLEAN.
+
+<!-- l4: declare:Administration -->
+
+**2.** In this Act, “Administration” means a record consisting of—
+
+    (a) “case”, being a Case;
+
+    (b) “persons who are or may become entitled to probate or letters of administration”, being a list of Applicant;
+
+    (c) “the date as at which the question is asked”, being a DATE;
+
+    (d) “there is a minority or a life interest arises under the will”, being a BOOLEAN;
+
+    (e) “a probate action is pending”, being a BOOLEAN;
+
+    (f) “a general caveat has been entered”, being a BOOLEAN;
+
+    (g) “the caveator has been given opportunity to contest”, being a BOOLEAN;
+
+    (h) “an application has been made for probate or letters of administration”, being a BOOLEAN;
+
+    (i) “the application has been proceeded with, and has not been withdrawn or refused”, being a BOOLEAN;
+
+    (j) “the administrator has extracted the grant of letters of administration”, being a BOOLEAN;
+
+    (k) “date of the grant”, being an optional DATE;
+
+    (l) “granted by a Family Court”, being a BOOLEAN;
+
+    (m) “the person for whose use and benefit the grant is made is an infant”, being a BOOLEAN;
+
+    (n) “the Family Court thinks fit to require such security”, being a BOOLEAN;
+
+    (o) “the administrator is entitled to the whole of the estate after payment of the debts”, being a BOOLEAN;
+
+    (p) “the amount at which the estate within the jurisdiction is sworn”, being a NUMBER;
+
+    (q) “debts due by the deceased secured by mortgage”, being a NUMBER;
+
+    (r) “such security as he is lawfully required to furnish has been given”, being a BOOLEAN;
+
+    (s) “date of death of the last surviving executor or administrator”, being an optional DATE;
+
+    (t) “an application for the representation of the estate has been made since that death”, being a BOOLEAN;
+
+    (u) “there is danger that the property may be wasted”, being a BOOLEAN;
+
+    (v) “the appointment of a receiver would be a sufficient protection for the estate”, being a BOOLEAN;
+
+    (w) “the Public Trustee has declared that he undertakes to administer the property”, being a BOOLEAN;
+
+    (x) “the value of the assets collected by them”, being a NUMBER; and
+
+    (y) “the order of application is varied by the will of the deceased”, being a BOOLEAN.
+
+<!-- l4: declare:Kind of grant -->
+
+**3.** In this Act, “Kind of grant” means one of the following—
+
+    (a) “probate”;
+
+    (b) “letters of administration with the will annexed”;
+
+    (c) “letters of administration”;
+
+    (d) “letters of administration pending probate action”; or
+
+    (e) “no grant”.
+
+<!-- l4: declare:Grant of representation -->
+
+**4.** In this Act, “Grant of representation” means a record consisting of—
+
+    (a) “kind”, being a Kind of grant;
+
+    (b) “name”, being a STRING; and
+
+    (c) “basis”, being a STRING.
+
+<!-- l4: declare:Rule of application -->
+
+**5.** In this Act, “Rule of application” means a record consisting of—
+
+    (a) “paragraph”, being a NUMBER; and
+
+    (b) “text”, being a STRING.
+
+<!-- l4: declare:Application of assets -->
+
+**6.** In this Act, “Application of assets” means a record consisting of—
+
+    (a) “solvent”, being a BOOLEAN;
+
+    (b) “schedule”, being a STRING;
+
+    (c) “rules”, being a list of Rule of application; and
+
+    (d) “basis”, being a STRING.
+
+<!-- l4: declare:Timeline event -->
+
+**7.** In this Act, “Timeline event” means a record consisting of—
+
+    (a) “date”, being a DATE;
+
+    (b) “event”, being a STRING; and
+
+    (c) “basis”, being a STRING.
+
+<!-- l4: declare:Charged interest -->
+
+**8.** In this Act, “Charged interest” means a record consisting of—
+
+    (a) “description”, being a STRING;
+
+    (b) “value”, being a NUMBER;
+
+    (c) “charged with the payment of money at the time of his death”, being a BOOLEAN;
+
+    (d) “a contrary or other intention signified by will, deed or other document”, being a BOOLEAN; and
+
+    (e) “that intention signified only by a general direction for the payment of debts or by a charge of debts upon the residuary estate”, being a BOOLEAN.
+
+## Part 1 — Preliminary
+
+<!-- l4: decide:the section 2 definition of -->
+
+**9.** In relation to a Kind of grant “k”, the section 2 definition of means consider the case distinctions of k :  when probate has  then a grant under the seal of the court issuing the same, authorising the executor or executors expressly or impliedly appointed by a testator's will, or one or more of them, to administer the testator's estate in compliance with the directions contained in his will, and in accordance with law. when letters of administration with the will annexed has  then a grant under the seal of the court issuing the same, authorising the person or persons therein named to administer a testator's estate in compliance with the directions contained in his will, and in accordance with law. when letters of administration has  then a grant under the seal of the court issuing the same, authorising the person or persons therein named to administer an intestate's estate in accordance with law. when letters of administration pending probate action has  then letters of administration granted pending a probate action under section 20, limited so that the administrator shall not be empowered to distribute the estate. when no grant has  then no grant of representation: under section 62 the Public Trustee may declare that he undertakes to administer property in Singapore not exceeding $50,000 in value.
+
+<!-- l4: decide:the deceased left a will in -->
+
+**10.** In relation to an Administration “a”, the deceased left a will in means consider the case distinctions of a's case's will :  when NOTHING has  then FALSE. when JUST has w then TRUE.
+
+<!-- l4: decide:the deceased died intestate in -->
+
+**11.** In relation to an Administration “a”, the deceased died intestate in if it is not the case that the deceased left a will in with a.
+
+## Part 2 — Renunciation
+
+<!-- l4: decide:renunciation precludes -->
+
+**12.** In relation to an Applicant “p”, renunciation precludes means p's has renounced the right to such grant.
+
+## Part 3 — Grant of probate or letters of administration
+
+<!-- l4: decide:a trust corporation for the purposes of section 6 is -->
+
+**13.** In relation to an Applicant “p”, a trust corporation for the purposes of section 6 is if—
+
+    (a) p's the Public Trustee; or
+
+    (b) p's a corporation licensed as a trust company under the Trust Companies Act 2005.
+
+<!-- l4: decide:the applicants for a grant in -->
+
+**14.** In relation to an Administration “a”, the applicants for a grant in means filter with given p then p's an applicant for the grant and a grant may be made to with p and everyone.
+
+For the purposes of this provision—
+
+“everyone” means a's persons who are or may become entitled to probate or letters of administration;
+
+<!-- l4: decide:the grant complies with section 6(1) in -->
+
+**15.** In relation to an Administration “a”, the grant complies with section 6(1) in means count with applicants is at most 4.
+
+For the purposes of this provision—
+
+“applicants” means the applicants for a grant in with a;
+
+<!-- l4: decide:the grant complies with section 6(2) in -->
+
+**16.** In relation to an Administration “a”, the grant complies with section 6(2) in means if not the grant is an administration in with a then TRUE if not a's there is a minority or a life interest arises under the will then TRUE otherwise any with given p then a trust corporation for the purposes of section 6 is with p and applicants or count with individuals is at least 2 where  and.
+
+<!-- l4: decide:section 21(1) refuses a grant to -->
+
+**17.** In relation to an Applicant “p”, section 21(1) refuses a grant to means p's an infant.
+
+<!-- l4: decide:section 22(1) refuses a grant to -->
+
+**18.** In relation to an Applicant “p”, section 22(1) refuses a grant to means p's lacks mental capacity.
+
+<!-- l4: decide:a grant may be made to -->
+
+**19.** In relation to an Applicant “p”, a grant may be made to if—
+
+    (a) it is not the case that renunciation precludes with p;
+
+    (b) it is not the case that section 21(1) refuses a grant to with p; and
+
+    (c) it is not the case that section 22(1) refuses a grant to with p.
+
+<!-- l4: decide:probate may be granted to -->
+
+**20.** In relation to an Applicant “p”, probate may be granted to if—
+
+    (a) p's an executor appointed by the will;
+
+    (b) p's survives the testator;
+
+    (c) it is not the case that p's legally incapable of acting as such;
+
+    (d) it is not the case that p's died before obtaining probate or before having administered all the estate of the deceased; and
+
+    (e) a grant may be made to with p.
+
+<!-- l4: decide:the executors appointed by the will in -->
+
+**21.** In relation to an Administration “a”, the executors appointed by the will in means filter with given p then p's an executor appointed by the will and everyone.
+
+For the purposes of this provision—
+
+“everyone” means a's persons who are or may become entitled to probate or letters of administration;
+
+<!-- l4: decide:the executors to whom probate may be granted in -->
+
+**22.** In relation to an Administration “a”, the executors to whom probate may be granted in means filter with given p then probate may be granted to with p and everyone.
+
+For the purposes of this provision—
+
+“everyone” means a's persons who are or may become entitled to probate or letters of administration;
+
+<!-- l4: decide:section 13(1)(a) no executor is appointed by a will in -->
+
+**23.** In relation to an Administration “a”, section 13(1)(a) no executor is appointed by a will in means count with executors is equal to 0.
+
+For the purposes of this provision—
+
+“executors” means the executors appointed by the will in with a;
+
+<!-- l4: decide:section 13(1)(b) the executors are legally incapable or have renounced in -->
+
+**24.** In relation to an Administration “a”, section 13(1)(b) the executors are legally incapable or have renounced in means all with given p then p's legally incapable of acting as such or p's has renounced the right to such grant and executors.
+
+For the purposes of this provision—
+
+“executors” means the executors appointed by the will in with a;
+
+<!-- l4: decide:section 13(1)(c) no executor survives the testator in -->
+
+**25.** In relation to an Administration “a”, section 13(1)(c) no executor survives the testator in means all with given p then not p's survives the testator and executors.
+
+For the purposes of this provision—
+
+“executors” means the executors appointed by the will in with a;
+
+<!-- l4: decide:section 13(1)(d) all the executors die before obtaining probate in -->
+
+**26.** In relation to an Administration “a”, section 13(1)(d) all the executors die before obtaining probate in means all with given p then p's died before obtaining probate or before having administered all the estate of the deceased and executors.
+
+For the purposes of this provision—
+
+“executors” means the executors appointed by the will in with a;
+
+<!-- l4: decide:section 13(1)(e) the executors do not appear and extract probate in -->
+
+**27.** In relation to an Administration “a”, section 13(1)(e) the executors do not appear and extract probate in means all with given p then not p's appears and extracts probate and executors.
+
+For the purposes of this provision—
+
+“executors” means the executors appointed by the will in with a;
+
+<!-- l4: decide:there is a failure of executors in -->
+
+**28.** In relation to an Administration “a”, there is a failure of executors in if—
+
+    (a) section 13(1)(a) no executor is appointed by a will in with a;
+
+    (b) section 13(1)(b) the executors are legally incapable or have renounced in with a;
+
+    (c) section 13(1)(c) no executor survives the testator in with a;
+
+    (d) section 13(1)(d) all the executors die before obtaining probate in with a; or
+
+    (e) section 13(1)(e) the executors do not appear and extract probate in with a.
+
+<!-- l4: decide:the section 13(2) rank of -->
+
+**29.** In relation to an Applicant “p”, the section 13(2) rank of means if p's a universal or residuary legatee then 1 if p's a legal personal representative of a deceased universal or residuary legatee then 2 if p's a beneficiary under the will who would have been entitled to a grant of letters of administration if the deceased had died intestate then 3 if p's a legatee having a beneficial interest then 4 if p's a creditor of the deceased then 5 otherwise 6.
+
+<!-- l4: decide:those with a prior right under section 13(2) in -->
+
+**30.** In relation to an Administration “a”, those with a prior right under section 13(2) in means filter with given p then the section 13(2) rank of with p is equal to best and candidates.
+
+For the purposes of this provision—
+
+“everyone” means a's persons who are or may become entitled to probate or letters of administration;
+
+“candidates” means filter with given p then a grant may be made to with p and everyone;
+
+“ranks” means map with given p then the section 13(2) rank of with p and candidates;
+
+“best” means minimum1 with 6 and ranks;
+
+<!-- l4: decide:letters of administration may be granted on intestacy in -->
+
+**31.** In relation to an Administration “a”, letters of administration may be granted on intestacy in means the deceased died intestate in with a.
+
+<!-- l4: decide:a person in the section 18(4)(a) class has applied in -->
+
+**32.** In relation to an Administration “a”, a person in the section 18(4)(a) class has applied in means any with given p then p's the husband or widow or next of kin and p's an applicant for the grant and candidates.
+
+For the purposes of this provision—
+
+“everyone” means a's persons who are or may become entitled to probate or letters of administration;
+
+“candidates” means filter with given p then a grant may be made to with p and everyone;
+
+<!-- l4: decide:the section 18(4) rank in -->
+
+**33.** In relation to an Administration “a” and an Applicant “p”, the section 18(4) rank in means if p's the husband or widow or next of kin and p's an applicant for the grant then 1 if p's a creditor of the deceased and p's an applicant for the grant and not a person in the section 18(4)(a) class has applied in with a then 2 otherwise 3.
+
+<!-- l4: decide:those who may be granted letters of administration under section 18(4) in -->
+
+**34.** In relation to an Administration “a”, those who may be granted letters of administration under section 18(4) in means filter with given p then the section 18(4) rank in _ of _ with a and p is equal to best and candidates.
+
+For the purposes of this provision—
+
+“everyone” means a's persons who are or may become entitled to probate or letters of administration;
+
+“candidates” means filter with given p then a grant may be made to with p and everyone;
+
+“ranks” means map with given p then the section 18(4) rank in _ of _ with a and p and candidates;
+
+“best” means minimum1 with 3 and ranks;
+
+<!-- l4: decide:letters of administration pending probate action may be granted in -->
+
+**35.** In relation to an Administration “a”, letters of administration pending probate action may be granted in means a's a probate action is pending.
+
+<!-- l4: decide:a further grant may be made on the death of an administrator in -->
+
+**36.** In relation to an Administration “a”, a further grant may be made on the death of an administrator in means consider the case distinctions of a's date of death of the last surviving executor or administrator :  when NOTHING has  then FALSE. when JUST has d then TRUE.
+
+<!-- l4: decide:the section 62 threshold -->
+
+**37.** The section 62 threshold means 50000.
+
+<!-- l4: decide:the Public Trustee may undertake to administer the property in -->
+
+**38.** In relation to an Administration “a”, the Public Trustee may undertake to administer the property in if—
+
+    (a) gross estate of with c is at most the section 62 threshold; and
+
+    (b) a's an application does not have been made for probate or letters of administration.
+
+For the purposes of this provision—
+
+“c” means a's case;
+
+<!-- l4: decide:the grant of representation in -->
+
+**39.** In relation to an Administration “a”, the grant of representation in means if a's the Public Trustee has declared that he undertakes to administer the property and the Public Trustee may undertake to administer the property in with a then Grant of representation where kind is no grant, name is no grant of representation is required and basis is PAA s 62(1): the deceased left property in Singapore not exceeding $50,000 in value (without deduction for debts), no application for letters of administration is pending, and the Public Trustee has declared that he undertakes to administer it. if letters of administration pending probate action may be granted in with a then Grant of representation where kind is letters of administration pending probate action, name is letters of administration pending probate action and basis is PAA s 20: pending any probate action, letters of administration may be granted to such person as the court may appoint, limited so that the administrator shall not be empowered to distribute the estate. if the deceased left a will in with a and not there is a failure of executors in with a then Grant of representation where kind is probate, name is probate and basis is PAA s 8(1): probate may be granted to any executor appointed by a will. if the deceased left a will in with a then Grant of representation where kind is letters of administration with the will annexed, name is letters of administration with the will annexed and basis is PAA s 13(1): on failure of executors, letters of administration with the will annexed may be granted to such person or persons as the court considers the fittest to administer the estate. PAA s 13(2) gives a prior right in order to a universal or residuary legatee, then to a legal personal representative of a deceased universal or residuary legatee, then to beneficiaries who would have been entitled on intestacy, then to a legatee having a beneficial interest, then to a creditor. otherwise Grant of representation where kind is letters of administration, name is letters of administration and basis is PAA s 18(1): when a person has died intestate, the court may grant letters of administration of his estate. PAA s 18(4) names the husband or widow or next of kin, or if none applies a creditor, or such person as the court thinks fit..
+
+<!-- l4: decide:the grant is an administration in -->
+
+**40.** In relation to an Administration “a”, the grant is an administration in means consider the case distinctions of g's kind :  when probate has  then FALSE. when letters of administration with the will annexed has  then TRUE. when letters of administration has  then TRUE. when letters of administration pending probate action has  then TRUE. when no grant has  then FALSE.
+
+For the purposes of this provision—
+
+“g” means the grant of representation in with a;
+
+<!-- l4: decide:the name of the grant in -->
+
+**41.** In relation to an Administration “a”, the name of the grant in means g's name.
+
+For the purposes of this provision—
+
+“g” means the grant of representation in with a;
+
+<!-- l4: decide:those who may take the grant in -->
+
+**42.** In relation to an Administration “a”, those who may take the grant in means consider the case distinctions of g's kind :  when probate has  then the executors to whom probate may be granted in with a. when letters of administration with the will annexed has  then those with a prior right under section 13(2) in with a. when letters of administration has  then those who may be granted letters of administration under section 18(4) in with a. when letters of administration pending probate action has  then EMPTY. when no grant has  then EMPTY.
+
+For the purposes of this provision—
+
+“g” means the grant of representation in with a;
+
+## Part 4 — Oath
+
+<!-- l4: decide:an oath is required of -->
+
+**43.** In relation to an Applicant “p”, an oath is required of if—
+
+    (a) it is not the case that p's the Public Trustee; and
+
+    (b) it is not the case that p's a corporation licensed as a trust company under the Trust Companies Act 2005.
+
+## Part 5 — Security
+
+<!-- l4: decide:the Public Trustee has obtained the grant in -->
+
+**44.** In relation to an Administration “a”, the Public Trustee has obtained the grant in means any with given p then p's the Public Trustee and applicants.
+
+For the purposes of this provision—
+
+“applicants” means the applicants for a grant in with a;
+
+<!-- l4: decide:security for the due administration of the estate is required in -->
+
+**45.** In relation to an Administration “a”, security for the due administration of the estate is required in means if not the grant is an administration in with a then FALSE if the Public Trustee has obtained the grant in with a then FALSE if a's granted by a Family Court then a's the person for whose use and benefit the grant is made is an infant or a's the Family Court thinks fit to require such security otherwise TRUE.
+
+<!-- l4: decide:the number of sureties a bond ordinarily requires -->
+
+**46.** The number of sureties a bond ordinarily requires means 2.
+
+<!-- l4: decide:the number of sureties required in -->
+
+**47.** In relation to an Administration “a”, the number of sureties required in means if not security for the due administration of the estate is required in with a then 0 if a's the administrator is entitled to the whole of the estate after payment of the debts then 0 otherwise the number of sureties a bond ordinarily requires.
+
+<!-- l4: decide:the amount of the bond in -->
+
+**48.** In relation to an Administration “a”, the amount of the bond in means if not security for the due administration of the estate is required in with a, then 0; otherwise, the difference between mortgages and sworn.
+
+For the purposes of this provision—
+
+“sworn” means a's the amount at which the estate within the jurisdiction is sworn;
+
+“mortgages” means a's debts due by the deceased secured by mortgage;
+
+<!-- l4: decide:a bond under section 30 may be required in -->
+
+**49.** In relation to an Administration “a”, a bond under section 30 may be required in if—
+
+    (a) the grant is an administration in with a; and
+
+    (b) any with given p then p's a creditor of the deceased and applicants.
+
+For the purposes of this provision—
+
+“applicants” means the applicants for a grant in with a;
+
+## Part 7 — Caveats
+
+<!-- l4: decide:a caveat bars the grant in -->
+
+**50.** In relation to an Administration “a”, a caveat bars the grant in if—
+
+    (a) a's a general caveat has been entered; and
+
+    (b) a's the caveator does not have been given opportunity to contest.
+
+## Part 9 — Protection of estates pending grant
+
+<!-- l4: decide:a grant has been made in -->
+
+**51.** In relation to an Administration “a”, a grant has been made in means consider the case distinctions of a's date of the grant :  when NOTHING has  then FALSE. when JUST has d then TRUE.
+
+<!-- l4: decide:there is no executor with power to obtain probate in -->
+
+**52.** In relation to an Administration “a”, there is no executor with power to obtain probate in if—
+
+    (a) the deceased died intestate in with a; or
+
+    (b) all of the following apply—
+
+        (i) the deceased left a will in with a; and
+
+        (ii) there is a failure of executors in with a.
+
+<!-- l4: decide:the estate vests in the Public Trustee under section 37 in -->
+
+**53.** In relation to an Administration “a”, the estate vests in the Public Trustee under section 37 in if—
+
+    (a) there is no executor with power to obtain probate in with a; and
+
+    (b) a grant does not have been made in with a.
+
+<!-- l4: decide:a receiver may be appointed under section 39 in -->
+
+**54.** In relation to an Administration “a”, a receiver may be appointed under section 39 in if—
+
+    (a) a's there is danger that the property may be wasted; and
+
+    (b) a grant does not have been made in with a.
+
+## Part 11 — General: the clocks
+
+<!-- l4: decide:the question date has reached -->
+
+**55.** In relation to an Administration “a” and a DATE “d”, the question date has reached means asked is at least d.
+
+For the purposes of this provision—
+
+“asked” means a's the date as at which the question is asked;
+
+<!-- l4: decide:the date 6 months after the death in -->
+
+**56.** In relation to an Administration “a”, the date 6 months after the death in means add months with dod and 6.
+
+For the purposes of this provision—
+
+“dod” means a's case's deceased's date of death;
+
+<!-- l4: decide:section 55(1)(a) is engaged in -->
+
+**57.** In relation to an Administration “a”, section 55(1)(a) is engaged in if—
+
+    (a) a's an application does not have been made for probate or letters of administration; and
+
+    (b) the question date has reached with a and due.
+
+For the purposes of this provision—
+
+“due” means the date 6 months after the death in with a;
+
+<!-- l4: decide:section 55(1)(b) is engaged in -->
+
+**58.** In relation to an Administration “a”, section 55(1)(b) is engaged in if—
+
+    (a) a's an application has been made for probate or letters of administration;
+
+    (b) a's the application does not have been proceeded with, and has not been withdrawn or refused; and
+
+    (c) the question date has reached with a and due.
+
+For the purposes of this provision—
+
+“due” means the date 6 months after the death in with a;
+
+<!-- l4: decide:the date one month after the grant in -->
+
+**59.** In relation to an Administration “a”, the date one month after the grant in means consider the case distinctions of a's date of the grant :  when NOTHING has  then NOTHING. when JUST has d then JUST with add months with d and 1.
+
+<!-- l4: decide:section 55(1)(c) is engaged in -->
+
+**60.** In relation to an Administration “a”, section 55(1)(c) is engaged in means consider the case distinctions of the date one month after the grant in with a :  when NOTHING has  then FALSE. when JUST has due then the grant is an administration in with a and security for the due administration of the estate is required in with a and not a's such security as he is lawfully required to furnish has been given and the question date has reached with a and due.
+
+<!-- l4: decide:section 55(1)(d) is engaged in -->
+
+**61.** In relation to an Administration “a”, section 55(1)(d) is engaged in if—
+
+    (a) a receiver may be appointed under section 39 in with a; and
+
+    (b) it is not the case that a's the appointment of a receiver would be a sufficient protection for the estate.
+
+<!-- l4: decide:section 55(1)(e) is engaged in -->
+
+**62.** In relation to an Administration “a”, section 55(1)(e) is engaged in if—
+
+    (a) a grant has been made in with a;
+
+    (b) the grant is an administration in with a; and
+
+    (c) a's the administrator does not have extracted the grant of letters of administration.
+
+<!-- l4: decide:the date 6 months after the death of the last surviving executor or administrator in -->
+
+**63.** In relation to an Administration “a”, the date 6 months after the death of the last surviving executor or administrator in means consider the case distinctions of a's date of death of the last surviving executor or administrator :  when NOTHING has  then NOTHING. when JUST has d then JUST with add months with d and 6.
+
+<!-- l4: decide:section 55(1)(f) is engaged in -->
+
+**64.** In relation to an Administration “a”, section 55(1)(f) is engaged in means consider the case distinctions of the date 6 months after the death of the last surviving executor or administrator in with a :  when NOTHING has  then FALSE. when JUST has due then not a's an application for the representation of the estate has been made since that death and the question date has reached with a and due.
+
+<!-- l4: decide:letters of administration may be granted to the Public Trustee under section 55 in -->
+
+**65.** In relation to an Administration “a”, letters of administration may be granted to the Public Trustee under section 55 in if—
+
+    (a) section 55(1)(a) is engaged in with a;
+
+    (b) section 55(1)(b) is engaged in with a;
+
+    (c) section 55(1)(c) is engaged in with a;
+
+    (d) section 55(1)(d) is engaged in with a;
+
+    (e) section 55(1)(e) is engaged in with a; or
+
+    (f) section 55(1)(f) is engaged in with a.
+
+<!-- l4: decide:the Public Trustee may apply before the 6 months expire in -->
+
+**66.** In relation to an Administration “a”, the Public Trustee may apply before the 6 months expire in means TRUE.
+
+<!-- l4: decide:Wills Act section 28(4) requires the grant to be disregarded in -->
+
+**67.** In relation to an Administration “a”, Wills Act section 28(4) requires the grant to be disregarded in means consider the case distinctions of g's kind :  when probate has  then FALSE. when letters of administration with the will annexed has  then FALSE. when letters of administration has  then FALSE. when letters of administration pending probate action has  then TRUE. when no grant has  then TRUE.
+
+For the purposes of this provision—
+
+“g” means the grant of representation in with a;
+
+<!-- l4: decide:the last date for an application to rectify the will in -->
+
+**68.** In relation to an Administration “a”, the last date for an application to rectify the will in means if not the deceased left a will in with a then NOTHING if Wills Act section 28(4) requires the grant to be disregarded in with a then NOTHING otherwise sixMonthsAfterTheGrant where.
+
+## The timeline, as an app would draw it
+
+<!-- l4: decide:the death event in -->
+
+**69.** In relation to an Administration “a”, the death event in means Timeline event where date is dod, event is the death of the deceased and basis is PAA s 37: on an intestacy, and on a testacy where no executor has power to obtain probate, the real and personal estate vests in the Public Trustee from this date until a grant of administration is made..
+
+For the purposes of this provision—
+
+“dod” means a's case's deceased's date of death;
+
+<!-- l4: decide:the section 55(1)(a) event in -->
+
+**70.** In relation to an Administration “a”, the section 55(1)(a) event in means Timeline event where date is due, event is 6 months from the death: if no application for probate or letters of administration has been made, letters of administration may be granted to the Public Trustee or to such other person as the court thinks fit and basis is PAA s 55(1)(a). By PAA s 55(2) the Public Trustee is not prevented from applying before this date..
+
+For the purposes of this provision—
+
+“due” means the date 6 months after the death in with a;
+
+<!-- l4: decide:the grant event on -->
+
+**71.** In relation to a DATE “d”, the grant event on means Timeline event where date is d, event is the grant is made and basis is PAA s 28(1): upon the grant the grantee takes an oath faithfully to administer the estate and to account for it, unless the grantee is the Public Trustee or a trust company (s 28(2)). PAA s 37(4): the estate ceases to be vested in the Public Trustee..
+
+<!-- l4: decide:the section 55(1)(c) event on -->
+
+**72.** In relation to a DATE “d”, the section 55(1)(c) event on means Timeline event where date is add months with d and 1, event is one month from the grant: security lawfully required must have been given, or letters of administration may be granted to the Public Trustee and basis is PAA s 55(1)(c), read with PAA s 29(7) and s 29(8) on when security is required at all..
+
+<!-- l4: decide:the Wills Act section 28(2) event on -->
+
+**73.** In relation to a DATE “due”, the Wills Act section 28(2) event on means Timeline event where date is due, event is 6 months from the date the grant is first made: last date for an application to rectify the will without the permission of a court and basis is WA 1838 s 28(2). The court may permit a later application; WA s 28(3) protects personal representatives who distribute after this date..
+
+<!-- l4: decide:the section 55(1)(f) event on -->
+
+**74.** In relation to a DATE “d”, the section 55(1)(f) event on means Timeline event where date is add months with d and 6, event is 6 months from the death of the last surviving executor or administrator: if no application for the representation of the estate has been made, letters of administration may be granted to the Public Trustee and basis is PAA s 55(1)(f), read with PAA s 25(2) under which the court is guided by the same rules as apply to original grants..
+
+<!-- l4: decide:the timeline in -->
+
+**75.** In relation to an Administration “a”, the timeline in means append with fromDeath and append with fromGrant and append with fromRectification and fromSecondDeath.
+
+For the purposes of this provision—
+
+“death” means the death event in with a;
+
+“sixMonths” means the section 55(1)(a) event in with a;
+
+“fromDeath” means list of death and sixMonths;
+
+“fromGrant” means consider the case distinctions of a's date of the grant :  when NOTHING has  then EMPTY. when JUST has d then list of the grant event on with d and the section 55(1)(c) event on with d;
+
+“fromRectification” means consider the case distinctions of the last date for an application to rectify the will in with a :  when NOTHING has  then EMPTY. when JUST has due then list of the Wills Act section 28(2) event on with due;
+
+“fromSecondDeath” means consider the case distinctions of a's date of death of the last surviving executor or administrator :  when NOTHING has  then EMPTY. when JUST has d then list of the section 55(1)(f) event on with d;
+
+## Part 11 — General: what comes off the top, and in what order
+
+<!-- l4: decide:First Schedule paragraph 1 -->
+
+**76.** First Schedule paragraph 1 means Rule of application where paragraph is 1 and text is The funeral, testamentary and administration expenses shall have priority..
+
+<!-- l4: decide:First Schedule paragraph 2 -->
+
+**77.** First Schedule paragraph 2 means Rule of application where paragraph is 2 and text is Subject to paragraph 1, the same rules shall prevail and be observed as to the respective rights of secured and unsecured creditors and as to debts and liabilities provable and as to the valuation of annuities and future and contingent liabilities respectively, and as to the priorities of debts and liabilities, as may be in force for the time being under the law of bankruptcy with respect to the assets of persons adjudged bankrupt..
+
+<!-- l4: decide:the First Schedule -->
+
+**78.** The First Schedule means list of First Schedule paragraph 1 and First Schedule paragraph 2.
+
+<!-- l4: decide:Second Schedule item 1 -->
+
+**79.** Second Schedule item 1 means Rule of application where paragraph is 1 and text is Property of the deceased undisposed of by will, subject to the retention thereout of a fund sufficient to meet any pecuniary legacies..
+
+<!-- l4: decide:Second Schedule item 2 -->
+
+**80.** Second Schedule item 2 means Rule of application where paragraph is 2 and text is Property of the deceased not specifically devised or bequeathed but included (either by a specific or general description) in a residuary gift, subject to the retention out of such property of a fund sufficient to meet any pecuniary legacies, so far as not provided for as aforesaid..
+
+<!-- l4: decide:Second Schedule item 3 -->
+
+**81.** Second Schedule item 3 means Rule of application where paragraph is 3 and text is Property of the deceased specifically appropriated or devised or bequeathed (either by a specific or general description) for the payment of debts..
+
+<!-- l4: decide:Second Schedule item 4 -->
+
+**82.** Second Schedule item 4 means Rule of application where paragraph is 4 and text is Property of the deceased charged with, or devised or bequeathed (either by a specific or general description) subject to a charge for the payment of debts..
+
+<!-- l4: decide:Second Schedule item 5 -->
+
+**83.** Second Schedule item 5 means Rule of application where paragraph is 5 and text is The fund, if any, retained to meet pecuniary legacies..
+
+<!-- l4: decide:Second Schedule item 6 -->
+
+**84.** Second Schedule item 6 means Rule of application where paragraph is 6 and text is Property specifically devised or bequeathed, rateably according to value..
+
+<!-- l4: decide:Second Schedule item 7 -->
+
+**85.** Second Schedule item 7 means Rule of application where paragraph is 7 and text is Property appointed by will under a general power, rateably according to value..
+
+<!-- l4: decide:Second Schedule item 8 -->
+
+**86.** Second Schedule item 8 means Rule of application where paragraph is 8 and text is The following provisions shall also apply: (a) the order of application may be varied by the will of the deceased; and (b) this Schedule does not affect the liability of land to answer the death duty imposed thereon in exoneration of other assets..
+
+<!-- l4: decide:the Second Schedule -->
+
+**87.** The Second Schedule means list of Second Schedule item 1, Second Schedule item 2, Second Schedule item 3, Second Schedule item 4, Second Schedule item 5, Second Schedule item 6, Second Schedule item 7 and Second Schedule item 8.
+
+<!-- l4: decide:the application of assets in -->
+
+**88.** In relation to an Administration “a”, the application of assets in means if the estate is solvent with c, then Application of assets where solvent is TRUE, schedule is Second Schedule, rules is the Second Schedule and basis is PAA s 57(4): where the estate of a deceased person is solvent his estate shall, subject to the Rules of Court and section 58 as to charges on property of the deceased, and to the provisions, if any, contained in his will, be applicable towards the discharge of the funeral, testamentary and administration expenses, debts and liabilities payable thereout in the order mentioned in the Second Schedule.; otherwise, Application of assets where solvent is FALSE, schedule is First Schedule, rules is the First Schedule and basis is PAA s 57(1): where the estate of a deceased person is insolvent his estate shall be administered in accordance with the rules set out in the First Schedule. Funeral, testamentary and administration expenses have priority; below them the bankruptcy priorities govern..
+
+For the purposes of this provision—
+
+“c” means a's case;
+
+<!-- l4: decide:the schedule that applies in -->
+
+**89.** In relation to an Administration “a”, the schedule that applies in means r's schedule.
+
+For the purposes of this provision—
+
+“r” means the application of assets in with a;
+
+<!-- l4: decide:the order of application of assets in -->
+
+**90.** In relation to an Administration “a”, the order of application of assets in means r's rules.
+
+For the purposes of this provision—
+
+“r” means the application of assets in with a;
+
+<!-- l4: decide:the statutory order governs in -->
+
+**91.** In relation to an Administration “a”, the statutory order governs in if a's the order of application is not varied by the will of the deceased.
+
+<!-- l4: decide:the interest charged is primarily liable in -->
+
+**92.** In relation to a Charged interest “i”, the interest charged is primarily liable in if—
+
+    (a) i's charged with the payment of money at the time of his death; and
+
+    (b) a contrary intention is not signified in with i.
+
+<!-- l4: decide:a contrary intention is signified in -->
+
+**93.** In relation to a Charged interest “i”, a contrary intention is signified in if—
+
+    (a) i's a contrary or other intention signified by will, deed or other document; and
+
+    (b) it is not the case that i's that intention signified only by a general direction for the payment of debts or by a charge of debts upon the residuary estate.
+
+<!-- l4: decide:the proportionate part of the charge borne by -->
+
+**94.** In relation to a Charged interest “i”, a NUMBER “part” and a NUMBER “charge”, the proportionate part of the charge borne by means if whole is greater than 0, then the product of charge and the result of dividing part by whole; otherwise, 0.
+
+For the purposes of this provision—
+
+“whole” means i's value;
+
+<!-- l4: decide:the section 66 maximum rate -->
+
+**95.** The section 66 maximum rate means the result of dividing 5 by 100.
+
+<!-- l4: decide:the maximum commission under section 66 in -->
+
+**96.** In relation to an Administration “a”, the maximum commission under section 66 in means the product of the section 66 maximum rate and collected.
+
+For the purposes of this provision—
+
+“collected” means a's the value of the assets collected by them;
+
+<!-- l4: decide:the heads of expense the court shall allow under section 67 -->
+
+**97.** The heads of expense the court shall allow under section 67 means list of the reasonable testamentary and other expenses incurred by them, proper funeral expenses and all reasonable expenses of subsequent religious ceremonies suitable to the station in life of the deceased.
+
+<!-- l4: decide:the matter is uncontested in -->
+
+**98.** In relation to an Administration “a”, the matter is uncontested in if—
+
+    (a) a's a probate action is not pending; and
+
+    (b) it is not the case that a caveat bars the grant in with a.
+
+<!-- l4: decide:the registrar may exercise the court's powers in -->
+
+**99.** In relation to an Administration “a”, the registrar may exercise the court's powers in means the matter is uncontested in with a.
+
+## Fixtures — the facts the assertions are asserted about
+
+<!-- l4: decide:an able and willing executor named -->
+
+**100.** In relation to a STRING “nm”, an able and willing executor named means Applicant where name is nm, has renounced the right to such grant is FALSE, the Public Trustee is FALSE, a corporation licensed as a trust company under the Trust Companies Act 2005 is FALSE, an infant is FALSE, lacks mental capacity is FALSE, an executor appointed by the will is TRUE, legally incapable of acting as such is FALSE, survives the testator is TRUE, died before obtaining probate or before having administered all the estate of the deceased is FALSE, appears and extracts probate is TRUE, a universal or residuary legatee is FALSE, a legal personal representative of a deceased universal or residuary legatee is FALSE, a beneficiary under the will who would have been entitled to a grant of letters of administration if the deceased had died intestate is FALSE, a legatee having a beneficial interest is FALSE, a creditor of the deceased is FALSE, the husband or widow or next of kin is FALSE and an applicant for the grant is TRUE.
+
+<!-- l4: decide:an executor who has renounced named -->
+
+**101.** In relation to a STRING “nm”, an executor who has renounced named means Applicant where name is nm, has renounced the right to such grant is TRUE, the Public Trustee is FALSE, a corporation licensed as a trust company under the Trust Companies Act 2005 is FALSE, an infant is FALSE, lacks mental capacity is FALSE, an executor appointed by the will is TRUE, legally incapable of acting as such is FALSE, survives the testator is TRUE, died before obtaining probate or before having administered all the estate of the deceased is FALSE, appears and extracts probate is FALSE, a universal or residuary legatee is FALSE, a legal personal representative of a deceased universal or residuary legatee is FALSE, a beneficiary under the will who would have been entitled to a grant of letters of administration if the deceased had died intestate is FALSE, a legatee having a beneficial interest is FALSE, a creditor of the deceased is FALSE, the husband or widow or next of kin is FALSE and an applicant for the grant is FALSE.
+
+<!-- l4: decide:an infant executor named -->
+
+**102.** In relation to a STRING “nm”, an infant executor named means Applicant where name is nm, has renounced the right to such grant is FALSE, the Public Trustee is FALSE, a corporation licensed as a trust company under the Trust Companies Act 2005 is FALSE, an infant is TRUE, lacks mental capacity is FALSE, an executor appointed by the will is TRUE, legally incapable of acting as such is FALSE, survives the testator is TRUE, died before obtaining probate or before having administered all the estate of the deceased is FALSE, appears and extracts probate is FALSE, a universal or residuary legatee is FALSE, a legal personal representative of a deceased universal or residuary legatee is FALSE, a beneficiary under the will who would have been entitled to a grant of letters of administration if the deceased had died intestate is FALSE, a legatee having a beneficial interest is FALSE, a creditor of the deceased is FALSE, the husband or widow or next of kin is FALSE and an applicant for the grant is TRUE.
+
+<!-- l4: decide:a universal or residuary legatee named -->
+
+**103.** In relation to a STRING “nm”, a universal or residuary legatee named means Applicant where name is nm, has renounced the right to such grant is FALSE, the Public Trustee is FALSE, a corporation licensed as a trust company under the Trust Companies Act 2005 is FALSE, an infant is FALSE, lacks mental capacity is FALSE, an executor appointed by the will is FALSE, legally incapable of acting as such is FALSE, survives the testator is TRUE, died before obtaining probate or before having administered all the estate of the deceased is FALSE, appears and extracts probate is FALSE, a universal or residuary legatee is TRUE, a legal personal representative of a deceased universal or residuary legatee is FALSE, a beneficiary under the will who would have been entitled to a grant of letters of administration if the deceased had died intestate is FALSE, a legatee having a beneficial interest is FALSE, a creditor of the deceased is FALSE, the husband or widow or next of kin is FALSE and an applicant for the grant is TRUE.
+
+<!-- l4: decide:a creditor named -->
+
+**104.** In relation to a STRING “nm”, a creditor named means Applicant where name is nm, has renounced the right to such grant is FALSE, the Public Trustee is FALSE, a corporation licensed as a trust company under the Trust Companies Act 2005 is FALSE, an infant is FALSE, lacks mental capacity is FALSE, an executor appointed by the will is FALSE, legally incapable of acting as such is FALSE, survives the testator is TRUE, died before obtaining probate or before having administered all the estate of the deceased is FALSE, appears and extracts probate is FALSE, a universal or residuary legatee is FALSE, a legal personal representative of a deceased universal or residuary legatee is FALSE, a beneficiary under the will who would have been entitled to a grant of letters of administration if the deceased had died intestate is FALSE, a legatee having a beneficial interest is FALSE, a creditor of the deceased is TRUE, the husband or widow or next of kin is FALSE and an applicant for the grant is TRUE.
+
+<!-- l4: decide:a widow or next of kin named -->
+
+**105.** In relation to a STRING “nm”, a widow or next of kin named means Applicant where name is nm, has renounced the right to such grant is FALSE, the Public Trustee is FALSE, a corporation licensed as a trust company under the Trust Companies Act 2005 is FALSE, an infant is FALSE, lacks mental capacity is FALSE, an executor appointed by the will is FALSE, legally incapable of acting as such is FALSE, survives the testator is TRUE, died before obtaining probate or before having administered all the estate of the deceased is FALSE, appears and extracts probate is FALSE, a universal or residuary legatee is FALSE, a legal personal representative of a deceased universal or residuary legatee is FALSE, a beneficiary under the will who would have been entitled to a grant of letters of administration if the deceased had died intestate is FALSE, a legatee having a beneficial interest is FALSE, a creditor of the deceased is FALSE, the husband or widow or next of kin is TRUE and an applicant for the grant is TRUE.
+
+<!-- l4: decide:a widow or next of kin who has not applied named -->
+
+**106.** In relation to a STRING “nm”, a widow or next of kin who has not applied named means Applicant where name is nm, has renounced the right to such grant is FALSE, the Public Trustee is FALSE, a corporation licensed as a trust company under the Trust Companies Act 2005 is FALSE, an infant is FALSE, lacks mental capacity is FALSE, an executor appointed by the will is FALSE, legally incapable of acting as such is FALSE, survives the testator is TRUE, died before obtaining probate or before having administered all the estate of the deceased is FALSE, appears and extracts probate is FALSE, a universal or residuary legatee is FALSE, a legal personal representative of a deceased universal or residuary legatee is FALSE, a beneficiary under the will who would have been entitled to a grant of letters of administration if the deceased had died intestate is FALSE, a legatee having a beneficial interest is FALSE, a creditor of the deceased is FALSE, the husband or widow or next of kin is TRUE and an applicant for the grant is FALSE.
+
+<!-- l4: decide:a licensed trust company named -->
+
+**107.** In relation to a STRING “nm”, a licensed trust company named means Applicant where name is nm, has renounced the right to such grant is FALSE, the Public Trustee is FALSE, a corporation licensed as a trust company under the Trust Companies Act 2005 is TRUE, an infant is FALSE, lacks mental capacity is FALSE, an executor appointed by the will is FALSE, legally incapable of acting as such is FALSE, survives the testator is TRUE, died before obtaining probate or before having administered all the estate of the deceased is FALSE, appears and extracts probate is FALSE, a universal or residuary legatee is FALSE, a legal personal representative of a deceased universal or residuary legatee is FALSE, a beneficiary under the will who would have been entitled to a grant of letters of administration if the deceased had died intestate is FALSE, a legatee having a beneficial interest is FALSE, a creditor of the deceased is FALSE, the husband or widow or next of kin is FALSE and an applicant for the grant is TRUE.
+
+<!-- l4: decide:Beatrice -->
+
+**108.** Beatrice means an able and willing executor named with Beatrice.
+
+<!-- l4: decide:Charles -->
+
+**109.** Charles means an executor who has renounced named with Charles.
+
+<!-- l4: decide:Dinesh -->
+
+**110.** Dinesh means an infant executor named with Dinesh.
+
+<!-- l4: decide:Esther -->
+
+**111.** Esther means a universal or residuary legatee named with Esther.
+
+<!-- l4: decide:Farid -->
+
+**112.** Farid means a creditor named with Farid.
+
+<!-- l4: decide:Grace -->
+
+**113.** Grace means a widow or next of kin named with Grace.
+
+<!-- l4: decide:Hui Ling -->
+
+**114.** Hui Ling means a widow or next of kin named with Hui Ling.
+
+<!-- l4: decide:Ismail -->
+
+**115.** Ismail means a widow or next of kin named with Ismail.
+
+<!-- l4: decide:Jaya -->
+
+**116.** Jaya means a widow or next of kin named with Jaya.
+
+<!-- l4: decide:Kumar -->
+
+**117.** Kumar means a widow or next of kin named with Kumar.
+
+<!-- l4: decide:Winnie -->
+
+**118.** Winnie means a widow or next of kin who has not applied named with Winnie.
+
+<!-- l4: decide:Lion City Trustees -->
+
+**119.** Lion City Trustees means a licensed trust company named with Lion City Trustees.
+
+<!-- l4: decide:no family facts are needed by this Act -->
+
+**120.** No family facts are needed by this Act means Family where surviving spouses is EMPTY, children is EMPTY, parents is EMPTY, siblings is EMPTY, grandparents is EMPTY and uncles and aunts is EMPTY.
+
+<!-- l4: decide:a Singapore-domiciled deceased named -->
+
+**121.** In relation to a STRING “nm” and a DATE “dod”, a Singapore-domiciled deceased named means Deceased where name is nm, date of death is dod, domiciled in Singapore is TRUE and Muslim is FALSE.
+
+<!-- l4: decide:an estate of -->
+
+**122.** In relation to a NUMBER “immovable”, a NUMBER “movable”, a NUMBER “expenses” and a NUMBER “debts”, an estate of means Estate where immovable property in Singapore is immovable, movable property in Singapore is movable, funeral, testamentary and administration expenses is expenses and debts and liabilities is debts.
+
+<!-- l4: decide:a solvent estate -->
+
+**123.** A solvent estate means an estate of _ and _ bearing expenses _ and debts _ with 500000, 100000, 20000 and 80000.
+
+<!-- l4: decide:an insolvent estate -->
+
+**124.** An insolvent estate means an estate of _ and _ bearing expenses _ and debts _ with 0, 50000, 10000 and 200000.
+
+<!-- l4: decide:a small estate -->
+
+**125.** A small estate means an estate of _ and _ bearing expenses _ and debts _ with 0, 40000, 2000 and 3000.
+
+<!-- l4: decide:a will appointing a willing executor -->
+
+**126.** A will appointing a willing executor means Will where in writing is TRUE, signed at the foot or end by the testator is TRUE, number of attesting witnesses is 2, witnesses present at the same time is TRUE, witnesses subscribed in the testator's presence is TRUE, testator's age at execution is 54, soldier in actual military service or mariner at sea is FALSE, married after execution is FALSE, expressed to be made in contemplation of that marriage is FALSE, revoked by a later will, writing or destruction is FALSE, proportion of the estate beneficially disposed of is 1 and an executor is appointed, and able and willing to act is TRUE.
+
+<!-- l4: decide:a will whose executor has renounced -->
+
+**127.** A will whose executor has renounced means Will where in writing is TRUE, signed at the foot or end by the testator is TRUE, number of attesting witnesses is 2, witnesses present at the same time is TRUE, witnesses subscribed in the testator's presence is TRUE, testator's age at execution is 54, soldier in actual military service or mariner at sea is FALSE, married after execution is FALSE, expressed to be made in contemplation of that marriage is FALSE, revoked by a later will, writing or destruction is FALSE, proportion of the estate beneficially disposed of is 1 and an executor is appointed, and able and willing to act is FALSE.
+
+<!-- l4: decide:the case of -->
+
+**128.** In relation to a Deceased “dd”, an Estate “es” and an optional Will “w”, the case of means Case where deceased is dd, family is no family facts are needed by this Act, estate is es and will is w.
+
+<!-- l4: decide:the date Alice died -->
+
+**129.** The date Alice died means YMD with 2026, 1 and 15.
+
+<!-- l4: decide:the date the Alice grant was made -->
+
+**130.** The date the Alice grant was made means YMD with 2026, 3 and 10.
+
+<!-- l4: decide:the Alice case -->
+
+**131.** The Alice case means the case of _ holding _ under _ with dd, es and w.
+
+For the purposes of this provision—
+
+“dd” means a Singapore-domiciled deceased named _ who died on _ with Alice Tan and the date Alice died;
+
+“es” means a solvent estate;
+
+“w” means JUST with a will appointing a willing executor;
+
+<!-- l4: decide:the Alice case where the executor renounced -->
+
+**132.** The Alice case where the executor renounced means the case of _ holding _ under _ with dd, es and w.
+
+For the purposes of this provision—
+
+“dd” means a Singapore-domiciled deceased named _ who died on _ with Alice Tan and the date Alice died;
+
+“es” means a solvent estate;
+
+“w” means JUST with a will whose executor has renounced;
+
+<!-- l4: decide:the Bernard case -->
+
+**133.** The Bernard case means the case of _ holding _ under _ with dd, es and w.
+
+For the purposes of this provision—
+
+“dd” means a Singapore-domiciled deceased named _ who died on _ with Bernard Lim and the date Alice died;
+
+“es” means a solvent estate;
+
+“w” means NOTHING;
+
+<!-- l4: decide:the Bernard case, insolvent -->
+
+**134.** The Bernard case, insolvent means the case of _ holding _ under _ with dd, es and w.
+
+For the purposes of this provision—
+
+“dd” means a Singapore-domiciled deceased named _ who died on _ with Bernard Lim and the date Alice died;
+
+“es” means an insolvent estate;
+
+“w” means NOTHING;
+
+<!-- l4: decide:the small estate case -->
+
+**135.** The small estate case means the case of _ holding _ under _ with dd, es and w.
+
+For the purposes of this provision—
+
+“dd” means a Singapore-domiciled deceased named _ who died on _ with Cheng Wei and the date Alice died;
+
+“es” means a small estate;
+
+“w” means NOTHING;
+
+<!-- l4: decide:an administration -->
+
+**136.** In relation to a Case “c”, a list of Applicant “people”, a DATE “askedOn”, a BOOLEAN “applied”, an optional DATE “grantDate”, a BOOLEAN “minority”, a BOOLEAN “probateAction” and an optional DATE “secondDeath”, an administration means Administration where case is c, persons who are or may become entitled to probate or letters of administration is people, the date as at which the question is asked is askedOn, there is a minority or a life interest arises under the will is minority, a probate action is pending is probateAction, a general caveat has been entered is FALSE, the caveator has been given opportunity to contest is FALSE, an application has been made for probate or letters of administration is applied, the application has been proceeded with, and has not been withdrawn or refused is TRUE, the administrator has extracted the grant of letters of administration is TRUE, date of the grant is grantDate, granted by a Family Court is FALSE, the person for whose use and benefit the grant is made is an infant is FALSE, the Family Court thinks fit to require such security is FALSE, the administrator is entitled to the whole of the estate after payment of the debts is FALSE, the amount at which the estate within the jurisdiction is sworn is 400000, debts due by the deceased secured by mortgage is 0, such security as he is lawfully required to furnish has been given is FALSE, date of death of the last surviving executor or administrator is secondDeath, an application for the representation of the estate has been made since that death is FALSE, there is danger that the property may be wasted is FALSE, the appointment of a receiver would be a sufficient protection for the estate is TRUE, the Public Trustee has declared that he undertakes to administer the property is FALSE, the value of the assets collected by them is 200000 and the order of application is varied by the will of the deceased is FALSE.
+
+<!-- l4: decide:the Alice probate -->
+
+**137.** The Alice probate means an administration with c, people, askedOn, TRUE, grantDate, FALSE, FALSE and NOTHING.
+
+For the purposes of this provision—
+
+“c” means the Alice case;
+
+“people” means list of Beatrice;
+
+“askedOn” means YMD with 2026, 4 and 1;
+
+“grantDate” means JUST with the date the Alice grant was made;
+
+<!-- l4: decide:the Alice probate where a life interest arises -->
+
+**138.** The Alice probate where a life interest arises means an administration with c, people, askedOn, TRUE, grantDate, TRUE, FALSE and NOTHING.
+
+For the purposes of this provision—
+
+“c” means the Alice case;
+
+“people” means list of Beatrice;
+
+“askedOn” means YMD with 2026, 4 and 1;
+
+“grantDate” means JUST with the date the Alice grant was made;
+
+<!-- l4: decide:the Alice estate on failure of executors -->
+
+**139.** The Alice estate on failure of executors means an administration with c, people, askedOn, TRUE, NOTHING, FALSE, FALSE and NOTHING.
+
+For the purposes of this provision—
+
+“c” means the Alice case where the executor renounced;
+
+“people” means list of Charles, Esther and Farid;
+
+“askedOn” means YMD with 2026, 4 and 1;
+
+<!-- l4: decide:the Alice estate on failure of executors, with a life interest -->
+
+**140.** The Alice estate on failure of executors, with a life interest means an administration with c, people, askedOn, TRUE, NOTHING, TRUE, FALSE and NOTHING.
+
+For the purposes of this provision—
+
+“c” means the Alice case where the executor renounced;
+
+“people” means list of Charles and Esther;
+
+“askedOn” means YMD with 2026, 4 and 1;
+
+<!-- l4: decide:the contested Alice estate -->
+
+**141.** The contested Alice estate means an administration with c, people, askedOn, TRUE, NOTHING, FALSE, TRUE and NOTHING.
+
+For the purposes of this provision—
+
+“c” means the Alice case;
+
+“people” means list of Beatrice and Esther;
+
+“askedOn” means YMD with 2026, 4 and 1;
+
+<!-- l4: decide:the contested Alice estate after a limited grant -->
+
+**142.** The contested Alice estate after a limited grant means an administration with c, people, askedOn, TRUE, grantDate, FALSE, TRUE and NOTHING.
+
+For the purposes of this provision—
+
+“c” means the Alice case;
+
+“people” means list of Beatrice and Esther;
+
+“askedOn” means YMD with 2026, 4 and 1;
+
+“grantDate” means JUST with the date the Alice grant was made;
+
+<!-- l4: decide:the Bernard intestacy -->
+
+**143.** The Bernard intestacy means an administration with c, people, askedOn, TRUE, NOTHING, FALSE, FALSE and NOTHING.
+
+For the purposes of this provision—
+
+“c” means the Bernard case;
+
+“people” means list of Grace and Farid;
+
+“askedOn” means YMD with 2026, 4 and 1;
+
+<!-- l4: decide:the Bernard intestacy where only the creditor applies -->
+
+**144.** The Bernard intestacy where only the creditor applies means an administration with c, people, askedOn, TRUE, NOTHING, FALSE, FALSE and NOTHING.
+
+For the purposes of this provision—
+
+“c” means the Bernard case;
+
+“people” means list of Winnie and Farid;
+
+“askedOn” means YMD with 2026, 4 and 1;
+
+<!-- l4: decide:the Bernard intestacy, insolvent -->
+
+**145.** The Bernard intestacy, insolvent means an administration with c, people, askedOn, TRUE, NOTHING, FALSE, FALSE and NOTHING.
+
+For the purposes of this provision—
+
+“c” means the Bernard case, insolvent;
+
+“people” means list of Grace;
+
+“askedOn” means YMD with 2026, 4 and 1;
+
+<!-- l4: decide:the neglected estate as at 30 June 2026 -->
+
+**146.** The neglected estate as at 30 June 2026 means an administration with c, people, askedOn, FALSE, NOTHING, FALSE, FALSE and NOTHING.
+
+For the purposes of this provision—
+
+“c” means the Bernard case;
+
+“people” means EMPTY;
+
+“askedOn” means YMD with 2026, 6 and 30;
+
+<!-- l4: decide:the neglected estate as at 16 July 2026 -->
+
+**147.** The neglected estate as at 16 July 2026 means an administration with c, people, askedOn, FALSE, NOTHING, FALSE, FALSE and NOTHING.
+
+For the purposes of this provision—
+
+“c” means the Bernard case;
+
+“people” means EMPTY;
+
+“askedOn” means YMD with 2026, 7 and 16;
+
+<!-- l4: decide:the estate whose administrator died, a further application having been made -->
+
+**148.** In relation to a BOOLEAN “appliedSince”, the estate whose administrator died, a further application having been made means Administration where case is the Bernard case, persons who are or may become entitled to probate or letters of administration is EMPTY, the date as at which the question is asked is YMD with 2026, 9 and 1, there is a minority or a life interest arises under the will is FALSE, a probate action is pending is FALSE, a general caveat has been entered is FALSE, the caveator has been given opportunity to contest is FALSE, an application has been made for probate or letters of administration is TRUE, the application has been proceeded with, and has not been withdrawn or refused is TRUE, the administrator has extracted the grant of letters of administration is TRUE, date of the grant is JUST with YMD with 2026, 2 and 10, granted by a Family Court is FALSE, the person for whose use and benefit the grant is made is an infant is FALSE, the Family Court thinks fit to require such security is FALSE, the administrator is entitled to the whole of the estate after payment of the debts is FALSE, the amount at which the estate within the jurisdiction is sworn is 400000, debts due by the deceased secured by mortgage is 0, such security as he is lawfully required to furnish has been given is TRUE, date of death of the last surviving executor or administrator is JUST with YMD with 2026, 2 and 28, an application for the representation of the estate has been made since that death is appliedSince, there is danger that the property may be wasted is FALSE, the appointment of a receiver would be a sufficient protection for the estate is TRUE, the Public Trustee has declared that he undertakes to administer the property is FALSE, the value of the assets collected by them is 200000 and the order of application is varied by the will of the deceased is FALSE.
+
+<!-- l4: decide:the stranded estate -->
+
+**149.** The stranded estate means the estate whose administrator died, a further application having been made with FALSE.
+
+<!-- l4: decide:the estate whose administrator died and whose family applied again -->
+
+**150.** The estate whose administrator died and whose family applied again means the estate whose administrator died, a further application having been made with TRUE.
+
+<!-- l4: decide:the minority with one administrator -->
+
+**151.** The minority with one administrator means an administration with c, people, askedOn, TRUE, NOTHING, TRUE, FALSE and NOTHING.
+
+For the purposes of this provision—
+
+“c” means the Bernard case;
+
+“people” means list of Grace;
+
+“askedOn” means YMD with 2026, 4 and 1;
+
+<!-- l4: decide:the minority with two administrators -->
+
+**152.** The minority with two administrators means an administration with c, people, askedOn, TRUE, NOTHING, TRUE, FALSE and NOTHING.
+
+For the purposes of this provision—
+
+“c” means the Bernard case;
+
+“people” means list of Grace and Hui Ling;
+
+“askedOn” means YMD with 2026, 4 and 1;
+
+<!-- l4: decide:the minority with a trust company -->
+
+**153.** The minority with a trust company means an administration with c, people, askedOn, TRUE, NOTHING, TRUE, FALSE and NOTHING.
+
+For the purposes of this provision—
+
+“c” means the Bernard case;
+
+“people” means list of Lion City Trustees;
+
+“askedOn” means YMD with 2026, 4 and 1;
+
+<!-- l4: decide:the estate with five applicants -->
+
+**154.** The estate with five applicants means an administration with c, people, askedOn, TRUE, NOTHING, FALSE, FALSE and NOTHING.
+
+For the purposes of this provision—
+
+“c” means the Bernard case;
+
+“people” means list of Grace, Hui Ling, Ismail, Jaya and Kumar;
+
+“askedOn” means YMD with 2026, 4 and 1;
+
+<!-- l4: decide:the estate with five applicants one of whom is an infant -->
+
+**155.** The estate with five applicants one of whom is an infant means an administration with c, people, askedOn, TRUE, NOTHING, FALSE, FALSE and NOTHING.
+
+For the purposes of this provision—
+
+“c” means the Alice case;
+
+“people” means list of Beatrice, Dinesh, Esther, Farid and Grace;
+
+“askedOn” means YMD with 2026, 4 and 1;
+
+<!-- l4: decide:the estate with an infant executor -->
+
+**156.** The estate with an infant executor means an administration with c, people, askedOn, TRUE, NOTHING, FALSE, FALSE and NOTHING.
+
+For the purposes of this provision—
+
+“c” means the Alice case;
+
+“people” means list of Beatrice and Dinesh;
+
+“askedOn” means YMD with 2026, 4 and 1;
+
+<!-- l4: decide:the Family Court administration -->
+
+**157.** The Family Court administration means Administration where case is the Bernard case, persons who are or may become entitled to probate or letters of administration is list of Grace, the date as at which the question is asked is YMD with 2026, 4 and 1, there is a minority or a life interest arises under the will is FALSE, a probate action is pending is FALSE, a general caveat has been entered is FALSE, the caveator has been given opportunity to contest is FALSE, an application has been made for probate or letters of administration is TRUE, the application has been proceeded with, and has not been withdrawn or refused is TRUE, the administrator has extracted the grant of letters of administration is TRUE, date of the grant is JUST with YMD with 2026, 3 and 10, granted by a Family Court is TRUE, the person for whose use and benefit the grant is made is an infant is FALSE, the Family Court thinks fit to require such security is FALSE, the administrator is entitled to the whole of the estate after payment of the debts is TRUE, the amount at which the estate within the jurisdiction is sworn is 400000, debts due by the deceased secured by mortgage is 150000, such security as he is lawfully required to furnish has been given is FALSE, date of death of the last surviving executor or administrator is NOTHING, an application for the representation of the estate has been made since that death is FALSE, there is danger that the property may be wasted is FALSE, the appointment of a receiver would be a sufficient protection for the estate is TRUE, the Public Trustee has declared that he undertakes to administer the property is FALSE, the value of the assets collected by them is 200000 and the order of application is varied by the will of the deceased is FALSE.
+
+<!-- l4: decide:the Bernard intestacy with a mortgaged flat -->
+
+**158.** The Bernard intestacy with a mortgaged flat means Administration where case is the Bernard case, persons who are or may become entitled to probate or letters of administration is list of Grace, the date as at which the question is asked is YMD with 2026, 4 and 1, there is a minority or a life interest arises under the will is FALSE, a probate action is pending is FALSE, a general caveat has been entered is FALSE, the caveator has been given opportunity to contest is FALSE, an application has been made for probate or letters of administration is TRUE, the application has been proceeded with, and has not been withdrawn or refused is TRUE, the administrator has extracted the grant of letters of administration is TRUE, date of the grant is NOTHING, granted by a Family Court is FALSE, the person for whose use and benefit the grant is made is an infant is FALSE, the Family Court thinks fit to require such security is FALSE, the administrator is entitled to the whole of the estate after payment of the debts is FALSE, the amount at which the estate within the jurisdiction is sworn is 400000, debts due by the deceased secured by mortgage is 150000, such security as he is lawfully required to furnish has been given is FALSE, date of death of the last surviving executor or administrator is NOTHING, an application for the representation of the estate has been made since that death is FALSE, there is danger that the property may be wasted is FALSE, the appointment of a receiver would be a sufficient protection for the estate is TRUE, the Public Trustee has declared that he undertakes to administer the property is FALSE, the value of the assets collected by them is 200000 and the order of application is varied by the will of the deceased is FALSE.
+
+<!-- l4: decide:the small estate administered by the Public Trustee -->
+
+**159.** The small estate administered by the Public Trustee means Administration where case is the small estate case, persons who are or may become entitled to probate or letters of administration is EMPTY, the date as at which the question is asked is YMD with 2026, 4 and 1, there is a minority or a life interest arises under the will is FALSE, a probate action is pending is FALSE, a general caveat has been entered is FALSE, the caveator has been given opportunity to contest is FALSE, an application has been made for probate or letters of administration is FALSE, the application has been proceeded with, and has not been withdrawn or refused is FALSE, the administrator has extracted the grant of letters of administration is FALSE, date of the grant is NOTHING, granted by a Family Court is FALSE, the person for whose use and benefit the grant is made is an infant is FALSE, the Family Court thinks fit to require such security is FALSE, the administrator is entitled to the whole of the estate after payment of the debts is FALSE, the amount at which the estate within the jurisdiction is sworn is 40000, debts due by the deceased secured by mortgage is 0, such security as he is lawfully required to furnish has been given is FALSE, date of death of the last surviving executor or administrator is NOTHING, an application for the representation of the estate has been made since that death is FALSE, there is danger that the property may be wasted is FALSE, the appointment of a receiver would be a sufficient protection for the estate is TRUE, the Public Trustee has declared that he undertakes to administer the property is TRUE, the value of the assets collected by them is 0 and the order of application is varied by the will of the deceased is FALSE.
+
+<!-- l4: decide:the mortgaged flat -->
+
+**160.** The mortgaged flat means Charged interest where description is a Housing and Development Board flat subject to a legal mortgage, value is 500000, charged with the payment of money at the time of his death is TRUE, a contrary or other intention signified by will, deed or other document is FALSE and that intention signified only by a general direction for the payment of debts or by a charge of debts upon the residuary estate is FALSE.
+
+<!-- l4: decide:the mortgaged flat with a general direction to pay debts -->
+
+**161.** The mortgaged flat with a general direction to pay debts means Charged interest where description is the same flat, under a will directing that debts be paid out of the residuary estate, value is 500000, charged with the payment of money at the time of his death is TRUE, a contrary or other intention signified by will, deed or other document is TRUE and that intention signified only by a general direction for the payment of debts or by a charge of debts upon the residuary estate is TRUE.
+
+<!-- l4: decide:the mortgaged flat with an express direction about the mortgage -->
+
+**162.** The mortgaged flat with an express direction about the mortgage means Charged interest where description is the same flat, under a will directing that the mortgage on it be discharged out of the residuary estate, value is 500000, charged with the payment of money at the time of his death is TRUE, a contrary or other intention signified by will, deed or other document is TRUE and that intention signified only by a general direction for the payment of debts or by a charge of debts upon the residuary estate is FALSE.
+
+## Assertions
+
+### Which grant — ss 8, 13, 18, 20, 62
+
+### Who may take it — ss 6, 21
+
+### Security — s 29
+
+### The timeline — s 55 and WA 1838 s 28(2)
+
+### What comes off the top — ss 57, 58, 66, 67 and the Schedules
+
+### How long it takes — s 69
+
+<!-- tnr-coverage: 162 provisions; 0 boolean atoms inlined; 79 directives suppressed -->

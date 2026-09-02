@@ -1,0 +1,16 @@
+---
+config:
+  railroad:
+    nonTerminalFill: "#ffffff"
+    nonTerminalStroke: "#222222"
+    nonTerminalTextColor: "#111111"
+    terminalFill: "transparent"
+    terminalStroke: "transparent"
+    terminalTextColor: "#888888"
+    lineColor: "#8a8a8a"
+    markerFill: "#222222"
+    strokeWidth: 1.5
+    fontSize: 15
+---
+railroad-beta
+issuer_is_excluded_by_Rule_100_b = sequence(terminal("(b) Applicability. The crowdfunding exemption shall not apply to transactions involving the offer or sale of securities by any issuer that:"), choice(nonterminal("(b)(1) — not organized under State or territorial law OF issuer"), nonterminal("(b)(2) — an Exchange Act reporting company OF issuer"), nonterminal("(b)(3) — an investment company OF issuer"), nonterminal("(b)(4) — subject to a bad-actor disqualification OF issuer"), nonterminal("(b)(5) — delinquent in ongoing annual reports OF issuer"), nonterminal("(b)(6) — no specific business plan, or a blank-check business plan OF issuer")));

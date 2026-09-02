@@ -1,0 +1,75 @@
+# Singapore succession — what happens after somebody dies
+
+## The order of the questions
+
+<!-- l4: declare:Succession outcome -->
+
+**1.** In this Act, “Succession outcome” means a record consisting of—
+
+    (a) “the Act that governs the distribution”, being a STRING;
+
+    (b) “there is an operative will”, being a BOOLEAN;
+
+    (c) “why there is no operative will”, being a STRING;
+
+    (d) “the gross estate”, being a NUMBER;
+
+    (e) “what is left to distribute”, being a NUMBER;
+
+    (f) “what this Act reaches”, being a NUMBER;
+
+    (g) “the intestate distribution”, being a Distribution; and
+
+    (h) “what happens next”, being a STRING.
+
+## Is there a will the law will act on?
+
+<!-- l4: decide:there is an operative will in -->
+
+**2.** In relation to a Case “c”, there is an operative will in means consider the case distinctions of c's will :  when NOTHING has  then FALSE. when JUST has w then the will is formally valid with w and not the will has been revoked with w.
+
+<!-- l4: decide:why there is no operative will in -->
+
+**3.** In relation to a Case “c”, why there is no operative will in means consider the case distinctions of c's will :  when NOTHING has  then No will was made, so the whole estate passes on intestacy under the Intestate Succession Act 1967.. when JUST has w then why the will w is not operative with w.
+
+<!-- l4: decide:why the will w is not operative -->
+
+**4.** In relation to a Will “w”, why the will w is not operative means if not the will is formally valid with w then why the will is not formally valid with w if the will has been revoked with w then why the will has been revoked with w otherwise The will is valid and unrevoked..
+
+## The whole answer
+
+<!-- l4: decide:what happens after the death in -->
+
+**5.** In relation to a Case “c”, what happens after the death in means Succession outcome where the Act that governs the distribution is governing, there is an operative will is there is an operative will in with c, why there is no operative will is why there is no operative will in with c, the gross estate is gross estate of with c, what is left to distribute is distributable estate of with c, what this Act reaches is the property this Act distributes in with c, the intestate distribution is dist and what happens next is what happens next in with c.
+
+For the purposes of this provision—
+
+“dist” means the intestate distribution for with c;
+
+“governing” means the Act governing the distribution in with c;
+
+<!-- l4: decide:the Act governing the distribution in -->
+
+**6.** In relation to a Case “c”, the Act governing the distribution in means if c's deceased's Muslim then Muslim law and the Administration of Muslim Law Act 1966 — not the Intestate Succession Act 1967 (ISA s 2). if not the intestate distribution for with c's governed by this Act then Not the Intestate Succession Act 1967 — see the note. otherwise The Intestate Succession Act 1967..
+
+<!-- l4: decide:what happens next in -->
+
+**7.** In relation to a Case “c”, what happens next in means if c's deceased's Muslim then The estate is distributed under Muslim law. Apply to the Syariah Court for an inheritance certificate, then to the Family Justice Courts for letters of administration. The Intestate Succession Act does not apply (ISA s 2). if there is an operative will in with c then There is a valid will. The executor named in it applies to the Family Justice Courts for a grant of PROBATE (PAA s 8). Until the grant is made the estate is administered under the will's directions. if not someone survived among with c's family's surviving spouses and not issue survive with c and not a parent survives with c then There is no will and no close family. Someone interested in the estate — including a creditor — may apply for LETTERS OF ADMINISTRATION (PAA s 18(4)(c)). If nobody applies within 6 months of the death, the Public Trustee may be granted them instead (PAA s 55(1)(a)). otherwise There is no will, so the estate passes on intestacy. A person entitled to a share applies to the Family Justice Courts for LETTERS OF ADMINISTRATION (PAA s 18). Priority follows entitlement to the estate under ISA s 7. Apply within 6 months of the death, or the Public Trustee may be granted them instead (PAA s 55(1)(a))..
+
+## An administration, for the timeline
+
+<!-- l4: decide:the ordinary administration of -->
+
+**8.** In relation to a Case “c”, an optional DATE “granted” and a DATE “asked”, the ordinary administration of means Administration where case is c, persons who are or may become entitled to probate or letters of administration is EMPTY, the date as at which the question is asked is asked, there is a minority or a life interest arises under the will is FALSE, a probate action is pending is FALSE, a general caveat has been entered is FALSE, the caveator has been given opportunity to contest is FALSE, an application has been made for probate or letters of administration is FALSE, the application has been proceeded with, and has not been withdrawn or refused is FALSE, the administrator has extracted the grant of letters of administration is FALSE, date of the grant is granted, granted by a Family Court is TRUE, the person for whose use and benefit the grant is made is an infant is FALSE, the Family Court thinks fit to require such security is FALSE, the administrator is entitled to the whole of the estate after payment of the debts is FALSE, the amount at which the estate within the jurisdiction is sworn is gross estate of with c, debts due by the deceased secured by mortgage is 0, such security as he is lawfully required to furnish has been given is FALSE, date of death of the last surviving executor or administrator is NOTHING, an application for the representation of the estate has been made since that death is FALSE, there is danger that the property may be wasted is FALSE, the appointment of a receiver would be a sufficient protection for the estate is TRUE, the Public Trustee has declared that he undertakes to administer the property is FALSE, the value of the assets collected by them is gross estate of with c and the order of application is varied by the will of the deceased is FALSE.
+
+<!-- l4: decide:the ordinary timeline for -->
+
+**9.** In relation to a Case “c”, the ordinary timeline for means the timeline in with the ordinary administration of _ granted on _ asked on _ with c, grant and asked.
+
+For the purposes of this provision—
+
+“grant” means JUST with add months with c's deceased's date of death and 6;
+
+“asked” means add months with c's deceased's date of death and 6;
+
+<!-- tnr-coverage: 9 provisions; 0 boolean atoms inlined; 0 directives suppressed -->

@@ -1,0 +1,16 @@
+-- REJECTED (§8.1). `catIdent` is not injective: `foo bar` and fooBar both
+-- mangle to `foo_bar`. Emitting them as nested `let`s makes the inner one
+-- shadow the outer, so `a` and `b` would read the same value — 200 in Catala
+-- against 101 in L4. Catala's `let` shadows silently, so nothing downstream
+-- would have caught it.
+
+@export
+GIVETH A NUMBER
+total MEANS a PLUS b
+  WHERE
+    `foo bar` MEANS 1
+    fooBar    MEANS 100
+    a         MEANS `foo bar`
+    b         MEANS fooBar
+
+#EVAL total   -- 101 in L4

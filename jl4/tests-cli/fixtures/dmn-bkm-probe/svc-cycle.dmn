@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  PROBE D6. Section 2.3.2's MANUFACTURED CYCLE: two decisionServices that require
+  each other, while their MEMBER decisions have no informationRequirement between
+  them. This is the hazard that constrains how coarsely sections may be grouped
+  into services, and it is the runtime companion of the p6 L4-level cycle
+  fixture.
+
+      decisionService alpha = { output: a_out, input: n }
+      decisionService beta  = { output: b_out, input: n }
+      a_out = beta(n: n) + 1      KR to beta
+      b_out = alpha(n: n) + 1     KR to alpha
+      top   = alpha(n: n)         KR to alpha
+
+  No decision requires another decision. The cycle exists ONLY between the two
+  services, i.e. only on the graph section 6.3.10 would run an SCC over, and it is
+  invisible to any check that looks at informationRequirement alone.
+
+  MEASURED 2026-07-31 on this exact file, and the shape of the answer is the
+  point:
+    Xerces         : VALID
+    KIE validator  : CLEAN. Not one message. Build clean too.
+    KIE runtime    : all three decisions report status SUCCEEDED with value
+                     null, AND evaluateAll additionally emits DMNResult-level
+                     ERROR messages:
+                       Error evaluating Decision node 'a_out': null
+                       Errors occured while evaluating Decision Service node
+                       'alpha'.
+                     (10 errors in total across evaluateAll and the two
+                     evaluateDecisionService calls.)
+
+  SHARPENING, worth carrying back into the spec. The spec's earlier note on this
+  hazard said the manufactured service cycle was caught by the harness's
+  null-value rule and NOT by any error leg. On this arrangement that is too
+  strong: the STATUS channel is indeed useless (SUCCEEDED on a null), and the
+  VALIDATOR is indeed silent, but the RUNTIME MESSAGE channel does fire. Two of
+  the three "silent" claims survive; the third does not. The practical
+  consequence is unchanged, because a design-time exporter cannot see runtime
+  messages, so a build-time SCC over the service graph is still the only thing
+  that can catch this before deployment.
+
+  Wired HarnessMustFail. Read the failure as "the value leg and the message leg
+  both caught it, the validator did not", not as "the engine rejected the file".
+
+  The whole file is Camunda-unparseable for D2's reason (a knowledgeRequirement
+  pointing at a decisionService), so the Camunda leg measures the throw, not the
+  cycle.
+-->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="definitions_svc_cycle" name="svc_cycle" namespace="https://legalese.com/l4/dmn/svc_cycle" exporter="hand">
+  <inputData id="input_n" name="n">
+    <variable id="input_n_var" name="n" typeRef="number"/>
+  </inputData>
+  <decision id="decision_a_out" name="a_out">
+    <variable id="decision_a_out_var" name="a_out" typeRef="number"/>
+    <informationRequirement id="ir_a_out_n">
+      <requiredInput href="#input_n"/>
+    </informationRequirement>
+    <knowledgeRequirement id="kr_a_out_beta">
+      <requiredKnowledge href="#svc_beta"/>
+    </knowledgeRequirement>
+    <literalExpression id="decision_a_out_lit">
+      <text>beta(n: n) + 1</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_b_out" name="b_out">
+    <variable id="decision_b_out_var" name="b_out" typeRef="number"/>
+    <informationRequirement id="ir_b_out_n">
+      <requiredInput href="#input_n"/>
+    </informationRequirement>
+    <knowledgeRequirement id="kr_b_out_alpha">
+      <requiredKnowledge href="#svc_alpha"/>
+    </knowledgeRequirement>
+    <literalExpression id="decision_b_out_lit">
+      <text>alpha(n: n) + 1</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_top" name="top">
+    <variable id="decision_top_var" name="top" typeRef="number"/>
+    <informationRequirement id="ir_top_n">
+      <requiredInput href="#input_n"/>
+    </informationRequirement>
+    <knowledgeRequirement id="kr_top_alpha">
+      <requiredKnowledge href="#svc_alpha"/>
+    </knowledgeRequirement>
+    <literalExpression id="decision_top_lit">
+      <text>alpha(n: n)</text>
+    </literalExpression>
+  </decision>
+  <decisionService id="svc_alpha" name="alpha">
+    <variable id="svc_alpha_var" name="alpha" typeRef="number"/>
+    <outputDecision href="#decision_a_out"/>
+    <inputData href="#input_n"/>
+  </decisionService>
+  <decisionService id="svc_beta" name="beta">
+    <variable id="svc_beta_var" name="beta" typeRef="number"/>
+    <outputDecision href="#decision_b_out"/>
+    <inputData href="#input_n"/>
+  </decisionService>
+</definitions>

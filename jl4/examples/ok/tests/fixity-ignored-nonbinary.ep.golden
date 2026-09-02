@@ -1,0 +1,9 @@
+-- A fixity annotation on anything that is not a plain binary infix operator
+-- is ignored with a warning (the module still typechecks and evaluates).
+
+@infixl 6
+GIVEN p IS A NUMBER
+GIVETH A NUMBER
+notbinary p MEANS p + 1
+
+#EVAL notbinary 41

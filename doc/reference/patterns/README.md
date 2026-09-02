@@ -1,8 +1,8 @@
 # L4 Advanced Patterns Reference
 
-Advanced and intermediate L4 patterns for structuring complex rules, calculations, and contracts. This page covers patterns beyond the basics found in the [Common Patterns tutorial](../../tutorials/getting-started/common-patterns.md).
+Advanced and intermediate L4 patterns for structuring complex rules, calculations, and contracts. This page covers patterns beyond the basics found in the [Common Patterns](common-patterns.md) reference.
 
-For basic patterns (simple records, predicates, list operations, conditionals, simple obligations), see the [Common Patterns](../../tutorials/getting-started/common-patterns.md) page.
+For basic patterns (simple records, predicates, list operations, conditionals, simple obligations), see the [Common Patterns](common-patterns.md) page.
 
 ---
 
@@ -118,6 +118,7 @@ mom and dad `have a baby named` kid MEANS
 - Parameters can appear before, between, or after the function's identifier words.
 - Backtick-quoted identifiers can contain spaces, allowing multi-word function names.
 - Useful for legal predicates that follow natural phrasing, e.g. `person `is entitled to` benefit`.
+- See [Functions Reference: Mixfix Function Definitions](../functions/README.md#mixfix-function-definitions) for how the typechecker's mixfix registry resolves these patterns and derives document headings from them.
 
 ---
 
@@ -222,6 +223,51 @@ DECIDE `is eligible` IF
 - `p UNLESS q` is equivalent to `p AND NOT q`.
 - Preferred in rules-as-code formalization where the source text says "unless" or "except where".
 - See the [Operators reference](../operators/README.md) for precedence details.
+
+---
+
+## Negation as Failure (Closed-World and Open-World Defaults)
+
+**When to use:** When a fact may be _undecided_ -- modelled as `MAYBE BOOLEAN`
+(`JUST TRUE` / `JUST FALSE` / `NOTHING`) -- and you must say what the _absence_ of
+proof means. Regulatory silence often means failure ("you did not prove you filed,
+so you are in breach"); a permission regime often means liberty ("nothing prohibits
+this, so it is allowed").
+
+**Canonical form:**
+
+```l4
+IMPORT `negation-as-failure`
+
+-- Closed-world: in breach unless timely filing is proven (NOTHING => breach)
+GIVEN `filed on time` IS A MAYBE BOOLEAN
+GIVETH A BOOLEAN
+`in breach` `filed on time` MEANS naf `filed on time`
+
+-- Open-world: may park unless a prohibition is proven (NOTHING => permitted)
+GIVEN `parking prohibited here` IS A MAYBE BOOLEAN
+GIVETH A BOOLEAN
+`may park` `parking prohibited here` MEANS naf `parking prohibited here`
+```
+
+**Notes:**
+
+- The three combinators live in the dedicated [negation-as-failure](../libraries/negation-as-failure.md)
+  library: `holds p` (≡ `fromMaybe FALSE`, closed-world grounding), `naf p`
+  (≡ `NOT (holds p)`, negation as failure), and `presumed p` (≡ `fromMaybe TRUE`,
+  the open-world dual).
+- `naf` succeeds on everything not provably true -- both the refuted (`JUST FALSE`)
+  and the unknown (`NOTHING`) cases -- mirroring Prolog's `\+`.
+- The default value _is_ the closed-world / open-world knob: `FALSE` for `holds`,
+  `TRUE` for `presumed`. This is how one `MAYBE BOOLEAN` supports both "silence =
+  failure" (obligations) and "silence = permission" (deontic liberty).
+- Contrast with [UNLESS](#unless): UNLESS negates a _known_ `BOOLEAN` exception
+  (`p AND NOT q`); negation-as-failure handles a _possibly-undecided_ proposition.
+- Each combinator carries an `@nlg` annotation, so `in breach` above renders as
+  "In breach if filed on time has not been proven true" without any extra work.
+- See the [negation-as-failure reference](../libraries/negation-as-failure.md) for
+  the full truth table, and the runnable example (with a Kleene three-valued lift)
+  [negation-as-failure-examples.l4](https://github.com/legalese/l4-ide/blob/main/jl4/experiments/negation-as-failure-examples.l4).
 
 ---
 
@@ -373,7 +419,7 @@ factorial MEANS
 **Notes:**
 
 - Always include a base case to prevent infinite recursion.
-- Recursive definitions work naturally with pattern matching on lists (see [Common Patterns: List Pattern Matching](../../tutorials/getting-started/common-patterns.md)).
+- Recursive definitions work naturally with pattern matching on lists (see [Common Patterns: List Patterns](common-patterns.md#list-patterns)).
 - The evaluator supports lazy evaluation, but infinite recursion without a base case will still diverge.
 
 ---
@@ -412,7 +458,7 @@ all (GIVEN g YIELD g's age >= 18) (charity's governors)
 
 ## See Also
 
-- **[Common Patterns](../../tutorials/getting-started/common-patterns.md)** -- Basic patterns (records, predicates, lists, conditionals, simple obligations)
+- **[Common Patterns](common-patterns.md)** -- Basic patterns (records, predicates, lists, conditionals, simple obligations)
 - **[Functions Reference](../functions/README.md)** -- GIVEN, GIVETH, DECIDE, MEANS, WHERE, LET
 - **[Operators Reference](../operators/README.md)** -- AND, OR, NOT, UNLESS, IMPLIES, ellipsis operators
 - **[Syntax Reference](../syntax/README.md)** -- Layout rules, backtick identifiers, ditto marks, annotations

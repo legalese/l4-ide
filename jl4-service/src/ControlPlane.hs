@@ -11,12 +11,19 @@ module ControlPlane (
   putDeploymentHandler,
   getUpdateStatusHandler,
   deleteDeploymentHandler,
+  -- Version helpers (exported for testing)
+  nextDeploymentVersion,
+  parseVersionCounts,
+  -- Deployment-id rules (exported for testing)
+  deploymentIdError,
+  maxDeploymentIdLength,
 ) where
 
 import qualified BundleStore
 import L4.FunctionSchema (Parameters (..))
 import Compatibility (FnIface, ifaceFromFunction, ifaceFromSummary, detectBreakingChanges)
 import Compiler (compileBundle, computeVersion)
+import qualified Version
 import DeploymentLoader (triggerCompilationIfPending)
 import Logging (logInfo, logWarn)
 import Options (Options (..))
@@ -39,6 +46,7 @@ import qualified Data.Map.Strict as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text.Encoding
+import qualified Data.Text.Read as Text.Read
 import Data.Maybe (fromMaybe)
 import Data.Time (UTCTime, diffUTCTime, getCurrentTime)
 import Data.UUID.V4 (nextRandom)
@@ -155,15 +163,24 @@ postDeploymentHandler multipart = do
       version = computeVersion sourceMap
 
   registry <- liftIO $ readTVarIO env.deploymentRegistry
+  -- The recompile shortcut is keyed on the CONTENT hash, so it must also be
+  -- keyed on the requested id. Matching content alone meant that asking for a
+  -- new deployment whose bytes happened to equal an existing one returned HTTP
+  -- 200 naming the OTHER deployment, and created nothing: a subsequent
+  -- @GET /deployments/<the id you asked for>@ 404s. Documented as "skips
+  -- recompilation", it actually skipped deployment creation. Deploying the
+  -- same bundle twice under two names is exactly what you do to compare them,
+  -- and the caller had no way to tell it had not happened.
   let existingMatch =
         [ (did, meta)
         | (did, DeploymentReady _ meta) <- Map.toList registry
         , meta.metaVersion == version
+        , did == deployId
         ]
 
   case existingMatch of
     ((existingId, existingMeta):_) ->
-      -- Identical sources already deployed — no recompile, no job.
+      -- Identical sources already deployed UNDER THIS ID — no recompile, no job.
       pure (mkStatus existingId.unDeploymentId "ready" (Just existingMeta) Nothing)
     [] -> do
       let cfg = env.options
@@ -176,6 +193,10 @@ postDeploymentHandler multipart = do
             { BundleStore.smVersion = version
             , BundleStore.smCreatedAt = Text.pack (show now)
             , BundleStore.smDescription = mDesc
+            -- Version strings are computed + stamped in by runDeployJob,
+            -- which can see the previously-deployed metadata.
+            , BundleStore.smServiceVersion = Nothing
+            , BundleStore.smDeploymentVersion = Nothing
             }
       jobId <- liftIO $ newJob env deployId
       _ <- liftIO $ async $
@@ -318,6 +339,8 @@ putDeploymentHandler deployIdText multipart = do
         { BundleStore.smVersion = version
         , BundleStore.smCreatedAt = Text.pack (show now)
         , BundleStore.smDescription = mDesc
+        , BundleStore.smServiceVersion = Nothing
+        , BundleStore.smDeploymentVersion = Nothing
         }
   jobId <- liftIO $ newJob env deployId
   _ <- liftIO $ async $
@@ -437,8 +460,44 @@ runDeployJob env deployId jobId sourceMap storedMeta mDesc mGate = do
           reject $ "Update rejected — it would break existing integrations: "
                      <> Text.intercalate "; " breaking
         [] -> do
-          let meta = meta0 { metaDescription = mDesc }
-          BundleStore.saveBundle env.bundleStore deployId.unDeploymentId sourceMap storedMeta
+          -- Compute the deployment version from the previously-deployed
+          -- metadata (read live from the registry — the old deployment keeps
+          -- serving until we swap below). RUNNING bumps on every applied
+          -- deploy; BREAKING bumps when this deploy's interface is breaking vs
+          -- the previous one (only reachable via the ungated POST/overwrite
+          -- path, since gated PUTs reject breaking changes above). First deploy
+          -- → {major}.0.0. Counters never reset and are restored from
+          -- StoredMetadata across restarts.
+          reg <- readTVarIO env.deploymentRegistry
+          let mPrevMeta = case Map.lookup deployId reg of
+                Just (DeploymentReady _ m)        -> Just m
+                Just (DeploymentPending (Just m)) -> Just m
+                _                                 -> Nothing
+              -- Bump the BREAKING/RUNNING components by string-editing the
+              -- previous deployment version (no separate counter fields are
+              -- stored). RUNNING +1 on every applied deploy; BREAKING +1 when
+              -- this deploy is breaking vs the previous interface (only
+              -- reachable via the ungated POST/overwrite path — gated PUTs
+              -- reject breaking changes above). First deploy → {major}.0.0.
+              isBreaking = case mPrevMeta of
+                Nothing -> False
+                Just pm -> not (null (detectBreakingChanges
+                  (map ifaceFromSummary pm.metaFunctions) newIfaces))
+              svcVersion = Version.serviceVersion
+              depVersion = nextDeploymentVersion
+                Version.serviceMajor
+                (fmap (.metaDeploymentVersion) mPrevMeta)
+                isBreaking
+              meta = meta0
+                { metaDescription = mDesc
+                , metaServiceVersion = svcVersion
+                , metaDeploymentVersion = depVersion
+                }
+              storedMeta' = storedMeta
+                { BundleStore.smServiceVersion = Just svcVersion
+                , BundleStore.smDeploymentVersion = Just depVersion
+                }
+          BundleStore.saveBundle env.bundleStore deployId.unDeploymentId sourceMap storedMeta'
           BundleStore.saveBundleCbor env.bundleStore deployId.unDeploymentId bundles
           BundleStore.saveMetadataCache env.bundleStore deployId.unDeploymentId (encodeMetadataCache meta)
             `catch` \(e :: SomeException) ->
@@ -457,6 +516,35 @@ runDeployJob env deployId jobId sourceMap storedMeta mDesc mGate = do
 -- ----------------------------------------------------------------------------
 -- Helpers
 -- ----------------------------------------------------------------------------
+
+-- | Parse the BREAKING and RUNNING components out of a
+-- @MAJOR.BREAKING.RUNNING@ deployment-version string. Returns @(0, 0)@ for an
+-- empty/malformed string (e.g. a first deploy, or metadata predating
+-- versioning), so the caller can bump from a clean baseline.
+parseVersionCounts :: Text -> (Int, Int)
+parseVersionCounts v = case Text.splitOn "." v of
+  (_ : b : r : _) -> (readInt b, readInt r)
+  _               -> (0, 0)
+ where
+  readInt t = case Text.Read.decimal t of
+    Right (n, _) -> n
+    Left _       -> 0
+
+-- | Compute the next @MAJOR.BREAKING.RUNNING@ deployment version by
+-- string-editing the previous one. The previous BREAKING/RUNNING counters are
+-- parsed out of @mPrev@ (the previously-deployed version string, 'Nothing' on
+-- the first deploy). RUNNING bumps on every applied deploy; BREAKING bumps when
+-- @isBreaking@. MAJOR always reflects the current service major, so a service
+-- major bump is picked up without resetting the counters. First deploy →
+-- @{major}.0.0@.
+nextDeploymentVersion :: Int -> Maybe Text -> Bool -> Text
+nextDeploymentVersion major mPrev isBreaking =
+  let (breaking, running) = case mPrev of
+        Nothing   -> (0, 0)
+        Just prev ->
+          let (b, r) = parseVersionCounts prev
+          in (b + (if isBreaking then 1 else 0), r + 1)
+  in Text.intercalate "." (map (Text.pack . show) [major, breaking, running])
 
 -- | Convert DeploymentState to a response.
 -- In non-debug mode, error details are hidden.
@@ -481,28 +569,57 @@ stateToResponse debugMode vis fnMode (DeploymentId did) = \case
     let errorMsg = if debugMode then Just err else Just "Compilation failed"
     in mkStatus did "failed" Nothing errorMsg
 
--- | Validate a deployment ID.
--- Must be <= 36 characters (UUID length), alphanumeric + hyphens + underscores,
--- and must not contain ".." sequences.
+-- | Validate a deployment ID: see 'deploymentIdError' for the rules.
 -- | Reserved words that cannot be used as deployment IDs.
 -- These correspond to top-level route segments in the API.
 reservedWords :: [Text]
 reservedWords = ["health", "deployments", "openapi.json"]
 
-validateDeploymentId :: Text -> AppM ()
-validateDeploymentId deployId = do
-  when (deployId `elem` reservedWords) $
-    throwError err400 { errBody = jsonError "Deployment ID is a reserved word" }
-  when (Text.isPrefixOf "." deployId) $
-    throwError err400 { errBody = jsonError "Deployment ID must not start with a dot" }
-  when (Text.length deployId > 36) $
-    throwError err400 { errBody = jsonError "Deployment ID exceeds maximum length of 36 characters" }
-  when (Text.isInfixOf ".." deployId) $
-    throwError err400 { errBody = jsonError "Deployment ID contains invalid sequence" }
-  when (not $ Text.all isValidIdChar deployId) $
-    throwError err400 { errBody = jsonError "Deployment ID contains invalid characters (allowed: a-z, A-Z, 0-9, -, _)" }
+-- | The length bound on a deployment id, and why it is what it is.
+--
+-- It was 36, with the comment "(UUID length)" -- which sized the bound to the
+-- id the service GENERATES when a caller omits one, rather than to anything the
+-- service needs. The id is used as one path component under the store and as
+-- one URL segment, and both admit far more: POSIX caps a filename component at
+-- 255 bytes. So 36 refused perfectly serviceable ids for no reason. The `go`
+-- orchestrator names deployments `<subject>-<run-id>`; that is 29 characters
+-- for subject `regcf` and 37 for `sg-succession`, so the second subject to use
+-- the orchestrator was rejected with HTTP 400 by a healthy service.
+--
+-- 128 keeps a real bound -- an unbounded path component is still worth
+-- refusing -- while leaving room for a descriptive, traceable id. RAISING a
+-- limit is backwards compatible: every id that validated before validates now.
+--
+-- The checks that do the actual safety work are the other four, and none of
+-- them moved: the reserved-word list guards top-level route segments, and the
+-- dot-prefix, `..` and charset rules guard path traversal.
+maxDeploymentIdLength :: Int
+maxDeploymentIdLength = 128
+
+-- | The deployment-id rules, as a pure function so they can be tested without
+-- the app monad. 'Nothing' is valid; 'Just' carries the reason for refusal.
+deploymentIdError :: Text -> Maybe Text
+deploymentIdError deployId
+  | deployId `elem` reservedWords =
+      Just "Deployment ID is a reserved word"
+  | Text.isPrefixOf "." deployId =
+      Just "Deployment ID must not start with a dot"
+  | Text.length deployId > maxDeploymentIdLength =
+      Just $ "Deployment ID exceeds maximum length of "
+          <> Text.pack (show maxDeploymentIdLength) <> " characters"
+  | Text.isInfixOf ".." deployId =
+      Just "Deployment ID contains invalid sequence"
+  | not (Text.all isValidIdChar deployId) =
+      Just "Deployment ID contains invalid characters (allowed: a-z, A-Z, 0-9, -, _)"
+  | otherwise = Nothing
  where
   isValidIdChar c = isAlphaNum c || c == '-' || c == '_'
+
+validateDeploymentId :: Text -> AppM ()
+validateDeploymentId deployId =
+  case deploymentIdError deployId of
+    Nothing -> pure ()
+    Just msg -> throwError err400 { errBody = jsonError msg }
 
 -- | Check if a zip entry path is safe (no path traversal).
 isPathSafe :: FilePath -> Bool
