@@ -125,7 +125,13 @@ because sub-provision anchoring (Jason's `sec_1__para_a_section`) is not in v1.
 
 **The record becomes the ontology.** `Inputs` lowers to a Blawx category;
 each boolean field to an attribute with an NLG template derived from the
-field name. The transpiled root workspace, in Blawx's own code editor:
+field name — or, if you write an `@nlg` on the field or the decision, from
+your sentence: `` `facial hair on chin` IS A BOOLEAN @nlg @(X) 's facial hair
+is on the chin `` puts exactly that in the justification tree. (Write a slot
+either as an ordinary parameter reference, `%p%`, or — where there is no
+parameter to reference, as on a record field — in Blawx's own `@(X)` / `@(Y)`
+spelling. See BLAWX-EXPORT-SPEC §4.9.) The transpiled root workspace, in
+Blawx's own code editor:
 
 ![The transpiled rodents ontology: one fact block declaring the inputs category and fifteen boolean attributes, each with its appearing-as template](figures/rodents-root.png)
 
