@@ -1,11 +1,13 @@
 # Specification: TNR Generation and Round-Tripping
 
-**Status:** Draft. Phase 1 (renderer, `l4 tnr`, `.tnr.golden`) is built on this
-branch and has never merged; the branch was merged up to `unstable` on
-2026-09-02. §3.6 is **proposed, not built** — nothing in it has been measured.
-§10 records that `unstable` grew a second module-level renderer while this
-branch sat; which one survives is undecided.
-**Branch:** `nlg-roundtrip`
+**Status:** Design document; nothing in it is CI-guarded. **RULED 2026-09-02
+(§10):** the renderer this spec is written against is `L4.Export.Document` +
+`L4.Export.Render` on `unstable` — the VS Code Render pane and `l4 render`.
+The June demonstrator `L4.TNR` is retired and no longer in the tree; its last
+commit is `0f90dab7` on this branch, for retrieval. What it demonstrated is
+now the house-style worklist (§2.3). §3.6 is proposed, not built, and nothing
+in it has been measured.
+**Branch:** `nlg-roundtrip` (this file is the branch's whole diff against `unstable`)
 **Related:** `specs/done/DESC-ANNOTATION-SPEC.md`, `specs/todo/REF-ANNOTATION-SPEC.md`, `jl4-core/src/L4/Nlg.hs`
 
 ## Executive Summary
@@ -13,8 +15,8 @@ branch sat; which one survives is undecided.
 Generate, from L4 source, legislative and regulative text that looks and feels
 like something a Parliament or a government agency would produce — the **"TNR"
 (Times New Roman) version** — while remaining provably faithful to the L4.
-Prototype output is Markdown; production output is `.docx` with proper
-paragraph styles.
+Output today is plain text, HTML and Akoma Ntoso from `l4 render`; production
+output is `.docx` with proper paragraph styles.
 
 The second half of the roadmap is **round-tripping**: humans edit the TNR
 version, the L4 updates in response, and the _next_ generation of the TNR from
@@ -65,23 +67,39 @@ Key plumbing facts:
   back to compositional linearization; binding-site annotations propagate to
   use sites (`Linearize Resolved`, Nlg.hs:369-383).
 
-### 1.2 What exists for generation — and the gap
+### 1.2 What exists for generation — and the gap (rewritten 2026-09-02)
 
-`L4.Nlg.simpleLinearizer` produces flat text from a single expression. The
-test driver (`jl4/tests/Main.hs:131-134`) linearizes **only `Directive`
-nodes** (`#EVAL` etc.) into `.nlg.golden` files. Consequences:
+Two layers exist, and they are not the same thing.
 
-- `imaginary-alcohol-act.nlg.golden` is empty (no directives in the file).
-- `ny-environmental-7.3.nlg.golden` reads like word salad:
-  `executing contract `Example Filing`at`Day`with`Jul` with 19 and 2025 …`
+- **Leaf phrases.** `L4.Nlg.simpleLinearizer` produces flat text from a single
+  expression, preferring an `@nlg` annotation where one is present. The
+  `.nlg.golden` files (`jl4NlgAnnotationsGolden` in `jl4/tests/Main.hs`) and
+  `l4 nlg` linearize **only `Directive` nodes**, so
+  `imaginary-alcohol-act.nlg.golden` is empty and
+  `ny-environmental-7.3.nlg.golden` reads
+  `executing contract `Example Filing`at`Day`with`Jul` with 19 and 2025 …`.
+  The go orchestrator's `p7-tnr.sh` diffs that payload and calls itself the
+  "TNR / NLG leg"; it is not a document renderer.
+- **The document.** `L4.Export.Document` walks a typechecked module plus its
+  import closure into a presentation-neutral `Document` IR — sections,
+  definitions, provisions, each rule body a recursive `Clause` outline — and
+  `L4.Export.Render` emits it as plain text, standalone HTML or Akoma Ntoso.
+  It is what the VS Code **Render** pane shows (custom LSP request
+  `l4/exportDocument`) and what `l4 render` prints; it prunes unreachable
+  imports, drops directives, and stamps every block with an id. It landed
+  2026-06-14 (`2bb2b6d5`), three days after the June version of this spec.
 
-**There is no module-level document renderer.** Nothing walks `DECLARE`,
-`ASSUME`, `DECIDE`, sections, and deontic rules to produce a _document_. The
-`LinTree` type is token-level only; the TODO at `Nlg.hs:25-28` already wishes
-for "a 'Doc' type… like GF, a typed LinTree that performs pre-analysis steps".
-This spec is that Doc type, plus the house style to render it.
+The gap is therefore not "no module-level renderer", which is what this spec
+said in June and was true then. The gap is **house style**. Measured
+2026-09-02 on `imaginary-alcohol-act.l4`, `l4 render --format text` opens with
+fourteen bullets of the form "The person is a body corporate is assumed to be
+given", renders each rule as "X means: all of the following are true:",
+renders negation as "the person is a public house is false", and a negated
+conjunction as one run-on line. It is a faithful outline of the L4. It is not
+what a Parliament prints. §2 is about closing that gap **inside**
+`Export.Document`/`Render`, not beside it.
 
-## 2. Goal 1: The TNR Renderer
+## 2. Goal 1: The TNR house style
 
 ### 2.1 Output target: legislative house style
 
@@ -166,58 +184,58 @@ Observations driving design:
 - Source comments in the file contain the _original_ statutory text, giving us
   immediate human evaluation: does our output read like what Matt sent?
 
-### 2.3 Architecture
+### 2.3 Architecture (rewritten 2026-09-02)
 
-New module `jl4-core/src/L4/TNR.hs` (working name; could live as
-`L4.Nlg.Document`):
+The IR exists. `L4.Export.Document`'s `Document` / `Block` / `Clause` is the
+"Doc type" the June version of this section proposed to build, and it has what
+that section asked for: presentation-neutral, one block per declaration, several
+backends over one IR (`renderText`, `renderHtml`, `renderAkn` in
+`L4.Export.Render`, plus the JSON form the TypeScript layer renders). So the
+architecture is: **the TNR house style is a rendering mode of
+`L4.Export.Render`**, selected by a `RenderConfig` field (working name
+`houseStyle = Legislative`), and where the style needs structure the IR does
+not carry, the IR grows a field. No second walker.
 
-```haskell
--- A structured document IR between AST and concrete formats
-data Doc
-  = DocTitle Text
-  | DocPart  Numbering Text [Doc]
-  | DocSection Numbering (Maybe Text) [Doc]       -- "1. Heading"
-  | DocProvision Anchor [Inline]                  -- running prose
-  | DocTabulation Anchor Conj [Doc]               -- Coode list, "; and"/"; or"
-  | DocDefinition Anchor Text [Inline]            -- "X means ..."
-  deriving stock (Show, Eq, Generic)
+What the retired demonstrator (`L4.TNR`, 690 lines, last at `0f90dab7`) did
+that `Export.Render` does not — and which is therefore the worklist, in the
+order the alcohol act needs it:
 
-data Anchor = MkAnchor { unique :: Unique, path :: Text }  -- see §3.2
+1. **Bare-`BOOLEAN` `ASSUME`s are atoms, not definitions.** They appear inline
+   inside the provisions that use them and get no "is assumed to be given"
+   entry; the coverage tally counts them as inlined. This alone removes the
+   fourteen-bullet preamble.
+2. **Coode tabulation** for `AND`/`OR` bodies: lettered paragraphs ending
+   "; and" / "; or", one tabulation level per nesting, the lead-in ending
+   "if—". `Export.Document`'s `Clause` tree already has the nesting; this is a
+   text backend, not a new analysis.
+3. **Negation as a copula swap** (" is " → " is not ", " has " → " does not
+   have ", first occurrence only), falling back to "it is not the case that—"
+   over a tabulated group. `Export.Document` renders " is false".
+4. **Negative-universal rewrite**: "the X must not VP", with every condition
+   predicated of the X, renders as "No X may VP who—" with subject elision and
+   verb-factored groups ("(e) has— (i) …; (ii) …"). Total and purely
+   syntactic; declines on mixed subjects.
+5. **Coverage tally** as a trailing comment (provisions / atoms inlined /
+   directives suppressed) so suppression is visible, per §2.5.
+6. **Anchors as round-trip identity** (§3.2). `Export.Render` already stamps
+   every block with `<sort>_<n>_<module>`, documented as a short, stable,
+   path-free link target. Whether it survives inserting a declaration above
+   the block is to be measured before it is reused as identity; §3.2 wants the
+   qualified name plus structural path. Either the existing id becomes that,
+   or a second id is added; the HTML and AKN link targets need not change.
 
-render :: Module Resolved -> Doc          -- the "get" of the lens
-renderMarkdown :: Doc -> Text
-renderPandocJSON :: Doc -> Value          -- → docx via pandoc, v2
-```
+A Markdown backend is **not** on the list. Text and HTML exist; docx comes
+from HTML or from the JSON IR via pandoc (Phase 3), not from Markdown.
 
-- `render` walks the module: sections → headings; `DECIDE`/`MEANS` →
-  provisions (Coode-tabulated via the existing `Linearize` machinery for
-  leaf expressions, reusing `lin`'s `@nlg` preference); `DECLARE`/`ASSUME` →
-  definitions; `Regulative`/deontic exprs → obligation prose; directives
-  (`#EVAL`, `#TRACE`) are **omitted** (they are tests, not law) — or
-  optionally rendered into an explanatory-notes appendix.
-- Every `Doc` block carries the `Anchor` of the L4 node it came from. This is
-  the backbone of both faithfulness checking and round-tripping.
-- **Markdown first.** `.docx` lands in v2 via pandoc with
-  `--reference-doc=tnr-reference.docx` whose styles (`Title`, `PartHeading`,
-  `SectionHeading`, `Subsection`, `Paragraph`, `Definition`) carry the actual
-  Times New Roman formatting. The IR is designed so no information is lost
-  between the MD and docx backends.
-- **Akoma Ntoso (LegalDocML)** is a third backend over the same IR:
-  hierarchical containers map 1:1 (section/paragraph/subparagraph/point,
-  `<intro>` for Coode lead-ins), and round-trip anchors ride natively in
-  `@GUID` alongside standard `eId`s. Prototyped in the demo server
-  (markdown→AKN transform, `/api/akn`); the production exporter renders
-  from `Block` directly.
-
-CLI surface:
-
-```
-l4 tnr foo.l4 [--format md|docx] [--anchors visible|hidden|none]
-```
-
-Golden tests: `foo.tnr.golden` alongside the existing `.nlg.golden` files in
-`jl4/examples/legal/tests/`, generated by the same harness in
-`jl4/tests/Main.hs`.
+CLI surface: `l4 render foo.l4 --format text|html|akn|json` plus one new flag
+for the style. Goldens: **there is no golden harness for `l4 render` output
+today** — `jl4/tests/Main.hs` has DMN, BPMN and relational export specs and
+nothing that reads `Export.Render`. A `.render.golden` per legal-corpus file,
+written by the same harness that writes `.nlg.golden`, is the first
+deliverable of Phase 1, before any style work, so the style work has a diff to
+land against. The June `.tnr.golden` files (26 of them at `0f90dab7`) are the
+record of what the legislative style produced; they were goldens for code that
+is gone and were removed with it.
 
 ### 2.4 New hint surface needed (small, incremental)
 
@@ -316,8 +334,8 @@ annotations — stable ordering (source order), no timestamps, no randomness.
 
 Each rendered block embeds a stable identifier linking it to its L4 node:
 
-- **Markdown:** trailing HTML comment, e.g.
-  `<!-- l4: imaginary-alcohol-act § the-person-must-not-sell-alcohol -->`
+- **Text / HTML / AKN:** a hidden per-block id — HTML `id`, AKN `eId` (and
+  `GUID`). The text format carries none, which is what §3.6 needs.
 - **docx:** bookmarks or content controls (invisible in print, survive Word
   editing reasonably well).
 - Anchor identity = module + qualified name + structural path (e.g.
@@ -391,9 +409,9 @@ not by string comparison.
 
 #### The property
 
-Let `get : L4 → TNR` be the renderer, with anchors **off** (an anchor carries
-the qualified name of its node, which is a hint no reader of the printed statute
-would have). Let `reencode : TNR → L4` be an encoder that sees the prose and
+Let `get : L4 → TNR` be the renderer with block ids **off** — the text format
+carries none, and a round-trip anchor (§3.2) would carry the qualified name of
+its node, which is a hint no reader of the printed statute would have. Let `reencode : TNR → L4` be an encoder that sees the prose and
 **nothing else** — not the source `.l4`, not the original statute, not this
 repo's corpus. Then
 
@@ -445,8 +463,8 @@ owns judgement:
 
 | step         | who             | detail                                                                                                                                                                                                                                                                                                                                                                              |
 | ------------ | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1. render    | script          | `l4 tnr --no-anchors FILE > FILE.tnr.md` (or whichever `get` survives §10, with its block ids suppressed)                                                                                                                                                                                                                                                                           |
-| 2. re-encode | cleanroom agent | driven by the `writing-l4-rules` skill, handed **only** the `.tnr.md`; its tool log is audited afterwards the way the charities cleanroom's was — zero reads of the source `.l4`, the corpus, or the statute. Plug `drafting-patterns.md`'s corpus citation first (it leaked Part 6 of the charities corpus last time).                                                             |
+| 1. render    | script          | `l4 render --format text FILE > FILE.txt` — the plain outline today, the legislative style once it exists                                                                                                                                                                                                                                                                           |
+| 2. re-encode | cleanroom agent | driven by the `writing-l4-rules` skill, handed **only** the `.txt`; its tool log is audited afterwards the way the charities cleanroom's was — zero reads of the source `.l4`, the corpus, or the statute. Plug `drafting-patterns.md`'s corpus citation first (it leaked Part 6 of the charities corpus last time).                                                                |
 | 3. pair      | reviewer        | write the surface map. Names will differ; that is the point. The battery and the pairing conventions are the oracle's existing ones.                                                                                                                                                                                                                                                |
 | 4. measure   | script          | `node etc/go/lib/denovo-diff.mjs run --map MAP.json`. Exit 0 or 1 is a measurement; 2 or 4 is a broken harness, never a finding about either side.                                                                                                                                                                                                                                  |
 | 5. triage    | reviewer        | each witness is one of: **renderer defect** (the prose under-determines what the L4 fixes — fix `get`, or add the missing hint kind to §2.4); **encoder error** (the prose was sufficient and the agent misread it — discard, but count); **house-style gap** (the prose is ambiguous in a way the statute itself would be — an `@nlg` or connective-table finding, recorded here). |
@@ -464,6 +482,9 @@ Inherited from the oracle's own Limits, and not to be worked around silently:
 - `ASSUME`-shaped modules do not evaluate at all.
 
 #### Pilot and exit criterion
+
+This does not wait for the house style. The plain outline is a `get` too, and
+running §3.6 on it first gives the style work a baseline it must not regress.
 
 Pilot on `imaginary-alcohol-act.l4` first (small, propositional, statute in the
 comments — so the _textual_ comparison can be run beside it as a foil and its
@@ -485,16 +506,18 @@ that entry exists, every sentence in this section is a proposal.
 | `jl4/examples/legal/promissory-note.l4`       | Contract (not statute) — tests that house style is pluggable; chained obligations                                         |
 | `doc/reference/syntax/annotation-example.l4`  | Exercises every annotation form                                                                                           |
 
-## 5. Phasing
+## 5. Phasing (re-cut 2026-09-02)
 
-| Phase                        | Deliverable                                                                                                                                                                                                                 | Exit criterion                                                                                                                       |
-| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| **1. TNR/MD renderer**       | `L4.TNR` Doc IR + Markdown backend + `l4 tnr` + `.tnr.golden` harness                                                                                                                                                       | `imaginary-alcohol-act.tnr.golden` judged faithful & readable against the in-comment original; coverage report clean on pilot corpus |
-| **2. Hints & polish**        | negation hints, whole-rule overrides, definitions section, `@ref` cites (after REF-ANNOTATION-SPEC); deterministic subject-factoring; **AI gloss pass** (§2.6) proposing `@nlg` patches gated by back-translation + goldens | british-citizen-act and ny-environmental renders pass review                                                                         |
-| **3. docx backend**          | pandoc JSON writer + `tnr-reference.docx` styles                                                                                                                                                                            | opens in Word with correct paragraph styles                                                                                          |
-| **4. Round-trip: Class A**   | anchor alignment, wording-edit detection, surgical `@nlg`/`@desc` updates; GetPut + idempotence property tests                                                                                                              | edit-a-phrase → regen produces minimal diff, `.l4` diff touches only annotations                                                     |
-| **5. Round-trip: Class B/C** | LLM-assisted semantic patch proposal + typecheck/#EVAL validation gate + human confirmation UX                                                                                                                              | demo: strike a condition in Word, confirm proposed L4 change, regen stable                                                           |
-| **6. Web playground** (§6.1) | split-pane jl4-web: L4 editor left, live TNR render right; later TNR-side editing via the ingestion path                                                                                                                    | edit L4 in browser → only the corresponding TNR block changes                                                                        |
+| Phase                              | Deliverable                                                                                                                                                                                                                 | Exit criterion                                                                                                                                       |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **0. Golden harness**              | `.render.golden` per legal-corpus file from `l4 render --format text`, written by the `jl4/tests/Main.hs` harness; `etc/check-corpus-goldens.mjs` taught the new kind                                                       | suite green on the 26-file legal corpus; a style change shows as a golden diff                                                                       |
+| **1. Legislative house style**     | §2.3 items 1–5 inside `L4.Export.Render`, behind a `RenderConfig` flag and a CLI flag                                                                                                                                       | `imaginary-alcohol-act` renders as §2.2 modulo numbering (the June `.tnr.golden` at `0f90dab7` is the reference); coverage tally clean on the pilots |
+| **2. Hints & polish**              | negation hints, whole-rule overrides, definitions section, `@ref` cites (after REF-ANNOTATION-SPEC); deterministic subject-factoring; **AI gloss pass** (§2.6) proposing `@nlg` patches gated by back-translation + goldens | british-citizen-act and ny-environmental renders pass review; deontic bodies no longer render as one run-on line on either style                     |
+| **3. docx backend**                | pandoc from HTML or the JSON IR + `tnr-reference.docx` styles                                                                                                                                                               | opens in Word with correct paragraph styles                                                                                                          |
+| **4. Round-trip: Class A**         | round-trip anchors (§2.3 item 6, §3.2), alignment, wording-edit detection, surgical `@nlg`/`@desc` updates; GetPut + idempotence property tests                                                                             | edit-a-phrase → regen produces minimal diff, `.l4` diff touches only annotations                                                                     |
+| **5. Round-trip: Class B/C**       | LLM-assisted semantic patch proposal + typecheck/#EVAL validation gate + human confirmation UX                                                                                                                              | demo: strike a condition in Word, confirm proposed L4 change, regen stable                                                                           |
+| **6. Web playground** (§6.1)       | step 1 **exists**: the Render pane re-renders on each successful typecheck via `l4/exportDocument`. Remaining: TNR-side editing through the ingestion path                                                                  | edit the rendered pane in the browser → only the corresponding L4 block changes                                                                      |
+| **Losslessness** (§3.6, any phase) | one cleanroom run on one subject through the diff oracle                                                                                                                                                                    | rate + witness list + dispositions recorded in §9                                                                                                    |
 
 ## 6. Delivery Vehicle: Agent Skill
 
@@ -510,7 +533,7 @@ provides its guardrails:
 ```
 deterministic core (Haskell)          agent skill (prompt + workflow)
 ─────────────────────────────         ────────────────────────────────
-l4 tnr      render, anchors      ←→   drive renders, present diffs
+l4 render   render, anchors      ←→   drive renders, present diffs
 l4 ingest   align, classify A/B/C ←→  draft Class B semantic patches
 l4 check    typecheck, #EVAL      ←→  run validation gate, iterate
 exact-print surgical edits        ←→  apply Class A edits mechanically
@@ -538,9 +561,9 @@ A second delivery vehicle, reusing `ts-apps/jl4-web`: a split-pane view with
 the existing L4 web editor on the left and an auto-refreshing rendered
 Markdown pane on the right — the **prototype TNR**. Sequencing:
 
-1. **L4-edits-first:** left pane editable; on each successful typecheck the
-   right pane re-renders (`l4 tnr` behind the existing language-server /
-   websessions plumbing). This alone demonstrates GetPut stability live:
+1. **L4-edits-first — exists.** The VS Code Render pane re-renders on each
+   successful typecheck through `l4/exportDocument`, i.e. `Export.Document`
+   behind the language server. This alone demonstrates GetPut stability live:
    the right pane only changes where the L4 changed.
 2. **TNR-edits-later:** make the right pane editable and wire the edits
    through the ingestion path (§3) — classification, annotation updates,
@@ -550,7 +573,8 @@ Markdown pane on the right — the **prototype TNR**. Sequencing:
 
 ## 7. Testing
 
-- **Goldens:** `.tnr.golden` per pilot file, same harness as `.nlg.golden`.
+- **Goldens:** `.render.golden` per legal-corpus file, same harness as
+  `.nlg.golden`. **Does not exist yet** (§2.3, Phase 0).
 - **Properties:**
   - idempotence: `render ∘ put ∘ get = render` on unedited docs (GetPut);
   - minimal-diff: for a corpus of synthetic single-block edits, regenerated
@@ -574,8 +598,8 @@ Markdown pane on the right — the **prototype TNR**. Sequencing:
    `tnr-coverage` comment so suppression is visible, not silent. An
    explanatory-notes appendix can come later.
 3. **House style** — _hardcoded Commonwealth_ for v1, but every connective /
-   lead-in / marker string lives in one place (`L4.TNR`'s house-style
-   helpers) so making it data-driven later is mechanical.
+   lead-in / marker string lives in one place (the house-style
+   helpers in `L4.Export.Render`) so making it data-driven later is mechanical.
 4. **Anchor visibility** — _hidden HTML comments_, on by default,
    `--no-anchors` to suppress. Robustness against comment-stripping editors
    is a docx-era problem (see 5).
@@ -583,6 +607,10 @@ Markdown pane on the right — the **prototype TNR**. Sequencing:
    content controls vs. fuzzy-match sidecar).
 
 ## 9. Status
+
+Entries before 2026-09-02 describe `L4.TNR` and its demo in the present
+tense. That code was removed on 2026-09-02 (§10); the entries stay as the
+record of what the demonstrator showed, retrievable at `0f90dab7`.
 
 - **2026-06-10** — Phase 1 implemented:
   - `jl4-core/src/L4/TNR.hs`: Doc IR + module walker + Coode tabulation +
@@ -627,8 +655,14 @@ Markdown pane on the right — the **prototype TNR**. Sequencing:
   wiring). The legal corpus has grown from 8 files to 26 since the fork, so
   the `tnr` harness now wants 18 new goldens. §3.6 written; **not run**.
   Finding recorded as §10.
+- **2026-09-02 (later)** — **ruled** (§10): keep the thinking, drop the code.
+  `L4.TNR`, `l4 tnr`, the `tnr` describe block, the 26 `.tnr.golden` files and
+  `specs/todo/tnr-prototype/` removed; the five wiring/cabal/`Nlg.hs` touches
+  restored to `unstable`'s versions. The branch's diff against `unstable` is
+  now this file. §1.2, §2.3, §5, §6.1, §7 rewritten against `Export.Document`;
+  §3.6 re-pointed at `l4 render --format text`.
 
-## 10. The second renderer (finding, 2026-09-02)
+## 10. The second renderer — RULED 2026-09-02
 
 While this branch sat unmerged, `unstable` grew a second module-level document
 renderer: `L4.Export.Document` (the IR) and `L4.Export.Render` (text, HTML,
@@ -644,7 +678,7 @@ A third surface borrows the name: `l4 nlg` and the go orchestrator's
 `p7-tnr.sh` call themselves the "TNR / NLG leg" but linearize directives only.
 They are not a document renderer and should not be read as one.
 
-|                | `L4.TNR` (this branch)                                                  | `L4.Export.Document` + `Render` (`unstable`)                          |
+|                | `L4.TNR` (at `0f90dab7`)                                                | `L4.Export.Document` + `Render` (`unstable`)                          |
 | -------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------- |
 | lines          | 690                                                                     | 1,633 + 649                                                           |
 | output         | Markdown, Coode tabulation                                              | text, HTML, AKN, JSON IR, plan                                        |
@@ -671,12 +705,13 @@ rewrite, atom inlining — and `Export.Document`/`Render` has the plumbing —
 imports, reachability, HTML/AKN, LSP wiring. Deontics and record-shaped rules
 are open on both sides (this spec's Phase 2 worklist, §9).
 
-**Undecided.** The obvious resolution is to retire `L4.TNR` as a renderer and
-fold what only it has — Coode tabulation as a selectable house style, the
-negative-universal rewrite, the coverage report, and anchor-as-round-trip-
-identity — into `Export.Document`/`Render`, keeping this spec for what only it
-records: the lens laws (§3.1), the edit classes (§3.3) and the losslessness
-property (§3.6), all of which are renderer-independent. That is a
-recommendation, not a ruling; it is made without a side-by-side of the two
-renderers on the same corpus, which is the evidence it needs. Whichever `get`
-survives, §3.6 applies to it unchanged.
+**Ruling (Meng, 2026-09-02).** `L4.TNR` was about half an hour of model time,
+built as a demonstrator; the thinking in this spec is worth keeping and the
+code is not. So: `Export.Document` + `Export.Render` is the renderer; the
+demonstrator's house style is its worklist (§2.3), with the alcohol-act
+rendering it produced as the target (§2.2); this spec keeps the lens laws
+(§3.1), the anchors (§3.2), the edit classes (§3.3), the losslessness property
+(§3.6) and the AI-gloss doctrine (§2.6), all of which are renderer-independent.
+The code, its goldens and the prototype demo were removed from the branch in
+the commit after `0f90dab7`; that hash is where to look if a detail of the
+demonstrator is wanted.

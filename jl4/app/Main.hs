@@ -41,7 +41,6 @@ import L4.Cli.OpenFisca (OpenFiscaOptions, openFiscaCmd, openFiscaOptionsParser)
 import L4.Cli.Render (RenderOptions, renderCmd, renderOptionsParser)
 import L4.Cli.Run (RunOptions, runCmd, runOptionsParser)
 import L4.Cli.StateGraph (StateGraphOptions, stateGraphCmd, stateGraphOptionsParser)
-import L4.Cli.Tnr (TnrCliOptions, tnrCmd, tnrOptionsParser)
 import L4.Cli.Trace (TraceOptions, traceCmd, traceOptionsParser)
 import L4.Cli.Verify (VerifyOptions, propositionalBound, verifyCmd, verifyOptionsParser)
 
@@ -57,7 +56,6 @@ data Command
   | CmdBatch      BatchOptions
   | CmdTrace      TraceOptions
   | CmdStateGraph StateGraphOptions
-  | CmdTnr        TnrCliOptions
   | CmdRender     RenderOptions
   | CmdExport     ExportOptions
   | CmdOpenFisca  OpenFiscaOptions
@@ -100,9 +98,6 @@ commandParser =
       <> command "state-graph"
            (info (CmdStateGraph <$> stateGraphOptionsParser)
              (progDesc "Extract regulative-rule state transition graphs as GraphViz DOT"))
-      <> command "tnr"
-           (info (CmdTnr <$> tnrOptionsParser)
-             (progDesc "Render an L4 file as legislative-style prose (Markdown)"))
       <> command "render"
            (info (CmdRender <$> renderOptionsParser)
              (progDesc "Render an L4 file to a formatted document (html|text|json|plan)"))
@@ -187,7 +182,6 @@ main = do
     CmdBatch      opts -> batchCmd      opts
     CmdTrace      opts -> traceCmd      opts
     CmdStateGraph opts -> stateGraphCmd opts
-    CmdTnr        opts -> tnrCmd        opts
     CmdRender     opts -> renderCmd     opts
     CmdExport     opts -> exportCmd     opts
     CmdOpenFisca  opts -> openFiscaCmd  opts
