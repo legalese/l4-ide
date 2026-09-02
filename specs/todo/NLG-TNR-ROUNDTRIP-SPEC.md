@@ -366,6 +366,54 @@ the complaint, choose the level, apply, re-render, present the golden diff,
 land on acceptance. The skill's job is the level choice; the CLI and the
 goldens are its guardrails.
 
+### 2.8 Dialects: synonymous forms as a bidirectional resource (design intuition, recorded 2026-09-02, not ruled)
+
+Background, so nobody proposes it again: the team ran Grammatical Framework
+(GF) for about two years and stopped because hand-writing concrete grammars
+for everything was not feasible. GF's abstract syntax had to be built per
+domain; L4 already _is_ the abstract syntax. What remained infeasible was the
+concrete side, and that is the part the §2.7 loop grows from complaints
+instead of from theory, and the part an AI can now do by **alignment** rather
+than generation.
+
+The intuition (Meng, 2026-09-02): the same L4 abstract expression has many
+synonymous surface forms, chosen on stylistic preference; at the limit every
+law firm has an internal dialect of English. Because each form is associated
+with its L4 abstract expression, the set of forms is a resource for the
+**ingester** as much as for the renderer.
+
+In GF's terms: one abstract tree, one concrete grammar per dialect, and GF
+parsed by running a concrete grammar in reverse. In machine-translation terms
+the resource is a **phrase table** between L4 and each dialect, and phrase-table
+extraction from an aligned corpus — a firm's precedent bank against the L4
+forms — is what a model does that word-alignment statistics could not.
+
+What follows, if pursued:
+
+- **Generation** selects one form per abstract expression under the chosen
+  dialect and stays deterministic (§2.6, §2.7 unchanged). **Ingestion**
+  accepts the union over dialects.
+- **Class A becomes mechanical.** An edit that moves within a synonym set is a
+  wording edit by construction (§3.3); only movement out of every known set
+  reaches the Class B path.
+- **Coverage per dialect** — the fraction of a document the phrasebook
+  accounts for — is the honest measure of how well a firm's dialect is
+  learned, and grows as the §2.7 loop runs on that firm's documents.
+- **Dialects live outside the `.l4`,** as data selected by a render option, so
+  the L4 stays firm-neutral and English stays a view (Positioning). The `@nlg`
+  annotation is the degenerate single-dialect case.
+- **Synonymy is a ruling, not a fact.** "Best efforts" and "reasonable
+  efforts" read as synonyms and are not. Every entry is admitted through the
+  §2.6 back-translation gate, and §3.6 becomes the per-dialect test: render in
+  dialect _D_, re-encode cleanroom, measure agreement. A dialect whose house
+  style elides a qualifier shows as a lower rate with a witness naming the
+  clause — "your house style is lossy, here is where" is a product finding in
+  its own right.
+
+Nothing here is built and none of it changes Phases 0–2. It changes what the
+house-style table in §2.7 is allowed to become: keyed by dialect, and mined
+rather than written.
+
 ## 3. Goal 2: Round-Tripping
 
 ### 3.1 Correctness criteria — lens laws
