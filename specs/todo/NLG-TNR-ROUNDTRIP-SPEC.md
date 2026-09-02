@@ -308,6 +308,64 @@ Constraints:
 - The MCP answer path never reads the gloss: English stays a view, logic
   stays the model.
 
+### 2.7 The feedback loop: a style complaint lands as a rule, and persists (recorded 2026-09-02)
+
+The thing the June demonstrator was actually good for, and the reason its
+output improved by the hour, was not any one transform. It was the loop:
+
+1. render the corpus;
+2. Meng reads a provision and says what is wrong with it, in English
+   ("that should read _No person may sell alcohol who—_", "_February with 4
+   and 2024_ is not a date");
+3. the agent decides **where the fix lands** (below), makes it, and re-renders
+   the whole corpus;
+4. the golden diff shows exactly which provisions changed, and nothing else;
+5. Meng accepts, and the fix is in source control — it replays on every
+   future render of every document.
+
+This is §2.6's doctrine ("the GPU drafts once, the CPU replays forever")
+applied one level up: not only phrasings persist as annotations, **style
+rules persist as renderer code and data.** A complaint is never answered by
+re-prompting the output. It is answered by changing the thing that generates
+the output, so the answer is deterministic, diffable, and corpus-wide.
+
+Where a fix lands, from narrowest to widest — the agent's first job on each
+complaint is to pick the level, and the rule is _the widest level at which the
+fix is total_:
+
+| level                               | lives in                                                                  | reach                            | example from the demonstrator                                                                                                                                         |
+| ----------------------------------- | ------------------------------------------------------------------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A. annotation** (`@nlg`, `@desc`) | the `.l4` source                                                          | one phrase in one document       | §2.6: an atom's negative form; a clumsy lead-in                                                                                                                       |
+| **B. house-style table**            | the connective / lead-in / marker / type-idiom strings in `Export.Render` | every document                   | `7d762caf`: `MAYBE T` renders "an optional T", `LIST T` "a list of T"; `0db07dcf`: possessive spacing                                                                 |
+| **C. transform**                    | a pure syntactic rewrite over the IR in `Export.Render`                   | every document, where it applies | `21f157ec`: the negative-universal rewrite — "the X must not VP" with all conditions predicated of X becomes "No X may VP who—", subject elided, groups verb-factored |
+
+Constraints on B and C, which are what keep the loop honest:
+
+- **Total and syntactic.** A transform applies wherever its precondition holds
+  and declines cleanly where it does not (`21f157ec` left the alcohol act's
+  provisions 2–3 untouched because their subjects are mixed). It never guesses,
+  and it never reads the meaning of an atom.
+- **The golden diff is the acceptance evidence.** "Regenerating the demo corpus
+  changed only the one rewritten provision — minimal-diff holds" is the
+  sentence in `21f157ec`'s body that made it mergeable. A level-B or level-C
+  change with no golden harness under it cannot show that it improved one
+  document without degrading another, which is why Phase 0 (§5) precedes any
+  style work: the harness is what makes a complaint answerable at levels B
+  and C at all.
+- **Complaints that surface in goldens become the worklist.** `7d762caf`
+  records "date/money constructor applications ('February with 4 and 2024',
+  'USD with 25000') want literal idioms" — observed in the new goldens, not
+  imagined. The §9 Phase 2 list was built this way.
+- **No render-time LLM.** §2.6's prohibition stands at every level. The agent
+  is in the loop at development time, editing rules; the renderer stays a
+  pure function of the L4 and its annotations.
+
+Delivery: this loop is what the §6 agent skill encodes on the generation
+side, alongside the ingestion workflow it already describes — render, take
+the complaint, choose the level, apply, re-render, present the golden diff,
+land on acceptance. The skill's job is the level choice; the CLI and the
+goldens are its guardrails.
+
 ## 3. Goal 2: Round-Tripping
 
 ### 3.1 Correctness criteria — lens laws
@@ -508,16 +566,16 @@ that entry exists, every sentence in this section is a proposal.
 
 ## 5. Phasing (re-cut 2026-09-02)
 
-| Phase                              | Deliverable                                                                                                                                                                                                                 | Exit criterion                                                                                                                                       |
-| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **0. Golden harness**              | `.render.golden` per legal-corpus file from `l4 render --format text`, written by the `jl4/tests/Main.hs` harness; `etc/check-corpus-goldens.mjs` taught the new kind                                                       | suite green on the 26-file legal corpus; a style change shows as a golden diff                                                                       |
-| **1. Legislative house style**     | §2.3 items 1–5 inside `L4.Export.Render`, behind a `RenderConfig` flag and a CLI flag                                                                                                                                       | `imaginary-alcohol-act` renders as §2.2 modulo numbering (the June `.tnr.golden` at `0f90dab7` is the reference); coverage tally clean on the pilots |
-| **2. Hints & polish**              | negation hints, whole-rule overrides, definitions section, `@ref` cites (after REF-ANNOTATION-SPEC); deterministic subject-factoring; **AI gloss pass** (§2.6) proposing `@nlg` patches gated by back-translation + goldens | british-citizen-act and ny-environmental renders pass review; deontic bodies no longer render as one run-on line on either style                     |
-| **3. docx backend**                | pandoc from HTML or the JSON IR + `tnr-reference.docx` styles                                                                                                                                                               | opens in Word with correct paragraph styles                                                                                                          |
-| **4. Round-trip: Class A**         | round-trip anchors (§2.3 item 6, §3.2), alignment, wording-edit detection, surgical `@nlg`/`@desc` updates; GetPut + idempotence property tests                                                                             | edit-a-phrase → regen produces minimal diff, `.l4` diff touches only annotations                                                                     |
-| **5. Round-trip: Class B/C**       | LLM-assisted semantic patch proposal + typecheck/#EVAL validation gate + human confirmation UX                                                                                                                              | demo: strike a condition in Word, confirm proposed L4 change, regen stable                                                                           |
-| **6. Web playground** (§6.1)       | step 1 **exists**: the Render pane re-renders on each successful typecheck via `l4/exportDocument`. Remaining: TNR-side editing through the ingestion path                                                                  | edit the rendered pane in the browser → only the corresponding L4 block changes                                                                      |
-| **Losslessness** (§3.6, any phase) | one cleanroom run on one subject through the diff oracle                                                                                                                                                                    | rate + witness list + dispositions recorded in §9                                                                                                    |
+| Phase                              | Deliverable                                                                                                                                                                                                                                                         | Exit criterion                                                                                                                                       |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **0. Golden harness**              | `.render.golden` per legal-corpus file from `l4 render --format text`, written by the `jl4/tests/Main.hs` harness; `etc/check-corpus-goldens.mjs` taught the new kind                                                                                               | suite green on the 26-file legal corpus; a style change shows as a golden diff                                                                       |
+| **1. Legislative house style**     | §2.3 items 1–5 inside `L4.Export.Render`, behind a `RenderConfig` flag and a CLI flag                                                                                                                                                                               | `imaginary-alcohol-act` renders as §2.2 modulo numbering (the June `.tnr.golden` at `0f90dab7` is the reference); coverage tally clean on the pilots |
+| **2. Hints & polish**              | negation hints, whole-rule overrides, definitions section, `@ref` cites (after REF-ANNOTATION-SPEC); deterministic subject-factoring; **AI gloss pass** (§2.6) proposing `@nlg` patches gated by back-translation + goldens; every item lands through the §2.7 loop | british-citizen-act and ny-environmental renders pass review; deontic bodies no longer render as one run-on line on either style                     |
+| **3. docx backend**                | pandoc from HTML or the JSON IR + `tnr-reference.docx` styles                                                                                                                                                                                                       | opens in Word with correct paragraph styles                                                                                                          |
+| **4. Round-trip: Class A**         | round-trip anchors (§2.3 item 6, §3.2), alignment, wording-edit detection, surgical `@nlg`/`@desc` updates; GetPut + idempotence property tests                                                                                                                     | edit-a-phrase → regen produces minimal diff, `.l4` diff touches only annotations                                                                     |
+| **5. Round-trip: Class B/C**       | LLM-assisted semantic patch proposal + typecheck/#EVAL validation gate + human confirmation UX                                                                                                                                                                      | demo: strike a condition in Word, confirm proposed L4 change, regen stable                                                                           |
+| **6. Web playground** (§6.1)       | step 1 **exists**: the Render pane re-renders on each successful typecheck via `l4/exportDocument`. Remaining: TNR-side editing through the ingestion path                                                                                                          | edit the rendered pane in the browser → only the corresponding L4 block changes                                                                      |
+| **Losslessness** (§3.6, any phase) | one cleanroom run on one subject through the diff oracle                                                                                                                                                                                                            | rate + witness list + dispositions recorded in §9                                                                                                    |
 
 ## 6. Delivery Vehicle: Agent Skill
 
@@ -660,7 +718,9 @@ record of what the demonstrator showed, retrievable at `0f90dab7`.
   `specs/todo/tnr-prototype/` removed; the five wiring/cabal/`Nlg.hs` touches
   restored to `unstable`'s versions. The branch's diff against `unstable` is
   now this file. §1.2, §2.3, §5, §6.1, §7 rewritten against `Export.Document`;
-  §3.6 re-pointed at `l4 render --format text`.
+  §3.6 re-pointed at `l4 render --format text`. §2.7 added: the
+  complaint-to-rule loop the demonstrator ran on, with its three landing
+  levels and the golden diff as acceptance evidence.
 
 ## 10. The second renderer — RULED 2026-09-02
 
