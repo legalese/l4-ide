@@ -183,7 +183,8 @@ newtype BVar = MkBVar Text
 -- | One Blawx project: exactly what one @.blawx@ file (and its sibling @.pl@
 -- dump) serialises. Workspaces are ordered: @root_section@ first, then the
 -- numbered sections ascending — the emission order of the YAML stream and of
--- the concatenated s(CASP).
+-- the concatenated s(CASP). \"Ascending\" is by section NUMBER, which since
+-- §11 W3 the author may pin and which therefore need not be 1..n.
 data BlawxDoc = MkBlawxDoc
   { bdName         :: !Text        -- ^ @ruledoc_name@
   , bdRuleText     :: !BRuleText   -- ^ structured CLEAN source; rendered by Emit
@@ -207,15 +208,26 @@ data BlawxDoc = MkBlawxDoc
 -- | The CLEAN @rule_text@, kept structured so eIds are predictable (R4): the
 -- rendered form is @title\n\n1. …\n2. …@ with flat numbered sections only —
 -- section /n/ yields AKN eId @sec_n@, hence workspace @sec_n_section@.
+--
+-- __The numbers need not be 1..n and need not be contiguous__ (spec §11 W3,
+-- 2026-09-02). clean-law 0.0.4 builds the eId from the numeral it reads, never
+-- from the section's position (@clean\/clean.py@, @generate_section@:
+-- @prefix = \"sec_\" + node['section index'][0]@), so an author who writes the
+-- Act's own numbering gets it — @rps.l4@ emits sections 3 and 4 only.
+-- "L4.Blawx.Lower"\'s @sectionNumbers@ is what assigns them; a module that pins
+-- nothing still gets 1..n in export order.
 data BRuleText = MkBRuleText
   { brTitle    :: !Text
-  , brSections :: ![BSection]   -- ^ numbered 1.. in list order
+  , brSections :: ![BSection]
+    -- ^ ascending by 'bsNumber', one entry per DISTINCT number
   }
   deriving stock (Eq, Show, Generic)
   deriving anyclass (NFData)
 
 data BSection = MkBSection
-  { bsNumber :: !Int    -- ^ 1-based; invariant: position in 'brSections' + 1
+  { bsNumber :: !Int
+    -- ^ the CLEAN section index, ≥ 1. Ascending across 'brSections' and
+    -- unique within it, but NOT necessarily its position + 1.
   , bsText   :: !Text   -- ^ one paragraph, no newlines
   }
   deriving stock (Eq, Show, Generic)

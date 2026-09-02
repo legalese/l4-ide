@@ -150,6 +150,13 @@
 -- __A section's @rule_text@ falls back through the citation__: @\@desc@, then
 -- @\@ref@, then the @\"Definition of x.\"@ stub (see 'lowerBlawx'). @\@nlg@
 -- remains deliberately unconsumed here, for the reason recorded above.
+--
+-- __The author pins the CLEAN section number by writing it__ (spec §11 W3, 2026-09-02):
+-- if that chosen text opens with a CLEAN section index (decimal digits, a
+-- period, then end-of-text or a space) the number is the section's, and the
+-- numeral is consumed rather than repeated ('sectionNumbers'). Decisions that
+-- pin nothing keep the old behaviour exactly: they take the lowest numbers no
+-- pin claims, in export order, so a module with no pins still numbers 1..n.
 module L4.Blawx.Lower
   ( lowerBlawx
   ) where
@@ -158,7 +165,7 @@ import Base
 import Control.Applicative ((<|>))
 import qualified Base.Map as Map
 import qualified Base.Text as Text
-import Data.Char (chr, isAsciiLower, isAsciiUpper, isDigit, ord, toLower, toUpper)
+import Data.Char (chr, isAsciiLower, isAsciiUpper, isDigit, isSpace, ord, toLower, toUpper)
 import qualified Data.Set as Set
 
 import L4.Blawx.IR
@@ -195,10 +202,26 @@ lowerBlawx prog0 = do
   when (null exported) $
     Left [ blawxErr "" Nothing LENoExport
              "no @export decision reached the Blawx classifier" ]
-  let secOf = sectionAssignment prog exported
-      nSecs = length exported
+  -- R4 / §11 W3: choose each exported decision's section TEXT first (@desc,
+  -- then @ref, then the stub), because the section NUMBER is read off the front
+  -- of that same text. 'squash' runs before the pin recogniser so a citation
+  -- that opens on its own line still presents its numeral first.
+  let secTexts = [ (p, squash (fromMaybe (stubSection p) (p.rpDesc <|> p.rpRef)))
+                 | p <- exported
+                 ]
+      numbered = sectionNumbers secTexts
+      secOf    = sectionAssignment prog [ (p, n) | (p, n, _) <- numbered ]
+      -- one BSection per DISTINCT number, ascending, its text the remainders of
+      -- the decisions that pinned it joined in export order (see
+      -- 'sectionNumbers'). A module with no pins yields 1..n in export order,
+      -- which is what it yielded before pinning existed.
+      secList =
+        [ (n, Text.unwords [ t | (_, n', t) <- numbered, n' == n, not (Text.null t) ])
+        | n <- sortNub [ n | (_, n, _) <- numbered ]
+        ]
+      firstSec = case secList of (n, _) : _ -> n; [] -> 1
   declBlocks <- declarations env prog
-  ruleBySec  <- ruleBlocks env prog secOf
+  ruleBySec  <- ruleBlocks env prog secOf firstSec
   qtests     <- collectE [ convertQuery env q | q <- prog.rpgQueries ]
   interview  <- interviewTest env prog exported
   let tests = qtests <> maybeToList interview
@@ -211,11 +234,11 @@ lowerBlawx prog0 = do
                | not (null rootStacks) ]
       secWs =
         [ MkBWorkspace
-            { bwName   = bSec i
-            , bwStacks = [ [b] | b <- Map.findWithDefault [] i ruleBySec ]
+            { bwName   = bSec n
+            , bwStacks = [ [b] | b <- Map.findWithDefault [] n ruleBySec ]
             , bwComment = Nothing
             }
-        | i <- [1 .. nSecs]
+        | (n, _) <- secList
         ]
       -- CLEAN's title grammar (clean-law 0.0.4, the version Blawx pins)
       -- requires the first word to start with an uppercase character; a
@@ -233,7 +256,7 @@ lowerBlawx prog0 = do
         { brTitle    = title
         , brSections =
             [ MkBSection
-                { bsNumber = i
+                { bsNumber = n
                 -- @\@desc@ first, then the @\@ref@ citation, then a stub. The
                 -- citation is a worse section text than prose and a much better
                 -- one than "Definition of x." — a corpus annotated for
@@ -251,9 +274,13 @@ lowerBlawx prog0 = do
                 -- section 1 contained "hearing—" produced an AKN with ONLY
                 -- sec_1, breaking every later citation link (/rule/sec_N/
                 -- 500s). Same family as 'capitalizeFirst''s title guard.
-                , bsText   = squash (fromMaybe (stubSection p) (p.rpDesc <|> p.rpRef))
+                --
+                -- The text arrives already squashed and already stripped of the
+                -- CLEAN index that pinned 'bsNumber', so the numeral clean-law
+                -- re-emits as the section's @\<num\>@ is written exactly once.
+                , bsText   = txt
                 }
-            | (i, p) <- zip [1 ..] exported
+            | (n, txt) <- secList
             ]
         }
     , bdWorkspaces = rootWs <> secWs
@@ -838,18 +865,88 @@ enumConstructorFacts env prog =
 -- Sections (R4)
 -- ---------------------------------------------------------------------------
 
--- | Which numbered section each rule-bearing predicate belongs to: exported
--- decisions get sections 1..n in 'rpgPreds' order; a helper (auxiliary or
--- non-exported computed) is filed with the first exported decision that
--- transitively depends on it. benefit.l4's @bonus@ lands in @sec_2@ this way.
-sectionAssignment :: RelProgram -> [RPred] -> Map Unique Int
-sectionAssignment prog exported =
-  foldl' claim base (zip [1 ..] exported)
+-- | The CLEAN section index an author has written at the head of a section's
+-- text, and what is left of the text once it is taken off.
+--
+-- The shape is clean-law 0.0.4's @section_index@ read backwards
+-- (@clean\/clean.py:53@ __[E]__, downloaded from PyPI and read 2026-09-02):
+-- @number(\"section number\") + Suppress(DOT)@ at the head of a line, whose
+-- @generate_section@ then builds the eId as @\"sec_\" + index@ — the /literal/
+-- numeral, never the section's position in the document. So a @rule_text@ line
+-- reading @\"4. The winner …\"@ yields eId @sec_4@ and workspace
+-- @sec_4_section@, which is what makes an author-written number and Blawx's
+-- @according_to@ attribution agree.
+--
+-- Deliberately narrow, because every character of it is load-bearing for a
+-- corpus that does /not/ want to pin:
+--
+-- * the digits must be followed by @.@ and then end-of-text or a space, so
+--   @\"1(a): facial hair …\"@ (no dot), @\"43(1)(a): the conduct …\"@ and
+--   @\"4, the other seat.\"@ (comma) all decline to pin;
+-- * @0@ declines, since clean-law would emit @sec_0@ and no Act has one;
+-- * clean-law's optional @insert index@ (@\"2.1.\"@ → @sec_2_1@) is NOT
+--   recognised, because 'BSection' numbers an 'Int'; such a text simply does
+--   not pin, and R4's flat numbering applies (spec §11 W3(b) leaves
+--   sub-provision eIds open).
+--
+-- Measured 2026-09-02 over the twelve emitting seeds under
+-- @jl4\/examples\/blawx@: only @rps.l4@ and @beard.l4@ pin, and every other
+-- golden regenerates byte-identically.
+pinnedSection :: Text -> Maybe (Int, Text)
+pinnedSection t0
+  | Text.null digits            = Nothing   -- no leading numeral at all
+  | Text.length digits > 6      = Nothing   -- not a section number; guards the fold
+  | n < 1                       = Nothing   -- clean-law would emit sec_0
+  | Just rest <- afterDot
+  , Text.null rest || isSpace (Text.head rest) = Just (n, Text.stripStart rest)
+  | otherwise                   = Nothing
  where
-  base = Map.fromList [ (p.rpName.rnUnique, i) | (i, p) <- zip [1 ..] exported ]
+  (digits, rest0) = Text.span isDigit (Text.stripStart t0)
+  afterDot = Text.stripPrefix "." rest0
+  n = Text.foldl' (\acc c -> acc * 10 + (ord c - ord '0')) 0 digits
+
+-- | The CLEAN section number of every exported decision, with its section text
+-- stripped of the index that pinned it (R4, spec §11 W3(a)).
+--
+-- A decision whose text opens with an index ('pinnedSection') is pinned to that
+-- number; the rest take the lowest numbers no pin claims, in export order. Two
+-- decisions may pin the same number — @rps.l4@ states s.4 once per seat, and
+-- @beard.l4@ states s.1's chapeau and its two limbs — and then they share one
+-- section: one workspace, one @rule_text@ entry, and an @according_to@ naming
+-- the same @sec_n_section@, which is what Jason Morris's own @beard_tax.yaml@
+-- does with @sec_1_section@.
+--
+-- __A module that pins nothing is unchanged__: @claimed@ is empty, so the free
+-- numbers are @1, 2, 3, …@ handed out in export order, exactly as the
+-- pre-pinning code did.
+sectionNumbers :: [(RPred, Text)] -> [(RPred, Int, Text)]
+sectionNumbers xs = go free [ (p, t, pinnedSection t) | (p, t) <- xs ]
+ where
+  claimed = Set.fromList [ n | (_, t) <- xs, Just (n, _) <- [pinnedSection t] ]
+  free = filter (`Set.notMember` claimed) [1 ..]
+  go _ [] = []
+  go ns ((p, _, Just (n, rest)) : more) = (p, n, rest) : go ns more
+  go (n : ns) ((p, t, Nothing) : more) = (p, n, t) : go ns more
+  go [] ((p, t, Nothing) : more) = (p, 1, t) : go [] more  -- unreachable: 'free' is infinite
+
+-- | Ascending, duplicates removed. (@Base@ re-exports neither @sort@ nor
+-- @nub@; a 'Set' round-trip is both.)
+sortNub :: Ord a => [a] -> [a]
+sortNub = Set.toAscList . Set.fromList
+
+-- | Which numbered section each rule-bearing predicate belongs to: each
+-- exported decision is given its number by 'sectionNumbers'; a helper
+-- (auxiliary or non-exported computed) is filed with the first exported
+-- decision that transitively depends on it. benefit.l4's @bonus@ lands in
+-- @sec_2@ this way.
+sectionAssignment :: RelProgram -> [(RPred, Int)] -> Map Unique Int
+sectionAssignment prog exported =
+  foldl' claim base exported
+ where
+  base = Map.fromList [ (p.rpName.rnUnique, i) | (p, i) <- exported ]
   deps = Map.fromListWith (<>)
            [ (e.redFrom.rnUnique, [e.redTo.rnUnique]) | e <- prog.rpgDeps ]
-  claim m (i, p) =
+  claim m (p, i) =
     foldl' (\mm u -> Map.insertWith (\_new old -> old) u i mm) m
            (reachable [p.rpName.rnUnique] Set.empty)
   reachable [] _ = []
@@ -862,14 +959,17 @@ sectionAssignment prog exported =
 -- ---------------------------------------------------------------------------
 
 -- | Every clause of every rule-bearing predicate, grouped by section number,
--- in 'rpgPreds' \/ 'rpClauses' order within each section.
-ruleBlocks :: Env -> RelProgram -> Map Unique Int -> Either [LowerError] (Map Int [BBlock])
-ruleBlocks env prog secOf = do
+-- in 'rpgPreds' \/ 'rpClauses' order within each section. @dflt@ is the lowest
+-- section the module actually has, for a rule-bearing predicate no export
+-- reaches; before section numbers could be pinned it was the constant @1@,
+-- which a pinned module need not own.
+ruleBlocks :: Env -> RelProgram -> Map Unique Int -> Int -> Either [LowerError] (Map Int [BBlock])
+ruleBlocks env prog secOf dflt = do
   rules <- collectE
     [ fmap (sec,) (convertClause env p (bSec sec) cl)
     | p <- prog.rpgPreds
     , not (null p.rpClauses)
-    , let sec = Map.findWithDefault 1 p.rpName.rnUnique secOf
+    , let sec = Map.findWithDefault dflt p.rpName.rnUnique secOf
     , cl <- p.rpClauses
     ]
   pure (Map.fromListWith (flip (<>)) [ (sec, [b]) | (sec, b) <- rules ])

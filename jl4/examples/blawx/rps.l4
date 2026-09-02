@@ -5,6 +5,18 @@
 -- His ontology: categories game / player / sign; attributes beats (sign -> sign),
 -- winner (game -> player), player (game -> player, multi-valued);
 -- relationship throw(player, sign, game).
+--
+-- The section numbers below are the Act's, not the export order's: a decision
+-- whose @export/@desc prose opens with a CLEAN section index ("4. ") is pinned
+-- to that section, so the emitted attributions read according_to(sec_4_section,
+-- ...) and according_to(sec_3_section, ...) and line up with Jason's own
+-- workspace names (BLAWX-EXPORT-SPEC R4, spec §11 W3). Two decisions may pin
+-- the same section: s.4 is stated once per seat and both land in
+-- sec_4_section, whose rule_text is their prose joined in export order.
+-- His s.1 ("A game of rock paper scissors has two players") and s.2 (the three
+-- signs) are ontology here -- the DECLAREs above -- and so have no decision to
+-- pin them; sub-paragraph canvases (his sec_3__para_a_section and friends)
+-- remain out of scope, W3(b).
 
 DECLARE Sign IS ONE OF Rock, Paper, Scissors
 
@@ -15,13 +27,18 @@ DECLARE Game HAS
     `first player`  IS A Player
     `second player` IS A Player
 
-@export 4. The winner of a game is the player who throws a sign that beats the sign of the other player. (Stated once per seat: L4 records are values, Blawx objects are atoms, so a rule that compares two Player records with EQUALS does not survive the flattening — see the tier-1 finding of 2026-09-02.)
+-- Stated once per seat: L4 records are values and Blawx objects are atoms, so a
+-- rule that compares two Player records with EQUALS does not survive the
+-- flattening — see the tier-1 finding of 2026-09-02, spec §11 W1.
+@export 4. The winner of a game is the player who throws a sign that beats the sign of the other player.
 GIVEN g IS A Game
 GIVETH A BOOLEAN
 DECIDE `first player wins` IF
   `beats` (g's `first player`'s throws) EQUALS g's `second player`'s throws
 
-@export 4, the other seat.
+-- The other seat. The index alone pins the section; there is no second
+-- sentence of s.4 to contribute, so nothing is added to its rule_text.
+@export 4.
 GIVEN g IS A Game
 GIVETH A BOOLEAN
 DECIDE `second player wins` IF

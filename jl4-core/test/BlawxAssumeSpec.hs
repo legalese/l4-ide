@@ -180,6 +180,63 @@ spec = do
       out <- emitted (refOnly "")
       hasLine out "1. Definition of is in arrears."
 
+  -- The CLEAN section number is the author's to write (spec §11 W3, 2026-09-02).
+  -- clean-law 0.0.4 builds the eId from the LITERAL numeral it reads, not from
+  -- the section's position (@clean/clean.py:193@, @generate_section@), so a
+  -- pinned number is the whole of what makes @according_to(sec_4_section, ...)@
+  -- agree with the source. Everything below is asserted on the emitted YAML,
+  -- so it cannot drift from what @l4 blawx@ writes.
+  describe "the author pins the CLEAN section number (§11 W3)" $ do
+    it "a leading CLEAN index picks the section, and is written only once" $ do
+      out <- emitted pinnedModule
+      hasLine out "1. The tenant may be given notice.\\n4. The tenant is in arrears."
+      hasLine out "workspace_name: sec_4_section"
+      hasLine out "according_to(sec_4_section,is_in_arrears,T)"
+      -- the numeral clean-law re-emits as the section's <num> is NOT repeated
+      lacksLine out "4. 4. The tenant"
+      lacksLine out "workspace_name: sec_2_section"
+
+    it "an unpinned decision takes the lowest number no pin claims" $ do
+      -- export order is (pinned 4, unpinned); the unpinned one is section 1,
+      -- not section 2, and the rule_text is written in ascending order.
+      out <- emitted pinnedModule
+      hasLine out "workspace_name: sec_1_section"
+      hasLine out "according_to(sec_1_section,may_be_given_notice,T)"
+
+    it "two decisions may pin one section, and then they share it" $ do
+      out <- emitted sharedPinModule
+      -- one numbered workspace, holding both rules
+      Text.count "workspace_name: sec_" out `shouldBe` 1
+      hasLine out "workspace_name: sec_1_section"
+      hasLine out "according_to(sec_1_section,is_in_arrears,T)"
+      hasLine out "according_to(sec_1_section,is_notified,T)"
+      -- and its rule_text is their prose joined in export order
+      hasLine out "1. In this Act, arrears means any amount unpaid, and (a) notified means notified in writing."
+
+    it "a helper follows the pinned section of the decision that reaches it" $ do
+      out <- emitted pinnedHelperModule
+      hasLine out "according_to(sec_7_section,qualifies,T)"
+      hasLine out "according_to(sec_7_section,deeply_in_arrears,T)"
+
+    -- The recogniser is deliberately narrow. Each of these is a real spelling
+    -- from the corpus or from an earlier draft of the two Blawx seeds, and each
+    -- must fall through to R4's flat numbering with its text untouched.
+    it "does not pin on a paragraph index with no dot (1(a): ...)" $ do
+      out <- emitted (descOnly "1(a): facial hair that occurs on or below the chin.")
+      hasLine out "1. 1(a): facial hair that occurs on or below the chin."
+
+    it "does not pin on a comma (4, the other seat.)" $ do
+      out <- emitted (descOnly "4, the other seat.")
+      hasLine out "1. 4, the other seat."
+
+    it "does not pin on 0, which no Act has" $ do
+      out <- emitted (descOnly "0. a section number no Act has.")
+      hasLine out "1. 0. a section number no Act has."
+
+    it "does not pin on clean-law's insert index (2.1.), which W3(b) leaves open" $ do
+      out <- emitted (descOnly "2.1. a sub-provision index.")
+      hasLine out "1. 2.1. a sub-provision index."
+
   describe "what the Blawx leg refuses, and the middle end does not" $ do
     it "rejects a subjectless input by name, rather than emitting a blank row" $ do
       -- `input p/0` is a fine Horn predicate and the relational golden
@@ -235,6 +292,69 @@ spec = do
     , "GIVEN t IS A Tenant"
     , "GIVETH A BOOLEAN"
     , "DECIDE `is in arrears` t IF t's arrears AT LEAST 1"
+    ]
+
+  -- One exported decision over a record, its @\@export@ prose supplied by the
+  -- caller: the section-pin arms differ in nothing else.
+  descOnly d = Text.unlines
+    [ "DECLARE Tenant HAS"
+    , "    arrears IS A NUMBER"
+    , ""
+    , "@export " <> d
+    , "GIVEN t IS A Tenant"
+    , "GIVETH A BOOLEAN"
+    , "DECIDE `is in arrears` t IF t's arrears AT LEAST 1"
+    ]
+
+  -- One pinned decision, one unpinned, in that export order.
+  pinnedModule = Text.unlines
+    [ "DECLARE Tenant HAS"
+    , "    arrears IS A NUMBER"
+    , "    warned  IS A BOOLEAN"
+    , ""
+    , "@export 4. The tenant is in arrears."
+    , "GIVEN t IS A Tenant"
+    , "GIVETH A BOOLEAN"
+    , "DECIDE `is in arrears` t IF t's arrears AT LEAST 1"
+    , ""
+    , "@export The tenant may be given notice."
+    , "GIVEN t IS A Tenant"
+    , "GIVETH A BOOLEAN"
+    , "DECIDE `may be given notice` t IF t's warned"
+    ]
+
+  -- A chapeau and a limb, both pinned to s.1 -- the beard.l4 shape, and what
+  -- Jason Morris's own beard_tax.yaml does with sec_1_section.
+  sharedPinModule = Text.unlines
+    [ "DECLARE Tenant HAS"
+    , "    arrears  IS A NUMBER"
+    , "    notified IS A BOOLEAN"
+    , ""
+    , "@export 1. In this Act, arrears means any amount unpaid, and"
+    , "GIVEN t IS A Tenant"
+    , "GIVETH A BOOLEAN"
+    , "DECIDE `is in arrears` t IF t's arrears AT LEAST 1"
+    , ""
+    , "@export 1. (a) notified means notified in writing."
+    , "GIVEN t IS A Tenant"
+    , "GIVETH A BOOLEAN"
+    , "DECIDE `is notified` t IF t's notified"
+    ]
+
+  -- A non-exported helper is filed with the exported decision that reaches it,
+  -- which now means the section that decision PINNED, not its export position.
+  pinnedHelperModule = Text.unlines
+    [ "DECLARE Tenant HAS"
+    , "    arrears IS A NUMBER"
+    , ""
+    , "@export 7. The tenant qualifies."
+    , "GIVEN t IS A Tenant"
+    , "GIVETH A BOOLEAN"
+    , "DECIDE `qualifies` t IF `deeply in arrears` t"
+    , ""
+    , "GIVEN t IS A Tenant"
+    , "GIVETH A BOOLEAN"
+    , "DECIDE `deeply in arrears` t IF t's arrears AT LEAST 100"
     ]
 
   recordModule = Text.unlines

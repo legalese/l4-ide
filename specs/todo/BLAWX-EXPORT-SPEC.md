@@ -452,7 +452,13 @@ section** — every rule carries `according_to(<section>, …)` attribution, and
 canvas per section of the source text. The mapping (R4): L4 `§`/`§§` headers and inert
 scaffolding synthesise the CLEAN `rule_text` (title line, numbered sections, indented
 sub-provisions); each `@ref`-annotated L4 decision lands its rules in the workspace named after
-the corresponding section eId; unanchored declarations land in `root_section`. `@nlg`
+the corresponding section eId; unanchored declarations land in `root_section`. **Since
+2026-09-02 the section number is the author's** (R4, §11 W3(a)): a decision whose section text
+opens with a CLEAN index (`@export 4. The winner of a game is …`) is anchored in
+`sec_4_section`, so the emitted `according_to` reads the Act's numbering rather than the export
+order's, and several decisions may pin one section and share it — `beard.l4`'s chapeau and its
+two limbs all attribute to `sec_1_section`, as Jason Morris's own `beard_tax.yaml` does. A
+decision that pins nothing keeps its 1..n place in export order. `@nlg`
 annotations — and, absent those, L4's already-sentence-like mixfix names (`` `eligible for
 benefit` `` → postfix `"is eligible for benefit"`) — populate the `#pred` prefix/infix/postfix
 NLG slots, which is what makes the justification trees and the scenario editor read as English
@@ -783,6 +789,38 @@ i.e. the isomorphism transfer of §4.9. **Not decided.** How `@ref` hierarchical
 to CLEAN sub-provision nesting (flat numbered sections may suffice for v1).
 
 **ANSWERED 2026-08-18 (Meng).** Flat numbered sections for v1.
+
+**The author pins the number (§11 W3(a), landed 2026-09-02).** Flat numbering stands;
+what changed is where the number comes from. If an exported decision's section text — the
+same `@desc`/`@export` prose the fallback above already chooses, or the `@ref` citation
+behind it — opens with a CLEAN section index, that index **is** the section's number and is
+consumed rather than repeated: `@export 4. The winner of a game is …` emits
+`according_to(sec_4_section, …)` and a `rule_text` line reading `4. The winner of a game
+is …`. Decisions that pin nothing take the lowest numbers no pin claims, in export order,
+so **a module with no pins is byte-identical to what it emitted before** (measured: ten of
+the twelve emitting seeds regenerate unchanged; only `rps` and `beard` pin). Sections are
+written ascending by number, and several decisions may pin the same one — they then share a
+workspace, an attribution and a `rule_text` entry, whose text is their remainders joined in
+export order. `L4.Blawx.Lower.sectionNumbers` is the implementation and
+`jl4-core/test/BlawxAssumeSpec.hs` pins eight cases of it.
+
+The recogniser is deliberately narrow, because most of the corpus must **not** pin: digits, a
+period, then end-of-line or a space. `1(a): facial hair …` (no period), `4, the other seat.`
+(comma), `0.` and clean-law's insert index `2.1.` all decline. The `2.1.` case is where the
+still-open half of this ruling lives: clean-law would give it eId `sec_2_1`, and recognising
+it is the door to sub-provision anchoring, which §11 W3(b) leaves shut.
+
+**Why the number and the eId must agree, measured.** clean-law 0.0.4's `generate_section`
+builds the eId as `"sec_" + node['section index'][0]` — the **literal** numeral, never the
+section's position (`clean/clean.py`, read 2026-09-02 from the PyPI sdist). Before this
+change the two new seeds wrote the number twice, once by the emitter and once in the author's
+prose, and `"1. 4. The winner …"` matched clean-law's _insert index_
+(`number ('.' number)* '.'`): `rps.blawx` parsed to eIds `sec_1_ 4` and `sec_3_ 3` against
+workspaces `sec_1_section`…`sec_3_section`, and `beard.blawx` to a single `sec_1_ 1` against
+three. **Every canvas in both was orphaned**, and no golden byte showed it, because both
+halves were ours and each was self-consistent. `etc/blawx-eid-harness.py` now runs clean-law
+over each golden's `rule_text` and compares the parse against the workspace names: 12 of 12
+agree today, and it exits 1 on the pre-W3 goldens (both measured 2026-09-02).
 
 ### 8.5 R5 — negation: complementary operators / classical `-p` on inputs / NAF on computed
 
@@ -1465,6 +1503,34 @@ which is not a flat numbered section"_ on both fixtures. **Do.** (a) Let a numbe
 (`§ 4. …`) or an `@ref … s 4` pin the CLEAN section number, so attributions read
 `according_to(sec_4_section, …)` and the synthesised `rule_text` numbers match the source; (b)
 paragraph eIds are the question R4 left open and stay open. Amends R4, §4.9.
+
+**DISCHARGED (a) 2026-09-02; (b) remains open as ruled.** The pin is read off the section's own
+text — the `@desc`/`@export` prose, else the `@ref` citation, i.e. exactly the string R4 already
+chose as the section body — rather than off a `§` header, because that string is already in
+`RPred` and a `§` header is not (`L4.Relational.Lower.topDecls` flattens sections away, so a
+per-decision heading would have to be plumbed through `TopDef` and `RPred` first). One
+recogniser, `L4.Blawx.Lower.pinnedSection`; the numeral is consumed, not repeated.
+`sectionNumbers` then hands unpinned decisions the lowest unclaimed numbers in export order, so
+an unpinned module is unchanged, and lets several decisions share a pinned section. R4 now
+carries the mechanism.
+
+Measured this session (all commands run in `l4wt/blawx-w3`, `l4` built from this branch):
+
+- **goldens**: 10 of the 12 emitting seeds regenerate byte-identically; only `rps` and `beard`
+  move (`for f in jl4/examples/blawx/*.l4; do … diff …`).
+- **`rps`** now emits `sec_3_section` and `sec_4_section` (was `sec_1`…`sec_3`) with 6 and 4
+  `according_to` atoms; `beard` emits `sec_1_section` alone with 10, its three decisions
+  sharing the section as Jason Morris's `beard_tax.yaml` does. `rule_text` for `beard` s.1 is
+  now his verbatim, assembled from the chapeau and the two limbs.
+- **fixpoint** (`BLAWX_CHECKOUT=…/blawx-stock`, W9): `rps` 8 checked / 0 failed, `beard` 7 / 0.
+- **tier-1**: `python3 etc/blawx-tier1-harness.py rps beard` → 8/8.
+- **`--roundtrip`**: both "IR and bytes unchanged".
+- **unit**: eight new cases in `jl4-core/test/BlawxAssumeSpec.hs`; `cabal test jl4-core-test`
+  → 429 examples, 0 failures.
+- **eId agreement** (new, `etc/blawx-eid-harness.py`): 12 of 12 goldens agree with clean-law
+  0.0.4's parse; **the pre-W3 `rps.blawx` and `beard.blawx` do not**, and that is a defect this
+  item found rather than introduced — see R4's closing paragraph. Both seeds' canvases were
+  orphaned on the branch as committed.
 
 ### W4 — NLG for object-valued attributes
 
