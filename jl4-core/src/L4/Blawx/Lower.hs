@@ -63,20 +63,32 @@
 -- order — the generator's rules always establish the subject's category
 -- first, and the accepted exemplar does the same.
 --
--- __@#pred@ NLG sourcing — deviation from R10's letter, reported as a
--- finding__: 'rpNlg'\/'rfNlg' are linearised sentences whose parameter slots
--- are plain words ("the loyalty bonus earned by m" — the @%m%@ marker does
--- not survive 'L4.Relational.Lower''s linearisation), so they cannot be
--- decomposed into the prefix\/infix\/postfix slot structure the block model
--- /stores/ — and an undecomposable sentence would break the R12 fixpoint
--- and the P5 lift. Until slot-structured NLG rides the IR, every
--- declaration's slots are synthesised from the mangled atom: category
--- @"is a ⟨pretty⟩"@ (article by initial vowel), boolean attribute postfix
--- @⟨pretty⟩@, value attribute infix @"has ⟨pretty⟩ of"@, relationship
--- prefixes @""@\/@"and"@ with postfix @"are related as ⟨pretty⟩"@ — all
--- guaranteed non-empty in interior positions (empty middles would emit the
--- generator's preserved double spaces) and quote-free (the @*_nlg@ facts
--- carry slot text unescaped).
+-- __@#pred@ NLG sourcing, R10__ (rewritten 2026-09-02, BLAWX-EXPORT-SPEC §11
+-- W4). An @\@nlg@ on a decision or a record field now /is/ the declaration's
+-- NLG: 'nlgChunks' cuts the linearised sentence at its slots and stores the
+-- literal chunks in the block's prefix\/infix\/postfix fields, which is the
+-- only shape Blawx has — it stores slot text around fixed placeholders, never
+-- a sentence. Both slot spellings are accepted ('NlgSlot'), and a sentence
+-- that cannot be cut at exactly the block's arity is refused by name rather
+-- than silently half-used.
+--
+-- __This paragraph used to say it was impossible__, on the ground that
+-- @%parameter%@ markers did not survive @L4.Relational.Lower.linearNlg@. They
+-- did not; they do now — restoring the delimiters there (one line) was the
+-- whole fix, and the field doc in "L4.Relational.IR" had promised them all
+-- along.
+--
+-- Categories keep the synthesised form unconditionally, because the middle-end
+-- carries no @\@nlg@ for a @DECLARE@\'s /own/ name (only for its fields), and
+-- because the synthesis already matches Jason Morris\'s hand NLG on every
+-- category of both his running examples. What is synthesised, when no
+-- @\@nlg@ is written: category @"is a ⟨pretty⟩"@ (article by initial vowel),
+-- boolean attribute postfix @⟨pretty⟩@, value attribute infix by
+-- 'defaultInfix', relationship prefixes @""@\/@"and"@ with postfix
+-- @"are related as ⟨pretty⟩"@ — all guaranteed non-empty in interior
+-- positions (empty middles would emit the generator\'s preserved double
+-- spaces) and quote-free (the @*_nlg@ facts carry slot text unescaped); the
+-- same two guarantees are enforced on an authored sentence by 'nlgChunks'.
 --
 -- __Mangling__ ('blawxAtom'): strip backticks, split @camelCase@ at a
 -- lower\/digit→upper boundary, map every non-ASCII-alphanumeric to a
@@ -149,7 +161,8 @@
 --
 -- __A section's @rule_text@ falls back through the citation__: @\@desc@, then
 -- @\@ref@, then the @\"Definition of x.\"@ stub (see 'lowerBlawx'). @\@nlg@
--- remains deliberately unconsumed here, for the reason recorded above.
+-- is not one of the fallbacks: it is the declaration's NLG (above), a
+-- different artifact with a different consumer.
 module L4.Blawx.Lower
   ( lowerBlawx
   ) where
@@ -753,40 +766,65 @@ declarations env prog = do
       , bcProv    = Just (rn.rnUnique, prov.rpvRange)
       }
   fieldAttribute r f = do
-    cat <- atomOf env r.rrName
-    n   <- atomOf env f.rfName
-    vt  <- valueTypeField f
-    pure (attributeBlock cat n vt (f.rfName.rnUnique, Nothing))
+    cat   <- atomOf env r.rrName
+    n     <- atomOf env f.rfName
+    vt    <- valueTypeField f
+    slots <- attrNlg f.rfName.rnBase Nothing n vt f.rfNlg
+    pure (attributeBlock cat n vt slots (f.rfName.rnUnique, Nothing))
   -- fields have no RPred to blame, so they name themselves
   valueTypeField f = blawxValueType env f.rfName.rnBase Nothing f.rfSort
   predAttribute p cat vt = do
     catAtom <- atomOf env cat
     n       <- atomOf env p.rpName
-    pure (attributeBlock catAtom n vt (p.rpName.rnUnique, p.rpProv.rpvRange))
-  attributeBlock cat n vt prov =
+    slots   <- attrNlg p.rpName.rnBase p.rpProv.rpvRange n vt p.rpNlg
+    pure (attributeBlock catAtom n vt slots (p.rpName.rnUnique, p.rpProv.rpvRange))
+  -- An attribute's three NLG slots: the author's @\@nlg@ decomposed, else
+  -- synthesised from the mangled atom ('defaultInfix' for the value arm).
+  attrNlg who rng n vt = \case
+    Nothing -> Right defaults
+    Just sentence -> do
+      cs <- nlgChunks who rng (case vt of BVBoolean -> ["X"]; _ -> ["X", "Y"]) sentence
+      pure $ case cs of
+        [pre, post]      -> (pre, "", post)
+        [pre, inf, post] -> (pre, inf, post)
+        -- unreachable: 'nlgChunks' has already fixed the length at 2 or 3.
+        _                -> defaults
+   where
+    defaults = case vt of
+      BVBoolean -> ("", "", prettyAtom (bNameText n))
+      _         -> ("", defaultInfix vt (bNameText n), "")
+  attributeBlock cat n vt (pre, inf, post) prov =
     BDeclareAttribute MkBAttributeDecl
       { baCategory = cat
       , baName     = n
       , baType     = vt
       , baOrder    = BOrderOV
-      , baPrefix   = ""
-      , baInfix    = case vt of
-          BVBoolean -> ""   -- rendered @not_applicable@ by the emitter
-          _         -> "has " <> prettyAtom (bNameText n) <> " of"
-      , baPostfix  = case vt of
-          BVBoolean -> prettyAtom (bNameText n)
-          _         -> ""
+      , baPrefix   = pre
+      , baInfix    = inf   -- rendered @not_applicable@ by the emitter when boolean
+      , baPostfix  = post
       , baProv     = Just prov
       }
   relationship p vts = do
-    n <- atomOf env p.rpName
+    n            <- atomOf env p.rpName
+    (pres, post) <- case p.rpNlg of
+      Nothing -> Right (defaultPrefixes, defaultPostfix n)
+      Just sentence -> do
+        cs <- nlgChunks p.rpName.rnBase p.rpProv.rpvRange
+                (take (length vts) relationshipVars) sentence
+        pure $ case splitAt (length cs - 1) cs of
+          (initCs, [lastC]) -> (initCs, lastC)
+          -- unreachable: 'nlgChunks' fixed the length at @length vts + 1@ ≥ 2.
+          _                 -> (defaultPrefixes, defaultPostfix n)
     pure $ BDeclareRelationship MkBRelationshipDecl
       { brName     = n
       , brTypes    = vts
-      , brPrefixes = "" : replicate (length vts - 1) "and"
-      , brPostfix  = "are related as " <> prettyAtom (bNameText n)
+      , brPrefixes = pres
+      , brPostfix  = post
       , brProv     = Just (p.rpName.rnUnique, p.rpProv.rpvRange)
       }
+   where
+    defaultPrefixes = "" : replicate (length vts - 1) "and"
+    defaultPostfix nm = "are related as " <> prettyAtom (bNameText nm)
 
 -- | Whether an 'RInput' predicate came from a stored record field (as opposed
 -- to a top-level @ASSUME@). The join is the 'Unique': an input predicate built
@@ -797,6 +835,151 @@ isFieldInput env p = p.rpKind == RInput && Map.member p.rpName.rnUnique env.envF
 
 prettyAtom :: Text -> Text
 prettyAtom = Text.replace "_" " "
+
+-- | The default infix of a value-typed attribute's NLG.
+--
+-- __The verb arm (BLAWX-EXPORT-SPEC §11 W4, 2026-09-02).__ An object-valued
+-- attribute whose mangled name is a single word ending in @s@ is read as a
+-- third-person verb and becomes the infix itself, so @beats@ declares
+-- @\@(X) beats \@(Y)@ rather than @\@(X) has beats of \@(Y)@ — which is
+-- byte-for-byte what Jason Morris's own hand NLG says for the same predicate
+-- (@blawx_attribute_nlg(beats,ov,\"\",\"beats\",\"\")@ in
+-- @blawx\/static\/blawx\/examples\/rps.yaml@).
+--
+-- The test is deliberately narrow, because a wrong guess reads worse than the
+-- clumsy default and only @\@nlg@ can repair it: __object-valued only__ (a
+-- number- or list-valued attribute is a measurement, not a relation), a single
+-- word (a multi-word name is a noun phrase — @first_player@, @the_basis_on_…@),
+-- and not an @-ss@\/@-us@\/@-is@\/@-as@\/@-os@ ending, which are the common
+-- English nouns that end in @s@ without being verbs (@address@, @status@,
+-- @basis@, @atlas@, @chaos@). Measured over the eight object-valued attributes
+-- in @jl4\/examples\/blawx@ on 2026-09-02, it fires on exactly @throws@ and
+-- @beats@ and leaves @effect@, @conduct@, @first_player@, @second_player@ and
+-- @the_basis_on_which_rent_is_payable@ on the noun default.
+defaultInfix :: BValueType -> Text -> Text
+defaultInfix vt atom
+  | verbShaped = atom
+  | otherwise  = "has " <> prettyAtom atom <> " of"
+ where
+  verbShaped = case vt of
+    BVCategory _ ->
+         not ("_" `Text.isInfixOf` atom)
+      && Text.length atom >= 4
+      && "s" `Text.isSuffixOf` atom
+      && not (any (`Text.isSuffixOf` atom) (["ss", "us", "is", "as", "os"] :: [Text]))
+    _ -> False
+
+-- | The relationship block's canonical NLG variables (@\@(A)@…@\@(J)@),
+-- matching @L4.Blawx.Emit.relationshipVariant@\'s argument letters.
+relationshipVars :: [Text]
+relationshipVars = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
+
+-- | One slot of an @\@nlg@ sentence, and which of the two spellings wrote it.
+--
+-- __Why two spellings.__ A slot the author /can/ name is written as an
+-- ordinary L4 parameter reference and reaches here as @%name%@ (see
+-- @L4.Relational.Lower.linearNlg@, whose delimiters exist for this). A slot
+-- with no L4 binder to reference cannot be: a record field has no binders at
+-- all for either its subject or its value, and an attribute-shaped @DECIDE@\'s
+-- value is its @GIVETH@, which L4 grammar leaves unnamed. Those are written in
+-- Blawx\'s own placeholder spelling, @\@(X)@ \/ @\@(Y)@ for a category or
+-- attribute and @\@(A)@… for a relationship — the spelling the target already
+-- prints in every @#pred@ line, so an author reading the emitted s(CASP) sees
+-- the same characters they wrote.
+--
+-- The flag is what lets 'nlgChunks' check the @\@(V)@ spelling against the
+-- block\'s canonical variable order (catching a sentence that puts the value
+-- before the subject) while leaving a @%name%@ slot unchecked, since its name
+-- is the author\'s parameter and carries no positional claim.
+data NlgSlot = MkNlgSlot
+  { nsName       :: !Text
+  , nsBlawxStyle :: !Bool
+  }
+
+-- | Split a linearised @\@nlg@ sentence into its literal chunks and its slots.
+-- @n@ slots yield @n+1@ chunks, some possibly empty. An unterminated @\@(@ or
+-- an odd @%@ is not a slot; it stays literal text and is caught downstream by
+-- the arity check in 'nlgChunks', which is the loud place to report it.
+scanNlg :: Text -> ([Text], [NlgSlot])
+scanNlg = go []
+ where
+  go acc t = case Text.uncons t of
+    Nothing -> ([lit acc], [])
+    Just ('@', rest)
+      | Just inner <- Text.stripPrefix "(" rest
+      , let (nm, rest') = Text.breakOn ")" inner
+      , not (Text.null rest') -> split acc (MkNlgSlot nm True) (Text.drop 1 rest')
+    Just ('%', rest)
+      | let (nm, rest') = Text.breakOn "%" rest
+      , not (Text.null rest') -> split acc (MkNlgSlot nm False) (Text.drop 1 rest')
+    Just (c, rest) -> go (c : acc) rest
+  split acc sl rest = let (cs, sls) = go [] rest in (lit acc : cs, sl : sls)
+  lit = Text.pack . reverse
+
+-- | Decompose an @\@nlg@ sentence into the NLG slots a declaration block
+-- stores, or refuse with named diagnostics.
+--
+-- Blawx stores NLG as slot text around fixed argument placeholders, never as a
+-- sentence, so a sentence that cannot be cut at exactly the block\'s arity has
+-- no image at all — refusing is the only honest answer, and it is loud.
+-- Three further conditions are the emitter\'s, not Blawx\'s taste:
+--
+-- * an interior chunk may not be empty, because
+--   @L4.Blawx.Emit.attributeVariant@ joins slots with single spaces and an
+--   empty middle emits the generator\'s preserved double space, which the R12
+--   fixpoint sees as a diff;
+-- * a chunk may not contain @\"@, because the @*_nlg@ facts carry slot text
+--   unescaped inside a double-quoted Prolog string;
+-- * the @\@(V)@ spelling must use the block\'s own variables in order.
+nlgChunks
+  :: Text            -- ^ what to blame
+  -> Maybe SrcRange
+  -> [Text]          -- ^ the block\'s canonical slot variables, in order
+  -> Text            -- ^ the linearised sentence
+  -> Either [LowerError] [Text]
+nlgChunks who rng vars sentence
+  | null errs = Right chunks
+  | otherwise = Left errs
+ where
+  (rawChunks, slots) = scanNlg sentence
+  chunks   = map Text.strip rawChunks
+  interior = drop 1 (take (max 0 (length chunks - 1)) chunks)
+  err = blawxErr who rng (LEUnsupported "@nlg slot structure (Blawx)")
+  slotTxt sl = if sl.nsBlawxStyle then "@(" <> sl.nsName <> ")" else "%" <> sl.nsName <> "%"
+  wantTxt = Text.intercalate ", " [ "@(" <> v <> ")" | v <- vars ]
+  errs =
+    if length slots /= length vars
+      then
+        [ err
+            ( "`" <> who <> "`'s @nlg has " <> Text.textShow (length slots)
+                <> " slot(s), but its Blawx declaration block has "
+                <> Text.textShow (length vars)
+                <> ". Write one slot per argument, in the block's order — "
+                <> "either an L4 parameter reference (`%p%`) or, where the "
+                <> "argument has no L4 binder (a record field, or a GIVETH "
+                <> "result), Blawx's own placeholder: " <> wantTxt ) ]
+      else
+        [ err
+            ( "`" <> who <> "`'s @nlg writes " <> slotTxt sl
+                <> " where its Blawx declaration block's argument "
+                <> Text.textShow (i :: Int) <> " is @(" <> v <> ")" )
+        | (i, v, sl) <- zip3 [1 ..] vars slots
+        , sl.nsBlawxStyle
+        , sl.nsName /= v
+        ]
+          <> [ err
+                 ( "`" <> who <> "`'s @nlg leaves no words between two "
+                     <> "slots; Blawx joins its NLG slots with single "
+                     <> "spaces, so an empty interior slot emits a double "
+                     <> "space and breaks the re-save fixpoint" )
+             | any Text.null interior
+             ]
+          <> [ err
+                 ( "`" <> who <> "`'s @nlg contains a double quote, which the "
+                     <> "*_nlg ontology facts carry unescaped inside a quoted "
+                     <> "Prolog string" )
+             | any (Text.isInfixOf "\"") chunks
+             ]
 
 -- | See the title derivation in 'lowerBlawx': CLEAN requires an
 -- uppercase-initial title, or the import view rejects the whole document.

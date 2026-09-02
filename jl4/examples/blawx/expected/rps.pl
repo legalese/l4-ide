@@ -134,29 +134,29 @@ blawx_during(datetime(bot),-sign(X),datetime(End)) :- blawx_initially(-sign(X)),
 blawx_during(datetime(Start),-sign(X),datetime(eot)) :- blawx_ultimately(-sign(X)), blawx_becomes(sign(X),datetime(Start)), blawx_not_interrupted(datetime(Start),-sign(X),datetime(eot)).
 blawx_during(datetime(bot),-sign(X),datetime(eot)) :- blawx_initially(-sign(X)), blawx_ultimately(-sign(X)), blawx_becomes(-sign(X),datetime(Start)), blawx_not_interrupted(datetime(bot),-sign(X),datetime(eot)).
 blawx_attribute(player,throws,sign).
-blawx_attribute_nlg(throws,ov,"","has throws of","").
+blawx_attribute_nlg(throws,ov,"","throws","").
 :- dynamic throws/2.
-#pred throws(X,Y) :: '@(X) has throws of @(Y)'.
-#pred holds(user,throws,X,Y) :: 'it is provided as a fact that @(X) has throws of @(Y)'.
-#pred holds(user,-throws,X,Y) :: 'it is provided as a fact that it is not the case that @(X) has throws of @(Y)'.
-#pred holds(Z,throws,X,Y) :: 'the conclusion in @(Z) that @(X) has throws of @(Y) holds'.
-#pred holds(Z,-throws,X,Y) :: 'the conclusion in @(Z) that it is not the case that @(X) has throws of @(Y) holds'.
-#pred according_to(Z,throws,X,Y) :: 'according to @(Z), @(X) has throws of @(Y)'.
-#pred according_to(Z,-throws,X,Y) :: 'according to @(Z), it is not the case that @(X) has throws of @(Y)'.
-#pred blawx_defeated(Z,throws,X,Y) :: 'the conclusion in @(Z) that @(X) has throws of @(Y) is defeated'.
-#pred blawx_defeated(Z,-throws,X,Y) :: 'the conclusion in @(Z) that @(X) has throws of @(Y) is defeated'.
-#pred blawx_initially(throws(X,Y)) :: 'that @(X) has throws of @(Y) holds initially'.
-#pred blawx_initially(-throws(X,Y)) :: 'that it is not the case that @(X) has throws of @(Y) holds initially'.
-#pred blawx_ultimately(throws(X,Y)) :: 'that @(X) has throws of @(Y) holds ultimately'.
-#pred blawx_ultimately(-throws(X,Y)) :: 'that it is not the case that @(X) has throws of @(Y) holds ultimately'.
-#pred blawx_as_of(throws(X,Y),T) :: 'that @(X) has throws of @(Y) holds at @(T)'.
-#pred blawx_as_of(-throws(X,Y),T) :: 'that it is not the case that @(X) has throws of @(Y) holds at @(T)'.
-#pred blawx_during(T1,throws(X,Y),T2) :: 'that @(X) has throws of @(Y) held between @(T1) and @(T2)'.
-#pred blawx_during(T1,-throws(X,Y),T2) :: 'that it is not the case that @(X) has throws of @(Y) held between @(T1) and @(T2)'.
-#pred blawx_becomes(throws(X,Y),T) :: 'that @(X) has throws of @(Y) became true at @(T)'.
-#pred blawx_becomes(-throws(X,Y),T) :: 'that it is not the case that @(X) has throws of @(Y) became true at @(T)'.
-#pred blawx_not_interrupted(Start,throws(X,Y),End) :: '@(X) has throws of @(Y) remained the case between @(Start) and @(End)'.
-#pred blawx_not_interrupted(Start,-throws(X,Y),End) :: 'it is not the case that @(X) has throws of @(Y) remained the case between @(Start) and @(End)'.
+#pred throws(X,Y) :: '@(X) throws @(Y)'.
+#pred holds(user,throws,X,Y) :: 'it is provided as a fact that @(X) throws @(Y)'.
+#pred holds(user,-throws,X,Y) :: 'it is provided as a fact that it is not the case that @(X) throws @(Y)'.
+#pred holds(Z,throws,X,Y) :: 'the conclusion in @(Z) that @(X) throws @(Y) holds'.
+#pred holds(Z,-throws,X,Y) :: 'the conclusion in @(Z) that it is not the case that @(X) throws @(Y) holds'.
+#pred according_to(Z,throws,X,Y) :: 'according to @(Z), @(X) throws @(Y)'.
+#pred according_to(Z,-throws,X,Y) :: 'according to @(Z), it is not the case that @(X) throws @(Y)'.
+#pred blawx_defeated(Z,throws,X,Y) :: 'the conclusion in @(Z) that @(X) throws @(Y) is defeated'.
+#pred blawx_defeated(Z,-throws,X,Y) :: 'the conclusion in @(Z) that @(X) throws @(Y) is defeated'.
+#pred blawx_initially(throws(X,Y)) :: 'that @(X) throws @(Y) holds initially'.
+#pred blawx_initially(-throws(X,Y)) :: 'that it is not the case that @(X) throws @(Y) holds initially'.
+#pred blawx_ultimately(throws(X,Y)) :: 'that @(X) throws @(Y) holds ultimately'.
+#pred blawx_ultimately(-throws(X,Y)) :: 'that it is not the case that @(X) throws @(Y) holds ultimately'.
+#pred blawx_as_of(throws(X,Y),T) :: 'that @(X) throws @(Y) holds at @(T)'.
+#pred blawx_as_of(-throws(X,Y),T) :: 'that it is not the case that @(X) throws @(Y) holds at @(T)'.
+#pred blawx_during(T1,throws(X,Y),T2) :: 'that @(X) throws @(Y) held between @(T1) and @(T2)'.
+#pred blawx_during(T1,-throws(X,Y),T2) :: 'that it is not the case that @(X) throws @(Y) held between @(T1) and @(T2)'.
+#pred blawx_becomes(throws(X,Y),T) :: 'that @(X) throws @(Y) became true at @(T)'.
+#pred blawx_becomes(-throws(X,Y),T) :: 'that it is not the case that @(X) throws @(Y) became true at @(T)'.
+#pred blawx_not_interrupted(Start,throws(X,Y),End) :: '@(X) throws @(Y) remained the case between @(Start) and @(End)'.
+#pred blawx_not_interrupted(Start,-throws(X,Y),End) :: 'it is not the case that @(X) throws @(Y) remained the case between @(Start) and @(End)'.
 blawx_not_interrupted(datetime(Start),throws(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-throws(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
 blawx_not_interrupted(datetime(Start),-throws(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(throws(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
 blawx_not_interrupted(datetime(bot),throws(X,Y),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-throws(X,Y),datetime(Time)),Times),blawx_list_not_before(Times,End).
@@ -178,29 +178,29 @@ blawx_during(datetime(bot),-throws(X,Y),datetime(End)) :- blawx_initially(-throw
 blawx_during(datetime(Start),-throws(X,Y),datetime(eot)) :- blawx_ultimately(-throws(X,Y)), blawx_becomes(throws(X,Y),datetime(Start)), blawx_not_interrupted(datetime(Start),-throws(X,Y),datetime(eot)).
 blawx_during(datetime(bot),-throws(X,Y),datetime(eot)) :- blawx_initially(-throws(X,Y)), blawx_ultimately(-throws(X,Y)), blawx_becomes(-throws(X,Y),datetime(Start)), blawx_not_interrupted(datetime(bot),-throws(X,Y),datetime(eot)).
 blawx_attribute(game,first_player,player).
-blawx_attribute_nlg(first_player,ov,"","has first player of","").
+blawx_attribute_nlg(first_player,ov,"the first player of","is","").
 :- dynamic first_player/2.
-#pred first_player(X,Y) :: '@(X) has first player of @(Y)'.
-#pred holds(user,first_player,X,Y) :: 'it is provided as a fact that @(X) has first player of @(Y)'.
-#pred holds(user,-first_player,X,Y) :: 'it is provided as a fact that it is not the case that @(X) has first player of @(Y)'.
-#pred holds(Z,first_player,X,Y) :: 'the conclusion in @(Z) that @(X) has first player of @(Y) holds'.
-#pred holds(Z,-first_player,X,Y) :: 'the conclusion in @(Z) that it is not the case that @(X) has first player of @(Y) holds'.
-#pred according_to(Z,first_player,X,Y) :: 'according to @(Z), @(X) has first player of @(Y)'.
-#pred according_to(Z,-first_player,X,Y) :: 'according to @(Z), it is not the case that @(X) has first player of @(Y)'.
-#pred blawx_defeated(Z,first_player,X,Y) :: 'the conclusion in @(Z) that @(X) has first player of @(Y) is defeated'.
-#pred blawx_defeated(Z,-first_player,X,Y) :: 'the conclusion in @(Z) that @(X) has first player of @(Y) is defeated'.
-#pred blawx_initially(first_player(X,Y)) :: 'that @(X) has first player of @(Y) holds initially'.
-#pred blawx_initially(-first_player(X,Y)) :: 'that it is not the case that @(X) has first player of @(Y) holds initially'.
-#pred blawx_ultimately(first_player(X,Y)) :: 'that @(X) has first player of @(Y) holds ultimately'.
-#pred blawx_ultimately(-first_player(X,Y)) :: 'that it is not the case that @(X) has first player of @(Y) holds ultimately'.
-#pred blawx_as_of(first_player(X,Y),T) :: 'that @(X) has first player of @(Y) holds at @(T)'.
-#pred blawx_as_of(-first_player(X,Y),T) :: 'that it is not the case that @(X) has first player of @(Y) holds at @(T)'.
-#pred blawx_during(T1,first_player(X,Y),T2) :: 'that @(X) has first player of @(Y) held between @(T1) and @(T2)'.
-#pred blawx_during(T1,-first_player(X,Y),T2) :: 'that it is not the case that @(X) has first player of @(Y) held between @(T1) and @(T2)'.
-#pred blawx_becomes(first_player(X,Y),T) :: 'that @(X) has first player of @(Y) became true at @(T)'.
-#pred blawx_becomes(-first_player(X,Y),T) :: 'that it is not the case that @(X) has first player of @(Y) became true at @(T)'.
-#pred blawx_not_interrupted(Start,first_player(X,Y),End) :: '@(X) has first player of @(Y) remained the case between @(Start) and @(End)'.
-#pred blawx_not_interrupted(Start,-first_player(X,Y),End) :: 'it is not the case that @(X) has first player of @(Y) remained the case between @(Start) and @(End)'.
+#pred first_player(X,Y) :: 'the first player of @(X) is @(Y)'.
+#pred holds(user,first_player,X,Y) :: 'it is provided as a fact that the first player of @(X) is @(Y)'.
+#pred holds(user,-first_player,X,Y) :: 'it is provided as a fact that it is not the case that the first player of @(X) is @(Y)'.
+#pred holds(Z,first_player,X,Y) :: 'the conclusion in @(Z) that the first player of @(X) is @(Y) holds'.
+#pred holds(Z,-first_player,X,Y) :: 'the conclusion in @(Z) that it is not the case that the first player of @(X) is @(Y) holds'.
+#pred according_to(Z,first_player,X,Y) :: 'according to @(Z), the first player of @(X) is @(Y)'.
+#pred according_to(Z,-first_player,X,Y) :: 'according to @(Z), it is not the case that the first player of @(X) is @(Y)'.
+#pred blawx_defeated(Z,first_player,X,Y) :: 'the conclusion in @(Z) that the first player of @(X) is @(Y) is defeated'.
+#pred blawx_defeated(Z,-first_player,X,Y) :: 'the conclusion in @(Z) that the first player of @(X) is @(Y) is defeated'.
+#pred blawx_initially(first_player(X,Y)) :: 'that the first player of @(X) is @(Y) holds initially'.
+#pred blawx_initially(-first_player(X,Y)) :: 'that it is not the case that the first player of @(X) is @(Y) holds initially'.
+#pred blawx_ultimately(first_player(X,Y)) :: 'that the first player of @(X) is @(Y) holds ultimately'.
+#pred blawx_ultimately(-first_player(X,Y)) :: 'that it is not the case that the first player of @(X) is @(Y) holds ultimately'.
+#pred blawx_as_of(first_player(X,Y),T) :: 'that the first player of @(X) is @(Y) holds at @(T)'.
+#pred blawx_as_of(-first_player(X,Y),T) :: 'that it is not the case that the first player of @(X) is @(Y) holds at @(T)'.
+#pred blawx_during(T1,first_player(X,Y),T2) :: 'that the first player of @(X) is @(Y) held between @(T1) and @(T2)'.
+#pred blawx_during(T1,-first_player(X,Y),T2) :: 'that it is not the case that the first player of @(X) is @(Y) held between @(T1) and @(T2)'.
+#pred blawx_becomes(first_player(X,Y),T) :: 'that the first player of @(X) is @(Y) became true at @(T)'.
+#pred blawx_becomes(-first_player(X,Y),T) :: 'that it is not the case that the first player of @(X) is @(Y) became true at @(T)'.
+#pred blawx_not_interrupted(Start,first_player(X,Y),End) :: 'the first player of @(X) is @(Y) remained the case between @(Start) and @(End)'.
+#pred blawx_not_interrupted(Start,-first_player(X,Y),End) :: 'it is not the case that the first player of @(X) is @(Y) remained the case between @(Start) and @(End)'.
 blawx_not_interrupted(datetime(Start),first_player(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-first_player(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
 blawx_not_interrupted(datetime(Start),-first_player(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(first_player(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
 blawx_not_interrupted(datetime(bot),first_player(X,Y),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-first_player(X,Y),datetime(Time)),Times),blawx_list_not_before(Times,End).
@@ -222,29 +222,29 @@ blawx_during(datetime(bot),-first_player(X,Y),datetime(End)) :- blawx_initially(
 blawx_during(datetime(Start),-first_player(X,Y),datetime(eot)) :- blawx_ultimately(-first_player(X,Y)), blawx_becomes(first_player(X,Y),datetime(Start)), blawx_not_interrupted(datetime(Start),-first_player(X,Y),datetime(eot)).
 blawx_during(datetime(bot),-first_player(X,Y),datetime(eot)) :- blawx_initially(-first_player(X,Y)), blawx_ultimately(-first_player(X,Y)), blawx_becomes(-first_player(X,Y),datetime(Start)), blawx_not_interrupted(datetime(bot),-first_player(X,Y),datetime(eot)).
 blawx_attribute(game,second_player,player).
-blawx_attribute_nlg(second_player,ov,"","has second player of","").
+blawx_attribute_nlg(second_player,ov,"the second player of","is","").
 :- dynamic second_player/2.
-#pred second_player(X,Y) :: '@(X) has second player of @(Y)'.
-#pred holds(user,second_player,X,Y) :: 'it is provided as a fact that @(X) has second player of @(Y)'.
-#pred holds(user,-second_player,X,Y) :: 'it is provided as a fact that it is not the case that @(X) has second player of @(Y)'.
-#pred holds(Z,second_player,X,Y) :: 'the conclusion in @(Z) that @(X) has second player of @(Y) holds'.
-#pred holds(Z,-second_player,X,Y) :: 'the conclusion in @(Z) that it is not the case that @(X) has second player of @(Y) holds'.
-#pred according_to(Z,second_player,X,Y) :: 'according to @(Z), @(X) has second player of @(Y)'.
-#pred according_to(Z,-second_player,X,Y) :: 'according to @(Z), it is not the case that @(X) has second player of @(Y)'.
-#pred blawx_defeated(Z,second_player,X,Y) :: 'the conclusion in @(Z) that @(X) has second player of @(Y) is defeated'.
-#pred blawx_defeated(Z,-second_player,X,Y) :: 'the conclusion in @(Z) that @(X) has second player of @(Y) is defeated'.
-#pred blawx_initially(second_player(X,Y)) :: 'that @(X) has second player of @(Y) holds initially'.
-#pred blawx_initially(-second_player(X,Y)) :: 'that it is not the case that @(X) has second player of @(Y) holds initially'.
-#pred blawx_ultimately(second_player(X,Y)) :: 'that @(X) has second player of @(Y) holds ultimately'.
-#pred blawx_ultimately(-second_player(X,Y)) :: 'that it is not the case that @(X) has second player of @(Y) holds ultimately'.
-#pred blawx_as_of(second_player(X,Y),T) :: 'that @(X) has second player of @(Y) holds at @(T)'.
-#pred blawx_as_of(-second_player(X,Y),T) :: 'that it is not the case that @(X) has second player of @(Y) holds at @(T)'.
-#pred blawx_during(T1,second_player(X,Y),T2) :: 'that @(X) has second player of @(Y) held between @(T1) and @(T2)'.
-#pred blawx_during(T1,-second_player(X,Y),T2) :: 'that it is not the case that @(X) has second player of @(Y) held between @(T1) and @(T2)'.
-#pred blawx_becomes(second_player(X,Y),T) :: 'that @(X) has second player of @(Y) became true at @(T)'.
-#pred blawx_becomes(-second_player(X,Y),T) :: 'that it is not the case that @(X) has second player of @(Y) became true at @(T)'.
-#pred blawx_not_interrupted(Start,second_player(X,Y),End) :: '@(X) has second player of @(Y) remained the case between @(Start) and @(End)'.
-#pred blawx_not_interrupted(Start,-second_player(X,Y),End) :: 'it is not the case that @(X) has second player of @(Y) remained the case between @(Start) and @(End)'.
+#pred second_player(X,Y) :: 'the second player of @(X) is @(Y)'.
+#pred holds(user,second_player,X,Y) :: 'it is provided as a fact that the second player of @(X) is @(Y)'.
+#pred holds(user,-second_player,X,Y) :: 'it is provided as a fact that it is not the case that the second player of @(X) is @(Y)'.
+#pred holds(Z,second_player,X,Y) :: 'the conclusion in @(Z) that the second player of @(X) is @(Y) holds'.
+#pred holds(Z,-second_player,X,Y) :: 'the conclusion in @(Z) that it is not the case that the second player of @(X) is @(Y) holds'.
+#pred according_to(Z,second_player,X,Y) :: 'according to @(Z), the second player of @(X) is @(Y)'.
+#pred according_to(Z,-second_player,X,Y) :: 'according to @(Z), it is not the case that the second player of @(X) is @(Y)'.
+#pred blawx_defeated(Z,second_player,X,Y) :: 'the conclusion in @(Z) that the second player of @(X) is @(Y) is defeated'.
+#pred blawx_defeated(Z,-second_player,X,Y) :: 'the conclusion in @(Z) that the second player of @(X) is @(Y) is defeated'.
+#pred blawx_initially(second_player(X,Y)) :: 'that the second player of @(X) is @(Y) holds initially'.
+#pred blawx_initially(-second_player(X,Y)) :: 'that it is not the case that the second player of @(X) is @(Y) holds initially'.
+#pred blawx_ultimately(second_player(X,Y)) :: 'that the second player of @(X) is @(Y) holds ultimately'.
+#pred blawx_ultimately(-second_player(X,Y)) :: 'that it is not the case that the second player of @(X) is @(Y) holds ultimately'.
+#pred blawx_as_of(second_player(X,Y),T) :: 'that the second player of @(X) is @(Y) holds at @(T)'.
+#pred blawx_as_of(-second_player(X,Y),T) :: 'that it is not the case that the second player of @(X) is @(Y) holds at @(T)'.
+#pred blawx_during(T1,second_player(X,Y),T2) :: 'that the second player of @(X) is @(Y) held between @(T1) and @(T2)'.
+#pred blawx_during(T1,-second_player(X,Y),T2) :: 'that it is not the case that the second player of @(X) is @(Y) held between @(T1) and @(T2)'.
+#pred blawx_becomes(second_player(X,Y),T) :: 'that the second player of @(X) is @(Y) became true at @(T)'.
+#pred blawx_becomes(-second_player(X,Y),T) :: 'that it is not the case that the second player of @(X) is @(Y) became true at @(T)'.
+#pred blawx_not_interrupted(Start,second_player(X,Y),End) :: 'the second player of @(X) is @(Y) remained the case between @(Start) and @(End)'.
+#pred blawx_not_interrupted(Start,-second_player(X,Y),End) :: 'it is not the case that the second player of @(X) is @(Y) remained the case between @(Start) and @(End)'.
 blawx_not_interrupted(datetime(Start),second_player(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-second_player(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
 blawx_not_interrupted(datetime(Start),-second_player(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(second_player(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
 blawx_not_interrupted(datetime(bot),second_player(X,Y),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-second_player(X,Y),datetime(Time)),Times),blawx_list_not_before(Times,End).
@@ -266,29 +266,29 @@ blawx_during(datetime(bot),-second_player(X,Y),datetime(End)) :- blawx_initially
 blawx_during(datetime(Start),-second_player(X,Y),datetime(eot)) :- blawx_ultimately(-second_player(X,Y)), blawx_becomes(second_player(X,Y),datetime(Start)), blawx_not_interrupted(datetime(Start),-second_player(X,Y),datetime(eot)).
 blawx_during(datetime(bot),-second_player(X,Y),datetime(eot)) :- blawx_initially(-second_player(X,Y)), blawx_ultimately(-second_player(X,Y)), blawx_becomes(-second_player(X,Y),datetime(Start)), blawx_not_interrupted(datetime(bot),-second_player(X,Y),datetime(eot)).
 blawx_attribute(game,first_player_wins,boolean).
-blawx_attribute_nlg(first_player_wins,not_applicable,"",not_applicable,"first player wins").
+blawx_attribute_nlg(first_player_wins,not_applicable,"the first player of",not_applicable,"wins").
 :- dynamic first_player_wins/1.
-#pred first_player_wins(X) :: '@(X) first player wins'.
-#pred holds(user,first_player_wins,X) :: 'it is provided as a fact that @(X) first player wins'.
-#pred holds(user,-first_player_wins,X) :: 'it is provided as a fact that it is not the case that @(X) first player wins'.
-#pred holds(Z,first_player_wins,X) :: 'the conclusion in @(Z) that @(X) first player wins holds'.
-#pred holds(Z,-first_player_wins,X) :: 'the conclusion in @(Z) that it is not the case that @(X) first player wins holds'.
-#pred according_to(Z,first_player_wins,X) :: 'according to @(Z), @(X) first player wins'.
-#pred according_to(Z,-first_player_wins,X) :: 'according to @(Z), it is not the case that @(X) first player wins'.
-#pred blawx_defeated(Z,first_player_wins,X) :: 'the conclusion in @(Z) that @(X) first player wins is defeated'.
-#pred blawx_defeated(Z,-first_player_wins,X) :: 'the conclusion in @(Z) that @(X) first player wins is defeated'.
-#pred blawx_initially(first_player_wins(X)) :: 'that @(X) first player wins holds initially'.
-#pred blawx_initially(-first_player_wins(X)) :: 'that it is not the case that @(X) first player wins holds initially'.
-#pred blawx_ultimately(first_player_wins(X)) :: 'that @(X) first player wins holds ultimately'.
-#pred blawx_ultimately(-first_player_wins(X)) :: 'that it is not the case that @(X) first player wins holds ultimately'.
-#pred blawx_as_of(first_player_wins(X),T) :: 'that @(X) first player wins holds at @(T)'.
-#pred blawx_as_of(-first_player_wins(X),T) :: 'that it is not the case that @(X) first player wins holds at @(T)'.
-#pred blawx_during(T1,first_player_wins(X),T2) :: 'that @(X) first player wins held between @(T1) and @(T2)'.
-#pred blawx_during(T1,-first_player_wins(X),T2) :: 'that it is not the case that @(X) first player wins held between @(T1) and @(T2)'.
-#pred blawx_becomes(first_player_wins(X),T) :: 'that @(X) first player wins became true at @(T)'.
-#pred blawx_becomes(-first_player_wins(X),T) :: 'that it is not the case that @(X) first player wins became true at @(T)'.
-#pred blawx_not_interrupted(Start,first_player_wins(X),End) :: '@(X) first player wins remained the case between @(Start) and @(End)'.
-#pred blawx_not_interrupted(Start,-first_player_wins(X),End) :: 'it is not the case that @(X) first player wins remained the case between @(Start) and @(End)'.
+#pred first_player_wins(X) :: 'the first player of @(X) wins'.
+#pred holds(user,first_player_wins,X) :: 'it is provided as a fact that the first player of @(X) wins'.
+#pred holds(user,-first_player_wins,X) :: 'it is provided as a fact that it is not the case that the first player of @(X) wins'.
+#pred holds(Z,first_player_wins,X) :: 'the conclusion in @(Z) that the first player of @(X) wins holds'.
+#pred holds(Z,-first_player_wins,X) :: 'the conclusion in @(Z) that it is not the case that the first player of @(X) wins holds'.
+#pred according_to(Z,first_player_wins,X) :: 'according to @(Z), the first player of @(X) wins'.
+#pred according_to(Z,-first_player_wins,X) :: 'according to @(Z), it is not the case that the first player of @(X) wins'.
+#pred blawx_defeated(Z,first_player_wins,X) :: 'the conclusion in @(Z) that the first player of @(X) wins is defeated'.
+#pred blawx_defeated(Z,-first_player_wins,X) :: 'the conclusion in @(Z) that the first player of @(X) wins is defeated'.
+#pred blawx_initially(first_player_wins(X)) :: 'that the first player of @(X) wins holds initially'.
+#pred blawx_initially(-first_player_wins(X)) :: 'that it is not the case that the first player of @(X) wins holds initially'.
+#pred blawx_ultimately(first_player_wins(X)) :: 'that the first player of @(X) wins holds ultimately'.
+#pred blawx_ultimately(-first_player_wins(X)) :: 'that it is not the case that the first player of @(X) wins holds ultimately'.
+#pred blawx_as_of(first_player_wins(X),T) :: 'that the first player of @(X) wins holds at @(T)'.
+#pred blawx_as_of(-first_player_wins(X),T) :: 'that it is not the case that the first player of @(X) wins holds at @(T)'.
+#pred blawx_during(T1,first_player_wins(X),T2) :: 'that the first player of @(X) wins held between @(T1) and @(T2)'.
+#pred blawx_during(T1,-first_player_wins(X),T2) :: 'that it is not the case that the first player of @(X) wins held between @(T1) and @(T2)'.
+#pred blawx_becomes(first_player_wins(X),T) :: 'that the first player of @(X) wins became true at @(T)'.
+#pred blawx_becomes(-first_player_wins(X),T) :: 'that it is not the case that the first player of @(X) wins became true at @(T)'.
+#pred blawx_not_interrupted(Start,first_player_wins(X),End) :: 'the first player of @(X) wins remained the case between @(Start) and @(End)'.
+#pred blawx_not_interrupted(Start,-first_player_wins(X),End) :: 'it is not the case that the first player of @(X) wins remained the case between @(Start) and @(End)'.
 blawx_not_interrupted(datetime(Start),first_player_wins(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-first_player_wins(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
 blawx_not_interrupted(datetime(Start),-first_player_wins(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(first_player_wins(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
 blawx_not_interrupted(datetime(bot),first_player_wins(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-first_player_wins(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
@@ -310,29 +310,29 @@ blawx_during(datetime(bot),-first_player_wins(X),datetime(End)) :- blawx_initial
 blawx_during(datetime(Start),-first_player_wins(X),datetime(eot)) :- blawx_ultimately(-first_player_wins(X)), blawx_becomes(first_player_wins(X),datetime(Start)), blawx_not_interrupted(datetime(Start),-first_player_wins(X),datetime(eot)).
 blawx_during(datetime(bot),-first_player_wins(X),datetime(eot)) :- blawx_initially(-first_player_wins(X)), blawx_ultimately(-first_player_wins(X)), blawx_becomes(-first_player_wins(X),datetime(Start)), blawx_not_interrupted(datetime(bot),-first_player_wins(X),datetime(eot)).
 blawx_attribute(game,second_player_wins,boolean).
-blawx_attribute_nlg(second_player_wins,not_applicable,"",not_applicable,"second player wins").
+blawx_attribute_nlg(second_player_wins,not_applicable,"the second player of",not_applicable,"wins").
 :- dynamic second_player_wins/1.
-#pred second_player_wins(X) :: '@(X) second player wins'.
-#pred holds(user,second_player_wins,X) :: 'it is provided as a fact that @(X) second player wins'.
-#pred holds(user,-second_player_wins,X) :: 'it is provided as a fact that it is not the case that @(X) second player wins'.
-#pred holds(Z,second_player_wins,X) :: 'the conclusion in @(Z) that @(X) second player wins holds'.
-#pred holds(Z,-second_player_wins,X) :: 'the conclusion in @(Z) that it is not the case that @(X) second player wins holds'.
-#pred according_to(Z,second_player_wins,X) :: 'according to @(Z), @(X) second player wins'.
-#pred according_to(Z,-second_player_wins,X) :: 'according to @(Z), it is not the case that @(X) second player wins'.
-#pred blawx_defeated(Z,second_player_wins,X) :: 'the conclusion in @(Z) that @(X) second player wins is defeated'.
-#pred blawx_defeated(Z,-second_player_wins,X) :: 'the conclusion in @(Z) that @(X) second player wins is defeated'.
-#pred blawx_initially(second_player_wins(X)) :: 'that @(X) second player wins holds initially'.
-#pred blawx_initially(-second_player_wins(X)) :: 'that it is not the case that @(X) second player wins holds initially'.
-#pred blawx_ultimately(second_player_wins(X)) :: 'that @(X) second player wins holds ultimately'.
-#pred blawx_ultimately(-second_player_wins(X)) :: 'that it is not the case that @(X) second player wins holds ultimately'.
-#pred blawx_as_of(second_player_wins(X),T) :: 'that @(X) second player wins holds at @(T)'.
-#pred blawx_as_of(-second_player_wins(X),T) :: 'that it is not the case that @(X) second player wins holds at @(T)'.
-#pred blawx_during(T1,second_player_wins(X),T2) :: 'that @(X) second player wins held between @(T1) and @(T2)'.
-#pred blawx_during(T1,-second_player_wins(X),T2) :: 'that it is not the case that @(X) second player wins held between @(T1) and @(T2)'.
-#pred blawx_becomes(second_player_wins(X),T) :: 'that @(X) second player wins became true at @(T)'.
-#pred blawx_becomes(-second_player_wins(X),T) :: 'that it is not the case that @(X) second player wins became true at @(T)'.
-#pred blawx_not_interrupted(Start,second_player_wins(X),End) :: '@(X) second player wins remained the case between @(Start) and @(End)'.
-#pred blawx_not_interrupted(Start,-second_player_wins(X),End) :: 'it is not the case that @(X) second player wins remained the case between @(Start) and @(End)'.
+#pred second_player_wins(X) :: 'the second player of @(X) wins'.
+#pred holds(user,second_player_wins,X) :: 'it is provided as a fact that the second player of @(X) wins'.
+#pred holds(user,-second_player_wins,X) :: 'it is provided as a fact that it is not the case that the second player of @(X) wins'.
+#pred holds(Z,second_player_wins,X) :: 'the conclusion in @(Z) that the second player of @(X) wins holds'.
+#pred holds(Z,-second_player_wins,X) :: 'the conclusion in @(Z) that it is not the case that the second player of @(X) wins holds'.
+#pred according_to(Z,second_player_wins,X) :: 'according to @(Z), the second player of @(X) wins'.
+#pred according_to(Z,-second_player_wins,X) :: 'according to @(Z), it is not the case that the second player of @(X) wins'.
+#pred blawx_defeated(Z,second_player_wins,X) :: 'the conclusion in @(Z) that the second player of @(X) wins is defeated'.
+#pred blawx_defeated(Z,-second_player_wins,X) :: 'the conclusion in @(Z) that the second player of @(X) wins is defeated'.
+#pred blawx_initially(second_player_wins(X)) :: 'that the second player of @(X) wins holds initially'.
+#pred blawx_initially(-second_player_wins(X)) :: 'that it is not the case that the second player of @(X) wins holds initially'.
+#pred blawx_ultimately(second_player_wins(X)) :: 'that the second player of @(X) wins holds ultimately'.
+#pred blawx_ultimately(-second_player_wins(X)) :: 'that it is not the case that the second player of @(X) wins holds ultimately'.
+#pred blawx_as_of(second_player_wins(X),T) :: 'that the second player of @(X) wins holds at @(T)'.
+#pred blawx_as_of(-second_player_wins(X),T) :: 'that it is not the case that the second player of @(X) wins holds at @(T)'.
+#pred blawx_during(T1,second_player_wins(X),T2) :: 'that the second player of @(X) wins held between @(T1) and @(T2)'.
+#pred blawx_during(T1,-second_player_wins(X),T2) :: 'that it is not the case that the second player of @(X) wins held between @(T1) and @(T2)'.
+#pred blawx_becomes(second_player_wins(X),T) :: 'that the second player of @(X) wins became true at @(T)'.
+#pred blawx_becomes(-second_player_wins(X),T) :: 'that it is not the case that the second player of @(X) wins became true at @(T)'.
+#pred blawx_not_interrupted(Start,second_player_wins(X),End) :: 'the second player of @(X) wins remained the case between @(Start) and @(End)'.
+#pred blawx_not_interrupted(Start,-second_player_wins(X),End) :: 'it is not the case that the second player of @(X) wins remained the case between @(Start) and @(End)'.
 blawx_not_interrupted(datetime(Start),second_player_wins(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-second_player_wins(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
 blawx_not_interrupted(datetime(Start),-second_player_wins(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(second_player_wins(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
 blawx_not_interrupted(datetime(bot),second_player_wins(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-second_player_wins(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
@@ -354,29 +354,29 @@ blawx_during(datetime(bot),-second_player_wins(X),datetime(End)) :- blawx_initia
 blawx_during(datetime(Start),-second_player_wins(X),datetime(eot)) :- blawx_ultimately(-second_player_wins(X)), blawx_becomes(second_player_wins(X),datetime(Start)), blawx_not_interrupted(datetime(Start),-second_player_wins(X),datetime(eot)).
 blawx_during(datetime(bot),-second_player_wins(X),datetime(eot)) :- blawx_initially(-second_player_wins(X)), blawx_ultimately(-second_player_wins(X)), blawx_becomes(-second_player_wins(X),datetime(Start)), blawx_not_interrupted(datetime(bot),-second_player_wins(X),datetime(eot)).
 blawx_attribute(sign,beats,sign).
-blawx_attribute_nlg(beats,ov,"","has beats of","").
+blawx_attribute_nlg(beats,ov,"","beats","").
 :- dynamic beats/2.
-#pred beats(X,Y) :: '@(X) has beats of @(Y)'.
-#pred holds(user,beats,X,Y) :: 'it is provided as a fact that @(X) has beats of @(Y)'.
-#pred holds(user,-beats,X,Y) :: 'it is provided as a fact that it is not the case that @(X) has beats of @(Y)'.
-#pred holds(Z,beats,X,Y) :: 'the conclusion in @(Z) that @(X) has beats of @(Y) holds'.
-#pred holds(Z,-beats,X,Y) :: 'the conclusion in @(Z) that it is not the case that @(X) has beats of @(Y) holds'.
-#pred according_to(Z,beats,X,Y) :: 'according to @(Z), @(X) has beats of @(Y)'.
-#pred according_to(Z,-beats,X,Y) :: 'according to @(Z), it is not the case that @(X) has beats of @(Y)'.
-#pred blawx_defeated(Z,beats,X,Y) :: 'the conclusion in @(Z) that @(X) has beats of @(Y) is defeated'.
-#pred blawx_defeated(Z,-beats,X,Y) :: 'the conclusion in @(Z) that @(X) has beats of @(Y) is defeated'.
-#pred blawx_initially(beats(X,Y)) :: 'that @(X) has beats of @(Y) holds initially'.
-#pred blawx_initially(-beats(X,Y)) :: 'that it is not the case that @(X) has beats of @(Y) holds initially'.
-#pred blawx_ultimately(beats(X,Y)) :: 'that @(X) has beats of @(Y) holds ultimately'.
-#pred blawx_ultimately(-beats(X,Y)) :: 'that it is not the case that @(X) has beats of @(Y) holds ultimately'.
-#pred blawx_as_of(beats(X,Y),T) :: 'that @(X) has beats of @(Y) holds at @(T)'.
-#pred blawx_as_of(-beats(X,Y),T) :: 'that it is not the case that @(X) has beats of @(Y) holds at @(T)'.
-#pred blawx_during(T1,beats(X,Y),T2) :: 'that @(X) has beats of @(Y) held between @(T1) and @(T2)'.
-#pred blawx_during(T1,-beats(X,Y),T2) :: 'that it is not the case that @(X) has beats of @(Y) held between @(T1) and @(T2)'.
-#pred blawx_becomes(beats(X,Y),T) :: 'that @(X) has beats of @(Y) became true at @(T)'.
-#pred blawx_becomes(-beats(X,Y),T) :: 'that it is not the case that @(X) has beats of @(Y) became true at @(T)'.
-#pred blawx_not_interrupted(Start,beats(X,Y),End) :: '@(X) has beats of @(Y) remained the case between @(Start) and @(End)'.
-#pred blawx_not_interrupted(Start,-beats(X,Y),End) :: 'it is not the case that @(X) has beats of @(Y) remained the case between @(Start) and @(End)'.
+#pred beats(X,Y) :: '@(X) beats @(Y)'.
+#pred holds(user,beats,X,Y) :: 'it is provided as a fact that @(X) beats @(Y)'.
+#pred holds(user,-beats,X,Y) :: 'it is provided as a fact that it is not the case that @(X) beats @(Y)'.
+#pred holds(Z,beats,X,Y) :: 'the conclusion in @(Z) that @(X) beats @(Y) holds'.
+#pred holds(Z,-beats,X,Y) :: 'the conclusion in @(Z) that it is not the case that @(X) beats @(Y) holds'.
+#pred according_to(Z,beats,X,Y) :: 'according to @(Z), @(X) beats @(Y)'.
+#pred according_to(Z,-beats,X,Y) :: 'according to @(Z), it is not the case that @(X) beats @(Y)'.
+#pred blawx_defeated(Z,beats,X,Y) :: 'the conclusion in @(Z) that @(X) beats @(Y) is defeated'.
+#pred blawx_defeated(Z,-beats,X,Y) :: 'the conclusion in @(Z) that @(X) beats @(Y) is defeated'.
+#pred blawx_initially(beats(X,Y)) :: 'that @(X) beats @(Y) holds initially'.
+#pred blawx_initially(-beats(X,Y)) :: 'that it is not the case that @(X) beats @(Y) holds initially'.
+#pred blawx_ultimately(beats(X,Y)) :: 'that @(X) beats @(Y) holds ultimately'.
+#pred blawx_ultimately(-beats(X,Y)) :: 'that it is not the case that @(X) beats @(Y) holds ultimately'.
+#pred blawx_as_of(beats(X,Y),T) :: 'that @(X) beats @(Y) holds at @(T)'.
+#pred blawx_as_of(-beats(X,Y),T) :: 'that it is not the case that @(X) beats @(Y) holds at @(T)'.
+#pred blawx_during(T1,beats(X,Y),T2) :: 'that @(X) beats @(Y) held between @(T1) and @(T2)'.
+#pred blawx_during(T1,-beats(X,Y),T2) :: 'that it is not the case that @(X) beats @(Y) held between @(T1) and @(T2)'.
+#pred blawx_becomes(beats(X,Y),T) :: 'that @(X) beats @(Y) became true at @(T)'.
+#pred blawx_becomes(-beats(X,Y),T) :: 'that it is not the case that @(X) beats @(Y) became true at @(T)'.
+#pred blawx_not_interrupted(Start,beats(X,Y),End) :: '@(X) beats @(Y) remained the case between @(Start) and @(End)'.
+#pred blawx_not_interrupted(Start,-beats(X,Y),End) :: 'it is not the case that @(X) beats @(Y) remained the case between @(Start) and @(End)'.
 blawx_not_interrupted(datetime(Start),beats(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-beats(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
 blawx_not_interrupted(datetime(Start),-beats(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(beats(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
 blawx_not_interrupted(datetime(bot),beats(X,Y),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-beats(X,Y),datetime(Time)),Times),blawx_list_not_before(Times,End).

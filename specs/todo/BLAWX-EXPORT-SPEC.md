@@ -454,11 +454,37 @@ scaffolding synthesise the CLEAN `rule_text` (title line, numbered sections, ind
 sub-provisions); each `@ref`-annotated L4 decision lands its rules in the workspace named after
 the corresponding section eId; unanchored declarations land in `root_section`. `@nlg`
 annotations — and, absent those, L4's already-sentence-like mixfix names (`` `eligible for
-benefit` `` → postfix `"is eligible for benefit"`) — populate the `#pred` prefix/infix/postfix
+benefit` `` → postfix `"eligible for benefit"`) — populate the `#pred` prefix/infix/postfix
 NLG slots, which is what makes the justification trees and the scenario editor read as English
 (R10). The result: the same provision-anchored discipline L4 enforces at authoring time arrives
 in Blawx as per-section canvases with per-section attributions — the isomorphism _transfers_
 rather than being re-derived.
+
+**How an `@nlg` reaches the slots** (built 2026-09-02, §11 W4; before that date this section
+described the `@nlg` leg in the present tense and the lowering ignored the annotation
+outright). Blawx stores NLG as slot text around _fixed argument placeholders_, never as a
+sentence, so the lowering cuts the sentence at its slots and stores the literal chunks —
+`L4.Blawx.Lower.nlgChunks`. A slot is written either as an ordinary L4 parameter reference
+(`%p%`, which survives linearisation with its `%…%` delimiters as of the same date) or, where
+the argument has no L4 binder to reference, in Blawx's own spelling `@(X)` / `@(Y)` — a record
+field has no binder for either its subject or its value, and an attribute-shaped `DECIDE`'s
+value is its `GIVETH`, which the grammar leaves unnamed. Slot count must equal the block's
+arity, `@(V)`-spelled slots must be in the block's own order, an interior chunk may not be
+empty (Blawx joins with single spaces; an empty middle emits a double space and fails the R12
+fixpoint) and no chunk may carry `"` (the `*_nlg` facts are double-quoted and unescaped): each
+is refused by name rather than half-applied. Categories keep the synthesised sentence
+unconditionally — the middle-end carries no `@nlg` for a `DECLARE`'s own name, only for its
+fields, and the synthesis already matches Jason Morris's hand NLG on every category of both
+his running examples.
+
+**The synthesised default for an object-valued attribute** reads a one-word, `s`-final,
+object-valued mangled name as a third-person verb and makes it the _infix_ — `beats` declares
+`@(X) beats @(Y)`, not `@(X) has beats of @(Y)` — which is byte-for-byte Jason's own
+`blawx_attribute_nlg(beats,ov,"","beats","")`. The test is narrow on purpose (object-valued
+only, single word, not an `-ss`/`-us`/`-is`/`-as`/`-os` ending): measured over the eight
+object-valued attributes in `jl4/examples/blawx` on 2026-09-02 it fires on exactly `throws` and
+`beats`, leaving `effect`, `conduct`, `first_player`, `second_player` and
+`the_basis_on_which_rent_is_payable` on the `"has ⟨pretty⟩ of"` noun form.
 
 ### 4.10 Tests
 
@@ -953,6 +979,29 @@ byte-fidelity contract untouched); the interview endpoint's `find_assumptions` c
 as **legalese/blawx#3**; the category-dropdown race (quirk #4, above) as **legalese/blawx#4**;
 and the negative `blawx_defeated` NLG asymmetry (quirk #3, above) as **legalese/blawx#5**.
 Per R10, all four wait on the fork beside #1 until upstreaming to Lexpedite is warranted._
+
+_Executed (2026-09-02, §11 W4): the `@nlg` half of this ruling — "NLG strings from `@nlg`,
+else prettified mixfix names" — is built. It was not, until this date: `L4.Blawx.Lower`'s
+module header recorded a deliberate deviation, on the ground that a linearised `@nlg` could not
+be decomposed into the slot structure the block model stores. That ground was one line wide;
+`L4.Relational.Lower.linearNlg` rendered a `%parameter%` slot as a bare word, while
+`L4.Relational.IR`'s own field doc had promised the markers all along. Restoring the
+delimiters made the sentence cuttable, and `nlgChunks` now cuts it (§4.9). Two measured traps
+sat behind the seeds: a trailing `@nlg` on a `DECLARE … HAS` row attaches to the row's
+**type-constructor name**, not to the row, the field name or the `Type'` node — and that name
+has to be reached through `getActual`, because `getOriginal` on a `Ref` hands back the
+\_defining_ occurrence, which carries no annotation. Both are recorded at `fieldDef`.\_
+
+_**What byte-exactness does and does not pin.** This ruling is about the declaration block's
+SHAPE — the 3 header lines, the 21 `#pred` templates, the 20 frame axioms, the two generator
+quirks, the indent leaks and the `'` escaping — not about the NLG string that gets substituted
+into them. A different NLG string moves no structure: it appears in the `*_nlg` fact, in the
+`prefix`/`infix`/`postfix` XML fields and inside the 21 templates, and the R12 fixpoint
+regenerates all of them from the same blocks. Measured after the W4 change: `rps.blawx` and
+`beard.blawx` each fixpoint **9/9** against `blawx-stock` (per W9); the four regenerated goldens changed
+609 lines in place (173 `beard.blawx`, 154 `beard.pl`, 150 `rps.blawx`, 132 `rps.pl`; no line
+added or removed), and every one of them is a `#pred` template, a `*_nlg` fact or a
+`prefix`/`infix`/`postfix` XML field._
 
 ### 8.11 R11 — tests: one BlawxTest per `#EVAL`/`#ASSERT`; the oracle is L4
 
@@ -1472,6 +1521,39 @@ paragraph eIds are the question R4 left open and stay open. Amends R4, §4.9.
 `"beats"`. R3/R10 leave `@nlg` as the override and no seed uses it yet. **Do.** Put `@nlg` on the
 two new seeds; consider a default that treats a verb-shaped attribute name as the infix (`ov`)
 form. Amends §4.9, R10.
+
+**DISCHARGED 2026-09-02.** Both halves built; §4.9 carries the slot-decomposition rules and the
+default, R10 (§8.10) carries what byte-exactness does and does not pin. The `@nlg` override was
+_not_ merely unused — the lowering ignored the annotation outright, and its module header said
+so; the blocker turned out to be one line in `L4.Relational.Lower.linearNlg`, which dropped the
+`%…%` delimiters that `L4.Relational.IR`'s own field doc claimed were there. Measured this
+session, each number from a command run here:
+
+- `beard.l4` now emits Jason's own NLG for **8 of 8** declarations that have a counterpart in
+  `beard_tax.yaml` — the `person` category plus all seven attributes — byte-for-byte, apostrophe
+  quirk (`"'s facial hair is on the chin"`) included. `rps.l4` matches his on the three
+  categories and on `beats`; `first player` / `second player` follow the shape of his `winner`
+  (`"the winner of","is",""`) since our record encoding has no multi-valued `player` attribute
+  (§11 preamble).
+- The verb default fires on exactly **2 of the 8** object-valued attributes in
+  `jl4/examples/blawx` (`throws`, `beats`) and on none of the other seven seeds: `git diff
+--numstat jl4/examples/blawx/expected/` names only `rps.*` and `beard.*`.
+- **13 changed NLG declarations** across the two seeds; **609 golden lines changed in place**,
+  zero added or removed, and a `grep` over the diff finds no changed line that is not a `#pred`
+  template, a `*_nlg` fact or a `prefix`/`infix`/`postfix` XML field.
+- Harnesses: fixpoint **9/9, 0 failed** on `rps.blawx` and **9/9, 0 failed** on `beard.blawx`
+  (`BLAWX_CHECKOUT=/Volumes/transcend/src/blawx-stock`, per W9); tier-1 **8/8** over both seeds'
+  `#EVAL` oracles; `l4 blawx --roundtrip` "IR and bytes unchanged" on both.
+- Suites: `jl4-core-test` **434 examples, 0 failures** (13 of them the new `BlawxNlgSpec`);
+  `jl4-test` **2670 examples, 0 failures** after re-blessing one golden line —
+  `jl4/examples/relational/expected/tiers`, where `nlg: the loyalty bonus earned by m` becomes
+  `… by %m%`, which is the delimiter repair showing up in the Debug renderer.
+
+**Left open, deliberately.** (a) A `DECLARE`'s own name still has no `@nlg` channel — the
+middle-end carries none — so a category sentence other than `"is a ⟨pretty⟩"` is unreachable;
+nothing in either running example needs one. (b) `BOrderVO` is still never constructed: a
+sentence whose value slot precedes its subject is refused rather than emitted as `vo`, which is
+what Jason's `player` attribute uses. Both are one-field additions when a corpus asks.
 
 ### W5 — the import fragment against Blawx's own running examples: 0 of 2
 

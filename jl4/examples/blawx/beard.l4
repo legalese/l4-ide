@@ -5,31 +5,45 @@
 -- His ontology: category person; attributes facial_hair_length_mm (number),
 -- facial_hair_on_chin / facial_hair_below_chin / facial_hair_continuous (boolean
 -- inputs), qualifies_s1a / qualifies_s1b / bearded (boolean, derived).
+--
+-- Every `@nlg` below is Jason's own NLG slot text, transcribed from the
+-- `blawx_attribute_nlg` facts of that fixture, so the emitted `#pred` sentences
+-- match his (BLAWX-EXPORT-SPEC §11 W4). A field has no L4 binder for either
+-- its subject or its value, so its slots are written in Blawx's own `@(X)` /
+-- `@(Y)` spelling; a DECIDE names its subject, so it uses an ordinary L4
+-- parameter reference. The `person` category needs no `@nlg`: the synthesised
+-- default already says "is a person", which is what Jason wrote.
 
 DECLARE Person HAS
-    `facial hair length mm`  IS A NUMBER
-    `facial hair on chin`    IS A BOOLEAN
-    `facial hair below chin` IS A BOOLEAN
-    `facial hair continuous` IS A BOOLEAN
+    `facial hair length mm`  IS A NUMBER   @nlg @(X) 's facial hair is @(Y) mm in length
+    `facial hair on chin`    IS A BOOLEAN  @nlg @(X) 's facial hair is on the chin
+    `facial hair below chin` IS A BOOLEAN  @nlg @(X) 's facial hair is below the chin
+    `facial hair continuous` IS A BOOLEAN  @nlg @(X) 's facial hair is ear to ear below the nose
 
 @export 1. In this Act, beard means any facial hair no shorter than 5 millimetres in length that: (a) occurs on or below the chin, or (b) exists in an uninterrupted line from the front of one ear to the front of the other ear below the nose.
 GIVEN p IS A Person
 GIVETH A BOOLEAN
-DECIDE `bearded` IF
+DECIDE `bearded`
+@nlg %p% is bearded
+  IF
         p's `facial hair length mm` AT LEAST 5
     AND (`qualifies s1a` p OR `qualifies s1b` p)
 
 @export 1(a): facial hair that occurs on or below the chin.
 GIVEN p IS A Person
 GIVETH A BOOLEAN
-DECIDE `qualifies s1a` IF
+DECIDE `qualifies s1a`
+@nlg %p% qualifies under section 1 a
+  IF
        p's `facial hair on chin`
     OR p's `facial hair below chin`
 
 @export 1(b): facial hair that exists in an uninterrupted line from the front of one ear to the front of the other ear below the nose.
 GIVEN p IS A Person
 GIVETH A BOOLEAN
-DECIDE `qualifies s1b` IF
+DECIDE `qualifies s1b`
+@nlg %p% qualifies under section 1 b
+  IF
     p's `facial hair continuous`
 
 -- 6 mm on the chin
