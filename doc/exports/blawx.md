@@ -72,6 +72,18 @@ faithfully.
 This matters if you have existing Blawx work: it is a migration path in, not only a projection
 out. Every other export on these pages is one-way.
 
+**How much it reads, as of 2026-09-02.** Four of the fifteen examples Blawx itself ships lift
+(`bird`, `beard_tax`, `wills`, `wills_tutorial`); the rest are refused by name, one diagnostic per
+construct, so a refusal tells you _which block_ has no L4 image rather than that the file is
+unsupported. The fragment is a **flat universe of objects** under unary predicates, plus
+**value-typed attributes**: a `number` or category-valued attribute becomes an optional field with
+two readers — "is it set?" and "what is it?" — and a comparison on it becomes an ordinary L4
+comparison. A section's **paragraph** canvases (`sec_1__para_a_section`) fold into their numbered
+parent, which is warned about and keeps the paragraph's own eId on the decision's `@ref` line —
+and an `overrules` the fold cannot carry across unchanged is refused rather than folded, because
+Blawx keys defeat on the exact section. What is still out: n-ary relationships, rules that
+_compute_ an attribute's value, arithmetic, and the date and event layers.
+
 ## What it consumes
 
 The **decision-rule subset**, relationalized. Because the target is a logic program rather than a
