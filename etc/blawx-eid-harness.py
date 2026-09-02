@@ -36,6 +36,16 @@ workspaces `sec_1_section`..`sec_3_section`, and `beard.blawx` produced a single
 `sec_1_ 1` against three workspaces, because `"1. 4. The winner ..."` matches
 clean-law's `section_index` INSERT INDEX (`number ('.' number)* '.'`).  Every
 canvas in both was orphaned.  That is the defect this file exists to catch.
+
+Run over one-decision counterexamples the same day, it found the SAME defect on
+the other side of the pin: a section text that merely OPENS on a digit is
+absorbed by our own separator's period, whether or not it looks like an index.
+`1(a): ...`, `43(1)(a): ...` and `4, the other seat.` yielded no sections at all
+(pyparsing's `And` does not backtrack out of the `Optional`, so the closing DOT
+fails); `0. ...` yielded `sec_1_ 0`; `2.1. ...` yielded `sec_1_ 2_1`; and a
+doubly-indexed pin, `4. 5. ...`, yielded `sec_4_ 5`.  `L4.Blawx.Lower`'s
+`sectionTexts` now refuses the last and quotes the rest, and all eleven emitted
+counterexamples agree.
 """
 
 import os
@@ -93,7 +103,19 @@ def main(argv):
             failed += 1
             continue
         # generate_akn wants the trailing newline addExplicitIndents assumes.
-        akn = generate_akn(rule_text + "\n")
+        # A ParseException here is not a harness bug: it is the WORST outcome
+        # this harness can report, because RuleDoc.save()'s pre_save signal runs
+        # the same call and the whole .blawx is then unimportable.  Report it as
+        # a failure rather than dying on the first bad file.  (Seen 2026-09-02
+        # with a title whose first character is not A-Z, before the herald in
+        # L4.Blawx.Lower.capitalizeFirst existed.)
+        try:
+            akn = generate_akn(rule_text + "\n")
+        except Exception as exc:  # noqa: BLE001 - clean-law raises pyparsing types
+            print("BAD  %s: clean-law cannot parse the rule_text (%s: %s)"
+                  % (os.path.basename(path), type(exc).__name__, exc))
+            failed += 1
+            continue
         eids = sorted(
             e + "_section" for e in re.findall(r'<section eId="([^"]+)"', akn)
         )

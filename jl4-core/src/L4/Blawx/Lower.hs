@@ -154,9 +154,20 @@
 -- __The author pins the CLEAN section number by writing it__ (spec §11 W3, 2026-09-02):
 -- if that chosen text opens with a CLEAN section index (decimal digits, a
 -- period, then end-of-text or a space) the number is the section's, and the
--- numeral is consumed rather than repeated ('sectionNumbers'). Decisions that
--- pin nothing keep the old behaviour exactly: they take the lowest numbers no
--- pin claims, in export order, so a module with no pins still numbers 1..n.
+-- numeral is consumed rather than repeated ('sectionNumbers'); failing that, a
+-- citation that /ends/ in @\", s 4\"@ pins the same way ('citedSection', W3's
+-- second spelling). Decisions that pin nothing keep the old behaviour exactly:
+-- they take the lowest numbers no pin claims, in export order, so a module with
+-- no pins still numbers 1..n.
+--
+-- __No emitted section text begins with a digit__ ('sectionTexts', 2026-09-02).
+-- The @rule_text@ line is @\"\<n\>. \<text\>\"@ and clean-law's @insert_index@ is
+-- @Suppress(DOT) + number@, so /our/ period plus a leading digit in the text is
+-- read as one index and the whole document's eIds shift off the workspace names
+-- — an orphaned canvas, invisible in the golden bytes. A text that pins nothing
+-- and opens on a digit is therefore quoted; a text that pinned and whose
+-- remainder still opens on an index is a sub-provision W3(b) leaves open, and is
+-- refused by name.
 module L4.Blawx.Lower
   ( lowerBlawx
   ) where
@@ -210,16 +221,14 @@ lowerBlawx prog0 = do
                  | p <- exported
                  ]
       numbered = sectionNumbers secTexts
-      secOf    = sectionAssignment prog [ (p, n) | (p, n, _) <- numbered ]
-      -- one BSection per DISTINCT number, ascending, its text the remainders of
-      -- the decisions that pinned it joined in export order (see
-      -- 'sectionNumbers'). A module with no pins yields 1..n in export order,
-      -- which is what it yielded before pinning existed.
-      secList =
-        [ (n, Text.unwords [ t | (_, n', t) <- numbered, n' == n, not (Text.null t) ])
-        | n <- sortNub [ n | (_, n, _) <- numbered ]
-        ]
-      firstSec = case secList of (n, _) : _ -> n; [] -> 1
+      secOf    = sectionAssignment prog [ (a.saPred, a.saNumber) | a <- numbered ]
+  -- one BSection per DISTINCT number, ascending, its text the remainders of the
+  -- decisions that pinned it joined in export order (see 'sectionNumbers'), and
+  -- guarded so it cannot extend the index we write in front of it
+  -- ('sectionTexts'). A module with no pins yields 1..n in export order, which
+  -- is what it yielded before pinning existed.
+  secList <- sectionTexts numbered
+  let firstSec = case secList of (n, _) : _ -> n; [] -> 1
   declBlocks <- declarations env prog
   ruleBySec  <- ruleBlocks env prog secOf firstSec
   qtests     <- collectE [ convertQuery env q | q <- prog.rpgQueries ]
@@ -835,10 +844,25 @@ prettyAtom = Text.replace "_" " "
 -- parse, and body text tolerates em dashes fine. So the TITLE channel maps
 -- em\/en dashes to an ASCII hyphen; the L4 source keeps its typography, and
 -- @\@desc@\/section prose is untouched.
+--
+-- __A title that cannot be uppercased at all gets a herald__ (2026-09-02).
+-- CLEAN's grammar is @Word(string.ascii_uppercase, printables)@: the first
+-- character must be @A@-@Z@, and @toUpper@ cannot make @\'1\'@ one. A module
+-- headed @\xa7 \`1988 Housing Act\`@ — or, via the filename fallback, a file
+-- called @4act.l4@ — therefore raised
+-- @ParseException: Expected W:(A-Z, !-~), found \'4act\' (at char 0)@ in
+-- @generate_akn@ and produced a document with NO sections at all, which is
+-- strictly worse than the orphaned canvases 'sectionTexts' guards against
+-- (measured 2026-09-02 by handing the emitted @rule_text@ to clean-law 0.0.4).
+-- So a title whose first character is not an ASCII letter is prefixed with
+-- @\"The \"@, on the same principle as the re-casing above: an unimportable
+-- title is worse than a heralded one.
 capitalizeFirst :: Text -> Text
 capitalizeFirst t = case Text.uncons (dashSafe t) of
-  Just (c, rest) -> Text.cons (toUpper c) rest
-  Nothing        -> t
+  Just (c, rest)
+    | isAsciiUpper c || isAsciiLower c -> Text.cons (toUpper c) rest
+    | otherwise                        -> "The " <> Text.cons c rest
+  Nothing -> t
  where
   dashSafe = Text.replace "\x2014" "-" . Text.replace "\x2013" "-"
 
@@ -889,6 +913,13 @@ enumConstructorFacts env prog =
 --   not pin, and R4's flat numbering applies (spec §11 W3(b) leaves
 --   sub-provision eIds open).
 --
+-- __Declining to pin is not by itself safe__, and saying so was a defect in the
+-- first cut of this ruling: every one of those spellings still opens on a
+-- /digit/, and the flat number is written as @\"1. \"@ in front of it, so
+-- clean-law reads our period plus that digit as one @insert_index@ and the
+-- document's eIds part company with its workspace names. 'sectionTexts' is what
+-- closes that; this recogniser only decides whose the number is.
+--
 -- Measured 2026-09-02 over the twelve emitting seeds under
 -- @jl4\/examples\/blawx@: only @rps.l4@ and @beard.l4@ pin, and every other
 -- golden regenerates byte-identically.
@@ -903,36 +934,185 @@ pinnedSection t0
  where
   (digits, rest0) = Text.span isDigit (Text.stripStart t0)
   afterDot = Text.stripPrefix "." rest0
-  n = Text.foldl' (\acc c -> acc * 10 + (ord c - ord '0')) 0 digits
+  n = digitsToInt digits
+
+-- | The CLEAN section number a /citation/ names at its end: spec §11 W3's
+-- second spelling, @\@ref Mortality Act 2026, s 4@.
+--
+-- Narrow on purpose, and narrowed by the corpus rather than by taste. The two
+-- @\@ref@ spellings the seeds actually use must not pin
+-- (@grep '\@ref' jl4\/examples\/blawx\/*.l4@, 2026-09-02):
+--
+-- * @\@ref https:\/\/www.legislation.gov.uk\/ukpga\/2014\/12\/section\/43@ ends in
+--   digits but the herald before them is @section\/@, not @, section@ — declines;
+-- * @\@ref Anti-social Behaviour, Crime and Policing Act 2014, s.43(1)(b)@ ends
+--   in @(b)@, so there are no trailing digits at all — declines, which is the
+--   answer we want: @43(1)(b)@ is a sub-provision, and pinning it to @sec_43@
+--   would silently anchor the rule one level up from where the author cited it.
+--
+-- So: a comma, then @s@ \/ @s.@ \/ @sec@ \/ @section@ (any case), then bare
+-- digits, then end of text. Unlike 'pinnedSection' the numeral is __not__
+-- consumed — it is part of the citation, and a citation that lost its section
+-- number would stop being one. It is safe to leave in place because it is at the
+-- /end/ of the text, where clean-law's index grammar cannot reach it.
+citedSection :: Text -> Maybe Int
+citedSection t0
+  | Text.null digits       = Nothing
+  | Text.length digits > 6 = Nothing
+  | n < 1                  = Nothing
+  | any (`Text.isSuffixOf` herald) [", s", ", s.", ", sec", ", sec.", ", section"] = Just n
+  | otherwise              = Nothing
+ where
+  t      = Text.stripEnd t0
+  digits = Text.takeWhileEnd isDigit t
+  herald = Text.toLower (Text.stripEnd (Text.dropEnd (Text.length digits) t))
+  n      = digitsToInt digits
+
+-- | @Text.foldl'@ over a digit run known to be at most six characters long, so
+-- the accumulator cannot overflow. Shared by both pin recognisers.
+digitsToInt :: Text -> Int
+digitsToInt = Text.foldl' (\acc c -> acc * 10 + (ord c - ord '0')) 0
+
+-- | One exported decision's place in the Act: its number, the text that will
+-- carry it, and whether the number came from an index at the /front/ of that
+-- text (which is the case 'sectionTexts' has to police).
+data SecAssign = MkSecAssign
+  { saPred          :: !RPred
+  , saNumber        :: !Int
+  , saText          :: !Text  -- ^ the text, with a leading pin already consumed
+  , saPinnedByIndex :: !Bool
+  }
 
 -- | The CLEAN section number of every exported decision, with its section text
 -- stripped of the index that pinned it (R4, spec §11 W3(a)).
 --
 -- A decision whose text opens with an index ('pinnedSection') is pinned to that
--- number; the rest take the lowest numbers no pin claims, in export order. Two
--- decisions may pin the same number — @rps.l4@ states s.4 once per seat, and
--- @beard.l4@ states s.1's chapeau and its two limbs — and then they share one
--- section: one workspace, one @rule_text@ entry, and an @according_to@ naming
--- the same @sec_n_section@, which is what Jason Morris's own @beard_tax.yaml@
--- does with @sec_1_section@.
+-- number; failing that, one whose text ends in a section citation
+-- ('citedSection') is pinned to /that/ number; the rest take the lowest numbers
+-- no pin claims, in export order. Two decisions may pin the same number —
+-- @rps.l4@ states s.4 once per seat, and @beard.l4@ states s.1's chapeau and its
+-- two limbs — and then they share one section: one workspace, one @rule_text@
+-- entry, and an @according_to@ naming the same @sec_n_section@, which is what
+-- Jason Morris's own @beard_tax.yaml@ does with @sec_1_section@.
 --
 -- __A module that pins nothing is unchanged__: @claimed@ is empty, so the free
 -- numbers are @1, 2, 3, …@ handed out in export order, exactly as the
 -- pre-pinning code did.
-sectionNumbers :: [(RPred, Text)] -> [(RPred, Int, Text)]
-sectionNumbers xs = go free [ (p, t, pinnedSection t) | (p, t) <- xs ]
+sectionNumbers :: [(RPred, Text)] -> [SecAssign]
+sectionNumbers xs = go free [ (p, t, sectionPin t) | (p, t) <- xs ]
  where
-  claimed = Set.fromList [ n | (_, t) <- xs, Just (n, _) <- [pinnedSection t] ]
+  claimed = Set.fromList [ pinNumber q | (_, t) <- xs, Just q <- [sectionPin t] ]
   free = filter (`Set.notMember` claimed) [1 ..]
   go _ [] = []
-  go ns ((p, _, Just (n, rest)) : more) = (p, n, rest) : go ns more
-  go (n : ns) ((p, t, Nothing) : more) = (p, n, t) : go ns more
-  go [] ((p, t, Nothing) : more) = (p, 1, t) : go [] more  -- unreachable: 'free' is infinite
+  go ns ((p, _, Just (PinIndex n rest)) : more) =
+    MkSecAssign { saPred = p, saNumber = n, saText = rest, saPinnedByIndex = True }
+      : go ns more
+  go ns ((p, t, Just (PinCite n)) : more) =
+    MkSecAssign { saPred = p, saNumber = n, saText = t, saPinnedByIndex = False }
+      : go ns more
+  go (n : ns) ((p, t, Nothing) : more) =
+    MkSecAssign { saPred = p, saNumber = n, saText = t, saPinnedByIndex = False }
+      : go ns more
+  go [] ((p, t, Nothing) : more) =
+    MkSecAssign { saPred = p, saNumber = 1, saText = t, saPinnedByIndex = False }
+      : go [] more
+    -- unreachable: 'free' is infinite
+
+-- | Which pin a section text carries. A leading CLEAN index wins over a
+-- trailing citation, because it is the spelling the two seeds use and the only
+-- one that consumes its numeral.
+data Pin
+  = PinIndex !Int !Text  -- ^ the number, and the text with the index taken off
+  | PinCite !Int         -- ^ the number; the text keeps its citation intact
+
+pinNumber :: Pin -> Int
+pinNumber = \case
+  PinIndex n _ -> n
+  PinCite n    -> n
+
+sectionPin :: Text -> Maybe Pin
+sectionPin t =
+  uncurry PinIndex <$> pinnedSection t <|> PinCite <$> citedSection t
 
 -- | Ascending, duplicates removed. (@Base@ re-exports neither @sort@ nor
 -- @nub@; a 'Set' round-trip is both.)
 sortNub :: Ord a => [a] -> [a]
 sortNub = Set.toAscList . Set.fromList
+
+-- | The @rule_text@ body of each numbered section, ascending by number: the
+-- texts of the decisions filed under that number, joined in export order.
+--
+-- __This is where number\/eId AGREEMENT is enforced__ (spec §11 W3, 2026-09-02).
+-- @L4.Blawx.Emit.renderRuleText@ writes each section as @\"\<n\>. \<text\>\"@, and
+-- clean-law 0.0.4 parses a section index as
+-- @number + Optional(insert_index) + DOT@ with
+-- @insert_index = Suppress(DOT) + number@ (@clean\/clean.py:53@ __[E]__). Our
+-- period is therefore the @DOT@ that /starts/ an insert index, so a section text
+-- opening on a digit is absorbed into the index:
+--
+-- * @1. 0. A human is mortal.@ parses to eId @sec_1_ 0@, not @sec_1@;
+-- * @1. 2.1. a sub-provision index.@ parses to @sec_1_ 2_1@;
+-- * @1. 1(a): facial hair …@, @1. 43(1)(a): …@ and @1. 4, the other seat.@ do
+--   not parse as a section /at all/ — pyparsing's @And@ does not backtrack out
+--   of the @Optional@, so the trailing @DOT@ fails and the document has NO
+--   sections.
+--
+-- In every one of those cases the workspaces we name @sec_1_section@ belong to
+-- no section of the Act: the canvas is __orphaned__, and nothing in the golden
+-- bytes says so, because both halves are ours and each is self-consistent. So:
+--
+-- * a text that pinned its number by a __leading index__ and still opens on an
+--   index is a sub-provision, which §11 W3(b) leaves open — refused by name,
+--   never emitted;
+-- * any other text opening on a digit is prose that merely starts with a
+--   numeral, and is __quoted__ ('guardSectionText'), which both stops the parse
+--   absorbing it and tells the reader the numeral is the author's, not ours.
+--
+-- @etc\/blawx-eid-harness.py@ is the executable form of this invariant.
+sectionTexts :: [SecAssign] -> Either [LowerError] [(Int, Text)]
+sectionTexts numbered =
+  collectE [ body n | n <- sortNub [ a.saNumber | a <- numbered ] ]
+ where
+  body n
+    | a : _ <- mine
+    , any (.saPinnedByIndex) mine
+    , indexShaped joined =
+        Left [ blawxErr a.saPred.rpName.rnBase a.saPred.rpProv.rpvRange
+                 (LEUnsupported "sub-provision index (Blawx v1)")
+                 ( "section " <> Text.textShow n <> " pins its own number and its text "
+                     <> "then opens with a second index (`" <> Text.take 32 joined
+                     <> "`); clean-law would read the two as one insert index and name "
+                     <> "the canvas after that, orphaning `sec_" <> Text.textShow n
+                     <> "_section` — sub-provision anchoring is not in v1 "
+                     <> "(BLAWX-EXPORT-SPEC §11 W3(b))" ) ]
+    | otherwise = Right (n, guardSectionText joined)
+   where
+    mine   = [ x | x <- numbered, x.saNumber == n ]
+    joined = Text.unwords [ x.saText | x <- mine, not (Text.null x.saText) ]
+
+-- | Does this text open with something clean-law's @section_index@ grammar would
+-- read as (the continuation of) an index? Digits, then a period. Deliberately
+-- laxer than 'pinnedSection': that recogniser decides whether we /honour/ a
+-- number, this one decides whether clean-law would /see/ one, and the second
+-- question has to be answered conservatively.
+indexShaped :: Text -> Bool
+indexShaped t = case Text.span isDigit (Text.stripStart t) of
+  (ds, r) -> not (Text.null ds) && "." `Text.isPrefixOf` r
+
+-- | Quote a section text that would otherwise extend the index written in front
+-- of it. Only a leading digit can do that (clean-law's @insert_index@ is
+-- @DOT + number@ and our separator supplies the @DOT@), so only a leading digit
+-- is guarded, and the transformation is idempotent: the guarded text opens on
+-- @\"@.
+--
+-- ASCII @\"@ specifically: it is in pyparsing's @printables@, so clean-law keeps
+-- it as ordinary section text; @L4.Blawx.Emit.yamlDoubleQuoted@ escapes it as
+-- @\\\"@ so the fixture still loads; and it is the punctuation a reader already
+-- reads as \"these are the author\'s words\", which is exactly what it means here.
+guardSectionText :: Text -> Text
+guardSectionText t
+  | Just (c, _) <- Text.uncons t, isDigit c = "\"" <> t <> "\""
+  | otherwise = t
 
 -- | Which numbered section each rule-bearing predicate belongs to: each
 -- exported decision is given its number by 'sectionNumbers'; a helper

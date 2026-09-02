@@ -3026,6 +3026,16 @@ spec bin = do
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("above the block ceiling of 10" `isInfixOf`)
 
+    -- Spec §11 W3(b): a pinned section whose text opens with a SECOND index is
+    -- a sub-provision, and emitting it hands clean-law the insert index `4. 5`
+    -- -- eId sec_4_5 against the workspace sec_4_section we wrote, i.e. an
+    -- orphaned canvas in a document that imports and stores without complaint.
+    it "rejects a pinned section whose text opens with another index" $ do
+      Output code _ serr <- runL4 bin ["blawx", "examples/blawx/not-ok/sub-provision-index.l4"]
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("sub-provision index (Blawx v1)" `isInfixOf`)
+      serr `shouldSatisfy` ("orphaning" `isInfixOf`)
+
     it "fails on a file that does not typecheck" $
       expectFail bin ["blawx", errorFixture]
 

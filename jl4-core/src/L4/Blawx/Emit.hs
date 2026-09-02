@@ -291,6 +291,12 @@ yamlDoubleQuoted t = "\"" <> Text.concatMap esc t <> "\""
 -- prose, @\"1. 4. The winner …\"@ parsed as clean-law's insert index and yielded
 -- eId @sec_1_ 4@, so every canvas in @rps.blawx@ and @beard.blawx@ was
 -- orphaned.
+--
+-- __The @\". \"@ this writes is a @DOT@ in clean-law's index grammar__, so a
+-- 'bsText' opening on a digit would be swallowed by the same insert index. That
+-- invariant is enforced upstream, in @L4.Blawx.Lower.sectionTexts@, so that
+-- @L4.Blawx.Parse.parseRuleText@ stays this function's exact byte-level inverse
+-- and the @--roundtrip@ property is untouched.
 renderRuleText :: BRuleText -> Text
 renderRuleText rt =
   rt.brTitle

@@ -10,7 +10,11 @@
 -- index "1." (BLAWX-EXPORT-SPEC R4, spec §11 W3), so all three attribute to
 -- according_to(sec_1_section, ...) -- the Act has one section and so does the
 -- export. Their prose is the chapeau and the two limbs, and sec_1's rule_text
--- is the three joined in export order, which reproduces Jason's s.1 verbatim.
+-- is the three joined in export order, which reproduces Jason's s.1 WORD FOR
+-- WORD but not byte for byte: measured 2026-09-02, ours is 248 bytes and his
+-- 257, because his carries five CRs and indents the limbs while ours is one
+-- flat line (a.split() == b.split() is True, a == b is False, over the two
+-- fixtures' rule_text).
 -- He gives (a) and (b) their own canvases, sec_1__para_a_section and
 -- sec_1__para_b_section; paragraph eIds are W3(b) and stay out of v1, so the
 -- limbs are numbered 1, with their chapeau, rather than 1(a) and 1(b).

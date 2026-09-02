@@ -228,7 +228,13 @@ data BSection = MkBSection
   { bsNumber :: !Int
     -- ^ the CLEAN section index, ≥ 1. Ascending across 'brSections' and
     -- unique within it, but NOT necessarily its position + 1.
-  , bsText   :: !Text   -- ^ one paragraph, no newlines
+  , bsText   :: !Text
+    -- ^ one paragraph, no newlines, and __never opening on a digit__: the
+    -- @rule_text@ line is @\"\<n\>. \<text\>\"@ and clean-law reads that period
+    -- plus a digit as an @insert_index@, which would name the canvas after a
+    -- section the Act does not have (see @L4.Blawx.Lower.sectionTexts@, spec
+    -- §11 W3). An imported document is not held to this — 'parseRuleText' is
+    -- deliberately total over prose a human may have edited.
   }
   deriving stock (Eq, Show, Generic)
   deriving anyclass (NFData)
