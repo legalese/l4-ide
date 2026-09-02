@@ -72,17 +72,27 @@ faithfully.
 This matters if you have existing Blawx work: it is a migration path in, not only a projection
 out. Every other export on these pages is one-way.
 
-**How much it reads, as of 2026-09-02.** Four of the fifteen examples Blawx itself ships lift
-(`bird`, `beard_tax`, `wills`, `wills_tutorial`); the rest are refused by name, one diagnostic per
-construct, so a refusal tells you _which block_ has no L4 image rather than that the file is
-unsupported. The fragment is a **flat universe of objects** under unary predicates, plus
-**value-typed attributes**: a `number` or category-valued attribute becomes an optional field with
-two readers — "is it set?" and "what is it?" — and a comparison on it becomes an ordinary L4
-comparison. A section's **paragraph** canvases (`sec_1__para_a_section`) fold into their numbered
-parent, which is warned about and keeps the paragraph's own eId on the decision's `@ref` line —
-and an `overrules` the fold cannot carry across unchanged is refused rather than folded, because
-Blawx keys defeat on the exact section. What is still out: n-ary relationships, rules that
-_compute_ an attribute's value, arithmetic, and the date and event layers.
+**How much it reads, as of 2026-09-02.** What comes back is measured rather than assumed. Three of
+Blawx's own shipped examples live under `jl4/examples/blawx/imported/`: **bird** (the defeasibility
+tutorial, where sections defeat one another), **beard_tax** (a number-valued attribute and the
+comparisons on it) and **Rock Paper Scissors** (objects related by two- and three-place predicates,
+a rule that quantifies over "the other player", and a test that declares its own objects). All
+three lift to L4 that type-checks, and the tier-1 harness puts each of their queries to real
+s(CASP) and to the L4 engine and compares the answers.
+
+The fragment is a **universe of objects** under predicates of any arity, plus **value-typed
+attributes**: a `number` attribute becomes an optional field with two readers — "is it set?" and
+"what is it?" — and a comparison on it becomes an ordinary L4 comparison, while a category-valued
+attribute is a binary predicate over the universe. A section's **paragraph** canvases
+(`sec_1__para_a_section`) fold into their numbered parent, which is warned about and keeps the
+paragraph's own eId on the decision's `@ref` line — and an `overrules` the fold cannot carry across
+unchanged is refused rather than folded, because Blawx keys defeat on the exact section.
+
+What does not come back yet is a list, not a guess — the import refuses one construct at a time,
+by name. Rules that _compute_ an attribute's value, arithmetic, and the date and event layers do
+not lift. A test canvas asking for **hypothetical** reasoning (Blawx's `#abducible`) is dropped,
+because abduction is not evaluation; the reason is written into the lifted file where that test's
+`#EVAL` would have been, so you can see what you did not get without re-running anything.
 
 ## What it consumes
 

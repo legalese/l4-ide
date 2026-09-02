@@ -763,42 +763,116 @@ measurement separates them (full table: `p5-design/census-results.md`):
 | examples with any blocks at all               | 14/15 | `wills_tutorial`'s only non-root workspace is the 61-char empty document                             |
 | parse to a **block tree** (`L4.Blawx.Blocks`) | 14/14 | total over all 47 block types the corpus uses                                                        |
 | classify to a **`BlawxDoc`** (`…Parse`)       | 10/15 | out: `covid_test` `life_act` `net30` `oasa` (date/event layer, ruling P5-1) and `r34` (three shapes) |
-| **lift to L4** (`…Lift`, v1 fragment)         |  4/15 | `bird`, `beard_tax`, `wills`, and `wills_tutorial` (title + `§§`s, no decisions)                     |
+| **lift to L4** (`…Lift`, v1 fragment)         |  6/15 | `bird`, `beard_tax`, `mortality`, `rps`, `wills`, `wills_tutorial`                                   |
 
-The last row is the one that matters, and **as of 2026-09-02 it reads 4/15, not the 2/15 measured
-on 2026-08-19** — the first W5 increment (§11 W5a) widened it. Both numbers are measurements of
-the same command, `l4 blawx --import <example>.yaml` over the fifteen shipped examples at
-`/Volumes/transcend/src/blawx-stock/blawx/static/blawx/examples/`; the 2026-09-02 run added
-`beard_tax` (Jason Morris's Beard Tax Act) and, unplanned, `wills`, which needed only the same
-`number`-attribute image. All four lifted modules pass `l4 check`. The row was **re-measured, not
-carried, after the review recorded in §11 W5**: the same command over the same fifteen files still
-lifts the same four, and the two diagnostics that review added (`blawx-lift/defeat-target`,
-`blawx-lift/defeat-fold-unsound`) refuse none of them.
+The last row is the one that matters, and **as of 2026-09-02 it reads 6/15, not the 2/15 measured
+on 2026-08-19**. Both numbers are measurements of the same command over the fifteen shipped
+examples at `/Volumes/transcend/src/blawx-stock/blawx/static/blawx/examples/`; the 6/15 was
+re-measured on the integrated branch:
+
+```
+for f in /Volumes/transcend/src/blawx-stock/blawx/static/blawx/examples/*.yaml; do
+  n=$(basename "$f" .yaml); l4 blawx --import "$f" -o /tmp/census/$n.l4 >/dev/null 2>&1
+  echo "$n RC=$?"
+done
+```
+
+which exits 0 on `beard_tax`, `bird`, `mortality`, `rps`, `wills` and `wills_tutorial` and 1 on the
+other nine, and all six lifted modules pass `l4 check`. The 6 is the union of two increments that
+were built and reviewed separately and integrated on 2026-09-02: §11 W5a's **value-typed
+attributes** (which added `beard_tax` and, unplanned, `wills`) and §11 W5b's **arities above one**
+(which added `rps` and `mortality`).
 
 P5's lift modelled **one flat universe of objects under unary predicates** — which is what the
-defeat layer needs and what `bird` is. W5a keeps the flat universe and adds the **value-typed
-attribute**: a `number` or category-valued attribute is a partial function from the universe to a
-sort, so it lifts to a `MAYBE NUMBER` / `MAYBE STRING` field plus two decisions — `p x` (the
-attribute is defined, `isJust`) and `` `the p of` x `` (its value, `fromMaybe`) — and a binary
-attribute goal `p(X,V)` becomes the definedness conjunct while `V` is **substituted** at every
-use, which is how `blawx_comparison(V,gte,5)` becomes `` `the p of` x AT LEAST 5 ``. The two
-halves are sound together because they sit in one top-level `AND` chain: an absent attribute makes
-the body `FALSE`, exactly as `p(X,V)` with no clause does. Under **default negation** the goal
-binds nothing — `V` has to be bound already — so `not p(X,V)` is a test of the value rather than
-the positive image's definedness conjunct, and lifts to
-``NOT (p x AND `the p of` x EQUALS <V>)``; an anonymous value slot (`not p(X,_)`) still reads as
-absence.
+defeat layer needs and what `bird` is. The two increments widened it in two independent
+directions, and the widening was ordinary work rather than a re-architecture, as this section
+predicted.
 
-What is still refused **by name**, one diagnostic per construct: n-ary relations
-(`blawx-lift/relationship`), a rule that _derives_ a value-typed attribute
-(`blawx-lift/value-attribute-concluded`) and the arithmetic behind it, a value variable used as an
-object (`blawx-lift/value-variable-in-object-position` — the flat universe has no name-to-object
-lookup), disequality, object declarations and `assume` in test canvases
-(`blawx-lift/test-block`), the date/event layers at parse time, and — since the review in §11 W5 —
-an `overrules` the paragraph fold would either dangle or activate
-(`blawx-lift/defeat-target`, `blawx-lift/defeat-fold-unsound`). Widening it further is still
-ordinary work, not a re-architecture. Ruled in R14; sequenced as P5; the `.blawx`-side _parser_
-half is shared with R13's tier-2 harness, which must read run results anyway.
+**W5a — the value-typed attribute.** A `number` attribute is a partial function from the universe
+to a sort, so it lifts to a `MAYBE NUMBER` field plus two decisions — `p x` (the attribute is
+defined, `isJust`) and `` `the p of` x `` (its value, `fromMaybe`) — and a binary attribute goal
+`p(X,V)` becomes the definedness conjunct while `V` is **substituted** at every use, which is how
+`blawx_comparison(V,gte,5)` becomes `` `the p of` x AT LEAST 5 ``. The two halves are sound
+together because they sit in one top-level `AND` chain: an absent attribute makes the body `FALSE`,
+exactly as `p(X,V)` with no clause does. Under **default negation** the goal binds nothing — `V`
+has to be bound already — so `not p(X,V)` is a test of the value rather than the positive image's
+definedness conjunct, and lifts to ``NOT (p x AND `the p of` x EQUALS <V>)``; an anonymous value
+slot (`not p(X,_)`) still reads as absence. A section's **paragraph** canvases fold into their
+numbered parent, warned about by name, and an `overrules` the fold cannot carry across unchanged is
+refused rather than folded.
+
+**Integration note (2026-09-02): a CATEGORY-valued attribute takes W5b's road, not W5a's.** W5a
+lifted a category-valued attribute the same way as a number one — a `MAYBE STRING` field holding
+the target atom's name — and W5b lifts it as an ordinary **binary predicate** over the universe.
+The two cannot both hold, and the binary predicate is the one that survives: a Blawx attribute is
+multi-valued (`rps`'s `player(Game,Player)` names both seats of a game), and a partial function to
+one name cannot say that. So `valueSortOf` now answers `Nothing` for `BVCategory`, the `ValueSort`
+type has one constructor (`VSNumber`), and the field-plus-accessor image is a **number**-attribute
+image only. Measured after the change: `bird.l4` and `rps.l4` regenerate byte-identical, and
+`beard_tax.l4` — the only committed artifact with a value attribute, and a number one — changes
+only in its provenance line, its header prose and one `-- NOT LIFTED` line (§8.14).
+
+**W5b — arities above one, and what they force.**
+
+- **Arity is part of a predicate's identity.** Blawx overloads on it — `rps` declares both the
+  category `player/1` and the attribute `player/2` — so `L4.Blawx.Lift`'s `Lit` carries the arity
+  and `predIdent` spells every arity but the lowest Prolog-style (`` `player/2` ``). A decision
+  takes one `Object` parameter per place (`x` at one place, `x1 … xn` above it).
+- **An n-ary fact channel** is a `LIST OF (LIST OF STRING)` of the remaining arguments' names,
+  carried by the first argument's record, beside the unary `MAYBE BOOLEAN` channel, which is
+  unchanged: `player(testgame,bob)` is a row of `testgame`'s `` `player/2 fact` ``.
+- **`blawx_diseq` and `=` compare the `name` field** — atoms, never records. That is W1's finding
+  read from the other direction: Blawx compares objects by atom, L4 compares records by value, and
+  the atom is the only thing the two agree on.
+- **An existential body variable becomes `any` over the world.** `rps` s.4 quantifies over the
+  other player and over both thrown signs; the rule splits into a _witness_ decision that takes
+  them as ordinary parameters, plus `any (GIVEN v YIELD …) w` once per witness. Exact because
+  Blawx has no open domain — an atom exists because a declaration or a fact introduced it. A
+  variable a binary VALUE-attribute goal binds is **not** one of these: it is discharged by
+  substitution, so it is neither quantified nor counted when deciding whether the module needs a
+  world (which is why `beard_tax` still emits no `w`).
+- **The universe is a parameter, not a constant.** A Blawx test loads its own objects beside the
+  rules, so as soon as any test declares objects (or any predicate that is not a value attribute is
+  n-ary, or any rule quantifies) every derived decision takes a leading `w IS A LIST OF Object` and
+  each test passes its own world. Baking every test's objects into one module-level `all objects`
+  would let `rps`'s `who_wins` find `bobjane`'s game and answer where real Blawx answers nothing. A
+  document needing none of this emits **exactly the bytes it did before** — measured on bird,
+  §8.14's 2026-09-02 note. The one exception is the _witness_ decision of the bullet above: nothing
+  calls it but the quantifier directly beneath it, so its arity is not pinned by an agreement with
+  another paragraph, and it takes the world only when a conjunct of its own body reads one. `rps`
+  s.4's body is all input predicates, so its witness declares no `w` at all — an unused
+  `w IS A LIST OF Object` is a parameter a reader goes looking for the use of. Both directions are
+  pinned in `BlawxLiftSpec` ("gives the witness decision no world parameter when its body reads
+  none" and "… a world parameter when its body reads one").
+- **A test canvas that cannot be lifted is dropped by name**, with `-- NOT LIFTED (<code>): …`
+  written where its `#EVAL` would have gone, and a WARNING rather than a document-level refusal. A
+  _rule_ that cannot be lifted still refuses the document. The asymmetry is the point, and it is
+  strictly stronger than what the 2026-08-19 review pass replaced: a test is an oracle, so dropping
+  it loses a check and cannot make an emitted rule wrong, and there is no `#EVAL` left to answer a
+  question the Blawx test did not ask. `beard_tax`'s free-variable query over an empty universe
+  takes this road (`blawx-lift/unbound-query-empty-universe`), which is why its lifted module
+  carries the test's provenance line and no `#EVAL`.
+
+What is still refused **by name**, one diagnostic per construct, from the same 2026-09-02 census:
+a rule that _derives_ a value-typed attribute (`blawx-lift/value-attribute-concluded` —
+`list_demo`, `numerical_constraints`) and the arithmetic behind it; a value variable used as an
+object (`blawx-lift/value-variable-in-object-position` — `numerical_constraints`); an unbound value
+or an unliftable goal (`blawx-lift/unbound-value`, `blawx-lift/goal-shape`, `blawx-lift/term-shape`
+— `list_demo`); a workspace-level `false :- …` (`blawx-lift/constraint` —
+`logical_constraints`); a conclusion with a constant argument (`blawx-lift/conclusion-shape` —
+`siblings`, `parent(Person,opg)`); an `overrules` the paragraph fold would either dangle or
+activate (`blawx-lift/defeat-target`, `blawx-lift/defeat-fold-unsound`); and the date/event layer,
+which is refused earlier, at **parse** — `covid_test`, `life_act`, `net30`, `oasa`, and `r34`'s
+three shapes, which is why the classify row above is 10/15 and not 15/15. Abduction is not lifted
+at all: `rps`'s `hypothetical` test declares `#abducible`s and is dropped by name.
+
+(`mortality` and `wills` lift as side effects of the same work. Neither is shipped under
+`jl4/examples/blawx/imported/`: `mortality`'s stem collides with the export seed
+`jl4/examples/blawx/mortality.l4` and the tier-1 harness keys on the stem, and `wills` adds no
+shape the three shipped artifacts do not already carry.)
+
+Ruled in R14; sequenced as P5; the `.blawx`-side _parser_ half is shared with R13's tier-2
+harness, which must read run results anyway.
 
 ## 6. The v1 source fragment, precisely
 
@@ -1609,7 +1683,7 @@ extension doing its job:
 - **Binary attribute goals and comparisons.** `p(X,V)` binds; the binding is discharged by
   substituting `` `the p of` x `` at every use of `V`, and the goal itself leaves the definedness
   conjunct `p x`. The environment is computed over the **whole** rule before any condition is
-  lifted, because beard*tax draws `blawx_comparison(Length,gte,5)` \_above* the goal that binds
+  lifted, because `beard_tax` draws `blawx_comparison(Length,gte,5)` _above_ the goal that binds
   `Length` (s(CASP) is happy: the constraint delays). `BCmpOp` renders as `EQUALS`, `AT LEAST`,
   `AT MOST`, `GREATER THAN`, `LESS THAN`, and `NOT (… EQUALS …)` — L4 has no disequality operator.
 - **Several `attributed_rule`s concluding one literal in one section.** They are separate clauses
@@ -1707,6 +1781,109 @@ unbounded domain, satisfied by an unbound witness rather than checked over the g
 The harness keeps the agreement claim (the L4 oracle must be among s(CASP)'s answers) and **pins
 the surplus** in one named table (`KNOWN_SURPLUS`), so a divergence that grows, shrinks or wanders
 fails the run; a control run with the pin removed reproduces the FAIL exactly.
+
+**EXECUTED 2026-09-02 — W5, the rps increment: the import fragment now reaches Blawx's own running
+example.** `l4 blawx --import` lifts `blawx/static/blawx/examples/rps.yaml` — Jason Morris's Rock
+Paper Scissors Act — to `jl4/examples/blawx/imported/rps.l4`, which `l4 check` accepts, and
+`--reemit` regenerates `jl4/examples/blawx/imported/rps.blawx` beside it. The constructs W5 named
+are listed in §5.2; what was measured here is whether the artifact runs and agrees.
+
+- **`bobjane` answers `LIST "jane"` on both engines** — jane throws rock, bob throws scissors, rock
+  beats scissors. It is the load-bearing row: it exercises the arity-3 relationship `throw`, the
+  binary attribute `player/2` beside the category `player/1`, `blawx_diseq`, three existential
+  witnesses, and a test canvas that declares its own three objects, all at once.
+- **`who_wins` (`?- winner(Game,Player).`) answers nothing on both engines.** State that for what
+  it is: a real execution on each side, but an agreement about _emptiness_, which is weaker
+  evidence than `bobjane`. It is kept because it is the corpus's only two-free-variable query and
+  it exercises the nested comprehension the lift emits for one, and because it is the row that
+  would fail if the world parameter were dropped — with one module-level universe it would find
+  `bobjane`'s game and answer where Blawx answers nothing.
+- **`hypothetical` is not lifted**, by name (`blawx-lift/test-block`, an `assume`), and the artifact
+  says so where its `#EVAL` would have been. Abduction is not evaluation; §5.2 records why a test
+  is dropped rather than the document refused.
+- **The CLEAN `rule_text` does not reach the `§§`s.** rps's prose is introduced by un-numbered
+  headings ("Players", "Defeating Relationships", "Winner"), so `parseRuleText` keeps the whole Act
+  in `brTitle`. The `§` now takes only the first line and the remainder is reproduced verbatim as
+  comment lines under a new `blawx-lift/rule-text-unstructured` warning naming §11 W3 — dropping it
+  would be dropping the statute, and a title 17 lines long was the alternative.
+
+**Numbers, every one run on this branch on 2026-09-02.** tier-1 `python3
+etc/blawx-tier1-harness.py`: **156/156** (121 distinct + 35 twin replays), of which rps contributes
+2 — `bobjane` and `who_wins`; the harness gained `parse_unlifted`, which excludes a test the lift
+refused so the positional pairing does not silently skip the whole seed, a k-tuple oracle reader
+for a multi-variable query, and a self-test for that reader (below). Fixpoint
+`BLAWX_CHECKOUT=…/blawx-stock node etc/blawx-fixpoint-harness.mjs`: **222 checked, 0 failed, 3
+empty-skipped**; `rps.blawx` on its own is **13 checked, 0 failed, 1 empty-skipped**. `cabal test
+jl4-core-test` **429 examples, 0 failures**. `BlawxLiftSpec` gains **eleven** `it` cases and loses
+**three**, a net **+8** (`git diff 803eb206..HEAD -- jl4-core/test/BlawxLiftSpec.hs | grep -c
+'^[+-] *it "'`). The three that went are the refusals the test-drop severity change replaced —
+_refuses a block the #EVAL rendering does not consume_, _refuses a NEGATIVE scenario fact rather
+than dropping it_, _refuses a scenario fact about an undeclared predicate_. The eleven that came
+are: the world parameter's absence on a unary document; a test canvas's `object_declaration`
+landing in that test's own world; the arity spelling; the tuple channel; the existential closure;
+the witness decision's world parameter, once for each direction; the diseq rendering; and the three
+test-drop paths that replaced the three refusals. `cabal test l4-cli-test` **343 examples, 0
+failures, 83 pending**.
+
+**bird is unchanged except for two header hunks.** `l4 blawx --import bird.yaml` reproduces
+`jl4/examples/blawx/imported/bird.l4` byte for byte apart from the module header's description of
+the model, which had to change because it said "unary predicates", and the `source` line, which
+changed for the reason below. Nothing else in the file's 274 lines moved
+(`git diff 803eb206..HEAD -- jl4/examples/blawx/imported/bird.l4` — two hunks, 9 insertions and 7
+deletions, both inside the first 21 lines): that is the regression evidence for the world parameter and the arity
+generalisation both being off when a document does not need them.
+
+**The provenance header names the fixture, not the path it was read from.** The `--   source` line
+used to carry `opts.bxFile` verbatim, so a committed artifact was regenerable byte-for-byte from
+exactly one checkout — and the two committed files disagreed about which
+(`/Volumes/transcend/src/blawx/…` for bird, `/Volumes/transcend/src/blawx-stock/…` for rps) while
+their inputs are byte-identical. It now records `takeFileName` of the input. Measured 2026-09-02:
+`l4 blawx --import <checkout>/blawx/static/blawx/examples/{bird,rps}.yaml` run against both
+`/Volumes/transcend/src/blawx` and `/Volumes/transcend/src/blawx-stock` produces four files that
+`cmp` pairwise identical, and each pair reproduces its committed artifact exactly.
+
+**The witness decision no longer pads its arity with a world it cannot read.** §5.2 records the
+rule; what changed here is `rps.l4`, whose `` `according to RPSA 4, …, witnessed by player2,
+throw1 and throw2` `` dropped its leading `w IS A LIST OF Object` (its seven conjuncts are `game`,
+`player` ×2, the name comparison, `player/2` ×2 and `throw` ×2 — every one an input decision, none
+worlded). The quantifier decision above it keeps `w`, which is the domain it ranges over. `l4
+check` still accepts the file, `l4 run` still answers `LIST "jane"` and `EMPTY`, and tier-1 is
+still 156/156.
+
+**The k-tuple oracle reader is covered by a self-test, because no shipped seed reaches it.** The
+`len(out_vars) > 1` branch of the harness's comparison ladder — and `parse_tuple_oracle`, which it
+calls — exists for a query with two or more free variables. The corpus has exactly one, rps's
+`who_wins`, and its oracle is `EMPTY`, which the ladder answers before it ever looks at the arity;
+so the branch that reads a NON-EMPTY k-tuple answer had no in-repo exercise at all. The comparison
+is now split out of `run_test` as `compare_answer`, and `main` runs **15 pure cases** over it and
+over `parse_tuple_oracle` before anything else — including the datapoint measured for it on
+2026-09-02 (rps's `bobjane` test rewritten to the open query `?- winner(Game,Winner).` by swapping
+the query's `object_selector` for a `variable` block; the lift records the oracle
+`LIST LIST "testgame", "jane"`, and registered as an IMPORTED seed it runs **2/2**, real s(CASP)
+answering `[('testgame','jane')]`), the malformed renderings the reader must refuse to guess at,
+and the one-free-variable case that must NOT take the k-tuple path. That fixture is deliberately
+not committed — it is a document Jason did not write, and its `.blawx` would be a re-emission of an
+XML we edited — so the harness carries the recipe for retaking the measurement instead. The cases
+need no swipl, so they run on a machine with no s(CASP) pack, and they run before the `have_scasp`
+skip. Control: reversing the tuple order inside `parse_tuple_oracle` takes the self-test to
+**10/15** and stops the run before a single seed executes.
+
+**The re-emitted s(CASP) against Jason's stored s(CASP): 9 of 14 rows byte-identical**, and the
+five that differ are exactly the five rows the P5-2 staleness warning names (`sec_1`, `sec_2`,
+`sec_3`, `sec_4`, and the `hypothetical` test). Read line by line, the divergence is `:- dynamic`,
+the `blawx_not_interrupted` frame axioms, one corrected `#pred` NLG string for the negative
+`blawx_defeated`, the comments both renderers drop by P5-4 — and **exactly one rule line**:
+`Player1 \= Player2` in the stored encoding against `blawx_diseq(Player1,Player2)` in ours. The
+fixpoint harness settles which is current: the real Blockly 10.1.3 generator, run over the same
+XML, produces ours byte for byte, so `\=` is the stale spelling. That is the sharpest witness yet
+for the header's warning about the reference corpus — the stale text differs from the current
+generator inside a rule, not only in the boilerplate around it.
+
+**One lift bug found and fixed on the way.** `objectParas` emitted `` `the name of` `` only when
+the WORKSPACES declared objects, but the query rendering uses it whatever world it ranges over. A
+document whose only atoms come from a test — `mortality` is one — therefore lifted to a module that
+did not compile, and the CLI refused to write it (correctly: "this is a lift bug, not a property of
+the input"). `mortality` now lifts and answers `LIST "socrates"`.
 
 ## 9. Non-goals (v1)
 
@@ -2200,7 +2377,7 @@ what Jason's `player` attribute uses. Both are one-field additions when a corpus
 object-valued attributes plus comparisons buy `beard_tax`; relationships, disequality, object
 declarations in tests and open queries buy `rps`. Amends R14, §5.2.
 
-**PARTIAL 2026-09-02 (W5a, the `beard_tax` half).** `beard_tax` lifts; `rps` does not. Measured
+**PARTIAL 2026-09-02 (W5a, the `beard_tax` half; see the integration note below).** `beard_tax` lifts; `rps` does not. Measured
 this day on this branch, `l4 blawx --import` over the fifteen shipped examples at
 `/Volumes/transcend/src/blawx-stock/…/examples/` lifts **4**, against the 2 of §5.2's table:
 `beard_tax` as planned and `wills` unplanned — it needed only the same `number`-attribute image.
@@ -2274,14 +2451,33 @@ Evidence, all run 2026-09-02 from this worktree: fixpoint (with
 **154/154**, to which `beard_tax` contributes nothing (no `#EVAL`, hence no oracle to pair) so
 its cross-engine check was made by hand with the harness's own assembly and agrees **6/6**;
 `jl4-core-test` **442/0** and `l4-cli-test` **346/0/83 pending** after the review fixes (434/0 and
-344/0/83 before them); bird and beard*tax both re-import byte-identically apart from the `source`
+344/0/83 before them); bird and `beard_tax` both re-import byte-identically apart from the `source`
 provenance line.
 Detail in §8.14's EXECUTED block. **Still open here:** everything the item lists as buying `rps` —
 relationships, `blawx_diseq`, object declarations and `assume` in test canvases, and open queries
-over a populated universe — plus binary \_facts* (`p(a,7).`), which are still refused by
+over a populated universe — plus binary facts (`p(a,7).`), which are still refused by
 `blawx-lift/fact-shape`, and rules that _derive_ a value-typed attribute
 (`blawx-lift/value-attribute-concluded`, which is what `benefit`, `list_demo`,
 `numerical_constraints` and `siblings` now stop on).
+
+**DISCHARGED (`rps` half) 2026-09-02.** Built as W5b; `beard_tax` is W5a's and is untouched here.
+`l4 blawx --import` lifts `rps.yaml` to `jl4/examples/blawx/imported/rps.l4` (`l4 check` clean) and
+`--reemit`s `rps.blawx` beside it. Measured on this branch that day: tier-1 **156/156** with rps's
+`bobjane` answering `LIST "jane"` on both engines and `who_wins` answering nothing on both;
+fixpoint **222/222** (rps alone 13/13); `jl4-core-test` **429/0**; `l4-cli-test` **343/0/83
+pending**; bird re-imports byte-identically apart from two header hunks, and both `bird.l4` and
+`rps.l4` now regenerate byte-for-byte from either local Blawx checkout (§8.14). The corpus lift
+count moves **2/15 → 4/15** (`bird`, `mortality`, `rps`, `wills_tutorial`). What was NOT lifted, by
+name: `hypothetical`'s `#abducible`s — the test is dropped with the reason written into the
+artifact, which is a change of severity recorded in §5.2. `beard_tax` still refuses, on **four**
+distinct diagnostic kinds — `attribute-type` ×1 and `goal-shape` ×2 on numbers (W5a),
+`rule-section` ×3 on paragraph sections (W3), and `unbound-query` ×1 because it declares no objects
+at all — measured on this branch on 2026-09-02 with `l4 blawx --import …/beard_tax.yaml 2>&1 |
+grep -o 'blawx-lift/[a-z-]*' | sort | uniq -c`. (An earlier draft of this note said the kinds had
+"narrowed from five to four". Nothing in this tree measures the five: it would need a build of the
+base branch, and the pre-W5 "Measured" paragraph above lists seven codes across BOTH fixtures
+rather than a per-fixture count. The comparative claim is withdrawn; only the four are measured.)
+Amends R14 (§8.14's 2026-09-02 note) and §5.2.
 
 ### W6 — stale fixtures, witnessed twice more
 

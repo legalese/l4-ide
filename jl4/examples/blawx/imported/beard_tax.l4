@@ -1,6 +1,6 @@
 -- Imported from Blawx by `l4 blawx --import` (BLAWX-EXPORT-SPEC R14, §10 P5).
 --
---   source        /Volumes/transcend/src/blawx-stock/blawx/static/blawx/examples/beard_tax.yaml
+--   source        beard_tax.yaml
 --   ruledoc       "Beard Tax Act"
 --   rows          4 blawx.workspace, 1 blawx.blawxtest
 --   blocks        62 across 13 block types
@@ -8,12 +8,14 @@
 --                 generator (P5-2) in 3 row(s), first sec_1_section.
 --                 The XML is canonical (R14); the encodings were not used.
 --
--- Blawx models a flat universe of atoms under unary predicates. Every
--- category and every boolean attribute is one such predicate, so this lift
--- declares ONE record for the universe, carrying a `MAYBE BOOLEAN` input
--- slot per predicate that is not derived (the s(CASP) fact channel) and one
--- BOOLEAN decision per predicate. The defeat layer is unfolded: one decision
--- per (section, literal) pair, named from the generator's own #pred wording.
+-- Blawx models a flat universe of atoms under predicates of one, two or
+-- more places: a category is `c(X)`, a category-valued attribute is
+-- `a(X,Y)`, a relationship is `r(X,Y,Z)`. So this lift declares ONE record
+-- for the universe, carrying one input slot per declared predicate (the
+-- s(CASP) fact channel: `MAYBE BOOLEAN` at one place, a list of argument
+-- tuples above it) and one BOOLEAN decision per predicate. The defeat layer
+-- is unfolded: one decision per (section, literal) pair, named from the
+-- generator's own #pred wording.
 --
 -- A value-typed attribute is a partial FUNCTION, not a predicate: it gets a
 -- field of its own sort instead of a `<p> fact` channel, a `p x` decision
@@ -180,3 +182,4 @@ DECIDE qualifies_s1b x @nlg %x% qualifies under section 1 b
 §§ `Tests`
 
 -- blawxtest are_they_bearded — `?- bearded(Person).`
+-- NOT LIFTED (blawx-lift/unbound-query-empty-universe): the query binds a free variable and the document declares no objects and asserts no ground facts, so there is nothing for an #EVAL to range over.
