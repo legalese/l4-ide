@@ -464,13 +464,43 @@ Administration Act 1934 and the Guardianship of Infants Act 1934 from the
 2020 text, with batteries and asserts. The pre-revision text of the same
 sections is the second dialect.
 
-Retrieval caveat, measured 2026-09-02: the lawplain corpus returns the
-current consolidation for both its `act_current` and `act_revised` kinds
-(probed on the Revised Edition of the Laws Act itself), so the **pre-2020
-text is not in hand**; it has to come from Singapore Statutes Online's
-point-in-time versions, which this spec has not yet verified are available
-per section. The PLUS survey report (AGC, PDF) and the 2021 second-reading
-speech on the Statute Law Reform Bill are the primary descriptions of intent.
+**Retrieval, verified 2026-09-02.** The lawplain corpus does not carry the
+pre-revision text (its `act_revised` kind returns the current consolidation;
+probed on the Revised Edition of the Laws Act itself). Singapore Statutes
+Online does, and serves it to a plain HTTP client with no bot wall:
+`https://sso.agc.gov.sg/Act/<ID>?ValidDate=YYYYMMDD&WholeDoc=1` selects a
+point-in-time version, and the page's timeline lists the dates it knows. Two
+things make a script necessary: the page lazy-loads its provisions through
+`/Details/GetLazyLoadContent`, whose parameters come from the page's own
+`lazyLoadFilter` and `fragments` map, and fetching the _root_ fragment returns
+the whole statute body in one request; and `?ViewType=Pdf` gives an official
+rendering that `pdftotext` reads cleanly. `etc/fetch-sso.py` does both and
+lists timelines. The pair for this corpus is **`ValidDate=20211230`**, the
+last day of the old text, against **`20211231`**, the day the 2020 Edition
+came into force — not "current", which carries later amendments.
+
+**The revision is bimodal, measured on 16 Acts.** The "as far as possible"
+in "shall is replaced by must as far as possible" was applied by exempting
+whole Acts, not by degrees within an Act:
+
+| restyled (share of "shall" removed)                         | left alone (operative text unchanged)                                              |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Contracts (Rights of Third Parties) 2001 — 100%, 2.5k words | Penal Code 1871 (753 → 744; the AGC's own example, yet untouched here)             |
+| Trustees Act 1967 — 95%, 27k words                          | Wills Act 1838, Probate and Administration 1934, Guardianship of Infants 1934      |
+| Interpretation Act 1965 — 94%, 12k                          | Intestate Succession 1967, Civil Law Act 1909, Limitation 1959, Sale of Goods 1979 |
+| Evidence Act 1893 — 93%; PDPA 2012 — 82%                    | Extradition 1968                                                                   |
+| Companies Act 1967 — 80%, 181k; Women's Charter 1961 — 64%  |                                                                                    |
+
+So the **sg-succession quartet is a weak pair**: every "shall" survives, and
+the diff is chapter numbers, commencement tables and annotation formats.
+The Acts to pilot on are in the left column. Recommended, in order:
+
+1. **Contracts (Rights of Third Parties) Act 2001** — 2,536 words, every
+   "shall" gone, contract law. Small enough to encode in a session, so §3.6
+   can run end to end on it first.
+2. **Interpretation Act 1965** — 94% restyled and already cited 17 times by
+   the sg-succession corpus, so an encoding pays twice.
+3. **Trustees Act 1967** — 95% restyled, 27k words, the AGC's named example.
 
 Nothing here is built and none of it changes Phases 0–2. It changes what the
 house-style table in §2.7 is allowed to become: keyed by dialect, and mined
