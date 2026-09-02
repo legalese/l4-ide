@@ -14,10 +14,13 @@
 -- text, so nothing here can drift from what @l4 blawx@ writes.
 --
 -- __Where the expected strings come from.__ Not from this file's taste: the
--- verb-infix and the transcribed sentences are Jason Morris's own hand NLG,
--- read out of @blawx\/static\/blawx\/examples\/{rps,beard_tax}.yaml@ at
--- checkout @6a717b1@ — @blawx_attribute_nlg(beats,ov,"","beats","")@ and
+-- transcribed sentences are Jason Morris's own hand NLG, read out of
+-- @blawx\/static\/blawx\/examples\/{rps,beard_tax}.yaml@ at checkout @6a717b1@
+-- — @blawx_attribute_nlg(beats,ov,"","beats","")@ and
 -- @blawx_attribute_nlg(bearded,not_applicable,"",not_applicable,"is bearded")@.
+-- The first of those is now reached by writing @\@nlg \@(X) beats \@(Y)@, not by
+-- a default: the verb-shaped default of 2026-09-02 was withdrawn the same day
+-- (BLAWX-EXPORT-SPEC §4.9), and the tests below pin its absence.
 module BlawxNlgSpec (spec) where
 
 import Test.Hspec
@@ -69,15 +72,17 @@ refusedFor needle src = case blawxYaml src of
 hasLine :: Text -> Text -> Expectation
 hasLine out needle = (needle, needle `Text.isInfixOf` out) `shouldBe` (needle, True)
 
--- | An RPS-shaped module. @throws@ is object-valued and verb-shaped;
--- @favourite@ is object-valued and noun-shaped; @rounds@ is a NUMBER whose name
--- ends in @s@, which is the control for "object-valued only".
+-- | An RPS-shaped module. @throws@ is object-valued and reads as a verb;
+-- @premises@ is object-valued and reads as a plural noun — the pair that no
+-- spelling test can separate, which is why there is no spelling test;
+-- @favourite@ is the singular control and @rounds@ the NUMBER control.
 signModule :: Text -> Text -> Text
 signModule fieldAnno decideAnno = Text.unlines
   [ "DECLARE Sign IS ONE OF Rock, Paper"
   , ""
   , "DECLARE Player HAS"
   , "    throws IS A Sign" <> fieldAnno
+  , "    premises IS A Sign"
   , "    favourite IS A Sign"
   , "    rounds IS A NUMBER"
   , ""
@@ -95,16 +100,21 @@ plain = signModule "" ""
 spec :: Spec
 spec = do
   describe "synthesised NLG (no @nlg written)" $ do
-    it "reads a one-word object-valued attribute as a verb and makes it the infix" $ do
+    -- The withdrawn heuristic would have made `throws` and `premises` infixes
+    -- ("@(X) throws @(Y)", "@(X) premises @(Y)"). Both stay possessive: an
+    -- s-final word is not evidence of a verb, and legal drafting supplies the
+    -- plural noun far more often (heirs, premises, proceeds, damages, goods).
+    it "leaves an s-final object-valued attribute on the possessive default" $ do
       out <- emitted plain
-      hasLine out "blawx_attribute_nlg(throws,ov,\"\",\"throws\",\"\")."
-      hasLine out "#pred throws(X,Y) :: '@(X) throws @(Y)'."
+      hasLine out "blawx_attribute_nlg(throws,ov,\"\",\"has throws of\",\"\")."
+      hasLine out "#pred throws(X,Y) :: '@(X) has throws of @(Y)'."
+      hasLine out "blawx_attribute_nlg(premises,ov,\"\",\"has premises of\",\"\")."
 
-    it "leaves a noun-shaped object-valued attribute on the possessive default" $ do
+    it "leaves a singular object-valued attribute on the same default" $ do
       out <- emitted plain
       hasLine out "blawx_attribute_nlg(favourite,ov,\"\",\"has favourite of\",\"\")."
 
-    it "does not read a NUMBER-valued attribute as a verb, however it is spelled" $ do
+    it "leaves a NUMBER-valued attribute on the same default" $ do
       out <- emitted plain
       hasLine out "blawx_attribute_nlg(rounds,ov,\"\",\"has rounds of\",\"\")."
 
@@ -114,6 +124,12 @@ spec = do
       hasLine out "blawx_category_nlg(player,\"\",\"is a player\")."
 
   describe "@nlg becomes the declaration's slots" $ do
+    -- Jason's own `beats` NLG, which is now written rather than guessed.
+    it "recovers the verb reading when the author writes it" $ do
+      out <- emitted (signModule " @nlg @(X) throws @(Y)" "")
+      hasLine out "blawx_attribute_nlg(throws,ov,\"\",\"throws\",\"\")."
+      hasLine out "#pred throws(X,Y) :: '@(X) throws @(Y)'."
+
     it "cuts a two-slot field sentence written in Blawx's own placeholders" $ do
       out <- emitted (signModule " @nlg the sign thrown by @(X) is @(Y)" "")
       hasLine out "blawx_attribute_nlg(throws,ov,\"the sign thrown by\",\"is\",\"\")."
@@ -156,3 +172,22 @@ spec = do
     it "refuses a double quote, which the *_nlg facts carry unescaped" $
       refusedFor "contains a double quote"
         (signModule " @nlg @(X) throws the \"sign\" @(Y)" "")
+
+  -- A `%` opens a slot only when it delimits a name. Before that test
+  -- (2026-09-02) prose percentages paired with each other into phantom slots,
+  -- and when the phantom count matched the block's arity the sentence was
+  -- mis-cut silently and `l4 blawx` exited 0.
+  describe "a % in prose is a percent sign, not a slot" $ do
+    it "refuses a sentence whose only % are percentages, on the arity check" $
+      refusedFor "has 0 slot(s), but its Blawx declaration block has 2"
+        (signModule " @nlg 5% a 10% b 15% c 20%" "")
+
+    it "keeps a percentage literal beside real Blawx placeholders" $ do
+      out <- emitted (signModule " @nlg @(X) pays 5% of @(Y)" "")
+      hasLine out "blawx_attribute_nlg(throws,ov,\"\",\"pays 5% of\",\"\")."
+      hasLine out "#pred throws(X,Y) :: '@(X) pays 5% of @(Y)'."
+
+    it "keeps a percentage literal beside a parameter reference" $ do
+      out <- emitted (signModule "" "@nlg %p% pays a 5% surcharge")
+      hasLine out
+        "blawx_attribute_nlg(wins,not_applicable,\"\",not_applicable,\"pays a 5% surcharge\")."

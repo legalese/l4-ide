@@ -6,17 +6,23 @@
 -- winner (game -> player), player (game -> player, multi-valued);
 -- relationship throw(player, sign, game).
 --
--- NLG (BLAWX-EXPORT-SPEC §11 W4): `throws` and `beats` carry no `@nlg` on
--- purpose — they are the witnesses for the improved default, which reads a
--- one-word object-valued attribute name as a verb and makes it the infix, so
--- both declare `@(X) <verb> @(Y)`. That is byte-for-byte Jason's own hand NLG
--- for `beats`. The four that do carry an `@nlg` are the ones the default gets
--- wrong: "has first player of", and a bare postfix "first player wins".
+-- NLG (BLAWX-EXPORT-SPEC §11 W4): every attribute here carries an `@nlg`,
+-- because the synthesised default is the possessive `"has <name> of"` for every
+-- object-valued attribute without exception — a verb-shaped default was tried
+-- on 2026-09-02 and withdrawn the same day for over-firing on plural nouns
+-- (§4.9). `throws` and `beats` therefore write their verb reading out, which is
+-- byte-for-byte Jason's own hand NLG for `beats`
+-- (`blawx_attribute_nlg(beats,ov,"","beats","")`).
+--
+-- Placement trap, measured 2026-09-02: on a value-returning `DECIDE … IS` the
+-- `@nlg` goes between the app form and the `IS` (as on `beats` below). On the
+-- line after `GIVETH` it type-checks and is silently ignored; on the line above
+-- `GIVEN` it is a parse error.
 
 DECLARE Sign IS ONE OF Rock, Paper, Scissors
 
 DECLARE Player HAS
-    throws IS A Sign
+    throws IS A Sign  @nlg @(X) throws @(Y)
 
 DECLARE Game HAS
     `first player`  IS A Player  @nlg the first player of @(X) is @(Y)
@@ -41,7 +47,9 @@ DECIDE `second player wins`
 @export 3. The signs are related in the following ways: (a) Rock beats Scissors, (b) Scissors beats Paper, and (c) Paper beats Rock.
 GIVEN s IS A Sign
 GIVETH A Sign
-DECIDE `beats` s IS
+DECIDE `beats` s
+@nlg %s% beats @(Y)
+  IS
   CONSIDER s
     WHEN Rock THEN Scissors
     WHEN Scissors THEN Paper

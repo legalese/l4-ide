@@ -472,19 +472,53 @@ value is its `GIVETH`, which the grammar leaves unnamed. Slot count must equal t
 arity, `@(V)`-spelled slots must be in the block's own order, an interior chunk may not be
 empty (Blawx joins with single spaces; an empty middle emits a double space and fails the R12
 fixpoint) and no chunk may carry `"` (the `*_nlg` facts are double-quoted and unescaped): each
-is refused by name rather than half-applied. Categories keep the synthesised sentence
-unconditionally — the middle-end carries no `@nlg` for a `DECLARE`'s own name, only for its
-fields, and the synthesis already matches Jason Morris's hand NLG on every category of both
-his running examples.
+is refused by name rather than half-applied.
 
-**The synthesised default for an object-valued attribute** reads a one-word, `s`-final,
-object-valued mangled name as a third-person verb and makes it the _infix_ — `beats` declares
-`@(X) beats @(Y)`, not `@(X) has beats of @(Y)` — which is byte-for-byte Jason's own
-`blawx_attribute_nlg(beats,ov,"","beats","")`. The test is narrow on purpose (object-valued
-only, single word, not an `-ss`/`-us`/`-is`/`-as`/`-os` ending): measured over the eight
-object-valued attributes in `jl4/examples/blawx` on 2026-09-02 it fires on exactly `throws` and
-`beats`, leaving `effect`, `conduct`, `first_player`, `second_player` and
-`the_basis_on_which_rent_is_payable` on the `"has ⟨pretty⟩ of"` noun form.
+A `%` opens a slot only when it delimits a _name_ — a letter or `_` first, a letter, digit or
+`'` last, and nothing but letters, digits, `_`, `-`, `'` and interior spaces between, which is
+the only thing `linearNlg` ever writes there. Any other `%` is a literal percent sign. Without
+that test (added 2026-09-02) a percentage in prose paired with the next percentage into a
+phantom slot, and where the phantom count happened to match the block's arity the sentence was
+mis-cut _silently_: `@nlg 5% a 10% b 15% c 20%` on a two-argument attribute emitted
+`blawx_attribute_nlg(tier,ov,"5","b 15","")` and exited 0 (measured here on the pre-fix binary).
+It now refuses on the arity check — 0 slots, block has 2 — while `@nlg @(X) pays 5% of @(Y)`
+emits infix `"pays 5% of"` and keeps both real slots.
+
+Where the annotation goes on a value-returning `DECIDE … IS` is not free (measured 2026-09-02):
+between the app form and the `IS` it is found; on the line after `GIVETH` the module
+type-checks and the annotation is **silently ignored** — the position list at
+`L4.Relational.Lower.decideNlg` (outer `TopDecl`, the `Decide`, its app form, its body, its
+head name, its app-form arguments) does not include the type signature's own annotation; on the
+line above `GIVEN` it is a parse error.
+
+Categories keep the synthesised sentence unconditionally — the middle-end carries no `@nlg` for
+a `DECLARE`'s own name, only for its fields, and the synthesis already matches Jason Morris's
+hand NLG on every category of both his running examples.
+
+**The synthesised default for a value-typed attribute is the possessive `"has ⟨pretty⟩ of"`
+infix, with no exceptions** — `beats` declares `@(X) has beats of @(Y)` unless an `@nlg` says
+otherwise, whatever the attribute's value type or the shape of its name.
+
+A narrower default was built on 2026-09-02 and withdrawn the same day: it read a one-word,
+`s`-final, object-valued mangled name as a third-person verb and made it the infix, which is
+byte-for-byte Jason Morris's own `blawx_attribute_nlg(beats,ov,"","beats","")`. It over-fires
+on the regular plural noun, which is the shape legal drafting supplies most often. Measured
+here on 2026-09-02, on a scratch module of nine category-valued fields, it fired on eight of
+them — `heirs`, `premises`, `news`, `shares`, `proceeds`, `damages`, `goods` and `securities`
+all became infixes, so `heirs` emitted `#pred heirs(X,Y) :: '@(X) heirs @(Y)'` — and only
+`owner`, the one name not ending in `s`, kept the possessive. The `-ss`/`-us`/`-is`/`-as`/`-os`
+exclusion list caught none of the eight. A wrong guess reads worse than the clumsy default and
+only `@nlg` can repair it, so the guess is not worth its 2 hits.
+
+`@nlg` is the mechanism instead, and `rps.l4` now writes what it wants: `@nlg @(X) throws @(Y)`
+on the field and `@nlg %s% beats @(Y)` on the decision. Regenerating all **12** seeds after the
+withdrawal leaves all 24 goldens byte-identical (`for f in jl4/examples/blawx/*.l4; do l4 blawx
+$f -o expected/$(basename $f .l4).blawx; done; git diff --stat` — empty), because the heuristic
+had fired on exactly `throws` and `beats` and on nothing else in the corpus. That corpus holds
+**7 distinct category-valued attributes over 9 occurrences** — `beats`, `conduct`, `effect`,
+`first_player`, `second_player`, `the_basis_on_which_rent_is_payable`, `throws` — counted by
+joining `blawx_attribute/3` against `blawx_category/1` over
+`jl4/examples/blawx/expected/*.pl`.
 
 ### 4.10 Tests
 
@@ -1522,32 +1556,54 @@ paragraph eIds are the question R4 left open and stay open. Amends R4, §4.9.
 two new seeds; consider a default that treats a verb-shaped attribute name as the infix (`ov`)
 form. Amends §4.9, R10.
 
-**DISCHARGED 2026-09-02.** Both halves built; §4.9 carries the slot-decomposition rules and the
-default, R10 (§8.10) carries what byte-exactness does and does not pin. The `@nlg` override was
-_not_ merely unused — the lowering ignored the annotation outright, and its module header said
-so; the blocker turned out to be one line in `L4.Relational.Lower.linearNlg`, which dropped the
-`%…%` delimiters that `L4.Relational.IR`'s own field doc claimed were there. Measured this
-session, each number from a command run here:
+**DISCHARGED 2026-09-02.** `@nlg` is the mechanism, and it is the only mechanism: §4.9 carries
+the slot-decomposition rules, R10 (§8.10) carries what byte-exactness does and does not pin. The
+`@nlg` override was _not_ merely unused — the lowering ignored the annotation outright, and its
+module header said so; the blocker turned out to be one line in
+`L4.Relational.Lower.linearNlg`, which dropped the `%…%` delimiters that `L4.Relational.IR`'s
+own field doc claimed were there. Measured this session, each number from a command run here:
 
-- `beard.l4` now emits Jason's own NLG for **8 of 8** declarations that have a counterpart in
+- `beard.l4` emits Jason's own NLG for **8 of 8** declarations that have a counterpart in
   `beard_tax.yaml` — the `person` category plus all seven attributes — byte-for-byte, apostrophe
   quirk (`"'s facial hair is on the chin"`) included. `rps.l4` matches his on the three
   categories and on `beats`; `first player` / `second player` follow the shape of his `winner`
   (`"the winner of","is",""`) since our record encoding has no multi-valued `player` attribute
   (§11 preamble).
-- The verb default fires on exactly **2 of the 8** object-valued attributes in
-  `jl4/examples/blawx` (`throws`, `beats`) and on none of the other seven seeds: `git diff
---numstat jl4/examples/blawx/expected/` names only `rps.*` and `beard.*`.
-- **13 changed NLG declarations** across the two seeds; **609 golden lines changed in place**,
-  zero added or removed, and a `grep` over the diff finds no changed line that is not a `#pred`
-  template, a `*_nlg` fact or a `prefix`/`infix`/`postfix` XML field.
-- Harnesses: fixpoint **9/9, 0 failed** on `rps.blawx` and **9/9, 0 failed** on `beard.blawx`
-  (`BLAWX_CHECKOUT=/Volumes/transcend/src/blawx-stock`, per W9); tier-1 **8/8** over both seeds'
-  `#EVAL` oracles; `l4 blawx --roundtrip` "IR and bytes unchanged" on both.
-- Suites: `jl4-core-test` **434 examples, 0 failures** (13 of them the new `BlawxNlgSpec`);
-  `jl4-test` **2670 examples, 0 failures** after re-blessing one golden line —
-  `jl4/examples/relational/expected/tiers`, where `nlg: the loyalty bonus earned by m` becomes
-  `… by %m%`, which is the delimiter repair showing up in the Debug renderer.
+- **The second half of the "Do." above was tried and reversed on the same day.** A default that
+  read a one-word, `s`-final, object-valued name as the infix over-fires on the regular plural
+  noun: on a nine-field scratch module it fired on eight — `heirs`, `premises`, `news`,
+  `shares`, `proceeds`, `damages`, `goods`, `securities` — and spared only `owner` (§4.9). It is
+  gone; `rps.l4` writes `@nlg @(X) throws @(Y)` and `@nlg %s% beats @(Y)` instead, which
+  reproduces Jason's `beats` NLG exactly. Regenerating all **12** emitting seeds after the
+  reversal leaves **24 of 24** goldens byte-identical — the heuristic had fired on exactly
+  `throws` and `beats`, which are the corpus's only two hits among its **7 distinct
+  category-valued attributes over 9 occurrences** (`beats`, `conduct`, `effect`, `first_player`,
+  `second_player`, `the_basis_on_which_rent_is_payable`, `throws`; joined `blawx_attribute/3`
+  against `blawx_category/1` over `jl4/examples/blawx/expected/*.pl`). The earlier draft of this
+  item said "2 of the 8 … and none of the other seven seeds"; both counts were wrong — there is
+  no eighth attribute, and there are ten other seeds.
+- **A `%` in the sentence opens a slot only when it delimits a name** (§4.9). Before that test,
+  `@nlg 5% a 10% b 15% c 20%` on a two-argument attribute emitted
+  `blawx_attribute_nlg(tier,ov,"5","b 15","")` and exited **0**; it now exits **1** on the arity
+  check, while `@nlg @(X) pays 5% of @(Y)` keeps its percentage and both slots.
+- The `@nlg` leg of the commit that opened this item changed **13 NLG declarations** and **609
+  golden lines in place**, zero added or removed, no changed line that is not a `#pred`
+  template, a `*_nlg` fact or a `prefix`/`infix`/`postfix` XML field. The reversal on top of it
+  changed **no golden byte at all**.
+- Harnesses, after both changes: fixpoint **18 checked, 0 failed** over `rps.blawx` and
+  `beard.blawx` together, **9 checked, 0 failed** on `rps.blawx` alone
+  (`BLAWX_CHECKOUT=/Volumes/transcend/src/blawx-stock`, per W9);
+  tier-1 **8/8** over both seeds' `#EVAL` oracles; `l4 blawx --roundtrip` "IR and bytes
+  unchanged" on both.
+- Suites: `jl4-core-test` **438 examples, 0 failures** (17 of them `BlawxNlgSpec`, which now
+  pins the _absence_ of the verb reading and the percent-in-prose behaviour); `l4-cli-test`
+  `-m blawx` **45 examples, 0 failures**; `check-corpus-goldens` **368 corpus files, all four
+  goldens present**. `jl4-test` was run once for the delimiter repair (**2670 examples, 0
+  failures**, after re-blessing `jl4/examples/relational/expected/tiers`, where `nlg: the
+loyalty bonus earned by m` becomes `… by %m%`) and _not_ re-run for the reversal, because
+  nothing the reversal touches is inside its globs: `jl4/tests/Main.hs:78-91` globs `ok/**`,
+  `legal/**`, `not-ok/tc/**`, `not-ok/nlg/**`, `not-ok/export-*.l4`, `lsp/**` and the libraries,
+  and `jl4/examples/blawx/` is in none of them.
 
 **Left open, deliberately.** (a) A `DECLARE`'s own name still has no `@nlg` channel — the
 middle-end carries none — so a category sentence other than `"is a ⟨pretty⟩"` is unreachable;

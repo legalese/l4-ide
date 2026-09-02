@@ -171,7 +171,8 @@ import Base
 import Control.Applicative ((<|>))
 import qualified Base.Map as Map
 import qualified Base.Text as Text
-import Data.Char (chr, isAsciiLower, isAsciiUpper, isDigit, ord, toLower, toUpper)
+import Data.Char
+  (chr, isAlpha, isAlphaNum, isAsciiLower, isAsciiUpper, isDigit, ord, toLower, toUpper)
 import qualified Data.Set as Set
 
 import L4.Blawx.IR
@@ -792,7 +793,7 @@ declarations env prog = do
    where
     defaults = case vt of
       BVBoolean -> ("", "", prettyAtom (bNameText n))
-      _         -> ("", defaultInfix vt (bNameText n), "")
+      _         -> ("", defaultInfix (bNameText n), "")
   attributeBlock cat n vt (pre, inf, post) prov =
     BDeclareAttribute MkBAttributeDecl
       { baCategory = cat
@@ -836,38 +837,26 @@ isFieldInput env p = p.rpKind == RInput && Map.member p.rpName.rnUnique env.envF
 prettyAtom :: Text -> Text
 prettyAtom = Text.replace "_" " "
 
--- | The default infix of a value-typed attribute's NLG.
+-- | The default infix of a value-typed attribute's NLG: @has \<name\> of@,
+-- unconditionally.
 --
--- __The verb arm (BLAWX-EXPORT-SPEC §11 W4, 2026-09-02).__ An object-valued
--- attribute whose mangled name is a single word ending in @s@ is read as a
--- third-person verb and becomes the infix itself, so @beats@ declares
--- @\@(X) beats \@(Y)@ rather than @\@(X) has beats of \@(Y)@ — which is
--- byte-for-byte what Jason Morris's own hand NLG says for the same predicate
--- (@blawx_attribute_nlg(beats,ov,\"\",\"beats\",\"\")@ in
--- @blawx\/static\/blawx\/examples\/rps.yaml@).
+-- __There is no verb heuristic (BLAWX-EXPORT-SPEC §11 W4, 2026-09-02).__ One
+-- was built earlier that day: an object-valued attribute whose mangled name was
+-- a single @s@-final word became the infix itself, so @beats@ declared
+-- @\@(X) beats \@(Y)@ — byte-for-byte Jason Morris's own
+-- @blawx_attribute_nlg(beats,ov,\"\",\"beats\",\"\")@. It was removed the same
+-- day because it over-fires on the regular plural noun, which is the shape
+-- legal drafting supplies most: measured on a nine-field scratch module, it
+-- fired on eight of nine fields — @heirs@, @premises@, @news@, @shares@,
+-- @proceeds@, @damages@, @goods@, @securities@ all became infixes
+-- (@\@(X) heirs \@(Y)@), and only @owner@ kept the default. The @-ss@\/@-us@
+-- \/@-is@\/@-as@\/@-os@ exclusion list did not touch any of them.
 --
--- The test is deliberately narrow, because a wrong guess reads worse than the
--- clumsy default and only @\@nlg@ can repair it: __object-valued only__ (a
--- number- or list-valued attribute is a measurement, not a relation), a single
--- word (a multi-word name is a noun phrase — @first_player@, @the_basis_on_…@),
--- and not an @-ss@\/@-us@\/@-is@\/@-as@\/@-os@ ending, which are the common
--- English nouns that end in @s@ without being verbs (@address@, @status@,
--- @basis@, @atlas@, @chaos@). Measured over the eight object-valued attributes
--- in @jl4\/examples\/blawx@ on 2026-09-02, it fires on exactly @throws@ and
--- @beats@ and leaves @effect@, @conduct@, @first_player@, @second_player@ and
--- @the_basis_on_which_rent_is_payable@ on the noun default.
-defaultInfix :: BValueType -> Text -> Text
-defaultInfix vt atom
-  | verbShaped = atom
-  | otherwise  = "has " <> prettyAtom atom <> " of"
- where
-  verbShaped = case vt of
-    BVCategory _ ->
-         not ("_" `Text.isInfixOf` atom)
-      && Text.length atom >= 4
-      && "s" `Text.isSuffixOf` atom
-      && not (any (`Text.isSuffixOf` atom) (["ss", "us", "is", "as", "os"] :: [Text]))
-    _ -> False
+-- The override is @\@nlg@ ('nlgChunks'), which is what @rps.l4@ now uses for
+-- @throws@ and @beats@ — an author who wants the verb reading writes it, and
+-- nothing has to guess.
+defaultInfix :: Text -> Text
+defaultInfix atom = "has " <> prettyAtom atom <> " of"
 
 -- | The relationship block's canonical NLG variables (@\@(A)@…@\@(J)@),
 -- matching @L4.Blawx.Emit.relationshipVariant@\'s argument letters.
@@ -900,6 +889,19 @@ data NlgSlot = MkNlgSlot
 -- @n@ slots yield @n+1@ chunks, some possibly empty. An unterminated @\@(@ or
 -- an odd @%@ is not a slot; it stays literal text and is caught downstream by
 -- the arity check in 'nlgChunks', which is the loud place to report it.
+--
+-- __A @%@ opens a slot only when it delimits a name__ (BLAWX-EXPORT-SPEC §11
+-- W4, 2026-09-02). @L4.Relational.Lower.linearNlg@ writes @%@ around one thing
+-- only — a parameter\'s raw name — so an interior that is not name-shaped
+-- ('slotNameShaped') is prose, and the @%@ stays a literal percent sign.
+-- Without that test a percentage in prose paired with the next percentage into
+-- a phantom slot, and when the phantoms happened to match the block\'s arity
+-- the sentence was silently mis-cut: @\@nlg 5% a 10% b 15% c 20%@ on a
+-- two-argument attribute emitted
+-- @blawx_attribute_nlg(tier,ov,\"5\",\"b 15\",\"\")@ and exited 0 (measured
+-- 2026-09-02). It is now refused by the arity check — 0 slots, block has 2 —
+-- while @\@nlg %p% pays 5% of @(Y)@ keeps its two real slots and its literal
+-- percent sign.
 scanNlg :: Text -> ([Text], [NlgSlot])
 scanNlg = go []
  where
@@ -911,10 +913,27 @@ scanNlg = go []
       , not (Text.null rest') -> split acc (MkNlgSlot nm True) (Text.drop 1 rest')
     Just ('%', rest)
       | let (nm, rest') = Text.breakOn "%" rest
-      , not (Text.null rest') -> split acc (MkNlgSlot nm False) (Text.drop 1 rest')
+      , not (Text.null rest')
+      , slotNameShaped nm -> split acc (MkNlgSlot nm False) (Text.drop 1 rest')
     Just (c, rest) -> go (c : acc) rest
   split acc sl rest = let (cs, sls) = go [] rest in (lit acc : cs, sl : sls)
   lit = Text.pack . reverse
+
+-- | Whether the text between a pair of @%@ is shaped like the L4 name that
+-- @L4.Relational.Lower.linearNlg@ puts there: a letter or @_@ first, a letter,
+-- digit or @\'@ last, and nothing but letters, digits, @_@, @-@, @\'@ and the
+-- interior spaces of a backticked multi-word name in between. Prose fragments
+-- caught between two percentages fail it on their leading space or digit
+-- (@\" a 10\"@, @\"-60\"@), which is the point.
+slotNameShaped :: Text -> Bool
+slotNameShaped nm = case (Text.uncons nm, Text.unsnoc nm) of
+  (Just (c, _), Just (_, l)) ->
+       (isAlpha c || c == '_')
+    && (isAlphaNum l || l == '\'')
+    && Text.all nameChar nm
+  _ -> False
+ where
+  nameChar ch = isAlphaNum ch || ch `elem` ("_-' " :: String)
 
 -- | Decompose an @\@nlg@ sentence into the NLG slots a declaration block
 -- stores, or refuse with named diagnostics.
