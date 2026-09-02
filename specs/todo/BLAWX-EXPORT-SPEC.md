@@ -13,9 +13,11 @@ recorded inline in §10; reader-facing documentation landed as PR #280
 `jl4-core/src/L4/Blawx/`, three under `jl4-core/src/L4/Relational/`, sixteen `.l4` files under
 `jl4/examples/blawx/` (eleven emitting seeds, five `not-ok/` refusal fixtures), and the verb
 wired at `jl4/app/Main.hs:110` →
-`jl4/app/L4/Cli/Blawx.hs`. What remains open is not code: R10's fork fixes wait in
+`jl4/app/L4/Cli/Blawx.hs`. What remains open: R10's fork fixes wait in
 `legalese/blawx` (#1–#5, filed 2026-08-20, see §8.10) until upstreaming to Lexpedite is
-warranted. (This header read "implementation beginning … nothing exists under
+warranted — and, since 2026-09-02, the **measured worklist of §11**, which \_is_ code: an
+exporter defect (W1), an ontology gap (W2), the import fragment's distance from Blawx's own
+running examples (W5), and the build pins the fork now carries (W8). (This header read "implementation beginning … nothing exists under
 `jl4-core/src/L4/Blawx/` or `jl4-core/src/L4/Relational/`" until 2026-08-28. That was true the
 day it was written and false the day after; it survived because §10's per-phase EXECUTED notes
 were appended without re-reading the top of the file. Do not restore it.) Siblings:
@@ -24,7 +26,7 @@ were appended without re-reading the top of the file. Do not restore it.) Siblin
 middle-end this spec consumes (§1.1, R2) — built as `L4.Relational` by #272, to the
 implementation brief in `RELATIONAL-M1-BRIEF.md`; the defeasibility prior-art evidence of §5.2 is
 consolidated into `SUBJECT-TO-NOTWITHSTANDING-SPEC.md` by PR #262, whose
-`BACKEND-PORTFOLIO-SPEC.md` records this bridge as seam S2 of the backend portfolio._
+`BACKEND-PORTFOLIO-SPEC.md` records this bridge as seam S2 of the backend portfolio.\_
 
 **One-line summary.** Where OpenFisca receives L4's `@export` decisions as Python formulas and
 Catala would receive them as scopes, Blawx receives them as **s(CASP) logic programs**: the
@@ -1393,6 +1395,132 @@ Parse}` + `L4.Blawx.Lift` + `l4 blawx --import/--parse-only/--reemit`; the emit�
   whose own body has none; `KNOWN_SURPLUS` table with control run) and rewrote the
   lift's stratification guard over the program the lift actually EMITS (witness: bird
   plus one mirrored `overrules` is refused `blawx-lift/unstratified` by name)._
+
+## 11. Worklist after the Blawx v3 webinar (2026-09-02)
+
+_Added 2026-09-02, nothing in it landed. Everything here was **measured that day** on
+`origin/unstable` at `f4ae3d5e` with an `l4` built from `31af0995` (the Blawx modules are
+unchanged since #279), against the checkout at `/Volumes/transcend/src/blawx` and the R13
+harnesses. Items are numbered **W1–W8** so later notes can cite them. Each says what was
+measured, what it implies, and which section it amends; the section it amends is **not**
+rewritten here — a W-item is discharged by editing that section and marking the item done._
+
+**The target froze while the product moved.** `Lexpedite/blawx` on GitHub has had no commit
+since 2024-11-01 (v1.6.22-alpha), which is what every byte-exactness claim in R10/R12 is about.
+`Lexpedite/blawx_mcp`'s README (read 2026-09-02) opens _"THIS REPOSITORY IS DEPRECATED AS OF
+BLAWX v2.2.3, June 20, 2026 — OFFICIAL MCP SUPPORT FOR BLAWX IS NOW VIA REMOTE MCP — SEE
+DOCUMENTATION AT HTTPS://APP.BLAWX.DEV"_; that site's landing page footer reads _"Blawx v3.0.5"_
+(fetched 2026-09-02), and `/api/`, `/api/deployments/` and `/docs/` all answer 404 to an
+unauthenticated fetch. At the webinar Jason Morris showed a deployments endpoint
+(`app.blawx.dev/api/deployments/`) and remote MCP; whether v2/v3 still generates the v1.6
+s(CASP) dialect is unknowable from outside. Consequence for this bridge: the `--scasp` leg is
+the part that survives a front-end rewrite; `EmitXml`/`Parse` survive only while Blawx keeps
+Blockly's XML serialisation (v1.6 calls `Blockly.Xml.domToWorkspace` throughout and never
+`Blockly.serialization` **[E]**), and the interview/abductive leg follows whatever the hosted
+reasoner exposes.
+
+**Two new seeds** (worktree `blawx-rps`, not yet a PR): `rps.l4` — Jason Morris's Rock Paper
+Scissors Act, his running example, from `blawx/static/blawx/examples/rps.yaml` — and `beard.l4`
+— his Beard Tax Act s.1, from `beard_tax.yaml`. Both are written in record style (Meng,
+2026-09-02: GIVEN-with-records over ASSUME for Blawx seeds unless the ASSUME shape is measurably
+more isomorphic); both `--roundtrip` "IR and bytes unchanged"; fixpoint 8/8 and 9/9 canvases
+byte-identical under the real Blockly 10.1.3 generator; tier-1 4/4 and 4/4 in swipl. An
+ASSUME-style twin of RPS also compiles, and its `throw` lowers to the arity-3 relationship Jason
+declares, where the record version lowers it to an attribute of a per-game Player; neither
+reproduces his multi-valued `player(Game, Player)` attribute, because a two-player game in a
+functional language is two named slots.
+
+### W1 — record identity does not survive flattening (exporter defect, silent)
+
+**Measured.** The first RPS encoding took a Player and a Game and asked whether that player
+wins, finding "the other player" by `EQUALS` on Player records. L4 said `TRUE` for Jane; the
+tier-1 harness said **no model**. The R11 flattening emits the `#EVAL`'s argument as object `p1`
+and the game's first player as `p2`, two objects for one structurally-equal value, so
+`P = Firstplayer` fails. Re-encoding s.4 once per seat (`first player wins` / `second player
+wins`) needs no identity and passes 4/4. **Implies.** L4 compares records by value, Blawx
+compares objects by atom; any rule with `EQUALS`/disequality on record-typed operands emits
+source that parses, checks, and _answers differently_ — the §3.2.1 failure class, caught here
+only because R11 keeps the oracle outside the artifact. **Do.** For v1, refuse
+`REq`/`RNeq` whose operands are record-typed with a named `LowerError` (loud), and keep the first
+RPS encoding as a `not-ok/` fixture; later, hash-cons structurally-equal record arguments in the
+query flattening (one object per distinct value) and lift the refusal. Amends §4.1, §8.11.
+
+### W2 — `STRING` fields have no ontology image
+
+**Measured.** `name IS A STRING` on Player: _"sort with no Blawx value type: `name` involves
+the sort RSString, which Blawx's ontology cannot declare"_. **Implies.** §4.7's "literals
+survive as atoms, usable for equality" is true only in rule bodies; a string-typed _field_ has no
+attribute value type to be declared under. **Do.** Verify against `scasp_generator.js:927-1156`
+(R3's value-type evidence) whether v1.6 has any string-valued attribute type; if not, narrow §4.7
+to say so and make the diagnostic say "use an enum or a category for identity"; if it does, give
+`classifyPred` the image. Amends §4.7.
+
+### W3 — section numbers follow `§` order, not the source's
+
+**Measured.** R4 ruled flat numbered sections for v1. On `rps`, Jason's `sec_4_section` (s.4,
+the winner) is our `sec_1_section` because the headline decision exports first; his paragraph
+canvases `sec_2__para_a_section` … `sec_3__para_c_section` have no image at all. The same shape
+blocks the reverse direction: the lift rejects _"the rule is attributed to sec_1\_\_para_a_section,
+which is not a flat numbered section"_ on both fixtures. **Do.** (a) Let a numbered `§` header
+(`§ 4. …`) or an `@ref … s 4` pin the CLEAN section number, so attributions read
+`according_to(sec_4_section, …)` and the synthesised `rule_text` numbers match the source; (b)
+paragraph eIds are the question R4 left open and stay open. Amends R4, §4.9.
+
+### W4 — NLG for object-valued attributes
+
+**Measured.** Ours synthesises `"has beats of"` / `"has first player of"`; Jason's hand NLG reads
+`"beats"`. R3/R10 leave `@nlg` as the override and no seed uses it yet. **Do.** Put `@nlg` on the
+two new seeds; consider a default that treats a verb-shaped attribute name as the infix (`ov`)
+form. Amends §4.9, R10.
+
+### W5 — the import fragment against Blawx's own running examples: 0 of 2
+
+**Measured.** `--import` on `rps.yaml` and `beard_tax.yaml` refuses both. By diagnostic:
+`blawx-lift/attribute-type` (number- and object-valued attributes), `blawx-lift/relationship`
+(`throw/3`), `blawx-lift/goal-shape` (`blawx_comparison(L,gte,5)`, binary attribute goals,
+`blawx_diseq`), `blawx-lift/rule-section` (paragraph sections, see W3),
+`blawx-lift/test-block` (`object_declaration`, `assume`/abducibles in test canvases),
+`blawx-lift/query-shape` and `unbound-query` (free-variable goals such as
+`?- winner(Game, Player)`). R14's "stratified ground fragment" is exactly the `bird` shape
+(2/15 fixtures, §5.2). **Do.** Size the next lift increment on these two fixtures: number and
+object-valued attributes plus comparisons buy `beard_tax`; relationships, disequality, object
+declarations in tests and open queries buy `rps`. Amends R14, §5.2.
+
+### W6 — stale fixtures, witnessed twice more
+
+**Measured.** Both fixtures store the old-form frame axioms (`not blawx_becomes`: 80 and 20
+lines; `blawx_not_interrupted`: 0). `blawx-parse/stale-encoding` fired per section and the XML
+was taken as canonical, per R14. **Do.** Nothing — recorded as the third and fourth witness for
+the header's warning about the reference corpus.
+
+### W7 — dates block the British Nationality Act
+
+**Measured.** One `@export` added to `jl4/examples/legal/bna/bna.l4` (it is annotated with `@ref`
+throughout and has no `@export`, so the exporter saw nothing to lower) stops at `commencement` and
+`the appointed day`: _"date-valued parameters and results are M2 (see
+specs/todo/DATE-LIBRARY-SPEC.md)"_. Jason presented a Claude-assisted Blawx encoding of the BNA
+at the webinar; ours cannot be compared with it until the M2 date leg lands. **Do.** Nothing new
+here — §4.6 already scopes it; this is evidence for its priority, and the reason the
+`legal/bna` corpus is the first thing to try when M2 lands.
+
+### W8 — the instance was not what the measurements said, and the fork now pins the build
+
+**Measured.** The container that ran the R12/R13 measurements was Docker Hub
+`lexpedite/blawx:latest`, built 2023-09-22 from `826315b` (v1.6.21-alpha), **amd64 under
+emulation**, with none of the five fork fixes. Rebuilding from source on 2026-09-02 exposed
+three moving targets in upstream's Dockerfile, each now pinned by a commit on `legalese/blawx`
+`mengwong/main` (which also carries #1–#5 merged): a bare `npm install blockly` (pinned to
+10.1.3, what the old image ships and what the fixpoint harness measures); a hard-coded
+`bin/x86_64-linux/swipl` symlink (the s(CASP) pack step died with `swipl: not found` on arm64;
+now a glob); and an unpinned Django (5.x rejects `TIME_ZONE = 'MST'` on a base with no tz
+database; now `Django<5` plus `tzdata`). Still unpinned there: `swipl:latest`, s(CASP) from
+`master.zip`, and `storage.js` from Blockly's `develop` branch. **Do.** Add these build commits to
+§8.10's fork list when they are PR'd; re-run the R12 fixpoint and the tier-2 bird tests on the
+rebuilt image and record the numbers beside the 2023-image numbers in §10.
+
+_Related, outside this spec: SARA (Holzenberger, Blair-Stanek & Van Durme 2020 — nine IRC
+sections with a Prolog reference encoding) is nominated on `legalese/canon`
+`subjects/LONGLIST.md` as a differential target for this leg and the Prolog leg._
 
 ## Appendix A — worked example **[E — executed at both tiers; Blockly XML remains U]**
 
