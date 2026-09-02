@@ -1518,6 +1518,22 @@ database; now `Django<5` plus `tzdata`). Still unpinned there: `swipl:latest`, s
 §8.10's fork list when they are PR'd; re-run the R12 fixpoint and the tier-2 bird tests on the
 rebuilt image and record the numbers beside the 2023-image numbers in §10.
 
+**Tier 2 on the rebuilt image, measured 2026-09-02 (same day, later).** Container
+`legalese/blawx:edge` (v1.6.22-alpha + fork fixes #1–#5, Django 4.2.30, native arm64
+SWI-Prolog 10.1.14, s(CASP) 1.1.4 from master, Blockly 10.1.3). One more missing runtime found
+only by running a test: the copied swipl tree lacks `libossp-uuid.so.16`, which
+`mqi_start` needs, so every run answered _"Blawx could not load the reasoner."_ until
+`libossp-uuid16` was installed (now in the Dockerfile). Then, through
+`POST /<owner>/<slug>/test/<name>/run/` with the docs published and `blawx.run` granted to
+the anonymous user: Jason's own `rps.yaml` — `bobjane` → `Winner = jane`, `who_wins` → 0
+answers (no facts, no abducibles), `hypothetical` → 3 abductive answers; **our** `rps.blawx`
+— q1 model, q2 no model, q3 no model, q4 model, matching the L4 oracle **4/4**, `interview` →
+3 abductive answers; **our** `beard.blawx` — model / no / model / no, matching **4/4**,
+`interview` → 3. Headless loading needs the fixture's owner pk to exist and the `.blawx`
+pks renumbered away from anything already loaded (our fixtures carry no `rule_slug`; the app
+derives it on save, so two copies of one Act under one owner collide on the unique
+constraint).
+
 ### W9 — R10's "current generator" now has two candidates, and they disagree
 
 **Measured.** The fixpoint harness regenerates s(CASP) with the generator in `BLAWX_CHECKOUT`.
