@@ -1,0 +1,63 @@
+§ `Rock Paper Scissors Act`
+
+-- Jason Morris's running Blawx example (Lexpedite/blawx v1.6.22-alpha,
+-- blawx/static/blawx/examples/rps.yaml), re-encoded in record style.
+-- His ontology: categories game / player / sign; attributes beats (sign -> sign),
+-- winner (game -> player), player (game -> player, multi-valued);
+-- relationship throw(player, sign, game).
+
+DECLARE Sign IS ONE OF Rock, Paper, Scissors
+
+DECLARE Player HAS
+    throws IS A Sign
+
+DECLARE Game HAS
+    `first player`  IS A Player
+    `second player` IS A Player
+
+@export 4. The winner of a game is the player who throws a sign that beats the sign of the other player. (Stated once per seat: L4 records are values, Blawx objects are atoms, so a rule that compares two Player records with EQUALS does not survive the flattening — see the tier-1 finding of 2026-09-02.)
+GIVEN g IS A Game
+GIVETH A BOOLEAN
+DECIDE `first player wins` IF
+  `beats` (g's `first player`'s throws) EQUALS g's `second player`'s throws
+
+@export 4, the other seat.
+GIVEN g IS A Game
+GIVETH A BOOLEAN
+DECIDE `second player wins` IF
+  `beats` (g's `second player`'s throws) EQUALS g's `first player`'s throws
+
+@export 3. The signs are related in the following ways: (a) Rock beats Scissors, (b) Scissors beats Paper, and (c) Paper beats Rock.
+GIVEN s IS A Sign
+GIVETH A Sign
+DECIDE `beats` s IS
+  CONSIDER s
+    WHEN Rock THEN Scissors
+    WHEN Scissors THEN Paper
+    WHEN Paper THEN Rock
+
+-- Jason's `bobjane` test: jane (first) throws rock, bob (second) throws scissors.
+#EVAL `first player wins` OF
+        Game WITH
+            `first player`  IS Player WITH throws IS Rock
+            `second player` IS Player WITH throws IS Scissors
+-- L4 oracle ==> TRUE
+
+#EVAL `second player wins` OF
+        Game WITH
+            `first player`  IS Player WITH throws IS Rock
+            `second player` IS Player WITH throws IS Scissors
+-- L4 oracle ==> FALSE
+
+-- a tie: nobody wins (in Blawx the winner is simply not derived)
+#EVAL `first player wins` OF
+        Game WITH
+            `first player`  IS Player WITH throws IS Rock
+            `second player` IS Player WITH throws IS Rock
+-- L4 oracle ==> FALSE
+
+#EVAL `second player wins` OF
+        Game WITH
+            `first player`  IS Player WITH throws IS Paper
+            `second player` IS Player WITH throws IS Scissors
+-- L4 oracle ==> TRUE
