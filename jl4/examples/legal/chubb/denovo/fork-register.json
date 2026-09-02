@@ -574,7 +574,7 @@
     "by": "HITL witness triage (see triage-2026-09-01.json)",
     "ruling": "theSeventhMonthIsWhenTimeIsUp",
     "basis": "27 witnesses ruled 'corpus' across cancel-ground-1-3 (9/9) and clause-1-3-pending (18/18): at the 7th month anniversary the condition is no longer pending. This is the reading the corpus took (AT LEAST 7) and the de novo did not (GREATER THAN 7). The de novo module is left as encoded; this field records the adjudication, not a rewrite.",
-    "note": "The nine clause-1-1-limb-3 witnesses are echoes of this same comparator through 1.1(3) \u2014 a pair whose surface-map entry carried no fork annotation (attribution is per-pair and shallow). The adjudicator marked them 'unsure' with 'not sure how these differ' before the echo mechanism was identified in discussion; they follow this ruling unless separately overruled."
+    "note": "The nine clause-1-1-limb-3 witnesses are echoes of this same comparator through 1.1(3) \u2014 a pair whose surface-map entry carried no fork annotation (attribution is per-pair and shallow). The adjudicator marked them 'unsure' with 'not sure how these differ' before the echo mechanism was identified in discussion; the adjudicator confirmed on 2026-09-02 that they follow this ruling (corpus)."
    }
   },
   {
@@ -649,8 +649,8 @@
    "disposition": {
     "adjudicated": "2026-09-01",
     "by": "HITL witness triage",
-    "ruling": "OPEN \u2014 discussion pending",
-    "basis": "clause-1-3-satisfied s11 family (8 witnesses, unqualified-provider scenarios) left 'unsure'. In-session discussion proposed the cataphoric reading of 'the medical provider in question' (forward reference to 'a qualified medical provider'), which un-dangles the clause and makes bothQualifiersOperative \u2014 the corpus side. The adjudicator has not yet ruled."
+    "ruling": "bothQualifiersOperative",
+    "basis": "clause-1-3-satisfied s11 family (8 witnesses, unqualified-provider scenarios) left 'unsure'. In-session discussion proposed the cataphoric reading of 'the medical provider in question' (forward reference to 'a qualified medical provider'), which un-dangles the clause and makes bothQualifiersOperative \u2014 the corpus side. RULED 2026-09-02: the adjudicator adopted the cataphoric reading \u2014 'the medical provider in question' forward-refers to 'a qualified medical provider', so both qualifiers are operative and co-referential (the corpus side; the de novo omitted both fields). The eight s11-family 'unsure' verdicts resolve to corpus."
    }
   },
   {
@@ -724,8 +724,8 @@
    "disposition": {
     "adjudicated": "2026-09-01",
     "by": "HITL witness triage",
-    "ruling": "OPEN \u2014 discussion pending",
-    "basis": "clause-1-3-satisfied s12 family (8 witnesses, event-ordering scenarios) left 'unsure'; likely subsumed by the deontic re-encoding, where as-at-which-event is a property of the trace rather than a comparator choice."
+    "ruling": "deferred to deontic re-encoding \u2014 no comparator reading endorsed",
+    "basis": "clause-1-3-satisfied s12 family (8 witnesses, event-ordering scenarios) left 'unsure'; RULED 2026-09-02: deferred to the deontic re-encoding, consistent with the adjudicator's four other deadline rulings \u2014 as-at-which-event is a property of the event order in a trace, not a comparator choice, where as-at-which-event is a property of the trace rather than a comparator choice."
    }
   },
   {
