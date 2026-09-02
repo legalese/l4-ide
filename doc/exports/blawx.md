@@ -108,8 +108,10 @@ Two different things happen, and it matters which one you are looking at.
 a fixture under `jl4/examples/blawx/not-ok/`:
 
 - a `DATE`-sorted field or argument (v1)
-- a `STRING` sort anywhere in a signature — field, parameter or result, and including a derived
-  predicate small enough that Blawx never declares it. Blawx's attribute-type dropdown is a closed
+- a `STRING` sort anywhere in a **lowered** predicate's signature — field, parameter or result, and
+  including a derived predicate small enough that Blawx never declares it. (A `STRING`-signed
+  helper that nothing exported reaches is pruned before the check ever sees it, and so compiles;
+  nothing string-typed reaches Blawx either way.) Blawx's attribute-type dropdown is a closed
   list — boolean, number, date, time, datetime, duration, list, and the categories you declared —
   so a string-typed field has no value type to be declared under. Write an enum
   (`DECLARE … IS ONE OF …`) if the values are a fixed vocabulary, or drop the field if the string
@@ -131,7 +133,20 @@ a fixture under `jl4/examples/blawx/not-ok/`:
   differently. Say the rule once per slot (which needs no identity at all), or compare an enum- or
   number-valued field of the two records. This does **not** apply to a category you introduced with
   `ASSUME T IS A TYPE`: it has no fields to compare structurally, its values are plain atoms on
-  both sides, and `EQUALS` on two of them still compiles.
+  both sides, and `EQUALS` on two of them still compiles. It **does** apply to a record type you
+  reached through `IMPORT`: the imported sort arrives with a printed name and no identity behind
+  it, so the compiler cannot tell whether it is a record, and it refuses with a message that says
+  so rather than guessing.
+- **a character clean-law cannot read in a section's prose.** The `rule_text` the exporter
+  synthesises is parsed by clean-law on import, and its text grammar is ASCII-only, so one
+  character above U+007F ends the parse there and every later section's canvas is left belonging to
+  no section of the Act — a document that imports and stores without complaint and is quietly
+  wrong. The punctuation legislation actually contains is folded for you (em and en dashes, curly
+  quotes and apostrophes, the ellipsis, the non-breaking space, the section sign), so a
+  legislation.gov.uk paste works; what is left is refused, naming the codepoint and the decision.
+  For the same reason a section's text may not begin with a digit unless it is the section number
+  itself: prose that merely starts with a numeral is quoted for you, and a genuine sub-provision
+  index (`4. 5. …`) is refused, because Blawx v1 has no sub-provision anchor.
 
 **Lossy — the compiler emits anyway and tells you what it dropped.** The one to know is
 `TYPICALLY` on an `ASSUME`. The name becomes an input predicate and the default is deliberately

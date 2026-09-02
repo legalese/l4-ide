@@ -26,10 +26,16 @@
 -- byte-for-byte Jason's own hand NLG for `beats`
 -- (`blawx_attribute_nlg(beats,ov,"","beats","")`).
 --
--- Placement trap, measured 2026-09-02: on a value-returning `DECIDE … IS` the
--- `@nlg` goes between the app form and the `IS` (as on `beats` below). On the
--- line after `GIVETH` it type-checks and is silently ignored; on the line above
--- `GIVEN` it is a parse error.
+-- Placement trap, measured 2026-09-02 and re-measured at integration: on a
+-- value-returning `DECIDE … IS` the `@nlg` goes between the app form and the
+-- `IS` (as on `beats` below). Everywhere else it is a THIRD silent ignore, not
+-- a loud error: after `GIVETH` it type-checks and is dropped, and on the line
+-- ABOVE `GIVEN` it also type-checks and is dropped (exit 0, the synthesised
+-- `"has beats of"` in the emitted `blawx_attribute_nlg`). The one loud case
+-- there is a `%param%` slot, which is out of the `GIVEN` binder's scope and so
+-- fails NAME RESOLUTION -- `Source: check`, "I could not find a definition for
+-- the identifier s" -- not the parser. An earlier draft of this comment called
+-- it a parse error; it is neither a parse error nor always an error.
 
 DECLARE Sign IS ONE OF Rock, Paper, Scissors
 

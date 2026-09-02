@@ -136,9 +136,19 @@ spec = do
         `shouldSatisfy` \t ->
           Text.isInfixOf "IF  `the hair of` x AT LEAST 5" t && Text.isInfixOf "AND hair x" t
 
-    it "declares a category-valued attribute as a MAYBE STRING field" $
-      textOf (valueDoc (BVCategory (bn "person")) [attrGoal, cmpGoal BEq (BTAtom (bn "pingu"))])
-        `shouldSatisfy` \t -> lineWith t "hair" "IS A MAYBE STRING"
+    -- INTEGRATION, 2026-09-02 (§5.2). W5a lifted a CATEGORY-valued attribute
+    -- the same way as a number one — a `MAYBE STRING` field holding the target
+    -- atom's name. W5b lifts it as an ordinary BINARY PREDICATE over the
+    -- universe, and that is the image that survives: a Blawx attribute is
+    -- multi-valued (`rps`'s `player(Game,Player)` names both seats of a game)
+    -- and a partial function to one name cannot say that. So the
+    -- field-plus-accessor image is a NUMBER-attribute image only, and this
+    -- pins the replacement rather than deleting the case.
+    it "declares a category-valued attribute as a binary predicate, not a field" $ do
+      let d = valueDoc (BVCategory (bn "person")) [BGCall True (bn "hair") [va, BTVar (MkBVar "B")]]
+      textOf d `shouldSatisfy` \t -> lineWith t "`hair fact`" "IS A LIST OF (LIST OF STRING)"
+      textOf d `shouldSatisfy` Text.isInfixOf "DECIDE hair x1 x2"
+      textOf d `shouldSatisfy` not . Text.isInfixOf "IS A MAYBE STRING"
 
     it "still refuses a date-valued attribute by name" $
       refusalsOf (valueDoc BVDate [attrGoal, cmpGoal BGte (BTNum 5)])
@@ -152,11 +162,17 @@ spec = do
       refusalsOf (valueDoc BVNumber [cmpGoal BGte (BTNum 5)])
         `shouldSatisfy` anyMentioning "blawx-lift/unbound-value"
 
-    -- Every object position lifts to the single GIVEN `x`, so a second object
-    -- variable would be silently identified with the first.
-    it "refuses a second object variable rather than collapsing it" $
-      refusalsOf (valueDoc BVNumber [BGCall True (bn "person") [BTVar (MkBVar "B")]])
-        `shouldSatisfy` anyMentioning "blawx-lift/multi-object-variable"
+    -- INTEGRATION, 2026-09-02 (§5.2). W5a refused a SECOND object variable
+    -- (`blawx-lift/multi-object-variable`), because every object position then
+    -- lifted to the single GIVEN `x` and a second one would have been silently
+    -- identified with the first. W5b gives each variable its own parameter and
+    -- closes a body-only one with `any` over the world, so the collapse cannot
+    -- happen and the refusal is gone. This pins what replaced it.
+    it "gives a second object variable its own binder instead of collapsing it" $ do
+      let d = valueDoc BVNumber [attrGoal, BGCall True (bn "person") [BTVar (MkBVar "B")]]
+      lifts d `shouldBe` Right ()
+      textOf d `shouldSatisfy` Text.isInfixOf ", witnessed by b`"
+      textOf d `shouldSatisfy` Text.isInfixOf "any (GIVEN b YIELD"
 
   describe "several rules concluding one literal in one section" $ do
     it "lifts, rather than emitting the same decision name twice" $

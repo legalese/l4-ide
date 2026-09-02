@@ -3047,6 +3047,21 @@ spec bin = do
       serr `shouldSatisfy` ("type `LIST OF Player`, which contains the record type `Player`" `isInfixOf`)
       serr `shouldSatisfy` ("type `LIST OF MAYBE Player`, which contains the record type `Player`" `isInfixOf`)
 
+    -- Integration, 2026-09-02 (§11 W1). W1's note said the `RSOpaque` escape
+    -- was "not known to be reachable in the M1 fragment, and none was
+    -- constructed". It is reachable through `IMPORT`, and this is the
+    -- construction: a record DECLAREd in an imported module arrives as
+    -- `RSOpaque "Shared Ontology.Player"` — a printed name with no `RName`
+    -- behind it — so `recordInSort` had nothing to look up and the comparison
+    -- lowered at exit 0, emitting the `A = B` identity W1 exists to refuse.
+    it "rejects EQUALS on an IMPORTed record, whose sort reaches us opaque" $ do
+      Output code _ serr <- runL4 bin
+        ["blawx", "tests-cli/fixtures/blawx-opaque/imported-record-identity.l4"]
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("record identity (Blawx)" `isInfixOf`)
+      serr `shouldSatisfy` ("opaque type `Shared Ontology.Player`" `isInfixOf`)
+      serr `shouldSatisfy` ("no name to look up" `isInfixOf`)
+
     it "rejects a relationship above the arity-10 block ceiling" $ do
       Output code _ serr <- runL4 bin ["blawx", "examples/blawx/not-ok/arity.l4"]
       code `shouldBe` ExitFailure 1
@@ -3061,6 +3076,29 @@ spec bin = do
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("sub-provision index (Blawx v1)" `isInfixOf`)
       serr `shouldSatisfy` ("orphaning" `isInfixOf`)
+
+    -- Integration, 2026-09-02 (§8.4, §11 W3). The number/eId invariant W3 built
+    -- has a third road into it: clean-law's `legal_text` is pyparsing
+    -- `printables`, which is ASCII-only, so ANY character above U+007F ends the
+    -- parse there and orphans every later canvas. `asciiFold` folds what
+    -- legislation actually contains; the residue is refused.
+    it "rejects a section text carrying a character clean-law cannot lex" $ do
+      Output code _ serr <- runL4 bin ["blawx", "examples/blawx/not-ok/section-text-non-ascii.l4"]
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("non-ASCII section text (Blawx v1)" `isInfixOf`)
+      serr `shouldSatisfy` ("U+00A3" `isInfixOf`)
+      serr `shouldSatisfy` ("orphaned" `isInfixOf`)
+
+    -- ... and the characters legislation.gov.uk actually serves are FOLDED, not
+    -- refused: a curly apostrophe would otherwise make every UK statute paste
+    -- unemittable. The fixture above pins the refusal; this pins the fold, on
+    -- the seed corpus, which carries ten U+2014 em dashes across five files.
+    it "folds the punctuation legislation carries rather than refusing it" $ do
+      Output code sout _ <- runL4 bin ["blawx", "examples/blawx/antisocial.l4"]
+      code `shouldBe` ExitSuccess
+      -- the ten U+2014 em dashes across the seed corpus become hyphens, and
+      -- none of them reaches the emitted rule_text
+      sout `shouldSatisfy` (not . ("\x2014" `isInfixOf`))
 
     it "fails on a file that does not typecheck" $
       expectFail bin ["blawx", errorFixture]
@@ -3251,6 +3289,26 @@ spec bin = do
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("blawx-lift/defeat-target" `isInfixOf`)
       serr `shouldSatisfy` ("holds(sec_1_section,qualifies_s1b,X)" `isInfixOf`)
+
+    -- __The APPLICABILITY layer's half of the same fold hazard__, found in
+    -- review of W5a and closed at integration (2026-09-02). The fixture is
+    -- Jason Morris's own bird.yaml with ONE empty workspace
+    -- (`sec_5__para_a_section`) added and two `doc_selector` section_references
+    -- repointed at it, so the `inapplicable TRUE` attributed_rule is attributed
+    -- to a PARAGRAPH. `scasp_generator.js:1188-1194` injects
+    -- `blawx_applies(<the rule's own section>, X)`, so Blawx asks
+    -- `blawx_applies(sec_5__para_a_section, X)`, which has no clause at all;
+    -- the lift injected the PARENT's gate, which is derivable. Measured before
+    -- the fix: exit 0, warnings only, `l4 check` clean, and the two engines
+    -- disagreed — L4 TRUE, s(CASP) NOMODEL, with a hand-added
+    -- `blawx_applies(sec_5__para_a_section,A) :- not -blawx_applies(...)`
+    -- flipping it back. Refused by name now, exactly as `defeat-target` is.
+    it "refuses an `inapplicable` rule the fold would re-gate, by name" $ do
+      Output code _ serr <- runL4 bin
+        ["blawx", "--import", "tests-cli/fixtures/blawx-import/paragraph-applies.blawx"]
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("blawx-lift/applies-target" `isInfixOf`)
+      serr `shouldSatisfy` ("blawx_applies(sec_5__para_a_section,X)" `isInfixOf`)
 
     it "--reemit writes the .blawx regenerated from the parsed blocks" $ do
       Output code sout serr <- runL4 bin

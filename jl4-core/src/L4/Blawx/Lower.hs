@@ -319,8 +319,68 @@ lowerBlawx prog0 = do
     }
  where
   stubSection p = "Definition of " <> p.rpName.rnBase <> "."
-  squash =
-    Text.unwords . Text.words . Text.replace "\x2014" "-" . Text.replace "\x2013" "-"
+  squash = Text.unwords . Text.words . Text.concatMap asciiFold
+
+-- | Fold into clean-law's character set the punctuation legislation actually
+-- contains, and leave everything else alone for 'sectionTexts' to refuse by
+-- name. Two separate measurements live in this one table.
+--
+-- CLEAN gives an EM DASH structural meaning in section bodies (a legislative
+-- sub-paragraph introduction), so a mid-text em dash silently swallows every
+-- following section into this one — measured 2026-08-19 against the pinned
+-- clean-law: a 14-section rule_text whose section 1 contained @hearing—@
+-- produced an AKN with ONLY @sec_1@.
+--
+-- And clean-law's @legal_text@ is built from pyparsing's @printables@, which is
+-- __ASCII-only__, so /any/ character above U+007F truncates the parse at that
+-- point and orphans every later canvas — measured 2026-09-02 on a two-section
+-- module, one non-ASCII character at a time: U+00A3, U+2019, U+00A7 and U+201C
+-- each left clean-law yielding @['sec_1_section']@ against workspaces
+-- @['sec_1_section', 'sec_2_section']@. That is the same defect the em-dash
+-- fold exists for, reached by a third road, and it is why the residue is a
+-- named refusal rather than a hope.
+asciiFold :: Char -> Text
+asciiFold = \case
+  '\x2013' -> "-"      -- en dash
+  '\x2014' -> "-"      -- em dash
+  '\x2010' -> "-"      -- hyphen
+  '\x2011' -> "-"      -- non-breaking hyphen
+  '\x2018' -> "'"      -- left single quote
+  '\x2019' -> "'"      -- right single quote (the apostrophe legislation.gov.uk serves)
+  '\x201A' -> "'"
+  '\x201B' -> "'"
+  '\x2032' -> "'"      -- prime
+  '\x201C' -> "\""     -- left double quote
+  '\x201D' -> "\""     -- right double quote
+  '\x201E' -> "\""
+  '\x2026' -> "..."    -- ellipsis
+  '\x00A0' -> " "      -- non-breaking space
+  '\x2007' -> " "
+  '\x2009' -> " "
+  '\x202F' -> " "
+  '\x00AD' -> ""       -- soft hyphen
+  '\x200B' -> ""       -- zero-width space
+  '\xFEFF' -> ""       -- byte-order mark
+  '\x00A7' -> "s."     -- section sign
+  c -> Text.singleton c
+
+-- | Is this character one clean-law's @legal_text@ can carry? pyparsing's
+-- @printables@ is @string.printable@ minus whitespace, restricted to ASCII; the
+-- text has already been through @Text.words@, so space is the only whitespace
+-- left.
+cleanPrintable :: Char -> Bool
+cleanPrintable c = c == ' ' || (c >= '!' && c <= '~')
+
+-- | @U+00A3@ — for a diagnostic that has to name a character the reader cannot
+-- see in their own terminal.
+codepoint :: Char -> Text
+codepoint c = "U+" <> Text.replicate (max 0 (4 - Text.length digits)) "0" <> digits
+ where
+  digits = go (ord c) ""
+  go n acc
+    | n < 16 = Text.singleton (hexDigit n) <> acc
+    | otherwise = go (n `div` 16) (Text.singleton (hexDigit (n `mod` 16)) <> acc)
+  hexDigit d = if d < 10 then chr (ord '0' + d) else chr (ord 'A' + d - 10)
 
 -- | Blawx v1 rejects a non-stratified program with a named diagnostic: its
 -- L4-oracle determinism obligation does not tolerate multiple stable models,
@@ -1356,6 +1416,24 @@ sectionTexts numbered =
                      <> "the canvas after that, orphaning `sec_" <> Text.textShow n
                      <> "_section` — sub-provision anchoring is not in v1 "
                      <> "(BLAWX-EXPORT-SPEC §11 W3(b))" ) ]
+    -- The same invariant as the index guard above, reached by a different
+    -- road: a character clean-law cannot lex ends its parse of the rule_text,
+    -- so every LATER section's canvas is orphaned. 'asciiFold' has already
+    -- folded the punctuation legislation actually contains; what is left is
+    -- refused rather than shipped, because the damage is invisible in the
+    -- emitted bytes (BLAWX-EXPORT-SPEC §8.4, §11 W3).
+    | a : _ <- mine
+    , bad : _ <- [ c | c <- Text.unpack joined, not (cleanPrintable c) ] =
+        Left [ blawxErr a.saPred.rpName.rnBase a.saPred.rpProv.rpvRange
+                 (LEUnsupported "non-ASCII section text (Blawx v1)")
+                 ( "section " <> Text.textShow n <> "'s text carries "
+                     <> codepoint bad <> " (`" <> Text.singleton bad
+                     <> "`); clean-law's `legal_text` is built from pyparsing's "
+                     <> "`printables`, which is ASCII-only, so its parse of the "
+                     <> "rule_text stops there and every later section's canvas is "
+                     <> "orphaned — invisible in the emitted bytes. Rewrite the text in "
+                     <> "ASCII, or add the character to `asciiFold` if it has a faithful "
+                     <> "ASCII reading (BLAWX-EXPORT-SPEC §8.4, §11 W3)" ) ]
     | otherwise = Right (n, guardSectionText joined)
    where
     mine   = [ x | x <- numbered, x.saNumber == n ]
@@ -1765,6 +1843,20 @@ recordInSort env cctx = \case
     RSMaybe s -> peel s
     _         -> Nothing
 
+-- | The printed name of an 'RSOpaque' inside an operand's recovered sort, at any
+-- nesting of @LIST OF@ and @MAYBE@ — the sibling of 'recordInSort' for the case
+-- where the sort kept a name and lost the identity. See 'recordIdentity'.
+opaqueInSort :: CCtx -> RTerm -> Maybe Text
+opaqueInSort cctx = \case
+  RTVar v -> Map.lookup v.rvId cctx.ccSorts >>= peel
+  _ -> Nothing
+ where
+  peel = \case
+    RSOpaque t -> Just t
+    RSList s   -> peel s
+    RSMaybe s  -> peel s
+    _          -> Nothing
+
 -- | An 'RSort' in the surface language's spelling, for a diagnostic. Names are
 -- 'rnBase' — this is the message a reader of the @.l4@ sees, not the debug dump
 -- ("L4.Relational.Debug".@renderSort@ renders the same shapes against a
@@ -1794,10 +1886,18 @@ sortText = \case
 -- operands is a variable whose recovered sort /contains/ a declared record sort
 -- — directly, or under any nesting of @LIST OF@ and @MAYBE@ ('recordInSort').
 -- Nothing else. An @ASSUME@d abstract category is not refused (see
--- 'recordInSort'), and a record-sorted operand whose sort did not survive into
--- 'varSorts' — an 'RSOpaque', say — is not detected at all, because there is
--- nothing left in the sort to detect. No such case is known to be reachable in
--- the M1 fragment; none was constructed.
+-- 'recordInSort').
+--
+-- __The 'RSOpaque' escape is reachable, and is refused too__ (found in review,
+-- measured 2026-09-02). A record @DECLARE@d in an IMPORTed module reaches the
+-- emitter as @RSOpaque \"\<Section\>.Player\"@: the sort carries a printed name
+-- and no 'RName', so 'recordInSort' has nothing to look up in 'envDeclRecords'
+-- and the comparison lowered with @EXIT=0@, emitting exactly the @A = B@
+-- identity the refusal exists to stop. An earlier draft of this note said no
+-- such case was known to be reachable; it was wrong. An opaque sort is not
+-- /known/ to be a record either — that is what opaque means — so the honest
+-- answer is a refusal of its own, with its own wording, rather than a silent
+-- pass.
 --
 -- Refusing is a v1 measure, not the fix. The fix is to hash-cons
 -- structurally-equal record arguments in 'skolemise' so one distinct value
@@ -1806,6 +1906,18 @@ sortText = \case
 -- both: state the rule once per slot (which needs no identity — that is what
 -- the shipped @rps.l4@ does), or compare a field whose sort /is/ an atom.
 recordIdentity :: Env -> CCtx -> Text -> RTerm -> RTerm -> Either [LowerError] ()
+recordIdentity _env cctx opName x y
+  | Just t <- opaqueInSort cctx x <|> opaqueInSort cctx y =
+      Left [ blawxErr cctx.ccFn Nothing
+               (LEUnsupported "record identity (Blawx)")
+               ( opName <> " on operands of opaque type `" <> t
+                   <> "` has no faithful Blawx image: the sort reaches this leg with \
+                      \no name to look up, so the emitter cannot tell whether it is a \
+                      \record — and if it is, L4 compares records by value while Blawx \
+                      \compares objects by atom, which answers differently under R11's \
+                      \query flattening. An imported `DECLARE` is the reachable case. \
+                      \State the rule once per slot so no identity is needed, or compare \
+                      \an enum- or number-valued FIELD of the two values instead" ) ]
 recordIdentity env cctx opName x y =
   case recordInSort env cctx x <|> recordInSort env cctx y of
     Nothing         -> Right ()

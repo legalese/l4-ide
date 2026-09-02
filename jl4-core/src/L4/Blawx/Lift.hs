@@ -533,6 +533,39 @@ renderDoc ctx doc = do
       warn "rule-filed-elsewhere" (renderSectionRef ws)
         ( "the rule's doc_selector names " <> renderSectionRef r.brSection
             <> ", not the workspace it is drawn in; the attribution wins" )
+    -- __The APPLICABILITY layer has the same fold hazard as the defeat layer,
+    -- and it was open until integration (2026-09-02).__
+    -- `scasp_generator.js:1188-1194` injects `blawx_applies(<value_source>, X)`
+    -- with @value_source@ the rule's OWN attributed section, while
+    -- 'ruleCondition' injects `appliesName (secOf r)` — the FOLDED one. For a
+    -- rule attributed to a paragraph those are two different gates: Blawx asks
+    -- `blawx_applies(<paragraph>, X)`, which typically has no clause at all, so
+    -- the rule can never fire there, while the lift asks the PARENT's gate,
+    -- which is derivable. Measured on a variant of Jason Morris's bird.yaml with
+    -- one `inapplicable TRUE` rule repointed at `sec_5__para_a_section`: L4
+    -- answered TRUE and s(CASP) NOMODEL, and hand-adding
+    -- `blawx_applies(sec_5__para_a_section,A) :- not -blawx_applies(...).`
+    -- flipped it. Since the two gates cannot be reconciled by folding — one
+    -- would be given a body the source does not have — it is refused by name,
+    -- exactly as `defeat-target` and `defeat-fold-unsound` are.
+    when (r.brInapplicable && secOf r /= r.brSection) $
+      case appliesRule r.brSection of
+        Nothing ->
+          refuse_ "applies-target" (renderSectionRef ws)
+            ( "the rule is `subject to applicability` and attributed to "
+                <> renderSectionRef r.brSection <> ", a paragraph, but no "
+                <> "unattributed_rule defines blawx_applies for THAT section, so "
+                <> "s(CASP) derives no `blawx_applies(" <> renderSectionRef r.brSection
+                <> ",X)` and the rule can never fire in Blawx; folding the gate "
+                <> "into " <> renderSectionRef (secOf r) <> " (§11 W3) would give "
+                <> "it a body the source does not have" )
+        Just _ ->
+          refuse_ "applies-fold-unsound" (renderSectionRef ws)
+            ( "the rule is `subject to applicability` and attributed to "
+                <> renderSectionRef r.brSection <> ", a paragraph with an "
+                <> "applicability rule of its own; folding it into "
+                <> renderSectionRef (secOf r) <> " (§11 W3) would swap that gate "
+                <> "for the parent section's, which is a different condition" )
 
   -- __An `overrules` names three sections, and the fold has to be checked on
   -- all of them.__ Only the workspace was checked before, which is how a

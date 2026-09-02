@@ -1,6 +1,6 @@
 # L4 ⇄ Blawx: expressive-domain overlap and transpiler spec
 
-_Status: **shipped and merged; this file is retained as the ruling record.** Design written
+\_Status: **shipped and merged; this file is retained as the ruling record.** Design written
 2026-08-16 (merged as PR #261); rulings R1–R14 answered by Meng 2026-08-18; all five phases of
 §10 built and merged over 2026-08-18…08-19 — the shared relational middle-end
 `L4.Relational.{IR,Lower,Debug}` first, Blawx-driven per R2 (PR #272), then
@@ -9,20 +9,28 @@ _Status: **shipped and merged; this file is retained as the ruling record.** Des
 `Parse`/`Lift` pair for import behind `l4 blawx --import`, R14 (#279). Per-phase evidence is
 recorded inline in §10; reader-facing documentation landed as PR #280
 (`doc/concepts/neighbours/blawx-and-scasp.md`, `doc/tutorials/blawx/l4-to-blawx.md`).
-**Verified against `origin/unstable` on 2026-08-28**: eight modules under
-`jl4-core/src/L4/Blawx/`, three under `jl4-core/src/L4/Relational/`, and the corpus under
-`jl4/examples/blawx/` — nineteen `.l4` files as re-counted on 2026-09-02 (twelve emitting seeds
-each with a golden in `expected/`, six `not-ok/` refusal fixtures, one `imported/`; it read
-"sixteen … eleven … five" for the 2026-08-28 tree, and the §11 work moves it, so re-derive with
-`ls jl4/examples/blawx/*.l4 jl4/examples/blawx/not-ok/*.l4` rather than trusting the number) —
-and the verb
-wired at `jl4/app/Main.hs:110` →
-`jl4/app/L4/Cli/Blawx.hs`. What remains open: R10's fork fixes wait in
-`legalese/blawx` (#1–#5, filed 2026-08-20, see §8.10) until upstreaming to Lexpedite is
-warranted — and, since 2026-09-02, the **measured worklist of §11**, which \_is_ code: an
-exporter defect (W1), an ontology gap (W2), the import fragment's distance from Blawx's own
-running examples (W5 — whose `beard_tax` half landed the same day, taking the lift from 2 of the
-15 shipped examples to 4; see §5.2 and §8.14), and the build pins the fork now carries (W8). (This header read "implementation beginning … nothing exists under
+**Verified against this branch on 2026-09-02** (`mengwong/blawx-integrated`, the integration of
+the six reviewed §11 branches W1–W5b): eight modules under `jl4-core/src/L4/Blawx/`, three under
+`jl4-core/src/L4/Relational/`, and the corpus under `jl4/examples/blawx/` — **twenty-six** `.l4`
+files, counted this day with
+`ls jl4/examples/blawx/*.l4 jl4/examples/blawx/not-ok/*.l4 jl4/examples/blawx/imported/*.l4`:
+**twelve** emitting seeds, each with a `.blawx` and a `.pl` golden in `expected/`; **eleven**
+`not-ok/` refusal fixtures; **three** `imported/` artifacts (`bird`, `beard_tax`, `rps`, each with
+its re-emitted `.blawx` beside it). The count moves with the work — it read "sixteen … eleven …
+five" for the 2026-08-28 tree and "nineteen … twelve … six … one" mid-§11 — so re-derive it rather
+than trusting the number. The verb is wired at `jl4/app/Main.hs:110` → `jl4/app/L4/Cli/Blawx.hs`.
+
+**What remains open, as of 2026-09-02 on this branch.** R10's fork fixes wait in `legalese/blawx`
+(#1–#5, filed 2026-08-20, see §8.10) until upstreaming to Lexpedite is warranted. Of the §11
+worklist, **W1, W2, W3(a), W4, W5 and W9 are discharged and W8's tier-2 numbers are taken**; what
+is left is **W2-followup** (a string literal renders as an object selector nothing declares —
+measured, harmless offline, unsettled against a live UI), **W3(b)** (paragraph eIds: a rule
+attributed to a paragraph is filed under its numbered parent, and an `overrules` or an
+`inapplicable` gate the fold cannot carry across unchanged is refused by name rather than folded),
+**W6** (nothing to do; recorded as evidence), and **W7** (the British Nationality Act, blocked on
+the M2 date leg). The import fragment now lifts **6 of Blawx's 15 shipped examples** — `beard_tax`,
+`bird`, `mortality`, `rps`, `wills`, `wills_tutorial`, all six `l4 check` clean (§5.2 carries the
+command). (This header read "implementation beginning … nothing exists under
 `jl4-core/src/L4/Blawx/` or `jl4-core/src/L4/Relational/`" until 2026-08-28. That was true the
 day it was written and false the day after; it survived because §10's per-phase EXECUTED notes
 were appended without re-reading the top of the file. Do not restore it.) Siblings:
@@ -367,9 +375,17 @@ still unifies, and must: `RSRecord` carries an abstract category as well as a de
 but an abstract category has no fields for L4 to compare structurally. Its values are atoms on both
 sides, `=` on atoms is the faithful image, and refusing it would delete an emission that works —
 `a EQUALS b` over two `ASSUME`d `Person`s emits `A = B.` — while recommending an edit, compare a
-field, that has no field to name. Nor is a record-sorted operand detected whose sort did not
-survive into `varSorts` as a sort at all (an `RSOpaque`): there is nothing left in the sort to
-test. No such case is known to be reachable in the M1 fragment and none was constructed.
+field, that has no field to name. **An `RSOpaque` operand is refused, with its own wording** (integration,
+2026-09-02). It used to fall through this check, on the ground that "no such case is known to be
+reachable in the M1 fragment and none was constructed" — which was wrong. `IMPORT` reaches it: a
+record `DECLARE`d in an imported module arrives as `RSOpaque "<Section>.Player"`, a printed name
+with no `RName` behind it, so `recordInSort` had nothing to look up in `envDeclRecords` and
+``DECIDE `same player` a b IF a EQUALS b`` lowered at exit 0 with
+`according_to(sec_1_section,same_player,A,B) :- A = B.` in the dump. An opaque sort is not known
+to _be_ a record either — that is what opaque means — so the honest answer is a refusal that says
+so rather than a silent pass: `EQUALS on operands of opaque type \`…\` … the sort reaches this leg
+with no name to look up`. Fixture: `jl4/tests-cli/fixtures/blawx-opaque/`(two files, because the
+shape needs an`IMPORT`), test in `jl4/tests-cli/Main.hs`.
 
 The diagnostic names both the divergence and the two edits that avoid it (state the rule once per
 slot; or compare an enum- or number-valued field, whose sorts _are_ atoms and do survive the
@@ -621,8 +637,18 @@ Where the annotation goes on a value-returning `DECIDE … IS` is not free (meas
 between the app form and the `IS` it is found; on the line after `GIVETH` the module
 type-checks and the annotation is **silently ignored** — the position list at
 `L4.Relational.Lower.decideNlg` (outer `TopDecl`, the `Decide`, its app form, its body, its
-head name, its app-form arguments) does not include the type signature's own annotation; on the
-line above `GIVEN` it is a parse error.
+head name, its app-form arguments) does not include the type signature's own annotation; and on
+the line **above** `GIVEN` it is a THIRD silent ignore, not a loud error.
+
+That last clause is corrected at integration, 2026-09-02: it read "on the line above `GIVEN` it is
+a parse error", and both halves were wrong. Re-measured on `jl4/examples/blawx/rps.l4` with the
+`beats` annotation moved above its `GIVEN`: in the `@(X)`/`@(Y)` spelling `l4 blawx` exits **0**
+and emits the synthesised default (`blawx_attribute_nlg(beats,ov,"","has beats of","")`), and in
+the `%s%` spelling it exits 1 — but with `Source: check`, "I could not find a definition for the
+identifier `s`", because the parameter reference sits outside the `GIVEN` binder's scope. That is
+name resolution, not the parser, and it is the reference rather than the position that fails. A
+disclosure that claims loudness the code does not provide is the same defect class as the two
+above it, which is why it is written out rather than quietly edited.
 
 Categories keep the synthesised sentence unconditionally — the middle-end carries no `@nlg` for
 a `DECLARE`'s own name, only for its fields, and the synthesis already matches Jason Morris's
@@ -1146,6 +1172,33 @@ prefixes `The ` to a title whose first character is not an ASCII letter, on the 
 as the re-casing it already did — an unimportable title is worse than a heralded one — and
 `etc/blawx-eid-harness.py` reports a `ParseException` as a failure instead of dying on it.
 
+**And a third road into the same defect: any non-ASCII character in a section's prose**
+(integration, 2026-09-02). clean-law's `legal_text` is built from `Word(printables)`
+(`clean/clean.py:66-77` **[E]**), and pyparsing's `printables` is **ASCII-only**. A single
+character above U+007F therefore ends clean-law's parse of the `rule_text` at that character, and
+every _later_ section's canvas is orphaned — exactly what the digit guard above exists to stop,
+invisible in the emitted bytes for exactly the same reason. Measured with
+`etc/blawx-eid-harness.py` against clean-law 0.0.4 + pyparsing 3.3.2 on one two-section module,
+one character at a time: U+00A3 (`£`), U+2019 (`’`), U+00A7 (`§`) and U+201C (`“`) each left
+clean-law yielding `['sec_1_section']` against workspaces
+`['sec_1_section', 'sec_2_section']`; the ASCII control (`{a, b}` in section 1) yielded both. The
+mechanism is the character, not the module shape.
+
+Reachability is not theoretical — this corpus encodes UK and Jersey statute by pasting its prose,
+and ten `@export` lines across five seeds already carry U+2014. They survived only because
+`squash` happened to map U+2014 and U+2013 and nothing else. So the fold is now a named table,
+`L4.Blawx.Lower.asciiFold`, covering the punctuation legislation actually contains — en/em dashes
+and the two Unicode hyphens, the curly single and double quotes (a right single quote is the
+apostrophe `legislation.gov.uk` serves), the prime, the ellipsis, the non-breaking and thin
+spaces, the soft hyphen, the zero-width space, the BOM, and the section sign — and what is left
+after folding is **refused by name**: `non-ASCII section text (Blawx v1)`, naming the codepoint,
+the character and the decision. Fixture `jl4/examples/blawx/not-ok/section-text-non-ascii.l4`
+(refused; `l4 check` succeeds on it), tests in `jl4/tests-cli/Main.hs` — one for the refusal, one
+pinning that the corpus's own em dashes are still _folded_ rather than refused, because a curly
+apostrophe that refused would make every UK statute paste unemittable. All twelve emitting seeds
+regenerate byte-identically across this change (no seed carries an unmapped non-ASCII character),
+and all twelve pass the eId harness.
+
 **Why the number and the eId must agree, measured.** clean-law 0.0.4's `generate_section`
 builds the eId as `"sec_" + node['section index'][0]` — the **literal** numeral, never the
 section's position (`clean/clean.py`, read 2026-09-02 from the PyPI sdist). Before this
@@ -1387,9 +1440,14 @@ declared record — bare, or under any nesting of `LIST OF` and `MAYBE` (§4.1) 
 comparisons stop instead of answering differently, while an `ASSUME`d abstract category, whose
 values are atoms on both sides, still unifies; and the honest fix — **hash-consing
 structurally-equal record arguments so one distinct value mints one object** — is scoped and _not
-built_, tracked at §11 W1. The refusal is a sort test, so it is only as wide as sort recovery: a
-record-typed operand whose sort reaches the emitter as `RSOpaque` would still lower, and no such
-case was constructed. Nothing about `#ASSERT`-as-constraint or the interview test changes.
+built_, tracked at §11 W1. **Corrected at integration, 2026-09-02:** an earlier draft of this paragraph
+said "a record-typed operand whose sort reaches the emitter as `RSOpaque` would still lower, and no
+such case was constructed". The case is reachable and was constructed — a record `DECLARE`d in an
+IMPORTed module arrives as `RSOpaque "<Section>.Player"`, a printed name with no `RName` behind it,
+so `recordInSort` had nothing to look up and `a EQUALS b` lowered at exit 0, emitting the `A = B`
+identity comparison this refusal exists to stop. An opaque sort is not known to be a record either,
+so it now gets a refusal of its own wording ("operands of opaque type `…`"), with the fixture at
+`jl4/tests-cli/fixtures/blawx-opaque/`. Nothing about `#ASSERT`-as-constraint or the interview test changes.
 
 ### 8.12 R12 — dual representation from one block-level IR; the re-save fixpoint is the gate
 
@@ -2132,18 +2190,42 @@ session, on this branch, with `l4` built from this worktree:
 `not-ok/record-identity-list.l4` move to the emitting corpus with tier-1 oracles of their own.
 Deliberately not attempted here: it changes the object names in every existing test canvas, so it
 is a golden-regenerating change and wants its own measurement (fixpoint and tier-1 across all 12
-seeds) rather than riding a refusal. **Also still open, and smaller**: the check is a sort test, so
-its reach is sort recovery's reach — an operand whose record type arrived as `RSOpaque` would carry
-no record name to find. No such case was constructed and none is known reachable in the M1
-fragment; it is written down here rather than claimed away.
+seeds) rather than riding a refusal. **Closed at integration, 2026-09-02 — the `RSOpaque` escape.** The paragraph that stood here said
+the check's reach was sort recovery's reach, that an operand arriving as `RSOpaque` would carry no
+record name to find, and that "no such case was constructed and none is known reachable in the M1
+fragment". Review constructed one, and it is reachable through `IMPORT`. Two files:
 
-**Not W1's to fix**: this section's own status header still counts the corpus as "sixteen `.l4`
-files … (eleven emitting seeds, five `not-ok/` refusal fixtures)". Measured 2026-09-02 with
-`ls jl4/examples/blawx/*.l4 | wc -l` → **12** emitting seeds and
-`ls jl4/examples/blawx/not-ok/*.l4 | wc -l` → **7** `not-ok/` fixtures (six, plus
-`record-identity-list.l4` added here), so the header is stale by one in each direction and this
-item widens the second gap. The header is edited once at integration, by whoever merges the
-W-branches, because every W-item would otherwise rewrite the same paragraph.
+```
+-- shared-ontology.l4
+§ `Shared Ontology`
+DECLARE Sign IS ONE OF Rock, Paper, Scissors
+DECLARE Player HAS
+    throws IS A Sign
+
+-- imported-record-identity.l4
+IMPORT `shared-ontology`
+§ `Section`
+@export Two players are the same player if they are equal.
+GIVEN a IS A Player
+      b IS A Player
+GIVETH A BOOLEAN
+DECIDE `same player` a b IF a EQUALS b
+```
+
+`l4 check` succeeded; before the fix `l4 blawx` exited **0** with no diagnostic and the `.pl` dump
+carried `according_to(sec_1_section,same_player,A,B) :- A = B.` — exactly the identity
+comparison this item exists to refuse. The sort arrives as `RSOpaque "Shared Ontology.Player"`: a
+printed name with no `RName`, so `recordInSort` has nothing to look up in `envDeclRecords`.
+
+Fixed here, not deferred: `opaqueInSort` is `recordInSort`'s sibling for the case where the sort
+kept a name and lost the identity, descending `LIST OF` and `MAYBE` the same way, and
+`recordIdentity` refuses on it first with its own wording — an opaque sort is not _known_ to be a
+record, and that is what the message says. Measured after the fix: the module above exits **1**
+with `record identity (Blawx): EQUALS on operands of opaque type \`Shared Ontology.Player\``; all
+12 emitting seeds re-lower byte-identically in `.blawx`and`.pl`; `jl4-core-test`and`l4-cli-test`stay green. Fixture`jl4/tests-cli/fixtures/blawx-opaque/`(in tests-cli rather than`examples/blawx/not-ok/`, because the shape needs two files and an `IMPORT`), test in
+`jl4/tests-cli/Main.hs`. §4.1 and §8.11 are corrected to match.
+
+The **hash-consing** above is still the real fix and is still not built.
 
 ### W2 — `STRING` fields have no ontology image
 
@@ -2239,6 +2321,25 @@ paragraph eIds are the question R4 left open and stay open. Amends R4, §4.9.
 **DISCHARGED (a) 2026-09-02; (b) remains open as ruled.** The property (a) actually establishes
 is **number/eId agreement**: for every module the emitter produces, clean-law's parse of the
 `rule_text` yields exactly the workspace names we wrote, so no canvas is orphaned.
+
+**That sentence was an overclaim when it was first written, and is true now** (integration,
+2026-09-02). The guard W3 built covered a leading DIGIT only, and §8.4's own wording was correctly
+scoped to that ("the emitter now guarantees **no section text begins with a digit**"), but this
+note stated the universal. There was a third road into the same defect: pyparsing's `printables`,
+which clean-law's `legal_text` is built from, is ASCII-only, so a single character above U+007F
+anywhere in a section's prose truncates the parse and orphans every later canvas. Measured on a
+two-section module, one character at a time: U+00A3, U+2019, U+00A7 and U+201C each yielded
+`['sec_1_section']` against workspaces `['sec_1_section', 'sec_2_section']`. It is closed here
+rather than recorded as open — `asciiFold` folds the punctuation legislation actually contains and
+the residue is refused by name (`non-ASCII section text (Blawx v1)`) — and the invariant is now
+checked end-to-end: **12 of 12** emitting seeds pass `etc/blawx-eid-harness.py`. §8.4 carries the
+detail and the fixture.
+
+One measured caveat on the harness, so a later reader does not chase it: `imported/bird.blawx`
+FAILS the eId check, and so does upstream's own `bird.yaml` — clean-law yields five sections
+against six workspaces, because Jason Morris's document carries an empty `sec_6_section` canvas
+that his `rule_text` does not number. That is a property of the source we re-emit faithfully, not
+of this emitter; W3(a)'s guarantee is about what `l4 blawx` _synthesises_.
 
 The pin is read off the section's own text — the `@desc`/`@export` prose, else the `@ref`
 citation, i.e. exactly the string R4 already chose as the section body. Two spellings pin, and
@@ -2478,6 +2579,52 @@ grep -o 'blawx-lift/[a-z-]*' | sort | uniq -c`. (An earlier draft of this note s
 base branch, and the pre-W5 "Measured" paragraph above lists seven codes across BOTH fixtures
 rather than a per-fixture count. The comparative claim is withdrawn; only the four are measured.)
 Amends R14 (§8.14's 2026-09-02 note) and §5.2.
+
+**DISCHARGED (both halves) at integration, 2026-09-02.** W5a and W5b were built and reviewed
+separately and were both true of their own branch; the two notes above are kept as written, and
+this one is the state of the merged tree. Three things changed in the merge, all measured on it:
+
+1. **The lift count is 6/15, the union of the two increments** — `beard_tax`, `bird`, `mortality`,
+   `rps`, `wills`, `wills_tutorial`, all six `l4 check` clean. So both "still refuses" sentences
+   above are superseded: W5b's note says `beard_tax` still refuses (it was W5a's), and W5a's says
+   `rps` does not lift (it was W5b's). §5.2 carries the command and the per-example refusal codes.
+2. **A CATEGORY-valued attribute takes W5b's road, not W5a's.** W5a lifted it as a `MAYBE STRING`
+   field holding the target atom's name; W5b lifts it as a binary predicate over the universe. The
+   two cannot both hold, and the binary predicate is the one that survives, because a Blawx
+   attribute is multi-valued — `rps`'s `player(Game,Player)` names both seats of a game — and a
+   partial function to one name cannot say that. `valueSortOf` now answers `Nothing` for
+   `BVCategory`, `ValueSort` has one constructor, and the field-plus-accessor image is a
+   **number**-attribute image. `BlawxLiftSpec` pins the replacement rather than dropping the case.
+   W5a's `blawx-lift/multi-object-variable` refusal is gone for the same reason: W5b gives each
+   object variable its own binder, so the collapse it guarded against cannot happen.
+3. **The applicability layer's fold hole is closed** — the one major the W5a review left open.
+   `scasp_generator.js:1188-1194` injects `blawx_applies(<the rule's own section>, X)` while
+   `ruleCondition` injected `appliesName (secOf r)`, the FOLDED one. For a rule attributed to a
+   paragraph those are two different gates: Blawx asks `blawx_applies(<paragraph>, X)`, which has
+   no clause at all, so the rule can never fire there, while the lift asked the parent's gate,
+   which is derivable. Measured on the review's own counterexample (bird.yaml with one empty
+   `sec_5__para_a_section` workspace added and two `doc_selector` section_references repointed at
+   it): before the fix, exit **0**, warnings only, `l4 check` clean, and the engines disagreed —
+   L4 `TRUE`, s(CASP) `NOMODEL`, with a hand-added
+   `blawx_applies(sec_5__para_a_section,A) :- not -blawx_applies(sec_5__para_a_section,A).`
+   flipping it. The two gates cannot be reconciled by folding — one would be given a body the
+   source does not have — so it is refused by name, exactly as `defeat-target` is:
+   `blawx-lift/applies-target` when the paragraph has no applicability rule of its own,
+   `blawx-lift/applies-fold-unsound` when it has one that is not the parent's. The counterexample
+   is committed as `jl4/tests-cli/fixtures/blawx-import/paragraph-applies.blawx` and now exits
+   **1**. §8.14 and §5.2 are corrected to match.
+
+Evidence on the merged tree, all run 2026-09-02: `jl4-core-test` **497/0**; `l4-cli-test`
+**353/0/83 pending**; `jl4-test` **2670/0**; `node etc/check-corpus-goldens.mjs` 368 corpus files,
+all four goldens each; fixpoint over `expected/*.blawx` and `imported/*.blawx`
+(`BLAWX_CHECKOUT=…/blawx-stock`, per W9) **223 checked, 0 failed, 4 empty-skipped**; tier-1 over
+the whole corpus **156/156**; `etc/blawx-eid-harness.py` over the twelve emitting goldens
+**12 checked, 0 failed**. `bird.l4`, `bird.blawx`, `rps.l4` and `rps.blawx` regenerate
+byte-identically from either local Blawx checkout; `beard_tax.l4` was regenerated here and changes
+in three hunks (the provenance line becomes a basename per W5b, the header prose becomes W5b's,
+and its unliftable test gains the `-- NOT LIFTED (blawx-lift/unbound-query-empty-universe): …`
+line, because W5a's warning is now routed through W5b's mechanism for writing a dropped test's
+reason into the artifact).
 
 ### W6 — stale fixtures, witnessed twice more
 
