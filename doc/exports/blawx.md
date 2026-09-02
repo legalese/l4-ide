@@ -72,6 +72,19 @@ faithfully.
 This matters if you have existing Blawx work: it is a migration path in, not only a projection
 out. Every other export on these pages is one-way.
 
+What comes back is measured rather than assumed. Two of Blawx's own shipped examples live under
+`jl4/examples/blawx/imported/`: **bird** (the defeasibility tutorial, where sections defeat one
+another) and **Rock Paper Scissors** (objects related by two- and three-place predicates, a rule
+that quantifies over "the other player", and a test that declares its own objects). Both lift to L4
+that type-checks, and the tier-1 harness puts each of their queries to real s(CASP) and to the L4
+engine and compares the answers.
+
+What does not come back yet is a list, not a guess — the import refuses one construct at a time,
+by name. Numbers and their comparisons do not lift. A test canvas asking for **hypothetical**
+reasoning (Blawx's `#abducible`) is dropped, because abduction is not evaluation; the reason is
+written into the lifted file where that test's `#EVAL` would have been, so you can see what you
+did not get without re-running anything.
+
 ## What it consumes
 
 The **decision-rule subset**, relationalized. Because the target is a logic program rather than a

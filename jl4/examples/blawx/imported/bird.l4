@@ -8,12 +8,14 @@
 --                 generator (P5-2) in 8 row(s), first sec_1_section.
 --                 The XML is canonical (R14); the encodings were not used.
 --
--- Blawx models a flat universe of atoms under unary predicates. Every
--- category and every boolean attribute is one such predicate, so this lift
--- declares ONE record for the universe, carrying a `MAYBE BOOLEAN` input
--- slot per predicate that is not derived (the s(CASP) fact channel) and one
--- BOOLEAN decision per predicate. The defeat layer is unfolded: one decision
--- per (section, literal) pair, named from the generator's own #pred wording.
+-- Blawx models a flat universe of atoms under predicates of one, two or
+-- more places: a category is `c(X)`, a category-valued attribute is
+-- `a(X,Y)`, a relationship is `r(X,Y,Z)`. So this lift declares ONE record
+-- for the universe, carrying one input slot per declared predicate (the
+-- s(CASP) fact channel: `MAYBE BOOLEAN` at one place, a list of argument
+-- tuples above it) and one BOOLEAN decision per predicate. The defeat layer
+-- is unfolded: one decision per (section, literal) pair, named from the
+-- generator's own #pred wording.
 
 IMPORT prelude
 IMPORT `negation-as-failure`

@@ -60,17 +60,36 @@ spec = do
       lifts (docWithTest [BFact True (bn "penguin") [BTAtom (bn "pingu")], q])
         `shouldBe` Right ()
 
-    it "refuses a block the #EVAL rendering does not consume, by name" $
-      refusalsOf (docWithTest [BDeclareObject (objDecl "socrates" "penguin"), q])
-        `shouldSatisfy` anyMentioning "blawx-lift/test-block"
+    -- W5, 2026-09-02: an `object_declaration` on a test canvas is no longer
+    -- refused. It is a TEST-LOCAL object — Blawx loads a test's declarations
+    -- beside the rules — so it lands in that test's own world, which is why
+    -- the world became a parameter rather than a module-level constant.
+    it "lifts an `object_declaration` on a test canvas into that test's own world" $
+      textOf (docWithTest [BDeclareObject (objDecl "socrates" "penguin"), q])
+        `shouldSatisfy` Text.isInfixOf "`t world` MEANS LIST `t socrates`"
 
-    it "refuses a NEGATIVE scenario fact rather than dropping it" $
-      refusalsOf (docWithTest [BFact False (bn "penguin") [BTAtom (bn "pingu")], q])
-        `shouldSatisfy` anyMentioning "blawx-lift/test-block"
+    -- The three below are still refused BY NAME; what changed with W5 is the
+    -- severity. A test is an oracle, not a rule: dropping it loses a check but
+    -- cannot make an emitted rule wrong, so the document still lifts and the
+    -- reason is written into the artifact where the `#EVAL` would have been.
+    -- That is strictly stronger than what the 2026-08-19 review replaced
+    -- (ignore the block, emit the `#EVAL` anyway): there is no `#EVAL` left to
+    -- answer the wrong question.
+    it "drops a test carrying a NEGATIVE scenario fact, by name, and emits no #EVAL" $ do
+      let d = docWithTest [BFact False (bn "penguin") [BTAtom (bn "pingu")], q]
+      warningsOf d `shouldSatisfy` anyMentioning "blawx-lift/test-block"
+      textOf d `shouldSatisfy` Text.isInfixOf "-- NOT LIFTED (blawx-lift/test-block)"
+      textOf d `shouldNotSatisfy` hasDirective
 
-    it "refuses a scenario fact about an undeclared predicate" $
-      refusalsOf (docWithTest [BFact True (bn "nosuch") [BTAtom (bn "pingu")], q])
-        `shouldSatisfy` anyMentioning "blawx-lift/scenario-undeclared"
+    it "drops a test carrying an `assume` (an abducible), by name" $ do
+      let d = docWithTest [BAbducible (bn "penguin") [BTVar (MkBVar "A")], q]
+      warningsOf d `shouldSatisfy` anyMentioning "blawx-lift/test-block"
+      textOf d `shouldNotSatisfy` hasDirective
+
+    it "drops a test whose scenario names an undeclared predicate, by name" $ do
+      let d = docWithTest [BFact True (bn "nosuch") [BTAtom (bn "pingu")], q]
+      warningsOf d `shouldSatisfy` anyMentioning "blawx-lift/scenario-undeclared"
+      textOf d `shouldNotSatisfy` hasDirective
 
   describe "the object universe" $
     -- `membersOf` always counted both sources; `all objects` did not, so an
@@ -87,6 +106,39 @@ spec = do
     it "gives a concluded category a fact field, so a scenario fact survives" $
       textOf (docWithTest [BFact True (bn "bird") [BTAtom (bn "pingu")], q])
         `shouldSatisfy` \t -> lineWith t "`bird fact`" "IS JUST TRUE"
+
+  -- ------------------------------------------------------------------
+  -- W5 (2026-09-02): arities above one, and what they force
+  -- ------------------------------------------------------------------
+  describe "predicates above arity one" $ do
+    it "keeps a document of unary predicates free of the world parameter" $
+      textOf (baseDoc [sec1Ws, sec2Ws, sec3Ws defeatsOnly, sec4Ws])
+        `shouldNotSatisfy` Text.isInfixOf "IS A LIST OF Object"
+
+    -- Blawx overloads on arity: rps declares BOTH the category `player/1` and
+    -- the attribute `player/2`, and s(CASP) tells them apart. L4 cannot, so
+    -- the lowest arity keeps the bare name and the rest are spelled
+    -- Prolog-style. Without this the two collapse into one L4 decision.
+    it "disambiguates a name declared at two arities, Prolog-style" $ do
+      textOf rpsShaped `shouldSatisfy` Text.isInfixOf "DECIDE `player/2` x1 x2"
+      textOf rpsShaped `shouldSatisfy` Text.isInfixOf "DECIDE player x "
+
+    it "carries an n-ary predicate's fact channel as a list of argument tuples" $
+      textOf rpsShaped
+        `shouldSatisfy` \t -> lineWith t "`player/2 fact`" "IS A LIST OF (LIST OF STRING)"
+
+    -- The rule's body binds `Player2`, which its head does not. s(CASP) reads
+    -- that existentially; an L4 decision's parameters are universal, so the
+    -- rule splits into a witness decision plus an `any` over the world.
+    it "closes a body-only variable with `any` over the world" $ do
+      textOf rpsShaped `shouldSatisfy` Text.isInfixOf ", witnessed by player2` w x1 x2 player2"
+      textOf rpsShaped `shouldSatisfy` Text.isInfixOf "any (GIVEN player2 YIELD"
+
+    -- Blawx compares objects by ATOM; L4 compares records by value. The atom
+    -- is the `name` field, so that is what the two agree on — the same finding
+    -- W1 records from the export side.
+    it "renders `blawx_diseq` as a comparison of atoms, never of records" $
+      textOf rpsShaped `shouldSatisfy` Text.isInfixOf "NOT (x2's name EQUALS player2's name)"
 
   describe "comments (ruling P5-4)" $ do
     it "lifts a workspace comment under the § of its section" $
@@ -132,6 +184,13 @@ textOf :: BlawxDoc -> Text
 textOf d = case liftBlawx emptyLiftContext d of
   Left ds -> error (Text.unpack ("lift refused: " <> Text.intercalate "; " (map renderLiftDiag ds)))
   Right (t, _) -> t
+
+-- | Is there an actual @#EVAL@ DIRECTIVE? Not merely the token, which also
+-- occurs inside the refusal message the artifact carries ("has no #EVAL image
+-- this phase") — the first spelling of these specs matched that and passed on
+-- a file with no directive in it at all.
+hasDirective :: Text -> Bool
+hasDirective = any ("#EVAL" `Text.isPrefixOf`) . Text.lines
 
 anyMentioning :: Text -> [Text] -> Bool
 anyMentioning needle = any (Text.isInfixOf needle)
@@ -272,6 +331,64 @@ orphanCommentWs =
     , bwStacks = []
     , bwComment = Just "no § for this"
     }
+
+-- | A miniature of Jason Morris's Rock Paper Scissors Act s.4 — the shape W5
+-- was sized on, and the smallest document carrying all four of its novelties:
+-- a name declared at two arities (@player@ the category and @player@ the
+-- attribute), a conclusion of arity two, a body-only variable, and a
+-- @blawx_diseq@.
+rpsShaped :: BlawxDoc
+rpsShaped =
+  (baseDoc [rpsWs])
+    { bdName = "Rock Paper Scissors Act"
+    , bdRuleText = MkBRuleText {brTitle = "Rock Paper Scissors Act", brSections = []}
+    }
+
+rpsWs :: BWorkspace
+rpsWs =
+  ws
+    (bSec 1)
+    [ [ BDeclareCategory
+          MkBCategoryDecl {bcName = bn "game", bcPrefix = "", bcPostfix = "is a game", bcProv = Nothing}
+      , BDeclareCategory
+          MkBCategoryDecl {bcName = bn "player", bcPrefix = "", bcPostfix = "is a player", bcProv = Nothing}
+      , catAttr "game" "player" "player" BOrderVO "" "played in" ""
+      , catAttr "game" "winner" "player" BOrderOV "the winner of" "is" ""
+      ]
+    , [ BAttributedRule
+          MkBRule
+            { brSection = bSec 1
+            , brConclusion =
+                MkBConclusion
+                  { bcSign = True
+                  , bcPred = bn "winner"
+                  , bcArgs = [BTVar (MkBVar "Game"), BTVar (MkBVar "Player1")]
+                  }
+            , brConditions =
+                [ BGCall True (bn "player") [BTVar (MkBVar "Game"), BTVar (MkBVar "Player1")]
+                , BGCall True (bn "player") [BTVar (MkBVar "Game"), BTVar (MkBVar "Player2")]
+                , BGDiseq (BTVar (MkBVar "Player1")) (BTVar (MkBVar "Player2"))
+                ]
+            , brDefeasible = False
+            , brInapplicable = False
+            , brProvenance = Nothing
+            }
+      ]
+    ]
+
+catAttr :: Text -> Text -> Text -> BNlgOrder -> Text -> Text -> Text -> BBlock
+catAttr cat nm val order pre inf post =
+  BDeclareAttribute
+    MkBAttributeDecl
+      { baCategory = bn cat
+      , baName = bn nm
+      , baType = BVCategory (bn val)
+      , baOrder = order
+      , baPrefix = pre
+      , baInfix = inf
+      , baPostfix = post
+      , baProv = Nothing
+      }
 
 objDecl :: Text -> Text -> BObjectDecl
 objDecl n cat =

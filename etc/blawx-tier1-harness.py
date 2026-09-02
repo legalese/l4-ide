@@ -117,7 +117,7 @@ TWINS = {"antisocial": "antisocial-twin", "alcohol": "alcohol-twin"}
 
 # The import direction's seeds: <stem> -> the subdirectory of jl4/examples/blawx
 # holding BOTH `<stem>.l4` (lifted) and `<stem>.blawx` (re-emitted).
-IMPORTED = {"bird": "imported"}
+IMPORTED = {"bird": "imported", "rps": "imported"}
 
 # UPSTREAM FINDING (legalese/blawx; belongs beside the quirk-fix issue #1).
 #
@@ -231,6 +231,29 @@ def parse_blawx(path):
 
 # --- oracle parsing --------------------------------------------------------
 
+def parse_unlifted(path):
+    """Test names the lift REFUSED, read off the `-- NOT LIFTED` lines it wrote.
+
+    `l4 blawx --import` drops a test canvas it cannot lift — `rps`'s
+    `hypothetical` declares `#abducible`s, and abduction is not evaluation — and
+    says so in the artifact where the `#EVAL` would have gone, so the .l4 has no
+    directive for it. The .blawx beside it still carries the test, because the
+    re-emission is of the PARSED BLOCKS and the parse read it fine. Excluding it
+    here BY NAME is what keeps the positional pairing honest; without it the
+    counts differ and the whole seed is skipped, which is a silent loss of the
+    tests that DID lift.
+    """
+    names, current = set(), None
+    for line in path.read_text(encoding="utf-8").splitlines():
+        s = line.strip()
+        m = re.match(r"-- blawxtest (\S+)", s)
+        if m:
+            current = m.group(1)
+        elif s.startswith("-- NOT LIFTED") and current is not None:
+            names.add(current)
+    return names
+
+
 def parse_oracles(path):
     """[(directive_line, expected_text)] in directive order."""
     oracles, pending = [], None
@@ -341,6 +364,21 @@ def run_test(swipl, seed, test_name, query, program_body, oracle, keep_dir,
         return (model, f"expected a model; got {'model' if model else 'NO model'}")
     if oracle == "FALSE":
         return (not model, f"expected no model; got {'model' if model else 'NO model'}")
+    if oracle == "EMPTY":
+        # The lift renders an enumerating query as a `filter`/`map` over the
+        # world, so "no answers" is the empty L4 list and "no model" is
+        # s(CASP)'s way of saying the same thing.
+        return (not rows, f"expected no answers; got {[tuple(r) for r in rows]}")
+    if len(out_vars) > 1:
+        # A query with two or more free variables (`?- winner(Game,Player).`)
+        # lifts to a nested comprehension whose elements are k-tuples of names.
+        want = parse_tuple_oracle(oracle, len(out_vars))
+        if want is None:
+            return False, (
+                f"could not read a {len(out_vars)}-tuple oracle from {oracle!r}"
+            )
+        got = sorted({tuple(row) for row in rows})
+        return (got == sorted(set(want)), f"expected {sorted(set(want))}; got {got}")
     if len(out_vars) != 1:
         return False, f"expected one output variable in {goal!r}, saw {out_vars}"
     got = sorted({row[0] for row in rows})
@@ -367,6 +405,35 @@ def run_test(swipl, seed, test_name, query, program_body, oracle, keep_dir,
         f" (+ pinned s(CASP) surplus {pinned}, see KNOWN_SURPLUS)" if pinned else ""
     )
     return (oracle in got, detail)
+
+
+def parse_tuple_oracle(oracle, k):
+    """The L4 rendering of a list of k-tuples of names, read back as tuples.
+
+    `l4 run` prints a `LIST OF (LIST OF STRING)` FLAT — `LIST LIST "a", "b",
+    LIST "c", "d"` — so the grouping is recoverable only with the arity in
+    hand, which this harness has (the query's output variables). Every k-th
+    field carries the inner `LIST` marker; anything else is a rendering this
+    function was not written for, and it returns None rather than guessing.
+    """
+    if oracle == "EMPTY":
+        return []
+    if not oracle.startswith("LIST "):
+        return None
+    fields = [f.strip() for f in oracle[len("LIST "):].split(",")]
+    if not fields or len(fields) % k:
+        return None
+    rows, cur = [], []
+    for i, f in enumerate(fields):
+        if i % k == 0:
+            if not f.startswith("LIST "):
+                return None
+            f = f[len("LIST "):].strip()
+        cur.append(f.strip().strip('"'))
+        if len(cur) == k:
+            rows.append(tuple(cur))
+            cur = []
+    return rows
 
 
 def split_row(text):
@@ -481,9 +548,12 @@ def main():
         # BOTH were produced by the pipeline rather than one being a golden.
         subdir = IMPORTED.get(seed)
         bridge = IMPORT_BRIDGE if subdir else ""
+        unlifted = set()
         if subdir:
             l4 = EXAMPLES / subdir / f"{seed}.l4"
             blawx = EXAMPLES / subdir / f"{seed}.blawx"
+            if l4.exists():
+                unlifted = parse_unlifted(l4)
         else:
             l4 = EXAMPLES / f"{seed}.l4"
             blawx = EXAMPLES / "expected" / f"{seed}.blawx"
@@ -494,8 +564,15 @@ def main():
         workspaces, tests = parse_blawx(blawx)
         # the "interview" test (#abducible declarations + a free-variable
         # query) has no L4 oracle — abduction is not evaluation — so it is
-        # excluded from the directive pairing below
+        # excluded from the directive pairing below ...
         tests = [(n, e) for n, e in tests if n != "interview"]
+        # ... and neither has a test the lift refused: see `parse_unlifted`.
+        if unlifted:
+            print(
+                f"blawx-tier1: {seed}: not lifted, so not paired: "
+                + ", ".join(sorted(unlifted))
+            )
+            tests = [(n, e) for n, e in tests if n not in unlifted]
         oracles = parse_oracles(l4)
         prefix = ""
         twin = TWINS.get(seed)
