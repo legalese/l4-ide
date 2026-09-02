@@ -175,7 +175,7 @@ plan as a rendering layer over the swipl leg (§5.5), sequenced after it.
 
 ErgoAI is the successor of Flora-2: F-logic frames (object–attribute–value,
 which is L4's record shape read relationally), HiLog for higher-order names,
-and **defeasible reasoning built into the language** — `\\overrides`
+and **defeasible reasoning built into the language** — `\overrides`
 between tagged rules under a pluggable argumentation theory — over the
 well-founded semantics on an XSB core. That is the one dimension none of
 the four earlier targets preserves _by construction_: PROLEG's exception
@@ -499,11 +499,11 @@ Ergo predicates or, where a decision's subject is a record, as frame
 molecules `?O[attr -> ?V]` so the object-attribute shape of L4 records
 survives instead of being flattened to positional arguments (this is the
 choice R2's Blawx leg makes with `blawx_attribute`, made native here).
-Negation lowers to Ergo's default negation `\\naf` under WFS (§3.4's hinge
+Negation lowers to Ergo's default negation `\naf` under WFS (§3.4's hinge
 holds on the stratified fragment; on non-stratified programs Ergo answers
 _undefined_ where the evaluator refuses — record, do not paper over).
 `SUBJECT TO` / `NOTWITHSTANDING`, once the language has them, lower to
-tagged rules with `\\overrides(tag_stronger, tag_weaker)`; until then the
+tagged rules with `\overrides(tag_stronger, tag_weaker)`; until then the
 idiom detector question is LP-R6's, shared with PROLEG. Validation: R1's
 differential harness with the engine swapped — `ergo` shell over
 ErgoEngine (XSB) as the reference; the reported SWI port, if it exists, as
@@ -601,7 +601,7 @@ it burden-blind, which §1.3 says is the one thing it must not be.
 | R2    | ASP emitter (clingo core, s(CASP) dialect flag), enumeration mode             | ~700-1,000 LOC   | three-way agreement on stratified fragment; ≥1 worked multi-model demo                                                                                        |
 | R3    | LE emitter (templates from `@nlg`), golden suite seeded from natural4 lessons | ~1,000-1,500 LOC | LE documents load in the reference LE engine and answer queries identically                                                                                   |
 | R4    | PROLEG emitter over `jl4-proleg`'s AST                                        | ~400-700 LOC     | lease fixture round-trip (§6.4); burden fidelity per LP-R6 ruling                                                                                             |
-| R5    | ErgoAI emitter (frames + `\\overrides`) over the R1 IR                        | ~600-900 LOC     | differential agreement with R1 on the stratified fragment via ErgoEngine; one SUBJECT-TO fixture where `\\overrides` carries the exception (added 2026-09-02) |
+| R5    | ErgoAI emitter (frames + `\overrides`) over the R1 IR                        | ~600-900 LOC     | differential agreement with R1 on the stratified fragment via ErgoEngine; one SUBJECT-TO fixture where `\overrides` carries the exception (added 2026-09-02) |
 
 Estimates are calibrated against the in-tree backends, counting **code
 lines, not file lines** — the distinction matters here because this
