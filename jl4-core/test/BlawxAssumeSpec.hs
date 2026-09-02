@@ -303,6 +303,72 @@ spec = do
       hasLine out "throws(P,Throws),"
       hasLine out "Throws = Throws2."
 
+    -- BLAWX-EXPORT-SPEC §11 W2, measured 2026-09-02. Blawx's attribute-type
+    -- dropdown is a closed list -- boolean, number, date, time, datetime,
+    -- duration, list, plus the declared categories
+    -- (@blawx-blocks.js:5376@ and @:5577-5583@ on the stock v1.6.22-alpha
+    -- checkout) -- and @scasp_generator.js@ has no per-type branch that could
+    -- add one. So a string sort in a SIGNATURE is refused, while a string
+    -- LITERAL in a rule body is not: the two halves are pinned separately
+    -- below, because §4.7 used to state the surviving half as though it
+    -- covered both.
+    it "refuses a STRING-sorted field, and says what to write instead" $
+      case blawxYaml stringFieldModule of
+        Right _  -> expectationFailure "expected a Blawx rejection for a STRING field"
+        Left err -> do
+          err `shouldSatisfy` Text.isInfixOf "STRING-sorted field or argument (Blawx)"
+          err `shouldSatisfy` Text.isInfixOf "no string attribute type"
+          -- the message names all three positions, because as of 2026-09-02
+          -- all three are refused (see the two cases below)
+          err `shouldSatisfy` Text.isInfixOf "STRING-sorted field, parameter or result"
+          -- the advice, which is the point of the message: an enum for a fixed
+          -- vocabulary, a category for identity
+          err `shouldSatisfy` Text.isInfixOf "DECLARE ... IS ONE OF ..."
+          err `shouldSatisfy` Text.isInfixOf "category for identity"
+          -- and it must not send the author looking for a spelling that works:
+          -- literals in a rule body are fine, so the message says so
+          err `shouldSatisfy` Text.isInfixOf "String literals inside a rule body are fine"
+
+    it "accepts the enum the diagnostic recommends, in the same shape" $ do
+      out <- emitted enumFieldModule
+      hasLine out "blawx_category(player_name)."
+      hasLine out "blawx_attribute(player,name,player_name)."
+
+    -- The hole the first cut of this work left open, found by review and
+    -- pinned here. 'classifyPred' only reaches 'valueType' from the arms that
+    -- build a DECLARATION BLOCK; a predicate of total arity <= 2 that is not
+    -- attribute-shaped is 'PCUndeclared' and used to skip the check entirely,
+    -- so this module emitted cleanly (exit 0, @S = zebra.@ in the s(CASP))
+    -- while its arity-3 spelling was refused. The corpus twin is
+    -- `jl4/examples/blawx/not-ok/string-param.l4`.
+    it "refuses a STRING PARAMETER even where the predicate gets no declaration block" $
+      case blawxYaml stringParamModule of
+        Right _  -> expectationFailure "expected a Blawx rejection for a STRING parameter"
+        Left err -> do
+          err `shouldSatisfy` Text.isInfixOf "STRING-sorted field or argument (Blawx)"
+          err `shouldSatisfy` Text.isInfixOf "STRING-sorted field, parameter or result"
+          -- and it is the DERIVED predicate that is named, not a field
+          err `shouldSatisfy` Text.isInfixOf "`throws named`"
+
+    -- The third position, and the one §4.7's own "Admitted" bullet used to be
+    -- an instance of: a nullary constant whose RESULT is a STRING.
+    it "refuses a STRING RESULT on a nullary constant" $
+      case blawxYaml stringResultModule of
+        Right _  -> expectationFailure "expected a Blawx rejection for a STRING result"
+        Left err -> do
+          err `shouldSatisfy` Text.isInfixOf "STRING-sorted field or argument (Blawx)"
+          err `shouldSatisfy` Text.isInfixOf "`the house sign`"
+
+    it "still admits a string LITERAL in a rule body, as an atom" $ do
+      -- The half of §4.7 that survives the narrowing. No signature in this
+      -- module is STRING-sorted: `aliases` is a LIST, which Blawx declares as
+      -- its untyped `list` value type without inspecting the element sort, and
+      -- the literal reaches the s(CASP) through the program-global string-atom
+      -- table, compared by unification.
+      out <- emitted stringLiteralModule
+      hasLine out "blawx_attribute(player,aliases,list)."
+      hasLine out "Aliases = [zebra | []]."
+
     it "admits an arity-3 input with no category parameter at all" $ do
       -- Not a defect: Blawx relationship blocks are n-ary over any declared
       -- value type. It is only the SPEC that claimed otherwise.
@@ -469,6 +535,88 @@ spec = do
     , "      q IS A Player"
     , "GIVETH A BOOLEAN"
     , "DECIDE `tied` p q IF p's throws EQUALS q's throws"
+    ]
+
+  -- A STRING-sorted stored field: refused, because there is no attribute value
+  -- type it could be declared under. The corpus twin is
+  -- `jl4/examples/blawx/not-ok/string-field.l4`.
+  stringFieldModule = Text.unlines
+    [ "DECLARE Sign IS ONE OF Rock, Paper, Scissors"
+    , ""
+    , "DECLARE Player HAS"
+    , "    name   IS A STRING"
+    , "    throws IS A Sign"
+    , ""
+    , "@export"
+    , "GIVEN p IS A Player"
+    , "GIVETH A BOOLEAN"
+    , "DECIDE `throws rock` p IF p's throws EQUALS Rock"
+    ]
+
+  -- The same module with the field's sort changed to the enum the diagnostic
+  -- recommends. Not `Name`: that and `name` both mangle to `name` and the
+  -- injectivity check refuses the module for an unrelated-looking reason.
+  enumFieldModule = Text.unlines
+    [ "DECLARE PlayerName IS ONE OF Jane, Bob"
+    , "DECLARE Sign IS ONE OF Rock, Paper, Scissors"
+    , ""
+    , "DECLARE Player HAS"
+    , "    name   IS A PlayerName"
+    , "    throws IS A Sign"
+    , ""
+    , "@export"
+    , "GIVEN p IS A Player"
+    , "GIVETH A BOOLEAN"
+    , "DECIDE `throws rock` p IF p's throws EQUALS Rock"
+    ]
+
+  -- A STRING PARAMETER on a derived predicate of total arity 2, which gets no
+  -- declaration block at all. Refused since 2026-09-02.
+  stringParamModule = Text.unlines
+    [ "DECLARE Sign IS ONE OF Rock, Paper, Scissors"
+    , ""
+    , "DECLARE Player HAS"
+    , "    throws IS A Sign"
+    , ""
+    , "@export"
+    , "GIVEN p IS A Player"
+    , "      s IS A STRING"
+    , "GIVETH A BOOLEAN"
+    , "DECIDE `throws named` p s IF s EQUALS \"zebra\""
+    ]
+
+  -- A STRING RESULT on a nullary constant. Also `PCUndeclared`, also refused
+  -- since 2026-09-02 -- this is the module §4.7 used to cite as its ADMITTED
+  -- example, which is why the section's two bullets contradicted each other.
+  stringResultModule = Text.unlines
+    [ "ASSUME Player IS A TYPE"
+    , ""
+    , "GIVEN p IS A Player"
+    , "ASSUME `is registered` p IS A BOOLEAN"
+    , ""
+    , "GIVETH A STRING"
+    , "DECIDE `the house sign` IS \"rock\""
+    , ""
+    , "@export"
+    , "GIVEN p IS A Player"
+    , "GIVETH A BOOLEAN"
+    , "DECIDE `qualifies` p IF"
+    , "      `is registered` p"
+    , "  AND `the house sign` EQUALS \"rock\""
+    ]
+
+  -- A string LITERAL in a rule body, with no STRING anywhere in a signature.
+  -- `LIST OF STRING` is admitted as Blawx's untyped `list` (RSList does not
+  -- inspect its element sort), so this is what a surviving literal looks like
+  -- now that the three signature positions are all closed.
+  stringLiteralModule = Text.unlines
+    [ "DECLARE Player HAS"
+    , "    aliases IS A LIST OF STRING"
+    , ""
+    , "@export"
+    , "GIVEN p IS A Player"
+    , "GIVETH A BOOLEAN"
+    , "DECIDE `known as zebra` p IF p's aliases EQUALS LIST \"zebra\""
     ]
 
   -- Total arity 3, and not one argument is a category.

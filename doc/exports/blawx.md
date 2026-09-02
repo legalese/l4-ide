@@ -86,6 +86,14 @@ Two different things happen, and it matters which one you are looking at.
 a fixture under `jl4/examples/blawx/not-ok/`:
 
 - a `DATE`-sorted field or argument (v1)
+- a `STRING` sort anywhere in a signature — field, parameter or result, and including a derived
+  predicate small enough that Blawx never declares it. Blawx's attribute-type dropdown is a closed
+  list — boolean, number, date, time, datetime, duration, list, and the categories you declared —
+  so a string-typed field has no value type to be declared under. Write an enum
+  (`DECLARE … IS ONE OF …`) if the values are a fixed vocabulary, or drop the field if the string
+  was only carrying identity: a record is already a category, and Blawx tells objects apart by
+  atom. String _literals_ in a rule body are fine, and survive as atoms you can compare for
+  equality; so is a `LIST OF STRING`, which is declared under the untyped `list` type.
 - more than ten arguments — a Blawx relationship block's ceiling
 - fewer than three, unless the shape is attribute-like (one category-sorted parameter plus an
   optional result); Blawx relationships start at three

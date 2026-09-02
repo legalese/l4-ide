@@ -621,21 +621,46 @@ data PredClass
   | PCRelationship ![BValueType]
   | PCUndeclared               -- ^ arity ≤ 2, not attribute-shaped: rules only
 
+-- | __A @STRING@ sort is refused wherever it occurs in a lowered predicate's
+-- signature — parameter or result — and that includes the rules-only band.__
+-- (The third position, a record FIELD, reaches 'blawxValueType' from
+-- 'fieldAttribute' instead and was never at risk.)
+--
+-- The obvious place to put the check is 'valueType', and that is where it
+-- lives; but 'valueType' is only reached from the two arms that build a
+-- /declaration block/ (the attribute arm and the arity-3-and-up relationship
+-- arm). A predicate of total arity ≤ 2 that is not attribute-shaped falls
+-- through to 'PCUndeclared' and gets no declaration block at all, so before
+-- 2026-09-02 a two-place derived predicate with a @STRING@ parameter emitted
+-- cleanly — measured, exit 0, @S = zebra.@ in the s(CASP) — while the
+-- three-place spelling of the same predicate was refused. The fixture for that
+-- hole is @jl4/examples/blawx/not-ok/string-param.l4@.
+--
+-- This pre-pass closes it by running the sorts that are @RSString@ through
+-- 'valueType' first, so the refusal is the same named diagnostic
+-- ("STRING-sorted field or argument (Blawx)") in all three positions. When
+-- there is no @STRING@ in the signature the list is empty and @collectE@ is
+-- @Right []@, so nothing else changes.
 classifyPred :: Env -> RPred -> Either [LowerError] PredClass
-classifyPred env p = case (p.rpParams, p.rpResult) of
-  ([s], Nothing) | Just cat <- categoryOf s -> Right (PCAttrBool cat)
-  ([s], Just res) | Just cat <- categoryOf s ->
-    PCAttrValue cat <$> valueType env p res
-  (params, res)
-    | arity > 10 ->
-        Left [ blawxErr p.rpName.rnBase p.rpProv.rpvRange LEArity
-                 ( "`" <> p.rpName.rnBase <> "` needs a Blawx relationship of arity "
-                     <> Text.textShow arity <> ", above the block ceiling of 10" ) ]
-    | arity >= 3 ->
-        PCRelationship <$> collectE (map (valueType env p) (params <> maybeToList res))
-    | otherwise -> Right PCUndeclared
-   where
-    arity = length params + maybe 0 (const 1) res
+classifyPred env p = refuseStrings *> classify
+ where
+  refuseStrings = void $ collectE
+    [ valueType env p s | s@RSString <- p.rpParams <> maybeToList p.rpResult ]
+
+  classify = case (p.rpParams, p.rpResult) of
+    ([s], Nothing) | Just cat <- categoryOf s -> Right (PCAttrBool cat)
+    ([s], Just res) | Just cat <- categoryOf s ->
+      PCAttrValue cat <$> valueType env p res
+    (params, res)
+      | arity > 10 ->
+          Left [ blawxErr p.rpName.rnBase p.rpProv.rpvRange LEArity
+                   ( "`" <> p.rpName.rnBase <> "` needs a Blawx relationship of arity "
+                       <> Text.textShow arity <> ", above the block ceiling of 10" ) ]
+      | arity >= 3 ->
+          PCRelationship <$> collectE (map (valueType env p) (params <> maybeToList res))
+      | otherwise -> Right PCUndeclared
+     where
+      arity = length params + maybe 0 (const 1) res
 
 -- | The category a sort names, if it names one. Blawx's ontology is
 -- category-centric: a declaration block hangs off a subject, and a sort that is
@@ -652,9 +677,9 @@ categoryOf = \case
 valueType :: Env -> RPred -> RSort -> Either [LowerError] BValueType
 valueType env p = blawxValueType env p.rpName.rnBase p.rpProv.rpvRange
 
--- | Sort → Blawx value type, with the two named rejections: dates (v1, by
--- name — see the module header) and everything else the ontology cannot
--- declare.
+-- | Sort → Blawx value type, with the three named rejections: strings (no
+-- attribute value type exists — see the 'RSString' arm), dates (v1, by name —
+-- see the module header) and everything else the ontology cannot declare.
 blawxValueType :: Env -> Text -> Maybe SrcRange -> RSort -> Either [LowerError] BValueType
 blawxValueType env who rng = \case
   RSBool     -> Right BVBoolean
@@ -662,6 +687,37 @@ blawxValueType env who rng = \case
   RSEnum e   -> BVCategory <$> atomOf env e
   RSRecord r -> BVCategory <$> atomOf env r
   RSList _   -> Right BVList
+  -- __Blawx v1.6 has no string attribute value type__, and this is a
+  -- measurement, not an inference: the declaration block's type dropdown is
+  -- literally @[["true / false","boolean"], ["number","number"],
+  -- ["date","date"], ["time","time"], ["datetime","datetime"],
+  -- ["duration","duration"], ['list','list']]@
+  -- (@blawx-blocks.js:5376@), and the list it is re-populated from at runtime
+  -- is that same set of datatypes concatenated with the declared categories
+  -- (@blawx-blocks.js:5577-5583@). @scasp_generator.js@ has no per-type branch
+  -- to add one either: its attribute arm splits only on @boolean@ vs
+  -- not-boolean and otherwise passes the dropdown value straight through into
+  -- @blawx_attribute(Cat,Name,Type)@ (@scasp_generator.js:927-1010@).
+  --
+  -- So the refusal is total for a string-sorted FIELD, parameter or result,
+  -- and the message says what to write instead. It is total only because
+  -- 'classifyPred' runs a @STRING@ pre-pass through here before classifying:
+  -- reaching this arm from the declaration-building arms alone would leave the
+  -- rules-only band ('PCUndeclared') open, which is exactly the hole
+  -- @not-ok/string-param.l4@ pins. String /literals/ in a rule body are
+  -- unaffected — they mangle to atoms through 'stringAtomTable' and are usable
+  -- for equality (BLAWX-EXPORT-SPEC §4.7).
+  RSString ->
+    Left [ blawxErr who rng
+             (LEUnsupported "STRING-sorted field or argument (Blawx)")
+             ( "`" <> who <> "` has a STRING-sorted field, parameter or \
+               \result, and Blawx's ontology has no string attribute type — a \
+               \declaration block offers boolean, number, date, time, \
+               \datetime, duration, list and the declared \
+               \categories, and nothing else. Use an enum \
+               \(DECLARE ... IS ONE OF ...) for a fixed vocabulary, or a \
+               \category for identity. String literals inside a rule body are \
+               \fine; it is the typed field that has nowhere to go" ) ]
   RSOpaque t | t `elem` (["DATE", "TIME", "DATETIME", "DURATION"] :: [Text]) ->
     Left [ blawxErr who rng
              (LEUnsupported "dates (Blawx v1)")
