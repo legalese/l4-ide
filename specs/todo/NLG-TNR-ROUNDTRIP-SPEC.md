@@ -410,6 +410,68 @@ What follows, if pursued:
   clause — "your house style is lossy, here is where" is a product finding in
   its own right.
 
+#### Drafting offices are dialect users too
+
+Not only firms. Matt Waddington (Jersey's legislative drafting office; the
+"Matt" whose text the alcohol act in §2.2 was converted from) has long wanted
+these methods for the **training and operations of legislative drafters**. In
+dialect terms an office's drafting manual _is_ its dialect, and the machinery
+above gives a drafter three things: a house-style check on a draft (does it
+use the office's forms?), a training loop (render the L4 in the office style
+and compare with what the trainee wrote), and — through §3.3 — a diff that
+says whether a redraft changed the law or only the wording. The last is the
+one drafters do by eye today.
+
+#### A gold corpus: two English renderings that promise the same meaning
+
+Singapore's **Plain Laws Understandable by Singaporeans** initiative (PLUS,
+AGC Legislation Division, begun 2013 with a public survey) concluded as the
+**2020 Revised Edition of Acts**: 510 Acts re-issued in modernised language,
+in force 31 December 2021. The documented changes are the dialect shift in
+miniature — "shall" → "must", "notwithstanding" → "despite", "for the avoidance
+of doubt" → "to avoid doubt", "chairman" → "chairperson", Roman → Arabic
+numerals, long provisions split into subsections.
+
+What makes it a _gold_ corpus rather than merely a large one is that the
+promise of meaning-preservation is **statutory**, not editorial. The Revised
+Edition of the Laws Act 1983, s 4(1), gives the Law Revision Commissioners
+their powers "**without changing the meaning of any Act**" — including, at
+s 4(1)(j)(i), "changes to spelling, punctuation, grammar or syntax, **or the
+use of conjunctives and disjunctives**", at (k) transposing words and
+combining or dividing sections, and at (m) "verbal additions, omissions or
+alterations". s 7(4) then makes the revised edition "the sole and only proper
+Statute Book", and s 23 provides for rectification of errors by Gazette
+order. So: two renderings of one meaning, 510 Acts wide, with the conjunctive
+and disjunctive structure — the exact thing L4 makes checkable — explicitly
+inside the editorial power.
+
+Two uses, in order of cheapness:
+
+1. **Phrase-table mining at scale** (§2.8 above): aligned pre- and
+   post-revision provisions are exactly the parallel corpus the AI aligns; the
+   pairs are already sentence-aligned by section number.
+2. **§3.6 with a known expected answer.** Everywhere else the losslessness run
+   produces a rate to be interpreted. Here the rate is _supposed_ to be 100%:
+   encode the pre-revision text, encode the 2020 text cleanroom, run the diff
+   oracle. Every divergence is an encoding error, an oracle limit, or a
+   revision that changed the law — and the third kind has a statutory home in
+   s 23. That is a finding a drafting office can act on, which is Matt's
+   interest and PLUS's own stated aim, met from the outside.
+
+A pilot is already half-built: `jl4/examples/legal/sg-succession/` encodes the
+Wills Act 1838, the Intestate Succession Act 1967, the Probate and
+Administration Act 1934 and the Guardianship of Infants Act 1934 from the
+2020 text, with batteries and asserts. The pre-revision text of the same
+sections is the second dialect.
+
+Retrieval caveat, measured 2026-09-02: the lawplain corpus returns the
+current consolidation for both its `act_current` and `act_revised` kinds
+(probed on the Revised Edition of the Laws Act itself), so the **pre-2020
+text is not in hand**; it has to come from Singapore Statutes Online's
+point-in-time versions, which this spec has not yet verified are available
+per section. The PLUS survey report (AGC, PDF) and the 2021 second-reading
+speech on the Statute Law Reform Bill are the primary descriptions of intent.
+
 Nothing here is built and none of it changes Phases 0–2. It changes what the
 house-style table in §2.7 is allowed to become: keyed by dialect, and mined
 rather than written.
