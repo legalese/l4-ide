@@ -966,7 +966,10 @@ getExpressionType st contextFile exprText = do
       -- Look for CheckInfo in the infos list - #CHECK adds the type as a CheckInfo
       let checkInfoTypes = [ty | MkCheckErrorWithContext (CheckInfo ty _) _ <- tc.infos]
       case checkInfoTypes of
-        (ty:_) -> pure $ Print.prettyLayout ty
+        -- Residual inference variables carry an edit-order-dependent gensym
+        -- (@res184@); render them as stable type-variable names (@a@, @b@, …)
+        -- exactly as #CHECK and hover do.
+        (ty:_) -> pure $ Print.prettyTypeForDisplay ty
         [] | not tc.success -> do
           -- Type error - report the first few errors
           let errors = tc.infos
