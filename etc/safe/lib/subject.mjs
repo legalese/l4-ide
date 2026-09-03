@@ -150,11 +150,16 @@ export function normaliseHoles(raw, readSource) {
         );
       }
     }
-    for (const e of entries)
+    for (const e of entries) {
       if (extended.has(e.literal)) {
         e.literal = extended.get(e.literal);
         e.wrap = "**";
+      } else if (e.literal.startsWith("\\[**") && e.literal.endsWith("]**")) {
+        // The map already carries the extended literal (canon's holes.json does, flagged
+        // `bold: true`), so there is nothing to repair — but the value is still bold.
+        e.wrap = "**";
       }
+    }
     forms[file] = {
       document: f.document,
       jurisdiction: f.jurisdiction,
