@@ -1,0 +1,19 @@
+-- Lexical section scoping — the flat-scope fallback (spec §3.3.4 as corrected
+-- 2026-09-04).
+--
+-- § b has no x of its own and no ancestor with one, so the reference is not
+-- on any x's ancestry. Resolution then falls back to the flat scope, where
+-- a's x is the ONLY candidate, and the unqualified name resolves to it.
+-- Qualification (a.x) is always sufficient (spec §3.2) but is only REQUIRED
+-- when the fallback is ambiguous — see
+-- jl4/examples/not-ok/tc/section-scoping-sibling-flat-fallback.l4.
+
+§ a
+x MEANS 1
+
+§ b
+y MEANS x PLUS 1              -- a's x: the only x anywhere
+z MEANS a.x PLUS 1            -- the same binding, qualified
+
+#EVAL y    -- 2
+#EVAL z    -- 2
