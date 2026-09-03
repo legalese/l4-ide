@@ -492,18 +492,19 @@ extractAssumeParamTypes mod' decide =
   [ (resolvedToText r, ty) | (r, ty) <- extractAssumeParamResolveds mod' decide ]
 
 -- | Like 'extractAssumeParamTypes' but also returns the TYPICALLY default
--- value (if any) declared on each ASSUME. Used by the function schema to
--- expose defaults to API consumers.
+-- value (if any) declared on each ASSUME, and the ASSUME's own @\@desc@
+-- text (if any). Used by the function schema to expose defaults and
+-- descriptions to API consumers.
 extractAssumeParamsWithDefaults
   :: Module Resolved
   -> Decide Resolved
-  -> [(Text, Type' Resolved, Maybe (Expr Resolved))]
+  -> [(Text, Type' Resolved, Maybe (Expr Resolved), Maybe Text)]
 extractAssumeParamsWithDefaults mod' decide =
   mapMaybe assumeInfo (assumesReadBy mod' (assumesFromModule mod') decide)
  where
-  assumeInfo :: Assume Resolved -> Maybe (Text, Type' Resolved, Maybe (Expr Resolved))
-  assumeInfo (MkAssume _ _ (MkAppForm _ name _ _) (Just ty) mTypically) =
-    Just (resolvedToText name, ty, mTypically)
+  assumeInfo :: Assume Resolved -> Maybe (Text, Type' Resolved, Maybe (Expr Resolved), Maybe Text)
+  assumeInfo (MkAssume ann _ (MkAppForm _ name _ _) (Just ty) mTypically) =
+    Just (resolvedToText name, ty, mTypically, getDesc <$> ann ^. annDesc)
   assumeInfo _ = Nothing
 
 -- | Like 'extractAssumeParamTypes' but returns the 'Resolved' name instead of
@@ -625,6 +626,7 @@ checkOneExport
 checkOneExport mod' synonyms assumes decide@(MkDecide _ tySig (MkAppForm _ fnName _ _) _) =
   checkGivenFunctionInputs synonyms fnName tySig
   ++ checkAssumeFunctionInputs synonyms readAssumes fnName
+  ++ checkAssumeNameClash readAssumes fnName tySig
  where
   readAssumes = assumesReadBy mod' assumes decide
 
@@ -649,6 +651,28 @@ checkAssumeFunctionInputs synonyms readAssumes fnName =
   | MkAssume _ _ (MkAppForm _ paramName _ _) (Just ty) _mTypically <- readAssumes
   , isFunctionTypeExpanded synonyms ty
   ]
+
+-- | A GIVEN parameter and a read ASSUME that share a name would collapse
+-- into one input field of the export's schema (the GIVEN shadows the
+-- ASSUME inside the export's own body, but a helper it reaches still reads
+-- the module-level ASSUME), so a request could never supply both. Report
+-- it rather than let the schema silently merge them.
+checkAssumeNameClash
+  :: [Assume Resolved]
+  -> Resolved
+  -> TypeSig Resolved
+  -> [CheckErrorWithContext]
+checkAssumeNameClash readAssumes fnName (MkTypeSig _ (MkGivenSig _ names) _) =
+  [ MkCheckErrorWithContext
+      { kind    = ExportAssumeNameClash fnName paramName
+      , context = WhileCheckingDecide (getActual fnName) None
+      }
+  | MkOptionallyTypedName _ paramName _ _ <- names
+  , resolvedToText paramName `Set.member` assumeNames
+  ]
+ where
+  assumeNames = Set.fromList
+    [ resolvedToText name | MkAssume _ _ (MkAppForm _ name _ _) _ _ <- readAssumes ]
 
 mkExportFunErr :: Resolved -> Resolved -> CheckErrorWithContext
 mkExportFunErr fnName paramName =

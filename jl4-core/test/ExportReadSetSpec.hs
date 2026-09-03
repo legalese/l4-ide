@@ -16,8 +16,9 @@ import qualified Data.Map.Strict as Map
 
 import L4.API.VirtualFS (checkWithImports, emptyVFS)
 import L4.Export (ExportedFunction(..), ExportedParam(..), getExportedFunctions)
-import L4.FunctionSchema (Parameters(..), parametersFromDecide)
+import L4.FunctionSchema (Parameters(..), Parameter(..), parametersFromDecide)
 import L4.Import.Resolution (TypeCheckWithDepsResult(..))
+import L4.TypeCheck.Types (CheckErrorWithContext(..), CheckError(..))
 
 -- | The parameter names of the single export in a source snippet.
 exportParamNames :: Text -> Either [Text] [Text]
@@ -36,6 +37,14 @@ exportSchema source =
     Right r -> case getExportedFunctions r.tcdModule of
       [ef] -> Right (parametersFromDecide r.tcdModule ef.exportDecide)
       efs  -> Left ["expected exactly one export, got " <> Text.pack (show (length efs))]
+
+-- | The GIVEN/ASSUME name-clash errors a snippet raises.
+nameClashErrors :: Text -> Either [Text] [CheckErrorWithContext]
+nameClashErrors source =
+  case checkWithImports emptyVFS source of
+    Left errs -> Left errs
+    Right r -> Right
+      [ e | e@MkCheckErrorWithContext{kind = ExportAssumeNameClash _ _} <- r.tcdErrors ]
 
 helperReadsAssume :: Text
 helperReadsAssume = Text.unlines
@@ -107,3 +116,48 @@ spec = do
         Right ps -> do
           ps.required `shouldBe` ["y", "x"]
           Map.keys ps.parameterMap `shouldBe` ["x", "y"]
+
+    it "carries the ASSUME's own @desc into the schema" $ do
+      let src = Text.unlines
+            [ "@desc the offset added by the helper"
+            , "ASSUME x IS A NUMBER"
+            , "g MEANS x PLUS 1"
+            , ""
+            , "@export f adds"
+            , "GIVEN y IS A NUMBER"
+            , "GIVETH A NUMBER"
+            , "f y MEANS g PLUS y"
+            ]
+      case exportSchema src of
+        Left errs -> fail $ "Fatal: " ++ show errs
+        Right ps ->
+          fmap (.parameterDescription) (Map.lookup "x" ps.parameterMap)
+            `shouldBe` Just "the offset added by the helper"
+
+  describe "GIVEN / ASSUME name clash" $ do
+    let clash = Text.unlines
+          [ "ASSUME x IS A NUMBER"
+          , "g MEANS x PLUS 1"
+          , ""
+          , "@export f adds"
+          , "GIVEN x IS A NUMBER"
+          , "GIVETH A NUMBER"
+          , "f x MEANS g PLUS x"
+          ]
+
+    it "is reported as a check error" $ do
+      case nameClashErrors clash of
+        Left errs -> fail $ "Fatal: " ++ show errs
+        Right es -> length es `shouldBe` 1
+
+    it "is not reported when the names differ" $ do
+      case nameClashErrors helperReadsAssume of
+        Left errs -> fail $ "Fatal: " ++ show errs
+        Right es -> es `shouldBe` []
+
+    it "keeps one property and one required entry for the clashing name" $ do
+      case exportSchema clash of
+        Left errs -> fail $ "Fatal: " ++ show errs
+        Right ps -> do
+          ps.required `shouldBe` ["x"]
+          Map.keys ps.parameterMap `shouldBe` ["x"]
