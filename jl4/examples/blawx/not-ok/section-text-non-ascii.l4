@@ -1,0 +1,38 @@
+-- REFUSAL FIXTURE (BLAWX-EXPORT-SPEC §8.4, §11 W3; integrated 2026-09-02).
+--
+-- `l4 blawx` refuses this module; `l4 check` succeeds on it. The refusal is
+-- the Blawx leg's, not L4's — the module is perfectly good L4.
+--
+-- clean-law 0.0.4 (the version Blawx pins) builds its `legal_text` from
+-- pyparsing's `printables`, which is ASCII-only. A single character above
+-- U+007F anywhere in a section's prose therefore ENDS clean-law's parse of the
+-- `rule_text` at that character, and every LATER section's canvas is orphaned:
+-- the workspace we name `sec_2_section` belongs to no section of the Act, and
+-- nothing in the emitted bytes says so, because both halves are ours and each
+-- is self-consistent.
+--
+-- Measured 2026-09-02 with etc/blawx-eid-harness.py against clean-law 0.0.4 +
+-- pyparsing 3.3.2, one character at a time on exactly this module: U+00A3 (£),
+-- U+2019 (’), U+00A7 (§) and U+201C (“) each left clean-law yielding
+-- ['sec_1_section'] against workspaces ['sec_1_section', 'sec_2_section'].
+--
+-- `asciiFold` (L4.Blawx.Lower) folds the punctuation legislation actually
+-- contains — em/en dashes, curly quotes and apostrophes, the ellipsis, the
+-- non-breaking space, the section sign — so a legislation.gov.uk paste keeps
+-- working. What is left, such as the currency sign below, is refused by name.
+
+§ `Levy Act`
+
+DECLARE Trader HAS
+    pays     IS A BOOLEAN
+    resident IS A BOOLEAN
+
+@export A trader who pays the £5 levy is registered.
+GIVEN t IS A Trader
+GIVETH A BOOLEAN
+DECIDE registered t IF t's pays
+
+@export A resident trader is domiciled here.
+GIVEN t IS A Trader
+GIVETH A BOOLEAN
+DECIDE domiciled t IF t's resident

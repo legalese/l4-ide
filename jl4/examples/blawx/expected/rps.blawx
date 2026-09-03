@@ -1,0 +1,617 @@
+- model: blawx.ruledoc
+  pk: 1
+  fields:
+    ruledoc_name: Rock Paper Scissors Act
+    rule_text: "Rock Paper Scissors Act\n\n3. The signs are related in the following ways: (a) Rock beats Scissors, (b) Scissors beats Paper, and (c) Paper beats Rock.\n4. The winner of a game is the player who throws a sign that beats the sign of the other player."
+    scasp_encoding: ''
+    tutorial: ''
+    owner: 1
+    published: true
+- model: blawx.workspace
+  pk: 1
+  fields:
+    ruledoc: 1
+    workspace_name: root_section
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="unattributed_fact" id="l4b000001" x="40" y="40"><statement name="statements"><block type="new_category_declaration" id="l4b000002"><field name="category_name">player</field><field name="prefix"></field><field name="first_element">object</field><field name="postfix">is a player</field><next><block type="new_category_declaration" id="l4b000003"><field name="category_name">game</field><field name="prefix"></field><field name="first_element">object</field><field name="postfix">is a game</field><next><block type="new_category_declaration" id="l4b000004"><field name="category_name">sign</field><field name="prefix"></field><field name="first_element">object</field><field name="postfix">is a sign</field><next><block type="new_attribute_declaration" id="l4b000005"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="player" attribute_type="sign"></mutation><field name="category_name">player</field><field name="attribute_name">throws</field><field name="attribute_type">sign</field><field name="order">ov</field><field name="prefix"></field><field name="first_element">object</field><field name="infix">throws</field><field name="second_element">value</field><field name="postfix"></field><next><block type="new_attribute_declaration" id="l4b000006"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="game" attribute_type="player"></mutation><field name="category_name">game</field><field name="attribute_name">first_player</field><field name="attribute_type">player</field><field name="order">ov</field><field name="prefix">the first player of</field><field name="first_element">object</field><field name="infix">is</field><field name="second_element">value</field><field name="postfix"></field><next><block type="new_attribute_declaration" id="l4b000007"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="game" attribute_type="player"></mutation><field name="category_name">game</field><field name="attribute_name">second_player</field><field name="attribute_type">player</field><field name="order">ov</field><field name="prefix">the second player of</field><field name="first_element">object</field><field name="infix">is</field><field name="second_element">value</field><field name="postfix"></field><next><block type="new_attribute_declaration" id="l4b000008"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="game" attribute_type="boolean"></mutation><field name="category_name">game</field><field name="attribute_name">first_player_wins</field><field name="attribute_type">boolean</field><field name="order">ov</field><field name="prefix">the first player of</field><field name="first_element">object</field><field name="infix"></field><field name="second_element">value</field><field name="postfix">wins</field><next><block type="new_attribute_declaration" id="l4b000009"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="game" attribute_type="boolean"></mutation><field name="category_name">game</field><field name="attribute_name">second_player_wins</field><field name="attribute_type">boolean</field><field name="order">ov</field><field name="prefix">the second player of</field><field name="first_element">object</field><field name="infix"></field><field name="second_element">value</field><field name="postfix">wins</field><next><block type="new_attribute_declaration" id="l4b000010"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="sign" attribute_type="sign"></mutation><field name="category_name">sign</field><field name="attribute_name">beats</field><field name="attribute_type">sign</field><field name="order">ov</field><field name="prefix"></field><field name="first_element">object</field><field name="infix">beats</field><field name="second_element">value</field><field name="postfix"></field></block></next></block></next></block></next></block></next></block></next></block></next></block></next></block></next></block></statement></block>
+      <block type="unattributed_fact" id="l4b000011" x="40" y="928"><statement name="statements"><block type="object_category" id="l4b000012"><value name="object"><block type="object_selector" id="l4b000013"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="rock"></mutation><field name="object_name">rock</field></block></value><value name="category"><block type="category_selector" id="l4b000014"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="sign"></mutation><field name="category_name">sign</field></block></value><next><block type="object_category" id="l4b000015"><value name="object"><block type="object_selector" id="l4b000016"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="paper"></mutation><field name="object_name">paper</field></block></value><value name="category"><block type="category_selector" id="l4b000017"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="sign"></mutation><field name="category_name">sign</field></block></value><next><block type="object_category" id="l4b000018"><value name="object"><block type="object_selector" id="l4b000019"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="scissors"></mutation><field name="object_name">scissors</field></block></value><value name="category"><block type="category_selector" id="l4b000020"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="sign"></mutation><field name="category_name">sign</field></block></value></block></next></block></next></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      blawx_category(player).
+      blawx_category_nlg(player,"","is a player").
+      :- dynamic player/1.
+      #pred player(X) :: '@(X) is a player'.
+      #pred holds(user,player,X) :: 'it is provided as a fact that @(X) is a player'.
+      #pred holds(user,-player,X) :: 'it is provided as a fact that it is not the case that @(X) is a player'.
+      #pred holds(Z,player,X) :: 'the conclusion in @(Z) that @(X) is a player holds'.
+      #pred holds(Z,-player,X) :: 'the conclusion in @(Z) that it is not the case that @(X) is a player holds'.
+      #pred according_to(Z,player,X) :: 'according to @(Z), @(X) is a player'.
+      #pred according_to(Z,-player,X) :: 'according to @(Z), it is not the case that @(X) is a player'.
+      #pred blawx_defeated(Z,player,X) :: 'the conclusion in @(Z) that @(X) is a player is defeated'.
+      #pred blawx_defeated(Z,-player,X) :: 'the conclusion in @(Z) that it is not the case that @(X) is a player is defeated'.
+      #pred blawx_initially(player(X)) :: 'that @(X) is a player holds initially'.
+      #pred blawx_initially(-player(X)) :: 'that it is not the case that @(X) is a player holds initially'.
+      #pred blawx_ultimately(player(X)) :: 'that @(X) is a player holds ultimately'.
+      #pred blawx_ultimately(-player(X)) :: 'that it is not the case that @(X) is a player holds ultimately'.
+      #pred blawx_as_of(player(X),T) :: 'that @(X) is a player holds at @(T)'.
+      #pred blawx_as_of(-player(X),T) :: 'that it is not the case that @(X) is a player holds at @(T)'.
+      #pred blawx_during(T1,player(X),T2) :: 'that @(X) is a player held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-player(X),T2) :: 'that it is not the case that @(X) is a player held between @(T1) and @(T2)'.
+      #pred blawx_becomes(player(X),T) :: 'that @(X) is a player became true at @(T)'.
+      #pred blawx_becomes(-player(X),T) :: 'that it is not the case that @(X) is a player became true at @(T)'.
+      #pred blawx_not_interrupted(Start,player(X),End) :: '@(X) is a player remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-player(X),End) :: 'it is not the case that @(X) is a player remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),player(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-player(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-player(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(player(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),player(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-player(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-player(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(player(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),player(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-player(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-player(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(player(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),player(X),datetime(eot)) :- blawx_initially(player(X)), blawx_ultimately(player(X)), findall(Time,blawx_becomes(-player(X),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-player(X),datetime(eot)) :- blawx_initially(-player(X)), blawx_ultimately(-player(X)), findall(Time,blawx_becomes(player(X),datetime(Time)),[]).
+      blawx_as_of(player(X),datetime(Time)) :- blawx_initially(player(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),player(X),datetime(BeforeT)).
+      blawx_as_of(player(X),datetime(Time)) :- blawx_becomes(player(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),player(X),datetime(Time)).
+      blawx_as_of(-player(X),datetime(Time)) :- blawx_initially(-player(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-player(X),datetime(BeforeT)).
+      blawx_as_of(-player(X),datetime(Time)) :- blawx_becomes(-player(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-player(X),datetime(Time)).
+      blawx_during(datetime(Start),player(X),datetime(End)) :- blawx_becomes(player(X),datetime(Start)), blawx_becomes(-player(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),player(X),datetime(End)).
+      blawx_during(datetime(bot),player(X),datetime(End)) :- blawx_initially(player(X)), blawx_becomes(-player(X),datetime(End)), blawx_not_interrupted(datetime(bot),player(X),datetime(End)).
+      blawx_during(datetime(Start),player(X),datetime(eot)) :- blawx_ultimately(player(X)), blawx_becomes(-player(X),datetime(Start)), blawx_not_interrupted(datetime(Start),player(X),datetime(eot)).
+      blawx_during(datetime(bot),player(X),datetime(eot)) :- blawx_initially(player(X)), blawx_ultimately(player(X)), blawx_becomes(-player(X),datetime(Start)), blawx_not_interrupted(datetime(bot),player(X),datetime(eot)).
+      blawx_during(datetime(Start),-player(X),datetime(End)) :- blawx_becomes(-player(X),datetime(Start)), blawx_becomes(player(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-player(X),datetime(End)).
+      blawx_during(datetime(bot),-player(X),datetime(End)) :- blawx_initially(-player(X)), blawx_becomes(player(X),datetime(End)), blawx_not_interrupted(datetime(bot),-player(X),datetime(End)).
+      blawx_during(datetime(Start),-player(X),datetime(eot)) :- blawx_ultimately(-player(X)), blawx_becomes(player(X),datetime(Start)), blawx_not_interrupted(datetime(Start),-player(X),datetime(eot)).
+      blawx_during(datetime(bot),-player(X),datetime(eot)) :- blawx_initially(-player(X)), blawx_ultimately(-player(X)), blawx_becomes(-player(X),datetime(Start)), blawx_not_interrupted(datetime(bot),-player(X),datetime(eot)).
+      blawx_category(game).
+      blawx_category_nlg(game,"","is a game").
+      :- dynamic game/1.
+      #pred game(X) :: '@(X) is a game'.
+      #pred holds(user,game,X) :: 'it is provided as a fact that @(X) is a game'.
+      #pred holds(user,-game,X) :: 'it is provided as a fact that it is not the case that @(X) is a game'.
+      #pred holds(Z,game,X) :: 'the conclusion in @(Z) that @(X) is a game holds'.
+      #pred holds(Z,-game,X) :: 'the conclusion in @(Z) that it is not the case that @(X) is a game holds'.
+      #pred according_to(Z,game,X) :: 'according to @(Z), @(X) is a game'.
+      #pred according_to(Z,-game,X) :: 'according to @(Z), it is not the case that @(X) is a game'.
+      #pred blawx_defeated(Z,game,X) :: 'the conclusion in @(Z) that @(X) is a game is defeated'.
+      #pred blawx_defeated(Z,-game,X) :: 'the conclusion in @(Z) that it is not the case that @(X) is a game is defeated'.
+      #pred blawx_initially(game(X)) :: 'that @(X) is a game holds initially'.
+      #pred blawx_initially(-game(X)) :: 'that it is not the case that @(X) is a game holds initially'.
+      #pred blawx_ultimately(game(X)) :: 'that @(X) is a game holds ultimately'.
+      #pred blawx_ultimately(-game(X)) :: 'that it is not the case that @(X) is a game holds ultimately'.
+      #pred blawx_as_of(game(X),T) :: 'that @(X) is a game holds at @(T)'.
+      #pred blawx_as_of(-game(X),T) :: 'that it is not the case that @(X) is a game holds at @(T)'.
+      #pred blawx_during(T1,game(X),T2) :: 'that @(X) is a game held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-game(X),T2) :: 'that it is not the case that @(X) is a game held between @(T1) and @(T2)'.
+      #pred blawx_becomes(game(X),T) :: 'that @(X) is a game became true at @(T)'.
+      #pred blawx_becomes(-game(X),T) :: 'that it is not the case that @(X) is a game became true at @(T)'.
+      #pred blawx_not_interrupted(Start,game(X),End) :: '@(X) is a game remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-game(X),End) :: 'it is not the case that @(X) is a game remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),game(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-game(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-game(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(game(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),game(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-game(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-game(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(game(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),game(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-game(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-game(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(game(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),game(X),datetime(eot)) :- blawx_initially(game(X)), blawx_ultimately(game(X)), findall(Time,blawx_becomes(-game(X),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-game(X),datetime(eot)) :- blawx_initially(-game(X)), blawx_ultimately(-game(X)), findall(Time,blawx_becomes(game(X),datetime(Time)),[]).
+      blawx_as_of(game(X),datetime(Time)) :- blawx_initially(game(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),game(X),datetime(BeforeT)).
+      blawx_as_of(game(X),datetime(Time)) :- blawx_becomes(game(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),game(X),datetime(Time)).
+      blawx_as_of(-game(X),datetime(Time)) :- blawx_initially(-game(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-game(X),datetime(BeforeT)).
+      blawx_as_of(-game(X),datetime(Time)) :- blawx_becomes(-game(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-game(X),datetime(Time)).
+      blawx_during(datetime(Start),game(X),datetime(End)) :- blawx_becomes(game(X),datetime(Start)), blawx_becomes(-game(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),game(X),datetime(End)).
+      blawx_during(datetime(bot),game(X),datetime(End)) :- blawx_initially(game(X)), blawx_becomes(-game(X),datetime(End)), blawx_not_interrupted(datetime(bot),game(X),datetime(End)).
+      blawx_during(datetime(Start),game(X),datetime(eot)) :- blawx_ultimately(game(X)), blawx_becomes(-game(X),datetime(Start)), blawx_not_interrupted(datetime(Start),game(X),datetime(eot)).
+      blawx_during(datetime(bot),game(X),datetime(eot)) :- blawx_initially(game(X)), blawx_ultimately(game(X)), blawx_becomes(-game(X),datetime(Start)), blawx_not_interrupted(datetime(bot),game(X),datetime(eot)).
+      blawx_during(datetime(Start),-game(X),datetime(End)) :- blawx_becomes(-game(X),datetime(Start)), blawx_becomes(game(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-game(X),datetime(End)).
+      blawx_during(datetime(bot),-game(X),datetime(End)) :- blawx_initially(-game(X)), blawx_becomes(game(X),datetime(End)), blawx_not_interrupted(datetime(bot),-game(X),datetime(End)).
+      blawx_during(datetime(Start),-game(X),datetime(eot)) :- blawx_ultimately(-game(X)), blawx_becomes(game(X),datetime(Start)), blawx_not_interrupted(datetime(Start),-game(X),datetime(eot)).
+      blawx_during(datetime(bot),-game(X),datetime(eot)) :- blawx_initially(-game(X)), blawx_ultimately(-game(X)), blawx_becomes(-game(X),datetime(Start)), blawx_not_interrupted(datetime(bot),-game(X),datetime(eot)).
+      blawx_category(sign).
+      blawx_category_nlg(sign,"","is a sign").
+      :- dynamic sign/1.
+      #pred sign(X) :: '@(X) is a sign'.
+      #pred holds(user,sign,X) :: 'it is provided as a fact that @(X) is a sign'.
+      #pred holds(user,-sign,X) :: 'it is provided as a fact that it is not the case that @(X) is a sign'.
+      #pred holds(Z,sign,X) :: 'the conclusion in @(Z) that @(X) is a sign holds'.
+      #pred holds(Z,-sign,X) :: 'the conclusion in @(Z) that it is not the case that @(X) is a sign holds'.
+      #pred according_to(Z,sign,X) :: 'according to @(Z), @(X) is a sign'.
+      #pred according_to(Z,-sign,X) :: 'according to @(Z), it is not the case that @(X) is a sign'.
+      #pred blawx_defeated(Z,sign,X) :: 'the conclusion in @(Z) that @(X) is a sign is defeated'.
+      #pred blawx_defeated(Z,-sign,X) :: 'the conclusion in @(Z) that it is not the case that @(X) is a sign is defeated'.
+      #pred blawx_initially(sign(X)) :: 'that @(X) is a sign holds initially'.
+      #pred blawx_initially(-sign(X)) :: 'that it is not the case that @(X) is a sign holds initially'.
+      #pred blawx_ultimately(sign(X)) :: 'that @(X) is a sign holds ultimately'.
+      #pred blawx_ultimately(-sign(X)) :: 'that it is not the case that @(X) is a sign holds ultimately'.
+      #pred blawx_as_of(sign(X),T) :: 'that @(X) is a sign holds at @(T)'.
+      #pred blawx_as_of(-sign(X),T) :: 'that it is not the case that @(X) is a sign holds at @(T)'.
+      #pred blawx_during(T1,sign(X),T2) :: 'that @(X) is a sign held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-sign(X),T2) :: 'that it is not the case that @(X) is a sign held between @(T1) and @(T2)'.
+      #pred blawx_becomes(sign(X),T) :: 'that @(X) is a sign became true at @(T)'.
+      #pred blawx_becomes(-sign(X),T) :: 'that it is not the case that @(X) is a sign became true at @(T)'.
+      #pred blawx_not_interrupted(Start,sign(X),End) :: '@(X) is a sign remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-sign(X),End) :: 'it is not the case that @(X) is a sign remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),sign(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-sign(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-sign(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(sign(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),sign(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-sign(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-sign(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(sign(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),sign(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-sign(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-sign(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(sign(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),sign(X),datetime(eot)) :- blawx_initially(sign(X)), blawx_ultimately(sign(X)), findall(Time,blawx_becomes(-sign(X),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-sign(X),datetime(eot)) :- blawx_initially(-sign(X)), blawx_ultimately(-sign(X)), findall(Time,blawx_becomes(sign(X),datetime(Time)),[]).
+      blawx_as_of(sign(X),datetime(Time)) :- blawx_initially(sign(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),sign(X),datetime(BeforeT)).
+      blawx_as_of(sign(X),datetime(Time)) :- blawx_becomes(sign(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),sign(X),datetime(Time)).
+      blawx_as_of(-sign(X),datetime(Time)) :- blawx_initially(-sign(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-sign(X),datetime(BeforeT)).
+      blawx_as_of(-sign(X),datetime(Time)) :- blawx_becomes(-sign(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-sign(X),datetime(Time)).
+      blawx_during(datetime(Start),sign(X),datetime(End)) :- blawx_becomes(sign(X),datetime(Start)), blawx_becomes(-sign(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),sign(X),datetime(End)).
+      blawx_during(datetime(bot),sign(X),datetime(End)) :- blawx_initially(sign(X)), blawx_becomes(-sign(X),datetime(End)), blawx_not_interrupted(datetime(bot),sign(X),datetime(End)).
+      blawx_during(datetime(Start),sign(X),datetime(eot)) :- blawx_ultimately(sign(X)), blawx_becomes(-sign(X),datetime(Start)), blawx_not_interrupted(datetime(Start),sign(X),datetime(eot)).
+      blawx_during(datetime(bot),sign(X),datetime(eot)) :- blawx_initially(sign(X)), blawx_ultimately(sign(X)), blawx_becomes(-sign(X),datetime(Start)), blawx_not_interrupted(datetime(bot),sign(X),datetime(eot)).
+      blawx_during(datetime(Start),-sign(X),datetime(End)) :- blawx_becomes(-sign(X),datetime(Start)), blawx_becomes(sign(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-sign(X),datetime(End)).
+      blawx_during(datetime(bot),-sign(X),datetime(End)) :- blawx_initially(-sign(X)), blawx_becomes(sign(X),datetime(End)), blawx_not_interrupted(datetime(bot),-sign(X),datetime(End)).
+      blawx_during(datetime(Start),-sign(X),datetime(eot)) :- blawx_ultimately(-sign(X)), blawx_becomes(sign(X),datetime(Start)), blawx_not_interrupted(datetime(Start),-sign(X),datetime(eot)).
+      blawx_during(datetime(bot),-sign(X),datetime(eot)) :- blawx_initially(-sign(X)), blawx_ultimately(-sign(X)), blawx_becomes(-sign(X),datetime(Start)), blawx_not_interrupted(datetime(bot),-sign(X),datetime(eot)).
+      blawx_attribute(player,throws,sign).
+      blawx_attribute_nlg(throws,ov,"","throws","").
+      :- dynamic throws/2.
+      #pred throws(X,Y) :: '@(X) throws @(Y)'.
+      #pred holds(user,throws,X,Y) :: 'it is provided as a fact that @(X) throws @(Y)'.
+      #pred holds(user,-throws,X,Y) :: 'it is provided as a fact that it is not the case that @(X) throws @(Y)'.
+      #pred holds(Z,throws,X,Y) :: 'the conclusion in @(Z) that @(X) throws @(Y) holds'.
+      #pred holds(Z,-throws,X,Y) :: 'the conclusion in @(Z) that it is not the case that @(X) throws @(Y) holds'.
+      #pred according_to(Z,throws,X,Y) :: 'according to @(Z), @(X) throws @(Y)'.
+      #pred according_to(Z,-throws,X,Y) :: 'according to @(Z), it is not the case that @(X) throws @(Y)'.
+      #pred blawx_defeated(Z,throws,X,Y) :: 'the conclusion in @(Z) that @(X) throws @(Y) is defeated'.
+      #pred blawx_defeated(Z,-throws,X,Y) :: 'the conclusion in @(Z) that @(X) throws @(Y) is defeated'.
+      #pred blawx_initially(throws(X,Y)) :: 'that @(X) throws @(Y) holds initially'.
+      #pred blawx_initially(-throws(X,Y)) :: 'that it is not the case that @(X) throws @(Y) holds initially'.
+      #pred blawx_ultimately(throws(X,Y)) :: 'that @(X) throws @(Y) holds ultimately'.
+      #pred blawx_ultimately(-throws(X,Y)) :: 'that it is not the case that @(X) throws @(Y) holds ultimately'.
+      #pred blawx_as_of(throws(X,Y),T) :: 'that @(X) throws @(Y) holds at @(T)'.
+      #pred blawx_as_of(-throws(X,Y),T) :: 'that it is not the case that @(X) throws @(Y) holds at @(T)'.
+      #pred blawx_during(T1,throws(X,Y),T2) :: 'that @(X) throws @(Y) held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-throws(X,Y),T2) :: 'that it is not the case that @(X) throws @(Y) held between @(T1) and @(T2)'.
+      #pred blawx_becomes(throws(X,Y),T) :: 'that @(X) throws @(Y) became true at @(T)'.
+      #pred blawx_becomes(-throws(X,Y),T) :: 'that it is not the case that @(X) throws @(Y) became true at @(T)'.
+      #pred blawx_not_interrupted(Start,throws(X,Y),End) :: '@(X) throws @(Y) remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-throws(X,Y),End) :: 'it is not the case that @(X) throws @(Y) remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),throws(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-throws(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-throws(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(throws(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),throws(X,Y),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-throws(X,Y),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-throws(X,Y),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(throws(X,Y),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),throws(X,Y),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-throws(X,Y),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-throws(X,Y),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(throws(X,Y),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),throws(X,Y),datetime(eot)) :- blawx_initially(throws(X,Y)), blawx_ultimately(throws(X,Y)), findall(Time,blawx_becomes(-throws(X,Y),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-throws(X,Y),datetime(eot)) :- blawx_initially(-throws(X,Y)), blawx_ultimately(-throws(X,Y)), findall(Time,blawx_becomes(throws(X,Y),datetime(Time)),[]).
+      blawx_as_of(throws(X,Y),datetime(Time)) :- blawx_initially(throws(X,Y)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),throws(X,Y),datetime(BeforeT)).
+      blawx_as_of(throws(X,Y),datetime(Time)) :- blawx_becomes(throws(X,Y),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),throws(X,Y),datetime(Time)).
+      blawx_as_of(-throws(X,Y),datetime(Time)) :- blawx_initially(-throws(X,Y)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-throws(X,Y),datetime(BeforeT)).
+      blawx_as_of(-throws(X,Y),datetime(Time)) :- blawx_becomes(-throws(X,Y),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-throws(X,Y),datetime(Time)).
+      blawx_during(datetime(Start),throws(X,Y),datetime(End)) :- blawx_becomes(throws(X,Y),datetime(Start)), blawx_becomes(-throws(X,Y),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),throws(X,Y),datetime(End)).
+      blawx_during(datetime(bot),throws(X,Y),datetime(End)) :- blawx_initially(throws(X,Y)), blawx_becomes(-throws(X,Y),datetime(End)), blawx_not_interrupted(datetime(bot),throws(X,Y),datetime(End)).
+      blawx_during(datetime(Start),throws(X,Y),datetime(eot)) :- blawx_ultimately(throws(X,Y)), blawx_becomes(-throws(X,Y),datetime(Start)), blawx_not_interrupted(datetime(Start),throws(X,Y),datetime(eot)).
+      blawx_during(datetime(bot),throws(X,Y),datetime(eot)) :- blawx_initially(throws(X,Y)), blawx_ultimately(throws(X,Y)), blawx_becomes(-throws(X,Y),datetime(Start)), blawx_not_interrupted(datetime(bot),throws(X,Y),datetime(eot)).
+      blawx_during(datetime(Start),-throws(X,Y),datetime(End)) :- blawx_becomes(-throws(X,Y),datetime(Start)), blawx_becomes(throws(X,Y),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-throws(X,Y),datetime(End)).
+      blawx_during(datetime(bot),-throws(X,Y),datetime(End)) :- blawx_initially(-throws(X,Y)), blawx_becomes(throws(X,Y),datetime(End)), blawx_not_interrupted(datetime(bot),-throws(X,Y),datetime(End)).
+      blawx_during(datetime(Start),-throws(X,Y),datetime(eot)) :- blawx_ultimately(-throws(X,Y)), blawx_becomes(throws(X,Y),datetime(Start)), blawx_not_interrupted(datetime(Start),-throws(X,Y),datetime(eot)).
+      blawx_during(datetime(bot),-throws(X,Y),datetime(eot)) :- blawx_initially(-throws(X,Y)), blawx_ultimately(-throws(X,Y)), blawx_becomes(-throws(X,Y),datetime(Start)), blawx_not_interrupted(datetime(bot),-throws(X,Y),datetime(eot)).
+      blawx_attribute(game,first_player,player).
+      blawx_attribute_nlg(first_player,ov,"the first player of","is","").
+      :- dynamic first_player/2.
+      #pred first_player(X,Y) :: 'the first player of @(X) is @(Y)'.
+      #pred holds(user,first_player,X,Y) :: 'it is provided as a fact that the first player of @(X) is @(Y)'.
+      #pred holds(user,-first_player,X,Y) :: 'it is provided as a fact that it is not the case that the first player of @(X) is @(Y)'.
+      #pred holds(Z,first_player,X,Y) :: 'the conclusion in @(Z) that the first player of @(X) is @(Y) holds'.
+      #pred holds(Z,-first_player,X,Y) :: 'the conclusion in @(Z) that it is not the case that the first player of @(X) is @(Y) holds'.
+      #pred according_to(Z,first_player,X,Y) :: 'according to @(Z), the first player of @(X) is @(Y)'.
+      #pred according_to(Z,-first_player,X,Y) :: 'according to @(Z), it is not the case that the first player of @(X) is @(Y)'.
+      #pred blawx_defeated(Z,first_player,X,Y) :: 'the conclusion in @(Z) that the first player of @(X) is @(Y) is defeated'.
+      #pred blawx_defeated(Z,-first_player,X,Y) :: 'the conclusion in @(Z) that the first player of @(X) is @(Y) is defeated'.
+      #pred blawx_initially(first_player(X,Y)) :: 'that the first player of @(X) is @(Y) holds initially'.
+      #pred blawx_initially(-first_player(X,Y)) :: 'that it is not the case that the first player of @(X) is @(Y) holds initially'.
+      #pred blawx_ultimately(first_player(X,Y)) :: 'that the first player of @(X) is @(Y) holds ultimately'.
+      #pred blawx_ultimately(-first_player(X,Y)) :: 'that it is not the case that the first player of @(X) is @(Y) holds ultimately'.
+      #pred blawx_as_of(first_player(X,Y),T) :: 'that the first player of @(X) is @(Y) holds at @(T)'.
+      #pred blawx_as_of(-first_player(X,Y),T) :: 'that it is not the case that the first player of @(X) is @(Y) holds at @(T)'.
+      #pred blawx_during(T1,first_player(X,Y),T2) :: 'that the first player of @(X) is @(Y) held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-first_player(X,Y),T2) :: 'that it is not the case that the first player of @(X) is @(Y) held between @(T1) and @(T2)'.
+      #pred blawx_becomes(first_player(X,Y),T) :: 'that the first player of @(X) is @(Y) became true at @(T)'.
+      #pred blawx_becomes(-first_player(X,Y),T) :: 'that it is not the case that the first player of @(X) is @(Y) became true at @(T)'.
+      #pred blawx_not_interrupted(Start,first_player(X,Y),End) :: 'the first player of @(X) is @(Y) remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-first_player(X,Y),End) :: 'it is not the case that the first player of @(X) is @(Y) remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),first_player(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-first_player(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-first_player(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(first_player(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),first_player(X,Y),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-first_player(X,Y),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-first_player(X,Y),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(first_player(X,Y),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),first_player(X,Y),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-first_player(X,Y),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-first_player(X,Y),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(first_player(X,Y),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),first_player(X,Y),datetime(eot)) :- blawx_initially(first_player(X,Y)), blawx_ultimately(first_player(X,Y)), findall(Time,blawx_becomes(-first_player(X,Y),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-first_player(X,Y),datetime(eot)) :- blawx_initially(-first_player(X,Y)), blawx_ultimately(-first_player(X,Y)), findall(Time,blawx_becomes(first_player(X,Y),datetime(Time)),[]).
+      blawx_as_of(first_player(X,Y),datetime(Time)) :- blawx_initially(first_player(X,Y)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),first_player(X,Y),datetime(BeforeT)).
+      blawx_as_of(first_player(X,Y),datetime(Time)) :- blawx_becomes(first_player(X,Y),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),first_player(X,Y),datetime(Time)).
+      blawx_as_of(-first_player(X,Y),datetime(Time)) :- blawx_initially(-first_player(X,Y)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-first_player(X,Y),datetime(BeforeT)).
+      blawx_as_of(-first_player(X,Y),datetime(Time)) :- blawx_becomes(-first_player(X,Y),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-first_player(X,Y),datetime(Time)).
+      blawx_during(datetime(Start),first_player(X,Y),datetime(End)) :- blawx_becomes(first_player(X,Y),datetime(Start)), blawx_becomes(-first_player(X,Y),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),first_player(X,Y),datetime(End)).
+      blawx_during(datetime(bot),first_player(X,Y),datetime(End)) :- blawx_initially(first_player(X,Y)), blawx_becomes(-first_player(X,Y),datetime(End)), blawx_not_interrupted(datetime(bot),first_player(X,Y),datetime(End)).
+      blawx_during(datetime(Start),first_player(X,Y),datetime(eot)) :- blawx_ultimately(first_player(X,Y)), blawx_becomes(-first_player(X,Y),datetime(Start)), blawx_not_interrupted(datetime(Start),first_player(X,Y),datetime(eot)).
+      blawx_during(datetime(bot),first_player(X,Y),datetime(eot)) :- blawx_initially(first_player(X,Y)), blawx_ultimately(first_player(X,Y)), blawx_becomes(-first_player(X,Y),datetime(Start)), blawx_not_interrupted(datetime(bot),first_player(X,Y),datetime(eot)).
+      blawx_during(datetime(Start),-first_player(X,Y),datetime(End)) :- blawx_becomes(-first_player(X,Y),datetime(Start)), blawx_becomes(first_player(X,Y),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-first_player(X,Y),datetime(End)).
+      blawx_during(datetime(bot),-first_player(X,Y),datetime(End)) :- blawx_initially(-first_player(X,Y)), blawx_becomes(first_player(X,Y),datetime(End)), blawx_not_interrupted(datetime(bot),-first_player(X,Y),datetime(End)).
+      blawx_during(datetime(Start),-first_player(X,Y),datetime(eot)) :- blawx_ultimately(-first_player(X,Y)), blawx_becomes(first_player(X,Y),datetime(Start)), blawx_not_interrupted(datetime(Start),-first_player(X,Y),datetime(eot)).
+      blawx_during(datetime(bot),-first_player(X,Y),datetime(eot)) :- blawx_initially(-first_player(X,Y)), blawx_ultimately(-first_player(X,Y)), blawx_becomes(-first_player(X,Y),datetime(Start)), blawx_not_interrupted(datetime(bot),-first_player(X,Y),datetime(eot)).
+      blawx_attribute(game,second_player,player).
+      blawx_attribute_nlg(second_player,ov,"the second player of","is","").
+      :- dynamic second_player/2.
+      #pred second_player(X,Y) :: 'the second player of @(X) is @(Y)'.
+      #pred holds(user,second_player,X,Y) :: 'it is provided as a fact that the second player of @(X) is @(Y)'.
+      #pred holds(user,-second_player,X,Y) :: 'it is provided as a fact that it is not the case that the second player of @(X) is @(Y)'.
+      #pred holds(Z,second_player,X,Y) :: 'the conclusion in @(Z) that the second player of @(X) is @(Y) holds'.
+      #pred holds(Z,-second_player,X,Y) :: 'the conclusion in @(Z) that it is not the case that the second player of @(X) is @(Y) holds'.
+      #pred according_to(Z,second_player,X,Y) :: 'according to @(Z), the second player of @(X) is @(Y)'.
+      #pred according_to(Z,-second_player,X,Y) :: 'according to @(Z), it is not the case that the second player of @(X) is @(Y)'.
+      #pred blawx_defeated(Z,second_player,X,Y) :: 'the conclusion in @(Z) that the second player of @(X) is @(Y) is defeated'.
+      #pred blawx_defeated(Z,-second_player,X,Y) :: 'the conclusion in @(Z) that the second player of @(X) is @(Y) is defeated'.
+      #pred blawx_initially(second_player(X,Y)) :: 'that the second player of @(X) is @(Y) holds initially'.
+      #pred blawx_initially(-second_player(X,Y)) :: 'that it is not the case that the second player of @(X) is @(Y) holds initially'.
+      #pred blawx_ultimately(second_player(X,Y)) :: 'that the second player of @(X) is @(Y) holds ultimately'.
+      #pred blawx_ultimately(-second_player(X,Y)) :: 'that it is not the case that the second player of @(X) is @(Y) holds ultimately'.
+      #pred blawx_as_of(second_player(X,Y),T) :: 'that the second player of @(X) is @(Y) holds at @(T)'.
+      #pred blawx_as_of(-second_player(X,Y),T) :: 'that it is not the case that the second player of @(X) is @(Y) holds at @(T)'.
+      #pred blawx_during(T1,second_player(X,Y),T2) :: 'that the second player of @(X) is @(Y) held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-second_player(X,Y),T2) :: 'that it is not the case that the second player of @(X) is @(Y) held between @(T1) and @(T2)'.
+      #pred blawx_becomes(second_player(X,Y),T) :: 'that the second player of @(X) is @(Y) became true at @(T)'.
+      #pred blawx_becomes(-second_player(X,Y),T) :: 'that it is not the case that the second player of @(X) is @(Y) became true at @(T)'.
+      #pred blawx_not_interrupted(Start,second_player(X,Y),End) :: 'the second player of @(X) is @(Y) remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-second_player(X,Y),End) :: 'it is not the case that the second player of @(X) is @(Y) remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),second_player(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-second_player(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-second_player(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(second_player(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),second_player(X,Y),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-second_player(X,Y),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-second_player(X,Y),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(second_player(X,Y),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),second_player(X,Y),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-second_player(X,Y),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-second_player(X,Y),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(second_player(X,Y),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),second_player(X,Y),datetime(eot)) :- blawx_initially(second_player(X,Y)), blawx_ultimately(second_player(X,Y)), findall(Time,blawx_becomes(-second_player(X,Y),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-second_player(X,Y),datetime(eot)) :- blawx_initially(-second_player(X,Y)), blawx_ultimately(-second_player(X,Y)), findall(Time,blawx_becomes(second_player(X,Y),datetime(Time)),[]).
+      blawx_as_of(second_player(X,Y),datetime(Time)) :- blawx_initially(second_player(X,Y)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),second_player(X,Y),datetime(BeforeT)).
+      blawx_as_of(second_player(X,Y),datetime(Time)) :- blawx_becomes(second_player(X,Y),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),second_player(X,Y),datetime(Time)).
+      blawx_as_of(-second_player(X,Y),datetime(Time)) :- blawx_initially(-second_player(X,Y)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-second_player(X,Y),datetime(BeforeT)).
+      blawx_as_of(-second_player(X,Y),datetime(Time)) :- blawx_becomes(-second_player(X,Y),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-second_player(X,Y),datetime(Time)).
+      blawx_during(datetime(Start),second_player(X,Y),datetime(End)) :- blawx_becomes(second_player(X,Y),datetime(Start)), blawx_becomes(-second_player(X,Y),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),second_player(X,Y),datetime(End)).
+      blawx_during(datetime(bot),second_player(X,Y),datetime(End)) :- blawx_initially(second_player(X,Y)), blawx_becomes(-second_player(X,Y),datetime(End)), blawx_not_interrupted(datetime(bot),second_player(X,Y),datetime(End)).
+      blawx_during(datetime(Start),second_player(X,Y),datetime(eot)) :- blawx_ultimately(second_player(X,Y)), blawx_becomes(-second_player(X,Y),datetime(Start)), blawx_not_interrupted(datetime(Start),second_player(X,Y),datetime(eot)).
+      blawx_during(datetime(bot),second_player(X,Y),datetime(eot)) :- blawx_initially(second_player(X,Y)), blawx_ultimately(second_player(X,Y)), blawx_becomes(-second_player(X,Y),datetime(Start)), blawx_not_interrupted(datetime(bot),second_player(X,Y),datetime(eot)).
+      blawx_during(datetime(Start),-second_player(X,Y),datetime(End)) :- blawx_becomes(-second_player(X,Y),datetime(Start)), blawx_becomes(second_player(X,Y),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-second_player(X,Y),datetime(End)).
+      blawx_during(datetime(bot),-second_player(X,Y),datetime(End)) :- blawx_initially(-second_player(X,Y)), blawx_becomes(second_player(X,Y),datetime(End)), blawx_not_interrupted(datetime(bot),-second_player(X,Y),datetime(End)).
+      blawx_during(datetime(Start),-second_player(X,Y),datetime(eot)) :- blawx_ultimately(-second_player(X,Y)), blawx_becomes(second_player(X,Y),datetime(Start)), blawx_not_interrupted(datetime(Start),-second_player(X,Y),datetime(eot)).
+      blawx_during(datetime(bot),-second_player(X,Y),datetime(eot)) :- blawx_initially(-second_player(X,Y)), blawx_ultimately(-second_player(X,Y)), blawx_becomes(-second_player(X,Y),datetime(Start)), blawx_not_interrupted(datetime(bot),-second_player(X,Y),datetime(eot)).
+      blawx_attribute(game,first_player_wins,boolean).
+      blawx_attribute_nlg(first_player_wins,not_applicable,"the first player of",not_applicable,"wins").
+      :- dynamic first_player_wins/1.
+      #pred first_player_wins(X) :: 'the first player of @(X) wins'.
+      #pred holds(user,first_player_wins,X) :: 'it is provided as a fact that the first player of @(X) wins'.
+      #pred holds(user,-first_player_wins,X) :: 'it is provided as a fact that it is not the case that the first player of @(X) wins'.
+      #pred holds(Z,first_player_wins,X) :: 'the conclusion in @(Z) that the first player of @(X) wins holds'.
+      #pred holds(Z,-first_player_wins,X) :: 'the conclusion in @(Z) that it is not the case that the first player of @(X) wins holds'.
+      #pred according_to(Z,first_player_wins,X) :: 'according to @(Z), the first player of @(X) wins'.
+      #pred according_to(Z,-first_player_wins,X) :: 'according to @(Z), it is not the case that the first player of @(X) wins'.
+      #pred blawx_defeated(Z,first_player_wins,X) :: 'the conclusion in @(Z) that the first player of @(X) wins is defeated'.
+      #pred blawx_defeated(Z,-first_player_wins,X) :: 'the conclusion in @(Z) that the first player of @(X) wins is defeated'.
+      #pred blawx_initially(first_player_wins(X)) :: 'that the first player of @(X) wins holds initially'.
+      #pred blawx_initially(-first_player_wins(X)) :: 'that it is not the case that the first player of @(X) wins holds initially'.
+      #pred blawx_ultimately(first_player_wins(X)) :: 'that the first player of @(X) wins holds ultimately'.
+      #pred blawx_ultimately(-first_player_wins(X)) :: 'that it is not the case that the first player of @(X) wins holds ultimately'.
+      #pred blawx_as_of(first_player_wins(X),T) :: 'that the first player of @(X) wins holds at @(T)'.
+      #pred blawx_as_of(-first_player_wins(X),T) :: 'that it is not the case that the first player of @(X) wins holds at @(T)'.
+      #pred blawx_during(T1,first_player_wins(X),T2) :: 'that the first player of @(X) wins held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-first_player_wins(X),T2) :: 'that it is not the case that the first player of @(X) wins held between @(T1) and @(T2)'.
+      #pred blawx_becomes(first_player_wins(X),T) :: 'that the first player of @(X) wins became true at @(T)'.
+      #pred blawx_becomes(-first_player_wins(X),T) :: 'that it is not the case that the first player of @(X) wins became true at @(T)'.
+      #pred blawx_not_interrupted(Start,first_player_wins(X),End) :: 'the first player of @(X) wins remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-first_player_wins(X),End) :: 'it is not the case that the first player of @(X) wins remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),first_player_wins(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-first_player_wins(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-first_player_wins(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(first_player_wins(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),first_player_wins(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-first_player_wins(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-first_player_wins(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(first_player_wins(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),first_player_wins(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-first_player_wins(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-first_player_wins(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(first_player_wins(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),first_player_wins(X),datetime(eot)) :- blawx_initially(first_player_wins(X)), blawx_ultimately(first_player_wins(X)), findall(Time,blawx_becomes(-first_player_wins(X),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-first_player_wins(X),datetime(eot)) :- blawx_initially(-first_player_wins(X)), blawx_ultimately(-first_player_wins(X)), findall(Time,blawx_becomes(first_player_wins(X),datetime(Time)),[]).
+      blawx_as_of(first_player_wins(X),datetime(Time)) :- blawx_initially(first_player_wins(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),first_player_wins(X),datetime(BeforeT)).
+      blawx_as_of(first_player_wins(X),datetime(Time)) :- blawx_becomes(first_player_wins(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),first_player_wins(X),datetime(Time)).
+      blawx_as_of(-first_player_wins(X),datetime(Time)) :- blawx_initially(-first_player_wins(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-first_player_wins(X),datetime(BeforeT)).
+      blawx_as_of(-first_player_wins(X),datetime(Time)) :- blawx_becomes(-first_player_wins(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-first_player_wins(X),datetime(Time)).
+      blawx_during(datetime(Start),first_player_wins(X),datetime(End)) :- blawx_becomes(first_player_wins(X),datetime(Start)), blawx_becomes(-first_player_wins(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),first_player_wins(X),datetime(End)).
+      blawx_during(datetime(bot),first_player_wins(X),datetime(End)) :- blawx_initially(first_player_wins(X)), blawx_becomes(-first_player_wins(X),datetime(End)), blawx_not_interrupted(datetime(bot),first_player_wins(X),datetime(End)).
+      blawx_during(datetime(Start),first_player_wins(X),datetime(eot)) :- blawx_ultimately(first_player_wins(X)), blawx_becomes(-first_player_wins(X),datetime(Start)), blawx_not_interrupted(datetime(Start),first_player_wins(X),datetime(eot)).
+      blawx_during(datetime(bot),first_player_wins(X),datetime(eot)) :- blawx_initially(first_player_wins(X)), blawx_ultimately(first_player_wins(X)), blawx_becomes(-first_player_wins(X),datetime(Start)), blawx_not_interrupted(datetime(bot),first_player_wins(X),datetime(eot)).
+      blawx_during(datetime(Start),-first_player_wins(X),datetime(End)) :- blawx_becomes(-first_player_wins(X),datetime(Start)), blawx_becomes(first_player_wins(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-first_player_wins(X),datetime(End)).
+      blawx_during(datetime(bot),-first_player_wins(X),datetime(End)) :- blawx_initially(-first_player_wins(X)), blawx_becomes(first_player_wins(X),datetime(End)), blawx_not_interrupted(datetime(bot),-first_player_wins(X),datetime(End)).
+      blawx_during(datetime(Start),-first_player_wins(X),datetime(eot)) :- blawx_ultimately(-first_player_wins(X)), blawx_becomes(first_player_wins(X),datetime(Start)), blawx_not_interrupted(datetime(Start),-first_player_wins(X),datetime(eot)).
+      blawx_during(datetime(bot),-first_player_wins(X),datetime(eot)) :- blawx_initially(-first_player_wins(X)), blawx_ultimately(-first_player_wins(X)), blawx_becomes(-first_player_wins(X),datetime(Start)), blawx_not_interrupted(datetime(bot),-first_player_wins(X),datetime(eot)).
+      blawx_attribute(game,second_player_wins,boolean).
+      blawx_attribute_nlg(second_player_wins,not_applicable,"the second player of",not_applicable,"wins").
+      :- dynamic second_player_wins/1.
+      #pred second_player_wins(X) :: 'the second player of @(X) wins'.
+      #pred holds(user,second_player_wins,X) :: 'it is provided as a fact that the second player of @(X) wins'.
+      #pred holds(user,-second_player_wins,X) :: 'it is provided as a fact that it is not the case that the second player of @(X) wins'.
+      #pred holds(Z,second_player_wins,X) :: 'the conclusion in @(Z) that the second player of @(X) wins holds'.
+      #pred holds(Z,-second_player_wins,X) :: 'the conclusion in @(Z) that it is not the case that the second player of @(X) wins holds'.
+      #pred according_to(Z,second_player_wins,X) :: 'according to @(Z), the second player of @(X) wins'.
+      #pred according_to(Z,-second_player_wins,X) :: 'according to @(Z), it is not the case that the second player of @(X) wins'.
+      #pred blawx_defeated(Z,second_player_wins,X) :: 'the conclusion in @(Z) that the second player of @(X) wins is defeated'.
+      #pred blawx_defeated(Z,-second_player_wins,X) :: 'the conclusion in @(Z) that the second player of @(X) wins is defeated'.
+      #pred blawx_initially(second_player_wins(X)) :: 'that the second player of @(X) wins holds initially'.
+      #pred blawx_initially(-second_player_wins(X)) :: 'that it is not the case that the second player of @(X) wins holds initially'.
+      #pred blawx_ultimately(second_player_wins(X)) :: 'that the second player of @(X) wins holds ultimately'.
+      #pred blawx_ultimately(-second_player_wins(X)) :: 'that it is not the case that the second player of @(X) wins holds ultimately'.
+      #pred blawx_as_of(second_player_wins(X),T) :: 'that the second player of @(X) wins holds at @(T)'.
+      #pred blawx_as_of(-second_player_wins(X),T) :: 'that it is not the case that the second player of @(X) wins holds at @(T)'.
+      #pred blawx_during(T1,second_player_wins(X),T2) :: 'that the second player of @(X) wins held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-second_player_wins(X),T2) :: 'that it is not the case that the second player of @(X) wins held between @(T1) and @(T2)'.
+      #pred blawx_becomes(second_player_wins(X),T) :: 'that the second player of @(X) wins became true at @(T)'.
+      #pred blawx_becomes(-second_player_wins(X),T) :: 'that it is not the case that the second player of @(X) wins became true at @(T)'.
+      #pred blawx_not_interrupted(Start,second_player_wins(X),End) :: 'the second player of @(X) wins remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-second_player_wins(X),End) :: 'it is not the case that the second player of @(X) wins remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),second_player_wins(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-second_player_wins(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-second_player_wins(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(second_player_wins(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),second_player_wins(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-second_player_wins(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-second_player_wins(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(second_player_wins(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),second_player_wins(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-second_player_wins(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-second_player_wins(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(second_player_wins(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),second_player_wins(X),datetime(eot)) :- blawx_initially(second_player_wins(X)), blawx_ultimately(second_player_wins(X)), findall(Time,blawx_becomes(-second_player_wins(X),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-second_player_wins(X),datetime(eot)) :- blawx_initially(-second_player_wins(X)), blawx_ultimately(-second_player_wins(X)), findall(Time,blawx_becomes(second_player_wins(X),datetime(Time)),[]).
+      blawx_as_of(second_player_wins(X),datetime(Time)) :- blawx_initially(second_player_wins(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),second_player_wins(X),datetime(BeforeT)).
+      blawx_as_of(second_player_wins(X),datetime(Time)) :- blawx_becomes(second_player_wins(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),second_player_wins(X),datetime(Time)).
+      blawx_as_of(-second_player_wins(X),datetime(Time)) :- blawx_initially(-second_player_wins(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-second_player_wins(X),datetime(BeforeT)).
+      blawx_as_of(-second_player_wins(X),datetime(Time)) :- blawx_becomes(-second_player_wins(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-second_player_wins(X),datetime(Time)).
+      blawx_during(datetime(Start),second_player_wins(X),datetime(End)) :- blawx_becomes(second_player_wins(X),datetime(Start)), blawx_becomes(-second_player_wins(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),second_player_wins(X),datetime(End)).
+      blawx_during(datetime(bot),second_player_wins(X),datetime(End)) :- blawx_initially(second_player_wins(X)), blawx_becomes(-second_player_wins(X),datetime(End)), blawx_not_interrupted(datetime(bot),second_player_wins(X),datetime(End)).
+      blawx_during(datetime(Start),second_player_wins(X),datetime(eot)) :- blawx_ultimately(second_player_wins(X)), blawx_becomes(-second_player_wins(X),datetime(Start)), blawx_not_interrupted(datetime(Start),second_player_wins(X),datetime(eot)).
+      blawx_during(datetime(bot),second_player_wins(X),datetime(eot)) :- blawx_initially(second_player_wins(X)), blawx_ultimately(second_player_wins(X)), blawx_becomes(-second_player_wins(X),datetime(Start)), blawx_not_interrupted(datetime(bot),second_player_wins(X),datetime(eot)).
+      blawx_during(datetime(Start),-second_player_wins(X),datetime(End)) :- blawx_becomes(-second_player_wins(X),datetime(Start)), blawx_becomes(second_player_wins(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-second_player_wins(X),datetime(End)).
+      blawx_during(datetime(bot),-second_player_wins(X),datetime(End)) :- blawx_initially(-second_player_wins(X)), blawx_becomes(second_player_wins(X),datetime(End)), blawx_not_interrupted(datetime(bot),-second_player_wins(X),datetime(End)).
+      blawx_during(datetime(Start),-second_player_wins(X),datetime(eot)) :- blawx_ultimately(-second_player_wins(X)), blawx_becomes(second_player_wins(X),datetime(Start)), blawx_not_interrupted(datetime(Start),-second_player_wins(X),datetime(eot)).
+      blawx_during(datetime(bot),-second_player_wins(X),datetime(eot)) :- blawx_initially(-second_player_wins(X)), blawx_ultimately(-second_player_wins(X)), blawx_becomes(-second_player_wins(X),datetime(Start)), blawx_not_interrupted(datetime(bot),-second_player_wins(X),datetime(eot)).
+      blawx_attribute(sign,beats,sign).
+      blawx_attribute_nlg(beats,ov,"","beats","").
+      :- dynamic beats/2.
+      #pred beats(X,Y) :: '@(X) beats @(Y)'.
+      #pred holds(user,beats,X,Y) :: 'it is provided as a fact that @(X) beats @(Y)'.
+      #pred holds(user,-beats,X,Y) :: 'it is provided as a fact that it is not the case that @(X) beats @(Y)'.
+      #pred holds(Z,beats,X,Y) :: 'the conclusion in @(Z) that @(X) beats @(Y) holds'.
+      #pred holds(Z,-beats,X,Y) :: 'the conclusion in @(Z) that it is not the case that @(X) beats @(Y) holds'.
+      #pred according_to(Z,beats,X,Y) :: 'according to @(Z), @(X) beats @(Y)'.
+      #pred according_to(Z,-beats,X,Y) :: 'according to @(Z), it is not the case that @(X) beats @(Y)'.
+      #pred blawx_defeated(Z,beats,X,Y) :: 'the conclusion in @(Z) that @(X) beats @(Y) is defeated'.
+      #pred blawx_defeated(Z,-beats,X,Y) :: 'the conclusion in @(Z) that @(X) beats @(Y) is defeated'.
+      #pred blawx_initially(beats(X,Y)) :: 'that @(X) beats @(Y) holds initially'.
+      #pred blawx_initially(-beats(X,Y)) :: 'that it is not the case that @(X) beats @(Y) holds initially'.
+      #pred blawx_ultimately(beats(X,Y)) :: 'that @(X) beats @(Y) holds ultimately'.
+      #pred blawx_ultimately(-beats(X,Y)) :: 'that it is not the case that @(X) beats @(Y) holds ultimately'.
+      #pred blawx_as_of(beats(X,Y),T) :: 'that @(X) beats @(Y) holds at @(T)'.
+      #pred blawx_as_of(-beats(X,Y),T) :: 'that it is not the case that @(X) beats @(Y) holds at @(T)'.
+      #pred blawx_during(T1,beats(X,Y),T2) :: 'that @(X) beats @(Y) held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-beats(X,Y),T2) :: 'that it is not the case that @(X) beats @(Y) held between @(T1) and @(T2)'.
+      #pred blawx_becomes(beats(X,Y),T) :: 'that @(X) beats @(Y) became true at @(T)'.
+      #pred blawx_becomes(-beats(X,Y),T) :: 'that it is not the case that @(X) beats @(Y) became true at @(T)'.
+      #pred blawx_not_interrupted(Start,beats(X,Y),End) :: '@(X) beats @(Y) remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-beats(X,Y),End) :: 'it is not the case that @(X) beats @(Y) remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),beats(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-beats(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-beats(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(beats(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),beats(X,Y),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-beats(X,Y),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-beats(X,Y),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(beats(X,Y),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),beats(X,Y),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-beats(X,Y),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-beats(X,Y),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(beats(X,Y),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),beats(X,Y),datetime(eot)) :- blawx_initially(beats(X,Y)), blawx_ultimately(beats(X,Y)), findall(Time,blawx_becomes(-beats(X,Y),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-beats(X,Y),datetime(eot)) :- blawx_initially(-beats(X,Y)), blawx_ultimately(-beats(X,Y)), findall(Time,blawx_becomes(beats(X,Y),datetime(Time)),[]).
+      blawx_as_of(beats(X,Y),datetime(Time)) :- blawx_initially(beats(X,Y)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),beats(X,Y),datetime(BeforeT)).
+      blawx_as_of(beats(X,Y),datetime(Time)) :- blawx_becomes(beats(X,Y),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),beats(X,Y),datetime(Time)).
+      blawx_as_of(-beats(X,Y),datetime(Time)) :- blawx_initially(-beats(X,Y)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-beats(X,Y),datetime(BeforeT)).
+      blawx_as_of(-beats(X,Y),datetime(Time)) :- blawx_becomes(-beats(X,Y),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-beats(X,Y),datetime(Time)).
+      blawx_during(datetime(Start),beats(X,Y),datetime(End)) :- blawx_becomes(beats(X,Y),datetime(Start)), blawx_becomes(-beats(X,Y),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),beats(X,Y),datetime(End)).
+      blawx_during(datetime(bot),beats(X,Y),datetime(End)) :- blawx_initially(beats(X,Y)), blawx_becomes(-beats(X,Y),datetime(End)), blawx_not_interrupted(datetime(bot),beats(X,Y),datetime(End)).
+      blawx_during(datetime(Start),beats(X,Y),datetime(eot)) :- blawx_ultimately(beats(X,Y)), blawx_becomes(-beats(X,Y),datetime(Start)), blawx_not_interrupted(datetime(Start),beats(X,Y),datetime(eot)).
+      blawx_during(datetime(bot),beats(X,Y),datetime(eot)) :- blawx_initially(beats(X,Y)), blawx_ultimately(beats(X,Y)), blawx_becomes(-beats(X,Y),datetime(Start)), blawx_not_interrupted(datetime(bot),beats(X,Y),datetime(eot)).
+      blawx_during(datetime(Start),-beats(X,Y),datetime(End)) :- blawx_becomes(-beats(X,Y),datetime(Start)), blawx_becomes(beats(X,Y),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-beats(X,Y),datetime(End)).
+      blawx_during(datetime(bot),-beats(X,Y),datetime(End)) :- blawx_initially(-beats(X,Y)), blawx_becomes(beats(X,Y),datetime(End)), blawx_not_interrupted(datetime(bot),-beats(X,Y),datetime(End)).
+      blawx_during(datetime(Start),-beats(X,Y),datetime(eot)) :- blawx_ultimately(-beats(X,Y)), blawx_becomes(beats(X,Y),datetime(Start)), blawx_not_interrupted(datetime(Start),-beats(X,Y),datetime(eot)).
+      blawx_during(datetime(bot),-beats(X,Y),datetime(eot)) :- blawx_initially(-beats(X,Y)), blawx_ultimately(-beats(X,Y)), blawx_becomes(-beats(X,Y),datetime(Start)), blawx_not_interrupted(datetime(bot),-beats(X,Y),datetime(eot)).
+
+      sign(rock).
+      sign(paper).
+      sign(scissors).
+- model: blawx.workspace
+  pk: 2
+  fields:
+    ruledoc: 1
+    workspace_name: sec_3_section
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="attributed_rule" id="l4b000021" x="40" y="40"><field name="defeasible">FALSE</field><field name="inapplicable">FALSE</field><statement name="conditions"><block type="object_category" id="l4b000022"><value name="object"><block type="variable" id="l4b000023"><field name="variable_name">S</field></block></value><value name="category"><block type="category_selector" id="l4b000024"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="sign"></mutation><field name="category_name">sign</field></block></value><next><block type="variable_assignment" id="l4b000025"><value name="variable"><block type="variable" id="l4b000026"><field name="variable_name">S</field></block></value><value name="value"><block type="object_selector" id="l4b000027"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="rock"></mutation><field name="object_name">rock</field></block></value></block></next></block></statement><value name="source"><block type="doc_selector" id="l4b000028"><mutation xmlns="http://www.w3.org/1999/xhtml" section_reference="sec_3_section"></mutation><field name="doc_part_name">RPSA 3</field></block></value><statement name="conclusion"><block type="attribute_selector" id="l4b000029"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="beats" attributetype="sign" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">beats</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000030"><field name="variable_name">S</field></block></value><value name="second_element"><block type="object_selector" id="l4b000031"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="scissors"></mutation><field name="object_name">scissors</field></block></value></block></statement></block>
+      <block type="attributed_rule" id="l4b000032" x="40" y="478"><field name="defeasible">FALSE</field><field name="inapplicable">FALSE</field><statement name="conditions"><block type="object_category" id="l4b000033"><value name="object"><block type="variable" id="l4b000034"><field name="variable_name">S</field></block></value><value name="category"><block type="category_selector" id="l4b000035"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="sign"></mutation><field name="category_name">sign</field></block></value><next><block type="variable_assignment" id="l4b000036"><value name="variable"><block type="variable" id="l4b000037"><field name="variable_name">S</field></block></value><value name="value"><block type="object_selector" id="l4b000038"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="scissors"></mutation><field name="object_name">scissors</field></block></value></block></next></block></statement><value name="source"><block type="doc_selector" id="l4b000039"><mutation xmlns="http://www.w3.org/1999/xhtml" section_reference="sec_3_section"></mutation><field name="doc_part_name">RPSA 3</field></block></value><statement name="conclusion"><block type="attribute_selector" id="l4b000040"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="beats" attributetype="sign" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">beats</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000041"><field name="variable_name">S</field></block></value><value name="second_element"><block type="object_selector" id="l4b000042"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="paper"></mutation><field name="object_name">paper</field></block></value></block></statement></block>
+      <block type="attributed_rule" id="l4b000043" x="40" y="916"><field name="defeasible">FALSE</field><field name="inapplicable">FALSE</field><statement name="conditions"><block type="object_category" id="l4b000044"><value name="object"><block type="variable" id="l4b000045"><field name="variable_name">S</field></block></value><value name="category"><block type="category_selector" id="l4b000046"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="sign"></mutation><field name="category_name">sign</field></block></value><next><block type="variable_assignment" id="l4b000047"><value name="variable"><block type="variable" id="l4b000048"><field name="variable_name">S</field></block></value><value name="value"><block type="object_selector" id="l4b000049"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="paper"></mutation><field name="object_name">paper</field></block></value></block></next></block></statement><value name="source"><block type="doc_selector" id="l4b000050"><mutation xmlns="http://www.w3.org/1999/xhtml" section_reference="sec_3_section"></mutation><field name="doc_part_name">RPSA 3</field></block></value><statement name="conclusion"><block type="attribute_selector" id="l4b000051"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="beats" attributetype="sign" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">beats</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000052"><field name="variable_name">S</field></block></value><value name="second_element"><block type="object_selector" id="l4b000053"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="rock"></mutation><field name="object_name">rock</field></block></value></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      according_to(sec_3_section,beats,S,scissors) :- sign(S),
+      S = rock.
+
+      % BLAWX CHECK DUPLICATES
+      holds(sec_3_section,beats,S,scissors) :- according_to(sec_3_section,beats,S,scissors).
+
+      % BLAWX CHECK DUPLICATES
+        beats(S,scissors) :- holds(sec_3_section,beats,S,scissors).
+
+      according_to(sec_3_section,beats,S,paper) :- sign(S),
+      S = scissors.
+
+      % BLAWX CHECK DUPLICATES
+      holds(sec_3_section,beats,S,paper) :- according_to(sec_3_section,beats,S,paper).
+
+      % BLAWX CHECK DUPLICATES
+        beats(S,paper) :- holds(sec_3_section,beats,S,paper).
+
+      according_to(sec_3_section,beats,S,rock) :- sign(S),
+      S = paper.
+
+      % BLAWX CHECK DUPLICATES
+      holds(sec_3_section,beats,S,rock) :- according_to(sec_3_section,beats,S,rock).
+
+      % BLAWX CHECK DUPLICATES
+        beats(S,rock) :- holds(sec_3_section,beats,S,rock).
+- model: blawx.workspace
+  pk: 3
+  fields:
+    ruledoc: 1
+    workspace_name: sec_4_section
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="attributed_rule" id="l4b000054" x="40" y="40"><field name="defeasible">FALSE</field><field name="inapplicable">FALSE</field><statement name="conditions"><block type="object_category" id="l4b000055"><value name="object"><block type="variable" id="l4b000056"><field name="variable_name">G</field></block></value><value name="category"><block type="category_selector" id="l4b000057"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="game"></mutation><field name="category_name">game</field></block></value><next><block type="attribute_selector" id="l4b000058"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="first_player" attributetype="player" attributeorder="ov"></mutation><field name="prefix">the first player of</field><field name="infix">is</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000059"><field name="variable_name">G</field></block></value><value name="second_element"><block type="variable" id="l4b000060"><field name="variable_name">Firstplayer</field></block></value><next><block type="attribute_selector" id="l4b000061"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="throws" attributetype="sign" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">throws</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000062"><field name="variable_name">Firstplayer</field></block></value><value name="second_element"><block type="variable" id="l4b000063"><field name="variable_name">Throws</field></block></value><next><block type="attribute_selector" id="l4b000064"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="beats" attributetype="sign" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">beats</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000065"><field name="variable_name">Throws</field></block></value><value name="second_element"><block type="variable" id="l4b000066"><field name="variable_name">Beats</field></block></value><next><block type="attribute_selector" id="l4b000067"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="second_player" attributetype="player" attributeorder="ov"></mutation><field name="prefix">the second player of</field><field name="infix">is</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000068"><field name="variable_name">G</field></block></value><value name="second_element"><block type="variable" id="l4b000069"><field name="variable_name">Secondplayer</field></block></value><next><block type="attribute_selector" id="l4b000070"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="throws" attributetype="sign" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">throws</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000071"><field name="variable_name">Secondplayer</field></block></value><value name="second_element"><block type="variable" id="l4b000072"><field name="variable_name">Throws2</field></block></value><next><block type="variable_assignment" id="l4b000073"><value name="variable"><block type="variable" id="l4b000074"><field name="variable_name">Beats</field></block></value><value name="value"><block type="variable" id="l4b000075"><field name="variable_name">Throws2</field></block></value></block></next></block></next></block></next></block></next></block></next></block></next></block></statement><value name="source"><block type="doc_selector" id="l4b000076"><mutation xmlns="http://www.w3.org/1999/xhtml" section_reference="sec_4_section"></mutation><field name="doc_part_name">RPSA 4</field></block></value><statement name="conclusion"><block type="unary_attribute_selector" id="l4b000077"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="first_player_wins" attributetype="boolean"></mutation><field name="prefix">the first player of</field><field name="postfix">wins</field><value name="first_element"><block type="variable" id="l4b000078"><field name="variable_name">G</field></block></value></block></statement></block>
+      <block type="attributed_rule" id="l4b000079" x="40" y="898"><field name="defeasible">FALSE</field><field name="inapplicable">FALSE</field><statement name="conditions"><block type="object_category" id="l4b000080"><value name="object"><block type="variable" id="l4b000081"><field name="variable_name">G</field></block></value><value name="category"><block type="category_selector" id="l4b000082"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="game"></mutation><field name="category_name">game</field></block></value><next><block type="attribute_selector" id="l4b000083"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="second_player" attributetype="player" attributeorder="ov"></mutation><field name="prefix">the second player of</field><field name="infix">is</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000084"><field name="variable_name">G</field></block></value><value name="second_element"><block type="variable" id="l4b000085"><field name="variable_name">Secondplayer</field></block></value><next><block type="attribute_selector" id="l4b000086"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="throws" attributetype="sign" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">throws</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000087"><field name="variable_name">Secondplayer</field></block></value><value name="second_element"><block type="variable" id="l4b000088"><field name="variable_name">Throws</field></block></value><next><block type="attribute_selector" id="l4b000089"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="beats" attributetype="sign" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">beats</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000090"><field name="variable_name">Throws</field></block></value><value name="second_element"><block type="variable" id="l4b000091"><field name="variable_name">Beats</field></block></value><next><block type="attribute_selector" id="l4b000092"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="first_player" attributetype="player" attributeorder="ov"></mutation><field name="prefix">the first player of</field><field name="infix">is</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000093"><field name="variable_name">G</field></block></value><value name="second_element"><block type="variable" id="l4b000094"><field name="variable_name">Firstplayer</field></block></value><next><block type="attribute_selector" id="l4b000095"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="throws" attributetype="sign" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">throws</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000096"><field name="variable_name">Firstplayer</field></block></value><value name="second_element"><block type="variable" id="l4b000097"><field name="variable_name">Throws2</field></block></value><next><block type="variable_assignment" id="l4b000098"><value name="variable"><block type="variable" id="l4b000099"><field name="variable_name">Beats</field></block></value><value name="value"><block type="variable" id="l4b000100"><field name="variable_name">Throws2</field></block></value></block></next></block></next></block></next></block></next></block></next></block></next></block></statement><value name="source"><block type="doc_selector" id="l4b000101"><mutation xmlns="http://www.w3.org/1999/xhtml" section_reference="sec_4_section"></mutation><field name="doc_part_name">RPSA 4</field></block></value><statement name="conclusion"><block type="unary_attribute_selector" id="l4b000102"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="second_player_wins" attributetype="boolean"></mutation><field name="prefix">the second player of</field><field name="postfix">wins</field><value name="first_element"><block type="variable" id="l4b000103"><field name="variable_name">G</field></block></value></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      according_to(sec_4_section,first_player_wins,G) :- game(G),
+      first_player(G,Firstplayer),
+      throws(Firstplayer,Throws),
+      beats(Throws,Beats),
+      second_player(G,Secondplayer),
+      throws(Secondplayer,Throws2),
+      Beats = Throws2.
+
+      % BLAWX CHECK DUPLICATES
+      holds(sec_4_section,first_player_wins,G) :- according_to(sec_4_section,first_player_wins,G).
+
+      % BLAWX CHECK DUPLICATES
+        first_player_wins(G) :- holds(sec_4_section,first_player_wins,G).
+
+      according_to(sec_4_section,second_player_wins,G) :- game(G),
+      second_player(G,Secondplayer),
+      throws(Secondplayer,Throws),
+      beats(Throws,Beats),
+      first_player(G,Firstplayer),
+      throws(Firstplayer,Throws2),
+      Beats = Throws2.
+
+      % BLAWX CHECK DUPLICATES
+      holds(sec_4_section,second_player_wins,G) :- according_to(sec_4_section,second_player_wins,G).
+
+      % BLAWX CHECK DUPLICATES
+        second_player_wins(G) :- holds(sec_4_section,second_player_wins,G).
+- model: blawx.blawxtest
+  pk: 1
+  fields:
+    ruledoc: 1
+    test_name: q1
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="unattributed_fact" id="l4b000104" x="40" y="40"><statement name="statements"><block type="object_category" id="l4b000105"><value name="object"><block type="object_selector" id="l4b000106"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="g1"></mutation><field name="object_name">g1</field></block></value><value name="category"><block type="category_selector" id="l4b000107"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="game"></mutation><field name="category_name">game</field></block></value><next><block type="object_category" id="l4b000108"><value name="object"><block type="object_selector" id="l4b000109"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="p1"></mutation><field name="object_name">p1</field></block></value><value name="category"><block type="category_selector" id="l4b000110"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="player"></mutation><field name="category_name">player</field></block></value><next><block type="object_category" id="l4b000111"><value name="object"><block type="object_selector" id="l4b000112"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="p2"></mutation><field name="object_name">p2</field></block></value><value name="category"><block type="category_selector" id="l4b000113"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="player"></mutation><field name="category_name">player</field></block></value><next><block type="attribute_selector" id="l4b000114"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="throws" attributetype="sign" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">throws</field><field name="postfix"></field><value name="first_element"><block type="object_selector" id="l4b000115"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="p1"></mutation><field name="object_name">p1</field></block></value><value name="second_element"><block type="object_selector" id="l4b000116"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="rock"></mutation><field name="object_name">rock</field></block></value><next><block type="attribute_selector" id="l4b000117"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="first_player" attributetype="player" attributeorder="ov"></mutation><field name="prefix">the first player of</field><field name="infix">is</field><field name="postfix"></field><value name="first_element"><block type="object_selector" id="l4b000118"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="g1"></mutation><field name="object_name">g1</field></block></value><value name="second_element"><block type="object_selector" id="l4b000119"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="p1"></mutation><field name="object_name">p1</field></block></value><next><block type="attribute_selector" id="l4b000120"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="throws" attributetype="sign" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">throws</field><field name="postfix"></field><value name="first_element"><block type="object_selector" id="l4b000121"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="p2"></mutation><field name="object_name">p2</field></block></value><value name="second_element"><block type="object_selector" id="l4b000122"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="scissors"></mutation><field name="object_name">scissors</field></block></value><next><block type="attribute_selector" id="l4b000123"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="second_player" attributetype="player" attributeorder="ov"></mutation><field name="prefix">the second player of</field><field name="infix">is</field><field name="postfix"></field><value name="first_element"><block type="object_selector" id="l4b000124"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="g1"></mutation><field name="object_name">g1</field></block></value><value name="second_element"><block type="object_selector" id="l4b000125"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="p2"></mutation><field name="object_name">p2</field></block></value></block></next></block></next></block></next></block></next></block></next></block></next></block></statement></block>
+      <block type="query" id="l4b000126" x="40" y="748"><statement name="query"><block type="unary_attribute_selector" id="l4b000127"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="first_player_wins" attributetype="boolean"></mutation><field name="prefix">the first player of</field><field name="postfix">wins</field><value name="first_element"><block type="object_selector" id="l4b000128"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="g1"></mutation><field name="object_name">g1</field></block></value></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      game(g1).
+      player(p1).
+      player(p2).
+      throws(p1,rock).
+      first_player(g1,p1).
+      throws(p2,scissors).
+      second_player(g1,p2).
+
+      ?- first_player_wins(g1).
+    tutorial: ''
+    view: ''
+    fact_scenario: ''
+- model: blawx.blawxtest
+  pk: 2
+  fields:
+    ruledoc: 1
+    test_name: q2
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="unattributed_fact" id="l4b000129" x="40" y="40"><statement name="statements"><block type="object_category" id="l4b000130"><value name="object"><block type="object_selector" id="l4b000131"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="g1"></mutation><field name="object_name">g1</field></block></value><value name="category"><block type="category_selector" id="l4b000132"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="game"></mutation><field name="category_name">game</field></block></value><next><block type="object_category" id="l4b000133"><value name="object"><block type="object_selector" id="l4b000134"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="p1"></mutation><field name="object_name">p1</field></block></value><value name="category"><block type="category_selector" id="l4b000135"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="player"></mutation><field name="category_name">player</field></block></value><next><block type="object_category" id="l4b000136"><value name="object"><block type="object_selector" id="l4b000137"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="p2"></mutation><field name="object_name">p2</field></block></value><value name="category"><block type="category_selector" id="l4b000138"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="player"></mutation><field name="category_name">player</field></block></value><next><block type="attribute_selector" id="l4b000139"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="throws" attributetype="sign" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">throws</field><field name="postfix"></field><value name="first_element"><block type="object_selector" id="l4b000140"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="p1"></mutation><field name="object_name">p1</field></block></value><value name="second_element"><block type="object_selector" id="l4b000141"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="rock"></mutation><field name="object_name">rock</field></block></value><next><block type="attribute_selector" id="l4b000142"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="first_player" attributetype="player" attributeorder="ov"></mutation><field name="prefix">the first player of</field><field name="infix">is</field><field name="postfix"></field><value name="first_element"><block type="object_selector" id="l4b000143"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="g1"></mutation><field name="object_name">g1</field></block></value><value name="second_element"><block type="object_selector" id="l4b000144"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="p1"></mutation><field name="object_name">p1</field></block></value><next><block type="attribute_selector" id="l4b000145"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="throws" attributetype="sign" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">throws</field><field name="postfix"></field><value name="first_element"><block type="object_selector" id="l4b000146"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="p2"></mutation><field name="object_name">p2</field></block></value><value name="second_element"><block type="object_selector" id="l4b000147"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="scissors"></mutation><field name="object_name">scissors</field></block></value><next><block type="attribute_selector" id="l4b000148"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="second_player" attributetype="player" attributeorder="ov"></mutation><field name="prefix">the second player of</field><field name="infix">is</field><field name="postfix"></field><value name="first_element"><block type="object_selector" id="l4b000149"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="g1"></mutation><field name="object_name">g1</field></block></value><value name="second_element"><block type="object_selector" id="l4b000150"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="p2"></mutation><field name="object_name">p2</field></block></value></block></next></block></next></block></next></block></next></block></next></block></next></block></statement></block>
+      <block type="query" id="l4b000151" x="40" y="748"><statement name="query"><block type="unary_attribute_selector" id="l4b000152"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="second_player_wins" attributetype="boolean"></mutation><field name="prefix">the second player of</field><field name="postfix">wins</field><value name="first_element"><block type="object_selector" id="l4b000153"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="g1"></mutation><field name="object_name">g1</field></block></value></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      game(g1).
+      player(p1).
+      player(p2).
+      throws(p1,rock).
+      first_player(g1,p1).
+      throws(p2,scissors).
+      second_player(g1,p2).
+
+      ?- second_player_wins(g1).
+    tutorial: ''
+    view: ''
+    fact_scenario: ''
+- model: blawx.blawxtest
+  pk: 3
+  fields:
+    ruledoc: 1
+    test_name: q3
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="unattributed_fact" id="l4b000154" x="40" y="40"><statement name="statements"><block type="object_category" id="l4b000155"><value name="object"><block type="object_selector" id="l4b000156"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="g1"></mutation><field name="object_name">g1</field></block></value><value name="category"><block type="category_selector" id="l4b000157"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="game"></mutation><field name="category_name">game</field></block></value><next><block type="object_category" id="l4b000158"><value name="object"><block type="object_selector" id="l4b000159"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="p1"></mutation><field name="object_name">p1</field></block></value><value name="category"><block type="category_selector" id="l4b000160"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="player"></mutation><field name="category_name">player</field></block></value><next><block type="object_category" id="l4b000161"><value name="object"><block type="object_selector" id="l4b000162"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="p2"></mutation><field name="object_name">p2</field></block></value><value name="category"><block type="category_selector" id="l4b000163"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="player"></mutation><field name="category_name">player</field></block></value><next><block type="attribute_selector" id="l4b000164"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="throws" attributetype="sign" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">throws</field><field name="postfix"></field><value name="first_element"><block type="object_selector" id="l4b000165"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="p1"></mutation><field name="object_name">p1</field></block></value><value name="second_element"><block type="object_selector" id="l4b000166"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="rock"></mutation><field name="object_name">rock</field></block></value><next><block type="attribute_selector" id="l4b000167"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="first_player" attributetype="player" attributeorder="ov"></mutation><field name="prefix">the first player of</field><field name="infix">is</field><field name="postfix"></field><value name="first_element"><block type="object_selector" id="l4b000168"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="g1"></mutation><field name="object_name">g1</field></block></value><value name="second_element"><block type="object_selector" id="l4b000169"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="p1"></mutation><field name="object_name">p1</field></block></value><next><block type="attribute_selector" id="l4b000170"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="throws" attributetype="sign" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">throws</field><field name="postfix"></field><value name="first_element"><block type="object_selector" id="l4b000171"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="p2"></mutation><field name="object_name">p2</field></block></value><value name="second_element"><block type="object_selector" id="l4b000172"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="rock"></mutation><field name="object_name">rock</field></block></value><next><block type="attribute_selector" id="l4b000173"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="second_player" attributetype="player" attributeorder="ov"></mutation><field name="prefix">the second player of</field><field name="infix">is</field><field name="postfix"></field><value name="first_element"><block type="object_selector" id="l4b000174"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="g1"></mutation><field name="object_name">g1</field></block></value><value name="second_element"><block type="object_selector" id="l4b000175"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="p2"></mutation><field name="object_name">p2</field></block></value></block></next></block></next></block></next></block></next></block></next></block></next></block></statement></block>
+      <block type="query" id="l4b000176" x="40" y="748"><statement name="query"><block type="unary_attribute_selector" id="l4b000177"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="first_player_wins" attributetype="boolean"></mutation><field name="prefix">the first player of</field><field name="postfix">wins</field><value name="first_element"><block type="object_selector" id="l4b000178"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="g1"></mutation><field name="object_name">g1</field></block></value></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      game(g1).
+      player(p1).
+      player(p2).
+      throws(p1,rock).
+      first_player(g1,p1).
+      throws(p2,rock).
+      second_player(g1,p2).
+
+      ?- first_player_wins(g1).
+    tutorial: ''
+    view: ''
+    fact_scenario: ''
+- model: blawx.blawxtest
+  pk: 4
+  fields:
+    ruledoc: 1
+    test_name: q4
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="unattributed_fact" id="l4b000179" x="40" y="40"><statement name="statements"><block type="object_category" id="l4b000180"><value name="object"><block type="object_selector" id="l4b000181"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="g1"></mutation><field name="object_name">g1</field></block></value><value name="category"><block type="category_selector" id="l4b000182"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="game"></mutation><field name="category_name">game</field></block></value><next><block type="object_category" id="l4b000183"><value name="object"><block type="object_selector" id="l4b000184"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="p1"></mutation><field name="object_name">p1</field></block></value><value name="category"><block type="category_selector" id="l4b000185"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="player"></mutation><field name="category_name">player</field></block></value><next><block type="object_category" id="l4b000186"><value name="object"><block type="object_selector" id="l4b000187"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="p2"></mutation><field name="object_name">p2</field></block></value><value name="category"><block type="category_selector" id="l4b000188"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="player"></mutation><field name="category_name">player</field></block></value><next><block type="attribute_selector" id="l4b000189"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="throws" attributetype="sign" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">throws</field><field name="postfix"></field><value name="first_element"><block type="object_selector" id="l4b000190"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="p1"></mutation><field name="object_name">p1</field></block></value><value name="second_element"><block type="object_selector" id="l4b000191"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="paper"></mutation><field name="object_name">paper</field></block></value><next><block type="attribute_selector" id="l4b000192"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="first_player" attributetype="player" attributeorder="ov"></mutation><field name="prefix">the first player of</field><field name="infix">is</field><field name="postfix"></field><value name="first_element"><block type="object_selector" id="l4b000193"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="g1"></mutation><field name="object_name">g1</field></block></value><value name="second_element"><block type="object_selector" id="l4b000194"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="p1"></mutation><field name="object_name">p1</field></block></value><next><block type="attribute_selector" id="l4b000195"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="throws" attributetype="sign" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">throws</field><field name="postfix"></field><value name="first_element"><block type="object_selector" id="l4b000196"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="p2"></mutation><field name="object_name">p2</field></block></value><value name="second_element"><block type="object_selector" id="l4b000197"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="scissors"></mutation><field name="object_name">scissors</field></block></value><next><block type="attribute_selector" id="l4b000198"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="second_player" attributetype="player" attributeorder="ov"></mutation><field name="prefix">the second player of</field><field name="infix">is</field><field name="postfix"></field><value name="first_element"><block type="object_selector" id="l4b000199"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="g1"></mutation><field name="object_name">g1</field></block></value><value name="second_element"><block type="object_selector" id="l4b000200"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="p2"></mutation><field name="object_name">p2</field></block></value></block></next></block></next></block></next></block></next></block></next></block></next></block></statement></block>
+      <block type="query" id="l4b000201" x="40" y="748"><statement name="query"><block type="unary_attribute_selector" id="l4b000202"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="second_player_wins" attributetype="boolean"></mutation><field name="prefix">the second player of</field><field name="postfix">wins</field><value name="first_element"><block type="object_selector" id="l4b000203"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="g1"></mutation><field name="object_name">g1</field></block></value></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      game(g1).
+      player(p1).
+      player(p2).
+      throws(p1,paper).
+      first_player(g1,p1).
+      throws(p2,scissors).
+      second_player(g1,p2).
+
+      ?- second_player_wins(g1).
+    tutorial: ''
+    view: ''
+    fact_scenario: ''
+- model: blawx.blawxtest
+  pk: 5
+  fields:
+    ruledoc: 1
+    test_name: interview
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="assume" id="l4b000204" x="40" y="40"><statement name="statements"><block type="object_category" id="l4b000205"><value name="object"><block type="variable" id="l4b000206"><field name="variable_name">X</field></block></value><value name="category"><block type="category_selector" id="l4b000207"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="player"></mutation><field name="category_name">player</field></block></value></block></statement></block>
+      <block type="assume" id="l4b000208" x="40" y="208"><statement name="statements"><block type="object_category" id="l4b000209"><value name="object"><block type="variable" id="l4b000210"><field name="variable_name">X</field></block></value><value name="category"><block type="category_selector" id="l4b000211"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="game"></mutation><field name="category_name">game</field></block></value></block></statement></block>
+      <block type="assume" id="l4b000212" x="40" y="376"><statement name="statements"><block type="attribute_selector" id="l4b000213"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="throws" attributetype="sign" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">throws</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000214"><field name="variable_name">X</field></block></value><value name="second_element"><block type="variable" id="l4b000215"><field name="variable_name">Y</field></block></value></block></statement></block>
+      <block type="assume" id="l4b000216" x="40" y="544"><statement name="statements"><block type="attribute_selector" id="l4b000217"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="first_player" attributetype="player" attributeorder="ov"></mutation><field name="prefix">the first player of</field><field name="infix">is</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000218"><field name="variable_name">X</field></block></value><value name="second_element"><block type="variable" id="l4b000219"><field name="variable_name">Y</field></block></value></block></statement></block>
+      <block type="assume" id="l4b000220" x="40" y="712"><statement name="statements"><block type="attribute_selector" id="l4b000221"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="second_player" attributetype="player" attributeorder="ov"></mutation><field name="prefix">the second player of</field><field name="infix">is</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000222"><field name="variable_name">X</field></block></value><value name="second_element"><block type="variable" id="l4b000223"><field name="variable_name">Y</field></block></value></block></statement></block>
+      <block type="query" id="l4b000224" x="40" y="880"><statement name="query"><block type="unary_attribute_selector" id="l4b000225"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="first_player_wins" attributetype="boolean"></mutation><field name="prefix">the first player of</field><field name="postfix">wins</field><value name="first_element"><block type="variable" id="l4b000226"><field name="variable_name">X</field></block></value></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      #abducible player(X).
+
+      #abducible game(X).
+
+      #abducible throws(X,Y).
+
+      #abducible first_player(X,Y).
+
+      #abducible second_player(X,Y).
+
+      ?- first_player_wins(X).
+    tutorial: ''
+    view: ''
+    fact_scenario: ''

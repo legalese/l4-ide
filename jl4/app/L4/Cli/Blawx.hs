@@ -235,9 +235,19 @@ importCmd opts = do
             Nothing -> Text.putStr yaml
           exitSuccess
       | otherwise -> do
+          -- The provenance header records the fixture's FILE NAME, not the
+          -- path it was read from. Every Blawx fixture arrives from a local
+          -- checkout of the Blawx repository, and the checkout's location is a
+          -- property of the machine, not of the document: baking it in made
+          -- the committed artifacts under jl4/examples/blawx/imported/
+          -- regenerable byte-for-byte from ONE checkout only, and the two
+          -- committed files disagreed on which (`.../blawx/...` for bird,
+          -- `.../blawx-stock/...` for rps) while their inputs were byte-
+          -- identical. The basename is the same from any checkout, and from a
+          -- copy of the fixture anywhere else.
           let ctx =
                 MkLiftContext
-                  { lcSource = Text.pack opts.bxFile
+                  { lcSource = Text.pack (takeFileName opts.bxFile)
                   , lcNotes = importNotes src diags
                   }
           case liftBlawx ctx doc of

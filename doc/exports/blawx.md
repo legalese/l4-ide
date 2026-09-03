@@ -72,6 +72,28 @@ faithfully.
 This matters if you have existing Blawx work: it is a migration path in, not only a projection
 out. Every other export on these pages is one-way.
 
+**How much it reads, as of 2026-09-02.** What comes back is measured rather than assumed. Three of
+Blawx's own shipped examples live under `jl4/examples/blawx/imported/`: **bird** (the defeasibility
+tutorial, where sections defeat one another), **beard_tax** (a number-valued attribute and the
+comparisons on it) and **Rock Paper Scissors** (objects related by two- and three-place predicates,
+a rule that quantifies over "the other player", and a test that declares its own objects). All
+three lift to L4 that type-checks, and the tier-1 harness puts each of their queries to real
+s(CASP) and to the L4 engine and compares the answers.
+
+The fragment is a **universe of objects** under predicates of any arity, plus **value-typed
+attributes**: a `number` attribute becomes an optional field with two readers — "is it set?" and
+"what is it?" — and a comparison on it becomes an ordinary L4 comparison, while a category-valued
+attribute is a binary predicate over the universe. A section's **paragraph** canvases
+(`sec_1__para_a_section`) fold into their numbered parent, which is warned about and keeps the
+paragraph's own eId on the decision's `@ref` line — and an `overrules` the fold cannot carry across
+unchanged is refused rather than folded, because Blawx keys defeat on the exact section.
+
+What does not come back yet is a list, not a guess — the import refuses one construct at a time,
+by name. Rules that _compute_ an attribute's value, arithmetic, and the date and event layers do
+not lift. A test canvas asking for **hypothetical** reasoning (Blawx's `#abducible`) is dropped,
+because abduction is not evaluation; the reason is written into the lifted file where that test's
+`#EVAL` would have been, so you can see what you did not get without re-running anything.
+
 ## What it consumes
 
 The **decision-rule subset**, relationalized. Because the target is a logic program rather than a
@@ -86,12 +108,45 @@ Two different things happen, and it matters which one you are looking at.
 a fixture under `jl4/examples/blawx/not-ok/`:
 
 - a `DATE`-sorted field or argument (v1)
+- a `STRING` sort anywhere in a **lowered** predicate's signature — field, parameter or result, and
+  including a derived predicate small enough that Blawx never declares it. (A `STRING`-signed
+  helper that nothing exported reaches is pruned before the check ever sees it, and so compiles;
+  nothing string-typed reaches Blawx either way.) Blawx's attribute-type dropdown is a closed
+  list — boolean, number, date, time, datetime, duration, list, and the categories you declared —
+  so a string-typed field has no value type to be declared under. Write an enum
+  (`DECLARE … IS ONE OF …`) if the values are a fixed vocabulary, or drop the field if the string
+  was only carrying identity: a record is already a category, and Blawx tells objects apart by
+  atom. String _literals_ in a rule body are fine, and survive as atoms you can compare for
+  equality; so is a `LIST OF STRING`, which is declared under the untyped `list` type.
 - more than ten arguments — a Blawx relationship block's ceiling
 - fewer than three, unless the shape is attribute-like (one category-sorted parameter plus an
   optional result); Blawx relationships start at three
 - a subjectless nullary input
 - **unstratified negation** — a cycle through a negation. The shared middle-end admits it; the
   Blawx leg is where it is refused.
+- **`EQUALS` (or a disequality) on two whole records** — including records inside a `LIST OF` or a
+  `LIST OF MAYBE`. L4 compares records by value, Blawx compares objects by atom, and the test
+  flattening gives each _occurrence_ of a record value its own object — so two structurally equal
+  records reach the reasoner as two different atoms, and two structurally equal lists of them reach
+  it as two lists of different atoms. Until the flattening shares one object per distinct value,
+  this is refused rather than emitted, because the emitted version runs and quietly answers
+  differently. Say the rule once per slot (which needs no identity at all), or compare an enum- or
+  number-valued field of the two records. This does **not** apply to a category you introduced with
+  `ASSUME T IS A TYPE`: it has no fields to compare structurally, its values are plain atoms on
+  both sides, and `EQUALS` on two of them still compiles. It **does** apply to a record type you
+  reached through `IMPORT`: the imported sort arrives with a printed name and no identity behind
+  it, so the compiler cannot tell whether it is a record, and it refuses with a message that says
+  so rather than guessing.
+- **a character clean-law cannot read in a section's prose.** The `rule_text` the exporter
+  synthesises is parsed by clean-law on import, and its text grammar is ASCII-only, so one
+  character above U+007F ends the parse there and every later section's canvas is left belonging to
+  no section of the Act — a document that imports and stores without complaint and is quietly
+  wrong. The punctuation legislation actually contains is folded for you (em and en dashes, curly
+  quotes and apostrophes, the ellipsis, the non-breaking space, the section sign), so a
+  legislation.gov.uk paste works; what is left is refused, naming the codepoint and the decision.
+  For the same reason a section's text may not begin with a digit unless it is the section number
+  itself: prose that merely starts with a numeral is quoted for you, and a genuine sub-provision
+  index (`4. 5. …`) is refused, because Blawx v1 has no sub-provision anchor.
 
 **Lossy — the compiler emits anyway and tells you what it dropped.** The one to know is
 `TYPICALLY` on an `ASSUME`. The name becomes an input predicate and the default is deliberately
