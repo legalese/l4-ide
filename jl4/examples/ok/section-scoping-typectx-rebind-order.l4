@@ -1,0 +1,49 @@
+-- Regression test for lexical section scoping — FIX D, order-independence of
+-- a type-directed reference across a differently-typed rebinding (spec §12).
+--
+-- A section binds x to a STRING and refers to x in a NUMBER position. A
+-- sibling or descendant section binds a NUMBER x. Under the per-type rule
+-- (spec §3.3.4 step 4) the differently-typed off-ancestry binding stays
+-- visible to type-directed resolution, so `x PLUS 1` resolves to the NUMBER x
+-- and evaluates to 3 — whether that binding is placed ABOVE or BELOW the
+-- reference. The first cut of FIX D dropped the not-yet-inferred candidate
+-- outright, which kept the ABOVE order at 3 but turned the BELOW order into a
+-- type error at the reference. A not-yet-inferred candidate is now DEFERRED
+-- instead: consulted only when the ancestry does not resolve the reference.
+--
+-- This fixture pins order-independence, not the design of the flat fallback;
+-- see the dated note under spec §3.3.4 for that rule as shipped.
+
+-- 1. Descendant, rebinding BELOW the reference.
+§ a
+x MEANS "s"
+f MEANS x PLUS 1              -- 3: §§ b's NUMBER x
+§§ b
+x MEANS 2
+
+-- 2. Descendant, rebinding ABOVE the reference.
+§ c
+y MEANS "s"
+§§ d
+y MEANS 2
+§§ e
+g MEANS y PLUS 1              -- 3: §§ d's NUMBER y
+
+-- 3. Sibling, rebinding BELOW the reference.
+§ m
+z MEANS "s"
+h MEANS z PLUS 1              -- 3: § n's NUMBER z
+§ n
+z MEANS 2
+
+-- 4. Sibling, rebinding ABOVE the reference.
+§ o
+w MEANS 2
+§ p
+w MEANS "s"
+k MEANS w PLUS 1              -- 3: § o's NUMBER w
+
+#EVAL a.f       -- 3
+#EVAL c.e.g     -- 3
+#EVAL m.h       -- 3
+#EVAL p.k       -- 3

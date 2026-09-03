@@ -18,7 +18,9 @@
 -- placed ABOVE the reference resolved fine, so the answer depended on textual
 -- order. FIX B (spec §12) already let a wildcard ANCESTOR shadow farther
 -- ancestors; this pins the missing complement: a wildcard that is OFF the
--- ancestry never out-competes a value ancestor.
+-- ancestry never out-competes a value ancestor whose own branch type-checks
+-- (the branch that chooses the wildcard is marked, and the forcing point
+-- prefers an unmarked success; see spec §12, FIX D).
 
 -- 1. Top level vs. a section below it (spec §5.2).
 x MEANS 10

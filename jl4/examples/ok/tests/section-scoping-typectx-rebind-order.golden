@@ -1,0 +1,11 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+section-scoping-typectx-rebind-order.l4:46:1-10:
+  3
+section-scoping-typectx-rebind-order.l4:47:1-12:
+  3
+section-scoping-typectx-rebind-order.l4:48:1-10:
+  3
+section-scoping-typectx-rebind-order.l4:49:1-10:
+  3

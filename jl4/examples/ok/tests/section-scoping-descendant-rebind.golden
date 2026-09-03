@@ -1,15 +1,15 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
-section-scoping-descendant-rebind.l4:31:1-9:
+section-scoping-descendant-rebind.l4:33:1-9:
   NUMBER
-section-scoping-descendant-rebind.l4:43:1-14:
+section-scoping-descendant-rebind.l4:45:1-14:
   10
-section-scoping-descendant-rebind.l4:44:1-12:
-  1
-section-scoping-descendant-rebind.l4:45:1-12:
-  2
-section-scoping-descendant-rebind.l4:46:1-16:
+section-scoping-descendant-rebind.l4:46:1-12:
   1
 section-scoping-descendant-rebind.l4:47:1-12:
+  2
+section-scoping-descendant-rebind.l4:48:1-16:
+  1
+section-scoping-descendant-rebind.l4:49:1-12:
   3

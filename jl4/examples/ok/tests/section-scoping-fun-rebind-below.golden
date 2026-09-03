@@ -1,0 +1,11 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+section-scoping-fun-rebind-below.l4:48:1-10:
+  2
+section-scoping-fun-rebind-below.l4:49:1-10:
+  11
+section-scoping-fun-rebind-below.l4:50:1-14:
+  101
+section-scoping-fun-rebind-below.l4:51:1-12:
+  201
