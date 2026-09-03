@@ -243,6 +243,7 @@ test-suite jl4-core-test
     StateGraphSpec
     RelationalSpec
     BlawxAssumeSpec
+    BlawxNlgSpec
     BlawxImportImageSpec
     BlawxLiftSpec
     BlawxParseSpec

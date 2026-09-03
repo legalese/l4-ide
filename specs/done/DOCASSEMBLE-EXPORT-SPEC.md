@@ -1,5 +1,18 @@
 # L4 → Docassemble: interview export and transpiler spec
 
+_**DISCHARGED 2026-08-20, and moved to `specs/done/` on 2026-08-27.** Every milestone this spec
+defines has been resolved and merged into `unstable`: M1 = #264 + #265, M2 = #267, M4 = #268
+(`2ac68a15`), M3 = #269 (`825dd7cf`). M3 merged a **decision not to build it** — the milestone was
+measured against §8.5's own gate and declined, so "all milestones resolved" is not the same claim as
+"all milestones shipped", and §8.5 is where the difference is recorded._
+
+_**Why this file is retained rather than deleted.** Its section numbers are load-bearing: they are
+cited from code and from sibling specs — `jl4-core/src/L4/Docassemble/Lower.hs` (§6),
+`jl4/app/L4/Cli/Docassemble.hs` (§8.11), `jl4/tests-cli/Main.hs` (§10),
+`jl4/examples/docassemble/probe_generic_object.py` (§8.2), and `DATE-LIBRARY-SPEC.md` (§8.12/R12,
+which promotes this spec's date measurement into a portfolio-wide requirement). **Renumbering a
+section is therefore a breaking change**, not an editorial one._
+
 _Status: **M1, M2 and M4 implemented; M1 review-repaired. M3 (the embedded plan) is DECLINED on
 measurement, not deferred — see §8.5.** Designed 2026-08-16 on branch
 `mengwong/docassemble-bridge`; M1 (the static core, §10) landed the same day on branch
@@ -1062,6 +1075,16 @@ never reaches `priorsByUnique` at all. Across the 17-file measurement corpus tha
 for all 250 decisions. Whatever else is true, the info-gain ranker is presently running with no
 priors on this corpus, and any future work premised on `TYPICALLY` priors should verify they are
 being read before assuming they are.
+
+**Do not "fix" R7 on the strength of the paragraph above — it does not apply to this backend, and
+the resemblance is a trap.** The finding is about `collectTypicallyDefaults` feeding the ordering
+priors. **The docassemble prefill is a different consumer and reads record fields perfectly well:**
+`fieldSpecOf` (`Lower.hs:135`) captures the field's `TYPICALLY` — the 4th component of
+`MkTypedName` — into `fsDefault`, and it reaches `qDefault` through `scalarArts`
+(`Lower.hs:1255`). So a record-field `TYPICALLY` **does** prefill the generated interview while
+**not** reaching the ranker, and R7 is correctly implemented for exactly the shape idiomatic L4
+uses. Traced and confirmed 2026-08-28, prompted by the `xpile-blawx` session asking whether the
+portfolio's "designated consumer of `TYPICALLY`" claim had gone stale. It has not.
 
 ### 8.8 R8 — `MAYBE` erased to optionality
 

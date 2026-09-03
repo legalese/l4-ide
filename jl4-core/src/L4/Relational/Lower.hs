@@ -548,7 +548,16 @@ descFromAnno ann = do
          else cur
 
 -- | An @\@nlg@ annotation as one line of text, with each @%parameter%@ slot
--- rendered as the bare parameter name.
+-- kept in its @%…%@ delimiters.
+--
+-- __The delimiters are load-bearing and were restored on 2026-09-02.__ This
+-- function used to render a slot as the bare parameter name, which made the
+-- sentence undecomposable: a consumer that has to know /where/ the arguments
+-- go — Blawx stores an attribute's NLG as prefix\/infix\/postfix around two
+-- fixed slots, never as a sentence — could not tell a slot from an ordinary
+-- word, and "L4.Blawx.Lower" recorded that as its reason for ignoring
+-- @\@nlg@ entirely (BLAWX-EXPORT-SPEC §11 W4). 'rpNlg' already documented the
+-- markers as present; the implementation is now what that doc says.
 --
 -- __A resolved annotation is NOT put through @simpleLinearizer@__, and the
 -- reason is a measured one rather than a preference: that function linearises a
@@ -571,7 +580,7 @@ linearNlg = \case
   squash = Text.unwords . Text.words
   frag = \case
     MkNlgText _ t -> t
-    MkNlgRef  _ r -> rawNameToText (rawName (getActual r))
+    MkNlgRef  _ r -> "%" <> rawNameToText (rawName (getActual r)) <> "%"
 
 -- | The @\@nlg@ attached to a @DECIDE@, __wherever it landed__.
 --
@@ -883,11 +892,30 @@ buildCtx ei exps m = ctx
     , ctxEnt = ei
     }
 
+  -- __Where a field's @\@nlg@ actually lands__ (measured 2026-09-02, against
+  -- the Blawx seeds of BLAWX-EXPORT-SPEC §11 W4, and the reason those seeds
+  -- could not be annotated until now): a trailing annotation on a
+  -- @DECLARE … HAS@ row — @\`facial hair on chin\` IS A BOOLEAN \@nlg …@ —
+  -- attaches to the row's __type-constructor name__. Not to the row, not to
+  -- the field name, and not to the 'Type'' node either; @l4 ast@ puts the
+  -- @nlg = Just@ on the @MkName@ of @BOOLEAN@, and the type checker says so out
+  -- loud when two rows collide ("More than one NLG annotation attached to:
+  -- Sign"). Two traps sat behind that: with only 'fAnn' and 'fRes' searched,
+  -- every field annotation in the corpus read as 'Nothing'; and the name has to
+  -- be reached through 'getActual', because 'getOriginal' on a @Ref@ hands back
+  -- the /defining/ occurrence — the @DECLARE Sign@ header, which carries no
+  -- annotation — so a search that used it stayed silently empty. All four
+  -- positions are searched here for the same reason 'decideNlg' searches five.
   fieldDef fAnn fRes fTy = MkRFieldDef
     { rfName = rName fRes
     , rfSort = sortOfType sortEnv (Just fTy)
     , rfDesc = getDesc <$> (fAnn ^. annDesc)
-    , rfNlg  = linearNlg <$> ((fAnn ^. annNlg) <|> (getOriginal fRes ^. annoOf % annNlg))
+    , rfNlg  = linearNlg <$> foldr (<|>) Nothing
+        (  [ fAnn ^. annNlg
+           , getOriginal fRes ^. annoOf % annNlg
+           , fTy ^. annoOf % annNlg
+           ]
+        <> [ getActual r ^. annoOf % annNlg | r <- toList fTy ] )
     }
 
   tops = [ mkTopDef ei exps ann d | Decide ann d <- decls ]

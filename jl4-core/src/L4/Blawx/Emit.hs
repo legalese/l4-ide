@@ -281,6 +281,22 @@ yamlDoubleQuoted t = "\"" <> Text.concatMap esc t <> "\""
 -- @rule_text@ (each parses, and its eIds match the emitted workspace names
 -- exactly — CLEAN requires the uppercase-initial title Lower now
 -- guarantees). Newlines are @\\n@; no sub-provisions, no indentation.
+--
+-- The numbers come from 'BSection', which since spec §11 W3 the author may pin,
+-- so this renders whatever ascending set 'brSections' carries rather than
+-- @1..n@ — @rps.l4@ emits @3.@ and @4.@ and nothing else. That check is now a
+-- script rather than an ad-hoc run: @etc\/blawx-eid-harness.py@ (2026-09-02,
+-- 12 of 12 goldens agree). It is what caught the two seeds' own defect: while
+-- the section number was written BOTH by this function and by the author's
+-- prose, @\"1. 4. The winner …\"@ parsed as clean-law's insert index and yielded
+-- eId @sec_1_ 4@, so every canvas in @rps.blawx@ and @beard.blawx@ was
+-- orphaned.
+--
+-- __The @\". \"@ this writes is a @DOT@ in clean-law's index grammar__, so a
+-- 'bsText' opening on a digit would be swallowed by the same insert index. That
+-- invariant is enforced upstream, in @L4.Blawx.Lower.sectionTexts@, so that
+-- @L4.Blawx.Parse.parseRuleText@ stays this function's exact byte-level inverse
+-- and the @--roundtrip@ property is untouched.
 renderRuleText :: BRuleText -> Text
 renderRuleText rt =
   rt.brTitle

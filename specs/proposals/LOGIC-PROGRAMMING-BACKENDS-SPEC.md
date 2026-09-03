@@ -1,12 +1,22 @@
 # Logic-Programming Backends Specification
 
-**Status:** Proposal — not implemented. No relational lowering and no
-logic-programming emitter exists anywhere in this tree as of 2026-08-12
-(verified: no module in `jl4-core/src` or `jl4-mlir/src` mentions Horn
-clauses, A-normal form, Prolog, PROLEG, or ASP; `jl4-proleg` contains a
-PROLEG reader/printer and a burden monad, not a transpiler — see §8.1).
+**Status:** Partly implemented, and no longer blocked. The middle-end this
+spec calls for exists: `L4.Relational.{IR,Lower,Debug}` landed 2026-08-18
+(legalese/l4-ide#272) to the brief in
+[RELATIONAL-M1-BRIEF.md](../todo/RELATIONAL-M1-BRIEF.md), and the first of
+the emitters — the **s(CASP)** leg — shipped on top of it as the Blawx
+bridge over 2026-08-19 (#273, #277, #278, #279; raw s(CASP) is dumped by
+`l4 blawx --scasp`), specified by
+[BLAWX-EXPORT-SPEC.md](../todo/BLAWX-EXPORT-SPEC.md). The other legs —
+**SWI-Prolog**, **Logical English**, **PROLEG**, and, added 2026-09-02, **ErgoAI**
+(§1.5, §5.7, R5) — remain unbuilt (verified against `origin/unstable` on
+2026-08-28 for the first three, and on 2026-09-02 for ErgoAI: no emitter module
+for any of them under `jl4-core/src`; `jl4-proleg` is still the
+reader/printer/burden-monad trio of §8.1, not a transpiler). The design below
+is unchanged and still governs those legs; read its present-tense statements about what the tree
+contains as claims of its 2026-08-12 authorship date, not of today.
 **Author:** Meng Wong
-**Date:** 2026-08-12
+**Date:** 2026-08-12 (status refreshed 2026-08-28; ErgoAI leg added 2026-09-02)
 **Related:**
 [VERIFICATION-BACKEND-LOWERING-SPEC.md](VERIFICATION-BACKEND-LOWERING-SPEC.md),
 [NEGATION-AS-FAILURE-SPEC.md](../done/NEGATION-AS-FAILURE-SPEC.md),
@@ -24,6 +34,12 @@ targets: **SWI-Prolog**, **Answer Set Programming** (clingo / s(CASP)),
 > relational lowering from L4's typed functional core to moded, typed Horn
 > clauses — plus four comparatively thin emitters. The middle-end is the hard
 > part, it does not exist, and every target is blocked on it.
+
+_(Written 2026-08-12. The middle-end now exists — see the status header — so the
+"does not exist" clause is history, not a description of the tree. The
+one-middle-end architecture is what got built; whether the remaining three
+emitters are as thin as claimed is still untested, since only the s(CASP) leg
+has been written.)_
 
 The ICAIL paper names the pass and its theory. §6 ("Two Readings of One
 Program: Functional and Relational", `paper/icail/l4-icail.tex:500`) observes
@@ -66,21 +82,26 @@ non-monotonic in-force determination (its line 124). This spec builds the
 lowering that would make such an ASP layer real. The regulative/deontic layer
 itself is **out of scope for v1** (§5.6, LP-R9).
 
-## 1. The four targets form a lattice, not a portfolio
+## 1. The targets form a lattice, not a portfolio
 
 The targets are ordered by **what each preserves of L4's meaning** — or,
 read downward, what each erases. Choosing a backend is choosing which
 dimensions of the source survive.
 
-| Dimension preserved                              | swipl | ASP | PROLEG | LE  |
-| ------------------------------------------------ | ----- | --- | ------ | --- |
-| Truth condition (closed-world, stratified)       | ✓     | ✓   | ✓      | ✓   |
-| **Multiplicity** (alternative consistent models) | ✗     | ✓   | ✗      | ✗   |
-| **Burden of proof** (who loses if unproven)      | ✗     | ✗\* | ✓      | ✗   |
-| Natural-language surface                         | ✗     | ✗   | ✗      | ✓   |
+| Dimension preserved                                   | swipl | ASP   | PROLEG | LE  | Ergo |
+| ----------------------------------------------------- | ----- | ----- | ------ | --- | ---- |
+| Truth condition (closed-world, stratified)            | ✓     | ✓     | ✓      | ✓   | ✓†   |
+| **Multiplicity** (alternative consistent models)      | ✗     | ✓     | ✗      | ✗   | ✗    |
+| **Burden of proof** (who loses if unproven)           | ✗     | ✗\*   | ✓      | ✗   | ✗    |
+| **Defeasible priority** (one rule overriding another) | ✗     | ✗\*\* | ✓      | ✗   | ✓    |
+| Natural-language surface                              | ✗     | ✗     | ✗      | ✓   | ✗    |
 
 \* recoverable by convention (party-indexed literals), not by construction —
-see §5.3.
+see §5.3. \*\* the Blawx dialect encodes `overrules` as a `blawx_defeated`
+convention over `holds`/`according_to` (BLAWX-EXPORT-SPEC R6), not as a
+language construct. † under the well-founded semantics, which agrees with
+the stratified reading on stratified programs and gives a third value where
+they are not (§1.5).
 
 ### 1.1 Pure Prolog keeps the truth condition and nothing else
 
@@ -149,6 +170,29 @@ rendering template to a definition at source (every combinator in
 `jl4-core/libraries/negation-as-failure.l4` carries one), so the LE
 emitter's hard half is substantially pre-paid. LE therefore sits in the
 plan as a rendering layer over the swipl leg (§5.5), sequenced after it.
+
+### 1.5 ErgoAI preserves defeasible priority as a construct (added 2026-09-02)
+
+ErgoAI is the successor of Flora-2: F-logic frames (object–attribute–value,
+which is L4's record shape read relationally), HiLog for higher-order names,
+and **defeasible reasoning built into the language** — `\overrides`
+between tagged rules under a pluggable argumentation theory — over the
+well-founded semantics on an XSB core. That is the one dimension none of
+the four earlier targets preserves _by construction_: PROLEG's exception
+blocks come closest, the Blawx s(CASP) dialect reaches it by convention,
+swipl and LE erase it. It matters here because `SUBJECT TO` /
+`NOTWITHSTANDING` (SUBJECT-TO-NOTWITHSTANDING-SPEC) is exactly an override
+relation between provisions, so an Ergo leg is the fourth external datapoint
+for that spec after LegalRuleML, Catala and s(CASP) — and the first where the
+target's own override construct, rather than an encoding of it, carries the
+meaning. What Ergo does not give: multiplicity (WFS yields one three-valued
+model) or burden. Engine facts, read 2026-09-02: the engine is open source at
+`github.com/ergoAI/ErgoEngine` (pushed 2026-05-22, "the ErgoAI reasoning
+engine, an advanced object-oriented knowledge management system") **[E:
+repository listing only]**; Jason Morris reported at the Blawx v3 webinar of
+2026-09-02 that Miguel Calejo had an LLM re-implement Ergo on SWI-Prolog
+**[U: hearsay, no artifact seen]** — if that exists and is faithful, it would
+let the R5 harness share R1's swipl plumbing instead of standing up XSB.
 
 ## 2. The shared middle-end: `L4.Relational`
 
@@ -448,6 +492,25 @@ discipline — first occurrence `a x`, subsequent `the x` — is a
 purely emitter-side rendering rule. Which LE implementation is the
 reference engine, and how its output is golden-pinned, is LP-R10.
 
+### 5.5a ErgoAI (R5) — added 2026-09-02, proposed, not built
+
+Emit Ergo (`.ergo`) over the same `L4.Relational` IR as R1: relations as
+Ergo predicates or, where a decision's subject is a record, as frame
+molecules `?O[attr -> ?V]` so the object-attribute shape of L4 records
+survives instead of being flattened to positional arguments (this is the
+choice R2's Blawx leg makes with `blawx_attribute`, made native here).
+Negation lowers to Ergo's default negation `\naf` under WFS (§3.4's hinge
+holds on the stratified fragment; on non-stratified programs Ergo answers
+_undefined_ where the evaluator refuses — record, do not paper over).
+`SUBJECT TO` / `NOTWITHSTANDING`, once the language has them, lower to
+tagged rules with `\overrides(tag_stronger, tag_weaker)`; until then the
+idiom detector question is LP-R6's, shared with PROLEG. Validation: R1's
+differential harness with the engine swapped — `ergo` shell over
+ErgoEngine (XSB) as the reference; the reported SWI port, if it exists, as
+a second runner, never as the reference until measured against XSB.
+Sequenced after R4 (§7): its distinctive value, like PROLEG's, is gated on
+LP-R6, and shipping it override-blind would make it a slower swipl.
+
 ### 5.6 The regulative layer: explicitly deferred
 
 The project's own publications settle where deontics-and-time belong.
@@ -521,7 +584,7 @@ evidence that never becomes a build dependency (repo `CLAUDE.md` §1.2).
 
 ## 7. Sequencing, with sizes
 
-Order: **R0 → R1 → R2 → R3 → R4.** Rationale: the middle-end unblocks
+Order: **R0 → R1 → R2 → R3 → R4 → R5.** Rationale: the middle-end unblocks
 everything (R0); swipl is the cheapest sound target and stands up the
 harness (R1); ASP is the largest new capability — enumeration — and reuses
 the harness three-way (R2); LE rides R1's emitter plus `@nlg` (R3); PROLEG
@@ -531,13 +594,14 @@ LP-R6 ruling, which depends on language work (`SUBJECT TO`) or an idiom
 detector that R1-R3 do not need. Shipping PROLEG earlier would mean shipping
 it burden-blind, which §1.3 says is the one thing it must not be.
 
-| Stage | Deliverable                                                                   | New code (est.)  | Exit criterion                                                              |
-| ----- | ----------------------------------------------------------------------------- | ---------------- | --------------------------------------------------------------------------- |
-| R0    | `L4.Relational.{IR,Lower}`, stratification check, `--report` census           | ~2,500-3,500 LOC | census over `jl4/examples` published in-tree; fragment % measured           |
-| R1    | swipl emitter + differential harness + CI wiring                              | ~800-1,200 LOC   | 100% agreement on in-fragment `#EVAL`/`#ASSERT` corpus                      |
-| R2    | ASP emitter (clingo core, s(CASP) dialect flag), enumeration mode             | ~700-1,000 LOC   | three-way agreement on stratified fragment; ≥1 worked multi-model demo      |
-| R3    | LE emitter (templates from `@nlg`), golden suite seeded from natural4 lessons | ~1,000-1,500 LOC | LE documents load in the reference LE engine and answer queries identically |
-| R4    | PROLEG emitter over `jl4-proleg`'s AST                                        | ~400-700 LOC     | lease fixture round-trip (§6.4); burden fidelity per LP-R6 ruling           |
+| Stage | Deliverable                                                                   | New code (est.)  | Exit criterion                                                                                                                                               |
+| ----- | ----------------------------------------------------------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| R0    | `L4.Relational.{IR,Lower}`, stratification check, `--report` census           | ~2,500-3,500 LOC | census over `jl4/examples` published in-tree; fragment % measured                                                                                            |
+| R1    | swipl emitter + differential harness + CI wiring                              | ~800-1,200 LOC   | 100% agreement on in-fragment `#EVAL`/`#ASSERT` corpus                                                                                                       |
+| R2    | ASP emitter (clingo core, s(CASP) dialect flag), enumeration mode             | ~700-1,000 LOC   | three-way agreement on stratified fragment; ≥1 worked multi-model demo                                                                                       |
+| R3    | LE emitter (templates from `@nlg`), golden suite seeded from natural4 lessons | ~1,000-1,500 LOC | LE documents load in the reference LE engine and answer queries identically                                                                                  |
+| R4    | PROLEG emitter over `jl4-proleg`'s AST                                        | ~400-700 LOC     | lease fixture round-trip (§6.4); burden fidelity per LP-R6 ruling                                                                                            |
+| R5    | ErgoAI emitter (frames + `\overrides`) over the R1 IR                         | ~600-900 LOC     | differential agreement with R1 on the stratified fragment via ErgoEngine; one SUBJECT-TO fixture where `\overrides` carries the exception (added 2026-09-02) |
 
 Estimates are calibrated against the in-tree backends, counting **code
 lines, not file lines** — the distinction matters here because this
@@ -724,6 +788,13 @@ decision?`)? OPEN.
   independently-registered transpiler modes (§8.3, "surface sprawl") are the
   cautionary precedent for the per-target option. Whoever owns the `l4`
   subcommand surface rules this before R0 lands. OPEN.
+
+- **LP-R12 (Ergo reference engine).** Added 2026-09-02. Is the R5 reference
+  the XSB-based `ErgoEngine` (open source, the only implementation whose
+  semantics is documented), or the SWI-Prolog re-implementation Jason Morris
+  attributed to Miguel Calejo at the Blawx v3 webinar — which, if real, would
+  let R5 reuse R1's harness end to end? Leaning: XSB as reference, the SWI
+  port as a second runner once someone has seen it. OPEN.
 
 ## References
 

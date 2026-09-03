@@ -1,0 +1,243 @@
+{
+  "kind": "source-bundle",
+  "bundle_version": 1,
+  "subject": "sg-succession",
+  "citation": "Wills Act 1838; Intestate Succession Act 1967; Probate and Administration Act 1934; Guardianship of Infants Act 1934 (Singapore)",
+  "retrieved": "2026-08-26",
+  "note": "FOUR Acts, one subject. They are four views of one event -- a death in a family -- and they share their nouns, so they are encoded against a single ontology rather than as four subjects. The fourth Act, the Guardianship of Infants Act 1934, is what joins the other three to the person who cannot yet act for themselves: a minority forces a second administrator under PAA s 6(2), bars a grant to the infant under PAA s 21(1), and -- GIA s 17 -- stops the guardian giving a good discharge for the legacy or intestate share the other two Acts say the infant is entitled to. It is the step between being entitled to a share and the share being payable.\n\nNO ENABLING INSTRUMENT IS RECORDED because there is none to record: these are Acts of Parliament, not subsidiary legislation, so P1's 'fetch the instrument it is made under' has no referent. The analogous upward read for primary legislation is twofold and both halves are here -- the amendment history, captured per document in annotations[], and the general statutes a definitional gap falls through to, captured as corroboration documents.\n\nRETRIEVAL NOTE. The SSO HTML landing page is NOT a usable text source for a long Act: PAA1934 returns its 70 section headings with no bodies, and both ?ViewType=Print and ?WholeDoc=1 are stubbed or WAF-blocked. The official PDF is complete and carries the Schedules, so it is what every sha256 here is taken over. SSO also SOFT-404s with HTTP 200 -- a wrong Act id returns an HTML error page that curl --fail cannot see -- so the fetch script checks the %PDF- magic before writing. See jl4/examples/legal/sg-succession/source/fetch-sso.py.\n\nSUPERSEDES jl4/examples/legal/sg-succession/denovo/source-bundle.json, which covered three of these four Acts as retrieved on 18 Aug 2026. That file is left on disk as the record of what was deposited then; it is no longer declared by the subject.\n\nWHY THE THREE CORROBORATION DOCUMENTS ARE HERE. The schema has no per-document note field, and these three each answer a question the four subject Acts raise and do not settle, so the answers are recorded here rather than left to be re-derived.\n\namla1966 -- ISA s 2 excludes Muslims from the Act entirely and routes their estates to Muslim law; this is the Act that receives them. Fetched so the exclusion can be checked against the text that takes over, rather than asserted.\n\nia1965 -- Fetched to answer a question the Guardianship of Infants Act raises and does not answer: it defines only \"court\" (s 2), never \"infant\". The general interpretation statute was the first place to look for an age of majority. IT DOES NOT SUPPLY ONE -- searched for \"minor\", \"majority\" and \"age of\" and found no general definition, only unrelated uses (s 32A's \"majority of those persons\"). Recorded as a negative result because a negative result that is not recorded reads later as a search nobody ran.\n\ncla1909 -- The second place to look, and the one that explains why the first failed. CLA s 35 is headed \"Contracts of minors who have attained 18 years of age\" and s 36 covers legal proceedings; each is confined to its own subject matter. s 35(3)(b) is decisive: subsection (1) \"shall not affect or alter ... the application of any provision in any other written law stipulating a requirement as to the attainment of a particular age for the purposes of that written law\" -- so it expressly preserves the Wills Act s 4 age bar and does not reach the Guardianship Act, which stipulates no age at all. Singapore has no single statutory age of majority.\n\nThe upshot for the encoding: \"infant\" in the Guardianship of Infants Act has no statutory age behind it in any of the three general statutes searched. The age is therefore a PARAMETER of the encoding and a fork, not a constant somebody may quietly write as 21. The Wills Act is the contrast that proves the point -- s 4 stipulates 21 in its own words, so CLA s 35(3)(b) preserves it and nothing has to be inferred.",
+  "in_force": {
+    "statement": "Current version as at 26 Aug 2026",
+    "as_of": "2026-08-26",
+    "document": "gia1934"
+  },
+  "retrieval_cost": {
+    "requests": 14,
+    "elapsed_ms": 2153,
+    "bytes": 3659592,
+    "tool": "jl4/examples/legal/sg-succession/source/fetch-sso.py"
+  },
+  "documents": [
+    {
+      "id": "wa1838",
+      "role": "current",
+      "title": "Wills Act 1838",
+      "citation": "Wills Act 1838 (2020 Rev Ed)",
+      "url": "https://sso.agc.gov.sg/Act/WA1838?ViewType=Pdf",
+      "retrieved": "2026-08-26",
+      "retrieval_method": "direct",
+      "integrity": {
+        "sha256": "06854af11c92d57811ba129fab8826602fa60c3ea3c195c9f269a7d2b8025e1b",
+        "local_path": "jl4/examples/legal/sg-succession/cleanroom-2026-08/source/WA1838.pdf"
+      },
+      "covers": {
+        "from": null,
+        "to": null
+      },
+      "retrieval_cost": {
+        "requests": 2,
+        "elapsed_ms": 71,
+        "bytes": 294672
+      },
+      "annotations": [
+        {
+          "scheme": "amendment",
+          "markers": [
+            "v19870330",
+            "v19920626",
+            "v19961227",
+            "v19971001",
+            "v20161201",
+            "v20210102",
+            "v20211231"
+          ],
+          "inventory_complete": true,
+          "inventory_note": "Every dated version SSO offers for this Act, read off the Historical links on its landing page. Complete AS THE PUBLISHER'S VERSION LIST, which is the only completeness anyone can establish here: SSO exposes a per-Act version timeline rather than the UK-style F-marker apparatus, so this is not a list of amending Acts and does not claim to be."
+        }
+      ]
+    },
+    {
+      "id": "isa1967",
+      "role": "current",
+      "title": "Intestate Succession Act 1967",
+      "citation": "Intestate Succession Act 1967 (2020 Rev Ed)",
+      "url": "https://sso.agc.gov.sg/Act/ISA1967?ViewType=Pdf",
+      "retrieved": "2026-08-26",
+      "retrieval_method": "direct",
+      "integrity": {
+        "sha256": "f488fe5e3742d1d2f5fe7f17e67eafe7cb61a997df018367c6383665edad6c79",
+        "local_path": "jl4/examples/legal/sg-succession/cleanroom-2026-08/source/ISA1967.pdf"
+      },
+      "covers": {
+        "from": null,
+        "to": null
+      },
+      "retrieval_cost": {
+        "requests": 2,
+        "elapsed_ms": 86,
+        "bytes": 365735
+      },
+      "annotations": [
+        {
+          "scheme": "amendment",
+          "markers": [
+            "v19870330",
+            "v20131231"
+          ],
+          "inventory_complete": true,
+          "inventory_note": "Every dated version SSO offers for this Act, read off the Historical links on its landing page. Complete AS THE PUBLISHER'S VERSION LIST, which is the only completeness anyone can establish here: SSO exposes a per-Act version timeline rather than the UK-style F-marker apparatus, so this is not a list of amending Acts and does not claim to be."
+        }
+      ]
+    },
+    {
+      "id": "paa1934",
+      "role": "current",
+      "title": "Probate and Administration Act 1934",
+      "citation": "Probate and Administration Act 1934 (2020 Rev Ed)",
+      "url": "https://sso.agc.gov.sg/Act/PAA1934?ViewType=Pdf",
+      "retrieved": "2026-08-26",
+      "retrieval_method": "direct",
+      "integrity": {
+        "sha256": "885046361e9746d753e76c0d2b0753dd47026eddff08e8f221eef25ea3767862",
+        "local_path": "jl4/examples/legal/sg-succession/cleanroom-2026-08/source/PAA1934.pdf"
+      },
+      "covers": {
+        "from": null,
+        "to": null
+      },
+      "retrieval_cost": {
+        "requests": 2,
+        "elapsed_ms": 71,
+        "bytes": 441336
+      },
+      "annotations": [
+        {
+          "scheme": "amendment",
+          "markers": [
+            "v19870330",
+            "v19971001",
+            "v19990225",
+            "v20000701",
+            "v20040308",
+            "v20060101",
+            "v20060201",
+            "v20100301",
+            "v20140307",
+            "v20141231",
+            "v20150101",
+            "v20160610",
+            "v20210102",
+            "v20211231"
+          ],
+          "inventory_complete": true,
+          "inventory_note": "Every dated version SSO offers for this Act, read off the Historical links on its landing page. Complete AS THE PUBLISHER'S VERSION LIST, which is the only completeness anyone can establish here: SSO exposes a per-Act version timeline rather than the UK-style F-marker apparatus, so this is not a list of amending Acts and does not claim to be."
+        }
+      ]
+    },
+    {
+      "id": "gia1934",
+      "role": "current",
+      "title": "Guardianship of Infants Act 1934",
+      "citation": "Guardianship of Infants Act 1934 (2020 Rev Ed)",
+      "url": "https://sso.agc.gov.sg/Act/GIA1934?ViewType=Pdf",
+      "retrieved": "2026-08-26",
+      "retrieval_method": "direct",
+      "integrity": {
+        "sha256": "bfa630e500498de9663e491d4548f5aefd75245fc41186f2f6456e87de9cb281",
+        "local_path": "jl4/examples/legal/sg-succession/cleanroom-2026-08/source/GIA1934.pdf"
+      },
+      "covers": {
+        "from": null,
+        "to": null
+      },
+      "retrieval_cost": {
+        "requests": 2,
+        "elapsed_ms": 67,
+        "bytes": 292167
+      },
+      "annotations": [
+        {
+          "scheme": "amendment",
+          "markers": [
+            "v19870330",
+            "v19930701",
+            "v20110601",
+            "v20140307",
+            "v20141001",
+            "v20210102",
+            "v20211231",
+            "v20240131",
+            "v20241015"
+          ],
+          "inventory_complete": true,
+          "inventory_note": "Every dated version SSO offers for this Act, read off the Historical links on its landing page. Complete AS THE PUBLISHER'S VERSION LIST, which is the only completeness anyone can establish here: SSO exposes a per-Act version timeline rather than the UK-style F-marker apparatus, so this is not a list of amending Acts and does not claim to be."
+        }
+      ]
+    },
+    {
+      "id": "amla1966",
+      "role": "corroboration",
+      "title": "Administration of Muslim Law Act 1966",
+      "citation": "Administration of Muslim Law Act 1966 (2020 Rev Ed)",
+      "url": "https://sso.agc.gov.sg/Act/AMLA1966?ViewType=Pdf",
+      "retrieved": "2026-08-26",
+      "retrieval_method": "direct",
+      "integrity": {
+        "sha256": "d0dc3fb83beda3670a8a52be22305f0340e769a4d6b8a896b8fe7d5ce32dd573",
+        "local_path": "jl4/examples/legal/sg-succession/cleanroom-2026-08/source/AMLA1966.pdf"
+      },
+      "covers": {
+        "from": null,
+        "to": null
+      },
+      "retrieval_cost": {
+        "requests": 2,
+        "elapsed_ms": 569,
+        "bytes": 974479
+      }
+    },
+    {
+      "id": "ia1965",
+      "role": "corroboration",
+      "title": "Interpretation Act 1965",
+      "citation": "Interpretation Act 1965 (2020 Rev Ed)",
+      "url": "https://sso.agc.gov.sg/Act/IA1965?ViewType=Pdf",
+      "retrieved": "2026-08-26",
+      "retrieval_method": "direct",
+      "integrity": {
+        "sha256": "1122b95b62e9a6a04a35fd2ede8288af3ecdfda5e304d26b698835c89b13116c",
+        "local_path": "jl4/examples/legal/sg-succession/cleanroom-2026-08/source/IA1965.pdf"
+      },
+      "covers": {
+        "from": null,
+        "to": null
+      },
+      "retrieval_cost": {
+        "requests": 2,
+        "elapsed_ms": 614,
+        "bytes": 622098
+      }
+    },
+    {
+      "id": "cla1909",
+      "role": "corroboration",
+      "title": "Civil Law Act 1909",
+      "citation": "Civil Law Act 1909 (2020 Rev Ed)",
+      "url": "https://sso.agc.gov.sg/Act/CLA1909?ViewType=Pdf",
+      "retrieved": "2026-08-26",
+      "retrieval_method": "direct",
+      "integrity": {
+        "sha256": "a1de32ca63932753efcef30f567e202630b1f629ddbbd4d533f41d624a341e02",
+        "local_path": "jl4/examples/legal/sg-succession/cleanroom-2026-08/source/CLA1909.pdf"
+      },
+      "covers": {
+        "from": null,
+        "to": null
+      },
+      "retrieval_cost": {
+        "requests": 2,
+        "elapsed_ms": 675,
+        "bytes": 669105
+      }
+    }
+  ]
+}

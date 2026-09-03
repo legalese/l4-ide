@@ -243,3 +243,46 @@ bundle`. The embedded stdlib is seeded into the VFS under the `jl4-embedded` URI
   specifically so it cannot collide with a real file path.
 - **`ASSUME` is uninterpreted** — modules in that style typecheck but do not evaluate. Idiomatic L4
   threads a record as one `GIVEN` parameter instead.
+
+---
+
+## 6. A feature is not done until `doc/` explains it
+
+**If a user can invoke it, it needs a page under `doc/` before the work is closed out** — a new CLI
+verb, a new backend, a new language construct, a new annotation. Not "later", not "in the next
+milestone": in the shipping PR, or in one that lands immediately behind it while the work is still
+in your head.
+
+**`specs/` is not user documentation.** A spec records why we built the thing and what we ruled
+along the way; it is written for whoever maintains it next, and it assumes the whole context. A
+`doc/` page is for someone who has never read the spec and wants to use the thing. Both are needed
+and neither substitutes for the other. Ten thousand words of spec is not a reason to skip the page
+— it is the reason the gap is easy to miss.
+
+**Write it in the reader's world, not ours.** For anything that touches an external system, lead
+with what that system _is_ and why someone would want it, then what compiling to it buys them —
+"docassemble is an open-source guided-interview platform used across access-to-justice work, and we
+compile to it so a member of the public can answer questions in a browser." Do not lead with our
+module names or our IR.
+
+**State the limits on the page.** What the export drops, what it refuses, where numbers stop being
+exact. A user finds those out anyway; the only question is whether they find out from us or from a
+wrong answer in production.
+
+Mechanics: add the page, and link it from `doc/SUMMARY.md`. `doc/test-docs.sh` runs in CI
+(`.github/workflows/pr-checks.yml`) and checks every markdown link, type-checks every `.l4` file
+under `doc/`, and **fails on orphans** — a page nothing links to turns the build red. Run it
+locally before pushing; it takes seconds. Note what it does _not_ check: that a page exists at all.
+Nothing mechanical will tell you this rule was skipped.
+
+> **Why.** The transpiler programme shipped five backends — OpenFisca, Catala, Blawx, docassemble,
+> DMN/BPMN — across dozens of merged PRs, with specs, rulings, goldens, executed harnesses against
+> real third-party toolchains, and per-example READMEs. On 2026-08-27 Meng asked whether we had
+> docs describing the work. We did not. Of the fifteen `l4` CLI verbs, five were transpilers and
+> **none of them appeared anywhere in `doc/` or in `doc/SUMMARY.md`**; the only mentions of these
+> systems in the whole user-facing tree were as ecosystem _neighbours_ in a concepts essay. A user
+> reading the manual cover to cover could not have learned that `l4 docassemble` exists.
+>
+> The trap is that the work felt heavily documented, because it was — in `specs/`, which had grown
+> past a hundred files, none of them addressed to a user. Volume of developer-facing writing is
+> what made the user-facing hole invisible.

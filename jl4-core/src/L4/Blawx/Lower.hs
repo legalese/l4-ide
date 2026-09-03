@@ -17,7 +17,8 @@
 -- * skolemisation of query subjects (one constant per @(rqId, rvId)@);
 -- * Blawx-specific rejections, each a named diagnostic: relationship arity
 --   above 10, 'RUnstratified', 'RMod', non-integral literals while the R7
---   measurement gate holds.
+--   measurement gate holds, and equality\/disequality whose operand sort
+--   contains a declared record ('recordIdentity', §11 W1).
 --
 -- == Decisions made here (P1 stage B), so nobody re-derives them
 --
@@ -28,7 +29,11 @@
 -- other equality becomes unification @X = Y@ (@REq@) or
 -- @blawx_diseq(X,Y)@ (@RNeq@). @=:=@-style arithmetic equality on an atom
 -- would raise rather than fail, which is why the split is by operand sort
--- and not by operator.
+-- and not by operator. __An operand whose sort contains a declared record is
+-- refused__ rather than dispatched at all ('recordIdentity', spec §11 W1): the
+-- two languages disagree on what equality of a record /means/, so any answer
+-- would be a guess. An @ASSUME@d abstract category is /not/ a declared record
+-- for this purpose and still unifies. See that function's haddock.
 --
 -- __The boolean-projection peephole__: @'RProj' a f V@ over a
 -- 'RSBool'-sorted field followed immediately by @'RUnify' V ('RTBool' b)@
@@ -63,20 +68,32 @@
 -- order — the generator's rules always establish the subject's category
 -- first, and the accepted exemplar does the same.
 --
--- __@#pred@ NLG sourcing — deviation from R10's letter, reported as a
--- finding__: 'rpNlg'\/'rfNlg' are linearised sentences whose parameter slots
--- are plain words ("the loyalty bonus earned by m" — the @%m%@ marker does
--- not survive 'L4.Relational.Lower''s linearisation), so they cannot be
--- decomposed into the prefix\/infix\/postfix slot structure the block model
--- /stores/ — and an undecomposable sentence would break the R12 fixpoint
--- and the P5 lift. Until slot-structured NLG rides the IR, every
--- declaration's slots are synthesised from the mangled atom: category
--- @"is a ⟨pretty⟩"@ (article by initial vowel), boolean attribute postfix
--- @⟨pretty⟩@, value attribute infix @"has ⟨pretty⟩ of"@, relationship
--- prefixes @""@\/@"and"@ with postfix @"are related as ⟨pretty⟩"@ — all
--- guaranteed non-empty in interior positions (empty middles would emit the
--- generator's preserved double spaces) and quote-free (the @*_nlg@ facts
--- carry slot text unescaped).
+-- __@#pred@ NLG sourcing, R10__ (rewritten 2026-09-02, BLAWX-EXPORT-SPEC §11
+-- W4). An @\@nlg@ on a decision or a record field now /is/ the declaration's
+-- NLG: 'nlgChunks' cuts the linearised sentence at its slots and stores the
+-- literal chunks in the block's prefix\/infix\/postfix fields, which is the
+-- only shape Blawx has — it stores slot text around fixed placeholders, never
+-- a sentence. Both slot spellings are accepted ('NlgSlot'), and a sentence
+-- that cannot be cut at exactly the block's arity is refused by name rather
+-- than silently half-used.
+--
+-- __This paragraph used to say it was impossible__, on the ground that
+-- @%parameter%@ markers did not survive @L4.Relational.Lower.linearNlg@. They
+-- did not; they do now — restoring the delimiters there (one line) was the
+-- whole fix, and the field doc in "L4.Relational.IR" had promised them all
+-- along.
+--
+-- Categories keep the synthesised form unconditionally, because the middle-end
+-- carries no @\@nlg@ for a @DECLARE@\'s /own/ name (only for its fields), and
+-- because the synthesis already matches Jason Morris\'s hand NLG on every
+-- category of both his running examples. What is synthesised, when no
+-- @\@nlg@ is written: category @"is a ⟨pretty⟩"@ (article by initial vowel),
+-- boolean attribute postfix @⟨pretty⟩@, value attribute infix by
+-- 'defaultInfix', relationship prefixes @""@\/@"and"@ with postfix
+-- @"are related as ⟨pretty⟩"@ — all guaranteed non-empty in interior
+-- positions (empty middles would emit the generator\'s preserved double
+-- spaces) and quote-free (the @*_nlg@ facts carry slot text unescaped); the
+-- same two guarantees are enforced on an authored sentence by 'nlgChunks'.
 --
 -- __Mangling__ ('blawxAtom'): strip backticks, split @camelCase@ at a
 -- lower\/digit→upper boundary, map every non-ASCII-alphanumeric to a
@@ -149,7 +166,26 @@
 --
 -- __A section's @rule_text@ falls back through the citation__: @\@desc@, then
 -- @\@ref@, then the @\"Definition of x.\"@ stub (see 'lowerBlawx'). @\@nlg@
--- remains deliberately unconsumed here, for the reason recorded above.
+-- is not one of the fallbacks: it is the declaration's NLG (above), a
+-- different artifact with a different consumer.
+--
+-- __The author pins the CLEAN section number by writing it__ (spec §11 W3, 2026-09-02):
+-- if that chosen text opens with a CLEAN section index (decimal digits, a
+-- period, then end-of-text or a space) the number is the section's, and the
+-- numeral is consumed rather than repeated ('sectionNumbers'); failing that, a
+-- citation that /ends/ in @\", s 4\"@ pins the same way ('citedSection', W3's
+-- second spelling). Decisions that pin nothing keep the old behaviour exactly:
+-- they take the lowest numbers no pin claims, in export order, so a module with
+-- no pins still numbers 1..n.
+--
+-- __No emitted section text begins with a digit__ ('sectionTexts', 2026-09-02).
+-- The @rule_text@ line is @\"\<n\>. \<text\>\"@ and clean-law's @insert_index@ is
+-- @Suppress(DOT) + number@, so /our/ period plus a leading digit in the text is
+-- read as one index and the whole document's eIds shift off the workspace names
+-- — an orphaned canvas, invisible in the golden bytes. A text that pins nothing
+-- and opens on a digit is therefore quoted; a text that pinned and whose
+-- remainder still opens on an index is a sub-provision W3(b) leaves open, and is
+-- refused by name.
 module L4.Blawx.Lower
   ( lowerBlawx
   ) where
@@ -158,7 +194,8 @@ import Base
 import Control.Applicative ((<|>))
 import qualified Base.Map as Map
 import qualified Base.Text as Text
-import Data.Char (chr, isAsciiLower, isAsciiUpper, isDigit, ord, toLower, toUpper)
+import Data.Char
+  (chr, isAlpha, isAlphaNum, isAsciiLower, isAsciiUpper, isDigit, isSpace, ord, toLower, toUpper)
 import qualified Data.Set as Set
 
 import L4.Blawx.IR
@@ -195,10 +232,24 @@ lowerBlawx prog0 = do
   when (null exported) $
     Left [ blawxErr "" Nothing LENoExport
              "no @export decision reached the Blawx classifier" ]
-  let secOf = sectionAssignment prog exported
-      nSecs = length exported
+  -- R4 / §11 W3: choose each exported decision's section TEXT first (@desc,
+  -- then @ref, then the stub), because the section NUMBER is read off the front
+  -- of that same text. 'squash' runs before the pin recogniser so a citation
+  -- that opens on its own line still presents its numeral first.
+  let secTexts = [ (p, squash (fromMaybe (stubSection p) (p.rpDesc <|> p.rpRef)))
+                 | p <- exported
+                 ]
+      numbered = sectionNumbers secTexts
+      secOf    = sectionAssignment prog [ (a.saPred, a.saNumber) | a <- numbered ]
+  -- one BSection per DISTINCT number, ascending, its text the remainders of the
+  -- decisions that pinned it joined in export order (see 'sectionNumbers'), and
+  -- guarded so it cannot extend the index we write in front of it
+  -- ('sectionTexts'). A module with no pins yields 1..n in export order, which
+  -- is what it yielded before pinning existed.
+  secList <- sectionTexts numbered
+  let firstSec = case secList of (n, _) : _ -> n; [] -> 1
   declBlocks <- declarations env prog
-  ruleBySec  <- ruleBlocks env prog secOf
+  ruleBySec  <- ruleBlocks env prog secOf firstSec
   qtests     <- collectE [ convertQuery env q | q <- prog.rpgQueries ]
   interview  <- interviewTest env prog exported
   let tests = qtests <> maybeToList interview
@@ -211,11 +262,11 @@ lowerBlawx prog0 = do
                | not (null rootStacks) ]
       secWs =
         [ MkBWorkspace
-            { bwName   = bSec i
-            , bwStacks = [ [b] | b <- Map.findWithDefault [] i ruleBySec ]
+            { bwName   = bSec n
+            , bwStacks = [ [b] | b <- Map.findWithDefault [] n ruleBySec ]
             , bwComment = Nothing
             }
-        | i <- [1 .. nSecs]
+        | (n, _) <- secList
         ]
       -- CLEAN's title grammar (clean-law 0.0.4, the version Blawx pins)
       -- requires the first word to start with an uppercase character; a
@@ -233,7 +284,7 @@ lowerBlawx prog0 = do
         { brTitle    = title
         , brSections =
             [ MkBSection
-                { bsNumber = i
+                { bsNumber = n
                 -- @\@desc@ first, then the @\@ref@ citation, then a stub. The
                 -- citation is a worse section text than prose and a much better
                 -- one than "Definition of x." — a corpus annotated for
@@ -251,9 +302,13 @@ lowerBlawx prog0 = do
                 -- section 1 contained "hearing—" produced an AKN with ONLY
                 -- sec_1, breaking every later citation link (/rule/sec_N/
                 -- 500s). Same family as 'capitalizeFirst''s title guard.
-                , bsText   = squash (fromMaybe (stubSection p) (p.rpDesc <|> p.rpRef))
+                --
+                -- The text arrives already squashed and already stripped of the
+                -- CLEAN index that pinned 'bsNumber', so the numeral clean-law
+                -- re-emits as the section's @\<num\>@ is written exactly once.
+                , bsText   = txt
                 }
-            | (i, p) <- zip [1 ..] exported
+            | (n, txt) <- secList
             ]
         }
     , bdWorkspaces = rootWs <> secWs
@@ -264,8 +319,68 @@ lowerBlawx prog0 = do
     }
  where
   stubSection p = "Definition of " <> p.rpName.rnBase <> "."
-  squash =
-    Text.unwords . Text.words . Text.replace "\x2014" "-" . Text.replace "\x2013" "-"
+  squash = Text.unwords . Text.words . Text.concatMap asciiFold
+
+-- | Fold into clean-law's character set the punctuation legislation actually
+-- contains, and leave everything else alone for 'sectionTexts' to refuse by
+-- name. Two separate measurements live in this one table.
+--
+-- CLEAN gives an EM DASH structural meaning in section bodies (a legislative
+-- sub-paragraph introduction), so a mid-text em dash silently swallows every
+-- following section into this one — measured 2026-08-19 against the pinned
+-- clean-law: a 14-section rule_text whose section 1 contained @hearing—@
+-- produced an AKN with ONLY @sec_1@.
+--
+-- And clean-law's @legal_text@ is built from pyparsing's @printables@, which is
+-- __ASCII-only__, so /any/ character above U+007F truncates the parse at that
+-- point and orphans every later canvas — measured 2026-09-02 on a two-section
+-- module, one non-ASCII character at a time: U+00A3, U+2019, U+00A7 and U+201C
+-- each left clean-law yielding @['sec_1_section']@ against workspaces
+-- @['sec_1_section', 'sec_2_section']@. That is the same defect the em-dash
+-- fold exists for, reached by a third road, and it is why the residue is a
+-- named refusal rather than a hope.
+asciiFold :: Char -> Text
+asciiFold = \case
+  '\x2013' -> "-"      -- en dash
+  '\x2014' -> "-"      -- em dash
+  '\x2010' -> "-"      -- hyphen
+  '\x2011' -> "-"      -- non-breaking hyphen
+  '\x2018' -> "'"      -- left single quote
+  '\x2019' -> "'"      -- right single quote (the apostrophe legislation.gov.uk serves)
+  '\x201A' -> "'"
+  '\x201B' -> "'"
+  '\x2032' -> "'"      -- prime
+  '\x201C' -> "\""     -- left double quote
+  '\x201D' -> "\""     -- right double quote
+  '\x201E' -> "\""
+  '\x2026' -> "..."    -- ellipsis
+  '\x00A0' -> " "      -- non-breaking space
+  '\x2007' -> " "
+  '\x2009' -> " "
+  '\x202F' -> " "
+  '\x00AD' -> ""       -- soft hyphen
+  '\x200B' -> ""       -- zero-width space
+  '\xFEFF' -> ""       -- byte-order mark
+  '\x00A7' -> "s."     -- section sign
+  c -> Text.singleton c
+
+-- | Is this character one clean-law's @legal_text@ can carry? pyparsing's
+-- @printables@ is @string.printable@ minus whitespace, restricted to ASCII; the
+-- text has already been through @Text.words@, so space is the only whitespace
+-- left.
+cleanPrintable :: Char -> Bool
+cleanPrintable c = c == ' ' || (c >= '!' && c <= '~')
+
+-- | @U+00A3@ — for a diagnostic that has to name a character the reader cannot
+-- see in their own terminal.
+codepoint :: Char -> Text
+codepoint c = "U+" <> Text.replicate (max 0 (4 - Text.length digits)) "0" <> digits
+ where
+  digits = go (ord c) ""
+  go n acc
+    | n < 16 = Text.singleton (hexDigit n) <> acc
+    | otherwise = go (n `div` 16) (Text.singleton (hexDigit (n `mod` 16)) <> acc)
+  hexDigit d = if d < 10 then chr (ord '0' + d) else chr (ord 'A' + d - 10)
 
 -- | Blawx v1 rejects a non-stratified program with a named diagnostic: its
 -- L4-oracle determinism obligation does not tolerate multiple stable models,
@@ -302,6 +417,13 @@ data Env = MkEnv
   , envPredResult :: !(Map Unique (Maybe RSort))
   , envFieldSort :: !(Map Unique RSort)
   , envFieldCat  :: !(Map Unique RName)   -- ^ field → owning record
+  , envDeclRecords :: !(Set Unique)
+    -- ^ the @DECLARE … HAS@ record names, and only those. 'RSRecord' also
+    -- carries an @ASSUME T IS A TYPE@ ("L4.Relational.IR": one constructor for
+    -- both, because every declaration-side use wants \"a category named /n/\"),
+    -- so a consumer that needs to tell a record from an abstract category looks
+    -- the name up here — which is what 'recordInSort' does, and the reason
+    -- 'recordIdentity' refuses the first and admits the second.
   }
 
 buildEnv :: RelProgram -> Either [LowerError] Env
@@ -317,6 +439,7 @@ buildEnv prog = do
         [ (f.rfName.rnUnique, f.rfSort) | r <- prog.rpgRecords, f <- r.rrFields ]
     , envFieldCat  = Map.fromList
         [ (f.rfName.rnUnique, r.rrName) | r <- prog.rpgRecords, f <- r.rrFields ]
+    , envDeclRecords = Set.fromList [ r.rrName.rnUnique | r <- prog.rpgRecords ]
     }
  where
   entities =
@@ -608,21 +731,46 @@ data PredClass
   | PCRelationship ![BValueType]
   | PCUndeclared               -- ^ arity ≤ 2, not attribute-shaped: rules only
 
+-- | __A @STRING@ sort is refused wherever it occurs in a lowered predicate's
+-- signature — parameter or result — and that includes the rules-only band.__
+-- (The third position, a record FIELD, reaches 'blawxValueType' from
+-- 'fieldAttribute' instead and was never at risk.)
+--
+-- The obvious place to put the check is 'valueType', and that is where it
+-- lives; but 'valueType' is only reached from the two arms that build a
+-- /declaration block/ (the attribute arm and the arity-3-and-up relationship
+-- arm). A predicate of total arity ≤ 2 that is not attribute-shaped falls
+-- through to 'PCUndeclared' and gets no declaration block at all, so before
+-- 2026-09-02 a two-place derived predicate with a @STRING@ parameter emitted
+-- cleanly — measured, exit 0, @S = zebra.@ in the s(CASP) — while the
+-- three-place spelling of the same predicate was refused. The fixture for that
+-- hole is @jl4/examples/blawx/not-ok/string-param.l4@.
+--
+-- This pre-pass closes it by running the sorts that are @RSString@ through
+-- 'valueType' first, so the refusal is the same named diagnostic
+-- ("STRING-sorted field or argument (Blawx)") in all three positions. When
+-- there is no @STRING@ in the signature the list is empty and @collectE@ is
+-- @Right []@, so nothing else changes.
 classifyPred :: Env -> RPred -> Either [LowerError] PredClass
-classifyPred env p = case (p.rpParams, p.rpResult) of
-  ([s], Nothing) | Just cat <- categoryOf s -> Right (PCAttrBool cat)
-  ([s], Just res) | Just cat <- categoryOf s ->
-    PCAttrValue cat <$> valueType env p res
-  (params, res)
-    | arity > 10 ->
-        Left [ blawxErr p.rpName.rnBase p.rpProv.rpvRange LEArity
-                 ( "`" <> p.rpName.rnBase <> "` needs a Blawx relationship of arity "
-                     <> Text.textShow arity <> ", above the block ceiling of 10" ) ]
-    | arity >= 3 ->
-        PCRelationship <$> collectE (map (valueType env p) (params <> maybeToList res))
-    | otherwise -> Right PCUndeclared
-   where
-    arity = length params + maybe 0 (const 1) res
+classifyPred env p = refuseStrings *> classify
+ where
+  refuseStrings = void $ collectE
+    [ valueType env p s | s@RSString <- p.rpParams <> maybeToList p.rpResult ]
+
+  classify = case (p.rpParams, p.rpResult) of
+    ([s], Nothing) | Just cat <- categoryOf s -> Right (PCAttrBool cat)
+    ([s], Just res) | Just cat <- categoryOf s ->
+      PCAttrValue cat <$> valueType env p res
+    (params, res)
+      | arity > 10 ->
+          Left [ blawxErr p.rpName.rnBase p.rpProv.rpvRange LEArity
+                   ( "`" <> p.rpName.rnBase <> "` needs a Blawx relationship of arity "
+                       <> Text.textShow arity <> ", above the block ceiling of 10" ) ]
+      | arity >= 3 ->
+          PCRelationship <$> collectE (map (valueType env p) (params <> maybeToList res))
+      | otherwise -> Right PCUndeclared
+     where
+      arity = length params + maybe 0 (const 1) res
 
 -- | The category a sort names, if it names one. Blawx's ontology is
 -- category-centric: a declaration block hangs off a subject, and a sort that is
@@ -639,9 +787,9 @@ categoryOf = \case
 valueType :: Env -> RPred -> RSort -> Either [LowerError] BValueType
 valueType env p = blawxValueType env p.rpName.rnBase p.rpProv.rpvRange
 
--- | Sort → Blawx value type, with the two named rejections: dates (v1, by
--- name — see the module header) and everything else the ontology cannot
--- declare.
+-- | Sort → Blawx value type, with the three named rejections: strings (no
+-- attribute value type exists — see the 'RSString' arm), dates (v1, by name —
+-- see the module header) and everything else the ontology cannot declare.
 blawxValueType :: Env -> Text -> Maybe SrcRange -> RSort -> Either [LowerError] BValueType
 blawxValueType env who rng = \case
   RSBool     -> Right BVBoolean
@@ -649,6 +797,37 @@ blawxValueType env who rng = \case
   RSEnum e   -> BVCategory <$> atomOf env e
   RSRecord r -> BVCategory <$> atomOf env r
   RSList _   -> Right BVList
+  -- __Blawx v1.6 has no string attribute value type__, and this is a
+  -- measurement, not an inference: the declaration block's type dropdown is
+  -- literally @[["true / false","boolean"], ["number","number"],
+  -- ["date","date"], ["time","time"], ["datetime","datetime"],
+  -- ["duration","duration"], ['list','list']]@
+  -- (@blawx-blocks.js:5376@), and the list it is re-populated from at runtime
+  -- is that same set of datatypes concatenated with the declared categories
+  -- (@blawx-blocks.js:5577-5583@). @scasp_generator.js@ has no per-type branch
+  -- to add one either: its attribute arm splits only on @boolean@ vs
+  -- not-boolean and otherwise passes the dropdown value straight through into
+  -- @blawx_attribute(Cat,Name,Type)@ (@scasp_generator.js:927-1010@).
+  --
+  -- So the refusal is total for a string-sorted FIELD, parameter or result,
+  -- and the message says what to write instead. It is total only because
+  -- 'classifyPred' runs a @STRING@ pre-pass through here before classifying:
+  -- reaching this arm from the declaration-building arms alone would leave the
+  -- rules-only band ('PCUndeclared') open, which is exactly the hole
+  -- @not-ok/string-param.l4@ pins. String /literals/ in a rule body are
+  -- unaffected — they mangle to atoms through 'stringAtomTable' and are usable
+  -- for equality (BLAWX-EXPORT-SPEC §4.7).
+  RSString ->
+    Left [ blawxErr who rng
+             (LEUnsupported "STRING-sorted field or argument (Blawx)")
+             ( "`" <> who <> "` has a STRING-sorted field, parameter or \
+               \result, and Blawx's ontology has no string attribute type — a \
+               \declaration block offers boolean, number, date, time, \
+               \datetime, duration, list and the declared \
+               \categories, and nothing else. Use an enum \
+               \(DECLARE ... IS ONE OF ...) for a fixed vocabulary, or a \
+               \category for identity. String literals inside a rule body are \
+               \fine; it is the typed field that has nowhere to go" ) ]
   RSOpaque t | t `elem` (["DATE", "TIME", "DATETIME", "DURATION"] :: [Text]) ->
     Left [ blawxErr who rng
              (LEUnsupported "dates (Blawx v1)")
@@ -753,40 +932,65 @@ declarations env prog = do
       , bcProv    = Just (rn.rnUnique, prov.rpvRange)
       }
   fieldAttribute r f = do
-    cat <- atomOf env r.rrName
-    n   <- atomOf env f.rfName
-    vt  <- valueTypeField f
-    pure (attributeBlock cat n vt (f.rfName.rnUnique, Nothing))
+    cat   <- atomOf env r.rrName
+    n     <- atomOf env f.rfName
+    vt    <- valueTypeField f
+    slots <- attrNlg f.rfName.rnBase Nothing n vt f.rfNlg
+    pure (attributeBlock cat n vt slots (f.rfName.rnUnique, Nothing))
   -- fields have no RPred to blame, so they name themselves
   valueTypeField f = blawxValueType env f.rfName.rnBase Nothing f.rfSort
   predAttribute p cat vt = do
     catAtom <- atomOf env cat
     n       <- atomOf env p.rpName
-    pure (attributeBlock catAtom n vt (p.rpName.rnUnique, p.rpProv.rpvRange))
-  attributeBlock cat n vt prov =
+    slots   <- attrNlg p.rpName.rnBase p.rpProv.rpvRange n vt p.rpNlg
+    pure (attributeBlock catAtom n vt slots (p.rpName.rnUnique, p.rpProv.rpvRange))
+  -- An attribute's three NLG slots: the author's @\@nlg@ decomposed, else
+  -- synthesised from the mangled atom ('defaultInfix' for the value arm).
+  attrNlg who rng n vt = \case
+    Nothing -> Right defaults
+    Just sentence -> do
+      cs <- nlgChunks who rng (case vt of BVBoolean -> ["X"]; _ -> ["X", "Y"]) sentence
+      pure $ case cs of
+        [pre, post]      -> (pre, "", post)
+        [pre, inf, post] -> (pre, inf, post)
+        -- unreachable: 'nlgChunks' has already fixed the length at 2 or 3.
+        _                -> defaults
+   where
+    defaults = case vt of
+      BVBoolean -> ("", "", prettyAtom (bNameText n))
+      _         -> ("", defaultInfix (bNameText n), "")
+  attributeBlock cat n vt (pre, inf, post) prov =
     BDeclareAttribute MkBAttributeDecl
       { baCategory = cat
       , baName     = n
       , baType     = vt
       , baOrder    = BOrderOV
-      , baPrefix   = ""
-      , baInfix    = case vt of
-          BVBoolean -> ""   -- rendered @not_applicable@ by the emitter
-          _         -> "has " <> prettyAtom (bNameText n) <> " of"
-      , baPostfix  = case vt of
-          BVBoolean -> prettyAtom (bNameText n)
-          _         -> ""
+      , baPrefix   = pre
+      , baInfix    = inf   -- rendered @not_applicable@ by the emitter when boolean
+      , baPostfix  = post
       , baProv     = Just prov
       }
   relationship p vts = do
-    n <- atomOf env p.rpName
+    n            <- atomOf env p.rpName
+    (pres, post) <- case p.rpNlg of
+      Nothing -> Right (defaultPrefixes, defaultPostfix n)
+      Just sentence -> do
+        cs <- nlgChunks p.rpName.rnBase p.rpProv.rpvRange
+                (take (length vts) relationshipVars) sentence
+        pure $ case splitAt (length cs - 1) cs of
+          (initCs, [lastC]) -> (initCs, lastC)
+          -- unreachable: 'nlgChunks' fixed the length at @length vts + 1@ ≥ 2.
+          _                 -> (defaultPrefixes, defaultPostfix n)
     pure $ BDeclareRelationship MkBRelationshipDecl
       { brName     = n
       , brTypes    = vts
-      , brPrefixes = "" : replicate (length vts - 1) "and"
-      , brPostfix  = "are related as " <> prettyAtom (bNameText n)
+      , brPrefixes = pres
+      , brPostfix  = post
       , brProv     = Just (p.rpName.rnUnique, p.rpProv.rpvRange)
       }
+   where
+    defaultPrefixes = "" : replicate (length vts - 1) "and"
+    defaultPostfix nm = "are related as " <> prettyAtom (bNameText nm)
 
 -- | Whether an 'RInput' predicate came from a stored record field (as opposed
 -- to a top-level @ASSUME@). The join is the 'Unique': an input predicate built
@@ -798,6 +1002,169 @@ isFieldInput env p = p.rpKind == RInput && Map.member p.rpName.rnUnique env.envF
 prettyAtom :: Text -> Text
 prettyAtom = Text.replace "_" " "
 
+-- | The default infix of a value-typed attribute's NLG: @has \<name\> of@,
+-- unconditionally.
+--
+-- __There is no verb heuristic (BLAWX-EXPORT-SPEC §11 W4, 2026-09-02).__ One
+-- was built earlier that day: an object-valued attribute whose mangled name was
+-- a single @s@-final word became the infix itself, so @beats@ declared
+-- @\@(X) beats \@(Y)@ — byte-for-byte Jason Morris's own
+-- @blawx_attribute_nlg(beats,ov,\"\",\"beats\",\"\")@. It was removed the same
+-- day because it over-fires on the regular plural noun, which is the shape
+-- legal drafting supplies most: measured on a nine-field scratch module, it
+-- fired on eight of nine fields — @heirs@, @premises@, @news@, @shares@,
+-- @proceeds@, @damages@, @goods@, @securities@ all became infixes
+-- (@\@(X) heirs \@(Y)@), and only @owner@ kept the default. The @-ss@\/@-us@
+-- \/@-is@\/@-as@\/@-os@ exclusion list did not touch any of them.
+--
+-- The override is @\@nlg@ ('nlgChunks'), which is what @rps.l4@ now uses for
+-- @throws@ and @beats@ — an author who wants the verb reading writes it, and
+-- nothing has to guess.
+defaultInfix :: Text -> Text
+defaultInfix atom = "has " <> prettyAtom atom <> " of"
+
+-- | The relationship block's canonical NLG variables (@\@(A)@…@\@(J)@),
+-- matching @L4.Blawx.Emit.relationshipVariant@\'s argument letters.
+relationshipVars :: [Text]
+relationshipVars = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
+
+-- | One slot of an @\@nlg@ sentence, and which of the two spellings wrote it.
+--
+-- __Why two spellings.__ A slot the author /can/ name is written as an
+-- ordinary L4 parameter reference and reaches here as @%name%@ (see
+-- @L4.Relational.Lower.linearNlg@, whose delimiters exist for this). A slot
+-- with no L4 binder to reference cannot be: a record field has no binders at
+-- all for either its subject or its value, and an attribute-shaped @DECIDE@\'s
+-- value is its @GIVETH@, which L4 grammar leaves unnamed. Those are written in
+-- Blawx\'s own placeholder spelling, @\@(X)@ \/ @\@(Y)@ for a category or
+-- attribute and @\@(A)@… for a relationship — the spelling the target already
+-- prints in every @#pred@ line, so an author reading the emitted s(CASP) sees
+-- the same characters they wrote.
+--
+-- The flag is what lets 'nlgChunks' check the @\@(V)@ spelling against the
+-- block\'s canonical variable order (catching a sentence that puts the value
+-- before the subject) while leaving a @%name%@ slot unchecked, since its name
+-- is the author\'s parameter and carries no positional claim.
+data NlgSlot = MkNlgSlot
+  { nsName       :: !Text
+  , nsBlawxStyle :: !Bool
+  }
+
+-- | Split a linearised @\@nlg@ sentence into its literal chunks and its slots.
+-- @n@ slots yield @n+1@ chunks, some possibly empty. An unterminated @\@(@ or
+-- an odd @%@ is not a slot; it stays literal text and is caught downstream by
+-- the arity check in 'nlgChunks', which is the loud place to report it.
+--
+-- __A @%@ opens a slot only when it delimits a name__ (BLAWX-EXPORT-SPEC §11
+-- W4, 2026-09-02). @L4.Relational.Lower.linearNlg@ writes @%@ around one thing
+-- only — a parameter\'s raw name — so an interior that is not name-shaped
+-- ('slotNameShaped') is prose, and the @%@ stays a literal percent sign.
+-- Without that test a percentage in prose paired with the next percentage into
+-- a phantom slot, and when the phantoms happened to match the block\'s arity
+-- the sentence was silently mis-cut: @\@nlg 5% a 10% b 15% c 20%@ on a
+-- two-argument attribute emitted
+-- @blawx_attribute_nlg(tier,ov,\"5\",\"b 15\",\"\")@ and exited 0 (measured
+-- 2026-09-02). It is now refused by the arity check — 0 slots, block has 2 —
+-- while @\@nlg %p% pays 5% of @(Y)@ keeps its two real slots and its literal
+-- percent sign.
+scanNlg :: Text -> ([Text], [NlgSlot])
+scanNlg = go []
+ where
+  go acc t = case Text.uncons t of
+    Nothing -> ([lit acc], [])
+    Just ('@', rest)
+      | Just inner <- Text.stripPrefix "(" rest
+      , let (nm, rest') = Text.breakOn ")" inner
+      , not (Text.null rest') -> split acc (MkNlgSlot nm True) (Text.drop 1 rest')
+    Just ('%', rest)
+      | let (nm, rest') = Text.breakOn "%" rest
+      , not (Text.null rest')
+      , slotNameShaped nm -> split acc (MkNlgSlot nm False) (Text.drop 1 rest')
+    Just (c, rest) -> go (c : acc) rest
+  split acc sl rest = let (cs, sls) = go [] rest in (lit acc : cs, sl : sls)
+  lit = Text.pack . reverse
+
+-- | Whether the text between a pair of @%@ is shaped like the L4 name that
+-- @L4.Relational.Lower.linearNlg@ puts there: a letter or @_@ first, a letter,
+-- digit or @\'@ last, and nothing but letters, digits, @_@, @-@, @\'@ and the
+-- interior spaces of a backticked multi-word name in between. Prose fragments
+-- caught between two percentages fail it on their leading space or digit
+-- (@\" a 10\"@, @\"-60\"@), which is the point.
+slotNameShaped :: Text -> Bool
+slotNameShaped nm = case (Text.uncons nm, Text.unsnoc nm) of
+  (Just (c, _), Just (_, l)) ->
+       (isAlpha c || c == '_')
+    && (isAlphaNum l || l == '\'')
+    && Text.all nameChar nm
+  _ -> False
+ where
+  nameChar ch = isAlphaNum ch || ch `elem` ("_-' " :: String)
+
+-- | Decompose an @\@nlg@ sentence into the NLG slots a declaration block
+-- stores, or refuse with named diagnostics.
+--
+-- Blawx stores NLG as slot text around fixed argument placeholders, never as a
+-- sentence, so a sentence that cannot be cut at exactly the block\'s arity has
+-- no image at all — refusing is the only honest answer, and it is loud.
+-- Three further conditions are the emitter\'s, not Blawx\'s taste:
+--
+-- * an interior chunk may not be empty, because
+--   @L4.Blawx.Emit.attributeVariant@ joins slots with single spaces and an
+--   empty middle emits the generator\'s preserved double space, which the R12
+--   fixpoint sees as a diff;
+-- * a chunk may not contain @\"@, because the @*_nlg@ facts carry slot text
+--   unescaped inside a double-quoted Prolog string;
+-- * the @\@(V)@ spelling must use the block\'s own variables in order.
+nlgChunks
+  :: Text            -- ^ what to blame
+  -> Maybe SrcRange
+  -> [Text]          -- ^ the block\'s canonical slot variables, in order
+  -> Text            -- ^ the linearised sentence
+  -> Either [LowerError] [Text]
+nlgChunks who rng vars sentence
+  | null errs = Right chunks
+  | otherwise = Left errs
+ where
+  (rawChunks, slots) = scanNlg sentence
+  chunks   = map Text.strip rawChunks
+  interior = drop 1 (take (max 0 (length chunks - 1)) chunks)
+  err = blawxErr who rng (LEUnsupported "@nlg slot structure (Blawx)")
+  slotTxt sl = if sl.nsBlawxStyle then "@(" <> sl.nsName <> ")" else "%" <> sl.nsName <> "%"
+  wantTxt = Text.intercalate ", " [ "@(" <> v <> ")" | v <- vars ]
+  errs =
+    if length slots /= length vars
+      then
+        [ err
+            ( "`" <> who <> "`'s @nlg has " <> Text.textShow (length slots)
+                <> " slot(s), but its Blawx declaration block has "
+                <> Text.textShow (length vars)
+                <> ". Write one slot per argument, in the block's order — "
+                <> "either an L4 parameter reference (`%p%`) or, where the "
+                <> "argument has no L4 binder (a record field, or a GIVETH "
+                <> "result), Blawx's own placeholder: " <> wantTxt ) ]
+      else
+        [ err
+            ( "`" <> who <> "`'s @nlg writes " <> slotTxt sl
+                <> " where its Blawx declaration block's argument "
+                <> Text.textShow (i :: Int) <> " is @(" <> v <> ")" )
+        | (i, v, sl) <- zip3 [1 ..] vars slots
+        , sl.nsBlawxStyle
+        , sl.nsName /= v
+        ]
+          <> [ err
+                 ( "`" <> who <> "`'s @nlg leaves no words between two "
+                     <> "slots; Blawx joins its NLG slots with single "
+                     <> "spaces, so an empty interior slot emits a double "
+                     <> "space and breaks the re-save fixpoint" )
+             | any Text.null interior
+             ]
+          <> [ err
+                 ( "`" <> who <> "`'s @nlg contains a double quote, which the "
+                     <> "*_nlg ontology facts carry unescaped inside a quoted "
+                     <> "Prolog string" )
+             | any (Text.isInfixOf "\"") chunks
+             ]
+
 -- | See the title derivation in 'lowerBlawx': CLEAN requires an
 -- uppercase-initial title, or the import view rejects the whole document.
 --
@@ -808,10 +1175,25 @@ prettyAtom = Text.replace "_" " "
 -- parse, and body text tolerates em dashes fine. So the TITLE channel maps
 -- em\/en dashes to an ASCII hyphen; the L4 source keeps its typography, and
 -- @\@desc@\/section prose is untouched.
+--
+-- __A title that cannot be uppercased at all gets a herald__ (2026-09-02).
+-- CLEAN's grammar is @Word(string.ascii_uppercase, printables)@: the first
+-- character must be @A@-@Z@, and @toUpper@ cannot make @\'1\'@ one. A module
+-- headed @\xa7 \`1988 Housing Act\`@ — or, via the filename fallback, a file
+-- called @4act.l4@ — therefore raised
+-- @ParseException: Expected W:(A-Z, !-~), found \'4act\' (at char 0)@ in
+-- @generate_akn@ and produced a document with NO sections at all, which is
+-- strictly worse than the orphaned canvases 'sectionTexts' guards against
+-- (measured 2026-09-02 by handing the emitted @rule_text@ to clean-law 0.0.4).
+-- So a title whose first character is not an ASCII letter is prefixed with
+-- @\"The \"@, on the same principle as the re-casing above: an unimportable
+-- title is worse than a heralded one.
 capitalizeFirst :: Text -> Text
 capitalizeFirst t = case Text.uncons (dashSafe t) of
-  Just (c, rest) -> Text.cons (toUpper c) rest
-  Nothing        -> t
+  Just (c, rest)
+    | isAsciiUpper c || isAsciiLower c -> Text.cons (toUpper c) rest
+    | otherwise                        -> "The " <> Text.cons c rest
+  Nothing -> t
  where
   dashSafe = Text.replace "\x2014" "-" . Text.replace "\x2013" "-"
 
@@ -838,18 +1220,262 @@ enumConstructorFacts env prog =
 -- Sections (R4)
 -- ---------------------------------------------------------------------------
 
--- | Which numbered section each rule-bearing predicate belongs to: exported
--- decisions get sections 1..n in 'rpgPreds' order; a helper (auxiliary or
--- non-exported computed) is filed with the first exported decision that
--- transitively depends on it. benefit.l4's @bonus@ lands in @sec_2@ this way.
-sectionAssignment :: RelProgram -> [RPred] -> Map Unique Int
-sectionAssignment prog exported =
-  foldl' claim base (zip [1 ..] exported)
+-- | The CLEAN section index an author has written at the head of a section's
+-- text, and what is left of the text once it is taken off.
+--
+-- The shape is clean-law 0.0.4's @section_index@ read backwards
+-- (@clean\/clean.py:53@ __[E]__, downloaded from PyPI and read 2026-09-02):
+-- @number(\"section number\") + Suppress(DOT)@ at the head of a line, whose
+-- @generate_section@ then builds the eId as @\"sec_\" + index@ — the /literal/
+-- numeral, never the section's position in the document. So a @rule_text@ line
+-- reading @\"4. The winner …\"@ yields eId @sec_4@ and workspace
+-- @sec_4_section@, which is what makes an author-written number and Blawx's
+-- @according_to@ attribution agree.
+--
+-- Deliberately narrow, because every character of it is load-bearing for a
+-- corpus that does /not/ want to pin:
+--
+-- * the digits must be followed by @.@ and then end-of-text or a space, so
+--   @\"1(a): facial hair …\"@ (no dot), @\"43(1)(a): the conduct …\"@ and
+--   @\"4, the other seat.\"@ (comma) all decline to pin;
+-- * @0@ declines, since clean-law would emit @sec_0@ and no Act has one;
+-- * clean-law's optional @insert index@ (@\"2.1.\"@ → @sec_2_1@) is NOT
+--   recognised, because 'BSection' numbers an 'Int'; such a text simply does
+--   not pin, and R4's flat numbering applies (spec §11 W3(b) leaves
+--   sub-provision eIds open).
+--
+-- __Declining to pin is not by itself safe__, and saying so was a defect in the
+-- first cut of this ruling: every one of those spellings still opens on a
+-- /digit/, and the flat number is written as @\"1. \"@ in front of it, so
+-- clean-law reads our period plus that digit as one @insert_index@ and the
+-- document's eIds part company with its workspace names. 'sectionTexts' is what
+-- closes that; this recogniser only decides whose the number is.
+--
+-- Measured 2026-09-02 over the twelve emitting seeds under
+-- @jl4\/examples\/blawx@: only @rps.l4@ and @beard.l4@ pin, and every other
+-- golden regenerates byte-identically.
+pinnedSection :: Text -> Maybe (Int, Text)
+pinnedSection t0
+  | Text.null digits            = Nothing   -- no leading numeral at all
+  | Text.length digits > 6      = Nothing   -- not a section number; guards the fold
+  | n < 1                       = Nothing   -- clean-law would emit sec_0
+  | Just rest <- afterDot
+  , Text.null rest || isSpace (Text.head rest) = Just (n, Text.stripStart rest)
+  | otherwise                   = Nothing
  where
-  base = Map.fromList [ (p.rpName.rnUnique, i) | (i, p) <- zip [1 ..] exported ]
+  (digits, rest0) = Text.span isDigit (Text.stripStart t0)
+  afterDot = Text.stripPrefix "." rest0
+  n = digitsToInt digits
+
+-- | The CLEAN section number a /citation/ names at its end: spec §11 W3's
+-- second spelling, @\@ref Mortality Act 2026, s 4@.
+--
+-- Narrow on purpose, and narrowed by the corpus rather than by taste. The two
+-- @\@ref@ spellings the seeds actually use must not pin
+-- (@grep '\@ref' jl4\/examples\/blawx\/*.l4@, 2026-09-02):
+--
+-- * @\@ref https:\/\/www.legislation.gov.uk\/ukpga\/2014\/12\/section\/43@ ends in
+--   digits but the herald before them is @section\/@, not @, section@ — declines;
+-- * @\@ref Anti-social Behaviour, Crime and Policing Act 2014, s.43(1)(b)@ ends
+--   in @(b)@, so there are no trailing digits at all — declines, which is the
+--   answer we want: @43(1)(b)@ is a sub-provision, and pinning it to @sec_43@
+--   would silently anchor the rule one level up from where the author cited it.
+--
+-- So: a comma, then @s@ \/ @s.@ \/ @sec@ \/ @section@ (any case), then bare
+-- digits, then end of text. Unlike 'pinnedSection' the numeral is __not__
+-- consumed — it is part of the citation, and a citation that lost its section
+-- number would stop being one. It is safe to leave in place because it is at the
+-- /end/ of the text, where clean-law's index grammar cannot reach it.
+citedSection :: Text -> Maybe Int
+citedSection t0
+  | Text.null digits       = Nothing
+  | Text.length digits > 6 = Nothing
+  | n < 1                  = Nothing
+  | any (`Text.isSuffixOf` herald) [", s", ", s.", ", sec", ", sec.", ", section"] = Just n
+  | otherwise              = Nothing
+ where
+  t      = Text.stripEnd t0
+  digits = Text.takeWhileEnd isDigit t
+  herald = Text.toLower (Text.stripEnd (Text.dropEnd (Text.length digits) t))
+  n      = digitsToInt digits
+
+-- | @Text.foldl'@ over a digit run known to be at most six characters long, so
+-- the accumulator cannot overflow. Shared by both pin recognisers.
+digitsToInt :: Text -> Int
+digitsToInt = Text.foldl' (\acc c -> acc * 10 + (ord c - ord '0')) 0
+
+-- | One exported decision's place in the Act: its number, the text that will
+-- carry it, and whether the number came from an index at the /front/ of that
+-- text (which is the case 'sectionTexts' has to police).
+data SecAssign = MkSecAssign
+  { saPred          :: !RPred
+  , saNumber        :: !Int
+  , saText          :: !Text  -- ^ the text, with a leading pin already consumed
+  , saPinnedByIndex :: !Bool
+  }
+
+-- | The CLEAN section number of every exported decision, with its section text
+-- stripped of the index that pinned it (R4, spec §11 W3(a)).
+--
+-- A decision whose text opens with an index ('pinnedSection') is pinned to that
+-- number; failing that, one whose text ends in a section citation
+-- ('citedSection') is pinned to /that/ number; the rest take the lowest numbers
+-- no pin claims, in export order. Two decisions may pin the same number —
+-- @rps.l4@ states s.4 once per seat, and @beard.l4@ states s.1's chapeau and its
+-- two limbs — and then they share one section: one workspace, one @rule_text@
+-- entry, and an @according_to@ naming the same @sec_n_section@, which is what
+-- Jason Morris's own @beard_tax.yaml@ does with @sec_1_section@.
+--
+-- __A module that pins nothing is unchanged__: @claimed@ is empty, so the free
+-- numbers are @1, 2, 3, …@ handed out in export order, exactly as the
+-- pre-pinning code did.
+sectionNumbers :: [(RPred, Text)] -> [SecAssign]
+sectionNumbers xs = go free [ (p, t, sectionPin t) | (p, t) <- xs ]
+ where
+  claimed = Set.fromList [ pinNumber q | (_, t) <- xs, Just q <- [sectionPin t] ]
+  free = filter (`Set.notMember` claimed) [1 ..]
+  go _ [] = []
+  go ns ((p, _, Just (PinIndex n rest)) : more) =
+    MkSecAssign { saPred = p, saNumber = n, saText = rest, saPinnedByIndex = True }
+      : go ns more
+  go ns ((p, t, Just (PinCite n)) : more) =
+    MkSecAssign { saPred = p, saNumber = n, saText = t, saPinnedByIndex = False }
+      : go ns more
+  go (n : ns) ((p, t, Nothing) : more) =
+    MkSecAssign { saPred = p, saNumber = n, saText = t, saPinnedByIndex = False }
+      : go ns more
+  go [] ((p, t, Nothing) : more) =
+    MkSecAssign { saPred = p, saNumber = 1, saText = t, saPinnedByIndex = False }
+      : go [] more
+    -- unreachable: 'free' is infinite
+
+-- | Which pin a section text carries. A leading CLEAN index wins over a
+-- trailing citation, because it is the spelling the two seeds use and the only
+-- one that consumes its numeral.
+data Pin
+  = PinIndex !Int !Text  -- ^ the number, and the text with the index taken off
+  | PinCite !Int         -- ^ the number; the text keeps its citation intact
+
+pinNumber :: Pin -> Int
+pinNumber = \case
+  PinIndex n _ -> n
+  PinCite n    -> n
+
+sectionPin :: Text -> Maybe Pin
+sectionPin t =
+  uncurry PinIndex <$> pinnedSection t <|> PinCite <$> citedSection t
+
+-- | Ascending, duplicates removed. (@Base@ re-exports neither @sort@ nor
+-- @nub@; a 'Set' round-trip is both.)
+sortNub :: Ord a => [a] -> [a]
+sortNub = Set.toAscList . Set.fromList
+
+-- | The @rule_text@ body of each numbered section, ascending by number: the
+-- texts of the decisions filed under that number, joined in export order.
+--
+-- __This is where number\/eId AGREEMENT is enforced__ (spec §11 W3, 2026-09-02).
+-- @L4.Blawx.Emit.renderRuleText@ writes each section as @\"\<n\>. \<text\>\"@, and
+-- clean-law 0.0.4 parses a section index as
+-- @number + Optional(insert_index) + DOT@ with
+-- @insert_index = Suppress(DOT) + number@ (@clean\/clean.py:53@ __[E]__). Our
+-- period is therefore the @DOT@ that /starts/ an insert index, so a section text
+-- opening on a digit is absorbed into the index:
+--
+-- * @1. 0. A human is mortal.@ parses to eId @sec_1_ 0@, not @sec_1@;
+-- * @1. 2.1. a sub-provision index.@ parses to @sec_1_ 2_1@;
+-- * @1. 1(a): facial hair …@, @1. 43(1)(a): …@ and @1. 4, the other seat.@ do
+--   not parse as a section /at all/ — pyparsing's @And@ does not backtrack out
+--   of the @Optional@, so the trailing @DOT@ fails and the document has NO
+--   sections.
+--
+-- In every one of those cases the workspaces we name @sec_1_section@ belong to
+-- no section of the Act: the canvas is __orphaned__, and nothing in the golden
+-- bytes says so, because both halves are ours and each is self-consistent. So:
+--
+-- * a text that pinned its number by a __leading index__ and still opens on an
+--   index is a sub-provision, which §11 W3(b) leaves open — refused by name,
+--   never emitted;
+-- * any other text opening on a digit is prose that merely starts with a
+--   numeral, and is __quoted__ ('guardSectionText'), which both stops the parse
+--   absorbing it and tells the reader the numeral is the author's, not ours.
+--
+-- @etc\/blawx-eid-harness.py@ is the executable form of this invariant.
+sectionTexts :: [SecAssign] -> Either [LowerError] [(Int, Text)]
+sectionTexts numbered =
+  collectE [ body n | n <- sortNub [ a.saNumber | a <- numbered ] ]
+ where
+  body n
+    | a : _ <- mine
+    , any (.saPinnedByIndex) mine
+    , indexShaped joined =
+        Left [ blawxErr a.saPred.rpName.rnBase a.saPred.rpProv.rpvRange
+                 (LEUnsupported "sub-provision index (Blawx v1)")
+                 ( "section " <> Text.textShow n <> " pins its own number and its text "
+                     <> "then opens with a second index (`" <> Text.take 32 joined
+                     <> "`); clean-law would read the two as one insert index and name "
+                     <> "the canvas after that, orphaning `sec_" <> Text.textShow n
+                     <> "_section` — sub-provision anchoring is not in v1 "
+                     <> "(BLAWX-EXPORT-SPEC §11 W3(b))" ) ]
+    -- The same invariant as the index guard above, reached by a different
+    -- road: a character clean-law cannot lex ends its parse of the rule_text,
+    -- so every LATER section's canvas is orphaned. 'asciiFold' has already
+    -- folded the punctuation legislation actually contains; what is left is
+    -- refused rather than shipped, because the damage is invisible in the
+    -- emitted bytes (BLAWX-EXPORT-SPEC §8.4, §11 W3).
+    | a : _ <- mine
+    , bad : _ <- [ c | c <- Text.unpack joined, not (cleanPrintable c) ] =
+        Left [ blawxErr a.saPred.rpName.rnBase a.saPred.rpProv.rpvRange
+                 (LEUnsupported "non-ASCII section text (Blawx v1)")
+                 ( "section " <> Text.textShow n <> "'s text carries "
+                     <> codepoint bad <> " (`" <> Text.singleton bad
+                     <> "`); clean-law's `legal_text` is built from pyparsing's "
+                     <> "`printables`, which is ASCII-only, so its parse of the "
+                     <> "rule_text stops there and every later section's canvas is "
+                     <> "orphaned — invisible in the emitted bytes. Rewrite the text in "
+                     <> "ASCII, or add the character to `asciiFold` if it has a faithful "
+                     <> "ASCII reading (BLAWX-EXPORT-SPEC §8.4, §11 W3)" ) ]
+    | otherwise = Right (n, guardSectionText joined)
+   where
+    mine   = [ x | x <- numbered, x.saNumber == n ]
+    joined = Text.unwords [ x.saText | x <- mine, not (Text.null x.saText) ]
+
+-- | Does this text open with something clean-law's @section_index@ grammar would
+-- read as (the continuation of) an index? Digits, then a period. Deliberately
+-- laxer than 'pinnedSection': that recogniser decides whether we /honour/ a
+-- number, this one decides whether clean-law would /see/ one, and the second
+-- question has to be answered conservatively.
+indexShaped :: Text -> Bool
+indexShaped t = case Text.span isDigit (Text.stripStart t) of
+  (ds, r) -> not (Text.null ds) && "." `Text.isPrefixOf` r
+
+-- | Quote a section text that would otherwise extend the index written in front
+-- of it. Only a leading digit can do that (clean-law's @insert_index@ is
+-- @DOT + number@ and our separator supplies the @DOT@), so only a leading digit
+-- is guarded, and the transformation is idempotent: the guarded text opens on
+-- @\"@.
+--
+-- ASCII @\"@ specifically: it is in pyparsing's @printables@, so clean-law keeps
+-- it as ordinary section text; @L4.Blawx.Emit.yamlDoubleQuoted@ escapes it as
+-- @\\\"@ so the fixture still loads; and it is the punctuation a reader already
+-- reads as \"these are the author\'s words\", which is exactly what it means here.
+guardSectionText :: Text -> Text
+guardSectionText t
+  | Just (c, _) <- Text.uncons t, isDigit c = "\"" <> t <> "\""
+  | otherwise = t
+
+-- | Which numbered section each rule-bearing predicate belongs to: each
+-- exported decision is given its number by 'sectionNumbers'; a helper
+-- (auxiliary or non-exported computed) is filed with the first exported
+-- decision that transitively depends on it. benefit.l4's @bonus@ lands in
+-- @sec_2@ this way.
+sectionAssignment :: RelProgram -> [(RPred, Int)] -> Map Unique Int
+sectionAssignment prog exported =
+  foldl' claim base exported
+ where
+  base = Map.fromList [ (p.rpName.rnUnique, i) | (p, i) <- exported ]
   deps = Map.fromListWith (<>)
            [ (e.redFrom.rnUnique, [e.redTo.rnUnique]) | e <- prog.rpgDeps ]
-  claim m (i, p) =
+  claim m (p, i) =
     foldl' (\mm u -> Map.insertWith (\_new old -> old) u i mm) m
            (reachable [p.rpName.rnUnique] Set.empty)
   reachable [] _ = []
@@ -862,14 +1488,17 @@ sectionAssignment prog exported =
 -- ---------------------------------------------------------------------------
 
 -- | Every clause of every rule-bearing predicate, grouped by section number,
--- in 'rpgPreds' \/ 'rpClauses' order within each section.
-ruleBlocks :: Env -> RelProgram -> Map Unique Int -> Either [LowerError] (Map Int [BBlock])
-ruleBlocks env prog secOf = do
+-- in 'rpgPreds' \/ 'rpClauses' order within each section. @dflt@ is the lowest
+-- section the module actually has, for a rule-bearing predicate no export
+-- reaches; before section numbers could be pinned it was the constant @1@,
+-- which a pinned module need not own.
+ruleBlocks :: Env -> RelProgram -> Map Unique Int -> Int -> Either [LowerError] (Map Int [BBlock])
+ruleBlocks env prog secOf dflt = do
   rules <- collectE
     [ fmap (sec,) (convertClause env p (bSec sec) cl)
     | p <- prog.rpgPreds
     , not (null p.rpClauses)
-    , let sec = Map.findWithDefault 1 p.rpName.rnUnique secOf
+    , let sec = Map.findWithDefault dflt p.rpName.rnUnique secOf
     , cl <- p.rpClauses
     ]
   pure (Map.fromListWith (flip (<>)) [ (sec, [b]) | (sec, b) <- rules ])
@@ -982,16 +1611,16 @@ convertGoals env cctx = go
       x' <- convertTerm env cctx x
       y' <- convertTerm env cctx y
       let numeric = isNumeric cctx x || isNumeric cctx y
-      pure . pure $ case op of
-        RLt  -> BGCompare BLt  x' y'
-        RLeq -> BGCompare BLte x' y'
-        RGt  -> BGCompare BGt  x' y'
-        RGeq -> BGCompare BGte x' y'
+      case op of
+        RLt  -> pure [BGCompare BLt  x' y']
+        RLeq -> pure [BGCompare BLte x' y']
+        RGt  -> pure [BGCompare BGt  x' y']
+        RGeq -> pure [BGCompare BGte x' y']
         -- the explicit REq/RNeq dispatch: see the module header
-        REq  | numeric   -> BGCompare BEq x' y'
-             | otherwise -> BGUnify x' y'
-        RNeq | numeric   -> BGCompare BNeq x' y'
-             | otherwise -> BGDiseq x' y'
+        REq  | numeric -> pure [BGCompare BEq x' y']
+        RNeq | numeric -> pure [BGCompare BNeq x' y']
+        REq  -> [BGUnify x' y'] <$ recordIdentity env cctx "EQUALS" x y
+        RNeq -> [BGDiseq x' y'] <$ recordIdentity env cctx "a disequality" x y
     REval v e -> do
       e' <- convertArith env cctx e
       pure [BGIs (bvar cctx v) e']
@@ -1174,6 +1803,145 @@ isNumeric cctx = \case
   RTNum _ -> True
   RTVar v -> Map.lookup v.rvId cctx.ccSorts == Just RSNum
   _       -> False
+
+-- | The declared record a term's recovered sort __contains__, paired with that
+-- sort, if it contains one. Everything record-shaped is a variable by the time
+-- it reaches here (the middle-end is in ANF: a record-typed @GIVEN@ parameter,
+-- the target of an 'RProj' over an object-valued field, and the result of a
+-- record-returning 'RCall' are all variables carrying their sort out of
+-- 'varSorts').
+--
+-- __The search descends 'RSList' and 'RSMaybe'__, because a container of
+-- records diverges exactly as a bare record does: L4 compares the container
+-- element-wise by value, Blawx unifies it element-wise by atom, and the
+-- occurrence-keyed flattening gives the elements different atoms. Measured
+-- 2026-09-02: before the descent, a @LIST OF Player@ field compared with
+-- @EQUALS@ lowered clean and emitted @Members = Members2@ (§11 W1). @RSList@ of
+-- @RSMaybe@ of a record is reachable — 'blawxValueType' types any @RSList@ as
+-- @BVList@ without looking inside — which is what
+-- @jl4\/examples\/blawx\/not-ok\/record-identity-list.l4@ exercises; a bare
+-- @MAYBE@ record is refused earlier, by that same ontology check.
+--
+-- __An @ASSUME T IS A TYPE@ is deliberately not a record here.__ 'RSRecord'
+-- carries both a @DECLARE … HAS@ record and an abstract category, and
+-- "L4.Relational.IR" says a consumer that needs to tell them apart looks the
+-- name up among the declared records — which is what 'envDeclRecords' is. The
+-- distinction matters because an abstract category has no fields for L4 to
+-- compare structurally: its values are atoms on both sides, @=@ on atoms is the
+-- faithful image, and refusing it would delete an emission that works and
+-- recommend an edit (compare a FIELD) that has nothing to name.
+recordInSort :: Env -> CCtx -> RTerm -> Maybe (RName, RSort)
+recordInSort env cctx = \case
+  RTVar v -> do
+    s <- Map.lookup v.rvId cctx.ccSorts
+    fmap (\r -> (r, s)) (peel s)
+  _ -> Nothing
+ where
+  peel = \case
+    RSRecord r | Set.member r.rnUnique env.envDeclRecords -> Just r
+    RSList s  -> peel s
+    RSMaybe s -> peel s
+    _         -> Nothing
+
+-- | The printed name of an 'RSOpaque' inside an operand's recovered sort, at any
+-- nesting of @LIST OF@ and @MAYBE@ — the sibling of 'recordInSort' for the case
+-- where the sort kept a name and lost the identity. See 'recordIdentity'.
+opaqueInSort :: CCtx -> RTerm -> Maybe Text
+opaqueInSort cctx = \case
+  RTVar v -> Map.lookup v.rvId cctx.ccSorts >>= peel
+  _ -> Nothing
+ where
+  peel = \case
+    RSOpaque t -> Just t
+    RSList s   -> peel s
+    RSMaybe s  -> peel s
+    _          -> Nothing
+
+-- | An 'RSort' in the surface language's spelling, for a diagnostic. Names are
+-- 'rnBase' — this is the message a reader of the @.l4@ sees, not the debug dump
+-- ("L4.Relational.Debug".@renderSort@ renders the same shapes against a
+-- 'DisplayNames' map instead).
+sortText :: RSort -> Text
+sortText = \case
+  RSBool     -> "BOOLEAN"
+  RSNum      -> "NUMBER"
+  RSString   -> "STRING"
+  RSEnum n   -> n.rnBase
+  RSRecord n -> n.rnBase
+  RSList s   -> "LIST OF " <> sortText s
+  RSMaybe s  -> "MAYBE " <> sortText s
+  RSOpaque t -> t
+
+-- | __Record identity does not survive the flattening__ (BLAWX-EXPORT-SPEC
+-- §11 W1, measured 2026-09-02). L4 compares records __by value__; Blawx
+-- compares objects __by atom__; and R11's query flattening emits one object per
+-- /occurrence/ of a record value, so two structurally equal records reach
+-- s(CASP) as two distinct atoms and the comparison answers differently — the
+-- §3.2.1 failure class, source that parses, type-checks and means something
+-- else. It was silent until this refusal: the first Rock Paper Scissors
+-- encoding lowered clean, L4 said @TRUE@ and the tier-1 harness said no model
+-- (@jl4\/examples\/blawx\/not-ok\/record-identity.l4@ is that encoding, kept).
+--
+-- __What is refused is exactly this__: an 'REq' or 'RNeq' either of whose
+-- operands is a variable whose recovered sort /contains/ a declared record sort
+-- — directly, or under any nesting of @LIST OF@ and @MAYBE@ ('recordInSort').
+-- Nothing else. An @ASSUME@d abstract category is not refused (see
+-- 'recordInSort').
+--
+-- __The 'RSOpaque' escape is reachable, and is refused too__ (found in review,
+-- measured 2026-09-02). A record @DECLARE@d in an IMPORTed module reaches the
+-- emitter as @RSOpaque \"\<Section\>.Player\"@: the sort carries a printed name
+-- and no 'RName', so 'recordInSort' has nothing to look up in 'envDeclRecords'
+-- and the comparison lowered with @EXIT=0@, emitting exactly the @A = B@
+-- identity the refusal exists to stop. An earlier draft of this note said no
+-- such case was known to be reachable; it was wrong. An opaque sort is not
+-- /known/ to be a record either — that is what opaque means — so the honest
+-- answer is a refusal of its own, with its own wording, rather than a silent
+-- pass.
+--
+-- Refusing is a v1 measure, not the fix. The fix is to hash-cons
+-- structurally-equal record arguments in 'skolemise' so one distinct value
+-- becomes one object, after which this check lifts; §11 W1 records it as the
+-- next step. Until then the diagnostic must name a reachable edit, so it names
+-- both: state the rule once per slot (which needs no identity — that is what
+-- the shipped @rps.l4@ does), or compare a field whose sort /is/ an atom.
+recordIdentity :: Env -> CCtx -> Text -> RTerm -> RTerm -> Either [LowerError] ()
+recordIdentity _env cctx opName x y
+  | Just t <- opaqueInSort cctx x <|> opaqueInSort cctx y =
+      Left [ blawxErr cctx.ccFn Nothing
+               (LEUnsupported "record identity (Blawx)")
+               ( opName <> " on operands of opaque type `" <> t
+                   <> "` has no faithful Blawx image: the sort reaches this leg with \
+                      \no name to look up, so the emitter cannot tell whether it is a \
+                      \record — and if it is, L4 compares records by value while Blawx \
+                      \compares objects by atom, which answers differently under R11's \
+                      \query flattening. An imported `DECLARE` is the reachable case. \
+                      \State the rule once per slot so no identity is needed, or compare \
+                      \an enum- or number-valued FIELD of the two values instead" ) ]
+recordIdentity env cctx opName x y =
+  case recordInSort env cctx x <|> recordInSort env cctx y of
+    Nothing         -> Right ()
+    Just (cat, srt) ->
+      Left [ blawxErr cctx.ccFn Nothing
+               (LEUnsupported "record identity (Blawx)")
+               ( opName <> " on operands of " <> operand cat srt
+                   <> " has no faithful Blawx image: L4 compares records by \
+                      \value, Blawx compares objects by atom, and the query \
+                      \flattening (R11) emits one object per occurrence of a \
+                      \record value — so two structurally equal `" <> cat.rnBase
+                   <> "` records arrive as two distinct atoms and the comparison \
+                      \silently answers differently. State the rule once per slot \
+                      \so no identity is needed (see jl4/examples/blawx/rps.l4), \
+                      \or compare an enum- or number-valued FIELD of the two \
+                      \records instead of the records themselves" ) ]
+ where
+  -- The bare case keeps its original wording; a container says what it is and
+  -- then names the record inside it, because "of record type `Player`" would be
+  -- a false description of a `LIST OF Player` operand.
+  operand cat = \case
+    RSRecord _ -> "record type `" <> cat.rnBase <> "`"
+    s -> "type `" <> sortText s <> "`, which contains the record type `"
+           <> cat.rnBase <> "`,"
 
 -- ---------------------------------------------------------------------------
 -- Queries → tests (R11)

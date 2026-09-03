@@ -1,0 +1,76 @@
+§ `Beard Tax Act`
+
+-- Jason Morris's Beard Tax Act as shipped in Lexpedite/blawx v1.6.22-alpha
+-- (blawx/static/blawx/examples/beard_tax.yaml): only s.1, the definition.
+-- His ontology: category person; attributes facial_hair_length_mm (number),
+-- facial_hair_on_chin / facial_hair_below_chin / facial_hair_continuous (boolean
+-- inputs), qualifies_s1a / qualifies_s1b / bearded (boolean, derived).
+--
+-- All three decisions pin s.1 by opening their @export prose with the CLEAN
+-- index "1." (BLAWX-EXPORT-SPEC R4, spec §11 W3), so all three attribute to
+-- according_to(sec_1_section, ...) -- the Act has one section and so does the
+-- export. Their prose is the chapeau and the two limbs, and sec_1's rule_text
+-- is the three joined in export order, which reproduces Jason's s.1 WORD FOR
+-- WORD but not byte for byte: measured 2026-09-02, ours is 248 bytes and his
+-- 257, because his carries five CRs and indents the limbs while ours is one
+-- flat line (a.split() == b.split() is True, a == b is False, over the two
+-- fixtures' rule_text).
+-- He gives (a) and (b) their own canvases, sec_1__para_a_section and
+-- sec_1__para_b_section; paragraph eIds are W3(b) and stay out of v1, so the
+-- limbs are numbered 1, with their chapeau, rather than 1(a) and 1(b).
+--
+-- Every `@nlg` below is Jason's own NLG slot text, transcribed from the
+-- `blawx_attribute_nlg` facts of that fixture, so the emitted `#pred` sentences
+-- match his (BLAWX-EXPORT-SPEC §11 W4). A field has no L4 binder for either
+-- its subject or its value, so its slots are written in Blawx's own `@(X)` /
+-- `@(Y)` spelling; a DECIDE names its subject, so it uses an ordinary L4
+-- parameter reference. The `person` category needs no `@nlg`: the synthesised
+-- default already says "is a person", which is what Jason wrote.
+
+DECLARE Person HAS
+    `facial hair length mm`  IS A NUMBER   @nlg @(X) 's facial hair is @(Y) mm in length
+    `facial hair on chin`    IS A BOOLEAN  @nlg @(X) 's facial hair is on the chin
+    `facial hair below chin` IS A BOOLEAN  @nlg @(X) 's facial hair is below the chin
+    `facial hair continuous` IS A BOOLEAN  @nlg @(X) 's facial hair is ear to ear below the nose
+
+@export 1. In this Act, beard means any facial hair no shorter than 5 millimetres in length that:
+GIVEN p IS A Person
+GIVETH A BOOLEAN
+DECIDE `bearded`
+@nlg %p% is bearded
+  IF
+        p's `facial hair length mm` AT LEAST 5
+    AND (`qualifies s1a` p OR `qualifies s1b` p)
+
+@export 1. (a) occurs on or below the chin, or
+GIVEN p IS A Person
+GIVETH A BOOLEAN
+DECIDE `qualifies s1a`
+@nlg %p% qualifies under section 1 a
+  IF
+       p's `facial hair on chin`
+    OR p's `facial hair below chin`
+
+@export 1. (b) exists in an uninterrupted line from the front of one ear to the front of the other ear below the nose.
+GIVEN p IS A Person
+GIVETH A BOOLEAN
+DECIDE `qualifies s1b`
+@nlg %p% qualifies under section 1 b
+  IF
+    p's `facial hair continuous`
+
+-- 6 mm on the chin
+#EVAL `bearded` (Person WITH `facial hair length mm` IS 6, `facial hair on chin` IS TRUE, `facial hair below chin` IS FALSE, `facial hair continuous` IS FALSE)
+-- L4 oracle ==> TRUE
+
+-- 4 mm on the chin: too short
+#EVAL `bearded` (Person WITH `facial hair length mm` IS 4, `facial hair on chin` IS TRUE, `facial hair below chin` IS FALSE, `facial hair continuous` IS FALSE)
+-- L4 oracle ==> FALSE
+
+-- 5 mm exactly, continuous line only: limb (b)
+#EVAL `bearded` (Person WITH `facial hair length mm` IS 5, `facial hair on chin` IS FALSE, `facial hair below chin` IS FALSE, `facial hair continuous` IS TRUE)
+-- L4 oracle ==> TRUE
+
+-- long, but nowhere the Act names
+#EVAL `bearded` (Person WITH `facial hair length mm` IS 20, `facial hair on chin` IS FALSE, `facial hair below chin` IS FALSE, `facial hair continuous` IS FALSE)
+-- L4 oracle ==> FALSE
