@@ -15,6 +15,7 @@ module TestData (
   deonticRecordPartyJL4,
   spacedFieldsJL4,
   assumeParamJL4,
+  assumeHelperJL4,
   importedRecordDeclJL4,
   importedRecordMainJL4,
   dnfBlowupJL4,
@@ -233,6 +234,23 @@ ASSUME age IS A NUMBER
 GIVEN threshold IS A NUMBER
 GIVETH A BOOLEAN
 DECIDE is_adult IF age >= threshold
+|]
+
+-- | L4 source whose @export reads a module-level ASSUME only through a
+-- helper. The read-set is transitive, so @age@ is a parameter of
+-- @may_drive@ (in the schema, and bound for the helper at evaluation).
+assumeHelperJL4 :: Text
+assumeHelperJL4 =
+  [i|
+ASSUME age IS A NUMBER
+
+GIVETH A BOOLEAN
+DECIDE is_adult IF age >= 18
+
+@export May drive: adult and licensed
+GIVEN licensed IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE may_drive IF is_adult AND licensed
 |]
 
 -- | L4 source returning a record type, for testing named fields in JSON output.

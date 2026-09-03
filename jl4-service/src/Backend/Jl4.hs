@@ -36,7 +36,7 @@ import qualified L4.API.EmbeddedLibraries as EmbeddedLibraries
 
 import Backend.Api
 import Backend.CodeGen (generateEvalWrapper, generateDeonticEvalWrapper, GeneratedCode(..))
-import L4.Export (extractAssumeParamTypes, extractAssumeParamResolveds)
+import L4.Export (AssumeRewrite(..), extractAssumeParamTypes, extractAssumeParamResolveds, rewriteModuleAssumes)
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as Aeson
 import qualified Data.Scientific as Scientific
@@ -606,15 +606,17 @@ evaluateWithCompiledDeontic filepath fnDecl compiled sourceText modContext param
     Just _xs -> throwError $ InterpreterError "L4: More than ONE #EVAL found in the program."
 
 -- | Direct AST evaluation (fast path) - for simple types without FnObject.
--- Referenced ASSUMEs are bound via a LET expression /around the inlined body/
--- (not around the call). A closure-based call captures its defining env, so
--- a LetIn wrapping @App fn [...]@ wouldn't reach the body — instead we
--- bind both GIVEN parameters and referenced ASSUMEs as local decls and
--- evaluate the body expression directly.
+-- Each supplied ASSUME is bound by installing a nullary DECIDE at the
+-- ASSUME's own address in the module ('rewriteModuleAssumes'): the
+-- exported body and every helper it reaches resolve the ASSUME by its
+-- 'Unique', and the module's own definitions are evaluated fresh per
+-- call, so all of them see the supplied value. A LET around the call (or
+-- around the inlined body) would not: a helper's closure captures the
+-- module environment, where the ASSUME is still 'ValAssumed'.
 evaluateDirectAST
   :: CompiledModule
   -> [(Text, Maybe FnLiteral)]            -- ^ GIVEN params (positional for the call)
-  -> [(Resolved, Type' Resolved)]         -- ^ ASSUMEs referenced by the body
+  -> [(Resolved, Type' Resolved)]         -- ^ ASSUMEs read by the export (transitively)
   -> [(Text, Maybe FnLiteral)]            -- ^ ASSUME values (keyed by name)
   -> TraceLevel
   -> Bool
@@ -627,7 +629,6 @@ evaluateDirectAST compiled params assumeRefs assumeValues traceLevel includeGrap
       paramTypes = extractParamTypes compiled.compiledDecide
       paramMap   = Map.fromList [(name, val) | (name, Just val) <- params]
       assumeMap  = Map.fromList [(name, val) | (name, Just val) <- assumeValues]
-      MkDecide _ _ (MkAppForm _ _ givenResolveds _) body = compiled.compiledDecide
 
   argExprs <- forM paramTypes $ \(name, ty) ->
     case fnLiteralToExprTyped moduleInfo ty (Map.lookup name paramMap) of
@@ -635,34 +636,22 @@ evaluateDirectAST compiled params assumeRefs assumeValues traceLevel includeGrap
         throwError $ InterpreterError ("Parameter '" <> name <> "': " <> err)
       Right e -> pure e
 
-  -- Emit a LocalDecide binding `name = valueExpr` — used for both GIVEN
-  -- parameters (from call args) and referenced ASSUMEs. The LocalDecide
-  -- reuses the parameter's/ASSUME's own Resolved so the body's refs
-  -- (which share the same Unique) resolve to this local binding.
-  let mkLocalBinding :: Resolved -> Expr Resolved -> LocalDecl Resolved
-      mkLocalBinding r valueExpr = LocalDecide emptyAnno $
-        MkDecide emptyAnno
-          (MkTypeSig emptyAnno (MkGivenSig emptyAnno []) Nothing)
-          (MkAppForm emptyAnno r [] Nothing)
-          valueExpr
-
-  assumeBindings <- forM assumeRefs $ \(assumeRes, assumeTy) -> do
+  assumeExprs <- fmap Map.fromList $ forM assumeRefs $ \(assumeRes, assumeTy) -> do
     let nm = rawNameToText (rawName (getActual assumeRes))
     case fnLiteralToExprTyped moduleInfo assumeTy (Map.lookup nm assumeMap) of
       Left err ->
         throwError $ InterpreterError ("ASSUME '" <> nm <> "': " <> err)
-      Right valueExpr -> pure (mkLocalBinding assumeRes valueExpr)
+      Right valueExpr -> pure (getUnique assumeRes, valueExpr)
 
-  -- If there are no ASSUME refs, use the closure-based call — it's the
-  -- well-trodden path and semantically equivalent to inlining. When ASSUMEs
-  -- are involved, inline the body with LET bindings for both GIVENs and
-  -- ASSUMEs so the body sees our local bindings instead of the closure's
-  -- captured module-level env (where ASSUMEs are still ValAssumed).
-  let funResolved = getFunctionResolved compiled.compiledDecide
-      callExpr = case assumeBindings of
-        [] -> buildFunctionCallExpr funResolved argExprs
-        _  -> let givenBindings = zipWith mkLocalBinding givenResolveds argExprs
-              in LetIn emptyAnno (assumeBindings <> givenBindings) body
+  -- The replacement DECIDE keeps the ASSUME's own type signature and app
+  -- form (hence its Resolved and Unique), so every reference in the
+  -- module — in the export or in a helper — now finds a value there.
+  let bindAssume (MkAssume _ tySig appForm@(MkAppForm _ r _ _) _ _) =
+        case Map.lookup (getUnique r) assumeExprs of
+          Nothing        -> KeepAssume
+          Just valueExpr -> ReplaceAssume (Decide emptyAnno (MkDecide emptyAnno tySig appForm valueExpr))
+      boundModule = rewriteModuleAssumes bindAssume compiled.compiledModule
+      callExpr = buildFunctionCallExpr (getFunctionResolved compiled.compiledDecide) argExprs
 
   -- Configure evaluation with tracing based on trace level
   let evalTracePolicy = case traceLevel of
@@ -683,7 +672,7 @@ evaluateDirectAST compiled params assumeRefs assumeValues traceLevel includeGrap
     evalConfig
     compiled.compiledEntityInfo
     callExpr
-    (compiled.compiledImportEnv, compiled.compiledModule)
+    (compiled.compiledImportEnv, boundModule)
 
   -- Handle result
   case mResult of

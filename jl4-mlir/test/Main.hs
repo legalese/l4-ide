@@ -46,7 +46,8 @@ main = do
     , test "builtin declarations"              testBuiltins
     , test "arithmetic ops"                    testArithOps
     , test "@export ASSUMEs become args"       testExportAssumePromotion
-    , test "internal callers fill via extern"  testInternalCallFillsAssumes
+    , test "internal callers pass ASSUMEs on"  testInternalCallFillsAssumes
+    , test "helper-read ASSUME threads through" testHelperReadAssumeThreaded
     , test "schema picks up imported DECLAREs" testSchemaUsesImportedDeclares
     , test "deontic contract baked into schema" testDeonticSchemaBaked
     , test "plain fn stays supported"          testPlainFunctionSupported
@@ -673,6 +674,22 @@ testNoStateGraphForPlainFn = do
           json = TE.decodeUtf8 (LBS.toStrict (encodeBundle bundle))
       pure $ T.isInfixOf "\"stateGraphs\":[]" json
 
+-- | How many @f64@ parameters @func.func \@name(...)@ declares, or
+-- 'Nothing' when no such function is emitted. SSA value ids are numbered
+-- module-globally (@%0@ belongs to whichever function is lowered first),
+-- so assertions on a signature must count parameters rather than spell
+-- out ids.
+f64Arity :: T.Text -> T.Text -> Maybe Int
+f64Arity name mlir =
+  case T.breakOn open mlir of
+    (_, rest)
+      | T.null rest -> Nothing
+      | otherwise ->
+          let sig = T.takeWhile (/= ')') (T.drop (T.length open) rest)
+          in Just (T.count ": f64" sig)
+  where
+    open = "func.func @" <> name <> "("
+
 -- | Verify that an @export-decorated DECIDE with a referenced ASSUME
 -- emits a function whose argument count matches GIVEN + ASSUME.
 testExportAssumePromotion :: IO Bool
@@ -691,12 +708,13 @@ testExportAssumePromotion = do
       pure False
     Right mlir ->
       -- Exported function must take two f64 args (threshold + age).
-      pure $ T.isInfixOf "func.func @is_adult(%0: f64, %1: f64)" mlir
-          || T.isInfixOf "func.func @is_adult(%arg0: f64, %arg1: f64)" mlir
+      pure $ f64Arity "is_adult" mlir == Just 2
 
 -- | When an internal (non-@export) function calls an @export function
--- that has ASSUME-derived args, the call site should invoke the ASSUME's
--- extern to fill the extra arg rather than pass too few.
+-- that has ASSUME-derived args, the caller reads the ASSUME transitively,
+-- so it takes the ASSUME as an extra parameter of its own and passes it
+-- on — the call site must never pass too few args, and no longer needs
+-- the ASSUME's extern to fill the gap.
 testInternalCallFillsAssumes :: IO Bool
 testInternalCallFillsAssumes = do
   let src = T.unlines
@@ -715,10 +733,39 @@ testInternalCallFillsAssumes = do
       putStrLn $ "\n    typecheck failed: " <> show errs
       pure False
     Right mlir ->
-      -- adult_at_18 must call the @age extern AND call is_adult with two args.
-      pure $ T.isInfixOf "func.call @age()" mlir
+      -- adult_at_18 takes age as its (only) parameter, calls is_adult with
+      -- two args, and does not fall back to the @age extern.
+      pure $ f64Arity "adult_at_18" mlir == Just 1
           && T.isInfixOf "func.call @is_adult" mlir
-      && Text.isInfixOf "arith.cmpf" mlir
+          && not (T.isInfixOf "func.call @age()" mlir)
+          && Text.isInfixOf "arith.cmpf" mlir
+
+-- | An @export whose /helper/ reads an ASSUME: the export's ABI takes the
+-- ASSUME (matching the schema's transitive read-set), the helper takes it
+-- too, and the export passes its parameter through rather than calling
+-- the extern — so the host-supplied value is the one the helper sees.
+testHelperReadAssumeThreaded :: IO Bool
+testHelperReadAssumeThreaded = do
+  let src = T.unlines
+        [ "ASSUME `age` IS A NUMBER"
+        , ""
+        , "GIVETH A BOOLEAN"
+        , "DECIDE `is_adult` IF `age` >= 18"
+        , ""
+        , "@export Helper reads the ASSUME"
+        , "GIVEN `licensed` IS A BOOLEAN"
+        , "GIVETH A BOOLEAN"
+        , "DECIDE `may_drive` IF `is_adult` AND `licensed`"
+        ]
+  case lowerSource src of
+    Left errs -> do
+      putStrLn $ "\n    typecheck failed: " <> show errs
+      pure False
+    Right mlir ->
+      pure $ f64Arity "may_drive" mlir == Just 2
+          && f64Arity "is_adult" mlir == Just 1
+          && T.isInfixOf "func.call @is_adult" mlir
+          && not (T.isInfixOf "func.call @age()" mlir)
 
 -- | When the @export-ed function's parameter type is DECLAREd in an
 -- IMPORTed module (not in the main file), the schema must still expand

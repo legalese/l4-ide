@@ -403,19 +403,36 @@ callL4Direct callee args retTy = do
   unboxABI retTy boxedResult
 
 -- | For callees that were registered with extra ASSUME-derived parameters
--- (see 'exportAssumeArgs'), append one extern call per extra parameter so
--- the call site matches the callee's extended arity.
+-- (see 'exportAssumeArgs'), append one value per extra parameter so the
+-- call site matches the callee's extended arity. When the function being
+-- lowered has that ASSUME as one of its /own/ extra parameters (it reads
+-- it transitively, so 'collectExportAssumeArgs' gave it the parameter),
+-- the bound parameter is passed through; otherwise the ASSUME's extern is
+-- called, preserving the pre-@\@export@ behaviour (the wasm host satisfies
+-- the import). The pass-through is gated on the caller's own registered
+-- extras rather than on a bare 'lookupVar': a lambda-lifted WHERE\/LET
+-- helper is lowered with its enclosing function's bindings still in scope,
+-- and handing it an SSA value from another @func.func@ would be invalid.
 appendAssumeExternArgs :: Text -> [(Value, MLIRType)] -> LowerM [(Value, MLIRType)]
 appendAssumeExternArgs callee args = do
   extras <- Map.findWithDefault [] callee <$> gets (.exportAssumeArgs)
   if null extras then pure args
   else do
     env <- gets (.typeEnv)
+    mCaller <- gets (.currentFunction)
+    callerExtras <- case mCaller of
+      Nothing     -> pure []
+      Just caller -> Map.findWithDefault [] caller <$> gets (.exportAssumeArgs)
+    let callerHas r = any (\(r', _) -> getUnique r' == getUnique r) callerExtras
     extraPairs <- forM extras $ \(assumeRes, assumeTy) -> do
-      let externName = sanitizeName (resolvedName assumeRes)
+      let name = resolvedName assumeRes
           mlTy = l4TypeToMLIR env assumeTy
-      v <- emitVal $ \vid -> funcCall [vid] externName [] [] [l4Value]
-      pure (v, mlTy)
+      mBound <- if callerHas assumeRes then lookupVar name else pure Nothing
+      case mBound of
+        Just v  -> pure (v, mlTy)
+        Nothing -> do
+          v <- emitVal $ \vid -> funcCall [vid] (sanitizeName name) [] [] [l4Value]
+          pure (v, mlTy)
     pure (args ++ extraPairs)
 
 -- | Allocate a fresh SSA value.
@@ -670,21 +687,30 @@ propagateDiagnostics cg direct = Map.unionWith (++) direct propagated
 -- ASSUME declarations it references. These get promoted to function-level
 -- parameters at the ABI boundary so hosts can supply their values without
 -- going through the extern-import mechanism used by non-exported DECIDEs.
+--
+-- The read-set is transitive ('Export.extractAssumeParamResolveds'): an
+-- export whose helper reads an ASSUME takes that ASSUME as an ABI
+-- parameter, matching the schema. For the value to reach the helper, the
+-- helper takes it as an extra parameter too — so every main-module
+-- DECIDE that (transitively) reads a promoted ASSUME is entered here, not
+-- only the exports, and a call site that has the ASSUME bound as its own
+-- parameter passes it on ('appendAssumeExternArgs').
 collectExportAssumeArgs :: Module Resolved -> Map Text [(Resolved, Type' Resolved)]
 collectExportAssumeArgs mod' = Map.fromList
   [ (sanitizeName (resolvedName fnName), args)
-  | decide@(MkDecide _ _ (MkAppForm _ fnName _ _) _) <- exportedDecides
-  , let args = Export.extractAssumeParamResolveds mod' decide
+  | decide@(MkDecide _ _ (MkAppForm _ fnName _ _) _) <- allDecides
+  , let args = [ a | a@(r, _) <- Export.extractAssumeParamResolveds mod' decide
+                   , Set.member (getUnique r) promoted ]
   , not (null args)
   ]
  where
-  exportedDecides = goSection sect
-  MkModule _ _ sect = mod'
-  goSection (MkSection _ _ _ decls) = decls >>= goDecl
-  goDecl = \case
-    Decide _ d | Export.isExportedDecide d -> [d]
-    Section _ s -> goSection s
-    _ -> []
+  allDecides = allModuleDecides mod'
+  -- The ASSUMEs some export promotes to a parameter.
+  promoted = Set.fromList
+    [ getUnique r
+    | d <- allDecides, Export.isExportedDecide d
+    , (r, _) <- Export.extractAssumeParamResolveds mod' d
+    ]
 
 -- | Every DECIDE in a module, descending into nested sections.
 allModuleDecides :: Module Resolved -> [Decide Resolved]
