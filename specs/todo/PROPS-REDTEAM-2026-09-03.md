@@ -612,7 +612,7 @@ Candidates, like §10. Worked out in conversation with Meng after the `WHEREIN` 
 ### 11.1 The refusal role, as found
 
 Reg CF's dated constants end in an `OTHERWISE` arm that names a sentence-long `ASSUME`
-(`regcf.l4:143`, reached from five functions at :154, :166, :175, :185, :195). The comment above it:
+(`regcf.l4:143`, reached from eight sites: :154, :166, :175, :185, :195, :205, :215, :409 — an earlier draft of this paragraph said five). The comment above it:
 "a rule date before 2016-05-16 is a curated refusal, not an answer. ASSUME makes this a deliberate
 bottom … **no input is ever routed through it.**" A second at `regcf.l4:486` refuses the COVID-19
 temporary rules ("the honest answer is a refusal, not a guess … decided 2026-07-29: refuse, not
