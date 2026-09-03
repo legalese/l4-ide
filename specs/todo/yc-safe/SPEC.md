@@ -374,9 +374,11 @@ What step 3 appends below the form, after a horizontal rule: the form's own head
 strings (the version stamp and the CC BY-ND sentence, from `footers.json`) and one italic
 line naming the source `.docx`, the tool, the date and the encoding row, stating that blanks
 and bracketed terms were filled and nothing else changed. It is an addition beneath the form,
-typographically separated, never an edit inside it. Signature lines and second address lines
-are left as the form's underlined blanks (the deposit's `holes.json` names them
-`companySignatureLine`, `investorSignatureLine`, `…AddressLine2`).
+typographically separated, never an edit inside it. An underlined blank `<u>…</u>` is filled
+**inside** its tags, so the form's fill-in rule survives (a bare value would print
+`Address:548 Market Street`). The four holes `deal.json` carries no value for — both
+signature lines and both address continuation lines — keep their placeholder; the spec did
+not say what to do with an unfillable hole, and that is now the rule.
 
 ### 5.3 Templates are derived, and the derivation is proven
 
@@ -384,7 +386,18 @@ are left as the form's underlined blanks (the deposit's `holes.json` names them
 maps each bracketed literal (`\[Company Name\]`, `$\[_____________\]`, …) to a hole name
 **by position** (the cover Company Name and the signature-block COMPANY are different holes
 that receive the same value; the two `$[___]` blanks on the cap form are Purchase Amount then
-Cap, in document order). It writes `templates/<jurisdiction>/<variant>.md.mustache`. The hole vocabulary is the
+Cap, in document order). It writes `templates/<jurisdiction>/<variant>.md.mustache`. Three facts the first draft of this section got wrong or left unsaid, each measured by the
+generator build: the per-form arrays in `holes.json` are named **`brackets`** and `blanks`
+(the loader accepts `holes` as an alias, but the name is pinned here so a rename cannot
+break a consumer silently); the signature block renders as `\[**COMPANY\]**` with the bold
+run opening inside the bracket and closing outside, so the measured literal was one `**`
+short in all six SAFEs and the map now carries the extended literal; and a hole name can
+have **two distinct literals in one form** (Canada: `[company name]` and `[Company Name]`;
+Singapore: `[COMPANY NAME]` and the bold one), rendered as `{{name}}` for the first distinct
+literal in document order and `{{name2}}` for the second, with every occurrence of the same
+literal sharing one token — the round-trip proof needs that rule to be deterministic. Side
+letters carry `variant: null`: one letter serves every SAFE of its jurisdiction, and the
+template path `side-letter/<jurisdiction>` says so. The hole vocabulary is the
 deposit's, not this document's: `holes.json` was measured form by form and adds five names
 the first draft of §3.1 lacked (the Singapore registration number, the two signature lines,
 the two second address lines), each flagged in the file.
@@ -431,6 +444,12 @@ defines the JSON it carries:
   "generator": { "tool": "etc/safe/gen.mjs", "l4": "<l4 --version>", "commit": "<l4-ide sha>", "at": "<ISO>" }
 }
 ```
+
+`form.edition` in the payload is the edition of **that document's** form, read from its own
+header stamp: the SAFE's for a SAFE, the side letter's for a side letter. The US side letter
+is stamped 1.0 and the three non-US letters are unstamped, so a side-letter payload may
+carry `"edition": null`. `deal.form.edition` names the SAFE only and is compared against
+the SAFE's stamp.
 
 Two carriers, as `SPEC-NOTES.md` §5 wanted: the XMP packet for identity and integrity, and
 a **PDF file attachment** of the instance `.l4` (qpdf 12.3 `--add-attachment`, present
