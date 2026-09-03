@@ -66,6 +66,23 @@ ASSUME `the person has an alcohol banning order` IS BOOLEAN
 
 L4 doesn't know or check these values—it just uses them.
 
+### Where the Values Come From
+
+Nothing inside the file supplies a value for an `ASSUME`. If you `#EVAL` a rule that
+needs one, evaluation stops at the first assumed fact:
+
+```
+I could not continue evaluating, because I needed to know the value of
+  `the person is a body corporate`
+but it is an assumed term.
+```
+
+The values arrive when the rule is deployed: `jl4-service` turns every `ASSUME` an
+`@export`ed rule refers to into a parameter of that rule and fills it from each request
+(see [ASSUME and `@export`](../../reference/types/ASSUME.md#assume-and-export)). To
+exercise the rule _inside_ the file, Step 4 gives it its inputs as a `GIVEN` parameter
+instead.
+
 ---
 
 ## Step 3: Encode the Rule
@@ -100,7 +117,44 @@ Notice how the L4 mirrors the legislation:
 
 ## Step 4: Add Test Cases
 
-Test the rule with specific scenarios:
+Test the rule with specific scenarios.
+
+There is a catch. The rule in Step 3 takes no parameters—its inputs are `ASSUME`s—and no
+directive can supply a value for an `ASSUME`. `WITH` passes _named arguments to a
+function_, so ``#EVAL `the person must not sell alcohol` WITH ...`` is a type error
+("You are trying to apply ... of type BOOLEAN (which is not a function) to (named)
+arguments"). To test the rule here, give it its inputs as a parameter. As in
+[Your First L4 File](first-l4-file.md), bundle the facts into a record and pass it as one
+`GIVEN`. This is also the house style for the larger encodings in this repository, for the
+same reason: a rule over a `GIVEN` record can be evaluated in full, while one over
+`ASSUME`s cannot be evaluated at all until it is deployed.
+
+```l4
+§ `Testable Version`
+
+DECLARE Person
+    HAS `is a body corporate` IS A BOOLEAN
+        `engages in business for profit` IS A BOOLEAN
+        `is a public house` IS A BOOLEAN
+        `is a hotel` IS A BOOLEAN
+        `has an unspent conviction for fraud` IS A BOOLEAN
+        `has an unspent conviction for providing misleading information` IS A BOOLEAN
+        `has an alcohol banning order` IS A BOOLEAN
+
+GIVEN person IS A Person
+DECIDE `must not sell alcohol`
+IF  person's `is a body corporate`
+    AND person's `engages in business for profit`
+    AND NOT person's `is a public house`
+    AND NOT person's `is a hotel`
+    AND (
+        person's `has an unspent conviction for fraud`
+        OR person's `has an unspent conviction for providing misleading information`
+        OR person's `has an alcohol banning order`
+    )
+```
+
+Each scenario is now a `Person`, and `#ASSERT` pins the outcome you expect:
 
 ```l4
 § `Test Cases`
@@ -112,14 +166,16 @@ Scenario 1: Corporate pub (exempt)
 - Public house: Yes (exempt!)
 Expected: FALSE (not prohibited because it's a public house)
 -}
-#CHECK `the person must not sell alcohol` WITH
-    `the person is a body corporate` IS TRUE,
-    `the person engages in business for profit` IS TRUE,
-    `the person is a public house` IS TRUE,
-    `the person is a hotel` IS FALSE,
-    `the person has an unspent conviction for fraud` IS TRUE,
-    `the person has an unspent conviction for providing misleading information` IS FALSE,
-    `the person has an alcohol banning order` IS FALSE
+`the corporate pub` MEANS Person WITH
+    `is a body corporate` IS TRUE
+    `engages in business for profit` IS TRUE
+    `is a public house` IS TRUE
+    `is a hotel` IS FALSE
+    `has an unspent conviction for fraud` IS TRUE
+    `has an unspent conviction for providing misleading information` IS FALSE
+    `has an alcohol banning order` IS FALSE
+
+#ASSERT NOT `must not sell alcohol` `the corporate pub`
 
 {-
 Scenario 2: Banned corporate (prohibited)
@@ -130,14 +186,16 @@ Scenario 2: Banned corporate (prohibited)
 - Banning order: Yes
 Expected: TRUE (prohibited)
 -}
-#CHECK `the person must not sell alcohol` WITH
-    `the person is a body corporate` IS TRUE,
-    `the person engages in business for profit` IS TRUE,
-    `the person is a public house` IS FALSE,
-    `the person is a hotel` IS FALSE,
-    `the person has an unspent conviction for fraud` IS FALSE,
-    `the person has an unspent conviction for providing misleading information` IS FALSE,
-    `the person has an alcohol banning order` IS TRUE
+`the banned corporate` MEANS Person WITH
+    `is a body corporate` IS TRUE
+    `engages in business for profit` IS TRUE
+    `is a public house` IS FALSE
+    `is a hotel` IS FALSE
+    `has an unspent conviction for fraud` IS FALSE
+    `has an unspent conviction for providing misleading information` IS FALSE
+    `has an alcohol banning order` IS TRUE
+
+#ASSERT `must not sell alcohol` `the banned corporate`
 
 {-
 Scenario 3: Clean corporate (not prohibited)
@@ -146,15 +204,20 @@ Scenario 3: Clean corporate (not prohibited)
 - No exemption, but no disqualifying factors
 Expected: FALSE (not prohibited - no (d) condition met)
 -}
-#CHECK `the person must not sell alcohol` WITH
-    `the person is a body corporate` IS TRUE,
-    `the person engages in business for profit` IS TRUE,
-    `the person is a public house` IS FALSE,
-    `the person is a hotel` IS FALSE,
-    `the person has an unspent conviction for fraud` IS FALSE,
-    `the person has an unspent conviction for providing misleading information` IS FALSE,
-    `the person has an alcohol banning order` IS FALSE
+`the clean corporate` MEANS Person WITH
+    `is a body corporate` IS TRUE
+    `engages in business for profit` IS TRUE
+    `is a public house` IS FALSE
+    `is a hotel` IS FALSE
+    `has an unspent conviction for fraud` IS FALSE
+    `has an unspent conviction for providing misleading information` IS FALSE
+    `has an alcohol banning order` IS FALSE
+
+#ASSERT NOT `must not sell alcohol` `the clean corporate`
 ```
+
+A failing `#ASSERT` reports `assertion failed` when you run the file. See
+[Testing Your Rules](testing-your-rules.md) for `#EVAL`, `#ASSERT` and `#CHECK`.
 
 ---
 
@@ -166,29 +229,40 @@ For complex rules, break into named sub-rules:
 § `Refactored Version`
 
 -- Sub-rule: Is this a commercial enterprise?
+GIVEN person IS A Person
 DECIDE `is commercial enterprise`
-IF  `the person is a body corporate`
-    AND `the person engages in business for profit`
+IF  person's `is a body corporate`
+    AND person's `engages in business for profit`
 
 -- Sub-rule: Is this an exempt establishment?
+GIVEN person IS A Person
 DECIDE `is exempt establishment`
-IF  `the person is a public house`
-    OR `the person is a hotel`
+IF  person's `is a public house`
+    OR person's `is a hotel`
 
 -- Sub-rule: Does person have disqualifying factors?
+GIVEN person IS A Person
 DECIDE `has disqualifying factors`
-IF  `the person has an unspent conviction for fraud`
-    OR `the person has an unspent conviction for providing misleading information`
-    OR `the person has an alcohol banning order`
+IF  person's `has an unspent conviction for fraud`
+    OR person's `has an unspent conviction for providing misleading information`
+    OR person's `has an alcohol banning order`
 
 -- Main rule: Prohibition (refactored)
-DECIDE `the person must not sell alcohol (refactored)`
-IF  `is commercial enterprise`
-    AND NOT `is exempt establishment`
-    AND `has disqualifying factors`
+GIVEN person IS A Person
+DECIDE `must not sell alcohol (refactored)`
+IF  `is commercial enterprise` person
+    AND NOT `is exempt establishment` person
+    AND `has disqualifying factors` person
 ```
 
-This version is easier to understand and maintain.
+This version is easier to understand and maintain—and the Step 4 scenarios run against it
+unchanged, so you can check that the refactor changed nothing:
+
+```l4
+#ASSERT NOT `must not sell alcohol (refactored)` `the corporate pub`
+#ASSERT `must not sell alcohol (refactored)` `the banned corporate`
+#ASSERT NOT `must not sell alcohol (refactored)` `the clean corporate`
+```
 
 ---
 
@@ -220,7 +294,8 @@ Act interpretation - see s.2 for definitions.
 
 ## Complete Example
 
-Here's the full file:
+Here's the full file. It is also saved beside this tutorial as
+[alcohol-act-example.l4](alcohol-act-example.l4), which `doc/test-docs.sh` runs:
 
 ```l4
 § `Imaginary Alcohol Act - Section 3`
@@ -228,60 +303,74 @@ Here's the full file:
 {-
 Implements Section 3 of the Imaginary Alcohol Act 2024.
 Determines whether a person is prohibited from selling alcohol.
+
+The facts about the person are bundled into one record and passed as a
+GIVEN parameter, so the rule can be tested in this file (see `Tests`).
+Facts declared with ASSUME instead have no value until the rule is
+deployed via jl4-service, which binds them from each request.
 -}
 
--- External facts (from user input or database)
-ASSUME `the person is a body corporate` IS BOOLEAN
-ASSUME `the person engages in business for profit` IS BOOLEAN
-ASSUME `the person is a public house` IS BOOLEAN
-ASSUME `the person is a hotel` IS BOOLEAN
-ASSUME `the person has an unspent conviction for fraud` IS BOOLEAN
-ASSUME `the person has an unspent conviction for providing misleading information` IS BOOLEAN
-ASSUME `the person has an alcohol banning order` IS BOOLEAN
+-- Facts about the person (from user input or database)
+DECLARE Person
+    HAS `is a body corporate` IS A BOOLEAN
+        `engages in business for profit` IS A BOOLEAN
+        `is a public house` IS A BOOLEAN
+        `is a hotel` IS A BOOLEAN
+        `has an unspent conviction for fraud` IS A BOOLEAN
+        `has an unspent conviction for providing misleading information` IS A BOOLEAN
+        `has an alcohol banning order` IS A BOOLEAN
 
 §§ `Sub-rules`
 
+GIVEN person IS A Person
 DECIDE `is commercial enterprise`
-IF  `the person is a body corporate`
-    AND `the person engages in business for profit`
+IF  person's `is a body corporate`
+    AND person's `engages in business for profit`
 
+GIVEN person IS A Person
 DECIDE `is exempt establishment`
-IF  `the person is a public house`
-    OR `the person is a hotel`
+IF  person's `is a public house`
+    OR person's `is a hotel`
 
+GIVEN person IS A Person
 DECIDE `has disqualifying factors`
-IF  `the person has an unspent conviction for fraud`
-    OR `the person has an unspent conviction for providing misleading information`
-    OR `the person has an alcohol banning order`
+IF  person's `has an unspent conviction for fraud`
+    OR person's `has an unspent conviction for providing misleading information`
+    OR person's `has an alcohol banning order`
 
 §§ `Main Rule`
 
-DECIDE `the person must not sell alcohol`
-IF  `is commercial enterprise`
-    AND NOT `is exempt establishment`
-    AND `has disqualifying factors`
+GIVEN person IS A Person
+DECIDE `must not sell alcohol`
+IF  `is commercial enterprise` person
+    AND NOT `is exempt establishment` person
+    AND `has disqualifying factors` person
 
 §§ `Tests`
 
+`the corporate pub` MEANS Person WITH
+    `is a body corporate` IS TRUE
+    `engages in business for profit` IS TRUE
+    `is a public house` IS TRUE
+    `is a hotel` IS FALSE
+    `has an unspent conviction for fraud` IS TRUE
+    `has an unspent conviction for providing misleading information` IS FALSE
+    `has an alcohol banning order` IS FALSE
+
+`the banned corporate` MEANS Person WITH
+    `is a body corporate` IS TRUE
+    `engages in business for profit` IS TRUE
+    `is a public house` IS FALSE
+    `is a hotel` IS FALSE
+    `has an unspent conviction for fraud` IS FALSE
+    `has an unspent conviction for providing misleading information` IS FALSE
+    `has an alcohol banning order` IS TRUE
+
 -- Exempt: public house
-#CHECK NOT `the person must not sell alcohol` WITH
-    `the person is a body corporate` IS TRUE,
-    `the person engages in business for profit` IS TRUE,
-    `the person is a public house` IS TRUE,
-    `the person is a hotel` IS FALSE,
-    `the person has an unspent conviction for fraud` IS TRUE,
-    `the person has an unspent conviction for providing misleading information` IS FALSE,
-    `the person has an alcohol banning order` IS FALSE
+#ASSERT NOT `must not sell alcohol` `the corporate pub`
 
 -- Prohibited: has banning order
-#CHECK `the person must not sell alcohol` WITH
-    `the person is a body corporate` IS TRUE,
-    `the person engages in business for profit` IS TRUE,
-    `the person is a public house` IS FALSE,
-    `the person is a hotel` IS FALSE,
-    `the person has an unspent conviction for fraud` IS FALSE,
-    `the person has an unspent conviction for providing misleading information` IS FALSE,
-    `the person has an alcohol banning order` IS TRUE
+#ASSERT `must not sell alcohol` `the banned corporate`
 ```
 
 ---
@@ -388,11 +477,11 @@ NOT (`is public house` OR `is hotel`)
 ## What You Learned
 
 - How to analyze legal text structure
-- How to use ASSUME for external facts
+- How to use ASSUME for external facts—and where their values come from
 - How to encode AND/OR conditions
 - How to carry inert recital/preamble text as a `hierarchy` outline
 - How to refactor for readability
-- How to test legislative rules
+- How to test legislative rules with a `GIVEN` record and `#ASSERT`
 
 ---
 
