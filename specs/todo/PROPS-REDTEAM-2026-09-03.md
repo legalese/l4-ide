@@ -581,3 +581,24 @@ WHEREAS issuer IS AN IssuerProfile
 
 Decision pending: 10.3 (layout, no keyword) first, 10.4 in reserve; or 10.4 outright if the
 non-operative reading of recitals is judged confusing enough to forbid the layout form.
+
+#### 10.4.1 Sibling candidate: `WHEREIN` (minuted 2026-09-04)
+
+```l4
+§§ `Rule 100(b) — issuer eligibility`
+WHEREIN issuer IS AN IssuerProfile
+```
+
+- **Fit.** "In which": the section, in which the issuer is an `IssuerProfile`. Patent-claim
+  drafting uses `wherein` clauses to characterise an element already introduced, and they are
+  operative (limiting), which removes `WHEREAS`'s non-operative-recital risk. Grammatically it
+  suits a **typed declaration** (characterising an entity) better than `WHEREAS`, which suits a
+  **stated premise** (a proposition). A section `GIVEN` is the former.
+- **Risk.** Proximity to the existing `WHERE` keyword, which introduces a rule's local
+  definitions (125 blocks in the legal corpus). Both mean "in which"; the pair would have to be
+  taught together — `WHERE` binds definitions below a rule, `WHEREIN` binds parameters below a
+  heading — or the similarity becomes a source of confusion. Also archaic; rare in modern
+  statutes.
+- **Mechanics.** As for `WHEREAS`: whole-token keyword lookup, no prefix clash; the token is
+  unused anywhere in `jl4/`, `jl4-core/`, `doc/`, and the word does not even occur in prose there.
+- **Cost.** As for `WHEREAS`.
