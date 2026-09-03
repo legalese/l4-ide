@@ -139,8 +139,8 @@ evalApp evalConfig entityInfo contextModule evalParams recentViz =
   where
     evalResultToLadderEvalAppResult :: EL.EvalDirectiveResult -> ExceptT (TResponseError method) m EvalAppResult
     evalResultToLadderEvalAppResult (EL.MkEvalDirectiveResult _ res _mtrace _ledger) = case res of
-      EL.Assertion True  -> pure $ EvalAppResult (toUBoolValue True)
-      EL.Assertion False -> pure $ EvalAppResult (toUBoolValue False)
+      EL.Assertion (Right b)  -> pure $ EvalAppResult (toUBoolValue b)
+      EL.Assertion (Left err) -> defaultResponseError $ EL.prettyAssertionOutcome (Left err)
       EL.Reduction v ->
         case v of
           Right (EL.MkNF val) ->

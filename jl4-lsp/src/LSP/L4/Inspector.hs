@@ -143,11 +143,13 @@ evalDirectiveToResult fields dirType rng evalRes@(EL.MkEvalDirectiveResult _rang
     { directiveType = dirType
     , prettyText = EL.prettyEvalDirectiveResultWithFields fields evalRes
     , success = case res of
-        EL.Assertion b        -> Just b
+        EL.Assertion (Right b) -> Just b
+        EL.Assertion (Left _)  -> Just False
         EL.Reduction (Right _) -> Just True
         EL.Reduction (Left _)  -> Just False
     , structuredValue = case res of
-        EL.Assertion b -> Just (Aeson.toJSON b)
+        EL.Assertion (Right b) -> Just (Aeson.toJSON b)
+        EL.Assertion (Left _)  -> Nothing
         EL.Reduction (Left _) -> Nothing
         EL.Reduction (Right nf) -> Just (nfToJson nf)
     , range = rng
@@ -275,7 +277,8 @@ evalDirectiveToUpdateItem fields getLines evalRes@(EL.MkEvalDirectiveResult (Jus
     { directiveId = Text.pack (show startLine) <> ":" <> Text.pack (show colNo)
     , prettyText  = EL.prettyEvalDirectiveResultWithFields fields evalRes
     , success     = case res of
-        EL.Assertion b         -> Just b
+        EL.Assertion (Right b) -> Just b
+        EL.Assertion (Left _)  -> Just False
         EL.Reduction (Right _) -> Just True
         EL.Reduction (Left _)  -> Just False
     , body        = getLines startLine endLine

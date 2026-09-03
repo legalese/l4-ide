@@ -186,7 +186,9 @@ fillTests fields oracle m =
           ([], [ note t "L4 produced no value for it (was the directive evaluated?)" ])
         Just (Reduction (Left _)) ->
           ([], [ note t "evaluating it in L4 raised" ])
-        Just (Assertion b) ->
+        Just (Assertion (Left _)) ->
+          ([], [ note t "evaluating it in L4 raised" ])
+        Just (Assertion (Right b)) ->
           ( [ SegTestCli t { tcOutput = [ wrap (if b then "true" else "false") ] }
             , humanBlock (if b then "TRUE" else "FALSE") ]
           -- R7's oracle is L4, so a false #ASSERT is transcribed faithfully as

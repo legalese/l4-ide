@@ -338,6 +338,7 @@ processRow opts evalConfig filteredSource exportFn params schema idx input
 resultExceptionMsgs :: EvalDirectiveResult -> [Text]
 resultExceptionMsgs (MkEvalDirectiveResult _ res _ _) = case res of
   Reduction (Left exc) -> prettyEvalException exc
+  Assertion (Left exc) -> prettyEvalException exc
   _                    -> []
 
 ----------------------------------------------------------------------------

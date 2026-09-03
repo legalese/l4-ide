@@ -17,6 +17,7 @@ module L4.EvaluateLazy
 , prettyEvalException
 , prettyEvalDirectiveResult
 , prettyEvalDirectiveResultWithFields
+, prettyAssertionOutcome
 , postprocessTrace
 , safePostprocessTrace
 , tracePostprocessFailed
@@ -237,8 +238,14 @@ nfDirective (MkEvalDirective r traced isAssert expr env) = withFreshLedger $ do
       if isAssert
         then Assertion
           case v of
-            Right (MkNF (ValBool True)) -> True
-            _                           -> False
+            -- An assertion whose expression RAISED is neither satisfied nor
+            -- failed: the evaluator could not decide it. Collapsing the
+            -- exception into 'False' made '#ASSERT P' and '#ASSERT NOT P'
+            -- both report "assertion failed" whenever P raised, so a test
+            -- suite could not tell a wrong answer from an error.
+            Left exc                    -> Left exc
+            Right (MkNF (ValBool True)) -> Right True
+            Right _                     -> Right False
         else Reduction v
   pure (MkEvalDirectiveResult r v' finalTrace directiveLedger)
 
@@ -294,16 +301,28 @@ data EvalDirectiveResult =
   deriving anyclass NFData
 
 data EvalDirectiveValue =
-    Assertion Bool
+    Assertion (Either EvalException Bool)
+    -- ^ @#ASSERT@: 'Right' is the verdict. 'Left' means the expression raised
+    -- before it could be decided — a distinct outcome from @Right False@,
+    -- and every consumer must render it as such.
   | Reduction (Either EvalException NF)
   deriving stock (Generic, Show)
   deriving anyclass NFData
 
 prettyEvalDirectiveValue :: EvalDirectiveValue -> Text
-prettyEvalDirectiveValue (Assertion True)       = "assertion satisfied"
-prettyEvalDirectiveValue (Assertion False)      = "assertion failed"
+prettyEvalDirectiveValue (Assertion a)          = prettyAssertionOutcome a
 prettyEvalDirectiveValue (Reduction (Left exc)) = Text.unlines (prettyEvalException exc)
 prettyEvalDirectiveValue (Reduction (Right v))  = prettyLayout v
+
+-- | The three outcomes of an @#ASSERT@, as the user sees them. The exception
+-- case keeps the exception's own lines verbatim under a header, so the reason
+-- (division by zero, an assumed term, a CONSIDER with no matching branch, …)
+-- is never lost. Every surface that renders an assertion goes through here.
+prettyAssertionOutcome :: Either EvalException Bool -> Text
+prettyAssertionOutcome (Right True)  = "assertion satisfied"
+prettyAssertionOutcome (Right False) = "assertion failed"
+prettyAssertionOutcome (Left exc)    =
+  Text.unlines ("assertion could not be evaluated:" : prettyEvalException exc)
 
 -- | STATE-AS-LEDGER M2/M4: render the per-party store a directive produced, as
 -- labelled sections. Returns the empty 'Text' when the directive wrote nothing,
@@ -404,9 +423,16 @@ instance Aeson.ToJSON EvalDirectiveResult where
     ]
 
 instance Aeson.ToJSON EvalDirectiveValue where
-  toJSON (Assertion b) = Aeson.object
+  toJSON (Assertion (Right b)) = Aeson.object
     [ "type"  Aeson..= ("assertion" :: Text)
     , "value" Aeson..= b
+    ]
+  -- Still an assertion (consumers counting them must see it), with a value
+  -- that is neither true nor false, and the reason alongside.
+  toJSON (Assertion (Left exc)) = Aeson.object
+    [ "type"  Aeson..= ("assertion" :: Text)
+    , "value" Aeson..= Aeson.Null
+    , "error" Aeson..= prettyAssertionOutcome (Left exc)
     ]
   toJSON (Reduction (Right val)) = Aeson.toJSON val
   toJSON (Reduction (Left exc)) = Aeson.object
@@ -414,8 +440,7 @@ instance Aeson.ToJSON EvalDirectiveValue where
     ]
 
 prettyEvalDirectiveValueWithFields :: ConstructorFieldNames -> EvalDirectiveValue -> Text
-prettyEvalDirectiveValueWithFields _fields (Assertion True)        = "assertion satisfied"
-prettyEvalDirectiveValueWithFields _fields (Assertion False)       = "assertion failed"
+prettyEvalDirectiveValueWithFields _fields (Assertion a)           = prettyAssertionOutcome a
 prettyEvalDirectiveValueWithFields _fields (Reduction (Left exc))  = Text.unlines (prettyEvalException exc)
 prettyEvalDirectiveValueWithFields fields  (Reduction (Right v))   = prettyLayoutNF fields v
 
