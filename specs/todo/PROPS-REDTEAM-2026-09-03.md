@@ -602,3 +602,160 @@ WHEREIN issuer IS AN IssuerProfile
 - **Mechanics.** As for `WHEREAS`: whole-token keyword lookup, no prefix clash; the token is
   unused anywhere in `jl4/`, `jl4-core/`, `doc/`, and the word does not even occur in prose there.
 - **Cost.** As for `WHEREAS`.
+
+---
+
+## 11. `REFUSE`, typed failure, and field-opening (minuted 2026-09-04; not ruled)
+
+Candidates, like §10. Worked out in conversation with Meng after the `WHEREIN` minute.
+
+### 11.1 The refusal role, as found
+
+Reg CF's dated constants end in an `OTHERWISE` arm that names a sentence-long `ASSUME`
+(`regcf.l4:143`, reached from five functions at :154, :166, :175, :185, :195). The comment above it:
+"a rule date before 2016-05-16 is a curated refusal, not an answer. ASSUME makes this a deliberate
+bottom … **no input is ever routed through it.**" A second at `regcf.l4:486` refuses the COVID-19
+temporary rules ("the honest answer is a refusal, not a guess … decided 2026-07-29: refuse, not
+encode"). Same device: `daydate.l4:104`, prelude `TBD` (:757-761), and the DMN fixtures
+`dmn/gst-rate.l4:63`, `dmn/ymd-dates.l4:84` ("same device").
+
+Why the deprecation must treat it separately: every other `ASSUME` wants a value from outside; this
+one must never receive one, and only a comment says so. jl4-service already breaks it:
+`Backend/Jl4.hs:556-560` promotes every `ASSUME` a function references into a request parameter, so
+the commencement refusal is offered to every caller as an input, and a supplied number yields a
+confident wrong answer for a period in which the regulation did not exist. Section `GIVEN`s (§10.2)
+are suppliable by design; discharge across `IMPORT` would make `daydate`'s refusal a parameter of
+every function calling `YMD`. The refusal needs a construct whose defining property is **not an
+input**.
+
+### 11.2 `REFUSE`: a throw that cannot be caught and can be statically analysed
+
+`REFUSE "message"` is an expression typed at any type. Evaluating it stops with the message as a
+distinct outcome — _declined_, neither an error nor an unknown fact. It appears in no schema. The
+trace records it as its own result kind (a wizard renders "outside what this model covers,
+because …" with the citation). `l4 check` lists every `REFUSE` with its reason: the model's declared
+boundary as a report.
+
+```l4
+`offering maximum in a 12-month period` MEANS
+    …
+    OTHERWISE REFUSE "no Regulation Crowdfunding figure exists before commencement on 2016-05-16"
+```
+
+Meng's characterisation (2026-09-04): **a `THROW` that cannot be caught and can be statically
+analysed.** Three consequences:
+
+1. **Uncatchable is what makes it analysable.** With no handler stack, "can this rule refuse?" is
+   reachability over the call graph, the same fixpoint as the read-set:
+   `Ref(f) = refusals in f ∪ ⋃ { Ref(g) | g referenced in f }`. Every function then carries two
+   inferred signatures — the read-set (what it needs from context: the coeffect) and the refusal
+   set (how it may decline: the effect) — both on hover, both in the export schema (required
+   inputs on one side, possible declared outcomes on the other). Checked exceptions with nothing
+   written and nothing swallowed.
+2. **Uncatchable is what keeps it honest.** The Reg CF authors avoided `NOTHING` because `NOTHING`
+   can be handled — a downstream `CONSIDER` launders a refusal into a default. `REFUSE` cannot be
+   converted by any rule; only the boundary observes it (evaluator top, service, wizard, test).
+   `NOTHING` is a value that is absent, which a rule may reason about; `REFUSE` is an answer that is
+   withheld, which no rule may reason past.
+3. **It composes with the legal devices without a catch.** A statute avoids a refusal by changing
+   what is asked — deeming is a record update on the subject before the rule runs — never by
+   handling it after. `SUBJECT TO` overrides a conclusion, not a refusal. A refusal can only be
+   prevented upstream, where the trace shows it.
+
+Two analyses, labelled differently: `Ref(f)` is syntactic and, under laziness, an
+over-approximation ("may refuse"); the verification rung answers "for which inputs does this export
+refuse?" as satisfiability, yielding a **region** — for Reg CF: rule date < 2016-05-16, or rule date
+in the COVID window ∧ aggregate in the band — the boundary in its most precise form ("does refuse").
+
+Two intents, two spellings over one primitive (Rust `unimplemented!`/`unreachable!`, Lean `sorry`):
+`TBD` = placeholder, should be zero at release, warned; `REFUSE` = deliberate and permanent,
+counted. `TBD` becomes a one-line prelude definition over `REFUSE`.
+
+Candidate ruling: `#ASSERT`/`#TRACE` may _expect_ a refusal, so a test can pin the model's boundary
+as it pins an answer — the only place a refusal is ever "caught".
+
+Cost: one builtin (`∀a. STRING → a`), one evaluator case reusing the `stuckOnAssumed` path
+(`Machine.hs:1080-1121, 1986-1999, 2884`) with a new message kind, one trace event, per-backend
+handling of a declined arm (DMN already has a reporting class), six corpus migrations. The temporal
+design's generated "not in force on <day>" arm (`TEMPORAL-RULE-VERSION-DESIGN.md` item 3) becomes a
+compiler-emitted `REFUSE`. The word is a candidate; it is the one the authors used in four separate
+comments. `DECLINE` would carry the same semantics.
+
+### 11.3 The penumbra: `ExceptT`-style throw/catch (explored, sorted into three things)
+
+Measured (legal corpus): `MAYBE` in 12 of 26 files; 28 functions with `GIVETH A MAYBE …`; ~1,180
+`JUST`/`NOTHING` occurrences in rule bodies (198 in data). `EITHER` is a builtin with `LEFT`/`RIGHT`
+(`prelude.l4:679-692`); prelude has `maybe`, `fromMaybe`, `isJust`, `maybeToList`, `listToMaybe`.
+The `DATE` vs `MAYBE DATE` polysemy (§10.1) is this tedium as duplicated declarations.
+
+1. **Catch-anywhere exceptions (the effect): rejected**, for the reason Reader `local` was. Under
+   laziness, which exception you catch depends on evaluation order — Peyton Jones, Reid, Hoare,
+   Marlow, Henderson, "A Semantics for Imprecise Exceptions" (PLDI 1999): pure code may raise;
+   catching is sound only at the boundary. That boundary-only rule _is_ `REFUSE`. A DRG has no
+   control flow to lower a catch to. And the legal meaning of "catch" is defeasance: Catala's
+   `exception` is prioritised default logic (already `SUBJECT TO`/`NOTWITHSTANDING`), and breach is
+   `MUST … LEST …`, a handler lexically attached to the obligation and compiled to a transition
+   system.
+2. **Typed failure as a value (the `ExceptT` type): already present; the sugar is missing.** The
+   principled form is Rust `?` / Swift optional chaining, not `ExceptT`: _success is unwrapped,
+   failure propagates to the nearest typed boundary, and the boundary is the function's `GIVETH`._
+   See 11.4.
+3. **`REFUSE`**: the labelled bottom, boundary-only. A different scenario: not "this computation
+   failed" but "the model declines".
+
+### 11.4 Candidate: failure-propagation sugar for `MAYBE` and `EITHER`
+
+**Rule.** Inside a function whose result type is `MAYBE T` or `EITHER E T`, a subexpression of the
+same failure type may be used at its payload type; a `NOTHING`/`LEFT e` short-circuits to the
+function's result. Elaboration inserts the bind. One level only; nesting stays explicit.
+
+```l4
+GIVEN w IS A Will
+GIVETH A MAYBE NUMBER
+`years between execution and death` w MEANS
+    `year of` `the date of death` MINUS `year of` (w's `date of execution`)
+    -- `date of execution` IS A MAYBE DATE; today: CONSIDER … WHEN JUST d THEN … WHEN NOTHING THEN NOTHING
+```
+
+Properties: pure (so laziness is fine); in the type (so analysable — `EITHER E T` with a reason
+type is the checked exception done right, reason visible in the signature, nothing written by
+hand); lowerable (DMN/FEEL null propagation is literally this semantics). The gate that keeps it
+from SQL's three-valued mess: **only a function whose `GIVETH` declares the failure type may
+propagate it.** Catching is pattern matching or `fromMaybe`, a value operation, allowed anywhere.
+Prior art: Rust `?`, Swift/Kotlin `?.`, Haskell do-notation, F# computation expressions, DMN null
+propagation; SQL `NULL` as the cautionary case.
+
+### 11.5 The taxonomy of non-answers
+
+| non-answer                        | construct                 | who handles it              | catchable       |
+| --------------------------------- | ------------------------- | --------------------------- | --------------- |
+| a value that may be absent        | `MAYBE`, with 11.4 sugar  | the rule, by matching       | yes, as a value |
+| an expected failure with a reason | `EITHER`, with 11.4 sugar | the rule or its caller      | yes, as a value |
+| a fact not yet known              | an unsupplied input       | the boundary asks           | n/a             |
+| the model declines                | `REFUSE`                  | the boundary only           | no              |
+| a breach                          | `LEST`                    | the obligation's own branch | structured      |
+| an overridden conclusion          | `SUBJECT TO`              | the overriding rule         | structured      |
+
+Reclassification that falls out: `daydate`'s out-of-range month is **invalid input**, a caller's
+problem, and belongs in the `EITHER` row, not a refusal. "The law does not cover this" is `REFUSE`;
+"you asked it wrong" is `LEFT`. Today `ASSUME` and `NOTHING` each do several of these jobs.
+
+### 11.6 Field-opening (Meng: "I like the record field-opening practice")
+
+Rule as proposed in §10 and here made explicit: **the fields of a record-typed parameter — a
+function's `GIVEN` or a section's `GIVEN` (§10.2) — are in scope by bare name** for the function and,
+via the callee-flow convention (§10.1), its callees. Precedent: computed fields already see sibling
+fields bare (`COMPUTED-FIELDS-SPEC` line 80; `ok/computed-fields.l4`). Collision rule: if two open
+records share a field name, the bare name is an error and `facts's field` is always available.
+This is what lets `imaginary-alcohol-act.l4`'s rule bodies stay byte-identical when its fourteen
+`ASSUME`s become one `DECLARE` (§10.2 example). Pascal `with`, Haskell `RecordWildCards`, OCaml
+`open`; the difference from `open` alone is that callee-flow removes the forwarding too.
+
+### 11.7 Additions to the proposed rulings (§9), still not ruled
+
+6. `REFUSE` is the refusal construct: uncatchable, boundary-only, in no schema, reported by
+   `l4 check`; `TBD` is its placeholder spelling; `#ASSERT` may expect one.
+7. Catch-anywhere exceptions are out; typed failure is `MAYBE`/`EITHER` with `GIVETH`-gated
+   propagation sugar (11.4).
+8. Field-opening per 11.6.
+9. Section-binder spelling: layout rule (§10.3) first; `WHEREIN` / `WHEREAS` in reserve (§10.4).
