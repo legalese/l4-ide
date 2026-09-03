@@ -476,3 +476,108 @@ f MEANS x PLUS 1
 
 The minimalist team's `env-as-record.l4` (a `DECLARE Estate` with three computed fields, one
 function-typed) reported TRUE, TRUE, `LIST FALSE`, FALSE for its four `#EVAL`s; not re-run here.
+
+---
+
+## 10. Refinements after the checkpoint (minuted 2026-09-03/04; not ruled)
+
+Everything in this section post-dates commit `c51e9e8f` and was worked out in conversation with
+Meng. Each item is a **candidate**, recorded so it is not lost; none is a ruling until
+`IMPLICIT-PROPS-DESIGN.md` says so.
+
+### 10.1 The convention: `GIVEN`s flow to callees by name
+
+Meng's extensible-record framing (a `ReaderT (Record xs)` with `Lookup xs "issuer" IssuerProfile`
+constraints and an `extendEnv` for sub-computations) adds one rule to the §4 position: **every
+`GIVEN` binding is also an implicit binding of the same name for the callee.** Application is
+`extendEnv` with the caller's argument names; `LET x = v IN e` is the one explicit extension. This
+is generation-one dynamic binding of parameters (LISP 1.5, Emacs Lisp) made static: inferred,
+elaborated by discharge, reported at the root. Its hazard is accidental capture; the argument that
+it is benign here is that parameter names are legal vocabulary.
+
+Measured (2026-09-03, 1,774 `GIVEN` slots, 559 distinct names in the legal corpus): 17 names bound
+at more than one type corpus-wide, 9 within a single file, all of them one-letter conveniences
+(`a`, `b`, `f`, `p`, `w`) or a `DATE` vs `MAYBE DATE` lifting. **Rule adopted as a candidate: one
+name, one type, per module**, checked only when a name is read implicitly. Requirements therefore
+stay sets; no row polymorphism.
+
+Resolution order for a free name: the function's own `GIVEN`, then the nearest enclosing section
+`GIVEN` (10.2), then the caller chain, then an error at the root. Lexical beats call-site. Nothing
+implicit crosses `IMPORT` (discharge at the module boundary).
+
+Environments as tiers, by binder: application (prelude/config: `TIMEZONE`, `RULES EFFECTIVE DATE`,
+jurisdiction, request id; supplied by the deployment; already the eight axes of the temporal
+context), world (module/section `GIVEN`s; supplied by the request), call (function `GIVEN`s;
+supplied by callers). The exporter's existing tier census classifies by call-site variation, so
+world-vs-subject is measured, not declared.
+
+### 10.2 Section-level `GIVEN` replaces `ASSUME`'s term role
+
+**A section is a function of its `GIVEN`s. The module is the outermost section (the title `§`,
+which all 26 legal files have). A function's `GIVEN`s flow to its callees.** Coq
+`Section`/`Variable` exactly; `ASSUME`'s term job was "section `GIVEN`" without types you can
+supply. Rules: visibility is the shipped nearest-ancestor section rule (its parent-ambiguity
+defect, §7, fixed first); extension only — a child section may add names, never re-declare an
+ancestor's; rebinding is `LET` at a site.
+
+Motivation measured (2026-09-04, 1,860 `GIVEN` parameter slots, 26 files): **889 (48%) repeat an
+identical name and type declared earlier in the same section; 1,177 (63%) repeat earlier in the
+same file.** `regcf.l4:280-330` opens eight consecutive functions with `GIVEN issuer IS AN
+IssuerProfile`. This is the feature Meng had long wanted: factoring the common `GIVEN`s of a run of
+functions. Trade: per-function `@desc` on a shared parameter (five different `issuer` descriptions
+in `regcf-denovo.l4`) collapses to one per section.
+
+`ASSUME` deprecation path, fully spelled: term `ASSUME` → section `GIVEN` under the nearest header
+(the 9 of 39 declared-in-a-sibling-section cases hoist to the title `§`); type `ASSUME` → an empty
+`DECLARE T`, which already parses (`ok/set-operators-nested.l4:36`, `ok/consider-simple.l4:3`);
+refusal `ASSUME` → a `REFUSE "…"` builtin at any type (`regcf.l4:143,486`, `daydate.l4:104`,
+prelude `TBD`). Counts: legal 54, ok 97, not-ok 20, experiments 418, doc 71, libraries 2, tests-cli 2
+lines; 113 type-role; 105 files. Order: `REFUSE` → read-set fact + export-schema test → field
+opening + discharge → DMN exporter consumes read-sets → legal corpus → deprecation warning →
+fixtures/experiments/docs → remove keyword.
+
+### 10.3 Disambiguating a section `GIVEN` from the next function's
+
+Today every top-level declaration is parsed **signature-first** (`Parser.hs` `topdecl` =
+`withTypeSig (declare | decide | assume)`), so a `GIVEN` is by construction the prefix of the next
+declaration; `MkSection` has no parameter slot. Probes on the 2026-08-27 binary: a `GIVEN` whose
+name the head does not bind still makes the definition a function of it (`GIVEN a IS A NUMBER` /
+`f MEANS a PLUS 1` / `#EVAL f WITH a IS 41` → 42); an indented `GIVEN` and a header-line `§ S GIVEN
+a …` both parse today and attach to the next function.
+
+**Candidate rule (layout): a `GIVEN` belongs to the section iff its keyword sits at a column
+greater than the header's `§`** — on the header line, or indented beneath it. Column-1 `GIVEN`
+stays the next declaration's signature. Measured: "adjacency" (the `GIVEN` right after a header is
+the section's) would reinterpret **160** sites in the legal corpus where a section's first function
+opens with a `GIVEN`; indentation collides with **zero** existing lines (no indented `GIVEN` in the
+corpus). Implementation: `MkSection` gains `Maybe (GivenSig n)`; `section n` gets
+`optional (indented givens headerColumn)`; both guarded printers (§3.2 of `CLAUDE.md`) emit the
+indented form. The anonymous top-of-file section has no header and cannot carry one.
+
+### 10.4 Candidate keyword for the section binder: `WHEREAS`
+
+Minuted at Meng's request (2026-09-04) as the fallback to 10.3 — Coq's answer, a distinct keyword
+for the section binder (`Variable` vs a definition's binders; Isabelle `fixes`) — and, if taken,
+the successor spelling of `ASSUME`'s term role:
+
+```l4
+§§ `Rule 100(b) — issuer eligibility`
+WHEREAS issuer IS AN IssuerProfile
+```
+
+- **Fit.** In contracts `WHEREAS` opens the recitals: the premises stated before the operative
+  terms. "Given these facts, the following applies" is exactly a section parameter. Older Acts use
+  the same preambular register ("Whereas it is expedient …").
+- **Risk.** In contract-drafting convention recitals are _non-operative_; a lawyer may read
+  `WHEREAS` as background narrative, whereas a section parameter is fully operative. Worth testing
+  on a drafter before ruling.
+- **Mechanics.** With a keyword, no layout rule is needed: it can sit at column 1, and, like
+  today's `ASSUME`, anywhere in its section, order-independent, binding the whole section. Lexer:
+  keywords are a whole-token `Map Text TKeywords` (`Lexer.hs:246`), so no prefix clash with
+  `WHERE`; the token `WHEREAS` is unused anywhere in `jl4/`, `jl4-core/`, `doc/` (20 lowercase
+  prose occurrences only).
+- **Cost.** One new keyword, which §4 was trying to avoid; ExactPrint/prettyLayout support as for
+  10.3.
+
+Decision pending: 10.3 (layout, no keyword) first, 10.4 in reserve; or 10.4 outright if the
+non-operative reading of recitals is judged confusing enough to forbid the layout form.
