@@ -279,11 +279,26 @@ export function liquiditySchedule(deal, event, result, meta = {}) {
     table(
       ["parameter", "value"],
       [
-        ["Proceeds legally available for distribution", money(event.proceeds, $, 0)],
-        ["Indebtedness and creditor claims ranking ahead", money(event.indebtedness, $, 0)],
-        ["Promised Options receiving Proceeds", shares(event.promisedOptionsReceivingProceeds)],
-        ["**Liquidity Capitalization**", `**${shares(result.liquidityCapitalization)}**`],
-        ["Consideration per as-converted share", money(result.perShareConsideration, $, 4)],
+        [
+          "Proceeds legally available for distribution",
+          money(event.proceeds, $, 0),
+        ],
+        [
+          "Indebtedness and creditor claims ranking ahead",
+          money(event.indebtedness, $, 0),
+        ],
+        [
+          "Promised Options receiving Proceeds",
+          shares(event.promisedOptionsReceivingProceeds),
+        ],
+        [
+          "**Liquidity Capitalization**",
+          `**${shares(result.liquidityCapitalization)}**`,
+        ],
+        [
+          "Consideration per as-converted share",
+          money(result.perShareConsideration, $, 4),
+        ],
       ],
     ),
   );

@@ -19,6 +19,8 @@ directory, which is always a path argument — this tool never assumes a checkou
 ```
 node etc/safe/gen.mjs fill   --subject DIR --deal deal.json --out DIR [--pdf] [--docx] [--no-embed]
 node etc/safe/gen.mjs round  --subject DIR --deal deal.json --out DIR
+node etc/safe/gen.mjs liquidity --subject DIR --deal deal.json --out DIR --proceeds N \
+                                [--indebtedness N] [--promised-options N]
 node etc/safe/gen.mjs verify FILE.pdf [--subject DIR]
 node etc/safe/make-templates.mjs  --subject DIR [--check]
 node etc/safe/check-templates.mjs --subject DIR
@@ -64,10 +66,14 @@ sibling worktrees. The call shapes, measured 2026-09-04:
 ```
 JL4_LIBRARY_PATH=<row> l4 batch <row>/safe-form.l4      -e "validate deal" -i rows.json
 JL4_LIBRARY_PATH=<row> l4 batch <row>/safe-portfolio.l4 -e convert         -i rows.json
+JL4_LIBRARY_PATH=<row> l4 batch <row>/safe-portfolio.l4 -e liquidity       -i rows.json
 JL4_LIBRARY_PATH=<row> l4 check  <out>/<safe-id>.l4
 ```
 
-`rows.json` is `[{"deal": <the deal.json object>}]`. `JL4_LIBRARY_PATH` must name the
+`rows.json` is `[{"deal": <the deal.json object>}]`, with one key per parameter — the
+two-parameter `liquidity` takes
+`[{"deal": {…}, "event": {"proceeds": 10000000, "indebtedness": 0, "promisedOptionsReceivingProceeds": 0}}]`,
+named as `encoding.json`'s `entrypoints.<name>.params` says. `JL4_LIBRARY_PATH` must name the
 encoding row or the modules' `IMPORT`s do not resolve. Output is NDJSON, one envelope per
 row:
 
@@ -89,6 +95,20 @@ failure `status` is `"error"` and `output[0].result.error` carries the message, 
 
 `l4` has no `--version` (it exits 1 with ``Invalid option `--version'``), so the payload's
 `generator.l4` reads `unknown`. That is a measured absence, not a failed probe.
+
+## The edition comes from the form, not from the deal
+
+The deposit measured the header stamp of every form. The US MFN SAFE is **Version 1.3**;
+the US cap and discount SAFEs are 1.2; Singapore, Canada and Cayman are "⟨place⟩ Version
+1.2"; the US side letter is 1.0 and the other three side letters carry no stamp at all.
+So a deal that declares one edition for every US form is wrong about one of them.
+
+`fill` therefore reads the edition off the stamp in `source/footers.json`, records that in
+the XMP payload and in `manifest.json`, and **refuses (exit 2) a deal whose
+`form.edition` names a different edition** than the form it selects. The check is against
+the SAFE, because that is the form the deal names; each document's payload still records
+its own form's edition, so an MFN SAFE reads 1.3 and its side letter reads 1.0. The
+manifest keeps the stamp string beside the number, because the stamp is the evidence.
 
 ## The XMP payload (SPEC.md §5.4)
 
@@ -196,6 +216,10 @@ The numbers it produces are the User Guide's own: Company Capitalization 11,764,
 Investor A 588,235 shares and Investor B 1,176,470, both at their caps; a Series A price
 of $1.1144 with a 1,694,570-share pool increase (the guide rounds that to 1,695,000); and
 448,642 pro rata shares for Investor B.
+
+`liquidity --proceeds 10000000` reproduces the guide's Q3 (both Safes convert, $0.8901
+per as-converted share, Conversion Amounts 561,764 and 1,123,529) and
+`--proceeds 3000000` its Q4 (neither converts; each takes its Cash-Out Amount).
 
 Every Safe in the round is bound into every instance module, not just the one the document
 is for: Company Capitalization includes all Converting Securities, so no Safe's share

@@ -440,7 +440,9 @@ function cmdRound(args) {
 // ---------------------------------------------------------------------------
 
 function cmdLiquidity(args) {
-  const subject = loadSubject(args.flags.subject, { encoding: args.flags.encoding });
+  const subject = loadSubject(args.flags.subject, {
+    encoding: args.flags.encoding,
+  });
   const deal = JSON.parse(readFileSync(resolve(args.flags.deal), "utf8"));
   const out = resolve(args.flags.out);
   mkdirSync(out, { recursive: true });
@@ -457,10 +459,13 @@ function cmdLiquidity(args) {
   const event = {
     proceeds: Number(args.flags.proceeds),
     indebtedness: Number(args.flags.indebtedness ?? 0),
-    promisedOptionsReceivingProceeds: Number(args.flags["promised-options"] ?? 0),
+    promisedOptionsReceivingProceeds: Number(
+      args.flags["promised-options"] ?? 0,
+    ),
   };
   for (const [k, v] of Object.entries(event))
-    if (!Number.isFinite(v)) throw new Error(`etc/safe: liquidity: ${k} is not a number`);
+    if (!Number.isFinite(v))
+      throw new Error(`etc/safe: liquidity: ${k} is not a number`);
 
   const ep = subject.encoding.entrypoints?.liquidity;
   if (!ep)
@@ -473,13 +478,23 @@ function cmdLiquidity(args) {
     subject.modulePath(ep.module),
     ep.function ?? "liquidity",
     { [dealParam]: deal, [eventParam]: event },
-    { l4: l4.path, libraryPath: subject.row, recordFields: subject.recordFields },
+    {
+      l4: l4.path,
+      libraryPath: subject.row,
+      recordFields: subject.recordFields,
+    },
   );
 
-  writeFileSync(join(out, "liquidity.json"), JSON.stringify({ event, result }, null, 2) + "\n");
+  writeFileSync(
+    join(out, "liquidity.json"),
+    JSON.stringify({ event, result }, null, 2) + "\n",
+  );
   writeFileSync(
     join(out, "liquidity-schedule.md"),
-    liquiditySchedule(deal, event, result, { at: localDate(), row: subject.rowName }),
+    liquiditySchedule(deal, event, result, {
+      at: localDate(),
+      row: subject.rowName,
+    }),
   );
   process.stdout.write(
     `liquidity Liquidity Capitalization ${Math.floor(result.liquidityCapitalization)}` +
