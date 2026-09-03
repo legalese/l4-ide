@@ -779,6 +779,19 @@ a defect: writing`base's l`when`l` is a local function of the base's type is a g
   act as, a same-named value forward reference (a `WHERE` binding named like a field it
   projects previously broke this).
 
+  **OPEN, not attempted on this branch (2026-09-04) — probe p12.** FIX B does not reach a
+  SAME-SECTION forward reference to a `GIVEN`-only function that shadows a same-typed
+  top-level one. That case still reports "multiple definitions for the identifier f" on all
+  three binaries measured — the pre-branch binary, the withdrawn first cut of FIX D, and the
+  binary built from this branch — so FIX D neither fixed nor caused it. The diagnosis is FIX
+  B's bare-`InfVar` test for the ANCESTOR side of the wildcard shadowing: a `GIVEN`-only
+  function's key is `FUNCTION FROM … TO <infvar>`, not a bare `InfVar`, so the nearer
+  binding never qualifies to shadow. Widening it is not a matter of swapping in FIX D's
+  `hasInfVarKey`. That is a KEY test, and what this needs is a UNIFIABILITY test: under a
+  key test a nearer `Fun [STRING] _` would shadow a farther, differently-typed overload that
+  type-direction should have selected — the same regression FIX D's note above records as the
+  reason FIX B keeps the bare test. Left open pending that test.
+
 - **FIX C — imports stay ambiguous (`jl4/examples/not-ok/tc/section-scoping-import-collision.l4`).**
   Imported candidates (identified by a differing module URI on the `Unique`) are never
   ranked or eliminated by section proximity: they remain co-equal viable candidates. So an
@@ -864,20 +877,42 @@ a defect: writing`base's l`when`l` is a local function of the base's type is a g
   outcomes of a `prune` only when such a branch exists, and `prune` falls through whenever it
   does not.
 
-  **The residue, stated because it is order-dependent.** With _no_ type context and a
-  _differently_-typed rebinding the two orders still differ: `§ a / x MEANS 1 / f MEANS x /
-§ b / x MEANS "s"` resolves `f` to `1` (the `STRING` `x` is not yet inferred, so its branch
-  is marked and loses), whereas with `§ b` placed first the `STRING` `x` is concrete, sits in
-  its own type group under §3.3.4 step 4, and `f` remains ambiguous, as it was before. Both
-  orders were ambiguous before FIX D. Removing the residue means marking _concrete_
-  off-ancestry candidates too, which changes the flat-fallback rule itself (§3.3.4 step 2)
-  and is not done here.
+  **The residue, stated because it is order-dependent.** The residue is a reference with no
+  type context _that selects between the candidates_, at which the off-ancestry binding is
+  still not inferred. Both halves are wider than "the rebinding sits below the reference". A
+  type context can be present and simply fail to discriminate; and whether the off-ancestry
+  binding is still un-inferred AT THE REFERENCE depends on any earlier declaration that
+  already resolved to it, not only on where `§ b` is placed.
+
+  The plain case: `§ a / x MEANS 1 / f MEANS x / § b / x MEANS "s"` resolves `f` to `1` (the
+  `STRING` `x` is not yet inferred, so its branch is marked and loses), whereas with `§ b`
+  placed first the `STRING` `x` is concrete, sits in its own type group under §3.3.4 step 4,
+  and `f` remains ambiguous, as it was before.
+
+  A NON-discriminating type context shows the same asymmetry, so "no type context" understates
+  it. Probe r20a, `§ a / x MEANS 1 / f MEANS x EQUALS x / §§ b / x MEANS "s"`, yields `TRUE`;
+  probe r20b, the same with `§§ b` above the reference, is ambiguous. An `EQUALS` context is
+  present in both and selects neither candidate.
+
+  With the rebinding BELOW the reference in _both_ orders, the order of the REFERENCES
+  decides, so `§ b`'s placement is not the only variable. Probe r19a,
+  `x MEANS "s" / f MEANS x PLUS 1 / g MEANS x / §§ b / x MEANS 2`, leaves `g` ambiguous:
+  `f`'s prune has already fixed `b`'s `x` to `NUMBER`, so that candidate is concrete by the
+  time `g` is checked and survives the flat fallback in its own type group. Probe r19b, with
+  `g` written before `f`, gives `g` = `"s"` and `f` = `3`.
+
+  All three pairs were ambiguous in both orders before FIX D. Removing the residue means
+  marking _concrete_ off-ancestry candidates too, which changes the flat-fallback rule itself
+  (§3.3.4 step 2) and is not done here.
 
   **Measured** (2026-09-04; `l4` built from this branch against the pre-branch binary of
   2026-08-27). Over the twenty-six probes of the independent verification that found the
-  first cut wanting, the branch differs from the pre-branch binary on exactly four — the
-  `GIVEN`-only, unannotated and sibling function rebindings below the reference, now
-  resolving to the ancestor, and the residue above, now `1` — and agrees with it on every
+  first cut wanting, the branch differs from the pre-branch binary in OUTPUT on eight, of
+  which exactly four differ in MEANING — p2, p2c, p13 and p3a: the `GIVEN`-only, unannotated
+  and sibling function rebindings below the reference, now resolving to the ancestor, and the
+  residue above, now `1`. The other four — p12, p3b, p4 and p6 — still report the same
+  ambiguity and differ only in the SPELLING of the candidate names, which commit `4357e163`
+  made section-qualified. The branch agrees with the pre-branch binary on every
   other, including `x PLUS 1` across a differently-typed rebinding (`3` in both orders, in
   both the descendant and the sibling shape) and a differently-typed unannotated overload in
   a later sibling (still selected by type direction). Ten further probes for type context
@@ -885,7 +920,11 @@ a defect: writing`base's l`when`l` is a local function of the base's type is a g
   a projection whose base is the rebinding, two references in one expression, a `WHERE`
   local referring to the rebinding — agree with the pre-branch binary in both orders except
   where both branches survive, which is the stated delta. `l4 check` over every `.l4` under
-  `jl4/examples` and `jl4-core/libraries` (514 files) changes on no file that predates the
+  `jl4/examples` and `jl4-core/libraries` (515 files: 493 under `jl4/examples` and 22 under
+  `jl4-core/libraries`, counted with `find … -name '*.l4' | wc -l`, and including the single
+  `.l4` that lives inside a `tests/` directory,
+  `jl4/examples/legal/tests/imaginary-alcohol-act.l4`, which the differential list skipped and
+  which is identical old vs new) changes on no file that predates the
   branch except the three `not-ok/tc` files whose ambiguity candidates are now
   section-qualified (header note); the remaining differences are files added on this branch
   — the fourth qualified-spelling fixture and the FIX D fixtures, on which the pre-branch

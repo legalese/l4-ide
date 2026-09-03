@@ -13,8 +13,8 @@
 --     There are multiple definitions for the identifier f
 --
 -- while the same rebinding placed ABOVE the reference resolved. The rule now
--- is that a not-yet-inferred off-ancestry candidate is DEFERRED: it is only
--- consulted when the ancestry does not already resolve the reference.
+-- is that the branch choosing a not-yet-inferred off-ancestry candidate is
+-- marked, and the forcing point prefers an unmarked success (spec §12, FIX D).
 
 -- 1. GIVEN, no GIVETH; rebound in a child section below the reference.
 § a

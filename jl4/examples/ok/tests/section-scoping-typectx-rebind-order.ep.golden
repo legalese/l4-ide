@@ -8,8 +8,8 @@
 -- and evaluates to 3 — whether that binding is placed ABOVE or BELOW the
 -- reference. The first cut of FIX D dropped the not-yet-inferred candidate
 -- outright, which kept the ABOVE order at 3 but turned the BELOW order into a
--- type error at the reference. A not-yet-inferred candidate is now DEFERRED
--- instead: consulted only when the ancestry does not resolve the reference.
+-- type error at the reference. Instead the branch that chooses a not-yet-
+-- inferred candidate is marked, and the forcing point prefers an unmarked one.
 --
 -- This fixture pins order-independence, not the design of the flat fallback;
 -- see the dated note under spec §3.3.4 for that rule as shipped.
