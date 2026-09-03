@@ -479,6 +479,11 @@ evalCrashFixture = fixtureDir </> "eval-crash.l4"
 assertRaisesFixture :: FilePath
 assertRaisesFixture = fixtureDir </> "assert-raises.l4"
 
+-- | Typechecks cleanly; both @#ASSERT@s are on a bare assumed BOOLEAN — one
+-- polarity raises, the other reduces to the symbolic term without raising.
+assertAssumedFixture :: FilePath
+assertAssumedFixture = fixtureDir </> "assert-assumed.l4"
+
 breachTraceFixture, breachInputsFixture :: FilePath
 breachTraceFixture  = fixtureDir </> "breach-trace.l4"
 breachInputsFixture = fixtureDir </> "breach-inputs.json"
@@ -1158,7 +1163,7 @@ main = do
        , hydrationGolden, hydrationEngineCases, sumtypeGolden
        , bkmSource, bkmDmnGolden, bkmEngineCases
        , svcSource, svcGolden, svcKieDmnGolden, svcEngineCases
-       , daCitationsSource, assertRaisesFixture ] \fp -> do
+       , daCitationsSource, assertRaisesFixture, assertAssumedFixture ] \fp -> do
     ok <- doesFileExist fp
     unless ok $ do
       putStrLn ("Missing fixture: " ++ fp)
@@ -1271,6 +1276,20 @@ spec bin = do
 
     it "still typechecks the raising fixture — l4 check succeeds on it" $
       expectOk bin ["check", assertRaisesFixture] "Check succeeded."
+
+    -- A bare assumed BOOLEAN is neither TRUE nor FALSE. `#ASSERT NOT b`
+    -- forces b and raises; `#ASSERT b` reduces to the symbolic b WITHOUT
+    -- raising, and used to fall through to "assertion failed" — so the two
+    -- polarities disagreed about the same undecidable term.
+    it "reports both polarities of an #ASSERT on a bare assumed BOOLEAN as undecided" $ do
+      Output _ sout _ <- runL4 bin ["run", assertAssumedFixture]
+      length (filter ("assertion could not be evaluated" `isInfixOf`) (lines sout)) `shouldBe` 2
+      sout `shouldSatisfy` ("assumed term" `isInfixOf`)
+      sout `shouldNotSatisfy` ("assertion failed" `isInfixOf`)
+      sout `shouldNotSatisfy` ("assertion satisfied" `isInfixOf`)
+
+    it "fails the run when an #ASSERT is stuck on a bare assumed BOOLEAN" $
+      expectFail bin ["run", assertAssumedFixture]
 
     it "falls through from a bare positional argument (backward-compat)" $
       expectOk bin [cleanFixture] "Checking succeeded."

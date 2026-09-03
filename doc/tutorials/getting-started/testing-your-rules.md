@@ -157,6 +157,8 @@ Result:
 
 This is a crash, not a verdict: `l4 run` exits non-zero, and in `--json` the result keeps `"kind": "assertion"` with `"value": null` and the reason under `"error"`.
 
+The same holds for a bare `ASSUME`d `BOOLEAN` asserted directly. `#ASSERT NOT b` forces `b` and raises; `#ASSERT b` reduces to the symbolic `b` without raising — but that is no verdict either, so it reports the same way rather than as `assertion failed`.
+
 > **CI note:** `l4 run` exits non-zero for _type errors_ and for directives that _crash during evaluation_ (runtime errors, including an `#ASSERT` that raises), but not for failed assertions — a file with a failing `#ASSERT` still typechecks, so the exit code is `0`. In a CI pipeline, run with `--json` and check each result of `"kind": "assertion"` for `"value": false`, or simply grep the text output for `assertion failed`.
 
 ---

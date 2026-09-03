@@ -4,6 +4,7 @@
 -- "assertion failed", so a wrong answer and an error were indistinguishable.
 
 ASSUME x IS A NUMBER
+ASSUME b IS A BOOLEAN
 
 -- raises: division by zero — both polarities "could not be evaluated"
 #ASSERT (1 DIVIDED BY 0) EQUALS 1
@@ -15,6 +16,13 @@ ASSUME x IS A NUMBER
 
 -- does not raise: the disjunction short-circuits before x is forced
 #ASSERT TRUE OR (x EQUALS 1)
+
+-- a bare assumed BOOLEAN is no verdict either — neither TRUE nor FALSE.
+-- `#ASSERT NOT b` forces b and raises; `#ASSERT b` reduces to the symbolic b
+-- WITHOUT raising, and used to fall through to "assertion failed", so the
+-- two polarities disagreed. Both "could not be evaluated".
+#ASSERT b
+#ASSERT NOT b
 
 -- the two clean verdicts, for contrast
 #ASSERT 1 EQUALS 2

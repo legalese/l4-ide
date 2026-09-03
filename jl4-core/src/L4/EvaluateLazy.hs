@@ -245,6 +245,12 @@ nfDirective (MkEvalDirective r traced isAssert expr env) = withFreshLedger $ do
             -- suite could not tell a wrong answer from an error.
             Left exc                    -> Left exc
             Right (MkNF (ValBool True)) -> Right True
+            -- A result that is a bare assumed term did not raise, but it is
+            -- no verdict either — neither TRUE nor FALSE. Report it exactly as
+            -- the raising polarity does ('#ASSERT NOT b' forces b and raises
+            -- 'Stuck'), so both polarities of an '#ASSERT' on an assumed
+            -- BOOLEAN agree instead of one of them collapsing to "failed".
+            Right (MkNF (ValAssumed a)) -> Left (UserEvalException (Stuck a))
             Right _                     -> Right False
         else Reduction v
   pure (MkEvalDirectiveResult r v' finalTrace directiveLedger)
