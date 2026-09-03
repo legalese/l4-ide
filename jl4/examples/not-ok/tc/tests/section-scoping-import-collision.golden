@@ -15,5 +15,5 @@ File: section-scoping-import-collision.l4
     and I do not have sufficient information to make a choice between them.
     The options are:
 
-      EULER (defined at section-scoping-import-collision.l4:14:1-6) of type NUMBER
+      `Local Section`.EULER (defined at section-scoping-import-collision.l4:14:1-6) of type NUMBER
       EULER (defined at math.l4:12:1-6) of type NUMBER

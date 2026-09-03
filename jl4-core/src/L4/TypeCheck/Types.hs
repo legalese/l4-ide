@@ -686,15 +686,35 @@ outOfScope n t = do
 
 ambiguousTerm :: Name -> [(Resolved, Type' Resolved)] -> Check Resolved
 ambiguousTerm n xs = do
-  addError (AmbiguousTermError n xs)
+  xs' <- traverse (\(r, t) -> (, t) <$> sectionQualified r) xs
+  addError (AmbiguousTermError n xs')
   u <- newUnique
   pure (OutOfScope u n)
 
 ambiguousType :: Name -> [(Resolved, Kind)] -> Check Resolved
 ambiguousType n xs = do
-  addError (AmbiguousTypeError n xs)
+  xs' <- traverse (\(r, k) -> (, k) <$> sectionQualified r) xs
+  addError (AmbiguousTypeError n xs')
   u <- newUnique
   pure (OutOfScope u n)
+
+-- | Re-spell a resolution candidate under its defining section, for the
+-- ambiguity diagnostics only: an @x@ defined in @§ a@ \/ @§§ b@ is listed as
+-- @a.b.x@. That is at once the section the reader needs in order to see why
+-- the candidates are co-equal (two siblings, say, neither on the reference's
+-- ancestry) and the spelling that disambiguates. Top-level and imported
+-- candidates (no recorded section path) and already-qualified names are left
+-- alone. Only the referring spelling changes: the 'Unique' and the original
+-- (defining) occurrence — hence the "defined at" range — are untouched.
+sectionQualified :: Resolved -> Check Resolved
+sectionQualified r = do
+  paths <- use #sectionPaths
+  pure case (r, Map.lookup (getUnique r) paths) of
+    (Ref n u o, Just secs)
+      | NormalName t <- rawName n
+      , Just qual <- nonEmpty ((\(h :| _) -> h) <$> secs)
+      -> Ref (MkName (getAnno n) (QualifiedName qual t)) u o
+    _ -> r
 
 -- | Is this 'Resolved' the sentinel that 'outOfScope', 'ambiguousTerm' and
 -- 'ambiguousType' mint to make progress after a name-resolution failure?

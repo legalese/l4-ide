@@ -1,0 +1,19 @@
+-- Test: the flat-scope fallback is ambiguous when several sibling sections
+-- define the name (spec §3.3.4 as corrected 2026-09-04, §5.1).
+--
+-- The reference below is at top level: neither § a nor § b is on its
+-- ancestry, so resolution falls back to the flat scope, where BOTH x's are
+-- candidates of the same type. That is a genuine ambiguity, and it must be
+-- reported AT THE REFERENCE (line 11) — not at either definition — naming
+-- each candidate together with the section that defines it, so the reader
+-- can see which qualified spelling (a.x or b.x) to use.
+
+f MEANS x
+
+§ a
+x MEANS 1
+
+§ b
+x MEANS 2
+
+#EVAL f
