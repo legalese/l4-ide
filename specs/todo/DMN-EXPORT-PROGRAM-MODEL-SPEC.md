@@ -151,6 +151,16 @@ So the translation is **un-lambda-lifting**, and DMN's answer to "where did the 
 _the model itself is the lambda_ — you invoke a DMN model by supplying its `inputData`. Arity
 moves from each decision up to the model, where DMN puts it.
 
+> **Cross-reference added 2026-09-04.** `IMPLICIT-PROPS-DESIGN.md` reads this frame from the
+> language side, and until this note this spec did not cite it back. Its §10.5 takes the model
+> this spec replaces — global scalars plus decisions over them, the `ASSUME` shape — as an
+> implicit environment, and observes that a typed `props` environment is isomorphic to the
+> `inputData` namespace of the let-block above; its §10.4 item 5 observes that the `local`
+> rebinding of its §4.4 is the scoped rebinding a DRG cannot represent — the construct §15.12
+> (R12) does not emit and §15.12.1 (R-C) declines to elaborate — so the unlowerable surface would
+> grow with every use of it. Neither observation is ruled here; this note is the reciprocal
+> citation that document asked for.
+
 ### 2.1 The analysis, stated once
 
 For each top-level `DECIDE` `d` with parameters `p₁…pₙ`:
