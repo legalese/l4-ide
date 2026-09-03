@@ -1,0 +1,47 @@
+-- Regression test for lexical section scoping — FIX D (the other half of FIX B).
+--
+-- A section's OWN reference to a name must resolve to the nearest
+-- ancestor-or-self binding even when a DESCENDANT section further down the
+-- file rebinds the same name. Spec §3.1: same section first, then ancestors,
+-- then top level; a child's rebinding is not on its parent's ancestry.
+--
+-- Previously the descendant's binding, not yet inferred when the ancestor's
+-- reference was checked, still carried an unresolved inference-variable type
+-- (a fully annotated ASSUME included: a signature's type is only unified with
+-- its declaration during inference). It therefore fell into its own type
+-- group, where the flat-scope fallback kept it, and the ancestor's own
+-- reference reported
+--
+--     There are multiple definitions for the identifier x
+--
+-- naming the ancestor's binding and the descendant's. The same rebinding
+-- placed ABOVE the reference resolved fine, so the answer depended on textual
+-- order. FIX B (spec §12) already let a wildcard ANCESTOR shadow farther
+-- ancestors; this pins the missing complement: a wildcard that is OFF the
+-- ancestry never out-competes a value ancestor.
+
+-- 1. Top level vs. a section below it (spec §5.2).
+x MEANS 10
+`top f` MEANS x               -- 10: top-level x, although § a rebinds x
+
+§ a
+x MEANS 1
+`a f` MEANS x                 -- 1: a's own x, although §§ b and §§§ c rebind x
+ASSUME y IS A NUMBER
+#CHECK y                      -- NUMBER: a's y, although §§ b rebinds y
+
+§§ b
+x MEANS 2
+ASSUME y IS A NUMBER
+`b f` MEANS x                 -- 2: b's own x, although §§§ c rebinds x
+`b via a` MEANS a.x           -- 1: qualified access unchanged (spec §3.2)
+
+§§§ c
+x MEANS 3
+`c f` MEANS x                 -- 3
+
+#EVAL `top f`     -- 10
+#EVAL `a f`       -- 1
+#EVAL `b f`       -- 2
+#EVAL `b via a`   -- 1
+#EVAL `c f`       -- 3

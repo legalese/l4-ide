@@ -1192,9 +1192,29 @@ resolveTermFilteredIn shadowing preambleErr p viab n kont = do
                  , isVal, isInfVarKey k, Just d <- [prox u] ] of
           [] -> Nothing
           ds -> Just (minimum ds)
-      keepCand (_, isVal, u, _) =
+      -- FIX D — the other half of FIX B. A same-module VALUE binding that is
+      -- OFF the ancestry (in a sibling or a descendant section) and whose type
+      -- is still an unresolved 'InfVar' is a forward reference to a definition
+      -- not yet inferred: in practice any same-named definition further down
+      -- the file, a fully annotated ASSUME included, since a signature's type
+      -- is only unified with its declaration during inference. Such a
+      -- candidate lands in its own 'typeKey' group, where 'selectByProximity'
+      -- finds no ancestor and falls back to the flat scope, so it survives
+      -- beside a concrete ancestor and turns the ancestor's OWN reference into
+      -- an ambiguity — one that depends on textual order, because the same
+      -- rebinding placed ABOVE the reference is concrete by then, shares the
+      -- ancestor's group, and is dropped as intended. Whenever a same-module
+      -- VALUE ancestor exists, proximity wins (spec §5.3) and the off-ancestry
+      -- wildcard is dropped. Imports are untouched (they carry no ancestry and
+      -- are never wildcards), as are selectors and constructors.
+      hasValueAncestor =
+        or [ isVal && isJust (prox u) | (_, isVal, u, _) <- candidates0 ]
+      keepCand (k, isVal, u, _) =
         case (wildValueAncestorProx, prox u) of
           (Just w, Just d) | isVal -> d <= w
+          (_, Nothing)
+            | isVal, isInfVarKey k, u.moduleUri == curUri, hasValueAncestor
+            -> False
           _                        -> True
       candidates = [ (k, u, a) | (k, _isVal, u, a) <- filter keepCand candidates0 ]
   case selectByProximityPerType curUri current paths candidates of
