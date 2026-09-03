@@ -9,14 +9,19 @@
 //   $ echo $?
 //   0
 //
-// So: `l4 run` exits 0 on a failed #ASSERT, on a runtime exception, and on a
-// Stuck evaluation. `ok` tracks TYPECHECKING only. The only machine-readable
-// verdict is results[], and it must be parsed here rather than inferred from
-// the process exit code.
+// So: `l4 run` exits 0 on a failed #ASSERT — a clean FALSE — with ok:true. That
+// is the case this module exists for, and it still holds. RE-MEASURED
+// 2026-09-04: the exit code and `ok` DO go red on a directive that CRASHES —
+// a raising #EVAL (kind "error"; exit 1 already on the 2026-08-27 binary), and,
+// as of fix/assert-check-reporting, an #ASSERT that raises or is stuck on an
+// assumed term (kind "assertion", value null, the reason under "error"; exit 1)
+// — but the envelope is still written, so results[] stays the only
+// machine-readable verdict and is parsed here rather than inferred from the
+// process exit code. (A null value is `!== true`, so it is a finding below.)
 //
 // UPGRADE TRIPWIRE. `l4 run --fail-on-assert` does not exist today
 // (specs/todo/lexipedia-superset/CORPUS-TRACK.md proposes it). When it ships,
-// this whole module is dead weight — and etc/go/phases/p6-tests.sh runs a
+// this whole module is dead weight — and etc/go/phases/p0-preflight.sh runs a
 // deliberately-failing fixture whose CONTINUED exit-0 is asserted, so the day
 // the CLI starts exiting 1 the tripwire goes red and tells you to delete this.
 //
