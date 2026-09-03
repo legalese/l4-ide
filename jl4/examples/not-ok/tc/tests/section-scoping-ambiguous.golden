@@ -7,7 +7,7 @@ File: section-scoping-ambiguous.l4
   Source: check
   Severity: DiagnosticSeverity_Information
   Code: <none>
-  Message: x5
+  Message: a
 File: section-scoping-ambiguous.l4
   Hidden: no
   Range: 12:8-12:9
