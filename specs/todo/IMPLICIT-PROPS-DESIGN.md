@@ -393,3 +393,15 @@ piece that lets the DMN exporter handle idiomatic L4 at all. What blocks a clean
 keyword": the fixture/experiment constituency (10.4 item 2), the uninterpreted-type role (10.4
 item 3), and the curated-refusal role (10.6 d) — all three separable, the third wanting a
 dedicated `REFUSE` construct.
+
+---
+
+## 11. Red-teamed position (2026-09-03) — proposed, not ruled
+
+The scoping question this design left open (§4.2, §8 Q2/Q4) and the `ASSUME` migration §10 raises
+were red-teamed by four adversarial reviews on 2026-09-03. The resulting position, the reports
+verbatim, and the probes are in `specs/todo/PROPS-REDTEAM-2026-09-03.md`. In one line: **`ASSUME`
+is an implicit parameter with compiler discharge (Coq `Section`/`Variable`); supply is
+application; no new keyword.** §4.2's section-scoped establishment is withdrawn there (visibility
+already ships; reach is stated by placement), and §5.1's structural subtyping is found unnecessary.
+None of its rulings is recorded here yet; when one is, it goes in this section with a date.

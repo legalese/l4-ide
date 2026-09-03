@@ -4,6 +4,9 @@ _Status: **a handoff, not a spec and not a ruling.** It records a conversation h
 and the state of the tree as measured that day. Nothing here has been implemented. Where it cites
 a document, re-read that document before acting: this file is a pointer, not a substitute._
 
+_Superseded in part on 2026-09-03: the §2 "third reading" below (the `§` hierarchy is the scope tree) was
+refuted by measurement; see `PROPS-REDTEAM-2026-09-03.md` §1 item 2. §3 and §7 stand._
+
 **Provenance.** Written by session `assume-and-props-and-lexically-scoped-function-calls`
 (`f7803a37-30ce-4d9a-b077-801487b87320`), a fork of the `dmnmd` session
 (`579c746e-f139-4fb0-ada5-19e438e734e9`), working out of `smucclaw/dmnmd` — which is the wrong
@@ -13,11 +16,11 @@ repo for this work, and is why it is being handed to a session launched in `lega
 
 ## 0. Where the work lives
 
-| | |
-|---|---|
-| branch | `mengwong/props-assume-scope` |
+|          |                                                        |
+| -------- | ------------------------------------------------------ |
+| branch   | `mengwong/props-assume-scope`                          |
 | worktree | `/Users/mengwong/src/legalese/l4wt/props-assume-scope` |
-| base | `origin/unstable` at `31af0995` (the merge of PR #320) |
+| base     | `origin/unstable` at `31af0995` (the merge of PR #320) |
 
 Nothing but this file is on the branch.
 
@@ -31,18 +34,18 @@ Nothing but this file is on the branch.
 
 Those two clauses name **two different mechanisms**, and the design turns on which is meant.
 
-- *"every function call scope inherits the scope of its caller"* → **dynamic scoping**. Lookup
+- _"every function call scope inherits the scope of its caller"_ → **dynamic scoping**. Lookup
   walks the **call stack**, resolved at call time.
-- *"defining a function inside another function … as Python supports"* → **lexical scoping**.
+- _"defining a function inside another function … as Python supports"_ → **lexical scoping**.
   Lookup walks the **definition nesting**, fixed at compile time. Python closures are static: a
-  nested function sees where it was *written*, never who *called* it.
+  nested function sees where it was _written_, never who _called_ it.
 
 They coincide only while every function has exactly one call site, written inside its definer.
 They diverge the moment a function is called from two places or passed as a value.
 
 **There is a third possibility, and it may be the one actually wanted.** §4's `§`-scoped
 visibility suggests lookup that follows **the section structure of the document** rather than
-either the call stack or the definition nesting — the `§` hierarchy *is* the scope tree, and the
+either the call stack or the definition nesting — the `§` hierarchy _is_ the scope tree, and the
 call graph merely has to be consistent with it. Legal text works this way (a definitions section
 binds throughout; "in this Part, X means Y" rebinds for a subtree). That reading is closer to
 attribute grammars than to dynamic scoping, and it is markedly easier to typecheck, to visualise,
@@ -51,12 +54,14 @@ and to lower to a DRG. **Settle this before syntax.**
 ## 3. Prior art — what the idea is called and who has built it
 
 ### Generation 1 — dynamic scope by accident
+
 LISP 1.5 (environment as an assoc list). Getting it wrong is the **funarg problem** (Moses, 1970).
 Still live in Emacs Lisp (dynamic by default until `lexical-binding`, Emacs 24), shell functions,
 TeX grouping, and **PostScript's dictionary stack** — `begin`/`end` push and pop dictionaries and
 lookup searches the stack. Literally "scope as a stack of dictionaries".
 
 ### Generation 2 — dynamic scope deliberately, alongside lexical
+
 - **Common Lisp special variables** (`defvar` + `let` rebinding) — the most battle-tested
   industrial design. Note the `*earmuff*` convention: the community found invisible dynamic
   binding dangerous enough to invent a **naming discipline that makes it visible at every use
@@ -72,17 +77,19 @@ lookup searches the stack. Literally "scope as a stack of dictionaries".
   historical curiosity.
 
 ### Generation 3 — typed, inferred, propagated into signatures (where `props` sits)
-- **Haskell implicit parameters.** The paper is titled *"Implicit Parameters: Dynamic Scoping with
-  Static Types"* (Lewis, Launchbury, Meijer, Shields, POPL 2000). A `?rate` in a body propagates
+
+- **Haskell implicit parameters.** The paper is titled _"Implicit Parameters: Dynamic Scoping with
+  Static Types"_ (Lewis, Launchbury, Meijer, Shields, POPL 2000). A `?rate` in a body propagates
   into the inferred type and bubbles up the call graph until bound. **This is §5.2.** Read its
   "why not dynamic scope" discussion for the hazard list.
 - **Scala 3 `using` / `given`** — contextual parameters threaded implicitly, inferred at call sites.
 - **The Reader monad / `MonadReader`** — which `IMPLICIT-PROPS-DESIGN.md` already invokes
   ("a Reader, not a lambda calculus").
 - **Algebraic effect handlers** — Koka, Eff, Effekt, OCaml 5, Unison abilities. The modern account:
-  dynamic binding *is* an effect, `local` *is* a handler, the handler's extent is the scope.
+  dynamic binding _is_ an effect, `local` _is_ a handler, the handler's extent is the scope.
 
 ### The three closest to the literal phrasing
+
 1. **Haskell implicit parameters** — closest to props-with-inference.
 2. **John Shutt's Kernel** (`$vau`, fexprs) — an operative receives the **caller's environment as a
    first-class argument**, which is the sentence taken literally. Also a cautionary tale: it makes
@@ -90,16 +97,18 @@ lookup searches the stack. Literally "scope as a stack of dictionaries".
 3. **Tcl `uplevel` / `upvar`** — reach explicitly into the caller's frame; the unprincipled version.
 
 ### Two non-PL framings that may explain it better to lawyers
+
 - **Attribute grammars** (Knuth, 1968): **inherited** attributes flow down the tree, **synthesized**
   flow up. `props` are inherited attributes over the call graph; "what the environment must supply"
   is a synthesized one. Fifty years of formalism and tooling.
 - **CSS inheritance** and **React Context** — implicit context down a tree, providers as `local`.
-  **Terminology hazard:** in React, `props` is the *explicit* mechanism and `context` the implicit
+  **Terminology hazard:** in React, `props` is the _explicit_ mechanism and `context` the implicit
   one — the opposite of our usage. Any web-native reader will trip on this.
 
 ### The formalism that names §5.2 exactly
+
 **Coeffects** — Petricek, Orchard & Mycroft (ICFP 2014, and Petricek's thesis). Effect systems type
-what a computation *does to* the world; coeffect systems type what it *requires from* its context.
+what a computation _does to_ the world; coeffect systems type what it _requires from_ its context.
 Flat coeffects are implicit parameters; structural coeffects track per-variable demand. If §5.2's
 "inferred per-function props requirement" wants a theory, that is it — and it is less trodden than
 the effects side, which for a paper is an opportunity. Related: **delimited dynamic binding**
@@ -111,7 +120,7 @@ Naive dynamic scope breaks three things:
 
 1. **Referential transparency** — a callee's meaning depends on who called it.
 2. **Accidental capture** — a caller's local silently captures a callee's free name, so renaming a
-   variable in *your* function changes *someone else's* behaviour. This is the killer, and the
+   variable in _your_ function changes _someone else's_ behaviour. This is the killer, and the
    reason for earmuffs.
 3. **Modular reasoning and typing** — a signature no longer tells you what a function needs.
 
@@ -137,16 +146,16 @@ problem instead of patching it.
 
 All against `origin/unstable` at `31af0995`.
 
-| thread | state |
-|---|---|
-| `IMPLICIT-PROPS-DESIGN.md` §10 (the `ASSUME` snapshot) | **on unstable** — PR #217 is **merged**, not draft |
-| props/program-model cross-citation (§10.4 item 5) | **half done** — props cites `DMN-EXPORT-PROGRAM-MODEL-SPEC.md`; the program model cites props **zero** times |
-| `DMN-EXPORT-PROGRAM-MODEL-SPEC.md` | on unstable, *design, not yet implemented*; its thesis is **un-lambda-lifting** — i.e. the lexical-scope question, asked from the exporter's end |
-| dmnmd as an l4-ide export validator in CI | **not started** — no mention of `dmnmd` anywhere in `.github/` |
-| the differential gate (PR #216) | **stalled** — open as "HANDOFF (draft, not for merge)", **324 commits behind** unstable, 2 ahead |
-| `DMN-DIFFERENTIAL-CI-SPEC.md` and `etc/dmn-differential/` | exist **only on the #216 branch**, absent from unstable — yet §10.4 item 5 cites the spec as though it were there |
-| dmnmd D-16 phase 2 (`dtDefaultOutput`) | **done** — dmnmd trunk `9535164` (PR #51) |
-| l4-ide#320 (BRANCH in expression position; prelude `elem`) | **merged** 2026-09-01, commit `31af0995` |
+| thread                                                     | state                                                                                                                                            |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `IMPLICIT-PROPS-DESIGN.md` §10 (the `ASSUME` snapshot)     | **on unstable** — PR #217 is **merged**, not draft                                                                                               |
+| props/program-model cross-citation (§10.4 item 5)          | **half done** — props cites `DMN-EXPORT-PROGRAM-MODEL-SPEC.md`; the program model cites props **zero** times                                     |
+| `DMN-EXPORT-PROGRAM-MODEL-SPEC.md`                         | on unstable, _design, not yet implemented_; its thesis is **un-lambda-lifting** — i.e. the lexical-scope question, asked from the exporter's end |
+| dmnmd as an l4-ide export validator in CI                  | **not started** — no mention of `dmnmd` anywhere in `.github/`                                                                                   |
+| the differential gate (PR #216)                            | **stalled** — open as "HANDOFF (draft, not for merge)", **324 commits behind** unstable, 2 ahead                                                 |
+| `DMN-DIFFERENTIAL-CI-SPEC.md` and `etc/dmn-differential/`  | exist **only on the #216 branch**, absent from unstable — yet §10.4 item 5 cites the spec as though it were there                                |
+| dmnmd D-16 phase 2 (`dtDefaultOutput`)                     | **done** — dmnmd trunk `9535164` (PR #51)                                                                                                        |
+| l4-ide#320 (BRANCH in expression position; prelude `elem`) | **merged** 2026-09-01, commit `31af0995`                                                                                                         |
 
 ## 7. Boundaries — what not to do
 
@@ -160,7 +169,7 @@ All against `origin/unstable` at `31af0995`.
 - **`ASSUME` is not simply to be deleted.** Of the 53 legal-corpus lines, `regcf`'s 2 are
   deliberate typed bottoms with provenance and want a first-class `REFUSE`, not `props`. And
   fixtures/experiments (418 lines in `jl4/experiments`) are a real constituency for whom `props` is
-  *worse* — a two-line operator demo should not need an environment. §10.4 items 2 and 3.
+  _worse_ — a two-line operator demo should not need an environment. §10.4 items 2 and 3.
 
 ## 8. Stale claims in the source material — do not propagate
 
