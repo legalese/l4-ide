@@ -3483,6 +3483,15 @@ evalDirective env (AssertRefused ann expr mmsg) = do
         TracePolicy.CollectTrace _ -> True
   -- The BECAUSE message is a literal, so the comparison the directive asks for
   -- is decided statically here rather than evaluated.
+  --
+  -- 'Nothing' here means "the directive imposes no constraint on the reason",
+  -- so the wildcard MUST be unreachable for a payload the author wrote: a
+  -- payload we cannot read would otherwise become an assertion that holds for
+  -- every refusal reason. Two upstream checks make it so -- 'Parser.directive'
+  -- accepts only a 'lit' after BECAUSE, and 'TypeCheck.inferDirective' requires
+  -- that literal to be a STRING -- which leaves the wildcard reachable only for
+  -- a module that never type-checked. If you widen either of those, decide what
+  -- an unreadable payload means before you land it.
   let wanted = case mmsg of
         Just (Lit _ (StringLit _ t)) -> Just t
         _                            -> Nothing
