@@ -1,14 +1,30 @@
-# Getting Started with LLM Integration
+# Getting Started with Large Language Models
 
-Set up and use Large Language Models with L4.
+Set up and use a large language model (**"LLM"**) with L4.
 
-**Prerequisites:** Basic L4 knowledge, API access to an LLM
+**Prerequisites:** Basic L4 knowledge, and access to a large language model
+through an application programming interface (an **"API"**) — the way one
+program asks another program a question.
 
 ---
 
-## Why Combine LLM and L4?
+## The words this page uses
 
-LLMs and L4 have complementary strengths:
+A rule is told some facts about the case in front of it — the names listed
+after `GIVEN` (its **"inputs"**) — and works out one answer from them (its
+**"output"**, whose kind of thing is named after `GIVETH`). Given these inputs,
+a rule gives an output.
+
+An input can be written in either of two places. A **"rule GIVEN"** sits
+immediately above one rule and lists that rule's own inputs. A **"section
+GIVEN"** sits once under a section heading, indented past the `§`, and names a
+fact that every rule in that section may read. This page uses both.
+
+---
+
+## Why Combine an LLM and L4?
+
+The two have complementary strengths:
 
 | LLM Strengths                  | L4 Strengths         |
 | ------------------------------ | -------------------- |
@@ -19,9 +35,9 @@ LLMs and L4 have complementary strengths:
 
 **Combined approach:**
 
-- LLM handles fuzzy interpretation
+- the LLM handles fuzzy interpretation
 - L4 handles formal reasoning
-- Together: explainable, auditable decisions
+- together: explainable, auditable decisions
 
 ---
 
@@ -34,7 +50,7 @@ LLMs and L4 have complementary strengths:
                       │
                       ▼
 ┌─────────────────────────────────────────────────┐
-│     LLM: Extract structured facts               │
+│     LLM: read the facts out of the text         │
 │     "Is this a 'reasonable time'?" → TRUE/FALSE │
 └─────────────────────────────────────────────────┘
                       │
@@ -52,17 +68,17 @@ LLMs and L4 have complementary strengths:
 
 ---
 
-## Step 1: Define LLM-Sourced Facts
+## Step 1: Name the Facts the LLM Will Supply
 
-Use `ASSUME` to declare facts that come from LLM analysis:
+Declare the facts that come from the LLM's reading with a `GIVEN` under the
+heading of the section that uses them, indented past the `§` — a section
+`GIVEN`. One declaration serves every rule in the section:
 
 ```l4
 § `LLM Integration Example`
-
--- Facts determined by LLM
-ASSUME `was reasonable time` IS BOOLEAN
-ASSUME `tone is professional` IS BOOLEAN
-ASSUME `contains required elements` IS BOOLEAN
+    GIVEN `was reasonable time` IS A BOOLEAN
+          `tone is professional` IS A BOOLEAN
+          `contains required elements` IS A BOOLEAN
 
 -- Pure L4 logic
 DECIDE `is valid notice` IF
@@ -71,9 +87,27 @@ DECIDE `is valid notice` IF
     AND `contains required elements`
 ```
 
+The indentation carries the meaning. A `GIVEN` at column 1 is a rule `GIVEN`:
+it lists the inputs of the one declaration below it, and nothing else can read
+them. A `GIVEN` indented past the `§` is a section `GIVEN`, and belongs to the
+whole section. See [the section `GIVEN`](../../reference/syntax/section-given.md).
+
+An older spelling declared each fact with `ASSUME` at the left margin. `ASSUME`
+is deprecated for this job (ruled 2026-09-04) and still works, so existing files
+keep running; the two spellings behave identically.
+
 ### Key Insight
 
-The LLM provides **inputs** (the ASSUME values). L4 provides **reasoning** (the DECIDE logic). This separation keeps the formal logic clean and auditable.
+The LLM supplies the inputs — the values of those three names. L4 does the
+reasoning — the `DECIDE` logic that combines them. Keeping the two apart is
+what makes the decision auditable: the judgement calls are all in one place, and
+the logic that acts on them is all in another.
+
+Nothing in the file supplies those values. They arrive from the boundary: a
+request that carries the LLM's answers, a run of
+`l4 batch rules.l4 --inputs cases.json`, or the generated web form. Until they
+arrive, a rule that reads one of them stops and says which name it needed and
+that nobody has supplied it.
 
 ---
 
@@ -192,12 +226,12 @@ GIVETH A Decision
 ## Example: Complete Integration
 
 ```l4
+-- The three judgments come from the API in practice; they are declared once
+-- for the whole section.
 § `Contract Compliance Check with LLM`
-
--- LLM-sourced judgments (would come from API in practice)
-ASSUME timingJudgment IS A LLMJudgment
-ASSUME qualityJudgment IS A LLMJudgment
-ASSUME professionalismJudgment IS A LLMJudgment
+    GIVEN timingJudgment IS A LLMJudgment
+          qualityJudgment IS A LLMJudgment
+          professionalismJudgment IS A LLMJudgment
 
 -- Confidence threshold for accepting LLM judgments
 minConfidence MEANS 0.75
@@ -221,36 +255,42 @@ DECIDE `is compliant` IF
     AND `quality ok`
     AND `professionalism ok`
 
--- Test with sample data
-sampleTiming MEANS LLMJudgment
-    "Was delivery timely?"
-    TRUE
-    0.90
-    "Delivered 2 days early"
-    "gpt-4"
-    "2024-01-15T10:30:00Z"
+-- What one case looks like: the three judgments a caller would send
+sampleTiming MEANS LLMJudgment WITH
+    question IS "Was delivery timely?"
+    answer IS TRUE
+    confidence IS 0.90
+    reasoning IS "Delivered 2 days early"
+    model IS "gpt-4"
+    timestamp IS "2024-01-15T10:30:00Z"
 
-sampleQuality MEANS LLMJudgment
-    "Does quality meet specifications?"
-    TRUE
-    0.85
-    "All quality metrics passed"
-    "gpt-4"
-    "2024-01-15T10:31:00Z"
+sampleQuality MEANS LLMJudgment WITH
+    question IS "Does quality meet specifications?"
+    answer IS TRUE
+    confidence IS 0.85
+    reasoning IS "All quality metrics passed"
+    model IS "gpt-4"
+    timestamp IS "2024-01-15T10:31:00Z"
 
-sampleProfessionalism MEANS LLMJudgment
-    "Was conduct professional?"
-    TRUE
-    0.80
-    "Communication was clear and timely"
-    "gpt-4"
-    "2024-01-15T10:32:00Z"
+sampleProfessionalism MEANS LLMJudgment WITH
+    question IS "Was conduct professional?"
+    answer IS TRUE
+    confidence IS 0.80
+    reasoning IS "Communication was clear and timely"
+    model IS "gpt-4"
+    timestamp IS "2024-01-15T10:32:00Z"
 
-#CHECK `is compliant` WITH
-    timingJudgment IS sampleTiming,
-    qualityJudgment IS sampleQuality,
-    professionalismJudgment IS sampleProfessionalism
+-- `#CHECK` reports what kind of thing the rule answers with. It does not
+-- supply the judgments: those come from the request.
+#CHECK `is compliant`
 ```
+
+_Proposed, not landed (2026-09-04): supplying values in the file itself, with a
+`WITH` clause on the instruction naming each judgment. This lands with the
+discharge pull request; until then supply values from outside the file (web
+form, `l4 batch`, API). `#CHECK ... WITH ...` does not supply them today: L4
+rejects it, reporting that a rule, which is not something you can apply to named
+inputs, is being applied to named inputs._
 
 ---
 
@@ -276,33 +316,36 @@ sampleProfessionalism MEANS LLMJudgment
 
 ### 4. Separation of Concerns
 
-- LLM: interpretation, classification
+- the LLM: interpretation, classification
 - L4: logic, consequences, obligations
-- Keep formal rules in L4, not prompts
+- keep the formal rules in L4, not in prompts
 
 ---
 
 ## Limitations
 
-- **LLM responses can vary** - same prompt may give different answers
-- **No guaranteed consistency** - unlike L4's deterministic logic
-- **Confidence scores are subjective** - calibrate carefully
-- **Audit requirements** - ensure you can explain decisions
+- **An LLM's answers can vary** - the same prompt may give different answers on
+  different days
+- **No guaranteed consistency** - unlike L4, which gives the same answer to the
+  same facts every time
+- **Confidence scores are subjective** - calibrate them carefully
+- **Audit requirements** - make sure you can explain every decision you ship
 
 ---
 
 ## What You Learned
 
-- How to combine LLM and L4 strengths
-- Using ASSUME for LLM-sourced facts
-- Designing prompts for structured answers
-- Creating audit trails
-- Best practices for hybrid systems
+- How to combine an LLM's strengths with L4's
+- How to declare the facts an LLM supplies as a section `GIVEN`, once for a
+  whole section
+- How to design prompts that come back as structured answers
+- How to keep an audit trail
+- Good practice for systems that use both
 
 ---
 
 ## Next Steps
 
-- [Legislative Ingestion](legislative-ingestion.md) - Use LLM to help encode legislation
-- [LLM Integration Spec](https://github.com/legalese/l4-ide/tree/main/specs/done/LLM-INTEGRATION-SPEC.md) - Technical details
+- [Legislative Ingestion](legislative-ingestion.md) - Use an LLM to help encode legislation
+- [The design record for this bridge](https://github.com/legalese/l4-ide/tree/main/specs/done/LLM-INTEGRATION-SPEC.md) - Technical details
 - [Foundation Course](../../courses/foundation/README.md) - Learn L4 fundamentals

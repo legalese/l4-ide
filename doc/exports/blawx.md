@@ -17,7 +17,9 @@ In practice a Blawx project gives you four things:
 - **A scenario explorer** that walks a user through the facts a question needs.
 - **Hypothetical, or abductive, reasoning**: rather than only answering "given these facts, what
   follows?", it can answer "what would have to be true for this outcome to hold?"
-- **A REST API** per rule.
+- **An application programming interface** (an **"API"**) per rule — a web address
+  another program can send a question to, in the widely used REST (representational
+  state transfer) style.
 
 ## Why compile L4 to it
 
@@ -48,20 +50,20 @@ what makes the logic-programming abilities above available to rules you wrote in
 l4 blawx FILE
 ```
 
-Compiles the decision-rule subset of `FILE` to a Blawx project and prints the `.blawx` YAML to
-standard output. The s(CASP) program is written alongside it only when you pass `--output`.
+Compiles the decision-rule subset of `FILE` to a Blawx project and prints the `.blawx` project
+file — written in YAML (a plain-text data format) — to standard output. The s(CASP) program is written alongside it only when you pass `--output`.
 
-| Flag            | Effect                                                                     |
-| --------------- | -------------------------------------------------------------------------- |
-| `--output FILE` | write the `.blawx` YAML to `FILE`, and the s(CASP) dump alongside it       |
-| `--scasp`       | emit the concatenated s(CASP) program instead of the `.blawx` YAML         |
-| `--import`      | **read** a `.blawx` project and lift it back to L4 — the reverse direction |
-| `--parse-only`  | with `--import`: parse and report without lifting                          |
-| `--reemit`      | with `--import`: re-emit the `.blawx` from what was parsed                 |
-| `--roundtrip`   | self-check: emit, parse back, and assert the two agree                     |
+| Flag            | Effect                                                                       |
+| --------------- | ---------------------------------------------------------------------------- |
+| `--output FILE` | write the `.blawx` project file to `FILE`, and the s(CASP) dump alongside it |
+| `--scasp`       | emit the concatenated s(CASP) program instead of the `.blawx` project file   |
+| `--import`      | **read** a `.blawx` project and lift it back to L4 — the reverse direction   |
+| `--parse-only`  | with `--import`: parse and report without lifting                            |
+| `--reemit`      | with `--import`: re-emit the `.blawx` from what was parsed                   |
+| `--roundtrip`   | self-check: emit, parse back, and assert the two agree                       |
 
 `--scasp` is the one to reach for when debugging: it hands you the logic program itself, which you
-can run against an s(CASP) system directly without going through the Blawx UI.
+can run against an s(CASP) system directly without going through the Blawx user interface.
 
 ## The only two-way export
 
@@ -138,8 +140,9 @@ a fixture under `jl4/examples/blawx/not-ok/`:
   it, so the compiler cannot tell whether it is a record, and it refuses with a message that says
   so rather than guessing.
 - **a character clean-law cannot read in a section's prose.** The `rule_text` the exporter
-  synthesises is parsed by clean-law on import, and its text grammar is ASCII-only, so one
-  character above U+007F ends the parse there and every later section's canvas is left belonging to
+  synthesises is parsed by clean-law on import, and its text grammar accepts only
+  ASCII (American Standard Code for Information Interchange — the plain unaccented letters,
+  digits and punctuation), so one character above U+007F ends the parse there and every later section's canvas is left belonging to
   no section of the Act — a document that imports and stores without complaint and is quietly
   wrong. The punctuation legislation actually contains is folded for you (em and en dashes, curly
   quotes and apostrophes, the ellipsis, the non-breaking space, the section sign), so a

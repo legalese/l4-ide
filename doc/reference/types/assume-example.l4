@@ -1,35 +1,35 @@
 -- ASSUME keyword examples
 
--- Basic Variable Assumptions
+-- Assuming plain facts
 
--- Assume primitive types
+-- Each name says what kind of thing it is, and carries no value
 ASSUME `is employed` IS A BOOLEAN
 ASSUME `annual income` IS A NUMBER
 ASSUME `applicant name` IS A STRING
 
--- Function Assumptions
+-- Assuming a rule defined elsewhere
 
--- Single parameter function
+-- One input, one answer
 ASSUME `calculate tax` IS A FUNCTION FROM NUMBER TO NUMBER
 
--- The assumed function can be used in expressions
+-- The assumed rule can be used like any other
 DECIDE `tax on income` IS `calculate tax` `annual income`
 
--- Using Assumed Values in Decisions
+-- Reading assumed names in a decision
 
 ASSUME age IS A NUMBER
 ASSUME `has valid license` IS A BOOLEAN
 
--- Combine assumed values in logic
+-- Combine assumed facts in one rule
 DECIDE `can drive` IS
   age >= 16 AND `has valid license`
 
--- Evaluating with Assumed Values
+-- Asking about a rule that reads assumed names
 
--- The expression uses assumed values
+-- #CHECK reports the kind of answer without working one out
 #CHECK `can drive`
 
--- Complex Example: Eligibility Check
+-- A longer example: an eligibility check
 
 ASSUME `applicant age` IS A NUMBER
 ASSUME `years of residence` IS A NUMBER
@@ -52,3 +52,22 @@ DECIDE `is adult` IF `applicant age for test` >= 18
 
 #EVAL `is adult` WITH `applicant age for test` IS 25
 #ASSERT `is adult` WITH `applicant age for test` IS 25
+
+-- Where a term ASSUME goes now: a GIVEN under the section heading
+
+-- The GIVEN is indented past the § of the heading, so it belongs to the
+-- section, and every rule in the section reads it without re-declaring it.
+-- It behaves exactly as the ASSUMEs above do: assumed until supplied.
+
+§ `Driving eligibility`
+    GIVEN `driver age` IS A NUMBER
+          `holds a valid licence` IS A BOOLEAN
+
+DECIDE `may drive alone` IS
+  `driver age` >= 18 AND `holds a valid licence`
+
+DECIDE `may drive supervised` IS
+  `driver age` >= 16 AND `holds a valid licence`
+
+#CHECK `may drive alone`
+#CHECK `may drive supervised`

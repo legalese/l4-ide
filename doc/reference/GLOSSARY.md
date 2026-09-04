@@ -10,30 +10,32 @@ Keywords are reserved words that form the structure of L4 programs.
 
 ### Function Keywords
 
-| Keyword                | Purpose                                                              | Reference                          |
-| ---------------------- | -------------------------------------------------------------------- | ---------------------------------- |
-| **AKA**                | Provides alternate names (aliases)                                   | [AKA](functions/AKA.md)            |
-| **DECIDE**             | Defines a decision function                                          | [DECIDE](functions/DECIDE.md)      |
-| **FUNCTION**           | Declares a function type                                             | [TYPE-KEYWORDS](types/keywords.md) |
-| **GIVEN**              | Introduces function parameters                                       | [GIVEN](functions/GIVEN.md)        |
-| **GIVETH** / **GIVES** | Specifies function return type                                       | [GIVETH](functions/GIVETH.md)      |
-| **IN**                 | Used with LET for scoped bindings                                    | [LET](functions/LET.md)            |
-| **LET**                | Introduces a local binding                                           | [LET](functions/LET.md)            |
-| **MEANS**              | Defines the body of a function, decision, or computed field (method) | [MEANS](functions/MEANS.md)        |
-| **WHERE**              | Introduces local declarations                                        | [WHERE](functions/WHERE.md)        |
-| **YIELD**              | Creates anonymous functions (lambdas)                                | [YIELD](functions/YIELD.md)        |
+| Keyword                | Purpose                                                                                                                          | Reference                                |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| **AKA**                | Provides alternate names (aliases)                                                                                               | [AKA](functions/AKA.md)                  |
+| **DECIDE**             | Defines a decision function                                                                                                      | [DECIDE](functions/DECIDE.md)            |
+| **FUNCTION**           | Declares a function type                                                                                                         | [TYPE-KEYWORDS](types/keywords.md)       |
+| **GIVEN**              | Lists the facts one rule is told about the case (its inputs): a "rule `GIVEN`"                                                   | [GIVEN](functions/GIVEN.md)              |
+| **GIVEN** (under a §)  | Declares a name once for a whole section — a "section `GIVEN`": an input every rule in the section reads, supplied for each case | [Section GIVEN](syntax/section-given.md) |
+| **GIVETH** / **GIVES** | Names the kind of thing a rule gives back (its output)                                                                           | [GIVETH](functions/GIVETH.md)            |
+| **IN**                 | Used with LET for scoped bindings                                                                                                | [LET](functions/LET.md)                  |
+| **LET**                | Introduces a local binding                                                                                                       | [LET](functions/LET.md)                  |
+| **MEANS**              | Defines the body of a function, decision, or computed field (method)                                                             | [MEANS](functions/MEANS.md)              |
+| **WHERE**              | Introduces local declarations                                                                                                    | [WHERE](functions/WHERE.md)              |
+| **YIELD**              | Creates anonymous functions (lambdas)                                                                                            | [YIELD](functions/YIELD.md)              |
 
 ### Control Flow Keywords
 
-| Keyword       | Purpose                              | Reference                              |
-| ------------- | ------------------------------------ | -------------------------------------- |
-| **BRANCH**    | Alternative pattern matching keyword | [CONTROL-FLOW](control-flow/README.md) |
-| **CONSIDER**  | Pattern matching on values           | [CONSIDER](control-flow/CONSIDER.md)   |
-| **ELSE**      | Alternative branch of IF             | [CONTROL-FLOW](control-flow/README.md) |
-| **IF**        | Conditional expression               | [IF](control-flow/IF.md)               |
-| **THEN**      | Consequent branch of IF              | [CONTROL-FLOW](control-flow/README.md) |
-| **OTHERWISE** | Default case in CONSIDER             | [CONTROL-FLOW](control-flow/README.md) |
-| **WHEN**      | Introduces a pattern match case      | [CONSIDER](control-flow/CONSIDER.md)   |
+| Keyword       | Purpose                                                                                                                                    | Reference                              |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------- |
+| **BRANCH**    | Alternative pattern matching keyword                                                                                                       | [CONTROL-FLOW](control-flow/README.md) |
+| **CONSIDER**  | Pattern matching on values                                                                                                                 | [CONSIDER](control-flow/CONSIDER.md)   |
+| **ELSE**      | Alternative branch of IF                                                                                                                   | [CONTROL-FLOW](control-flow/README.md) |
+| **IF**        | Conditional expression                                                                                                                     | [IF](control-flow/IF.md)               |
+| **THEN**      | Consequent branch of IF                                                                                                                    | [CONTROL-FLOW](control-flow/README.md) |
+| **OTHERWISE** | Default case in CONSIDER                                                                                                                   | [CONTROL-FLOW](control-flow/README.md) |
+| **REFUSE**    | Declines to answer: this case is outside what the model covers. No later rule can turn a refusal into an answer; only the boundary sees it | [REFUSE](control-flow/REFUSE.md)       |
+| **WHEN**      | Introduces a pattern match case                                                                                                            | [CONSIDER](control-flow/CONSIDER.md)   |
 
 ### Logical Keywords
 
@@ -60,20 +62,20 @@ Keywords are reserved words that form the structure of L4 programs.
 
 ### Type Keywords
 
-| Keyword        | Purpose                                                                 | Reference                          |
-| -------------- | ----------------------------------------------------------------------- | ---------------------------------- |
-| **A** / **AN** | Type articles                                                           | [ARTICLES](types/A-AN.md)          |
-| **ASSUME**     | Declares a variable of assumed type                                     | [ASSUME](types/ASSUME.md)          |
-| **DECLARE**    | Defines a type                                                          | [DECLARE](types/DECLARE.md)        |
-| **IS**         | Type assertion or definition                                            | [TYPE-KEYWORDS](types/keywords.md) |
-| **HAS**        | Record field declaration (supports computed fields / methods via MEANS) | [TYPE-KEYWORDS](types/keywords.md) |
-| **LIST**       | List type or list literal                                               | [TYPE-KEYWORDS](types/keywords.md) |
-| **ONE OF**     | Used for enum types                                                     | [TYPE-KEYWORDS](types/keywords.md) |
-| **OF**         | Type application or constructor pattern                                 | [TYPE-KEYWORDS](types/keywords.md) |
-| **TYPE**       | The kind of types                                                       | [TYPE-KEYWORDS](types/keywords.md) |
-| **TYPICALLY**  | Default value for a field, parameter, or assumption                     | [TYPICALLY](types/TYPICALLY.md)    |
-| **WITH**       | Record construction with named fields                                   | [TYPE-KEYWORDS](types/keywords.md) |
-| **FOR ALL**    | Universal quantifier for polymorphism                                   | [FOR ALL](types/for-all.md)        |
+| Keyword        | Purpose                                                                                                                                                                                                                                                                                                                                                                                            | Reference                          |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| **A** / **AN** | Type articles                                                                                                                                                                                                                                                                                                                                                                                      | [ARTICLES](types/A-AN.md)          |
+| **ASSUME**     | Declares a name and the kind of thing it stands for, without giving it a value. Deprecated 2026-09-04; it still parses, checks and exports as before. A fact to be supplied per case is now a section [`GIVEN`](syntax/section-given.md); a case the model does not cover is now [`REFUSE`](control-flow/REFUSE.md); an uninterpreted type will become `DECLARE` (proposed, not landed 2026-09-04) | [ASSUME](types/ASSUME.md)          |
+| **DECLARE**    | Defines a type                                                                                                                                                                                                                                                                                                                                                                                     | [DECLARE](types/DECLARE.md)        |
+| **IS**         | Type assertion or definition                                                                                                                                                                                                                                                                                                                                                                       | [TYPE-KEYWORDS](types/keywords.md) |
+| **HAS**        | Record field declaration (supports computed fields / methods via MEANS)                                                                                                                                                                                                                                                                                                                            | [TYPE-KEYWORDS](types/keywords.md) |
+| **LIST**       | List type or list literal                                                                                                                                                                                                                                                                                                                                                                          | [TYPE-KEYWORDS](types/keywords.md) |
+| **ONE OF**     | Used for enum types                                                                                                                                                                                                                                                                                                                                                                                | [TYPE-KEYWORDS](types/keywords.md) |
+| **OF**         | Type application or constructor pattern                                                                                                                                                                                                                                                                                                                                                            | [TYPE-KEYWORDS](types/keywords.md) |
+| **TYPE**       | The kind of types                                                                                                                                                                                                                                                                                                                                                                                  | [TYPE-KEYWORDS](types/keywords.md) |
+| **TYPICALLY**  | Default value for a field of a record, for one rule's own input, for a section `GIVEN`, or for an assumed name                                                                                                                                                                                                                                                                                     | [TYPICALLY](types/TYPICALLY.md)    |
+| **WITH**       | Record construction with named fields                                                                                                                                                                                                                                                                                                                                                              | [TYPE-KEYWORDS](types/keywords.md) |
+| **FOR ALL**    | Universal quantifier for polymorphism                                                                                                                                                                                                                                                                                                                                                              | [FOR ALL](types/for-all.md)        |
 
 ### Regulative Keywords
 
@@ -113,12 +115,12 @@ For expressing legal obligations, permissions, and prohibitions.
 
 ### Other Keywords
 
-| Keyword         | Purpose                               | Reference                          |
-| --------------- | ------------------------------------- | ---------------------------------- |
-| **IMPORT**      | Imports definitions from another file | [IMPORT](libraries/IMPORT.md)      |
-| **TIMEZONE IS** | Sets document timezone (IANA name)    | [timezone](libraries/timezone.md)  |
-| **TO**          | Function type return separator        | [SYNTAX](syntax/README.md)         |
-| **OF**          | Positional argument / type syntax     | [TYPE-KEYWORDS](types/keywords.md) |
+| Keyword         | Purpose                                                                                      | Reference                          |
+| --------------- | -------------------------------------------------------------------------------------------- | ---------------------------------- |
+| **IMPORT**      | Imports definitions from another file                                                        | [IMPORT](libraries/IMPORT.md)      |
+| **TIMEZONE IS** | Sets document timezone (a name from the Internet Assigned Numbers Authority (IANA) database) | [timezone](libraries/timezone.md)  |
+| **TO**          | Function type return separator                                                               | [SYNTAX](syntax/README.md)         |
+| **OF**          | Positional argument / type syntax                                                            | [TYPE-KEYWORDS](types/keywords.md) |
 
 ---
 
@@ -209,39 +211,39 @@ Special syntax features and patterns in L4.
 
 For complete documentation, see **[Syntax Reference](syntax/README.md)**.
 
-| Feature             | Description                                   |
-| ------------------- | --------------------------------------------- |
-| **Layout Rules**    | Indentation-based grouping                    |
-| **Comments**        | `--` line comments and `{- -}` block comments |
-| **Identifiers**     | Backtick-quoted identifiers                   |
-| **Annotations**     | `@desc`, `@nlg`, `@ref`, `@export`            |
-| **Directives**      | `#EVAL`, `#TRACE`, `#CHECK`, `#ASSERT`        |
-| **Ditto**           | `^` copy from previous line                   |
-| **Asyndetic**       | `...` (AND) and `..` (OR) implicit operators  |
-| **Computed Fields** | Derived attributes / methods via MEANS in HAS |
-| **Genitive**        | `'s` for record field access                  |
-| **Section Markers** | `§` for document sections                     |
+| Feature             | Description                                                    |
+| ------------------- | -------------------------------------------------------------- |
+| **Layout Rules**    | Indentation-based grouping                                     |
+| **Comments**        | `--` line comments and `{- -}` block comments                  |
+| **Identifiers**     | Backtick-quoted identifiers                                    |
+| **Annotations**     | `@desc`, `@nlg`, `@ref`, `@export`                             |
+| **Directives**      | `#EVAL`, `#TRACE`, `#CHECK`, `#ASSERT`                         |
+| **Ditto**           | `^` copy from previous line                                    |
+| **Asyndetic**       | `...` (AND) and `..` (OR) implicit operators                   |
+| **Computed Fields** | Derived attributes / methods via MEANS in HAS                  |
+| **Genitive**        | `'s` for record field access                                   |
+| **Section Markers** | `§` for document sections — see [Sections](syntax/sections.md) |
 
 ---
 
 ## Symbols
 
-| Symbol | Name            | Purpose                    |
-| ------ | --------------- | -------------------------- |
-| `()`   | Parentheses     | Grouping, tuples           |
-| `{}`   | Braces          | Block comments             |
-| `[]`   | Square brackets | NLG inline annotations     |
-| `<<>>` | Double angles   | Reference annotations      |
-| `§`    | Section symbol  | Document sections          |
-| `^`    | Caret           | Ditto (copy above)         |
-| `,`    | Comma           | Separator                  |
-| `;`    | Semicolon       | Statement separator        |
-| `.`    | Dot             | Decimal point, punctuation |
-| `...`  | Ellipsis        | Asyndetic AND              |
-| `..`   | Double dot      | Asyndetic OR               |
-| `:`    | Colon           | Type signature separator   |
-| `%`    | Percent         | Percentage, NLG delimiter  |
-| `'s`   | Genitive        | Possession/field access    |
+| Symbol | Name            | Purpose                                              |
+| ------ | --------------- | ---------------------------------------------------- |
+| `()`   | Parentheses     | Grouping, tuples                                     |
+| `{}`   | Braces          | Block comments                                       |
+| `[]`   | Square brackets | Natural language generation (NLG) inline annotations |
+| `<<>>` | Double angles   | Reference annotations                                |
+| `§`    | Section symbol  | Document sections ([Sections](syntax/sections.md))   |
+| `^`    | Caret           | Ditto (copy above)                                   |
+| `,`    | Comma           | Separator                                            |
+| `;`    | Semicolon       | Statement separator                                  |
+| `.`    | Dot             | Decimal point, punctuation                           |
+| `...`  | Ellipsis        | Asyndetic AND                                        |
+| `..`   | Double dot      | Asyndetic OR                                         |
+| `:`    | Colon           | Type signature separator                             |
+| `%`    | Percent         | Percentage, NLG delimiter                            |
+| `'s`   | Genitive        | Possession/field access                              |
 
 ---
 
@@ -265,20 +267,20 @@ Libraries shipped with L4.
 
 For complete documentation, see **[Libraries Reference](libraries/README.md)**.
 
-| Library           | Purpose                              |
-| ----------------- | ------------------------------------ |
-| **prelude**       | Standard functions (always imported) |
-| **daydate**       | Date calculations and temporal logic |
-| **time**          | Wall-clock time-of-day operations    |
-| **datetime**      | Absolute points in time (with tz)    |
-| **timezone**      | IANA timezone constants              |
-| **actus**         | ACTUS financial contract standards   |
-| **excel-date**    | Excel date compatibility             |
-| **math**          | Mathematical functions               |
-| **currency**      | ISO 4217 currency handling           |
-| **legal-persons** | Legal entity types                   |
-| **jurisdiction**  | Jurisdiction definitions             |
-| **llm**           | LLM API integration                  |
+| Library           | Purpose                                                                                 |
+| ----------------- | --------------------------------------------------------------------------------------- |
+| **prelude**       | Standard functions (always imported)                                                    |
+| **daydate**       | Date calculations and temporal logic                                                    |
+| **time**          | Wall-clock time-of-day operations                                                       |
+| **datetime**      | Absolute points in time (with tz)                                                       |
+| **timezone**      | Timezone constants from the Internet Assigned Numbers Authority (IANA) database         |
+| **actus**         | Algorithmic Contract Types Unified Standards (ACTUS) financial contract standards       |
+| **excel-date**    | Excel date compatibility                                                                |
+| **math**          | Mathematical functions                                                                  |
+| **currency**      | Currency handling under International Organization for Standardization (ISO) 4217       |
+| **legal-persons** | Legal entity types                                                                      |
+| **jurisdiction**  | Jurisdiction definitions                                                                |
+| **llm**           | Large language model (LLM) integration, over an application programming interface (API) |
 
 ### Built-in Functions
 
@@ -297,7 +299,7 @@ These are built into the compiler (not a library):
 
 See [coercions documentation](types/coercions.md) for details.
 
-#### HTTP and JSON
+#### Hypertext Transfer Protocol (HTTP) and JavaScript Object Notation (JSON)
 
 | Function       | Purpose                      |
 | -------------- | ---------------------------- |
@@ -315,13 +317,14 @@ See [HTTP and JSON documentation](builtins/http-json.md) for details.
 
 Compiler directives for testing and evaluation.
 
-| Directive    | Purpose                       |
-| ------------ | ----------------------------- |
-| `#EVAL`      | Evaluate and print expression |
-| `#EVALTRACE` | Evaluate with execution trace |
-| `#TRACE`     | Contract/state graph tracing  |
-| `#CHECK`     | Type check expression         |
-| `#ASSERT`    | Assert truth value            |
+| Directive         | Purpose                                                                                   |
+| ----------------- | ----------------------------------------------------------------------------------------- |
+| `#EVAL`           | Evaluate and print expression                                                             |
+| `#EVALTRACE`      | Evaluate with execution trace                                                             |
+| `#TRACE`          | Contract/state graph tracing                                                              |
+| `#CHECK`          | Type check expression                                                                     |
+| `#ASSERT`         | Assert truth value                                                                        |
+| `#ASSERT REFUSED` | Assert that an expression refuses; add `BECAUSE "..."` to require the refusal message too |
 
 ---
 
@@ -343,19 +346,19 @@ Metadata annotations for documentation and generation.
 
 ## Built-in Constants
 
-| Constant        | Type           | Description                                                   |
-| --------------- | -------------- | ------------------------------------------------------------- |
-| **TRUE**        | BOOLEAN        | Boolean true value                                            |
-| **FALSE**       | BOOLEAN        | Boolean false value                                           |
-| **NOTHING**     | MAYBE a        | Absence of value                                              |
-| **JUST**        | a → MAYBE a    | Present value constructor                                     |
-| **LEFT**        | a → EITHER a b | Left alternative                                              |
-| **RIGHT**       | b → EITHER a b | Right alternative                                             |
-| **EMPTY**       | LIST a         | Empty list                                                    |
-| **TODAY**       | DATE           | Current date (requires `TIMEZONE IS`)                         |
-| **NOW**         | DATETIME       | Current date and time (defaults to UTC without `TIMEZONE IS`) |
-| **CURRENTTIME** | TIME           | Current local time (requires `TIMEZONE IS`)                   |
-| **TIMEZONE**    | STRING         | Document timezone (requires `TIMEZONE IS`)                    |
+| Constant        | Type           | Description                                                                                |
+| --------------- | -------------- | ------------------------------------------------------------------------------------------ |
+| **TRUE**        | BOOLEAN        | Boolean true value                                                                         |
+| **FALSE**       | BOOLEAN        | Boolean false value                                                                        |
+| **NOTHING**     | MAYBE a        | Absence of value                                                                           |
+| **JUST**        | a → MAYBE a    | Present value constructor                                                                  |
+| **LEFT**        | a → EITHER a b | Left alternative                                                                           |
+| **RIGHT**       | b → EITHER a b | Right alternative                                                                          |
+| **EMPTY**       | LIST a         | Empty list                                                                                 |
+| **TODAY**       | DATE           | Current date (requires `TIMEZONE IS`)                                                      |
+| **NOW**         | DATETIME       | Current date and time (defaults to Coordinated Universal Time (UTC) without `TIMEZONE IS`) |
+| **CURRENTTIME** | TIME           | Current local time (requires `TIMEZONE IS`)                                                |
+| **TIMEZONE**    | STRING         | Document timezone (requires `TIMEZONE IS`)                                                 |
 
 ---
 

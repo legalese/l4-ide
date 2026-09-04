@@ -17,7 +17,8 @@ the transpiled projects inside a Blawx v1.6-alpha container.
 
 ## Setup
 
-You need the `l4` CLI and, to _run_ the exported projects, a Blawx server.
+You need the `l4` command-line interface (**"CLI"**) and, to _run_ the exported
+projects, a Blawx server.
 The quickest server is the published Docker image:
 
 ```bash
@@ -36,7 +37,8 @@ The L4 sources used below all live in this repository under
 [`rodents.l4`](../../../jl4/examples/blawx/rodents.l4)), together with their
 committed expected outputs under `expected/` (e.g.
 [`rodents.pl`](../../../jl4/examples/blawx/expected/rodents.pl)) — the
-bridge is golden-tested, so what this page shows is what CI holds fixed.
+bridge is golden-tested, so what this page shows is what our automated
+checks hold fixed.
 
 ## First export: an insurance exclusion
 
@@ -70,14 +72,15 @@ l4 blawx: s(CASP) dump written to rodents.pl
 
 Two artifacts come out:
 
-- **`rodents.blawx`** — the primary artifact: a Blawx project in the
-  fixture-YAML shape that `http://localhost:8000/import/` accepts. It
+- **`rodents.blawx`** — the primary artifact: a Blawx project in the fixture
+  shape, written in YAML (a plain-text data format), that
+  `http://localhost:8000/import/` accepts. It
   contains the rule document, one root workspace for the ontology plus one
   code workspace per `@export`ed decision, the Blockly block layout _and_
   the generated s(CASP) for each workspace, and one Blawx test per
   `#EVAL`/`#ASSERT`.
 - **`rodents.pl`** — the same s(CASP), concatenated, for running under a
-  local SWI-Prolog with the s(CASP) pack (that is what the repository's
+  local `SWI-Prolog` with the s(CASP) pack (that is what the repository's
   tier-1 harness `etc/blawx-tier1-harness.py` does).
 
 ### Where each piece of L4 lands
@@ -86,8 +89,7 @@ Two artifacts come out:
 legal text; an L4 module has none as such, so the exporter synthesises it
 (ruling R4): the module's `§` title becomes the document name and each
 exported decision's `@export` prose becomes a numbered section, parsed by
-Blawx's CLEAN grammar (its plain-text legislative format) into Akoma
-Ntoso. The start of the generated `rule_text` for rodents:
+CLEAN (Blawx's plain-text legislative format) into Akoma Ntoso. The start of the generated `rule_text` for rodents:
 
 ```
 Home insurance policy - the rodents, insects, vermin and birds exclusion
@@ -124,13 +126,13 @@ Writing **both** — `@export 4. 5. …` — is refused by name rather than emit
 because sub-provision anchoring (Jason's `sec_1__para_a_section`) is not in v1.
 
 **The record becomes the ontology.** `Inputs` lowers to a Blawx category;
-each boolean field to an attribute with an NLG template derived from the
-field name — or, if you write an `@nlg` on the field or the decision, from
+each boolean field to an attribute with a natural-language generation
+(**"NLG"**) template derived from the field name — or, if you write an `@nlg` on the field or the decision, from
 your sentence: `` `facial hair on chin` IS A BOOLEAN @nlg @(X) 's facial hair
 is on the chin `` puts exactly that in the justification tree. (Write a slot
 either as an ordinary parameter reference, `%p%`, or — where there is no
 parameter to reference, as on a record field — in Blawx's own `@(X)` / `@(Y)`
-spelling. See BLAWX-EXPORT-SPEC §4.9.) The transpiled root workspace, in
+spelling. See `BLAWX-EXPORT-SPEC` §4.9.) The transpiled root workspace, in
 Blawx's own code editor:
 
 ![The transpiled rodents ontology: one fact block declaring the inputs category and fifteen boolean attributes, each with its appearing-as template](figures/rodents-root.png)
@@ -206,7 +208,7 @@ and the server-stored code is byte-identical to what the exporter wrote.**
 The emitter reproduces Blawx's own browser-side generator exactly —
 including its indentation quirks — so the L4 artifact is indistinguishable
 from one authored in the editor. In the bridge's validation campaign the
-real-UI open-and-save drive held byte-identity on all 146 workspace and
+open-and-save drive in the real user interface held byte-identity on all 146 workspace and
 test rows of the six modules it covered (a headless harness covers all 181
 rows of the shipped examples); separately, the generated programs' answers
 matched the L4 evaluator on every tier-1 query
@@ -214,34 +216,42 @@ matched the L4 evaluator on every tier-1 query
 
 ## The mapping at a glance
 
-| L4                             | Blawx / s(CASP)                                                         |
-| ------------------------------ | ----------------------------------------------------------------------- |
-| `DECLARE R HAS …` input record | category + one attribute per field                                      |
-| enum (`IS ONE OF`)             | atoms; a `CONSIDER` over it becomes one clause per branch               |
-| `@export` boolean decision     | attributed rule(s) concluding `according_to(sec_N, …)`                  |
-| value-returning decision       | relation with an extra output argument                                  |
-| arithmetic                     | `Tmp is ( X * Y )` — exact rationals (`1/3` stays `1r3`, never a float) |
-| comparisons (`AT LEAST`, …)    | `blawx_comparison(…, gte, …)` — CLP, works on unbound values            |
-| `NOT` on a computed predicate  | negation as failure, `not p(X)`                                         |
-| a denied input                 | classical negation, `-p(x)` scenario fact                               |
-| `ASSUME`d predicate            | input predicate: declaration block + `#abducible` in the interview      |
-| `#EVAL` / `#ASSERT`            | one Blawx test each (assertion = global constraint)                     |
-| `@export` prose                | the CLEAN legal text; section citations in every explanation            |
+| L4                             | Blawx / s(CASP)                                                                                               |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| `DECLARE R HAS …` input record | category + one attribute per field                                                                            |
+| enum (`IS ONE OF`)             | atoms; a `CONSIDER` over it becomes one clause per branch                                                     |
+| `@export` boolean decision     | attributed rule(s) concluding `according_to(sec_N, …)`                                                        |
+| value-returning decision       | relation with an extra output argument                                                                        |
+| arithmetic                     | `Tmp is ( X * Y )` — exact rationals (`1/3` stays `1r3`, never a float)                                       |
+| comparisons (`AT LEAST`, …)    | `blawx_comparison(…, gte, …)` — constraint logic programming (**"CLP"**), works on values not yet pinned down |
+| `NOT` on a computed predicate  | negation as failure, `not p(X)`                                                                               |
+| a denied input                 | classical negation, `-p(x)` scenario fact                                                                     |
+| `ASSUME`d predicate            | input predicate: declaration block + `#abducible` in the interview                                            |
+| `#EVAL` / `#ASSERT`            | one Blawx test each (assertion = global constraint)                                                           |
+| `@export` prose                | the CLEAN legal text; section citations in every explanation                                                  |
 
 Two details deserve a word:
 
 **`ASSUME` inputs.** A module whose inputs are top-level `ASSUME`d
 predicates (rather than record fields) exports too —
 [`antisocial.l4`](../../../jl4/examples/blawx/antisocial.l4) is the shipped
-example, encoding s. 43 of the UK's Anti-social Behaviour, Crime and
+example, encoding s. 43 of the United Kingdom's Anti-social Behaviour, Crime and
 Policing Act 2014 with nine `ASSUME`d predicates over five `ASSUME`d types.
 Note the spelling: `ASSUME `is authorised` p IS A BOOLEAN` (a declared
 parameter), not `ASSUME `is authorised` IS A FUNCTION FROM Person TO
 BOOLEAN` — function-typed `ASSUME`s are rejected on the export path because
-they cannot cross the web-app JSON boundary. Each shipped `ASSUME` seed has
+they cannot cross the web-app boundary, which carries data as JavaScript
+Object Notation (**"JSON"**). Each shipped `ASSUME` seed has
 a record-spelling twin (`antisocial-twin.l4`) that emits **byte-identical**
 s(CASP) apart from the provenance header naming the source file — the two
 idioms are the same program to Blawx.
+
+`ASSUME` is deprecated as the way to declare an input (ruled 2026-09-04) and
+still works, so those seeds and every file like them keep exporting unchanged.
+For a new encoding, write the record spelling the twin uses, or declare the
+fact as a [section `GIVEN`, under the heading of the section](../../reference/syntax/section-given.md)
+that reads it; the exporter treats a section `GIVEN` exactly as it treats an
+`ASSUME` term.
 
 **What does not map, refuses loudly — with one exception that warns.** The
 regulative layer (obligations, parties, deadlines), temporal
@@ -303,7 +313,7 @@ GIVETH A NUMBER
 
 Transpiled, section 1 is the both-dates rule in blocks:
 
-![The transpiled Ground 8 rule: when a claim is a ground8_claim and the per-period threshold is met for the arrears at the date of service and at the date of the hearing, then according to HASG 1, ground 8 is made out](figures/housing-sec1.png)
+![The transpiled Ground 8 rule: when a claim is a ground8_claim and the per-period threshold is met for the arrears at the date of service and at the date of the hearing, then according to HASG (the exporter's short name for the Housing Act Schedule 2 grounds document) 1, ground 8 is made out](figures/housing-sec1.png)
 
 and the value function becomes a relation with an output argument, one
 clause per `CONSIDER` branch (from
@@ -370,7 +380,8 @@ rather than papered over.
 ## Importing from Blawx
 
 The bridge runs backwards too: `l4 blawx --import` parses a `.blawx`
-project — the Blockly XML is treated as canonical — and lifts the
+project — the Blockly XML (Extensible Markup Language) is treated as
+canonical — and lifts the
 stratified ground fragment into an L4 module. The shipped worked example
 is Blawx's own **New Bird Act** (penguins, planes, jetpacks: the defeat
 example from the concepts page). Reproduce it from the container image:

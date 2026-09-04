@@ -12,7 +12,7 @@ FOR ALL typeVar1 AND typeVar2 AND typeVar3 ...
 
 ## Purpose
 
-`FOR ALL` introduces type variables (type parameters) in type signatures, enabling polymorphism. A polymorphic function can operate on values of any type without knowing the specific type in advance.
+`FOR ALL` introduces type variables — names that stand for a kind of thing rather than a value — in type signatures. A rule declared this way works for any kind of thing, without knowing in advance which kind it will be asked about.
 
 ## Examples
 
@@ -103,6 +103,17 @@ Both express the same polymorphic type, but:
 - `FOR ALL` is for **type declarations** (no implementation)
 - `GIVEN ... IS A TYPE` is for **function definitions** (with implementation)
 
+**`ASSUME` is deprecated (ruled 2026-09-04), and it still works.** The ruling
+names three jobs the keyword was doing and where each one goes: a fact supplied
+afresh for each case moves to a
+[`GIVEN` under its section's heading](../syntax/section-given.md); an
+uninterpreted type moves to `DECLARE T`, which is proposed, not landed
+(2026-09-04), so keep writing `ASSUME T IS A TYPE` for now; and a
+case the encoding does not cover becomes a
+[`REFUSE`](../control-flow/REFUSE.md). None of the three is a spelling for a
+function type, so the `FOR ALL` declarations on this page are unchanged in this
+release.
+
 ## Type Variables
 
 Type variables introduced by `FOR ALL`:
@@ -190,7 +201,7 @@ any (GIVEN x YIELD x > 0) myList    -- Check if any element
 
 ## Related Keywords
 
-- **[GIVEN](../functions/GIVEN.md)** - Function parameters (including type parameters)
+- **[GIVEN](../functions/GIVEN.md)** - The inputs of a rule, including inputs that are kinds of thing
 - **[TYPE](keywords.md)** - The kind of types
 - **[ASSUME](ASSUME.md)** - Declare types without implementation
 - **[FUNCTION](keywords.md)** - Function type constructor

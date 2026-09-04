@@ -18,6 +18,7 @@ If you already know what error you are looking at, use the table of contents bel
 - [Indentation Errors](#indentation-errors)
   - [Body less indented than definition](#body-less-indented-than-definition)
   - [Multi-line function arguments](#multi-line-function-arguments)
+  - [GIVEN at column 1 meant for the section](#given-at-column-1-meant-for-the-section)
 - [Type Errors](#type-errors)
   - [Branch type mismatch](#branch-type-mismatch)
   - [Undefined field access](#undefined-field-access)
@@ -30,6 +31,8 @@ If you already know what error you are looking at, use the table of contents bel
   - [Circular definition](#circular-definition)
   - [Non-exhaustive patterns at runtime](#non-exhaustive-patterns-at-runtime)
   - [DEONTIC rule does not execute](#deontic-rule-does-not-execute)
+  - [Needed the value of an assumed term](#needed-the-value-of-an-assumed-term)
+  - [Refusal reported instead of a result](#refusal-reported-instead-of-a-result)
 - [Common Gotchas](#common-gotchas)
   - [Equality uses single equals](#equality-uses-single-equals)
   - [Missing IMPORT prelude](#missing-import-prelude)
@@ -251,6 +254,54 @@ r MEANS triple OF 100, 200, 300
 
 ---
 
+### GIVEN at column 1 meant for the section
+
+**Error message:**
+
+```
+This GIVEN starts at column 1, so it is the signature of the declaration
+below it -- and that declaration never uses
+
+  `the rate`
+
+If `the rate` was meant as a binder for the whole of
+
+  § S
+
+indent the GIVEN so that it starts past the § of the heading:
+
+  § <heading>
+      GIVEN `the rate` IS A <type>
+```
+
+It arrives alongside a pair of "The names in a type signature must match those in the definition" errors, which have the same cause. The word "binder" in the message is L4's own wording for what the manual calls a section `GIVEN`.
+
+**What you wrote:**
+
+```l4
+§ S
+
+GIVEN `the rate` IS A NUMBER
+DECLARE Applicant
+    HAS name IS A STRING
+```
+
+**What went wrong:** A `GIVEN` belongs to the section only when it starts at a column past the heading's `§`. At column 1 it lists the facts the declaration immediately below it is told about the case (its **"inputs"**) — so L4 tried to give `Applicant` an input called `the rate`, which `Applicant` never mentions. A paste, or a re-indent that straightened the file's left margin, is the usual way to arrive here.
+
+**How to fix it:** Indent the `GIVEN` past the `§`, on the line after the heading:
+
+```l4
+§ S
+    GIVEN `the rate` IS A NUMBER
+
+DECLARE Applicant
+    HAS name IS A STRING
+```
+
+**Note:** the check fires for a `DECLARE` or an `ASSUME` below the `GIVEN`, not for a `DECIDE`. A decision that ignores one of its own inputs is an ordinary thing to write, and is indistinguishable from a section `GIVEN` that has been pushed back to column 1. So if a rule that should read a section-wide name is asking whoever calls it for an input instead, check the column of its `GIVEN` yourself. See [The section `GIVEN`](../syntax/section-given.md).
+
+---
+
 ## Type Errors
 
 Type errors mean L4 understood the structure of your code but found a logical inconsistency in how values are used.
@@ -444,6 +495,50 @@ See [Regulative Rules](../regulative/README.md) for more on deontic logic in L4.
 
 ---
 
+### Needed the value of an assumed term
+
+**Error message:**
+
+```
+I could not continue evaluating, because I needed to know the value of
+  rate
+but it is an assumed term.
+```
+
+**What went wrong:** The rule you evaluated reads a name that stands for a fact to be supplied for each case, and nothing supplied it for this run. Two spellings produce that kind of name: a section `GIVEN`, indented under a `§` heading, and a module-level `ASSUME`. Both are blanks in the rule rather than values, and evaluation stops at the blank. A directive that stops this way makes `l4 run` exit non-zero.
+
+**How to fix it:** Decide which of three things you meant.
+
+- _The fact genuinely varies from case to case._ Supply it from outside the file. `l4 batch rules.l4 --inputs cases.json` fills each blank from the case it is given, as do `jl4-service` and the web form generated from an `@export`ed rule; the published list of facts asks for exactly the blanks that rule reads, directly or through any rule it relies on, and requires every one of them.
+- _The fact is fixed for everyone._ Define it instead of leaving it open — `` `rate` MEANS 0.2 `` — and it stops being a blank.
+- _You only wanted to see the rule's shape._ Use `#CHECK`, which reports the type without evaluating anything, rather than `#EVAL`.
+
+There is no way to fill a blank inside the file today, and `WITH` fails in two different ways depending on where it is written. ``#EVAL `tax on` 100 WITH rate IS 0.2``, with a value before the `WITH`, does not parse: `unexpected WITH`. Where the name takes no inputs of its own, `#EVAL isAdult WITH age IS 25` and `#CHECK isAdult WITH age IS 25` both parse and then report a check error, that `isAdult`, which is not a function, is being applied to named arguments.
+
+_Proposed, not landed (2026-09-04): supplying a value at the directive or the point of use with `WITH`, and the discharge that works out which blanks an entry point reads and asks for exactly those. This lands with the discharge pull request; until then supply values from outside the file (web form, `l4 batch`, application programming interface (API))._
+
+See [The section `GIVEN`](../syntax/section-given.md) and [ASSUME](../types/ASSUME.md).
+
+---
+
+### Refusal reported instead of a result
+
+**What you see:**
+
+```
+Result:
+  The model refuses to answer:
+    no Regulation Crowdfunding figure exists before commencement on 2016-05-16
+```
+
+**This is not an error.** Evaluation reached a `REFUSE`, which is how the author of the encoding says that the model does not cover this case. The sentence you are reading is theirs. It is not zero, not FALSE, and not "unknown": nobody is missing a fact, and nothing crashed. It is a claim about the encoding, not about the law.
+
+**Where it came from:** search the file for the message. It is a string literal in a `REFUSE`, by house style inside one named definition whose name says the same thing, with an `@ref` above it giving the reason. `TBD`, the drafting placeholder from the prelude, is itself a `REFUSE`, and is not reported any differently from one written out by hand, so the message is what tells you which you have.
+
+**What to do about it:** If the case ought to have an answer, the encoding has a gap, and filling it is a drafting job. There is nothing to deal with a refusal with and nothing to default it to: no `IF`, `CONSIDER`, `AND`/`OR`, `WHERE` or `LET` in any later rule can observe a refusal or turn it into an answer, so only the boundary — the directive, the command-line interface (CLI), the API, the form — ever sees one. If declining _is_ the right answer for this case, record that with `#ASSERT REFUSED`, so a later edit that quietly starts answering it is caught. See [REFUSE](../control-flow/REFUSE.md).
+
+---
+
 ## Common Gotchas
 
 These are not always error messages per se, but they trip up many L4 users.
@@ -490,12 +585,12 @@ See [Libraries](../libraries/README.md) for the full list of available libraries
 
 **What went wrong:** L4 could not find the module you are trying to import. L4 searches for modules in this order (first match wins):
 
-1. Virtual filesystem (VFS) provided by the IDE or service
+1. Virtual filesystem (VFS) provided by the integrated development environment (IDE) or by the service
 2. `JL4_LIBRARY_PATH` environment variable (if set)
 3. Project root directory
 4. Relative to the importing file
 5. Embedded standard libraries compiled into the binary
-6. XDG data directory (`~/.local/share/jl4/libraries/`)
+6. The user-wide data directory laid down by the Cross-Desktop Group (XDG) specification (`~/.local/share/jl4/libraries/`)
 7. Bundled with the VSCode extension (`../../libraries/` from executable)
 
 Project-scoped locations (2–4) outrank the embedded stdlib, so intentional overrides work; machine-global locations (6–7) rank below it, so they can only supply modules the embed does not carry. When `JL4_LIBRARY_PATH` is set, the embedded copy (step 5) is skipped entirely — the operator has full control over which libraries are available. See [Library Resolution](../libraries/resolution.md) for the full story, including the shadow warning emitted when several differing copies of a module are visible at once.
