@@ -1,0 +1,5 @@
+§ `Rates`
+    GIVEN `applicable rate` IS A NUMBER
+
+GIVETH A NUMBER
+`tax on` amount MEANS amount TIMES `applicable rate`

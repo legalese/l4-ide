@@ -1,0 +1,28 @@
+-- A reader that reaches two same-named section binders at once is an error, and
+-- the diagnostic names the candidates by their declaring section. This is §§ 5
+-- of the ruled §11.4 fruit pattern; the green half is
+-- ok/section-given-fruit.l4.
+--
+-- The three ways out: hoist `foo` to the title heading if it is one thing;
+-- rename one if they are two; or bridge at the call, `g WITH foo IS foo`.
+
+§ toplevel
+
+DECLARE Fruit IS ONE OF Apple, Banana
+
+§§ `1`
+    GIVEN foo IS A Fruit
+
+GIVETH A Fruit
+r1 MEANS foo
+
+§§ `2`
+    GIVEN foo IS A Fruit
+
+GIVETH A Fruit
+r2 MEANS foo
+
+§§ `5`
+
+GIVETH A Fruit
+r5 MEANS foo

@@ -14,6 +14,7 @@ module L4.Desugar (
   -- * Section binders
   --
   desugarSectionGivens,
+  detectMisattachedSectionGivens,
   ) where
 
 
@@ -21,8 +22,9 @@ import           Base
 import           Data.Graph               (stronglyConnComp, SCC(..))
 import qualified Data.Map.Strict          as Map
 import qualified Data.Set                 as Set
-import           L4.Annotation            (Anno_ (..), HasAnno (..), emptyAnno, mkHoleWithSrcRangeHint)
+import           L4.Annotation            (Anno_ (..), HasAnno (..), HasSrcRange (..), emptyAnno, mkHoleWithSrcRangeHint)
 import           L4.Names
+import           L4.Parser.SrcSpan        (SrcPos (MkSrcPos), SrcRange (MkSrcRange))
 import           L4.Syntax
 import qualified L4.TypeCheck.Environment as TypeCheck
 import Control.Category ((>>>))
@@ -615,3 +617,77 @@ elaborateSectionBinder (MkOptionallyTypedName pAnn nm mTy mTypically) =
       (MkAppForm emptyAnno nm [] Nothing)
       mTy
       mTypically)
+
+-- | The dedent hazard of R4, as a diagnosable shape.
+--
+-- A section binder that a paste or a hand-edit pushes back to column 1 stops
+-- being the section's and silently becomes the signature of the declaration
+-- below it: the checker rewrites a 0-ary head to take the GIVEN's names as its
+-- arguments, so nothing complains. Reported here are the cases where that
+-- reading cannot have been meant, because the declaration makes no use of the
+-- name anywhere — not in its head, not in its result type, not in its body, and
+-- not in another parameter's type.
+--
+-- The test is deliberately this narrow, in two ways, both of them measured
+-- rather than reasoned.
+--
+-- First, a column-1 @GIVEN@ opening a section is how 736 declarations in this
+-- tree spell an ordinary function signature, so flagging a name merely because
+-- the /written/ head does not bind it would report every one of them (the
+-- checker rewrites a 0-ary head to take the GIVEN's term names as arguments,
+-- 'checkTermAppFormTypeSigConsistency'). Hence \"used nowhere at all\".
+--
+-- Second, only a @DECLARE@ or an @ASSUME@ is considered. Extending the same
+-- test to @DECIDE@ was built and measured on 2026-09-04 and reports five
+-- existing files — @jl4-core\/libraries\/actus.l4@ (@state@),
+-- @legal\/ceo-performance-award.l4@ (@tranche number@),
+-- @legal\/sg-succession\/cleanroom-2026-08\/wills-act.l4@ and
+-- @family-cases.l4@ (@the will@) and @not-ok\/tc\/sing.l4@ (@p@) — each an
+-- ordinary function that simply does not use one of its parameters, which is
+-- indistinguishable from a dedented binder and is not this check's business.
+-- Restricted to @DECLARE@ and @ASSUME@ the rule fires on no existing file under
+-- @jl4\/examples@, @jl4-core\/libraries@ or @doc@.
+--
+-- The third shape the design names, a column-1 @GIVEN@ followed by another
+-- heading, needs no check: it is a parse error already.
+--
+-- Returns the unused parameter and the heading it sits under.
+detectMisattachedSectionGivens :: Module Name -> [(Name, Maybe Name)]
+detectMisattachedSectionGivens (MkModule _ _ sect) = goSection sect
+ where
+  goSection :: Section Name -> [(Name, Maybe Name)]
+  goSection (MkSection _ mn _ _ decls) =
+    -- Only a section with a heading has a § to indent past; the anonymous root
+    -- section's first GIVEN is an ordinary module-level signature.
+    (case (mn, decls) of
+       (Just _, d : _) -> misattachedIn mn d
+       _               -> [])
+    <> concat [ goSection s | Section _ s <- decls ]
+
+  misattachedIn :: Maybe Name -> TopDecl Name -> [(Name, Maybe Name)]
+  misattachedIn mn d = case typeSigOf d of
+    Just (MkTypeSig _ (MkGivenSig gann params@(_ : _)) _)
+      | startsAtColumnOne gann ->
+          [ (nm, mn)
+          | MkOptionallyTypedName _ nm _ _ <- params
+          , occurrences (rawName nm) d <= 1
+          ]
+    _ -> []
+
+  startsAtColumnOne :: Anno -> Bool
+  startsAtColumnOne gann = case rangeOf gann of
+    Just (MkSrcRange (MkSrcPos _ col) _ _ _) -> col == 1
+    Nothing                                  -> False
+
+  -- How many times this raw name occurs anywhere in the declaration. The
+  -- parameter's own binding occurrence is one of them, so a name used nowhere
+  -- else has a count of exactly one.
+  occurrences :: RawName -> TopDecl Name -> Int
+  occurrences rn d = length [ () | n <- toList d, rawName n == rn ]
+
+  -- DECIDE is deliberately absent; see the note above.
+  typeSigOf :: TopDecl Name -> Maybe (TypeSig Name)
+  typeSigOf = \ case
+    Declare _ (MkDeclare _ tysig _ _)   -> Just tysig
+    Assume  _ (MkAssume  _ tysig _ _ _) -> Just tysig
+    _                                   -> Nothing

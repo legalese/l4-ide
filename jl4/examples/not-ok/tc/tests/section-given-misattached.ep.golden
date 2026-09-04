@@ -1,0 +1,18 @@
+-- The dedent hazard of R4. A section binder that a paste or a hand-edit pushes
+-- back to column 1 stops being the section's and becomes the signature of the
+-- declaration below it. Where that declaration makes no use of the name at all,
+-- it is a check error that names the fix: indent the GIVEN past the §.
+--
+-- Only DECLARE and ASSUME are tested this way. The same test on DECIDE reports
+-- five existing corpus files whose functions simply do not use one of their
+-- parameters, which is indistinguishable from a dedented binder; see
+-- 'detectMisattachedSectionGivens' in L4.Desugar for the measurement.
+
+§ `S`
+GIVEN `the rate` IS A NUMBER
+DECLARE Money
+    HAS amount IS A NUMBER
+
+§ `T`
+GIVEN `the other rate` IS A NUMBER
+ASSUME `base fee` IS A NUMBER

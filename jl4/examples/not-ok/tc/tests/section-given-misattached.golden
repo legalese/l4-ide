@@ -1,0 +1,72 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: section-given-misattached.l4
+  Hidden: no
+  Range: 12:7-12:17
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The names in a type signature must match those in the definition.
+
+    However, this name `the rate` appears in the signature,
+    and the corresponding name in the definition is
+
+      `the rate` (at <no location>)
+
+File: section-given-misattached.l4
+  Hidden: no
+  Range: 12:7-12:17
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    This GIVEN starts at column 1, so it is the signature of the declaration
+    below it -- and that declaration never uses
+
+      `the rate`
+
+    If `the rate` was meant as a binder for the whole of
+
+      § S
+
+    indent the GIVEN so that it starts past the § of the heading:
+
+      § <heading>
+          GIVEN `the rate` IS A <type>
+
+File: section-given-misattached.l4
+  Hidden: no
+  Range: 13:9-13:14
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The names in a definition must match those in the type signature.
+
+    However, this name `the rate` appears in the definition
+    and the corresponding name in the type signature is
+
+      `the rate` (at section-given-misattached.l4:12:7-17)
+
+File: section-given-misattached.l4
+  Hidden: no
+  Range: 17:7-17:23
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    This GIVEN starts at column 1, so it is the signature of the declaration
+    below it -- and that declaration never uses
+
+      `the other rate`
+
+    If `the other rate` was meant as a binder for the whole of
+
+      § T
+
+    indent the GIVEN so that it starts past the § of the heading:
+
+      § <heading>
+          GIVEN `the other rate` IS A <type>

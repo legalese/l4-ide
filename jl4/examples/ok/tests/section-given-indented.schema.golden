@@ -1,0 +1,25 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "Tax on an amount",
+    "properties": {
+        "amount": {
+            "description": "The amount being taxed",
+            "type": "number"
+        },
+        "applicable rate": {
+            "description": "The rate that applies to this transaction",
+            "type": "number"
+        },
+        "surcharge": {
+            "default": 2,
+            "type": "number"
+        }
+    },
+    "required": [
+        "amount",
+        "applicable rate",
+        "surcharge"
+    ],
+    "title": "tax on",
+    "type": "object"
+}

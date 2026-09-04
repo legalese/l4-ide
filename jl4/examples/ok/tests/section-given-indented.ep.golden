@@ -1,0 +1,29 @@
+-- A section-level GIVEN (R4): a name declared once for a whole section,
+-- instead of being repeated in every rule's own GIVEN.
+--
+-- The taught spelling is on the line after the heading, indented past the §.
+-- A GIVEN at column 1 is still the next declaration's signature, as it always
+-- was.
+--
+-- In this release a section binder evaluates as an assumed term, exactly like
+-- ASSUME: a rule that reads one cannot be evaluated to a value until the binder
+-- is supplied. It does appear in the export schema as a required request
+-- parameter, which is what the .schema.golden beside this file shows.
+--
+-- Read that golden with one thing in mind: `surcharge` carries a TYPICALLY and
+-- so has a JSON Schema `default`, yet is still listed in `required`. That is
+-- today's ASSUME behaviour, inherited deliberately; making a TYPICALLY
+-- parameter optional is separate, later work, so this is not a difference to
+-- "fix".
+
+§ `Rates`
+    GIVEN `applicable rate` IS A NUMBER @desc The rate that applies to this transaction
+          surcharge IS A NUMBER TYPICALLY 2
+
+@export Tax on an amount
+GIVEN amount IS A NUMBER @desc The amount being taxed
+GIVETH A NUMBER
+`tax on` amount MEANS
+    amount TIMES `applicable rate` PLUS surcharge
+
+#CHECK `tax on`

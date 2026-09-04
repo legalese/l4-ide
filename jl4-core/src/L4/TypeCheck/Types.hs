@@ -111,6 +111,11 @@ data CheckError =
   | CyclicComputedFields Name [Name]
     -- ^ Circular dependency between computed fields (record name, cycle of field names)
   | CyclicTypeSynonyms [Name]
+  -- | A column-1 @GIVEN@ that opens a section and declares a name the
+  -- declaration it attaches to never uses. Carries the unused parameter name
+  -- and the name of the section whose heading it sits under. See
+  -- 'L4.Desugar.detectMisattachedSectionGivens'.
+  | MisattachedSectionGiven Name (Maybe Name)
     -- ^ Circular dependency between type synonym declarations (cycle members)
   | SuppliedComputedField Name
     -- ^ Tried to supply a computed field in a record constructor (field name)
@@ -310,6 +315,7 @@ instance HasSrcRange CheckError where
   -- WhileCheckingDecide context range via @rangeOf e <|> rangeOf ctx@ above.
   rangeOf (CheckWarning (PatternClausesMissing r _ _)) = Just r
   rangeOf (SuspiciousBinderPattern b _)     = rangeOf b
+  rangeOf (MisattachedSectionGiven n _)     = rangeOf n
   rangeOf _                                 = Nothing
 
 -- | A token in a mixfix pattern, representing either a keyword (part of the function name)

@@ -115,7 +115,7 @@ import qualified Base.Set as Set
 import Data.Function (on)
 import Control.Exception (assert)
 import Text.Read (readMaybe)
-import L4.Desugar (desugarComputedFields, desugarSectionGivens, detectComputedFieldCycles, detectTypeSynonymCycles, extractComputedFieldNames)
+import L4.Desugar (desugarComputedFields, desugarSectionGivens, detectComputedFieldCycles, detectMisattachedSectionGivens, detectTypeSynonymCycles, extractComputedFieldNames)
 
 mkInitialCheckState :: Substitution -> CheckState
 mkInitialCheckState substitution =
@@ -178,6 +178,14 @@ doCheckProgramWithDependencies checkState checkEnv program =
         ++
         [ MkCheckErrorWithContext (CyclicTypeSynonyms cyc) (WhileCheckingDeclare synName None)
         | cyc@(synName : _) <- synonymCycles
+        ]
+        ++
+        -- The dedent hazard of R4: a section binder pushed back to column 1
+        -- silently becomes the next declaration's parameter. Reported only
+        -- where the declaration makes no use of the name at all, which is the
+        -- one shape that cannot be a deliberately written function signature.
+        [ MkCheckErrorWithContext (MisattachedSectionGiven n mSection) None
+        | (n, mSection) <- detectMisattachedSectionGivens program
         ]
       synonymCycles = detectTypeSynonymCycles program
       checkEnv' = checkEnv
@@ -5090,6 +5098,21 @@ prettyCheckError (SuspiciousBinderPattern binder ctor)     =
   , "a constructor of the type being matched that no other branch covers."
   , "If you meant the constructor, fix the spelling; if you meant a"
   , "catch-all, consider OTHERWISE or a name unlike any constructor."
+  ]
+prettyCheckError (MisattachedSectionGiven n mSection)       =
+  [ "This GIVEN starts at column 1, so it is the signature of the declaration"
+  , "below it -- and that declaration never uses"
+  , ""
+  , "  " <> quotedName n
+  , ""
+  , "If " <> quotedName n <> " was meant as a binder for the whole of"
+  , ""
+  , "  " <> maybe "this section" (("\167 " <>) . prettyLayout) mSection
+  , ""
+  , "indent the GIVEN so that it starts past the \167 of the heading:"
+  , ""
+  , "  \167 <heading>"
+  , "      GIVEN " <> prettyLayout n <> " IS A <type>"
   ]
 prettyCheckError (OutOfScopeError n t)                     =
   [ "I could not find a definition for the identifier"
