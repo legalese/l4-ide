@@ -406,8 +406,8 @@ that file's history at `d119c521`. In one line: **`ASSUME` is deprecated; its te
 section-level `GIVEN` that the compiler discharges into ordinary parameters of every definition
 that transitively reads it; supply is the existing named-argument `WITH`.** §4.2's section-scoped
 establishment is withdrawn there (visibility already ships; `§` placement is a tiebreak), and
-§5.1's structural subtyping is found unnecessary. R0, R1, R2, R3, R4 and R8 are recorded below; R5–R7
-and R9–R12 are candidates on the rulings sheet and are recorded here, dated, as each is decided.
+§5.1's structural subtyping is found unnecessary. R0–R8 and R10–R12 are recorded below, each with the mark Meng gave it on 2026-09-04; R9 is the
+one open candidate, with a recommendation on the rulings sheet.
 
 ### 11.1 R0 — `ASSUME` is deprecated. RULED 2026-09-04.
 
@@ -442,10 +442,8 @@ rewrites a term `ASSUME` to the ruled spelling — the warning does not land bef
 can; (6) corpus and docs migration, `doc/reference/types/ASSUME.md` carrying the notice and the
 recipe (CLAUDE.md §6); (7) keyword removal, together with the dead `LocalAssume` grammar.
 
-**What this does not decide.** `REFUSE`'s specification (R7), field-opening, hypotheticals,
-backends and `@reads` (R5, R9–R11) — `PROPS-REDTEAM-2026-09-03.md`
-§4, still candidates. The supply grammar, the resolution rule, visibility and defaults are ruled
-in §11.2–§11.5 below, and the binder's spelling in §11.6. Consistent with §10.7 above and the handoff's §7 ("`ASSUME` is not simply
+**What this does not decide.** In-body hypotheticals (R9), still a candidate on the rulings sheet
+with a recommendation. Everything else the red team put up is ruled in §11.2–§11.12 below. Consistent with §10.7 above and the handoff's §7 ("`ASSUME` is not simply
 to be deleted"): the refusal and type roles get their own constructs _before_ the keyword goes.
 
 ### 11.2 R1 — A call site is entirely positional or entirely named. RULED 2026-09-04.
@@ -542,3 +540,68 @@ formatter never moves a `GIVEN` across the column boundary; and diagnostics abou
 the heading line it was declared on. Measured 2026-09-04: the rival adjacency rule would
 reinterpret 160 legal-corpus sites; the indentation rule collides with none. ExactPrint preserves
 what was written; `prettyLayout` emits the indented form; both have round-trip goldens. Detail: `PROPS-REDTEAM-2026-09-03.md` §2.1.
+
+### 11.7 R5 — Field-opening is lexical only. RULED 2026-09-04 (marked accept).
+
+The fields of a record-typed `GIVEN`, function or section, are in scope by bare name within the
+function that declares or sees the binder, never in its callees. Rank, innermost first:
+`WHERE`/`LET` locals; the function's own `GIVEN`; fields opened from it; section `GIVEN`s; fields
+opened from those; selectors. A collision between two opened records sharing a field name is an
+error at the read naming both records and at the declaration that opens the second; `r's f` is
+always available. A bare opened field elaborates to `Proj (App r []) field` in a post-typecheck AST
+every backend consumes. Only binders are suppliable at `WITH`. **Sequencing note:** the sample that
+motivated opening (the alcohol act as one record) was re-cut as fourteen scalars under R10, so
+opening's remaining value is bare field names inside a rule; it is implemented after discharge
+lands, and opt-in `OPENED` stays the fallback if reviewers cannot see binding class. Detail:
+`PROPS-REDTEAM-2026-09-03.md` §2.7.
+
+### 11.8 R6 — The `MAYBE`/`EITHER` propagation sugar is withdrawn. RULED 2026-09-04 (marked accept).
+
+Declined on measurement: seven of seven rating sets against; no use-site marker; the FEEL claim
+false; strictness under call-by-need; 28 functions, none exported; the deleted line is the
+encoder's visible allocation of the not-proved case. The taxonomy of non-answers stands. If
+revisited: a use-site `?`, bind at the nearest enclosing failure-typed node, lambda its own
+boundary, `JUST` explicit, elaborated to `CONSIDER` before any backend. Detail:
+`PROPS-REDTEAM-2026-09-03.md` §2.8, §5 item 11.
+
+### 11.9 R7 — `REFUSE` stays, specified. RULED 2026-09-04 (marked accept).
+
+A throw at force, never a value; `#ASSERT REFUSED e` with an optional message and a three-valued
+assertion outcome; house style one named definition per refusal with its `@ref`, readers
+byte-identical, polymorphic ones declared `GIVEN a IS A TYPE`; `Ref(f)` reported per reason string
+with the prelude's `TBD` excluded and warned separately; the per-backend image of
+`PROPS-REDTEAM-2026-09-03.md` §2.8 (DMN omits the refusing row, non-Blocking `D-REFUSE`,
+`MayRefuse` safety kind; Catala no definition; Docassemble a terminal screen; evaluator, CLI, batch
+and service a `refused` kind); order-dependence under lazy `AND`/`OR` written down. The taxonomy
+row is split: "the law does not apply / is not in force" is a value or gate that savings and
+transitional provisions can reach; "the model does not cover this" is `REFUSE`.
+
+**Consequence to carry, so two documents do not contradict.** The split reclassifies Reg CF's
+pre-commencement case, which `specs/todo/lexipedia-superset/CORPUS-TRACK.md` §8 ruling R2 and
+`regcf.l4:135-143` record as a curated refusal, and the temporal design's generated "not in force
+on <day>" arm (`TEMPORAL-RULE-VERSION-DESIGN.md` item 3), which becomes a gate. Neither has a gate
+design yet. Until one exists the commencement arm stays a `REFUSE`, and the PR that lands `REFUSE`
+amends CORPUS-TRACK §8 in the same change.
+
+### 11.10 R10 — Backends. RULED 2026-09-04 (marked accept).
+
+The transitive read-set pass lands first; the schema is keyed by (name, tier) with `x-l4-tier`;
+check rejects an explicit parameter sharing a name with a discharged implicit; defaulted implicits
+are not `required`; `BatchRequest` gains a `world` object; discharged implicits trail positional
+parameters; OpenFisca puts scalar implicits in `parameters(period)` and refuses record ones;
+`imaginary-alcohol-act.l4` migrates as fourteen scalar section `GIVEN`s. Detail:
+`PROPS-REDTEAM-2026-09-03.md` §2.10.
+
+### 11.11 R11 — `@reads`. RULED 2026-09-04 (marked accept).
+
+A function may annotate an implicit it reads, `@reads interp — …`, or override the section's
+`@desc` with its own, so the per-decision fork register of the de novo Reg CF encoding survives
+hoisting. Detail: `PROPS-REDTEAM-2026-09-03.md` §2.9.
+
+### 11.12 R12 — Six pre-existing defects are fixed now. RULED 2026-09-04 (marked accept).
+
+Independent of any ruling: the tutorial's flat `#CHECK … WITH` form; the section-scoping
+parent-ambiguity defect and the §3.3.4 drift; the schema's one-body-deep collector; `#ASSERT`
+collapsing an exception to a plain failure; `#CHECK` printing inference gensyms; `l4 batch`
+mis-applying a directly-read `ASSUME`. Built and independently verified on four branches off
+`origin/unstable` (`PROPS-REDTEAM-2026-09-03.md` §7); delivery is four PRs into `unstable`.
