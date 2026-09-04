@@ -406,8 +406,8 @@ that file's history at `d119c521`. In one line: **`ASSUME` is deprecated; its te
 section-level `GIVEN` that the compiler discharges into ordinary parameters of every definition
 that transitively reads it; supply is the existing named-argument `WITH`.** §4.2's section-scoped
 establishment is withdrawn there (visibility already ships; `§` placement is a tiebreak), and
-§5.1's structural subtyping is found unnecessary. R0 is recorded below; R1–R12 are candidates on the
-rulings sheet and are recorded here, dated, as each is decided.
+§5.1's structural subtyping is found unnecessary. R0, R1, R2, R3 and R8 are recorded below; R4–R7
+and R9–R12 are candidates on the rulings sheet and are recorded here, dated, as each is decided.
 
 ### 11.1 R0 — `ASSUME` is deprecated. RULED 2026-09-04.
 
@@ -442,7 +442,80 @@ rewrites a term `ASSUME` to the ruled spelling — the warning does not land bef
 can; (6) corpus and docs migration, `doc/reference/types/ASSUME.md` carrying the notice and the
 recipe (CLAUDE.md §6); (7) keyword removal, together with the dead `LocalAssume` grammar.
 
-**What this does not decide.** The spelling of the section binder, the supply grammar, the
-resolution and supply rules, and `REFUSE`'s specification — `PROPS-REDTEAM-2026-09-03.md` §4
-R1–R12, still candidates. Consistent with §10.7 above and the handoff's §7 ("`ASSUME` is not simply
+**What this does not decide.** The spelling of the section binder (R4), `REFUSE`'s specification
+(R7), field-opening, hypotheticals, backends and `@reads` (R5, R9–R11) — `PROPS-REDTEAM-2026-09-03.md`
+§4, still candidates. The supply grammar, the resolution rule, visibility and defaults are ruled
+in §11.2–§11.5 below. Consistent with §10.7 above and the handoff's §7 ("`ASSUME` is not simply
 to be deleted"): the refusal and type roles get their own constructs _before_ the keyword goes.
+
+### 11.2 R1 — A call site is entirely positional or entirely named. RULED 2026-09-04.
+
+**Ruling (Meng, 2026-09-04, in conversation: "i'm minded to allow all positional or all by-name but
+not allow an admixture of styles").** There is no mixed form `f x WITH y IS v`. The grammar is
+unchanged; the one compiler change is that `supplyAppNamed` may omit a parameter that is flowed
+from a visible section binder or has a `TYPICALLY` default, and a section `GIVEN` in the callee's
+read-set is a suppliable name at a `WITH` site. Implicits are keyword-only: at a positional site
+they flow or default. A `WITH` names only what it overrides; the rest keeps flowing.
+
+**What decided it.** The mixed form was never live code: it is a parse error on every binary that
+exists, and the corpus's roughly a thousand `WITH` sites are all-named because nothing else parses.
+Per-site practice already mixes styles across sites (`is adult`: one `WITH` site, fourteen
+positional). The red team's original R1, a new mixed grammar, is struck. Detail:
+`PROPS-REDTEAM-2026-09-03.md` §2.4.
+
+### 11.3 R2 — Resolution is lexical; a function `GIVEN` never flows to a callee. RULED 2026-09-04.
+
+**Ruling (Meng, 2026-09-04, on the resulting rule set: "a good balance between referential
+transparency and DWIM convenience").** A bare name resolves at the definition to a `WHERE`/`LET`
+local, the function's own `GIVEN`, a field opened from one, or a section `GIVEN`, else it is a
+check error; there is no caller chain in resolution. Only section binders and an explicit
+`WITH`/`LET` supply a callee's requirement; a function's own `GIVEN` never does. A function
+`GIVEN` that restates a visible section `GIVEN` is a **check error**, so a name has one binder per
+root (§11.4). Per-call variation is written, `callee WITH person IS person's guardian`.
+
+**What decided it.** The argument recorded at `PROPS-REDTEAM-2026-09-03.md` §2.3: a name
+coincidence would become a binding; `R(f)` would stop being the callee's; one program would have two
+readings; every tradition that had dynamic parameter binding gave it up (Common Lisp's `special`
+declaration is exactly the section-`GIVEN`/function-`GIVEN` line). Measured cost zero: across 607
+files there are 235 term-role `ASSUME` names and 2,311 function `GIVEN` names and no file where the
+two sets overlap. Restatement as an error rather than a warning was part of the recommendation Meng
+accepted; it is the one sub-point he did not separately voice.
+
+### 11.4 R3 — Distinct binders per section; one binder per name per root. RULED 2026-09-04.
+
+**Ruling (Meng, 2026-09-04: "I had intended our module scope mechanism to allow" a `foo` defined
+in each of four sibling sections, apple in 1 and 2, banana in 3 and 4).** Visibility is as shipped:
+nearest ancestor section, falling back to all candidates when no ancestor matches. Same-named
+section binders in different sections are distinct binders, each read by its own section and its
+descendants. One binder per name is enforced per root, not per module: a directive or export whose
+read-set holds two binders of one name is a check error naming both by section, and the ways out
+are hoist to the title heading, rename, or bridge at the call with `g WITH foo IS foo`. Nesting: a
+heading's binder covers its subtree; a child re-declaring an ancestor's name shadows within the
+child; a parent reading a name several children declare is ambiguous. Tier (world vs subject) is
+classified by call-site variation, never by placement.
+
+**What decided it.** The first draft's one-binder-per-module would have merged silently the
+"for the purposes of sections 1 and 2 … sections 3 and 4" pattern when the two are same-typed
+inputs. As definitions the pattern runs today on the FIX D branch exactly as intended, and with
+`ASSUME` in each section it checks identically; the shipped binary gets it wrong only through the
+defect FIX D repairs. Preconditions: FIX D and the §3.3.4 drift, both on
+`fix/section-scoping-ambiguity`. Detail: `PROPS-REDTEAM-2026-09-03.md` §2.1, §2.2.
+
+### 11.5 R8 — `TYPICALLY` has one behaviour, filled in once at the root. RULED 2026-09-04.
+
+**Ruling (Meng, 2026-09-04: "Agree with these three rules, please add"; on a definition as a
+default, "Yes please").** A defaulted `GIVEN`, section or function, may be omitted at a supply site
+and the evaluator honours the default, filled in once per evaluation at the root. Three rules: a
+function's own defaulted `GIVEN` may be omitted only at a named site; each binder has one
+declaration and its default lives there; a default is a module-scope expression, may name another
+binder or a definition (`beta TYPICALLY phi`), is evaluated lazily at the root, and a cycle
+`b ∈ R*(default(b))` is a check error, the default's read-set joining the requirement of every root
+that may use it. Surfaces: the trace records a defaulted binder as its own event with the
+declaration line and value; the JSON schema lists a `TYPICALLY` parameter as optional, never in
+`required`, with its default (as source text when it is an expression) and description.
+
+**What decided it.** Three images today (schema required-and-defaulted, Catala `context`,
+evaluator discards) and a reference page saying defaults do not change evaluation. Meng's own
+note: this expands `TYPICALLY` from a literal annotation into a defaulted expression, a language
+change in its own right; `doc/reference/types/TYPICALLY.md` says so when R8 lands. Detail:
+`PROPS-REDTEAM-2026-09-03.md` §2.5.
