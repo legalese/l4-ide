@@ -1,6 +1,6 @@
 # Regulative Rules Reference
 
-Deep dive on L4's regulative machinery: obligations, permissions, prohibitions, deadlines, consequences, and contract-trace simulation. This is L4's unique strength and the part most likely to trip a general-purpose LLM.
+Deep dive on L4's regulative machinery: obligations, permissions, prohibitions, deadlines, consequences, and contract-trace simulation. This is L4's unique strength and the part most likely to trip a general-purpose large language model.
 
 **Canonical reference:** <https://legalese.com/l4/reference/regulative.md>
 
@@ -17,6 +17,7 @@ Deep dive on L4's regulative machinery: obligations, permissions, prohibitions, 
 - [Composition: RAND and ROR](#composition-rand-and-ror)
 - [Recursive obligations](#recursive-obligations)
 - [#TRACE — simulating contract execution](#trace--simulating-contract-execution)
+  - [What may go in the `WITH` block](#what-may-go-in-the-with-block)
 - [Complete example](#complete-example)
 
 ---
@@ -91,6 +92,8 @@ Without a `LEST` clause on the inner obligation, missing that deadline is a term
 
 Both are **keywords**, not just outcomes from the evaluator.
 
+All four spellings parse:
+
 ```l4
 HENCE FULFILLED
 LEST  BREACH
@@ -99,7 +102,17 @@ LEST  BREACH BECAUSE "delivery deadline exceeded"
 LEST  BREACH BY Seller BECAUSE "failed to deliver within 14 days"
 ```
 
-`BECAUSE` attaches a reason to a breach and is reported in the trace output. Use it — breach reasons are the thing a legal reviewer or downstream system actually wants to read.
+**Write the last one.** `BECAUSE` attaches a reason to a breach and is reported verbatim in the trace output, under the `BY` line:
+
+```
+Result:
+  DEONTIC BREACHED:
+    BREACH
+    BY Seller
+    BECAUSE "the goods were not delivered within 3 days"
+```
+
+Breach reasons are the thing a legal reviewer or a downstream system actually reads, so every example in this file carries one. `SKILL.md` states the same rule under "Model obligations and deadlines".
 
 Reference: <https://legalese.com/l4/reference/regulative/BECAUSE.md>
 
@@ -156,7 +169,10 @@ applied to `5`; the second stops at `OF`). See
 [source-patterns/04-dates-and-periods.md](source-patterns/04-dates-and-periods.md#e4-3),
 entry 4.3, for the measured forms.
 
-**`BEFORE` (absolute deadlines) is planned but not yet implemented** — use `WITHIN` for now.
+**There is no `BEFORE` for an absolute deadline in this release.** `MUST pay BEFORE 30` does not
+read as a deadline at all — the parser takes it as applying the action to two arguments, and the
+check fails with `You are trying to apply pay … (which is not a function) to 2 arguments here`
+(probe `g14-before-deadline.l4`, exit 1). Use `WITHIN`.
 
 ---
 
@@ -170,14 +186,18 @@ entry 4.3, for the measured forms.
 
 ```l4
 -- Both parties must fulfill their halves
-(PARTY seller MUST deliver WITHIN 14 HENCE FULFILLED LEST BREACH)
+(PARTY seller MUST deliver WITHIN 14 HENCE FULFILLED
+  LEST BREACH BY seller BECAUSE "goods not delivered within 14 days")
 RAND
-(PARTY buyer  MUST pay     WITHIN 30 HENCE FULFILLED LEST BREACH)
+(PARTY buyer  MUST pay     WITHIN 30 HENCE FULFILLED
+  LEST BREACH BY buyer  BECAUSE "price not paid within 30 days")
 
 -- Seller has two ways to satisfy the obligation
-(PARTY seller MUST ship              WITHIN 14 HENCE FULFILLED LEST BREACH)
+(PARTY seller MUST ship             WITHIN 14 HENCE FULFILLED
+  LEST BREACH BY seller BECAUSE "not shipped within 14 days")
 ROR
-(PARTY seller MUST `arrange pickup`  WITHIN 7  HENCE FULFILLED LEST BREACH)
+(PARTY seller MUST `arrange pickup` WITHIN 7  HENCE FULFILLED
+  LEST BREACH BY seller BECAUSE "no pickup arranged within 7 days")
 ```
 
 `AND` and `OR` at the top level of a regulative rule are also accepted as composition forms in many programs; the authoritative semantics live at <https://legalese.com/l4/reference/regulative.md>.
@@ -218,6 +238,43 @@ The `HENCE` branch reduces the balance; the `LEST` branch increases it with a pe
 ```
 
 Timestamps are numbers on a shared timeline. For date-based contracts, the canonical docs show a `Day (…)` form; use whatever form your rule uses for `WITHIN`.
+
+### What may go in the `WITH` block
+
+One event per line, in the order they happen. There are exactly **two** kinds and they mix freely
+(probe `g11-trace-events.l4`, exit 0, no errors, six traces):
+
+```l4
+-- An act: PARTY … DOES … AT n
+#TRACE `the payment duty` AT 0 WITH
+    PARTY `the Company` DOES `pay the invoice` AT 12
+
+-- A clock advance with no act: `WAIT UNTIL` n
+#TRACE `the payment duty` AT 0 WITH
+    (`WAIT UNTIL` 31)
+
+-- Both kinds in one block, in authored order — the only way to show a LEST
+-- chain expiring on its first rung and then discharging on its second.
+#TRACE `the payment duty` AT 0 WITH
+    (`WAIT UNTIL` 45)
+    PARTY `the Company` DOES `pay the unpaid amount with interest` AT 50
+```
+
+- **`` `WAIT UNTIL` `` is built into the compiler, not a library name.** The probe above has no
+  `IMPORT` line at all and every trace runs. The parentheses are the house form and what the corpus
+  writes; a bare `` `WAIT UNTIL` 31 `` on its own line also parses and gives the same result
+  (probes `g11b`, `g11c`).
+- **The deadline is inclusive.** An act `AT 30` against `WITHIN 30` is timely; it takes
+  ``(`WAIT UNTIL` 31)`` to expire it.
+- **A rule that takes arguments is applied before `AT`, and more than one argument is fine.**
+  ``#TRACE `cl 6 -- confidentiality` `the Contractor` (`disclose` "the world") AT 0 WITH`` runs and
+  produces the breach. Parenthesise a constructed argument.
+- **`#TRACE` is the one directive whose body wraps onto following lines.** Everything else is a
+  one-line construct, `#ASSERT REFUSED … BECAUSE` excepted.
+
+Entry 5.11 of the phrasebook,
+[source-patterns/05-duties-powers-consequences.md](source-patterns/05-duties-powers-consequences.md#e5-11),
+works the same ground from the drafting side.
 
 ### Happy-path example
 
@@ -265,13 +322,19 @@ saleContract MEANS
         PARTY Buyer
         MUST payment 100
         WITHIN 7
+        LEST BREACH BY Buyer BECAUSE "the price was not paid within 7 days of delivery"
     )
-    LEST BREACH
+    LEST BREACH BY Seller BECAUSE "the goods were not delivered within 3 days"
 
 #TRACE saleContract AT 0 WITH
     PARTY Seller DOES delivery AT 2
     PARTY Buyer  DOES payment 100 AT 5
 -- Result: FULFILLED
+
+#TRACE saleContract AT 0 WITH
+    (`WAIT UNTIL` 4)
+-- Result: DEONTIC BREACHED: BREACH BY Seller
+--         BECAUSE "the goods were not delivered within 3 days"
 ```
 
 ---

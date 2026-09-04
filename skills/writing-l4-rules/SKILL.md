@@ -110,7 +110,7 @@ GIVEN n IS A NUMBER
 
 **Key idioms:**
 
-- `IF … THEN … ELSE` idioms must always be indented in stair-stepping fashion. `BRANCH IF … OTHERWISE` is the flat multi-way-if form. Note that `OTHERWISE` must match `IF` intendation, not `BRANCH`.
+- `IF … THEN … ELSE` idioms must always be indented in stair-stepping fashion. `BRANCH` is the flat multi-way-if form, and it has **two layouts, both in use**: the first `IF` on the `BRANCH` line, or a bare `BRANCH` with the arms indented beneath it. The alignment rule is the same for both — **every arm, `OTHERWISE` included, must begin strictly to the right of the column where `BRANCH` starts.** Arms need not line up with each other. An arm at the `BRANCH` column is rejected with `incorrect indentation (got 3, should be greater than 3)`. Pick one layout and keep it for the file; both layouts and the diagnostic are shown in entry 2.10 of the phrasebook, [references/source-patterns/02-conditions-and-logic.md](references/source-patterns/02-conditions-and-logic.md#e2-10).
 - `CONSIDER … WHEN … OTHERWISE …` is the pattern-match form.
 - `WHERE` introduces local helpers using `… MEANS`, `DECIDE … IS`, `DECIDE … IF`. `LET x MEANS … IN …` introduces a single local name.
 - `YIELD` makes lambdas: `GIVEN n YIELD n GREATER THAN 0`.
@@ -191,7 +191,9 @@ DECIDE obligation IS
 
 Both type names may be backticked multi-word names, as in `` GIVETH A DEONTIC `A party under this Part` `An act under section 8` ``.
 
-Actions with fields are **enum constructors** — apply them to arguments like any function (`` `pay invoice` amt recipient ``). Don't use `WITH` inside a `MUST`/`MAY` action; `WITH` is for record construction, not enum constructors. Always include `BECAUSE "reason"` on `LEST BREACH` — that string is what auditors read.
+Actions with fields are **enum constructors** — apply them to arguments like any function (`` `pay invoice` amt recipient ``). Don't use `WITH` inside a `MUST`/`MAY` action; `WITH` is for record construction, not enum constructors.
+
+**Write `BECAUSE "reason"` on every `LEST BREACH`.** The language accepts the bare `LEST BREACH` and `LEST BREACH BY <party>` too — that is why you will see all three spellings — but the reason string is what a trace prints back, and it is what a legal reviewer or a downstream system reads. A breach with no reason reports the failure without saying which clause failed.
 
 Full treatment — `RAND`/`ROR` composition, `PROVIDED` guards, `EXACTLY` matching, recursive obligations, and `#TRACE` simulation — is in [references/regulative.md](references/regulative.md).
 
@@ -227,6 +229,14 @@ error and on an `#EVAL` that reaches an unsupplied section `GIVEN`. So
 `l4 run f.l4 && echo green` reports a file with failing assertions as green;
 check the output for `DiagnosticSeverity_Error` as well, which is what
 `doc/test-docs.sh` does.
+
+**Every result is printed twice, and `#CHECK` is the exception.** `l4 run`
+emits a diagnostics section first, then one `Evaluation[n]` block per directive
+that evaluates — so each `#EVAL` and `#ASSERT` result appears in both halves and
+the file looks twice as long as your directive count. `#CHECK` prints its type in
+the diagnostics only and gets **no** `Evaluation` block, so a file with 92
+directives of which one is a `#CHECK` ends at `Evaluation[91]`. Do not read the
+gap as a dropped directive.
 
 **Other subcommands** (run `l4 <command> --help` for details):
 
@@ -269,6 +279,21 @@ green: put the operative test in a rule with its own `GIVEN` and `#ASSERT`
 that; have the section-`GIVEN` rule delegate to it and `#CHECK` that. Worked
 recipe: entry 11.9 of the phrasebook,
 [references/source-patterns/11-when-the-encoding-cannot-answer.md](references/source-patterns/11-when-the-encoding-cannot-answer.md#e11-9).
+
+**`#CHECK` is also how you find a signature you do not have.** On a name with
+one definition it prints the type. On an **overloaded** name it is an error, and
+the error is the answer: it lists every definition with its `file:line` and its
+type. Provoke it deliberately, read the list, delete the `#CHECK`. The library
+tables in [references/builtins.md](references/builtins.md) were built this way.
+
+**Where the fixtures go.** Write the rules first, then a child `§§` heading of
+the section they belong to, then the named case values, then the directives that
+use them — `` §§ `4 -- illustrations` `` under `` § `4. Fees` ``. Placement is
+not cosmetic once a section `GIVEN` is in the file: a `§` heading scopes
+everything beneath it, so a fixture under the wrong heading inherits a scope you
+did not intend. Entry 1.13 of the phrasebook,
+[references/source-patterns/01-definitions-and-scope.md](references/source-patterns/01-definitions-and-scope.md#e1-13),
+has the worked file.
 
 ### 8. Deploy
 
@@ -506,6 +531,24 @@ person's `name`
 application's employee's nationality   -- chaining
 ```
 
+**There are two spellings for a record spread over several lines, and both
+parse.** Fields on continuation lines may each be led by a comma, or carry no
+comma at all; the reference files and the phrasebook use both. Pick one per
+file.
+
+```l4
+-- Leading commas on the continuation lines
+`Alice` MEANS Driver WITH `name` IS "Alice"
+                        , `age` IS 25
+
+-- No commas at all
+`Bob` MEANS Driver WITH
+    `name` IS "Bob"
+    `age`  IS 25
+```
+
+Entry 6.2 of the phrasebook, [references/source-patterns/06-parties-and-things.md](references/source-patterns/06-parties-and-things.md#e6-2), shows when a record is the right shape for a list of limbs in the source.
+
 ### Directives
 
 - `#EVAL expr` — evaluate and print
@@ -538,7 +581,9 @@ IMPORT prelude
 IMPORT `excel-date`
 ```
 
-The prelude is always available. For the full library list (`prelude`, `daydate`, `time`, `datetime`, `timezone`, `math`, `currency`, `legal-persons`, `jurisdiction`, `actus`, `llm`, `excel-date`, `holdings`, `date-compat`), see [references/builtins.md](references/builtins.md) or <https://legalese.com/l4/reference/libraries.md>.
+**Every library needs an `IMPORT`, the prelude included.** A file with no `IMPORT` line does not have `sum`: it fails with `I could not find a definition for the identifier`. A library you import for another reason may bring the prelude with it — `hierarchy` opens with its own `IMPORT prelude` — but write the import rather than relying on that.
+
+Twenty-two libraries ship: `prelude`, `daydate`, `time`, `datetime`, `timezone`, `excel-date`, `date-compat`, `math`, `currency`, `hierarchy`, `negation-as-failure`, `legal-persons`, `jurisdiction`, `holdings`, `llm`, `actus`, and the six `actus-*` files `actus` is assembled from. `hierarchy` is the one to know about early: it builds numbered outlines, which is what recitals, schedules and numbered paragraphs want. For the purpose and import line of each, see [references/builtins.md](references/builtins.md) or <https://legalese.com/l4/reference/libraries.md>.
 
 **Filenames with hyphens, spaces, or other non-identifier characters must be backtick-quoted.**
 

@@ -172,10 +172,14 @@ DECLARE TableRow HAS
 
 ### Total enum over `MAYBE` — where the source names the absent case
 
-**Statute:** a provision whose outcomes include a named "nothing follows" case — "no issuance", "no
-liability", "the application is refused".
+**The rule, in two sentences.** `MAYBE` inbound, for a fact you may not have been given; a **total
+enum** outbound, for a result you always have. Where the source itself names the absent outcome —
+"no issuance", "no liability", "the application is refused" — that name belongs in the result type
+as a member, not folded into `NOTHING`.
+
+**Statute:** a provision whose outcomes include a named "nothing follows" case.
 **Shape:** one nullary `IS ONE OF` covering _every_ outcome, the absent one included, returned as
-`GIVETH A <Enum>` — **not** `GIVETH A MAYBE <Enum>` with the absent case folded into `NOTHING`.
+`GIVETH A <Enum>` — **not** `GIVETH A MAYBE <Enum>`.
 
 `jl4/examples/legal/ny-environmental-7.3.l4` (6 NYCRR 624 §7.3(b)(2), issuance of the final EIS)
 already does this, and does it while keeping `MAYBE` exactly where `MAYBE` belongs:
@@ -197,92 +201,13 @@ GIVETH A `Final EIS Issuance`                                                 --
               WHEN JUST cause THEN `Issued extended beyond 45 days of the close of the record`
 ```
 
-The asymmetry _is_ the rule, and it fits in one function: **`MAYBE` inbound for a fact you may not
-have been given; a total enum outbound for a result you always have.** The surviving `MAYBE` on
+The asymmetry _is_ the rule, and it fits in one function. The surviving `MAYBE` on
 `Cause for extension` is correct and must not be swept up.
 
-> **Read this example for reasons 1 and 2 only.** Reason 3 does not fire on it, in either form, and
-> saying otherwise would be a wrong claim about a real corpus file. `WHEN JUST cause` is a
-> **binding** pattern, and a binding arm has no guard the exporter can write down; the whole
-> `CONSIDER` therefore collapses to a single verbatim default entry (`Blocking`, and `null` under
-> `SUCCEEDED`) whether the arms return `` `Issued extended…` `` or `` JUST `Issued extended…` ``.
-> The MAYBE-first counterfactual below collapses identically. There is a second-order drafting
-> lesson in that — **a `CONSIDER` arm that binds a payload is itself a DMN-hostile shape**, for the
-> same reason `JUST x` is — but it is not the lesson this section is about, and folding the return
-> type does not fix it.
-
-The same provision written the other way — the shape to avoid:
-
-```l4
--- NOT the corpus code. The same rule, drafted MAYBE-first, for contrast.
-DECLARE `Final EIS Issuance` IS ONE OF
-    `Issued within 45 days of the close of the record`
-    `Issued extended beyond 45 days of the close of the record`
-    -- "no issuance" has no name here; it lives in the wrapper
-
-GIVETH A MAYBE `Final EIS Issuance`
-`Determining issuance for final EIS` MEANS
-    IF    NOT `Tentative or recommended decision will contain a final EIS` `The decision`
-    THEN  NOTHING
-    ELSE  CONSIDER `Cause for extension`
-              WHEN NOTHING    THEN JUST `Issued within 45 days of the close of the record`
-              WHEN JUST cause THEN JUST `Issued extended beyond 45 days of the close of the record`
-```
-
-Three reasons to prefer the first:
-
-1. **Fidelity to the source.** Legislation usually _names_ the null outcome rather than leaving a
-   gap, and the name carries the citation. `NOTHING` cannot hold `"No issuance"`; an enum member
-   can, and it reads back in the statute's own words. Under `MAYBE` the domain also silently
-   shrinks — the declared enum above goes from three outcomes to two.
-2. **A finite declared domain, which is what static analysis needs.** A nullary `IS ONE OF` is the
-   one L4 type with a faithful image in FEEL/DMN, because its values serialise as strings; it
-   lowers to `typeRef="string"`. `MAYBE T` is a type _applied to an argument_, so it does not match
-   the exporter's nullary-enum test and the output column erases to `Any` — the exporter's type
-   lowering maps a **nullary** type constructor to a FEEL type and everything else to `Any`, so
-   `GIVETH A MAYBE T` contributes no declared type at all. (Do not over-generalise this to
-   "`GIVETH` is authoritative". It is authoritative only when it lowers to something other than
-   `Any`; when it lowers to `Any` — which is exactly the `MAYBE` case — the exporter falls back to
-   inferring the type from the cells, and the column ends up `Any` because the `JUST x` cells are
-   unrenderable, not because the declared `MAYBE` won.) Emitting the domain itself as DMN
-   `<outputValues>` — the precondition for the `P` and `O` hit policies — is pending
-   (smucclaw/l4-ide#923); the `typeRef` difference is present behaviour.
-3. **No null wrapper in the export target.** `NOTHING` is nullary and survives as the string
-   `"NOTHING"`, but `JUST x` is an _applied_ constructor, which the DMN exporter cannot render as
-   executable FEEL: it emits it verbatim and reports **Blocking**, because a real engine
-   (Drools/KIE 8.44) answers `Unknown variable 'JUST'` and the whole decision evaluates to **null**
-   — reported as `SUCCEEDED`.
-
-   **And FEEL's null is not a failure signal — it reads as `FALSE`.** This is the opposite of what
-   you would expect from an undefined value, and it is why the failure is silent. Verified in
-   `feelin` 7.0.1: `1 / 0`, `{a: 1}.b` and friends all yield `null`; `null` then _propagates_
-   through arithmetic and comparison (`100 / 0 > 10` → `null`) but is **coerced to `false` at the
-   first boolean consumer** — `if null then 1 else 2` → `2`, a unary test against a `null` input
-   silently does not match, `every p in [2, null] satisfies p > 1` → `false`. Nothing downstream
-   ever sees an error. A silent `false` under `SUCCEEDED` is the worst available failure mode for a
-   legal reasoner.
-
-   **Where this bites is a flat guarded chain**, where the `JUST x` sits in a cell the exporter
-   renders — `IF … THEN JUST X ELSE NOTHING`, which
-   `paper/case-studies/charities-jersey-2014/part-6-use-of-terms.l4` emits four times. It does
-   **not** bite on the worked example above; see the note under it.
-
-> **PROVENANCE — reasons 2 and 3 describe a backend you cannot run from this checkout.** Reason 1
-> stands on the L4 source alone. Reasons 2 and 3 rest on the DMN/FEEL exporter, which lives on the
-> `mengwong/dmn-export` line and is **not** on `unstable`: there is no `jl4-core/src/L4/Dmn/`, no
-> `specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md`, and `l4 --help` has no `dmn` subcommand here. So
-> take them as reported behaviour of another branch, not as something to verify in situ, and
-> **re-check them against `specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §2.4 and §3 once that line
-> merges** — two earlier versions of this section stated the FEEL null semantics backwards and
-> over-generalised the `GIVETH` rule, and both survived review precisely because nothing here could
-> falsify them. Independently of the exporter, reason 1 and the `MAYBE`-is-usually-right section
-> below are the load-bearing guidance.
-
-> **SCOPE — this is a drafting default, not a sweep.** Across the repo there are 62
-> `GIVETH … MAYBE` signatures in 17 files, and **only 4 of them are in a real legal corpus**. The
-> rest are standard-library partiality (`minimum`, `lookup`, `ln`, date parsing), JSON-decode and
-> MLIR fixtures, and teaching examples — all of which are _correct_ and none of which this rule
-> touches. Apply the rule when drafting a new decision; do not go hunting.
+**Why, in the terms you can check from here.** Legislation usually _names_ the null outcome rather
+than leaving a gap, and the name carries the citation. `NOTHING` cannot hold `"No issuance"`; an
+enum member can, and it reads back in the statute's own words. Under `MAYBE` the declared domain
+also silently shrinks — the enum above would go from three outcomes to two.
 
 **And the fold is not always a rename.** The four real-corpus occurrences —
 `the entity's/person's liability under Article 21/23` in
@@ -294,21 +219,60 @@ the file's flagship assertion,
 Flattening the penalties into nullary enum members would delete that assertion's subject matter.
 The available fold is a **sentinel record** — add a fifth constant (`the absence of a penalty`,
 imprisonment `0`, `liable to a fine IS FALSE`) and return `GIVETH A Part6Penalty` — which costs 4
-signatures, 4 `ELSE` arms and 12 `#ASSERT` edits (9 lose a `JUST`, 3 lose a `NOTHING`). Note what
-it does and does not buy: it clears the four Blocking `JUST` sites (reason 3), but the column stays
-`Any`, because reason 2 is gated on nullary-enum-ness and the payload is a record. It is also a
-_modelling_ claim — it makes "no offence" and "an offence with a nil penalty" the same value.
-**Do not present a fold like that as cosmetic.** Retrofitting a total enum onto a record-valued
-result is a modelling decision and belongs in review, not in a tidy-up. This is bucket 5 of the next
-section, and it is the case the "does the source name this outcome?" test gets wrong on its own: the
-statute plainly names the absence, so that question says fold, and it is still not a tidy-up.
+signatures, 4 `ELSE` arms and 12 `#ASSERT` edits (9 lose a `JUST`, 3 lose a `NOTHING`). It is also
+a _modelling_ claim: it makes "no offence" and "an offence with a nil penalty" the same value.
+Retrofitting a total enum onto a record-valued result is a modelling decision and belongs in
+review, not in a tidy-up. This is bucket 5 of the next section, and it is the case the "does the
+source name this outcome?" test gets wrong on its own: the statute plainly names the absence, so
+that question says fold, and it is still not a tidy-up.
 
-Related: a non-nullary `IS ONE OF` (a tagged union, e.g.
-`` `no liability` | `liable` HAS `the penalty` IS A Part6Penalty ``) buys nothing **downstream in
-DMN** — FEEL has no sum type, so it lowers to `Any` too. That is an export-fidelity fact and not a
-drafting verdict: upstream, in L4 itself, the tagged union is the only shape that both names the
-absent outcome and keeps the payload typed, which is what bucket 5 below is about. Do not read this
-line as a reason to prefer `MAYBE`.
+**Scope — a drafting default, not a sweep.** Across the repo there are 62 `GIVETH … MAYBE`
+signatures in 17 files, and **only 4 of them are in a real legal corpus**. The rest are
+standard-library partiality (`minimum`, `lookup`, `ln`, date parsing), JSON-decode and MLIR
+fixtures, and teaching examples — all correct, none touched by this rule. Apply it when drafting a
+new decision; do not go hunting.
+
+**For an absent value that is a fact about the case rather than an outcome** — "…, if any", "where
+there is no …" — the phrasebook entry that owns it is 11.3,
+[source-patterns/11-when-the-encoding-cannot-answer.md](source-patterns/11-when-the-encoding-cannot-answer.md#e11-3).
+That is a `MAYBE`, matched with `CONSIDER`, and folding it is a category error.
+
+#### Background, not needed to write L4: what these shapes do in the decision-table export
+
+Nothing below changes what you write. It is here because two further arguments for the total enum
+were made from the exporter that writes L4 out as DMN (Decision Model and Notation), whose
+expression language is FEEL, and retiring them silently would lose the measurements.
+
+> **Provenance.** These two rest on the DMN/FEEL exporter, which lives on the `mengwong/dmn-export`
+> line and is **not** on `unstable`: there is no `jl4-core/src/L4/Dmn/` and `l4 --help` has no `dmn`
+> subcommand here. Reported behaviour of another branch, not something to verify in situ. Re-check
+> against `specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §2.4 and §3 once that line merges — two
+> earlier versions of this passage stated the FEEL null semantics backwards.
+
+- **A finite declared domain.** A nullary `IS ONE OF` is the one L4 type with a faithful image in
+  FEEL/DMN, because its values serialise as strings; it lowers to `typeRef="string"`. `MAYBE T` is a
+  type _applied to an argument_, so it lowers to `Any` and contributes no declared type. Do not
+  over-generalise this to "`GIVETH` is authoritative": it is authoritative only when it lowers to
+  something other than `Any`. Emitting the domain as DMN `<outputValues>` is pending
+  (smucclaw/l4-ide#923); the `typeRef` difference is present behaviour.
+- **No null wrapper in the export target.** `NOTHING` is nullary and survives as the string
+  `"NOTHING"`, but `JUST x` is an _applied_ constructor, which the exporter cannot render as
+  executable FEEL: it emits it verbatim and reports **Blocking**, because a real engine
+  (Drools/KIE 8.44) answers `Unknown variable 'JUST'` and the decision evaluates to **null**,
+  reported as `SUCCEEDED`. FEEL's null is not a failure signal — it is coerced to `false` at the
+  first boolean consumer (verified in `feelin` 7.0.1: `if null then 1 else 2` → `2`), so nothing
+  downstream ever sees an error. Where this bites is a flat guarded chain,
+  `IF … THEN JUST X ELSE NOTHING`, which
+  `paper/case-studies/charities-jersey-2014/part-6-use-of-terms.l4` emits four times.
+- **It does not bite on the worked example above.** `WHEN JUST cause` is a **binding** pattern, and
+  a binding arm has no guard the exporter can write down, so the whole `CONSIDER` collapses to a
+  single verbatim default entry either way. The second-order lesson — a `CONSIDER` arm that binds a
+  payload is itself a DMN-hostile shape — is real, and folding the return type does not fix it.
+- **A tagged union buys nothing downstream.** FEEL has no sum type, so
+  `` `no liability` | `liable` HAS `the penalty` IS A Part6Penalty `` lowers to `Any` too. That is
+  an export-fidelity fact, not a drafting verdict: upstream, in L4 itself, the tagged union is the
+  only shape that both names the absent outcome and keeps the payload typed. Not a reason to prefer
+  `MAYBE`.
 
 ### Where `MAYBE` is right — and it usually is
 

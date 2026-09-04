@@ -1,6 +1,6 @@
 # L4 Gotchas
 
-Things that will trip up a general-purpose LLM because they are not in any other language and are not visible in a naïve reading of the syntax.
+Things that will trip up a general-purpose large language model because they are not in any other language and are not visible in a naïve reading of the syntax.
 
 **Canonical references:**
 
@@ -170,6 +170,37 @@ GIVETH A BOOLEAN
 ```
 
 Mixfix is the reason L4 code can read like legal prose. Use it for binary-ish relations. Use normal prefix-style function names for everything else.
+
+**A backticked segment may begin with punctuation** — a comma, a semicolon, a colon, an opening
+bracket — which is what lets a call read as one clause of English rather than a run of unlabelled
+arguments. All four were measured at the head of a segment and all four check (probe
+`g12-mixfix-punctuation.l4`, exit 0, four assertions satisfied):
+
+```l4
+`an expense of` n `, reasonably incurred being` r
+`the total of` a `, and` b `; and` c `: and` d
+`the fee for` n `hours (at the first band); and` m `hours (at the second band)`
+`clause 9: the cap on` n
+```
+
+Two limits on what a segment can be:
+
+- **No segment may contain `--`.** That is the comment marker and backticks do not protect it: the
+  definition silently ends at the segment before it, so the head is defined at the wrong arity and
+  the rest of the line becomes a free identifier. You get two errors and neither says "comment"
+  (probe `g12b-mixfix-comment-marker.l4`, exit 1).
+- **A pattern with exactly ONE argument may not end with a keyword segment.**
+  `` `the sum of` n `rounded down` `` registers `` `the sum of` `` at arity 1 and leaves
+  `` `rounded down` `` undefined; the call site then reports `expects 1 argument, but you are
+applying it to 2 arguments here` (probe `g12c-mixfix-one-arg-trailing.l4`, exit 1). A trailing
+  segment is fine once there are two or more arguments —
+  `` `the sum of` n `and` m `rounded down` `` checks (probe `g12d`, exit 0). With one argument,
+  either drop the trailing segment or move its words into the head.
+
+Entry 6.10 of the phrasebook,
+[source-patterns/06-parties-and-things.md](source-patterns/06-parties-and-things.md#e6-10), shows
+what these punctuated segments buy you: a named fact pattern an `#ASSERT` can be applied to on one
+line.
 
 ---
 
