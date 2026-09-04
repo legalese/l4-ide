@@ -33,7 +33,7 @@ import qualified LSP.L4.Viz.Ladder as LadderViz
 import qualified LSP.L4.Viz.QueryPlan as LspQueryPlan
 import qualified LSP.L4.Viz.VizExpr as VizExpr
 
-import L4.EvaluateLazy (EvalConfig, resolveEvalConfig, EvalDirectiveResult(..), EvalDirectiveValue(..), prettyEvalException)
+import L4.EvaluateLazy (EvalConfig, resolveEvalConfig, EvalDirectiveResult(..), EvalDirectiveValue(..), prettyEvalException, prettyAssertionOutcome)
 import qualified L4.EvaluateLazy.GraphViz2 as GraphViz
 import L4.EvaluateLazy.GraphVizOptions (defaultGraphVizOptions)
 import L4.TracePolicy (replDefaultPolicy)
@@ -644,8 +644,9 @@ formatResults results = Text.unlines $ map formatResult results
 
 formatResult :: EvalDirectiveResult -> Text
 formatResult (MkEvalDirectiveResult _range res _trace _ledger) = case res of
-  Assertion True  -> "True (assertion passed)"
-  Assertion False -> "False (assertion failed)"
+  Assertion (Right True)  -> "True (assertion passed)"
+  Assertion (Right False) -> "False (assertion failed)"
+  Assertion (Left err)    -> "Error: " <> prettyAssertionOutcome (Left err)
   Reduction (Right nf) -> Print.prettyLayout nf
   Reduction (Left err) -> "Error: " <> Text.unlines (prettyEvalException err)
 
@@ -754,8 +755,9 @@ formatAsciiTraceResults results = Text.unlines $ map formatAsciiTraceResult resu
 formatAsciiTraceResult :: EvalDirectiveResult -> Text
 formatAsciiTraceResult (MkEvalDirectiveResult _range res mtrace _ledger) =
   let resultText = case res of
-        Assertion True  -> "Result: True (assertion passed)"
-        Assertion False -> "Result: False (assertion failed)"
+        Assertion (Right True)  -> "Result: True (assertion passed)"
+        Assertion (Right False) -> "Result: False (assertion failed)"
+        Assertion (Left err)    -> "Error: " <> prettyAssertionOutcome (Left err)
         Reduction (Right nf) -> "Result: " <> Print.prettyLayout nf
         Reduction (Left err) -> "Error: " <> Text.unlines (prettyEvalException err)
   in case mtrace of
@@ -829,8 +831,10 @@ inlineSingleLine txt =
 
 summarizeEvalResult :: EvalDirectiveResult -> Text
 summarizeEvalResult (MkEvalDirectiveResult _range res _trace _ledger) = case res of
-  Assertion True  -> "True (assertion passed)"
-  Assertion False -> "False (assertion failed)"
+  Assertion (Right True)  -> "True (assertion passed)"
+  Assertion (Right False) -> "False (assertion failed)"
+  Assertion (Left err)    ->
+    Text.intercalate "; " ("Error" : "assertion could not be evaluated" : prettyEvalException err)
   Reduction (Right nf) -> Print.prettyLayout nf
   Reduction (Left err)  ->
     Text.intercalate "; " ("Error" : prettyEvalException err)
@@ -962,7 +966,10 @@ getExpressionType st contextFile exprText = do
       -- Look for CheckInfo in the infos list - #CHECK adds the type as a CheckInfo
       let checkInfoTypes = [ty | MkCheckErrorWithContext (CheckInfo ty _) _ <- tc.infos]
       case checkInfoTypes of
-        (ty:_) -> pure $ Print.prettyLayout ty
+        -- Residual inference variables carry an edit-order-dependent gensym
+        -- (@res184@); render them as stable type-variable names (@a@, @b@, …)
+        -- exactly as #CHECK and hover do.
+        (ty:_) -> pure $ Print.prettyTypeForDisplay ty
         [] | not tc.success -> do
           -- Type error - report the first few errors
           let errors = tc.infos

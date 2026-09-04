@@ -109,13 +109,15 @@ parseErrorToDiagnostic err = SimpleDiagnostic
 
 -- | Convert an evaluation result to a platform-agnostic diagnostic.
 --
--- Failed assertions get Error severity, successful evaluations get Info.
+-- Failed assertions, and assertions whose expression raised, get Error
+-- severity; successful evaluations get Info.
 evalResultToDiagnostic :: EL.EvalDirectiveResult -> SimpleDiagnostic
 evalResultToDiagnostic r@(EL.MkEvalDirectiveResult mrange res _mtrace _ledger) = SimpleDiagnostic
   { sdLocation = RangeLoc <$> mrange
   , sdSeverity = case res of
-      EL.Assertion False -> DSError
-      _                  -> DSInformation
+      EL.Assertion (Right False) -> DSError
+      EL.Assertion (Left _)      -> DSError
+      _                          -> DSInformation
   , sdMessage  = EL.prettyEvalDirectiveResult r
   , sdSource   = "eval"
   }

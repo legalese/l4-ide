@@ -475,6 +475,15 @@ garbageFixture = fixtureDir </> "garbage.l4"
 evalCrashFixture :: FilePath
 evalCrashFixture = fixtureDir </> "eval-crash.l4"
 
+-- | Typechecks cleanly; every @#ASSERT@ in it RAISES instead of deciding.
+assertRaisesFixture :: FilePath
+assertRaisesFixture = fixtureDir </> "assert-raises.l4"
+
+-- | Typechecks cleanly; both @#ASSERT@s are on a bare assumed BOOLEAN — one
+-- polarity raises, the other reduces to the symbolic term without raising.
+assertAssumedFixture :: FilePath
+assertAssumedFixture = fixtureDir </> "assert-assumed.l4"
+
 breachTraceFixture, breachInputsFixture :: FilePath
 breachTraceFixture  = fixtureDir </> "breach-trace.l4"
 breachInputsFixture = fixtureDir </> "breach-inputs.json"
@@ -1162,7 +1171,7 @@ main = do
        , hydrationGolden, hydrationEngineCases, sumtypeGolden
        , bkmSource, bkmDmnGolden, bkmEngineCases
        , svcSource, svcGolden, svcKieDmnGolden, svcEngineCases
-       , daCitationsSource ] \fp -> do
+       , daCitationsSource, assertRaisesFixture, assertAssumedFixture ] \fp -> do
     ok <- doesFileExist fp
     unless ok $ do
       putStrLn ("Missing fixture: " ++ fp)
@@ -1240,6 +1249,55 @@ spec bin = do
     -- does not, is unaffected.
     it "still typechecks the crashing fixture — l4 check succeeds on it" $
       expectOk bin ["check", evalCrashFixture] "Check succeeded."
+
+    -- An #ASSERT whose expression RAISES is a distinct outcome from one that
+    -- evaluates to FALSE. Before this was pinned, `#ASSERT P` and
+    -- `#ASSERT NOT P` both reported "assertion failed" whenever P raised
+    -- (division by zero, an assumed term, …), so a test suite could not tell
+    -- a wrong answer from an error.
+    it "reports an #ASSERT that raises as unevaluable, with the reason, never as failed" $ do
+      Output _ sout _ <- runL4 bin ["run", assertRaisesFixture]
+      sout `shouldSatisfy` ("assertion could not be evaluated" `isInfixOf`)
+      sout `shouldSatisfy` ("Division by zero" `isInfixOf`)
+      sout `shouldSatisfy` ("assumed term" `isInfixOf`)
+      sout `shouldNotSatisfy` ("assertion failed" `isInfixOf`)
+
+    -- It did not evaluate cleanly, so it is the crash the 2026-08-01 ruling
+    -- covers — unlike a clean FALSE, which stays exit 0.
+    it "fails the run when an #ASSERT raises" $
+      expectFail bin ["run", assertRaisesFixture]
+
+    it "keeps kind \"assertion\", a null value and the reason in JSON when an #ASSERT raises" $ do
+      env <- jsonEnvelope bin ["run", assertRaisesFixture, "--json"]
+      objField env "ok" `shouldBe` Just (Bool False)
+      case objField env "results" of
+        Just (Array v) -> do
+          length v `shouldBe` 2
+          mapM_ (\r -> do
+                   objField r "kind"  `shouldBe` Just (String "assertion")
+                   objField r "value" `shouldBe` Just Null
+                   case objField r "error" of
+                     Just (String s) -> s `shouldSatisfy` ("assertion could not be evaluated" `T.isInfixOf`)
+                     other -> expectationFailure ("Expected an error string, got " ++ show other))
+                (toList v)
+        other -> expectationFailure ("Expected results array, got " ++ show other)
+
+    it "still typechecks the raising fixture — l4 check succeeds on it" $
+      expectOk bin ["check", assertRaisesFixture] "Check succeeded."
+
+    -- A bare assumed BOOLEAN is neither TRUE nor FALSE. `#ASSERT NOT b`
+    -- forces b and raises; `#ASSERT b` reduces to the symbolic b WITHOUT
+    -- raising, and used to fall through to "assertion failed" — so the two
+    -- polarities disagreed about the same undecidable term.
+    it "reports both polarities of an #ASSERT on a bare assumed BOOLEAN as undecided" $ do
+      Output _ sout _ <- runL4 bin ["run", assertAssumedFixture]
+      length (filter ("assertion could not be evaluated" `isInfixOf`) (lines sout)) `shouldBe` 2
+      sout `shouldSatisfy` ("assumed term" `isInfixOf`)
+      sout `shouldNotSatisfy` ("assertion failed" `isInfixOf`)
+      sout `shouldNotSatisfy` ("assertion satisfied" `isInfixOf`)
+
+    it "fails the run when an #ASSERT is stuck on a bare assumed BOOLEAN" $
+      expectFail bin ["run", assertAssumedFixture]
 
     it "falls through from a bare positional argument (backward-compat)" $
       expectOk bin [cleanFixture] "Checking succeeded."

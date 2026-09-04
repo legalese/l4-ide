@@ -23,7 +23,7 @@ import qualified LSP.Core.Shake as Shake
 import qualified LSP.L4.Rules as Rules
 import Language.LSP.Protocol.Types (normalizedFilePathToUri)
 
-import L4.EvaluateLazy (EvalDirectiveResult(..), EvalDirectiveValue(..))
+import L4.EvaluateLazy (EvalDirectiveResult(..), EvalDirectiveValue(..), prettyAssertionOutcome)
 import L4.Parser.SrcSpan (prettySrcRange)
 
 import L4.Cli.Common
@@ -138,9 +138,15 @@ runCmd opts = do
 -- directive that merely evaluated to @Assertion False@ does not.
 evalDirectiveCrashed :: EvalDirectiveResult -> Bool
 evalDirectiveCrashed r = case r.result of
-  Reduction (Left _) -> True
+  Reduction (Left _)  -> True
   Reduction (Right _) -> False
-  Assertion _         -> False
+  -- An assertion whose expression RAISED did not evaluate cleanly: it is the
+  -- same crash as a raising #EVAL, and the ruling above covers every
+  -- 'EvalException'. (Before the exception was reported distinctly it was
+  -- collapsed into @Assertion False@ and so exited 0 — that was the hiding,
+  -- not a ruling.) A clean @Assertion (Right False)@ stays exit 0.
+  Assertion (Left _)  -> True
+  Assertion (Right _) -> False
 
 ----------------------------------------------------------------------------
 -- JSON shape
@@ -148,13 +154,17 @@ evalDirectiveCrashed r = case r.result of
 
 evalResultToJson :: EvalDirectiveResult -> Aeson.Value
 evalResultToJson MkEvalDirectiveResult{range = mRange, result, trace = _} =
-  Aeson.object
+  Aeson.object $
     [ Key.fromString "range" Aeson..= fmap prettySrcRange mRange
     , Key.fromString "kind"  Aeson..= kindText
     , Key.fromString "value" Aeson..= valueJson
-    ]
+    ] <> errorField
   where
-    (kindText, valueJson) = case result of
-      Assertion b             -> ("assertion" :: Text, Aeson.Bool b)
-      Reduction (Left exc)    -> ("error" :: Text, Aeson.String (Text.unlines ["evaluation exception:", Text.pack (show exc)]))
-      Reduction (Right val)   -> ("value" :: Text, Aeson.String (renderEvalValue (Reduction (Right val))))
+    (kindText, valueJson, errorField) = case result of
+      Assertion (Right b)     -> ("assertion" :: Text, Aeson.Bool b, [])
+      -- An assertion that raised keeps kind "assertion" (it IS one, and a
+      -- consumer counting assertions must still see it) with a null value —
+      -- neither true nor false — and the reason under "error".
+      Assertion (Left exc)    -> ("assertion", Aeson.Null, [Key.fromString "error" Aeson..= prettyAssertionOutcome (Left exc)])
+      Reduction (Left exc)    -> ("error", Aeson.String (Text.unlines ["evaluation exception:", Text.pack (show exc)]), [])
+      Reduction (Right val)   -> ("value", Aeson.String (renderEvalValue (Reduction (Right val))), [])
