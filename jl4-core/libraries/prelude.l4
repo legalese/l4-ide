@@ -754,11 +754,17 @@ nub list @nlg %list% with duplicate items removed
   MEANS
   nubBy (GIVEN x, y YIELD x EQUALS y) list
 
--- polymorphic placeholder
+-- Polymorphic placeholder: a rule that has not been written yet.
+--
+-- Reaching TBD REFUSES. It is deliberately not an ASSUME: an ASSUME is an
+-- unknown FACT, which the boundary is asked to supply and which therefore
+-- appears in an export schema as a required input. A placeholder is not a fact
+-- anyone can supply; it is the model declining to answer, and it should be
+-- zero at release.
 GIVEN
   a IS A TYPE
 GIVETH AN a
-ASSUME TBD
+TBD MEANS REFUSE "TBD: this rule has not been written yet"
 
 §§ `Comparison Operators`
 
