@@ -392,6 +392,25 @@ drop this job too, and is worth a line in any props-era deprecation plan.
 > a `REFUSE` has no FEEL image, `gst-rate.cases.json` deliberately feeds a rule date below
 > commencement, and both engine harnesses would therefore stop answering the exhibit whose
 > whole claim is that they do. That unblocks when the designed DMN image lands (§6 item 6).
+>
+> **What this change did NOT do, and why.** The same work order bundled the uninterpreted-**type**
+> role above (10.4 item 3 / 10.6 (b)): rewrite every `ASSUME T IS A TYPE` as `DECLARE T`. That is
+> **deferred, not done**, because the target syntax does not parse on this tree. Measured
+> 2026-09-04 with this branch's binary:
+>
+> ```
+> DECLARE Jurisdiction
+>
+> GIVEN j IS A Jurisdiction
+>   | ^^^^^  unexpected GIVEN / expecting AKA, HAS, IS, OF, or space token
+> ```
+>
+> A `DECLARE` with no `HAS`/`IS` body is not accepted, so the migration has no landing site until
+> either empty `DECLARE` parses or the role gets a different spelling. Anything that claims
+> otherwise — including a source that cites `ok/set-operators-nested.l4` or `ok/consider-simple.l4`
+> as evidence that empty `DECLARE` "parses today" — is wrong: both of those are ordinary
+> declarations with `HAS` or `IS` on the following line. Splitting the two halves of the item is
+> therefore a departure from the bundled sequencing, taken on that measurement.
 
 **Reading of the whole:** the corpus does not argue for keeping `ASSUME`; it argues for building
 `props`. Categories (a) and (b) — 49 of 53 lines — are authors reaching for an implicit typed
