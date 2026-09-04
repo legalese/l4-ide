@@ -58,6 +58,7 @@ import L4.Evaluate.ValueLazy (NF (..), Value (..), WHNF)
 import L4.EvaluateLazy
   ( EvalDirectiveResult (..)
   , EvalDirectiveValue (..)
+  , ReductionOutcome (..)
   , currentLedger
   , currentStore
   , evalExprForLedger
@@ -151,7 +152,7 @@ spec = describe "STATE-AS-LEDGER: RECORD/COMMIT/ATTEST (M1 write) + RECALL (M1.5
           (_, results) <- execEvalModuleWithEnv cfg r.tcdEntityInfo emptyEnvironment r.tcdModule
           case results of
             [res] -> case res.result of
-              Reduction (Right (MkNF (ValNumber n))) -> n `shouldBe` (5463 / 20)  -- 273.15
+              Reduction (Reduced (MkNF (ValNumber n))) -> n `shouldBe` (5463 / 20)  -- 273.15
               other -> expectationFailure ("expected 273.15, got: " <> show other)
             _ -> expectationFailure ("expected exactly one directive result, got " <> show (length results))
 
@@ -259,11 +260,11 @@ spec = describe "STATE-AS-LEDGER: RECORD/COMMIT/ATTEST (M1 write) + RECALL (M1.5
             [writeRes, readRes] -> do
               -- the write directive still returns its written value ...
               case writeRes.result of
-                Reduction (Right (MkNF (ValNumber n))) -> n `shouldBe` (5463 / 20)
+                Reduction (Reduced (MkNF (ValNumber n))) -> n `shouldBe` (5463 / 20)
                 other -> expectationFailure ("write directive: expected 273.15, got " <> show other)
               -- ... but the read directive, isolated, sees NOTHING.
               case readRes.result of
-                Reduction (Right nfVal) ->
+                Reduction (Reduced nfVal) ->
                   isNothingNF nfVal `shouldBe` True
                 other -> expectationFailure ("read directive: expected NOTHING, got " <> show other)
             _ -> expectationFailure ("expected exactly two directive results, got " <> show (length results))
@@ -304,14 +305,14 @@ spec = describe "STATE-AS-LEDGER: RECORD/COMMIT/ATTEST (M1 write) + RECALL (M1.5
             [firstRes, secondRes] -> do
               -- directive 1 (recordThenRead): writes `x`, reads it back, FULFILLED.
               case firstRes.result of
-                Reduction (Right nf) -> do
+                Reduction (Reduced nf) -> do
                   isBreachedNF nf `shouldBe` False
                   prettyEvalDirectiveResult firstRes `shouldSatisfy` Text.isInfixOf "FULFILLED"
                 other -> expectationFailure ("first directive: expected FULFILLED, got " <> show other)
               -- directive 2 (bare reader): isolated fresh ledger => RECALL is
               -- NOTHING => BREACH. The bug returned a cached FULFILLED here.
               case secondRes.result of
-                Reduction (Right nf) -> isBreachedNF nf `shouldBe` True
+                Reduction (Reduced nf) -> isBreachedNF nf `shouldBe` True
                 other -> expectationFailure ("second directive: expected a BREACH (ValBreached), got " <> show other)
             _ -> expectationFailure ("expected exactly two directive results, got " <> show (length results))
 

@@ -47,6 +47,7 @@ import L4.Evaluate.ValueLazy (NF (..), Value (..))
 import L4.EvaluateLazy
   ( EvalDirectiveResult (..)
   , EvalDirectiveValue (..)
+  , ReductionOutcome (..)
   , currentStore
   , evalExprForLedgerWithEnv
   , execEvalModuleWithEnv
@@ -242,7 +243,7 @@ spec = describe "STATE-AS-LEDGER M4: per-party ledgers + official record (R1)" $
 
       -- The directive's value is a real breach (deadline missed on the second MUST).
       case res.result of
-        Reduction (Right nf) -> isBreachedNF nf `shouldBe` True
+        Reduction (Reduced nf) -> isBreachedNF nf `shouldBe` True
         other                -> expectationFailure ("expected a ValBreached reduction, got " <> show other)
 
       -- ... and the pre-breach RECORD survives in Alice's own ledger (keep-on-breach).
