@@ -2729,10 +2729,16 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
         let ns = [n | n <- (dmnReport drg).notes, n.code == "D-SVCEMPTY"]
             claimsAll n = Text.isInfixOf "all emitted" n.lost
         -- the pure arm-(ii) §s keep the strong claim …
+        -- `Thresholds` is NO LONGER in this list, and its absence is the point:
+        -- it now emits a decisionService at all. Its commencement floor used to
+        -- be a module-level ASSUME, i.e. an inputData, so the § had 13 outputs
+        -- and no encapsulated member and could not satisfy §6.3.10. As a
+        -- REFUSE it is a member DECIDE, the shape is satisfiable, and the § is
+        -- reported by D-FLAVOR-NOSERVICE (an uninvoked grouping service)
+        -- instead of by D-SVCEMPTY.
         sort [n.element | n <- ns, claimsAll n]
           `shouldBe` [ "Group_4_disclosure_Rule_201_t_boundaries_at_124_000_618_000_1_235_000"
                      , "Periods_every_deadline_bound_once"
-                     , "Thresholds_every_dollar_figure_bound_once_dated_per_regime"
                      , "_2_Offering_limit_Rule_100_a_1"
                      ]
         -- … and every mixed § says instead how many decides were dropped,
@@ -2823,8 +2829,29 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       drg <- corpusDrg
       let notes = (dmnReport drg).notes
       [n | n <- notes, n.code == "D-CYCLE"] `shouldBe` []
-      -- the R0 headline: nothing in the corpus report is Blocking any more
-      [(n.code, n.element) | n <- notes, n.severity == Blocking] `shouldBe` []
+      -- The R0 headline, with its ONE stated exception. Nothing in the corpus
+      -- report is Blocking except the two REFUSE-bodied decisions themselves.
+      --
+      -- Those two are the corpus's curated refusals (the commencement floor
+      -- and the unmodelled COVID-19 rules). They were module-level ASSUMEs
+      -- until REFUSE existed, which made them suppliable inputData in this very
+      -- artifact — an engine could be handed a value for "no Reg CF figure
+      -- exists before commencement" and would compute with it. Blocking the
+      -- decision is strictly better than that, and it is TEMPORARY: the
+      -- designed DMN image for a refusal — omit the refusing row, a
+      -- NON-Blocking D-REFUSE note, and a `MayRefuse` safety kind that does not
+      -- withdraw DMN-SAFE — is PROPS-REDTEAM-2026-09-03 §6 item 6 and is not
+      -- built. When it lands, this list goes back to empty.
+      --
+      -- The exception is enumerated, not widened: any OTHER Blocking note, or
+      -- a Blocking note on any other element, still fails this test.
+      [(n.code, n.element) | n <- notes, n.severity == Blocking]
+        `shouldBe`
+          [ ( "D-LITERALEXPR"
+            , "decision_no_regulation_crowdfunding_figure_exists_before_commencement_on_2016_05_16" )
+          , ( "D-LITERALEXPR"
+            , "decision_the_covid_19_temporary_rules_rule_201_z_and_bb_are_not_modelled_here" )
+          ]
       [n.severity | n <- notes, n.code == "D-VERDICT"] `shouldBe` [Lossy]
       [n | n <- notes, n.code == "D-LITERALEXPR"
          , n.element == "decision_ongoing_reporting_obligation"] `shouldBe` []

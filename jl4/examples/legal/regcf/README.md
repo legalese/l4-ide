@@ -432,9 +432,12 @@ Honest list. Nothing below is hidden behind a `TRUE`.
    - **The COVID-19 temporary rules (Rule 201(z)/(bb)) are refused, not modelled.** For a
      rule date in 2020-05-04 – 2022-08-28 AND an aggregate in the affected band (above the
      then-tier-1 ceiling, at most $250,000), `financial statements required` stops with a
-     deliberate `ASSUME` bottom rather than guessing: relief eligibility turns on facts
+     deliberate `REFUSE` rather than guessing: relief eligibility turns on facts
      (organization age, prior delinquency) the corpus does not model. Outside that band,
-     in-window questions answer normally, and two assertions pin that.
+     in-window questions answer normally, and two assertions pin that. (It was a typed
+     `ASSUME` bottom until 2026-09-04, which made it a required input of every exported
+     decision that reached it; a refusal is not a fact a caller can supply. See
+     `doc/reference/control-flow/REFUSE.md`.)
    - **Per-arm citation has no in-language home** (CORPUS-TRACK §2.4 trap 4): each dated
      arm's authority is a `--` comment, because number-returning bodies cannot carry inert
      prose. Phase 2's `@label` is the designed fix.

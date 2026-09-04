@@ -133,14 +133,24 @@ GIVETH A BOOLEAN
     `RULES EFFECTIVE DATE` AT LEAST amendment
 
 -- Ruling R2 (CORPUS-TRACK §8): below commencement there is no Reg CF to
--- answer for, so a rule date before 2016-05-16 is a curated refusal, not an
--- answer. ASSUME makes this a deliberate bottom: an arm that reaches it
--- stops evaluation with "... is an assumed term", naming this binding.
--- Phase 2's generated "not in force on <day>" arm is the designed
--- replacement (TEMPORAL-RULE-VERSION-DESIGN.md item 3); delete this when it
--- lands. This is not the deprecated module-parameter ASSUME style
--- (CORPUS-TRACK §1.3): no input is ever routed through it.
-ASSUME `no Regulation Crowdfunding figure exists before commencement on 2016-05-16` IS A NUMBER
+-- answer for, so a rule date before 2016-05-16 is a refusal, not an answer.
+--
+-- It is spelled REFUSE. An arm that reaches it stops evaluation with the
+-- reason below; no rule can catch that or convert it into a figure; and it
+-- appears in no export schema, because it is not an input any caller could be
+-- asked to supply. (It was an ASSUME until REFUSE existed, which made it a
+-- required parameter of every money decision — an unknown FACT, which it is
+-- not.)
+--
+-- The taxonomy of PROPS-REDTEAM-2026-09-03 §2.8 puts "the law is not in force"
+-- in the GATE row rather than the REFUSE row. No gate design exists, so the
+-- commencement arm is a REFUSE and stays one until one does. Phase 2's
+-- generated "not in force on <day>" arm (TEMPORAL-RULE-VERSION-DESIGN.md item
+-- 3) is reconsidered as that gate, not as a drop-in replacement for this
+-- binding.
+GIVETH A NUMBER
+`no Regulation Crowdfunding figure exists before commencement on 2016-05-16` MEANS
+    REFUSE "no Regulation Crowdfunding figure exists before commencement on 2016-05-16"
 
 -- $1,000,000 as adopted (80 FR 71537); $1,070,000 from 2017-04-12
 -- (82 FR 17545 instr. 5.a); $5,000,000 from 2021-03-15 (86 FR 3496 instr. 3).
@@ -483,7 +493,14 @@ DECLARE FinancialStatementRequirement IS ONE OF
 -- honest answer is a refusal, not a guess. Outside the band the ordinary
 -- tiers were unaffected and the answer stands. CORPUS-TRACK §2.4.1;
 -- decided 2026-07-29: refuse, not encode. See README §5.
-ASSUME `the COVID-19 temporary rules, Rule 201(z) and (bb), are not modelled here` IS A FinancialStatementRequirement
+--
+-- Spelled REFUSE, at the user-declared type above: a refusal is an expression
+-- at ANY type, so it needs no sentinel constructor in
+-- FinancialStatementRequirement and cannot be mistaken for one of the three
+-- real answers.
+GIVETH A FinancialStatementRequirement
+`the COVID-19 temporary rules, Rule 201(z) and (bb), are not modelled here` MEANS
+    REFUSE "the COVID-19 temporary rules, Rule 201(z) and (bb), are not modelled here"
 
 @ref 85 FR 27116 (Rule 201(z)); 86 FR 3496 instr. 5 (Rule 201(bb))
 GIVETH A BOOLEAN

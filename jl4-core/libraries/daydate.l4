@@ -101,6 +101,15 @@ GIVETH A DATE
 -- arithmetic relies on (`Date 1 (month PLUS 6) year` is idiomatic). The
 -- refusal is a deliberate ASSUME bottom: evaluation that reaches it stops
 -- with "... is an assumed term", naming the binding below.
+--
+-- STILL AN ASSUME, DELIBERATELY. `REFUSE` exists since 2026-09-04 (R7) and the
+-- Reg CF corpus's commencement floor moved to it, but this site is NOT the
+-- same case: the taxonomy of PROPS-REDTEAM-2026-09-03 §2.8 classifies an
+-- out-of-range YMD as INVALID INPUT (the EITHER row), not as the model
+-- declining to answer. Its designed shape is therefore a change to this
+-- constructor's RETURN TYPE, which every date-arithmetic call site in the
+-- corpus goes through — a different and much larger change than swapping the
+-- bottom, and one that belongs in its own branch.
 ASSUME `YMD refused an out-of-range month or day` IS A DATE
 
 GIVEN year  IS A NUMBER

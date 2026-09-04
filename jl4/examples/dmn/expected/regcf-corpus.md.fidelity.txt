@@ -44,6 +44,9 @@ fidelity report — dmnmd
   [D-MD-NOLITERAL] blocking — decision_the_2022_inflation_adjustment
       `the 2022 inflation adjustment` is a formula (date("2022-09-20")), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision_no_regulation_crowdfunding_figure_exists_before_commencement_on_2016_05_16
+      `no Regulation Crowdfunding figure exists before commencement on 2016-05-16` is a formula (REFUSE "no Regulation Crowdfunding figure exists before commencement on 2016-05-16"), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
   [D-MD-CELLSYNTAX] blocking — decision_offering_maximum_in_a_12_month_period
       rule decision_offering_maximum_in_a_12_month_period_r1 has a cell dmnmd cannot read (a DATE cell -- dmnmd's cell grammar has no date datatype at all), so this table is omitted
       lost: the whole table
@@ -193,6 +196,9 @@ fidelity report — dmnmd
       lost: the decision itself; it is omitted from the markdown
   [D-MD-NOLITERAL] blocking — decision_the_accredited_investor_carve_out_applies_to
       `the accredited-investor carve-out applies to` is a formula (the_rules_in_force_include(amendment: the_2021_amendments, RULES_EFFECTIVE_DATE: RULES_EFFECTIVE_DATE) and investor.an_accredited_investor_as_defined_in_Rule_501), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision_the_covid_19_temporary_rules_rule_201_z_and_bb_are_not_modelled_here
+      `the COVID-19 temporary rules, Rule 201(z) and (bb), are not modelled here` is a formula (REFUSE "the COVID-19 temporary rules, Rule 201(z) and (bb), are not modelled here"), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
   [D-MD-NOLITERAL] blocking — decision_the_rule_date_is_inside_the_covid_19_temporary_rules_window
       `the rule date is inside the COVID-19 temporary rules window` is a formula (RULES_EFFECTIVE_DATE >= date("2020-05-04") and RULES_EFFECTIVE_DATE <= date("2022-08-28")), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table

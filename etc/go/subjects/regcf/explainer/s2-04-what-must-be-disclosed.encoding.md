@@ -12,15 +12,18 @@ question the rule asks only in part.
 made temporary relief available to certain issuers raising modest amounts, in
 Rule 201(z) and later Rule 201(bb). Eligibility for it turned on facts this
 corpus does not model — how old the company is, whether it was previously
-delinquent. So instead of guessing, the encoding declares a typed bottom:
+delinquent. So instead of guessing, the encoding refuses, by name:
 
 ```
-ASSUME `the COVID-19 temporary rules, Rule 201(z) and (bb), are not modelled here`
-       IS A FinancialStatementRequirement
+GIVETH A FinancialStatementRequirement
+`the COVID-19 temporary rules, Rule 201(z) and (bb), are not modelled here` MEANS
+    REFUSE "the COVID-19 temporary rules, Rule 201(z) and (bb), are not modelled here"
 ```
 
-Any evaluation that reaches it stops and names that binding rather than
-answering. The interesting part is that the refusal is **banded, not blanket**:
+Any evaluation that reaches it stops and gives that reason rather than
+answering. No rule downstream can catch the refusal or turn it into one of the
+three real answers, and — unlike the `ASSUME` this was written as until
+2026-09-04 — it is not an input a caller can be asked to supply. The interesting part is that the refusal is **banded, not blanket**:
 it fires only when the rule date is inside the temporary window _and_ the
 aggregate sits in the affected range. Ask a question outside that band and you
 get an ordinary answer, pinned by assertions on both sides. A blanket refusal

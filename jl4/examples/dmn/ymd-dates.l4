@@ -82,7 +82,10 @@ GIVETH A STRING
 
 -- Before commencement there is no fee to answer for, so a rule date earlier
 -- than 1983-01-01 is a curated refusal rather than an answer. Same device, and
--- the same reasoning, as `gst-rate.l4`'s and the Reg CF corpus's ASSUME floor.
+-- the same reasoning, as `gst-rate.l4`'s floor — including the reason it is
+-- still an `ASSUME` and not the `REFUSE` the Reg CF corpus moved to on
+-- 2026-09-04 (R7): see the paragraph at `gst-rate.l4`'s floor, and
+-- PROPS-REDTEAM-2026-09-03 §6 item 6.
 ASSUME `no fee is prescribed before commencement on 1983-01-01` IS A NUMBER
 
 GIVETH A NUMBER

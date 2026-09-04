@@ -381,6 +381,18 @@ generated "not in force" arm) and says "delete this when it lands". **Dispositio
 first-class refusal construct exists** — a `REFUSE "…"`-style typed bottom would let `ASSUME`
 drop this job too, and is worth a line in any props-era deprecation plan.
 
+> **Discharged 2026-09-04 (R7).** The construct exists. `REFUSE "message"` is an expression at
+> any type whose evaluation stops with the author's reason, uncatchable by any rule, and absent
+> from every export schema. Both `regcf.l4` sites and the `regcf-denovo.l4` one are now `REFUSE`
+> definitions, and the prelude's `TBD` is one too. The paragraph above therefore describes the
+> tree **before** that change; the fifth role is no longer a role of `ASSUME`. Not yet migrated,
+> and why, is recorded in `doc/reference/control-flow/REFUSE.md`: `daydate.l4`'s out-of-range
+> `YMD` (which §2.8 reclassifies as invalid INPUT rather than a refusal), and the two
+> `jl4/examples/dmn/` exhibits, where the migration was tried and reverted on a measurement —
+> a `REFUSE` has no FEEL image, `gst-rate.cases.json` deliberately feeds a rule date below
+> commencement, and both engine harnesses would therefore stop answering the exhibit whose
+> whole claim is that they do. That unblocks when the designed DMN image lands (§6 item 6).
+
 **Reading of the whole:** the corpus does not argue for keeping `ASSUME`; it argues for building
 `props`. Categories (a) and (b) — 49 of 53 lines — are authors reaching for an implicit typed
 environment that does not exist yet, and paying for it with modules that either cannot be

@@ -115,7 +115,12 @@ capability claim about L4, not a statement about this corpus.
 
 ### 1.3 House style: GIVEN/record throughout — no `ASSUME`, and that matters twice
 
-`grep -c ASSUME regcf.l4` → **0**. Every group declares a record and threads it as one
+`grep -c ASSUME regcf.l4` → **0**. (**True when written; false from 2026-07-29 to
+2026-09-04**, when the module carried two refusal-role `ASSUME`s — the R2 commencement
+floor and the 201(z)/(bb) COVID window — and **true again from 2026-09-04**, when R7
+turned both into `REFUSE` definitions. The claim below was always about the
+module-parameter style, and no input ever routed through those two.) Every group declares
+a record and threads it as one
 `GIVEN` parameter, per house style. The module fully evaluates: 55 concrete
 `assertion satisfied` results, no `ValAssumed`, no `Stuck`.
 
@@ -357,9 +362,10 @@ recorded in PROCESS-TRACK.md, but it is not this move's argument.
 > **Status (2026-07-29): BUILT**, on branch `mengwong/regcf-rule-version`, exactly to this
 > section's prescription — §6.2 steps 1, 1b, 2 and 2b in one change, because trap 5 makes
 > them one unit. All seven moved constants carry four-regime dated arms; the lesser→greater
-> shape and the accredited carve-out are dated; the R2 floor is a deliberate `ASSUME`
-> bottom (an arm that reaches it stops with "…is an assumed term", naming the refusal —
-> not the deprecated module-parameter ASSUME style, no input routes through it); the
+> shape and the accredited carve-out are dated; the R2 floor is a deliberate refusal
+> (an arm that reaches it stops with the refusal's own reason, naming it) — spelled
+> `ASSUME` when this was written and **`REFUSE` since 2026-09-04**, see the amendment to
+> ruling R2 in §8; the
 > 201(z)/(bb) COVID window is a **banded refusal** in `financial statements required`
 > (decided 2026-07-29 — see §2.4.1). Every claim below this note describes the tree
 > **before** that change and is kept as the build spec it was; the paragraph-opening grep
@@ -451,8 +457,13 @@ whether to encode 201(z)/(bb) or to refuse rule dates in `2020-05-04 … 2022-08
 > $250,000**; outside that band the ordinary tiers were unaffected, so in-window questions
 > outside the band still answer (and two assertions pin that). Inside the band the
 > eligibility conditions turn on facts the corpus does not model (organization age, prior
-> delinquency), so the arm stops on a typed `ASSUME` bottom naming Rule 201(z)/(bb) rather
+> delinquency), so the arm stops on a typed refusal naming Rule 201(z)/(bb) rather
 > than guessing. Documented in `regcf/README.md §5`.
+>
+> **Amended 2026-09-04** (R7): that refusal is spelled `REFUSE`, at the declared
+> `FinancialStatementRequirement` type — a refusal is an expression at any type, so it needs
+> no sentinel constructor and cannot be mistaken for one of the three real answers. It was a
+> typed `ASSUME` bottom until then, which made it a suppliable input.
 
 #### 2.4.2 The shape a C1 author writes
 
@@ -1314,7 +1325,7 @@ rather than one edited number.
 | `minimum permitted investment` (**91**) — three arms: 2000 / 2200 / 2500                       | Read by limb (i) at **311-312**                                                                                                   |
 | **`maximum amount sold to any one investor…` (**96**) — three arms: 100000 / 107000 / 124000** | **Read by limb (ii) at 314-316. Omitted by the previous draft; this is the blocking fix**                                         |
 | `greater of annual income or net worth` (**290-293**) — dated lesser→greater at 2021-03-15     | The **shape** is a dated body too. Without it the function is wrong for every investor whose income ≠ net worth before 2021-03-15 |
-| A floor arm refusing rule dates before **2016-05-16**                                          | Ruling **R2**. Below commencement there is no Reg CF to answer for                                                                |
+| A floor arm refusing rule dates before **2016-05-16**                                          | Ruling **R2**. Below commencement there is no Reg CF to answer for. Spelled `REFUSE` since 2026-09-04 (R7)                        |
 | Fixture + I-3 pair (§5.2) **and I-4, the cap regression** (§4.3)                               | I-4 is the assertion that fails if closure is broken                                                                              |
 | Re-bless `tests/regcf.golden`                                                                  | Keyed by `file:line:col`, so it re-baselines wholesale                                                                            |
 
@@ -1423,13 +1434,26 @@ changed the shape of the fourth; the reasoning is kept so the decision is audita
   2016-2017 window the previous model got wrong _inside_ its own table. Decision: every dated
   constant carries an explicit floor arm at Reg CF's commencement (80 FR 71388 instr. 4,
   "Effective May 16, 2016"), and a rule date below it is a curated refusal, not an answer.
-  Phase 2's generated "not in force on ⟨day⟩" arm
-  (`TEMPORAL-RULE-VERSION-DESIGN.md:348-352`) remains the designed replacement and is not
-  built; the hand-written arm is the interim and should be written so Phase 2 can delete it.
+
+  **Amended 2026-09-04** (R7, `PROPS-REDTEAM-2026-09-03.md` §2.8 /
+  `IMPLICIT-PROPS-DESIGN.md` §11.9): the MECHANISM is now named, because it changed. The
+  floor arm is a **`REFUSE`**, not an `ASSUME`. That is not cosmetic: an `ASSUME` is an
+  unknown FACT the boundary supplies, so it was promoted to a required parameter of every
+  exported money decision and emitted as a suppliable `inputData` in the DMN artifact — an
+  engine could be handed a value for "no Reg CF figure exists before commencement" and would
+  compute with it. A `REFUSE` is not an input anyone can supply: it appears in no export
+  schema, and no rule can catch it or convert it into a figure.
+
+  The §2.8 taxonomy puts "the law is not in force" in the **gate** row rather than the
+  `REFUSE` row. **No gate design exists**, so the commencement arm is a `REFUSE` and stays
+  one until one does. Phase 2's generated "not in force on ⟨day⟩" arm
+  (`TEMPORAL-RULE-VERSION-DESIGN.md:348-352`) is reconsidered as that gate, not as a
+  drop-in replacement for this binding; it is not built.
   **Note the limit of this ruling:** a floor arm catches queries _below_ the window. It does
   **not** catch the two failure modes that actually bit — a constant left undated _inside_
   the window (trap 5) and an omitted boundary _inside_ the window (2017-04-12). Those need
   closure discipline and primary-source verification respectively, not a floor.
+
 - **R3 — Do C0's 55 existing assertions get pinned? — RESOLVED 2026-07-29: pin none,
   document the dependency.** The 55 assertions state the _current_ law and stay unpinned;
   the dependency on the harness clock (`jl4/tests/Main.hs:64-66`, fixed `2025-01-31`, which

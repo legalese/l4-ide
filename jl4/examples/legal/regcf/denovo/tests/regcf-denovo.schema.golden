@@ -730,9 +730,6 @@
             "$ref": "#/$defs/IssuerProfile",
             "description": "The issuer's eligibility facts, its prior sales under section 4(a)(6), and its covered persons."
         },
-        "no encoding of Part 227 exists for rule dates before 2022-09-20": {
-            "type": "number"
-        },
         "offering": {
             "$ref": "#/$defs/OfferingProfile",
             "description": "The offering: target amount, deadline, intermediary arrangements and disclosure."
@@ -753,8 +750,7 @@
         "offering",
         "investor",
         "this investment",
-        "the date of the offer or sale",
-        "no encoding of Part 227 exists for rule dates before 2022-09-20"
+        "the date of the offer or sale"
     ],
     "title": "the exemption is available",
     "type": "object"

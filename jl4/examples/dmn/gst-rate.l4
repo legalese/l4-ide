@@ -60,8 +60,22 @@ GIVETH A DATE
 `GST commenced` MEANS Date 1 4 1994
 
 -- Before commencement there is no GST to answer for, so a rule date earlier
--- than 1994-04-01 is a curated refusal rather than an answer. Same device, and
--- the same reasoning, as the Reg CF corpus's ASSUME floor.
+-- than 1994-04-01 is a curated refusal rather than an answer.
+--
+-- STILL AN ASSUME, DELIBERATELY, AND THE REASON IS THIS FILE'S JOB. The Reg CF
+-- corpus's floor became a `REFUSE` on 2026-09-04 (R7), which is the right
+-- device: an ASSUME is an unknown FACT and so is emitted here as a suppliable
+-- `inputData`, which an engine can be handed a value for. This exhibit cannot
+-- follow yet, MEASURED: a `REFUSE` has no FEEL image, so the emitted decision
+-- carries raw L4 and is Blocking, and `gst-rate.cases.json` deliberately feeds
+-- a rule date well before commencement — so both engine harnesses would stop
+-- answering it, and the exhibit's whole claim ("the SAME model answers
+-- differently for ten rule dates, in two real engines") would be false.
+--
+-- The unblocking change is the designed DMN image for a refusal — omit the
+-- refusing row, a non-Blocking `D-REFUSE` note, a `MayRefuse` safety kind —
+-- which is PROPS-REDTEAM-2026-09-03 §6 item 6. Migrate this line when that
+-- lands, together with `ymd-dates.l4`'s twin.
 ASSUME `no GST rate exists before commencement on 1994-04-01` IS A NUMBER
 
 GIVEN change IS A DATE

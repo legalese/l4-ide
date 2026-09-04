@@ -206,9 +206,17 @@ GIVETH A DATE
 `the 2022 inflation adjustment` MEANS YMD 2022 9 20
 
 -- Below this date the module has no text to encode from. Reaching this
--- binding stops evaluation loudly and names itself, which is the whole point:
--- a curated refusal beats a silently wrong number.
-ASSUME `no encoding of Part 227 exists for rule dates before 2022-09-20` IS A NUMBER
+-- definition stops evaluation loudly and names itself, which is the whole
+-- point: a curated refusal beats a silently wrong number.
+--
+-- It is a REFUSE, not an ASSUME. That distinction is visible at the API
+-- boundary: an ASSUME is an unknown FACT and is promoted to a parameter of
+-- every exported function that transitively reads it, so a caller of the money
+-- decisions used to be asked to supply the encoding floor. A refusal is not a
+-- fact anyone can supply, so it appears in no export schema.
+GIVETH A NUMBER
+`no encoding of Part 227 exists for rule dates before 2022-09-20` MEANS
+    REFUSE "no encoding of Part 227 exists for rule dates before 2022-09-20"
 
 @ref eCFR versioner diff of 2023-02-28 against 2023-03-02; 86 FR 3590/3591/3592 sunset
 GIVETH A DATE
@@ -3028,16 +3036,6 @@ GIVETH A BOOLEAN
 -- Regulation Crowdfunding actually has, gives every parameter an @desc a
 -- caller can act on, and delegates to the encoded provision above. The
 -- decisions themselves stay where the regulation puts them.
---
--- ONE CONSEQUENCE OF THE ENCODING FLOOR, stated here because it shows up at
--- the API boundary and nowhere else: every decision that reads one of the
--- seven inflation-indexed constants transitively references the module-level
--- ASSUME `no encoding of Part 227 exists for rule dates before 2022-09-20`,
--- and a referenced ASSUME is promoted to a parameter of an exported function.
--- So a caller of the money decisions is asked for that binding. It is never
--- consumed for a rule date on or after 2022-09-20 — the BRANCH selects the
--- other arm — but it is asked for, and that is the price of a curated refusal
--- rather than a silently wrong number below the floor.
 
 @export Decide whether the Regulation Crowdfunding exemption under Securities Act section 4(a)(6) is available for a particular sale of securities by a particular issuer to a particular investor.
 GIVEN interp   IS AN Interpretation   @desc Which reading of the six contested provisions to apply. Use `the staff reading` for the SEC staff's published interpretations, `the text alone` for the regulation's own words.
