@@ -29,7 +29,7 @@ L4 does **no implicit coercion** between types. Use these explicit conversions. 
 
 | Function          | Signature                                                          | Notes                                                                                                                           |
 | ----------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
-| `TOSTRING`        | `NUMBER \| BOOLEAN \| DATE \| TIME \| DATETIME \| STRING → STRING` | Numbers render canonically; dates `YYYY-MM-DD`; datetimes in the ISO 8601 (International Organization for Standardization) form |
+| `TOSTRING`        | `NUMBER \| BOOLEAN \| DATE \| TIME \| DATETIME \| STRING → STRING` | Numbers render canonically; dates `YYYY-MM-DD`; datetimes in the International Organization for Standardization (ISO) 8601 form |
 | `TONUMBER`        | `STRING → MAYBE NUMBER`                                            | Accepts optional sign, decimals, `1.2E3` scientific                                                                             |
 | `TODATE`          | `STRING → MAYBE DATE`                                              | Accepts `YYYY-MM-DD`, `YYYY/MM/DD`, `DD-MMM-YYYY`, `DD/MM/YYYY`, `MMM DD, YYYY`                                                 |
 | `TOTIME`          | `STRING → MAYBE TIME`                                              | Accepts `HH:MM:SS`, `HH:MM`, `h:MM AM/PM`                                                                                       |

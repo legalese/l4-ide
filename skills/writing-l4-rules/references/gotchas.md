@@ -25,6 +25,7 @@ Things that will trip up a general-purpose large language model because they are
 - [`LET … IN` vs `WHERE`](#let--in-vs-where)
 - [`@export` placement](#export-placement)
 - [Annotation fence](#annotation-fence)
+- [A library's own example definitions are visible to importers](#a-librarys-own-example-definitions-are-visible-to-importers)
 - [NLG and reference annotations](#nlg-and-reference-annotations)
 
 ---
@@ -359,6 +360,16 @@ In addition to the `@`-prefixed annotations above, L4 recognises two **inline** 
 - `%...%` — NLG delimiter (wraps a phrase for the NLG renderer)
 
 These are rare in hand-written rules but appear in machine-generated or NLG-bidirectional files. If you see them in existing code, leave them alone — they are meaningful.
+
+---
+
+## A library's own example definitions are visible to importers
+
+A library file may carry fixtures for its own tests, and `IMPORT` brings those names in with the
+rest. A file that imports `hierarchy` and defines its own `amended` fails with
+`There are multiple definitions for the identifier` naming `hierarchy.l4:298`, one of the
+library's own examples (measured 2026-09-05). If a plain name collides with something you did not
+define, look in the library you imported, and rename yours.
 
 ---
 

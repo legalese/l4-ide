@@ -652,9 +652,8 @@ column is rejected, and the message names the column, not the construct (probe
     incorrect indentation (got 3, should be greater than 3)
 ```
 
-Whichever layout you pick, keep it for the whole file. `SKILL.md`'s rule — "OTHERWISE must match IF
-indentation, not BRANCH" — is written for the second layout and is stricter than the language; the
-measured rule is the one above.
+Whichever layout you pick, keep it for the whole file. `SKILL.md`'s key-idioms bullet states the
+same measured rule for both layouts.
 
 **Not** a `BRANCH` with no `OTHERWISE`. It is a parse error, and the error is reported against the
 **next top-level line**, not against the `BRANCH`:

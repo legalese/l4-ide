@@ -789,7 +789,9 @@ and `FULFILLED` again, the chain discharged on its second rung.
 Six facts, all measured on that probe, none of them stated anywhere else:
 
 - **``(`WAIT UNTIL` n)`` is built in.** It is not a prelude name and it needs no `IMPORT`. The
-  parentheses are required: it is an application in event position.
+  parentheses are the house form and what the corpus writes; a bare `` `WAIT UNTIL` n `` on its
+  own line also parses and gives the same result (measured 2026-09-05, both forms solo and mixed
+  with an act).
 - **The two kinds mix, in one block, in authored order.** A clock advance may precede an act, which
   is the only way to show a `LEST` chain fulfilling on its second rung.
   `jl4/examples/ok/deontic-breach-semantics.l4:131-133` stacks two waits and an act in one block.
