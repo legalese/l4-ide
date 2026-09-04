@@ -397,3 +397,235 @@ piece that lets the DMN exporter handle idiomatic L4 at all. What blocks a clean
 keyword": the fixture/experiment constituency (10.4 item 2), the uninterpreted-type role (10.4
 item 3), and the curated-refusal role (10.6 d) — all three separable, the third wanting a
 dedicated `REFUSE` construct.
+
+---
+
+## 11. Red-teamed position (2026-09-03) — R0 ruled, R1–R12 proposed
+
+The scoping question this design left open (§4.2, §8 Q2/Q4) and the `ASSUME` migration §10 raises
+were red-teamed by four adversarial reviews on 2026-09-03 and a second, eleven-agent review on
+2026-09-04. The resulting position is `specs/todo/PROPS-REDTEAM-2026-09-03.md`, which on 2026-09-04
+was revised to carry only the current proposal; the earlier strata and the verbatim reports are in
+that file's history at `d119c521`. In one line: **`ASSUME` is deprecated; its term role is a
+section-level `GIVEN` that the compiler discharges into ordinary parameters of every definition
+that transitively reads it; supply is the existing named-argument `WITH`.** §4.2's section-scoped
+establishment is withdrawn there (visibility already ships; `§` placement is a tiebreak), and
+§5.1's structural subtyping is found unnecessary. R0–R12 are all recorded below, each with the mark Meng gave it on 2026-09-04. The red team's
+rulings are closed; what remains is implementation in the order of `PROPS-REDTEAM-2026-09-03.md` §6.
+
+### 11.1 R0 — `ASSUME` is deprecated. RULED 2026-09-04.
+
+**Ruling (Meng, 2026-09-04): `ASSUME` is deprecated.** Its three jobs go to three destinations:
+
+| job                                | destination                                                                  | status                    |
+| ---------------------------------- | ---------------------------------------------------------------------------- | ------------------------- |
+| suppliable term (the ~550 uses)    | a section-level `GIVEN` discharged by the compiler into ordinary parameters  | mechanism pending (R1–R5) |
+| uninterpreted type (`… IS A TYPE`) | an empty `DECLARE T`, which already parses (`ok/set-operators-nested.l4:36`) | available today           |
+| refusal / typed bottom             | `REFUSE "…"`, uncatchable, boundary-only, in no schema                       | spec pending (R7)         |
+
+**What decided it.** Not the design argument but the defect list. Of the eight proposal-independent
+bugs found by the 2026-09-03/04 red teams (`PROPS-REDTEAM-2026-09-03.md` §7), five are
+consequences of `ASSUME` being an input with no binder, so that every consumer invented its own
+binding path and they disagree: the export schema's one-body-deep collector, the service's LetIn
+inlining, Catala's and Docassemble's private transitive walks, DMN's free-term map, `l4 batch`'s
+positional mis-application, OpenFisca's absence of any handling, and two promotion paths in
+`Export.hs`, one keyed on an out-of-scope error. Measured 2026-09-04: **35 Haskell files, 752
+occurrences, 16 named entry points** that collect, bind, promote or lower it (jl4-core 618,
+jl4-service 88, jl4-mlir 46). After discharge there is one binding path, application, and those
+collapse into the read-set pass plus ordinary parameters.
+
+**Cost committed to.** 664 `ASSUME` lines in 105 files (legal 54, ok 97, not-ok 20, experiments 418,
+doc 71, libraries 2, tests-cli 2), of which 113 are type-role; most are scriptable
+(`PROPS-REDTEAM-2026-09-03.md` §6 gives the per-role recipe).
+
+**Sequencing.** (1) the transitive read-set pass, in progress on `fix/export-transitive-readset`,
+which is both a bug fix and step one of discharge; (2) the mechanism rulings R1–R3 and R7;
+(3) discharge; (4) `REFUSE` and the empty-`DECLARE` migration of the type role, so that no refusal
+and no sort is ever suppliable; (5) a deprecation warning in `l4 check` with a code action that
+rewrites a term `ASSUME` to the ruled spelling — the warning does not land before the code action
+can; (6) corpus and docs migration, `doc/reference/types/ASSUME.md` carrying the notice and the
+recipe (CLAUDE.md §6); (7) keyword removal, together with the dead `LocalAssume` grammar.
+
+**What this does not decide.** Nothing of the red team's remains open; R1–R12 are ruled in
+§11.2–§11.13 below. Still owed from the riders: the pre-commencement gate design and the
+CORPUS-TRACK §8 amendment (§11.9). Consistent with §10.7 above and the handoff's §7 ("`ASSUME` is not simply
+to be deleted"): the refusal and type roles get their own constructs _before_ the keyword goes.
+
+### 11.2 R1 — A call site is entirely positional or entirely named. RULED 2026-09-04.
+
+**Ruling (Meng, 2026-09-04, in conversation: "i'm minded to allow all positional or all by-name but
+not allow an admixture of styles").** There is no mixed form `f x WITH y IS v`. The grammar is
+unchanged; the one compiler change is that `supplyAppNamed` may omit a parameter that is flowed
+from a visible section binder or has a `TYPICALLY` default, and a section `GIVEN` in the callee's
+read-set is a suppliable name at a `WITH` site. Implicits are keyword-only: at a positional site
+they flow or default. A `WITH` names only what it overrides; the rest keeps flowing.
+
+**What decided it.** The mixed form was never live code: it is a parse error on every binary that
+exists, and the corpus's roughly a thousand `WITH` sites are all-named because nothing else parses.
+Per-site practice already mixes styles across sites (`is adult`: one `WITH` site, fourteen
+positional). The red team's original R1, a new mixed grammar, is struck. Detail:
+`PROPS-REDTEAM-2026-09-03.md` §2.4.
+
+### 11.3 R2 — Resolution is lexical; a function `GIVEN` never flows to a callee. RULED 2026-09-04.
+
+**Ruling (Meng, 2026-09-04, on the resulting rule set: "a good balance between referential
+transparency and DWIM convenience").** A bare name resolves at the definition to a `WHERE`/`LET`
+local, the function's own `GIVEN`, a field opened from one, or a section `GIVEN`, else it is a
+check error; there is no caller chain in resolution. Only section binders and an explicit
+`WITH`/`LET` supply a callee's requirement; a function's own `GIVEN` never does. A function
+`GIVEN` that restates a visible section `GIVEN` is a **check error**, so a name has one binder per
+root (§11.4). Per-call variation is written, `callee WITH person IS person's guardian`.
+
+**What decided it.** The argument recorded at `PROPS-REDTEAM-2026-09-03.md` §2.3: a name
+coincidence would become a binding; `R(f)` would stop being the callee's; one program would have two
+readings; every tradition that had dynamic parameter binding gave it up (Common Lisp's `special`
+declaration is exactly the section-`GIVEN`/function-`GIVEN` line). Measured cost zero: across 607
+files there are 235 term-role `ASSUME` names and 2,311 function `GIVEN` names and no file where the
+two sets overlap. Restatement as an error rather than a warning was part of the recommendation Meng
+accepted; it is the one sub-point he did not separately voice.
+
+### 11.4 R3 — Distinct binders per section; one binder per name per root. RULED 2026-09-04.
+
+**Ruling (Meng, 2026-09-04: "I had intended our module scope mechanism to allow" a `foo` defined
+in each of four sibling sections, apple in 1 and 2, banana in 3 and 4).** Visibility is as shipped:
+nearest ancestor section, falling back to all candidates when no ancestor matches. Same-named
+section binders in different sections are distinct binders, each read by its own section and its
+descendants. One binder per name is enforced per root, not per module: a directive or export whose
+read-set holds two binders of one name is a check error naming both by section, and the ways out
+are hoist to the title heading, rename, or bridge at the call with `g WITH foo IS foo`. Nesting: a
+heading's binder covers its subtree; a child re-declaring an ancestor's name shadows within the
+child; a parent reading a name several children declare is ambiguous. Tier (world vs subject) is
+classified by call-site variation, never by placement.
+
+**What decided it.** The first draft's one-binder-per-module would have merged silently the
+"for the purposes of sections 1 and 2 … sections 3 and 4" pattern when the two are same-typed
+inputs. As definitions the pattern runs today on the FIX D branch exactly as intended, and with
+`ASSUME` in each section it checks identically; the shipped binary gets it wrong only through the
+defect FIX D repairs. Preconditions: FIX D and the §3.3.4 drift, both on
+`fix/section-scoping-ambiguity`. Detail: `PROPS-REDTEAM-2026-09-03.md` §2.1, §2.2.
+
+### 11.5 R8 — `TYPICALLY` has one behaviour, filled in once at the root. RULED 2026-09-04.
+
+**Ruling (Meng, 2026-09-04: "Agree with these three rules, please add"; on a definition as a
+default, "Yes please").** A defaulted `GIVEN`, section or function, may be omitted at a supply site
+and the evaluator honours the default, filled in once per evaluation at the root. Three rules: a
+function's own defaulted `GIVEN` may be omitted only at a named site; each binder has one
+declaration and its default lives there; a default is a module-scope expression, may name another
+binder or a definition (`beta TYPICALLY phi`), is evaluated lazily at the root, and a cycle
+`b ∈ R*(default(b))` is a check error, the default's read-set joining the requirement of every root
+that may use it. Surfaces: the trace records a defaulted binder as its own event with the
+declaration line and value; the JSON schema lists a `TYPICALLY` parameter as optional, never in
+`required`, with its default (as source text when it is an expression) and description.
+
+**What decided it.** Three images today (schema required-and-defaulted, Catala `context`,
+evaluator discards) and a reference page saying defaults do not change evaluation. Meng's own
+note: this expands `TYPICALLY` from a literal annotation into a defaulted expression, a language
+change in its own right; `doc/reference/types/TYPICALLY.md` says so when R8 lands. Detail:
+`PROPS-REDTEAM-2026-09-03.md` §2.5.
+
+### 11.6 R4 — The section binder is the indented `GIVEN` on the line after the heading. RULED 2026-09-04.
+
+**Ruling (Meng, 2026-09-04: "next-line-after-section, indented, to be the convention; having a
+GIVEN at the rhs of the section heading text just looks weird").** A `GIVEN` belongs to a section
+iff its keyword sits at a column greater than the heading's `§`, on the line after the heading. The
+heading-line form `§ ⟨name⟩ GIVEN …` falls under the same rule and parses, but is not taught as a
+style: docs show only the indented form and the formatter emits it ("if the parser needs to do it
+that way, fine, but let's not teach it as the primary style"). A column-1 `GIVEN` stays the next
+declaration's signature. `WHEREAS` and `WHEREIN` are struck.
+
+```l4
+§ `1. Issuer eligibility — Rule 100(b)`
+    GIVEN issuer IS AN IssuerProfile
+```
+
+**What decided it.** Readability, against the red team's preference for the heading-line form on
+the ground that it has no indentation hazard. The hazard is mitigated instead: a column-1 `GIVEN`
+immediately after a heading whose names the next head does not bind is a check error; the
+formatter never moves a `GIVEN` across the column boundary; and diagnostics about an implicit name
+the heading line it was declared on. Measured 2026-09-04: the rival adjacency rule would
+reinterpret 160 legal-corpus sites; the indentation rule collides with none. ExactPrint preserves
+what was written; `prettyLayout` emits the indented form; both have round-trip goldens. Detail: `PROPS-REDTEAM-2026-09-03.md` §2.1.
+
+### 11.7 R5 — Field-opening is lexical only. RULED 2026-09-04 (marked accept).
+
+The fields of a record-typed `GIVEN`, function or section, are in scope by bare name within the
+function that declares or sees the binder, never in its callees. Rank, innermost first:
+`WHERE`/`LET` locals; the function's own `GIVEN`; fields opened from it; section `GIVEN`s; fields
+opened from those; selectors. A collision between two opened records sharing a field name is an
+error at the read naming both records and at the declaration that opens the second; `r's f` is
+always available. A bare opened field elaborates to `Proj (App r []) field` in a post-typecheck AST
+every backend consumes. Only binders are suppliable at `WITH`. **Sequencing note:** the sample that
+motivated opening (the alcohol act as one record) was re-cut as fourteen scalars under R10, so
+opening's remaining value is bare field names inside a rule; it is implemented after discharge
+lands, and opt-in `OPENED` stays the fallback if reviewers cannot see binding class. Detail:
+`PROPS-REDTEAM-2026-09-03.md` §2.7.
+
+### 11.8 R6 — The `MAYBE`/`EITHER` propagation sugar is withdrawn. RULED 2026-09-04 (marked accept).
+
+Declined on measurement: seven of seven rating sets against; no use-site marker; the FEEL claim
+false; strictness under call-by-need; 28 functions, none exported; the deleted line is the
+encoder's visible allocation of the not-proved case. The taxonomy of non-answers stands. If
+revisited: a use-site `?`, bind at the nearest enclosing failure-typed node, lambda its own
+boundary, `JUST` explicit, elaborated to `CONSIDER` before any backend. Detail:
+`PROPS-REDTEAM-2026-09-03.md` §2.8, §5 item 11.
+
+### 11.9 R7 — `REFUSE` stays, specified. RULED 2026-09-04 (marked accept).
+
+A throw at force, never a value; `#ASSERT REFUSED e` with an optional message and a three-valued
+assertion outcome; house style one named definition per refusal with its `@ref`, readers
+byte-identical, polymorphic ones declared `GIVEN a IS A TYPE`; `Ref(f)` reported per reason string
+with the prelude's `TBD` excluded and warned separately; the per-backend image of
+`PROPS-REDTEAM-2026-09-03.md` §2.8 (DMN omits the refusing row, non-Blocking `D-REFUSE`,
+`MayRefuse` safety kind; Catala no definition; Docassemble a terminal screen; evaluator, CLI, batch
+and service a `refused` kind); order-dependence under lazy `AND`/`OR` written down. The taxonomy
+row is split: "the law does not apply / is not in force" is a value or gate that savings and
+transitional provisions can reach; "the model does not cover this" is `REFUSE`.
+
+**Consequence to carry, so two documents do not contradict.** The split reclassifies Reg CF's
+pre-commencement case, which `specs/todo/lexipedia-superset/CORPUS-TRACK.md` §8 ruling R2 and
+`regcf.l4:135-143` record as a curated refusal, and the temporal design's generated "not in force
+on <day>" arm (`TEMPORAL-RULE-VERSION-DESIGN.md` item 3), which becomes a gate. Neither has a gate
+design yet. Until one exists the commencement arm stays a `REFUSE`, and the PR that lands `REFUSE`
+amends CORPUS-TRACK §8 in the same change.
+
+### 11.10 R10 — Backends. RULED 2026-09-04 (marked accept).
+
+The transitive read-set pass lands first; the schema is keyed by (name, tier) with `x-l4-tier`;
+check rejects an explicit parameter sharing a name with a discharged implicit; defaulted implicits
+are not `required`; `BatchRequest` gains a `world` object; discharged implicits trail positional
+parameters; OpenFisca puts scalar implicits in `parameters(period)` and refuses record ones;
+`imaginary-alcohol-act.l4` migrates as fourteen scalar section `GIVEN`s. Detail:
+`PROPS-REDTEAM-2026-09-03.md` §2.10.
+
+### 11.11 R11 — `@reads`. RULED 2026-09-04 (marked accept).
+
+A function may annotate an implicit it reads, `@reads interp — …`, or override the section's
+`@desc` with its own, so the per-decision fork register of the de novo Reg CF encoding survives
+hoisting. Detail: `PROPS-REDTEAM-2026-09-03.md` §2.9.
+
+### 11.12 R12 — Six pre-existing defects are fixed now. RULED 2026-09-04 (marked accept).
+
+Independent of any ruling: the tutorial's flat `#CHECK … WITH` form; the section-scoping
+parent-ambiguity defect and the §3.3.4 drift; the schema's one-body-deep collector; `#ASSERT`
+collapsing an exception to a plain failure; `#CHECK` printing inference gensyms; `l4 batch`
+mis-applying a directly-read `ASSUME`. Built and independently verified on four branches off
+`origin/unstable` (`PROPS-REDTEAM-2026-09-03.md` §7); delivered as PRs into `unstable` on 2026-09-04: legalese/l4-ide#328 (export read-set), #329
+(section scoping), #330 (assert/check reporting), #331 (docs).
+
+### 11.13 R9 — `WITH` is the one override mechanism; `LET` is unchanged. RULED 2026-09-04 (marked alternative).
+
+An in-body hypothetical is written as a named application at the call, `` `the issuer's headroom`
+WITH interp IS `the strict reading` ``, which discharge carries down the callee's subtree; at a
+directive supply is likewise `WITH`. `LET` keeps its present meaning: it does not reach callees,
+and a `LET` shadowing a name in scope stays an error. `WHERE` never supplies. Supplying a name the
+callee neither takes nor reads is the existing check error. For DMN, rebinding the rule date drops
+per ruling R-C of `DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §15.12.1; any other binder overridden at an
+inner site lowers as a tier-2 knowledge model. The temporal form `EVAL UNDER RULES EFFECTIVE AT d e`
+succeeds to `e WITH \`RULES EFFECTIVE DATE\` IS d` once sharing is measured.
+
+**What decided it.** One mechanism after R1–R3, no second binder with dynamic extent to explain;
+no existing program changes meaning (`LET` appears 127 times in the examples and libraries and 7 in
+canon); no demand (`LET` has zero uses in the 26 legal files against 125 `WHERE` blocks, and the
+corpus's only hypothetical, `EVAL UNDER RULES EFFECTIVE AT`, has nineteen uses all at the outermost
+position of a directive, measured 2026-09-04). The cost, terseness when several calls share one
+override, is met by a helper. Detail: `PROPS-REDTEAM-2026-09-03.md` §2.6.
