@@ -1978,7 +1978,7 @@ already models `And`/`Or` as **n-ary**.
 
 ### 17.3 Recommended style — the NY/NJ example, five ways
 
-Styles 1, 2, 4 and 5 re-verified green on 2026-08-27 against the 4 Aug `l4` build (Style 2 via `l4 run` on a reconstruction taken verbatim from the July probe file — setSize 2, carol `is in` TRUE, dave `is in` FALSE). **Style 3 does not parse** — see the bookmark below it. `alice` resides in NY, `carol` in NJ, `dave` in CT.
+Styles 1, 2, 4 and 5 re-verified green on 2026-08-27 against the 4 Aug `l4` build (Style 2 via `l4 run` on a reconstruction taken verbatim from the July probe file — setSize 2, carol `is in` TRUE, dave `is in` FALSE). **Style 3 is green as of the infix-under-connective grammar change** (2026-08-27, branch `mengwong/infix-under-connective`): both forms — the two-element `OR` form and the four-element `..` chain with caret dittos — parse and evaluate, pinned with all their goldens by `jl4/examples/ok/infix-under-connective.l4`. `alice` resides in NY, `carol` in NJ, `dave` in CT.
 
 **Style 1 — enumerated values + membership (the default recommendation).** When the statute
 enumerates _attribute values_ (states), the enumeration is the object and membership is the
@@ -2041,94 +2041,47 @@ compose into (Meng, 2026-07-29, recording original design intent).** It is the c
 to transcribing an enumeration as the list it is (§17.1) while remaining an honest boolean
 disjunction for every consumer in §17.4.
 
-#### BOOKMARK — Style 3 does not parse (recorded 2026-08-27)
+#### Style 3 implementation note (2026-08-27)
 
-Both Style 3 forms above are rejected by the 4 Aug `l4` build, and independently by the 7 Aug
-reference build (promote-set, 2026-08-27) — so this is not an artefact of a stale binary.
+A user-defined infix operator is now admitted as an operand of the built-in operator chain
+(`AND` / `OR` / `..` / comparisons / arithmetic), binding tighter than every built-in operator —
+the same grouping prefix application always had. The change is confined to the parser
+(`expressionCont` and `singleLineExpressionCont` parse their operand via `mixfixChainOperand` —
+the chain-head production restricted to same-line keywords); the typechecker, both printers, and
+the fixity machinery needed nothing, because parentheses leave no AST trace on this tree — the
+new operands are indistinguishable from the parenthesized ones that always worked. **Operand
+chains are same-line only**: chain-head positions sit behind a `withIndent GT` column guard, but
+operand position does not, and adversarial review showed an aligned next-line keyword there is
+routinely the _next declaration's head_ (or an unmarked continuation of a `#EVAL`) — cross-line
+capture turned previously-valid programs into parse errors before the restriction. Fixity still governs
+grouping _among_ user operators (typechecker re-association); user-vs-built-in grouping is fixed
+at "user binds tighter", and an undeclared user-op chain under a connective stays an error
+(pinned by `not-ok/tc/infix-under-connective-undeclared.l4`). Two residual truths worth keeping
+now that the defect is gone:
 
-**When the parser accepts them: re-run all five styles, add Style 3 to §17.3's green list above,
-and delete this bookmark.** This copy — `specs/todo/SET-OPERATORS-SPEC.md` in the repo proper — is
-the canonical one; corrections land here first. A byte-identical mirror may exist at
-`seqsim/specs/todo/SET-OPERATORS-SPEC.md`: `seqsim/` is a scratch nested clone of this repo
-(detached HEAD, uncommitted working copy — established 2026-08-27), not a second canonical home;
-sync the mirror while it exists, and shed no tears if it is gone.
-Amend the green list rather than restoring the old "All verified green": that phrase is what
-allowed a per-style status to be asserted collectively without any style being named.
-
-**The caret dittos are not the cause.** A ditto pair copying a _built-in_ operator parses fine:
-
-```l4
-f x MEANS
-       x EQUALS 1
-    OR ^ ^      2      -- parses, evaluates
-```
-
-The cause is that **a user-defined infix operator cannot be an operand of a built-in connective
-without parentheses.** Established by elimination, all against the same build:
-
-| form                                                         | result       |
-| ------------------------------------------------------------ | ------------ |
-| ``p `resides in` "NY"`` alone, as a whole `MEANS` body       | parses       |
-| ``(p `resides in` "NY") OR (p `resides in` "NJ")``           | parses       |
-| ``p `resides in` "NY" OR p `resides in` "NJ"`` (no dittos)   | **rejected** |
-| the same with a bare-word operator `RESIDESIN`               | **rejected** |
-| the same with `@infixl 4`, `@infixl 6`, `@infixl 9` declared | **rejected** |
-| the same under `AND`, and under the `..` asyndeton           | **rejected** |
-
-So it is neither the caret, nor the backticks, nor a missing fixity declaration. The operator table
-for the built-in chain is the fixed list the parser names in its own error (`&&, *, +, …, WHERE`); a
-user-defined operator is admitted only at the outermost level of an expression, or immediately
-inside parentheses.
-
-**The boundary is infix position, specifically.** The same operator spelled _prefix_ is admitted as
-an operand of the same connective — plain application binds tighter than the built-in chain, so only
-a user-defined operator _used infix_ is refused (promote-set, 2026-08-27; re-verified here on the
-4 Aug build with `l4 run`, not just `l4 check`):
-
-```l4
-`may apply` p MEANS
-       `resides in` p "NY"
-    OR ^            ^ "NJ"
-```
-
-alice (NY) **TRUE**, carol (NJ) **TRUE**, dave (CT) **FALSE** — so the dittos resolve to the right
-tokens rather than to something merely well-formed. The four-element `..` chain works prefix too.
-
-Note what that means for this section: **the composition §17.3 is arguing for — asyndetic `..` +
-caret dittos + layout bracketing — already works.** Only the subject-first _infix_ spelling is
-blocked. So the parser fix restores the intended reading order; it does not rescue the mechanism,
-which is sound today. A prefix-spelled Style 3 is available in the meantime, at the cost of the
-subject-first order that is most of the point.
-
-**Fix the diagnostic first — it is what hid this.** `L4/Lexer.hs` prints a _resolved_ ditto as `^`:
-
-```haskell
--- NOTE: we cannot look up TCopy (Just _) in the map - instead we just act as if it was
--- TCopy Nothing, which is fine
-RealTCopy _ -> displayTokenType (TSymbols (TCopy Nothing))
-```
-
-so the diagnostic says `unexpected ^` in a case where the caret resolved correctly and the
-_operator it resolved to_ was refused. The parser is not at fault for the confusion — it matches
-through `computedPayload` everywhere (`Parser.hs:299, 321, 362`), so a resolved ditto is already
-transparent to it. Only the error renderer loses the information. Printing the copied token
-(with the caret's own position) would have pointed straight at the real defect; instead this was
-recorded as a ditto limitation for three weeks.
-
-**How the stale "green" got here.** Resolved by transcript archaeology (promote-set, 2026-08-27,
-session `c8d4f88f`; each step below read first-hand from the lexipedia transcript `7c74365c` and
-`git show`). The July session's probe file (`nynj-styles.l4`) was written **exactly once**, with
-Style 3 in the **prefix** spelling — which parses — and was never edited afterward except a `sed`
-fixing Style 4's lambda. The subject-first infix + ditto spelling went into the _spec_ via Edit
-(committed at `9db0f659` and `bd399e35`, both 2026-07-29, PR #170) and **was never executed by
-anything**. The session's claim "I re-ran the whole probe after the rewrite: zero errors" was
-literally true and completely misleading: the rewrite was in the spec, and the probe it re-ran
-still held the prefix form. So this is not a regression to hunt for — there is no evidence any
-build ever accepted the infix form (#168/#169 had merged the day before, and the probe binary was
-the post-#168 worktree build) — it is a claim that was never tested in the spelling displayed.
-The operational lesson stands, sharpened: green must attach to the _exact text shown_, and the
-probe that produced it should be named next to the claim. Re-run the styles rather than re-read
-them, whenever this section is next touched.
+- **Diagnostics.** A parse error caused by a _resolved_ ditto now names the copied token —
+  ``unexpected ^ (resolved to `resides in`)`` — fixed at the megaparsec `showTokens` seam only;
+  `displayPosToken` still prints the `^` the user wrote, because exactprint byte-identity
+  reconstructs source text through it. The old bare-`^` rendering is what mis-recorded this
+  defect as "a ditto cannot copy a mixfix operator" for three weeks.
+- **Hint-registry facts, corrected by adversarial re-verification (2026-08-27).** Two claims an
+  earlier draft of this note made were wrong, and one live bug hid behind them. (1) The CLI is
+  _not_ module-local: `l4 run` drives the same Shake rules as the LSP (`jl4/app/L4/Cli/Run.hs`
+  uses `Rules.SuccessfulTypeCheck`, whose `GetMixfixRegistry` merges imported hints). The
+  genuinely module-local path is `typecheckWithDependencies` in `L4/Import/Resolution.hs`, used
+  only by the VirtualFS API (`L4/API/VirtualFS.hs`). (2) "Outcomes converge (both parse
+  everywhere)" was false in the one configuration that exercises the machinery: the hint gate is
+  _skipped_ when a module's merged registry is empty (any identifier chain parses permissively,
+  failing only at scope-check), so import-merge severing is silent in an importer with no local
+  operators — and in an importer _with_ a local operator, prelude word operators (`` `is in` ``)
+  were a parse error, live, because `buildMixfixHintRegistry` used one-layer `foldTopDecls` and
+  the prelude wraps everything in `§ Prelude`: **section-nested `DECIDE`s contributed zero
+  hints**. Fixed in the same PR (registry recursion into `Section`); pinned by
+  `ok/infix-under-connective-imported.l4`, which now declares a local operator precisely so its
+  registry is non-empty and the gate is active — severing the import merge or the section
+  recursion turns its `#EVAL`s into loud parse errors. Verdict trail: the review finding
+  "imported infix operator under a connective is unpinned" survived its 3-refuter panel 2–1 and
+  the strengthened pin is its discharge.
 
 **Style 4 — `any`-fold over the enumeration.** The list-shaped form for _predicate_ limbs; the
 prelude's `any`/`all` carry `@nlg` templates already. NOTE: L4 functions are **not curried** —

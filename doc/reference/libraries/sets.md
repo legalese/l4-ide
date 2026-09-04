@@ -35,7 +35,12 @@ A `SET OF a` is a wrapper around a list in which **order and duplicates are irre
 
 `UNION`, `INTERSECT`, and `WITHOUT` are ordinary identifiers and work **bare** at call sites. `LESS` must be written `` `LESS` `` (backticked) because bare `LESS` is the lexer keyword that starts `LESS THAN`.
 
-These word operators have **no precedence**: parenthesize compounds, e.g. `A UNION (B INTERSECT C)`.
+These word operators carry declared fixities in the prelude (`@infixl 6` for
+`UNION` and `WITHOUT`, `@infixl 7` for `INTERSECT`), so unparenthesized
+compounds group as in set theory: `A UNION B INTERSECT C` is
+`A UNION (B INTERSECT C)`. They may also appear unparenthesized as operands
+of built-in operators (`AND`, `OR`, `EQUALS`, ...), where the whole set
+expression binds tighter than the built-in.
 
 ### Operator overloads
 

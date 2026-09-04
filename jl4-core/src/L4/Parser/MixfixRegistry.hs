@@ -61,6 +61,13 @@ buildMixfixHintRegistry =
     gatherTop = \case
       Decide _ dec -> foldDecides gatherDecide dec
       Assume _ ass -> gatherAssume ass
+      -- Sections are organizational, not scoping: a `§`-nested operator is in
+      -- scope module-wide, so its hint must be too. 'foldTopDecls' is one
+      -- gplate layer and never descends; without this case a library wrapped
+      -- in a section (the prelude wraps everything in `§ Prelude`) contributes
+      -- zero hints, and its word operators fail to parse in any importer that
+      -- has local hints of its own.
+      Section _ (MkSection _ _ _ decls) -> foldMap gatherTop decls
       _ -> mempty
 
     gatherDecide :: Decide Name -> MixfixHintRegistry
