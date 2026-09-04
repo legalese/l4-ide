@@ -406,7 +406,7 @@ that file's history at `d119c521`. In one line: **`ASSUME` is deprecated; its te
 section-level `GIVEN` that the compiler discharges into ordinary parameters of every definition
 that transitively reads it; supply is the existing named-argument `WITH`.** §4.2's section-scoped
 establishment is withdrawn there (visibility already ships; `§` placement is a tiebreak), and
-§5.1's structural subtyping is found unnecessary. R0, R1, R2, R3 and R8 are recorded below; R4–R7
+§5.1's structural subtyping is found unnecessary. R0, R1, R2, R3, R4 and R8 are recorded below; R5–R7
 and R9–R12 are candidates on the rulings sheet and are recorded here, dated, as each is decided.
 
 ### 11.1 R0 — `ASSUME` is deprecated. RULED 2026-09-04.
@@ -442,10 +442,10 @@ rewrites a term `ASSUME` to the ruled spelling — the warning does not land bef
 can; (6) corpus and docs migration, `doc/reference/types/ASSUME.md` carrying the notice and the
 recipe (CLAUDE.md §6); (7) keyword removal, together with the dead `LocalAssume` grammar.
 
-**What this does not decide.** The spelling of the section binder (R4), `REFUSE`'s specification
-(R7), field-opening, hypotheticals, backends and `@reads` (R5, R9–R11) — `PROPS-REDTEAM-2026-09-03.md`
+**What this does not decide.** `REFUSE`'s specification (R7), field-opening, hypotheticals,
+backends and `@reads` (R5, R9–R11) — `PROPS-REDTEAM-2026-09-03.md`
 §4, still candidates. The supply grammar, the resolution rule, visibility and defaults are ruled
-in §11.2–§11.5 below. Consistent with §10.7 above and the handoff's §7 ("`ASSUME` is not simply
+in §11.2–§11.5 below, and the binder's spelling in §11.6. Consistent with §10.7 above and the handoff's §7 ("`ASSUME` is not simply
 to be deleted"): the refusal and type roles get their own constructs _before_ the keyword goes.
 
 ### 11.2 R1 — A call site is entirely positional or entirely named. RULED 2026-09-04.
@@ -519,3 +519,24 @@ evaluator discards) and a reference page saying defaults do not change evaluatio
 note: this expands `TYPICALLY` from a literal annotation into a defaulted expression, a language
 change in its own right; `doc/reference/types/TYPICALLY.md` says so when R8 lands. Detail:
 `PROPS-REDTEAM-2026-09-03.md` §2.5.
+
+### 11.6 R4 — The section binder is the indented `GIVEN` on the line after the heading. RULED 2026-09-04.
+
+**Ruling (Meng, 2026-09-04: "next-line-after-section, indented, to be the convention; having a
+GIVEN at the rhs of the section heading text just looks weird").** A `GIVEN` belongs to a section
+iff its keyword sits at a column greater than the heading's `§`, on the line after the heading. The
+heading-line form `§ ⟨name⟩ GIVEN …` is not adopted. A column-1 `GIVEN` stays the next
+declaration's signature. `WHEREAS` and `WHEREIN` are struck.
+
+```l4
+§ `1. Issuer eligibility — Rule 100(b)`
+    GIVEN issuer IS AN IssuerProfile
+```
+
+**What decided it.** Readability, against the red team's preference for the heading-line form on
+the ground that it has no indentation hazard. The hazard is mitigated instead: a column-1 `GIVEN`
+immediately after a heading whose names the next head does not bind is a check error; the
+formatter never moves a `GIVEN` across the column boundary; and diagnostics about an implicit name
+the heading line it was declared on. Measured 2026-09-04: the rival adjacency rule would
+reinterpret 160 legal-corpus sites; the indentation rule collides with none. Both printers emit
+the indented form with round-trip goldens. Detail: `PROPS-REDTEAM-2026-09-03.md` §2.1.

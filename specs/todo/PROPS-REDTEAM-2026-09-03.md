@@ -1,8 +1,8 @@
 # Props: the proposal, as it stands on 2026-09-04
 
 _Status: **a proposal, not implemented.** R0 is ruled (2026-09-04, `IMPLICIT-PROPS-DESIGN.md`
-§11.1). R1, R2, R3 and R8 were ruled in conversation on 2026-09-04 and are recorded in
-`IMPLICIT-PROPS-DESIGN.md` §11.2–§11.5; R4–R7 and R9–R12 are candidates awaiting Meng's marks on
+§11.1). R1, R2, R3, R4 and R8 were ruled in conversation on 2026-09-04 and are recorded in
+`IMPLICIT-PROPS-DESIGN.md` §11.2–§11.6; R5–R7 and R9–R12 are candidates awaiting Meng's marks on
 the rulings sheet. This revision replaces every earlier
 stratum of the file: the 2026-09-03 reduced position, the 2026-09-03/04 refinement minutes, the
 second red team's verified findings and the four verbatim red-team reports are all in git history
@@ -68,33 +68,33 @@ GIVETH A BOOLEAN
     issuer's `subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act`
 ```
 
-**Spelling, R4, not yet marked.** Two candidates, both of which parse on the 2026-08-27 binary and
-both of which today attach the `GIVEN` to the _next definition_ (probe q9, Appendix A), so either
-needs a parser change (`MkSection` gains a `Maybe (GivenSig n)`; both printers, `Rules.ExactPrint`
-and `L4.Print.prettyLayout`, emit the chosen form; round-trip goldens per `CLAUDE.md` §3.2).
+**Spelling, R4 (ruled 2026-09-04).** The binder is written on the line after the heading,
+indented: a `GIVEN` belongs to the section iff its keyword sits at a column greater than the
+heading's `§`. Meng: "next-line-after-section, indented, to be the convention; having a GIVEN at
+the rhs of the section heading text just looks weird." The heading-line form `§ ⟨name⟩ GIVEN …`
+is not adopted. A column-1 `GIVEN` stays the next declaration's signature. Measured 2026-09-04:
+the rival "adjacency" rule (the `GIVEN` right after a heading is the section's) would reinterpret
+**160** sites in the legal corpus where a section's first function opens with a `GIVEN`; the
+indentation rule collides with **zero** existing lines, there being no indented `GIVEN` in the
+corpus. Both forms parse on the 2026-08-27 binary and both attach the `GIVEN` to the _next
+definition_ (probe q9, Appendix A), so the parser changes: `MkSection` gains a `Maybe (GivenSig n)`,
+`section n` takes `optional (indented givens headerColumn)`, and both printers, `Rules.ExactPrint`
+and `L4.Print.prettyLayout`, emit the indented form with round-trip goldens per `CLAUDE.md` §3.2.
 
-- **Indented, as minuted with Meng on 2026-09-04 and the form he described as the design:** a
-  `GIVEN` belongs to the section iff its keyword sits at a column greater than the heading's `§`,
-  on the heading line or indented beneath it; a column-1 `GIVEN` stays the next declaration's
-  signature. Measured 2026-09-04: the rival "adjacency" rule (the `GIVEN` right after a heading is
-  the section's) would reinterpret **160** sites in the legal corpus where a section's first
-  function opens with a `GIVEN`; the indentation rule collides with **zero** existing lines, there
-  being no indented `GIVEN` in the corpus.
-- **Heading-line, `§ ⟨name⟩ GIVEN …`, as R4 proposes:** no indentation hazard. The hazard is real:
-  a dedent by a formatter or a paste re-attaches a section binder to the next definition with no
-  error at the site. The seasoned rater's 130-line rewrite of Reg CF §3 produced 21 errors on
-  today's binary, five of them at `Range 1:1-1:1` about `_self`, because an indented `GIVEN` had
-  attached to `DECLARE InvestorProfile`.
-
-Under either spelling: a column-1 `GIVEN` immediately after a heading whose names the next head
-does not bind is a **check error** (today it silently makes the next definition a function of
-those names, probe q9). A keyword for the binder is in reserve if neither layout survives review:
-`WHEREAS` is struck (a recital is a statement of fact by the parties, Greer v Kettle [1938] AC 156,
-presumptively non-operative where the operative words are clear, Re Moon, ex p Dawes (1886) 17 QBD
-275, applied in [2001] SGCA 41; every legal reader read it as non-operative); `WHEREIN` is doubtful
-(characterises an element already introduced, limits only conditionally, MPEP 2111.04; both
-beginner raters confused it with `WHERE`); the drafter's `IN THIS SECTION x IS A T` is unambiguous
-at the cost of three tokens. The examples in this file use the indented spelling pending R4.
+The dedent hazard is real and is mitigated rather than avoided: a formatter or a paste that
+dedents a section binder re-attaches it to the next definition, and the seasoned rater's 130-line
+rewrite of Reg CF §3 produced 21 errors on today's binary, five at `Range 1:1-1:1` about `_self`,
+because an indented `GIVEN` had attached to `DECLARE InvestorProfile`. Three mitigations: a
+column-1 `GIVEN` immediately after a heading whose names the next head does not bind is a **check
+error** (today it silently makes the next definition a function of those names, probe q9); the
+formatter never moves a `GIVEN` across the column boundary; and a diagnostic about an implicit
+names the heading line it was declared on. The keyword candidates are struck: `WHEREAS` (a recital
+is a statement of fact by the parties, Greer v Kettle [1938] AC 156, presumptively non-operative
+where the operative words are clear, Re Moon, ex p Dawes (1886) 17 QBD 275, applied in [2001] SGCA
+41; every legal reader read it as non-operative); `WHEREIN` (characterises an element already
+introduced, limits only conditionally, MPEP 2111.04; both beginner raters confused it with
+`WHERE`); the drafter's `IN THIS SECTION x IS A T` stays noted as the reach-by-words spelling if
+one is ever wanted. The examples in this file use the ruled spelling.
 
 **Visibility, R3 (amended 2026-09-04 at Meng's direction).** A section `GIVEN` is resolved exactly
 as a top-level name is today: `selectByProximity` (`jl4-core/src/L4/TypeCheck/Types.hs:902`)
@@ -654,7 +654,7 @@ The canonical statement of each is on the rulings sheet (artifact "Twelve Ruling
 | R1  | **RULED 2026-09-04** in conversation; `IMPLICIT-PROPS-DESIGN.md` §11.2                           | A call site is entirely positional or entirely named. Grammar unchanged; `supplyAppNamed` may omit a flowed or defaulted parameter; a section `GIVEN` in the read-set is a suppliable name; implicits keyword-only. (Original R1 had proposed a new mixed grammar `f x WITH y IS v`; struck, never live code.)                                                                                | Positional implicits as leading parameters, which forces an order onto a set; argued against by two lenses.                                                                                                  |
 | R2  | **RULED 2026-09-04** in conversation, the recommendation taken; `IMPLICIT-PROPS-DESIGN.md` §11.3 | Resolution lexical, no caller chain; a bare name resolves to own `GIVEN`, opened field or section `GIVEN` or is a check error. Sheet holding: a caller's same-named `GIVEN` supplies the section binder; same-type restatement warns, different-type errors.                                                                                                                                  | **Recommended:** a function `GIVEN` never flows; restatement of a visible section `GIVEN` is a check error. Measured cost: zero.                                                                             |
 | R3  | **RULED 2026-09-04** in conversation; `IMPLICIT-PROPS-DESIGN.md` §11.4                           | Visibility as shipped, nearest ancestor with fallback; same-named section binders in different sections are distinct binders; one binder per name **per root**, a root reaching two being a check error naming both by section (hoist, rename, or bridge with `g WITH foo IS foo`); fix the parent-ambiguity defect and the §3.3.4 drift first; tier by call-site variation, never placement. | Coq subtree visibility: matches "in this Part" literally, breaks the nine sibling-section declarations, buys nothing the tiebreak lacks. Or the first draft's one binder per module, rejected in §5 item 13. |
-| R4  | candidate; **spelling contested** (§2.1)                                                         | Heading-line `§ ⟨name⟩ GIVEN …`; `WHEREAS` struck; `WHEREIN` in reserve beside `IN THIS SECTION x IS A T`; a column-1 `GIVEN` after a heading whose names the next head does not bind is a check error; round-trip goldens on both printers.                                                                                                                                                  | Take a keyword now. The indented form (§2.1) is what was minuted with Meng and what he described as the design; mark modify to keep it.                                                                      |
+| R4  | **RULED 2026-09-04** in conversation; `IMPLICIT-PROPS-DESIGN.md` §11.6                           | The binder is the indented `GIVEN` on the line after the heading, keyword right of the `§`; the heading-line form is not adopted; a column-1 `GIVEN` after a heading whose names the next head does not bind is a check error; the formatter never moves a `GIVEN` across the column boundary; `WHEREAS`/`WHEREIN` struck; round-trip goldens on both printers.                               | The heading-line form, which the red team had proposed for its lack of an indentation hazard; struck as looking weird.                                                                                       |
 | R5  | candidate                                                                                        | Field-opening lexical only, ranked as §2.7, collision error at read and at the opening declaration, elaborated to `Proj`, binders only at `WITH`.                                                                                                                                                                                                                                             | Opt-in `OPENED` per binder; or no opening at all.                                                                                                                                                            |
 | R6  | withdrawn                                                                                        | The `MAYBE`/`EITHER` propagation sugar is withdrawn, declined on measurement (§5). The taxonomy stands.                                                                                                                                                                                                                                                                                       | Keep it with five conditions (use-site `?`, bind at nearest failure-typed node, lambda its own boundary, `JUST` explicit, elaborate to `CONSIDER`).                                                          |
 | R7  | candidate                                                                                        | `REFUSE` as §2.8: throw at force; `#ASSERT REFUSED`; three-valued assertions; one named definition per refusal; per-backend image; `Ref(f)` per reason, `TBD` excluded; taxonomy row split.                                                                                                                                                                                                   | Keep pre-commencement as a refusal per corpus ruling R2 and accept that transitional provisions cannot be encoded over it.                                                                                   |
@@ -798,8 +798,8 @@ the dead `LocalAssume` grammar (§6 item 7); function-typed `ASSUME` refused by 
 
 ## 9. Open
 
-- Meng's marks on R4–R7 and R9–R12 (R1, R2, R3 and R8 are ruled, §4; R4 carries the spelling
-  question). Accepted rulings go to `IMPLICIT-PROPS-DESIGN.md` §11 dated; modified ones come back
+- Meng's marks on R5–R7 and R9–R12 (R1, R2, R3, R4 and R8 are ruled, §4). Accepted rulings go
+  to `IMPLICIT-PROPS-DESIGN.md` §11 dated; modified ones come back here for argument.
   here for argument.
 - Whether to push the four §7 branches and open PRs into `unstable`.
 - Runtime shape (per-field vs one record per module) and its sharing cost; unmeasured.
