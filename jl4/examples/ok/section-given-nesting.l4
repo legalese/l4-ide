@@ -1,0 +1,21 @@
+-- Nesting. A binder on a heading covers every definition in every section
+-- beneath it. A child re-declaring an ancestor's name is a DISTINCT binder that
+-- shadows within the child's subtree. A sibling with no binder of its own sees
+-- the ancestor's.
+
+§ `top`
+    GIVEN foo IS A NUMBER
+
+GIVETH A NUMBER
+`top reader` MEANS foo PLUS 1
+
+§§ `child`
+    GIVEN foo IS A STRING
+
+GIVETH A STRING
+`child reader` MEANS foo
+
+§§ `sibling`
+
+GIVETH A NUMBER
+`sibling reader` MEANS foo PLUS 2

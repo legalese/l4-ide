@@ -1,0 +1,15 @@
+-- A binder is visible upward and sideways when it is the only candidate: `the
+-- rate` is declared on §§ 1 and read from §§ 2, which declares none of its own.
+
+§ `top`
+
+§§ `one`
+    GIVEN `the rate` IS A NUMBER
+
+GIVETH A NUMBER
+`rule one` MEANS `the rate` TIMES 2
+
+§§ `two`
+
+GIVETH A NUMBER
+`rule two` MEANS `the rate` TIMES 3

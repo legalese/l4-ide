@@ -39,6 +39,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import L4.Annotation (getAnno)
 import L4.Syntax
+import L4.Names (filterGivenSigTo, getName, isSectionBinderElaboration, sectionGivenNames)
 import L4.TypeCheck.Environment (maybeUnique)
 import L4.TypeCheck.Types (CheckErrorWithContext(..), CheckError(..), CheckEntity(..), CheckErrorContext(..), EntityInfo)
 import Optics
@@ -141,7 +142,7 @@ getExportedFunctions mod'@(MkModule _ _ section) =
     -- Has explicit exports with default: use as-is
     _ -> explicitExports
  where
-  collectSection tdm assumes' (MkSection _ _ _ decls) =
+  collectSection tdm assumes' (MkSection _ _ _ _ decls) =
     decls >>= collectDecl tdm assumes'
 
   collectDecl tdm assumes' = \ case
@@ -276,7 +277,7 @@ buildTypeDescMap :: Module Resolved -> TypeDescMap
 buildTypeDescMap (MkModule _ _ section) =
   Map.fromList (collectSection section)
  where
-  collectSection (MkSection _ _ _ decls) =
+  collectSection (MkSection _ _ _ _ decls) =
     decls >>= collectDecl
 
   collectDecl = \ case
@@ -301,7 +302,7 @@ assumesFromModule mod'@(MkModule _ _ section) =
  where
   synonyms = collectTypeSynonyms mod'
 
-  collectSection (MkSection _ _ _ decls) =
+  collectSection (MkSection _ _ _ _ decls) =
     decls >>= collectDecl
 
   collectDecl = \case
@@ -318,7 +319,7 @@ collectTypeSynonyms :: Module Resolved -> Map.Map Unique (Type' Resolved)
 collectTypeSynonyms (MkModule _ _ section) =
   Map.fromList (goSection section)
  where
-  goSection (MkSection _ _ _ decls) =
+  goSection (MkSection _ _ _ _ decls) =
     decls >>= goDecl
 
   goDecl = \case
@@ -377,7 +378,7 @@ decideBodiesFromModule :: Module Resolved -> Map.Map Unique (Expr Resolved)
 decideBodiesFromModule (MkModule _ _ section) =
   Map.fromList (goSection section)
  where
-  goSection (MkSection _ _ _ decls) = decls >>= goDecl
+  goSection (MkSection _ _ _ _ decls) = decls >>= goDecl
   goDecl = \case
     Decide _ (MkDecide _ _ (MkAppForm _ name _ _) body) -> [(getUnique name, body)]
     Section _ sub -> goSection sub
@@ -440,8 +441,20 @@ rewriteModuleAssumes
 rewriteModuleAssumes rewrite (MkModule ann uri section) =
   MkModule ann uri (goSection section)
  where
-  goSection (MkSection sann name aka decls) =
-    MkSection sann name aka (mapMaybe goDecl decls)
+  -- Hold a section's own GIVEN and its elaborations in step (see the invariant
+  -- on 'L4.Desugar.desugarSectionGivens'): a parameter whose elaboration was
+  -- dropped or replaced is no longer a section binder, and leaving it on the
+  -- heading would make 'L4.Print.prettyLayout' re-introduce a binder the caller
+  -- has just bound -- which is exactly what @l4 batch@ does, so the wrapper's
+  -- definition would then collide with it.
+  goSection (MkSection sann name aka mgiven decls) =
+    let binders = sectionGivenNames mgiven
+        decls'  = mapMaybe goDecl decls
+        kept    = [ rawName (getName r)
+                  | d@(Assume _ (MkAssume _ _ (MkAppForm _ r [] _) _ _)) <- decls'
+                  , isSectionBinderElaboration binders d
+                  ]
+    in MkSection sann name aka (filterGivenSigTo kept mgiven) decls'
   goDecl = \case
     decl@(Assume _ assume) -> case rewrite assume of
       KeepAssume          -> Just decl
@@ -583,7 +596,7 @@ validateExportInputs mod' =
 collectExportedDecides :: Module Resolved -> [Decide Resolved]
 collectExportedDecides (MkModule _ _ section) = goSection section
  where
-  goSection (MkSection _ _ _ decls) = decls >>= goDecl
+  goSection (MkSection _ _ _ _ decls) = decls >>= goDecl
   goDecl = \case
     Decide _ d | isExportedDecide d -> [d]
     Section _ sub -> goSection sub
@@ -610,7 +623,7 @@ allAssumesFromModule :: Module Resolved -> Map.Map Unique (Assume Resolved)
 allAssumesFromModule (MkModule _ _ section) =
   Map.fromList (collectSection section)
  where
-  collectSection (MkSection _ _ _ decls) = decls >>= collectDecl
+  collectSection (MkSection _ _ _ _ decls) = decls >>= collectDecl
   collectDecl = \case
     Assume _ assume@(MkAssume _ _ (MkAppForm _ name _ _) _ _) ->
       [(getUnique name, assume)]

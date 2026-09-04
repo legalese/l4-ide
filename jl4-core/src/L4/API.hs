@@ -683,7 +683,7 @@ l4CodeLenses source uriText version =
     collectDirectiveLenses f (MkModule _ _ section) = collectFromSection f section
 
     collectFromSection :: (TopDecl Resolved -> [Aeson.Value]) -> Section Resolved -> [Aeson.Value]
-    collectFromSection f (MkSection _ _ _ topDecls) = concatMap (collectFromTopDecl f) topDecls
+    collectFromSection f (MkSection _ _ _ _ topDecls) = concatMap (collectFromTopDecl f) topDecls
 
     collectFromTopDecl :: (TopDecl Resolved -> [Aeson.Value]) -> TopDecl Resolved -> [Aeson.Value]
     collectFromTopDecl f td = f td ++ case td of

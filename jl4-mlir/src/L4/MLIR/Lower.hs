@@ -621,7 +621,7 @@ knownTermTypes = Map.mapMaybe $ \(_, entity) -> case entity of
 collectTypeSynonyms :: Module Resolved -> Map Text (Type' Resolved)
 collectTypeSynonyms (MkModule _ _ section) = Map.fromList (goSection section)
   where
-    goSection (MkSection _ _ _ decls) = concatMap goDecl decls
+    goSection (MkSection _ _ _ _ decls) = concatMap goDecl decls
     goDecl = \case
       Declare _ (MkDeclare _ _ (MkAppForm _ name _ _) (SynonymDecl _ inner)) ->
         [(resolvedName name, inner)]
@@ -716,7 +716,7 @@ collectExportAssumeArgs mod' = Map.fromList
 allModuleDecides :: Module Resolved -> [Decide Resolved]
 allModuleDecides (MkModule _ _ sect) = goSection sect
   where
-    goSection (MkSection _ _ _ decls) = concatMap goDecl decls
+    goSection (MkSection _ _ _ _ decls) = concatMap goDecl decls
     goDecl (Decide _ d)  = [d]
     goDecl (Section _ s) = goSection s
     goDecl _             = []
@@ -970,7 +970,7 @@ allOps = concatMap walk
 collectLocalNames :: Module Resolved -> Set.Set Text
 collectLocalNames (MkModule _ _ section) = goSection section
   where
-    goSection (MkSection _ _ _ decls) = foldr (Set.union . goDecl) Set.empty decls
+    goSection (MkSection _ _ _ _ decls) = foldr (Set.union . goDecl) Set.empty decls
     goDecl = \case
       Decide _ (MkDecide _ _ appForm _) ->
         Set.singleton (sanitizeName (resolvedName (appFormHead' appForm)))
@@ -986,7 +986,7 @@ collectLocalNames (MkModule _ _ section) = goSection section
 registerDependencyModule :: Set.Set Text -> Module Resolved -> LowerM ()
 registerDependencyModule skipLocal (MkModule _ _ section) = go section
   where
-    go (MkSection _ _ _ decls) = forM_ decls processDep
+    go (MkSection _ _ _ _ decls) = forM_ decls processDep
 
     processDep :: TopDecl Resolved -> LowerM ()
     processDep = \case
@@ -1078,7 +1078,7 @@ lowerModuleDecls :: Module Resolved -> LowerM ()
 lowerModuleDecls (MkModule _ _ section) = lowerSection section
 
 lowerSection :: Section Resolved -> LowerM ()
-lowerSection (MkSection _ _ _ decls) = do
+lowerSection (MkSection _ _ _ _ decls) = do
   -- Three-pass: (1) register types, (2) register function signatures, (3) lower bodies
   forM_ decls registerTypeDecl
   forM_ decls registerFuncSig
@@ -1088,7 +1088,7 @@ lowerSection (MkSection _ _ _ decls) = do
 registerTypeDecl :: TopDecl Resolved -> LowerM ()
 registerTypeDecl (Declare _ decl) = lowerDeclare decl
 registerTypeDecl (Section _ sect) = do
-  let MkSection _ _ _ ds = sect
+  let MkSection _ _ _ _ ds = sect
   forM_ ds registerTypeDecl
 registerTypeDecl _ = pure ()
 
@@ -1112,7 +1112,7 @@ registerFuncSig (Decide _ (MkDecide _ typeSig appForm body)) = do
     , funcListElems = Map.insert name (argListElems ++ extraListElems) s.funcListElems
     }
 registerFuncSig (Section _ sect) = do
-  let MkSection _ _ _ ds = sect
+  let MkSection _ _ _ _ ds = sect
   forM_ ds registerFuncSig
 registerFuncSig _ = pure ()
 

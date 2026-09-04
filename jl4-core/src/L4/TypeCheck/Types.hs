@@ -112,6 +112,11 @@ data CheckError =
     -- ^ Circular dependency between computed fields (record name, cycle of field names)
   | CyclicTypeSynonyms [Name]
     -- ^ Circular dependency between type synonym declarations (cycle members)
+  | MisattachedSectionGiven Name (Maybe Name)
+    -- ^ A column-1 @GIVEN@ that opens a section and declares a name the
+    -- declaration it attaches to never uses. Carries the unused parameter name
+    -- and the name of the section whose heading it sits under. See
+    -- 'L4.Desugar.detectMisattachedSectionGivens'.
   | SuppliedComputedField Name
     -- ^ Tried to supply a computed field in a record constructor (field name)
   | ExportFunctionTypeInput Resolved Resolved
@@ -310,6 +315,7 @@ instance HasSrcRange CheckError where
   -- WhileCheckingDecide context range via @rangeOf e <|> rangeOf ctx@ above.
   rangeOf (CheckWarning (PatternClausesMissing r _ _)) = Just r
   rangeOf (SuspiciousBinderPattern b _)     = rangeOf b
+  rangeOf (MisattachedSectionGiven n _)     = rangeOf n
   rangeOf _                                 = Nothing
 
 -- | A token in a mixfix pattern, representing either a keyword (part of the function name)
@@ -1069,7 +1075,7 @@ ancestorProximity curUri current paths u
   | otherwise             = sectionProximity current (Map.findWithDefault [] u paths)
 
 isTopLevelBindingInSection :: Unique -> Section Resolved -> Bool
-isTopLevelBindingInSection u (MkSection _a  _mn _maka decls) = any (elem u . map getUnique . relevantResolveds) decls
+isTopLevelBindingInSection u (MkSection _a  _mn _maka _ decls) = any (elem u . map getUnique . relevantResolveds) decls
   where
   relevantResolveds = \ case
     Declare _ (MkDeclare _ _ af _) -> appFormHeads af
@@ -1080,7 +1086,12 @@ isTopLevelBindingInSection u (MkSection _a  _mn _maka decls) = any (elem u . map
     Timezone _ _ -> []
     -- NOTE: Sections are a toplevel binding in the current section but can also contain further
     -- toplevel bindings
-    Section _ (MkSection _ mr maka decls') -> toResolved mr <> toResolved maka <> foldMap relevantResolveds decls'
+    --
+    -- The section's own GIVEN is deliberately NOT collected here: a section
+    -- binder is already present as the 0-ary ASSUME its GivenSig elaborates to
+    -- (see 'L4.Desugar.desugarSectionGivens'), so adding the GivenSig would
+    -- count the same binding twice.
+    Section _ (MkSection _ mr maka _ decls') -> toResolved mr <> toResolved maka <> foldMap relevantResolveds decls'
 
 resolveTerm' :: (TermKind -> Bool) -> Name -> Check (Resolved, Type' Resolved)
 resolveTerm' p n = resolveTermFiltered False p (const True) n pure

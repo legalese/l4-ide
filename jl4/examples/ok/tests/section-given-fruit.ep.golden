@@ -1,0 +1,42 @@
+-- The ruled §11.4 pattern, spelled with section binders: "for the purposes of
+-- sections 1 and 2, foo means apple; for the purposes of sections 3 and 4, foo
+-- means banana". Same-named binders in different sections are DISTINCT binders,
+-- each read by its own section and its descendants — exactly as two ASSUMEs or
+-- two definitions are.
+--
+-- The reader that reaches two of them at once is the ambiguity case, and lives
+-- in not-ok/tc/section-given-ambiguous-parent.l4.
+--
+-- The spec spells the readers r1..r4; here they are `reader one`..`reader four`
+-- and each carries an explicit GIVETH. Both changes are for the round-trip
+-- check, which forbids any inference variable's rendering (@seed <> uniq@) from
+-- appearing in prettyLayout's output and so reads a definition literally named
+-- `r4` as a leaked gensym.
+
+§ toplevel
+
+DECLARE Fruit IS ONE OF Apple, Banana
+
+§§ `1`
+    GIVEN foo IS A Fruit
+
+GIVETH A Fruit
+`reader one` MEANS foo
+
+§§ `2`
+    GIVEN foo IS A Fruit
+
+GIVETH A Fruit
+`reader two` MEANS foo
+
+§§ `3`
+    GIVEN foo IS A Fruit
+
+GIVETH A Fruit
+`reader three` MEANS foo
+
+§§ `4`
+    GIVEN foo IS A Fruit
+
+GIVETH A Fruit
+`reader four` MEANS foo

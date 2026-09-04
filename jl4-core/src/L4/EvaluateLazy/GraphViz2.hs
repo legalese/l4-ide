@@ -469,7 +469,7 @@ enhanceLabelWithDesc (Just module') (Just resolved) baseLabel =
 
 -- | Look up function @desc and body searching both top-level and WHERE clauses
 lookupFunctionInfo :: Module Resolved -> Resolved -> Maybe (Maybe Desc, Expr Resolved)
-lookupFunctionInfo (MkModule _ _ (MkSection _ _ _ topDecls)) resolved =
+lookupFunctionInfo (MkModule _ _ (MkSection _ _ _ _ topDecls)) resolved =
   let targetUnique = getUnique resolved
   in findInfoByUnique targetUnique topDecls
 

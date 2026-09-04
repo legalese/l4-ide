@@ -64,11 +64,11 @@ buildCompletionItem raw = \ case
     pure (defaultTopDeclCompletionItem (typeFunction kind))
       { CompletionItem._kind = Just CompletionItemKind_Class
       }
-  KnownSection (MkSection _ (Just n) _ _) ->
+  KnownSection (MkSection _ (Just n) _ _ _) ->
     pure (defaultCompletionItem $  nameToText $ getOriginal n)
       { CompletionItem._kind = Just CompletionItemKind_Module
       }
-  KnownSection (MkSection _ Nothing _ _) ->
+  KnownSection (MkSection _ Nothing _ _ _) ->
     -- NOTE: a section without name is just the toplevel section - we don't need to
     -- autocomplete anything there
     []

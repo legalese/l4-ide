@@ -125,6 +125,13 @@ DECIDE isAdult IF age >= 18
 #ASSERT isAdult WITH age IS 25
 ```
 
+## A name for a whole section
+
+For a name that is an input to every rule in a section rather than to one
+definition, a `GIVEN` indented under the section's heading declares it once for
+that section. It resolves, evaluates and exports exactly as a same-section
+`ASSUME` term does. See [the section `GIVEN`](../syntax/section-given.md).
+
 ## Related Keywords
 
 - **[DECIDE](../functions/DECIDE.md)** - Define a value or function with a body

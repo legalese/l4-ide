@@ -384,7 +384,7 @@ extractStateGraph m = case extractStateGraphs m of
 
 -- | Extract state graphs from a section
 extractFromSection :: Section Resolved -> [StateGraph]
-extractFromSection (MkSection _ mName _ decls) =
+extractFromSection (MkSection _ mName _ _ decls) =
   let sectionName = maybe "contract" resolvedToText mName
   in concatMap (extractFromTopDecl sectionName) decls
 

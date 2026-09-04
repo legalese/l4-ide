@@ -364,7 +364,7 @@ processInput st input
 decidesInModule :: Module Resolved -> [(Text, Decide Resolved)]
 decidesInModule (MkModule _ _ sect) = goSection sect
  where
-  goSection (MkSection _ _ _ decls) =
+  goSection (MkSection _ _ _ _ decls) =
     decls >>= goTopDecl
 
   goTopDecl = \case

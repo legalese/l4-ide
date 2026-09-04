@@ -67,7 +67,7 @@ buildMixfixHintRegistry =
       -- in a section (the prelude wraps everything in `§ Prelude`) contributes
       -- zero hints, and its word operators fail to parse in any importer that
       -- has local hints of its own.
-      Section _ (MkSection _ _ _ decls) -> foldMap gatherTop decls
+      Section _ (MkSection _ _ _ _ decls) -> foldMap gatherTop decls
       _ -> mempty
 
     gatherDecide :: Decide Name -> MixfixHintRegistry

@@ -411,7 +411,7 @@ constructorName = \case
 collectRecords :: Map Text OFEnumDef -> Module Resolved -> Map Text RecordInfo
 collectRecords enums (MkModule _ _ section) = Map.fromList (goSection section)
  where
-  goSection (MkSection _ _ _ decls) = decls >>= goDecl
+  goSection (MkSection _ _ _ _ decls) = decls >>= goDecl
   goDecl = \case
     Declare _ (MkDeclare _ _ (MkAppForm _ recRes _ _) (RecordDecl _ _ fields)) ->
       let nm = resolvedToText recRes
@@ -433,7 +433,7 @@ collectRecords enums (MkModule _ _ section) = Map.fromList (goSection section)
 collectScaleParams :: Module Resolved -> Map Unique OFScaleParam
 collectScaleParams (MkModule _ _ section) = Map.fromList (goSection section)
  where
-  goSection (MkSection _ _ _ decls) = decls >>= goDecl
+  goSection (MkSection _ _ _ _ decls) = decls >>= goDecl
   goDecl = \case
     Decide _ d@(MkDecide _ _ (MkAppForm _ nameRes _ _) body)
       | Just path <- scaleAnnotation d
@@ -459,7 +459,7 @@ paramAnnotation = descKeyword "parameter"
 collectScalarParams :: Module Resolved -> Map Unique OFScalarParam
 collectScalarParams (MkModule _ _ section) = Map.fromList (goSection section)
  where
-  goSection (MkSection _ _ _ decls) = decls >>= goDecl
+  goSection (MkSection _ _ _ _ decls) = decls >>= goDecl
   goDecl = \case
     Decide _ d@(MkDecide _ _ (MkAppForm _ nameRes _ _) body)
       | Just path <- paramAnnotation d
@@ -629,7 +629,7 @@ collectEnums (MkModule _ _ section) =
   )
  where
   defs = goSection section
-  goSection (MkSection _ _ _ decls) = decls >>= goDecl
+  goSection (MkSection _ _ _ _ decls) = decls >>= goDecl
   goDecl = \case
     Declare _ (MkDeclare _ _ (MkAppForm _ tyRes _ _) (EnumDecl _ conDecls)) ->
       let ty      = resolvedToText tyRes

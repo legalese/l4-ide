@@ -30,7 +30,7 @@ decideExprNamed target src = do
     Left errs -> do
       expectationFailure $ "Parser failed: " <> show errs
       error "unreachable"
-    Right (MkModule _ _ (MkSection _ _ _ decls), _, _) ->
+    Right (MkModule _ _ (MkSection _ _ _ _ decls), _, _) ->
       case [ body | Decide _ (MkDecide _ _ (MkAppForm _ nm _ _) body) <- decls, rawNameText nm == target ] of
         (body : _) -> pure body
         [] -> do

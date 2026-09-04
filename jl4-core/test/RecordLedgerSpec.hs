@@ -84,7 +84,7 @@ fixedNow = UTCTime (fromGregorian 2026 1 1) (secondsToDiffTime 0)
 directiveExprs :: Module Resolved -> [Expr Resolved]
 directiveExprs (MkModule _ _ sec) = goSection sec
   where
-    goSection (MkSection _ _ _ decls) = concatMap goDecl decls
+    goSection (MkSection _ _ _ _ decls) = concatMap goDecl decls
     goDecl (Directive _ (LazyEval _ e))      = [e]
     goDecl (Directive _ (LazyEvalTrace _ e)) = [e]
     goDecl (Section _ s)                     = goSection s

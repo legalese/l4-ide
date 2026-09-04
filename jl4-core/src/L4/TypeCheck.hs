@@ -115,7 +115,7 @@ import qualified Base.Set as Set
 import Data.Function (on)
 import Control.Exception (assert)
 import Text.Read (readMaybe)
-import L4.Desugar (desugarComputedFields, detectComputedFieldCycles, detectTypeSynonymCycles, extractComputedFieldNames)
+import L4.Desugar (desugarComputedFields, desugarSectionGivens, detectComputedFieldCycles, detectMisattachedSectionGivens, detectTypeSynonymCycles, extractComputedFieldNames)
 
 mkInitialCheckState :: Substitution -> CheckState
 mkInitialCheckState substitution =
@@ -179,12 +179,24 @@ doCheckProgramWithDependencies checkState checkEnv program =
         [ MkCheckErrorWithContext (CyclicTypeSynonyms cyc) (WhileCheckingDeclare synName None)
         | cyc@(synName : _) <- synonymCycles
         ]
+        ++
+        -- The dedent hazard of R4: a section binder pushed back to column 1
+        -- silently becomes the next declaration's parameter. Reported only
+        -- where the declaration makes no use of the name at all, which is the
+        -- one shape that cannot be a deliberately written function signature.
+        [ MkCheckErrorWithContext (MisattachedSectionGiven n mSection) None
+        | (n, mSection) <- detectMisattachedSectionGivens program
+        ]
       synonymCycles = detectTypeSynonymCycles program
       checkEnv' = checkEnv
         { computedFields = extractComputedFieldNames program
         , cyclicSynonyms = Set.fromList (rawName <$> concat synonymCycles)
         }
-  in case runCheckUnique (checkProgram (desugarComputedFields program)) checkEnv' checkState of
+  in -- Section binders are elaborated LAST, so that the ASSUME each one becomes
+     -- sits at the very head of its section's declaration list. Computed-field
+     -- desugaring only ever inserts DECIDEs after a DECLARE, so the two passes
+     -- do not interfere.
+     case runCheckUnique (checkProgram (desugarSectionGivens (desugarComputedFields program))) checkEnv' checkState of
     (w, s) ->
       let
         (errs, (rprog, topEnv, localMixfixRegistry)) = runWith w
@@ -586,7 +598,7 @@ inferImport (MkImport ann n mr) = do
   pure (MkImport ann rn mr)
 
 inferSection :: Section Name -> Check (Section Resolved, [CheckInfo])
-inferSection (MkSection ann mn maka topdecls) = do
+inferSection (MkSection ann mn maka mgiven topdecls) = do
   -- NOTE: we currently treat section names as defining occurrences, but they play no further role
   rmn <- traverse def mn
   rmaka <-
@@ -599,7 +611,42 @@ inferSection (MkSection ann mn maka topdecls) = do
   (rtopdecls, topDeclExtends) <- withSectionStack mn maka $
     unzip <$> traverse inferTopDecl topdecls
 
-  pure (MkSection ann rmn rmaka rtopdecls, concat topDeclExtends)
+  rmgiven <- traverse (resolveSectionGiven rtopdecls) mgiven
+
+  pure (MkSection ann rmn rmaka rmgiven rtopdecls, concat topDeclExtends)
+
+-- | Resolve a section's own @GIVEN@ (the section binder, R4) against the
+-- elaborations that 'desugarSectionGivens' prepended to that section's
+-- declarations.
+--
+-- The binder is DEFINED by its elaboration, so this must not 'def' anything: a
+-- second defining occurrence of the same name in the same section would make
+-- every reader ambiguous, which is precisely the failure R3 depends on
+-- avoiding. Instead the elaboration's already-resolved name, type and
+-- @TYPICALLY@ are reused, and the 'GivenSig' occurrence is recorded as a
+-- reference to it — so the printed 'GivenSig' stays a faithful re-spelling of
+-- the source and the binder keeps exactly one binding occurrence.
+--
+-- A parameter with no elaboration cannot arise while the invariant on
+-- 'desugarSectionGivens' holds; it is dropped rather than reported, because a
+-- diagnostic here would be about an internal inconsistency, not about the
+-- user's program.
+resolveSectionGiven :: [TopDecl Resolved] -> GivenSig Name -> Check (GivenSig Resolved)
+resolveSectionGiven rdecls (MkGivenSig gann otns) =
+  MkGivenSig gann . catMaybes <$> traverse resolveParam otns
+ where
+  elaborations :: [(RawName, (Resolved, Maybe (Type' Resolved), Maybe (Expr Resolved)))]
+  elaborations =
+    [ (rawName (getName rn), (rn, rmTy, rmTypically))
+    | Assume _ (MkAssume _ _ (MkAppForm _ rn [] _) rmTy rmTypically) <- rdecls
+    ]
+
+  resolveParam (MkOptionallyTypedName pann nm _mTy _mTypically) =
+    case List.lookup (rawName nm) elaborations of
+      Nothing -> pure Nothing
+      Just (rn, rmTy, rmTypically) -> do
+        rnm <- ref nm rn
+        pure (Just (MkOptionallyTypedName pann rnm rmTy rmTypically))
 
 inferLocalDecl :: LocalDecl Name -> Check (LocalDecl Resolved, [CheckInfo])
 inferLocalDecl (LocalDecide ann decide) = do
@@ -3733,7 +3780,7 @@ inferTyDeclModule (MkModule _ _ sects) =
   inferTyDeclSection sects
 
 inferTyDeclSection :: Section Name -> Check [DeclChecked DeclareOrAssume]
-inferTyDeclSection (MkSection _ name maka topDecls) =
+inferTyDeclSection (MkSection _ name maka _ topDecls) =
   -- Keep the section stack accurate while inferring type-declaration bodies so
   -- that type references resolve with the correct nearest-enclosing-section
   -- preference.
@@ -3812,7 +3859,7 @@ scanTyDeclModule (MkModule _ _ sects) =
   scanTyDeclSection sects
 
 scanTyDeclSection :: Section Name -> Check [DeclTypeSig]
-scanTyDeclSection (MkSection _ name maka topDecls) =
+scanTyDeclSection (MkSection _ name maka _ topDecls) =
   -- NOTE: previously this phase did NOT push the section, so DECLARE/type-ASSUME
   -- names defined inside sections received neither qualified-name variants nor a
   -- recorded section path (unlike DECIDE/term-ASSUME, handled in
@@ -4676,7 +4723,7 @@ scanFunSigModule (MkModule _ _ sects) =
   scanFunSigSection sects
 
 scanFunSigSection :: Section Name -> Check [FunTypeSig]
-scanFunSigSection (MkSection _ name maka topDecls) =
+scanFunSigSection (MkSection _ name maka _ topDecls) =
   withSectionStack name maka $ concat <$> traverse scanFunSigTopLevel topDecls
 
 scanFunSigTopLevel :: TopDecl Name -> Check [FunTypeSig]
@@ -5051,6 +5098,21 @@ prettyCheckError (SuspiciousBinderPattern binder ctor)     =
   , "a constructor of the type being matched that no other branch covers."
   , "If you meant the constructor, fix the spelling; if you meant a"
   , "catch-all, consider OTHERWISE or a name unlike any constructor."
+  ]
+prettyCheckError (MisattachedSectionGiven n mSection)       =
+  [ "This GIVEN starts at column 1, so it is the signature of the declaration"
+  , "below it -- and that declaration never uses"
+  , ""
+  , "  " <> quotedName n
+  , ""
+  , "If " <> quotedName n <> " was meant as a binder for the whole of"
+  , ""
+  , "  " <> maybe "this section" (("\167 " <>) . prettyLayout) mSection
+  , ""
+  , "indent the GIVEN so that it starts past the \167 of the heading:"
+  , ""
+  , "  \167 <heading>"
+  , "      GIVEN " <> prettyLayout n <> " IS A <type>"
   ]
 prettyCheckError (OutOfScopeError n t)                     =
   [ "I could not find a definition for the identifier"
