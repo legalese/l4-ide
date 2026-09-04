@@ -388,6 +388,8 @@ DECIDE `is adult under sub 2` IF
     age >= `Part VII`'s `Subsection 2`'s `age of majority`
 ```
 
+**Section binders:** A `GIVEN` indented under a section heading declares a name once for the whole section, instead of repeating it in every rule's own `GIVEN`. See [The section `GIVEN`](section-given.md) and [section-given-example.l4](section-given-example.l4).
+
 **Section aliases:** Use AKA to create shorter names for qualified references:
 
 ```l4

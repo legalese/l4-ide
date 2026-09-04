@@ -76,6 +76,12 @@ GIVEN amount IS A NUMBER @nlg
 processPayment customer amount MEANS ...
 ```
 
+## A GIVEN for a whole section
+
+A `GIVEN` indented under a section heading belongs to the **section**, not to
+the declaration below it: it declares a name once for every rule in that
+section. See [the section `GIVEN`](../syntax/section-given.md).
+
 ## Related Keywords
 
 - **[GIVETH](GIVETH.md)** - Specifies return type
