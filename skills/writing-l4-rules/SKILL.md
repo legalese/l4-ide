@@ -189,6 +189,8 @@ DECIDE obligation IS
     LEST  BREACH BY Customer BECAUSE "payment overdue"
 ```
 
+Both type names may be backticked multi-word names, as in `` GIVETH A DEONTIC `A party under this Part` `An act under section 8` ``.
+
 Actions with fields are **enum constructors** — apply them to arguments like any function (`` `pay invoice` amt recipient ``). Don't use `WITH` inside a `MUST`/`MAY` action; `WITH` is for record construction, not enum constructors. Always include `BECAUSE "reason"` on `LEST BREACH` — that string is what auditors read.
 
 Full treatment — `RAND`/`ROR` composition, `PROVIDED` guards, `EXACTLY` matching, recursive obligations, and `#TRACE` simulation — is in [references/regulative.md](references/regulative.md).
@@ -217,6 +219,14 @@ L4 sidebar menu and pick **Install L4 CLI**. A shell-wrapper is
 provided at [scripts/validate.sh](scripts/validate.sh) for environments
 where `PATH` is problematic. Type errors are reported with line numbers —
 iterate until the check passes.
+
+**Read the diagnostics, not the exit code.** `l4 run` exits 0 on a failing
+`#ASSERT` (it prints `assertion failed` at `DiagnosticSeverity_Error` and
+carries on) and on a refusing `#EVAL`. It exits non-zero on a parse or check
+error and on an `#EVAL` that reaches an unsupplied section `GIVEN`. So
+`l4 run f.l4 && echo green` reports a file with failing assertions as green;
+check the output for `DiagnosticSeverity_Error` as well, which is what
+`doc/test-docs.sh` does.
 
 **Other subcommands** (run `l4 <command> --help` for details):
 
@@ -251,6 +261,14 @@ iterate until the check passes.
 ```
 
 Available directives: `#EVAL`, `#EVALTRACE`, `#TRACE`, `#CHECK`, `#ASSERT`.
+
+`#CHECK expr` prints the expression's type (`BOOLEAN `, at Information
+severity) and never makes the run exit 1, even when the rule reads a section
+`GIVEN` nobody has supplied. That is what lets a file in the house style run
+green: put the operative test in a rule with its own `GIVEN` and `#ASSERT`
+that; have the section-`GIVEN` rule delegate to it and `#CHECK` that. Worked
+recipe: [references/source-patterns.md](references/source-patterns.md),
+entry 25.
 
 ### 8. Deploy
 
@@ -313,6 +331,11 @@ Two house-style spellings, in this order of preference:
 
    The indentation is the whole difference: a `GIVEN` at column 1 is the
    signature of the declaration below it, as always.
+
+   Nothing inside the file supplies a section `GIVEN` in this release (`WITH`
+   at a call site is proposed, not landed, 2026-09-04): an `#EVAL` or `#ASSERT`
+   that reaches one stops and makes `l4 run` exit 1. To exercise such a rule,
+   follow entry 25 of [references/source-patterns.md](references/source-patterns.md).
 
 **`ASSUME` is deprecated for declaring inputs (ruled 2026-09-04), and it is
 still accepted.** It parses, type-checks and exports as it always has, and no
@@ -424,7 +447,7 @@ Just enough to write most rules without a round-trip. Anything not here, check <
 | `MAYBE T`                     | Optional (`JUST x` / `NOTHING`)                                                                   |
 | `EITHER A B`                  | Choice (`LEFT x` / `RIGHT y`)                                                                     |
 | `DECLARE T HAS ...`           | Record                                                                                            |
-| `DECLARE T IS ONE OF a, b, c` | Enum (optionally with per-constructor `HAS` fields)                                               |
+| `DECLARE T IS ONE OF a, b, c` | Enum (optionally with per-constructor `HAS` fields; a single constructor is legal)                |
 
 `TODAY` returns `DATE`. `CURRENTTIME` returns `TIME`. Both need e.g. `TIMEZONE IS "America/New_York"` in scope to return a value.
 `NOW` returns `DATETIME` and defaults to `"Etc/UTC"`.
@@ -446,6 +469,7 @@ Full table at <https://legalese.com/l4/reference/GLOSSARY.md>. The ones used con
 - **Arithmetic:** `PLUS`, `MINUS`, `TIMES`, `DIVIDED BY`, `MODULO` — or `+`, `-`, `*`, `/`
 - **String:** `CONCAT "a", "b", "c"` (variadic, not infix), `APPEND`
 - **List:** `LIST a, b, c`, `EMPTY`, `x FOLLOWED BY xs`
+- **Percent:** `%` is a postfix operator, not a literal suffix — `2%` is `0.02`, `100%` is `1`, and it applies to a name or a parenthesised expression (`n%`, `(1 PLUS 1)%`)
 
 ### Control flow
 
@@ -485,9 +509,17 @@ application's employee's nationality   -- chaining
 
 - `#EVAL expr` — evaluate and print
 - `#EVALTRACE expr` — evaluate with execution trace
-- `#CHECK expr` — type-check without evaluating
-- `#ASSERT bool_expr` — assert must be TRUE
+- `#CHECK expr` — print the type without evaluating; never exits 1 (see §7)
+- `#ASSERT bool_expr` — assert must be TRUE; a failure prints `assertion failed` at Error severity and the exit code stays 0
+- `#ASSERT REFUSED expr [BECAUSE "message"]` — assert that evaluating the expression refuses, optionally with that exact message (a string literal)
 - `#TRACE contract AT time WITH ...` — simulate a regulative rule; see [references/regulative.md](references/regulative.md)
+
+A directive is one line. Continuing an `#ASSERT` onto a second line that begins
+`EQUALS` is a parse error. The two exceptions: `#ASSERT REFUSED e` may put its
+`BECAUSE "…"` on the next line, and `#TRACE … WITH` takes its events on the
+lines that follow. Output is not always source: `#EVAL` prints an applied
+constructor with an `OF` that never appears in a file (`` `the levy is` OF 200 ``,
+`` LEFT OF `x` ``), so do not paste printed values back in as they are.
 
 ### Annotations
 
@@ -510,6 +542,8 @@ The prelude is always available. For the full library list (`prelude`, `daydate`
 **Filenames with hyphens, spaces, or other non-identifier characters must be backtick-quoted.**
 
 ---
+
+`IMPORT currency` is a table of currency codes and their decimal places, not a money type: amounts stay `NUMBER`s, and the unit lives in a name or a comment.
 
 ## Writing for legal audiences
 

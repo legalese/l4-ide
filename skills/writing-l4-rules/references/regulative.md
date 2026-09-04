@@ -142,12 +142,18 @@ PARTY Alice MUST pay price EXACTLY 100 WITHIN 30
 
 ## WITHIN — deadlines
 
-`WITHIN` takes a duration. The duration can optionally be anchored to an event with `OF`:
+`WITHIN` takes a bare number. The unit is a convention of the file, not part of
+the language: `WITHIN 30` means thirty of whatever the file's clock counts, so
+record the unit once in a comment or in the name of the constant.
 
 ```l4
-PARTY Alice  MUST pay 100 WITHIN 30
-PARTY Seller MUST deliver WITHIN 5 days OF `order confirmation`
+PARTY Alice  MUST pay 100 WITHIN 30          -- days, by this file's convention
 ```
+
+Neither `WITHIN 5 days` nor `WITHIN 5 days OF \`order confirmation\``parses in
+this release (measured 2026-09-04: the first reads`days`as a function applied
+to`5`; the second stops at `OF`). See
+[source-patterns.md](source-patterns.md), entry 21, for the measured forms.
 
 **`BEFORE` (absolute deadlines) is planned but not yet implemented** — use `WITHIN` for now.
 
@@ -228,6 +234,11 @@ Timestamps are numbers on a shared timeline. For date-based contracts, the canon
 -- Result: the LEST branch — either BREACH, or the reparation obligation
 -- if the rule has a LEST clause
 ```
+
+A `WITH` block with no events is legal and is the way to ask "what is still
+standing if nothing happens": the result is the obligation printed back, not a
+breach, because with no events the clock does not advance. Dropping the `WITH`
+altogether (`#TRACE c AT 0` and nothing after it) is a parse error.
 
 The residual is the most useful output from a trace: it is the contract in its current state, as a machine-readable value, showing exactly what is still owed by whom.
 

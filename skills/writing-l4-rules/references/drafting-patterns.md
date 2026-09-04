@@ -488,7 +488,9 @@ for the full HENCE/LEST default table.
 
 ### Exercising a DEONTIC — `#ASSERT` the boolean, `#TRACE` the deontic
 
-**Gotcha:** a `DEONTIC` value **cannot** be `EQUALS`-compared in `#ASSERT`. So land your `#ASSERT`s on the
+**Gotcha:** a `DEONTIC` value **cannot** be `EQUALS`-compared in `#ASSERT`. (This is specific to `DEONTIC`:
+an `EITHER` value and an enum constructor carrying fields compare fine — `x EQUALS LEFT y`,
+``x EQUALS `the levy is` 200``.) So land your `#ASSERT`s on the
 `\`<x> made out\`` BOOLEAN, and *exercise* the guarded deontic via **`#TRACE`\*\* (which residuates it against an
 event stream and prints what is left standing).
 
