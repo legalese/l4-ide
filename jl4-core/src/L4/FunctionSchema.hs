@@ -278,11 +278,14 @@ parametersFromDecideWithErrors resolvedModule decide@(MkDecide _ (MkTypeSig _ (M
     -- Extract implicit ASSUME params from OutOfScopeError with resolved types
     implicitParams = extractImplicitAssumeParams errors
 
-    mkAssumeParam (name, ty, mTypically) =
+    -- An ASSUME's own @desc (mirroring the GIVEN treatment above: the
+    -- param's annotation, or blank — never the type's description).
+    mkAssumeParam (name, ty, mTypically, mDesc) =
       let base = typeToParameter declares Set.empty ty
-      in (name, base {parameterDescription = "", parameterAlias = Nothing, parameterDefault = typicallyToJson =<< mTypically})
+      in (name, base {parameterDescription = Maybe.fromMaybe "" mDesc, parameterAlias = Nothing, parameterDefault = typicallyToJson =<< mTypically})
 
     givenParamList = map mkOne names
+    givenNames = map fst givenParamList
     -- Track which GIVEN params have MAYBE/Optional types (these are not required)
     requiredGivenParams =
       [ resolvedNameText resolved
@@ -290,14 +293,20 @@ parametersFromDecideWithErrors resolvedModule decide@(MkDecide _ (MkTypeSig _ (M
       , not (isMaybeType mType)
       ]
     assumeParamList = map mkAssumeParam assumeParams
-    implicitParamList = map (\ (n, ty) -> mkAssumeParam (n, ty, Nothing)) implicitParams
+    implicitParamList = map (\ (n, ty) -> mkAssumeParam (n, ty, Nothing, Nothing)) implicitParams
 
     -- Combine all params, avoiding duplicates (explicit ASSUMEs take precedence)
     allAssumeParams = assumeParamList <> filter (\(n, _) -> n `notElem` map fst assumeParamList) implicitParamList
+    -- A read ASSUME spelled like a GIVEN is reported by the type checker
+    -- ('L4.Export.validateExportInputs', @ExportAssumeNameClash@). Here the
+    -- GIVEN keeps the property: 'Map.fromList' would otherwise let the
+    -- ASSUME silently overwrite it (last wins) while `required` listed the
+    -- name twice.
+    distinctAssumeParams = filter (\(n, _) -> n `notElem` givenNames) allAssumeParams
    in
     MkParameters
-      { parameterMap = Map.fromList (givenParamList <> allAssumeParams)
-      , required = requiredGivenParams <> map fst allAssumeParams
+      { parameterMap = Map.fromList (givenParamList <> distinctAssumeParams)
+      , required = requiredGivenParams <> map fst distinctAssumeParams
       }
  where
   emptyParam :: Text -> Parameter

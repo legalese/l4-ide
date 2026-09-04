@@ -5262,6 +5262,13 @@ prettyCheckError (ExportFunctionTypeInput _fnName paramName) =
       <> quotedName (getActual paramName)
       <> " has a function type."
   ]
+prettyCheckError (ExportAssumeNameClash fnName paramName) =
+  [ "The @export function " <> quotedName (getActual fnName)
+      <> " has a GIVEN parameter " <> quotedName (getActual paramName)
+      <> " with the same name as an ASSUME it reads."
+  , "Both would be one input field, so a request could not supply them separately."
+  , "Rename the parameter or the ASSUME."
+  ]
 prettyCheckError (RegulativeActorMismatch party performer actionName) =
   [ "An actor may only perform its own actions."
   , ""

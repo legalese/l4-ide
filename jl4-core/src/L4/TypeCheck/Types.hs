@@ -110,6 +110,11 @@ data CheckError =
     -- ^ An @export-decorated DECIDE has a function-typed input (GIVEN or
     -- referenced ASSUME). Arguments: exported-function name, offending
     -- parameter/assume name.
+  | ExportAssumeNameClash Resolved Resolved
+    -- ^ An @export-decorated DECIDE has a GIVEN parameter spelled the same
+    -- as a module-level ASSUME it (or a helper it reaches) reads. Both
+    -- would be one JSON property, so a request could not supply them
+    -- separately. Arguments: exported-function name, the clashing GIVEN.
   | RegulativeActorMismatch Resolved Resolved Resolved
     -- ^ A regulative @PARTY p MUST a@ (or a @PARTY p DOES a@ event) binds a
     -- party to an action belonging to a different actor. In a value-actor

@@ -491,6 +491,14 @@ batchExponentCsv  = fixtureDir </> "batch-exponent.csv"
 batchMaybeFixture = fixtureDir </> "batch-maybe.l4"
 batchMaybeBadJson = fixtureDir </> "batch-maybe-bad.json"
 
+-- | An @export reading a module-level ASSUME: directly, or only through a
+-- helper it calls. The rows either supply the ASSUME (@x@) or omit it.
+batchAssumeDirectFixture, batchAssumeHelperFixture, batchAssumeFullJson, batchAssumeMissingJson :: FilePath
+batchAssumeDirectFixture = fixtureDir </> "batch-assume-direct.l4"
+batchAssumeHelperFixture = fixtureDir </> "batch-assume-helper.l4"
+batchAssumeFullJson      = fixtureDir </> "batch-assume-full.json"
+batchAssumeMissingJson   = fixtureDir </> "batch-assume-missing.json"
+
 -- | Decode stdout as a single JSON array (for @l4 batch --format json@).
 decodeArray :: String -> IO [Value]
 decodeArray sout =
@@ -1467,6 +1475,33 @@ spec bin = do
       sout `shouldSatisfy` ("\"status\":\"invalid\"" `isInfixOf`)
       sout `shouldSatisfy` ("Type mismatch for field 'premium'" `isInfixOf`)
       sout `shouldSatisfy` ("expected NUMBER" `isInfixOf`)
+
+    -- An ASSUME the export reads is a schema field, not a call argument.
+    -- Before: the batch wrapper applied the export to every schema field
+    -- positionally ("f expects 1 argument, but you are applying it to 2").
+    it "binds a directly-read ASSUME by name, not as a positional argument" $ do
+      env <- jsonEnvelope bin ["batch", batchAssumeDirectFixture, "--inputs", batchAssumeFullJson]
+      objField env "status" `shouldBe` Just (String "success")
+      Output _ sout _ <- runL4 bin ["batch", batchAssumeDirectFixture, "--inputs", batchAssumeFullJson]
+      sout `shouldSatisfy` ("\"result\":21" `isInfixOf`)
+
+    -- The read-set is transitive: an ASSUME read only by a helper the
+    -- export calls is still a required field. Before: the schema was one
+    -- body deep, so --validate-only accepted a row without it and
+    -- evaluation then got stuck on "an assumed term".
+    it "validate-only rejects a row missing an ASSUME read only by a helper" $ do
+      Output code sout _ <-
+        runL4 bin [ "batch", batchAssumeHelperFixture, "--inputs", batchAssumeMissingJson
+                  , "--validate-only" ]
+      code `shouldSatisfy` (/= ExitSuccess)
+      sout `shouldSatisfy` ("\"status\":\"invalid\"" `isInfixOf`)
+      sout `shouldSatisfy` ("Missing required field: 'x'" `isInfixOf`)
+
+    it "evaluates through a helper that reads a supplied ASSUME" $ do
+      env <- jsonEnvelope bin ["batch", batchAssumeHelperFixture, "--inputs", batchAssumeFullJson]
+      objField env "status" `shouldBe` Just (String "success")
+      Output _ sout _ <- runL4 bin ["batch", batchAssumeHelperFixture, "--inputs", batchAssumeFullJson]
+      sout `shouldSatisfy` ("\"result\":22" `isInfixOf`)
 
     -- Regression tests for target T11 (CLI injection / corruption).
     it "escapes payloads with backslashes, quotes and control chars (no lexer break)" $ do

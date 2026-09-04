@@ -1,0 +1,7 @@
+§ `Export reads an ASSUME directly`
+ASSUME x IS A NUMBER
+
+@export f adds y to the assumed x
+GIVEN y IS A NUMBER
+GIVETH A NUMBER
+f y MEANS x PLUS y

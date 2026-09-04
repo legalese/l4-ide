@@ -220,6 +220,7 @@ test-suite jl4-core-test
     PatternMatchParserSpec
     BulletParserSpec
     UUID5Spec
+    ExportReadSetSpec
     ExportValidationSpec
     CatalaLowerSpec
     NumberLiteralSpec

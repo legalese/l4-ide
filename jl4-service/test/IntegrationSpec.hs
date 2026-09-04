@@ -43,7 +43,7 @@ import System.Directory (removeDirectoryRecursive, doesDirectoryExist, doesFileE
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -99,6 +99,56 @@ spec = describe "integration" do
             ])
         assertSuccess resp \r ->
           Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool False)
+
+    -- The read-set is transitive: an ASSUME read only by a helper the
+    -- export calls is bound for the helper too. Before, the value was
+    -- bound with a LET around the inlined export body, which the helper's
+    -- closure never saw, so evaluation got stuck on "an assumed term".
+    it "binds an ASSUME read only by a helper of the @export (true case)" do
+      withServiceFromSources "assume-helper-true" [("drive.l4", assumeHelperJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "assume-helper-true" "may_drive"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "licensed" Aeson..= True
+                , "age" Aeson..= (25 :: Int)
+                ]
+            ])
+        assertSuccess resp \r ->
+          Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool True)
+
+    it "binds an ASSUME read only by a helper of the @export (false case)" do
+      withServiceFromSources "assume-helper-false" [("drive.l4", assumeHelperJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "assume-helper-false" "may_drive"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "licensed" Aeson..= True
+                , "age" Aeson..= (15 :: Int)
+                ]
+            ])
+        assertSuccess resp \r ->
+          Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool False)
+
+    it "lists a helper-read ASSUME as a required parameter in the schema" do
+      withServiceFromSources "assume-helper-schema" [("drive.l4", assumeHelperJL4)] \baseUrl mgr -> do
+        req <- parseRequest (baseUrl <> "/deployments?functions=full")
+        resp <- httpLbs req mgr
+        statusCode' resp `shouldBe` 200
+        let body = Aeson.decode @Aeson.Value (responseBody resp)
+        case body of
+          Just (Aeson.Array deployments) -> do
+            let findRequired = do
+                  Aeson.Object deploy <- toList deployments
+                  Aeson.Object meta <- toList $ Aeson.KeyMap.lookup "metadata" deploy
+                  Aeson.Array fns <- toList $ Aeson.KeyMap.lookup "functions" meta
+                  Aeson.Object fn <- toList fns
+                  guard (Aeson.KeyMap.lookup "name" fn == Just (Aeson.String "may_drive"))
+                  Aeson.Object params <- toList $ Aeson.KeyMap.lookup "parameters" fn
+                  Aeson.Array reqArr <- toList $ Aeson.KeyMap.lookup "required" params
+                  pure [t | Aeson.String t <- toList reqArr]
+            case findRequired of
+              (reqList:_) -> reqList `shouldBe` ["licensed", "age"]
+              [] -> expectationFailure "Could not find may_drive function in deployment response"
+          other -> expectationFailure ("Expected JSON array of deployments, got: " <> show other)
 
     it "lists functions for a deployment" do
       withServiceFromSources "list-fns" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
