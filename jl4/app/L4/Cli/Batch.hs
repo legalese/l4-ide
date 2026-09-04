@@ -73,7 +73,10 @@ import L4.EvaluateLazy
   ( EvalConfig
   , EvalDirectiveResult(..)
   , EvalDirectiveValue(..)
+  , AssertionOutcome(..)
+  , ReductionOutcome(..)
   , prettyEvalException
+  , prettyRefusal
   )
 import L4.Lexer (showStringLit)
 import L4.Print (prettyLayout)
@@ -351,9 +354,16 @@ processRow opts evalConfig filteredSource exportFn givenParams assumeParams sche
               -- an exception (e.g. JSONDECODE could not coerce a cell to the
               -- declared type). Those surface as `Reduction (Left …)`.
               let excMsgs = concatMap resultExceptionMsgs evalResults
-              in if null excMsgs
-                   then ("success", Aeson.toJSON evalResults, Aeson.Array mempty)
-                   else ("error",   Aeson.toJSON evalResults, Aeson.toJSON excMsgs)
+                  refMsgs = concatMap resultRefusalMsgs evalResults
+              in if not (null excMsgs)
+                   then ("error",   Aeson.toJSON evalResults, Aeson.toJSON excMsgs)
+                   -- A REFUSED row is a determinate answer, not a failure: the
+                   -- model declined to answer this input and said why. It gets
+                   -- its own terminal status and, crucially, does NOT stop the
+                   -- batch (see the 'status == "error"' test below).
+                   else if not (null refMsgs)
+                   then ("refused", Aeson.toJSON evalResults, Aeson.toJSON refMsgs)
+                   else ("success", Aeson.toJSON evalResults, Aeson.Array mempty)
           env = Aeson.object
             [ Key.fromString "input"       Aeson..= input
             , Key.fromString "output"      Aeson..= outputJson
@@ -366,9 +376,19 @@ processRow opts evalConfig filteredSource exportFn givenParams assumeParams sche
 -- to an evaluation exception. An empty list means the row evaluated cleanly.
 resultExceptionMsgs :: EvalDirectiveResult -> [Text]
 resultExceptionMsgs (MkEvalDirectiveResult _ res _ _) = case res of
-  Reduction (Left exc) -> prettyEvalException exc
-  Assertion (Left exc) -> prettyEvalException exc
-  _                    -> []
+  Reduction (ReducedErrored exc) -> prettyEvalException exc
+  Assertion (Errored exc)        -> prettyEvalException exc
+  -- A refusal is deliberately NOT counted here: it is not an exception, and
+  -- counting it would both mark the row an error and stop the batch.
+  _                              -> []
+
+-- | Refusal reasons for any directive in the row that REFUSED. An empty list
+-- means nothing in the row declined to answer.
+resultRefusalMsgs :: EvalDirectiveResult -> [Text]
+resultRefusalMsgs (MkEvalDirectiveResult _ res _ _) = case res of
+  Reduction (ReducedRefused r) -> prettyRefusal r
+  Assertion (Refused r)        -> prettyRefusal r
+  _                            -> []
 
 ----------------------------------------------------------------------------
 -- Row validation (for --validate-only)

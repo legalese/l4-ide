@@ -414,6 +414,7 @@ handlers evalConfig recorder =
             Check{}         -> "#CHECK"
             Contract{}      -> "#CHECK"
             Assert{}        -> "#ASSERT"
+            AssertRefused{} -> "#ASSERT REFUSED"
 
           mkRenderResultCodeLens srcPos label = CodeLens
             { _command = Just Command
@@ -556,6 +557,7 @@ handlers evalConfig recorder =
                           Check _ e         -> ("#CHECK", e)
                           Contract _ e _ _  -> ("#CHECK", e)
                           Assert _ e        -> ("#ASSERT", e)
+                          AssertRefused _ e _ -> ("#ASSERT REFUSED", e)
                         detail = prettyLayout dExpr
                     in [ mkSymbol label (Just detail) SymbolKind_Operator lspRange lspRange ]
                   Nothing -> []

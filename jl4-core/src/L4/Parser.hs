@@ -612,6 +612,16 @@ directive =
           <*> annoHole singleLineExpr
           <* annoLexeme (spacedKeyword_ TKWith)
           <*> contractEvents
+      -- #ASSERT REFUSED e [BECAUSE "message"].  'tryParser' is load-bearing:
+      -- this alternative consumes the #ASSERT token before it can discover
+      -- there is no REFUSED, and without backtracking the plain #ASSERT
+      -- alternative below would never be reached.
+      , tryParser $
+          AssertRefused emptyAnno
+          <$ annoLexeme (spacedToken_ (TDirectives TAssertDirective))
+          <* annoLexeme (spacedKeyword_ TKRefused)
+          <*> annoHole singleLineExpr
+          <*> optionalWithHole (annoLexeme (spacedKeyword_ TKBecause) *> annoHole singleLineExpr)
       , Assert emptyAnno
           <$ annoLexeme (spacedToken_ (TDirectives TAssertDirective))
           <*> annoHole singleLineExpr
@@ -1877,6 +1887,7 @@ baseExpr' =
   <|> try event
   <|> regulative
   <|> breach
+  <|> refuse
   <|> lam
   <|> consider
   <|> try namedApp -- This is not nice
@@ -2425,6 +2436,19 @@ breach = do
       <$  annoLexeme (spacedKeyword_ TKBreach)
       <*> optionalWithHole (annoLexeme (spacedKeyword_ TKBy) *> annoHole (indentedExpr current))
       <*> optionalWithHole (annoLexeme (spacedKeyword_ TKBecause) *> annoHole (indentedExpr current))
+
+-- | Parse @REFUSE "message"@.
+--
+-- The message is a LITERAL, not an arbitrary expression. That is deliberate:
+-- a refusal's reason is meant to be statically readable (so it can be reported
+-- without running the program), and a literal payload means 'Refuse' needs no
+-- machine 'Frame' and so no 'unwindFrame' arm. @REFUSE 42@ parses and is
+-- rejected by the type checker; @REFUSE (something computed)@ does not parse.
+refuse :: Parser (Expr Name)
+refuse = attachAnno $
+  Refuse emptyAnno
+    <$  annoLexeme (spacedKeyword_ TKRefuse)
+    <*> annoHole lit
 
 optionalWithHole :: HasSrcRange a => AnnoParser a -> AnnoParser (Maybe a)
 optionalWithHole p = Just <$> p <|> annoHole (pure Nothing)

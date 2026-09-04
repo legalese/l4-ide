@@ -2211,6 +2211,11 @@ lowerExprCases expr expectedTy = case expr of
   Breach{}     -> emitVal $ \vid -> arithConstantFloat vid 0.0
   -- Event / IO constructs still aren't supported — they don't have a
   -- runtime interpretation in the schema yet.
+  -- REFUSE has no WASM image: the compiled module has no way to stop with a
+  -- reason. 'markUnsupported' marks the export @supported:false@, which routes
+  -- the request to the fallback evaluator — and that one raises the refusal
+  -- properly. Never lowered to a value.
+  Refuse{}     -> markUnsupported "REFUSE is not supported by the WASM backend"
   Event{}      -> markUnsupported "EVENT construct not supported by the WASM backend"
   Fetch{}      -> markUnsupported "FETCH (IO) not supported by the WASM backend"
   Post{}       -> markUnsupported "POST (IO) not supported by the WASM backend"
@@ -3290,6 +3295,8 @@ freeVarsOfExpr expr0 bound0 = go bound0 expr0
         in Set.unions (self : map (go bound) args)
       AppNamed _ _ named _ ->
         Set.unions [go bound e | MkNamedExpr _ _ e <- named]
+      -- The REFUSE message is a literal; it binds and mentions nothing.
+      Refuse{} -> Set.empty
       And _ a b        -> Set.union (go bound a) (go bound b)
       Or _ a b         -> Set.union (go bound a) (go bound b)
       RAnd _ a b       -> Set.union (go bound a) (go bound b)

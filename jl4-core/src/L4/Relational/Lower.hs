@@ -1002,7 +1002,7 @@ bBool False = BFalse
 -- would be silently unusable the moment M2 admits dates — and its output would
 -- still typecheck.
 toBForm :: Ctx -> LEnv -> Bool -> Expr Resolved -> L BForm
-toBForm ctx _env = go
+toBForm ctx env0 = go
  where
   go neg e
     | Just b <- literalBool e = pure (bBool (if neg then not b else b))
@@ -1031,6 +1031,11 @@ toBForm ctx _env = go
     -- context was annotated by carameliseExprWithContext. Without this the
     -- whole inert-style corpus is out of fragment.
     Inert _ _ ictx -> pure (bBool (applyNeg neg (inertIdentity ictx)))
+    -- A refusal must NEVER become a relational atom. The wildcard below would
+    -- make it 'APExpr', i.e. a proposition the Blawx/Prolog path can assert or
+    -- negate — which is exactly the conversion a refusal must not admit, on
+    -- the one backend whose whole surface is propositional.
+    Refuse {} -> bailIn env0 (rangeOf e) (kindOfExpr e) (msgOfExpr e)
     -- A guarded chain nested inside boolean structure. The top-level case is
     -- split into clauses by 'expandRows'; here the chain has to become a
     -- formula, by the same law (GuardedRows.hs:229-240).
@@ -2214,6 +2219,7 @@ kindOfExpr = \case
   Record{}     -> LELedger
   ReadCell{}   -> LELedger
   Breach{}     -> LEBreach
+  Refuse{}     -> LEUnsupported "REFUSE"
   Concat{}     -> LEString
   AsString{}   -> LEString
   Lam{}        -> LEHigherOrder
@@ -2240,6 +2246,8 @@ msgOfExpr = \case
   Record{}   -> "a ledger write has no image in a clause body"
   ReadCell{} -> "a ledger read has no image in a clause body"
   Breach{}   -> "BREACH is a deontic outcome, not a proposition"
+  Refuse{}   -> "REFUSE is a declined answer, not a proposition: a Horn clause could only \
+                \assert or negate it, which is precisely the conversion a refusal forbids"
   Concat{}   -> "M1 admits strings only as literal-equality atoms"
   AsString{} -> "M1 admits strings only as literal-equality atoms"
   Lam{}      -> "first-order Horn clauses cannot carry a function as a value; M1 admits a lambda only inside a recognised aggregate"
@@ -2264,6 +2272,7 @@ constructorName = \case
   Record{}     -> "RECORD/COMMIT/ATTEST"
   ReadCell{}   -> "RECALL"
   Breach{}     -> "BREACH"
+  Refuse{}     -> "REFUSE"
   Concat{}     -> "string concatenation"
   AsString{}   -> "string coercion"
   Lam{}        -> "lambda"
@@ -2316,6 +2325,9 @@ lowerQueries ctx m = do
     LazyEval _ ex      -> Just (RQEval, ex)
     LazyEvalTrace _ ex -> Just (RQEval, ex)
     Assert _ ex        -> Just (RQAssert, ex)
+    -- A refusal assertion has no image as a Horn-clause query: there is no
+    -- proposition \"this refuses\" for the relational fragment to hold.
+    AssertRefused{}    -> Nothing
     Check{}            -> Nothing
     Contract{}         -> Nothing
 

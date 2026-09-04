@@ -813,8 +813,16 @@ collectTests ctx decides mod' = go (1 :: Int) [ d | Directive _ d <- topDecls mo
     LazyEval ann e      -> build i (rangeOf ann) e (resultType e)
     LazyEvalTrace ann e -> build i (rangeOf ann) e (resultType e)
     Assert ann e        -> build i (rangeOf ann) e (Just TBool)
+    -- A refusal assertion has no Catala counterpart: Catala has no notion of a
+    -- declined answer, so there is nothing to test against. Skipped with a note
+    -- rather than rejected, exactly as a #TRACE directive is.
+    AssertRefused {}    -> Left (Just refuseAssertNote)
     Check {}            -> Left Nothing
     Contract {}         -> Left (Just contractNote)
+
+  refuseAssertNote =
+    "a `#ASSERT REFUSED` directive has no Catala counterpart (Catala has no notion of a refusal, \
+    \so there is no oracle to compare against)"
 
   contractNote =
     "a `#TRACE`/contract directive has no Catala counterpart (Catala models no deontic layer, \
@@ -1986,6 +1994,13 @@ unsupported e = "this construct is outside the v1 Catala fragment (§6): " <> ca
   Post{}       -> "POST — emitted Catala is pure and self-contained (§5.1)"
   Env{}        -> "an environment lookup — emitted Catala is pure and self-contained (§5.1)"
   Breach{}     -> "BREACH — Catala models no deontic layer (§5.1)"
+  -- The designed image (Catala emits NO definition for a refusing rule, so a
+  -- caller of it is a Catala scope-variable-not-defined error) is
+  -- PROPS-REDTEAM-2026-09-03 §6 item 6 and is not built. Until it is, the
+  -- module is refused by name rather than lowered to anything.
+  Refuse{}     -> "REFUSE — Catala has no notion of a declined answer, and emitting one as a \
+                  \value would launder a refusal into an answer (the designed image, no \
+                  \definition at all, is PROPS-REDTEAM §6 item 6)"
   RAnd{}       -> "regulative AND — Catala models no deontic layer (§5.1)"
   ROr{}        -> "regulative OR — Catala models no deontic layer (§5.1)"
   Record{}     -> "a ledger RECORD/COMMIT — Catala is pure (§5.1)"

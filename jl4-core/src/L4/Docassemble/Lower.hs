@@ -2219,6 +2219,13 @@ refuse = \case
   Breach {} -> LFBlocked "DA-DEONTIC"
     "BREACH has no docassemble form"
     "the breach verdict of the deontic machine"
+  -- The designed image (a terminal screen that shows the reason and stops the
+  -- interview) is PROPS-REDTEAM-2026-09-03 §6 item 6 and is not built. Until
+  -- it is, a refusal blocks its block rather than becoming a question or a
+  -- value the interview could answer with.
+  Refuse {} -> LFBlocked "DA-REFUSE"
+    "REFUSE has no docassemble form in v1"
+    "a declined answer (the designed image, a terminal screen carrying the reason, is PROPS-REDTEAM §6 item 6)"
   RAnd {} -> LFBlocked "DA-DEONTIC"
     "regulative AND has no docassemble form"
     "deontic composition"

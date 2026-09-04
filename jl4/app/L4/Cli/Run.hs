@@ -23,7 +23,7 @@ import qualified LSP.Core.Shake as Shake
 import qualified LSP.L4.Rules as Rules
 import Language.LSP.Protocol.Types (normalizedFilePathToUri)
 
-import L4.EvaluateLazy (EvalDirectiveResult(..), EvalDirectiveValue(..), prettyAssertionOutcome)
+import L4.EvaluateLazy (EvalDirectiveResult(..), EvalDirectiveValue(..), AssertionOutcome(..), ReductionOutcome(..), Refusal(..), prettyAssertionOutcome, prettyEvalException)
 import L4.Parser.SrcSpan (prettySrcRange)
 
 import L4.Cli.Common
@@ -138,15 +138,22 @@ runCmd opts = do
 -- directive that merely evaluated to @Assertion False@ does not.
 evalDirectiveCrashed :: EvalDirectiveResult -> Bool
 evalDirectiveCrashed r = case r.result of
-  Reduction (Left _)  -> True
-  Reduction (Right _) -> False
+  Reduction (ReducedErrored _) -> True
+  Reduction (Reduced _)        -> False
+  -- A REFUSAL is not a crash. The model declined to answer and said why: that
+  -- is a determinate outcome of the program, so @l4 run@ exits 0. (Errors keep
+  -- exit 1; the two must not be conflated, which is the whole point of REFUSE.)
+  Reduction (ReducedRefused _) -> False
   -- An assertion whose expression RAISED did not evaluate cleanly: it is the
   -- same crash as a raising #EVAL, and the ruling above covers every
   -- 'EvalException'. (Before the exception was reported distinctly it was
   -- collapsed into @Assertion False@ and so exited 0 — that was the hiding,
-  -- not a ruling.) A clean @Assertion (Right False)@ stays exit 0.
-  Assertion (Left _)  -> True
-  Assertion (Right _) -> False
+  -- not a ruling.) A clean @Assertion Fails@ stays exit 0.
+  Assertion (Errored _)      -> True
+  Assertion (Refused _)      -> False
+  Assertion Holds            -> False
+  Assertion Fails            -> False
+  Assertion (FailsBecause _) -> False
 
 ----------------------------------------------------------------------------
 -- JSON shape
@@ -161,10 +168,28 @@ evalResultToJson MkEvalDirectiveResult{range = mRange, result, trace = _} =
     ] <> errorField
   where
     (kindText, valueJson, errorField) = case result of
-      Assertion (Right b)     -> ("assertion" :: Text, Aeson.Bool b, [])
+      Assertion Holds         -> ("assertion" :: Text, Aeson.Bool True, [])
+      Assertion Fails         -> ("assertion", Aeson.Bool False, [])
+      Assertion a@(FailsBecause _) ->
+        ("assertion", Aeson.Bool False, [Key.fromString "error" Aeson..= prettyAssertionOutcome a])
+      -- A REFUSED assertion keeps kind "assertion" with a null value, and its
+      -- reason under "refused" — NOT under "error". A consumer that reads
+      -- every non-boolean assertion out of "error" would report a designed
+      -- outcome as a defect.
+      Assertion (Refused ref) ->
+        ("assertion", Aeson.Null,
+         [Key.fromString "refused" Aeson..= Aeson.object [Key.fromString "reason" Aeson..= ref.message]])
       -- An assertion that raised keeps kind "assertion" (it IS one, and a
       -- consumer counting assertions must still see it) with a null value —
       -- neither true nor false — and the reason under "error".
-      Assertion (Left exc)    -> ("assertion", Aeson.Null, [Key.fromString "error" Aeson..= prettyAssertionOutcome (Left exc)])
-      Reduction (Left exc)    -> ("error", Aeson.String (Text.unlines ["evaluation exception:", Text.pack (show exc)]), [])
-      Reduction (Right val)   -> ("value", Aeson.String (renderEvalValue (Reduction (Right val))), [])
+      Assertion a@(Errored _) -> ("assertion", Aeson.Null, [Key.fromString "error" Aeson..= prettyAssertionOutcome a])
+      -- A refusing #EVAL gets its OWN kind. It is neither a value nor an
+      -- error, and a consumer must be able to tell all three apart.
+      Reduction (ReducedRefused ref) ->
+        ("refused", Aeson.Null,
+         [Key.fromString "reason" Aeson..= ref.message])
+      -- 'prettyEvalException', not 'show': 'show' leaks the raw Haskell
+      -- constructor names of the exception into the JSON.
+      Reduction (ReducedErrored exc) ->
+        ("error", Aeson.String (Text.unlines ("evaluation exception:" : prettyEvalException exc)), [])
+      Reduction (Reduced val) -> ("value", Aeson.String (renderEvalValue (Reduction (Reduced val))), [])

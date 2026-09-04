@@ -35,6 +35,7 @@ module L4.EvaluateLazy.Machine
 , matchPattern
 , backward
 , EvalDirective (..)
+, AssertKind (..)
 , evalModule
 , initialEnvironment
 , evalRef
@@ -456,6 +457,21 @@ userException = raiseException . UserEvalException
 
 stuckOnAssumed :: Resolved -> Eval a
 stuckOnAssumed assumedResolved = userException (Stuck assumedResolved)
+
+-- | REFUSE: stop evaluation with the author's reason.
+--
+-- UNCATCHABLE, and that is the point. 'tryEval' is the only @try@ over an
+-- 'EvalException' anywhere in the tree, and it is used only at the directive
+-- boundary ('L4.EvaluateLazy.nfDirective') and in @withEvalClauses@ (which
+-- rethrows). There is no user-facing catch construct, so nothing between a
+-- 'Refuse' and the directive that demanded it can observe the refusal or turn
+-- it into a value: not a CONSIDER arm, not a boolean connective, not a
+-- WHERE\/LET binding. THIS IS AN INVARIANT, not an accident of the current
+-- code: a static refusal analysis is only sound while it holds. Anything that
+-- adds a second @try@ (a TRY\/RECOVER construct, a service-level resume)
+-- breaks it, and would also have to reckon with 'unwindFrame'\'s docstring.
+refuseWith :: Refusal -> Eval a
+refuseWith = raiseException . RefusalException
 
 pushFrame :: Frame -> Eval ()
 pushFrame frame = do
@@ -944,6 +960,16 @@ forwardExpr env = \ case
     mPartyRef <- traverse (\p -> allocate_ p env) mParty
     mReasonRef <- traverse (\r -> allocate_ r env) mReason
     continueBackward (ValBreached (ExplicitBreach mPartyRef mReasonRef))
+  -- REFUSE only ever reaches 'forwardExpr' when the machine actually REDUCES
+  -- it, so a refusal inside an unforced thunk is never entered. That is what
+  -- makes @FALSE AND <refusing>@ answer FALSE while @<refusing> AND FALSE@
+  -- refuses: 'And' desugars to an 'IfThenElse' whose scrutinee is forced first.
+  Refuse _ann (Lit _ (StringLit _ txt)) ->
+    refuseWith (MkRefusal txt)
+  Refuse _ann _msg ->
+    -- Unreachable: the parser accepts only a literal message and the type
+    -- checker requires that literal to be a STRING.
+    internalException (RuntimeTypeError "the message of a REFUSE is not a string literal")
   Inert _ann _txt ctx ->
     -- Inert elements are grammatical scaffolding with context-aware evaluation
     -- In AND context: True (identity), in OR context: False (identity)
@@ -3433,13 +3459,13 @@ evalDirective env (LazyEval ann expr) = do
   let shouldTrace = case tracePolicy.evalDirectiveTrace of
         TracePolicy.NoTrace -> False
         TracePolicy.CollectTrace _ -> True
-  pure [MkEvalDirective (rangeOf ann) shouldTrace False expr env]
+  pure [MkEvalDirective (rangeOf ann) shouldTrace NotAnAssert expr env]
 evalDirective env (LazyEvalTrace ann expr) = do
   tracePolicy <- getTracePolicy
   let shouldTrace = case tracePolicy.evaltraceDirectiveTrace of
         TracePolicy.NoTrace -> False
         TracePolicy.CollectTrace _ -> True
-  pure [MkEvalDirective (rangeOf ann) shouldTrace False expr env]
+  pure [MkEvalDirective (rangeOf ann) shouldTrace NotAnAssert expr env]
 evalDirective _env (Check _ann _expr) =
   pure []
 evalDirective env (Contract ann expr t evs) =
@@ -3449,7 +3475,18 @@ evalDirective env (Assert ann expr) = do
   let shouldTrace = case tracePolicy.evalDirectiveTrace of
         TracePolicy.NoTrace -> False
         TracePolicy.CollectTrace _ -> True
-  pure [MkEvalDirective (rangeOf ann) shouldTrace True expr env]
+  pure [MkEvalDirective (rangeOf ann) shouldTrace AssertHolds expr env]
+evalDirective env (AssertRefused ann expr mmsg) = do
+  tracePolicy <- getTracePolicy
+  let shouldTrace = case tracePolicy.evalDirectiveTrace of
+        TracePolicy.NoTrace -> False
+        TracePolicy.CollectTrace _ -> True
+  -- The BECAUSE message is a literal, so the comparison the directive asks for
+  -- is decided statically here rather than evaluated.
+  let wanted = case mmsg of
+        Just (Lit _ (StringLit _ t)) -> Just t
+        _                            -> Nothing
+  pure [MkEvalDirective (rangeOf ann) shouldTrace (AssertRefuses wanted) expr env]
 
 contractToEvalDirective :: Expr Resolved -> Expr Resolved -> [Expr Resolved] -> Machine (Expr Resolved)
 contractToEvalDirective contract t evs = do
@@ -3647,11 +3684,26 @@ eventCVal = ValUnappliedConstructor TypeCheck.eventCRef
 emptyEnvironment :: Environment
 emptyEnvironment = Map.empty
 
+-- | What kind of assertion (if any) a directive is.
+--
+-- Replaces a bare @isAssert :: Bool@, so that adding @#ASSERT REFUSED@ made
+-- every consumer decide what it means rather than inheriting the plain
+-- assertion's answer.
+data AssertKind
+  = NotAnAssert
+    -- ^ @#EVAL@ \/ @#EVALTRACE@ \/ @#TRACE@: reduce and report the value.
+  | AssertHolds
+    -- ^ @#ASSERT e@: @e@ must evaluate to TRUE.
+  | AssertRefuses !(Maybe Text)
+    -- ^ @#ASSERT REFUSED e [BECAUSE m]@: @e@ must refuse, and when @m@ is
+    -- present the refusal's reason must equal it.
+  deriving stock (Generic, Show)
+
 data EvalDirective =
   MkEvalDirective
     { range    :: Maybe SrcRange -- ^ of the (L)EVAL directive
     , trace    :: !Bool -- ^ whether a trace is wanted
-    , isAssert :: !Bool -- ^ whether it is to be treated as an assertion
+    , assertKind :: !AssertKind -- ^ whether, and how, it is to be treated as an assertion
     , expr     :: !(Expr Resolved) -- ^ expression to evaluate
     , env      :: !Environment -- ^ environment to evaluate the expression in
     }
