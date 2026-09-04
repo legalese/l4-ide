@@ -1,439 +1,641 @@
-# Props red team (2026-09-03): the reduced position
+# Props: the proposal, as it stands on 2026-09-04
 
-_Status: **a red-teamed design position, not a ruling and not implemented.** It records a
-conversation held on 2026-09-02/03 between Meng and session `dynamic-scoping`
-(`fd385a3f-be5b-4213-921c-9e8c0e47cee0`), and the reports of four adversarial subagents that
-session ran against the design. Meng has further questions not yet put; nothing in §9 is decided
-until `IMPLICIT-PROPS-DESIGN.md` says so. Every count below is as measured by the named team on
-that day; re-verify before relying. The `l4` binary used for probes is `~/.local/bin/l4` dated
-2026-08-27 and may lag `unstable`._
+_Status: **a proposal, not implemented.** R0 is ruled (2026-09-04, `IMPLICIT-PROPS-DESIGN.md`
+§11.1). R1–R12 are candidates awaiting Meng's marks on the rulings sheet; two of them carry a
+later amendment or recommendation, labelled as such in §4. This revision replaces every earlier
+stratum of the file: the 2026-09-03 reduced position, the 2026-09-03/04 refinement minutes, the
+second red team's verified findings and the four verbatim red-team reports are all in git history
+at `d119c521` and are not restated here. Every count below carries the date it was measured and
+the tree it was measured on; re-verify before relying. Probes ran on `~/.local/bin/l4` dated
+2026-08-27, which lags `unstable`._
 
 Supersedes, in part, `PROPS-SCOPE-HANDOFF.md`: its §2 "third reading" (the `§` hierarchy is the
-scope tree) is refuted in §2 below. Its prior-art survey (§3) and boundaries (§7) stand.
+scope tree) is refuted by measurement (§5 item 2 below). Its prior-art survey (§3) and boundaries
+(§7) stand. Decisions are recorded only in `IMPLICIT-PROPS-DESIGN.md` §11; this file argues, it does
+not decide.
 
 ---
 
-## 0. How this came about
+## 1. The position
 
-`PROPS-SCOPE-HANDOFF.md` asked for a scoping ruling. A first sketch (2026-09-02) answered it
-with three constructs: `§`-scoped `ASSUME` as declaration, `ASSUMING` as both initial supply and
-Reader `local`, an optional authored `TAKING` clause, a compiler-enforced no-shadowing rule
-("earmuff"), and five lints. Meng's reaction, verbatim:
+**`ASSUME` is deprecated (R0, ruled).** Its term role becomes a **section-level `GIVEN`**, which the
+compiler **discharges** into an ordinary parameter of every definition that transitively reads it.
+**Supply is application**: the existing named-argument `WITH`, with nothing new in the grammar.
+Its type role becomes an empty `DECLARE`. Its refusal role becomes `REFUSE`, a throw that cannot
+be caught and can be statically analysed.
 
-> "something about this still doesn't feel right. it feels like too many mechanisms overlapping.
-> can we reduce the surfaces to be more principled and concise? this last example with ASSUMING
-> feels like parametric modules from ocaml. perhaps an adversarial redteam on the design could
-> offer more thoughts?"
+| job of `ASSUME` today              | destination                                                             | status                    |
+| ---------------------------------- | ----------------------------------------------------------------------- | ------------------------- |
+| suppliable term (~550 uses)        | section `GIVEN`, discharged by the compiler (§2.1–§2.4)                 | mechanism = R1–R5, R8–R11 |
+| uninterpreted type (`… IS A TYPE`) | empty `DECLARE T`, which parses today (`ok/set-operators-nested.l4:36`) | available today           |
+| refusal / typed bottom             | `REFUSE "…"`, uncatchable, boundary-only, in no schema (§2.8)           | specification = R7        |
 
-Four subagents were run in parallel from one shared brief, each with a different adversarial
-angle: PL theory, legal isomorphism, backends, and minimalism. Their reports are in Appendix A,
-verbatim. Their probe files and observed outputs are in Appendix B.
+What the compiler adds is the threading authors were expected to write by hand: Meng's own
+history of the keyword is that "everybody assumed we would deprecate it in favour of more regular
+given-parameterized functions with purity." Discharge is that, with the pass-through parameters
+written by the compiler. The cost of writing them by hand was measured on 2026-09-03: **506 of
+1,112 record-typed `GIVEN` slots in the legal corpus are pure pass-through**, never `'s`-accessed
+in their own body (`probate-administration-act.l4` 87 of 183, `intestate-succession-act.l4` 82 of
+122). The factoring it buys was measured on 2026-09-04 over 1,860 `GIVEN` parameter slots in 26
+legal files: **889 (48%) repeat an identical name and type declared earlier in the same section;
+1,177 (63%) repeat one earlier in the same file.** `regcf.l4:280-330` opens eight consecutive
+functions with `GIVEN issuer IS AN IssuerProfile`.
 
-Meng later added the history that explains the keyword: _"when we first wrote ASSUME we were very
-early in the project and just wanted to satisfy the type checker. Everybody assumed we would
-deprecate it in favour of more regular given-parameterized functions with purity."_
+The name for the mechanism is **Coq `Section`/`Variable` discharge**: each definition is abstracted
+over exactly the section variables it transitively uses, recursive groups discharged as a block.
+It is also the dictionary-passing translation of Lewis, Launchbury, Meijer and Shields, "Implicit
+Parameters: Dynamic Scoping with Static Types" (POPL 2000); a flat coeffect in Petricek, Orchard
+and Mycroft, "Coeffects" (ICFP 2014); Agda's parameterised modules; Isabelle's `locale … fixes`;
+Lean 4 `variable`. It is not an OCaml functor (uniform, generative, explicitly applied); what looked
+functor-like in the first sketch was a dedicated supply keyword, which no prior art has, because
+supply is application.
 
-## 1. What the red team killed, and the witness for each
+## 2. The design
 
-All four teams agreed on every item here.
+### 2.1 Declaring: the section `GIVEN` (R3, R4)
 
-1. **`ASSUMING` as Reader `local` (dynamic binding as machine state).** The one ambient field
-   today, the rule date, is machine state (`Machine.hs` ~837-841, ~1100-1106); making it correct
-   under laziness needed a two-pass deep force plus snapshot (~2991-3040) and a per-axis cache
-   fingerprint (`TemporalContext.hs` ~140-224), and `ok/temporal-pin-deep.l4` cases I/J/K still
-   answer the unpinned value through closures by design. N user fields multiply all three costs.
-   Demand: all 19 legal-corpus uses of `EVAL UNDER RULES EFFECTIVE AT` (17 in `regcf.l4`
-   fixtures, `regcf-wizard.l4:630`, one in denovo) sit at the outermost position of a directive
-   or export body; zero inside a rule, quantifier or lambda. This is Yang 2020 exactly: dynamic
-   scoping is an effect and does not survive call-by-need; implicit parameters are a coeffect and
-   do.
-2. **`§`-subtree scoping of `ASSUME`.** Statutes declare reach by words ("in this Part", "for
-   the purposes of this section") and put interpretation sections as siblings, often last (BNA
-   1981 s 50 of 53; CA 2006 Part 38). The corpus does the same: `british-citizen-act.l4:3-12`
-   declares 7 in `§§ Assumptions` and consumes them in sibling sections (:81-155);
-   `promissory-note.l4:226-228` declares in an end-of-file appendix, consumed at :15 and :302;
-   `regcf.l4:143` → `:409`. Legal team: 9 of 39 unique declarations go dark; PL team: 7 files
-   break. Every one of the 26 legal files opens with a `§` title, so "module-wide if before any
-   `§`" would mean above the document title. And nearest-ancestor section shadowing **already
-   ships** (`Types.hs:877-899`; `TypeCheck.hs:596-599`; `specs/done/SECTION-LEXICAL-SCOPING-SPEC.md`,
-   smucclaw#50; fixtures `not-ok/tc/section-scoping-ambiguous.l4`), so the §4.2 wish for
-   _visibility_ was already granted.
-3. **The enforced earmuff.** It reverses a shipped ruling (FIX A,
-   `ok/section-scoping-param-not-shadowed.l4`: a `GIVEN` parameter beats a same-named section
-   binding; probe t3 confirms `GIVEN x` silently shadows `ASSUME x`), contradicts Coq, Lean and
-   GHC, and guards a hazard (capture) that cannot occur once names resolve statically by
-   `Unique`. Legal prior art: UK/SG statutes mark nothing and publish an index of defined
-   expressions (CA 2006 Sch 8); Australia's ITAA 1997 asterisk convention exempts basic terms.
-4. **Authored `TAKING`.** Inference is a displayed compiler fact, never written.
-5. **The DMN "literal → specialise, computed → drop" rules.** Specialisation is ladder rung 2,
-   which `DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §15.12.1 (ruling R-C) stops at rung 0; and "computed
-   → drop" would delete the Reg CF wizard's rebind, whose value is the export's own `GIVEN`
-   `rule date` and is therefore trivially lowerable. Right criterion: a field lowers iff it is
-   single-valued per evaluation.
+A `GIVEN` attached to a section heading declares a binder for the whole module, with the heading
+as its documented home and as the tiebreak when two sections declare the same name.
 
-## 2. What survived, and what it is called
+```l4
+§ `1. Issuer eligibility — Rule 100(b)`
+    GIVEN issuer IS AN IssuerProfile
 
-The inference rule from the sketch is correct:
+@ref 17 CFR 227.100(b)(2)
+GIVETH A BOOLEAN
+`(b)(2) — an Exchange Act reporting company` MEANS
+    issuer's `subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act`
+```
+
+**Spelling, R4, not yet marked.** Two candidates, both of which parse on the 2026-08-27 binary and
+both of which today attach the `GIVEN` to the _next definition_ (probe q9, Appendix A), so either
+needs a parser change (`MkSection` gains a `Maybe (GivenSig n)`; both printers, `Rules.ExactPrint`
+and `L4.Print.prettyLayout`, emit the chosen form; round-trip goldens per `CLAUDE.md` §3.2).
+
+- **Indented, as minuted with Meng on 2026-09-04 and the form he described as the design:** a
+  `GIVEN` belongs to the section iff its keyword sits at a column greater than the heading's `§`,
+  on the heading line or indented beneath it; a column-1 `GIVEN` stays the next declaration's
+  signature. Measured 2026-09-04: the rival "adjacency" rule (the `GIVEN` right after a heading is
+  the section's) would reinterpret **160** sites in the legal corpus where a section's first
+  function opens with a `GIVEN`; the indentation rule collides with **zero** existing lines, there
+  being no indented `GIVEN` in the corpus.
+- **Heading-line, `§ ⟨name⟩ GIVEN …`, as R4 proposes:** no indentation hazard. The hazard is real:
+  a dedent by a formatter or a paste re-attaches a section binder to the next definition with no
+  error at the site. The seasoned rater's 130-line rewrite of Reg CF §3 produced 21 errors on
+  today's binary, five of them at `Range 1:1-1:1` about `_self`, because an indented `GIVEN` had
+  attached to `DECLARE InvestorProfile`.
+
+Under either spelling: a column-1 `GIVEN` immediately after a heading whose names the next head
+does not bind is a **check error** (today it silently makes the next definition a function of
+those names, probe q9). A keyword for the binder is in reserve if neither layout survives review:
+`WHEREAS` is struck (a recital is a statement of fact by the parties, Greer v Kettle [1938] AC 156,
+presumptively non-operative where the operative words are clear, Re Moon, ex p Dawes (1886) 17 QBD
+275, applied in [2001] SGCA 41; every legal reader read it as non-operative); `WHEREIN` is doubtful
+(characterises an element already introduced, limits only conditionally, MPEP 2111.04; both
+beginner raters confused it with `WHERE`); the drafter's `IN THIS SECTION x IS A T` is unambiguous
+at the cost of three tokens. The examples in this file use the indented spelling pending R4.
+
+**Visibility, R3.** A section `GIVEN` is **module-visible**, exactly as top-level names are today:
+`selectByProximity` (`jl4-core/src/L4/TypeCheck/Types.hs:902`) prefers the nearest ancestor
+section and falls back to all candidates when no ancestor matches, so a binder under a title `§`
+already reaches a sibling `§` and a grandchild `§§`. `§` placement is documentation and the
+tiebreak, not a scope wall. This is stated as it ships, not as Coq: 7 of 26 legal files have a
+title `§` that is a _sibling_ of the operative sections, not their ancestor (`regcf.l4`'s title is
+one of eleven siblings), so "the module is the title `§`" is false as a tree statement, and
+statutes re-declare the same binder per section (Bribery Act 2010 ss 1, 2, 6 each re-declare "P"),
+so an "extension only, never re-declare" rule was dropped. Same-name re-declaration in another
+section at the **same type** is governed by R2; at a **different type** it is an error. Two shipped
+defects are repaired first (§7): a parent's own reference goes ambiguous whenever a descendant
+rebinds the name, and `SECTION-LEXICAL-SCOPING-SPEC.md` §3.3.4 says a sibling must qualify while
+the implementation says it need not.
+
+**Tier is measured, never declared.** Whether a binder is _world_ (one value per request) or
+_subject_ (varies per case) is classified by call-site variation, by the exporter's existing
+census, never by where the `GIVEN` sits. The sample that hoisted "the date of such offer or sale"
+(17 CFR 227.100(a)(1), a per-transaction date; the de novo encoding's directives use 13 distinct
+dates) onto a heading and thereby asked it once per batch is the witness for why.
+
+### 2.2 Discharge: the read-set is one compiler fact
 
 ```
 R(f)                 = reads(f) ∪ ⋃ { R(g) | g referenced in f }      -- least fixpoint over call-graph SCCs
 R(LET x = v IN e)    = (R(e) \ {x}) ∪ R(v)                              -- context subtraction
 ```
 
-Its name is **Coq `Section`/`Variable` discharge**: each definition is abstracted over exactly
-the section variables it transitively uses, recursive groups discharged as a block. Not an OCaml
-functor (uniform, generative, explicitly applied). What smelled functor-like in the sketch was
-the dedicated supply keyword; prior art has none because supply is application. Also: Lewis,
-Launchbury, Meijer, Shields, "Implicit Parameters: Dynamic Scoping with Static Types" (POPL 2000)
-under its dictionary-passing translation; Petricek, Orchard, Mycroft, "Coeffects" (ICFP 2014),
-flat coeffects; Agda parameterised modules; Isabelle `locale … fixes`; Lean 4 `variable`.
+`reads(f)` is the set of section binders `f`'s body names. Every definition with non-empty `R(f)`
+is elaborated to take those binders as parameters, **trailing** its positional ones (R10: leading
+implicits displace OpenFisca's subject entity, `mSubj = firstJust`, run-verified 2026-09-04); every
+reference passes them through unchanged; a `WITH` or `LET` binding a member of `R(f)` at a call
+site becomes application. After elaboration the program is plain L4 with `GIVEN`s: no environment,
+no pin, no cache-fingerprint axis; "assumed term" survives only as "unsupplied at the root".
+Recursive groups are discharged as a block. Nothing implicit crosses `IMPORT`: discharge happens at
+the module boundary, and an importer sees ordinary parameters (this is also why `REFUSE` must land
+before discharge, §2.8: `daydate.l4:104`'s refusal would otherwise become a parameter of every
+importer calling `YMD`).
 
-**The read-set must be one compiler fact.** As of this snapshot it exists twice, in
-`Catala/Lower.hs:969-985` (fixpoint) and `Docassemble/Lower.hs:541-557`, and is missing where it
-bites: the HTTP schema (`FunctionSchema.hs:276-300`), the direct evaluator (`Backend/Jl4.hs:558`)
-and the WASM ABI (`jl4-mlir/.../Lower.hs:677`) all use `collectReferencedUniques`
-(`Export.hs:354-358`), which is one body deep. **By code reading, not by run:** an `@export`
-whose helper reads an `ASSUME` publishes a schema without that field and evaluation goes
-`Stuck` (`Machine.hs:457`). The only test is a direct read (`jl4-service/test/TestData.hs:224-234`).
-This is the first test to write, and fixing it is a bug fix with no language change.
+The runtime shape is a compiler choice: per-field (Coq-exact) or one record per module, which
+preserves sharing of 0-ary dated constants (`the rules in force include` in `regcf.l4` has ten
+readers). Unmeasured; backends project per-field from `R(f)` either way.
 
-Meng's history (§0) confirms the direction: "deprecate `ASSUME` in favour of
-`GIVEN`-parameterised pure functions" is exactly what discharge does, with the compiler writing
-the threading that authors were expected to write by hand. The minimalist team measured what the
-hand-written version cost: **506 of 1,112 record-typed `GIVEN` slots in the legal corpus are pure
-pass-through** (never `'s`-accessed in their own body; e.g. `probate-administration-act.l4`
-87/183, `intestate-succession-act.l4` 82/122).
+The read-set exists **twice** today and is **missing where it bites** (as of 2026-09-03):
+`jl4-core/src/L4/Catala/Lower.hs:969-985` (a fixpoint) and `Docassemble/Lower.hs:541-557` each
+compute it privately, while the HTTP schema (`FunctionSchema.hs:276-300`), the direct evaluator
+(`jl4-service/src/Backend/Jl4.hs:558`) and the WASM ABI (`jl4-mlir/src/L4/MLIR/Lower.hs:677`)
+all use `collectReferencedUniques` (`jl4-core/src/L4/Export.hs:354`), which is one body deep.
+Run-verified 2026-09-04: `l4 batch --validate-only` accepts a request missing the `ASSUME` a
+helper reads, then evaluation is `Stuck`. The transitive pass is a bug fix with no language change
+and is step one of everything else; it is built on `fix/export-transitive-readset` (§7).
 
-## 3. The one fork, and its resolution
+### 2.3 Resolving a name (R2)
 
-Two teams (PL, backends) want per-field discharge into implicit parameters. The minimalist wants
-the environment to be a `DECLARE`d record whose rules are computed fields, `WITH` to construct,
-and `BUT WITH` (`RECORD-UPDATE-SPEC.md`, proposed) as `local`; zero new keywords. These are the
-same design at two granularities: per-field is Coq, one-record is dictionary passing, and the
-compiler can hold the per-field read-set while passing one record at runtime.
+A bare name in a body must resolve, at the definition, to one of: a `WHERE`/`LET` local, the
+function's own `GIVEN`, a field opened from one (§2.7), or a module-visible section `GIVEN`. Else
+it is a **check error at the definition**. There is no "then the caller chain": with that in the
+resolution order a misspelt name stops being an error and becomes an inferred request parameter at
+the root, which no cited prior art permits (Coq, Lean, Isabelle and GHC `?x` all require a
+declaration or a sigil).
 
-The surface question is what the author writes, and the evidence favours the implicit-parameter
-form: only 4 computed fields exist in the whole legal corpus, so the record-as-Act form is
-unmeasured at scale; the drilling is real (506/1,112); and `Docassemble/Lower.hs:941` refuses a
-record-typed `ASSUME`, so every flat backend is per-field anyway.
-
-The record team's durable contribution is different: the statutory rebinding device is
-**deeming** ("treated as … for the purposes of subsection (1)", BNA s 1(2), `bna.l4:263-276`),
-and it rebinds the **subject**, not the world. That is a record update on a `GIVEN`, which is why
-`BUT WITH` is wanted independently (smucclaw#438) and should not be conscripted as the
-environment's `local`.
-
-## 4. The reduced design
-
-Two sentences. **`ASSUME` is an implicit parameter, module-visible under the existing section
-rule. Supply is application.** No new keyword. Everything else is a compiler fact or tooling.
-
-Syntax verified on the 2026-08-27 binary (Appendix B): named application
-`f WITH b IS 1, a IS 3` evaluates today; `LET x = 41 IN f` does **not** reach the callee today
-(lookup is by `Unique`, `Machine.hs:3204-3212`); `TYPICALLY 41` on an `ASSUME` is discarded at
-evaluation today. The design changes the second and third.
-
-### 4.1 Drilling gone (real case, `regcf/denovo/regcf-denovo.l4:1364-1372` as of this snapshot)
-
-Today the headroom rule takes `interp` and the offer date only to forward them:
+The open question is what a **function's own `GIVEN`** does for a callee that reads a section
+binder of the same name. The trap, reduced to four lines (sample S10(a), 2026-09-04):
 
 ```l4
-GIVEN interp   IS AN Interpretation
-      issuer   IS AN IssuerProfile
-      offering IS AN OfferingProfile
-      `the date of the offer or sale` IS A DATE
+§ `1. Issuer eligibility — Rule 100(b)`
+    GIVEN issuer IS AN IssuerProfile
+
+GIVETH A BOOLEAN
+`the issuer is a reporting company` MEANS                 -- reads the SECTION issuer
+    issuer's `subject to the requirement to file reports …`
+
+GIVEN issuer IS AN IssuerProfile                           -- same name, same type
+GIVETH A BOOLEAN
+`this issuer is a reporting company` issuer MEANS         -- its own GIVEN wins in this body
+    `the issuer is a reporting company`                    -- which issuer does the callee see?
+
+#EVAL `this issuer is a reporting company` `a reporting issuer`
+```
+
+- **R2 as it stands on the sheet:** the caller's same-named `GIVEN` _supplies_ the section binder,
+  so the `#EVAL` answers for `` `a reporting issuer` ``; a function `GIVEN` that restates a visible
+  section `GIVEN` at the same type is a **warning** ("redundant restatement") and is the supply; at
+  a different type, an error. Ground: drafting's consistent-expression presumption says a restated
+  "the issuer" is the same issuer (Courtauld v Legh; Bennion s 21.3), and both beginner raters read
+  it that way cold.
+- **The recommendation put to Meng on 2026-09-04, not yet marked:** a function `GIVEN` **never
+  flows** to a callee; only section `GIVEN`s and an explicit `WITH`/`LET` supply; and a function
+  `GIVEN` that restates a visible section `GIVEN` is a **check error**, so a name has exactly one
+  binder in a module. The `#EVAL` above is then an error at the definition, pointing at the
+  restating `GIVEN`, and the fix is to delete it. Grounds: today's binary already answers by binding
+  (probe t3, Appendix A: `GIVEN x` shadows `ASSUME x` inside its own body and a sibling reading `x`
+  still sees the `ASSUME`); every cited prior art binds lexically; and the rule costs nothing
+  today, because, measured 2026-09-04 across **607 files** (the l4-ide corpus, libraries, `doc/`,
+  and `legalese/canon`), there are **235** term-role `ASSUME` names and **2,311** function `GIVEN`
+  names and **no file** in which the two sets overlap. The rule governs only the migration state.
+  The one witness in the corpus, the §7 caller at `regcf.l4:882`, is handled by dropping its own
+  `GIVEN issuer` when section 1's binder is introduced (§3). A genuine per-call variation is still
+  written, as `WITH issuer IS …` at the call; a helper that is genuinely polymorphic over issuers
+  names its parameter something other than the section binder, which makes the polymorphism
+  visible.
+
+Either way the earlier "one name, one type, per module" observation stands as a check that fires
+only when a name is read implicitly. Measured 2026-09-03 over 1,774 `GIVEN` slots and 559 distinct
+names in the legal corpus: 17 names are bound at more than one type corpus-wide, 9 within a single
+file, all one-letter conveniences (`a`, `b`, `f`, `p`, `w`) or a `DATE` vs `MAYBE DATE` lifting.
+Requirements are therefore sets; no row polymorphism.
+
+### 2.4 Supplying a value (R1, amended)
+
+**A call site is entirely positional or entirely named.** There is no mixed form: `f x WITH y IS v`
+is a parse error today ("unexpected WITH", probe `mixed`, Appendix A) and was never live code. This
+is the amendment Meng directed on 2026-09-04 ("all positional or all by-name but not an admixture");
+it replaces the sheet's original R1, which had proposed writing a new mixed grammar. Measured
+2026-09-04: no mixed site exists in the corpus because none can parse; on the order of a thousand
+all-named `WITH` sites do (971 named-application sites by the session's count; 1,416 `WITH` tokens
+in 179 of 608 `.l4` files on a plain re-count over `jl4/examples`, `jl4-core/libraries`, `doc/` and
+canon); and the corpus already calls the same function both ways at different sites (`is adult`:
+one `WITH` site, fourteen positional).
+
+So the grammar is unchanged. The one compiler change is in `supplyAppNamed`
+(`jl4-core/src/L4/TypeCheck.hs:2976`), which today raises `IncompleteAppNamed` for any omitted
+parameter: under R1 a `WITH` site **may omit** any parameter that is flowed from a visible section
+binder or has a `TYPICALLY` default, and a section `GIVEN` in the callee's read-set is a
+**suppliable name** at a `WITH` site. Implicits are keyword-only: at a positional site they must
+flow or default, and an implicit that does neither is an error at the root naming the binder and
+the chain of calls that needs it. On an `@export` nothing fails: an unsupplied binder becomes a
+request parameter (§2.10).
+
+```l4
+#EVAL `the issuer's headroom under the twelve month cap`
+      WITH issuer IS acme, offering IS `acme's offering`, `the date of the offer or sale` IS Date 1 7 2026
+-- interp takes its TYPICALLY; omit the date and the check error names it and the chain
+```
+
+`WITH` binds loosely: it runs to the comma or end of line, so `#ASSERT f WITH a IS 3 EQUALS 4`
+parses as `a IS (3 EQUALS 4)`. Tightening it would break two corpus sites (2026-09-04); it stays,
+with a check hint when a `WITH` value's outermost operator is a comparison.
+
+### 2.5 Defaults (R8)
+
+`TYPICALLY` has **one behaviour**: a defaulted `GIVEN`, section or function, may be omitted at any
+supply site, and the evaluator honours the default. Today it has three images: the schema marks a
+defaulted parameter both `required` and defaulted, Catala makes it a caller-overridable `context`
+(`Catala/Lower.hs:1136-1153`), the evaluator discards it (probe t4), and the reference page says
+"It does **not** change evaluation" (`doc/reference/types/TYPICALLY.md:37`, `typically-example.l4`).
+Every directive and trace output names each parameter that took its default; exports publish it
+as optional with the default _and a description_ (today the description is empty,
+`FunctionSchema.hs:283`); a defaulted `Interpretation`-typed binder is linted, because a fixture
+that passes only under a defaulted `interp` passes only under the non-binding SEC staff reading
+and says so nowhere. The page and the example are corrected in the same change.
+
+### 2.6 Hypotheticals (R9)
+
+At a directive, supply is `WITH`. An in-body hypothetical ("under the strict reading") may use
+`LET` reaching callees, or, more simply, `e WITH x IS v` at any site as the one mechanism; the
+seasoned raters preferred the latter, and it leaves no dynamic binder to explain. Whichever
+survives: a `LET` scopes over a trailing `WITH`; `WHERE` never supplies (19 `WHERE`-local names
+coincide with `GIVEN` names in the corpus, 2026-09-04); a `LET` binding a section-binder name that
+nothing under it reads is a warning; and the read-set subtraction rule of §2.2 applies. Today a
+`LET` shadowing a same-named `GIVEN` in scope is a "multiple definitions" error (probe q13). For
+DMN, rebinding the rule date drops per ruling R-C of `DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §15.12.1;
+any other binder is the exporter's existing tier-2 BKM case.
+
+Deeming ("treated as … for the purposes of subsection (1)", BNA 1981 s 1(2), `bna.l4:263-276`)
+rebinds the **subject**, not the world: it is a record update on a `GIVEN`, which is why `BUT WITH`
+(`RECORD-UPDATE-SPEC.md`, smucclaw#438) is wanted independently and is not the environment's
+`local`.
+
+### 2.7 Opened fields (R5)
+
+The fields of a record-typed `GIVEN`, function or section, are in scope by bare name **within the
+function that declares or sees the binder, and never in its callees**. Precedent: computed fields
+already see sibling fields bare (`COMPUTED-FIELDS-SPEC` line 80; `ok/computed-fields.l4`). Flowing
+opened fields to callees would be the row polymorphism on field names that §2.3 disclaims.
+
+Rank, innermost first: `WHERE`/`LET` locals; the function's own `GIVEN`; fields opened from it;
+section `GIVEN`s; fields opened from those; selectors (selector resolution stays type-directed as
+today, `inferSelector`, `TypeCheck.hs:1312`). A collision between two opened records sharing a
+field name is an error at the read naming both records and at the declaration that opens the
+second; `facts's field` is always available. The corpus house style names a parameter after its
+own field (`amount's amount`, `the witness's the witness`; 15 field names are also `GIVEN` names in
+the charities cleanroom, five at mismatched types, 2026-09-04), and the computed-field precedent
+resolves a clash by silently preferring the field (probe q17: field 26 beat top-level 99, no
+error), which is why the rank is written down. A bare opened field elaborates to
+`Proj (App r []) field` in a post-typecheck elaborated AST that every backend consumes, since every
+backend keys on that projection shape and consumes `Module Resolved` directly and no stage produces
+the projection today (`Desugar.hs:266-330` rewrites at parse time on `Expr Name`). Only binders are
+suppliable at `WITH`, not opened fields. In reserve, favoured by the seasoned raters: opt-in
+opening per binder (`GIVEN facts IS A `The facts` OPENED`) so a reviewer can see binding class.
+
+### 2.8 Refusal (R7), and the taxonomy of non-answers
+
+`REFUSE "message"` is an expression at any type. Evaluating it stops with the message as a distinct
+outcome, _declined_, neither an error nor an unknown fact. It appears in no schema. Meng's
+characterisation (2026-09-04): **a throw that cannot be caught and can be statically analysed.**
+
+```l4
+@ref Ruling R2 (CORPUS-TRACK §8)
 GIVETH A NUMBER
-`the issuer's headroom under the twelve month cap` interp issuer offering `the date of the offer or sale` MEANS
-          `the aggregate offering cap`
-    MINUS `the amount already sold in the twelve month window` interp issuer `the date of the offer or sale`
+`no Regulation Crowdfunding figure exists before commencement on 2016-05-16` MEANS
+    REFUSE "no Regulation Crowdfunding figure exists before commencement on 2016-05-16"
+-- the eight OTHERWISE arms that reach it (regcf.l4:154, :166, :175, :185, :195, :205, :215, :409) do not change
 ```
 
-Under the design, the two world values are declared once, anywhere in the module, and vanish
-from every signature and call site on the chain; the callee that consults the interpretation
-still writes `interp's `twelve month window anchor``, bare, as it does now:
+1. **Uncatchable is what makes it analysable.** With no handler stack, "can this rule refuse?" is
+   reachability over the call graph, the same fixpoint as the read-set:
+   `Ref(f) = refusals in f ∪ ⋃ { Ref(g) | g referenced in f }`. Every function carries two inferred
+   signatures, the read-set (the coeffect: what it needs) and the refusal set (the effect: how it
+   may decline), both on hover, both in the export schema. `Ref(f)` is syntactic and, under
+   laziness, an over-approximation ("may refuse"); it is reported **per reason string**, because a
+   boolean badge says nothing when the commencement refusal is reachable from every dated constant
+   in Reg CF. The verification rung answers "for which inputs does this export refuse?" as
+   satisfiability, yielding a region.
+2. **Uncatchable is what keeps it honest.** The Reg CF authors avoided `NOTHING` because `NOTHING`
+   can be handled: a downstream `CONSIDER` launders a refusal into a default. `REFUSE` cannot be
+   converted by any rule; only the boundary observes it.
+3. **It composes with the legal devices without a catch.** A statute avoids a refusal by changing
+   what is asked, deeming being a record update on the subject before the rule runs, never by
+   handling it after. `SUBJECT TO` overrides a conclusion, not a refusal.
 
-```l4
-§ `Interpretation`
-ASSUME interp IS AN Interpretation TYPICALLY `the staff reading`
-ASSUME `the date of the offer or sale` IS A DATE
+Specification, per R7: a **throw at force, never a value** (built on the `ValAssumed` path it would
+be a lazy value, printed as data at the root, dropped by the print-depth cutoff, unobserved inside
+an unforced closure); `#ASSERT REFUSED e`, with an optional message, and a **three-valued assertion
+outcome**, since today `#ASSERT P` and `#ASSERT NOT P` both report "assertion failed" when `P`
+raises (probe pC, 2026-09-04) and no boundary can be pinned; house style **one named definition per
+refusal** with its `@ref`, readers byte-identical, polymorphic ones declared `GIVEN a IS A TYPE`
+(a 0-ary `x MEANS REFUSE "…"` is otherwise monomorphic, probe pD2); `TBD` becomes a one-line prelude
+definition over `REFUSE`, excluded from `Ref(f)` and warned separately as a placeholder that should
+be zero at release. **Refusal is order-dependent under lazy `AND`/`OR`** (`FALSE AND x` answers,
+`x AND FALSE` refuses) and so diverges from FEEL's commutative Kleene logic; the region is
+well-defined only if the verifier models left-to-right demand. This is written down, not fixed.
 
-GIVEN issuer   IS AN IssuerProfile
-      offering IS AN OfferingProfile
-GIVETH A NUMBER
-`the issuer's headroom under the twelve month cap` issuer offering MEANS
-          `the aggregate offering cap`
-    MINUS `the amount already sold in the twelve month window` issuer
-```
+**Per-backend image**, which no backend has today (every one lowers the refusal `ASSUME` as a
+suppliable input, run-verified 2026-09-04): DMN omits the refusing row, reports a non-Blocking
+`D-REFUSE` with the reason, and adds a `MayRefuse` safety kind that does not withdraw `DMN-SAFE`
+(FEEL `null` is already spent on `NOTHING`, so `REFUSE → null` would launder; `analyzeSafety`
+deliberately treats an assumed term as not partial, so `D-PARTIAL` is the wrong class); Catala
+emits no definition (its ladder veto exempts consequences); Docassemble a terminal screen;
+evaluator, CLI, batch and service a `refused` kind on all six surfaces. The temporal design's
+generated "not in force on <day>" arm (`TEMPORAL-RULE-VERSION-DESIGN.md` item 3) is reconsidered as
+a **gate** rather than a refusal, per the split row below.
 
-### 4.2 Supply is application (existing `WITH`)
+| non-answer                               | construct            | who handles it                                   | catchable       |
+| ---------------------------------------- | -------------------- | ------------------------------------------------ | --------------- |
+| a value that may be absent               | `MAYBE`              | the rule, by matching                            | yes, as a value |
+| an expected failure with a reason        | `EITHER`             | the rule or its caller                           | yes, as a value |
+| a fact not yet known                     | an unsupplied binder | the boundary asks                                | n/a             |
+| the law does not apply / is not in force | a value or gate      | savings and transitional provisions can reach it | yes             |
+| the model does not cover this            | `REFUSE`             | the boundary only                                | no              |
+| a breach                                 | `LEST`               | the obligation's own branch                      | structured      |
+| an overridden conclusion                 | `SUBJECT TO`         | the overriding rule                              | structured      |
 
-```l4
-#EVAL `the issuer's headroom under the twelve month cap` acme `acme's offering`
-  WITH `the date of the offer or sale` IS Date 1 7 2026
-```
+The fourth row was split from the fifth on the legal lens's finding: pre-commencement is
+determinate and reachable by savings provisions (SG Interpretation Act 1965 s 16(1)(b)–(c)), and a
+provision that operates on non-application is unencodable over a `REFUSE`. `daydate`'s
+out-of-range month is **invalid input**, the `EITHER` row, not a refusal. Catch-anywhere exceptions
+are out (§5), and the `MAYBE`/`EITHER` propagation sugar once proposed for the first two rows is
+withdrawn (R6, §5).
 
-`interp` takes its `TYPICALLY`. Omit the date too and the `#EVAL` fails at check time, naming the
-field and the chain of calls that needs it. On an `@export` nothing fails: unsupplied fields
-become request parameters, grouped by tier (`GIVEN` = subject, `ASSUME` = world). The wizard asks
-the world once and the subject per instance; nothing provides that today (`BatchRequest`,
-`jl4-service/src/Types.hs:376-405`, repeats the world in every case; OpenFisca's entity-vs-
-`parameters(period)` split is the prior art).
+### 2.9 What the reader sees (R11)
 
-### 4.3 Hypothetical evaluation (existing `LET`, made to reach callees)
-
-```l4
-#EVAL LET interp = `the strict reading`
-      IN `100(a)(1) — the aggregate amount does not exceed the cap` acme `acme's offering`
-```
-
-Reads as "under the strict interpretation". Deeming a fact about the subject stays a record
-update on the `GIVEN` (§3).
-
-### 4.4 What the reader sees
-
-No sigil. Hover shows the inferred clause the sketch wanted authored:
+No sigil in source. Hover on a definition shows the inferred clause that the first sketch wanted
+authored:
 
 ```
 `the issuer's headroom under the twelve month cap`
-  GIVEN   issuer, offering
-  reads   interp                           via `the amount already sold …`
+  GIVEN   offering
+  reads   issuer                           via `the amount already sold …`
+          interp                           via `the amount already sold …`   (TYPICALLY `the staff reading`)
           `the date of the offer or sale`  via `the amount already sold …`
+  refuses "no Regulation Crowdfunding figure exists before commencement on 2016-05-16"
   pure    no
 ```
 
-The read-sets also print as an index of defined expressions at the end of a rendered document.
-A rule with an empty read-set gets the pure badge with no annotation. `imaginary-alcohol-act.l4`
-migrates with zero changes to rule text and gains its first `#EVAL`.
-
-## 5. Compiler plan (proposed order)
-
-1. **Read-set pass** (`R(f)` over `Unique`s, transitive over SCCs, closed at lambdas), one
-   module, replacing the Catala and Docassemble private copies and the shallow collector. Write
-   the helper-reads-an-`ASSUME` export test first; it is expected to fail today.
-2. **Preconditions.** Own keyword for uninterpreted types (`ASSUME T IS A TYPE`, 101 uses, 6 in
-   legal): a type-dependent `ASSUME` makes discharge an ordered telescope, not a set
-   (`anti-social.l4:11-18`, `british-citizen-act.l4:5-12`; polymorphic `prelude.l4:757-761`
-   `TBD`). Non-suppliable refusal form (`REFUSE` or a marker) for `regcf.l4:143,486`,
-   `daydate.l4:104`, prelude `TBD`: discharge plus `IMPORT` would otherwise make them request
-   parameters (`assumesFromModule` is current-module-only today, `Export.hs:293-307`; the service
-   already promotes referenced `ASSUME`s, `Backend/Jl4.hs:556-560`).
-3. **Elaboration = discharge.** Every definition with non-empty `R(f)` gains those fields as
-   leading implicit parameters; every reference passes them through; `LET`/`WITH` binding a
-   field at a site whose read-set contains it becomes application. After elaboration the program
-   is plain L4 with `GIVEN`s: no environment, no pin, no fingerprint axis; the assumed-term path
-   shrinks to "unsupplied at root".
-4. **Runtime shape** is a compiler choice: per-field (Coq-exact) or one per-module record
-   (preserves sharing of 0-ary dated constants, e.g. the 10 readers of `the rules in force
-include` in `regcf.l4`; cost unmeasured). Backends project per-field from `R(f)` either way.
-5. **`TYPICALLY` as the default of an implicit parameter** (Lean `optParam`); today the schema
-   exposes it and the evaluator discards it (`Machine.hs:3514-3520`).
-6. **Consumers:** hover/CodeLens; `@export` schema with tiers; DMN (`ASSUME` → `inputData`,
-   `R(f)` → information requirements, `GIVEN` functions → BKM; a `LET` at a non-root site is the
-   exporter's existing tier-2 case, no new drop class); trace needs nothing new (a supplied field
-   is an ordinary bound argument).
-7. **Temporal**, last: `RULES EFFECTIVE DATE` as a prelude-declared field, `EVAL UNDER RULES
-EFFECTIVE AT d e` as `LET`, once sharing is measured. The per-day interval iterators rebind
-   per iteration by construction (`Machine.hs:1253-1302`) and need a rank-2 implicit; not
-   designed.
-
-## 6. Scorecard against `IMPLICIT-PROPS-DESIGN.md`
-
-| wish                                 | reduced design                                                                       |
-| ------------------------------------ | ------------------------------------------------------------------------------------ |
-| §4.1 every function gets typed props | every `ASSUME` is an implicit parameter of every function that transitively reads it |
-| §4.2 `§`-scoped establishment        | dropped: visibility already ships; reach is stated by placement, anywhere            |
-| §4.3 purity discovered               | `R(f) = ∅` ⇒ untouched by discharge ⇒ badge for free                                 |
-| §4.4 `local`                         | `LET` reaching callees for the world; `BUT WITH` for subject deeming                 |
-| §4.5 provenance                      | supplied field is an ordinary traced argument; declaration and supply sites static   |
-| §5.1 structural subtyping            | unnecessary: declared field types; requirement = set inclusion                       |
-| §5.2 inference                       | `R(f)`, one pass, transitive                                                         |
-| §6 `TAKING`                          | hover and schema only, never authored                                                |
-| §10.5 DMN isomorphism                | `ASSUME` → `inputData`, `R(f)` → info requirements, `GIVEN` fns → BKM                |
-
-## 7. Defects found incidentally (pre-existing, stand regardless)
-
-- A parent section's own reference goes ambiguous ("multiple definitions") whenever any
-  descendant section rebinds the name (PL probes v3/v4), contradicting the documented
-  nearest-ancestor rule.
-- `TYPICALLY` on `ASSUME`: advertised in the schema, discarded by the evaluator (probe t4).
-- `collectReferencedUniques` is one body deep (§2); helper-read `ASSUME`s are unsuppliable and
-  unlisted via the service. Code reading; unrun.
-- `LocalAssume` is in the grammar (`Syntax.hs:454`, `Parser.hs:502`), 0 legal-corpus uses,
-  refused by Docassemble.
-- Function-typed `ASSUME` (`anti-social.l4:12-28`) is refused by every backend; it is a
-  `DECLARE` record in disguise (design §10.6 b).
-
-## 8. Open questions
-
-Meng has stated he has further questions; none recorded yet. Known unresolved on our side:
-whether the keyword `ASSUME` survives for the term role or is renamed (cosmetic; corpus
-migration is zero either way); the runtime shape (§5 item 4) and its sharing cost; whether
-`LET`-reaching-callees should be promoted in docs before there is in-body demand; whether
-`ASSUME` visibility crosses `IMPORT` (not verified by any team).
-
-## 9. Proposed rulings (NOT yet ruled; record in `IMPLICIT-PROPS-DESIGN.md` when decided)
-
-1. `ASSUME` (term role) is an implicit parameter with compiler discharge; supply is application.
-2. No `ASSUMING`, no authored `TAKING`, no earmuff rule, no `§`-scoping beyond what ships.
-3. `BUT WITH` is subject deeming, not environment rebinding.
-4. Preconditions land first: own keyword for uninterpreted types; non-suppliable refusal form.
-5. The read-set is one compiler fact consumed by every backend.
-
----
-
-## Appendix A. The four red-team reports, verbatim
-
-Each was written from a read-only survey of this worktree; none built or edited it. Their
-"not verified" sections are kept.
-
-### A.1 Legal isomorphism (`redteam-legal`)
-
-Red team (legal isomorphism) verdict: "the § tree is the scope tree of the law" is false for every corpus file and for statutes generally. Drafting has two scoping devices, and L4 already has both. Read-only; nothing built or run.
-
-FINDINGS, most damaging first
-
-1. Statutory reach is declared by words, not position. "In this Act", "in this Part", "for the purposes of this section" state reach explicitly and position-independently. Interpretation sections are siblings of operative sections, often at the end: BNA 1981 s 50 (of 53), Companies Act 2006 Part 38, Reg CF §227.100(d) inside the Part's first section. The corpus already does this: british-citizen-act.l4:3-12 declares 7 ASSUMEs under `§§ Assumptions` and consumes them in sibling sections (:104-155); promissory-note.l4:226,228 declares in an end-of-file `§ Promissory Appendix` and consumes at :15 and :302; bna.l4:71 `§§ Interpretation` is a sibling of `§§ Subsection (1)` (:178). Under "binds that § subtree", 9 of 39 unique corpus declarations (23%) go dark. "Module-wide if before any §" is worse: all 26 legal files open with a § title, so module-wide means above the document title.
-
-2. Headers track the statute half the time, never wholly. Of 511 headers: 271 statute-numbered (53%), 99 encoder-organisational (Types/Tests/Fixtures/Helpers), 141 descriptive. Six older files score 0 (ceo, bca, directive, promissory, alcohol, anti-social). The cleanroom scores 48/72 (ISA), 41/64 (GIA), 32/44 (PAA), but interleaves `Fixtures`, `The ontology`, `The person` as siblings of `Subsection (3)`. A scope tree read off § mixes statute and encoder taste in every file.
-
-3. The statutory `local` rebinds the SUBJECT, not the world. Drafting's one rebinding device is deeming/modification: "deemed for the purposes of subsection (1)" (BNA s 1(2), bna.l4:263-276), "applies as if". It rebinds fields of the GIVEN record, which ASSUMING cannot reach (no record update). World-level rebinding has exactly 19 corpus uses (`EVAL UNDER RULES EFFECTIVE AT`: regcf.l4 x17, regcf-wizard.l4:630, denovo x1), every one at the outermost position of a #EVAL or @export body; zero inside a rule, quantifier or lambda. The ASSUMING expression form, its two lints, and DMN's specialise/drop split serve a case with no instances.
-
-4. ASSUMING collides with ASSUME on epistemic status and mis-describes the worked example. ASSUME means "unknown, uninterpreted"; regcf.l4:143 is a curated refusal that must never be supplied (ruling R2). ASSUMING means "take as known". Making every ASSUME suppliable lets a caller bind the refusal and get a confident wrong answer below commencement. jl4-service already does this: Backend/Jl4.hs:556-560 promotes referenced ASSUMEs to request parameters, and regcf-denovo.l4:3035-3036 records the refusal being asked of every caller. In legal English "assuming" is advocacy's hypothetical (arguendo). The wizard's use (regcf-wizard.l4:626-632) is not hypothetical: it is the law actually in force on the investment date. A drafter writes "under the rules in force on [date]".
-
-5. World/subject flips at seams, not by nature. Rule date: ambient at regcf.l4:133,:491, a GIVEN at regcf-wizard.l4:626. The issuer: subject of Rule 100(b) (regcf.l4:280-332) and a boolean field of three other subjects (Offering :342, IntermediaryArrangement :564, ReportingStatus :652). `survived the deceased` bakes the world fact `date of death` (sg-succession-domain.l4:78) into each subject Person (:53-58). `the relevant day` is scoped by s 1(9) to two subsections but bound module-wide (bna.l4:88-96). The corpus never makes a world constant an ASSUME; world constants are dated MEANS. What actually gets drilled is interpretive choice: `interp IS AN Interpretation` (regcf-denovo.l4:142-160) is threaded through 26 functions and read by 7, so 19 are pure pass-throughs. That is the props use case, and the "called twice per evaluation?" rule of thumb classifies it correctly.
-
-6. Context-displacement and cross-Act borrowing are beyond any static scope. GIA s 3 "any court" displaces s 2 inside its own reach (guardianship-of-infants-act.l4:456-470; encoder widened the type). "court" is Act-wide in PAA/GIA and section-only in WA s 28(7), deliberately unified into one shared type (family-domain.l4:168-215). PAA restates ISA's "child" rather than importing (probate-administration-act.l4:400-410). Interpretation Acts: zero corpus references.
-
-7. Sigil. GIVEN names are 716 bare vs 341 backticked, and ambient names are backticked phrases, so a de facto distinction exists but is unreliable. Prior art splits: contracts capitalise Defined Terms; UK/SG statutes mark nothing and publish an index of defined expressions (CA 2006 Sch 8); Australia's ITAA 1997 ss 2-10/2-15 asterisks defined terms and then exempts basic terms. A sigil earns its keep only at dictionary scale and prunes itself. So: no source sigil; the read-set is a generated index (hover/printer), never authored or checked.
-
-SMALLEST DESIGN A DRAFTER RECOGNISES
-
-(a) Declaration with stated reach = ASSUME, module-wide, position-independent. The module is the Act or Part; "has the same meaning as in the X Act" is IMPORT (the cleanroom already splits Acts plus a shared domain module). Drop § scoping: 0/39 declarations want it, 9/39 break under it. Narrower reach is not an environment: "for the purposes of this section" definitions are functions of the subject (sg-paa.l4:308 puts the section number in the name; sg-wills.l4:626 makes it a data-entry field). Split the refusal role into non-suppliable REFUSE (design §10.6d) so suppliability is total over what remains.
-
-(b) Supply only at the boundary: #EVAL/#ASSERT arguments, the @export request schema (extractAssumeParamResolveds already does this), and IMPORT. `EVAL UNDER RULES EFFECTIVE AT` becomes a directive form; the wizard surfaces `RULES EFFECTIVE DATE` as a request parameter via the generated read-set. No ASSUMING expression means no lambda/quantifier lint, no dead-rebind lint, no DMN drop class: every ASSUME is inputData, every supply an input. Keep the sketch's R(f) inference, displayed not written.
-
-(c) If an in-expression rebind is ever needed, spell it as the deeming device, `e TREATING x AS v` (UK OPC prefers "is to be treated as" over "deemed"), and let it reach subject fields, since that is the statutory case. Do not build it now: zero demand inside rule bodies.
-
-Prior art: Interpretation Act 1978 s 5, Sch 1, s 11; SG Interpretation Act 1965 s 2(1); 1 U.S.C. §1; BNA 1981 s 50(1); ITAA 1997 ss 2-10, 2-15, 995-1; CA 2006 Sch 8; Thornton, Legislative Drafting (definitions chapter); Dickerson, Fundamentals of Legal Drafting; UK OPC Drafting Guidance.
-
-NOT VERIFIED: whether ASSUME visibility crosses IMPORT; Export.hs:488 extractImplicitAssumeParams keys on OutOfScopeError, so which of two promotion paths the service takes for regcf's refusal; the 15-dropped-decisions figure comes from the handoff, not re-measured.
-
-### A.2 Backends (`redteam-backends`)
-
-Backends red-team report on the props/ASSUME sketch (brief §B). Read-only survey; nothing built or run.
-
-RANKED FINDINGS
-
-1. `ASSUMING` as runtime `local` is smucclaw#934's deep-pin trap, generalised. The one ambient field today is machine state, not a binding: `EVAL UNDER RULES EFFECTIVE AT` pushes a frame and calls `putTemporalContext` (jl4-core/src/L4/EvaluateLazy/Machine.hs:837-840, 1100-1106). Under laziness that answered wrongly until the two-pass deep force + snapshot landed (Machine.hs:2991-3040); closures stay opaque ("a pin cannot follow a value into a scope it does not dominate"); and cache validity needs one `CtxReads` axis per field (jl4-core/src/L4/TemporalContext.hs:140-224). N user fields = N fingerprint axes, each deep-pinned. The lexical alternative, LetIn shadowing the ASSUME's own Unique, which jl4-service already does (jl4-service/src/Backend/Jl4.hs:639-665), is closure-correct for free but reaches only the inlined body: every top-level decide closes over the module env where the field is `ValAssumed` (Machine.hs:3531-3536, 3516-3520). So Reader `local` in this evaluator is either dynamic-and-deep-pinned or lexical-and-shallow. Only compile-time discharge (callees take the field as a parameter) is both correct and cheap.
-
-2. R(f) already exists twice and is missing where it bites; a live bug. Catala (jl4-core/src/L4/Catala/Lower.hs:969-985, fixpoint) and Docassemble (jl4-core/src/L4/Docassemble/Lower.hs:541-557) compute the transitive requirement. The HTTP schema (jl4-core/src/L4/FunctionSchema.hs:276-300), the direct evaluator (Backend/Jl4.hs:558) and the WASM ABI (jl4-mlir/src/L4/MLIR/Lower.hs:677) all use `collectReferencedUniques` (jl4-core/src/L4/Export.hs:354-358), which is one body deep. By code reading: an `@export` whose helper reads an ASSUME publishes a schema without that field and evaluation goes `Stuck` (Machine.hs:457). The only test is a direct read (jl4-service/test/TestData.hs:224-234). Whatever lands, R(f) must be one compiler fact, not five backend re-derivations.
-
-3. The sketch's DMN rules contradict ruling R-C and misclassify the one production `local`. "Literal → specialise subgraph" is rung 2 of the ladder that specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md §15.12.1 (lines 5766-5830) ruled to stop at rung 0 ("the model owns the law under a date; the harness owns the dates"), rejected on legibility (doubles the requirement cone) and sufficiency (finite regimes; 20 harness cases, 1340/1340 on both engines). "Computed → drop" would drop `investment limit under the rules effective on` in jl4/examples/legal/regcf/regcf-wizard.l4, the only `EVAL UNDER` outside fixtures, whose value is the export's own GIVEN `rule date`: the trivially lowerable case, because that GIVEN _is_ the inputData. Right criterion: a field lowers iff it is single-valued per evaluation. Rebinding at an export root is boundary discharge (free); rebinding anywhere else is a second value, unlowerable whatever v is. Missing from the sketch's unlowerable list: rebinding inside a recursive function, inside a hydrated computed field (§4.4), and the per-day interval iterators (Machine.hs:1253-1302), which rebind per iteration by construction. Counts: 19 uses in the legal corpus, 17 of them regcf.l4 fixtures; 15 decisions dropped (16 `D-RULEDATE-UNBOUND` lines in jl4/examples/dmn/expected/regcf-corpus.fidelity.txt).
-
-4. §-scoped fields recreate the N-inputData-per-name defect Phase 4 un-lifted. FEEL has one flat variable scope (jl4-core/src/L4/Dmn/Lower.hs:4740-4760, `uniquifyIn`), a same-name type conflict is Blocking (spec §2.5.3), and a § is a `decisionService` over global inputData (§2.3). Two sibling §§ each declaring `jurisdiction` at different types is legal in the sketch and unlowerable. Let § govern visibility of a module-global name; never mint a second identity.
-
-5. Nothing provides "world once, subject per instance". `BatchRequest` is `{outcomes, cases:[{id, attributes}]}` (jl4-service/src/Types.hs:376-405): every case repeats the world. OpenFisca is the prior art and is natively two-tier: entity inputs vs `parameters(period)` (jl4-core/src/L4/OpenFisca/Lower.hs:251-252, 272), and its world tier is keyed by date, so the rule-date axis _is_ a world field. Reader and discharge yield the same flattened schema; grouping by § names the tier (`x-l4-type`, FunctionSchema.hs:44).
-
-6. Provenance. The trace records reads as Enter/Exit of a term (jl4-core/src/L4/EvaluateLazy/Trace.hs:87-94); ambient observations go to the cache fingerprint (Machine.hs:654-687), not the trace, and the binder is invisible. Under discharge the binding is an ordinary parameter/LetIn allocation already traced, and "established at §3.2" is the declaration site. Reader adds nothing without a new trace event.
-
-7. Two dead surfaces to retire, not extend. `LocalAssume` is in the grammar (jl4-core/src/L4/Syntax.hs:454, Parser.hs:502), 0 legal-corpus uses, refused by Docassemble (Lower.hs:1508). `ASSUME f IS A FUNCTION …` (jl4/examples/legal/anti-social.l4:12-28) is refused by every backend (Export.hs `validateExportInputs`; Machine.hs:3517-3520 TODO) and is a DECLARE record in disguise (props §10.6b). Reusing `ASSUME` as the field spelling keeps both ambiguities alive.
-
-MINIMAL DESIGN, FROM THE BACKENDS' SIDE: section parameters, discharged.
-
-One mechanism. `ASSUME x IS A T` (keep the spelling, or `CONTEXT`) declares that its enclosing § (the module, if before any §) is parameterised by x. The compiler computes R(f) transitively over call-graph SCCs and rewrites every f with R(f) ≠ ∅ to take those fields as leading implicit parameters, passed unchanged at every call. This is Coq `Section`/`Variable` with discharge at `End` (only the variables actually used, transitively), Agda parameterised modules, Isabelle `locale … fixes`; formally the dictionary-passing translation of implicit parameters (Lewis, Launchbury, Meijer, Shields 2000), i.e. flat coeffects made explicit.
-
-- No new supply form. Supply is application. The export boundary gets R(f) as schema properties (what FunctionSchema does today, made transitive). Hypothetical evaluation is Agda's named implicit argument: `f ASSUMING x IS v` supplies x at that application; lexical, closure-correct, no machine state, no deep pin, no per-field fingerprint. `EVAL UNDER RULES EFFECTIVE AT d e` becomes `e ASSUMING RULES EFFECTIVE DATE IS d`, the date being a prelude-declared field. Meng's "OCaml functor" smell is accurate and is the honest name: Coq sections are functor application with the arguments discharged. Three overlapping mechanisms become one, named.
-- DMN needs no new concept. Discharged arguments are "the same argument at every call site", tier 1 (spec §2.1), un-lifted to inputData by the existing analysis; `ASSUMING` at a non-root site is tier 2 (a real λ → BKM, or R-C's drop+harness). The sketch's three DMN rules and the "would I call this twice?" rule of thumb collapse into the exporter's existing tier census (96% tier 1, §2.2); the lint _is_ `D-BKM`. Un-lambda-lifting and discharge are inverses, and §2 already says so.
-- Every other backend gets its native view. Catala: scope `input`s, with `TYPICALLY` → `context` (R10, Catala/Lower.hs:1136-1153). Docassemble: one question per field. OpenFisca: fields → `parameters`/entity inputs. jl4-service and MLIR: what they do today, made correct. Discharge per field (Coq-exact), not one record per §: every flat backend is per-field, and Docassemble refuses record-typed ASSUME (Lower.hs:941). Group by § only in the schema, for the two-tier API.
-- Lints reduce to two: unresolved name → "declare a field in the nearest §"; a GIVEN/WHERE binder shadowing a visible field → error. No dead-ASSUMING lint, no quantifier lint: those are backend fidelity notes.
-
-NOT VERIFIED. Finding 2 is code reading, not a run. Discharging `RULES EFFECTIVE DATE` turns 0-ary dated constants (10 readers of `the rules in force include` in regcf.l4) into 1-ary functions and loses sharing unless memoised per date; unmeasured. Word-greps for any/all (1347/644) include prose; the brief's ~150 is the careful figure. Blawx/s(CASP) with a twice-valued field not examined.
-
-### A.3 PL theory (`redteam-pl`)
-
-Red team (PL theory) verdict: the sketch's inference rule R(f) is right (it is Coq section discharge), but its evaluation model (Reader `local` as machine state) and its §-subtree visibility are both wrong, and two of its three surfaces are redundant with syntax L4 already has.
-
-Probes ran on a prebuilt `l4` (l4wt/blawx-integrated @2e8317d1; v1–v4 cross-checked on the Aug-7 reference binary), no build in this worktree. Files: scratchpad/{t1-let,t3-shadow,t4-typically,t7-named,v1..v4}.l4, xsec.py.
-
-#### Ranked findings
-
-**F1. `ASSUMING` as Reader `local` is dynamic binding as machine state, and L4 already shows it fails under laziness.** The one instance today, `EVAL UNDER RULES EFFECTIVE AT`, mutates `TemporalContext` for a frame's extent (Machine.hs:837-841, 363). Thunks escape the extent, so #934 added deep-force + snapshot (Machine.hs ~2985-3040), which changes strictness and still leaks through closures, record fields and obligations: `ok/temporal-pin-deep.l4` cases I/J/K answer 9/900 for a pinned computation, by design. T6 then fingerprints every cached thunk on the axes it read. N fields multiply all three costs. This is Yang 2020 exactly: dynamic scoping is an effect and does not survive call-by-need; implicit parameters are a coeffect and do. Under static discharge the rebound `e` is an application; the escaped closure carries the value; I/J/K give 7/700 with no forcing, snapshot or fingerprints.
-
-**F2. §-subtree visibility breaks the definitions-section idiom (HANDOFF §5's own domain argument) and is unnecessary.** Measured (xsec.py): 151 files have ≥2 § headers, 16 contain ASSUME, 7 use one outside its declaring subtree. Legal: `british-citizen-act.l4` declares 7 in `§§ Assumptions` (l.3-12), used in four sibling §§ (l.81-155); `promissory-note.l4` 2 (l.226-228 → l.15, 302); `regcf.l4:143` → `:409`, a different top-level §; plus `experiments/britishcitizen.l4`, `dogs.l4`, and two scoping fixtures whose diagnostics change. ASSUME would become the only top-level form with subtree visibility (DECIDE stays module-wide: v2 → 1). What §4.2 wants already exists: nearest-ancestor shadowing (Types.hs:877-899, commits 29ace1c8/a6ac3e7a): v1 child rebinds x, child ref → 2; v2 sibling ref, ancestor def → 1. Live defect: a parent's own reference is ambiguous whenever any descendant rebinds the name (v3, v4: "multiple definitions" at 3:9), contradicting the documented rule. Fix regardless.
-
-**F3. Supply must be elaboration, not env rebinding.** Lookup is by Unique only (Machine.hs:3204-3212): with `f MEANS x PLUS 1`, `LET x = 41 IN f` is stuck on assumed x (t1) while `LET x = 41 IN x PLUS 1` is 42. The service works only by inlining the exported body into a `LetIn` reusing the ASSUME's own Resolved (Jl4.hs:640-665), and the schema collects direct body refs only (Export.hs:354-358): an @export whose helper reads an ASSUME is unsuppliable and unlisted today. R(f) fixes that, but only via dictionary-passing, at which point "initial supply" and `local` are one construct: application.
-
-**F4. "Sets not rows" is unsound for two ASSUME populations.** Type-dependent: `anti-social.l4:11-18` (`Person IS A TYPE`, `is authorised IS A FUNCTION FROM Person TO BOOLEAN`), `british-citizen-act.l4:5-12`: discharge is an ordered dependent telescope (Coq), not a set. Polymorphic: `prelude.l4:757-761` `ASSUME TBD` under `GIVEN a IS A TYPE` has no monomorphic type to supply (cf. Export.hs:464). Sets are sound only after §10.4 item 3 lands; it is a precondition.
-
-**F5. IMPORT turns refusal bottoms into inputs.** `daydate.l4:104` is a refusal ASSUME; discharge makes it a parameter of every importer calling YMD, and a DMN inputData. It is hidden today only because `assumesFromModule` is current-module-only (Export.hs:293-307). `REFUSE` must land first (also regcf.l4:143).
-
-**F6. Three surfaces where prior art has one, plus a rule prior art rejects.** Coq: `Variable` + application. GHC: `?x` + `let ?x`. Scala: `using` + `given`. Sketch: ASSUME + ASSUMING + TAKING + earmuff. The earmuff rule contradicts Coq, Lean, GHC and current L4 (t3: `GIVEN x` silently shadows `ASSUME x`, `g 1` = 2; `ok/section-scoping-param-not-shadowed.l4`). Capture is a dynamic-scoping hazard; with Unique-resolved static discharge it cannot occur.
-
-**F7. The OCaml diagnosis is half right.** Not a functor (uniform, module-level, generative, explicit). R(f) with least fixpoint is Coq section discharge: each constant abstracted over exactly the variables it transitively uses; SCCs discharged as a block. That granularity is correct. What smells functor-like is a dedicated supply keyword. Coq's supply is application, which L4 has: `f WITH b IS 1, a IS 3` = 2 (t7).
-
-**F8. TYPICALLY is half-built.** Schema exposes defaults (FunctionSchema.hs:276-292); the evaluator discards them (Machine.hs:3514-3520; t4 stuck). Under implicit parameters it is Lean's `optParam`.
-
-**F9 (§D).** "Parameters cannot be dropped" is right and sharper: props are parameters, distinguished only by being named and inferred. "Called twice per evaluation" = "bound under a lambda in a quantifier body", the same criterion the DMN lint needs. Visual distinctness needs no syntax: Unique-resolved reads, coloured.
-
-#### Minimal design: ASSUME is an implicit parameter
-
-1. Declare: `ASSUME n IS T`, unchanged, module-visible under the existing proximity rule. Zero corpus migration.
-2. Infer: R(f) over Uniques, transitive, closed at lambdas (definition-site discharge). Flat coeffects, Petricek–Orchard–Mycroft ICFP 2014; the LET rule is their context subtraction. Shown on hover and by `l4 check`; drop TAKING.
-3. Supply with existing syntax only: `LET x = v IN e` / `WHERE` (Lewis–Launchbury–Meijer–Shields POPL 2000, `let ?x`) and `f WITH x IS v`. Drop ASSUMING. `EVAL UNDER RULES EFFECTIVE AT d e` becomes `LET \`RULES EFFECTIVE DATE\` = d IN e` once that builtin is a prelude ASSUME. Rule: local bindings never generalise over requirements, which removes the GHC monomorphism pathology.
-4. Boundary: unsupplied R(entry) = inputs (#EVAL error, @export schema, DMN inputData); TYPICALLY = default.
-5. Semantics: elaborate to explicit parameters and run the ordinary lazy machine. Sharing recovered by memoising on implicit arguments (T6 generalised).
-6. Preconditions: own keyword for TYPE-ASSUME; REFUSE for daydate, regcf, TBD.
-7. DMN: discharged decisions → BKM parameters; supply → invocation bindings; literal LET → invocation with a literal.
-
-#### Not verified
-
-- Interval builtins rebind per stepped day (Machine.hs:2960-2985); under discharge they need a rank-2 implicit (`((?d) => BOOL) -> …`), one elaborator special form. Not designed.
-- Item 7 against the exporter.
-- The cause of v3; only measured.
-- Service behaviour for helper-read ASSUMEs: read from code, not run.
-
-### A.4 Minimalist (`redteam-minimal`)
-
-Minimalist red-team verdict: the sketch in brief §B adds a second Reader beside one L4 already has; the goal in §A is met today by DECLARE + computed fields, verified on the installed l4 binary, with zero new keywords and one already-specced addition (BUT WITH).
-
-RANKED FINDINGS (most damaging first)
-
-F1. ASSUMING duplicates an existing mechanism. jl4-core/src/L4/TemporalContext.hs:33-57 is already an 8-axis implicit environment (5 axes latent, no reader), with `EVAL UNDER …` as its `local` (Machine.hs:2975-2981 applyEvalClauses + pushFrame) and T6 read-fingerprinting for memo correctness (Machine.hs:671-675). Generalising it to user axes inherits the DMN problem wholesale: Analysis.hs:775-790 drops every rule-date rebind (DroppedRuleDateRebind) because a DRG has no scoped rebinding. A record-VALUED environment sidesteps it: `f (env BUT WITH x IS v)` is a BKM invocation (FEEL 1.3 `context put`), lowerable where ASSUMING is not.
-
-F2. "§-scoped ASSUME" already exists. jl4/examples/not-ok/tc/section-scoping-ambiguous.l4 declares `ASSUME x` in §§ b and §§ c and resolves them lexically; TypeCheck.hs:596-599 pushes the section stack for exactly this (specs/done/SECTION-LEXICAL-SCOPING-SPEC.md, DONE, smucclaw#50). The DECLARE half of §B is a no-op.
-
-F3. The "enforced earmuff" lint reverses a shipped ruling. FIX A (jl4/examples/ok/section-scoping-param-not-shadowed.l4): a GIVEN parameter takes absolute priority over a same-named enclosing section binding. §B would make `GIVEN foo` an error when `ASSUME foo` is visible. The shipped rule is Python's; keep it.
-
-F4. Drilling is real, but the fix is already in the language. Measured over the 25 legal-corpus files: 1,112 record-typed GIVEN slots, of which 506 (45%) are pure pass-through (never `'s`-accessed in their own body; e.g. probate-administration-act.l4 87/183, intestate-succession-act.l4 82/122). Computed fields remove pass-through by construction: sibling fields and sibling computed fields are in scope bare (COMPUTED-FIELDS-SPEC line 80; chained deps in jl4/examples/ok/computed-fields.l4 §2). Scratch witness, run with ~/.local/bin/l4 (scratchpad/env-as-record.l4): `DECLARE Estate HAS \`adult age\`, jurisdiction, beneficiaries, \`is adult\` IS A FUNCTION FROM Beneficiary TO BOOLEAN MEANS GIVEN b YIELD b's age AT LEAST \`adult age\`, \`all adults\` MEANS all \`is adult\` beneficiaries, distributable MEANS \`all adults\` AND jurisdiction EQUALS "SG"`→ TRUE, TRUE,`map (e's \`is adult\`) [c aged 3]`→ LIST FALSE, and a second`Estate WITH \`adult age\` IS 26 …`→ FALSE. That last line is`local`; the function-typed field is a parameterised rule reading the environment bare and applied per element, which answers §D's "call twice with different X" objection without a second tier.
-
-F5. Inference is tooling, not language (H6 accepted). Desugar.hs:450 `exprFieldRefs` already computes which sibling fields a computed field reads; TAKING is its transitive closure over chained fields, displayed in hover. COMPUTED-FIELDS-SPEC line 511 already anticipates "derivable from stored fields, need not be supplied as input".
-
-F6. Production `local` is already a parameter (H3 accepted). jl4-service takes only `arguments` (Backend/Api.hs:121-132; no evalClause channel); regcf-wizard.l4:627-631 takes `rule date` as a GIVEN and pins inside. 17 of the 18 legal-corpus `EVAL UNDER` sites are test fixtures (regcf.l4:1338-1433). Generalising `local` serves fixtures, not exports.
-
-F7. ASSUME (H4, refined: shrink, don't delete). 39 unique legal declarations: (a) 14 alcohol-act booleans → one DECLARE with computed-field DECIDEs, the flagship; (b) 21 anti-social/BNA function-typed → records (already ruled §10.6); (c) 2 sentinels → constants; (d) refusals: regcf.l4:143,486, daydate.l4:104, and prelude.l4:758-761 `GIVEN a IS A TYPE GIVETH AN a ASSUME TBD`, a polymorphic bottom that shows refusal is already a library idiom. Experiments: 418 lines, 13 files, 284 function-typed, 88 types, where "uninterpreted symbol" is the right construct. Ruling: ASSUME keeps two jobs, uninterpreted sort and typed bottom; it stops being a supply channel. No REFUSE keyword needed unless a message string is wanted.
-
-F8. §-scoped environments are unneeded (H5 accepted). 23 of 25 legal files are multi-§, but sections are document structure; the corpus threads records (1,112 record vs 526 scalar params) and the only ambient reads are the builtin law-time axis at 3 sites (regcf.l4:133, 491-492; regcf-denovo.l4:220). Nesting = nested records (computed-fields.l4 §4 Policy→Driver: `driver's adult`).
-
-H2 refined: WHERE is the intra-definition closure (125 blocks, 2 nested; sg-paa.l4:327-341 read the GIVEN `a`), never inter-rule, so it does not touch drilling. H1 refined: `open`-record alone still forwards through intermediates; computed fields are `open` plus no forwarding.
-
-MINIMAL PROPOSAL: "the environment is a record; a rule is a field of it."
-
-- Declare/consume/supply: DECLARE World HAS <inputs> + computed fields for rules; construct with WITH; call `w's rule`. 0 keywords.
-- local: `w BUT WITH x IS v` (RECORD-UPDATE-SPEC, PROPOSED, independently motivated by smucclaw#438). The one addition.
-- Temporal: leave `EVAL UNDER RULES EFFECTIVE AT` as the closed builtin Reader; do not open a user tier.
-- Lints: none of the five; total construction already catches a missing input.
-- DMN: stored fields → inputData, computed fields → decisions (exporter already models them, Lower.hs:164-247 hydrators), function-typed fields → BKMs, BUT WITH → BKM invocation or drop+report.
-- Prior art: Catala scopes (record-to-record function, caller-overridable `context` vars; CATALA-EXPORT-SPEC lines 138-142), the closest legal DSL; Smalltalk/Java implicit `this` for methods; Pascal `with` / Haskell RecordWildCards for bare access; ReaderT `local (\r -> r{x=v})` for update-as-local. In React terms the record IS the props and the computed fields are the component, matching §1's own vocabulary.
-
-NOT VERIFIED: DMN lowering of function-typed computed fields; trace output form for computed-field evaluation; scale (only 4 computed fields exist in the legal corpus, so a regcf-size rewrite is unmeasured); transitive exprFieldRefs is not built; the l4 binary used is dated 2026-08-27 and may lag unstable. No cabal, no edits to the worktree.
-
-## Appendix B. Probes and observed outputs
-
-Run by session `dynamic-scoping` on 2026-09-03 with `~/.local/bin/l4 run` (binary dated
-2026-08-27). Kept as snippets, not as `.l4` files, so they cannot fall into a golden glob.
+A rendered document ends with an index of defined expressions and their read-sets, as UK and SG
+statutes publish an index of defined expressions (CA 2006 Sch 8) rather than marking each use. A
+definition with an empty read-set and an empty refusal set gets a purity badge for free. Hover at a
+call site says where each flowed value came from, and a diagnostic about an implicit names the
+heading line it was declared on: the personas asked for both.
+
+**`@reads` (R11).** A function may annotate an implicit it reads, `@reads interp — this decision is
+where the look-through fork bites`, or override the section's `@desc` with its own, so that the
+per-decision fork register survives hoisting. The de novo Reg CF encoding carries five different
+descriptions of `interp` (`regcf-denovo.l4:3043-3078`), each naming which contested reading that
+decision turns on, and the wizard's per-question help is built from them; the legal lens rated
+their collapse a loss of legal meaning.
+
+### 2.10 Backends (R10)
+
+The read-set pass lands first, replacing the two private copies and the shallow collector (§2.2).
+Then: the export schema is keyed by (name, tier) with an `x-l4-tier` annotation; check rejects an
+explicit parameter sharing a name with a discharged implicit (today the two collapse to one
+property with the name listed twice in `required`, `FunctionSchema.hs:299-300`); defaulted
+implicits are not `required`; `BatchRequest` (`jl4-service/src/Types.hs:376-405`) gains a `world`
+object so a batch supplies the world once and the subject per case, which nothing provides today
+(OpenFisca's entity-vs-`parameters(period)` split is the prior art); discharged implicits **trail**
+positional parameters; OpenFisca puts scalar implicits in `parameters(period)` and refuses record
+ones; DMN lowers discharged implicits as decide parameters, not free terms, so that `paramGroups`
+(`Dmn/Lower.hs:3756`) merges same-named same-typed parameters into one `inputData` as it already
+does for the eight limbs of Rule 100(b). `imaginary-alcohol-act.l4` migrates as fourteen scalar
+section `GIVEN`s, not one record: one record collapses fourteen requirement edges into one for DMN,
+Docassemble refuses a record-typed input (`Docassemble/Lower.hs:941`), and scalars keep the rule
+bodies byte-identical without needing field-opening.
+
+### 2.11 Temporal, last
+
+`RULES EFFECTIVE DATE` becomes a prelude-declared binder and `EVAL UNDER RULES EFFECTIVE AT d e`
+a `WITH`, once sharing is measured. Demand today (2026-09-03): all 19 legal-corpus uses (17 in
+`regcf.l4` fixtures, `regcf-wizard.l4:630`, one in the de novo file) sit at the outermost position
+of a directive or export body, zero inside a rule, quantifier or lambda. The per-day interval
+iterators rebind per iteration by construction (`Machine.hs:1253-1302`) and would need a rank-2
+implicit; not designed.
+
+## 3. Worked example: Reg CF Rule 100(b)
+
+`jl4/examples/legal/regcf/regcf.l4:279-333` (verbatim before, sample S4 after). Eight consecutive
+definitions open with `GIVEN issuer IS AN IssuerProfile`; the six limb bodies read `issuer's …`;
+two bodies call the limbs; one caller lives in a different top-level section (§7, :882); two
+`#ASSERT`s at :1001-1004 supply from the root. This is the sample every lens rated highest: "the
+one place the construct is isomorphic with its source" (legal lens).
 
 ```l4
--- t7-named: named application already exists
+§ `1. Issuer eligibility — Rule 100(b)`
+    GIVEN issuer IS AN IssuerProfile
+
+@ref 17 CFR 227.100(b)(1)
+GIVETH A BOOLEAN
+`(b)(1) — not organized under State or territorial law` MEANS
+        "(1)" ... NOT issuer's `organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia`
+
+@ref 17 CFR 227.100(b)(2)
+GIVETH A BOOLEAN
+`(b)(2) — an Exchange Act reporting company` MEANS
+        "(2)" ... issuer's `subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act`
+
+-- (b)(3) to (b)(6) likewise: the GIVEN line and the positional `issuer` go, the body is byte-identical
+
+@ref 17 CFR 227.100(b) — the disjunction of exclusions
+GIVETH A BOOLEAN
+`issuer is excluded by Rule 100(b)` MEANS
+        "(b) Applicability. The crowdfunding exemption shall not apply to transactions involving the offer or sale of securities by any issuer that:"
+    ..  `(b)(1) — not organized under State or territorial law`
+    ..  `(b)(2) — an Exchange Act reporting company`
+    ..  `(b)(3) — an investment company`
+    ..  `(b)(4) — subject to a bad-actor disqualification`
+    ..  `(b)(5) — delinquent in ongoing annual reports`
+    ..  `(b)(6) — no specific business plan, or a blank-check business plan`
+
+@ref 17 CFR 227.100(b) — eligibility is the negation of the exclusions
+GIVETH A BOOLEAN
+DECIDE `issuer is eligible` IF
+    NOT `issuer is excluded by Rule 100(b)`
+```
+
+The cross-section caller, `:873-882`, today declares its own `GIVEN issuer` and passes it
+positionally. Under the R2 recommendation it **drops** its own `GIVEN issuer` (the restatement
+would be the check error) and reads section 1's binder like everything else; under R2 as first
+drafted it keeps it, with a redundancy warning, and the binding supplies the callee. Either way the
+call loses its argument:
+
+```l4
+GIVEN offering    IS AN Offering
+      …
+DECIDE `the transaction qualifies for the section 4(a)(6) exemption` offering investor amount arrangement filing IF
+        "(a) Exemption. An issuer may offer or sell securities in reliance on section 4(a)(6) of the Securities Act of 1933, provided that:"
+    ... `issuer is eligible`
+    AND `offering is within the offering limit` offering
+
+#ASSERT     `issuer is eligible` WITH issuer IS `a clean issuer`
+#ASSERT NOT `issuer is eligible` WITH issuer IS `a foreign issuer`
+```
+
+What changed: eight identical `GIVEN` lines became one; eight heads lost a positional parameter;
+six bodies are byte-identical; seven call sites in the two calling bodies lost an argument; the
+`#ASSERT`s supply by name. Under DMN the eight limbs already share one `input_issuer` via
+`paramGroups`; after discharge the same merge applies to the section binder.
+
+## 4. The rulings
+
+The canonical statement of each is on the rulings sheet (artifact "Twelve Rulings on Props",
+`fdc2631d`); what follows is the same text condensed, with status. A ruling is recorded only in
+`IMPLICIT-PROPS-DESIGN.md` §11, dated.
+
+| #   | status                                               | holding (condensed)                                                                                                                                                                                                                                                                                            | alternative on the sheet                                                                                                                            |
+| --- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| R0  | **RULED 2026-09-04**                                 | `ASSUME` is deprecated: term → section `GIVEN` with discharge; type → empty `DECLARE`; refusal → `REFUSE`.                                                                                                                                                                                                     | —                                                                                                                                                   |
+| R1  | **amended 2026-09-04** at Meng's direction; unmarked | A call site is entirely positional or entirely named. Grammar unchanged; `supplyAppNamed` may omit a flowed or defaulted parameter; a section `GIVEN` in the read-set is a suppliable name; implicits keyword-only. (Original R1 had proposed a new mixed grammar `f x WITH y IS v`; struck, never live code.) | Positional implicits as leading parameters, which forces an order onto a set; argued against by two lenses.                                         |
+| R2  | candidate; **recommendation posted 2026-09-04**      | Resolution lexical, no caller chain; a bare name resolves to own `GIVEN`, opened field or section `GIVEN` or is a check error. Sheet holding: a caller's same-named `GIVEN` supplies the section binder; same-type restatement warns, different-type errors.                                                   | **Recommended:** a function `GIVEN` never flows; restatement of a visible section `GIVEN` is a check error. Measured cost: zero.                    |
+| R3  | candidate                                            | Section visibility as shipped: module-visible, `§` a tiebreak; different-type re-declaration errors; fix the parent-ambiguity defect and the §3.3.4 drift first; tier by call-site variation, never placement.                                                                                                 | Coq subtree visibility: matches "in this Part" literally, breaks nine sibling-section declarations, buys nothing the tiebreak lacks.                |
+| R4  | candidate; **spelling contested** (§2.1)             | Heading-line `§ ⟨name⟩ GIVEN …`; `WHEREAS` struck; `WHEREIN` in reserve beside `IN THIS SECTION x IS A T`; a column-1 `GIVEN` after a heading whose names the next head does not bind is a check error; round-trip goldens on both printers.                                                                   | Take a keyword now. The indented form (§2.1) is what was minuted with Meng and what he described as the design; mark modify to keep it.             |
+| R5  | candidate                                            | Field-opening lexical only, ranked as §2.7, collision error at read and at the opening declaration, elaborated to `Proj`, binders only at `WITH`.                                                                                                                                                              | Opt-in `OPENED` per binder; or no opening at all.                                                                                                   |
+| R6  | withdrawn                                            | The `MAYBE`/`EITHER` propagation sugar is withdrawn, declined on measurement (§5). The taxonomy stands.                                                                                                                                                                                                        | Keep it with five conditions (use-site `?`, bind at nearest failure-typed node, lambda its own boundary, `JUST` explicit, elaborate to `CONSIDER`). |
+| R7  | candidate                                            | `REFUSE` as §2.8: throw at force; `#ASSERT REFUSED`; three-valued assertions; one named definition per refusal; per-backend image; `Ref(f)` per reason, `TBD` excluded; taxonomy row split.                                                                                                                    | Keep pre-commencement as a refusal per corpus ruling R2 and accept that transitional provisions cannot be encoded over it.                          |
+| R8  | candidate                                            | `TYPICALLY` one behaviour as §2.5.                                                                                                                                                                                                                                                                             | Defaults stay documentation; a section binder needing a default is a definition with an override.                                                   |
+| R9  | candidate                                            | `WITH` at directives; `LET`-reaching-callees or `e WITH x IS v` in bodies; `LET` over trailing `WITH`; `WHERE` never supplies; DMN per R-C.                                                                                                                                                                    | Drop `LET`-reaching-callees; rebinding is application at any site. Preferred by the seasoned raters.                                                |
+| R10 | candidate                                            | Backends as §2.10; implicits trail; alcohol act as fourteen scalars.                                                                                                                                                                                                                                           | Each backend places implicits from the read-set as a separate list (the same thing from the other side).                                            |
+| R11 | candidate                                            | `@reads x — …` or a function-level `@desc` override, so the fork register survives hoisting.                                                                                                                                                                                                                   | Accept the collapse (rated a loss of legal meaning).                                                                                                |
+| R12 | candidate; **fixes built** (§7)                      | Six pre-existing defects are fixed now, ruling or no ruling.                                                                                                                                                                                                                                                   | None sensible.                                                                                                                                      |
+
+## 5. Rejected, with the witness for each
+
+Kept so that no later session re-proposes one without meeting its witness.
+
+1. **`ASSUMING` as Reader `local`, dynamic binding as machine state.** The one ambient field today,
+   the rule date, is machine state (`Machine.hs`, `putTemporalContext`); making it correct under
+   laziness needed a two-pass deep force plus snapshot and a per-axis cache fingerprint
+   (`TemporalContext.hs`), and `ok/temporal-pin-deep.l4` cases I/J/K still answer the unpinned value
+   through closures by design. N user fields multiply all three costs. Dynamic scoping is an effect
+   and does not survive call-by-need; implicit parameters are a coeffect and do (Yang 2020). In
+   this evaluator Reader `local` is either dynamic-and-deep-pinned or lexical-and-shallow (the
+   service's `LetIn` inlining, `Backend/Jl4.hs:639-665`, reaches only the inlined body because
+   every top-level decide closes over the module environment); only compile-time discharge is both
+   correct and cheap.
+2. **`§`-subtree scoping.** Statutes declare reach by words and put interpretation sections as
+   siblings, often last (BNA 1981 s 50 of 53; CA 2006 Part 38); the corpus does the same
+   (`british-citizen-act.l4:3-12` declares 7 under `§§ Assumptions`, consumed at :81-155;
+   `promissory-note.l4:226-228` in an end-of-file appendix, consumed at :15 and :302;
+   `regcf.l4:143` → `:409`). 9 of 39 unique legal declarations go dark under subtree scoping
+   (2026-09-03); 0 of 39 want it; and nearest-ancestor tiebreak visibility already ships.
+3. **The enforced earmuff** (no function `GIVEN` may shadow a section binder, as a lint). It
+   reversed shipped FIX A (`ok/section-scoping-param-not-shadowed.l4`) and contradicted Coq, Lean
+   and GHC, guarding a capture hazard that cannot occur once names resolve statically. Note that
+   the R2 recommendation re-introduces a **narrower** rule as a check error: not "no shadowing" but
+   "no restatement of a visible section binder", measured at zero cost.
+4. **Authored `TAKING`.** Inference is a displayed compiler fact, never written.
+5. **The DMN "literal → specialise, computed → drop" rules.** Specialisation is ladder rung 2,
+   which ruling R-C stops at rung 0; "computed → drop" would delete the Reg CF wizard's rebind. A
+   binder lowers iff it is single-valued per evaluation.
+6. **"Then the caller chain" in name resolution.** Turns a typo into a request parameter (§2.3).
+7. **A new mixed supply grammar `f x WITH y IS v`.** Never parsed, never live; replaced by R1 as
+   amended (§2.4).
+8. **`WHEREAS`.** Wrong speech act for a typed free variable (§2.1).
+9. **"Coq `Section`/`Variable` exactly", "the module is the title `§`", "extension only".** False
+   as tree statements for 7 of 26 legal files, and forbids what statutes do (§2.1).
+10. **Catch-anywhere exceptions.** Under laziness which exception you catch depends on evaluation
+    order (Peyton Jones, Reid, Hoare, Marlow, Henderson, "A Semantics for Imprecise Exceptions",
+    PLDI 1999); catching is sound only at the boundary, which is `REFUSE`. A DRG has no control
+    flow to lower a catch to; the legal meaning of "catch" is defeasance, already `SUBJECT TO` and
+    `MUST … LEST …`.
+11. **`MAYBE`/`EITHER` propagation sugar (R6).** Seven of seven rating sets called the sample
+    confusing or misleading. No use-site marker, so a `GIVETH` edit twenty lines away silently
+    rewrites a body; "FEEL null propagation is literally this semantics" is false (FEEL `and`/`or`
+    are Kleene, `null = null` is true, propagation ignores the decision's type); under call-by-need
+    a bind under a constructor cannot fire and hoisting changes strictness; a lambda has no result
+    to escape to; Docassemble refuses every produced `MAYBE`; population 28 `GIVETH A MAYBE`
+    functions, 0 exported; and the deleted line `WHEN NOTHING THEN NOTHING`
+    (`guardianship-of-infants-act.l4:174`) is the encoder's visible allocation of the not-proved
+    case, which three Acts allocate differently.
+12. **Tier by placement.** A heading-declared per-transaction date got asked once per batch (§2.1).
+
+## 6. Order of work
+
+1. **Read-set pass**, one module, transitive over SCCs, closed at lambdas, replacing the Catala and
+   Docassemble copies and the shallow collector; the helper-reads-a-binder export test first. Built
+   on `fix/export-transitive-readset` (§7).
+2. **Shipped section-scoping repairs**: the parent-ambiguity defect and the §3.3.4 drift. Built on
+   `fix/section-scoping-ambiguity` (§7).
+3. **`REFUSE`** (R7) and the empty-`DECLARE` migration of the type role, so that no refusal and no
+   sort is ever suppliable, before any discharge crosses `IMPORT`.
+4. **Section binder parse** per R4, with the misattachment check error and both printers' goldens.
+5. **Discharge** = elaboration; `supplyAppNamed` relaxed per R1; resolution per R2; `TYPICALLY`
+   honoured per R8; `WITH`/`LET` per R9; field-opening per R5 with the elaborated-AST stage.
+6. **Consumers**: hover, index, `@reads`; schema tiers; `BatchRequest.world`; DMN, Catala,
+   Docassemble, OpenFisca, MLIR per R10; trace needs nothing new, a supplied binder being an
+   ordinary bound argument.
+7. **Migration and deprecation**: a warning in `l4 check` with a code action that rewrites a term
+   `ASSUME` to the ruled spelling, the warning not landing before the code action can; then corpus
+   and docs, `doc/reference/types/ASSUME.md` carrying the notice and the recipe (`CLAUDE.md` §6);
+   then keyword removal together with the dead `LocalAssume` grammar (`Syntax.hs:454`,
+   `Parser.hs:502`; 0 legal-corpus uses, refused by Docassemble).
+8. **Temporal**, last (§2.11).
+
+**Migration recipe by role** (counts 2026-09-04: 664 `ASSUME` lines in 105 files; legal 54, ok 97,
+not-ok 20, experiments 418, doc 71, libraries 2, tests-cli 2; 113 type-role): term `ASSUME` →
+section `GIVEN` under the nearest heading, the 9 of 39 legal declarations that sit in a sibling
+section hoisting to the title `§`, which is a no-op for visibility under R3; type `ASSUME` → an
+empty `DECLARE T` (parses today: `ok/set-operators-nested.l4:36`, `ok/consider-simple.l4:3`);
+refusal `ASSUME` → one named `REFUSE` definition per refusal (`regcf.l4:143, :486`,
+`daydate.l4:104`, prelude `TBD` at `prelude.l4:761`, DMN fixtures `dmn/gst-rate.l4:63`,
+`dmn/ymd-dates.l4:84`). Function-typed `ASSUME` (`anti-social.l4:12-28`, 21 legal, 284 in
+experiments) is a `DECLARE` record in disguise and migrates to one (`IMPLICIT-PROPS-DESIGN.md`
+§10.6). Getting-started tutorial: the first rule keeps its function `GIVEN person`; hoisting the
+varying subject onto a heading teaches the wrong instinct (sample S1 was mis-cut that way).
+
+## 7. Defects that stand regardless (R12)
+
+Each reproduces on the 2026-08-27 binary; none depends on the environment design. Four branches
+were built against `origin/unstable` (`7ed1589e`) by a two-round fix-and-verify workflow on
+2026-09-04, each verified by an independent agent in a disposable worktree. **As of 2026-09-04 all
+four are local, unpushed, and awaiting Meng's word before any PR is opened.**
+
+| defect                                                                                                                                                                                                                                 | branch                                 | commits                                                    |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | ---------------------------------------------------------- |
+| the export schema's one-body-deep collector; `l4 batch` binding a directly-read `ASSUME` as a positional argument; same-name `GIVEN`/`ASSUME` collapse; an `ASSUME`'s `@desc` missing from its schema entry; jl4-mlir's arity mangling | `fix/export-transitive-readset`        | `de4f0b2b`, `306164b7`, `bca5d5d3`                         |
+| a parent section's own reference ambiguous whenever a descendant rebinds the name (FIX D); candidates unnamed by section; `SECTION-LEXICAL-SCOPING-SPEC.md` §3.3.4 stated as shipped; residue p12 recorded open                        | `fix/section-scoping-ambiguity`        | `cfae309b`, `4357e163`, `60cd1479`, `0b4d461c`, `27f5b72c` |
+| `#ASSERT` collapsing an exception to a plain failure in both polarities; an `#ASSERT` reducing to a bare assumed term reported as undecided; `#CHECK` and the REPL's `:type` printing inference gensyms                                | `fix/assert-check-reporting`           | `82152cdc`, `af9f13e1`, `a46ac120`, `2c9e3f30`, `1679c8d4` |
+| the tutorial's flat `#CHECK rule WITH fact IS TRUE` form that does not run (`encoding-legislation.md:115-122`, `ASSUME.md`); a citation to a file not in the tree; the retracted binding claim's other copy                            | `fix/docs-assume-supply-and-citations` | `47580bf3`, `785c8b2d`, `b3ec6f30`                         |
+
+Still open, filed here and not yet on a branch: `TYPICALLY`'s three images (§2.5, folded into R8);
+the dead `LocalAssume` grammar (§6 item 7); function-typed `ASSUME` refused by every backend
+(§6 recipe).
+
+## 8. Measurements relied on
+
+| what                                                                                               | value                                       | date       | scope                                                       |
+| -------------------------------------------------------------------------------------------------- | ------------------------------------------- | ---------- | ----------------------------------------------------------- |
+| record-typed `GIVEN` slots that are pure pass-through                                              | 506 of 1,112                                | 2026-09-03 | legal corpus                                                |
+| `GIVEN` slots repeating an identical name+type earlier in the same section / same file             | 889 (48%) / 1,177 (63%) of 1,860            | 2026-09-04 | 26 legal files                                              |
+| `GIVEN` names bound at more than one type                                                          | 17 corpus-wide, 9 in one file, of 559 names | 2026-09-03 | legal corpus                                                |
+| legal files whose title `§` is a sibling of the operative sections                                 | 7 of 26                                     | 2026-09-04 | legal corpus                                                |
+| sites reinterpreted by an "adjacency" section-binder rule / lines colliding with the indented rule | 160 / 0                                     | 2026-09-04 | legal corpus                                                |
+| term-role `ASSUME` names / function `GIVEN` names / files where the sets overlap                   | 235 / 2,311 / 0 of 607 files                | 2026-09-04 | l4-ide corpus + libraries + `doc/` + canon                  |
+| named-application `WITH` sites / mixed sites                                                       | 971 / 0 (cannot parse)                      | 2026-09-04 | session count; 1,416 tokens in 179 of 608 files on re-count |
+| unique legal `ASSUME` declarations that go dark under `§`-subtree scoping                          | 9 of 39                                     | 2026-09-03 | legal corpus                                                |
+| `ASSUME` lines / files, and type-role lines                                                        | 664 / 105, 113 type-role                    | 2026-09-04 | whole tree                                                  |
+| Haskell files / occurrences / entry points that collect, bind, promote or lower `ASSUME`           | 35 / 752 / 16                               | 2026-09-04 | jl4-core 618, jl4-service 88, jl4-mlir 46                   |
+| readers of the commencement refusal                                                                | 8                                           | 2026-09-04 | `regcf.l4`                                                  |
+| `GIVETH A MAYBE` functions / exported                                                              | 28 / 0                                      | 2026-09-04 | legal corpus                                                |
+| `EVAL UNDER RULES EFFECTIVE AT` uses, all at outermost position                                    | 19                                          | 2026-09-03 | legal corpus                                                |
+| `WHERE`-local names coinciding with `GIVEN` names                                                  | 19                                          | 2026-09-04 | legal corpus                                                |
+| field names that are also `GIVEN` names / at mismatched types                                      | 15 / 5                                      | 2026-09-04 | charities cleanroom                                         |
+
+## 9. Open
+
+- Meng's marks on R1–R12 (R1 as amended, R2 with the recommendation, R4 with the spelling
+  question). Accepted rulings go to `IMPLICIT-PROPS-DESIGN.md` §11 dated; modified ones come back
+  here for argument.
+- Whether to push the four §7 branches and open PRs into `unstable`.
+- Runtime shape (per-field vs one record per module) and its sharing cost; unmeasured.
+- Whether `ASSUME` visibility crosses `IMPORT` today; asserted by no team, verified by none. The
+  design says nothing implicit crosses `IMPORT` after discharge, which does not depend on the
+  answer.
+- The rank-2 implicit the per-day iterators would need (§2.11).
+
+## Appendix A. Probes and observed outputs
+
+Run on `~/.local/bin/l4 run` (binary dated 2026-08-27), 2026-09-03 unless marked. Kept as snippets,
+not `.l4` files, so they cannot fall into a golden glob.
+
+```l4
+-- t7-named: named application exists today
 GIVEN a IS A NUMBER
       b IS A NUMBER
 GIVETH A NUMBER
@@ -442,15 +644,20 @@ f a b MEANS a MINUS b
 ```
 
 ```l4
--- t1-let: LET does not reach the callee today (lookup by Unique)
-ASSUME x IS A NUMBER
-f MEANS x PLUS 1
-#EVAL LET x = 41 IN f                -- observed: "needed to know the value of x but it is an assumed term"
-#EVAL LET x = 41 IN x PLUS 1         -- observed (PL team): 42
+-- mixed (2026-09-04): the mixed form is a parse error; it was never live code
+#EVAL f 3 WITH b IS 1                -- observed: parser error at 5:11-5:15, caret under WITH
 ```
 
 ```l4
--- t3-shadow: GIVEN silently shadows ASSUME (FIX A)
+-- t1-let: LET does not reach the callee today (lookup by Unique, Machine.hs ~3204-3212)
+ASSUME x IS A NUMBER
+f MEANS x PLUS 1
+#EVAL LET x = 41 IN f                -- observed: "needed to know the value of x but it is an assumed term"
+#EVAL LET x = 41 IN x PLUS 1         -- observed: 42
+```
+
+```l4
+-- t3-shadow: a function GIVEN shadows a same-named ASSUME inside its own body only (FIX A)
 ASSUME x IS A NUMBER
 GIVEN x IS A NUMBER
 GIVETH A NUMBER
@@ -474,575 +681,19 @@ f MEANS x PLUS 1
 #EVAL f WITH x IS 41                 -- observed: check error at 3:7-3:21
 ```
 
-The minimalist team's `env-as-record.l4` (a `DECLARE Estate` with three computed fields, one
-function-typed) reported TRUE, TRUE, `LIST FALSE`, FALSE for its four `#EVAL`s; not re-run here.
-
----
-
-## 10. Refinements after the checkpoint (minuted 2026-09-03/04; not ruled)
-
-Everything in this section post-dates commit `c51e9e8f` and was worked out in conversation with
-Meng. Each item is a **candidate**, recorded so it is not lost; none is a ruling until
-`IMPLICIT-PROPS-DESIGN.md` says so.
-
-### 10.1 The convention: `GIVEN`s flow to callees by name
-
-Meng's extensible-record framing (a `ReaderT (Record xs)` with `Lookup xs "issuer" IssuerProfile`
-constraints and an `extendEnv` for sub-computations) adds one rule to the §4 position: **every
-`GIVEN` binding is also an implicit binding of the same name for the callee.** Application is
-`extendEnv` with the caller's argument names; `LET x = v IN e` is the one explicit extension. This
-is generation-one dynamic binding of parameters (LISP 1.5, Emacs Lisp) made static: inferred,
-elaborated by discharge, reported at the root. Its hazard is accidental capture; the argument that
-it is benign here is that parameter names are legal vocabulary.
-
-Measured (2026-09-03, 1,774 `GIVEN` slots, 559 distinct names in the legal corpus): 17 names bound
-at more than one type corpus-wide, 9 within a single file, all of them one-letter conveniences
-(`a`, `b`, `f`, `p`, `w`) or a `DATE` vs `MAYBE DATE` lifting. **Rule adopted as a candidate: one
-name, one type, per module**, checked only when a name is read implicitly. Requirements therefore
-stay sets; no row polymorphism.
-
-Resolution order for a free name: the function's own `GIVEN`, then the nearest enclosing section
-`GIVEN` (10.2), then the caller chain, then an error at the root. Lexical beats call-site. Nothing
-implicit crosses `IMPORT` (discharge at the module boundary).
-
-Environments as tiers, by binder: application (prelude/config: `TIMEZONE`, `RULES EFFECTIVE DATE`,
-jurisdiction, request id; supplied by the deployment; already the eight axes of the temporal
-context), world (module/section `GIVEN`s; supplied by the request), call (function `GIVEN`s;
-supplied by callers). The exporter's existing tier census classifies by call-site variation, so
-world-vs-subject is measured, not declared.
-
-### 10.2 Section-level `GIVEN` replaces `ASSUME`'s term role
-
-**A section is a function of its `GIVEN`s. The module is the outermost section (the title `§`,
-which all 26 legal files have). A function's `GIVEN`s flow to its callees.** Coq
-`Section`/`Variable` exactly; `ASSUME`'s term job was "section `GIVEN`" without types you can
-supply. Rules: visibility is the shipped nearest-ancestor section rule (its parent-ambiguity
-defect, §7, fixed first); extension only — a child section may add names, never re-declare an
-ancestor's; rebinding is `LET` at a site.
-
-Motivation measured (2026-09-04, 1,860 `GIVEN` parameter slots, 26 files): **889 (48%) repeat an
-identical name and type declared earlier in the same section; 1,177 (63%) repeat earlier in the
-same file.** `regcf.l4:280-330` opens eight consecutive functions with `GIVEN issuer IS AN
-IssuerProfile`. This is the feature Meng had long wanted: factoring the common `GIVEN`s of a run of
-functions. Trade: per-function `@desc` on a shared parameter (five different `issuer` descriptions
-in `regcf-denovo.l4`) collapses to one per section.
-
-`ASSUME` deprecation path, fully spelled: term `ASSUME` → section `GIVEN` under the nearest header
-(the 9 of 39 declared-in-a-sibling-section cases hoist to the title `§`); type `ASSUME` → an empty
-`DECLARE T`, which already parses (`ok/set-operators-nested.l4:36`, `ok/consider-simple.l4:3`);
-refusal `ASSUME` → a `REFUSE "…"` builtin at any type (`regcf.l4:143,486`, `daydate.l4:104`,
-prelude `TBD`). Counts: legal 54, ok 97, not-ok 20, experiments 418, doc 71, libraries 2, tests-cli 2
-lines; 113 type-role; 105 files. Order: `REFUSE` → read-set fact + export-schema test → field
-opening + discharge → DMN exporter consumes read-sets → legal corpus → deprecation warning →
-fixtures/experiments/docs → remove keyword.
-
-### 10.3 Disambiguating a section `GIVEN` from the next function's
-
-Today every top-level declaration is parsed **signature-first** (`Parser.hs` `topdecl` =
-`withTypeSig (declare | decide | assume)`), so a `GIVEN` is by construction the prefix of the next
-declaration; `MkSection` has no parameter slot. Probes on the 2026-08-27 binary: a `GIVEN` whose
-name the head does not bind still makes the definition a function of it (`GIVEN a IS A NUMBER` /
-`f MEANS a PLUS 1` / `#EVAL f WITH a IS 41` → 42); an indented `GIVEN` and a header-line `§ S GIVEN
-a …` both parse today and attach to the next function.
-
-**Candidate rule (layout): a `GIVEN` belongs to the section iff its keyword sits at a column
-greater than the header's `§`** — on the header line, or indented beneath it. Column-1 `GIVEN`
-stays the next declaration's signature. Measured: "adjacency" (the `GIVEN` right after a header is
-the section's) would reinterpret **160** sites in the legal corpus where a section's first function
-opens with a `GIVEN`; indentation collides with **zero** existing lines (no indented `GIVEN` in the
-corpus). Implementation: `MkSection` gains `Maybe (GivenSig n)`; `section n` gets
-`optional (indented givens headerColumn)`; both guarded printers (§3.2 of `CLAUDE.md`) emit the
-indented form. The anonymous top-of-file section has no header and cannot carry one.
-
-### 10.4 Candidate keyword for the section binder: `WHEREAS`
-
-Minuted at Meng's request (2026-09-04) as the fallback to 10.3 — Coq's answer, a distinct keyword
-for the section binder (`Variable` vs a definition's binders; Isabelle `fixes`) — and, if taken,
-the successor spelling of `ASSUME`'s term role:
-
 ```l4
-§§ `Rule 100(b) — issuer eligibility`
-WHEREAS issuer IS AN IssuerProfile
+-- q9 (2026-09-04): a GIVEN under a heading attaches to the next definition and is suppliable
+§ `S`
+GIVEN a IS A NUMBER
+GIVETH A NUMBER
+f MEANS a PLUS 1
+#EVAL f WITH a IS 41                 -- observed: 42
 ```
 
-- **Fit.** In contracts `WHEREAS` opens the recitals: the premises stated before the operative
-  terms. "Given these facts, the following applies" is exactly a section parameter. Older Acts use
-  the same preambular register ("Whereas it is expedient …").
-- **Risk.** In contract-drafting convention recitals are _non-operative_; a lawyer may read
-  `WHEREAS` as background narrative, whereas a section parameter is fully operative. Worth testing
-  on a drafter before ruling.
-- **Mechanics.** With a keyword, no layout rule is needed: it can sit at column 1, and, like
-  today's `ASSUME`, anywhere in its section, order-independent, binding the whole section. Lexer:
-  keywords are a whole-token `Map Text TKeywords` (`Lexer.hs:246`), so no prefix clash with
-  `WHERE`; the token `WHEREAS` is unused anywhere in `jl4/`, `jl4-core/`, `doc/` (20 lowercase
-  prose occurrences only).
-- **Cost.** One new keyword, which §4 was trying to avoid; ExactPrint/prettyLayout support as for
-  10.3.
-
-Decision pending: 10.3 (layout, no keyword) first, 10.4 in reserve; or 10.4 outright if the
-non-operative reading of recitals is judged confusing enough to forbid the layout form.
-
-#### 10.4.1 Sibling candidate: `WHEREIN` (minuted 2026-09-04)
-
 ```l4
-§§ `Rule 100(b) — issuer eligibility`
-WHEREIN issuer IS AN IssuerProfile
+-- q13 (2026-09-04): LET shadowing a same-named GIVEN in scope is an error today
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+f x MEANS LET x = 41 IN x PLUS 1
+#EVAL f 1                            -- observed: check error 3:25-3:31 "There are multiple definitions for the identifier x"
 ```
-
-- **Fit.** "In which": the section, in which the issuer is an `IssuerProfile`. Patent-claim
-  drafting uses `wherein` clauses to characterise an element already introduced, and they are
-  operative (limiting), which removes `WHEREAS`'s non-operative-recital risk. Grammatically it
-  suits a **typed declaration** (characterising an entity) better than `WHEREAS`, which suits a
-  **stated premise** (a proposition). A section `GIVEN` is the former.
-- **Risk.** Proximity to the existing `WHERE` keyword, which introduces a rule's local
-  definitions (125 blocks in the legal corpus). Both mean "in which"; the pair would have to be
-  taught together — `WHERE` binds definitions below a rule, `WHEREIN` binds parameters below a
-  heading — or the similarity becomes a source of confusion. Also archaic; rare in modern
-  statutes.
-- **Mechanics.** As for `WHEREAS`: whole-token keyword lookup, no prefix clash; the token is
-  unused anywhere in `jl4/`, `jl4-core/`, `doc/`, and the word does not even occur in prose there.
-- **Cost.** As for `WHEREAS`.
-
----
-
-## 11. `REFUSE`, typed failure, and field-opening (minuted 2026-09-04; not ruled)
-
-Candidates, like §10. Worked out in conversation with Meng after the `WHEREIN` minute.
-
-### 11.1 The refusal role, as found
-
-Reg CF's dated constants end in an `OTHERWISE` arm that names a sentence-long `ASSUME`
-(`regcf.l4:143`, reached from eight sites: :154, :166, :175, :185, :195, :205, :215, :409 — an earlier draft of this paragraph said five). The comment above it:
-"a rule date before 2016-05-16 is a curated refusal, not an answer. ASSUME makes this a deliberate
-bottom … **no input is ever routed through it.**" A second at `regcf.l4:486` refuses the COVID-19
-temporary rules ("the honest answer is a refusal, not a guess … decided 2026-07-29: refuse, not
-encode"). Same device: `daydate.l4:104`, prelude `TBD` (:757-761), and the DMN fixtures
-`dmn/gst-rate.l4:63`, `dmn/ymd-dates.l4:84` ("same device").
-
-Why the deprecation must treat it separately: every other `ASSUME` wants a value from outside; this
-one must never receive one, and only a comment says so. jl4-service already breaks it:
-`Backend/Jl4.hs:556-560` promotes every `ASSUME` a function references into a request parameter, so
-the commencement refusal is offered to every caller as an input, and a supplied number yields a
-confident wrong answer for a period in which the regulation did not exist. Section `GIVEN`s (§10.2)
-are suppliable by design; discharge across `IMPORT` would make `daydate`'s refusal a parameter of
-every function calling `YMD`. The refusal needs a construct whose defining property is **not an
-input**.
-
-### 11.2 `REFUSE`: a throw that cannot be caught and can be statically analysed
-
-`REFUSE "message"` is an expression typed at any type. Evaluating it stops with the message as a
-distinct outcome — _declined_, neither an error nor an unknown fact. It appears in no schema. The
-trace records it as its own result kind (a wizard renders "outside what this model covers,
-because …" with the citation). `l4 check` lists every `REFUSE` with its reason: the model's declared
-boundary as a report.
-
-```l4
-`offering maximum in a 12-month period` MEANS
-    …
-    OTHERWISE REFUSE "no Regulation Crowdfunding figure exists before commencement on 2016-05-16"
-```
-
-Meng's characterisation (2026-09-04): **a `THROW` that cannot be caught and can be statically
-analysed.** Three consequences:
-
-1. **Uncatchable is what makes it analysable.** With no handler stack, "can this rule refuse?" is
-   reachability over the call graph, the same fixpoint as the read-set:
-   `Ref(f) = refusals in f ∪ ⋃ { Ref(g) | g referenced in f }`. Every function then carries two
-   inferred signatures — the read-set (what it needs from context: the coeffect) and the refusal
-   set (how it may decline: the effect) — both on hover, both in the export schema (required
-   inputs on one side, possible declared outcomes on the other). Checked exceptions with nothing
-   written and nothing swallowed.
-2. **Uncatchable is what keeps it honest.** The Reg CF authors avoided `NOTHING` because `NOTHING`
-   can be handled — a downstream `CONSIDER` launders a refusal into a default. `REFUSE` cannot be
-   converted by any rule; only the boundary observes it (evaluator top, service, wizard, test).
-   `NOTHING` is a value that is absent, which a rule may reason about; `REFUSE` is an answer that is
-   withheld, which no rule may reason past.
-3. **It composes with the legal devices without a catch.** A statute avoids a refusal by changing
-   what is asked — deeming is a record update on the subject before the rule runs — never by
-   handling it after. `SUBJECT TO` overrides a conclusion, not a refusal. A refusal can only be
-   prevented upstream, where the trace shows it.
-
-Two analyses, labelled differently: `Ref(f)` is syntactic and, under laziness, an
-over-approximation ("may refuse"); the verification rung answers "for which inputs does this export
-refuse?" as satisfiability, yielding a **region** — for Reg CF: rule date < 2016-05-16, or rule date
-in the COVID window ∧ aggregate in the band — the boundary in its most precise form ("does refuse").
-
-Two intents, two spellings over one primitive (Rust `unimplemented!`/`unreachable!`, Lean `sorry`):
-`TBD` = placeholder, should be zero at release, warned; `REFUSE` = deliberate and permanent,
-counted. `TBD` becomes a one-line prelude definition over `REFUSE`.
-
-Candidate ruling: `#ASSERT`/`#TRACE` may _expect_ a refusal, so a test can pin the model's boundary
-as it pins an answer — the only place a refusal is ever "caught".
-
-Cost: one builtin (`∀a. STRING → a`), one evaluator case reusing the `stuckOnAssumed` path
-(`Machine.hs:1080-1121, 1986-1999, 2884`) with a new message kind, one trace event, per-backend
-handling of a declined arm (DMN already has a reporting class), six corpus migrations. The temporal
-design's generated "not in force on <day>" arm (`TEMPORAL-RULE-VERSION-DESIGN.md` item 3) becomes a
-compiler-emitted `REFUSE`. The word is a candidate; it is the one the authors used in four separate
-comments. `DECLINE` would carry the same semantics.
-
-### 11.3 The penumbra: `ExceptT`-style throw/catch (explored, sorted into three things)
-
-Measured (legal corpus): `MAYBE` in 12 of 26 files; 28 functions with `GIVETH A MAYBE …`; ~1,180
-`JUST`/`NOTHING` occurrences in rule bodies (198 in data). `EITHER` is a builtin with `LEFT`/`RIGHT`
-(`prelude.l4:679-692`); prelude has `maybe`, `fromMaybe`, `isJust`, `maybeToList`, `listToMaybe`.
-The `DATE` vs `MAYBE DATE` polysemy (§10.1) is this tedium as duplicated declarations.
-
-1. **Catch-anywhere exceptions (the effect): rejected**, for the reason Reader `local` was. Under
-   laziness, which exception you catch depends on evaluation order — Peyton Jones, Reid, Hoare,
-   Marlow, Henderson, "A Semantics for Imprecise Exceptions" (PLDI 1999): pure code may raise;
-   catching is sound only at the boundary. That boundary-only rule _is_ `REFUSE`. A DRG has no
-   control flow to lower a catch to. And the legal meaning of "catch" is defeasance: Catala's
-   `exception` is prioritised default logic (already `SUBJECT TO`/`NOTWITHSTANDING`), and breach is
-   `MUST … LEST …`, a handler lexically attached to the obligation and compiled to a transition
-   system.
-2. **Typed failure as a value (the `ExceptT` type): already present; the sugar is missing.** The
-   principled form is Rust `?` / Swift optional chaining, not `ExceptT`: _success is unwrapped,
-   failure propagates to the nearest typed boundary, and the boundary is the function's `GIVETH`._
-   See 11.4.
-3. **`REFUSE`**: the labelled bottom, boundary-only. A different scenario: not "this computation
-   failed" but "the model declines".
-
-### 11.4 Candidate: failure-propagation sugar for `MAYBE` and `EITHER`
-
-**Rule.** Inside a function whose result type is `MAYBE T` or `EITHER E T`, a subexpression of the
-same failure type may be used at its payload type; a `NOTHING`/`LEFT e` short-circuits to the
-function's result. Elaboration inserts the bind. One level only; nesting stays explicit.
-
-```l4
-GIVEN w IS A Will
-GIVETH A MAYBE NUMBER
-`years between execution and death` w MEANS
-    `year of` `the date of death` MINUS `year of` (w's `date of execution`)
-    -- `date of execution` IS A MAYBE DATE; today: CONSIDER … WHEN JUST d THEN … WHEN NOTHING THEN NOTHING
-```
-
-Properties: pure (so laziness is fine); in the type (so analysable — `EITHER E T` with a reason
-type is the checked exception done right, reason visible in the signature, nothing written by
-hand); lowerable (DMN/FEEL null propagation is literally this semantics). The gate that keeps it
-from SQL's three-valued mess: **only a function whose `GIVETH` declares the failure type may
-propagate it.** Catching is pattern matching or `fromMaybe`, a value operation, allowed anywhere.
-Prior art: Rust `?`, Swift/Kotlin `?.`, Haskell do-notation, F# computation expressions, DMN null
-propagation; SQL `NULL` as the cautionary case.
-
-### 11.5 The taxonomy of non-answers
-
-| non-answer                        | construct                 | who handles it              | catchable       |
-| --------------------------------- | ------------------------- | --------------------------- | --------------- |
-| a value that may be absent        | `MAYBE`, with 11.4 sugar  | the rule, by matching       | yes, as a value |
-| an expected failure with a reason | `EITHER`, with 11.4 sugar | the rule or its caller      | yes, as a value |
-| a fact not yet known              | an unsupplied input       | the boundary asks           | n/a             |
-| the model declines                | `REFUSE`                  | the boundary only           | no              |
-| a breach                          | `LEST`                    | the obligation's own branch | structured      |
-| an overridden conclusion          | `SUBJECT TO`              | the overriding rule         | structured      |
-
-Reclassification that falls out: `daydate`'s out-of-range month is **invalid input**, a caller's
-problem, and belongs in the `EITHER` row, not a refusal. "The law does not cover this" is `REFUSE`;
-"you asked it wrong" is `LEFT`. Today `ASSUME` and `NOTHING` each do several of these jobs.
-
-### 11.6 Field-opening (Meng: "I like the record field-opening practice")
-
-Rule as proposed in §10 and here made explicit: **the fields of a record-typed parameter — a
-function's `GIVEN` or a section's `GIVEN` (§10.2) — are in scope by bare name** for the function and,
-via the callee-flow convention (§10.1), its callees. Precedent: computed fields already see sibling
-fields bare (`COMPUTED-FIELDS-SPEC` line 80; `ok/computed-fields.l4`). Collision rule: if two open
-records share a field name, the bare name is an error and `facts's field` is always available.
-This is what lets `imaginary-alcohol-act.l4`'s rule bodies stay byte-identical when its fourteen
-`ASSUME`s become one `DECLARE` (§10.2 example). Pascal `with`, Haskell `RecordWildCards`, OCaml
-`open`; the difference from `open` alone is that callee-flow removes the forwarding too.
-
-### 11.7 Additions to the proposed rulings (§9), still not ruled
-
-6. `REFUSE` is the refusal construct: uncatchable, boundary-only, in no schema, reported by
-   `l4 check`; `TBD` is its placeholder spelling; `#ASSERT` may expect one.
-7. Catch-anywhere exceptions are out; typed failure is `MAYBE`/`EITHER` with `GIVETH`-gated
-   propagation sugar (11.4).
-8. Field-opening per 11.6.
-9. Section-binder spelling: layout rule (§10.3) first; `WHEREIN` / `WHEREAS` in reserve (§10.4).
-
----
-
-## 12. Second red team (2026-09-04): samples, personas, verification
-
-**Method.** One workflow, eleven agents, none failed (`wf_8eaba350-386`; 1.9M subagent tokens,
-347 tool uses). A sample author rewrote ten real pieces of tutorial and corpus code into the §10–§11
-syntax, before/after, plus two labelled traps (`scratchpad/props-sample-pack.md`, S1–S10). Five
-lenses reviewed the pack in parallel: a **beginner** L4 developer with no other language, a
-**seasoned** L4 developer with Python/JS, PL theory, backends, legal drafting. Each technical lens
-was then adversarially verified by a refuter allowed to withdraw a finding only on a concrete
-witness; each persona lens was re-rated blind by an independent second rater in the same persona,
-and inter-rater agreement was computed in code. Every lens ran probes on the 2026-08-27 binary.
-Probe files are under the session scratchpad (`beg/`, `beginner-probes/`, `dev-probes/`,
-`probes-dev/`, `pl/`, `pl-verify/`, `be-probes/`, `legal-probes/`).
-
-Verdict counts: PL 13 findings (4 confirmed, 9 disputed, 0 withdrawn); backends 10 (6 confirmed, 4
-disputed); legal 11 (8 confirmed, 3 disputed). No finding was withdrawn. Persona agreement:
-**beginner 2 of 10 samples, seasoned 5 of 10** — low on the middle categories, unanimous on the
-extremes (see 12.3).
-
-### 12.1 What every lens confirmed
-
-1. **"Supply is application, no new syntax" is false for the case everyone writes first.**
-   `f x WITH y IS v` — positional subject, then a world value by `WITH` — is a parse error today
-   ("unexpected WITH"), parenthesised or not. Only the all-named form was ever probed. §4.2's own
-   headline example, S5, S9 and both personas' production tasks use the mixed form. Also: `WITH`
-   swallows to end of line (`f WITH a IS 3 EQUALS 4` parses as `a IS (3 EQUALS 4)`), every
-   parameter is mandatory at a `WITH` site regardless of `TYPICALLY` (`supplyAppNamed`,
-   `TypeCheck.hs:2978-2986`), and `AppNamed`'s head must be a name (`Syntax.hs:248`). [beginner
-   F1/B2; seasoned D1/F2; PL F8 CONFIRMED]
-2. **§10.1 gives two answers to S10(a).** "Every `GIVEN` binding is also an implicit binding of the
-   same name for the callee" (by name) and "lexical beats call-site" + §2's discharge by `Unique`
-   (by binding) answer a program that runs today in opposite ways; today's binary answers by
-   binding (probe L3: assumed-term error). PL F2 (CONFIRMED) sharpens it: with "then the caller
-   chain" in the _resolution_ order, a misspelt free name is no longer a check error but an
-   inferred request parameter at the root, contradicting every cited prior art (Coq, Lean,
-   Isabelle, GHC `?x` all require a declaration or sigil). Under discharge by `Unique` with
-   shadowing permitted, a function that restates a section `GIVEN` and transitively reads the
-   section binder would be discharged over two parameters both spelled `issuer`, which today's
-   checker rejects (probe pF). [beginner F6/B6; seasoned D2/F1; PL F1 DISPUTED, F2 CONFIRMED;
-   legal F3 CONFIRMED; backends B4a]
-3. **The layout rule makes indentation semantic and fails silently.** An indented `GIVEN` under a
-   `§` _and_ the header-line `§ S GIVEN …` both parse today and attach to the next definition; a
-   headless `GIVEN` still type-checks and makes the next definition a function of it (probe q9),
-   so a dedent by a formatter or a copy-paste re-attaches a section `GIVEN` with no error at the
-   site — the seasoned second rater's 130-line Reg CF §3 rewrite produced 21 errors on today's
-   binary, five of them at `Range 1:1-1:1` about `_self`, because the indented `GIVEN` attached to
-   `DECLARE InvestorProfile`. [beginner F3/B7; seasoned D5/F3; PL S8]
-4. **`WHEREAS` is dead; `WHEREIN` is doubtful.** A recital is a statement of fact by the parties
-   (Greer v Kettle [1938] AC 156), presumptively non-operative where the operative words are clear
-   (Re Moon, ex p Dawes (1886) 17 QBD 275, applied in MCST Plan No 1933 v Liang Huat Aluminium
-   [2001] SGCA 41); `WHEREAS person IS A Person` is the wrong speech act for a typed free
-   variable. `WHEREIN` characterises an element already introduced and, per MPEP 2111.04
-   (Griffin v Bertina; Hoffer v Microsoft), limits only conditionally; both beginners confuse it
-   with `WHERE`. Drafter idioms offered instead: `IN THIS SECTION x IS A T`, `APPLIES WHERE x IS
-A T`. [legal F6 CONFIRMED; beginner F10/B8; seasoned S8 rating split]
-5. **Field-opening is under-specified and, flowing to callees, is the row polymorphism §10.1
-   disclaims.** Unranked collisions: opened field vs the function's own `GIVEN`, vs a `WHERE`/`LET`
-   local, vs the selector function that already exists under every field name (`inferSelector`,
-   `TypeCheck.hs:1312-1328`); the computed-field precedent resolves a clash by _silently_ preferring
-   the field (probe q17: field 26 beat top-level 99, no error); the corpus house style names a
-   parameter after its own field (`amount's amount`, `the witness's the witness`; 15 field names
-   are also `GIVEN` names in the cleanroom, 5 at mismatched types); every backend keys on the
-   `Proj _ (App r []) field` shape and consumes `Module Resolved` directly, so a bare opened
-   field is backend-safe only as a post-typecheck `Proj` rewrite that no stage produces
-   (`Desugar.hs:266-330` rewrites at parse time on `Expr Name`). Error site unstated. [beginner F2;
-   seasoned D3/F4; PL F6/F7 DISPUTED (selector case is today's ordinary overload resolution;
-   identity is the path if elaborated as `Proj`); backends B5 DISPUTED; legal F11 CONFIRMED]
-6. **§11.4's propagation sugar was rated confusing or misleading by all seven rating sets.** No
-   use-site marker, so a `GIVETH` edit twenty lines away silently rewrites a body (probe q5: two
-   check errors vanish); the spec's own example returns a bare `NUMBER` while S7 writes `JUST`, so
-   even the return convention is undecided; "FEEL null propagation is literally this semantics" is
-   false — FEEL `and`/`or` are Kleene, `null = null` is true, `if null` takes the else branch, and
-   FEEL propagates regardless of the decision's type (`Dmn/Lower.hs:2251-2256` corroborates);
-   under call-by-need a bind under a constructor cannot fire (`isJust (JUST d)` is `TRUE` with
-   `d` bottom), hoisting to the function top changes strictness (probe pV5b), a lambda has no
-   enclosing result to escape to; Docassemble refuses every _produced_ `MAYBE` (`Lower.hs:1896`);
-   the population is 28 `GIVETH A MAYBE` functions, 0 exported; and the line the sugar deletes
-   (`WHEN NOTHING THEN NOTHING`, guardianship-of-infants-act.l4:174) is the encoder's visible
-   allocation of the not-proved case, which the file's own comment says three Acts allocate
-   differently (Evidence Act 1893 ss 109–110 for why law fills absence with presumptions, not
-   propagation). [beginner F8/B9; seasoned D4/F5; PL F5 DISPUTED (nearest-enclosing-bind exists;
-   IF-case and lambda gap stand), F13; backends B3 CONFIRMED; legal F7 CONFIRMED]
-7. **`REFUSE` is the best-received construct in source and the least specified in the machine.**
-   S6 rated intuitive or learnable by every lens but backends. Confirmed gaps: (a) no test
-   spelling, and `#ASSERT` collapses every exception to `False` in both polarities (probe L2/pC:
-   `#ASSERT P` and `#ASSERT NOT P` both "assertion failed"), so a boundary cannot be pinned;
-   (b) built on the `ValAssumed` path it is a lazy _value_, printed as data at the root (`nfAux`
-   `EvaluateLazy.hs:458`), dropped by the NF depth cutoff (:427), unobserved inside an unforced
-   closure — the refuter notes the text is ambiguous between value and throw; (c) refusal is
-   order-dependent under lazy `AND`/`OR` (`FALSE AND x` answers, `x AND FALSE` refuses) and so
-   diverges from FEEL's commutative Kleene logic — the "region" is well-defined only if the
-   verifier models left-to-right demand; (d) **no backend has an image**: today every backend
-   lowers the refusal `ASSUME` as a suppliable input (DMN `inputData`, a Docassemble number
-   question, a Catala `input`, a service parameter — run-verified), FEEL's `null` is already spent
-   on `NOTHING` so `REFUSE → null` launders, verbatim is Blocking on the floor row of every dated
-   table, and the six evaluator/CLI/service surfaces have no `refused` kind; "DMN already has a
-   reporting class" is true of the note mechanism and false of a refusal class; `analyzeSafety`
-   deliberately treats an assumed term as not partial, so `REFUSE` flips DMN-SAFE for every dated
-   constant and D-PARTIAL is the wrong class; (e) S6 inlines one string at the readers — of which
-   there are **eight**, not five (:154, :166, :175, :185, :195, :205, :215, :409) — losing the
-   single named definition, its `@ref` and the maintenance note; a named 0-ary
-   `x MEANS REFUSE "…"` is the idiom (the prelude's `TBD` already is one) but is monomorphic
-   without `GIVEN a IS A TYPE` (probe pD2), and `#CHECK` leaks a gensym; (f) `Ref(f)` is non-empty
-   for essentially every Reg CF export (the commencement refusal is reachable from every dated
-   constant and `the rules in force include` has ten readers) so a boolean badge says nothing;
-   (g) the taxonomy row conflates "the law does not apply" (pre-commencement: a recorded ruling,
-   R2, but determinate and reached by savings/transitional provisions — SG Interpretation Act
-   1965 s 16(1)(b)–(c)) with "the model does not cover" (COVID), and consequence 3 makes a
-   provision that operates on non-application unencodable over a `REFUSE`. [beginner F11/B13;
-   seasoned D7/F6; PL F3/F4 DISPUTED, F11 CONFIRMED; backends B1 DISPUTED (core confirmed), B8,
-   B10 CONFIRMED; legal F5 DISPUTED, F8, F9 CONFIRMED]
-8. **"The module is the title §" is false as a tree statement for 7 of 26 legal files** (regcf.l4's
-   title is one of eleven sibling `§`s), **and the shipped visibility is module-flat with § as a
-   tiebreak, not Coq.** `selectByProximity` (`Types.hs:895-912`) falls back to all candidates when
-   no ancestor matches; a title-§ `ASSUME` _is_ resolvable from a sibling `§` and a grandchild `§§`
-   (probes L1, V1, pI), so "hoist to the title §" works for flat-§ files under the shipped rule —
-   but `specs/done/SECTION-LEXICAL-SCOPING-SPEC.md` §3.3.4 says a sibling must qualify, so the
-   shipped spec and the shipped implementation disagree, and "a section is a function of its
-   `GIVEN`s" is not what ships. §10.2's "extension only" also forbids what statutes do (Bribery Act
-   2010 ss 1, 2, 6 re-declare "P" per section). [beginner F9/B11; seasoned D6/F9; PL F10
-   CONFIRMED; legal F2 DISPUTED, F10 CONFIRMED]
-9. **Tier is declared by placement in §10.2 and "measured" in §10.1; S5 mis-tiers a per-transaction
-   date** ("the date of SUCH offer or sale", 17 CFR 227.100(a)(1); denovo's directives use 13
-   distinct dates) as world, so §4.2's wizard would ask it once per batch. The "existing tier
-   census" is `Analysis.tierOf`, a DMN un-lifting class, not a world/subject split. [legal F4
-   CONFIRMED; beginner B5]
-10. **`TYPICALLY` has three images today** — schema required _and_ defaulted, Catala
-    caller-overridable `context`, evaluator discards — and the shipped doc says "It does not change
-    evaluation" (`TYPICALLY.md:37`, `typically-example.l4`). S5's `#ASSERT` passes only under a
-    defaulted `interp`, i.e. under non-binding SEC staff views, without saying so; the schema
-    publishes the default but with an empty description (`FunctionSchema.hs:283`). [beginner
-    F5/B3; seasoned D10/F10; backends B4b CONFIRMED; legal F1 DISPUTED]
-11. **`LET` reaching callees**: LET shadowing a same-named `GIVEN` in scope is a "multiple
-    definitions" error today (probe q13), so S9's in-body form does not check; `WHERE` does not
-    flow while `LET` does (19 `WHERE`-local names coincide with `GIVEN` names in the corpus);
-    LET/WITH relative scope at one site is unstated; and §5 item 6 contradicts ruling R-C for the
-    rule-date field (DROP, not tier-2) while tier-2 BKM lowering does exist for a generic field
-    after discharge. [beginner F7/B12; seasoned D8/F7; PL F12 DISPUTED; backends B2 DISPUTED]
-12. **Schema and service, run-verified**: the one-body-deep collector bug is real — `l4 batch
---validate-only` accepts a request missing the `ASSUME` a helper reads, then evaluation is
-    Stuck (`be-probes/pd.l4`); same-name explicit+implicit collapse to one property with the name
-    listed twice in `required` (`FunctionSchema.hs:299-300`); no tier representation anywhere;
-    discharged implicits as _leading_ parameters displace OpenFisca's subject entity (`mSubj =
-firstJust`, run-verified with `po.l4`) and OpenFisca has zero `ASSUME` handling; S3's single
-    record collapses fourteen requirement edges into one for DMN (Docassemble still asks per
-    attribute, refuted in part). Incidental: `l4 batch` mis-applies a directly-read `ASSUME` as a
-    positional argument. [backends B4, B6 CONFIRMED; B9 DISPUTED]
-13. **`@desc` collapse loses the fork register**: five per-decision descriptions on `interp` in
-    regcf-denovo.l4 (:3043–:3078), each saying which contested reading that decision turns on,
-    become one. [legal F1; seasoned F12; beginner B14]
-14. **The tutorial teaches a form that does not run today.** `encoding-legislation.md:115-122` and
-    `ASSUME.md` show `#CHECK rule WITH fact IS TRUE, …`; the binary answers "of type BOOLEAN (which
-    is not a function) … to (named) arguments". Both beginners hit it first. [beginner F4/B1]
-15. **S1 was mis-cut**: it hoists the _varying_ `person` onto the heading, teaching the wrong
-    instinct for the first rule anyone writes; both beginners and the legal lens would leave the
-    tutorial's first rule as a function `GIVEN`. [beginner B5; legal S1; PL S1]
-
-### 12.2 Where the verifiers pushed back (kept, not withdrawn)
-
-- PL F1's "unsuppliable implicit" arises only under the by-`Unique` reading; under by-name flow the
-  caller's own `GIVEN` _is_ the supply and no double parameter exists — the two readings are the
-  defect, and a narrow no-shadow rule reconciles them either way.
-- PL F3/F4: the text is ambiguous whether `REFUSE` is a value or a throw; as a throw at force, three
-  of four "printed as data" cases become observed. Order-dependence stands as "order-dependent and
-  divergent from FEEL", not "not a function of inputs".
-- PL F5: an elaboration point for the sugar exists (nearest enclosing failure-typed node); the
-  `IF c THEN x? ELSE 0` strictness change and the lambda gap stand.
-- PL F6: opened field vs selector is today's ordinary overload resolution (probe pV1b: 124 = 99 +
-  25 in one body); the unranked _equal-type_ collisions and error-at-a-distance stand.
-- PL F7 / backends B7: if opened fields elaborate to `Proj`, identity is already the path and the
-  DMN exporter already merges same-named same-typed `GIVEN` parameters into one `inputData`
-  (`paramGroups`, `Dmn/Lower.hs:3748-3807`; regcf-corpus.dmn has one `input_issuer` for the eight
-  limbs), so "S4 fixes the eight-way collision" is not a new win and sibling-section `GIVEN`s would
-  merge — provided discharged implicits are lowered as decide parameters, not as free terms.
-- Backends B1: Catala's ladder veto exempts consequences, so a `REFUSE` in an `OTHERWISE` needs no
-  entry; Docassemble has terminal screens, what is missing is a decline _value_.
-- Backends B2: R-C is ruled for law time; a generic field's `LET` after discharge is tier-2 BKM.
-- Legal F2: hoisting works under the shipped flat rule; the residue is the spec/implementation
-  disagreement. Legal F5: pre-commencement-as-refusal is ruling R2 with a stated reason and is not
-  re-litigated; `@ref` does attach inside an arm today (probe V3).
-
-### 12.3 Sample reception
-
-| sample                                | beginner ×2   | seasoned ×2   | PL    | backends | legal | one-line verdict                                                                                                           |
-| ------------------------------------- | ------------- | ------------- | ----- | -------- | ----- | -------------------------------------------------------------------------------------------------------------------------- |
-| S1 tutorial first rule, section GIVEN | learn / learn | learn / learn | learn | learn    | conf  | mis-cut: the varying `person` on the heading; positional `#EVAL` left undefined                                            |
-| S2 assume-example → section GIVEN     | learn / intu  | learn / intu  | intu  | conf     | learn | Coq `Variable` verbatim; `#CHECK` output undefined; function-typed implicit has no image                                   |
-| S3 alcohol act → one record           | intu / learn  | conf / misl   | intu  | misl     | intu  | lawyers like it; engineers see `with(obj)` and 14→1 requirement edges; migrate as 14 scalars instead                       |
-| S4 Reg CF Rule 100(b) factoring       | learn / intu  | conf / conf   | conf  | intu     | intu  | "the one place the construct is isomorphic with its source" (legal); the :882 cross-section caller is S10(a) in production |
-| S5 denovo `interp`/date hoisted       | conf / learn  | misl / conf   | conf  | conf     | misl  | mis-tiered date, lost `@desc`, defaulted `interp`, unparseable `#ASSERT`                                                   |
-| S6 commencement `REFUSE`              | intu / intu   | intu / learn  | intu  | misl     | learn | best source construct; no test spelling, no backend image, inline eight times                                              |
-| S7 MAYBE sugar                        | misl / conf   | misl / misl   | misl  | conf     | conf  | worst-received; no marker, JUST undecided, hides the burden allocation                                                     |
-| S8 WHEREIN / WHEREAS                  | misl / learn  | learn / intu  | learn | intu     | misl  | WHEREAS rejected by every legal reader; keyword wanted by engineers for tooling reasons                                    |
-| S9 LET hypothetical                   | conf / learn  | conf / conf   | conf  | misl     | intu  | reads as arguendo to a lawyer; dynamic binding to a programmer; DMN drop                                                   |
-| S10 traps                             | misl / conf   | misl / misl   | misl  | misl     | misl  | (a) is a real contradiction in the text; (b) error site unstated                                                           |
-
-Persona production tasks: both beginners' first instinct for "fixed for the whole Act" was a plain
-definition (`` `the voting age` MEANS 18 ``), not an input; both then wrote the mixed
-positional+`WITH` call, which did not parse; hesitation counts 7 and 8. The seasoned raters
-rewrote Reg CF §3; one file produced 21 location-less errors on today's binary (12.1 item 3); both
-kept `investor's …` qualified rather than opening fields, and both asked whether a 0-ary
-`MEANS REFUSE "…"` definition is legal and whether a same-named explicit+implicit pair may
-coexist.
-
-### 12.4 Revised candidate rulings (supersede §9 / §11.7 where they differ; still not ruled)
-
-R0. **RULED 2026-09-04** and recorded in `IMPLICIT-PROPS-DESIGN.md` §11.1: `ASSUME` is deprecated; term role → section `GIVEN` with discharge, type role → empty `DECLARE`, refusal → `REFUSE`. R1–R12 below decide the mechanism and remain candidates.
-
-R1. **Supply grammar is new syntax and must be written**: `⟨positional application⟩ WITH k IS v,
-    …` supplies implicits and any unsupplied explicit; binds tighter than every infix operator;
-one continuation-line rule for both `WITH` forms; a `WITH` site may omit any parameter that is
-flowed or `TYPICALLY`-defaulted; implicits are keyword-only (never positional). Record the
-mixed probe in Appendix B.
-R2. **Resolution is lexical; supply may be by name.** A bare name must resolve to the function's
-own `GIVEN`, an opened field, or a module-visible section `GIVEN`, else it is an error at the
-definition (strike "then the caller chain" from resolution). A caller's same-named `GIVEN`
-_supplies_ an already-declared section binder. A function `GIVEN` restating a visible section
-`GIVEN` at the same type is a **warning** ("redundant restatement") and is the supply; at a
-different type it is an error. S10(a) then has one answer, the drafter's (consistent
-expression: Courtauld v Legh; Bennion s 21.3).
-R3. **Section visibility as shipped**: a section `GIVEN` is module-visible; `§` placement is
-documentation and a tiebreak; same-type restatement in a child is a no-op with the R2 warning;
-different-type re-declaration is an error; fix the parent-ambiguity defect and reconcile
-`SECTION-LEXICAL-SCOPING-SPEC.md` §3.3.4 with the implementation first. Drop "Coq
-`Section`/`Variable` exactly" and "the module is the title §". **Tier is classified by
-call-site variation, never by placement**; a per-case section `GIVEN` is demoted to subject.
-R4. **Binder spelling**: the header-line form `§ ⟨name⟩ GIVEN …` (parses today, no indentation
-hazard) over the indented form; `WHEREAS` struck; `WHEREIN` kept in reserve with `IN THIS
-    SECTION x IS A T` beside it; either way a check error when a column-1 `GIVEN` immediately
-follows a header and its names are unbound by the next head, plus ExactPrint/prettyLayout
-round-trip goldens.
-R5. **Field-opening is lexical only** — never flows to callees. Rank: `WHERE`/`LET` locals > own
-`GIVEN` > fields opened from own `GIVEN` > section `GIVEN` > fields opened from section `GIVEN` > selectors (selector resolution stays type-directed as today). Collision error at the read,
-naming both records, and also at the declaration that opens the second record. Elaborate a
-bare opened field to `Proj (App r []) field` in a post-typecheck elaborated AST that every
-backend consumes; identity by path. Only binders are suppliable at `WITH`, not opened fields.
-Consider opt-in (`OPENED`) if reviewers cannot see binding class.
-R6. **§11.4 withdrawn as a candidate** (declined on measurement: 28 functions, 0 exported, seven of
-seven rating sets negative, Docassemble refuses produced `MAYBE`, the FEEL claim is false, and
-it hides the encoder's burden allocation). If revisited: use-site marker (`?`), bind at the
-nearest enclosing failure-typed node, lambda is its own boundary, `JUST` explicit, elaborated
-to the explicit `CONSIDER` before any backend sees it. The taxonomy (§11.5) stands.
-R7. **`REFUSE` stays, specified**: a throw at force, never a value; `#ASSERT REFUSED e` (with
-optional message) and a three-valued assertion outcome; house style one named definition per
-refusal (`GIVETH A T` / `` `…` MEANS REFUSE "…" ``, polymorphic ones with `GIVEN a IS A
-    TYPE`), readers byte-identical, `@ref` on the definition; per-backend image written down —
-DMN omits the refusing row, reports a non-Blocking `D-REFUSE` with the reason and adds a
-`MayRefuse` safety kind that does not withdraw DMN-SAFE; Catala emits no definition; Docassemble
-a terminal screen; evaluator/CLI/batch/service a `refused` kind on all six surfaces; `Ref(f)`
-reported per reason string, prelude `TBD` excluded and warned separately; note the
-left-to-right order dependence and FEEL divergence in the spec. Split the taxonomy row: "the law
-does not apply / is not in force" is a value or gate that savings provisions can reach; "the
-model does not cover" is `REFUSE`.
-R8. **`TYPICALLY`, one behaviour**: a defaulted `GIVEN` may be omitted at any supply site; every
-directive/trace output names each implicit that took its default; exports publish it optional
-with the default _and a description_; lint on a defaulted `Interpretation`-typed field; fix
-`TYPICALLY.md:37` and `typically-example.l4` in the same PR.
-R9. **`LET`**: at directives use `WITH`; in-body hypotheticals may use `LET` reaching callees or,
-simpler, `e WITH x IS v` at any site (one mechanism); `LET` scopes over a trailing `WITH`;
-`WHERE` never supplies; a `LET` binding a section-`GIVEN` name read by nothing under it is a
-warning. DMN: rule-date rebinding drops per R-C; any other field is tier-2 BKM.
-R10. **Backends**: read-set pass first (the schema bug is run-verified); schema keyed by
-(name, tier) with `x-l4-tier`; check rejects an explicit parameter sharing a name with a
-discharged implicit; defaulted implicits not `required`; a `world` object on `BatchRequest`;
-discharged implicits **trail** positional parameters; OpenFisca puts scalar implicits in
-`parameters(period)` and refuses record ones; migrate `imaginary-alcohol-act.l4` as fourteen
-scalar section `GIVEN`s, reserving the record form for genuine records.
-R11. **`@desc`**: a per-function `@reads x — …` (or a function-level `@desc` override) so the fork
-register survives hoisting.
-R12. **File now, independent of any ruling**: the tutorial's flat `#CHECK … WITH` form is broken
-(`encoding-legislation.md`, `ASSUME.md`); `TYPICALLY.md:37`; `SECTION-LEXICAL-SCOPING-SPEC.md`
-§3.3.4 vs `selectByProximity`; the parent-ambiguity defect; `l4 batch` mis-applying a
-directly-read `ASSUME`; the schema's one-body-deep collector (test first, per §5).
-
-### 12.5 What survives of §4 and §10–§11
-
-The two sentences survive: `ASSUME`'s term role is an implicit parameter with discharge, and supply
-is application — but the application grammar is new (R1). Of the four refinements: section-level
-`GIVEN` survives with shipped flat visibility and header-line spelling (R3, R4); callee flow
-survives as _supply_ only (R2); field-opening survives as lexical only (R5); the propagation sugar
-is withdrawn (R6). `REFUSE` survives with a specification it did not have (R7). The strongest
-sample by consensus is S4, the Reg CF chapeau; the weakest is S7. What the personas wanted most
-and the design did not list: a call-site hover saying where each flowed value came from, a formatter
-that never moves a `GIVEN` across the column boundary, and diagnostics that name the section line
-a value was declared on.

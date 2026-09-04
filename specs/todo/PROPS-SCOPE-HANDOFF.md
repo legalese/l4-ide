@@ -5,7 +5,7 @@ and the state of the tree as measured that day. Nothing here has been implemente
 a document, re-read that document before acting: this file is a pointer, not a substitute._
 
 _Superseded in part on 2026-09-03: the §2 "third reading" below (the `§` hierarchy is the scope tree) was
-refuted by measurement; see `PROPS-REDTEAM-2026-09-03.md` §1 item 2. §3 and §7 stand._
+refuted by measurement; see `PROPS-REDTEAM-2026-09-03.md` §5 item 2. §3 and §7 stand._
 
 **Provenance.** Written by session `assume-and-props-and-lexically-scoped-function-calls`
 (`f7803a37-30ce-4d9a-b077-801487b87320`), a fork of the `dmnmd` session

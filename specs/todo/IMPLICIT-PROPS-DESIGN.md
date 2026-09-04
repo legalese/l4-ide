@@ -396,15 +396,18 @@ dedicated `REFUSE` construct.
 
 ---
 
-## 11. Red-teamed position (2026-09-03) — proposed, not ruled
+## 11. Red-teamed position (2026-09-03) — R0 ruled, R1–R12 proposed
 
 The scoping question this design left open (§4.2, §8 Q2/Q4) and the `ASSUME` migration §10 raises
-were red-teamed by four adversarial reviews on 2026-09-03. The resulting position, the reports
-verbatim, and the probes are in `specs/todo/PROPS-REDTEAM-2026-09-03.md`. In one line: **`ASSUME`
-is an implicit parameter with compiler discharge (Coq `Section`/`Variable`); supply is
-application; no new keyword.** §4.2's section-scoped establishment is withdrawn there (visibility
-already ships; reach is stated by placement), and §5.1's structural subtyping is found unnecessary.
-None of its rulings is recorded here yet; when one is, it goes in this section with a date.
+were red-teamed by four adversarial reviews on 2026-09-03 and a second, eleven-agent review on
+2026-09-04. The resulting position is `specs/todo/PROPS-REDTEAM-2026-09-03.md`, which on 2026-09-04
+was revised to carry only the current proposal; the earlier strata and the verbatim reports are in
+that file's history at `d119c521`. In one line: **`ASSUME` is deprecated; its term role is a
+section-level `GIVEN` that the compiler discharges into ordinary parameters of every definition
+that transitively reads it; supply is the existing named-argument `WITH`.** §4.2's section-scoped
+establishment is withdrawn there (visibility already ships; `§` placement is a tiebreak), and
+§5.1's structural subtyping is found unnecessary. R0 is recorded below; R1–R12 are candidates on the
+rulings sheet and are recorded here, dated, as each is decided.
 
 ### 11.1 R0 — `ASSUME` is deprecated. RULED 2026-09-04.
 
@@ -417,7 +420,7 @@ None of its rulings is recorded here yet; when one is, it goes in this section w
 | refusal / typed bottom             | `REFUSE "…"`, uncatchable, boundary-only, in no schema                       | spec pending (R7)         |
 
 **What decided it.** Not the design argument but the defect list. Of the eight proposal-independent
-bugs found by the 2026-09-03/04 red teams (`PROPS-REDTEAM-2026-09-03.md` §12.4 R12), five are
+bugs found by the 2026-09-03/04 red teams (`PROPS-REDTEAM-2026-09-03.md` §7), five are
 consequences of `ASSUME` being an input with no binder, so that every consumer invented its own
 binding path and they disagree: the export schema's one-body-deep collector, the service's LetIn
 inlining, Catala's and Docassemble's private transitive walks, DMN's free-term map, `l4 batch`'s
@@ -429,7 +432,7 @@ collapse into the read-set pass plus ordinary parameters.
 
 **Cost committed to.** 664 `ASSUME` lines in 105 files (legal 54, ok 97, not-ok 20, experiments 418,
 doc 71, libraries 2, tests-cli 2), of which 113 are type-role; most are scriptable
-(`PROPS-REDTEAM-2026-09-03.md` §10.2 gives the per-category recipe).
+(`PROPS-REDTEAM-2026-09-03.md` §6 gives the per-role recipe).
 
 **Sequencing.** (1) the transitive read-set pass, in progress on `fix/export-transitive-readset`,
 which is both a bug fix and step one of discharge; (2) the mechanism rulings R1–R3 and R7;
@@ -440,6 +443,6 @@ can; (6) corpus and docs migration, `doc/reference/types/ASSUME.md` carrying the
 recipe (CLAUDE.md §6); (7) keyword removal, together with the dead `LocalAssume` grammar.
 
 **What this does not decide.** The spelling of the section binder, the supply grammar, the
-resolution and supply rules, and `REFUSE`'s specification — `PROPS-REDTEAM-2026-09-03.md` §12.4
+resolution and supply rules, and `REFUSE`'s specification — `PROPS-REDTEAM-2026-09-03.md` §4
 R1–R12, still candidates. Consistent with §10.7 above and the handoff's §7 ("`ASSUME` is not simply
 to be deleted"): the refusal and type roles get their own constructs _before_ the keyword goes.
