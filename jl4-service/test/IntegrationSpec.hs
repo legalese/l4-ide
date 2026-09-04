@@ -84,10 +84,20 @@ spec = describe "integration" do
         resp <- evalFunction baseUrl mgr "refuse-eval" "fee"
           (Aeson.object [ "arguments" Aeson..= Aeson.object [ "y" Aeson..= (1999 :: Int) ] ])
         case Aeson.decode (responseBody resp) :: Maybe SimpleResponse of
-          Just (SimpleError e) ->
+          Just (SimpleError e@(EvaluatorRefused _)) ->
             prettyEvaluatorError e `shouldBe`
               "The model refuses to answer: this schedule is not encoded for years before 2000"
           other -> expectationFailure ("Expected a refusal error, got: " <> show other)
+        -- And the distinction is MACHINE-readable on the wire, not merely
+        -- legible in the prose: 'EvaluatorError''s derived encoding tags the
+        -- constructor, so a consumer separates refused from error by reading
+        -- contents.tag rather than by string-matching the message prefix.
+        let constructorTag = case Aeson.decode (responseBody resp) :: Maybe Aeson.Value of
+              Just (Aeson.Object o)
+                | Just (Aeson.Object c) <- Aeson.KeyMap.lookup "contents" o ->
+                    Aeson.KeyMap.lookup "tag" c
+              _ -> Nothing
+        constructorTag `shouldBe` Just (Aeson.String "EvaluatorRefused")
 
     it "answers normally for an input the same function does cover" do
       withServiceFromSources "refuse-eval-ok" [("fee.l4", refuseJL4)] \baseUrl mgr -> do
