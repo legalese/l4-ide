@@ -42,6 +42,7 @@ import L4.Evaluate.Ledger
 import L4.EvaluateLazy
   ( EvalDirectiveResult (..)
   , EvalDirectiveValue (..)
+  , ReductionOutcome (..)
   , execEvalModuleWithEnv
   , resolveEvalConfig
   )
@@ -75,7 +76,7 @@ cellsOf led = [ p | Assign p _ _ <- foldr (:) [] led ]
 -- | Render the directive's reduction for structural comparison.
 renderedResult :: EvalDirectiveResult -> Text.Text
 renderedResult res = case res.result of
-  Reduction (Right nf) -> prettyLayout nf
+  Reduction (Reduced nf) -> prettyLayout nf
   other                -> Text.pack (show other)
 
 -- | A shared top-level binding whose force BOTH writes the ledger (RECORD)

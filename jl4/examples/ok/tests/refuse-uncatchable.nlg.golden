@@ -1,0 +1,9 @@
+the following must refuse: `consider over a refusing maybe`
+the following must refuse: `TRUE` and `not modelled (boolean)`
+the following must refuse: `not modelled (boolean)` and `FALSE`
+the following must refuse: `FALSE` or `not modelled (boolean)`
+the following must refuse: not `not modelled (boolean)`
+not `FALSE` and `not modelled (boolean)`
+`TRUE` or `not modelled (boolean)`
+the following must refuse: `let over a refusal`
+the following must refuse: `where over a refusal`

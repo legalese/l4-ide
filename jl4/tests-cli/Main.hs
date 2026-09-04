@@ -479,6 +479,16 @@ evalCrashFixture = fixtureDir </> "eval-crash.l4"
 assertRaisesFixture :: FilePath
 assertRaisesFixture = fixtureDir </> "assert-raises.l4"
 
+-- | REFUSE: a determinate non-answer. @l4 run@ exits 0 on it, and @--json@
+-- gives it its own kind rather than folding it into a value or an error.
+refuseRunFixture :: FilePath
+refuseRunFixture = fixtureDir </> "refuse-run.l4"
+
+-- | An @export whose helper refuses for one row and answers for the next.
+refuseBatchFixture, refuseBatchJson :: FilePath
+refuseBatchFixture = fixtureDir </> "refuse-batch.l4"
+refuseBatchJson    = fixtureDir </> "refuse-batch.json"
+
 -- | Typechecks cleanly; both @#ASSERT@s are on a bare assumed BOOLEAN — one
 -- polarity raises, the other reduces to the symbolic term without raising.
 assertAssumedFixture :: FilePath
@@ -1284,6 +1294,53 @@ spec bin = do
 
     it "still typechecks the raising fixture — l4 check succeeds on it" $
       expectOk bin ["check", assertRaisesFixture] "Check succeeded."
+
+    -- REFUSE (R7). A refusal is neither a value, nor an evaluation error, nor
+    -- an unknown fact: it is the model declining to answer, with a reason. The
+    -- three tests below pin the three ways that distinction could be lost.
+
+    -- (1) A refusal must not be treated as a crash. `l4 run` exits 0.
+    it "exits 0 when a directive REFUSES — a refusal is an answer, not a crash" $
+      expectOk bin ["run", refuseRunFixture] "The model refuses to answer"
+
+    -- (2) --json gives a refusing #EVAL its own kind, and a refused #ASSERT its
+    -- reason under "refused" rather than "error". A consumer that reads every
+    -- non-boolean assertion out of "error" would otherwise report a designed
+    -- outcome as a defect.
+    it "emits kind \"refused\" for a refusing #EVAL and a refused field for a refused #ASSERT" $ do
+      env <- jsonEnvelope bin ["run", refuseRunFixture, "--json"]
+      objField env "ok" `shouldBe` Just (Bool True)
+      case objField env "results" of
+        Just (Array v) -> case toList v of
+          [ev, assertRefused, assertPlain] -> do
+            objField ev "kind"   `shouldBe` Just (String "refused")
+            objField ev "value"  `shouldBe` Just Null
+            objField ev "reason" `shouldBe` Just (String "this case is not modelled")
+            -- #ASSERT REFUSED holds: it is an ordinary satisfied assertion.
+            objField assertRefused "kind"  `shouldBe` Just (String "assertion")
+            objField assertRefused "value" `shouldBe` Just (Bool True)
+            -- A PLAIN #ASSERT whose expression refuses is neither true nor
+            -- false, and its reason is NOT under "error".
+            objField assertPlain "kind"  `shouldBe` Just (String "assertion")
+            objField assertPlain "value" `shouldBe` Just Null
+            objField assertPlain "error" `shouldBe` Nothing
+            case objField assertPlain "refused" of
+              Just r  -> objField r "reason" `shouldBe` Just (String "this case is not modelled")
+              other   -> expectationFailure ("Expected a refused object, got " ++ show other)
+          other -> expectationFailure ("Expected 3 results, got " ++ show (length other))
+        other -> expectationFailure ("Expected results array, got " ++ show other)
+
+    -- (3) A refused BATCH row is a third terminal status, and it does NOT stop
+    -- the batch: the row after it is still processed. Folding it into "error"
+    -- would both mislabel it and truncate the run.
+    it "gives a refusing batch row status \"refused\" and does not stop the batch" $ do
+      Output code sout _ <-
+        runL4 bin ["batch", refuseBatchFixture, "--inputs", refuseBatchJson]
+      code `shouldBe` ExitSuccess
+      nonBlankLines sout `shouldBe` 2
+      sout `shouldSatisfy` ("\"status\":\"refused\"" `isInfixOf`)
+      sout `shouldSatisfy` ("\"status\":\"success\"" `isInfixOf`)
+      sout `shouldSatisfy` ("this schedule is not encoded for years before 2000" `isInfixOf`)
 
     -- A bare assumed BOOLEAN is neither TRUE nor FALSE. `#ASSERT NOT b`
     -- forces b and raises; `#ASSERT b` reduces to the symbolic b WITHOUT

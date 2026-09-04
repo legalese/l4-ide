@@ -16,6 +16,7 @@ module TestData (
   spacedFieldsJL4,
   assumeParamJL4,
   assumeHelperJL4,
+  refuseJL4,
   importedRecordDeclJL4,
   importedRecordMainJL4,
   dnfBlowupJL4,
@@ -234,6 +235,26 @@ ASSUME age IS A NUMBER
 GIVEN threshold IS A NUMBER
 GIVETH A BOOLEAN
 DECIDE is_adult IF age >= threshold
+|]
+
+-- | L4 source whose @export REFUSES for one input and answers for another.
+-- Exercises the refusal path in the direct-AST evaluator: a refusal must reach
+-- the caller as its own error kind, not as an 'InterpreterError' (which reads
+-- as a server fault).
+refuseJL4 :: Text
+refuseJL4 =
+  [i|
+GIVETH A NUMBER
+`this schedule is not encoded for years before 2000` MEANS
+    REFUSE "this schedule is not encoded for years before 2000"
+
+@export The fee for a rule year
+GIVEN y IS A NUMBER
+GIVETH A NUMBER
+fee y MEANS
+    IF y >= 2000
+    THEN 100
+    ELSE `this schedule is not encoded for years before 2000`
 |]
 
 -- | L4 source whose @export reads a module-level ASSUME only through a
