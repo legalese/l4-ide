@@ -796,6 +796,7 @@ the dead `LocalAssume` grammar (§6 item 7); function-typed `ASSUME` refused by 
 | term-role `ASSUME`s read only in their own section / from a sibling / from a parent or child                                      | 30 / 3 / 0 of 33                            | 2026-09-04 | legal corpus (48 / 39 / 9 / 0 counting function-typed)      |
 | cross-section calls into a definition sharing a `GIVEN` with ≥2 section-mates / caller has the same-named `GIVEN` / parent↔child | 312 / 195 / 0                               | 2026-09-04 | legal corpus                                                |
 | names defined by `MEANS` in ≥2 sections of one file / `ASSUME`s so declared                                                       | 1 (a mixfix false positive) / 0             | 2026-09-04 | legal corpus                                                |
+| `LET` uses in the legal corpus / `WHERE` blocks / `LET` uses in all examples + libraries / in canon                               | 0 / 125 / 127 in 24 files / 7               | 2026-09-04 | as stated                                                   |
 | named arguments of the shape `name IS r's field` / with `name` = `field`                                                          | 6 / 0                                       | 2026-09-04 | corpus + canon                                              |
 | field names that are also `GIVEN` names / at mismatched types                                                                     | 15 / 5                                      | 2026-09-04 | charities cleanroom                                         |
 
@@ -804,6 +805,9 @@ the dead `LocalAssume` grammar (§6 item 7); function-typed `ASSUME` refused by 
 - R9, the one unruled candidate. Recommendation: the alternative, `e WITH x IS v` as the one
   override mechanism at any site, `LET` unchanged from today (it does not reach callees, probe t1;
   shadowing a `GIVEN` is an error, probe q13); the temporal form's successor is then a `WITH`.
+  Measured 2026-09-04: `LET` has **zero** uses in the 26 legal files (125 `WHERE` blocks), 127 uses
+  in 24 files elsewhere under `jl4/examples` and the libraries, 7 in canon; nothing legal is asking
+  for a `LET` that reaches callees.
 - R7's consequence rider (design spec §11.9): a gate design for pre-commencement, and the
   amendment of `lexipedia-superset/CORPUS-TRACK.md` §8 R2 in the PR that lands `REFUSE`.
   here for argument.
