@@ -263,10 +263,24 @@ the default in any case (probes typ1 and t4, Appendix A).
 2. **One declaration owns the default.** A restatement of a binder in a sibling or child section
    (§2.1) may not carry its own `TYPICALLY`, since one binder would then have two defaults. Check
    error at the restatement.
-3. **A default is a module-scope expression.** It may refer to another binder or definition
-   (`GIVEN beta IS A NUMBER TYPICALLY alpha`), is evaluated lazily at the root after supply, and a
-   cycle among defaults is a check error. Today `TYPICALLY` takes an atom: `TYPICALLY alpha PLUS 1`
-   is a parse error (probe typ2).
+3. **A default is a module-scope expression.** It may refer to another binder or to a definition
+   (`GIVEN beta IS A NUMBER TYPICALLY phi`, where `phi MEANS alpha TIMES 2`), and is evaluated
+   lazily at the root after supply. Section placement is irrelevant, visibility being module-flat;
+   what matters is the read-set. **Cycle:** `b ∈ R*(default(b))`, the binder transitively read by
+   its own default, is a check error at the declaration, so a definition among the rules that read
+   `beta` bare cannot be `beta`'s default, while one that reads only `alpha` can be. **Closure:**
+   `R(default(b))` joins the requirement of every root that may use the default, so an export that
+   reads `beta` and never mentions `alpha` still lists `alpha` as a request parameter, required
+   unless `alpha` defaults too. The expression is type-checked against the binder's declared type,
+   as the literal is today (probe typ5). Today a `TYPICALLY` value must be a literal, a number, a
+   string, or a nullary constructor, and naming a definition is a check error whether or not
+   there is a cycle (probes typ3, typ4); an operator is a parse error (probe typ2). The restriction
+   exists for the schema's sake, and the source-text carriage below is what lets this rule lift it.
+
+**Side effect, noted by Meng on 2026-09-04.** This expands `TYPICALLY` from a literal annotation
+into a defaulted expression, a language change in its own right, independent of the environment
+work; `doc/reference/types/TYPICALLY.md` must say so when R8 lands, alongside the correction that
+defaults now change evaluation.
 
 **Two surfaces, confirmed with Meng on 2026-09-04.** _Provenance in the trace_: a discharged binder
 that was supplied is an ordinary bound argument and the trace (`L4.EvaluateLazy.Trace`) already
@@ -747,4 +761,14 @@ f a b MEANS a PLUS b
 -- typ2 (2026-09-04): TYPICALLY takes an atom today
 ASSUME x IS A NUMBER TYPICALLY 41
 ASSUME y IS A NUMBER TYPICALLY x PLUS 1   -- observed: parse error at 2:34-2:38 "unexpected PLUS"
+```
+
+```l4
+-- typ3 / typ4 / typ5 (2026-09-04): a definition as a default is refused today, with or without a cycle;
+-- the literal is type-checked
+ASSUME alpha IS A NUMBER TYPICALLY 10
+ASSUME beta  IS A NUMBER TYPICALLY phi         -- observed: check error "The TYPICALLY value for `beta` must be a literal:
+GIVETH A NUMBER                                --   a number, a string, or a nullary constructor such as TRUE, FALSE or NOTHING."
+phi MEANS alpha TIMES 2                        --   (typ3; typ4, with `phi MEANS beta PLUS 1`, gives the same error)
+ASSUME gamma IS A NUMBER TYPICALLY "no"        -- observed (typ5): "expected to be of type NUMBER but is here of type STRING"
 ```
