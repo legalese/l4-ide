@@ -357,6 +357,7 @@ combineResolvedImports uri imports =
         , TypeCheck.descMap = finalState.descMap
         , TypeCheck.constBodies = finalState.constBodies
         , TypeCheck.sectionPaths = finalState.sectionPaths
+        , TypeCheck.deferredChoices = 0
         }
     , finalEnv
     )
@@ -383,6 +384,7 @@ combineResolvedImports uri imports =
              , TypeCheck.descMap = IV.empty
              , TypeCheck.constBodies = accState.constBodies
              , TypeCheck.sectionPaths = accState.sectionPaths
+             , TypeCheck.deferredChoices = 0
              }
          , TypeCheck.unionImportedCheckEnv accEnv r.environment resolvedEntityInfo r.mixfixRegistry
          )

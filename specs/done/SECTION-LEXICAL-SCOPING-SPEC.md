@@ -14,6 +14,20 @@ param-not-shadowed.l4`, `section-scoping-forward-ref.l4`,
 > test `jl4/examples/ok/section-scoping-projection-label.l4`. The count is corrected here
 > rather than left to drift, because a header that says "all three" is how a reader
 > concludes a fourth is not real.
+>
+> **Amended 2026-09-04**: §12 now carries **five** fixes — FIX D closes the descendant /
+> later-sibling rebinding defect (a parent's own reference to `x` reported ambiguous because
+> a section below it rebound `x`), with regression tests
+> `jl4/examples/ok/section-scoping-descendant-rebind.l4`,
+> `jl4/examples/ok/section-scoping-sibling-later.l4`,
+> `jl4/examples/ok/section-scoping-fun-rebind-below.l4`,
+> `jl4/examples/ok/section-scoping-typectx-rebind-order.l4` and
+> `jl4/examples/ok/section-scoping-fun-overload-below-untyped.l4`. In the same change §3.3.4 was
+> corrected: it said a sibling's binding _must_ be qualified, which the implementation has
+> never required — see the dated note there for the rule as shipped — and §10's table row was
+> brought into line with it. Ambiguity diagnostics now list each candidate under its
+> section-qualified spelling (`a.b.x`), so the reader can see why the candidates are co-equal
+> and which spelling disambiguates.
 
 # Section Lexical Scoping Specification
 
@@ -202,7 +216,7 @@ DECIDE y MEANS x + 1
 -- To access outer: a.x
 ```
 
-#### 3.3.4 Cross-Section Access Still Requires Qualification
+#### 3.3.4 Cross-Section Access: Qualification Is Sufficient, and Required Only When the Fallback Is Ambiguous
 
 ```l4
 § a
@@ -211,8 +225,41 @@ ASSUME x IS A BOOLEAN
 § b
 DECIDE y IS A BOOLEAN
 DECIDE y MEANS a.x
--- Must qualify: a.x (§ a is not a parent of § b, it is a sibling)
+-- a.x always works (§3.2). Plain x ALSO resolves here: § b has no x of its
+-- own and no ancestor with one, so resolution falls back to the flat scope,
+-- where a's x is the only candidate.
 ```
+
+> **Corrected 2026-09-04.** This example originally read "Must qualify: `a.x` (§ a is not a
+> parent of § b, it is a sibling)". That overstated the rule: the implementation (PR #50 and
+> every version since) has never required qualification for a name defined in only one other
+> section, and this correction changes no behaviour — only the text was wrong. The rule as
+> shipped (`resolveTermFilteredIn` / `selectByProximity`, `jl4-core/src/L4/TypeCheck/Types.hs`):
+>
+> 1. **Ancestry first.** Current-module candidates on the reference's own ancestry (same
+>    section, then each enclosing section, then top level) are ranked by proximity and only
+>    the nearest survive (§3.1, §5.1–§5.3).
+> 2. **Flat fallback.** If _no_ current-module candidate lies on the ancestry, every
+>    current-module candidate stays viable — siblings, cousins and descendants alike — which is
+>    the pre-lexical-scoping behaviour preserved verbatim. A single survivor resolves; several
+>    go to type-directed resolution, and if that cannot choose the reference is reported as
+>    ambiguous _at the reference_, each candidate listed under its section-qualified spelling
+>    (`a.x`, `b.x`).
+> 3. **Imports** are never ranked or eliminated by proximity (§5.5, FIX C).
+> 4. **Per declared type.** Steps 1–2 run within each group of candidates that share a
+>    declared type (`selectByProximityPerType`): a same-typed nearer binding shadows a farther
+>    one, while differently-typed bindings in other sections remain visible as overloads to
+>    type-directed resolution. This is a deliberate departure from §5.3 as written, required by
+>    the standard library, whose comparison operators are overloaded per type across sibling
+>    subsections. The one exception is a candidate whose type is not yet known — a definition
+>    further down the file than the reference — which never out-competes an ancestor whose
+>    own branch type-checks (FIX D, §12).
+>
+> So qualification is always _sufficient_ (§3.2) and is _required_ only when step 2 leaves
+> more than one same-typed candidate: two sibling sections both defining `x`, referenced from
+> somewhere that has neither on its ancestry (§3.3.6, §5.1; regression test
+> `jl4/examples/not-ok/tc/section-scoping-sibling-flat-fallback.l4`). The unique-sibling case
+> of this example is pinned by `jl4/examples/ok/section-scoping-sibling-unique.l4`.
 
 #### 3.3.5 AKA Aliases Follow Section Membership
 
@@ -612,14 +659,14 @@ Add a `ResolveSectionScope` pass that runs after the current desugaring steps.
 
 ## 10. Summary
 
-| Aspect                    | Current                            | Proposed                          |
-| ------------------------- | ---------------------------------- | --------------------------------- |
-| Same-section reference    | Ambiguous if name exists elsewhere | Resolves to local binding         |
-| Parent-section reference  | Ambiguous if name exists elsewhere | Resolves to nearest ancestor      |
-| Cross-section reference   | Must qualify                       | Must qualify (unchanged)          |
-| Fully qualified reference | Works                              | Works (unchanged)                 |
-| No-collision reference    | Works                              | Works (unchanged)                 |
-| Backward compatibility    | N/A                                | No breakage for well-written code |
+| Aspect                    | Current                                              | Proposed                                                                                                   |
+| ------------------------- | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Same-section reference    | Ambiguous if name exists elsewhere                   | Resolves to local binding                                                                                  |
+| Parent-section reference  | Ambiguous if name exists elsewhere                   | Resolves to nearest ancestor                                                                               |
+| Cross-section reference   | Flat scope: ambiguous if defined in several sections | Flat fallback only when nothing is on the ancestry; qualify to disambiguate (§3.3.4, corrected 2026-09-04) |
+| Fully qualified reference | Works                                                | Works (unchanged)                                                                                          |
+| No-collision reference    | Works                                                | Works (unchanged)                                                                                          |
+| Backward compatibility    | N/A                                                  | No breakage for well-written code                                                                          |
 
 The change brings L4's section scoping in line with both legal drafting convention and
 programming language best practices, making unqualified names resolve to the nearest
@@ -732,6 +779,19 @@ a defect: writing`base's l`when`l` is a local function of the base's type is a g
   act as, a same-named value forward reference (a `WHERE` binding named like a field it
   projects previously broke this).
 
+  **OPEN, not attempted on this branch (2026-09-04) — probe p12.** FIX B does not reach a
+  SAME-SECTION forward reference to a `GIVEN`-only function that shadows a same-typed
+  top-level one. That case still reports "multiple definitions for the identifier f" on all
+  three binaries measured — the pre-branch binary, the withdrawn first cut of FIX D, and the
+  binary built from this branch — so FIX D neither fixed nor caused it. The diagnosis is FIX
+  B's bare-`InfVar` test for the ANCESTOR side of the wildcard shadowing: a `GIVEN`-only
+  function's key is `FUNCTION FROM … TO <infvar>`, not a bare `InfVar`, so the nearer
+  binding never qualifies to shadow. Widening it is not a matter of swapping in FIX D's
+  `hasInfVarKey`. That is a KEY test, and what this needs is a UNIFIABILITY test: under a
+  key test a nearer `Fun [STRING] _` would shadow a farther, differently-typed overload that
+  type-direction should have selected — the same regression FIX D's note above records as the
+  reason FIX B keeps the bare test. Left open pending that test.
+
 - **FIX C — imports stay ambiguous (`jl4/examples/not-ok/tc/section-scoping-import-collision.l4`).**
   Imported candidates (identified by a differing module URI on the `Unique`) are never
   ranked or eliminated by section proximity: they remain co-equal viable candidates. So an
@@ -749,3 +809,127 @@ a defect: writing`base's l`when`l` is a local function of the base's type is a g
   bindings imported from different sections of another module_ is not modelled. Left as-is
   to avoid regressing the standard-library overload resolution that depends on cross-module
   candidates remaining co-equal.
+
+- **FIX D — an off-ancestry binding that is not yet inferred never out-competes an ancestor
+  whose own branch type-checks (`jl4/examples/ok/section-scoping-descendant-rebind.l4`,
+  `jl4/examples/ok/section-scoping-sibling-later.l4`,
+  `jl4/examples/ok/section-scoping-fun-rebind-below.l4`,
+  `jl4/examples/ok/section-scoping-typectx-rebind-order.l4`,
+  `jl4/examples/ok/section-scoping-fun-overload-below-untyped.l4`; added 2026-09-04).**
+  FIX B let a wildcard _ancestor_ shadow farther ancestors. Its complement was missing. A
+  same-module VALUE binding that is _off_ the ancestry (in a sibling or a descendant section)
+  and whose type still contains an unresolved inference variable — which is every same-named
+  definition further down the file at the moment the reference is checked whose signature has
+  not fixed its type: an unannotated `DECIDE`, a `DECIDE` with a `GIVEN` but no `GIVETH`, and
+  a fully annotated `ASSUME`, whose signature is unified with its declaration only during
+  inference — lands in its own `typeKey` group, where `selectByProximity` finds no ancestor
+  and falls back to the flat scope. It therefore survived beside a concrete ancestor of the
+  same name, and the ancestor's _own_ reference was reported ambiguous:
+
+  ```
+  § a
+  x MEANS 1
+  f MEANS x        -- "multiple definitions for the identifier x": a's x and b's x
+  §§ b
+  x MEANS 2
+  ```
+
+  Moving `§§ b` above the reference made the error vanish (b's `x` was concrete by then,
+  shared a's type group, and was dropped as intended), so the meaning of a program depended
+  on the textual order of a rebinding that is not even in scope at the reference. The defect
+  contradicted §3.1 and §3.3.3 (parent/child), §3.1 (sibling/sibling) and §5.2
+  (top-level/section), and was reported by two independent probes as an error "inside the
+  first section" — the location of the spurious ambiguity, not of the rebinding.
+
+  **The rule now asserted** (`resolveTermFilteredIn` and `prune`, `TypeCheck/Types.hs`). Such
+  a candidate _stays_ a candidate — the flat fallback is what lets `big "hello"` find a
+  `STRING` overload of `big` in a later sibling section (§3.3.4 step 4), and whether the
+  not-yet-inferred binding is that or a same-typed rebinding cannot be known at the reference
+  — but the search branch that chooses it is marked (`CheckState.deferredChoices`), and at the
+  forcing point `prune` prefers, among the viable outcomes of a declaration or directive, the
+  one that made the fewest such choices, when exactly one did. Ties, and outcome sets in
+  which no branch made such a choice, fall through to the ordinary ambiguity rule unchanged.
+  The test for "not yet inferred" is `hasInfVarKey` — an inference variable _anywhere_ in the
+  type key — not FIX B's bare-`InfVar` test, because a `GIVEN`-only function has key
+  `FUNCTION FROM NUMBER TO <infvar>`; FIX B keeps the bare test, since it _shadows_, and a
+  nearer `FUNCTION FROM STRING TO _` must not shadow a farther
+  `FUNCTION FROM NUMBER TO BOOLEAN` that type-direction would have selected. Imports are
+  untouched (no ancestry, fully typed); selectors and constructors are untouched (not value
+  bindings), exactly as in FIX B. `resolveType` needs no counterpart: a type's kind is known
+  at scan time, so no type candidate is ever a wildcard.
+
+  **Why the decision is made at the forcing point and not at the reference.** Two earlier
+  cuts decided at the reference and were withdrawn on measurement. The first _dropped_ the
+  not-yet-inferred candidate whenever a value ancestor existed. It fixed the zero-arity probe
+  above but left `GIVEN`-only functions ambiguous (bare-`InfVar` test), and it made `x PLUS 1`
+  order-dependent: in `§ a / x MEANS "s" / f MEANS x PLUS 1 / §§ b / x MEANS 2` the `NUMBER`
+  `x` below was dropped and the reference became a type error, whereas the same `§§ b` placed
+  above (concrete, in its own type group) still resolved to 3 — as both orders had before.
+  The second cut _deferred_ the candidate, consulting it only if the ancestor's branch did not
+  resolve locally, and failed the same probe, because type context can arrive after
+  resolution: a bare variable is resolved before its expected type is unified with it, and an
+  application before its result type is. Only the forcing point sees the whole declaration.
+
+  **The semantic delta, stated exactly.** One class of program changes meaning: a reference
+  for which _both_ the ancestor's branch and the not-yet-inferred off-ancestry branch survive
+  the whole declaration. It was ambiguous; it now resolves to the ancestor. Every other
+  program is handled byte-for-byte as before, because `deferredChoices` differs between the
+  outcomes of a `prune` only when such a branch exists, and `prune` falls through whenever it
+  does not.
+
+  **The residue, stated because it is order-dependent.** The residue is a reference with no
+  type context _that selects between the candidates_, at which the off-ancestry binding is
+  still not inferred. Both halves are wider than "the rebinding sits below the reference". A
+  type context can be present and simply fail to discriminate; and whether the off-ancestry
+  binding is still un-inferred AT THE REFERENCE depends on any earlier declaration that
+  already resolved to it, not only on where `§ b` is placed.
+
+  The plain case: `§ a / x MEANS 1 / f MEANS x / § b / x MEANS "s"` resolves `f` to `1` (the
+  `STRING` `x` is not yet inferred, so its branch is marked and loses), whereas with `§ b`
+  placed first the `STRING` `x` is concrete, sits in its own type group under §3.3.4 step 4,
+  and `f` remains ambiguous, as it was before.
+
+  A NON-discriminating type context shows the same asymmetry, so "no type context" understates
+  it. Probe r20a, `§ a / x MEANS 1 / f MEANS x EQUALS x / §§ b / x MEANS "s"`, yields `TRUE`;
+  probe r20b, the same with `§§ b` above the reference, is ambiguous. An `EQUALS` context is
+  present in both and selects neither candidate.
+
+  With the rebinding BELOW the reference in _both_ orders, the order of the REFERENCES
+  decides, so `§ b`'s placement is not the only variable. Probe r19a,
+  `x MEANS "s" / f MEANS x PLUS 1 / g MEANS x / §§ b / x MEANS 2`, leaves `g` ambiguous:
+  `f`'s prune has already fixed `b`'s `x` to `NUMBER`, so that candidate is concrete by the
+  time `g` is checked and survives the flat fallback in its own type group. Probe r19b, with
+  `g` written before `f`, gives `g` = `"s"` and `f` = `3`.
+
+  All three pairs were ambiguous in both orders before FIX D. Removing the residue means
+  marking _concrete_ off-ancestry candidates too, which changes the flat-fallback rule itself
+  (§3.3.4 step 2) and is not done here.
+
+  **Measured** (2026-09-04; `l4` built from this branch against the pre-branch binary of
+  2026-08-27). Over the twenty-six probes of the independent verification that found the
+  first cut wanting, the branch differs from the pre-branch binary in OUTPUT on eight, of
+  which exactly four differ in MEANING — p2, p2c, p13 and p3a: the `GIVEN`-only, unannotated
+  and sibling function rebindings below the reference, now resolving to the ancestor, and the
+  residue above, now `1`. The other four — p12, p3b, p4 and p6 — still report the same
+  ambiguity and differ only in the SPELLING of the candidate names, which commit `4357e163`
+  made section-qualified. The branch agrees with the pre-branch binary on every
+  other, including `x PLUS 1` across a differently-typed rebinding (`3` in both orders, in
+  both the descendant and the sibling shape) and a differently-typed unannotated overload in
+  a later sibling (still selected by type direction). Ten further probes for type context
+  that arrives after resolution — an application whose _result_ type selects the rebinding,
+  a projection whose base is the rebinding, two references in one expression, a `WHERE`
+  local referring to the rebinding — agree with the pre-branch binary in both orders except
+  where both branches survive, which is the stated delta. `l4 check` over every `.l4` under
+  `jl4/examples` and `jl4-core/libraries` (515 files: 493 under `jl4/examples` and 22 under
+  `jl4-core/libraries`, counted with `find … -name '*.l4' | wc -l`, and including the single
+  `.l4` that lives inside a `tests/` directory,
+  `jl4/examples/legal/tests/imaginary-alcohol-act.l4`, which the differential list skipped and
+  which is identical old vs new) changes on no file that predates the
+  branch except the three `not-ok/tc` files whose ambiguity candidates are now
+  section-qualified (header note); the remaining differences are files added on this branch
+  — the fourth qualified-spelling fixture and the FIX D fixtures, on which the pre-branch
+  binary reports the defect. The full `jl4-test` golden suite (2,710 examples) fails on
+  exactly the fourteen goldens this change creates or moves — the twelve first-time goldens of
+  the three new fixtures, and the two goldens of `section-scoping-descendant-rebind` whose
+  source comment grew by two lines — and no other; with those blessed, its section-scoping
+  subset (198 examples) passes. `jl4-core-test` 497/497, `jl4-lsp-test` 10/10.

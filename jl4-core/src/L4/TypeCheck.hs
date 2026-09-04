@@ -128,6 +128,7 @@ mkInitialCheckState substitution =
     , descMap      = IV.empty
     , constBodies  = Map.empty
     , sectionPaths = Map.empty
+    , deferredChoices = 0
     }
 
 mkInitialCheckEnv :: NormalizedUri -> Environment -> EntityInfo -> CheckEnv

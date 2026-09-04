@@ -1,16 +1,9 @@
 Parsing successful
 Typechecking successful
 Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
-File: section-scoping-ambiguous.l4
+File: section-scoping-sibling-flat-fallback.l4
   Hidden: no
-  Range: 12:1-12:9
-  Source: check
-  Severity: DiagnosticSeverity_Information
-  Code: <none>
-  Message: x5
-File: section-scoping-ambiguous.l4
-  Hidden: no
-  Range: 12:8-12:9
+  Range: 11:9-11:10
   Source: check
   Severity: DiagnosticSeverity_Error
   Code: <none>
@@ -22,5 +15,5 @@ File: section-scoping-ambiguous.l4
     and I do not have sufficient information to make a choice between them.
     The options are:
 
-      a.c.x (defined at section-scoping-ambiguous.l4:18:8-9) of type NUMBER
-      a.b.x (defined at section-scoping-ambiguous.l4:15:8-9) of type BOOLEAN
+      b.x (defined at section-scoping-sibling-flat-fallback.l4:17:1-2) of type NUMBER
+      a.x (defined at section-scoping-sibling-flat-fallback.l4:14:1-2) of type NUMBER

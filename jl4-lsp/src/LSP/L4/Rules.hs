@@ -692,6 +692,7 @@ jl4Rules evalConfig rootDirectory recorder = do
           , descMap = IV.empty
           , constBodies = cState.constBodies
           , sectionPaths = cState.sectionPaths
+          , deferredChoices = 0
           }
         -- NOTE: tcRes.entityInfo is already zonked (the final substitution is
         -- applied when the TypeCheckResult is built below), as
