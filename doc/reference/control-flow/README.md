@@ -132,6 +132,7 @@ CONSIDER status
 
 - **[IF](IF.md)** - Detailed conditional documentation
 - **[CONSIDER](CONSIDER.md)** - Detailed pattern matching documentation
+- **[REFUSE](REFUSE.md)** - Declining to answer, with a reason nothing downstream can convert
 - **[AND](../operators/AND.md)** / **[OR](../operators/OR.md)** - Combine conditions
 
 ## See Also
