@@ -2,6 +2,8 @@
 
 Declares a variable or function with a specified type, without providing a definition. Used for external values or assumptions about inputs.
 
+> `ASSUME` is for a fact the boundary SUPPLIES — it becomes a required input in the export schema. If what you mean is that the model declines to answer, that is a refusal, and it is spelled [`REFUSE`](../control-flow/REFUSE.md). A refusal is not an input anyone can supply, and no rule can convert it into an answer.
+
 ## Syntax
 
 ```l4
