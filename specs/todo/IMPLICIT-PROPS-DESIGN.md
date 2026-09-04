@@ -525,7 +525,9 @@ change in its own right; `doc/reference/types/TYPICALLY.md` says so when R8 land
 **Ruling (Meng, 2026-09-04: "next-line-after-section, indented, to be the convention; having a
 GIVEN at the rhs of the section heading text just looks weird").** A `GIVEN` belongs to a section
 iff its keyword sits at a column greater than the heading's `§`, on the line after the heading. The
-heading-line form `§ ⟨name⟩ GIVEN …` is not adopted. A column-1 `GIVEN` stays the next
+heading-line form `§ ⟨name⟩ GIVEN …` falls under the same rule and parses, but is not taught as a
+style: docs show only the indented form and the formatter emits it ("if the parser needs to do it
+that way, fine, but let's not teach it as the primary style"). A column-1 `GIVEN` stays the next
 declaration's signature. `WHEREAS` and `WHEREIN` are struck.
 
 ```l4
@@ -538,5 +540,5 @@ the ground that it has no indentation hazard. The hazard is mitigated instead: a
 immediately after a heading whose names the next head does not bind is a check error; the
 formatter never moves a `GIVEN` across the column boundary; and diagnostics about an implicit name
 the heading line it was declared on. Measured 2026-09-04: the rival adjacency rule would
-reinterpret 160 legal-corpus sites; the indentation rule collides with none. Both printers emit
-the indented form with round-trip goldens. Detail: `PROPS-REDTEAM-2026-09-03.md` §2.1.
+reinterpret 160 legal-corpus sites; the indentation rule collides with none. ExactPrint preserves
+what was written; `prettyLayout` emits the indented form; both have round-trip goldens. Detail: `PROPS-REDTEAM-2026-09-03.md` §2.1.
