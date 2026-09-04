@@ -544,17 +544,25 @@ evalResultToJson fields edr = Aeson.object $
     Nothing -> []
     Just r -> ["range" .= rangeToJson r]
   where
-    isSuccess (EL.Assertion EL.Holds) = True
-    isSuccess (EL.Assertion EL.Fails) = False
-    isSuccess (EL.Assertion (EL.FailsBecause _)) = False
-    -- A refusal is not a success. It is not a failure either, but this field is
-    -- a boolean; the distinguishing text is in "result", which goes through
-    -- 'prettyAssertionOutcome'.
-    isSuccess (EL.Assertion (EL.Refused _)) = False
-    isSuccess (EL.Assertion (EL.Errored _)) = False
-    isSuccess (EL.Reduction (EL.Reduced _)) = True
-    isSuccess (EL.Reduction (EL.ReducedRefused _)) = False
-    isSuccess (EL.Reduction (EL.ReducedErrored _)) = False
+    -- "success" is a NULLABLE boolean, and a refusal is the null. Saying
+    -- @false@ would tell a consumer the assertion FAILED, which is a laundered
+    -- answer: the program declined to answer, so there is no verdict to report.
+    -- 'LSP.L4.Inspector' makes the same call ('Refused _ -> Nothing'), and the
+    -- webview already types the field @boolean | null@ and renders null as
+    -- neither success nor failure (ts-apps/webview/.../inspector-panel.svelte).
+    -- The reason itself is in "result", via 'prettyAssertionOutcome'.
+    --
+    -- 'Errored' keeps its historical @false@: widening that is a separate
+    -- decision about errors, not about refusals, and is not made here.
+    isSuccess :: EL.EvalDirectiveValue -> Aeson.Value
+    isSuccess (EL.Assertion EL.Holds) = Aeson.Bool True
+    isSuccess (EL.Assertion EL.Fails) = Aeson.Bool False
+    isSuccess (EL.Assertion (EL.FailsBecause _)) = Aeson.Bool False
+    isSuccess (EL.Assertion (EL.Refused _)) = Aeson.Null
+    isSuccess (EL.Assertion (EL.Errored _)) = Aeson.Bool False
+    isSuccess (EL.Reduction (EL.Reduced _)) = Aeson.Bool True
+    isSuccess (EL.Reduction (EL.ReducedRefused _)) = Aeson.Null
+    isSuccess (EL.Reduction (EL.ReducedErrored _)) = Aeson.Bool False
 
 -- | Pretty print an evaluation directive result value.
 prettyEvalResult :: ConstructorFieldNames -> EL.EvalDirectiveValue -> Text
