@@ -11,4 +11,4 @@ File: ditto-resolved-diag.l4
     7 | huh MEANS   ^
       |             ^
     unexpected ^ (resolved to PLUS)
-    expecting (, AT, ATTEST, BRANCH, BREACH, COMMIT, CONCAT, CONSIDER, ENV, FETCH, Float Literal, GIVEN, IF, LET, LIST, NOT, Numeric Literal, PARTY, POST, RECALL, RECORD, String Literal, identifier, space token, or •
+    expecting (, AT, ATTEST, BRANCH, BREACH, COMMIT, CONCAT, CONSIDER, ENV, FETCH, Float Literal, GIVEN, IF, LET, LIST, NOT, Numeric Literal, PARTY, POST, RECALL, RECORD, REFUSE, String Literal, identifier, space token, or •

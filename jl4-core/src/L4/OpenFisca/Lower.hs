@@ -402,6 +402,9 @@ constructorName = \case
   Concat{}     -> "string concat"; AsString{} -> "string coercion"
   AppNamed{}   -> "named-argument application"
   Inert{}      -> "inert scaffolding"
+  -- Explicit, ABOVE the wildcard: without this a refusal is rejected as a
+  -- nameless "expression" and the author cannot tell what was refused.
+  Refuse{}     -> "REFUSE (a refusal has no OpenFisca form: a variable always returns a value)"
   _            -> "expression"
 
 -- ---------------------------------------------------------------------------

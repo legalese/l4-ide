@@ -272,6 +272,9 @@ instance Linearize (Expr Resolved) where
       [ text "breach" ]
       <> maybe [] (\p -> [ text "by", lin p ]) mParty
       <> maybe [] (\r -> [ text "because", lin r ]) mReason
+    -- A refusal reads as what it is: the model declining to answer, with the
+    -- author's reason.
+    Refuse _ msg -> hcat [ "the model refuses to answer:", lin msg ]
     Inert _ txt _ctx -> text txt
 
 instance Linearize (Event Resolved) where
@@ -287,6 +290,7 @@ instance Linearize (Directive Resolved) where
       [ "executing contract", lin e, "at", lin t, "with the following events: " ]
       <> map lin es
     Assert _ e -> linearize e
+    AssertRefused _ e _mmsg -> hcat [ "the following must refuse:", lin e ]
 
 
 instance Linearize (NamedExpr Resolved) where

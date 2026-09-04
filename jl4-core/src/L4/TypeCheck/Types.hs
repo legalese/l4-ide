@@ -234,6 +234,7 @@ data ExpectationContext =
   | ExpectAsStringArgumentContext -- argument of AS STRING
   | ExpectTypicallyValueContext Name -- TYPICALLY value must match the declared type
   | ExpectBreachReasonContext -- reason argument of BREACH
+  | ExpectRefuseMessageContext -- message argument of REFUSE
   | ExpectRecordCellContext -- cell (path) argument of RECORD/COMMIT/ATTEST
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData

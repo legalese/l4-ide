@@ -416,6 +416,12 @@ translateExpr shouldSimplify = top
               InertCtxNone -> InertAnd
         pure $ VizExpr.InertE vid txt inertCtx
 
+      -- A refusal is drawn as an ordinary leaf, labelled with its own source
+      -- (@REFUSE "…"@) so the picture says what it is. Explicit above the
+      -- wildcard because the wildcard would first try 'normaliseGuarded' on
+      -- it, and a refusal is not ladder STRUCTURE — it is a terminal.
+      Refuse{} -> leafFromExpr e
+
       App _ resolved [] -> do
         vid <- getFresh
         let vname = mkPrettyVizName resolved

@@ -46,7 +46,7 @@ import L4.Catala.Emit (renderModule)
 import L4.Catala.IR (CatModule (..), CatSegment (..), CatTestCli (..), catIdent, catUpper)
 import L4.Catala.Lower (LowerOptions (..), lowerModuleWith, renderLowerError)
 import L4.Evaluate.ValueLazy (NF (..), Value (..))
-import L4.EvaluateLazy (EvalDirectiveResult (..), EvalDirectiveValue (..))
+import L4.EvaluateLazy (EvalDirectiveResult (..), EvalDirectiveValue (..), AssertionOutcome (..), ReductionOutcome (..))
 import L4.EvaluateLazy.Machine (pattern ValBool)
 import L4.Parser.SrcSpan (SrcRange)
 import L4.Print (ConstructorFieldNames, extractConstructorFieldNames, prettyLayoutNF)
@@ -184,26 +184,37 @@ fillTests fields oracle m =
       case Map.lookup rng oracle of
         Nothing ->
           ([], [ note t "L4 produced no value for it (was the directive evaluated?)" ])
-        Just (Reduction (Left _)) ->
+        Just (Reduction (ReducedErrored _)) ->
           ([], [ note t "evaluating it in L4 raised" ])
-        Just (Assertion (Left _)) ->
+        Just (Assertion (Errored _)) ->
           ([], [ note t "evaluating it in L4 raised" ])
-        Just (Assertion (Right b)) ->
-          ( [ SegTestCli t { tcOutput = [ wrap (if b then "true" else "false") ] }
-            , humanBlock (if b then "TRUE" else "FALSE") ]
-          -- R7's oracle is L4, so a false #ASSERT is transcribed faithfully as
-          -- `{"result":false}` and `clerk test` passes on it — which reads, to
-          -- anyone scanning the run, as "the source's assertion holds". It does
-          -- not, and that has to be said out loud.
-          , [ "the L4 assertion behind `" <> t.tcCommand <> "` is FALSE in L4 itself. The emitted "
-              <> "block expects `false` and will pass, because R7 tests L4/Catala agreement and "
-              <> "not the assertion — fix the assertion in the L4 source."
-            | not b ] )
-        Just (Reduction (Right v)) -> case catalaJson fields v of
+        -- A refusal is not an oracle either, and it is not a raise: say which,
+        -- so a reader of the run does not go hunting for a crash.
+        Just (Reduction (ReducedRefused _)) ->
+          ([], [ note t "L4 REFUSES to answer it, so there is no expected output" ])
+        Just (Assertion (Refused _)) ->
+          ([], [ note t "L4 REFUSES to answer it, so there is no expected output" ])
+        Just (Assertion (FailsBecause _)) ->
+          ([], [ note t "the L4 assertion behind it did not hold" ])
+        Just (Assertion Holds) -> verdictSeg t True
+        Just (Assertion Fails) -> verdictSeg t False
+        Just (Reduction (Reduced v)) -> case catalaJson fields v of
           Nothing   -> ([], [ note t "its value has no Catala JSON rendering" ])
           Just json -> ([ SegTestCli t { tcOutput = [ wrap json ] }
                         , humanBlock (prettyLayoutNF fields v) ], [])
     _ -> ([seg], [])
+
+  verdictSeg t b =
+    ( [ SegTestCli t { tcOutput = [ wrap (if b then "true" else "false") ] }
+      , humanBlock (if b then "TRUE" else "FALSE") ]
+    -- R7's oracle is L4, so a false #ASSERT is transcribed faithfully as
+    -- `{"result":false}` and `clerk test` passes on it — which reads, to
+    -- anyone scanning the run, as "the source's assertion holds". It does
+    -- not, and that has to be said out loud.
+    , [ "the L4 assertion behind `" <> t.tcCommand <> "` is FALSE in L4 itself. The emitted "
+        <> "block expects `false` and will pass, because R7 tests L4/Catala agreement and "
+        <> "not the assertion — fix the assertion in the L4 source."
+      | not b ] )
 
   wrap v = "{\"result\":" <> v <> "}"
   note t why = "no expected output for `" <> t.tcCommand <> "`: " <> why
