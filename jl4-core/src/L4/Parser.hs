@@ -644,12 +644,20 @@ directive =
       -- this alternative consumes the #ASSERT token before it can discover
       -- there is no REFUSED, and without backtracking the plain #ASSERT
       -- alternative below would never be reached.
+      --
+      -- The BECAUSE payload is a LITERAL ('lit'), matching 'refuse' -- REFUSE's
+      -- own message is a literal for the same reason, and the two must agree.
+      -- The directive's job is to pin a refusal's reason, and the comparison is
+      -- decided statically in 'evalDirective' without evaluating the payload; a
+      -- payload the evaluator cannot read statically would silently degrade to
+      -- "no constraint", i.e. an assertion that holds for ANY refusal reason.
+      -- So a non-literal payload is a parse error, not a vacuous success.
       , tryParser $
           AssertRefused emptyAnno
           <$ annoLexeme (spacedToken_ (TDirectives TAssertDirective))
           <* annoLexeme (spacedKeyword_ TKRefused)
           <*> annoHole singleLineExpr
-          <*> optionalWithHole (annoLexeme (spacedKeyword_ TKBecause) *> annoHole singleLineExpr)
+          <*> optionalWithHole (annoLexeme (spacedKeyword_ TKBecause) *> annoHole lit)
       , Assert emptyAnno
           <$ annoLexeme (spacedToken_ (TDirectives TAssertDirective))
           <*> annoHole singleLineExpr
