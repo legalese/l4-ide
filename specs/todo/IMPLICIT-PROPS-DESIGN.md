@@ -392,7 +392,7 @@ drop this job too, and is worth a line in any props-era deprecation plan.
 > (`Dmn/Lower.hs:2285`), so a migrated `regcf` exports DMN carrying the L4 source text inside a
 > FEEL literal, and KIE 8.44.0.Final does not merely mark it Blocking — it **fails to compile the
 > file**: `ERROR [ERR_COMPILING_FEEL] … syntax error near '"no Regulation Crowdfunding figure
-> exists before commencement on 2016-05-16"'`, twice, `VERDICT … <<< FAILED` (job 101189031152 of
+exists before commencement on 2016-05-16"'`, twice, `VERDICT … <<< FAILED` (job 101189031152 of
 > run 33924199101). The DMN Engine Checks job runs both engines end to end over every
 > DMN-declaring subject, so the migration cannot land before the designed DMN image does.
 >

@@ -162,16 +162,16 @@ directive exists to test.
 | an execution trace    | `↯ refused: <reason>` — a first-class event, distinct from a crash. Both renders say so: `l4 trace` text, and the `--format dot` node label                                                  |
 | the export schema     | nothing. A refusal is not an input, so it is not a parameter                                                                                                                                 |
 
-That last row is the change worth seeing. In `jl4/examples/legal/regcf/denovo/`, the encoding floor
-used to appear in the exported JSON schema as
+That last row is the one to watch when the corpus moves. In `jl4/examples/legal/regcf/denovo/`,
+the encoding floor is still an `ASSUME`, so it still appears in the exported JSON schema as
 
 ```json
 "no encoding of Part 227 exists for rule dates before 2022-09-20": { "type": "number" }
 ```
 
-and in that function's `required` list. A caller of the money decisions was being asked to supply
-the encoding floor. As a `REFUSE` it is gone from the schema, and the ten-line paragraph in the
-source that apologised for it is gone too.
+and in that function's `required` list — a caller of the money decisions is being asked to supply
+the encoding floor. Written as a `REFUSE` it leaves the schema entirely. **That migration is
+written but not landed**: see the DMN limit below, which is what holds it.
 
 ## Limits, as they stand today
 
@@ -193,14 +193,20 @@ us or from a wrong answer.
   `RAND` / `ROR`.
 - **`#ASSERT REFUSED e BECAUSE "…"` where `e` ends in a `BREACH`**: `BREACH` itself takes an
   optional `BECAUSE`, and it wins. Bracket the expression if you need the outer reading.
-- **The backends do not yet have their designed image for a refusal.** Today every backend refuses
-  it loudly and by name — none crashes, and none emits a refusal as something a caller could be
-  asked to supply:
+- **The backends do not yet have their designed image for a refusal.** Today every backend but one
+  refuses it loudly and by name, and none emits a refusal as something a caller could be asked to
+  supply. The exception is DMN, which emits a file a real engine rejects:
 
-  - **DMN** renders the refusing decision verbatim, which marks it Blocking. In
-    `jl4/examples/dmn/expected/regcf-corpus.dmn` this means two Blocking notes where there were
-    none. The designed image — omit the refusing row, report a **non-Blocking** `D-REFUSE`, and add
-    a `MayRefuse` safety kind that does not withdraw `DMN-SAFE` — is not built.
+  - **DMN** is the exception to "none crashes", and it is why no legal-corpus site has been
+    migrated yet. `L4.Dmn.Lower` lowers a refusal as `Refuse {} -> verbatim e`
+    (`Dmn/Lower.hs:2285`), which writes the L4 source text into a FEEL literal expression. That is
+    not merely Blocking: **KIE cannot compile the file at all** — `ERROR [ERR_COMPILING_FEEL] …
+syntax error near '"no Regulation Crowdfunding figure exists before commencement on
+2016-05-16"'`, and the engine verdict is `FAILED`. Measured 2026-09-05 on CI, which runs KIE
+    and Camunda end to end over every DMN-declaring subject; the migration of `regcf.l4` was
+    dropped from the PR that landed `REFUSE` because of it. The designed image — omit the refusing
+    row, report a **non-Blocking** `D-REFUSE`, and add a `MayRefuse` safety kind that does not
+    withdraw `DMN-SAFE` — is not built.
   - **Catala** and **docassemble** refuse the module, naming `REFUSE` (`DA-REFUSE`). The designed
     images (Catala emits no definition; docassemble shows a terminal screen carrying the reason)
     are not built.
