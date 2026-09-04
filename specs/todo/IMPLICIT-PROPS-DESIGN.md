@@ -304,12 +304,16 @@ question if promoted. Some fraction of the 418 is that, not operator demos.
    `local` generalises `EVAL UNDER RULES EFFECTIVE AT` — rebind one environment component for a
    subtree, evaluate, unwind. That is precisely the construct the DMN exporter cannot lower: a DMN
    decision is a 0-ary variable holding one value per evaluation, so a DRG has no scoped
-   rebinding. Today that costs 15 dropped decisions (the `D-RULEDATE-UNBOUND` class in
-   `specs/todo/DMN-DIFFERENTIAL-CI-SPEC.md`); if `local` becomes a general feature, **every use
-   of it is unlowerable by the same argument**, and the unlowerable surface grows in proportion to
-   how much authors reach for hypothetical evaluation. Not an argument against `props` — an
-   argument that this spec and `DMN-EXPORT-PROGRAM-MODEL-SPEC.md` should cite each other, which
-   as of this snapshot neither does.
+   rebinding. Today that costs 15 dropped decisions (the `D-RULEDATE-UNBOUND` class — ruled R12 in
+   `DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §15.12, which is where the count lives in this tree.
+   `DMN-DIFFERENTIAL-CI-SPEC.md`, which discusses the same class, is **not in this tree**: it and
+   `etc/dmn-differential/` exist only on PR #216's branch `mengwong/dmn-differential-ci-handoff`,
+   an open handoff marked not for merge); if `local` becomes a general feature, **every use of it
+   is unlowerable by the same argument**, and the unlowerable surface grows in proportion to how
+   much authors reach for hypothetical evaluation. Not an argument against `props` — an argument
+   that this spec and `DMN-EXPORT-PROGRAM-MODEL-SPEC.md` should cite each other. (As of the
+   2026-08-04 snapshot neither did; the reciprocal citation was added to that spec's §2 on
+   2026-09-04.)
 
 ### 10.5 Correction: a partial deprecation ruling already exists, and it couples to DMN export
 
