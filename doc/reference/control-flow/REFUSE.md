@@ -125,6 +125,10 @@ refusal, and it diverges from FEEL's commutative three-valued logic. The regulat
 #ASSERT REFUSED e BECAUSE "message"      -- ...and the reason must be exactly this
 ```
 
+The `BECAUSE` payload is a **string literal**, like `REFUSE`'s own message. The comparison is
+made without evaluating it, so a computed payload does not parse rather than quietly constraining
+nothing.
+
 A plain `#ASSERT` has four outcomes, not two:
 
 | what happened                      | what is printed                                                 |
@@ -153,9 +157,9 @@ directive exists to test.
 | `l4 batch`            | the row's `"status"` is `"refused"` — a third terminal status beside `"success"` and `"error"` — and the batch does **not** stop on it                                                       |
 | editor diagnostics    | a **Warning**, not an Error: a refusal is a designed outcome, and Error would squiggle every deliberate refusal in the corpus                                                                |
 | the decision service  | its own error kind, never an interpreter error (which would read as a server fault)                                                                                                          |
-| `l4/getDirectiveInfo` | `success` is **absent**, not `false`: a refusal is not a negative verdict                                                                                                                    |
+| `l4/getDirectiveInfo` | `success` is **absent** (and `null` on the `L4.API` envelope), never `false`: a refusal is not a negative verdict                                                                            |
 | the REPL              | `Refused: ` and the reason                                                                                                                                                                   |
-| an execution trace    | `↯ refused: <reason>` — a first-class event, distinct from a crash                                                                                                                           |
+| an execution trace    | `↯ refused: <reason>` — a first-class event, distinct from a crash. Both renders say so: `l4 trace` text, and the `--format dot` node label                                                  |
 | the export schema     | nothing. A refusal is not an input, so it is not a parameter                                                                                                                                 |
 
 That last row is the change worth seeing. In `jl4/examples/legal/regcf/denovo/`, the encoding floor
@@ -175,7 +179,16 @@ Stated plainly, because you find these out anyway; the only question is whether 
 us or from a wrong answer.
 
 - **The message must be a string literal.** `REFUSE 42` is a type error; `REFUSE (1 PLUS 1)` does
-  not parse. Interpolated or computed reasons are not supported.
+  not parse. Interpolated or computed reasons are not supported. The same holds for the `BECAUSE`
+  payload of `#ASSERT REFUSED`: `BECAUSE 42` is a type error and `` BECAUSE `some string decision` ``
+  does not parse. That is stricter than it needs to be for the grammar's sake, and deliberately so —
+  the comparison is decided statically, so a payload the evaluator could not read would degrade into
+  "this directive constrains nothing", i.e. an assertion satisfied by _any_ refusal reason.
+- **`l4 verify` does not know about refusals.** The propositional verifier treats `REFUSE` as an
+  opaque leaf, like any other expression it cannot lower, so a decision that can only ever refuse —
+  `` `combo` y MEANS `eligible` y AND REFUSE "…" `` — is reported clean, with no findings. This
+  follows from `verify`'s stated "every leaf is an opaque atom" model rather than from anything
+  specific to refusals, and the fix is `Ref(f)` below.
 - **Order-dependence under lazy `AND` / `OR`**, as above, and no demand order at all under
   `RAND` / `ROR`.
 - **`#ASSERT REFUSED e BECAUSE "…"` where `e` ends in a `BREACH`**: `BREACH` itself takes an

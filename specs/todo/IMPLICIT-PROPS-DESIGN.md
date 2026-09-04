@@ -381,6 +381,46 @@ generated "not in force" arm) and says "delete this when it lands". **Dispositio
 first-class refusal construct exists** — a `REFUSE "…"`-style typed bottom would let `ASSUME`
 drop this job too, and is worth a line in any props-era deprecation plan.
 
+> **Discharged 2026-09-04 (R7); the corpus migration is NOT part of it.** The construct exists.
+> `REFUSE "message"` is an expression at any type whose evaluation stops with the author's reason,
+> uncatchable by any rule, and absent from every export schema. The prelude's `TBD` is a `REFUSE`.
+> The paragraph above therefore describes what `ASSUME` was used for, and the fifth role now has a
+> construct of its own — but **no legal-corpus site has moved to it yet.**
+>
+> The `regcf.l4` and `regcf-denovo.l4` migration was written, and was **dropped from this PR on
+> 2026-09-05** on a CI measurement. `L4.Dmn.Lower` lowers `Refuse {} -> verbatim e`
+> (`Dmn/Lower.hs:2285`), so a migrated `regcf` exports DMN carrying the L4 source text inside a
+> FEEL literal, and KIE 8.44.0.Final does not merely mark it Blocking — it **fails to compile the
+> file**: `ERROR [ERR_COMPILING_FEEL] … syntax error near '"no Regulation Crowdfunding figure
+> exists before commencement on 2016-05-16"'`, twice, `VERDICT … <<< FAILED` (job 101189031152 of
+> run 33924199101). The DMN Engine Checks job runs both engines end to end over every
+> DMN-declaring subject, so the migration cannot land before the designed DMN image does.
+>
+> **Therefore the whole refusal-role migration waits on §6 item 6**, not just the two
+> `jl4/examples/dmn/` exhibits: `regcf.l4` ×2, `regcf-denovo.l4` ×1, the `dmn/` exhibits, and
+> `daydate.l4`'s out-of-range `YMD` (which §2.8 reclassifies as invalid INPUT rather than a
+> refusal, so it is not a refusal site at all). The designed image — omit the refusing row, report
+> a non-Blocking `D-REFUSE`, add a `MayRefuse` safety kind — is specified in §11.9 and unbuilt.
+>
+> **What this change did NOT do, and why.** The same work order bundled the uninterpreted-**type**
+> role above (10.4 item 3 / 10.6 (b)): rewrite every `ASSUME T IS A TYPE` as `DECLARE T`. That is
+> **deferred, not done**, because the target syntax does not parse on this tree. Measured
+> 2026-09-04 with this branch's binary:
+>
+> ```
+> DECLARE Jurisdiction
+>
+> GIVEN j IS A Jurisdiction
+>   | ^^^^^  unexpected GIVEN / expecting AKA, HAS, IS, OF, or space token
+> ```
+>
+> A `DECLARE` with no `HAS`/`IS` body is not accepted, so the migration has no landing site until
+> either empty `DECLARE` parses or the role gets a different spelling. Anything that claims
+> otherwise — including a source that cites `ok/set-operators-nested.l4` or `ok/consider-simple.l4`
+> as evidence that empty `DECLARE` "parses today" — is wrong: both of those are ordinary
+> declarations with `HAS` or `IS` on the following line. Splitting the two halves of the item is
+> therefore a departure from the bundled sequencing, taken on that measurement.
+
 **Reading of the whole:** the corpus does not argue for keeping `ASSUME`; it argues for building
 `props`. Categories (a) and (b) — 49 of 53 lines — are authors reaching for an implicit typed
 environment that does not exist yet, and paying for it with modules that either cannot be
