@@ -95,19 +95,74 @@ presumptively non-operative where the operative words are clear, Re Moon, ex p D
 beginner raters confused it with `WHERE`); the drafter's `IN THIS SECTION x IS A T` is unambiguous
 at the cost of three tokens. The examples in this file use the indented spelling pending R4.
 
-**Visibility, R3.** A section `GIVEN` is **module-visible**, exactly as top-level names are today:
-`selectByProximity` (`jl4-core/src/L4/TypeCheck/Types.hs:902`) prefers the nearest ancestor
-section and falls back to all candidates when no ancestor matches, so a binder under a title `§`
-already reaches a sibling `§` and a grandchild `§§`. `§` placement is documentation and the
-tiebreak, not a scope wall. This is stated as it ships, not as Coq: 7 of 26 legal files have a
-title `§` that is a _sibling_ of the operative sections, not their ancestor (`regcf.l4`'s title is
-one of eleven siblings), so "the module is the title `§`" is false as a tree statement, and
-statutes re-declare the same binder per section (Bribery Act 2010 ss 1, 2, 6 each re-declare "P"),
-so an "extension only, never re-declare" rule was dropped. Same-name re-declaration in another
-section at the **same type** is governed by R2; at a **different type** it is an error. Two shipped
-defects are repaired first (§7): a parent's own reference goes ambiguous whenever a descendant
-rebinds the name, and `SECTION-LEXICAL-SCOPING-SPEC.md` §3.3.4 says a sibling must qualify while
-the implementation says it need not.
+**Visibility, R3 (amended 2026-09-04 at Meng's direction).** A section `GIVEN` is resolved exactly
+as a top-level name is today: `selectByProximity` (`jl4-core/src/L4/TypeCheck/Types.hs:902`)
+prefers the nearest ancestor section and falls back to all candidates when no ancestor matches, so
+a binder under a title `§` reaches a sibling `§` and a grandchild `§§` whenever it is the only
+candidate. **Same-named binders in different sections are distinct binders**, each read by its own
+section and its descendants, exactly as two `ASSUME`s or two definitions are today. **One binder
+per name is enforced per root, not per module.** A directive or export whose read-set contains
+two binders spelled `foo` is a check error naming both by section (`` `Sections 1 and 2`.foo ``,
+`` `Sections 3 and 4`.foo ``); a root that reads only one supplies it as plain `WITH foo IS …`.
+The ways out each say what was meant: hoist `foo` to the title heading if it is one thing; rename
+one if they are two; bridge at the call, `g WITH foo IS foo`, if section 2's `foo` is section 1's
+for that call, which the error should offer. Different-type same-name binders are distinct in the
+same way, the per-root check catching a root that reaches both.
+
+This replaced the first draft's "one binder per name per module", which would have merged
+silently the drafting pattern Meng put on 2026-09-04, "for the purposes of sections 1 and 2, foo
+means apple; for the purposes of sections 3 and 4, foo means banana", laid out as he intends the
+module mechanism to allow it:
+
+```l4
+§ toplevel
+
+DECLARE Fruit IS ONE OF Apple, Banana
+
+§§ `1`
+foo MEANS Apple
+r1 MEANS foo                   -- Apple
+
+§§ `2`
+foo MEANS Apple
+r2 MEANS foo                   -- Apple
+
+§§ `3`
+foo MEANS Banana
+r3 MEANS foo                   -- Banana
+
+§§ `4`
+foo MEANS Banana
+r4 MEANS foo                   -- Banana
+
+§§ `5`
+r5 MEANS foo                   -- error: multiple definitions, toplevel.`1`.foo … toplevel.`4`.foo
+```
+
+As definitions this runs today on the FIX D branch exactly so, and a reader placed in `§ toplevel`
+is ambiguous like `r5`, both the right answer, since the statute defined `foo` for neither; the
+shipped 2026-08-27 binary reports `r1`–`r3` ambiguous as well, which is the not-yet-inferred
+candidate defect FIX D repairs (probe meng-fruit, Appendix A). The same file with
+`ASSUME foo IS A Fruit` in each section checks identically, and that is the rule section `GIVEN`
+inherits. Stated as it ships, not as Coq: 7 of 26 legal files have a title `§` that is a _sibling_
+of the operative sections, not their ancestor (`regcf.l4`'s title is one of eleven siblings), so
+"the module is the title `§`" is false as a tree statement, and statutes re-declare the same
+binder per section (Bribery Act 2010 ss 1, 2, 6 each re-declare "P"), which distinct binders
+allow and "extension only" would have forbidden. Two shipped defects are repaired first (§7): a
+parent's own reference goes ambiguous whenever a descendant rebinds the name, and
+`SECTION-LEXICAL-SCOPING-SPEC.md` §3.3.4 says a sibling must qualify while the implementation
+says it need not.
+
+**Nesting.** A binder on a heading covers every definition in every section beneath it. That is
+the one nesting pattern the corpus exercises: 2,407 of 2,409 legal-corpus definitions sit in leaf
+sections (2026-09-04), so a parent section with rules of its own is a two-case rarity. A child
+re-declaring an ancestor's name is a distinct binder that shadows within the child's subtree, as
+today. A parent reading a name that several children declare is ambiguous, as today (probe
+meng-fruit, the `top` reader). A child's binder is visible upward and sideways when it is the only
+candidate; no legal file relies on that (of 33 term-role `ASSUME`s, 30 are read only in their own
+section, 3 from a sibling, 0 from a parent or child in either direction, 2026-09-04). Supply never
+qualifies a name, because a root that reaches two same-named binders is already an error. The
+nearest-ancestor tiebreak is therefore the whole scoping rule, and headings are placement.
 
 **Tier is measured, never declared.** Whether a binder is _world_ (one value per request) or
 _subject_ (varies per case) is classified by call-site variation, by the exporter's existing
@@ -136,6 +191,35 @@ importer calling `YMD`).
 The runtime shape is a compiler choice: per-field (Coq-exact) or one record per module, which
 preserves sharing of 0-ary dated constants (`the rules in force include` in `regcf.l4` has ten
 readers). Unmeasured; backends project per-field from `R(f)` either way.
+
+**Across sections.** The buffet is per definition, laid out by lexical position, and a call passes
+requirements upward without the caller having to see them:
+
+```l4
+§ `1`
+    GIVEN alpha IS A NUMBER
+
+GIVETH A NUMBER
+f MEANS alpha PLUS g                  -- R(f) = {`1`.alpha} ∪ R(g) = {`1`.alpha, `2`.beta}
+
+§ `2`
+    GIVEN beta IS A NUMBER
+
+GIVETH A NUMBER
+g MEANS beta TIMES 2                  -- R(g) = {`2`.beta}
+
+#EVAL f WITH alpha IS 1, beta IS 2    -- 5
+```
+
+`f` inherits `beta` without naming it; hover on `f` says "reads beta via g, declared at § 2". `f`
+may read `beta` bare, resolution finding the one candidate, and may override it with
+`g WITH beta IS v`, which names `g`'s parameter and so works whether or not `beta` is visible from
+§ 1. The buffet at `g` is § 2's whoever calls it. If both sections declare `foo` and both `f` and
+`g` read it, `R(f)` holds `` `1`.foo `` and `` `2`.foo `` and the per-root error of §2.1 fires at any
+root that evaluates `f`. Measured 2026-09-04 on the legal corpus: 312 calls cross a section into a
+definition that shares a `GIVEN` with two or more of its section-mates, all of them between
+siblings or cousins, none between a parent and a child; in 195 of them the caller carries the
+same-named `GIVEN`, which under the R2 recommendation it drops.
 
 The read-set exists **twice** today and is **missing where it bites** (as of 2026-09-03):
 `jl4-core/src/L4/Catala/Lower.hs:969-985` (a fixpoint) and `Docassemble/Lower.hs:541-557` each
@@ -196,8 +280,31 @@ GIVETH A BOOLEAN
   names its parameter something other than the section binder, which makes the polymorphism
   visible.
 
+**Why a function `GIVEN` should not flow automatically**, put to Meng on 2026-09-04 and accepted
+("a good balance between referential transparency and DWIM convenience"). What it would buy is
+real: the corpus is dense with the shape, 195 of the 312 cross-section calls above coming from a
+caller with a same-named `GIVEN`, and every one of them works unedited under automatic flow. What
+it costs: (i) a name coincidence becomes a binding, so a private rename in a caller silently
+changes what a callee three calls down reads, and a parameter called `issuer` because it holds an
+issuer, the one an intermediary is affiliated with say, rebinds every callee that reads the
+offering's `issuer` with no diagnostic anywhere, the corpus house style of naming parameters after
+what they hold making collisions the norm; (ii) `R(f)` stops being the callee's: how much of it
+survives to the root depends on parameter names along the call chain, so one export has different
+request forms depending on who calls what, and provenance becomes "the nearest caller up the
+stack with a parameter of that name" instead of a static line number; (iii) one program has two
+readings, S10(a), and today's binary gives the lexical one; (iv) every tradition that had it gave
+it up: LISP 1.5 and early Emacs Lisp bound every parameter dynamically, Common Lisp kept dynamic
+binding only for variables declared `special`, which is exactly the section-`GIVEN`/function-`GIVEN`
+line, GHC's `?x` is bound only by `let ?x` and never by a lambda parameter, Coq's section variables
+are bound by declaration, React's props do not become context until a Provider says so; (v) the
+saving is one migration edit while the hazard is permanent, and under the amended R3 most of the
+195 sites vanish anyway, the restatement becoming an error, the caller dropping the `GIVEN`, the
+value flowing. The residual price shows in iteration: a quantifier over a household whose body
+calls a rule reading the section binder `applicant` cannot name its lambda parameter `applicant`;
+it writes `WITH applicant IS member` at the one place a different value is intended.
+
 Either way the earlier "one name, one type, per module" observation stands as a check that fires
-only when a name is read implicitly. Measured 2026-09-03 over 1,774 `GIVEN` slots and 559 distinct
+only when a name is read implicitly, now per root under the amended R3. Measured 2026-09-03 over 1,774 `GIVEN` slots and 559 distinct
 names in the legal corpus: 17 names are bound at more than one type corpus-wide, 9 within a single
 file, all one-letter conveniences (`a`, `b`, `f`, `p`, `w`) or a `DATE` vs `MAYBE DATE` lifting.
 Requirements are therefore sets; no row polymorphism.
@@ -228,6 +335,18 @@ request parameter (§2.10).
       WITH issuer IS acme, offering IS `acme's offering`, `the date of the offer or sale` IS Date 1 7 2026
 -- interp takes its TYPICALLY; omit the date and the check error names it and the chain
 ```
+
+**À la carte and the buffet.** A `WITH` names only what it overrides; every other binder in the
+callee's read-set keeps flowing, and the named ones are what the callee's subtree sees from there
+down. Supplying a binder at a call removes it from the caller's read-set along that path (the
+`LET` subtraction rule of §2.2), so the root is not asked for it unless another path reads it. The
+one price of all-or-nothing is that a site naming one implicit must name every explicit parameter
+too, never the section binders it leaves alone. Supplying a name the callee neither takes nor
+reads is an error today ("could not find a definition for the identifier zzz", probe oversupply)
+and stays one, as the typo guard. There is no record-spread form: a record-typed binder is one
+dish, its fields reached by `r's f` or opened lexically (§2.7); measured 2026-09-04 across the
+corpus and canon, six named arguments have the shape `name IS r's field` and none has
+`name` equal to `field`, so nothing is asking for one.
 
 `WITH` binds loosely: it runs to the comma or end of line, so `#ASSERT f WITH a IS 3 EQUALS 4`
 parses as `a IS (3 EQUALS 4)`. Tightening it would break two corpus sites (2026-09-04); it stays,
@@ -260,9 +379,10 @@ the default in any case (probes typ1 and t4, Appendix A).
 1. **Positional sites omit nothing explicit.** Under R1 a positional call supplies every explicit
    parameter; a function's own defaulted `GIVEN` may be omitted only at a named site. The only
    parameters absent at a positional site are section binders, which flow or default.
-2. **One declaration owns the default.** A restatement of a binder in a sibling or child section
-   (§2.1) may not carry its own `TYPICALLY`, since one binder would then have two defaults. Check
-   error at the restatement.
+2. **One declaration owns the default.** Each binder has exactly one declaration and its
+   `TYPICALLY` lives there. (As first agreed this read "a restatement in a sibling or child may not
+   carry its own `TYPICALLY`"; under the amended R3 of the same day a same-named `GIVEN` in another
+   section is a distinct binder with its own default, so the rule reduces to the sentence above.)
 3. **A default is a module-scope expression.** It may refer to another binder or to a definition
    (`GIVEN beta IS A NUMBER TYPICALLY phi`, where `phi MEANS alpha TIMES 2`), and is evaluated
    lazily at the root after supply. Section placement is irrelevant, visibility being module-flat;
@@ -527,21 +647,21 @@ The canonical statement of each is on the rulings sheet (artifact "Twelve Ruling
 `fdc2631d`); what follows is the same text condensed, with status. A ruling is recorded only in
 `IMPLICIT-PROPS-DESIGN.md` §11, dated.
 
-| #   | status                                                                   | holding (condensed)                                                                                                                                                                                                                                                                                            | alternative on the sheet                                                                                                                            |
-| --- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| R0  | **RULED 2026-09-04**                                                     | `ASSUME` is deprecated: term → section `GIVEN` with discharge; type → empty `DECLARE`; refusal → `REFUSE`.                                                                                                                                                                                                     | —                                                                                                                                                   |
-| R1  | **amended 2026-09-04** at Meng's direction; unmarked                     | A call site is entirely positional or entirely named. Grammar unchanged; `supplyAppNamed` may omit a flowed or defaulted parameter; a section `GIVEN` in the read-set is a suppliable name; implicits keyword-only. (Original R1 had proposed a new mixed grammar `f x WITH y IS v`; struck, never live code.) | Positional implicits as leading parameters, which forces an order onto a set; argued against by two lenses.                                         |
-| R2  | candidate; **recommendation posted 2026-09-04**                          | Resolution lexical, no caller chain; a bare name resolves to own `GIVEN`, opened field or section `GIVEN` or is a check error. Sheet holding: a caller's same-named `GIVEN` supplies the section binder; same-type restatement warns, different-type errors.                                                   | **Recommended:** a function `GIVEN` never flows; restatement of a visible section `GIVEN` is a check error. Measured cost: zero.                    |
-| R3  | candidate                                                                | Section visibility as shipped: module-visible, `§` a tiebreak; different-type re-declaration errors; fix the parent-ambiguity defect and the §3.3.4 drift first; tier by call-site variation, never placement.                                                                                                 | Coq subtree visibility: matches "in this Part" literally, breaks nine sibling-section declarations, buys nothing the tiebreak lacks.                |
-| R4  | candidate; **spelling contested** (§2.1)                                 | Heading-line `§ ⟨name⟩ GIVEN …`; `WHEREAS` struck; `WHEREIN` in reserve beside `IN THIS SECTION x IS A T`; a column-1 `GIVEN` after a heading whose names the next head does not bind is a check error; round-trip goldens on both printers.                                                                   | Take a keyword now. The indented form (§2.1) is what was minuted with Meng and what he described as the design; mark modify to keep it.             |
-| R5  | candidate                                                                | Field-opening lexical only, ranked as §2.7, collision error at read and at the opening declaration, elaborated to `Proj`, binders only at `WITH`.                                                                                                                                                              | Opt-in `OPENED` per binder; or no opening at all.                                                                                                   |
-| R6  | withdrawn                                                                | The `MAYBE`/`EITHER` propagation sugar is withdrawn, declined on measurement (§5). The taxonomy stands.                                                                                                                                                                                                        | Keep it with five conditions (use-site `?`, bind at nearest failure-typed node, lambda its own boundary, `JUST` explicit, elaborate to `CONSIDER`). |
-| R7  | candidate                                                                | `REFUSE` as §2.8: throw at force; `#ASSERT REFUSED`; three-valued assertions; one named definition per refusal; per-backend image; `Ref(f)` per reason, `TBD` excluded; taxonomy row split.                                                                                                                    | Keep pre-commencement as a refusal per corpus ruling R2 and accept that transitional provisions cannot be encoded over it.                          |
-| R8  | **amended 2026-09-04** at Meng's direction (three rules, §2.5); unmarked | `TYPICALLY` one behaviour as §2.5, filled in once at the root; positional sites omit nothing explicit; one declaration owns the default; a default is a module-scope expression, cycles a check error.                                                                                                         | Defaults stay documentation; a section binder needing a default is a definition with an override.                                                   |
-| R9  | candidate                                                                | `WITH` at directives; `LET`-reaching-callees or `e WITH x IS v` in bodies; `LET` over trailing `WITH`; `WHERE` never supplies; DMN per R-C.                                                                                                                                                                    | Drop `LET`-reaching-callees; rebinding is application at any site. Preferred by the seasoned raters.                                                |
-| R10 | candidate                                                                | Backends as §2.10; implicits trail; alcohol act as fourteen scalars.                                                                                                                                                                                                                                           | Each backend places implicits from the read-set as a separate list (the same thing from the other side).                                            |
-| R11 | candidate                                                                | `@reads x — …` or a function-level `@desc` override, so the fork register survives hoisting.                                                                                                                                                                                                                   | Accept the collapse (rated a loss of legal meaning).                                                                                                |
-| R12 | candidate; **fixes built** (§7)                                          | Six pre-existing defects are fixed now, ruling or no ruling.                                                                                                                                                                                                                                                   | None sensible.                                                                                                                                      |
+| #   | status                                                                   | holding (condensed)                                                                                                                                                                                                                                                                                                                                                                           | alternative on the sheet                                                                                                                                                                                     |
+| --- | ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| R0  | **RULED 2026-09-04**                                                     | `ASSUME` is deprecated: term → section `GIVEN` with discharge; type → empty `DECLARE`; refusal → `REFUSE`.                                                                                                                                                                                                                                                                                    | —                                                                                                                                                                                                            |
+| R1  | **amended 2026-09-04** at Meng's direction; unmarked                     | A call site is entirely positional or entirely named. Grammar unchanged; `supplyAppNamed` may omit a flowed or defaulted parameter; a section `GIVEN` in the read-set is a suppliable name; implicits keyword-only. (Original R1 had proposed a new mixed grammar `f x WITH y IS v`; struck, never live code.)                                                                                | Positional implicits as leading parameters, which forces an order onto a set; argued against by two lenses.                                                                                                  |
+| R2  | candidate; **recommendation posted 2026-09-04**                          | Resolution lexical, no caller chain; a bare name resolves to own `GIVEN`, opened field or section `GIVEN` or is a check error. Sheet holding: a caller's same-named `GIVEN` supplies the section binder; same-type restatement warns, different-type errors.                                                                                                                                  | **Recommended:** a function `GIVEN` never flows; restatement of a visible section `GIVEN` is a check error. Measured cost: zero.                                                                             |
+| R3  | **amended 2026-09-04** at Meng's direction; unmarked                     | Visibility as shipped, nearest ancestor with fallback; same-named section binders in different sections are distinct binders; one binder per name **per root**, a root reaching two being a check error naming both by section (hoist, rename, or bridge with `g WITH foo IS foo`); fix the parent-ambiguity defect and the §3.3.4 drift first; tier by call-site variation, never placement. | Coq subtree visibility: matches "in this Part" literally, breaks the nine sibling-section declarations, buys nothing the tiebreak lacks. Or the first draft's one binder per module, rejected in §5 item 13. |
+| R4  | candidate; **spelling contested** (§2.1)                                 | Heading-line `§ ⟨name⟩ GIVEN …`; `WHEREAS` struck; `WHEREIN` in reserve beside `IN THIS SECTION x IS A T`; a column-1 `GIVEN` after a heading whose names the next head does not bind is a check error; round-trip goldens on both printers.                                                                                                                                                  | Take a keyword now. The indented form (§2.1) is what was minuted with Meng and what he described as the design; mark modify to keep it.                                                                      |
+| R5  | candidate                                                                | Field-opening lexical only, ranked as §2.7, collision error at read and at the opening declaration, elaborated to `Proj`, binders only at `WITH`.                                                                                                                                                                                                                                             | Opt-in `OPENED` per binder; or no opening at all.                                                                                                                                                            |
+| R6  | withdrawn                                                                | The `MAYBE`/`EITHER` propagation sugar is withdrawn, declined on measurement (§5). The taxonomy stands.                                                                                                                                                                                                                                                                                       | Keep it with five conditions (use-site `?`, bind at nearest failure-typed node, lambda its own boundary, `JUST` explicit, elaborate to `CONSIDER`).                                                          |
+| R7  | candidate                                                                | `REFUSE` as §2.8: throw at force; `#ASSERT REFUSED`; three-valued assertions; one named definition per refusal; per-backend image; `Ref(f)` per reason, `TBD` excluded; taxonomy row split.                                                                                                                                                                                                   | Keep pre-commencement as a refusal per corpus ruling R2 and accept that transitional provisions cannot be encoded over it.                                                                                   |
+| R8  | **amended 2026-09-04** at Meng's direction (three rules, §2.5); unmarked | `TYPICALLY` one behaviour as §2.5, filled in once at the root; positional sites omit nothing explicit; one declaration owns the default; a default is a module-scope expression, cycles a check error.                                                                                                                                                                                        | Defaults stay documentation; a section binder needing a default is a definition with an override.                                                                                                            |
+| R9  | candidate                                                                | `WITH` at directives; `LET`-reaching-callees or `e WITH x IS v` in bodies; `LET` over trailing `WITH`; `WHERE` never supplies; DMN per R-C.                                                                                                                                                                                                                                                   | Drop `LET`-reaching-callees; rebinding is application at any site. Preferred by the seasoned raters.                                                                                                         |
+| R10 | candidate                                                                | Backends as §2.10; implicits trail; alcohol act as fourteen scalars.                                                                                                                                                                                                                                                                                                                          | Each backend places implicits from the read-set as a separate list (the same thing from the other side).                                                                                                     |
+| R11 | candidate                                                                | `@reads x — …` or a function-level `@desc` override, so the fork register survives hoisting.                                                                                                                                                                                                                                                                                                  | Accept the collapse (rated a loss of legal meaning).                                                                                                                                                         |
+| R12 | candidate; **fixes built** (§7)                                          | Six pre-existing defects are fixed now, ruling or no ruling.                                                                                                                                                                                                                                                                                                                                  | None sensible.                                                                                                                                                                                               |
 
 ## 5. Rejected, with the witness for each
 
@@ -593,6 +713,10 @@ Kept so that no later session re-proposes one without meeting its witness.
     (`guardianship-of-infants-act.l4:174`) is the encoder's visible allocation of the not-proved
     case, which three Acts allocate differently.
 12. **Tier by placement.** A heading-declared per-transaction date got asked once per batch (§2.1).
+13. **One binder per name per module** (R3 as first drafted). It merges silently the statute's
+    "for the purposes of sections 1 and 2 … for the purposes of sections 3 and 4" when the two
+    are same-typed inputs, which is the case where they must not merge; replaced by distinct
+    binders per section and one binder per root (§2.1, 2026-09-04).
 
 ## 6. Order of work
 
@@ -648,27 +772,32 @@ the dead `LocalAssume` grammar (§6 item 7); function-typed `ASSUME` refused by 
 
 ## 8. Measurements relied on
 
-| what                                                                                               | value                                       | date       | scope                                                       |
-| -------------------------------------------------------------------------------------------------- | ------------------------------------------- | ---------- | ----------------------------------------------------------- |
-| record-typed `GIVEN` slots that are pure pass-through                                              | 506 of 1,112                                | 2026-09-03 | legal corpus                                                |
-| `GIVEN` slots repeating an identical name+type earlier in the same section / same file             | 889 (48%) / 1,177 (63%) of 1,860            | 2026-09-04 | 26 legal files                                              |
-| `GIVEN` names bound at more than one type                                                          | 17 corpus-wide, 9 in one file, of 559 names | 2026-09-03 | legal corpus                                                |
-| legal files whose title `§` is a sibling of the operative sections                                 | 7 of 26                                     | 2026-09-04 | legal corpus                                                |
-| sites reinterpreted by an "adjacency" section-binder rule / lines colliding with the indented rule | 160 / 0                                     | 2026-09-04 | legal corpus                                                |
-| term-role `ASSUME` names / function `GIVEN` names / files where the sets overlap                   | 235 / 2,311 / 0 of 607 files                | 2026-09-04 | l4-ide corpus + libraries + `doc/` + canon                  |
-| named-application `WITH` sites / mixed sites                                                       | 971 / 0 (cannot parse)                      | 2026-09-04 | session count; 1,416 tokens in 179 of 608 files on re-count |
-| unique legal `ASSUME` declarations that go dark under `§`-subtree scoping                          | 9 of 39                                     | 2026-09-03 | legal corpus                                                |
-| `ASSUME` lines / files, and type-role lines                                                        | 664 / 105, 113 type-role                    | 2026-09-04 | whole tree                                                  |
-| Haskell files / occurrences / entry points that collect, bind, promote or lower `ASSUME`           | 35 / 752 / 16                               | 2026-09-04 | jl4-core 618, jl4-service 88, jl4-mlir 46                   |
-| readers of the commencement refusal                                                                | 8                                           | 2026-09-04 | `regcf.l4`                                                  |
-| `GIVETH A MAYBE` functions / exported                                                              | 28 / 0                                      | 2026-09-04 | legal corpus                                                |
-| `EVAL UNDER RULES EFFECTIVE AT` uses, all at outermost position                                    | 19                                          | 2026-09-03 | legal corpus                                                |
-| `WHERE`-local names coinciding with `GIVEN` names                                                  | 19                                          | 2026-09-04 | legal corpus                                                |
-| field names that are also `GIVEN` names / at mismatched types                                      | 15 / 5                                      | 2026-09-04 | charities cleanroom                                         |
+| what                                                                                                                              | value                                       | date       | scope                                                       |
+| --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- | ---------- | ----------------------------------------------------------- |
+| record-typed `GIVEN` slots that are pure pass-through                                                                             | 506 of 1,112                                | 2026-09-03 | legal corpus                                                |
+| `GIVEN` slots repeating an identical name+type earlier in the same section / same file                                            | 889 (48%) / 1,177 (63%) of 1,860            | 2026-09-04 | 26 legal files                                              |
+| `GIVEN` names bound at more than one type                                                                                         | 17 corpus-wide, 9 in one file, of 559 names | 2026-09-03 | legal corpus                                                |
+| legal files whose title `§` is a sibling of the operative sections                                                                | 7 of 26                                     | 2026-09-04 | legal corpus                                                |
+| sites reinterpreted by an "adjacency" section-binder rule / lines colliding with the indented rule                                | 160 / 0                                     | 2026-09-04 | legal corpus                                                |
+| term-role `ASSUME` names / function `GIVEN` names / files where the sets overlap                                                  | 235 / 2,311 / 0 of 607 files                | 2026-09-04 | l4-ide corpus + libraries + `doc/` + canon                  |
+| named-application `WITH` sites / mixed sites                                                                                      | 971 / 0 (cannot parse)                      | 2026-09-04 | session count; 1,416 tokens in 179 of 608 files on re-count |
+| unique legal `ASSUME` declarations that go dark under `§`-subtree scoping                                                         | 9 of 39                                     | 2026-09-03 | legal corpus                                                |
+| `ASSUME` lines / files, and type-role lines                                                                                       | 664 / 105, 113 type-role                    | 2026-09-04 | whole tree                                                  |
+| Haskell files / occurrences / entry points that collect, bind, promote or lower `ASSUME`                                          | 35 / 752 / 16                               | 2026-09-04 | jl4-core 618, jl4-service 88, jl4-mlir 46                   |
+| readers of the commencement refusal                                                                                               | 8                                           | 2026-09-04 | `regcf.l4`                                                  |
+| `GIVETH A MAYBE` functions / exported                                                                                             | 28 / 0                                      | 2026-09-04 | legal corpus                                                |
+| `EVAL UNDER RULES EFFECTIVE AT` uses, all at outermost position                                                                   | 19                                          | 2026-09-03 | legal corpus                                                |
+| `WHERE`-local names coinciding with `GIVEN` names                                                                                 | 19                                          | 2026-09-04 | legal corpus                                                |
+| legal-corpus definitions in leaf sections / in a section that has child sections                                                  | 2,407 / 2                                   | 2026-09-04 | legal corpus                                                |
+| term-role `ASSUME`s read only in their own section / from a sibling / from a parent or child                                      | 30 / 3 / 0 of 33                            | 2026-09-04 | legal corpus (48 / 39 / 9 / 0 counting function-typed)      |
+| cross-section calls into a definition sharing a `GIVEN` with ≥2 section-mates / caller has the same-named `GIVEN` / parent↔child | 312 / 195 / 0                               | 2026-09-04 | legal corpus                                                |
+| names defined by `MEANS` in ≥2 sections of one file / `ASSUME`s so declared                                                       | 1 (a mixfix false positive) / 0             | 2026-09-04 | legal corpus                                                |
+| named arguments of the shape `name IS r's field` / with `name` = `field`                                                          | 6 / 0                                       | 2026-09-04 | corpus + canon                                              |
+| field names that are also `GIVEN` names / at mismatched types                                                                     | 15 / 5                                      | 2026-09-04 | charities cleanroom                                         |
 
 ## 9. Open
 
-- Meng's marks on R1–R12 (R1 as amended, R2 with the recommendation, R4 with the spelling
+- Meng's marks on R1–R12 (R1, R3 and R8 as amended, R2 with the recommendation, R4 with the spelling
   question). Accepted rulings go to `IMPLICIT-PROPS-DESIGN.md` §11 dated; modified ones come back
   here for argument.
 - Whether to push the four §7 branches and open PRs into `unstable`.
@@ -771,4 +900,54 @@ ASSUME beta  IS A NUMBER TYPICALLY phi         -- observed: check error "The TYP
 GIVETH A NUMBER                                --   a number, a string, or a nullary constructor such as TRUE, FALSE or NOTHING."
 phi MEANS alpha TIMES 2                        --   (typ3; typ4, with `phi MEANS beta PLUS 1`, gives the same error)
 ASSUME gamma IS A NUMBER TYPICALLY "no"        -- observed (typ5): "expected to be of type NUMBER but is here of type STRING"
+```
+
+```l4
+-- nest (2026-09-04, shipped binary): visibility across nesting is module-flat today
+§ outer
+ASSUME alpha IS A NUMBER
+o2 MEANS beta PLUS 100          -- parent reads a child's binder: resolves
+§§ inner
+ASSUME beta IS A NUMBER
+i1 MEANS alpha PLUS beta        -- child reads ancestor + own: resolves
+§§ inner2
+s1 MEANS beta PLUS alpha        -- sibling reads inner's binder: resolves
+-- observed: no check errors; each #EVAL fails only for want of a value
+```
+
+```l4
+-- nest2 (2026-09-04): a child re-declaring the ancestor's name breaks the PARENT's own reference today
+§ outer
+ASSUME alpha IS A NUMBER
+o1 MEANS alpha PLUS 1           -- observed (shipped): "multiple definitions for the identifier alpha" at 5:10
+§§ inner
+ASSUME alpha IS A NUMBER
+i1 MEANS alpha PLUS 2           -- observed: resolves to inner's
+-- the FIX D branch resolves o1 to outer's
+```
+
+```l4
+-- reach-def / reach-asm (2026-09-04): per-section same-name, siblings; FIX D branch
+§ `Sections 1 and 2`
+foo MEANS "apple"               -- or: ASSUME foo IS A STRING
+s1 MEANS foo                    -- observed (FIX D): resolves; (shipped): ambiguous
+§ `Sections 3 and 4`
+foo MEANS "banana"
+s3 MEANS foo                    -- observed: resolves, both binaries
+§ `Section 5`
+s5 MEANS foo                    -- observed: "multiple definitions … `Sections 3 and 4`.foo … `Sections 1 and 2`.foo"
+```
+
+```l4
+-- meng-fruit (2026-09-04): the layout in §2.1; FIX D branch evaluates r1..r4 to Apple, Apple, Banana, Banana;
+-- a reader in `§ toplevel` and one in §§ `5` are ambiguous over all four; shipped binary also flags r1..r3.
+-- Note `§§ 1` with a bare number is a parse error ("unexpected 1"); the heading needs backticks.
+```
+
+```l4
+-- oversupply (2026-09-04): a named argument the callee does not take
+GIVEN a IS A NUMBER
+GIVETH A NUMBER
+f a MEANS a PLUS 1
+#EVAL f WITH a IS 1, zzz IS 2        -- observed: "I could not find a definition for the identifier zzz"
 ```
