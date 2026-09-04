@@ -760,8 +760,8 @@ varying subject onto a heading teaches the wrong instinct (sample S1 was mis-cut
 
 Each reproduces on the 2026-08-27 binary; none depends on the environment design. Four branches
 were built against `origin/unstable` (`7ed1589e`) by a two-round fix-and-verify workflow on
-2026-09-04, each verified by an independent agent in a disposable worktree. **As of 2026-09-04 all
-four are local, unpushed, and awaiting Meng's word before any PR is opened.**
+2026-09-04, each verified by an independent agent in a disposable worktree. **Opened as PRs into `unstable` on
+2026-09-04 on Meng's word (R12 accept): #328, #329, #330, #331, in the table's order.**
 
 | defect                                                                                                                                                                                                                                 | branch                                 | commits                                                    |
 | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | ---------------------------------------------------------- |

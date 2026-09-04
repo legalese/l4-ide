@@ -604,4 +604,5 @@ Independent of any ruling: the tutorial's flat `#CHECK … WITH` form; the secti
 parent-ambiguity defect and the §3.3.4 drift; the schema's one-body-deep collector; `#ASSERT`
 collapsing an exception to a plain failure; `#CHECK` printing inference gensyms; `l4 batch`
 mis-applying a directly-read `ASSUME`. Built and independently verified on four branches off
-`origin/unstable` (`PROPS-REDTEAM-2026-09-03.md` §7); delivery is four PRs into `unstable`.
+`origin/unstable` (`PROPS-REDTEAM-2026-09-03.md` §7); delivered as PRs into `unstable` on 2026-09-04: legalese/l4-ide#328 (export read-set), #329
+(section scoping), #330 (assert/check reporting), #331 (docs).
