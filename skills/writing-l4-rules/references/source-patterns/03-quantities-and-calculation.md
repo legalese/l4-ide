@@ -16,7 +16,7 @@ the Federal Register:
 -- (82 FR 17545 instr. 5.a); $5,000,000 from 2021-03-15 (86 FR 3496 instr. 3).
 ```
 
-— `jl4/examples/legal/regcf/regcf.l4:155-156`, with the rule at `:158-164`.
+— `jl4/examples/legal/regcf/regcf.l4:145-146`, with the rule at `:158-164`.
 
 **It is doing** delegating the number to an instrument. The power has been exercised, so **the
 instrument is law and you encode it**, with the citation on each arm.
@@ -120,7 +120,7 @@ own default.
 -- exclusive, so one boolean selects between them.
 ```
 
-— `jl4/examples/legal/regcf/regcf.l4:422-425`
+— `jl4/examples/legal/regcf/regcf.l4:412-415`
 
 (The citations in this area are to the Code of Federal Regulations (CFR) and the Federal Register
 (FR), which are where the rules and the releases amending them are published.)
@@ -165,7 +165,7 @@ case a dollar below the cut point and one exactly on it, asserted separately —
 #ASSERT NOT `either annual income or net worth is less than the cut point` (`an investor with` FALSE 124000 124000 0)
 ```
 
-— `jl4/examples/legal/regcf/regcf.l4:1056-1057`.
+— `jl4/examples/legal/regcf/regcf.l4:1039-1040`.
 
 **Not** `GREATER THAN` for "not less than". It is off by exactly the case the drafter cared about,
 and nothing type-checks it for you:
@@ -212,7 +212,7 @@ GIVEN a IS A NUMBER                         -- At some point in the future, ther
 **It is doing** exactly what it says. The interest is that "greater of" and "lesser of" are the two
 words most often swapped by an amendment: the 2021 amendment to the investor limit in Regulation
 Crowdfunding substituted one for the other in both limbs, which raised the limit for every investor
-whose two figures differed (`jl4/examples/legal/regcf/regcf.l4:394-416`). Name the concept after
+whose two figures differed (`jl4/examples/legal/regcf/regcf.l4:384-406`). Name the concept after
 the phrase so that an amendment is a one-word edit in one place.
 
 **Write** the prelude's `max` and `min`. They are there now, so the hand-written pair above is
@@ -318,7 +318,7 @@ GIVETH A NUMBER
     PLUS offering's `maximum offering amount the issuer will accept`
 ```
 
-— `jl4/examples/legal/regcf/regcf.l4:359-364`
+— `jl4/examples/legal/regcf/regcf.l4:349-354`
 
 **It is doing** two different jobs under one word. When the source **names** the things being added
 — "the aggregate of the amount already sold and the amount to be sold" — the naming is operative:
@@ -410,7 +410,7 @@ GIVETH A FinancialStatementRequirement
            OTHERWISE `financial statements audited by an independent public accountant`
 ```
 
-— `jl4/examples/legal/regcf/regcf.l4:514-522`
+— `jl4/examples/legal/regcf/regcf.l4:497-505`
 
 **It is doing** partitioning a quantity into intervals. Two readings are possible and the source
 almost never says which in the table itself: a **slab** table applies one rate to the whole amount
@@ -557,7 +557,7 @@ over time.
          ELSE `maximum amount sold to any one investor in a 12-month period`
 ```
 
-— `jl4/examples/legal/regcf/regcf.l4:433-443`
+— `jl4/examples/legal/regcf/regcf.l4:423-433`
 
 **It is doing** two different things that look alike. A **floor** ("or $2,500, whichever is
 greater") protects the smallest case, and it is `max`. A **cap** ("not to exceed $124,000") protects

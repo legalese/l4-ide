@@ -68,10 +68,10 @@ for commencement.
 rule does to it, and [entry 11.5](11-when-the-encoding-cannot-answer.md#e11-5) for the different
 case of scope the encoding deliberately does not cover.
 
-**One documented exception.** `jl4/examples/legal/regcf/regcf.l4:145-153` does spell its
-pre-commencement arm as a refusal, and says out loud why: the taxonomy puts "not in force" in the gate row, no gate
-construct exists, there is no figure to return, "so the
-commencement arm is a REFUSE and stays one until one does". Cite it as an exception, never as the pattern.
+**One documented near-exception.** `jl4/examples/legal/regcf/regcf.l4:143-154` names its
+pre-commencement arm for a refusal, and says out loud why: the taxonomy puts "not in force" in the gate row, no gate
+construct exists, and there is no figure to return. The site itself is still an `ASSUME` — the
+rewrite to `REFUSE` is drafted, unlanded. Cite it as an exception, never as the pattern.
 
 **See** entry 4.2, and [drafting-patterns.md](../drafting-patterns.md), "Leap-safe date windows" for
 building the comparison (and the `Date` month-subtraction footgun, which `YMD` does not share).
@@ -564,7 +564,7 @@ rule does. The corpus records one of the second kind at length:
 -- consequential edit in Reg CF's history for an individual investor.
 ```
 
-— `jl4/examples/legal/regcf/regcf.l4:397-402`
+— `jl4/examples/legal/regcf/regcf.l4:387-392`
 
 **It is doing** replacing one rule with another as of a date, while leaving both in force for their
 own periods. The encoding does not choose between them; it holds both and selects on the rule-version
@@ -727,8 +727,8 @@ harder to transpose than `Date day month year`, and it fails loudly on a date th
 @ref § 227.203(b)(3) — "within five business days from the date on which the issuer becomes eligible"
 ```
 
-— `jl4/examples/legal/regcf/denovo/regcf-denovo.l4:2034`; the corpus binds the number once, as
-`` `business days to file Form C-TR` MEANS 5 `` (`jl4/examples/legal/regcf/regcf.l4:249`)
+— `jl4/examples/legal/regcf/denovo/regcf-denovo.l4:2026`; the corpus binds the number once, as
+`` `business days to file Form C-TR` MEANS 5 `` (`jl4/examples/legal/regcf/regcf.l4:239`)
 
 **It is doing** counting against a calendar that the instrument does not print. "Business day"
 almost always means "not a Saturday, not a Sunday, and not a public holiday **in a named place**",

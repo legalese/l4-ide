@@ -121,7 +121,7 @@ GIVETH A BOOLEAN
 not the priority operator. Measured 2026-09-04 over the 26 files under `jl4/examples/legal/`: 173
 occurrences, of which 89 sit inside a backticked name — 21 distinct names, every one of them a
 **status** rather than a priority, headed by `` `subject to the requirement to file reports pursuant
-to section 13 or section 15(d) of the Exchange Act` `` (`jl4/examples/legal/regcf/regcf.l4:283`, and
+to section 13 or section 15(d) of the Exchange Act` `` (`jl4/examples/legal/regcf/regcf.l4:273`, and
 five more sites in that file). Every occurrence in `regcf.l4` is of that kind. The real priority
 operator does appear, in the succession files, and there it is handled by technique 3 above: the
 override is written into the **name** of the rule — `` `s 8(3) — probate may be granted to one or
@@ -270,7 +270,7 @@ scopes a whole list and De Morgan's law is the thing to get right.
 
 > `"(a) Exemption. An issuer may offer or sell securities in reliance on section 4(a)(6) of the Securities Act of 1933, provided that:"`
 >
-> — `jl4/examples/legal/regcf/regcf.l4:898`, quoting 17 CFR (the Code of Federal Regulations)
+> — `jl4/examples/legal/regcf/regcf.l4:881`, quoting 17 CFR (the Code of Federal Regulations)
 > § 227.100(a)
 
 **It is doing** one of two quite different things, and the encoding differs completely.
@@ -297,7 +297,7 @@ GIVETH A BOOLEAN
 For job 2, put the proviso arm first and say in a comment that the order is not the source's.
 § 227.201(t)(3) requires audited financial statements above $618,000 "provided, however, that" a
 first-time issuer up to $1,235,000 needs only reviewed ones — so the proviso **inverts its own main
-clause** (`jl4/examples/legal/regcf/denovo/regcf-denovo.l4:1777-1785`):
+clause** (`jl4/examples/legal/regcf/denovo/regcf-denovo.l4:1769-1777`):
 
 ```l4
 @ref 17 CFR 227.201(t)(1)-(3) — the (t)(3) proviso is tested before the (t)(3) main clause
@@ -334,7 +334,7 @@ Y`", for the proviso that only ever _subtracts_ (it is a limb, not an arm), and 
 **If the source says**
 
 > `"unless such securities are transferred:"` — the chapeau, carried verbatim into the encoding at
-> `jl4/examples/legal/regcf/regcf.l4:859`, over limbs `"(1)"` … `"(4)"` of 17 CFR § 227.501(a)
+> `jl4/examples/legal/regcf/regcf.l4:842`, over limbs `"(1)"` … `"(4)"` of 17 CFR § 227.501(a)
 
 **It is doing** distributing one condition over a numbered list. The chapeau tells you which
 operator: "any of the following" and a list ending "; or" are disjunctive; "all of the following"
@@ -358,7 +358,7 @@ GIVETH A BOOLEAN
 The conjunctive form takes `...` and `AND`. Where the limbs are themselves named rules rather than
 record fields, drop the inert scaffolding and write the plain conjunction. That is what the corpus
 does for the early-close conditions of 17 CFR § 227.304(b)
-(`jl4/examples/legal/regcf/denovo/regcf-denovo.l4:2375-2384`): each numbered condition is a rule of
+(`jl4/examples/legal/regcf/denovo/regcf-denovo.l4:2367-2376`): each numbered condition is a rule of
 its own, named for the paragraph it comes from, and the top rule applies those rules to `offering`
 rather than reading fields off it.
 
@@ -406,7 +406,7 @@ operators `...` and `..`".
 
 > `"The decomposition STOPS HERE. 17 CFR 227.501(c) defines 'member of the family of the purchaser or the equivalent' with 'includes' — an open list of 14 relationships plus adoptive ones. Enumerating them would encode an open term as a closed one, which is a worse fidelity loss than the one this decomposition repairs."`
 >
-> — the encoder's note at `jl4/examples/legal/regcf/regcf.l4:768-772`
+> — the encoder's note at `jl4/examples/legal/regcf/regcf.l4:751-755`
 
 **It is doing** naming examples without exhausting the category. "Includes" is not "means" (entry
 [1.1](01-definitions-and-scope.md#e1-1)); a list introduced by it stays open, and the residue is

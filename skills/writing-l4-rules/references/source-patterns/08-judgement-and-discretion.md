@@ -135,7 +135,7 @@ permission.
 
 > `` `the intermediary has a reasonable basis for believing that the investor satisfies the investment limitations` IS A BOOLEAN ``
 >
-> — `jl4/examples/legal/regcf/regcf.l4:580`, a field of `IntermediaryArrangement`, read at `:603` as
+> — `jl4/examples/legal/regcf/regcf.l4:563`, a field of `IntermediaryArrangement`, read at `:603` as
 > the second limb of `` `the intermediary has discharged its investor-facing duties` ``.
 
 **It is doing** imposing a duty **on one party to have formed a view about another**. The subject of

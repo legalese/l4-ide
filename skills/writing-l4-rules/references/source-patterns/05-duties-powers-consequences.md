@@ -161,7 +161,7 @@ assert-the-boolean, trace-the-deontic division of labour.
 
 > `@ref § 227.206(a) last sentence — "No solicitation or acceptance of money or other consideration ... is permitted until the offering statement is filed"`
 >
-> — `jl4/examples/legal/regcf/denovo/regcf-denovo.l4:2076`, encoded at `:2078-2082`
+> — `jl4/examples/legal/regcf/denovo/regcf-denovo.l4:2068`, encoded at `:2078-2082`
 
 **It is doing** forbidding an act, which is not the same as obliging an omission: for a prohibition,
 **doing the act is the failure**, and the deadline passing quietly is the good outcome. `SHANT`
@@ -192,7 +192,7 @@ LEST (BREACH …)` — probe `d02b-shant-noevent.l4`.)_
 **Not** a `WITHIN` borrowed from a neighbouring rule. **`SHANT … WITHIN n` sunsets at `n`**: after
 the deadline the prohibition is spent and the act is free. The same file, same events, with
 `WITHIN 365` added and the act at 400, returns `FULFILLED` (probe `d02-shant.l4`, second trace).
-This is not hypothetical — `jl4/examples/legal/regcf/regcf.l4:653-656` records it as a defect that
+This is not hypothetical — `jl4/examples/legal/regcf/regcf.l4:636-639` records it as a defect that
 shipped and was removed, in the encoder's own words:
 
 ```text
@@ -360,7 +360,7 @@ entry [5.1](#e5-1) for the passive "may", the commonest way an entitlement gets 
 >
 > — `17 CFR 227.304(c)(1)`, at
 > `jl4/examples/legal/regcf/denovo/source/part227.txt:632`, encoded at
-> `jl4/examples/legal/regcf/denovo/regcf-denovo.l4:2392-2412`, which the encoder calls "the richest
+> `jl4/examples/legal/regcf/denovo/regcf-denovo.l4:2384-2404`, which the encoder calls "the richest
 > deontic chain in the part: notice -> reconfirm within five business days -> else cancel, notify
 > and refund within a further five" (`:2386-2387`)
 
@@ -534,7 +534,7 @@ rather than one ceiling.
 
 > `@ref § 227.304(b)(3) — "at least five business days after the notice ... is provided"`
 >
-> — `jl4/examples/legal/regcf/denovo/regcf-denovo.l4:2361`, beside the three things the notice must
+> — `jl4/examples/legal/regcf/denovo/regcf-denovo.l4:2353`, beside the three things the notice must
 > say at `:2353-2359`
 
 **It is doing** two things a drafter writes as one clause. The notice has **contents** the law

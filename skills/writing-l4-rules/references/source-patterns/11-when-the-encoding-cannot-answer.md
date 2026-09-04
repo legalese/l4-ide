@@ -299,7 +299,7 @@ prose in the corpus — 25-plus sites. One of them:
 
 > `-- ... the honest answer is a refusal, not a guess. Outside the band the ordinary tiers were unaffected and the answer stands.`
 >
-> — `jl4/examples/legal/regcf/regcf.l4:492-494`, on the temporary rules made during the coronavirus
+> — `jl4/examples/legal/regcf/regcf.l4:482-484`, on the temporary rules made during the coronavirus
 > disease 2019 pandemic
 
 **It is doing** marking the boundary of the model. The question is only whether a rule can **reach**
@@ -334,10 +334,10 @@ cannot be hit. State which way the omission errs, as the corpus does
 ```
 
 **Not** an `ASSUME`. That says "this is an unknown fact", so it is promoted to a parameter of every
-exported function that reads it — and a caller of the Regulation Crowdfunding money decisions was
-being asked to supply a value for _"no Regulation Crowdfunding figure exists before commencement on
-2016-05-16"_. Nobody can supply that. A refusal appears in no export schema, because it is not an
-input.
+exported function that reads it — which is why a caller of the Regulation Crowdfunding money
+decisions is still asked, today, to supply a value for _"no Regulation Crowdfunding figure exists
+before commencement on 2016-05-16"_. Nobody can supply that. A refusal appears in no export schema,
+because it is not an input.
 
 **Not** `NOTHING`, because a later rule can quietly default it:
 
@@ -402,10 +402,10 @@ directive may be split over two lines, as above, and asserts equally on a named 
 an argument and on one called bare.
 
 The year parameter above is this page's simplification. The corpus selects the figure on a rule
-date rather than a year — `jl4/examples/legal/regcf/regcf.l4:152-164`, where the same refusal is the
-`OTHERWISE` arm of a `BRANCH` over `` `the rules in force include` ``, and a caller reaches it
-through `EVAL UNDER RULES EFFECTIVE AT`. The refusal and the assertion shape are identical either
-way. `jl4/examples/ok/refuse.l4:25-26` is the smallest runnable pair in the tree.
+date rather than a year — `jl4/examples/legal/regcf/regcf.l4:148-154`, whose `OTHERWISE` arm over
+`` `the rules in force include` `` is reached through `EVAL UNDER RULES EFFECTIVE AT`. That arm is
+still an `ASSUME`, not yet a refusal; the shape is what to copy, not the keyword.
+`jl4/examples/ok/refuse.l4:25-26` is the smallest runnable pair in the tree.
 
 Two facts worth knowing when you read the output:
 

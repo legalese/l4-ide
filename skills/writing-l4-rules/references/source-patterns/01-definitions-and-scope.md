@@ -663,7 +663,7 @@ DECIDE `the intermediary is a funding portal` intermediary IF
 
 _(Checked on the release binary, exit 0, no errors; limb (iii) is elided above for length, which is
 why the tags run (i), (ii), (iv).)_ This is the corpus's own shape, at
-`jl4/examples/legal/regcf/denovo/regcf-denovo.l4:2218-2226`, where all four limbs are written
+`jl4/examples/legal/regcf/denovo/regcf-denovo.l4:2210-2218`, where all four limbs are written
 against fields declared in the positive at `:869-873`, under a comment calling them the four
 negative limbs of "funding portal".
 

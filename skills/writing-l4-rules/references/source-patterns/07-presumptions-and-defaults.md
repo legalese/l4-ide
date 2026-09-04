@@ -252,7 +252,7 @@ record fields, rule `GIVEN` parameters and `ASSUME` declarations, and whose own 
 
 > `... "No presumption shall arise that a funding portal has violated the prohibitions under section 3(a)(80) of the Exchange Act or this part by reason of ... engaging in activities ... that do not meet the conditions specified in paragraph (b) of this section."`
 >
-> — `jl4/examples/legal/regcf/denovo/regcf-denovo.l4:2889`, carried verbatim. The note above it, at
+> — `jl4/examples/legal/regcf/denovo/regcf-denovo.l4:2881`, carried verbatim. The note above it, at
 > `:2881-2883`: "Encoded as a definition carrier, because turning 'no presumption shall arise' into a
 > boolean would assert something the paragraph is careful not to assert."
 
