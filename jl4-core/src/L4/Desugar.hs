@@ -11,6 +11,9 @@ module L4.Desugar (
   -- * Type Synonyms
   --
   detectTypeSynonymCycles,
+  -- * Section binders
+  --
+  desugarSectionGivens,
   ) where
 
 
@@ -18,7 +21,7 @@ import           Base
 import           Data.Graph               (stronglyConnComp, SCC(..))
 import qualified Data.Map.Strict          as Map
 import qualified Data.Set                 as Set
-import           L4.Annotation            (HasAnno (..), emptyAnno)
+import           L4.Annotation            (Anno_ (..), HasAnno (..), emptyAnno, mkHoleWithSrcRangeHint)
 import           L4.Names
 import           L4.Syntax
 import qualified L4.TypeCheck.Environment as TypeCheck
@@ -235,8 +238,8 @@ desugarComputedFields (MkModule ann imports section) =
   MkModule ann imports (desugarCFSection section)
 
 desugarCFSection :: Section Name -> Section Name
-desugarCFSection (MkSection sAnn sMn sMaka topDecls) =
-  MkSection sAnn sMn sMaka (concatMap desugarCFTopDecl topDecls)
+desugarCFSection (MkSection sAnn sMn sMaka sMgiven topDecls) =
+  MkSection sAnn sMn sMaka sMgiven (concatMap desugarCFTopDecl topDecls)
 
 desugarCFTopDecl :: TopDecl Name -> [TopDecl Name]
 desugarCFTopDecl (Declare dAnn decl) = desugarCFDeclare dAnn decl
@@ -421,7 +424,7 @@ detectComputedFieldCycles :: Module Name -> [(Name, [Name])]
 detectComputedFieldCycles (MkModule _ _ section) = detectCFCSection section
 
 detectCFCSection :: Section Name -> [(Name, [Name])]
-detectCFCSection (MkSection _ _ _ topDecls) = concatMap detectCFCTopDecl topDecls
+detectCFCSection (MkSection _ _ _ _ topDecls) = concatMap detectCFCTopDecl topDecls
 
 detectCFCTopDecl :: TopDecl Name -> [(Name, [Name])]
 detectCFCTopDecl (Declare _ decl) = detectCFCDeclare decl
@@ -504,7 +507,7 @@ detectTypeSynonymCycles (MkModule _ _ section) =
 -- | All type synonym declarations in a section (recursively):
 -- name, AKA aliases, type parameters, body.
 synonymsInSection :: Section Name -> [(Name, [RawName], Set RawName, Type' Name)]
-synonymsInSection (MkSection _ _ _ topDecls) = concatMap go topDecls
+synonymsInSection (MkSection _ _ _ _ topDecls) = concatMap go topDecls
   where
     go (Declare _ (MkDeclare _ _ (MkAppForm _ n args mAka) (SynonymDecl _ ty))) =
       [(n, akaNames mAka, Set.fromList (rawName <$> args), ty)]
@@ -525,7 +528,7 @@ extractComputedFieldNames :: Module Name -> Map.Map RawName (Set RawName)
 extractComputedFieldNames (MkModule _ _ section) = extractCFNSection section
 
 extractCFNSection :: Section Name -> Map.Map RawName (Set RawName)
-extractCFNSection (MkSection _ _ _ topDecls) =
+extractCFNSection (MkSection _ _ _ _ topDecls) =
   Map.unionsWith Set.union (map extractCFNTopDecl topDecls)
 
 extractCFNTopDecl :: TopDecl Name -> Map.Map RawName (Set RawName)
@@ -535,3 +538,80 @@ extractCFNTopDecl (Declare _ (MkDeclare _ _ (MkAppForm _ recName _ _) (RecordDec
     in Map.singleton (rawName recName) cfNames
 extractCFNTopDecl (Section _ section) = extractCFNSection section
 extractCFNTopDecl _ = Map.empty
+
+-- ----------------------------------------------------------------------------
+-- Section binders (the section-level GIVEN, R4)
+-- ----------------------------------------------------------------------------
+
+-- | Elaborate each section-level @GIVEN@ parameter into a synthetic 0-ary
+-- @ASSUME@ prepended to that section's declaration list.
+--
+-- INVARIANT (cited from "L4.Print" and "L4.Export"). In a /parsed/ module a
+-- section's 'GivenSig' stands alone. In a /desugared/ module the 'GivenSig' is
+-- the declaration of record — it is what 'L4.Print.prettyLayout' re-emits —
+-- and, for each of its parameters, there is exactly one 0-ary @ASSUME@ at the
+-- head of that section's declaration list bearing the same name: the
+-- parameter's /elaboration/. Any pass that drops or replaces an elaboration
+-- must drop the matching parameter, or what 'L4.Print.prettyLayout' re-emits
+-- stops being a faithful source of the module it holds.
+--
+-- Why elaborate at all: R3\/R4 rule that a section binder resolves, evaluates
+-- and exports exactly as a same-section term @ASSUME@ does. Making the checker
+-- literally see an @ASSUME@ in that section buys the resolution rules
+-- (nearest-ancestor tiebreak, child shadows ancestor, ambiguity when a parent
+-- reaches two children), the @ValAssumed@ evaluation path, the export schema
+-- entry and all six backends by construction, instead of by a dozen parallel
+-- edits that could each drift from the behaviour they mirror.
+--
+-- The elaboration is deliberately /token-free/: every annotation it introduces
+-- is empty, so no traversal that walks concrete syntax (exact printing,
+-- semantic tokens) descends into it and the binder's tokens are emitted once,
+-- by the 'GivenSig' the section keeps. The parameter's own 'Name', type and
+-- @TYPICALLY@ nodes are reused as-is, so the binder's defining occurrence still
+-- carries the source range of the @GIVEN@ line — which is what makes
+-- diagnostics, hover and go-to-definition point at the heading's binder rather
+-- than at @1:1@.
+desugarSectionGivens :: Module Name -> Module Name
+desugarSectionGivens (MkModule ann uri sect) = MkModule ann uri (goSection sect)
+ where
+  goSection :: Section Name -> Section Name
+  goSection (MkSection sAnn mn maka mgiven decls) =
+    MkSection sAnn mn maka mgiven
+      (map elaborateSectionBinder (sectionGivenParams mgiven) <> map goTopDecl decls)
+
+  goTopDecl :: TopDecl Name -> TopDecl Name
+  goTopDecl = \ case
+    Section a s -> Section a (goSection s)
+    other       -> other
+
+-- | The parameters a section's own @GIVEN@ declares (none when it has no
+-- @GIVEN@).
+sectionGivenParams :: Maybe (GivenSig n) -> [OptionallyTypedName n]
+sectionGivenParams = maybe [] (\ (MkGivenSig _ otns) -> otns)
+
+-- | One section-binder parameter, as the 0-ary @ASSUME@ that stands for it.
+--
+-- The @extra@ of the parameter's annotation is carried onto the @ASSUME@ so
+-- that a @\@desc@ written above a section-@GIVEN@ parameter reaches
+-- 'L4.Export.assumeToParam', which reads the description off exactly this node.
+-- The concrete-syntax payload is dropped, for the token-freeness reason given
+-- on 'desugarSectionGivens'. The @range@ is NOT: the checker keys a
+-- declaration's scanned signature by its annotation's source range
+-- ('lookupFunTypeSigByAnno'), and a range-less declaration is a fatal
+-- @MissingSrcRangeForDeclaration@. Each parameter has a distinct range, so the
+-- keys stay distinct.
+--
+-- 'rangeOf' on an 'Anno' is computed from its payload, not read off the @range@
+-- field, so the range has to be carried by exactly ONE 'AnnoHole'. One, not
+-- four: 'flattenConcreteNodes' pairs holes with child node-lists positionally
+-- and drops the surplus, so a single hole is filled by the (empty) TypeSig and
+-- the reused type and @TYPICALLY@ nodes emit nothing — which is what keeps the
+-- elaboration token-free.
+elaborateSectionBinder :: OptionallyTypedName Name -> TopDecl Name
+elaborateSectionBinder (MkOptionallyTypedName pAnn nm mTy mTypically) =
+  Assume (Anno mempty pAnn.range [mkHoleWithSrcRangeHint pAnn.range])
+    (MkAssume (Anno pAnn.extra pAnn.range [mkHoleWithSrcRangeHint pAnn.range])
+      (MkTypeSig emptyAnno (MkGivenSig emptyAnno []) Nothing)
+      (MkAppForm emptyAnno nm [] Nothing)
+      mTy
+      mTypically)

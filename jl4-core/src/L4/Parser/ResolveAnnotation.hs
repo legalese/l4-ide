@@ -193,11 +193,15 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Module n) where
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Section n) where
   addNlg a = extendNlgA a $ case a of
-    MkSection ann lbl maka topDecls -> do
+    MkSection ann lbl maka mgiven topDecls -> do
       lbl' <- traverse addNlg lbl
       maka' <- traverse addNlg maka
+      -- The section's own GIVEN is traversed BEFORE the declarations: these
+      -- passes consume a range-sorted annotation list in source order, and the
+      -- section binder is written above the first declaration.
+      mgiven' <- traverse addNlg mgiven
       topDecls' <- traverse addNlg topDecls
-      pure (MkSection ann lbl' maka' topDecls')
+      pure (MkSection ann lbl' maka' mgiven' topDecls')
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (TopDecl n) where
   addNlg a = extendNlgA a $ case a of
@@ -609,9 +613,14 @@ instance HasDesc (Module n) where
     MkModule uri ann <$> addDesc sect
 
 instance HasDesc (Section n) where
-  addDesc (MkSection ann lbl maka decls) = do
+  addDesc (MkSection ann lbl maka mgiven decls) = do
+    -- Source order: the section's own GIVEN precedes the declarations, and
+    -- 'addDesc' consumes a range-sorted list, so it must be traversed first —
+    -- otherwise a @desc written above a section-GIVEN parameter is handed to
+    -- the section's first declaration instead.
+    mgiven' <- traverse addDesc mgiven
     decls' <- traverse addDesc decls
-    pure $ MkSection ann lbl maka decls'
+    pure $ MkSection ann lbl maka mgiven' decls'
 
 instance HasDesc (TopDecl n) where
   addDesc = \ case
@@ -984,9 +993,12 @@ instance HasFixity (Section n) where
   -- claims the annotations that precede it. A fixity above a section header
   -- therefore becomes the leading annotation of the section's first
   -- declaration — the nearest following construct.
-  addFixity (MkSection ann lbl maka decls) = do
+  -- The section's own GIVEN is deliberately NOT traversed: only DECIDE and
+  -- ASSUME can define an operator, so a fixity annotation between a heading and
+  -- its section GIVEN still belongs to the first declaration below it.
+  addFixity (MkSection ann lbl maka mgiven decls) = do
     decls' <- traverse addFixity decls
-    pure $ MkSection ann lbl maka decls'
+    pure $ MkSection ann lbl maka mgiven decls'
 
 instance HasFixity (TopDecl n) where
   -- Only DECIDE/ASSUME can define a binary operator, so only they honor a
@@ -1192,11 +1204,13 @@ instance (HasSrcRange n, HasRef n) => HasRef (Module n) where
 instance (HasSrcRange n, HasRef n) => HasRef (Section n) where
   -- As with 'HasRef (Module n)', do NOT attach at the container level; recurse
   -- only so a leading @ref reaches the first child declaration.
-  addRef (MkSection ann lbl maka decls) = do
+  addRef (MkSection ann lbl maka mgiven decls) = do
     lbl' <- traverse addRef lbl
     maka' <- traverse addRef maka
+    -- Before the declarations, for the source-order reason given on 'addDesc'.
+    mgiven' <- traverse addRef mgiven
     decls' <- traverse addRef decls
-    pure $ MkSection ann lbl' maka' decls'
+    pure $ MkSection ann lbl' maka' mgiven' decls'
 
 instance (HasSrcRange n, HasRef n) => HasRef (TopDecl n) where
   addRef a = case a of

@@ -481,16 +481,16 @@ fragmentSortError _ = Nothing
 topDecls :: Module Resolved -> [TopDecl Resolved]
 topDecls (MkModule _ _ sec) = goSection sec
  where
-  goSection (MkSection _ _ _ decls) = concatMap goDecl decls
+  goSection (MkSection _ _ _ _ decls) = concatMap goDecl decls
   goDecl d = case d of
     Section _ sub -> d : goSection sub
     _             -> [d]
 
 moduleTitleOf :: Module Resolved -> Maybe Text
-moduleTitleOf (MkModule _ _ (MkSection _ mName _ decls)) =
+moduleTitleOf (MkModule _ _ (MkSection _ mName _ _ decls)) =
   listToMaybe
     ( [ nm n | Just n <- [mName] ]
-        <> [ nm n | Section _ (MkSection _ (Just n) _ _) <- decls ]
+        <> [ nm n | Section _ (MkSection _ (Just n) _ _ _) <- decls ]
     )
  where nm = rawNameToText . rawName . getOriginal
 

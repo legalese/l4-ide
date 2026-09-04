@@ -2008,7 +2008,7 @@ topDecls = map snd . topDeclsWithPath
 topDeclsWithPath :: Module Resolved -> [([Text], TopDecl Resolved)]
 topDeclsWithPath (MkModule _ _ section) = goSection [] section
  where
-  goSection path (MkSection _ mname _ ds) =
+  goSection path (MkSection _ mname _ _ ds) =
     let path' = case Text.strip . resolvedToText <$> mname of
           Just t | not (Text.null t) -> path <> [t]
           _                          -> path

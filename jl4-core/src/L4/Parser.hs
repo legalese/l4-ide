@@ -444,18 +444,46 @@ anonymousSection =
     MkSection emptyAnno
       <$> annoHole (pure Nothing)
       <*> annoHole (pure Nothing)
+      -- The anonymous root section has no '\u00a7' to indent past, so it can never
+      -- carry a section binder; the hole is still emitted so that the
+      -- 'ToConcreteNodes' \/ 'ToSemTokens' hole order is the same for both
+      -- section parsers.
+      <*> annoHole (pure Nothing)
       <*> annoHole (lsepBy (const (topdeclWithRecovery 0)) (spacedSymbol_ TSemicolon))
 
 section :: Int -> Parser (Section Name)
-section n = attachAnno $
-  MkSection emptyAnno
-    <$> (wrapAnnoParser (try do
-           wa@WithAnno {payload = syms} <- unwrapAnnoParser sectionSymbols
-           guard (syms >= n)
-           pure wa) *> annoHole (optional name)
-        )
-    <*> annoHole (optional aka)
-    <*> annoHole (lsepBy (const (topdeclWithRecovery n)) (spacedSymbol_ TSemicolon))
+section n = do
+  -- 'Lexer.indentLevel' reports the column of the NEXT token -- here, of the
+  -- '\u00a7' itself, because it peeks and never consumes (see 'withIndent'). That
+  -- single fact is what lets ONE combinator accept both ruled spellings of a
+  -- section binder: the taught form on the next line indented past the '\u00a7',
+  -- and the heading-line form '\u00a7 NAME GIVEN ...', whose GIVEN also sits at a
+  -- column greater than the '\u00a7'.
+  headingCol <- Lexer.indentLevel
+  attachAnno $
+    MkSection emptyAnno
+      <$> (wrapAnnoParser (try do
+             wa@WithAnno {payload = syms} <- unwrapAnnoParser sectionSymbols
+             guard (syms >= n)
+             pure wa) *> annoHole (optional name)
+          )
+      <*> annoHole (optional aka)
+      -- A GIVEN whose keyword column is greater than the heading's belongs to
+      -- the section (R4). 'indented' peeks and fails WITHOUT consuming, so a
+      -- column-1 GIVEN falls straight through to 'lsepBy' and stays the next
+      -- declaration's signature, exactly as it always was.
+      --
+      -- The 'try' is load-bearing: 'givens' consumes the GIVEN keyword before
+      -- its parameter list can fail, and without backtracking a malformed
+      -- section-level parameter list would kill the whole section instead of
+      -- falling back to today's reading.
+      --
+      -- Consuming the binder here also restores the section body's alignment
+      -- column: 'lsepBy' \/ 'manyLines' fixes that column from the first token
+      -- it sees, so eating a heading-line GIVEN leaves the body at column 1
+      -- where it belongs.
+      <*> annoHole (optional (try (indented givens headingCol)))
+      <*> annoHole (lsepBy (const (topdeclWithRecovery n)) (spacedSymbol_ TSemicolon))
 
 sectionSymbols :: AnnoParser Int
 sectionSymbols =

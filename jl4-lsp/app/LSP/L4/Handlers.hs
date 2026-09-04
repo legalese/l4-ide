@@ -436,7 +436,7 @@ handlers evalConfig recorder =
           -- foldTopDecls only visits the top-level section; directives can be
           -- nested inside §§ sub-sections, so we recurse through all sections.
           collectFromSection :: Section Resolved -> [CodeLens]
-          collectFromSection (MkSection _ _ _ topDecls) = concatMap collectFromTopDecl topDecls
+          collectFromSection (MkSection _ _ _ _ topDecls) = concatMap collectFromTopDecl topDecls
 
           collectFromTopDecl :: TopDecl Resolved -> [CodeLens]
           collectFromTopDecl td = directiveToCodeLens td ++ case td of
@@ -475,12 +475,12 @@ handlers evalConfig recorder =
                 in sectionToSymbols moduleNuri subst entInfo section
 
             sectionToSymbols :: NormalizedUri -> Substitution -> EntityInfo -> Section Resolved -> [DocumentSymbol]
-            sectionToSymbols moduleNuri subst entInfo (MkSection _ _ _ topDecls) =
+            sectionToSymbols moduleNuri subst entInfo (MkSection _ _ _ _ topDecls) =
               concatMap (topDeclToSymbol moduleNuri subst entInfo) topDecls
 
             topDeclToSymbol :: NormalizedUri -> Substitution -> EntityInfo -> TopDecl Resolved -> [DocumentSymbol]
             topDeclToSymbol moduleNuri subst entInfo = \case
-              Section _ s@(MkSection _ mName _ _) ->
+              Section _ s@(MkSection _ mName _ _ _) ->
                 case rangeOfNode s of
                   Just rng ->
                     let name = maybe "§" (nameToText . getOriginal) mName

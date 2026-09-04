@@ -114,7 +114,7 @@ declaresFromModule :: Module Resolved -> Map Text (Declare Resolved)
 declaresFromModule (MkModule _ _ section) =
   Map.fromList (collectSection section)
  where
-  collectSection (MkSection _ _ _ decls) =
+  collectSection (MkSection _ _ _ _ decls) =
     decls >>= collectDecl
 
   collectDecl = \case

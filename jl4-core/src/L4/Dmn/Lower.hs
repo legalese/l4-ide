@@ -5096,7 +5096,7 @@ lowerModule opts modul@(MkModule _ uri _) =
    where
     MkModule _ _ topSec = modul
     (assigns, secs, _) = goSec Nothing (0 :: Int) topSec
-    goSec cur idx (MkSection _ mName _ ds) =
+    goSec cur idx (MkSection _ mName _ _ ds) =
       let (cur', idx', secs0) = case mName of
             Just n  -> (Just idx, idx + 1, [(idx, nameOf n)])
             Nothing -> (cur, idx, [])
@@ -6685,16 +6685,16 @@ sanitiseId t
 -- across three files and stale in at least two of them is the exact defect
 -- this exhibit exists to criticise.
 moduleTitle :: Module Resolved -> Maybe Text
-moduleTitle (MkModule _ _ (MkSection _ mName _ decls)) =
+moduleTitle (MkModule _ _ (MkSection _ mName _ _ decls)) =
   listToMaybe
     ( [nameOf n | Just n <- [mName]]
-        <> [nameOf n | Section _ (MkSection _ (Just n) _ _) <- decls]
+        <> [nameOf n | Section _ (MkSection _ (Just n) _ _ _) <- decls]
     )
 
 topDecls :: Module Resolved -> [TopDecl Resolved]
 topDecls (MkModule _ _ sec) = section sec
  where
-  section (MkSection _ _ _ ds) = concatMap decl ds
+  section (MkSection _ _ _ _ ds) = concatMap decl ds
   decl d = case d of
     Section _ sub -> d : section sub
     _             -> [d]

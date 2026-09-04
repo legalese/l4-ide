@@ -713,8 +713,8 @@ filterDirectivesFromModule (MkModule ann uri section) =
   MkModule ann uri (filterDirectivesFromSection section)
 
 filterDirectivesFromSection :: Section Resolved -> Section Resolved
-filterDirectivesFromSection (MkSection sann sresolved maka decls) =
-  MkSection sann sresolved maka (mapMaybe filterTopDecl decls)
+filterDirectivesFromSection (MkSection sann sresolved maka mgiven decls) =
+  MkSection sann sresolved maka mgiven (mapMaybe filterTopDecl decls)
   where
     filterTopDecl :: TopDecl Resolved -> Maybe (TopDecl Resolved)
     filterTopDecl (Directive _ _) = Nothing  -- Remove directives

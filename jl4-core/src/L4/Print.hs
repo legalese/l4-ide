@@ -568,18 +568,37 @@ instance (LayoutPrinterWithName a, n ~ Int) => LayoutPrinter (n, Section a) wher
     -- resolving in the re-emitted `cross-section-qualified-additive.l4` for
     -- exactly this reason, and re-resolved as soon as the headings were shifted
     -- back by one.
-    (i, MkSection _ Nothing _ ds)    ->
+    --
+    -- The parser cannot put a section binder on the anonymous root section
+    -- (there is no § to indent past), so there is nothing to print here.
+    (i, MkSection _ Nothing _ _ ds)    ->
       vcatHard (map (printWithLayout . (i ,)) ds)
-    (i, MkSection _ name maka ds) ->
+    (i, MkSection _ name maka mgiven ds) ->
+      let
+        -- In a desugared module each section-GIVEN parameter also has a 0-ary
+        -- ASSUME elaboration at the head of this section's declarations (see
+        -- the invariant on 'desugarSectionGivens' in "L4.Desugar"). The
+        -- GivenSig is the declaration of record, so print it and suppress the
+        -- elaborations: printing both would emit the binder twice, and the
+        -- re-parsed module would be a duplicate definition.
+        binders = sectionGivenNames mgiven
+        visible = filter (not . isSectionBinderElaboration binders) ds
+      in
       vcatHard $
         [ pretty (replicate i '§') <+>
           case maka of
             Nothing  -> maybe mempty printWithLayout name
             Just aka -> maybe mempty printWithLayout name <+> printWithLayout aka
         ]
-        <> case ds of
+        -- The taught spelling: on the line below the heading, indented past the
+        -- §. 'indent' wraps only the signature -- wrapping the rest would nest
+        -- every following declaration, which prints flat at column 1.
+        <> (case mgiven of
+              Just g@(MkGivenSig _ (_ : _)) -> [indent 4 (printWithLayout g)]
+              _                             -> [])
+        <> case visible of
           [] -> mempty
-          _ -> map (printWithLayout . (i + 1 ,)) ds
+          _ -> map (printWithLayout . (i + 1 ,)) visible
 
 instance LayoutPrinterWithName a => LayoutPrinter (Module  a) where
   printWithLayout = \ case

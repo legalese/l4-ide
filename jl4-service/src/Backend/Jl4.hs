@@ -368,7 +368,7 @@ moduleDeclaresOnly :: Module Resolved -> [Declare Resolved]
 moduleDeclaresOnly (MkModule _ _ section) = flattenDeclares section
   where
     flattenDeclares :: Section Resolved -> [Declare Resolved]
-    flattenDeclares (MkSection _ _ _ decls) = concatMap step decls
+    flattenDeclares (MkSection _ _ _ _ decls) = concatMap step decls
       where
         step (Declare _ d)  = [d]
         step (Section _ s') = flattenDeclares s'
@@ -991,7 +991,7 @@ getFunctionDefinition name (MkModule _ _ sect) = case goSection sect of
   Nothing -> throwError $ InterpreterError $ "L4: No function with name " <> prettyLayout name <> " found."
   Just dec -> pure dec
  where
-  goSection (MkSection _ _ _ decls) =
+  goSection (MkSection _ _ _ _ decls) =
     listToMaybe $ mapMaybe (goTopDecl) decls
 
   rawNameOfDecide = rawNameToText . rawName . getActual . nameOf

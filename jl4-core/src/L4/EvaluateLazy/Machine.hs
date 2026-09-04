@@ -3340,7 +3340,7 @@ evalRecLocalDecls env decls = do
 
 -- | Just collect all defined names; could plausibly be done generically.
 scanSection :: Section Resolved -> Machine [Resolved]
-scanSection (MkSection _ann _mn _maka topdecls) =
+scanSection (MkSection _ann _mn _maka _ topdecls) =
   concat <$> traverse scanTopDecl topdecls
 
 -- | Just collect all defined names; could plausibly be done generically.
@@ -3390,7 +3390,7 @@ scanConDecl (MkConDecl _ann n [])  = pure [n]
 scanConDecl (MkConDecl _ann n tns) = pure (n : ((\ (MkTypedName _ n' _ _ _) -> n') <$> tns))
 
 evalSection :: Environment -> Section Resolved -> Machine [EvalDirective]
-evalSection env (MkSection _ann _mn _maka topdecls) =
+evalSection env (MkSection _ann _mn _maka _ topdecls) =
   concat <$> traverse (evalTopDecl env) topdecls
 
 evalTopDecl :: Environment -> TopDecl Resolved -> Machine [EvalDirective]

@@ -1069,7 +1069,7 @@ ancestorProximity curUri current paths u
   | otherwise             = sectionProximity current (Map.findWithDefault [] u paths)
 
 isTopLevelBindingInSection :: Unique -> Section Resolved -> Bool
-isTopLevelBindingInSection u (MkSection _a  _mn _maka decls) = any (elem u . map getUnique . relevantResolveds) decls
+isTopLevelBindingInSection u (MkSection _a  _mn _maka _ decls) = any (elem u . map getUnique . relevantResolveds) decls
   where
   relevantResolveds = \ case
     Declare _ (MkDeclare _ _ af _) -> appFormHeads af
@@ -1080,7 +1080,12 @@ isTopLevelBindingInSection u (MkSection _a  _mn _maka decls) = any (elem u . map
     Timezone _ _ -> []
     -- NOTE: Sections are a toplevel binding in the current section but can also contain further
     -- toplevel bindings
-    Section _ (MkSection _ mr maka decls') -> toResolved mr <> toResolved maka <> foldMap relevantResolveds decls'
+    --
+    -- The section's own GIVEN is deliberately NOT collected here: a section
+    -- binder is already present as the 0-ary ASSUME its GivenSig elaborates to
+    -- (see 'L4.Desugar.desugarSectionGivens'), so adding the GivenSig would
+    -- count the same binding twice.
+    Section _ (MkSection _ mr maka _ decls') -> toResolved mr <> toResolved maka <> foldMap relevantResolveds decls'
 
 resolveTerm' :: (TermKind -> Bool) -> Name -> Check (Resolved, Type' Resolved)
 resolveTerm' p n = resolveTermFiltered False p (const True) n pure

@@ -150,10 +150,14 @@ instance ToSemTokens Context PosToken (Module  Name) where
 instance ToSemTokens Context PosToken (TopDecl Name) where
 
 instance ToSemTokens Context PosToken (Section Name) where
-  toSemTokens (MkSection ann name maka decls) =
+  -- The hole list must follow the parser's 'annoHole' order exactly: name,
+  -- AKA, the section's own GIVEN, then the declarations. A mismatch here is a
+  -- runtime 'TraverseAnnoError', not a compile error.
+  toSemTokens (MkSection ann name maka mgiven decls) =
     traverseCsnWithHoles ann
       [ withTokenType identIsDirective $ toSemTokens name
       , withTokenType identIsDirective $ toSemTokens maka
+      , toSemTokens mgiven
       , toSemTokens decls
       ]
 
@@ -294,10 +298,15 @@ instance ToSemTokens () PosToken (Module  Resolved) where
 instance ToSemTokens () PosToken (TopDecl Resolved) where
 
 instance ToSemTokens () PosToken (Section Resolved) where
-  toSemTokens (MkSection ann name maka decls) =
+  -- Same hole order as the 'Name' instance. In a resolved (post-desugar)
+  -- module the section's GIVEN carries a cleared source annotation and emits
+  -- nothing; its tokens are emitted once, by the elaboration that heads
+  -- @decls@. See "L4.Desugar", @desugarSectionGivens@.
+  toSemTokens (MkSection ann name maka mgiven decls) =
     traverseCsnWithHoles ann
       [ withTokenType identIsDirective $ toSemTokens name
       , withTokenType identIsDirective $ toSemTokens maka
+      , toSemTokens mgiven
       , toSemTokens decls
       ]
 instance ToSemTokens () PosToken (Declare Resolved) where

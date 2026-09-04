@@ -432,8 +432,16 @@ data Module n =
   deriving stock (GHC.Generic, Eq, Ord, Show, Functor, Foldable, Traversable)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
+-- | A section: its heading name, an optional @AKA@, an optional section-level
+-- @GIVEN@ (the /section binder/, R4), and its declarations.
+--
+-- The @GIVEN@ field sits between the @AKA@ and the declarations because that is
+-- source order in both accepted spellings — @\u00a7 NAME [AKA ...] GIVEN ...@ on the
+-- heading line, and the taught form on the next line indented past the
+-- @\u00a7@. Every hole-order-sensitive traversal ('ToConcreteNodes',
+-- @ToSemTokens@) must list it in that position.
 data Section n =
-  MkSection Anno (Maybe n) (Maybe (Aka n)) [TopDecl n]
+  MkSection Anno (Maybe n) (Maybe (Aka n)) (Maybe (GivenSig n)) [TopDecl n]
   deriving stock (GHC.Generic, Eq, Ord, Show, Functor, Foldable, Traversable)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
@@ -507,9 +515,9 @@ updateImport imported i@(MkImport ann n _) = case mapMaybe (\(importName, import
 
 moduleTopDecls :: Lens' (Module n) [TopDecl n]
 moduleTopDecls = lens
-                 (\(MkModule _ _ (MkSection _ _ _ decls)) -> decls)
-                 (\(MkModule ann nuri (MkSection sann sresolved maka _oldDecls)) decls ->
-                     MkModule ann nuri (MkSection sann sresolved maka decls))
+                 (\(MkModule _ _ (MkSection _ _ _ _ decls)) -> decls)
+                 (\(MkModule ann nuri (MkSection sann sresolved maka mgiven _oldDecls)) decls ->
+                     MkModule ann nuri (MkSection sann sresolved maka mgiven decls))
 
 -- ----------------------------------------------------------------------------
 -- Source Annotations
@@ -722,8 +730,8 @@ deriving via L4Syntax (LocalDecl n)
 
 -- Generic instance does not apply because we exclude the level.
 instance ToConcreteNodes PosToken (Section Name) where
-  toNodes (MkSection ann name maka decls) =
-    flattenConcreteNodes ann [toNodes name, toNodes maka, toNodes decls]
+  toNodes (MkSection ann name maka mgiven decls) =
+    flattenConcreteNodes ann [toNodes name, toNodes maka, toNodes mgiven, toNodes decls]
 
 deriving anyclass instance ToConcreteNodes PosToken (TopDecl Name)
 deriving anyclass instance ToConcreteNodes PosToken (Assume Name)
@@ -775,8 +783,8 @@ instance ToConcreteNodes PosToken NormalizedUri where
 
 -- Generic instance does not apply because we exclude the level.
 instance ToConcreteNodes PosToken (Section Resolved) where
-  toNodes (MkSection ann name maka decls) =
-    flattenConcreteNodes ann [toNodes name, toNodes maka, toNodes decls]
+  toNodes (MkSection ann name maka mgiven decls) =
+    flattenConcreteNodes ann [toNodes name, toNodes maka, toNodes mgiven, toNodes decls]
 
 deriving anyclass instance ToConcreteNodes PosToken (TopDecl Resolved)
 deriving anyclass instance ToConcreteNodes PosToken (Assume Resolved)
