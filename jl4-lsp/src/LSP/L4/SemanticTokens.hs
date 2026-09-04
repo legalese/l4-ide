@@ -299,9 +299,11 @@ instance ToSemTokens () PosToken (TopDecl Resolved) where
 
 instance ToSemTokens () PosToken (Section Resolved) where
   -- Same hole order as the 'Name' instance. In a resolved (post-desugar)
-  -- module the section's GIVEN carries a cleared source annotation and emits
-  -- nothing; its tokens are emitted once, by the elaboration that heads
-  -- @decls@. See "L4.Desugar", @desugarSectionGivens@.
+  -- module the section's GIVEN keeps its source annotation and emits its
+  -- tokens here, once; the elaborated ASSUME that heads @decls@ is token-free
+  -- (empty annotations, one range-carrying hole) and emits nothing. See
+  -- "L4.Desugar", @desugarSectionGivens@, and the semantic-tokens golden
+  -- @lsp/semantic-tokens/section-given.l4@.
   toSemTokens (MkSection ann name maka mgiven decls) =
     traverseCsnWithHoles ann
       [ withTokenType identIsDirective $ toSemTokens name

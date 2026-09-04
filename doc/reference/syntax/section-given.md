@@ -152,8 +152,10 @@ What does work today:
   the same way they bind a read `ASSUME`.
 - **Every export backend** — DMN/BPMN, docassemble, Catala, OpenFisca, Blawx,
   MLIR — treats a section binder as it treats an `ASSUME` term.
-- **Hover, go-to-definition and find-references**, which point at the `GIVEN`
-  line under the heading.
+- **Diagnostics and hover**, which point at the `GIVEN` line under the heading
+  (a "defined at" note names that line, and hovering the parameter shows its
+  type). Go-to-definition and find-references have not been exercised on a
+  section `GIVEN` in this release.
 
 A parameter with no type (`GIVEN a`) is accepted and behaves as `ASSUME a` does.
 A parameter typed `IS A TYPE` declares a section-scoped opaque type, as
