@@ -267,8 +267,8 @@ severity) and never makes the run exit 1, even when the rule reads a section
 `GIVEN` nobody has supplied. That is what lets a file in the house style run
 green: put the operative test in a rule with its own `GIVEN` and `#ASSERT`
 that; have the section-`GIVEN` rule delegate to it and `#CHECK` that. Worked
-recipe: [references/source-patterns.md](references/source-patterns.md),
-entry 25.
+recipe: entry 11.9 of the phrasebook,
+[references/source-patterns/11-when-the-encoding-cannot-answer.md](references/source-patterns/11-when-the-encoding-cannot-answer.md#e11-9).
 
 ### 8. Deploy
 
@@ -335,7 +335,8 @@ Two house-style spellings, in this order of preference:
    Nothing inside the file supplies a section `GIVEN` in this release (`WITH`
    at a call site is proposed, not landed, 2026-09-04): an `#EVAL` or `#ASSERT`
    that reaches one stops and makes `l4 run` exit 1. To exercise such a rule,
-   follow entry 25 of [references/source-patterns.md](references/source-patterns.md).
+   follow entry 11.9 of the phrasebook,
+   [references/source-patterns/11-when-the-encoding-cannot-answer.md](references/source-patterns/11-when-the-encoding-cannot-answer.md#e11-9).
 
 **`ASSUME` is deprecated for declaring inputs (ruled 2026-09-04), and it is
 still accepted.** It parses, type-checks and exports as it always has, and no

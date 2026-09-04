@@ -150,10 +150,11 @@ record the unit once in a comment or in the name of the constant.
 PARTY Alice  MUST pay 100 WITHIN 30          -- days, by this file's convention
 ```
 
-Neither `WITHIN 5 days` nor `WITHIN 5 days OF \`order confirmation\``parses in
-this release (measured 2026-09-04: the first reads`days`as a function applied
-to`5`; the second stops at `OF`). See
-[source-patterns.md](source-patterns.md), entry 21, for the measured forms.
+Neither `WITHIN 5 days` nor ``WITHIN 5 days OF `order confirmation` `` parses
+in this release (measured 2026-09-04: the first reads `days` as a function
+applied to `5`; the second stops at `OF`). See
+[source-patterns/04-dates-and-periods.md](source-patterns/04-dates-and-periods.md#e4-3),
+entry 4.3, for the measured forms.
 
 **`BEFORE` (absolute deadlines) is planned but not yet implemented** — use `WITHIN` for now.
 
