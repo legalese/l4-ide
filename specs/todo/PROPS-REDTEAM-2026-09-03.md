@@ -1,8 +1,9 @@
 # Props: the proposal, as it stands on 2026-09-04
 
 _Status: **a proposal, not implemented.** R0 is ruled (2026-09-04, `IMPLICIT-PROPS-DESIGN.md`
-§11.1). R1–R8 and R10–R12 were ruled on 2026-09-04 and are recorded in `IMPLICIT-PROPS-DESIGN.md`
-§11.2–§11.12; R9 is the one open candidate, with a recommendation on the rulings sheet. This revision replaces every earlier
+§11.1). R1–R12 were all ruled on 2026-09-04 and are recorded in `IMPLICIT-PROPS-DESIGN.md`
+§11.2–§11.13; the four R12 fixes are PRs #328–#331. What remains is implementation in the order of
+§6. This revision replaces every earlier
 stratum of the file: the 2026-09-03 reduced position, the 2026-09-03/04 refinement minutes, the
 second red team's verified findings and the four verbatim red-team reports are all in git history
 at `d119c521` and are not restated here. Every count below carries the date it was measured and
@@ -419,12 +420,12 @@ string literal or `TRUE`/`FALSE`; a default that is an expression under rule 3 h
 so the schema marks the parameter optional and carries the default as its L4 source text in a
 sibling key (`x-l4-default`) rather than omitting it.
 
-### 2.6 Hypotheticals (R9)
+### 2.6 Hypotheticals (R9, ruled 2026-09-04: `WITH` at any site, `LET` unchanged)
 
-At a directive, supply is `WITH`. An in-body hypothetical ("under the strict reading") may use
-`LET` reaching callees, or, more simply, `e WITH x IS v` at any site as the one mechanism; the
-seasoned raters preferred the latter, and it leaves no dynamic binder to explain. Whichever
-survives: a `LET` scopes over a trailing `WITH`; `WHERE` never supplies (19 `WHERE`-local names
+At a directive, supply is `WITH`. An in-body hypothetical ("under the strict reading") is
+`e WITH x IS v` at the call, the one mechanism, carried down the callee's subtree by discharge;
+`LET` keeps its present meaning and never reaches callees (ruled over the earlier candidate of a
+callee-reaching `LET`, on the grounds in `IMPLICIT-PROPS-DESIGN.md` §11.13). `WHERE` never supplies (19 `WHERE`-local names
 coincide with `GIVEN` names in the corpus, 2026-09-04); a `LET` binding a section-binder name that
 nothing under it reads is a warning; and the read-set subtraction rule of §2.2 applies. Today a
 `LET` shadowing a same-named `GIVEN` in scope is a "multiple definitions" error (probe q13). For
@@ -662,7 +663,7 @@ The canonical statement of each is on the rulings sheet (artifact "Twelve Ruling
 | R6  | **RULED 2026-09-04**, accept (withdrawn); `IMPLICIT-PROPS-DESIGN.md` §11.8                           | The `MAYBE`/`EITHER` propagation sugar is withdrawn, declined on measurement (§5). The taxonomy stands.                                                                                                                                                                                                                                                                                                                                  | Keep it with five conditions (use-site `?`, bind at nearest failure-typed node, lambda its own boundary, `JUST` explicit, elaborate to `CONSIDER`).                                                          |
 | R7  | **RULED 2026-09-04**, accept, with a consequence rider; `IMPLICIT-PROPS-DESIGN.md` §11.9             | `REFUSE` as §2.8: throw at force; `#ASSERT REFUSED`; three-valued assertions; one named definition per refusal; per-backend image; `Ref(f)` per reason, `TBD` excluded; taxonomy row split.                                                                                                                                                                                                                                              | Keep pre-commencement as a refusal per corpus ruling R2 and accept that transitional provisions cannot be encoded over it.                                                                                   |
 | R8  | **RULED 2026-09-04** in conversation; `IMPLICIT-PROPS-DESIGN.md` §11.5                               | `TYPICALLY` one behaviour as §2.5, filled in once at the root; positional sites omit nothing explicit; one declaration owns the default; a default is a module-scope expression, cycles a check error.                                                                                                                                                                                                                                   | Defaults stay documentation; a section binder needing a default is a definition with an override.                                                                                                            |
-| R9  | candidate; **recommendation: alternative** (one mechanism, `WITH` at any site)                       | `WITH` at directives; `LET`-reaching-callees or `e WITH x IS v` in bodies; `LET` over trailing `WITH`; `WHERE` never supplies; DMN per R-C.                                                                                                                                                                                                                                                                                              | Drop `LET`-reaching-callees; rebinding is application at any site. Preferred by the seasoned raters.                                                                                                         |
+| R9  | **RULED 2026-09-04**, alternative; `IMPLICIT-PROPS-DESIGN.md` §11.13                                 | `WITH` at directives; `LET`-reaching-callees or `e WITH x IS v` in bodies; `LET` over trailing `WITH`; `WHERE` never supplies; DMN per R-C.                                                                                                                                                                                                                                                                                              | Drop `LET`-reaching-callees; rebinding is application at any site. Preferred by the seasoned raters.                                                                                                         |
 | R10 | **RULED 2026-09-04**, accept; `IMPLICIT-PROPS-DESIGN.md` §11.10                                      | Backends as §2.10; implicits trail; alcohol act as fourteen scalars.                                                                                                                                                                                                                                                                                                                                                                     | Each backend places implicits from the read-set as a separate list (the same thing from the other side).                                                                                                     |
 | R11 | **RULED 2026-09-04**, accept; `IMPLICIT-PROPS-DESIGN.md` §11.11                                      | `@reads x — …` or a function-level `@desc` override, so the fork register survives hoisting.                                                                                                                                                                                                                                                                                                                                             | Accept the collapse (rated a loss of legal meaning).                                                                                                                                                         |
 | R12 | **RULED 2026-09-04**, accept; `IMPLICIT-PROPS-DESIGN.md` §11.12; delivery = four PRs into `unstable` | Six pre-existing defects are fixed now, ruling or no ruling.                                                                                                                                                                                                                                                                                                                                                                             | None sensible.                                                                                                                                                                                               |
@@ -802,12 +803,6 @@ the dead `LocalAssume` grammar (§6 item 7); function-typed `ASSUME` refused by 
 
 ## 9. Open
 
-- R9, the one unruled candidate. Recommendation: the alternative, `e WITH x IS v` as the one
-  override mechanism at any site, `LET` unchanged from today (it does not reach callees, probe t1;
-  shadowing a `GIVEN` is an error, probe q13); the temporal form's successor is then a `WITH`.
-  Measured 2026-09-04: `LET` has **zero** uses in the 26 legal files (125 `WHERE` blocks), 127 uses
-  in 24 files elsewhere under `jl4/examples` and the libraries, 7 in canon; nothing legal is asking
-  for a `LET` that reaches callees.
 - R7's consequence rider (design spec §11.9): a gate design for pre-commencement, and the
   amendment of `lexipedia-superset/CORPUS-TRACK.md` §8 R2 in the PR that lands `REFUSE`.
   here for argument.

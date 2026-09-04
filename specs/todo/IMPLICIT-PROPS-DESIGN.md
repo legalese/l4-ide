@@ -406,8 +406,8 @@ that file's history at `d119c521`. In one line: **`ASSUME` is deprecated; its te
 section-level `GIVEN` that the compiler discharges into ordinary parameters of every definition
 that transitively reads it; supply is the existing named-argument `WITH`.** §4.2's section-scoped
 establishment is withdrawn there (visibility already ships; `§` placement is a tiebreak), and
-§5.1's structural subtyping is found unnecessary. R0–R8 and R10–R12 are recorded below, each with the mark Meng gave it on 2026-09-04; R9 is the
-one open candidate, with a recommendation on the rulings sheet.
+§5.1's structural subtyping is found unnecessary. R0–R12 are all recorded below, each with the mark Meng gave it on 2026-09-04. The red team's
+rulings are closed; what remains is implementation in the order of `PROPS-REDTEAM-2026-09-03.md` §6.
 
 ### 11.1 R0 — `ASSUME` is deprecated. RULED 2026-09-04.
 
@@ -442,8 +442,9 @@ rewrites a term `ASSUME` to the ruled spelling — the warning does not land bef
 can; (6) corpus and docs migration, `doc/reference/types/ASSUME.md` carrying the notice and the
 recipe (CLAUDE.md §6); (7) keyword removal, together with the dead `LocalAssume` grammar.
 
-**What this does not decide.** In-body hypotheticals (R9), still a candidate on the rulings sheet
-with a recommendation. Everything else the red team put up is ruled in §11.2–§11.12 below. Consistent with §10.7 above and the handoff's §7 ("`ASSUME` is not simply
+**What this does not decide.** Nothing of the red team's remains open; R1–R12 are ruled in
+§11.2–§11.13 below. Still owed from the riders: the pre-commencement gate design and the
+CORPUS-TRACK §8 amendment (§11.9). Consistent with §10.7 above and the handoff's §7 ("`ASSUME` is not simply
 to be deleted"): the refusal and type roles get their own constructs _before_ the keyword goes.
 
 ### 11.2 R1 — A call site is entirely positional or entirely named. RULED 2026-09-04.
@@ -606,3 +607,21 @@ collapsing an exception to a plain failure; `#CHECK` printing inference gensyms;
 mis-applying a directly-read `ASSUME`. Built and independently verified on four branches off
 `origin/unstable` (`PROPS-REDTEAM-2026-09-03.md` §7); delivered as PRs into `unstable` on 2026-09-04: legalese/l4-ide#328 (export read-set), #329
 (section scoping), #330 (assert/check reporting), #331 (docs).
+
+### 11.13 R9 — `WITH` is the one override mechanism; `LET` is unchanged. RULED 2026-09-04 (marked alternative).
+
+An in-body hypothetical is written as a named application at the call, `` `the issuer's headroom`
+WITH interp IS `the strict reading` ``, which discharge carries down the callee's subtree; at a
+directive supply is likewise `WITH`. `LET` keeps its present meaning: it does not reach callees,
+and a `LET` shadowing a name in scope stays an error. `WHERE` never supplies. Supplying a name the
+callee neither takes nor reads is the existing check error. For DMN, rebinding the rule date drops
+per ruling R-C of `DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §15.12.1; any other binder overridden at an
+inner site lowers as a tier-2 knowledge model. The temporal form `EVAL UNDER RULES EFFECTIVE AT d e`
+succeeds to `e WITH \`RULES EFFECTIVE DATE\` IS d` once sharing is measured.
+
+**What decided it.** One mechanism after R1–R3, no second binder with dynamic extent to explain;
+no existing program changes meaning (`LET` appears 127 times in the examples and libraries and 7 in
+canon); no demand (`LET` has zero uses in the 26 legal files against 125 `WHERE` blocks, and the
+corpus's only hypothetical, `EVAL UNDER RULES EFFECTIVE AT`, has nineteen uses all at the outermost
+position of a directive, measured 2026-09-04). The cost, terseness when several calls share one
+override, is met by a helper. Detail: `PROPS-REDTEAM-2026-09-03.md` §2.6.
