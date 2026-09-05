@@ -10,16 +10,22 @@
 > `IMPLICIT-PROPS-DESIGN.md` §11, `SUBJECT-TO-NOTWITHSTANDING-SPEC.md` §11,
 > `SET-OPERATORS-SPEC.md` §18, `TEMPORAL-RULE-VERSION-DESIGN.md` §1.4.3.
 >
+> **Every finding has a stable id, `OF-n`, and the id is the handle — not its position in this
+> file, and not a section number in some other spec.** Ids are never reused and never renumbered;
+> new findings take the next free number. Cite `OF-3`, not "§3 of the findings file". This exists
+> because three branches appended to `IMPLICIT-PROPS-DESIGN.md` §11 on one day and collided, which
+> is what a positional handle does under concurrency.
+>
 > **Who found what is deliberately not recorded.** What is recorded is what was measured, when,
 > and on which binary — because that is what a later reader has to re-check.
 
-## 0. Two cautions for anyone re-checking these
+## Cautions for anyone re-checking these
 
 **Line numbers here are `origin/unstable` at `b2a3faac`, and they drift between branches.** Three
 different line numbers were in circulation for one function on one day: `mergeResultTypeInto` is at
 `TypeCheck.hs:4847` on `b2a3faac`, at `:4891` on `props/tdnr-collapse`, and was cited as `:4958`
 from a third tree. **Always name the tree with the line.** Twice on 2026-09-05 a borrowed
-`file:line` would have caused a wrong action, and once (§6 below) the citation was right while the
+`file:line` would have caused a wrong action, and once (**OF-6**) the citation was right while the
 verification had been taken against the wrong branch — so "which branch" belongs in the same reflex
 as "which line".
 
@@ -31,13 +37,20 @@ those branches have all landed and one of them has renumbered. **Cite the branch
 until then**, and prefer the stable ruling id (`R13`, `R14`) where one exists, since R-numbers do
 not shift when a list grows.
 
+**A retracted cause is not finished until whatever rested on it has been re-derived.** _A wrong
+cause does not stay in the sentence that states it — it propagates into whatever was built to check
+the claim, and a test written against a misdiagnosed symptom is worse than none, because it reports
+green._ The instance that produced this is in **OF-1**: a mechanism claim was retracted, and the
+retraction exposed that the fix's own acceptance marker had been written against the misdiagnosed
+symptom. When you retract a cause, grep for what cites it — tests first.
+
 **`grep -c` over an `.l4` file counts comments.** `regcf-denovo.l4` matches its floor binding eight
 times outside the declaration and has seven arms; the eighth, at `:3035`, is inside prose. Drop
 lines whose first non-space characters are `--`.
 
 ---
 
-## 1. Declaration-order sensitivity in TDNR candidate resolution — ALREADY RECORDED ELSEWHERE
+## OF-1 — declaration-order sensitivity in TDNR candidate resolution. RECORDED ELSEWHERE
 
 **Do not re-record this here.** It is written up in full, with its four-line witness and its
 mechanism, in `IMPLICIT-PROPS-DESIGN.md` §11.15 on branch `props/tdnr-collapse` ("Correction to the
@@ -52,7 +65,7 @@ zero); the same overload written as two `DECIDE`s, or as `ASSUME`s in `GIVEN`/`G
 order-**in**sensitive; and it **predates section binders**, so it is not a props defect and will not
 be fixed by anything in that programme.
 
-**Entered here only so that a reader of this file is not told six findings and given five.**
+**Entered here only so that a reader of this file is not told seven findings and given six.**
 
 **And one thing worth keeping beyond the finding itself: the wrong cause had reached a test.**
 `props/assume-sweep` §11.14 originally offered `macma3.l4` as a second instance of the
@@ -71,7 +84,7 @@ check the claim, and a test written against a misdiagnosed symptom is worse than
 reports green. When a mechanism claim is retracted, the retraction is not finished until whatever
 was built on it has been re-derived.
 
-## 2. `isSectionBinderElaboration` keys on the raw name — ALREADY RECORDED ELSEWHERE
+## OF-2 — `isSectionBinderElaboration` keys on the raw name. RECORDED ELSEWHERE
 
 **Do not re-record this here either.** Same section, same branch (`props/tdnr-collapse`,
 `IMPLICIT-PROPS-DESIGN.md` §11.15, "Not fixed here, same family"), where it is written up with the
@@ -95,7 +108,7 @@ the shape the corpus sweep produces wherever a section acquires a binder while k
 
 ---
 
-## 3. `l4 batch`'s generated wrapper lands inside whatever section is open at end of file
+## OF-3 — `l4 batch`'s generated wrapper lands inside whatever section is open at end of file
 
 **Severity: loud failure, not a wrong answer. No owner. Owed upstream as an issue.**
 
@@ -155,7 +168,7 @@ fixtures. It becomes reachable the moment `props/assume-sweep` lands, which is w
 
 ---
 
-## 4. BPMN: what an exclusive gateway does with a `null` from a `businessRuleTask` — UNMEASURED
+## OF-4 — BPMN: what an exclusive gateway does with a `null` from a `businessRuleTask`. UNMEASURED
 
 **Status: an open question, not a finding. Nothing here is measured, and it is written down as
 unmeasured deliberately rather than guessed at.**
@@ -180,7 +193,7 @@ both engines, and record what each does.
 
 ---
 
-## 5. A `WHERE` local silently shadows a section `GIVEN` of the same name
+## OF-5 — a `WHERE` local silently shadows a section `GIVEN` of the same name
 
 **Severity: silent wrong answer. No defect owner; a documentation owner exists.**
 
@@ -227,7 +240,7 @@ already an error (R9, §11.13). The gap is specifically the 0-ary `WHERE` local.
 
 ---
 
-## 6. smucclaw/l4-ide#948 — fixed on `unstable`, live on `main`
+## OF-6 — smucclaw/l4-ide#948 is fixed on `unstable` and live on `main`
 
 **Status: a disagreement about state, recorded with the measurement rather than resolved by
 assertion. Nothing has been posted to the issue.**
@@ -292,14 +305,78 @@ applies depends on the base that work is cut from.
 
 ---
 
-## 7. What is owed upstream
+## OF-7 — the read-set does not cross an `IMPORT`, and neither does the supply path
+
+**Severity: a false green, then a loud failure. Ruled, not built. The ORDERING is ruled in
+`IMPLICIT-PROPS-DESIGN.md` §11.16 — the refusal first, the closure second — and this is the record
+that ruling points at.** Also listed in `PROPS-REDTEAM-2026-09-03.md` §7.
+
+**The hole, measured 2026-09-05** (probe `scratchpad/consult/adv-d5/cf5.l4` + `lib_c.l4`, run on
+`l4-base2`). `lib_c.l4` declares a section `GIVEN rate3 IS A NUMBER TYPICALLY 0.05` and a helper
+`scaled3` that reads it. `cf5.l4` imports `lib_c` and exports `top5 m MEANS scaled3 m`. Then:
+
+| command                                        | result                                                                                                                       |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `l4 batch cf5.l4 -i in5.json --validate-only`  | `{"errors":[],"input":{"m":100,"rate3":0.99},"status":"valid"}` — **a false green**                                          |
+| `l4 batch cf5.l4 -i in5.json`                  | `status: error`, "I could not continue evaluating, because I needed to know the value of `rate3` but it is an assumed term." |
+| the same with `rate3` **omitted** from the row | byte-identical error                                                                                                         |
+
+So `rate3` is neither demanded nor delivered: `--validate-only` passes an input that cannot
+evaluate, and a value supplied under that name is **accepted into the row and ignored**.
+
+**Both halves must be named, or the next person fixes the half that makes it worse.**
+
+1. **The read-set collector does not follow `IMPORT`.** Its three sites are per-module by type
+   signature: `assumesFromModule :: Module Resolved -> …` (`Export.hs:300`),
+   `decideBodiesFromModule :: Module Resolved -> …` (`Export.hs:377`, the call graph's edge table),
+   and `rewriteModuleAssumes :: … -> Module Resolved -> Module Resolved` (`Export.hs:441`). The
+   card's prior analysis said the fix is "confined to one module: `Export.hs` is the only place the
+   closure is computed"; it is one of four sites, and the fourth is not in `Export.hs` at all.
+2. **The supply path cannot deliver across an `IMPORT` even if the collector did.** `l4 batch`
+   supplies a read binder by **rewriting the module's source**: it drops the binder's declaration
+   and redefines it over the decoded row in a generated wrapper (`jl4/app/L4/Cli/Batch.hs:221-236`,
+   which explains why a `LET` would not do), then concatenates
+   `filteredSource <> wrapperCode` (`Batch.hs:340-342`). `filteredSource` is
+   `prettyLayout filteredModule`, and `prettyLayout` **re-emits the `IMPORT`** verbatim
+   (`jl4-core/src/L4/Print.hs:561-563`), so the imported module is re-resolved from disk and the
+   rewrite never reaches it.
+
+**Therefore the refusal comes first.** Closing the collector over imports, on its own, converts a
+false green into a **demanded-then-silently-ignored** parameter — the schema would require `rate3`,
+`--validate-only` would enforce it, and `Batch.hs` would still be unable to put the value where the
+callee reads it. `l4 check`/`l4 batch` must **refuse** an export whose read-set crosses an `IMPORT`
+before the closure is allowed to find one.
+
+**Exposure today: zero corpus files.** Measured 2026-09-05 over the **25 distinct module names
+appearing in an `IMPORT` line** across `jl4 jl4-core doc`: **three** of them contain an `ASSUME` at
+all — `jl4-core/libraries/daydate.l4:104`, `jl4/examples/legal/regcf/regcf.l4:143` and `:486`, and
+`jl4/experiments/thailand-cosmetics/prelude.l4:665` (`ASSUME TBD`, a vendored copy of the stdlib's)
+— and **all four lines are refusal-role**, so none of them is in the discharge population. (The
+card said "every one at `ASSUME` = 0 except regcf's two"; it missed `daydate` and the vendored
+prelude. Its conclusion is unchanged and slightly strengthened: **zero term-role `ASSUME`s live in
+an imported module today.**) Section `GIVEN` exists in only 7 files, all fixtures added by PR #333,
+and none of them is imported. (`gm-discharge` measured the same independently and recorded the same
+deferral.) **After discharge the exposed population is
+every file that imports a migrated domain module** — 664 `ASSUME` lines in 105 files become section
+binders in exactly the modules other files import, which is R0's committed cost arriving.
+
+**One sequencing disagreement with the card's prior analysis, resolved in favour of the earlier
+fix.** It proposed updating `doc/reference/syntax/section-given.md:164` "in the same PR as the fix,
+not before". That line said the crossing behaviour is "not asserted"; it is now measured. Leaving a
+known false green documented as unknown for the length of a queue is the drift the user-level
+`CLAUDE.md` rule 1 forbids, so the page is corrected in this change and says what happens today.
+
+---
+
+## Owed upstream
 
 Filed by whoever holds GitHub write authority; **nothing here has been posted**.
 
-| finding | what to file                                                                                                                |
-| ------- | --------------------------------------------------------------------------------------------------------------------------- |
-| §3      | New issue: `l4 batch`'s wrapper is scoped by the last open `§`. Witness and control are in §3 above.                        |
-| §5      | New issue: a `WHERE` local silently shadows a section `GIVEN`; ask for a warning, not an error.                             |
-| §4      | No issue yet — measure first. An issue asserting a behaviour nobody has run would be the thing this file exists to prevent. |
-| §6      | **#948: neither close nor re-open on today's evidence.** Comment the branch split if anything at all.                       |
-| §1, §2  | Nothing new — they live in `IMPLICIT-PROPS-DESIGN.md` §11.15 on `props/tdnr-collapse`.                                      |
+| finding    | what to file                                                                                                                                       |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| OF-3       | New issue: `l4 batch`'s wrapper is scoped by the last open `§`. Witness and control are in OF-3 above.                                             |
+| OF-5       | New issue: a `WHERE` local silently shadows a section `GIVEN`; ask for a warning, not an error.                                                    |
+| OF-4       | No issue yet — measure first. An issue asserting a behaviour nobody has run would be the thing this file exists to prevent.                        |
+| OF-6       | **#948: neither close nor re-open on today's evidence.** Comment the branch split if anything at all.                                              |
+| OF-7       | Nothing yet — the ruling (refusal first) is not built, and an issue before the branch exists would only restate `IMPLICIT-PROPS-DESIGN.md` §11.16. |
+| OF-1, OF-2 | Nothing new — they live in `IMPLICIT-PROPS-DESIGN.md` §11.15 on `props/tdnr-collapse`.                                                             |

@@ -236,7 +236,8 @@ nothing at all about a module that reads a name declared in one it imports. The
 repair is ruled and not yet built, and the first part of it is a **refusal** —
 `l4 check` rejecting this shape rather than accepting it quietly — not a wider
 search. Recorded as a defect in
-`specs/todo/PROPS-REDTEAM-2026-09-03.md` §7 and ruled in
+`specs/todo/OPEN-FINDINGS-2026-09-05.md` as **OF-7** (and listed in
+`specs/todo/PROPS-REDTEAM-2026-09-03.md` §7); the ordering of the repair is ruled in
 `specs/todo/IMPLICIT-PROPS-DESIGN.md` §11.16.
 
 ## Example

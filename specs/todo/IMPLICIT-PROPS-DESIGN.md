@@ -470,8 +470,10 @@ rulings are closed; what remains is implementation in the order of `PROPS-REDTEA
 **Added 2026-09-05, from a second rulings sheet Meng marked that day.** Four further rulings sit
 below and are **not** part of the 2026-09-04 red team: **R7 is amended** by §11.9.1 (the DMN image
 of a refusal), **R7.1** is added by §11.9.2 (the pre-commencement gate), and **R13** and **R14**
-are added by §11.14 and §11.15 (§5.3 discharged, §4.3 and §8 Q8 withdrawn), with the cross-`IMPORT`
-hole filed as a defect in §11.16. **Every one of the four authorises work that has not been done**;
+are added by §11.14 and §11.15 (§5.3 discharged, §4.3 and §8 Q8 withdrawn), and §11.16 rules the
+ORDER in which the cross-`IMPORT` hole is repaired — the refusal before the closure — while the
+defect record itself lives at `OPEN-FINDINGS-2026-09-05.md` **OF-7**, because it spans `Export.hs`,
+`Batch.hs` and `Print.hs` and needs an id that does not move when this section list grows. **Every one of the four authorises work that has not been done**;
 each says so in its own status line and names what would make it true.
 
 ### 11.1 R0 — `ASSUME` is deprecated. RULED 2026-09-04.
@@ -1590,64 +1592,21 @@ proposal against a read-set that by then exists, not a resumption of this one.
 
 ---
 
-### 11.18 The cross-`IMPORT` hole, filed as a defect. RECORDED 2026-09-05.
+### 11.18 The cross-`IMPORT` hole. RULING here; the defect record is OF-7.
 
-Ruled with R13/R14 (card `D5-computed-fields-purity`, option A′): the measurement pass that
-discharged §5.3 turned up a hole, and it is filed as a defect in
-`PROPS-REDTEAM-2026-09-03.md` §7 rather than silently absorbed. **Its first required move is the
-refusal, not the closure**, and that ordering is the ruling — not a preference.
+**Ruling (with R13/R14, card `D5-computed-fields-purity`, option A′).** The measurement pass that
+discharged §5.3 turned up a hole, and it is **filed as a defect rather than silently absorbed**.
+What is ruled here is the **ordering, not a preference: the first required move is the REFUSAL, not
+the closure.** `l4 check`/`l4 batch` must refuse an export whose read-set crosses an `IMPORT` before
+the closure is allowed to find one — because closing the collector over imports on its own converts
+a false green into a **demanded-then-silently-ignored** parameter, which is worse than the state it
+replaces.
 
-**The hole, measured 2026-09-05** (probe `scratchpad/consult/adv-d5/cf5.l4` + `lib_c.l4`, run on
-`l4-base2`). `lib_c.l4` declares a section `GIVEN rate3 IS A NUMBER TYPICALLY 0.05` and a helper
-`scaled3` that reads it. `cf5.l4` imports `lib_c` and exports `top5 m MEANS scaled3 m`. Then:
+**Ruled 2026-09-05; not built.**
 
-| command                                        | result                                                                                                                       |
-| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `l4 batch cf5.l4 -i in5.json --validate-only`  | `{"errors":[],"input":{"m":100,"rate3":0.99},"status":"valid"}` — **a false green**                                          |
-| `l4 batch cf5.l4 -i in5.json`                  | `status: error`, "I could not continue evaluating, because I needed to know the value of `rate3` but it is an assumed term." |
-| the same with `rate3` **omitted** from the row | byte-identical error                                                                                                         |
-
-So `rate3` is neither demanded nor delivered: `--validate-only` passes an input that cannot
-evaluate, and a value supplied under that name is **accepted into the row and ignored**.
-
-**Both halves must be named, or the next person fixes the half that makes it worse.**
-
-1. **The read-set collector does not follow `IMPORT`.** Its three sites are per-module by type
-   signature: `assumesFromModule :: Module Resolved -> …` (`Export.hs:300`),
-   `decideBodiesFromModule :: Module Resolved -> …` (`Export.hs:377`, the call graph's edge table),
-   and `rewriteModuleAssumes :: … -> Module Resolved -> Module Resolved` (`Export.hs:441`). The
-   card's prior analysis said the fix is "confined to one module: `Export.hs` is the only place the
-   closure is computed"; it is one of four sites, and the fourth is not in `Export.hs` at all.
-2. **The supply path cannot deliver across an `IMPORT` even if the collector did.** `l4 batch`
-   supplies a read binder by **rewriting the module's source**: it drops the binder's declaration
-   and redefines it over the decoded row in a generated wrapper (`jl4/app/L4/Cli/Batch.hs:221-236`,
-   which explains why a `LET` would not do), then concatenates
-   `filteredSource <> wrapperCode` (`Batch.hs:340-342`). `filteredSource` is
-   `prettyLayout filteredModule`, and `prettyLayout` **re-emits the `IMPORT`** verbatim
-   (`jl4-core/src/L4/Print.hs:561-563`), so the imported module is re-resolved from disk and the
-   rewrite never reaches it.
-
-**Therefore the refusal comes first.** Closing the collector over imports, on its own, converts a
-false green into a **demanded-then-silently-ignored** parameter — the schema would require `rate3`,
-`--validate-only` would enforce it, and `Batch.hs` would still be unable to put the value where the
-callee reads it. `l4 check`/`l4 batch` must **refuse** an export whose read-set crosses an `IMPORT`
-before the closure is allowed to find one.
-
-**Exposure today: zero corpus files.** Measured 2026-09-05 over the **25 distinct module names
-appearing in an `IMPORT` line** across `jl4 jl4-core doc`: **three** of them contain an `ASSUME` at
-all — `jl4-core/libraries/daydate.l4:104`, `jl4/examples/legal/regcf/regcf.l4:143` and `:486`, and
-`jl4/experiments/thailand-cosmetics/prelude.l4:665` (`ASSUME TBD`, a vendored copy of the stdlib's)
-— and **all four lines are refusal-role**, so none of them is in the discharge population. (The
-card said "every one at `ASSUME` = 0 except regcf's two"; it missed `daydate` and the vendored
-prelude. Its conclusion is unchanged and slightly strengthened: **zero term-role `ASSUME`s live in
-an imported module today.**) Section `GIVEN` exists in only 7 files, all fixtures added by PR #333,
-and none of them is imported. (`gm-discharge` measured the same independently and recorded the same
-deferral.) **After discharge the exposed population is
-every file that imports a migrated domain module** — 664 `ASSUME` lines in 105 files become section
-binders in exactly the modules other files import, which is R0's committed cost arriving.
-
-**One sequencing disagreement with the card's prior analysis, resolved in favour of the earlier
-fix.** It proposed updating `doc/reference/syntax/section-given.md:164` "in the same PR as the fix,
-not before". That line said the crossing behaviour is "not asserted"; it is now measured. Leaving a
-known false green documented as unknown for the length of a queue is the drift the user-level
-`CLAUDE.md` rule 1 forbids, so the page is corrected in this change and says what happens today.
+**The defect record — mechanism, probe, both halves, exposure — is
+[`OPEN-FINDINGS-2026-09-05.md` OF-7](./OPEN-FINDINGS-2026-09-05.md), not this section.** It was
+moved there 2026-09-05 because a defect that spans `Export.hs`, `Batch.hs` and `Print.hs` was never
+a props-spec section, and because `OF-7` is a stable id while a §11 number is not: three branches
+appended to §11 on one day and collided. **Cite `OF-7` for the defect and §11.16 for the ruling.**
+Also recorded in `PROPS-REDTEAM-2026-09-03.md` §7.
