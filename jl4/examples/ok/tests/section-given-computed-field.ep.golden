@@ -1,0 +1,35 @@
+-- A COMPUTED field whose body reads a section binder.
+--
+-- The evaluator desugars `x's tax` to an application of the field's selector,
+-- which is an ordinary module-level definition; so a computed field that reads
+-- a binder is discharged exactly like any other rule, and the projection site
+-- has to grow the same arguments a call site does.
+--
+-- This is a separate code path from the plain call in
+-- ok/section-given-discharge.l4 (`Proj` rather than `App`/`Var`), which is why
+-- it has a file of its own.
+
+§ `Rates`
+    GIVEN `the rate` IS A NUMBER TYPICALLY 0.05
+
+DECLARE Sale
+    HAS amount IS A NUMBER
+        tax    IS A NUMBER MEANS amount TIMES `the rate`
+
+GIVETH A NUMBER
+`tax of the sample sale` MEANS (Sale WITH amount IS 100)'s tax
+
+-- Supplied at the call: the value reaches the field's own body.
+#EVAL `tax of the sample sale` WITH `the rate` IS 0.07
+
+-- Nothing supplied: the binder's TYPICALLY is filled in at the root, and the
+-- computed field sees it.
+#EVAL `tax of the sample sale`
+
+-- `WITH` attaches to a NAME, not to an arbitrary expression, so a projection
+-- cannot carry one directly: `(Sale WITH amount IS 200)'s tax WITH ...` is a
+-- parse error ("unexpected WITH"). Supply the binder at a rule that wraps the
+-- projection, as `tax of the sample sale` does above.
+
+#ASSERT (`tax of the sample sale` WITH `the rate` IS 0.07) EQUALS 7
+#ASSERT `tax of the sample sale` EQUALS 5
