@@ -534,15 +534,15 @@ The temporal design's generated "not in force on <day>" arm
 the split row below; D6 (2026-09-05) rules that gate to be a property of the rule-version axis, and
 `IMPLICIT-PROPS-DESIGN.md` §11.9.3 records why its proposed DMN half was not built alongside D1's.
 
-| non-answer                               | construct              | who handles it                                   | catchable       |
-| ---------------------------------------- | ---------------------- | ------------------------------------------------ | --------------- |
-| a value that may be absent               | `MAYBE`                | the rule, by matching                            | yes, as a value |
-| an expected failure with a reason        | `EITHER`               | the rule or its caller                           | yes, as a value |
-| a fact not yet known                     | an unsupplied binder   | the boundary asks                                | n/a             |
-| the law does not apply / is not in force | a gate (D6, §11.9.3)   | savings and transitional provisions can reach it | yes             |
-| the model does not cover this            | `REFUSE`               | the boundary only                                | no              |
-| a breach                                 | `LEST`                 | the obligation's own branch                      | structured      |
-| an overridden conclusion                 | `SUBJECT TO`           | the overriding rule                              | structured      |
+| non-answer                               | construct            | who handles it                                   | catchable       |
+| ---------------------------------------- | -------------------- | ------------------------------------------------ | --------------- |
+| a value that may be absent               | `MAYBE`              | the rule, by matching                            | yes, as a value |
+| an expected failure with a reason        | `EITHER`             | the rule or its caller                           | yes, as a value |
+| a fact not yet known                     | an unsupplied binder | the boundary asks                                | n/a             |
+| the law does not apply / is not in force | a gate (D6, §11.9.3) | savings and transitional provisions can reach it | yes             |
+| the model does not cover this            | `REFUSE`             | the boundary only                                | no              |
+| a breach                                 | `LEST`               | the obligation's own branch                      | structured      |
+| an overridden conclusion                 | `SUBJECT TO`         | the overriding rule                              | structured      |
 
 The fourth row was split from the fifth on the legal lens's finding: pre-commencement is
 determinate and reachable by savings provisions (SG Interpretation Act 1965 s 16(1)(b)–(c)), and a

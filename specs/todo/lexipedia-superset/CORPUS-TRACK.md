@@ -1460,12 +1460,12 @@ changed the shape of the fourth; the reasoning is kept so the decision is audita
   its shape is now ruled. D6 also proposed omitting the floor row in DMN as its first half; that
   was **measured and not built**, and §11.9.3 records the numbers and the reason.
 
-
   _One site does **not** migrate with them, folded in from the rulings branch 2026-09-05._
   `regcf-denovo.l4:211`'s floor says "no encoding of Part 227 exists for rule dates before
   2022-09-20" — the _encoding_ has no sources for that period, not that the law was not in
   force. That is the `REFUSE` row of R7's taxonomy, not the gate row, even though it is
   guarded on a rule date. The migration classifies per site; it does not sweep.
+
 - **R3 — Do C0's 55 existing assertions get pinned? — RESOLVED 2026-07-29: pin none,
   document the dependency.** The 55 assertions state the _current_ law and stay unpinned;
   the dependency on the harness clock (`jl4/tests/Main.hs:64-66`, fixed `2025-01-31`, which
