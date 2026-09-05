@@ -7,6 +7,9 @@
 > typechecking cost ([smucclaw/l4-ide#929](https://github.com/smucclaw/l4-ide/issues/929)).
 > Phase 4 (the lint) remains unbuilt. Earlier sections are retained unrenumbered because code and
 > goldens cite them; read §D4, §5, §6 Phase 2, §9.5, and §10.5 together with §16.
+> **§18 (added 2026-09-05) carries the rulings.** §18.1 rules `NOT`'s reach — layout scope kept,
+> single-line form refused — and **corrects §0's rung-2 remedy**, which named a fix this language
+> does not use. §18.1 is RULED and NOT BUILT.
 > **Seed:** [`specs/roadmap/future-features.md:17`](../roadmap/future-features.md) — _"Set-theoretic syntax for UNION and INTERSECT. Sometimes set-and means logical-or."_
 > That one-liner is the whole of the prior writing on this topic. This spec expands it.
 
@@ -18,11 +21,22 @@ nobody needs a semantics lecture to feel the problem.
 
 Its value here is **as a foil, not as an analogy** — and getting that right is the whole point.
 
-| Rung | Case                                        | What is in dispute                                                                     | Disease                                | Fix                                      |
-| ---- | ------------------------------------------- | -------------------------------------------------------------------------------------- | -------------------------------------- | ---------------------------------------- |
-| 1    | `8÷2(2+2)` — 1 vs 16                        | **How the tokens bind.** Nobody disputes what `÷` and `×` _mean_.                      | **Syntactic**                          | Declared precedence; parentheses.        |
-| 2    | _Pulsifer_ — `¬(A∧B∧C)` vs `(¬A)∧(¬B)∧(¬C)` | **Scope of the negation.** Operators still classical.                                  | **Syntactic** (same disease as rung 1) | Declared precedence; parentheses.        |
-| 3    | "residents of NY and NJ"                    | **What `and` _denotes_** — Boolean meet, or lattice join. The parse is not in dispute. | **Semantic**                           | Types + a lint. Parentheses cannot help. |
+| Rung | Case                                        | What is in dispute                                                                     | Disease                                | Fix                                                                                                                                                                                                           |
+| ---- | ------------------------------------------- | -------------------------------------------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | `8÷2(2+2)` — 1 vs 16                        | **How the tokens bind.** Nobody disputes what `÷` and `×` _mean_.                      | **Syntactic**                          | Declared precedence; parentheses.                                                                                                                                                                             |
+| 2    | _Pulsifer_ — `¬(A∧B∧C)` vs `(¬A)∧(¬B)∧(¬C)` | **Scope of the negation.** Operators still classical.                                  | **Syntactic** (same disease as rung 1) | ~~Declared precedence; parentheses.~~ **Corrected 2026-09-05 — see §18.1:** a **layout scope plus a refusal**. In L4 `NOT`'s reach is set by indentation, and parenthesising the operand does **not** fix it. |
+| 3    | "residents of NY and NJ"                    | **What `and` _denotes_** — Boolean meet, or lattice join. The parse is not in dispute. | **Semantic**                           | Types + a lint. Parentheses cannot help.                                                                                                                                                                      |
+
+> **The rung-2 remedy is corrected, 2026-09-05 (§18.1).** The row above used to say the fix for a
+> scope-of-negation dispute is "declared precedence; parentheses". That is the textbook answer, and
+> it is not L4's. L4's `NOT` is **layout-scoped, not precedence-ranked** — a connective at a column
+> less than or equal to the `NOT`'s terminates its operand, a strictly deeper one is swallowed, a
+> single line always swallows, and **parenthesising the operand does not help** (`NOT (x) AND y`
+> still means `NOT (x AND y)`; only `(NOT x) AND y` is safe). The ruling therefore does not declare
+> a precedence: it keeps the layout scope, which the corpus uses deliberately for negation over a
+> group, and **refuses the one-line spelling** that reads like the textbook answer and is not. Both
+> halves of the old remedy were wrong for this language, and the parenthesis half was the more
+> dangerous, because it is what a careful programmer reaches for first.
 
 The rhetorical move: _"You might think law's and/or problem is just PEMDAS with higher stakes.
 It is — right up until it isn't."_ The reader arrives already conceding that notation can fail to
@@ -2160,6 +2174,149 @@ sentence that carries no meaning.
 ---
 
 ## 18. Rulings
+
+### 18.1 R-NOT-1 — `NOT`'s reach is a layout scope, and the single-line form is refused. RULED 2026-09-05.
+
+**Ruling (Meng, 2026-09-05, mark `accept` on rulings-bench card `D4-not-precedence`).** Option B,
+**with option C's corpus fixes, doc corrections and CI wiring landed first, as a separate,
+immediately-mergeable PR.**
+
+- **`NOT`'s precedence is NOT flipped.** The proposal to make `NOT` bind tighter than `AND`/`OR`
+  (upstream smucclaw/l4-ide#943, and what three shipped documents already claim) is **declined**.
+- **`NOT … ⟨connective⟩ …` on a SINGLE LINE becomes a check error.** That is the one spelling that
+  is silently wrong, and refusing it costs no meaning: the sites that use it are wrong today.
+- **The layout-scoped `NOT` the corpus deliberately uses for negation over a group is kept**, and
+  the boundary rule is written down here so the next reader does not re-derive it from a linter
+  that cannot see half the cases.
+
+**The boundary rule, measured 2026-09-05, verbatim.** `NOT`'s operand is **layout-scoped, not
+precedence-ranked**:
+
+- a connective at a column **less than or equal to** the `NOT`'s **terminates** the operand;
+- a connective at a column **strictly deeper** than the `NOT`'s is **swallowed** into the operand;
+- **a single line always swallows** — `NOT x AND y` means `NOT (x AND y)`;
+- **parenthesising the operand does not help** — `NOT (x) AND y` also means `NOT (x AND y)`;
+- the only safe form is to parenthesise the **negation**: `(NOT x) AND y`.
+
+Probed on the `l4-base2` binary, one `MEANS` per row, `TRUE`/`FALSE` operands so the two readings
+differ:
+
+| written                                  | `NOT` col | connective col | answer  | reading            |
+| ---------------------------------------- | --------- | -------------- | ------- | ------------------ |
+| `NOT TRUE` ⏎ `AND FALSE` (both at col 5) | 5         | 5              | `FALSE` | `(NOT TRUE) AND …` |
+| `NOT TRUE` ⏎ `····AND FALSE`             | 5         | 9              | `TRUE`  | `NOT (TRUE AND …)` |
+| `NOT TRUE AND FALSE` on one line         | —         | —              | `TRUE`  | `NOT (TRUE AND …)` |
+| `NOT (TRUE) AND FALSE` on one line       | —         | —              | `TRUE`  | `NOT (TRUE AND …)` |
+| `····NOT TRUE` ⏎ `AND FALSE`             | 9         | 5              | `FALSE` | `(NOT TRUE) AND …` |
+| `(NOT TRUE) AND FALSE`                   | —         | —              | `FALSE` | the safe form      |
+
+**Status: ruled 2026-09-05; NOT BUILT.** Nothing in the parser rejects the single-line form today,
+and none of option C's prerequisites has landed. What would make this ruling true, **in this
+order**:
+
+1. **First PR (option C, immediately mergeable, no language change).** Fix the ten same-line sites
+   in l4-ide (below); correct the three documents that state the opposite of the implementation;
+   amend the header of `etc/check-not-precedence.mjs`, which asserts the loose reading as a
+   _precedence_ rather than a layout scope; and **wire that checker into
+   `.github/workflows/pr-checks.yml`** — measured 2026-09-05, `check-not-precedence` appears in no
+   workflow file and in no `package.json` script, so today it protects nothing.
+2. **Second PR (option B, the language change).** `NOT` followed by a connective on the same
+   physical line is a check error, with a message that names the safe form.
+
+**What decided it.** One sentence: **option A converts eleven loud-once-you-look wrong answers into
+eight silent ones, which is the trade this project's rules exist to refuse.** Flipping the
+precedence would re-mean every layout-scoped `NOT` in the corpus — and those sites are not
+mistakes; they are the construction the corpus uses on purpose, one of them a decision literally
+named `perm3 — negation over a group`.
+
+**The counts, re-measured 2026-09-05.**
+
+- **Same-line sites, which are wrong today.** The shipped linter
+  (`node etc/check-not-precedence.mjs --dir .`) reports **12 findings across 11 files** in l4-ide.
+  **Two are false positives** — `paper/case-studies/charities-jersey-2014/part-5-governors.l4:945`
+  and `:955`, where the " AND " the linter matched is inside a backticked identifier
+  (`` `Article 18(4)(d) — the governor knew (or should have) AND concealed …` ``); it is a text
+  linter, not a parser. That leaves **10 real sites**: 8 under `jl4/`
+  (`ok/xor.l4:7`, `ok/ref.l4:16`, `lsp/semantic-tokens/annotations.l4:8`,
+  `tests-cli/fixtures/clean.l4:7`, `tests-cli/fixtures/verify-clean.l4:13`,
+  `experiments/query-planner-tests/03-dont-care-branch.l4:15`,
+  `experiments/query-planner-tests/06-reactive-relevance.l4:35`,
+  `legal/sg-succession/cleanroom-2026-08/probate-administration-act.l4:1915`) and **2 under
+  `doc/`** (`reference/operators/implies-example.l4:23`, `reference/operators/not-example.l4:43`).
+  Five of the ten are the same five-line XOR snippet. Canon adds **one** finding, at
+  `subjects/sg/succession/encodings/cleanroom-2026-08/probate-administration-act.l4:1915` — the
+  **byte-identical mirror** of the jl4 file (md5 `faa13c08…` on both), so it is one site counted
+  twice, not two.
+- **Continuation sites the linter can NEVER report — and the count is NOT established.** The
+  shipped linter reports **zero** of them: it "errs toward silence" by its own header, because it
+  cannot see through a line continuation. The card counted **8 in 7 files** (`ok/logic.l4` ×2,
+  `ok/inert/grounding-variants.l4`, `ok/rodentsAndVermin.l4`,
+  `docassemble/rodents-and-vermin.l4`, `experiments/classic/vermin_and_rodent.l4`,
+  `experiments/jerseyAlcohol.l4`, `experiments/seatbelt.l4`) and reported that all eight intend the
+  current reading, with one golden that would move under option A
+  (`rodentsAndVermin.golden`, value `FALSE`). **Spot-checked and confirmed 2026-09-05** on
+  `ok/inert/grounding-variants.l4:136-138`, `ok/logic.l4:52-53`, `ok/rodentsAndVermin.l4:20-22`,
+  `experiments/jerseyAlcohol.l4:19-20` and `experiments/seatbelt.l4:14-15`: every one is negation
+  over a group, written on purpose, and one of them sits under a decision literally named
+  `` `perm3 — negation over a group` `` (`grounding-variants.l4:135`).
+
+  **But the exact figure is not settled, and a text scan cannot settle it.** A regex sweep for
+  "`NOT` on one line, connective strictly deeper on the next" over `jl4 jl4-core doc paper` plus
+  canon returns 27 candidates, and inspection shows it **over-counts**, for two reasons that a
+  linter has no way to tell apart:
+
+  - the `NOT`'s operand may already be **closed by a parenthesis**, in which case the deeper
+    connective binds outside it and the site is safe — `sg-succession.l4:127-129`,
+    `IF (NOT (…))` ⏎ `AND (NOT (…))`;
+  - the connectives may be **inside** a parenthesised operand on purpose —
+    `blawx/alcohol.l4:172-174`, `AND NOT (` ⏎ `AND …` ⏎ `AND …)`.
+
+  So the honest statement is: the linter's number is a floor, the card's 8-in-7 is a hand-verified
+  sample, and **a real census needs the parser**, not a text scan. That census is owed by the first
+  PR, because it is also what tells us whether the refusal in step 2 has a hidden cost.
+
+- **Denominator:** 4097 `NOT` tokens (2589 l4-ide + 1508 canon) across 261 `.l4` files;
+  `jl4-core/libraries` is clean across 22 files.
+
+**Documents that state the opposite of the implementation, today.** Each is false, not merely
+incomplete, and each is repaired by the first PR:
+
+| site                                                      | what it says                                                  |
+| --------------------------------------------------------- | ------------------------------------------------------------- |
+| `doc/reference/operators/NOT.md:45`                       | "NOT binds tighter than AND and OR"                           |
+| `doc/reference/operators/README.md` precedence list       | ranks unary `NOT` at position 2, above `AND` and `OR`         |
+| `doc/courses/foundation/module-3-control-flow.md:157-166` | "`NOT a AND b` — means: `(NOT a) AND b`"                      |
+| `doc/reference/operators/not-example.l4:42-43`            | `-- NOT binds tighter than AND` over a **live** `NOT a AND b` |
+
+The fourth was not on the card's list. It matters more than the other three: it is a shipped,
+type-checked `.l4` example under `doc/`, so the comment and the code it comments disagree in a file
+`doc/test-docs.sh` runs. **The precedence table must stop listing unary `NOT` as a rank at all** —
+there is no rank to state; there is a layout scope.
+
+**Two corrections to the card, both measured.**
+
+1. The card asked to "correct the stale comment at `jl4/tests-cli/Main.hs:2761`". **There is no such
+   comment.** `grep -n 'NOT binds\|binds tighter\|binds looser\|precedence' jl4/tests-cli/Main.hs`
+   returns nothing, and `:2761` is inside an unrelated `verify --help` test. The comment that does
+   exist is at `jl4/tests-cli/fixtures/verify-dead-branch.l4:10`, and it is **correct**: "the inner
+   parentheses around `NOT x` are load-bearing: NOT binds LOOSER than OR here". It needs no repair,
+   only the word "looser" reading as shorthand for the layout rule above.
+2. The card's "11 same-line" is right as a total but is 10 distinct sites plus one mirror; and the
+   12th and 13th raw hits are the two backticked-identifier false positives named above, which the
+   first PR should teach the linter to skip rather than "fix" in the corpus.
+
+**Kept separate from smucclaw/l4-ide#910 on purpose.** `#910` is `AND`-tighter-than-`OR`, which is
+conventional and a style nit. This is a correctness trap. Giving them one colour teaches a reader to
+dismiss both. Owed as comments (not written by the author of this change, which has no GitHub write
+authority): close smucclaw/l4-ide#943 by hand per `CLAUDE.md` §1.1 when the second PR lands, and
+say on #910 why the two are not merged.
+
+**Coordination note, 2026-09-05.** `gm-assume-sweep` reports having already repaired
+`doc/reference/operators/NOT.md`'s prose on branch `props/assume-sweep`, for a different reason (a
+page disagreeing with its own linked example). Whoever writes the first PR above must read that
+branch before touching `NOT.md`, `not-example.l4` or `implies-example.l4`.
+
+---
 
 ### 18.2 R-NOT-1, step 1 of 2: option C is BUILT. 2026-09-05.
 
