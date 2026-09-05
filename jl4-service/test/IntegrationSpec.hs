@@ -43,7 +43,7 @@ import System.Directory (removeDirectoryRecursive, doesDirectoryExist, doesFileE
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -73,6 +73,38 @@ spec = describe "integration" do
             ])
         assertSuccess resp \r ->
           Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool False)
+
+    -- REFUSE (R7): the model declined to answer. It must reach the caller as
+    -- a refusal, NOT as an 'InterpreterError' — that reads as a server fault,
+    -- and it is exactly the conflation REFUSE exists to prevent. The answering
+    -- input in the twin test proves the refusal is the input's doing and not a
+    -- broken deployment.
+    it "reports a REFUSE as a refusal, not as an interpreter error" do
+      withServiceFromSources "refuse-eval" [("fee.l4", refuseJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "refuse-eval" "fee"
+          (Aeson.object [ "arguments" Aeson..= Aeson.object [ "y" Aeson..= (1999 :: Int) ] ])
+        case Aeson.decode (responseBody resp) :: Maybe SimpleResponse of
+          Just (SimpleError e@(EvaluatorRefused _)) ->
+            prettyEvaluatorError e `shouldBe`
+              "The model refuses to answer: this schedule is not encoded for years before 2000"
+          other -> expectationFailure ("Expected a refusal error, got: " <> show other)
+        -- And the distinction is MACHINE-readable on the wire, not merely
+        -- legible in the prose: 'EvaluatorError''s derived encoding tags the
+        -- constructor, so a consumer separates refused from error by reading
+        -- contents.tag rather than by string-matching the message prefix.
+        let constructorTag = case Aeson.decode (responseBody resp) :: Maybe Aeson.Value of
+              Just (Aeson.Object o)
+                | Just (Aeson.Object c) <- Aeson.KeyMap.lookup "contents" o ->
+                    Aeson.KeyMap.lookup "tag" c
+              _ -> Nothing
+        constructorTag `shouldBe` Just (Aeson.String "EvaluatorRefused")
+
+    it "answers normally for an input the same function does cover" do
+      withServiceFromSources "refuse-eval-ok" [("fee.l4", refuseJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "refuse-eval-ok" "fee"
+          (Aeson.object [ "arguments" Aeson..= Aeson.object [ "y" Aeson..= (2001 :: Int) ] ])
+        assertSuccess resp \r ->
+          Map.lookup "value" r.fnResult `shouldBe` Just (FnLitInt 100)
 
     it "promotes referenced ASSUMEs to parameters on @export (true case)" do
       -- Verifies the direct-AST path binds module-level ASSUMEs from the

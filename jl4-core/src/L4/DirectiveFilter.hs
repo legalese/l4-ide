@@ -37,4 +37,5 @@ isIdeDirective = \case
   LazyEvalTrace{} -> True   -- #EVALTRACE
   Check{}         -> True   -- #CHECK
   Assert{}        -> True   -- #ASSERT
+  AssertRefused{} -> True   -- #ASSERT REFUSED
   Contract{}      -> False  -- Keep #CONTRACT

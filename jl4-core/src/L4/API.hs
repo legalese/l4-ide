@@ -46,7 +46,7 @@ import L4.Syntax (Info(..), Type'(..), Resolved, OptionallyNamedType(..), TopDec
 import L4.Annotation (emptyAnno)
 import qualified L4.Utils.IntervalMap as IV
 import qualified L4.EvaluateLazy as EL
-import L4.EvaluateLazy.Machine (prettyEvalException)
+import L4.EvaluateLazy.Machine (prettyEvalException, prettyRefusal)
 
 import L4.TracePolicy (lspDefaultPolicy)
 import L4.EvaluateLazy.GraphVizOptions (defaultGraphVizOptions)
@@ -307,14 +307,23 @@ l4EvalDirective source line col directiveType =
             [ "directiveType" .= directiveType
             , "prettyText" .= prettyEvalResult conFields res
             , "success" .= case res of
-                EL.Assertion (Right b) -> Aeson.toJSON b
-                EL.Assertion (Left _)  -> Aeson.toJSON False
+                EL.Assertion EL.Holds            -> Aeson.toJSON True
+                EL.Assertion EL.Fails            -> Aeson.toJSON False
+                EL.Assertion (EL.FailsBecause _) -> Aeson.toJSON False
+                -- NOT False: a refusal is not a negative verdict. Reporting it
+                -- as one is exactly the laundering REFUSE exists to prevent.
+                EL.Assertion (EL.Refused _)      -> Aeson.Null
+                EL.Assertion (EL.Errored _)      -> Aeson.toJSON False
                 EL.Reduction _ -> Aeson.Null
             , "structuredValue" .= case res of
-                EL.Assertion (Right b) -> Aeson.toJSON b
-                EL.Assertion (Left _)  -> Aeson.Null
-                EL.Reduction (Left _) -> Aeson.Null
-                EL.Reduction (Right nf) -> Aeson.toJSON (prettyLayoutNF conFields nf)
+                EL.Assertion EL.Holds               -> Aeson.toJSON True
+                EL.Assertion EL.Fails               -> Aeson.toJSON False
+                EL.Assertion (EL.FailsBecause _)    -> Aeson.toJSON False
+                EL.Assertion (EL.Refused _)         -> Aeson.Null
+                EL.Assertion (EL.Errored _)         -> Aeson.Null
+                EL.Reduction (EL.ReducedErrored _)  -> Aeson.Null
+                EL.Reduction (EL.ReducedRefused _)  -> Aeson.Null
+                EL.Reduction (EL.Reduced nf)        -> Aeson.toJSON (prettyLayoutNF conFields nf)
             , "range" .= rangeJson
             ]
 
@@ -535,16 +544,32 @@ evalResultToJson fields edr = Aeson.object $
     Nothing -> []
     Just r -> ["range" .= rangeToJson r]
   where
-    isSuccess (EL.Assertion (Right b)) = b
-    isSuccess (EL.Assertion (Left _)) = False
-    isSuccess (EL.Reduction (Right _)) = True
-    isSuccess (EL.Reduction (Left _)) = False
+    -- "success" is a NULLABLE boolean, and a refusal is the null. Saying
+    -- @false@ would tell a consumer the assertion FAILED, which is a laundered
+    -- answer: the program declined to answer, so there is no verdict to report.
+    -- 'LSP.L4.Inspector' makes the same call ('Refused _ -> Nothing'), and the
+    -- webview already types the field @boolean | null@ and renders null as
+    -- neither success nor failure (ts-apps/webview/.../inspector-panel.svelte).
+    -- The reason itself is in "result", via 'prettyAssertionOutcome'.
+    --
+    -- 'Errored' keeps its historical @false@: widening that is a separate
+    -- decision about errors, not about refusals, and is not made here.
+    isSuccess :: EL.EvalDirectiveValue -> Aeson.Value
+    isSuccess (EL.Assertion EL.Holds) = Aeson.Bool True
+    isSuccess (EL.Assertion EL.Fails) = Aeson.Bool False
+    isSuccess (EL.Assertion (EL.FailsBecause _)) = Aeson.Bool False
+    isSuccess (EL.Assertion (EL.Refused _)) = Aeson.Null
+    isSuccess (EL.Assertion (EL.Errored _)) = Aeson.Bool False
+    isSuccess (EL.Reduction (EL.Reduced _)) = Aeson.Bool True
+    isSuccess (EL.Reduction (EL.ReducedRefused _)) = Aeson.Null
+    isSuccess (EL.Reduction (EL.ReducedErrored _)) = Aeson.Bool False
 
 -- | Pretty print an evaluation directive result value.
 prettyEvalResult :: ConstructorFieldNames -> EL.EvalDirectiveValue -> Text
-prettyEvalResult _fields (EL.Assertion a)          = EL.prettyAssertionOutcome a
-prettyEvalResult _fields (EL.Reduction (Left exc)) = Text.unlines (prettyEvalException exc)
-prettyEvalResult fields  (EL.Reduction (Right v))  = prettyLayoutNF fields v
+prettyEvalResult _fields (EL.Assertion a)                    = EL.prettyAssertionOutcome a
+prettyEvalResult _fields (EL.Reduction (EL.ReducedErrored e)) = Text.unlines (prettyEvalException e)
+prettyEvalResult _fields (EL.Reduction (EL.ReducedRefused r)) = Text.unlines (prettyRefusal r)
+prettyEvalResult fields  (EL.Reduction (EL.Reduced v))        = prettyLayoutNF fields v
 
 -- | Generate ladder diagram visualization data for a specific DECIDE rule by name.
 --
@@ -649,6 +674,7 @@ l4CodeLenses source uriText version =
       Check{}         -> "#CHECK"
       Contract{}      -> "#CHECK"
       Assert{}        -> "#ASSERT"
+      AssertRefused{} -> "#ASSERT REFUSED"
 
     directiveToCodeLens :: Text -> Int -> TopDecl Resolved -> [Aeson.Value]
     directiveToCodeLens uriTxt ver = \case

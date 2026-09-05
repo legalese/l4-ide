@@ -269,6 +269,10 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Directive n) where
     Assert ann e -> do
       e' <- addNlg e
       pure $ Assert ann e'
+    AssertRefused ann e mmsg -> do
+      e' <- addNlg e
+      mmsg' <- traverse addNlg mmsg
+      pure $ AssertRefused ann e' mmsg'
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Event n) where
   addNlg a@(MkEvent ann party act timestamp atFirst) = extendNlgA a do
@@ -542,6 +546,7 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Expr n) where
       mParty' <- traverse addNlg mParty
       mReason' <- traverse addNlg mReason
       pure $ Breach ann mParty' mReason'
+    Refuse ann msg -> Refuse ann <$> addNlg msg
     Inert ann txt ctx -> pure $ Inert ann txt ctx
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Deonton n) where
@@ -667,6 +672,7 @@ instance HasDesc (Directive n) where
     Check ann e -> Check ann <$> addDesc e
     Contract ann e t evs -> Contract ann <$> addDesc e <*> addDesc t <*> traverse addDesc evs
     Assert ann e -> Assert ann <$> addDesc e
+    AssertRefused ann e mmsg -> AssertRefused ann <$> addDesc e <*> traverse addDesc mmsg
 
 instance HasDesc (Import n) where
   addDesc a = pure a
@@ -787,6 +793,7 @@ instance HasDesc (Expr n) where
     Concat     ann es    -> Concat     ann <$> traverse addDesc es
     AsString   ann e     -> AsString   ann <$> addDesc e
     Breach     ann mp mr -> Breach     ann <$> traverse addDesc mp <*> traverse addDesc mr
+    Refuse     ann msg   -> Refuse     ann <$> addDesc msg
     Inert      ann t c   -> pure (Inert ann t c)
 
 instance HasDesc (GuardedExpr n) where
@@ -1255,6 +1262,8 @@ instance (HasSrcRange n, HasRef n) => HasRef (Directive n) where
     Contract ann e t evs -> attachRef a ann >>= \ann' ->
       Contract ann' <$> addRef e <*> addRef t <*> traverse addRef evs
     Assert ann e -> attachRef a ann >>= \ann' -> Assert ann' <$> addRef e
+    AssertRefused ann e mmsg -> attachRef a ann >>= \ann' ->
+      AssertRefused ann' <$> addRef e <*> traverse addRef mmsg
 
 instance (HasSrcRange n, HasRef n) => HasRef (Event n) where
   addRef a@(MkEvent ann party act timestamp atFirst) = do
@@ -1454,6 +1463,7 @@ instance (HasSrcRange n, HasRef n) => HasRef (Expr n) where
       mParty' <- traverse addRef mParty
       mReason' <- traverse addRef mReason
       pure $ Breach ann' mParty' mReason'
+    Refuse ann msg -> attachRef expr ann >>= \ann' -> Refuse ann' <$> addRef msg
     Inert ann txt ctx -> attachRef expr ann >>= \ann' -> pure (Inert ann' txt ctx)
    where
     bin f ann e1 e2 = do

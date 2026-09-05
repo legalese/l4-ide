@@ -554,6 +554,9 @@ instance LayoutPrinterWithName a => LayoutPrinter (Directive a) where
       map (indent 2 . printWithLayout) stmts
     Assert _ e ->
       "#ASSERT" <+> printWithLayout e
+    AssertRefused _ e mmsg ->
+      "#ASSERT REFUSED" <+> printWithLayout e <>
+        maybe mempty (\m -> " BECAUSE" <+> printWithLayout m) mmsg
 
 instance LayoutPrinterWithName a => LayoutPrinter (Import a) where
   printWithLayout = \ case
@@ -782,6 +785,8 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
     -- again on re-parse. `...` is NOT a prefix marker for one — it is the
     -- infix AND operator ('TEllipsis'), so the old rendering printed a binary
     -- operator with no left operand.
+    Refuse _ msg ->
+      "REFUSE" <+> printWithLayout msg
     Inert _ txt _ctx ->
       surround (pretty $ escapeStringLiteral txt) "\"" "\""
 
@@ -792,6 +797,8 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
     Var{} -> printWithLayout e
     -- A BREACH with neither BY nor BECAUSE is a single keyword, i.e. an atom.
     Breach _ Nothing Nothing -> printWithLayout e
+    -- REFUSE is a keyword followed by a literal: an atom.
+    Refuse{} -> printWithLayout e
     _ -> surround (printWithLayout e) "(" ")"
 
 -- | Bracket a conjunct of an @AND@/@OR@/@RAND@/@ROR@ chain, but only when its
@@ -865,6 +872,7 @@ parensIfOpenTailed e
       Lam{}         -> True  -- the YIELD body keeps consuming
       Breach _ Nothing Nothing -> False -- a bare BREACH is an atom
       Breach{}      -> True  -- open BY/BECAUSE clauses
+      Refuse{}      -> False -- REFUSE plus a literal: no open tail
       -- `NOT` binds LOOSER than the connectives, not tighter: measured,
       -- `NOT TRUE AND FALSE` evaluates as `NOT (TRUE AND FALSE)`. So a negated
       -- conjunct is always bracketed — inheriting the operand's tail was not

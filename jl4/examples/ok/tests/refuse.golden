@@ -1,0 +1,17 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+refuse.l4:22:1-42:
+  assertion satisfied
+refuse.l4:25:1-39:
+  assertion satisfied
+refuse.l4:26:1-100:
+  assertion satisfied
+refuse.l4:31:1-42:
+  assertion refused:
+  The model refuses to answer:
+    this schedule is not encoded for years before 2000
+refuse.l4:32:1-48:
+  assertion refused:
+  The model refuses to answer:
+    this schedule is not encoded for years before 2000

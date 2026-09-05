@@ -1,0 +1,64 @@
+-- REFUSE examples.
+--
+-- A refusal is the model declining to answer, with a reason. It is not a
+-- value, not an evaluation error, and not an unknown fact the caller can
+-- supply -- so nothing downstream can convert it into an answer, and it
+-- appears in no export schema.
+
+IMPORT prelude
+
+-- House style: one NAMED definition per refusal, named for what is not
+-- covered, so the arms that reach it read as the source text does.
+
+GIVETH A NUMBER
+`this schedule is not encoded for years before 2000` MEANS
+    REFUSE "this schedule is not encoded for years before 2000"
+
+GIVEN y IS A NUMBER
+GIVETH A NUMBER
+`the fee in year` y MEANS
+    IF y AT LEAST 2000
+    THEN 100
+    ELSE `this schedule is not encoded for years before 2000`
+
+#ASSERT `the fee in year` 2001 EQUALS 100
+#ASSERT REFUSED `the fee in year` 1999
+#ASSERT REFUSED `the fee in year` 1999 BECAUSE "this schedule is not encoded for years before 2000"
+
+-- A refusal used at more than one type is declared polymorphic. Without
+-- `GIVEN a IS A TYPE` a 0-ary definition takes the first type it is used at.
+
+GIVEN a IS A TYPE
+GIVETH AN a
+`this rule has not been written yet` MEANS
+    REFUSE "this rule has not been written yet"
+
+GIVETH A NUMBER
+`the amount` MEANS 1 PLUS `this rule has not been written yet`
+
+GIVETH A BOOLEAN
+`is eligible` MEANS TRUE AND `this rule has not been written yet`
+
+#ASSERT REFUSED `the amount`
+#ASSERT REFUSED `is eligible`
+
+-- Uncatchable: no rule observes a refusal. A CONSIDER must force its
+-- scrutinee, so neither arm is reached.
+
+GIVETH A MAYBE NUMBER
+`the optional amount is not modelled` MEANS
+    REFUSE "the optional amount is not modelled"
+
+GIVETH A NUMBER
+`consider over a refusing maybe` MEANS
+    CONSIDER `the optional amount is not modelled`
+      WHEN NOTHING THEN 0
+      WHEN JUST n  THEN n
+
+#ASSERT REFUSED `consider over a refusing maybe`
+
+-- ...but DEMAND ORDER decides whether the refusal is reached at all. AND and
+-- OR are lazy and left to right.
+
+#ASSERT NOT (FALSE AND `is eligible`)
+#ASSERT REFUSED (`is eligible` AND FALSE)

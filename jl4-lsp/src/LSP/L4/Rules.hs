@@ -932,9 +932,16 @@ jl4Rules evalConfig rootDirectory recorder = do
         { _range = srcRangeToLspRange range
         , _severity =
             case res of
-              EvaluateLazy.Assertion (Right False) -> Just LSP.DiagnosticSeverity_Error
-              EvaluateLazy.Assertion (Left _)      -> Just LSP.DiagnosticSeverity_Error
-              EvaluateLazy.Reduction (Left _)      -> Just LSP.DiagnosticSeverity_Error
+              -- A refusal is a designed outcome, not a defect: Warning, so it
+              -- is visible without reading as a broken program. Every corpus
+              -- refusal (a commencement floor, an unmodelled arm) would
+              -- otherwise squiggle red in the editor.
+              EvaluateLazy.Assertion (EvaluateLazy.Refused _)        -> Just LSP.DiagnosticSeverity_Warning
+              EvaluateLazy.Reduction (EvaluateLazy.ReducedRefused _) -> Just LSP.DiagnosticSeverity_Warning
+              EvaluateLazy.Assertion EvaluateLazy.Fails              -> Just LSP.DiagnosticSeverity_Error
+              EvaluateLazy.Assertion (EvaluateLazy.FailsBecause _)   -> Just LSP.DiagnosticSeverity_Error
+              EvaluateLazy.Assertion (EvaluateLazy.Errored _)        -> Just LSP.DiagnosticSeverity_Error
+              EvaluateLazy.Reduction (EvaluateLazy.ReducedErrored _) -> Just LSP.DiagnosticSeverity_Error
               _                                    -> Just LSP.DiagnosticSeverity_Information
         , _code = Nothing
         , _codeDescription = Nothing

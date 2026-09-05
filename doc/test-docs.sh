@@ -311,6 +311,15 @@ run_l4_cli() {
 L4_CLI_DIRECT=""
 JL4_AVAILABLE=false
 
+# NOTE: an `l4` on PATH WINS over this worktree's freshly built one. That is
+# right for a reader checking out the docs and wrong for anyone developing a
+# language feature: an INSTALLED binary older than the tree cannot parse syntax
+# the tree just added, and the failure reads as "this doc page has a broken
+# example" rather than "your `l4` is old". If a doc `.l4` fails on a construct
+# you know is valid, check `which l4` first, and either put this worktree's
+# `dist-newstyle/.../l4` earlier on PATH or run with a PATH that has no `l4`
+# so the `cabal list-bin` branch below is taken. (Measured 2026-09-04: a 27 Aug
+# ~/.local/bin/l4 rejected a REFUSE example added the same day.)
 if command -v l4 &> /dev/null; then
     L4_CLI_DIRECT="l4"
     JL4_AVAILABLE=true

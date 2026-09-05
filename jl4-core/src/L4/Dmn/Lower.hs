@@ -2271,6 +2271,18 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
                   , "if " <> parenIf (ps < 5) ts <> " != null then " <> ta <> " else " <> tb
                   , maximum [FullFeel, fs, fa, fb]
                   )
+    -- REFUSE: no FEEL image, deliberately. 'verbatim' renders the L4 source
+    -- (so the note names @REFUSE "…"@ and the reader can see which refusal it
+    -- was) and marks the fragment 'L4Verbatim', which raises a Blocking
+    -- D-NONFEELINPUT \/ D-NONFEELOUTPUT on the containing decision. Explicit
+    -- above the wildcard so the choice is recorded, not inherited.
+    --
+    -- The DESIGNED image — omit the refusing row, a non-Blocking @D-REFUSE@
+    -- note, and a @MayRefuse@ safety kind that does not withdraw DMN-SAFE — is
+    -- PROPS-REDTEAM-2026-09-03 §6 item 6 and is NOT built here. Until it is,
+    -- the whole decision is blocked rather than a refusal being lowered to
+    -- anything a DMN engine could answer with.
+    Refuse {} -> verbatim e
     _ -> verbatim e
    where
     atomPrec = 9 :: Int

@@ -213,6 +213,9 @@ buildCallGraph decides directives otherExprs =
     LazyEvalTrace _ e -> [e]
     Check _ e         -> [e]
     Assert _ e        -> [e]
+    -- The asserted expression is still a directive head for fixture purposes;
+    -- the BECAUSE message is a literal and heads nothing.
+    AssertRefused _ e _ -> [e]
     Contract _ a b cs -> a : b : cs
 
   -- The tested SUBJECT(s) of a directive expression: the applied (or bare)
@@ -971,6 +974,9 @@ exprIsRegulative e =
   not $ null
     [ ()
     | c <- universeExpr e
+    -- A refusal is not deontic, and it is deliberately NOT added here: this
+    -- predicate routes a body to the BPMN leg, and a refusal belongs on
+    -- neither leg. It is blocked in 'L4.Dmn.Lower' instead, by name.
     , case c of Regulative {} -> True; Event {} -> True; Breach {} -> True; _ -> False
     ]
 
