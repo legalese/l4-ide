@@ -182,6 +182,56 @@ Phase 5's work.
 `financial statements required` flattens; `annual limit basis` and the floor inside
 `investor limit` do not.
 
+### The refusal exhibit (`refuse.l4`)
+
+A rule that reaches `REFUSE "…"` stops with the author's sentence: **the model does not
+cover this**, which is neither a value nor an error, and no rule can catch it. DMN has no
+such outcome. Its entire vocabulary for "no answer" is FEEL's single `null`, which also
+spells "there is none" and "the engine could not compute it".
+
+Ruling D1 (2026-09-05, `specs/todo/IMPLICIT-PROPS-DESIGN.md` §11.9.1): **the refusal
+becomes `null`, the refusing row is kept, and the reason travels in the artifact** — on
+that row's `<description>` (`OTHERWISE — REFUSE: …`) and, when a whole body refuses, on
+the `<decision>`'s own. Nothing is deleted, because deleting the row answers `null` too
+(measured on both engines) and would take the reason with it. `DMN-SAFE` is **withdrawn**
+from any decision that can refuse — including transitively, through the call graph — and
+`D-REFUSE` carries the reason at the same severity `D-PARTIAL` uses: `Lossy` when every
+consumer is a lazy arm that can fence the null, `Blocking` when one is strict or when
+nothing consumes it at all.
+
+Before that ruling this exhibit could not exist. The exporter wrote the L4 text
+`REFUSE "…"` into a `<literalExpression>`, and KIE 8.44.0.Final failed to compile the
+**whole file** (`ERROR [ERR_COMPILING_FEEL] … syntax error`, verdict `FAILED`), which is
+why every legal-corpus refusal site is still spelled `ASSUME`.
+
+The module holds one of each **position** a refusal can occupy, because each is a
+different code path: a whole body (a boxed `null`), the floor arm of a law-time chain, an
+inline `OTHERWISE`, an enum-valued `OTHERWISE`, and a plain arithmetic decision downstream
+of one. `refuse.cases.json` runs all five through both engines.
+
+**Two things this exhibit pins that are easy to get wrong.**
+
+- **A refusing decision is evaluated even when nothing reaches it.** A DMN `<decision>` is
+  a node in a graph, not a branch of an expression, so `no fee is prescribed before
+  commencement on 1983-01-01` answers `null` in _every_ case, including the ones where the
+  floor row never fires. That is what `D-REFUSE`'s severity calibration is about.
+- **The enum case is where the two engines disagreed.** An enum-valued table declares its
+  domain in `<outputValues>`, and a refusing row answers a value that list does not
+  contain. Measured 2026-09-05: KIE enforces the list at run time and **FAILS** the
+  decision (`Invalid result value on rule #3, output #1. Value null does not match list of
+allowed values`); Camunda 8.7.6 returns the `null` **silently**. One artifact, two
+  meanings. The exporter now widens _that table's_ `<outputValues>` by the FEEL keyword
+  `null` and reports `D-OUTPUTVALUES-NULL` (Lossy); the enum's own `<itemDefinition>` is
+  untouched, because a separate probe measured that widening the type does not stop the KIE
+  error and widening the table does. The pre-repair shape is kept as a negative control in
+  `jl4/tests-cli/fixtures/dmn-refuse-enum/unwidened.dmn`.
+
+**The dmnmd projection of this module is an empty document**, and that is the second
+per-backend image rather than a defect in the fixture: dmnmd's cell grammar is a number, an
+integer range, or a bare token, with no `null` and no date, so all three tables are omitted
+and `refuse.md.fidelity.txt` says so ten times by name. A bare `null` cell would be read
+back as the _string_ `"null"`, which is the one outcome worse than omission.
+
 ## The fidelity report
 
 The report is the point, not a footnote. DMN's decision-table analysis — completeness
