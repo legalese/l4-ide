@@ -107,8 +107,8 @@ Both express the same polymorphic type, but:
 names three jobs the keyword was doing and where each one goes: a fact supplied
 afresh for each case moves to a
 [`GIVEN` under its section's heading](../syntax/section-given.md); an
-uninterpreted type moves to `DECLARE T`, which is proposed, not landed
-(2026-09-04), so keep writing `ASSUME T IS A TYPE` for now; and a
+uninterpreted type moves to [`DECLARE T`](DECLARE.md#opaque-types), a name
+with no stated contents; and a
 case the encoding does not cover becomes a
 [`REFUSE`](../control-flow/REFUSE.md). None of the three is a spelling for a
 function type, so the `FOR ALL` declarations on this page are unchanged in this

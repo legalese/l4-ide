@@ -530,7 +530,7 @@ GIVETH A BOOLEAN
 
 Behaviour in this release is identical: both wait to be supplied, and both appear in the published list of facts of any `@export`ed question that reaches them. What you gain is that the fact has a stated home, visible at a glance to a reader and to every tool that reads the file. There is no hurry; migrate when you are in the file for other reasons.
 
-One `ASSUME` does not migrate this way. `ASSUME T IS A TYPE` does not name a fact about a case at all: it names a kind of thing, the way a statute says "an insurer" throughout without setting out what an insurer is made of. _Proposed, not landed (2026-09-04): the `DECLARE` spelling for a kind of thing with no stated contents. Until it lands, keep writing `ASSUME T IS A TYPE` for that job._ See [`ASSUME`](../../reference/types/ASSUME.md) for the keyword's other uses.
+One `ASSUME` does not migrate this way. `ASSUME T IS A TYPE` does not name a fact about a case at all: it names a kind of thing, the way a statute says "an insurer" throughout without setting out what an insurer is made of. Write it as `DECLARE T`, a name with no stated contents. See [`ASSUME`](../../reference/types/ASSUME.md) for the keyword's other uses.
 
 ---
 

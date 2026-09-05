@@ -16,13 +16,9 @@ carrying four unrelated jobs.
 | The job the `ASSUME` was doing                                    | Where that job goes                                                                                             |
 | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
 | a fact supplied afresh for each case (the applicant's age)        | a [`GIVEN` under the section heading](../syntax/section-given.md) whose rules read it — a **"section `GIVEN`"** |
-| a kind of thing the model treats as opaque (`ASSUME T IS A TYPE`) | `DECLARE T` — see the status note below, and keep the `ASSUME` until that spelling lands                        |
+| a kind of thing the model treats as opaque (`ASSUME T IS A TYPE`) | [`DECLARE T`](DECLARE.md#opaque-types) — a name with no stated contents                                         |
 | a case the encoding deliberately does not cover                   | [`REFUSE "..."`](../control-flow/REFUSE.md)                                                                     |
 | a rule defined elsewhere (`… IS A FUNCTION FROM …`)               | not yet ruled — keep the `ASSUME`, and see "Function-typed inputs" below                                        |
-
-_Proposed, not landed (2026-09-04): the bare `DECLARE T` spelling for an opaque
-type. L4 does not accept it today, so `ASSUME T IS A TYPE` is still how you write
-one._
 
 ## Migrating a term `ASSUME`
 
