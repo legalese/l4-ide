@@ -673,8 +673,16 @@ its amendment identity — without runtime machinery.
    exporter refuses today with `2 blocking D-SUMTYPE`, exactly as it used to
    refuse a `REFUSE`. D6 carries **one opinion, not two** — its adversarial
    refuter died on a session limit — so treat it with corresponding caution;
-   its proposed DMN half (omit the refusing row) was measured and NOT built,
-   and §11.9.3 records both the numbers and the reason.
+   its proposed DMN half (omit the refusing row) is **not merely unbuilt — it was
+   RULED AGAINST**. It contradicted D1, which rules the refusing row is kept and
+   answers FEEL `null`, on the one construct where the two overlap: a dated
+   interval table (`DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §15.3) whose floor arm
+   refuses. Meng ruled on that conflict on 2026-09-05, with the omission
+   variant's per-evaluation KIE warning in front of him, and **kept D1's
+   image**. So this item's gate is D6's option 4 and nothing else; there is no
+   DMN half of it left to build. `IMPLICIT-PROPS-DESIGN.md` §11.9.3 carries the
+   ruling, the two engines' numbers, and the counter-evidence it was taken
+   against.
 
 4. **Round-trip**: TNR/NLG anchors attach to the _arm_ DECIDEs (each keeps
    its own SrcRange and `@label` with the amending instrument), so amendment
