@@ -640,9 +640,24 @@ inferSection (MkSection ann mn maka mgiven topdecls) = do
 -- 'desugarSectionGivens' holds; it is dropped rather than reported, because a
 -- diagnostic here would be about an internal inconsistency, not about the
 -- user's program.
+--
+-- Each elaboration is consumed by AT MOST ONE parameter. A raw name is not a
+-- key here: L4 has type-directed name resolution, so one spelling may be bound
+-- several times at different types in a single @GIVEN@
+-- (@ok\/section-given-tdnr.l4@), and 'desugarSectionGivens' then prepends one
+-- elaboration per parameter, all of them sharing that spelling. Keying on the
+-- name alone (@List.lookup@) sent every such parameter to the FIRST
+-- elaboration, so the 'GivenSig' the checker produced held one binder repeated
+-- at one type instead of n binders at n types — and since
+-- 'L4.Print.prettyLayout' prints exactly this node while suppressing the
+-- elaborations, @l4 batch@ and the REPL re-emitted a module that had lost every
+-- binding after the first and no longer type-checked. Consuming the list
+-- restores the one-to-one pairing the invariant already guarantees, while still
+-- tolerating a pass that drops an elaboration: the orphaned parameter finds no
+-- match and is dropped, as before.
 resolveSectionGiven :: [TopDecl Resolved] -> GivenSig Name -> Check (GivenSig Resolved)
 resolveSectionGiven rdecls (MkGivenSig gann otns) =
-  MkGivenSig gann . catMaybes <$> traverse resolveParam otns
+  MkGivenSig gann <$> resolveParams elaborations otns
  where
   elaborations :: [(RawName, (Resolved, Maybe (Type' Resolved), Maybe (Expr Resolved)))]
   elaborations =
@@ -650,12 +665,26 @@ resolveSectionGiven rdecls (MkGivenSig gann otns) =
     | Assume _ (MkAssume _ _ (MkAppForm _ rn [] _) rmTy rmTypically) <- rdecls
     ]
 
-  resolveParam (MkOptionallyTypedName pann nm _mTy _mTypically) =
-    case List.lookup (rawName nm) elaborations of
-      Nothing -> pure Nothing
-      Just (rn, rmTy, rmTypically) -> do
+  resolveParams ::
+       [(RawName, (Resolved, Maybe (Type' Resolved), Maybe (Expr Resolved)))]
+    -> [OptionallyTypedName Name]
+    -> Check [OptionallyTypedName Resolved]
+  resolveParams _ [] = pure []
+  resolveParams unmatched (MkOptionallyTypedName pann nm _mTy _mTypically : otns') =
+    case takeFirstNamed (rawName nm) unmatched of
+      Nothing -> resolveParams unmatched otns'
+      Just ((rn, rmTy, rmTypically), unmatched') -> do
         rnm <- ref nm rn
-        pure (Just (MkOptionallyTypedName pann rnm rmTy rmTypically))
+        (MkOptionallyTypedName pann rnm rmTy rmTypically :) <$> resolveParams unmatched' otns'
+
+  -- 'List.lookup', but also returning the list with the matched entry removed.
+  takeFirstNamed :: RawName -> [(RawName, a)] -> Maybe (a, [(RawName, a)])
+  takeFirstNamed wanted = search []
+   where
+    search _       []                 = Nothing
+    search skipped ((k, v) : rest)
+      | k == wanted                   = Just (v, reverse skipped <> rest)
+      | otherwise                     = search ((k, v) : skipped) rest
 
 inferLocalDecl :: LocalDecl Name -> Check (LocalDecl Resolved, [CheckInfo])
 inferLocalDecl (LocalDecide ann decide) = do
