@@ -197,6 +197,11 @@ jobs:
               - 'jl4-core/libraries/daydate.l4'
               # The engine-intersection triple: likewise hand-written.
               - 'jl4/tests-cli/fixtures/dmn-engine-intersection/**'
+              # The enum-refusal pair (ruling D1): likewise hand-written, and it
+              # has to be — the emitter can no longer produce the un-widened
+              # <outputValues>, so only a fixture can ask whether KIE still
+              # rejects it and zeebe-dmn still does not.
+              - 'jl4/tests-cli/fixtures/dmn-refuse-enum/**'
               # See the note on the haskell filter.
               - '.github/workflows/pr-checks.yml'
 
@@ -1422,6 +1427,111 @@ jobs:
             jl4/examples/dmn/expected/ymd-dates.dmn \
             --cases jl4/examples/dmn/ymd-dates.cases.json | tee camunda-ymd.log
           grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT: 1 file(s), 8 case(s), 1 parsed, 0 error(s), 48/48 decision(s) evaluated, 48/48 value(s) as expected' camunda-ymd.log
+
+      # THE REFUSAL leg (ruling D1, 2026-09-05; IMPLICIT-PROPS-DESIGN §11.9.1).
+      #
+      # This is the step the whole ruling rests on. A decision that DECLINES TO
+      # ANSWER is now executed by both engines, and both agree about what comes
+      # back. Before D1 no such step could exist: the exporter wrote the L4 text
+      # `REFUSE "…"` into a <literalExpression> and KIE answered
+      # ERR_COMPILING_FEEL on the WHOLE model, which is why the Reg CF migration
+      # was dropped from PR #334 and why every legal-corpus refusal site was
+      # still spelled `ASSUME`.
+      #
+      # Five cases x seven decisions = 35, and the counts are pinned to the
+      # LOCALLY MEASURED verdict lines (2026-09-05). What each case is for is in
+      # refuse.cases.json; the two that matter most here are C (every refusal
+      # fires at once) and D (a pre-commencement RULE DATE against a large
+      # CLAIM, so the fee chain refuses while the discount and the band answer —
+      # a refusal that leaked across the two axes fails there and only there).
+      #
+      # `no_fee_is_prescribed_before_commencement_on_1983_01_01` is null in
+      # EVERY case, including the ones where no rule reaches it, because a DMN
+      # <decision> is a node in a graph rather than a branch of an expression:
+      # the engine evaluates it whenever it evaluates the model. That is the
+      # fact D-REFUSE's severity calibration is about.
+      - name: Refusal -- a decision that declines to answer (KIE + Camunda)
+        env:
+          KIE_CHECK_REQUIRED: "1"
+          KIE_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
+          CAMUNDA_CHECK_REQUIRED: "1"
+          CAMUNDA_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_21_X64 }}
+        run: |
+          set -euo pipefail
+          ./etc/kie-dmn-check/run.sh \
+            jl4/examples/dmn/expected/refuse.dmn \
+            --cases jl4/examples/dmn/refuse.cases.json | tee kie-refuse.log
+          grep -q 'KIE 8.44.0.Final VERDICT: 1 file(s), 5 case(s), 0 error(s), 0 warning(s), 35/35 decision(s) SUCCEEDED, 35/35 value(s) as expected, 25/25 service output value(s) as expected' kie-refuse.log
+
+          ./etc/camunda-dmn-check/run.sh \
+            jl4/examples/dmn/expected/refuse.dmn \
+            --cases jl4/examples/dmn/refuse.cases.json | tee camunda-refuse.log
+          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT: 1 file(s), 5 case(s), 1 parsed, 0 error(s), 35/35 decision(s) evaluated, 35/35 value(s) as expected' camunda-refuse.log
+
+      # THE ENUM-REFUSAL PAIR, and it is the one place the two engines were
+      # measured to DISAGREE (2026-09-05).
+      #
+      # An enum-valued decision emits <outputValues> naming its constructors,
+      # and a refusing row answers a value that list does not contain. KIE
+      # 8.44.0.Final enforces <outputValues> AT RUN TIME and FAILS the decision;
+      # Camunda 8.7.6 does not check it at all and returns the null silently.
+      # One artifact, two meanings. The exporter therefore widens that table's
+      # <outputValues> by the FEEL keyword `null` (reporting
+      # D-OUTPUTVALUES-NULL, Lossy) and leaves the TYPE's own <allowedValues>
+      # alone — a separate probe measured that widening the type does NOT stop
+      # the KIE error and widening the table does.
+      #
+      # THE POSITIVE ALONE IS NOT EVIDENCE, the same way it is not for the
+      # date-axis probe below: `widened.dmn` passing is equally consistent with
+      # KIE having stopped checking <outputValues> altogether, which is exactly
+      # what this step claims to exclude. So the negative runs too, with
+      # `&& rc=0 || rc=$?` keeping `set -e` from ending the step on the very
+      # exit code being asserted.
+      #
+      # If EITHER half moves, the widening needs re-ruling rather than
+      # re-blessing: KIE ceasing to reject removes its justification, and
+      # zeebe-dmn beginning to reject means the divergence was never one-sided.
+      - name: Refusal -- the enum pair, where the engines disagreed (KIE + Camunda)
+        env:
+          KIE_CHECK_REQUIRED: "1"
+          KIE_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
+          CAMUNDA_CHECK_REQUIRED: "1"
+          CAMUNDA_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_21_X64 }}
+        run: |
+          set -euo pipefail
+          pair=jl4/tests-cli/fixtures/dmn-refuse-enum
+
+          # The POSITIVE: what the exporter emits today. Green on both.
+          ./etc/kie-dmn-check/run.sh \
+            "$pair/widened.dmn" --cases "$pair/enum.cases.json" | tee kie-enum-widened.log
+          grep -q 'KIE 8.44.0.Final VERDICT: 1 file(s), 2 case(s), 0 error(s), 0 warning(s), 2/2 decision(s) SUCCEEDED, 2/2 value(s) as expected' kie-enum-widened.log
+
+          ./etc/camunda-dmn-check/run.sh \
+            "$pair/widened.dmn" --cases "$pair/enum.cases.json" | tee camunda-enum-widened.log
+          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT: 1 file(s), 2 case(s), 1 parsed, 0 error(s), 2/2 decision(s) evaluated, 2/2 value(s) as expected' camunda-enum-widened.log
+
+          # The NEGATIVE on KIE: the pre-D1 shape must still come back red, with
+          # the message that identifies WHY. Not just "exited non-zero": a
+          # harness that died before running also exits non-zero, so the banner
+          # is what says it ran and the message is what says it failed for the
+          # reason this fixture exists.
+          ./etc/kie-dmn-check/run.sh \
+            "$pair/unwidened.dmn" --cases "$pair/enum.cases.json" > kie-enum-unwidened.log 2>&1 && rc=0 || rc=$?
+          cat kie-enum-unwidened.log
+          if [ "$rc" -eq 0 ]; then
+            echo "::error::KIE 8.44.0.Final now ACCEPTS a null output entry against an <outputValues> that does not list it. That is GOOD NEWS from an engine upgrade, not a regression — but the D-OUTPUTVALUES-NULL widening was ruled on the divergence, so re-rule it (DMN-EXPORT-PROGRAM-MODEL-SPEC.md §7, IMPLICIT-PROPS-DESIGN.md §11.9.1) rather than deleting this step."
+            exit 1
+          fi
+          grep -q 'KIE 8.44.0.Final VERDICT' kie-enum-unwidened.log
+          grep -q 'Invalid result value on rule #3, output #1. Value null does not match list of allowed values' kie-enum-unwidened.log
+
+          # The NEGATIVE on Camunda: the OTHER half of the divergence. The same
+          # file that KIE refuses must still evaluate GREEN and SILENT here —
+          # that silence is the finding, and a step that only ran KIE would have
+          # no way to say so.
+          ./etc/camunda-dmn-check/run.sh \
+            "$pair/unwidened.dmn" --cases "$pair/enum.cases.json" | tee camunda-enum-unwidened.log
+          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT: 1 file(s), 2 case(s), 1 parsed, 0 error(s), 2/2 decision(s) evaluated, 2/2 value(s) as expected' camunda-enum-unwidened.log
 
       # The hand-written probe PAIR (spec §15.6). Not redundant with the step
       # above: the emitter cannot produce an <annotationEntry> carrying an @id,
