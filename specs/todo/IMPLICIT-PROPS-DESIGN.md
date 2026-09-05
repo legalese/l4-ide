@@ -767,25 +767,35 @@ the kind of split a later reader gets wrong. **Nothing in D6's own reasoning is 
 its deciding measurement is that every corpus bottom is `NUMBER`-typed so the gate cannot live
 in the return type, which is equally true under D1's image.
 
-**D6's blast-radius counts were wrong, and the re-measurement is below rather than borrowed.**
-D6 as accepted says "9 declarations and 22 floor-arm sites across 9 `.l4` files" and "**0 sites in
-canon**". Re-measured 2026-09-05 by `grep -rn '^ASSUME'` over `jl4/examples`, `jl4-core/libraries`,
-`doc` and `canon`, counting each floor name's occurrences minus its declaration:
+**D6's blast-radius counts were wrong, and the re-measurement is below, ENUMERATED BY LINE so the
+addition can be checked rather than taken.** D6 as accepted says "9 declarations and 22 floor-arm
+sites across 9 `.l4` files" and "**0 sites in canon**".
 
-| file                                              | floor arms             | declared type |
-| ------------------------------------------------- | ---------------------- | ------------- |
-| `jl4/examples/legal/regcf/regcf.l4`               | 8                      | `NUMBER`      |
-| `jl4/examples/legal/regcf/denovo/regcf-denovo.l4` | 8                      | `NUMBER`      |
-| `jl4/examples/dmn/gst-rate.l4`                    | 2                      | `NUMBER`      |
-| `jl4/examples/dmn/ymd-dates.l4`                   | 1                      | `NUMBER`      |
-| `jl4/examples/dmn/not-ok/dated-chain-*.l4`        | 1 each, **five** files | `NUMBER`      |
-| `canon .../legalese/sg-csp.l4:79`                 | 1                      | `NUMBER`      |
+| file                                              | decl   | floor arms, by line                        | type     |
+| ------------------------------------------------- | ------ | ------------------------------------------ | -------- |
+| `jl4/examples/legal/regcf/regcf.l4`               | `:143` | 154, 166, 175, 185, 195, 205, 215, 409 — 8 | `NUMBER` |
+| `jl4/examples/legal/regcf/denovo/regcf-denovo.l4` | `:211` | 226, 232, 240, 246, 252, 258, 264 — **7**  | `NUMBER` |
+| `jl4/examples/dmn/gst-rate.l4`                    | `:65`  | 79, 92 — 2                                 | `NUMBER` |
+| `jl4/examples/dmn/ymd-dates.l4`                   | `:86`  | 92 — 1                                     | `NUMBER` |
+| `dmn/not-ok/dated-chain-nested-otherwise.l4`      | `:29`  | 38 (an `ELSE`, not an `OTHERWISE`) — 1     | `NUMBER` |
+| `dmn/not-ok/dated-chain-misordered.l4`            | `:35`  | 47 — 1                                     | `NUMBER` |
+| `dmn/not-ok/dated-chain-mixed.l4`                 | `:31`  | 45 — 1                                     | `NUMBER` |
+| `dmn/not-ok/dated-chain-rolling-date.l4`          | `:28`  | 39 — 1                                     | `NUMBER` |
+| `dmn/not-ok/dated-chain-duplicate-date.l4`        | `:28`  | 40 — 1                                     | `NUMBER` |
+| `canon .../legalese/sg-csp.l4`                    | `:79`  | 88 — 1                                     | `NUMBER` |
 
-**10 declarations, 25 arms, 10 files.** So: canon is **not** zero — `sg-csp.l4:79`,
+**10 declarations, 24 arms, 10 files.** Canon is **not** zero — `sg-csp.l4:79`,
 `no Baby Bonus Cash Gift rate is encoded for a birth before 2015-01-01`, is a pre-commencement
-bottom of exactly this shape. There are **five** `dmn/not-ok` fixtures with floor arms, not four.
-And the arm count is 25, one more than the 24 a subsequent correction gave — `gst-rate.l4` carries
-**two** floor arms (`:79` and `:92`), which is easy to miss because both name the same declaration.
+bottom of exactly this shape. There are **five** `dmn/not-ok` fixtures with floor arms, not four; a
+sixth, `dated-chain-regulative.l4`, declares no floor and is not counted.
+
+**A correction to this paragraph's own first version, kept because the method error is the reusable
+part.** It said **25**, and blamed the difference on `gst-rate.l4`'s second arm. Both were wrong.
+That count was taken as "occurrences of the floor name, minus one for the declaration", which
+silently counted **a comment at `regcf-denovo.l4:3035`** as an arm — so that file read 8 where the
+enumeration above gives 7. `gst-rate.l4`'s two arms were never in dispute. Counting occurrences and
+subtracting the ones you know about is not enumeration: it cannot tell an arm from a comment, and it
+fails silently, in the direction of over-counting. That is why the table above lists line numbers.
 
 **What survives the recount is the load-bearing part**: every one of the ten is `NUMBER`-typed, so
 D6's argument that the gate cannot live in the return type without making each a tagged union
