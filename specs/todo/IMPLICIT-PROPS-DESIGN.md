@@ -916,7 +916,20 @@ succeeds to `e WITH \`RULES EFFECTIVE DATE\` IS d` once sharing is measured.
 no existing program changes meaning (`LET` appears 127 times in the examples and libraries and 7 in
 canon); no demand (`LET` has zero uses in the 26 legal files against 125 `WHERE` blocks, and the
 corpus's only hypothetical, `EVAL UNDER RULES EFFECTIVE AT`, has nineteen uses all at the outermost
-position of a directive, measured 2026-09-04). The cost, terseness when several calls share one
+position of a directive **or export body**, measured 2026-09-03 over `jl4/examples/legal/**`).
+
+**Corrected 2026-09-05.** The sentence above dropped the "or export body" qualifier its own source
+carries (`PROPS-REDTEAM-2026-09-03.md` §2.11: "all 19 legal-corpus uses … sit at the outermost
+position of a directive **or export body**, zero inside a rule, quantifier or lambda"), was undated
+in one place and misdated in another, and did not say what it was counting over. The count itself
+was and is right: re-measured 2026-09-05, `grep -rn 'EVAL UNDER RULES EFFECTIVE AT' --include='*.l4'
+jl4/examples/legal/` returns **19** — 17 in `regcf.l4`, 1 in `regcf-wizard.l4`, 1 in
+`regcf-denovo.l4`. Do not read this correction as saying the nineteen was overstated; it was not.
+**What R9 schedules is separately re-ruled**: `TEMPORAL-RULE-VERSION-DESIGN.md` §1.4.3 (2026-09-05)
+rules sub-question (c) that the fold of `EVAL UNDER RULES EFFECTIVE AT` into `WITH` **is not a
+rename** — it re-schedules on the 21 interval-builtin sites that rebind the axis per iterated day,
+and it cannot be defined without also defining `WITH` discharge to snapshot and to report its own
+unfrozen arms. The cost, terseness when several calls share one
 override, is met by a helper. Detail: `PROPS-REDTEAM-2026-09-03.md` §2.6.
 
 ### 11.14 Sequencing item 6 — the corpus and docs migration: what it swept, and the two things it found

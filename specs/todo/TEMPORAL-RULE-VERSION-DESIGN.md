@@ -126,8 +126,9 @@ _Status: **implemented** on branch `mengwong/eval-pin-and-shadowing`, rebased on
 implementation `startDeepPin` / `driveDeepPin` / `snapshotVal` / `snapshotRef`
 in `jl4-core/src/L4/EvaluateLazy/Machine.hs`. Resolves
 [smucclaw/l4-ide#934](https://github.com/smucclaw/l4-ide/issues/934) **for
-functional values only** — see the four boundaries below, of which the
-regulative one is open and material. Adversarially re-measured 2026-08-03
+functional values only** — see the four boundaries below, of which **two are
+open and material: the regulative one and (corrected 2026-09-05) the
+depth-budget one**. §1.4.3 rules what is done about all of them. Adversarially re-measured 2026-08-03
 against a second pair of full-tree sweeps (base `16adc022` binary vs this
 branch, `l4 run` over all 725 shared `.l4` files)._
 
@@ -231,8 +232,12 @@ exactly the part of the value the evaluator prints.**
   `thailand-cosmetics/orchestrator`) make live HTTP calls and differ in UUIDs
   and AWS trace ids between any two runs; the sixth is the #930 file, below.
 
-**Four boundaries. Three are deliberate; the fourth is the ruling's real
-limit.**
+**Four boundaries.** ~~Three are deliberate; the fourth is the ruling's real
+limit.~~ **CORRECTED 2026-09-05, see §1.4.3: TWO are deliberate and TWO are
+open.** The depth-budget boundary below was classed deliberate on a
+verification that did not test the case that matters, and its own concluding
+sentence is retracted in place. The regulative boundary is unchanged and is
+still the ruling's largest limit.
 
 - **Closures** are opaque to both passes, exactly as they are to `nfAux`. A
   function returned from under a pin still reads the _ambient_ context when it
@@ -303,7 +308,111 @@ limit.**
   200 sevens then `...`, with zero nines, and every consumer of a value goes
   through `NF` (`Print.hs`, `API.hs`, `ValueLazyJSON.hs`,
   `jl4-service/src/Backend/Jl4.hs`), which `nfAux` truncates at the same 200.
-  So the budget boundary is unobservable, not merely tolerable.
+  ~~So the budget boundary is unobservable, not merely tolerable.~~
+
+  > **RETRACTED 2026-09-05. That sentence is false, and it was marked
+  > verified.** The 2026-08-03 verification printed the pinned list **whole**,
+  > and `nfAux` truncates a printed list at 200 on both sides, so the test
+  > could not have observed the boundary whichever way it fell. It did not test
+  > a program that **consumes** past the budget and prints a short result — a
+  > `sum`, a `count`, a `drop`/`take`, a fold — which is what a real encoding
+  > does. That test now exists. On the same shape, `sum` of a 250-element list
+  > of `GST rate` pinned to 2023-06-01 answers **1848** = 201×7 + 49×9: two
+  > legal regimes added together, exit code 0, no diagnostic above
+  > `Information`. Reproduced 2026-09-05 (probe
+  > `scratchpad/consult/adv-d3/p4.l4`, `l4-base2` binary). **The budget
+  > boundary is observable, and it is the escape that produces the worst answer
+  > in the whole space** — which is why §1.4.3 puts a warning on the depth arm
+  > (`Machine.hs:3139`) and not only on the opaque constructors. The bullet's
+  > first two sentences stand: the reference IS kept, and the printer WOULD
+  > have elided it. It is the conclusion drawn from them that does not follow.
+
+### 1.4.3 RULING: the pin stays dynamically scoped, and every failure to freeze is LOUD (2026-09-05)
+
+**Ruling (Meng, 2026-09-05, mark `accept` on rulings-bench card `D3-temporal-934`).** Option 2, in
+the corrected form:
+
+- `EVAL UNDER RULES EFFECTIVE AT` **is and stays dynamically scoped**. The corpus depends on it —
+  `regcf.l4` reads the axis in three places, funnelled through one helper, so one pin reaches
+  hundreds of dated arms — and nothing about that changes.
+- **The pin's coverage is exactly what the snapshot FREEZES, not what the walk reaches**, and every
+  arm where it fails to freeze **emits a runtime warning**. There are five such arms, not three:
+  1. `ValClosure` — "this pin cannot cover this function's body";
+  2. `ValObligation` / `ValROp` — "this pin cannot cover the obligation's deadline and followups";
+  3. **the depth arm**, `d <= 0` in `snapshotRef` (`jl4-core/src/L4/EvaluateLazy/Machine.hs:3139`)
+     — "this pin stopped at depth 200; deeper values read the ambient rule date";
+  4. **the back-edge arm**, `Unevaluated {}` (`Machine.hs:3143`).
+- The pin gets **its own budget constant** instead of borrowing the printer's `maximumStackSize`,
+  so arm 3 can be raised without touching printing.
+
+**Sub-questions, ruled with it.**
+
+- **(a) Does a contract pinned at trace start stay pinned across a multi-day trace whose own events
+  carry timestamps? NO.** This is the semantic ruling §1.4.1 says it does not have; it has it now.
+  Each event is judged under the law in force at its own time, via `EVAL UNDER VALID TIME` and the
+  legalese/l4-ide#89 fallback (rule-version → valid-time → today). Cross-reference
+  smucclaw/l4-ide#914 §2C, which designs that mechanism. The alternative — a contract pinned in
+  2023 judging a duty that arises in 2027 under 2023 law — is retroactivity by default, the
+  opposite of the presumption the #89 fallback encodes.
+- **(b) Loud, or changed? LOUD, not changed.** The escapes stay; they stop being silent.
+- **(c) Does R9's fold of the temporal form into `WITH` proceed now? Not as a rename.** R9
+  (`IMPLICIT-PROPS-DESIGN.md` §11.13) schedules `EVAL UNDER RULES EFFECTIVE AT d e` to succeed to
+  ``e WITH `RULES EFFECTIVE DATE` IS d``. That fold **re-schedules on the 21 interval-builtin
+  sites** that rebind the axis per iterated day by construction — `VALUE AT` 7, `EVER BETWEEN` 4,
+  `ALWAYS BETWEEN` 2, `WHEN LAST` 4, `WHEN NEXT` 4, measured 2026-09-05 over
+  `jl4 jl4-core doc` plus canon with comment lines excluded — each of which needs the rank-2
+  implicit `PROPS-REDTEAM-2026-09-03.md` §2.11 calls "not designed". It also cannot be a rename
+  while the deep-pin snapshot exists: `WITH` discharge would have to be separately defined to
+  snapshot **and** to report its own unfrozen arms.
+
+**Status: ruled 2026-09-05; NOT BUILT.** No warning arm exists in `snapshotRef` today, and the pin
+still borrows `maximumStackSize`. What would make this ruling true: four warning arms in
+`snapshotRef`/`snapshotVal`, a pin-specific budget constant, three moved fixture goldens in
+`jl4/examples/ok/temporal-pin-deep.l4` (cases I, J, K), and **a fourth fixture the card's own
+analysis did not budget for** — a pinned structure past the budget, asserting the warning rather
+than the number below.
+
+**What decided it.** One sentence, and it is why the ruling says _every_ arm rather than the three
+constructors:
+
+> `sum` of a value pinned to 2023 returns **1848** — 201 elements of 2023 law and 49 elements of
+> 2025 law added together — with **exit code 0** and nothing but `DiagnosticSeverity_Information`
+> on the wire.
+
+Reproduced independently 2026-09-05 on the `l4-base2` binary, probe
+`scratchpad/consult/adv-d3/p4.l4`: a 250-element list of `GST rate` pinned to 1 June 2023, ambient
+clock 2025, where the rate is 7 before 2024-01-01 and 9 on or after. `take 1 (drop 199 …)` answers
+`LIST 7`; `take 1 (drop 201 …)` answers `LIST 9`; `sum` answers `1848` = 201×7 + 49×9 — one
+arithmetic result mixing two legal regimes, belonging to neither. **A warning gated on reaching
+`ValClosure`/`ValObligation`/`ValROp` would stay silent through all of it**, because at `d <= 0`
+`snapshotRef` returns before it ever inspects the constructor (the `d <= 0` guard at
+`Machine.hs:3139` precedes the `readThunk` and `case thunk` at `:3141-3142`). The card cited
+`:3110-3117`, `:3112` and `:3115` for these arms; the module has moved since, and the arms are at
+`:3138-3143` as of 2026-09-05.
+
+**Blast radius.** 64 pin sites — **48 in l4-ide across 9 files**, **16 in canon across 3 files**
+(not 4) — reproduced verbatim 2026-09-05 with
+`grep -rn "EVAL UNDER RULES EFFECTIVE AT" --include='*.l4' jl4 jl4-core doc | grep -vE ':[0-9]+:\s*--'`
+(and the same over canon), plus 24 `RULES EFFECTIVE DATE` reader sites across 18 files. **Under
+this ruling none of them changes meaning.** The warning fires on the three fixture cases in
+`temporal-pin-deep.l4` plus any pinned structure past the budget — measured **zero** in the legal
+corpus, because regcf's five pinned heads and canon's four are shallow scalars or flat records —
+but that was **not exhaustively instrumented, so it is a bound, not a proof**. The measurement that
+would settle it: instrument `snapshotRef` to count unfrozen returns bucketed by arm (constructor /
+depth / back-edge) over an `l4 run` sweep of the 725 shared `.l4` files — the same rig §1.4.1 used
+on 2026-08-03, which would have caught the depth escape had it counted arms instead of diffing
+printed output.
+
+**What review changed.** The analysis this ruling was taken from proposed a warning gated on the
+three opaque constructors. That was refuted by the probe above, and the refutation is the whole
+reason the ruling names five arms: **the escape that produces the worst answer in the entire space
+is the one a constructor-gated warning cannot see.** The same probe falsified a sentence of §1.4.1
+that was marked verified — retracted at §1.4.1's own "Beyond the depth budget" bullet, in this same
+change, rather than merely superseded here.
+
+**Tracking.** smucclaw/l4-ide#934 (OPEN as of 2026-09-05) is what §1.4.1 says tracks this; the
+ruling is owed as a comment there. Not posted by the author of this change, which has no GitHub
+write authority.
 
 ---
 
