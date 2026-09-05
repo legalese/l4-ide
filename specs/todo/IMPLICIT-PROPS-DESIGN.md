@@ -733,3 +733,99 @@ canon); no demand (`LET` has zero uses in the 26 legal files against 125 `WHERE`
 corpus's only hypothetical, `EVAL UNDER RULES EFFECTIVE AT`, has nineteen uses all at the outermost
 position of a directive, measured 2026-09-04). The cost, terseness when several calls share one
 override, is met by a helper. Detail: `PROPS-REDTEAM-2026-09-03.md` §2.6.
+
+### 11.15 The section binder is paired with its elaboration by identity, not by raw name. FIXED 2026-09-05.
+
+`L4.TypeCheck.resolveSectionGiven` paired each section-`GIVEN` parameter with the 0-ary `ASSUME`
+that `L4.Desugar.desugarSectionGivens` prepends for it using `List.lookup (rawName nm)`. L4 has
+type-directed name resolution, so one spelling may be bound several times at different types
+(`jl4/examples/ok/tdnr.l4` does exactly that with three `ASSUME`s); through a section binder every
+repetition of the name therefore collapsed onto the **first** elaboration. Fixed by consuming the
+elaboration list — each elaboration is taken by at most one parameter, in order — which is the
+one-to-one pairing the desugarer's invariant already guarantees.
+
+**What decided it.** Measured on `props/tdnr-collapse` 2026-09-05, with
+`jl4/examples/ok/section-given-tdnr.l4` (a section `GIVEN` binding `foo` at `NUMBER`, `BOOLEAN` and
+`STRING`, the section-binder spelling of `ok/tdnr.l4`):
+
+- Before: the checked `GivenSig` held `[(foo, NUMBER), (foo, NUMBER), (foo, NUMBER)]` on one
+  `Unique`; `prettyLayout` printed `GIVEN foo IS NUMBER` three times; re-checking that text gave
+  three `AmbiguousTermError`s and the `prettyLayout round-trip` property (`jl4-test`) failed.
+- After: `[(foo, NUMBER), (foo, BOOLEAN), (foo, STRING)]` on three distinct `Unique`s, the printed
+  text carries all three types, and the round-trip is green.
+
+Nothing in the tree could have caught it: the elaborations stayed distinct and they are what
+evaluates, so `l4 check` reported zero errors, no golden changed, and the sweep's oracle — which
+compared error _counts_ — saw nothing. The regression guard is therefore
+`jl4-core/test/SectionGivenTdnrSpec.hs`, which asserts **which** binder and **which** type stands at
+each position (four of its seven examples fail on the pre-fix compiler) plus the corpus file above,
+whose round-trip is the end-to-end form of the same property.
+
+**This unblocks `PROPS-REDTEAM-2026-09-03.md` §6 item 7, measured on the sweep's own marker.**
+Removing `ASSUME` no longer costs type-directed name resolution: the section-binder path now
+expresses what overloaded module-level `ASSUME`s express. `props/assume-sweep` left `ok/tdnr.l4`
+(`foo` at three types) and `ok/misc.l4`'s four `coerce` declarations un-migrated deliberately, as
+the marker for this defect, and its `etc/migrate-assume.mjs` refuses them under an `overload` guard.
+Running that script over both files with only that guard lifted, 2026-09-05:
+
+|        | `l4 check` | `prettyLayout round-trip` | the printed `GIVEN`                                                |
+| ------ | ---------- | ------------------------- | ------------------------------------------------------------------ |
+| before | succeeded  | **failed, both files**    | `foo IS NUMBER` x3; `coerce IS FUNCTION FROM NUMBER TO BOOLEAN` x4 |
+| after  | succeeded  | passed, both files        | all three `foo` types; all four `coerce` types                     |
+
+The `l4 check` column is the whole reason this defect survived: it reads "Check succeeded" on both
+files on the pre-fix compiler. Non-overloaded neighbours are unaffected either way — `ok/misc.l4`'s
+`cat` prints correctly on both compilers — so the repair is confined to the repeated name. The
+`overload` refusal, and those two files' migration, can be lifted once this and the sweep are both
+on `unstable`; the corpus files themselves are the sweep's and are untouched here.
+
+**Correction to the finding this discharges.** The sweep reported a "second, worse instance": that
+migrating `jl4/experiments/macma3.l4` made two `AmbiguousTermError`s disappear, and attributed that
+to this collapse. **The attribution is wrong and this fix does not repair it.** Measured 2026-09-05
+on the pre-fix and post-fix compilers alike: taking the swept `macma3.l4` and _only_ moving its two
+`ASSUME forfeiture`/`ASSUME confiscation` lines (the `Action`-typed pair, at the file's end) up to
+just below the section heading — leaving them as `ASSUME`s, adding nothing to any `GIVEN` — loses
+the same two diagnostics, 4 errors to 2. So the trigger is a **declaration-order sensitivity in
+TDNR candidate resolution**, which the migration meets only because `desugarSectionGivens` prepends
+elaborations to the head of the section. It is a separate, unfixed defect, present on `unstable`
+before section binders existed.
+
+**Its witness and its mechanism** (verified here 2026-09-05, after a reviewer pointed at the site;
+line numbers are this tree's). Four lines are enough:
+
+```l4
+§ `S`
+#EVAL f 1
+ASSUME f IS A FUNCTION FROM NUMBER TO BOOLEAN
+ASSUME f IS A FUNCTION FROM STRING TO BOOLEAN
+```
+
+Measured: one `AmbiguousTermError` as written; **zero** with the `#EVAL` moved below the two
+`ASSUME`s. `scanFunSigAssume`'s `mergeResultTypeInto` (`jl4-core/src/L4/TypeCheck.hs:4891`, used at
+`:4852`) folds an `ASSUME`'s own type into a `GIVETH` so the scan phase can record it — but its
+first equation, for a signature with an empty `GIVEN` and no `GIVETH`, returns the signature
+unchanged and drops that type on the floor. A bare `ASSUME f IS A FUNCTION FROM … TO …` is exactly
+that shape, so it reaches the scan with no result type, and a use checked before `inferAssume` gets
+to it sees a candidate that unifies with anything. Both controls are order-insensitive, measured the
+same day: the identical overload written as two `DECIDE`s, and written as two `ASSUME`s in
+`GIVEN`/`GIVETH` form, give zero ambiguities in either order.
+
+That also explains the asymmetry in `macma3.l4` and why three earlier attempts here to shrink it
+missed it: the use site sits at line 115, _between_ the `Order`-typed pair at 94 and the
+`Action`-typed pair at 188, so exactly one candidate is scanned late; moving the late pair up puts
+both before the use and the diagnostic goes. Every one of those three shrink attempts put the use
+site _after_ all the declarations — the order-insensitive direction — which is why they all came
+back clean.
+
+**Not fixed here, same family, measured 2026-09-05.** `L4.Names.isSectionBinderElaboration` also
+keys on the raw name, and its docstring's ground for that ("a section that also spells out an
+`ASSUME` of a name its own `GIVEN` binds is already a duplicate definition, so the name-based test
+has no reachable false positive") is false under TDNR. A section with `GIVEN foo IS A NUMBER` on its
+heading and a hand-written `ASSUME foo IS A BOOLEAN` in its body type-checks; `prettyLayout` then
+**drops the hand-written `ASSUME`** as though it were the binder's elaboration, and the printed
+module fails to type-check. `L4.Export.rewriteModuleAssumes` and
+`L4.Names.stripSectionBinderElaborations` share the helper and the hazard. The repair is not the
+same one: the elaboration has to be identifiable _as_ an elaboration (a marker on its annotation, or
+a `Resolved`-only `Unique` match, which the polymorphic `LayoutPrinterWithName` printer cannot use
+as it stands). This is the shape the sweep will produce wherever a section acquires a binder and
+keeps an overloaded `ASSUME` of the same name, so it wants an owner before item 7.
