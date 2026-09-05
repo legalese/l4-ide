@@ -267,6 +267,34 @@ jobs:
       - name: The NOT checker can still tell right from wrong
         run: node etc/check-not-precedence.mjs --selftest
 
+      # Same lane, same reasoning: a word we coined and then retired can be put
+      # back by a PR touching any page at all, so no `paths:` filter could be
+      # right about which PRs need checking. Measured: on 2026-09-05 #336
+      # removed the word from `doc/reference/syntax/section-given.md`, and #338
+      # put it back into that same page five times hours later -- in a PR whose
+      # filter would never have suggested a docs review. Node-only, 0.06 s over
+      # 141 files, no build.
+      #
+      # The selftest runs FIRST, and it is the reason to trust the sweep at
+      # all. It lives inside the script rather than in a committed fixture
+      # because a page full of deliberately-retired words would fail the very
+      # sweep it exists to validate.
+      - name: The retired-terms checker still detects what it claims to
+        run: node etc/check-retired-terms.mjs --selftest
+      # Scoped to the LEARNING quadrants by Meng's ruling of 2026-09-05: retired
+      # words are excluded from tutorials and the cookbook, and allowed in a
+      # Diataxis-style reference or concepts page iff the page introduces the
+      # term. `--dir doc` would forbid exactly what that permits, on pages
+      # including one named `type-theory.md`. When a cookbook directory exists it
+      # joins this list; there is none today, so none is named.
+      #
+      # Note what this therefore does NOT cover: the five reintroductions that
+      # motivated the checker were in `doc/reference/`, which this sweep no longer
+      # visits. They were still violations -- of the "iff introduced" half of the
+      # ruling, which is not yet enforced mechanically (CLAUDE.md section 7).
+      - name: No retired vocabulary in the learning-oriented pages
+        run: node etc/check-retired-terms.mjs --dir doc/tutorials doc/courses
+
   # ============================================
   # Repo-wide invariants: unfiltered, no build
   # ============================================

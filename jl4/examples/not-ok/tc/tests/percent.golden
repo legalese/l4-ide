@@ -15,7 +15,7 @@ File: percent.l4
   Severity: DiagnosticSeverity_Error
   Code: <none>
   Message:
-    The argument of '%' is expected to be of type
+    The input to '%' is expected to be of type
 
       NUMBER
 
@@ -30,7 +30,7 @@ File: percent.l4
   Severity: DiagnosticSeverity_Error
   Code: <none>
   Message:
-    The argument of '%' is expected to be of type
+    The input to '%' is expected to be of type
 
       NUMBER
 
@@ -52,7 +52,7 @@ File: percent.l4
   Severity: DiagnosticSeverity_Error
   Code: <none>
   Message:
-    The argument of '%' is expected to be of type
+    The input to '%' is expected to be of type
 
       NUMBER
 
@@ -67,7 +67,7 @@ File: percent.l4
   Severity: DiagnosticSeverity_Error
   Code: <none>
   Message:
-    The first argument of function 
+    The first input of function 
 
       MyType (defined at percent.l4:6:9-15)
 

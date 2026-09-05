@@ -8,7 +8,7 @@ File: set-and-unoverloaded.l4
   Severity: DiagnosticSeverity_Error
   Code: <none>
   Message:
-    The first argument of function 
+    The first input of function 
 
       `__AND__` (predefined)
 
@@ -27,7 +27,7 @@ File: set-and-unoverloaded.l4
   Severity: DiagnosticSeverity_Error
   Code: <none>
   Message:
-    The second argument of function 
+    The second input of function 
 
       `__AND__` (predefined)
 

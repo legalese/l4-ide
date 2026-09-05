@@ -118,21 +118,21 @@ name already get (`jl4/examples/ok/tdnr.l4`).
           `late fee` IS A STRING
 
 GIVETH A NUMBER
-`fee due` MEANS `late fee` TIMES 2      -- the NUMBER binder
+`fee due` MEANS `late fee` TIMES 2      -- reads the NUMBER one
 
 GIVETH A STRING
-`fee label` MEANS `late fee`            -- the STRING binder
+`fee label` MEANS `late fee`            -- reads the STRING one
 ```
 
 This is a drafting idiom to reach for sparingly: a reader who cannot see the
-types cannot see which binder a rule means, and a use site whose context settles
+types cannot see which of them a rule means, and a use site whose context settles
 nothing is a "multiple definitions" error naming both candidates. It is
-supported because the `ASSUME`s a section binder replaces support it, and a
+supported because the `ASSUME`s a section `GIVEN` replaces support it, and a
 migration that lost it would silently change which programs compile.
 
 **Limit.** A section that binds a name on its heading and _also_ writes its own
 `ASSUME` of that name in its body type-checks, but does not survive being
-re-printed: the printer treats the hand-written `ASSUME` as the binder's own and
+re-printed: the printer treats the hand-written `ASSUME` as the section's own and
 drops it, so `l4 batch` and the REPL rebuild a module that has lost it. Write
 the second binding as another `GIVEN` parameter on the heading instead.
 

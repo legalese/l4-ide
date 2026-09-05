@@ -122,8 +122,9 @@ place that asked the question:
 Neither `#CHECK ... WITH ...` nor `#EVAL ... WITH ...` binds an assumed value
 today, and the failure takes more than one shape. Where the name takes no
 inputs of its own, both `#CHECK isAdult WITH age IS 25` and `#EVAL isAdult WITH
-age IS 25` report the same check error: `isAdult … (which is not a function)
-to (named) arguments here.` Where a value is written before the `WITH`, as in
+age IS 25` report the same check error: `You are giving named inputs to isAdult …
+but it is not a function, so it takes none.` Where a value is written before
+the `WITH`, as in
 ``#EVAL `tax on` 100 WITH rate IS 0.2``, the file does not parse at all:
 `unexpected WITH`.
 

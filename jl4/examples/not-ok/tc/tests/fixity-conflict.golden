@@ -8,7 +8,7 @@ File: fixity-conflict.l4
   Severity: DiagnosticSeverity_Error
   Code: <none>
   Message:
-    The operator `CLASHOP` has conflicting fixity declarations in scope:
+    The operator `CLASHOP` has conflicting fixity declarations visible here:
 
       @infixr 7
       @infixl 6
