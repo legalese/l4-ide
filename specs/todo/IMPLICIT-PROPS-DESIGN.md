@@ -105,6 +105,13 @@ This is the answer to the closure-opacity problem: with closures you must trace 
 
 ### 4.3 Discover purity; don't annotate it
 
+> **WITHDRAWN 2026-09-05 — see §11.15 (R14).** Nothing below was ever built, and the badge it
+> proposes would be uninformative: 95 of the 745 `.l4` files under `jl4/` and `jl4-core/` carry a
+> module-level `ASSUME` at all, so "very pure" would be true of roughly seven files in eight.
+> The read-set that §4.3 wanted as its mechanism is separately real and shipped (PR #328); what is
+> withdrawn is the classification painted on top of it. Retained unedited below because §8 Q8 and
+> §9 cite it.
+
 Because `props` is available everywhere by default, the interesting analysis is the inverse: **statically determine which functions actually use it.**
 
 - Analyze each function and the **transitive closure of its callees** for any reference to a `props` component.
@@ -146,6 +153,13 @@ Extend the same inference to `props`: a reference to `props's jurisdiction` (or 
 The intent is that **the developer never has to write the `props` requirements by hand** — the compiler infers them. Annotation is a smell we are explicitly trying to avoid.
 
 ### 5.3 Computed fields compose with `props`
+
+> **DISCHARGED 2026-09-05 — see §11.14 (R13).** This section turns out to describe the tree
+> rather than propose anything: a computed field reading a section binder type-checks, exports,
+> and evaluates today (probe measured 2026-09-05, answer 109), because
+> `jl4-core/src/L4/TypeCheck.hs:195-199` orders the two desugars so they do not interfere and
+> `jl4-core/src/L4/Export.hs:353-356` walks a computed field's selector `DECIDE` like any other
+> callee. Nothing is owed on it. Read the present tense below as reporting, not promising.
 
 L4 already supports **computed fields** — properties defined entirely in terms of other attributes of the object (methods-as-fields). These compose cleanly with `props`: a derived property like `eligibility` can be computed from `age` and `jurisdiction` without explicit drilling, and the compiler tracks the dependency automatically. Whether a given field is a plain stored value or a computed one is "further magic" the inference layer resolves; the consuming rule shouldn't have to care.
 
@@ -202,7 +216,7 @@ Minimize the surface of the breaking change: existing explicit `GIVEN` threading
 5. **Interaction with `WHERE` closures.** How does the new `props` model relate to the existing `WHERE`-block environment access? Subsume it, coexist, or reframe `WHERE` in terms of `props`?
 6. **Regulative rules.** How does implicit `props` interact with `PARTY`/`MUST`/`HENCE`/`LEST` and with `#TRACE` temporal testing? Does the environment flow through state transitions, and how is it shown in `#TRACE` output?
 7. **Teaching story.** How do we _teach_ `props`? The mental model ("everything the caller knows is passed on, unless you deliberately use `local`") needs a crisp, honest framing that doesn't read as "we brought back globals."
-8. **Purity classification surface.** How is "very pure" exposed — diagnostic, hover, badge in the visualizer, attribute in generated artifacts?
+8. ~~**Purity classification surface.** How is "very pure" exposed — diagnostic, hover, badge in the visualizer, attribute in generated artifacts?~~ **WITHDRAWN 2026-09-05, see §11.15 (R14)** — it asks where to paint a classification that was never built and would not inform; §4.3, which it depends on, is withdrawn with it.
 9. **Error messages.** When a function references a `props` field not available in scope, the diagnostic must stay intelligible across a large call graph. What does a good error look like?
 
 ---
@@ -452,6 +466,13 @@ that transitively reads it; supply is the existing named-argument `WITH`.** §4.
 establishment is withdrawn there (visibility already ships; `§` placement is a tiebreak), and
 §5.1's structural subtyping is found unnecessary. R0–R12 are all recorded below, each with the mark Meng gave it on 2026-09-04. The red team's
 rulings are closed; what remains is implementation in the order of `PROPS-REDTEAM-2026-09-03.md` §6.
+
+**Added 2026-09-05, from a second rulings sheet Meng marked that day.** Four further rulings sit
+below and are **not** part of the 2026-09-04 red team: **R7 is amended** by §11.9.1 (the DMN image
+of a refusal), **R7.1** is added by §11.9.2 (the pre-commencement gate), and **R13** and **R14**
+are added by §11.14 and §11.15 (§5.3 discharged, §4.3 and §8 Q8 withdrawn), with the cross-`IMPORT`
+hole filed as a defect in §11.16. **Every one of the four authorises work that has not been done**;
+each says so in its own status line and names what would make it true.
 
 ### 11.1 R0 — `ASSUME` is deprecated. RULED 2026-09-04.
 
@@ -1430,3 +1451,118 @@ boundary", and it is deferred. `ok/section-given-import-def.l4` and
   `` `is a British citizen (variant)` `` to a higher-order rule and lost both its
   `#EVAL`s without it. `ok/section-given-reader-as-value.l4` pins both spellings.
   `ImplicitReaderUsedAsValue` and its corpus file are gone with it.
+---
+
+### 11.16 R13 — §5.3 is discharged: computed fields already compose. RULED 2026-09-05.
+
+**Ruling (Meng, 2026-09-05, mark `accept` on rulings-bench card `D5-computed-fields-purity`,
+option A′).** §5.3, "computed fields compose with `props`", is **discharged**: it is a description
+of the tree, not a proposal. Nothing is owed on it, and §5.3 above is retensed to say so.
+
+**What decided it.** A probe, and two code facts.
+
+- Probe `scratchpad/consult/adv-d5/cf1.l4`, re-run 2026-09-05 on the `l4-base2` binary: a
+  `DECLARE Sale` whose `gst` field is `` MEANS `net` * `gst rate` `` — a computed field reading a
+  section binder declared two declarations away — exports, demands `gst rate` in its schema, and
+  `l4 batch cf1.l4 -i '{"x":{"net":100},"gst rate":0.09}'` answers **109**. Omit `gst rate` from
+  the row and it answers `Missing required field 'gst rate' in JSON object`. The composition works
+  and the schema knows about it.
+- `jl4-core/src/L4/TypeCheck.hs:195-199` runs the two desugars in a stated order —
+  `desugarSectionGivens (desugarComputedFields program)` — with the comment explaining why they do
+  not interfere: computed-field desugaring only inserts `DECIDE`s after a `DECLARE`, and section
+  binders are elaborated last so each `ASSUME` sits at its section's head.
+- `jl4-core/src/L4/Export.hs:353-356` says in its own Haddock that a computed `MEANS` record field
+  desugars to a top-level selector `DECIDE` and "must be walked like any other callee", which is
+  why the read-set finds it.
+
+**Blast radius: zero.** No file changes and no program re-means. Computed fields measure **89
+indented-`MEANS` sites in 20 files** by the count taken for this ruling (the card's prior analysis
+used a narrower heuristic and got 50 in 12; neither number is load-bearing here), and **0 in
+`/Users/mengwong/src/legalese/canon`** under both. Four of those 20 are libraries — `prelude.l4`,
+`math.l4`, `excel-date.l4`, `negation-as-failure.l4` — which 159 and 65 files import, so the
+exposure is wider than a file list suggests even though the count of changes is nil.
+
+---
+
+### 11.17 R14 — §4.3 and §8 Q8 are withdrawn: "very pure" is not built and would not inform. RULED 2026-09-05.
+
+**Ruling (Meng, 2026-09-05, same card, option A′).** §4.3 ("Discover purity; don't annotate it" —
+mark a subtree "very pure" when it never touches the environment) and §8 open question 8 ("Purity
+classification surface" — how is "very pure" exposed) are **withdrawn**. §4.3 and §8 Q8 above are
+retensed to say so.
+
+**What decided it.** Two measurements, both taken 2026-09-05.
+
+- **Nothing was ever built.**
+  `grep -rniE 'very pure|veryPure|isPure|purity' --include='*.hs' --include='*.ts' --include='*.svelte' .`
+  over the tree returns **nothing**. §4.3 has been a proposal for its whole life, and §8 Q8 asks
+  how to surface a classification that does not exist.
+- **The badge would be uninformative.** `grep -rlE '^[[:space:]]*ASSUME ' --include='*.l4' jl4 jl4-core`
+  returns **95** files, against **745** `.l4` files under those two trees. So a "very pure" badge
+  would be true of roughly seven files in eight, which is not a distinction a reader can act on.
+  (The card gave this as "95 of 615"; the numerator reproduces exactly, the denominator does not —
+  745 is what `find jl4 jl4-core -name '*.l4'` counts on this tree today. The ratio is more lopsided
+  than the card's, not less.)
+
+**What this does not withdraw.** The read-set itself, which R0/R10/R11 build and which PR #328
+already landed, is the mechanism §4.3 wanted; what is withdrawn is the badge on top of it and the
+question of where to paint it. If purity is ever wanted as an artifact attribute, it is a fresh
+proposal against a read-set that by then exists, not a resumption of this one.
+
+---
+
+### 11.18 The cross-`IMPORT` hole, filed as a defect. RECORDED 2026-09-05.
+
+Ruled with R13/R14 (card `D5-computed-fields-purity`, option A′): the measurement pass that
+discharged §5.3 turned up a hole, and it is filed as a defect in
+`PROPS-REDTEAM-2026-09-03.md` §7 rather than silently absorbed. **Its first required move is the
+refusal, not the closure**, and that ordering is the ruling — not a preference.
+
+**The hole, measured 2026-09-05** (probe `scratchpad/consult/adv-d5/cf5.l4` + `lib_c.l4`, run on
+`l4-base2`). `lib_c.l4` declares a section `GIVEN rate3 IS A NUMBER TYPICALLY 0.05` and a helper
+`scaled3` that reads it. `cf5.l4` imports `lib_c` and exports `top5 m MEANS scaled3 m`. Then:
+
+| command                                        | result                                                                                                                       |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `l4 batch cf5.l4 -i in5.json --validate-only`  | `{"errors":[],"input":{"m":100,"rate3":0.99},"status":"valid"}` — **a false green**                                          |
+| `l4 batch cf5.l4 -i in5.json`                  | `status: error`, "I could not continue evaluating, because I needed to know the value of `rate3` but it is an assumed term." |
+| the same with `rate3` **omitted** from the row | byte-identical error                                                                                                         |
+
+So `rate3` is neither demanded nor delivered: `--validate-only` passes an input that cannot
+evaluate, and a value supplied under that name is **accepted into the row and ignored**.
+
+**Both halves must be named, or the next person fixes the half that makes it worse.**
+
+1. **The read-set collector does not follow `IMPORT`.** Its three sites are per-module by type
+   signature: `assumesFromModule :: Module Resolved -> …` (`Export.hs:300`),
+   `decideBodiesFromModule :: Module Resolved -> …` (`Export.hs:377`, the call graph's edge table),
+   and `rewriteModuleAssumes :: … -> Module Resolved -> Module Resolved` (`Export.hs:441`). The
+   card's prior analysis said the fix is "confined to one module: `Export.hs` is the only place the
+   closure is computed"; it is one of four sites, and the fourth is not in `Export.hs` at all.
+2. **The supply path cannot deliver across an `IMPORT` even if the collector did.** `l4 batch`
+   supplies a read binder by **rewriting the module's source**: it drops the binder's declaration
+   and redefines it over the decoded row in a generated wrapper (`jl4/app/L4/Cli/Batch.hs:221-236`,
+   which explains why a `LET` would not do), then concatenates
+   `filteredSource <> wrapperCode` (`Batch.hs:340-342`). `filteredSource` is
+   `prettyLayout filteredModule`, and `prettyLayout` **re-emits the `IMPORT`** verbatim
+   (`jl4-core/src/L4/Print.hs:561-563`), so the imported module is re-resolved from disk and the
+   rewrite never reaches it.
+
+**Therefore the refusal comes first.** Closing the collector over imports, on its own, converts a
+false green into a **demanded-then-silently-ignored** parameter — the schema would require `rate3`,
+`--validate-only` would enforce it, and `Batch.hs` would still be unable to put the value where the
+callee reads it. `l4 check`/`l4 batch` must **refuse** an export whose read-set crosses an `IMPORT`
+before the closure is allowed to find one.
+
+**Exposure today: zero corpus files.** Measured across all 25 modules named in an `IMPORT` line,
+every one has `ASSUME` = 0 except `regcf.l4`'s two refusal-role lines; and section `GIVEN` exists
+in only 7 files, all fixtures added by PR #333, none of them imported. (`gm-discharge` measured the
+same independently and recorded the same deferral.) **After discharge the exposed population is
+every file that imports a migrated domain module** — 664 `ASSUME` lines in 105 files become section
+binders in exactly the modules other files import, which is R0's committed cost arriving.
+
+**One sequencing disagreement with the card's prior analysis, resolved in favour of the earlier
+fix.** It proposed updating `doc/reference/syntax/section-given.md:164` "in the same PR as the fix,
+not before". That line said the crossing behaviour is "not asserted"; it is now measured. Leaving a
+known false green documented as unknown for the length of a queue is the drift the user-level
+`CLAUDE.md` rule 1 forbids, so the page is corrected in this change and says what happens today.
