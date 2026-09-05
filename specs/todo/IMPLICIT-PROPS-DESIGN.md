@@ -736,11 +736,24 @@ override, is met by a helper. Detail: `PROPS-REDTEAM-2026-09-03.md` §2.6.
 
 ### 11.14 Sequencing item 6 — the corpus and docs migration: what it swept, and the two things it found
 
-**Status 2026-09-05: built on branch `props/assume-sweep`, NOT merged, no PR open.** Everything
-below describes that branch, not `unstable`. The migration is driven by `etc/migrate-assume.mjs`,
-which is committed with it: the script is idempotent and never writes without `--write`, so the
-tree it produces is re-derivable — re-running it over the swept trees is a no-op, and that is the
-intended way to review the mechanical half of the diff.
+**Status 2026-09-05: built on branch `props/assume-sweep`, rebased onto `props/opaque-declare`
+(PR #335), NOT merged.** Everything below describes that branch, not `unstable`. The migration is
+driven by `etc/migrate-assume.mjs`, which is committed with it: the script is idempotent and never
+writes without `--write`, so the tree it produces is re-derivable — re-running it over the swept
+trees is a no-op, and that is the intended way to review the mechanical half of the diff.
+
+**One exception to that no-op, measured after the rebase**, so a reviewer who runs the script is not
+misled by it: `props/opaque-declare` added two fixtures that did not exist when the sweep ran, and
+the script reports **4 term-role sites** in them — `ok/opaque-declare.l4:84-85`
+(`` `some person` ``, `` `some premises` ``) and `doc/reference/types/opaque-example.l4:40-41`
+(`` `the applicant` ``, `` `the premises` ``). **They are deliberately not swept here.** Both files
+name the keyword in their own prose — "a value arrives from outside — an `ASSUME` here, a JSON input
+at a service boundary in production" — so rewriting the declarations without rewriting the
+surrounding explanation would leave each page contradicting its own example, which is the drift this
+migration repaired in `legal/anti-social.l4` and `legal/british-citizen-act.l4`. Whether those two
+fixtures should teach the section-`GIVEN` spelling is a question about what the opaque-type
+documentation says, and it belongs to whoever owns that page — sequencing item 5's documentation
+pass, alongside `doc/reference/types/ASSUME.md`'s deprecation notice — not to a mechanical sweep.
 
 **Swept.** 207 term- and function-role `ASSUME` declarations rewritten to the R4 section `GIVEN`
 across 62 `.l4` files — counted off the branch diff itself (`grep -c '^-ASSUME '` over the changed
