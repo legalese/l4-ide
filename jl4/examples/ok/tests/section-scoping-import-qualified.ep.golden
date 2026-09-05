@@ -1,0 +1,28 @@
+-- The positive companion to not-ok/tc/section-scoping-import-collision.l4
+-- (spec §5.5, FIX C; specs/todo/MODULE-BOUNDARY-SPEC.md §4).
+--
+-- That file asserts that an import and a local section binding of the same name
+-- and type stay a genuine ambiguity. Its diagnostic answers the question the
+-- reader actually has -- "then how do I say which one I meant?" -- by listing
+-- each candidate under the sections that enclose it, the IMPORTED one included:
+--
+--     `Local Section`.EULER (defined at section-scoping-import-collision.l4:...)
+--     Math.Constants.EULER  (defined at math.l4:12:1-6)
+--
+-- This file asserts the other half: that BOTH of those spellings resolve. A
+-- suggestion you cannot paste back is not a suggestion, and before the imported
+-- binding's section path crossed the boundary the second line read bare `EULER`
+-- -- the very spelling that was ambiguous.
+--
+-- `math` defines EULER in § Math / §§ Constants. § `Local Section` below binds
+-- its own EULER at the same type, so a BARE reference here is ambiguous by FIX
+-- C; each qualified spelling is not.
+
+IMPORT math
+
+§ `Local Section`
+GIVETH A NUMBER
+EULER MEANS 3
+
+#EVAL Math.Constants.EULER
+#EVAL `Local Section`.EULER

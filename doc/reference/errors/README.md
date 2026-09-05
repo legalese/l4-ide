@@ -264,7 +264,7 @@ below it -- and that declaration never uses
 
   `the rate`
 
-If `the rate` was meant as a binder for the whole of
+If `the rate` was meant as an input for the whole of
 
   § S
 
@@ -274,7 +274,7 @@ indent the GIVEN so that it starts past the § of the heading:
       GIVEN `the rate` IS A <type>
 ```
 
-It arrives alongside a pair of "The names in a type signature must match those in the definition" errors, which have the same cause. The word "binder" in the message is L4's own wording for what the manual calls a section `GIVEN`.
+It arrives alongside a pair of "The names in a type signature must match those in the definition" errors, which have the same cause.
 
 **What you wrote:**
 

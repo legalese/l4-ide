@@ -10,7 +10,7 @@ plainly, there are five conditions:
    likely to need.
 4. **Go through one registered intermediary, exclusively.** Rule 100(a)(3)
    requires the transaction to be
-   [conducted exclusively through the intermediary's platform](src:jl4/examples/legal/regcf/regcf.l4#L560 "verbatim"),
+   [conducted exclusively through the intermediary's platform](src:jl4/examples/legal/regcf/regcf.l4#L559 "verbatim"),
    and the Instruction to that paragraph fixes the number of intermediaries at
    one. This condition drags the intermediary's own regime in behind it. The
    requirement that an offering sit publicly on the platform for

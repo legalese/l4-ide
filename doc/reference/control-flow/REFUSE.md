@@ -40,15 +40,15 @@ no export schema, because it is not an input.
 A refusal is one of several ways a rule can decline to produce an ordinary value, and choosing the
 right one is a modelling decision. (From `specs/todo/PROPS-REDTEAM-2026-09-03.md` §2.8.)
 
-| the non-answer                           | the construct        | who handles it                                   | catchable?      |
-| ---------------------------------------- | -------------------- | ------------------------------------------------ | --------------- |
-| a value that may be absent               | `MAYBE`              | the rule, by matching                            | yes, as a value |
-| an expected failure with a reason        | `EITHER`             | the rule or its caller                           | yes, as a value |
-| a fact not yet known                     | an unsupplied binder | the boundary asks for it                         | n/a             |
-| the law does not apply / is not in force | a value or a gate    | savings and transitional provisions can reach it | yes             |
-| the model does not cover this            | `REFUSE`             | the boundary only                                | **no**          |
-| a breach                                 | `LEST`               | the obligation's own branch                      | structured      |
-| an overridden conclusion                 | `SUBJECT TO`         | the overriding rule                              | structured      |
+| the non-answer                           | the construct                         | who handles it                                   | catchable?      |
+| ---------------------------------------- | ------------------------------------- | ------------------------------------------------ | --------------- |
+| a value that may be absent               | `MAYBE`                               | the rule, by matching                            | yes, as a value |
+| an expected failure with a reason        | `EITHER`                              | the rule or its caller                           | yes, as a value |
+| a fact not yet known                     | a blank, written as a section `GIVEN` | the boundary asks for it                         | n/a             |
+| the law does not apply / is not in force | a value or a gate                     | savings and transitional provisions can reach it | yes             |
+| the model does not cover this            | `REFUSE`                              | the boundary only                                | **no**          |
+| a breach                                 | `LEST`                                | the obligation's own branch                      | structured      |
+| an overridden conclusion                 | `SUBJECT TO`                          | the overriding rule                              | structured      |
 
 The fourth and fifth rows are close, and the difference is legal, not technical. "Not in force" is
 _determinate_ and a savings or transitional provision can operate on it, so it wants a value or a

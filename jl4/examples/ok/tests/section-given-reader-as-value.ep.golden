@@ -1,0 +1,29 @@
+-- A rule that reads a section binder, passed as a value.
+--
+-- Discharge gives such a rule an extra input for the binder, which a bare
+-- mention of its name cannot carry -- so the reference is eta-expanded into the
+-- function the writer meant, `GIVEN _eta0 YIELD bump _eta0 `the rate``. Passing
+-- a reader to `map` is ordinary L4 and has to keep working.
+
+IMPORT prelude
+
+§ `Rates`
+    GIVEN `the rate` IS A NUMBER
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+bump n MEANS n TIMES `the rate`
+
+-- The bare name, passed straight to a higher-order function.
+GIVETH A LIST OF NUMBER
+`all bumped` MEANS map bump (LIST 1, 2, 3)
+
+-- The explicit lambda, which meant the same thing before and still does.
+GIVETH A LIST OF NUMBER
+`all bumped the long way` MEANS map (GIVEN x YIELD bump x) (LIST 1, 2, 3)
+
+#EVAL `all bumped` WITH `the rate` IS 10
+#EVAL `all bumped the long way` WITH `the rate` IS 10
+
+#ASSERT (`all bumped` WITH `the rate` IS 10) EQUALS (LIST 10, 20, 30)
+#ASSERT (`all bumped the long way` WITH `the rate` IS 10) EQUALS (LIST 10, 20, 30)

@@ -24,6 +24,7 @@ DECIDE name MEANS expression   -- Definition
 | [WHERE](WHERE.md)                        | Adds local definitions after an expression  | Optional                   |
 | [LET](LET.md)                            | Adds local definitions before an expression | Optional                   |
 | [AKA](AKA.md)                            | Creates aliases for definitions             | Optional                   |
+| [WITH](WITH.md)                          | Supplies a call's arguments by name         | Optional                   |
 
 ## Quick Examples
 

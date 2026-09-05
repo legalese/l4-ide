@@ -473,7 +473,7 @@ below it -- and that declaration never uses
 
   `the rate`
 
-If `the rate` was meant as a binder for the whole of
+If `the rate` was meant as an input for the whole of
 
   § `Part 7`
 
@@ -485,7 +485,7 @@ indent the GIVEN so that it starts past the § of the heading:
 
 **What it means.** A `GIVEN` belongs to the section only when it starts at a column past the heading's `§` — that is, when the word `GIVEN` sits further from the left margin than the `§` above it. At column 1, hard against the left margin, it is the next declaration's own inputs instead; this is usually the result of a paste or a re-indent.
 
-The message uses two of L4's internal words. **"Binder"** is its name for what this page calls a section `GIVEN`. **Signature** is its word for the list of a rule's own inputs — so "the signature of the declaration below it" means "the list of inputs belonging to the declaration written below it". The shape the message prints at the end is the correction. Above a `DECLARE` it arrives with two neighbouring errors about names in a signature not matching the definition's; above an `ASSUME`, alone.
+The message uses one of L4's internal words. **"Signature"** is its word for the list of a rule's own inputs — so "the signature of the declaration below it" means "the list of inputs belonging to the declaration written below it". The shape the message prints at the end is the correction. Above a `DECLARE` it arrives with two neighbouring errors about names in a signature not matching the definition's; above an `ASSUME`, alone.
 
 **The fix.** Indent the `GIVEN` line, as the message shows. This check fires only when the declaration below is a `DECLARE` or an `ASSUME` that never uses the name; it deliberately does not fire on a `DECIDE`, because a rule that ignores one of its own inputs is an ordinary thing to write.
 
