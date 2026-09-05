@@ -416,8 +416,8 @@ shadow warning **only when `JL4_LIBRARY_PATH` is unset**, deliberately — with 
 the operator has taken explicit control, and the golden suites pin it so their captured logs
 stay machine-independent.
 
-Today 282 files opt into prelude resolution by writing `IMPORT prelude`. Make it implicit and
-all 884 do, silently. The repo `CLAUDE.md` §3.1 records the failure that then becomes reachable
+Today 283 files opt into prelude resolution by writing `IMPORT prelude`. Make it implicit and
+all 894 do, silently. The repo `CLAUDE.md` §3.1 records the failure that then becomes reachable
 from every file rather than from the ones that asked: a `JL4_LIBRARY_PATH` pinned at a prelude
 newer than the binary does not report a version mismatch, it produces cascading "could not find
 a definition" errors for `setFromList`, `UNION` and every other prelude name — which reads as a

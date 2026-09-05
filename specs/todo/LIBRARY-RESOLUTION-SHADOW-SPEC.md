@@ -29,9 +29,10 @@
 >
 > **Amended 2026-09-05 — an implicit `IMPORT prelude` would make the dev-regime
 > gate above reachable from every file.** Ruling D8 proposed that every script
-> get the prelude without asking. Measured: 282 of 884 `.l4` files opt into
-> prelude resolution today by writing the import; under an implicit one, all 884
-> would, silently. The failure the repo `CLAUDE.md` §3.1 records — a pinned
+> get the prelude without asking. Measured at `88d9f8b9` plus that branch, over
+> every `.l4` in the worktree: **283 of 894** files opt into prelude resolution
+> today by writing the import; under an implicit one, **all 894** would,
+> silently. The failure the repo `CLAUDE.md` §3.1 records — a pinned
 > `JL4_LIBRARY_PATH` at a prelude newer than the binary, which presents as
 > cascading "could not find a definition" errors rather than as a version
 > mismatch — would then be reachable from files that never mentioned the
