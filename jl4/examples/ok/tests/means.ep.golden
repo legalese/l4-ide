@@ -1,9 +1,9 @@
 § Example
+    GIVEN walks IS A BOOLEAN
+          drinks IS A BOOLEAN
+          eats IS A BOOLEAN
 
 DECLARE Person
-ASSUME walks  IS A BOOLEAN
-ASSUME drinks IS A BOOLEAN
-ASSUME eats   IS A BOOLEAN
 
 GIVEN x IS A Person
 y MEANS walks

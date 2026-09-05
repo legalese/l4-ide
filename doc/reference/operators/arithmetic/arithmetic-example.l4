@@ -1,5 +1,9 @@
 -- Arithmetic keyword examples
 
+§ `Arithmetic keyword examples`
+    GIVEN income IS A NUMBER
+          expenses IS A NUMBER
+
 -- PLUS (Addition)
 
 #EVAL 5 PLUS 3
@@ -84,9 +88,6 @@ applyDiscount originalPrice discountPercent MEANS
 #EVAL applyDiscount 200 25
 
 -- Combining with Comparisons
-
-ASSUME income IS A NUMBER
-ASSUME expenses IS A NUMBER
 
 DECIDE profit IS income MINUS expenses
 DECIDE isProfitable IS profit GREATER THAN 0

@@ -1,4 +1,18 @@
 § `Imaginary Alcohol Act`
+    GIVEN `the person is a body corporate` IS BOOLEAN
+          `the person engages in business for profit` IS BOOLEAN
+          `the person is a public house` IS BOOLEAN
+          `the person is a hotel` IS BOOLEAN
+          `the person has an unspent conviction for fraud` IS BOOLEAN
+          `the person has an unspent conviction for providing misleading information in relation to an application for a licence under an enactment` IS BOOLEAN
+          `the person has an alcohol banning order` IS BOOLEAN
+          `a price list for alcohol is displayed on the premises` IS BOOLEAN
+          `the premises are registered as a hotel` IS BOOLEAN
+          `the enforcement officer believes that the price list is misleading to customers` IS BOOLEAN
+          `the enforcement officer has issued a warning to the proprietor of premises` IS BOOLEAN
+          `the proprietor corrects the price list` IS BOOLEAN
+          `the proprietor does so to the satisfaction of the enforcement officer` IS BOOLEAN
+          `the proprietor does so within 5 days after the warning was issued` IS BOOLEAN
 
 {-
 CRLP's Imaginary Alcohol Act
@@ -30,14 +44,6 @@ THEN
 the person must not sell alcohol 
 -}
 
-ASSUME `the person is a body corporate` IS BOOLEAN
-ASSUME `the person engages in business for profit` IS BOOLEAN
-ASSUME `the person is a public house` IS BOOLEAN
-ASSUME `the person is a hotel` IS BOOLEAN
-ASSUME `the person has an unspent conviction for fraud` IS BOOLEAN
-ASSUME `the person has an unspent conviction for providing misleading information in relation to an application for a licence under an enactment` IS BOOLEAN
-ASSUME `the person has an alcohol banning order` IS BOOLEAN
-
 DECIDE `the person must not sell alcohol`
 IF  `the person is a body corporate`
     AND  `the person engages in business for profit`
@@ -61,10 +67,6 @@ THEN
 the enforcement officer may issue a warning to the proprietor of premises
 -}
 
-ASSUME `a price list for alcohol is displayed on the premises` IS BOOLEAN
-ASSUME `the premises are registered as a hotel` IS BOOLEAN
-ASSUME `the enforcement officer believes that the price list is misleading to customers` IS BOOLEAN
-
 DECIDE `the enforcement officer may issue a warning to the proprietor of premises`
 IF  `a price list for alcohol is displayed on the premises`
     AND  `the premises are registered as a hotel`
@@ -84,11 +86,6 @@ THEN
 the enforcement officer may cancel the registration of the hotel
 -}
 
-ASSUME `the enforcement officer has issued a warning to the proprietor of premises` IS BOOLEAN
-ASSUME `the proprietor corrects the price list` IS BOOLEAN
-ASSUME `the proprietor does so to the satisfaction of the enforcement officer` IS BOOLEAN
-ASSUME `the proprietor does so within 5 days after the warning was issued` IS BOOLEAN
-
 DECIDE `the enforcement officer may cancel the registration of the hotel`
 IF  `the enforcement officer has issued a warning to the proprietor of premises`
     AND  NOT (
@@ -96,4 +93,3 @@ IF  `the enforcement officer has issued a warning to the proprietor of premises`
         AND  `the proprietor does so to the satisfaction of the enforcement officer`
         AND  `the proprietor does so within 5 days after the warning was issued`
     )
-

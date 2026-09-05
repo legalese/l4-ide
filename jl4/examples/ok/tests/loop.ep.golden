@@ -1,6 +1,7 @@
 -- some lazy evaluation tests
 
-ASSUME unknown IS A BOOLEAN
+§ `some lazy evaluation tests`
+    GIVEN unknown IS A BOOLEAN
 
 DECLARE PAIR
   HAS

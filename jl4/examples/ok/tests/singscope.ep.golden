@@ -1,9 +1,9 @@
 § Example
+    GIVEN walks IS A FUNCTION FROM Person TO BOOLEAN
+          eats IS A FUNCTION FROM Person TO BOOLEAN
+          drinks IS A FUNCTION FROM Person TO BOOLEAN
 
 DECLARE Person
-ASSUME walks  IS A FUNCTION FROM Person TO BOOLEAN
-ASSUME eats   IS A FUNCTION FROM Person TO BOOLEAN
-ASSUME drinks IS A FUNCTION FROM Person TO BOOLEAN
 
 GIVEN p IS A Person
 DECIDE `must sing`

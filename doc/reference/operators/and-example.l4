@@ -1,5 +1,12 @@
 -- AND keyword examples
 
+§ `AND keyword examples`
+    GIVEN age IS A NUMBER
+          hasLicense IS A BOOLEAN
+          personAge IS A NUMBER
+          personIncome IS A NUMBER
+          hasCriminalRecord IS A BOOLEAN
+
 -- Basic AND Operations
 
 #EVAL TRUE AND TRUE
@@ -13,9 +20,6 @@
 #EVAL TRUE && FALSE
 
 -- In Conditional Logic
-
-ASSUME age IS A NUMBER
-ASSUME hasLicense IS A BOOLEAN
 
 DECIDE canDrive IS age >= 16 AND hasLicense
 
@@ -32,10 +36,6 @@ allTrue a b c MEANS a AND b AND c
 #EVAL allTrue TRUE TRUE FALSE
 
 -- Layout-Sensitive AND (Vertical Format)
-
-ASSUME personAge IS A NUMBER
-ASSUME personIncome IS A NUMBER
-ASSUME hasCriminalRecord IS A BOOLEAN
 
 DECIDE isEligible IS
       personAge >= 18

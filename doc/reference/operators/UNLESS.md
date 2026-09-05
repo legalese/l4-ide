@@ -52,9 +52,10 @@ DECIDE blocked IF TRUE UNLESS TRUE
 -- "The applicant is eligible if they are a citizen
 --  and have resided for 5 years, UNLESS they have been disqualified"
 
-ASSUME `is a citizen` IS A BOOLEAN
-ASSUME `has resided for 5 years` IS A BOOLEAN
-ASSUME `has been disqualified` IS A BOOLEAN
+§ `Legal exception pattern`
+    GIVEN `is a citizen` IS A BOOLEAN
+          `has resided for 5 years` IS A BOOLEAN
+          `has been disqualified` IS A BOOLEAN
 
 DECIDE `is eligible` IF
       `is a citizen`

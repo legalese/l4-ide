@@ -3,11 +3,11 @@
 -- See: https://github.com/legalese/l4-ide/issues/756
 
 § `section alpha`
-ASSUME a1 IS A BOOLEAN
+    GIVEN a1 IS A BOOLEAN
 §§ `subsection aa`
-ASSUME a2 IS A BOOLEAN
+    GIVEN a2 IS A BOOLEAN
 §§§ `deep section`
-ASSUME a3 IS A BOOLEAN
+    GIVEN a3 IS A BOOLEAN
 
 -- Test dereferencing with quoted section names
 #CHECK `section alpha`.a1
@@ -16,9 +16,9 @@ ASSUME a3 IS A BOOLEAN
 
 -- Test mixed quoted and unquoted names
 § regular
-ASSUME b1 IS A BOOLEAN
+    GIVEN b1 IS A BOOLEAN
 §§ `quoted child`
-ASSUME b2 IS A BOOLEAN
+    GIVEN b2 IS A BOOLEAN
 
 #CHECK regular.b1
 #CHECK regular.`quoted child`.b2
@@ -26,7 +26,7 @@ ASSUME b2 IS A BOOLEAN
 -- Test qualified names starting with quoted identifier
 § `another section`
 §§ nested
-ASSUME c1 IS A BOOLEAN
+    GIVEN c1 IS A BOOLEAN
 
 #CHECK `another section`.nested.c1
 

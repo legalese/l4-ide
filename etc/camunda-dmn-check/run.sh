@@ -81,6 +81,25 @@ fi
 [ -s "$cp" ] || skip "empty classpath after dependency:build-classpath"
 
 src="$here/src/main/java/CamundaDmnCheck.java"
+# THE COMPILED-CLASS CACHE IS KEYED ON THE SOURCE'S MTIME AND NOT ON THE JDK, so
+# switching JDKs between runs reuses bytecode the newer-then-older JVM refuses to
+# load. Measured 2026-09-05: a run on JDK 26 leaves class file version 70 in
+# $out/classes, and the next run on JDK 21 — the version CI pins — dies before
+# reaching any DMN, with
+#
+#   UnsupportedClassVersionError: CamundaDmnCheck has been compiled by a more
+#   recent version of the Java Runtime (class file version 70.0), this version
+#   of the Java Runtime only recognizes class file versions up to 65.0
+#
+# That reads as a broken harness rather than a stale cache, because the class it
+# names is this harness's own. The unwedge is `rm -rf "$out/classes"`.
+#
+# etc/kie-dmn-check/run.sh does not have this problem: it compiles with
+# `--release 11`, so its cached bytecode loads on every JDK it accepts. Adding
+# `--release 21` here would fix it the same way — 21 is already this script's
+# enforced floor, checked just above — and is the obvious repair for whoever
+# owns this harness next. Deliberately NOT done as a drive-by from a corpus
+# branch, because it changes what every CI run of this checker compiles.
 if [ ! -s "$out/classes/CamundaDmnCheck.class" ] || [ "$src" -nt "$out/classes/CamundaDmnCheck.class" ]; then
   mkdir -p "$out/classes"
   "$JAVA_HOME/bin/javac" -nowarn -cp "$(cat "$cp")" -d "$out/classes" "$src" \

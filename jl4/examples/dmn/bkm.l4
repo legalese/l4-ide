@@ -28,13 +28,12 @@
 IMPORT prelude
 
 § `BKM exhibit`
+    GIVEN pay IS A Pay
 
 DECLARE Pay HAS
     base  IS A NUMBER
     bonus IS A NUMBER
     total IS A NUMBER MEANS `weighted sum` base bonus
-
-ASSUME pay IS A Pay
 
 GIVEN a IS A NUMBER
       b IS A NUMBER
