@@ -501,25 +501,42 @@ be zero at release. **Refusal is order-dependent under lazy `AND`/`OR`** (`FALSE
 `x AND FALSE` refuses) and so diverges from FEEL's commutative Kleene logic; the region is
 well-defined only if the verifier models left-to-right demand. This is written down, not fixed.
 
+> **The DMN clause of the next paragraph is SUPERSEDED. ANSWERED 2026-09-05, see
+> `IMPLICIT-PROPS-DESIGN.md` §11.9.1** (ruling card `D1-dmn-refuse-image`, mark accept). DMN
+> lowers a reachable `REFUSE` to FEEL **`null`** and omits **nothing**; the export **withdraws
+> `DMN-SAFE`**; `D-REFUSE` carries two severities set by the strictness calibration; and
+> **`MayRefuse` is dropped**. The "`REFUSE → null` would launder" argument below is what the
+> ruling overturned: omission and `null` were measured engine-identical under both hit policies
+> (`Dmn/Lower.hs:695`, `:1645-1655`), so it cannot choose between them. The rest of the paragraph —
+> Catala, Docassemble, evaluator, CLI, batch, service — stands unchanged. The **dmnmd/Markdown**
+> carrier is a second per-backend image that neither this paragraph nor the ruling decides; §11.9.1
+> records the measured consequence and leaves it open.
+
 **Per-backend image**, which no backend has today (every one lowers the refusal `ASSUME` as a
-suppliable input, run-verified 2026-09-04): DMN omits the refusing row, reports a non-Blocking
+suppliable input, run-verified 2026-09-04): ~~DMN omits the refusing row, reports a non-Blocking
 `D-REFUSE` with the reason, and adds a `MayRefuse` safety kind that does not withdraw `DMN-SAFE`
 (FEEL `null` is already spent on `NOTHING`, so `REFUSE → null` would launder; `analyzeSafety`
-deliberately treats an assumed term as not partial, so `D-PARTIAL` is the wrong class); Catala
+deliberately treats an assumed term as not partial, so `D-PARTIAL` is the wrong class)~~ (see the
+note above); Catala
 emits no definition (its ladder veto exempts consequences); Docassemble a terminal screen;
 evaluator, CLI, batch and service a `refused` kind on all six surfaces. The temporal design's
 generated "not in force on <day>" arm (`TEMPORAL-RULE-VERSION-DESIGN.md` item 3) is reconsidered as
-a **gate** rather than a refusal, per the split row below.
+a **gate** rather than a refusal, per the split row below. **That gate is now designed: ANSWERED
+2026-09-05, see `IMPLICIT-PROPS-DESIGN.md` §11.9.2 (R7.1)** — a property of the rule-version axis,
+answered once at the boundary. Its first-written DMN half, a structural absence in the table, was
+withdrawn the same day: §11.9.1a rules that a dated interval table whose floor arm refuses **keeps**
+the row and answers FEEL `null`, per R7's amended image, so R7.1 has no separate DMN half. Ruled,
+not built.
 
-| non-answer                               | construct            | who handles it                                   | catchable       |
-| ---------------------------------------- | -------------------- | ------------------------------------------------ | --------------- |
-| a value that may be absent               | `MAYBE`              | the rule, by matching                            | yes, as a value |
-| an expected failure with a reason        | `EITHER`             | the rule or its caller                           | yes, as a value |
-| a fact not yet known                     | an unsupplied binder | the boundary asks                                | n/a             |
-| the law does not apply / is not in force | a value or gate      | savings and transitional provisions can reach it | yes             |
-| the model does not cover this            | `REFUSE`             | the boundary only                                | no              |
-| a breach                                 | `LEST`               | the obligation's own branch                      | structured      |
-| an overridden conclusion                 | `SUBJECT TO`         | the overriding rule                              | structured      |
+| non-answer                               | construct              | who handles it                                   | catchable       |
+| ---------------------------------------- | ---------------------- | ------------------------------------------------ | --------------- |
+| a value that may be absent               | `MAYBE`                | the rule, by matching                            | yes, as a value |
+| an expected failure with a reason        | `EITHER`               | the rule or its caller                           | yes, as a value |
+| a fact not yet known                     | an unsupplied binder   | the boundary asks                                | n/a             |
+| the law does not apply / is not in force | a gate (R7.1, §11.9.2) | savings and transitional provisions can reach it | yes             |
+| the model does not cover this            | `REFUSE`               | the boundary only                                | no              |
+| a breach                                 | `LEST`                 | the obligation's own branch                      | structured      |
+| an overridden conclusion                 | `SUBJECT TO`           | the overriding rule                              | structured      |
 
 The fourth row was split from the fifth on the legal lens's finding: pre-commencement is
 determinate and reachable by savings provisions (SG Interpretation Act 1965 s 16(1)(b)–(c)), and a
@@ -731,13 +748,22 @@ Kept so that no later session re-proposes one without meeting its witness.
 2. **Shipped section-scoping repairs**: the parent-ambiguity defect and the §3.3.4 drift. Built on
    `fix/section-scoping-ambiguity` (§7).
 3. **`REFUSE`** (R7) and the empty-`DECLARE` migration of the type role, so that no refusal and no
-   sort is ever suppliable, before any discharge crosses `IMPORT`.
+   sort is ever suppliable, before any discharge crosses `IMPORT`. **"Before any discharge crosses
+   `IMPORT`" is now a measured requirement, not a precaution: the read-set does not cross an
+   `IMPORT` today and neither does the supply path, and the two fail in opposite directions.** See
+   the cross-`IMPORT` defect in §7 below, `IMPLICIT-PROPS-DESIGN.md` §11.19, which rules that
+   the **refusal** is the first required move and the closure the second, and
+   `OPEN-FINDINGS-2026-09-05.md` **OF-7**, which is the defect record.
 4. **Section binder parse** per R4, with the misattachment check error and both printers' goldens.
 5. **Discharge** = elaboration; `supplyAppNamed` relaxed per R1; resolution per R2; `TYPICALLY`
    honoured per R8; `WITH`/`LET` per R9; field-opening per R5 with the elaborated-AST stage.
 6. **Consumers**: hover, index, `@reads`; schema tiers; `BatchRequest.world`; DMN, Catala,
    Docassemble, OpenFisca, MLIR per R10; trace needs nothing new, a supplied binder being an
-   ordinary bound argument.
+   ordinary bound argument. **The DMN refusal image this step builds is the one ruled 2026-09-05 in
+   `IMPLICIT-PROPS-DESIGN.md` §11.9.1 (FEEL `null`, nothing omitted, `DMN-SAFE` withdrawn, no
+   `MayRefuse`), not §2.8's**, and it does not ship without §11.9.1's three conditions.
+   `jl4-core/src/L4/Dmn/Lower.hs:2285` cites "§6 item 6" for this work; that citation still points
+   here, and here now points at §11.9.1.
 7. **Migration and deprecation**: a warning in `l4 check` with a code action that rewrites a term
    `ASSUME` to the ruled spelling, the warning not landing before the code action can; then corpus
    and docs, `doc/reference/types/ASSUME.md` carrying the notice and the recipe (`CLAUDE.md` §6);
@@ -777,6 +803,46 @@ were built against `origin/unstable` (`7ed1589e`) by a two-round fix-and-verify 
 Still open, filed here and not yet on a branch: `TYPICALLY`'s three images (§2.5, folded into R8);
 the dead `LocalAssume` grammar (§6 item 7); function-typed `ASSUME` refused by every backend
 (§6 recipe).
+
+**NEW 2026-09-05 — the read-set does not cross an `IMPORT`, and neither does the supply path.**
+Filed with R13/R14 (rulings-bench card `D5-computed-fields-purity`, option A′); ruled in
+`IMPLICIT-PROPS-DESIGN.md` §11.19; the full probe and both halves are in
+`OPEN-FINDINGS-2026-09-05.md` **OF-7**. In one line: an export whose read
+crosses an `IMPORT` gets `{"errors":[],"status":"valid"}` from `l4 batch --validate-only` and then
+fails to evaluate, and a value supplied under the binder's name is accepted into the row and
+ignored (measured 2026-09-05, `scratchpad/consult/adv-d5/cf5.l4` on the `l4-base2` binary).
+**Both halves have to be named or the wrong one gets fixed first:**
+
+- **the read-set collector**, whose three sites are per-module by type signature —
+  `assumesFromModule` (`Export.hs:300`), `decideBodiesFromModule` (`Export.hs:377`) and
+  `rewriteModuleAssumes` (`Export.hs:441`);
+- **the supply path**, which rewrites the module's own source (`Batch.hs:221-236`, `:340-342`) and
+  therefore cannot reach an imported module at all, because `prettyLayout` re-emits the `IMPORT`
+  (`Print.hs:561-563`) and the file is re-resolved from disk.
+
+Closing the collector alone turns a false green into a demanded-then-silently-ignored parameter, so
+**the refusal is the first required move**: `l4 check`/`l4 batch` refuse an export whose read-set
+crosses an `IMPORT`, before the closure is allowed to find one. Zero corpus files are exposed today
+(every one of the 25 imported modules has `ASSUME` = 0 apart from `regcf.l4`'s two refusal-role
+lines; the 7 files with a section `GIVEN` are all fixtures and none is imported), which is why this
+is a defect on a schedule rather than a stop-work.
+
+**Findings from 2026-09-05 that are NOT props defects, and live in their own file.**
+`specs/todo/OPEN-FINDINGS-2026-09-05.md` collects twelve open items (`OF-1` … `OF-12`) found while the 2026-09-05 rulings
+were being recorded. Three of them touch this programme and are named here so a reader of §7 is not
+missing them:
+
+- **`l4 batch`'s generated wrapper is scoped by the last open `§`** (**OF-3**). Loud failure,
+  reproduced with a control. Unreachable today; reachable the moment `props/assume-sweep` lands.
+- **`L4.Names.isSectionBinderElaboration` keys on the raw name** (**OF-2**, recorded in full in
+  `IMPLICIT-PROPS-DESIGN.md` §11.15, which reached `unstable` in #338). **This blocks §6 item 7
+  above.**
+- **A `WHERE` local silently shadows a section `GIVEN`** (**OF-5**). Silent wrong answer: with the
+  binder supplied as 4, one entrypoint answers 4 and its neighbour answers 51, no diagnostic.
+
+The other four — a TDNR declaration-order sensitivity that predates section binders (**OF-1**), an
+unmeasured BPMN question (**OF-4**), the branch-dependent state of smucclaw/l4-ide#948 (**OF-6**),
+and the cross-`IMPORT` hole this section already carries (**OF-7**) — are in that file.
 
 ## 8. Measurements relied on
 

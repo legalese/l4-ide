@@ -214,8 +214,31 @@ model treats as opaque, declared for the section on the same visibility rules
 as any other section `GIVEN`, exactly as `ASSUME a IS A TYPE` does at module
 level; prefer `DECLARE` for that.
 
-Whether a section `GIVEN` crosses an `IMPORT` is whatever `ASSUME` does today,
-which this release does not change and does not assert.
+A section `GIVEN` does **not** reach across an `IMPORT`, and neither does
+`ASSUME`. Suppose module `B` imports module `A`, `A` declares a section `GIVEN`
+called `gst rate`, and one of `A`'s own definitions reads it. A function in `B`
+marked `@export` that calls that definition cannot be given a value for
+`gst rate`. Two things go wrong, and the quiet one comes first:
+
+- `l4 batch B.l4 --inputs row.json --validate-only` answers
+  `{"errors":[],"status":"valid"}`. The list of inputs an exported function
+  needs is collected from `B` alone; it does not follow the `IMPORT` into `A`,
+  so it never learns that `gst rate` is wanted.
+- Running the same row then stops with _"I could not continue evaluating,
+  because I needed to know the value of `gst rate` but it is an assumed term."_
+  Adding `"gst rate"` to the input row does **not** help: the value is accepted
+  into the row and then ignored, because the way `l4 batch` supplies a value is
+  by rewriting the module it was given, and it cannot rewrite a module it only
+  imports.
+
+Measured 2026-09-05. Until this is repaired, read `--validate-only` as saying
+nothing at all about a module that reads a name declared in one it imports. The
+repair is ruled and not yet built, and the first part of it is a **refusal** —
+`l4 check` rejecting this shape rather than accepting it quietly — not a wider
+search. Recorded as a defect in
+`specs/todo/OPEN-FINDINGS-2026-09-05.md` as **OF-7** (and listed in
+`specs/todo/PROPS-REDTEAM-2026-09-03.md` §7); the ordering of the repair is ruled in
+`specs/todo/IMPLICIT-PROPS-DESIGN.md` §11.19.
 
 ## Example
 

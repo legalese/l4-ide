@@ -1424,12 +1424,39 @@ changed the shape of the fourth; the reasoning is kept so the decision is audita
   constant carries an explicit floor arm at Reg CF's commencement (80 FR 71388 instr. 4,
   "Effective May 16, 2016"), and a rule date below it is a curated refusal, not an answer.
   Phase 2's generated "not in force on ⟨day⟩" arm
-  (`TEMPORAL-RULE-VERSION-DESIGN.md:348-352`) remains the designed replacement and is not
+  (`TEMPORAL-RULE-VERSION-DESIGN.md` Phase 2 item 3, `:540-546` — the citation here read
+  `:348-352` until 2026-09-05, by which date those lines held an unrelated critique-disposition
+  list) remains the designed replacement and is not
   built; the hand-written arm is the interim and should be written so Phase 2 can delete it.
+
+  **AMENDED 2026-09-05, see `IMPLICIT-PROPS-DESIGN.md` §11.9.2 (R7.1).** Two things about this
+  ruling have since been decided elsewhere and are recorded here so R2 does not go on saying
+  something the owning documents have moved past.
+
+  1. **"A curated refusal" is no longer the right description of the floor arm.** R7's taxonomy
+     split (`IMPLICIT-PROPS-DESIGN.md` §11.9) separates _"the law is not in force"_ — a value or
+     gate — from _"the model does not cover this"_ — a `REFUSE`. Reg CF's commencement floor is
+     the first, not the second. R7.1 rules the gate: **a property of the rule-version axis,
+     answered once at the boundary**. ~~with its DMN half landing first as a **structural absence**
+     — the refusing row omitted and the table declaring itself incomplete.~~ **That DMN half was
+     withdrawn the same day — ANSWERED 2026-09-05, see `IMPLICIT-PROPS-DESIGN.md` §11.9.1a:**
+     where it overlapped R7's `REFUSE` image, the row is **kept** and answers FEEL `null`. R7.1
+     rules the axis and has no separate DMN half of its own. Ruled 2026-09-05;
+     **not built**, so the eight hand-written arms in `regcf.l4` stand exactly as R2
+     wrote them, and the "delete this when Phase 2 lands" instruction at `regcf.l4:135-143` is
+     still the standing instruction.
+  2. **`regcf-denovo.l4:211` is a different animal and does not migrate with them.** Its floor
+     says "no encoding of Part 227 exists for rule dates before 2022-09-20" — the _encoding_ has
+     no sources for that period, not the law was not in force — which is the `REFUSE` row of R7's
+     taxonomy. §11.9.2 records the distinction and requires the migration to classify per site.
+
+  What R2 itself decided is unchanged: every dated constant carries an explicit floor arm at
+  commencement, and a rule date below it is not answered.
   **Note the limit of this ruling:** a floor arm catches queries _below_ the window. It does
   **not** catch the two failure modes that actually bit — a constant left undated _inside_
   the window (trap 5) and an omitted boundary _inside_ the window (2017-04-12). Those need
   closure discipline and primary-source verification respectively, not a floor.
+
 - **R3 — Do C0's 55 existing assertions get pinned? — RESOLVED 2026-07-29: pin none,
   document the dependency.** The 55 assertions state the _current_ law and stay unpinned;
   the dependency on the harness clock (`jl4/tests/Main.hs:64-66`, fixed `2025-01-31`, which
