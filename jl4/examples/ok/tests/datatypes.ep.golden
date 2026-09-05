@@ -1,4 +1,10 @@
 § `Algebraic data types`
+    GIVEN map3 IS
+              FOR ALL a AND b
+              A FUNCTION
+                FROM      FUNCTION FROM a TO b
+                      AND List OF a
+                TO    List OF b
 
 DECLARE List OF a
   IS ONE OF
@@ -49,12 +55,6 @@ map2 f list MEANS
     WHEN x FOLLOWED BY xs THEN f x FOLLOWED BY map2 f xs
 
 -- polymorphic type
-ASSUME map3 IS
-  FOR ALL a AND b
-  A FUNCTION
-    FROM      FUNCTION FROM a TO b
-          AND List OF a
-    TO    List OF b
 
 GIVEN  a      IS A TYPE
        b      IS A TYPE

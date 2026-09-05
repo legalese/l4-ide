@@ -765,6 +765,10 @@ unitRendering u = case u.uDecl of
       RecordDecl _ _ (_ : _) -> ("means a record with", declareClause tyDecl)
       EnumDecl _ cons
         | longEnum cons -> ("means one of", CFields [ (conName c, "") | c <- cons ])
+      -- An opaque type says nothing about its values, so the sentence has
+      -- no object: "Person is a kind of thing." (the @ASSUME@ spelling of the
+      -- same declaration reads "Person is assumed to be given.").
+      OpaqueDecl _           -> ("is a kind of thing", CLeaf "")
       _                      -> ("means", declareClause tyDecl)
  where
   conName (MkConDecl _ n _) = resolvedText n
@@ -942,6 +946,7 @@ declareClause = \case
   EnumDecl _ [c]        -> CLeaf (conName c)
   EnumDecl _ cons       -> CLeaf ("one of " <> oxford "or" (map conName cons))
   SynonymDecl _ ty      -> CLeaf (typeText ty)
+  OpaqueDecl _          -> CLeaf "a kind of thing"
  where
   recordField (MkTypedName _ n ty _mTypically Nothing)     = (resolvedText n, typeText ty)
   recordField (MkTypedName _ n ty _mTypically (Just expr)) =

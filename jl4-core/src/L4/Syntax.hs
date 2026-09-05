@@ -219,6 +219,16 @@ data TypeDecl n =
     RecordDecl Anno (Maybe n) [TypedName n]
   | EnumDecl Anno [ConDecl n]
   | SynonymDecl Anno (Type' n)
+  | OpaqueDecl Anno
+    -- ^ A bodiless @DECLARE T@ (or @DECLARE T x@): an opaque nominal type,
+    -- like Haskell's @data T@ with no constructors. It has no constructors and
+    -- no fields, so a value of it arises only as a parameter (a @GIVEN@, a
+    -- section @GIVEN@, an @ASSUME@ term, or a JSON input at a service
+    -- boundary). This is the ruled spelling for the type role of
+    -- @ASSUME T IS A TYPE@ (@specs/todo/IMPLICIT-PROPS-DESIGN.md@ §11.1);
+    -- the type checker gives both the same entity, a 'KnownType' with no
+    -- expansion and no constructors. Its 'Anno' is empty: the parser's
+    -- alternative consumes no token.
   deriving stock (GHC.Generic, Eq, Ord, Show, Functor, Foldable, Traversable)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 

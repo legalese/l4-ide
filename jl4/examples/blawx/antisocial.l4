@@ -95,13 +95,13 @@
 -- before. Read its section in `expected/antisocial.blawx`: it should be the
 -- citation, not "Definition of the conduct is unreasonable."
 
-ASSUME Person IS A TYPE
-ASSUME Receiver IS A TYPE
-ASSUME Behaviour IS A TYPE
-ASSUME Consequence IS A TYPE
+DECLARE Person
+DECLARE Receiver
+DECLARE Behaviour
+DECLARE Consequence
 
 -- Unreferenced on purpose: the reachability gate's corpus witness (see header).
-ASSUME EffectTarget IS A TYPE
+DECLARE EffectTarget
 
 GIVEN p IS A Person
 ASSUME `is authorised` p IS A BOOLEAN

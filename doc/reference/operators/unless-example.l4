@@ -1,6 +1,21 @@
 -- UNLESS Keyword Examples
 -- UNLESS is syntactic sugar for AND NOT, with precedence lower than OR.
 
+§ `UNLESS Keyword Examples`
+    GIVEN `is a citizen` IS A BOOLEAN
+          `has resided for 5 years` IS A BOOLEAN
+          `has valid identification` IS A BOOLEAN
+          `has been disqualified` IS A BOOLEAN
+          `signed by both parties` IS A BOOLEAN
+          `consideration exchanged` IS A BOOLEAN
+          `signed under duress` IS A BOOLEAN
+          `has valid badge` IS A BOOLEAN
+          `during business hours` IS A BOOLEAN
+          `building is closed` IS A BOOLEAN
+          `is employee` IS A BOOLEAN
+          `is contractor` IS A BOOLEAN
+          `has been terminated` IS A BOOLEAN
+
 --------------------------------------------------------------------------------
 -- Basic UNLESS Tests
 --------------------------------------------------------------------------------
@@ -27,11 +42,6 @@ DECIDE basic4 IF FALSE UNLESS FALSE
 
 -- "The applicant is eligible if they meet all requirements,
 --  UNLESS they have been disqualified"
-
-ASSUME `is a citizen` IS A BOOLEAN
-ASSUME `has resided for 5 years` IS A BOOLEAN
-ASSUME `has valid identification` IS A BOOLEAN
-ASSUME `has been disqualified` IS A BOOLEAN
 
 DECIDE `is eligible for benefits` IF
       `is a citizen`
@@ -109,9 +119,6 @@ DECIDE precedence_test IF TRUE OR FALSE UNLESS TRUE
 --------------------------------------------------------------------------------
 
 -- Contract validity
-ASSUME `signed by both parties` IS A BOOLEAN
-ASSUME `consideration exchanged` IS A BOOLEAN
-ASSUME `signed under duress` IS A BOOLEAN
 
 DECIDE `contract is valid` IF
       `signed by both parties`
@@ -119,9 +126,6 @@ DECIDE `contract is valid` IF
   UNLESS `signed under duress`
 
 -- Building access
-ASSUME `has valid badge` IS A BOOLEAN
-ASSUME `during business hours` IS A BOOLEAN
-ASSUME `building is closed` IS A BOOLEAN
 
 DECIDE `can enter building` IF
       `has valid badge`
@@ -129,9 +133,6 @@ DECIDE `can enter building` IF
   UNLESS `building is closed`
 
 -- Employment eligibility
-ASSUME `is employee` IS A BOOLEAN
-ASSUME `is contractor` IS A BOOLEAN
-ASSUME `has been terminated` IS A BOOLEAN
 
 DECIDE `has system access` IF
          `is employee`

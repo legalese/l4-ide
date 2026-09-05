@@ -3801,6 +3801,7 @@ lowerModule opts modul@(MkModule _ uri _) =
       RecordDecl _ _ fs -> [ty | MkTypedName _ _ ty _ _ <- fs]
       EnumDecl _ cds    -> [ty | MkConDecl _ _ fs <- cds, MkTypedName _ _ ty _ _ <- fs]
       SynonymDecl _ ty  -> [ty]
+      OpaqueDecl _      -> []
 
   popVerdict :: A.PopulationVerdict
   popVerdict =
@@ -3969,6 +3970,7 @@ lowerModule opts modul@(MkModule _ uri _) =
     EnumDecl _ cds    -> [n | MkConDecl _ n _ <- cds]
     RecordDecl _ mn _ -> maybeToList mn
     SynonymDecl _ _   -> []
+    OpaqueDecl _      -> []
 
   -- Field selectors are references in the AST but are not terms; a record
   -- projection must not conjure an inputData element for the field name.
@@ -3986,6 +3988,7 @@ lowerModule opts modul@(MkModule _ uri _) =
     EnumDecl _ cds    -> [n | MkConDecl _ _ fs <- cds, MkTypedName _ n _ _ _ <- fs]
     RecordDecl _ _ fs -> [n | MkTypedName _ n _ _ _ <- fs]
     SynonymDecl _ _   -> []
+    OpaqueDecl _      -> []
 
   -- §5.2 SCOPE 2: the record-field namespace. One 'uniquifyIn' PER DECLARED
   -- TYPE, in field source order, because that is the namespace DMN has -- an
@@ -4176,6 +4179,10 @@ lowerModule opts modul@(MkModule _ uri _) =
         , length cds > 1 && any (\(MkConDecl _ _ cfs) -> not (null cfs)) cds
         )
     SynonymDecl _ _ -> Nothing
+    -- An opaque type gets no itemDefinition, exactly as an @ASSUME T IS A
+    -- TYPE@ name gets none by having no 'Declare' to read; a parameter of
+    -- that type is an inputData with @typeRef="Any"@ on both spellings.
+    OpaqueDecl _    -> Nothing
 
   itemDefIds   = assignIds "itemdef_" (map (.itdName) itemDecls)
 

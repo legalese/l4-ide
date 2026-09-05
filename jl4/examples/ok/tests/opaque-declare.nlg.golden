@@ -1,0 +1,8 @@
+`is a person`
+`is an applicant`
+`is a candidate`
+`holds both`
+`was granted`
+`is on duty`
+`was granted` with `Application` where `applicant` is `some person`, `premises` is `some premises` and `outcome` is `granted`
+`was granted` with `Application` where `applicant` is `some person`, `premises` is `some premises` and `outcome` is `refused`

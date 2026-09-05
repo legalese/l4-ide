@@ -21,8 +21,6 @@ DECLARE Person
 
 `Billy` MEANS Person WITH name IS "William", address IS "home"
 
-
-
 ASSUME Property IS A TYPE
 ASSUME Name IS A TYPE
 ASSUME Decision IS A TYPE
@@ -38,12 +36,9 @@ DECLARE Governor
     HAS name               IS A STRING
         `symbol of office` IS A STRING
 
-
-
 `William Farquhar` MEANS
     Governor WITH name               IS "William Farquhar"
                   `symbol of office` IS "large hat"
-
 
 -- Register sections enumeration
 DECLARE RegisterSection
@@ -214,9 +209,17 @@ DECIDE `qualifying territory` p IF
     isBOT p
     AND NOT p's `English name` = "Sovereign Base Areas of Akrotiri and Dhekelia"
 
-
 -- The charity test
 §§ `section 5, charity test`
+    GIVEN `is ancillary` IS A FUNCTION FROM Purpose TO BOOLEAN
+          `is analogous to charitable purpose` IS A FUNCTION FROM Purpose TO BOOLEAN
+          `in public register` IS A FUNCTION FROM Information TO BOOLEAN
+          `general section` IS A FUNCTION FROM Information TO BOOLEAN
+          `restricted section public elements` IS A FUNCTION FROM Information TO BOOLEAN
+          `historic section` IS A FUNCTION FROM Information TO BOOLEAN
+          `disclosure to authorized person` IS A FUNCTION FROM Information TO BOOLEAN
+          `for investigation of offense` IS A FUNCTION FROM Information TO BOOLEAN
+          `for legal proceedings` IS A FUNCTION FROM Information TO BOOLEAN
 @ref url https://www.jerseylaw.je/laws/current/l_41_2014#_Toc181797832
 
 -- 5        The charity test
@@ -226,8 +229,6 @@ DECIDE `qualifying territory` p IF
 --      (ii)      purposes that are purely ancillary or incidental to any of its charitable purposes; and
 
 --  what about transitive closure? i.e. a purpose that is ancillary to a purpose that is incidental to a charitable purpose. nope: we only allow the first degree.
-
-
 
 --    (b)     in giving effect to those purposes, it provides (or, in the case of an applicant, provides or intends to provide) public benefit in Jersey or elsewhere to a reasonable degree.
 --  (2)     An entity that otherwise meets the charity test, nevertheless does not meet that test, despite paragraph (1),
@@ -248,16 +249,12 @@ DECIDE `qualifying territory` p IF
 --  (7)     Within a reasonable time after issuing or amending guidance the Commissioner must provide to the Minister a copy of the issued or amended guidance and the report published under paragraph (6)(b).
 --  (8)     The Minister must lay a copy of the guidance and report so provided before the States as soon as practicable after the Minister receives the guidance and report.
 
-
 -- reindenting
 --  (5)     Any person, in determining whether an entity meets the charity test,
 --                      must have regard to the guidance,
 --          and the Commissioner, the tribunal, a registered charity and a governor of a registered charity
 --                      must have regard to the guidance
 --                      when performing any other of their functions under this Law to which the guidance is relevant.
-
-ASSUME `is ancillary` IS A FUNCTION FROM Purpose TO BOOLEAN
-ASSUME `is analogous to charitable purpose` IS A FUNCTION FROM Purpose TO BOOLEAN
 
 GIVETH A LIST OF Purpose
 knownCharitablePurposes MEANS
@@ -307,7 +304,6 @@ DECIDE `meets the charity test` IF
                       OR `is ancillary`  p)
         (entity's purposes)
 
-
 -- (a)     the prevention or relief of poverty;
 -- (b)     the advancement of education;
 -- (c)     the advancement of religion;
@@ -339,7 +335,6 @@ DECLARE CharitablePurpose
     `advancement of sport`
     `provision of recreation`
     `advancement of human rights`
-
 
 -- Requirements for registration
 GIVEN entity IS AN Entity
@@ -563,15 +558,6 @@ DECIDE `may appeal to tribunal` IF
         AND `is required steps notice` decision
     )
 
--- Information disclosure functions
-ASSUME `in public register` IS A FUNCTION FROM Information TO BOOLEAN
-ASSUME `general section` IS A FUNCTION FROM Information TO BOOLEAN
-ASSUME `restricted section public elements` IS A FUNCTION FROM Information TO BOOLEAN
-ASSUME `historic section` IS A FUNCTION FROM Information TO BOOLEAN
-ASSUME `disclosure to authorized person` IS A FUNCTION FROM Information TO BOOLEAN
-ASSUME `for investigation of offense` IS A FUNCTION FROM Information TO BOOLEAN
-ASSUME `for legal proceedings` IS A FUNCTION FROM Information TO BOOLEAN
-
 -- Restricted information handling
 GIVEN person IS A Person
       info IS Information
@@ -592,4 +578,3 @@ GIVETH A BOOLEAN
 DECIDE `may require governor removal` IF
     `may issue required steps notice` entity
     AND NOT `organized religious charity` entity
-

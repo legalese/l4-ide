@@ -1,5 +1,10 @@
 -- NOT keyword examples
 
+§ `NOT keyword examples`
+    GIVEN hasCriminalRecord IS A BOOLEAN
+          personAge IS A NUMBER
+          isBlocked IS A BOOLEAN
+
 -- Basic NOT Operations
 
 #EVAL NOT TRUE
@@ -12,16 +17,11 @@
 
 -- In Conditional Logic
 
-ASSUME hasCriminalRecord IS A BOOLEAN
-
 DECIDE isClean IS NOT hasCriminalRecord
 
 #CHECK isClean
 
 -- With AND
-
-ASSUME personAge IS A NUMBER
-ASSUME isBlocked IS A BOOLEAN
 
 DECIDE canAccess IS personAge >= 18 AND NOT isBlocked
 

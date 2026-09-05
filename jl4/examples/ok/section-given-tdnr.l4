@@ -1,0 +1,22 @@
+-- Type-directed name resolution through a SECTION binder.
+--
+-- `ok/tdnr.l4` pins the same property for module-level ASSUMEs: one name may be
+-- bound several times at different types, and each occurrence resolves by the
+-- type its context demands. A section GIVEN is ruled (R3/R4) to resolve exactly
+-- as a same-section ASSUME does, so the same file written with the binder on
+-- the heading must behave identically -- including through the printer, which
+-- re-emits the GivenSig rather than the elaborations it desugars to.
+
+§ `Type-directed name resolution through a section binder`
+    GIVEN foo IS A NUMBER
+          foo IS A BOOLEAN
+          foo IS A STRING
+
+DECIDE bar
+  IS foo + 2
+
+DECIDE baz
+  IS NOT foo
+
+DECIDE all
+  IS IF foo THEN foo ELSE "foo"

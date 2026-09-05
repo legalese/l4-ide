@@ -1216,6 +1216,9 @@ lowerDeclare (MkDeclare _ _ appForm typeDecl) = do
       modify' $ \s -> s { typeEnv = registerEnum name variantInfos s.typeEnv }
 
     SynonymDecl _ _ -> pure ()  -- Type synonyms are erased
+    OpaqueDecl _ -> pure ()     -- No fields, no variants: nothing to register.
+                                -- A parameter of the type lowers exactly as one
+                                -- of an ASSUMEd type did (no Declare to read).
   where
     fieldName :: TypedName Resolved -> Text
     fieldName (MkTypedName _ n _ _ _) = resolvedName n

@@ -1,7 +1,7 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
-lazytrace-exception.l4:10:1-66:
+lazytrace-exception.l4:11:1-66:
   I could not continue evaluating, because I needed to know the value of
     something
   but it is an assumed term.
@@ -72,7 +72,7 @@ lazytrace-exception.l4:10:1-66:
   │└ TRUE
   ├ b
   └ ↯ stuck
-lazytrace-exception.l4:19:1-52:
+lazytrace-exception.l4:20:1-52:
   Division by zero in the operation:
   DIVIDED BY
   

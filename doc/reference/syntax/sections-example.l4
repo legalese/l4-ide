@@ -1,0 +1,160 @@
+-- Companion file for doc/reference/syntax/sections.md ("Sections").
+--
+-- Every example on that page that L4 accepts today appears here, in the order
+-- the page presents them. Examples that produce an error are shown on the page
+-- in a fenced block only, because a file under doc/ has to run cleanly.
+
+DECLARE Person
+    HAS `full name` IS A STRING
+        age         IS A NUMBER
+
+alex MEANS Person WITH `full name` IS "Alex Tan", age IS 19
+
+-- ---------------------------------------------------------------------------
+-- 1. Headings and nesting
+-- ---------------------------------------------------------------------------
+
+§ `Part 1`
+`short title` MEANS "the Licensing Act"
+
+§§ `Division 1`
+`applies to individuals` MEANS TRUE
+
+§§§ `Subdivision A`
+`exempt while under age` MEANS TRUE
+
+§§ `Division 2`
+`base fee` MEANS 300
+
+§ `Part 2`
+`licence term in years` MEANS 3
+
+§§§§ `Rule 12`
+`renewal window in days` MEANS 60
+
+#EVAL `Part 1`.`Division 1`.`Subdivision A`.`exempt while under age`  -- TRUE
+#EVAL `Part 1`.`Division 2`.`base fee`                                -- 300
+#EVAL `Part 2`.`Rule 12`.`renewal window in days`                     -- 60
+
+-- ---------------------------------------------------------------------------
+-- 2. What a rule can see
+-- ---------------------------------------------------------------------------
+
+§ `Part 3`
+`prescribed rate` MEANS 5
+
+§§ `Division 5`
+`late fee` MEANS `prescribed rate` TIMES 10
+`filing deadline in days` MEANS 30
+
+§§ `Division 6`
+`extended deadline in days` MEANS `filing deadline in days` PLUS 14
+
+§§§ `Subdivision B`
+`prescribed rate` MEANS 7
+`local charge` MEANS `prescribed rate` TIMES 10
+
+#EVAL `Part 3`.`Division 5`.`late fee`                     -- 50
+#EVAL `Part 3`.`Division 6`.`extended deadline in days`    -- 44
+#EVAL `Part 3`.`Division 6`.`Subdivision B`.`local charge` -- 70
+#EVAL `Part 3`.`prescribed rate`                           -- 5
+-- asking for each candidate by its qualified spelling is how you confirm which
+-- declaration `local charge` read: 70 is 7 TIMES 10, so it read Subdivision B's.
+#EVAL `Part 3`.`Division 6`.`Subdivision B`.`prescribed rate` -- 7
+
+§ `Part 4`
+
+§§ `Division 7`
+`age of majority` MEANS 18
+`alex is of age` MEANS alex's age AT LEAST `age of majority`
+
+§§ `Division 8`
+`age of majority` MEANS 21
+`alex is of age` MEANS alex's age AT LEAST `age of majority`
+
+#EVAL `Part 4`.`Division 7`.`alex is of age`  -- TRUE
+#EVAL `Part 4`.`Division 8`.`alex is of age`  -- FALSE
+
+-- ---------------------------------------------------------------------------
+-- 3. Saying which one you mean
+-- ---------------------------------------------------------------------------
+
+§ `Part 5` AKA `the fees Part`
+`prescribed fee` MEANS 250
+
+§§ `Division 9` AKA `the discount Division`
+`discount` MEANS 50
+
+§ `Part 6`
+`net fee dotted` MEANS
+    `Part 5`.`prescribed fee` MINUS `Part 5`.`Division 9`.`discount`
+
+`net fee genitive` MEANS
+    `Part 5`'s `prescribed fee` MINUS `Part 5`'s `Division 9`'s `discount`
+
+`net fee via alias` MEANS
+    `the fees Part`'s `prescribed fee`
+        MINUS `the fees Part`.`the discount Division`.`discount`
+
+#EVAL `Part 6`.`net fee dotted`     -- 200
+#EVAL `Part 6`.`net fee genitive`   -- 200
+#EVAL `Part 6`.`net fee via alias`  -- 200
+
+-- ---------------------------------------------------------------------------
+-- 4. The section GIVEN under these rules
+-- ---------------------------------------------------------------------------
+
+§ `Part 7`
+    GIVEN `the rate` IS A NUMBER
+
+GIVETH A NUMBER
+`ordinary charge` MEANS `the rate` TIMES 100
+
+§§ `Division 12`
+
+GIVETH A NUMBER
+`sibling charge` MEANS `the rate` TIMES 200
+
+§§ `Division 13`
+    GIVEN `the rate` IS A STRING
+
+GIVETH A STRING
+`special rate description` MEANS `the rate`
+
+GIVETH A NUMBER
+`ordinary charge here` MEANS `Part 7`.`the rate` TIMES 300
+
+#CHECK `Part 7`.`ordinary charge`                     -- NUMBER
+#CHECK `Part 7`.`Division 12`.`sibling charge`        -- NUMBER
+#CHECK `Part 7`.`Division 13`.`special rate description` -- STRING
+#CHECK `Part 7`.`Division 13`.`ordinary charge here`  -- NUMBER
+
+§ `Part 8`
+
+§§ `Division 14`
+    GIVEN `the applicant` IS A Person
+
+GIVETH A STRING
+`name for Division 14` MEANS `the applicant`'s `full name`
+
+§§ `Division 15`
+    GIVEN `the applicant` IS A Person
+
+GIVETH A STRING
+`name for Division 15` MEANS `the applicant`'s `full name`
+
+#CHECK `Part 8`.`Division 14`.`name for Division 14`  -- STRING
+#CHECK `Part 8`.`Division 15`.`name for Division 15`  -- STRING
+
+-- ---------------------------------------------------------------------------
+-- 6. Limits: two kinds of thing under one name, written in this order
+-- ---------------------------------------------------------------------------
+
+§ `Part 9`
+`the limit` MEANS 500
+`limit note` MEANS `the limit`
+
+§ `Part 10`
+`the limit` MEANS "not set"
+
+#EVAL `Part 9`.`limit note`  -- 500; reversing the order of the two Parts is an error

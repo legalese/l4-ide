@@ -408,7 +408,6 @@ GIVETH A NUMBER
            IF ^                            `Reg CF commenced`    THEN investor's `lesser of annual income or net worth`
            OTHERWISE `no Regulation Crowdfunding figure exists before commencement on 2016-05-16`
 
-
 -- The (i)/(ii) selector. Limb (i) applies "if EITHER the investor's annual
 -- income or net worth is less than $124,000"; limb (ii) applies "if BOTH ...
 -- are equal to or more than $124,000". The two are exhaustive and mutually
@@ -466,6 +465,7 @@ GIVETH A BOOLEAN
         AT MOST `investment limit` investor
 
 § `4. Disclosure requirements — Rules 201, 201(t), 203(a)`
+    GIVEN `the COVID-19 temporary rules, Rule 201(z) and (bb), are not modelled here` IS A FinancialStatementRequirement
 
 @ref 17 CFR 227.201(t)
 DECLARE FinancialStatementRequirement IS ONE OF
@@ -483,7 +483,6 @@ DECLARE FinancialStatementRequirement IS ONE OF
 -- honest answer is a refusal, not a guess. Outside the band the ordinary
 -- tiers were unaffected and the answer stands. CORPUS-TRACK §2.4.1;
 -- decided 2026-07-29: refuse, not encode. See README §5.
-ASSUME `the COVID-19 temporary rules, Rule 201(z) and (bb), are not modelled here` IS A FinancialStatementRequirement
 
 @ref 85 FR 27116 (Rule 201(z)); 86 FR 3496 instr. 5 (Rule 201(bb))
 GIVETH A BOOLEAN

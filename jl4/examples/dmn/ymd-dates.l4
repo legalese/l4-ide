@@ -51,6 +51,7 @@ IMPORT prelude
 IMPORT daydate
 
 § `YMD date literals`
+    GIVEN `the application date` IS A DATE
 
 -- Required by the rule-version axis: an unpinned `RULES EFFECTIVE DATE` read
 -- resolves to the localized current day, and localization needs a timezone.
@@ -71,7 +72,6 @@ GIVETH A DATE
 -- The date the CASE is about, as opposed to the date the LAW is about. It is
 -- an ordinary input, so the comparisons below are ordinary decision-table
 -- cells rather than law-time intervals.
-ASSUME `the application date` IS A DATE
 
 GIVETH A STRING
 `the regime that applies` MEANS

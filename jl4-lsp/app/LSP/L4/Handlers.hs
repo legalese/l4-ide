@@ -515,6 +515,14 @@ handlers evalConfig recorder =
                       SynonymDecl _ ty ->
                         let detail = prettyLayout ty
                         in [ mkSymbol originalName (Just detail) SymbolKind_Variable lspRange selRange ]
+                      -- An opaque type has no body to describe, so no detail.
+                      -- 'SymbolKind_TypeParameter' is what the @ASSUME T IS A
+                      -- TYPE@ spelling of the same declaration already yields
+                      -- ('typeToSymbolKind' falls through on @"TYPE"@), and is
+                      -- what a record yields; a migration between the two
+                      -- spellings leaves the outline unchanged.
+                      OpaqueDecl _ ->
+                        [ mkSymbol originalName Nothing SymbolKind_TypeParameter lspRange selRange ]
                   Nothing -> []
 
               Decide _ decide@(MkDecide _ (MkTypeSig _ (MkGivenSig _ givenParams) _) (MkAppForm _ n _ _) body) ->

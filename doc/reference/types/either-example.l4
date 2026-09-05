@@ -1,8 +1,8 @@
 -- Example: Either type usage
 -- Either represents a choice: LEFT for errors, RIGHT for success values
 
--- Declare a result with explicit EITHER type
-ASSUME `api result` IS AN EITHER STRING NUMBER
+§ `Example: Either type usage`
+    GIVEN `api result` IS AN EITHER STRING NUMBER
 
 -- Create specific Either values
 `error case` MEANS LEFT OF "Error occurred"
