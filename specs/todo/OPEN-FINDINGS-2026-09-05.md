@@ -16,6 +16,14 @@
 > because three branches appended to `IMPLICIT-PROPS-DESIGN.md` §11 on one day and collided, which
 > is what a positional handle does under concurrency.
 >
+> **Rulings-bench cards are cited by SLUG, never as a bare "D8".** The 2026-09-05 bench is
+> `D1-dmn-refuse-image`, `D2-subject-to-syntax`, `D3-temporal-934`, `D4-not-precedence`,
+> `D5-computed-fields-purity`, `D6-precommencement-gate`, `D7-small-language-cluster`,
+> **`D8-imports-namespacing`**, `D9-release-and-partition`, `D10-corpus-selection`. A bare `D8` is
+> already ambiguous in this repo: `DATE-LIBRARY-SPEC.md` has **R-D8** (no algebraic rewrites over
+> date expressions) and `yc-safe/SPEC-NOTES.md` has its own **D8** (two-round collusion against the
+> SAFE holder). Cite the slug.
+>
 > **Who found what is deliberately not recorded.** What is recorded is what was measured, when,
 > and on which binary — because that is what a later reader has to re-check.
 
@@ -29,13 +37,16 @@ from a third tree. **Always name the tree with the line.** Twice on 2026-09-05 a
 verification had been taken against the wrong branch — so "which branch" belongs in the same reflex
 as "which line".
 
-**Three branches appended to `IMPLICIT-PROPS-DESIGN.md` §11 on one day, and the numbers collide.**
-As of 2026-09-05: `props/assume-sweep` defines **§11.14** (sequencing item 6), `props/tdnr-collapse`
-defines **§11.15** (the section-binder pairing fix), and `props/rulings` defines **§11.14, §11.15
-and §11.16** (R13, R14, the cross-`IMPORT` defect). A bare "§11.15" is therefore ambiguous until
-those branches have all landed and one of them has renumbered. **Cite the branch with the number
-until then**, and prefer the stable ruling id (`R13`, `R14`) where one exists, since R-numbers do
-not shift when a list grows.
+**Three branches appended to `IMPLICIT-PROPS-DESIGN.md` §11 on one day, and two of them collided.
+Resolved 2026-09-05 — recorded because the resolution is the reason the numbers are what they are.**
+`props/tdnr-collapse` took **§11.15** and reached `unstable` in #338, leaving a deliberate gap at
+§11.14. `props/assume-sweep` fills that gap with its own **§11.14** (sequencing item 6).
+`props/rulings` had also written **§11.14, §11.15 and §11.16**, so two of its three headings were
+duplicates the moment #338 landed; it renumbered to **§11.16 (R13), §11.17 (R14), §11.18** (the
+cross-`IMPORT` ruling), which is free under either landing order. **The lesson, not the numbers:**
+a positional handle is not safe under concurrent authorship, so prefer the stable ruling id
+(`R13`, `R14`) where one exists, and — as this file does — give defect records ids of their own
+rather than section numbers.
 
 **A retracted cause is not finished until whatever rested on it has been re-derived.** _A wrong
 cause does not stay in the sentence that states it — it propagates into whatever was built to check
@@ -43,6 +54,16 @@ the claim, and a test written against a misdiagnosed symptom is worse than none,
 green._ The instance that produced this is in **OF-1**: a mechanism claim was retracted, and the
 retraction exposed that the fix's own acceptance marker had been written against the misdiagnosed
 symptom. When you retract a cause, grep for what cites it — tests first.
+
+**A grep is only a detector when the term has no legitimate uses.** Measured on `doc/` 2026-09-05:
+a wide banned-word sweep returns 590 hits across 90 files (`parameters` 95, `evaluation` 72,
+`argument` 66, `parameter` 65) and almost all are correct — `robdd.md` says "variable" twelve times
+because a variable in a reduced ordered binary decision diagram is called a variable — so the real
+defects are indistinguishable from the noise. A narrow grep for a **retired** term is a different
+instrument: `binder` returns 23 hits, all classifiable in seconds, because a word we coined and then
+retired has no legitimate uses. **Scope a term sweep to retired vocabulary.** And note the trap one
+level up: a hit count is a property of the **branch**, not of the tree — `grep -rn 'roposed, not
+landed' doc/` is 0 on one branch and 30 on another.
 
 **`grep -c` over an `.l4` file counts comments.** `regcf-denovo.l4` matches its floor binding eight
 times outside the declaration and has seven arms; the eighth, at `:3035`, is inside prose. Drop
@@ -53,7 +74,7 @@ lines whose first non-space characters are `--`.
 ## OF-1 — declaration-order sensitivity in TDNR candidate resolution. RECORDED ELSEWHERE
 
 **Do not re-record this here.** It is written up in full, with its four-line witness and its
-mechanism, in `IMPLICIT-PROPS-DESIGN.md` §11.15 on branch `props/tdnr-collapse` ("Correction to the
+mechanism, in `IMPLICIT-PROPS-DESIGN.md` §11.15, which reached `unstable` in #338 ("Correction to the
 finding this discharges"). In one line: a bare `ASSUME f IS A FUNCTION FROM … TO …` reaches the
 scan phase with no result type, because `scanFunSigAssume`'s `mergeResultTypeInto` returns an
 empty-`GIVEN`/no-`GIVETH` signature unchanged and drops the type, so a use checked before
@@ -87,7 +108,7 @@ was built on it has been re-derived.
 ## OF-2 — `isSectionBinderElaboration` keys on the raw name. RECORDED ELSEWHERE
 
 **Do not re-record this here either.** Same section, same branch (`props/tdnr-collapse`,
-`IMPLICIT-PROPS-DESIGN.md` §11.15, "Not fixed here, same family"), where it is written up with the
+`IMPLICIT-PROPS-DESIGN.md` §11.15 (on `unstable` since #338), "Not fixed here, same family"), where it is written up with the
 repair options. In one line: `L4.Names.isSectionBinderElaboration` (`jl4-core/src/L4/Names.hs:48-51`
 on `b2a3faac`) tests ``rawName (getName n) `elem` ns``, and the docstring's ground for that —
 "a section that also spells out an `ASSUME`of a name its own`GIVEN` binds is already a duplicate
@@ -333,7 +354,7 @@ applies depends on the base that work is cut from.
 ## OF-7 — the read-set does not cross an `IMPORT`, and neither does the supply path
 
 **Severity: a false green, then a loud failure. Ruled, not built. The ORDERING is ruled in
-`IMPLICIT-PROPS-DESIGN.md` §11.16 — the refusal first, the closure second — and this is the record
+`IMPLICIT-PROPS-DESIGN.md` §11.18 — the refusal first, the closure second — and this is the record
 that ruling points at.** Also listed in `PROPS-REDTEAM-2026-09-03.md` §7.
 
 **The hole, measured 2026-09-05** (probe `scratchpad/consult/adv-d5/cf5.l4` + `lib_c.l4`, run on
@@ -442,6 +463,47 @@ Entered here only because "scheduled" and "remembered" are different states.
 
 ---
 
+## OF-11 — two backend diagnostics call a section `GIVEN` a "binder", which the docs have retired
+
+**Severity: cosmetic, but the coupling is the point. Unowned.**
+
+`jl4-core/src/L4/Relational/Lower.hs:398` emits "… is a local helper that needs an enclosing
+**binder**", and `jl4-core/src/L4/Blawx/Lower.hs:1143` emits "argument has no L4 **binder** (a
+record field, or a `GIVETH` …)". Both describe our own construct, and "binder" is the term the
+documentation panel retired in favour of naming the construct — a section `GIVEN`, a rule `GIVEN`,
+a fact.
+
+**The sequencing rule, which is the transferable part:** docs first, message second, and **whoever
+changes the message owns every page that quotes it.** A page quoting a diagnostic is coupled to the
+compiler's wording, so re-wording without grepping the pages breaks them silently — they still
+render, they are just no longer true.
+
+**What would close it.** Re-word both messages, then re-grep `doc/` for the old strings. Neither
+message has a golden, so nothing will tell you if you miss a page.
+
+---
+
+## OF-12 — nothing compares a quoted screen in `doc/` against what the binary actually prints
+
+**Severity: a whole class of doc defect with no detector. Unowned and uncosted.**
+
+`doc/test-docs.sh` has exactly two parts — PART 1 checks markdown links, PART 2 type-checks the
+`.l4` files — and **structurally cannot** do this: it never compares a fenced block to real output.
+A page that quotes a diagnostic, a `--help` screen or an evaluation result is checked for nothing.
+It renders, it links, its `.l4` companion type-checks, and its quoted screen can say whatever it
+said the day it was pasted.
+
+**Sketch, not a design:** extract fenced blocks that look like tool output, re-run the command that
+produced them, diff. The hard parts are recognising which fences are output rather than source, and
+normalising what legitimately varies — paths, timings, line numbers.
+
+**Why it is worth costing.** It is the only mechanical answer to the defect class a grep cannot
+find: a page whose prose is a _false technical claim_ reads identically to a page whose prose is
+true (`NOT` precedence was tonight's instance), and a quoted screen is the one place where truth is
+machine-checkable. It would also catch OF-11's re-wording before it reached a page.
+
+---
+
 ## Owed upstream
 
 Filed by whoever holds GitHub write authority; **nothing here has been posted**.
@@ -452,8 +514,10 @@ Filed by whoever holds GitHub write authority; **nothing here has been posted**.
 | OF-5       | New issue: a `WHERE` local silently shadows a section `GIVEN`; ask for a warning, not an error.                                                                                                     |
 | OF-4       | No issue yet — measure first. An issue asserting a behaviour nobody has run would be the thing this file exists to prevent.                                                                         |
 | OF-6       | **#948: neither close nor re-open on today's evidence.** Comment the branch split if anything at all.                                                                                               |
-| OF-7       | Nothing yet — the ruling (refusal first) is not built, and an issue before the branch exists would only restate `IMPLICIT-PROPS-DESIGN.md` §11.16.                                                  |
+| OF-7       | Nothing yet — the ruling (refusal first) is not built, and an issue before the branch exists would only restate `IMPLICIT-PROPS-DESIGN.md` §11.18.                                                  |
 | OF-8       | Nothing — a toolchain decision, not a defect; it wants a PR, not an issue.                                                                                                                          |
+| OF-11      | Nothing — a wording change plus a grep, not an issue.                                                                                                                                               |
+| OF-12      | Nothing until it is costed; an issue asking for an unscoped tool is not a request anyone can act on.                                                                                                |
 | OF-9       | Nothing until it is reproduced. It is recorded on report and says so.                                                                                                                               |
 | OF-10      | Nothing — scheduled behind discharge.                                                                                                                                                               |
-| OF-1, OF-2 | Nothing new — they live in `IMPLICIT-PROPS-DESIGN.md` §11.15 on `props/tdnr-collapse`.                                                                                                              |
+| OF-1, OF-2 | Nothing new — they live in `IMPLICIT-PROPS-DESIGN.md` §11.15, on `unstable` since #338.                                                                                                             |

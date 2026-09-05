@@ -751,7 +751,7 @@ Kept so that no later session re-proposes one without meeting its witness.
    sort is ever suppliable, before any discharge crosses `IMPORT`. **"Before any discharge crosses
    `IMPORT`" is now a measured requirement, not a precaution: the read-set does not cross an
    `IMPORT` today and neither does the supply path, and the two fail in opposite directions.** See
-   the cross-`IMPORT` defect in §7 below, `IMPLICIT-PROPS-DESIGN.md` §11.16, which rules that
+   the cross-`IMPORT` defect in §7 below, `IMPLICIT-PROPS-DESIGN.md` §11.18, which rules that
    the **refusal** is the first required move and the closure the second, and
    `OPEN-FINDINGS-2026-09-05.md` **OF-7**, which is the defect record.
 4. **Section binder parse** per R4, with the misattachment check error and both printers' goldens.
@@ -806,7 +806,7 @@ the dead `LocalAssume` grammar (§6 item 7); function-typed `ASSUME` refused by 
 
 **NEW 2026-09-05 — the read-set does not cross an `IMPORT`, and neither does the supply path.**
 Filed with R13/R14 (rulings-bench card `D5-computed-fields-purity`, option A′); ruled in
-`IMPLICIT-PROPS-DESIGN.md` §11.16; the full probe and both halves are in
+`IMPLICIT-PROPS-DESIGN.md` §11.18; the full probe and both halves are in
 `OPEN-FINDINGS-2026-09-05.md` **OF-7**. In one line: an export whose read
 crosses an `IMPORT` gets `{"errors":[],"status":"valid"}` from `l4 batch --validate-only` and then
 fails to evaluate, and a value supplied under the binder's name is accepted into the row and
@@ -828,15 +828,14 @@ lines; the 7 files with a section `GIVEN` are all fixtures and none is imported)
 is a defect on a schedule rather than a stop-work.
 
 **Findings from 2026-09-05 that are NOT props defects, and live in their own file.**
-`specs/todo/OPEN-FINDINGS-2026-09-05.md` collects ten open items (`OF-1` … `OF-10`) found while the 2026-09-05 rulings
+`specs/todo/OPEN-FINDINGS-2026-09-05.md` collects twelve open items (`OF-1` … `OF-12`) found while the 2026-09-05 rulings
 were being recorded. Three of them touch this programme and are named here so a reader of §7 is not
 missing them:
 
 - **`l4 batch`'s generated wrapper is scoped by the last open `§`** (**OF-3**). Loud failure,
   reproduced with a control. Unreachable today; reachable the moment `props/assume-sweep` lands.
 - **`L4.Names.isSectionBinderElaboration` keys on the raw name** (**OF-2**, recorded in full in
-  `IMPLICIT-PROPS-DESIGN.md` §11.15 **as numbered on `props/tdnr-collapse`** — not this branch's
-  §11.15, which is R14; see that file's §0 on colliding section numbers). **This blocks §6 item 7
+  `IMPLICIT-PROPS-DESIGN.md` §11.15, which reached `unstable` in #338). **This blocks §6 item 7
   above.**
 - **A `WHERE` local silently shadows a section `GIVEN`** (**OF-5**). Silent wrong answer: with the
   binder supplied as 4, one entrypoint answers 4 and its neighbour answers 51, no diagnostic.
