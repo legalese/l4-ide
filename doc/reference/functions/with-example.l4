@@ -1,0 +1,40 @@
+-- Supplying arguments by name, and supplying a section binder.
+-- Reference: doc/reference/functions/WITH.md
+
+GIVEN principal IS A NUMBER
+      rate      IS A NUMBER
+GIVETH A NUMBER
+`interest on` principal `at` rate MEANS principal TIMES rate
+
+-- The same call, positionally and by name.
+#EVAL `interest on` 1000 `at` 0.05                            -- 50
+#EVAL `interest on` WITH rate IS 0.05, principal IS 1000       -- 50
+
+§ `Rates`
+    GIVEN `the rate` IS A NUMBER
+
+GIVETH A NUMBER
+doubled MEANS `the rate` TIMES 2
+
+-- `quadrupled` never mentions `the rate`. It reads it through `doubled`.
+GIVETH A NUMBER
+quadrupled MEANS doubled TIMES 2
+
+#EVAL doubled    WITH `the rate` IS 5                          -- 10
+#EVAL quadrupled WITH `the rate` IS 5                          -- 20
+
+-- An override for one call and everything under it. Elsewhere the binder is
+-- unchanged, which is what the second directive below shows.
+GIVETH A NUMBER
+`under the strict reading` MEANS quadrupled WITH `the rate` IS 10
+
+#EVAL `under the strict reading`                               -- 40
+#EVAL quadrupled WITH `the rate` IS 5                          -- 20
+
+-- A rule with its own parameter as well: the site names both, because a call
+-- is all-named or all-positional.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+bump n MEANS n TIMES `the rate`
+
+#EVAL bump WITH n IS 3, `the rate` IS 5                        -- 15
