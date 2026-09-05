@@ -606,10 +606,23 @@ root (§11.4). Per-call variation is written, `callee WITH person IS person's gu
 **What decided it.** The argument recorded at `PROPS-REDTEAM-2026-09-03.md` §2.3: a name
 coincidence would become a binding; `R(f)` would stop being the callee's; one program would have two
 readings; every tradition that had dynamic parameter binding gave it up (Common Lisp's `special`
-declaration is exactly the section-`GIVEN`/function-`GIVEN` line). Measured cost zero: across 607
-files there are 235 term-role `ASSUME` names and 2,311 function `GIVEN` names and no file where the
-two sets overlap. Restatement as an error rather than a warning was part of the recommendation Meng
-accepted; it is the one sub-point he did not separately voice.
+declaration is exactly the section-`GIVEN`/function-`GIVEN` line). Measured cost zero **as of
+2026-09-04**: across 607 files there were 235 term-role `ASSUME` names and 2,311 function `GIVEN`
+names and no file where the two sets overlapped. Those counts are pre-sweep and are now stale —
+2026-09-05, post-#337: 644 files, 101 term-role `ASSUME` lines. Restatement as an error rather than
+a warning was part of the recommendation Meng accepted; it is the one sub-point he did not
+separately voice.
+
+**The cost is still zero, but not for the reason above, and it was not zero in between.** That count
+measured a proxy — whether any file spells a name as both a term-role `ASSUME` and a function
+`GIVEN` — rather than the check as built. The first implementation keyed on the raw name
+**module-wide** and rejected `doc/tutorials/section-given/what-a-section-needs-to-know.l4`, a
+before-and-after tutorial whose "before" section deliberately repeats a name that a **different,
+later** section declares as a section `GIVEN`; `doc/test-docs.sh` went red on a correct file (#344).
+Scoped to the binders _visible_ at the declaration — its own section and its ancestors — the check
+now fires on **zero** files across `jl4/examples/ok`, `jl4/examples/legal`, `jl4-core/libraries` and
+`doc`, measured 2026-09-05 post-sweep. Note for anyone re-deriving this: the column-1 reading is a
+false lead. A column-1 `GIVEN` is never read as a section binder, so R4 was never in play.
 
 ### 11.4 R3 — Distinct binders per section; one binder per name per root. RULED 2026-09-04.
 
@@ -1496,10 +1509,43 @@ evaluation.
 
 What the importer still cannot do is `WITH`-supply that binder:
 `CheckEnv.sectionBinderNames` is per module, so the name is not suppliable across
-the boundary and the imported module's own `TYPICALLY` (or "assumed term")
-applies. That is the remaining half of §2.2's "discharge happens at the module
+the boundary ~~and the imported module's own `TYPICALLY` (or "assumed term")
+applies~~. That is the remaining half of §2.2's "discharge happens at the module
 boundary", and it is deferred. `ok/section-given-import-def.l4` and
 `ok/section-given-import-call.l4` pin both the fix and the limit.
+
+**Corrected 2026-09-05 — the conclusion holds, the message does not.** The
+struck clause is a reasonable inference and it is kept, because the cost of
+deleting it is that nobody learns the search term is wrong. **Predicted:** the
+imported module's own `TYPICALLY`, or failing that "… is an assumed term".
+**Measured:** neither. That binder carries no `TYPICALLY`, and the observable on
+the corpus's own witness is a **`CONSIDER` exhaustiveness failure** — the
+binder's value flows into `regcf-wizard.l4:345`'s three-arm `CONSIDER` and
+matches no arm:
+
+```
+The value
+  `the COVID-19 temporary rules, Rule 201(z) and (bb), are not modelled here`
+reached a CONSIDER that has no branch for it.
+```
+
+**How it was produced**, on `origin/unstable` `063ddd34` with that tree's own
+binary — the arm needs a rule date inside the COVID window _and_ an aggregate
+above tier 1 and at most 250,000 (`regcf.l4:510-513`), so both have to be forced:
+
+```
+l4 batch regcf-wizard.l4 -e 'raise check' -i plan.json   --fixed-now 2021-06-01T00:00:00Z          # aggregate 200000
+```
+
+**Severity is unchanged and "loud, not silent" stands** — `"status":"error"`, no
+wrong answer. What changes is what a reader greps for: **anyone searching logs
+for `assumed term` to find this class will miss every instance.**
+
+**And the same row passes `--validate-only`.** `{"status":"valid","errors":[]}`,
+because the export schema demands only the export's own record parameter
+(`plan`) and never the imported binder — a green validate in front of a red run,
+on the wizard. That half is recorded as `OPEN-FINDINGS-2026-09-05.md` **OF-7**,
+which owns the defect; this section owns the ruling and the limit.
 
 #### Deferred, each with why
 

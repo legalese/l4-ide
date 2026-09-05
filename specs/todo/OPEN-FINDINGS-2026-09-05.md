@@ -412,14 +412,47 @@ them is imported.~~ **THAT BOUND HAS EXPIRED, and the exposure is no longer zero
 `origin/unstable` **`063ddd34`**: **93 files carry a section binder** (140 sites), and **one of them
 is imported** — `jl4/examples/legal/regcf/regcf.l4`, which acquired a section `GIVEN` at `:468` in
 the sweep and is imported by `jl4/examples/legal/regcf/regcf-wizard.l4`, a file carrying **eight**
-`@export`s. That is the first time the two halves of this defect have met in the corpus rather than
-in a probe.
+`@export`s.
 
-**Whether it bites is a separate question and is NOT yet measured.** `regcf.l4`'s binder is the
-COVID refusal, reached from one arm, so an exported decision in the wizard only trips this if its
-read-set actually reaches that name. The decisive test is
-`l4 batch jl4/examples/legal/regcf/regcf-wizard.l4 --validate-only` against a row for each of the
-eight exports, compared with what an actual run does. **Run it before quoting either answer.** (`gm-discharge` measured the same independently and recorded the same
+**This is NOT new, and the crash half is already fixed. Corrected before it was written up as a
+find.** `IMPLICIT-PROPS-DESIGN.md` §11.16 ("Crossing an `IMPORT` was reachable and crashed; it is
+now handled in the evaluator") reached the same pair on the sweep tree `a1525a89`, measured six
+sites dying with `Internal error: given signatures' values' lengths do not match`, and repaired it
+in `L4.EvaluateLazy.Machine.matchGivens'`. `ok/section-given-import-def.l4` and
+`ok/section-given-import-call.l4` pin the fix.
+
+**What §11.16 explicitly leaves open is the half OF-7 is about**, and it says so: "the importer
+still cannot `WITH`-supply that binder: `CheckEnv.sectionBinderNames` is per module, so the name is
+not suppliable across the boundary and the imported module's own `TYPICALLY` (or 'assumed term')
+applies." §11.16 characterises what remains as **loud, not silent**.
+
+**MEASURED 2026-09-05 on `063ddd34`, with that tree's own binary. It bites, and it is LOUD.**
+`regcf-wizard.l4`'s `raise check` calls `financial statements required` (`regcf-wizard.l4:345`),
+whose first arm reads the imported binder when the rule date is inside the COVID window
+**and** the aggregate is in the band (`regcf.l4:510-513`: above tier 1, at most 250,000). Driving
+exactly that — a valid `plan` row, aggregate 200,000, `--fixed-now 2021-06-01T00:00:00Z`:
+
+| command                      | result                                                                                                           |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `l4 batch … --validate-only` | `{"status":"valid","errors":[]}` — **a false green, exactly OF-7's shape**                                       |
+| the same row, actually run   | `{"status":"error"}` — "The value `the COVID-19 temporary rules…` reached a CONSIDER that has no branch for it." |
+
+**Classification: loud, not silent.** No wrong answer is produced and the failure is
+unmissable, so `IMPLICIT-PROPS-DESIGN.md` §11.16's "what remains is loud, not silent" **holds** on
+the corpus's own witness. What OF-7 contributes is that `--validate-only` is still the false green
+in front of it — the schema demands only the export's own record parameter (`plan`), never the
+imported binder, so validation passes a row that provably cannot evaluate.
+
+**One correction to §11.16's predicted mechanism, which does not change its conclusion.** §11.16
+expects "the imported module's own `TYPICALLY` (or 'assumed term') applies". Neither happens: that
+binder carries no `TYPICALLY`, and the observable is not "is an assumed term" but a **`CONSIDER`
+exhaustiveness failure** — the binder's value flows into `why those financial statements for`'s
+three-arm `CONSIDER` and matches none of them. Same severity, different message; worth knowing for
+anyone grepping logs for "assumed term" to find this class.
+
+**Other exports:** `can this company raise` behaves identically (same `plan` parameter, same path);
+`investment limit check`, `resale check` and `reporting exit check` take different records and are
+correctly rejected by `--validate-only` for the wrong row, which is not this defect. (`gm-discharge` measured the same independently and recorded the same
 deferral.) **After discharge the exposed population is
 every file that imports a migrated domain module** — 664 `ASSUME` lines in 105 files become section
 binders in exactly the modules other files import, which is R0's committed cost arriving.
