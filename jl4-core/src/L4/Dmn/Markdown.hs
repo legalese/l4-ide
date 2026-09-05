@@ -63,9 +63,62 @@ emitMarkdown drg =
     ]
       <> concatMap block (drgDecisions drg)
  where
+  -- An omitted decision leaves a MARKER, not a hole.
+  --
+  -- __Why this exists.__ Every omission below is already named in the fidelity
+  -- report, and that was treated as sufficient until it was measured: a user
+  -- running @l4 export --to dmn-md@ gets exit 0, a one-line tally on STDERR,
+  -- and a FILE containing a heading and nothing else. The report travels
+  -- separately from the artifact and is not written at all without
+  -- @--fidelity-report@ — so the committed @.md@, the thing a reader opens and
+  -- a reviewer diffs, said nothing whatever about the tables it was missing. A
+  -- backend that drops a whole decision without a word IN ITS OWN OUTPUT is
+  -- worse than one that fails loudly, because nothing downstream can tell.
+  --
+  -- An HTML comment is the right carrier: dmnmd separates tables on any line
+  -- that does not start with @|@, and names a table from the last HEADING
+  -- before it, so a comment is inert to both the parser and the naming rule.
+  -- No heading is emitted for an omitted decision, exactly as before, so the
+  -- round trip is unchanged.
   block d = case renderDecision d of
-    Nothing   -> []
+    Nothing   -> [ "\n<!-- OMITTED: `" <> htmlCommentSafe d.dcnName <> "` \8212 "
+                     <> htmlCommentSafe (omissionReason d)
+                     <> ". Located, with its code, in the fidelity report. -->\n" ]
     Just body -> ["\n## `" <> d.dcnName <> "`\n\n", body]
+
+-- | Why this decision has no markdown form, in one clause, for the marker in
+-- the artifact. The FULL wording with its code and source location stays in the
+-- fidelity report; this is the sentence a reader of the @.md@ ALONE needs in
+-- order to know that something is missing and what to go and read.
+omissionReason :: Decision -> Text
+omissionReason d = case d.dcnLogic of
+  -- A whole body that REFUSES (ruling D1, 2026-09-05) arrives here as the boxed
+  -- literal @null@. Named first and separately, because "a formula" would be a
+  -- false description of it and because this is the case a reader most needs to
+  -- see: the decision DECLINES, rather than merely being unspellable.
+  LogicLiteral e
+    | e.feText == "null" ->
+        "this decision REFUSES, and dmnmd has no way to say `declined`"
+          <> maybe "" (\t -> " (" <> t <> ")") d.dcnDescription
+  LogicLiteral e  -> "a formula (" <> e.feText <> "), and dmnmd has no boxed-expression form"
+  LogicContext _  -> "a boxed context (a hydrated record), which dmnmd cannot express"
+  LogicTable t
+    | any (\r -> r.drOutput.feText == "null") t.dtRules
+        || maybe False (\o -> o.feText == "null") t.dtOutput.ocDefault ->
+        "a rule of it answers `null` (the decision can REFUSE), and dmnmd's cell \
+        \grammar has no null"
+    | otherwise -> "a cell outside dmnmd's grammar"
+
+-- | An HTML comment may not contain @--@ at all. Both a decision name and a
+-- refusal reason are author-written text that can, so neither may be
+-- interpolated raw. (The corpus already has one: @gst-rate.l4@\'s reasons are
+-- written with @--@ dashes.)
+htmlCommentSafe :: Text -> Text
+htmlCommentSafe = Text.pack . go . Text.unpack
+ where
+  go ('-' : '-' : rest) = '\8212' : go (dropWhile (== '-') rest)
+  go (c : rest)         = c : go rest
+  go []                 = []
 
 -- | dmnmd's parser accepts a table row only if it ends in a newline, and
 -- diagnoses a missing one at the wrong line. Cheap to honour, expensive to debug.
@@ -237,8 +290,19 @@ cellSyntaxReason outTy r
       <> [ "a half-open or non-integer range"
          | any (anyTest isBadRange) r.drInputs
          ]
+      -- A REFUSING ROW, since D1: the output entry is FEEL's `null`. Named
+      -- separately from the generic output gap below for exactly the reason the
+      -- DATE arm above is named separately -- it is not parentheses, not a
+      -- comma, and not an expression, and a reader sent looking for those finds
+      -- nothing. dmnmd's cell grammar has no null: a bare `null` cell would be
+      -- read back as the STRING "null", which is worse than an omitted table.
+      <> [ "a `null` output entry -- the decision can REFUSE, and dmnmd has no way to say \
+           \`declined`; a bare `null` cell would be read back as the STRING \"null\""
+         | r.drOutput.feText == "null"
+         ]
       <> [ "an output dmnmd cannot read: parentheses, a comma, or an expression outside S-FEEL"
-         | isNothing (mdOutput outTy r.drOutput)
+         | r.drOutput.feText /= "null"
+         , isNothing (mdOutput outTy r.drOutput)
          ]
 
   -- 'TestOneOf' nests, so the search must too.
@@ -360,6 +424,26 @@ markdownReport drg =
     ]
 
   decisionNotes d = case d.dcnLogic of
+    -- A whole body that REFUSES (ruling D1, 2026-09-05) arrives here as the
+    -- boxed literal `null`, and "is a formula (null)" would be a false
+    -- description of it: `null` is not a formula, it is the absence of an
+    -- answer. Named separately for the reason 'cellSyntaxReason' names the DATE
+    -- gap separately -- a reader told the enumeration rather than the instance
+    -- goes looking for a defect that is not there. The CODE is unchanged,
+    -- because the loss is the same one dmnmd's table grammar imposes (the
+    -- decision is omitted) and @D-MD-NOLITERAL@ is already carried in
+    -- FIDELITY-SEVERITY-AXIS-SPEC.md with that meaning.
+    LogicLiteral e | e.feText == "null" ->
+      [ note "D-MD-NOLITERAL" Blocking d.dcnId
+          ("`" <> d.dcnName <> "` REFUSES: it declines to answer, which DMN spells as the \
+             \FEEL literal `null` and dmnmd cannot spell at all -- dmnmd has neither a \
+             \boxed-expression form nor any way to say `declined` -- so the decision is \
+             \omitted. The author's reason survives in the XML artifact, on this \
+             \decision's <description>"
+             <> maybe "" (\t -> ": " <> t) d.dcnDescription)
+          "the decision itself, AND the fact that it declines: a reader of the markdown \
+          \alone sees neither the rule nor its absence"
+      ]
     LogicLiteral e ->
       [ note "D-MD-NOLITERAL" Blocking d.dcnId
           ("`" <> d.dcnName <> "` is a formula (" <> e.feText

@@ -45,21 +45,26 @@ IMPORT utils
 
 L4 includes several standard libraries:
 
-| Library         | Description                    |
-| --------------- | ------------------------------ |
-| `prelude`       | Core functions (auto-imported) |
-| `math`          | Mathematical functions         |
-| `daydate`       | Date calculations              |
-| `excel-date`    | Excel date compatibility       |
-| `currency`      | Currency handling              |
-| `legal-persons` | Legal entity types             |
-| `coercion`      | Type conversions               |
+| Library         | Description              |
+| --------------- | ------------------------ |
+| `prelude`       | Core functions           |
+| `math`          | Mathematical functions   |
+| `daydate`       | Date calculations        |
+| `excel-date`    | Excel date compatibility |
+| `currency`      | Currency handling        |
+| `legal-persons` | Legal entity types       |
+| `coercion`      | Type conversions         |
 
 ## Import Resolution
 
-1. Prelude is automatically imported in all files
+1. Every library, `prelude` included, has to be asked for by name. Nothing is in scope until
+   you write its `IMPORT` line
 2. Library names resolve to `jl4-core/libraries/`
 3. Relative names resolve to the current directory
+
+L4 looks in more places than those two, and in a fixed order — a copy sitting beside your file
+outranks the copy built into the compiler, for instance. [Library Resolution](resolution.md)
+sets out the whole order and when each step matters.
 
 ## See Also
 

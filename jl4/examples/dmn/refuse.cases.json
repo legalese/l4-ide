@@ -1,0 +1,143 @@
+{
+  "note": [
+    "Engine cases for the REFUSAL exhibit (refuse.l4; ruling D1, 2026-09-05).",
+    "",
+    "WHAT THESE COVER, and it is the whole point of the exhibit: a decision that",
+    "DECLINES TO ANSWER is executed by two real engines, and both agree about",
+    "what comes back. Before D1 this file could not exist — the exporter wrote",
+    "the L4 text `REFUSE \"…\"` into a <literalExpression> and KIE 8.44.0.Final",
+    "failed to compile the WHOLE model (ERR_COMPILING_FEEL, VERDICT FAILED), so",
+    "no case could reach a refusal on any engine.",
+    "",
+    "`null` IS THE EXPECTED VALUE, AND IT IS DECLARED. The harnesses treat a",
+    "null answer as a failure BY DEFAULT; an EXPLICIT JSON null in `expect`",
+    "licenses it, for that decision and that case only. Every null below is",
+    "therefore an assertion that the model declined, not an absence of one.",
+    "",
+    "A REFUSING DECISION IS EVALUATED EVEN WHEN NOTHING REACHES IT, which is",
+    "why `no_fee_is_prescribed_before_commencement_on_1983_01_01` is null in",
+    "EVERY case including the ones where the floor row does not fire. A DMN",
+    "<decision> is a node in a graph, not a branch of an expression: the engine",
+    "evaluates it whenever it evaluates the model. That is the fact D-REFUSE's",
+    "severity calibration is about, and pinning it here is what stops a later",
+    "reading of `the filing fee` = 1000 being mistaken for `the refusal did not",
+    "happen`.",
+    "",
+    "TWO INDEPENDENT AXES, and case D separates them: `RULES_EFFECTIVE_DATE` is",
+    "the date the LAW is about and gates the fee chain; `the_claim_amount` is",
+    "what the CASE is about and gates the discount and the band. Case D asks a",
+    "pre-commencement rule date about a large claim, so the fee chain refuses",
+    "while the discount and the band answer — a refusal that leaked across the",
+    "two axes would fail there and only there.",
+    "",
+    "CASE E STRADDLES COMMENCEMENT ITSELF (the day of, against case C's day",
+    "before), which is what pins the closed-low convention on the interval",
+    "table's lowest arm. Delete the pair and an off-by-one on `commencement`",
+    "passes green.",
+    "",
+    "THE ENUM CASE IS `the_band`. Its <outputValues> declares `null` alongside",
+    "the three constructors, because the two engines disagreed without that:",
+    "KIE enforces <outputValues> at run time and FAILED the decision (\"Value",
+    "null does not match list of allowed values\") while zeebe-dmn returned the",
+    "null silently. Measured 2026-09-05. The unwidened form is kept as a",
+    "negative control in not-ok/refuse-enum-unwidened.dmn so the divergence",
+    "cannot come back unnoticed.",
+    "",
+    "ACTIVATION CONTRACT: every expected value below was derived from the L4",
+    "SOURCE, not from a DMN engine's own output — a pin regenerated from the",
+    "thing it pins is vacuous. `commencement`, `the transition day`, the three",
+    "fee arms and the two ladders are read straight off refuse.l4; the nulls",
+    "are what L4 says a REFUSE does, which is to stop with the author's reason.",
+    "The one value that is NOT derivable from L4 is `the_fee_with_surcharge` in",
+    "the refusing cases: L4 never reaches the multiplication, because the",
+    "refusal stops evaluation, whereas FEEL has no such notion and computes",
+    "`null * 2`. That it is null on both engines is a MEASURED FEEL fact, and",
+    "it is stated here rather than passed off as a derivation.",
+    "",
+    "`{\"$date\": \"YYYY-MM-DD\"}` is the fixture vocabulary's only way to say",
+    "\"this is a FEEL date\"; both harnesses convert by declared type, never by",
+    "appearance."
+  ],
+  "cases": [
+    {
+      "name": "A. the current regime, a large claim — nothing refuses except the refusal itself",
+      "context": {
+        "RULES_EFFECTIVE_DATE": { "$date": "2026-06-01" },
+        "the_claim_amount": 5000
+      },
+      "expect": {
+        "commencement": { "$date": "1983-01-01" },
+        "the_transition_day": { "$date": "2026-01-01" },
+        "no_fee_is_prescribed_before_commencement_on_1983_01_01": null,
+        "the_filing_fee": 1000,
+        "the_fee_with_surcharge": 2000,
+        "the_discount": 100,
+        "the_band": "standard"
+      }
+    },
+    {
+      "name": "B. the original regime, a middling claim",
+      "context": {
+        "RULES_EFFECTIVE_DATE": { "$date": "2000-01-01" },
+        "the_claim_amount": 500
+      },
+      "expect": {
+        "commencement": { "$date": "1983-01-01" },
+        "the_transition_day": { "$date": "2026-01-01" },
+        "no_fee_is_prescribed_before_commencement_on_1983_01_01": null,
+        "the_filing_fee": 250,
+        "the_fee_with_surcharge": 500,
+        "the_discount": 10,
+        "the_band": "reduced"
+      }
+    },
+    {
+      "name": "C. THE REFUSAL — the day before commencement, a claim below every floor",
+      "context": {
+        "RULES_EFFECTIVE_DATE": { "$date": "1982-12-31" },
+        "the_claim_amount": 50
+      },
+      "expect": {
+        "commencement": { "$date": "1983-01-01" },
+        "the_transition_day": { "$date": "2026-01-01" },
+        "no_fee_is_prescribed_before_commencement_on_1983_01_01": null,
+        "the_filing_fee": null,
+        "the_fee_with_surcharge": null,
+        "the_discount": null,
+        "the_band": null
+      }
+    },
+    {
+      "name": "D. the two axes pulled apart — the law refuses, the claim does not",
+      "context": {
+        "RULES_EFFECTIVE_DATE": { "$date": "1982-12-31" },
+        "the_claim_amount": 5000
+      },
+      "expect": {
+        "commencement": { "$date": "1983-01-01" },
+        "the_transition_day": { "$date": "2026-01-01" },
+        "no_fee_is_prescribed_before_commencement_on_1983_01_01": null,
+        "the_filing_fee": null,
+        "the_fee_with_surcharge": null,
+        "the_discount": 100,
+        "the_band": "standard"
+      }
+    },
+    {
+      "name": "E. boundary — commencement day itself: the lowest arm's low end is CLOSED",
+      "context": {
+        "RULES_EFFECTIVE_DATE": { "$date": "1983-01-01" },
+        "the_claim_amount": 100
+      },
+      "expect": {
+        "commencement": { "$date": "1983-01-01" },
+        "the_transition_day": { "$date": "2026-01-01" },
+        "no_fee_is_prescribed_before_commencement_on_1983_01_01": null,
+        "the_filing_fee": 250,
+        "the_fee_with_surcharge": 500,
+        "the_discount": 10,
+        "the_band": "reduced"
+      }
+    }
+  ]
+}

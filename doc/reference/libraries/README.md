@@ -6,7 +6,7 @@ L4 ships with a set of core libraries that provide essential functions for commo
 
 Core libraries are located in the [jl4-core/libraries/](https://github.com/legalese/l4-ide/tree/main/jl4-core/libraries) directory:
 
-- **[prelude](prelude.md)** - Standard functions (automatically imported)
+- **[prelude](prelude.md)** - Standard functions (`IMPORT prelude`, like every other library)
 - **[sets](sets.md)** - Set-theoretic collections: `SET OF a`, UNION/INTERSECT/difference, and the set-aware `PLUS`/`MINUS` overloads (part of the prelude)
 - **[negation-as-failure](negation-as-failure.md)** - NAF combinators (`holds` / `naf` / `presumed`) over `MAYBE BOOLEAN`
 - **[daydate](daydate.md)** - Date calculations and temporal logic
@@ -106,7 +106,7 @@ Condensed function tables for each core library. See individual library pages fo
 
 ### prelude
 
-Automatically imported. Provides foundational functions for lists, numbers, and data types.
+`IMPORT prelude`. Provides foundational functions for lists, numbers, and data types.
 
 **List Functions:**
 

@@ -469,7 +469,8 @@ rulings are closed; what remains is implementation in the order of `PROPS-REDTEA
 
 **Added 2026-09-05, from a second rulings sheet Meng marked that day.** Four further rulings sit
 below and are **not** part of the 2026-09-04 red team: **R7 is amended** by §11.9.1 (the DMN image
-of a refusal), **R7.1** is added by §11.9.2 (the pre-commencement gate), and **R13** and **R14**
+of a refusal), §11.9.2 (`<outputValues>` widened by `null`) and §11.9.3 (which also carries D6's
+pre-commencement-gate ruling and why its DMN half was not taken), and **R13** and **R14**
 are added by §11.17 and §11.18 (§5.3 discharged, §4.3 and §8 Q8 withdrawn), and §11.19 rules the
 ORDER in which the cross-`IMPORT` hole is repaired — the refusal before the closure — while the
 defect record itself lives at `OPEN-FINDINGS-2026-09-05.md` **OF-7**, because it spans `Export.hs`,
@@ -715,11 +716,12 @@ A throw at force, never a value; `#ASSERT REFUSED e` with an optional message an
 assertion outcome; house style one named definition per refusal with its `@ref`, readers
 byte-identical, polymorphic ones declared `GIVEN a IS A TYPE`; `Ref(f)` reported per reason string
 with the prelude's `TBD` excluded and warned separately; the per-backend image of
-`PROPS-REDTEAM-2026-09-03.md` §2.8 (DMN omits the refusing row, non-Blocking `D-REFUSE`,
-`MayRefuse` safety kind; Catala no definition; Docassemble a terminal screen; evaluator, CLI, batch
-and service a `refused` kind); order-dependence under lazy `AND`/`OR` written down. The taxonomy
-row is split: "the law does not apply / is not in force" is a value or gate that savings and
-transitional provisions can reach; "the model does not cover this" is `REFUSE`.
+`PROPS-REDTEAM-2026-09-03.md` §2.8 (~~DMN omits the refusing row, non-Blocking `D-REFUSE`,
+`MayRefuse` safety kind~~ — **DMN's third of that image is SUPERSEDED by §11.9.1 below**; Catala no
+definition; Docassemble a terminal screen; evaluator, CLI, batch and service a `refused` kind);
+order-dependence under lazy `AND`/`OR` written down. The taxonomy row is split: "the law does not
+apply / is not in force" is a value or gate that savings and transitional provisions can reach;
+"the model does not cover this" is `REFUSE`.
 
 **Consequence to carry, so two documents do not contradict.** The split reclassifies Reg CF's
 pre-commencement case, which `specs/todo/lexipedia-superset/CORPUS-TRACK.md` §8 ruling R2 and
@@ -728,268 +730,217 @@ on <day>" arm (`TEMPORAL-RULE-VERSION-DESIGN.md` item 3), which becomes a gate. 
 design yet. Until one exists the commencement arm stays a `REFUSE`, and the PR that lands `REFUSE`
 amends CORPUS-TRACK §8 in the same change.
 
-#### 11.9.1 R7 AMENDED 2026-09-05 — the DMN image of a refusal is FEEL `null`, and it withdraws `DMN-SAFE`
+### 11.9.1 D1 — the DMN image of a refusal. RULED 2026-09-05 (marked accept).
 
-**Ruling (Meng, 2026-09-05, mark `accept` on rulings-bench card `D1-dmn-refuse-image`).** The DMN
-half of R7's per-backend image above — "DMN omits the refusing row, non-Blocking `D-REFUSE`,
-`MayRefuse` safety kind" — is **superseded**. The image is now:
+**A `REFUSE` lowers to FEEL `null`. The refusing row is NOT omitted. `DMN-SAFE` is withdrawn from
+any decision that can refuse, and the existing call-site calibration sets the severity of a new
+`D-REFUSE` code. `MayRefuse` is dropped.** This AMENDS §11.9's reference to
+`PROPS-REDTEAM-2026-09-03.md` §2.8; that paragraph's DMN sentence is superseded, and §2.8 and §6
+item 6 say so in this same change.
 
-- `l4 export --to dmn` lowers a reachable `REFUSE` to FEEL **`null`**, and **omits nothing**;
-- the reason string rides on the surviving `OTHERWISE` row's `<description>`, under a new
-  `D-REFUSE` code;
-- the export **withdraws `DMN-SAFE`**;
-- severity is set by the existing strictness calibration — `Lossy` when only lazy positions
-  consume the refusal, `Blocking` from any strict consumer;
-- **`MayRefuse` is dropped.** A safety kind that does not withdraw `DMN-SAFE` certifies a decision
-  total when we can see it is not, which is the thing this ruling exists to stop.
+The reason string is written into the artifact twice, which is the property omission could not
+have had: on the refusing `<rule>`'s `<description>` (`OTHERWISE — REFUSE: …`), and on a new
+`<decision>` `<description>` (`REFUSE: …`) covering the two shapes with no row — a whole body that
+refuses, and an `OTHERWISE` that became a `defaultOutputEntry` under `UNIQUE`.
 
-Every other backend in R7's list (Catala no definition, Docassemble a terminal screen; evaluator,
-CLI, batch and service a `refused` kind) is unchanged.
+**What decided it.**
 
-**Status: ruled 2026-09-05; NOT BUILT.** What is in the tree today is neither the old image nor
-this one: `L4.Dmn.Lower` lowers `Refuse {} -> verbatim e` (`jl4-core/src/L4/Dmn/Lower.hs:2285`),
-writing L4 source text into a FEEL literal, and KIE 8.44.0.Final then fails to compile the whole
-DMN file (`ERR_COMPILING_FEEL`, measured 2026-09-05 while repairing PR #334; recorded in §10.6 and
-in `doc/reference/control-flow/REFUSE.md`). What would make this ruling true: the `Refuse` arm at
-`Lower.hs:2285` emitting `null`; a `D-REFUSE` row in `DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §7;
-`analyzeSafety` withdrawing `DMN-SAFE` on a reachable refusal; and the three conditions below.
+1. **The baseline, reproduced rather than inherited.** Before this change the exporter wrote the L4
+   source text into a FEEL literal (`Dmn/Lower.hs:2285`, `Refuse {} -> verbatim e`), and KIE
+   8.44.0.Final answered `ERROR [ERR_COMPILING_FEEL] … syntax error`, `BUILD 1 error(s)`,
+   `VERDICT … <<< FAILED` — it did not merely mark the file Blocking, it failed to compile it.
+   After the change the same module is `XSD valid / VALID clean / BUILD clean`.
+2. **§2.8's argument for omission cannot choose between the options.** It read "FEEL `null` is
+   already spent on `NOTHING`, so `REFUSE → null` would launder". Measured: an omitted row and a
+   `null` row are **engine-identical under both hit policies this exporter emits** — under
+   `HitFirst` the catch-all is a rule (`Lower.hs:695`) and deleting it leaves nothing matching;
+   under `HitUnique` the `OTHERWISE` is the `defaultOutputEntry` (`Lower.hs:1651`) and deleting it
+   has the same effect. Both answer `null`. Given the equivalence, `null` is the cheaper arm (one
+   case alternative, versus recomputing eight `informationRequirement` sets) and the only one that
+   keeps the author's sentence, because omission deletes the `<rule>` whose `<description>` would
+   hold it.
+3. **What replaces the laundering worry.** Not a promise, three mechanisms: a refusal is a `REFUSE`
+   clause in `analyzeSafety`, so a refusing decide is **not** `DMN-SAFE` and does not un-lift; the
+   clause **propagates to callers** carrying the callee's own reason, which is §2.8's `Ref(f)`
+   fixpoint over the graph that already existed; and `D-REFUSE` is raised at the severity
+   `D-PARTIAL` already uses (extracted into one shared helper, not copied) — `Lossy` when every
+   call site is a lazy arm, `Blocking` on any strict consumer or none at all. §2.8's "non-Blocking
+   `D-REFUSE`" is overruled by the DRG-root case, where a caller gets `null` with status SUCCEEDED
+   and nothing to tell it apart from an answer.
+4. **Neutrality, measured not assumed.** All ten existing DMN golden subjects regenerate
+   byte-identically (`.dmn` and `.fidelity.txt`, 20/20, after normalising the harness's `main.l4:`
+   source prefix). No corpus module contains a `REFUSE` the DMN exporter can see, and
+   `analyzeSafety`'s documented cross-module gap keeps `prelude.l4`'s `TBD` invisible to it.
 
-**The three conditions. The ruling is not shipped without them** — Meng accepted the
-recommendation _as written_, and it was written as "C, conditional on three things landing with
-it", because C on its own ships a green pipeline over a region no test evaluates:
+**The condition Meng's acceptance attached, and what each half became.**
 
-1. **A pre-commencement engine-differential case that does _not_ supply the floor**, in each of
-   `jl4/examples/dmn/regcf-corpus.cases.json`, `gst-rate.cases.json` and `ymd-dates.cases.json`,
-   with both engines' answers recorded in `jl4/examples/dmn/expected/regcf-corpus.engine-baseline.txt`.
-   **Corrected against the tree 2026-09-05:** the condition as originally worded ("a
-   pre-commencement case in each of the three") is already met by two of them and would have been
-   discharged without testing anything. `gst-rate.cases.json` has two pre-commencement cases (F, J
-   — rule dates 1990-01-01 and 1994-03-31 against commencement 1994-04-01) and `ymd-dates.cases.json`
-   has three (F, G, H), whose rule dates are 1900-01-01 and 1982-12-31 against commencement
-   1983-01-01 — and **every one of
-   them supplies the floor itself as `-1` and expects `-1` back**, so the engines see a supplied
-   number and never a refusal. `regcf-corpus.cases.json` has none at all: all 22 cases carry a
-   rule date of 2016-09-01 or later, against commencement 2016-05-16. The condition that bites is
-   therefore the un-supplied one.
-2. **`--fail-on=blocking` actually passed by the `p7-dmn` leg** of `etc/go/go.sh`. Measured
-   2026-09-05: the flag exists (`jl4/app/L4/Cli/Export.hs:234`, `Docassemble.hs:107`) and occurs in
-   **no** `.github/workflows/*` file and **no** file under `etc/go/`. Until it is passed, a
-   `Blocking` `D-REFUSE` is a line of report text that fails nothing.
-3. **The enum-typed COVID refusal covered by its own case.** `regcf.l4:486` declares the refusal at
-   type `FinancialStatementRequirement`, a nullary `IS ONE OF` (`regcf.l4:471-474`), and it is
-   reached from one arm, `regcf.l4:501`. `null`-against-an-enum is the concrete silent-wrong-answer
-   path, and no option on the card was designed with it in view.
+- _A case that evaluates through a refusal, on both engines._ Built as
+  `jl4/examples/dmn/refuse.l4` + `refuse.cases.json`, an eleventh golden subject holding one of
+  each position a refusal can occupy. **KIE: `5 case(s), 0 error(s), 0 warning(s), 35/35 SUCCEEDED,
+35/35 value(s) as expected, 25/25 service output value(s) as expected`. Camunda 8.7.6: `5
+case(s), 1 parsed, 0 error(s), 35/35 evaluated, 35/35 value(s) as expected`.** Wired as its own
+  step in the DMN engine job.
+- _`--fail-on=blocking` actually exercised._ Wired into the `p7-dmn` leg's export
+  (`etc/go/phases/p7-dmn.sh` step 1, gated at step 4b). Measured green first: the Reg CF corpus
+  exports **0 blocking** notes today (21 lossy, 133 advisory), so the gate is not red on arrival.
+- _The enum case._ See §11.9.2, which is where it stopped being a precondition and became a
+  ruling of its own.
 
-**What decided it.** Not the design argument; the measurement that §2.8's reasoning turns on.
-§2.8 rejected `null` on the ground that "FEEL `null` is already spent on `NOTHING`, so
-`REFUSE → null` would launder". The D1 review measured that omission and `null` are
-**engine-identical under both hit policies**, which leaves that argument unable to choose between
-them: under `UNIQUE` the `OTHERWISE` is a `defaultOutputEntry` (`jl4-core/src/L4/Dmn/Lower.hs:695`)
-and under the dated-chain form it is a floor row with no default (`Lower.hs:1645-1655`), and in
-both an absent answer and an explicit `null` reach a consumer the same way. _(The two code sites
-were re-verified 2026-09-05; the engine-level equivalence is the D1 review's measurement and was
-not re-run here — running it needs the KIE and Camunda images.)_ Once they are equivalent, `null`
-is the cheaper half — one arm at `Lower.hs:2285`, against recomputing the `informationRequirement`
-edges of the eight output entries that reach `regcf.l4:143` (`regcf.l4:154, :166, :175, :185,
-:195, :205, :215, :409`) — and it is the only half that keeps the reason string in the artifact at
-all, because omitting the row deletes the very `<rule>` whose `<description>` would carry it.
+**A correction to the precondition as written.** "A pre-commencement case in each of
+`regcf-corpus.cases.json`, `gst-rate.cases.json` and `ymd-dates.cases.json`" was already true of
+two of them: `gst-rate` has cases F (1990-01-01) and J (1994-03-31), `ymd-dates` has F, G and H.
+Only `regcf-corpus` has none — all 22 cases sit at 2016-09-01 or later against a 2016-05-16
+commencement. The substantive half of the finding stands for all three and is **not** discharged by
+this change: none of those cases evaluates through a `REFUSE`, because all three still spell the
+floor as an `ASSUME` the harness supplies as `-1`. `refuse.l4` is what makes that migration safe to
+attempt; the migration itself is the next change, and it is where the `regcf-corpus` case belongs,
+since a case added now would pin the `ASSUME` image it is about to replace.
 
-The finding that decides how confident anyone should be is condition 1's: the two-engine check
-reports `1540/1540 decision(s) SUCCEEDED, 1540/1540 value(s) as expected` on both KIE 8.44.0.Final
-and Camunda 8.7.6, over 22 cases, **none of which evaluates through a refusal**. That number is
-not evidence about this ruling.
+**Owner's note on the second per-backend image.** The dmnmd/markdown carrier is ruled here too:
+**a refusing table is omitted, loudly.** No code was needed for the omission — `mdOutput` already
+refuses anything outside S-FEEL and FEEL `null` is not S-FEEL — but the message was wrong, naming
+the enumeration ("parentheses, a comma, or an expression outside S-FEEL") rather than the instance,
+which is the mistake `cellSyntaxReason`'s own header records having made once already over dates.
+Both `D-MD-CELLSYNTAX` and `D-MD-NOLITERAL` now name the refusal and carry the reason. The
+projection of `refuse.l4` to markdown is an empty document, and that is the finding rather than a
+defect in the fixture: dmnmd cannot say `null`, and a bare `null` cell would be read back as the
+STRING `"null"`.
 
-**The second per-backend image, which R7 did not name: the dmnmd/Markdown carrier.** It is a
-separate lowering (`jl4-core/src/L4/Dmn/Markdown.hs`) with **20 goldens of its own** under
-`jl4/examples/dmn/expected/` — 10 `.dmn.md` renderings and 10 `.md.fidelity.txt` reports, beside
-the DMN backend's 11 `.dmn` and 11 `.fidelity.txt` (counted 2026-09-05) — and its cell
-grammar is S-FEEL only: `mdOutput` refuses anything that is not S-FEEL, and the code already
-records that a `null` catch-all is the reachable case (`Dmn/Markdown.hs:404-412`, the R8-d′ note).
-So ruling C, applied unchanged, makes a refusing table emit `D-MD-CELLSYNTAX` (Blocking, dmnmd
-only) rather than a `null` cell. **Whether that is the wanted dmnmd image is OPEN and is not
-decided here** — Meng ruled the DMN image, not this one. Recording it so the implementing PR does
-not discover it in a golden.
+### 11.9.2 D1a — `<outputValues>` is widened by `null`. RULED 2026-09-05 on measurement.
 
-**What review changed.** The card's own recommendation was C _with conditions_, and the conditions
-are the substance: read without them, C ships a green pipeline over an untested region, which is
-what an earlier reading of the prior analysis would have done. The card's adversarial pass had
-already corrected the prior analysis on one count — `regcf.l4` carries **two distinct refusals**,
-one `NUMBER`-typed reached from eight output-entry sites and one
-`FinancialStatementRequirement`-typed reached from one, not "one refusal" — and re-measurement on
-2026-09-05 confirms both figures. The one thing this record changes against the card is condition
-1's wording, which was already satisfied in two of the three files by cases that supply the floor,
-and is restated above as "does not supply the floor". `daydate.l4:104` stays out of scope by R7's
-own taxonomy — an out-of-range month is invalid input, the `EITHER` row, not a refusal.
+**When a decision table's output entry can be FEEL `null` and the table declares an
+`<outputValues>` domain, `null` joins that list — unquoted, as the FEEL keyword. The type's own
+`<itemDefinition>`/`<allowedValues>` is untouched. A `D-OUTPUTVALUES-NULL` note (Lossy) records
+it.**
 
-**Corpus sites that cite the superseded image by name**, and migrate with the implementing PR:
-`jl4/examples/dmn/gst-rate.l4:62-65`, `jl4/examples/dmn/ymd-dates.l4:83-86`,
-`jl4/examples/legal/regcf/regcf.l4:135-143`. `jl4-core/libraries/daydate.l4:102-104` does not.
+**What decided it, and it is the finding of this whole change.** D1's third precondition called
+`null`-against-an-enum "the concrete silent-wrong-answer path". It is not silent, and it is not
+loud either — **the two target engines disagree**. Measured 2026-09-05 on a
+`Band IS ONE OF standard, reduced, exempt` table whose `OTHERWISE` refuses:
 
-##### 11.9.1a AMENDED 2026-09-05 (later the same day) — where D1 and D6 overlap, **D1's image wins**
+| engine                    | what it does with `null` against `<outputValues>`                                                                                       |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| KIE 8.44.0.Final          | runtime **ERROR**, decision **FAILED** — `Invalid result value on rule #3, output #1. Value null does not match list of allowed values` |
+| Camunda 8.7.6 (zeebe-dmn) | returns the `null` **silently**, `0 error(s)`, decision evaluated                                                                       |
 
-**The conflict.** §11.9.1 (card D1) rules that the exporter must **not** omit a refusing row — keep
-it and answer FEEL `null`. §11.9.2 (card D6) accepted "the refusing row is omitted and the table
-declares itself incomplete" as the DMN half to land first. The two overlap on exactly one
-construct: **a dated interval table (`DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §15.3) whose floor arm
-refuses.** Both cards were marked `accept` on 2026-09-05, 73 seconds apart, and the conflict was
-not visible on either card.
+One artifact, two meanings, which is a stronger reason to act than either engine alone would have
+been. Widening the list reconciles them (re-measured: KIE `2/2 SUCCEEDED`, Camunda `2/2 value(s) as
+expected`) at a cost of exactly one value of domain assertion — a value the table genuinely can
+produce, so declaring it is more accurate than not, not less.
 
-**Ruling (Meng, 2026-09-05).** **D1's image wins on that construct.** The refusing row is **kept**
-and answers `null`. D6's long-run option 4 — the gate as a property of the rule-version axis —
-**stands unchanged**; what is withdrawn is only option 3 as its DMN half. Nothing in D6's own
-reasoning is contradicted: its deciding measurement — that the corpus bottoms are all
-`NUMBER`-typed, so the gate cannot live in the return type without becoming a tagged union the
-exporter refuses with `D-SUMTYPE` — is equally true under D1's image.
+**Isolated by probe, not by argument.** The same enum is declared twice: on the type's
+`<allowedValues>` and on the table's `<outputValues>`. Widening `allowedValues` alone does **not**
+stop the KIE error; widening `outputValues` alone does. So the TYPE keeps its exact L4 domain for
+every other consumer, and only the table that can decline says that it can.
 
-**The counter-evidence he ruled AGAINST, recorded because the outcome alone is not the record.**
-Omission is **not** diagnostically silent. Measured by `gm-dmn-refusal` on a hand-built omission
-variant of the emitted `.dmn`, over the same five cases:
+**Not refusal-specific, deliberately.** The condition is "an output entry renders as bare `null`",
+which since R8-d′ is also true of a `MAYBE`-valued table. That case carried the same latent
+divergence and is closed by the same line. No existing golden moves, so the corpus has no such
+table today.
 
-| image                        | values           | KIE 8.44.0.Final                                                                                                                  | Camunda 8.7.6        |
-| ---------------------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
-| floor row KEPT, `null` (D1)  | 35/35            | `0 error(s), 0 warning(s)`                                                                                                        | `0 error(s)`         |
-| floor row OMITTED (D6 opt 3) | 35/35, identical | `0 error(s), 4 warning(s)` — `No rule matched for decision table '…' and no default values were defined. Setting result to null.` | `0 error(s)`, silent |
+**Kept honest by a pair, not a positive.** `jl4/tests-cli/fixtures/dmn-refuse-enum/` holds
+`widened.dmn` and `unwidened.dmn`, differing in one token, and CI asserts KIE green on the first
+and red-with-that-message on the second, **and Camunda green on both**. The positive alone would be
+equally consistent with KIE having stopped checking `<outputValues>` at all, which is exactly what
+the step claims to exclude. If either half moves, the widening is re-ruled rather than re-blessed.
 
-So omission buys a **runtime WARN on KIE once per unmatched evaluation** that the `null` row does
-not. That is a real point for D6. What omission costs is **the row and everything on it** — the
-author's sentence on `<description>` and the `@ref` in the `annotationEntry` — at export time, on
-both engines. Both images raise `D-REFUSE` in the fidelity report either way, and both give
-**identical answers on both engines**.
+### 11.9.3 D6's DMN half — NOT taken. RULED by Meng 2026-09-05 on the conflict.
 
-**What decided it, against that.** Three reasons, in the order they weigh:
+**THE RULING. Keep D1's image: the refusing row stays and answers `null`.** Ruled by Meng
+2026-09-05 on the conflict between D1 and D6 option 3, **having been shown the omission variant's
+per-evaluation KIE warning and its cost in the reason string and the `@ref`** — that is, decided
+_with_ the counter-evidence in hand, not in ignorance of it. The table of measurements below is
+what he was shown. D6's long-run option 4 (the gate is a property of the rule-version axis) stands
+unchanged.
 
-1. **Two opinions against one.** D1 was adversarially checked; D6's refuter died on a session limit
-   (recorded in §11.9.2's own "Adversarial status" note below).
-2. **Omission buys no answer-visible loudness.** D1's equivalence measurement applies unchanged to
-   the floor row — 35/35 identical on both engines — so the KIE warning is the whole of the gain,
-   and a warning on one of two engines is not the loudness the omission image was sold on.
-3. **Two images for one construct inside one exporter is the split a later reader gets wrong.**
+D6 (accepted 2026-09-05) rules the pre-commencement gate to be a property of the rule-version axis
+in the long run, and says its DMN half lands first as option 3: **"the refusing row is omitted, and
+the table declares itself incomplete"**. On the one construct where D1 and D6 overlap — a dated
+interval table (§15.3) whose floor arm refuses — **that contradicts D1, which rules the refusing
+row is kept.** Both were accepted, 73 seconds apart.
 
-**Correction to §11.9.2's own reasoning, made here rather than left standing.** §11.9.2 says the
-two rulings "do not conflict, because R7's own taxonomy puts them in different rows". That is true
-of a site that migrates to the gate and stops being a refusal — but it is **not true of a floor arm
-that is genuinely a `REFUSE`**, which §11.9.2 itself identifies two of (`regcf-denovo.l4:211` and
-canon's `sg-csp.l4:79`, both "this encoding does not carry that period"). Those are dated interval
-tables whose floor arm refuses, and they are exactly the overlap. The paragraph is marked in place.
+**D1's image was built, and D6's was not.** Three reasons, stated so a later reader does not
+mistake this for an oversight: D1 was adversarially checked and D6's refuter died on a session
+limit, so D1 carries two opinions and D6 one; the measurement that decides D1 (omission and `null`
+are engine-identical) applies unchanged to the floor row, so option 3 buys no engine-visible
+loudness while losing the reason string; and two images for one construct inside one exporter is
+the kind of split a later reader gets wrong. **Nothing in D6's own reasoning is contradicted** —
+its deciding measurement is that every corpus bottom is `NUMBER`-typed so the gate cannot live
+in the return type, which is equally true under D1's image.
 
-**Status: ruled 2026-09-05; the D1 image is BUILT on branch `props/dmn-refusal`** (not merged as of
-this writing). Its measurements — including the engine divergence on `null` against `<outputValues>`
-and the new `D-OUTPUTVALUES-NULL` code — are recorded by `gm-dmn-refusal` in §11.9.3 and in
-`DMN-EXPORT-PROGRAM-MODEL-SPEC.md`; they are not restated here.
+**D6's blast-radius counts were wrong, and the re-measurement is below, ENUMERATED BY LINE so the
+addition can be checked rather than taken.** D6 as accepted says "9 declarations and 22 floor-arm
+sites across 9 `.l4` files" and "**0 sites in canon**".
 
-#### 11.9.2 R7.1 — the pre-commencement gate lives on the rule-version axis. RULED 2026-09-05.
+| file                                              | decl   | floor arms, by line                        | type     |
+| ------------------------------------------------- | ------ | ------------------------------------------ | -------- |
+| `jl4/examples/legal/regcf/regcf.l4`               | `:143` | 154, 166, 175, 185, 195, 205, 215, 409 — 8 | `NUMBER` |
+| `jl4/examples/legal/regcf/denovo/regcf-denovo.l4` | `:211` | 226, 232, 240, 246, 252, 258, 264 — **7**  | `NUMBER` |
+| `jl4/examples/dmn/gst-rate.l4`                    | `:65`  | 79, 92 — 2                                 | `NUMBER` |
+| `jl4/examples/dmn/ymd-dates.l4`                   | `:86`  | 92 — 1                                     | `NUMBER` |
+| `dmn/not-ok/dated-chain-nested-otherwise.l4`      | `:29`  | 38 (an `ELSE`, not an `OTHERWISE`) — 1     | `NUMBER` |
+| `dmn/not-ok/dated-chain-misordered.l4`            | `:35`  | 47 — 1                                     | `NUMBER` |
+| `dmn/not-ok/dated-chain-mixed.l4`                 | `:31`  | 45 — 1                                     | `NUMBER` |
+| `dmn/not-ok/dated-chain-rolling-date.l4`          | `:28`  | 39 — 1                                     | `NUMBER` |
+| `dmn/not-ok/dated-chain-duplicate-date.l4`        | `:28`  | 40 — 1                                     | `NUMBER` |
+| `canon .../legalese/sg-csp.l4`                    | `:79`  | 88 — 1                                     | `NUMBER` |
 
-R7's "Consequence to carry" above says the taxonomy split reclassifies Reg CF's pre-commencement
-case and the temporal design's generated "not in force on ⟨day⟩" arm, and that **neither has a gate
-design yet**. This is that design.
+**10 declarations, 24 arms, 10 files.** Canon is **not** zero — `sg-csp.l4:79`,
+`no Baby Bonus Cash Gift rate is encoded for a birth before 2015-01-01`, is a pre-commencement
+bottom of exactly this shape. There are **five** `dmn/not-ok` fixtures with floor arms, not four; a
+sixth, `dated-chain-regulative.l4`, declares no floor and is not counted.
 
-**Ruling (Meng, 2026-09-05, mark `accept` on rulings-bench card `D6-precommencement-gate`).**
+**A correction to this paragraph's own first version, kept because the method error is the reusable
+part.** It said **25**, and blamed the difference on `gst-rate.l4`'s second arm. Both were wrong.
+That count was taken as "occurrences of the floor name, minus one for the declaration", which
+silently counted **a comment at `regcf-denovo.l4:3035`** as an arm — so that file read 8 where the
+enumeration above gives 7. `gst-rate.l4`'s two arms were never in dispute. Counting occurrences and
+subtracting the ones you know about is not enumeration: it cannot tell an arm from a comment, and it
+fails silently, in the direction of over-counting. That is why the table above lists line numbers.
 
-- The gate is a **property of the rule-version axis, answered once at the boundary** (the card's
-  option 4). That is the design.
-- ~~Its **DMN half lands first as the card's option 3**: the refusing row is **omitted** from the
-  exported table, and the table **declares itself incomplete**.~~ **SUPERSEDED the same day —
-  ANSWERED 2026-09-05, see §11.9.1a.** On the one construct where this overlapped §11.9.1 — a
-  dated interval table whose floor arm refuses — **D1's image wins**: the row is kept and answers
-  `null`. Option 4 below is unaffected; R7.1 now has no separate DMN half of its own.
-- The gate is **not** a value in the return type (option 2, declined on measurement — see below).
-- "Do nothing, leave the arm an `ASSUME` bottom until Phase 2 builds the axis" (option 1) is
-  declined: R0 deprecates `ASSUME`, so doing nothing is not a stable resting place.
+**The second grep was wrong too, in the other direction.** The re-enumeration that produced that
+table classified each occurrence by keyword, and keyed on `OTHERWISE` — so it dropped
+`dated-chain-nested-otherwise.l4:38`, which is an **`ELSE`**, and reported 23. Two greps in a row,
+two different wrong answers, neither of them careless. What caught it was printing the
+**unclassified residue** rather than the total: a classifier that reports a number and not what it
+failed to classify cannot tell you what it dropped. If a count matters, print the leftovers.
 
-**Read this beside §11.9.1.** §11.9.1 rules that a `REFUSE` lowers to FEEL `null` and **omits
-nothing**. R7.1 as first written ruled that a pre-commencement gate **omits its row**. **PARTLY
-WRONG — corrected 2026-09-05, see §11.9.1a:** the two DO conflict, on a dated interval table whose
-floor arm genuinely refuses, and that conflict was resolved in §11.9.1's favour. The paragraph
-below is right about everything except the word "not", and is kept because the taxonomy argument it
-makes is still what separates the two rulings everywhere else. ~~They do not conflict~~, because
-R7's own taxonomy puts them in different rows: _"the law does not
-apply / is not in force"_ is a value or gate — this ruling — and _"the model does not cover this"_
-is `REFUSE` — §11.9.1. The migration is what makes the difference visible: a site that moves to the
-gate stops being a refusal, and §11.9.1 stops reaching it. `regcf.l4:486`, the COVID-19 temporary
-rules, stays a `REFUSE` and is governed by §11.9.1; the model genuinely does not cover it.
+**What survives the recount is the load-bearing part**: every one of the ten is `NUMBER`-typed, so
+D6's argument that the gate cannot live in the return type without making each a tagged union
+stands, and stands over a slightly larger population than it claimed. Since D6 is one of the cards
+whose adversarial refuter died, treat its remaining figures as unverified too.
 
-**Status: ruled 2026-09-05; NOT BUILT, on either half.** Option 4 needs the rule-version axis of
-`TEMPORAL-RULE-VERSION-DESIGN.md` Phase 2, which is unstarted. Option 3 needs the DMN exporter to
-omit a floor row and to mark the table incomplete, and no code does either today: `§15.3` emits the
-floor row `< date(dₙ)` precisely so the table is **total** over the date axis, and §3.3.1's `SHALL`
-is read as forbidding a default on a complete table. Until both land, the arms stay as they are.
+**The measurement, taken 2026-09-05 rather than left owed.** `refuse.dmn`'s floor row was deleted
+by hand from the emitted artifact — the exact shape option 3 asks for — and both engines were run
+over the same five cases:
 
-**What decided it.** One measurement rules out the return-type answer, and it is the only one that
-separates the options. **Every pre-commencement bottom in the tree is `NUMBER`-typed** — measured
-2026-09-05, ten declarations across ten `.l4` files, every one `IS A NUMBER`. A gate carried in the
-return type therefore has to widen `NUMBER` into a tagged union, and a payload-carrying
-`IS ONE OF` read by a decision is exactly what the DMN exporter refuses today with a **`Blocking`
-`D-SUMTYPE`** (`DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §7 and §4.2.1) — the same class of "raw L4 that
-no engine can evaluate" that §11.9.1 is repairing for `REFUSE`. Option 2 would buy a gate by
-creating, in ten places, the defect the sibling ruling exists to remove. That leaves the
-shape of the table and the axis itself, which is what was ruled.
+| image                        | values           | KIE 8.44.0.Final                                                                                                                                      | Camunda 8.7.6        | the reason, in the artifact                                                               |
+| ---------------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- | ----------------------------------------------------------------------------------------- |
+| floor row KEPT, `null` (D1)  | 35/35            | `0 error(s), 0 warning(s)`                                                                                                                            | `0 error(s)`         | row `<description>`, `<decision>` `<description>`, and the arm's `@ref` `annotationEntry` |
+| floor row OMITTED (D6 opt 3) | 35/35, identical | `0 error(s), 4 warning(s)` — `WARN … No rule matched for decision table 'the_filing_fee' and no default values were defined. Setting result to null.` | `0 error(s)`, silent | none — the `<rule>` that held all three is deleted                                        |
 
-**Blast radius, measured 2026-09-05.** Ten declarations and **twenty-four floor-arm sites** across
-ten `.l4` files:
+**So D1's "engine-identical" claim is confirmed on the VALUES, on both engines, and is incomplete
+on KIE's diagnostics: omission does buy a runtime WARN that the `null` row does not.** That is a
+real point for D6 and it is recorded here rather than argued away. What it buys is one-engine-only
+(zeebe-dmn is silent either way) and per-evaluation; what it costs is the author's sentence, the
+`@ref` citation and the `<description>`, at export time, on both engines. Both images are equally
+loud in the FIDELITY REPORT, which carries `D-REFUSE` either way.
 
-| file                                              | declaration | floor arms |
-| ------------------------------------------------- | ----------- | ---------- |
-| `jl4/examples/legal/regcf/regcf.l4`               | `:143`      | 8          |
-| `jl4/examples/legal/regcf/denovo/regcf-denovo.l4` | `:211`      | 7          |
-| `jl4/examples/dmn/gst-rate.l4`                    | `:65`       | 2          |
-| `jl4/examples/dmn/ymd-dates.l4`                   | `:86`       | 1          |
-| five `jl4/examples/dmn/not-ok/dated-chain-*.l4`   | one each    | 1 each     |
-| `canon` `subjects/sg/child-support/…/sg-csp.l4`   | `:79`       | 1          |
+**Ruled 2026-09-05: D1's image stands.** The KIE warning is real and one-engine-only and
+per-evaluation; what omission costs is the author's sentence, the `@ref` and the `<description>`,
+at export time, on both engines. Meng saw both sides and kept the row. Should this ever be
+revisited, the change is one arm of `datedTable`'s `ruleSpecs` and its goldens, and it would be an
+amendment to §11.9.1 rather than a second image alongside it.
 
-Also: **2 export-schema entries** in `jl4/examples/legal/regcf/denovo/tests/regcf-denovo.schema.golden`
-(`:733` under `/properties`, `:757` under `/required`) and **one `<inputData>` per exported DMN with
-a floor arm** disappear under options 3 and 4. **3 sg-succession sites** already use a value-shaped
-gate for enum-returning sections and are unaffected. Under options 3 and 4 no existing program
-changes meaning: each migrated site moves from a bottom that stops evaluation to a gate that stops
-evaluation, and the only observable difference is at the backends, where a caller-supplied number
-becomes a declared absence.
-
-**Three corrections to the counts, all measured.**
-
-1. The card counted **9 declarations, 22 arms, across 9 files, "four `dmn/not-ok` fixtures"**.
-   There are **five** such fixtures (`dated-chain-rolling-date`, `-duplicate-date`, `-misordered`,
-   `-nested-otherwise`, `-mixed`), which makes the l4-ide totals 9 declarations and 23 arms — and
-   the card's own "across 9 `.l4` files" was already counting all five.
-2. **A third recount, 2026-09-05, proposed 25 arms; the table above sums to 24 and stands.** The
-   proposed extra was `dmn/gst-rate.l4`'s second floor arm, "easy to miss because both arms name
-   the same binding" — but that arm is already counted: `gst-rate.l4` is listed at **2** above
-   (`:79` and `:92`), which is why the l4-ide subtotal is 23 and not 22. Re-derived from source
-   the same day, per file: `regcf.l4` `:143` → arms `:154 :166 :175 :185 :195 :205 :215 :409` (8);
-   `regcf-denovo.l4` `:211` → `:226 :232 :240 :246 :252 :258 :264` (7); `gst-rate.l4` `:65` →
-   `:79 :92` (2); `ymd-dates.l4` `:86` → `:92` (1); five `dated-chain-*` fixtures, one arm each
-   (5); canon `sg-csp.l4` `:79` → `:88` (1). **8+7+2+1+5+1 = 24.** A sixth `dated-chain` fixture,
-   `dated-chain-regulative.l4`, carries no floor declaration and is not in the count.
-
-   **The trap that has now moved this count three times: `regcf-denovo.l4` grep-matches EIGHT
-   times outside its declaration, but only SEVEN are arms.** The eighth, at `:3035`, is **inside a
-   comment** — ``-- ASSUME `no encoding of Part 227 exists for rule dates before 2022-09-20`,``
-   — part of a prose paragraph explaining what the encoding floor costs at the API boundary. A
-   plain `grep -c` over that file returns 8 and is wrong by one. Any recount must drop lines whose
-   first non-space characters are `--`; that is how the enumeration above was taken. The
-   load-bearing half is unaffected either way: **all ten declarations are `NUMBER`-typed**, which
-   is the measurement the ruling turns on.
-
-3. The card said **"0 sites in canon — canon has no pre-commencement bottom."** It has one:
-   `subjects/sg/child-support/encodings/legalese/sg-csp.l4:79`,
-   ``ASSUME `no Baby Bonus Cash Gift rate is encoded for a birth before 2015-01-01` IS A NUMBER``,
-   reached from one arm at `:88`. The card's other canon claim is right — `sg-child-support.l4`'s
-   live transitional provision models "born before commencement" as an ordinary value — but that is
-   a different site.
-
-**A distinction the card did not draw, and the migration must.** These ten are not one population.
-Some say _the law was not in force_ (`regcf.l4:143`, `gst-rate.l4:65`, `ymd-dates.l4:86`, the five
-fixtures) and belong in the gate row. Others say _this encoding does not carry that period_ —
+**One distinction D6 draws that the recount does not, folded in from the rulings branch 2026-09-05.**
+These ten are not one population, and the migration must classify per site rather than sweep. Some
+say _the law was not in force_ — `regcf.l4:143`, `dmn/gst-rate.l4:65`, `dmn/ymd-dates.l4:86`, the
+five fixtures — and belong in the gate row. Two say _this encoding does not carry that period_:
 `regcf-denovo.l4:211` ("no encoding of Part 227 exists for rule dates before 2022-09-20") and
-canon's `sg-csp.l4:79` ("this encoding does NOT carry the earlier rates", its own comment at
-`:70-78`) — which is the `REFUSE` row of R7's taxonomy, not the gate row, even though both are
-guarded on a date. Canon's is guarded on the **child's date of birth**, not on
-`RULES EFFECTIVE DATE`, so no rule-version axis can answer it at all. **The migration classifies
-per site against R7's taxonomy; it does not sweep the ten.**
-
-**Adversarial status.** Card D6's refuter died on a session limit, so this ruling rests on **one
-opinion, not two** — unlike D1, D2, D3, D4 and D5. The measurement it turns on (all bottoms
-`NUMBER`-typed; a tagged union is `Blocking D-SUMTYPE`) was re-checked here and holds, but no
-adversary looked for a reading it misses. Treat it accordingly.
+canon's `sg-csp.l4:79`, whose own comment at `:70-78` says the encoding lacks the earlier rates.
+Those are the `REFUSE` row of R7's taxonomy, not the gate row, even though both are guarded on a
+date — and canon's is guarded on the **child's date of birth**, not on `RULES EFFECTIVE DATE`, so no
+rule-version axis can answer it at all.
 
 ### 11.10 R10 — Backends. RULED 2026-09-04 (marked accept).
 

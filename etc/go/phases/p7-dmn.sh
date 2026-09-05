@@ -293,15 +293,35 @@ OUT="$GO_OUT/$(basename "$GOLDEN")"
 DIFFLOG="$GO_OUT/p7-dmn.canon-diff.txt"
 
 # --- 1. regenerate -----------------------------------------------------------
+#
+# `--fail-on=blocking` is the gate, and it is wired HERE. Ruling D1 (2026-09-05)
+# lowers a REFUSE to FEEL `null` and is sold on the exporter being LOUD about it
+# instead — a Blocking `D-REFUSE` on any decision no consumer can fence. That
+# loudness was worth nothing while the flag was wired into no CI job and no leg:
+# a subject could acquire a Blocking note and this stage would still report PASS
+# with `blocking=N` sitting in a metric nobody reads.
+#
+# MEASURED 2026-09-05 before wiring it: the Reg CF corpus exports with 0
+# blocking notes (21 lossy, 133 advisory), so this gate is green on the subject
+# that has one today and turns red the moment a change introduces one.
+#
+# The artifact is still written when the flag trips (measured), so the two
+# failure modes share an exit code and are told apart below by whether a
+# fidelity report exists at all: a Blocking note is a finding ABOUT THE ENCODING
+# and is reported at step 4b, while an export that produced nothing is a defect
+# in the harness and stays `go_broken`.
 set +e
-"$L4" export "$GO_S_ENCODING" --to dmn -o "$OUT" --fidelity-report 2>"$GO_OUT/p7-dmn.fidelity.stderr"
+"$L4" export "$GO_S_ENCODING" --to dmn -o "$OUT" --fidelity-report --fail-on=blocking \
+  2>"$GO_OUT/p7-dmn.fidelity.stderr"
 EXPORT_RC=$?
 set -e
-[[ $EXPORT_RC -eq 0 ]] || go_broken "l4 export --to dmn exited $EXPORT_RC on a module that typechecks"
 cat "$GO_OUT/p7-dmn.fidelity.stderr"
 
 # `--fidelity-report` with `-o out.dmn` writes a sibling out.fidelity.txt.
 FID="${OUT%.dmn}.fidelity.txt"
+
+[[ $EXPORT_RC -eq 0 || -s "$FID" ]] || \
+  go_broken "l4 export --to dmn exited $EXPORT_RC on a module that typechecks, and wrote no fidelity report — so this is not the --fail-on gate tripping"
 
 # --- 2. differential oracle against the committed golden --------------------
 # NOT a bare byte-diff: that is red on day one and the cause is a defect in the
@@ -326,6 +346,19 @@ tail -3 "$GO_OUT/p7-dmn.validate.txt" || true
 
 # --- 4. fidelity counts, parsed — never typed -------------------------------
 read -r BLOCKING LOSSY ADVISORY < <(node "$GO_LIB/fidelity-counts.mjs" "$FID")
+
+# --- 4b. the --fail-on=blocking gate (ruling D1) -----------------------------
+# Reported BEFORE the golden diff, deliberately: a Blocking note says the
+# emitted DMN carries something no engine can act on, and a byte-diff against a
+# golden that carries the same defect would be GREEN. The stronger claim goes
+# first, so a stale-golden message can never stand in for it.
+if [[ $EXPORT_RC -ne 0 ]]; then
+  go_receipt --status DEGRADED \
+    --reason "l4 export --to dmn --fail-on=blocking exited $EXPORT_RC: the emitted DMN carries $BLOCKING blocking fidelity note(s). Blocking means the target notation has no form for something this encoding says and a fallback was emitted — for D-REFUSE that is a decision which can DECLINE to answer, lowered to FEEL null, with no consumer positioned to fence it. Read $FID, then either repair the encoding or record why the note is accepted; do not drop the flag." \
+    --artifact "$OUT" --artifact "$FID" \
+    --metric "blocking=$BLOCKING" --metric "lossy=$LOSSY" --metric "advisory=$ADVISORY"
+  exit "$GO_EXIT_FINDING"
+fi
 
 # --- 5. the execution question ----------------------------------------------
 EXECUTABLE=0

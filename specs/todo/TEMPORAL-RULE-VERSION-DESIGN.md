@@ -650,26 +650,31 @@ its amendment identity — without runtime machinery.
    loudly _only_ if the scan actually reaches an uncovered day and the author
    provided no base arm — and the fix (add a base arm) is in-language.
 
-   **AMENDED 2026-09-05, see `IMPLICIT-PROPS-DESIGN.md` §11.9.2 (R7.1). "A generated final arm
-   raising a curated user error" is the wording R7 overruled and R7.1 replaces.** R7's taxonomy
-   split (`IMPLICIT-PROPS-DESIGN.md` §11.9) puts "the law is not in force" in the value-or-gate
-   row, not the refusal row, so the absence answer is **not** an error raised from inside a
-   generated arm. R7.1 rules it a **property of this axis, answered once at the boundary**. ~~with
-   a **structural absence** as the DMN half — the row omitted, the table declaring itself
-   incomplete — landing first.~~ **That DMN half was withdrawn the same day — ANSWERED 2026-09-05,
-   see `IMPLICIT-PROPS-DESIGN.md` §11.9.1a**, which rules that where it overlapped R7's `REFUSE`
-   image (a dated interval table whose floor arm refuses) the row is **kept** and answers FEEL
-   `null`. R7.1 therefore has **no separate DMN half**; what it rules is the axis.
-   Ruled 2026-09-05; **not built**, so nothing in
-   this Phase 2 item has moved from unstarted. What changes is what item 3 must build when it is
-   built: an axis-level gate at the boundary, not a per-family error arm. The rest of item 3 (the
-   gap/overlap lint, the overlapping-identical-spans error) is untouched.
+   **AMENDED 2026-09-05 by rulings R7 and D6** (`IMPLICIT-PROPS-DESIGN.md`
+   §11.9, §11.9.1, §11.9.3). Two corrections, and they are about different
+   halves of the sentence above.
 
-   Two consumers of this wording, corrected in the same change:
-   `specs/todo/lexipedia-superset/CORPUS-TRACK.md` §8 R2 and
-   `jl4/examples/legal/regcf/regcf.l4:135-143`, both of which name item 3 as their designed
-   replacement. R2 is amended; the corpus comment is left for the migration PR, which is the
-   change that will delete the arm it describes.
+   _"A curated user error" is the wrong category._ R7 split the taxonomy row
+   this item sits in: "the model does not cover this" is a `REFUSE`, while
+   "the law does not apply / is not in force" is a **gate** — determinate,
+   reachable by savings and transitional provisions, and encodable over. A
+   pre-commencement day is the second, not the first, so the generated arm
+   must not raise the same thing an unmodelled case does. `REFUSE` is the
+   interim spelling, and this arm is what replaces it. As of 2026-09-05 the
+   corpus has not moved even that far: `regcf.l4:143`, `dmn/gst-rate.l4:65`
+   and `dmn/ymd-dates.l4:86` are still `ASSUME`, and
+   `jl4/examples/dmn/refuse.l4` is the worked example of the migration.
+
+   _Where the gate lives is now ruled._ D6 (accepted 2026-09-05): the gate is
+   a **property of the rule-version axis, answered once at the boundary** —
+   this item — and **not** a value in the return type. The deciding
+   measurement is that every corpus bottom is `NUMBER`-typed, so a gate
+   in the return type would make every one a tagged union, which the DMN
+   exporter refuses today with `2 blocking D-SUMTYPE`, exactly as it used to
+   refuse a `REFUSE`. D6 carries **one opinion, not two** — its adversarial
+   refuter died on a session limit — so treat it with corresponding caution;
+   its proposed DMN half (omit the refusing row) was measured and NOT built,
+   and §11.9.3 records both the numbers and the reason.
 
 4. **Round-trip**: TNR/NLG anchors attach to the _arm_ DECIDEs (each keeps
    its own SrcRange and `@label` with the amending instrument), so amendment

@@ -61,12 +61,14 @@ elements — 9 decision
 tables, 60 boxed literal expressions, 1 boxed context — plus 10 `businessKnowledgeModel`s (3 more
 tables live inside them) and 7 `decisionService`s; 15 `<inputData>`, 155 `<informationRequirement>`
 edges, 31 `<knowledgeRequirement>`s, one diagram. Loads clean in `dmn-moddle` — and **evaluates**,
-over the 22 cases in `jl4/examples/dmn/regcf-corpus.cases.json` (the base world, 15 dated
+over the 23 cases in `jl4/examples/dmn/regcf-corpus.cases.json` (the base world, 15 dated
 relocation cases carrying the dropped rule-date fixtures' truths — ruling R-C, spec §15.12.1 —
-4 seed cases added 2026-08-03, the leap case added 2026-08-05, and the escheat case added
-2026-08-09): KIE 8.44.0.Final answers
-1540/1540 decisions, 1540/1540 values as expected (330/330 decision-service output values);
-Camunda 8.7.6 (zeebe-dmn) parses and answers 1540/1540. The
+4 seed cases added 2026-08-03, the leap case added 2026-08-05, the escheat case added
+2026-08-09, and the pre-commencement case added 2026-09-05 under ruling D1, which is the first
+that leaves the window this corpus models and the first that supplies neither refusal):
+KIE 8.44.0.Final answers
+1610/1610 decisions, 1610/1610 values as expected (345/345 decision-service output values);
+Camunda 8.7.6 (zeebe-dmn) parses and answers 1610/1610. The
 verbatim verdict lines live in
 `jl4/examples/dmn/README.md` and are CI-gated (`.github/workflows/pr-checks.yml`, dmn-engines).
 

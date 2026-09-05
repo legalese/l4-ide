@@ -15,5 +15,16 @@
 # edit this file until you know WHICH decisions moved and why -- a count that
 # drifts down by one is a decision that stopped being evaluated, and blessing it
 # here is how that becomes the expected behaviour.
-KIE 8.44.0.Final VERDICT: 1 file(s), 22 case(s), 0 error(s), 0 warning(s), 1540/1540 decision(s) SUCCEEDED, 1540/1540 value(s) as expected, 330/330 service output value(s) as expected
-Camunda 8.7.6 (zeebe-dmn) VERDICT: 1 file(s), 22 case(s), 1 parsed, 0 error(s), 1540/1540 decision(s) evaluated, 1540/1540 value(s) as expected
+#
+# 2026-09-05, ruling D1: 22 -> 23 cases, 1540 -> 1610, 330 -> 345. The new case is
+# the FIRST here to ask a rule date below Reg CF's 2016-05-16 commencement, and the
+# first to supply NEITHER refusal -- both are explicit JSON nulls rather than the
+# -1 and the invented assurance level every other case hands the model. Until it
+# existed, the floor arm ruling R2 (CORPUS-TRACK 8) put in the artifact was
+# reachable by nothing, so this gate said 1540/1540 about a model whose
+# pre-commencement half had never been evaluated. Sixteen of the seventy answers
+# move there; seven of them move to a LAUNDERED `false` (FEEL's null reads as
+# false at the first boolean consumer), which regcf-corpus.cases.json pins as
+# evidence and explicitly not as endorsement.
+KIE 8.44.0.Final VERDICT: 1 file(s), 23 case(s), 0 error(s), 0 warning(s), 1610/1610 decision(s) SUCCEEDED, 1610/1610 value(s) as expected, 345/345 service output value(s) as expected
+Camunda 8.7.6 (zeebe-dmn) VERDICT: 1 file(s), 23 case(s), 1 parsed, 0 error(s), 1610/1610 decision(s) evaluated, 1610/1610 value(s) as expected

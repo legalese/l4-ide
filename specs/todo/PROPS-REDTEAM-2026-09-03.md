@@ -501,39 +501,45 @@ be zero at release. **Refusal is order-dependent under lazy `AND`/`OR`** (`FALSE
 `x AND FALSE` refuses) and so diverges from FEEL's commutative Kleene logic; the region is
 well-defined only if the verifier models left-to-right demand. This is written down, not fixed.
 
-> **The DMN clause of the next paragraph is SUPERSEDED. ANSWERED 2026-09-05, see
-> `IMPLICIT-PROPS-DESIGN.md` §11.9.1** (ruling card `D1-dmn-refuse-image`, mark accept). DMN
-> lowers a reachable `REFUSE` to FEEL **`null`** and omits **nothing**; the export **withdraws
-> `DMN-SAFE`**; `D-REFUSE` carries two severities set by the strictness calibration; and
-> **`MayRefuse` is dropped**. The "`REFUSE → null` would launder" argument below is what the
-> ruling overturned: omission and `null` were measured engine-identical under both hit policies
-> (`Dmn/Lower.hs:695`, `:1645-1655`), so it cannot choose between them. The rest of the paragraph —
-> Catala, Docassemble, evaluator, CLI, batch, service — stands unchanged. The **dmnmd/Markdown**
-> carrier is a second per-backend image that neither this paragraph nor the ruling decides; §11.9.1
-> records the measured consequence and leaves it open.
+**Per-backend image.** DMN's third of this paragraph is **SUPERSEDED — ruled D1, 2026-09-05,
+recorded in `IMPLICIT-PROPS-DESIGN.md` §11.9.1 and §11.9.2, and BUILT.** The superseded text is
+struck through below and kept, because the reasoning it gave is what the measurement had to
+answer:
 
-**Per-backend image**, which no backend has today (every one lowers the refusal `ASSUME` as a
-suppliable input, run-verified 2026-09-04): ~~DMN omits the refusing row, reports a non-Blocking
-`D-REFUSE` with the reason, and adds a `MayRefuse` safety kind that does not withdraw `DMN-SAFE`
-(FEEL `null` is already spent on `NOTHING`, so `REFUSE → null` would launder; `analyzeSafety`
-deliberately treats an assumed term as not partial, so `D-PARTIAL` is the wrong class)~~ (see the
-note above); Catala
-emits no definition (its ladder veto exempts consequences); Docassemble a terminal screen;
-evaluator, CLI, batch and service a `refused` kind on all six surfaces. The temporal design's
-generated "not in force on <day>" arm (`TEMPORAL-RULE-VERSION-DESIGN.md` item 3) is reconsidered as
-a **gate** rather than a refusal, per the split row below. **That gate is now designed: ANSWERED
-2026-09-05, see `IMPLICIT-PROPS-DESIGN.md` §11.9.2 (R7.1)** — a property of the rule-version axis,
-answered once at the boundary. Its first-written DMN half, a structural absence in the table, was
-withdrawn the same day: §11.9.1a rules that a dated interval table whose floor arm refuses **keeps**
-the row and answers FEEL `null`, per R7's amended image, so R7.1 has no separate DMN half. Ruled,
-not built.
+> ~~DMN omits the refusing row, reports a non-Blocking `D-REFUSE` with the reason, and adds a
+> `MayRefuse` safety kind that does not withdraw `DMN-SAFE` (FEEL `null` is already spent on
+> `NOTHING`, so `REFUSE → null` would launder; `analyzeSafety` deliberately treats an assumed term
+> as not partial, so `D-PARTIAL` is the wrong class)~~
+
+What ships instead: **DMN lowers a refusal to FEEL `null`, KEEPS the refusing row, WITHDRAWS
+`DMN-SAFE`, and raises a `D-REFUSE` whose severity is the existing call-site calibration —
+`Lossy` from lazy consumers, `Blocking` from any strict one or from none. `MayRefuse` is dropped.**
+The laundering argument could not choose between the options: an omitted row and a `null` row are
+engine-identical on values under both hit policies (measured on KIE 8.44.0.Final and Camunda 8.7.6),
+and once they are equivalent, `null` is the only arm that keeps the author's reason, because
+omission deletes the `<rule>` whose `<description>` would hold it. A second ruling the design never
+anticipated came out of the same pass: on an ENUM-valued table the two engines **disagree** about a
+`null` the `<outputValues>` does not list — KIE fails the decision, zeebe-dmn returns it silently —
+so that table's `<outputValues>` is widened by `null` (§11.9.2).
+
+The other backends are unchanged and unbuilt (every one still lowers the refusal `ASSUME` as a
+suppliable input, run-verified 2026-09-04): Catala emits no definition (its ladder veto exempts
+consequences); Docassemble a terminal screen; evaluator, CLI, batch and service a `refused` kind on
+all six surfaces. **Added by D1:** the dmnmd markdown carrier is a SECOND per-backend image, with 11
+goldens of its own, and its ruling is that a refusing table is **omitted, loudly** — dmnmd's cell
+grammar has no `null`, and a bare `null` cell would be read back as the string `"null"`.
+
+The temporal design's generated "not in force on <day>" arm
+(`TEMPORAL-RULE-VERSION-DESIGN.md` item 3) is reconsidered as a **gate** rather than a refusal, per
+the split row below; D6 (2026-09-05) rules that gate to be a property of the rule-version axis, and
+`IMPLICIT-PROPS-DESIGN.md` §11.9.3 records why its proposed DMN half was not built alongside D1's.
 
 | non-answer                               | construct              | who handles it                                   | catchable       |
 | ---------------------------------------- | ---------------------- | ------------------------------------------------ | --------------- |
 | a value that may be absent               | `MAYBE`                | the rule, by matching                            | yes, as a value |
 | an expected failure with a reason        | `EITHER`               | the rule or its caller                           | yes, as a value |
 | a fact not yet known                     | an unsupplied binder   | the boundary asks                                | n/a             |
-| the law does not apply / is not in force | a gate (R7.1, §11.9.2) | savings and transitional provisions can reach it | yes             |
+| the law does not apply / is not in force | a gate (D6, §11.9.3)   | savings and transitional provisions can reach it | yes             |
 | the model does not cover this            | `REFUSE`               | the boundary only                                | no              |
 | a breach                                 | `LEST`                 | the obligation's own branch                      | structured      |
 | an overridden conclusion                 | `SUBJECT TO`           | the overriding rule                              | structured      |
@@ -759,11 +765,15 @@ Kept so that no later session re-proposes one without meeting its witness.
    honoured per R8; `WITH`/`LET` per R9; field-opening per R5 with the elaborated-AST stage.
 6. **Consumers**: hover, index, `@reads`; schema tiers; `BatchRequest.world`; DMN, Catala,
    Docassemble, OpenFisca, MLIR per R10; trace needs nothing new, a supplied binder being an
-   ordinary bound argument. **The DMN refusal image this step builds is the one ruled 2026-09-05 in
-   `IMPLICIT-PROPS-DESIGN.md` §11.9.1 (FEEL `null`, nothing omitted, `DMN-SAFE` withdrawn, no
-   `MayRefuse`), not §2.8's**, and it does not ship without §11.9.1's three conditions.
-   `jl4-core/src/L4/Dmn/Lower.hs:2285` cites "§6 item 6" for this work; that citation still points
-   here, and here now points at §11.9.1.
+   ordinary bound argument.
+   **DMN's half of §2.8's per-backend image is DONE, and not as §2.8 wrote it** — ruled D1,
+   2026-09-05, built, and recorded in `IMPLICIT-PROPS-DESIGN.md` §11.9.1/§11.9.2: a refusal lowers
+   to FEEL `null` with the reason on the row's and the decision's `<description>`, `DMN-SAFE` is
+   withdrawn, `D-REFUSE` takes the call-site severity calibration, and `MayRefuse` is dropped.
+   The dmnmd markdown carrier is a second image and is ruled with it (a refusing table is omitted,
+   loudly). Read §2.8 with its strikethrough, not as originally written.
+   `jl4-core/src/L4/Dmn/Lower.hs` cited "§6 item 6" for this work while it was unbuilt; if that
+   comment survives anywhere, it points here, and here now points at §11.9.1.
 7. **Migration and deprecation**: a warning in `l4 check` with a code action that rewrites a term
    `ASSUME` to the ruled spelling, the warning not landing before the code action can; then corpus
    and docs, `doc/reference/types/ASSUME.md` carrying the notice and the recipe (`CLAUDE.md` §6);

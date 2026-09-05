@@ -67,6 +67,22 @@ agents committed goldens and corpus files, which need no build at all.
 > of phantom compile failures. The rule costs a little parallelism and buys back an entire class of
 > unreproducible error.
 
+**Wait on a PID, never on a process name.** The obvious way to honour the rule above is
+`until ! pgrep -f 'cabal test'; do sleep 20; done` — and it never exits, because **the waiting shell
+is itself a process whose command line contains that string**, so `pgrep` matches the waiter. It
+does not hang visibly: it reports "still running" forever, which is indistinguishable from a slow
+build and is therefore believed. Use `until ! kill -0 <pid> 2>/dev/null`, which cannot self-match,
+or wait on a file the run itself creates. A bracketed class (`pgrep -f '[c]abal test'`) works but is
+a trick that survives only as long as the next person copying the line knows why the bracket is
+there.
+
+> **Why.** 2026-09-05: **sixteen deadlocked waiter shells across four deputies**, two with a
+> `cabal test` queued behind a wait that would never fire. At least two "still running" status
+> reports were about runs that had never started, and one build was reported finished when it had
+> barely begun. Nothing looks wrong from inside the waiter; `ps` was the only thing that disagreed
+> with it. Same family as §3.2.1's snapshot rule — a probe that reads a name rather than a fact
+> reports confidently about a world it is not observing.
+
 ---
 
 ## 3. Build and test facts
@@ -86,7 +102,7 @@ the string anywhere is `-Wno-name-shadowing` in `jl4-wasm`.
 Test suites include `jl4-test` (goldens), `jl4-core-test`, `l4-cli-test`, `jl4-lsp-test`,
 `jl4-service-test`, `jl4-mlir-test`, `jl4-websessions-test`.
 
-### 3.1 Four traps that produce fake failures
+### 3.1 Five traps that produce fake failures
 
 **Pin `JL4_LIBRARY_PATH` when running goldens locally.** CI sets it
 (`.github/workflows/pr-checks.yml`); without it you get unrelated failures that look like
@@ -121,6 +137,29 @@ looked at is how a wrong answer becomes the expected answer.
 > now runs in CI on every event with no filter and no build, and names the missing files. If you are
 > reading this because that check failed, it has done its job.
 
+**Pin `CAMUNDA_CHECK_JAVA_HOME`, and clear the harness's class cache when you change it.** The
+Camunda leg picks its own JDK from a candidate list whose FIRST entry is
+`/opt/homebrew/opt/openjdk/…` — deliberately "the newest JDK we can find" (`run.sh:51-53`), which
+on a machine that also has plain `openjdk` is **26**, where CI runs **21**. The bare `java` on PATH
+is irrelevant; the harness ignores it. Worse, `run.sh:84` recompiles `CamundaDmnCheck.java` only
+when the class is **missing or the source is newer** — it does not key on the JDK — so a class
+compiled by an earlier run under a different JDK is silently reused. Together those make a local
+green possibly a different JVM _and_ different bytecode from CI's, with nothing said. Do not trust
+which `java` you invoked: read the class-file major version
+(`od -An -tu1 -N8 "$TMPDIR/l4-camunda-dmn-check/classes/CamundaDmnCheck.class"`; `65` is Java 21),
+and reset with `rm -rf "$TMPDIR/l4-camunda-dmn-check/classes"`. The `kie-dmn-check` leg is immune
+because it compiles `--release 11` (`etc/kie-dmn-check/run.sh:81`); `--release 21` on the Camunda
+leg would fix it the same way. **That fix is deliberately not applied** — changing what every CI
+run compiles is not a corpus or exporter branch's call, and two branches have now declined it on
+that ground.
+
+> **Why.** 2026-09-05: a deputy reported Camunda results, was asked to re-run them on 21, did, and
+> reported them as reproduced. Both passes were in fact wrong in different ways — the first ran the
+> engine on 26, and the second reused bytecode the first had not compiled either. The numbers did
+> not move, but that was luck, and it was only visible after reading the class-file version. "I
+> re-ran it on 21" is a weaker claim than it sounds: re-running a command is not the same as
+> re-establishing a condition.
+
 **Never point an `l4` binary at a prelude newer than itself.** New prelude annotations
 (`@nonexhaustive`, in `jl4-core/libraries/prelude.l4` since #256) are parse errors to a binary
 built before them, and the failure does NOT present as a version mismatch: the prelude fails to
@@ -137,6 +176,29 @@ can resolve different prelude versions. Rebuild, or drop the pin.
 > `setFromList`. The same probe on the 4 Aug installed binary with its embedded prelude: zero
 > errors. The mismatch was one `@nonexhaustive` annotation the older parser could not read, and
 > nothing in the output said so.
+
+**The same trap arrives from the CORPUS side, and the paragraph above does not cover it**: a binary
+older than the code it reads reports newly-landed **syntax** as broken source. Since #335
+(`f48cdddb`, in `unstable`) a bodiless `DECLARE T` is the opaque-type spelling; on any binary built
+before it, `DECLARE Thing` followed by a rule is a parse error at the NEXT token — which reads as a
+broken example, not a stale binary. **The direction of safety is not symmetric and is easy to
+invert**: a binary NEWER than the tree is fine; it is older-than-what-it-reads that breaks. So the
+question is never "is my binary current" but "is it at least as new as everything it will parse" —
+prelude, corpus and docs alike. `doc/test-docs.sh` is the usual route in, because it prefers any
+`l4` on `PATH` over the one you built (`:323`), and `~/.local/bin/l4` was a 27 Aug build when this
+was written (2026-09-05); put your worktree's binary first on `PATH`, or run with no `l4` on it at
+all. How many errors a stale binary invents is a function of BOTH the binary and the corpus, so
+it is a symptom to read, never a constant to memorise — a count quoted from a previous session
+is the first thing to distrust here.
+
+> **Why.** 2026-09-05, twice in one evening and from both directions. `gm-docs`'s shim was pinned to
+> a pre-#335 build and flagged the opaque-type spelling as invalid documentation. Independently
+> confirmed here on this branch's own binary (base `b2a3faac`, which predates `f48cdddb`): the probe
+> `DECLARE Thing` + a rule reading it is a `parser` error at `3:1-3:6`, the line AFTER the
+> declaration — so the message points at the reader, not at the unsupported declaration, which is
+> what makes it read as broken code. `git diff <binary's commit> HEAD -- jl4-core/libraries/` is a
+> cheap check, but **read the diff rather than its exit code**: deleted comment lines are safe, an
+> added annotation is not.
 
 ### 3.2 There are TWO printers, and they are guarded differently
 
@@ -175,13 +237,29 @@ So when you touch `L4.Print`, run this too:
 
 ```bash
 find jl4 jl4-core -name '*.evaldiff.l4' -delete            # always start clean
+cp dist-newstyle/.../l4 "$SCRATCH/l4-evaldiff"             # SNAPSHOT: see below
 JL4_EVALDIFF=1 jl4_datadir=$PWD/jl4 jl4_core_datadir=$PWD/jl4-core \
   JL4_LIBRARY_PATH=$PWD/jl4-core/libraries <jl4-test binary> -m "prettyLayout round-trip"
-# then, per file, compare `l4 run <f>` against `l4 run <f>.evaldiff.l4`,
-# keeping only the `Result:` blocks
+# then, per file, compare `$SCRATCH/l4-evaldiff run <f>` against the same on
+# `<f>.evaldiff.l4`, keeping only the `Result:` blocks
 find jl4 jl4-core -name '*.evaldiff.l4' -delete            # MUST clean up: these are inside the
                                                            # corpus globs and would be goldened
 ```
+
+**Snapshot the binary before you probe with it, and never point a differential at
+`dist-newstyle/.../l4` directly.** Any build in the same worktree relinks that path mid-run, and a
+partially written binary fails on **both** sides — which a harness that compares outputs records as
+"no difference". A crash on one side is loud; a crash on both is silent, and silence is the answer
+this harness is looking for. The comparison above keeps only `Result:` blocks, so two runs that
+produced no output at all compare **equal**: the instrument cannot tell "identical" from "neither
+one started". Copy the binary somewhere unique first and point both sides at the copy.
+
+> **Why.** 2026-09-05 (`gm-module-boundary`): one file in a 493-file evaluation differential was
+> scored SAME this way, and it surfaced only because a _different_ file in the same run recorded a
+> DIFF that would not reproduce. Nothing about the false SAME was visible on its own. The same shape
+> applies to any before/after probe that greps for a marker rather than checking the exit code —
+> `l4 check`, `l4 export`, the engine harnesses. Assert that the run HAPPENED before you compare
+> what it said.
 
 Measured on this tree: **288 of 291 comparable files identical**. The three that differ are
 clock-dependent, not printer defects — `ok/excel-date/serials.l4` and the bitemporal ledger files

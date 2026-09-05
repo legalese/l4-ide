@@ -1,0 +1,52 @@
+fidelity report — DMN 1.3 (XML), camunda flavor
+  [D-RULEDATE] advisory — input_rules_effective_date
+      this model is temporally parameterised: 1 decision(s) read the rule date, which is supplied as the DMN input `RULES_EFFECTIVE_DATE` (L4: `RULES EFFECTIVE DATE`) -- `the filing fee`. Bind that input or every dated decision answers null
+      lost: the reader's ability to run this model without knowing it has a rule-date precondition: an unbound `RULES_EFFECTIVE_DATE` is a well-formed DMN model that silently answers null in every dated decision
+  [D-LITERALEXPR] advisory — decision_commencement  (main.l4:90:22-34)
+      `commencement` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_the_transition_day  (main.l4:93:28-40)
+      `the transition day` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_no_fee_is_prescribed_before_commencement_on_1983_01_01  (main.l4:101:5-68)
+      `no fee is prescribed before commencement on 1983-01-01` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_the_fee_with_surcharge  (main.l4:115:32-56)
+      `the fee with surcharge` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-OUTPUTVALUES-NULL] lossy — decision_the_band
+      `the band`'s <outputValues> declares `null` alongside standard, reduced, exempt, because a rule of this table answers `null` (a REFUSE, or a MAYBE's absent case). Without it the two target engines disagree: KIE 8.44.0.Final enforces <outputValues> at run time and FAILS the decision ("Value null does not match list of allowed values") while zeebe-dmn does not check it and returns the null silently. The TYPE's own <allowedValues> is unchanged and still declares exactly the L4 domain
+      lost: the artifact's claim that this decision answers only a value of its declared type: its emitted output domain now admits `null` as well
+  [D-REFUSE] lossy — decision_no_fee_is_prescribed_before_commencement_on_1983_01_01  (main.l4:101:5-68)
+      `no fee is prescribed before commencement on 1983-01-01` can decline to answer (refuses: no fee is prescribed before commencement on 1983-01-01). A refusal has no DMN image, so it is emitted as FEEL `null`, which DMN 1.3 does not distinguish from an absent value or from a computation the engine could not perform. The author's reason is carried on the <description> of the refusing row, and of this <decision> when its whole body refuses. Every call site consumes it from a lazy position (an IF/CONSIDER arm), so a guard in the consumer can fence the null
+      lost: the distinction between `the model declines to answer this` and `the answer is absent`: FEEL has one null and spells both with it, so no reader or analyser of the artifact alone can recover which was meant
+  [D-REFUSE] blocking — decision_the_filing_fee
+      `the filing fee` can decline to answer (calls `no fee is prescribed before commencement on 1983-01-01`, which can refuse — no fee is prescribed before commencement on 1983-01-01). A refusal has no DMN image, so it is emitted as FEEL `null`, which DMN 1.3 does not distinguish from an absent value or from a computation the engine could not perform. The author's reason is carried on the <description> of the refusing row, and of this <decision> when its whole body refuses. At least one call site consumes it from a strict position, so no guard fences the null
+      lost: the distinction between `the model declines to answer this` and `the answer is absent`: FEEL has one null and spells both with it, so no reader or analyser of the artifact alone can recover which was meant
+  [D-REFUSE] blocking — decision_the_fee_with_surcharge
+      `the fee with surcharge` can decline to answer (calls `the filing fee`, which can refuse — calls `no fee is prescribed before commencement on 1983-01-01`, which can refuse — no fee is prescribed before commencement on 1983-01-01). A refusal has no DMN image, so it is emitted as FEEL `null`, which DMN 1.3 does not distinguish from an absent value or from a computation the engine could not perform. The author's reason is carried on the <description> of the refusing row, and of this <decision> when its whole body refuses. No call site consumes it (it is a DRG root), so no guard can fence the null
+      lost: the distinction between `the model declines to answer this` and `the answer is absent`: FEEL has one null and spells both with it, so no reader or analyser of the artifact alone can recover which was meant
+  [D-REFUSE] blocking — decision_the_discount  (main.l4:123:22-78)
+      `the discount` can decline to answer (refuses: no discount is prescribed for a claim below 100). A refusal has no DMN image, so it is emitted as FEEL `null`, which DMN 1.3 does not distinguish from an absent value or from a computation the engine could not perform. The author's reason is carried on the <description> of the refusing row, and of this <decision> when its whole body refuses. No call site consumes it (it is a DRG root), so no guard can fence the null
+      lost: the distinction between `the model declines to answer this` and `the answer is absent`: FEEL has one null and spells both with it, so no reader or analyser of the artifact alone can recover which was meant
+  [D-REFUSE] blocking — decision_the_band  (main.l4:133:22-74)
+      `the band` can decline to answer (refuses: no band is prescribed for a claim below 100). A refusal has no DMN image, so it is emitted as FEEL `null`, which DMN 1.3 does not distinguish from an absent value or from a computation the engine could not perform. The author's reason is carried on the <description> of the refusing row, and of this <decision> when its whole body refuses. No call site consumes it (it is a DRG root), so no guard can fence the null
+      lost: the distinction between `the model declines to answer this` and `the answer is absent`: FEEL has one null and spells both with it, so no reader or analyser of the artifact alone can recover which was meant
+  [D-FLAVOR-NOSERVICE] advisory — service_refusal
+      the decisionService `Refusal` (§ `Refusal`) is emitted as GROUPING only: no call site invokes it, and on this flavor none could — the `camunda` flavor never emits the knowledgeRequirement→decisionService edge an invocation needs (§13.4/§13.5)
+      lost: nothing: an uninvoked grouping service is inert on both engines (probe D1)
+  [D-COMPUTEDOUTPUT] advisory — decision_the_filing_fee  (main.l4:110:22-78)
+      the output entry `no_fee_is_prescribed_before_commencement_on_1983_01_01` is an expression, not a constant; DMN 8.2.9 permits that, but every published decision-table analysis defines an output entry as a constant
+      lost: gap and overlap analysis of this table: DMN renders it, DMN's checkers do not check it
+  [D-ORDERDEPENDENT] advisory — decision_the_discount  (main.l4:121:15-47)
+      hit policy First is order-dependent: DMN 8.2.10 says of such tables that "the table is hard to validate manually and therefore has to be used with care"
+      lost: order-free reading; a rule cannot be checked without the rules above it
+  [D-COMPUTEDOUTPUT] advisory — decision_the_discount  (main.l4:123:22-78)
+      the output entry `null` is FEEL's null LITERAL (DMN 1.3 grammar rule 34), not an expression -- but it denotes no object in any domain, and every published decision-table analysis maps an output entry to one
+      lost: gap and overlap analysis of this table: DMN renders it, DMN's checkers do not check it
+  [D-ORDERDEPENDENT] advisory — decision_the_band  (main.l4:131:15-47)
+      hit policy First is order-dependent: DMN 8.2.10 says of such tables that "the table is hard to validate manually and therefore has to be used with care"
+      lost: order-free reading; a rule cannot be checked without the rules above it
+  [D-COMPUTEDOUTPUT] advisory — decision_the_band  (main.l4:133:22-74)
+      the output entry `null` is FEEL's null LITERAL (DMN 1.3 grammar rule 34), not an expression -- but it denotes no object in any domain, and every published decision-table analysis maps an output entry to one
+      lost: gap and overlap analysis of this table: DMN renders it, DMN's checkers do not check it

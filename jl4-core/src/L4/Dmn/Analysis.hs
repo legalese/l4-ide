@@ -51,6 +51,7 @@ module L4.Dmn.Analysis
     -- * Shared helpers
   , decideParams
   , nonexhaustiveDecides
+  , refuseMessageText
   ) where
 
 import Base
@@ -407,19 +408,44 @@ analyzeSafety inp cg decides =
   -- verdict (minus the exclusions the caller passes)
   calleeIssues :: Map Unique [SafetyIssue] -> Set Unique -> Decide Resolved -> [SafetyIssue]
   calleeIssues acc excluded d =
-    [ MkSafetyIssue
-        { safClause = "TOTAL"
-        , safRange  = Nothing
-        , safDetail =
-            "calls `" <> maybe "?" decideNameA (Map.lookup c byUnique)
-              <> "`, which could not itself be certified total"
-        }
+    [ calleeIssue c (Map.findWithDefault [] c acc)
     | let u = getUnique (decideResolvedA d)
     , c <- calleesOf u
     , c /= u
     , not (Set.member c excluded)
     , Map.member c acc
     ]
+   where
+    -- The refusal set propagates as a REFUSE clause carrying the callee's own
+    -- reason, not as a bare TOTAL clause — ruling D1, and §2.8's
+    -- @Ref(f) = refusals in f ∪ ⋃ { Ref(g) | g referenced in f }@, which is the
+    -- same fixpoint this one already computes. Two things follow. The reader of
+    -- a @D-REFUSE@ note on a CALLER learns which refusal it inherited, which is
+    -- the whole reason §2.8 asks for the set to be reported per reason string.
+    -- And a caller that is uncertified ONLY because of an inherited refusal is
+    -- not also reported as @D-PARTIAL@, so one cause raises one note.
+    calleeIssue c is = case [i | i <- is, i.safClause == "REFUSE"] of
+      (i : _) ->
+        MkSafetyIssue
+          { safClause = "REFUSE"
+          , safRange  = Nothing
+            -- A TRAIL, not a nest. Written as
+            -- @calls `f`, which can refuse — calls `g`, which can refuse — <the
+            -- author's sentence>@, so a caller three hops from a refusal reads
+            -- as a path to it rather than as three levels of parentheses whose
+            -- depth grows with the call graph.
+          , safDetail =
+              "calls `" <> calleeName c <> "`, which can refuse \8212 "
+                <> fromMaybe i.safDetail (Text.stripPrefix "refuses: " i.safDetail)
+          }
+      [] ->
+        MkSafetyIssue
+          { safClause = "TOTAL"
+          , safRange  = Nothing
+          , safDetail =
+              "calls `" <> calleeName c <> "`, which could not itself be certified total"
+          }
+    calleeName c = maybe "?" decideNameA (Map.lookup c byUnique)
 
   -- Mutual recursion rejects in v1 (the TERMINATES ruling): no structural
   -- measure spans a cycle of decisions, and an un-lifted cycle would emit
@@ -470,6 +496,24 @@ analyzeSafety inp cg decides =
   -- is exactly the configuration un-lifting would create (§2.4.2).
   walkIssues :: Strictness -> Expr Resolved -> [SafetyIssue]
   walkIssues s e = case e of
+    -- REFUSE WITHDRAWS @DMN-SAFE@ — ruling D1, accepted 2026-09-05
+    -- (@IMPLICIT-PROPS-DESIGN.md@ §11.9.1). §2.8 had proposed a @MayRefuse@
+    -- safety kind that did NOT withdraw it; that is overruled, because a
+    -- decision certified @DMN-SAFE@ is one this exporter is willing to un-lift,
+    -- and un-lifting a decision that answers @null@ on part of its domain is
+    -- precisely the silent wrong answer §2.4 exists to close.
+    --
+    -- __Position-independent, unlike L3–L6, and that is the point.__ Those
+    -- clauses fire only in a strict position because a guard travelling with the
+    -- operation makes them safe. A refusal has no such guard: it does not raise
+    -- on some inputs, it declines on the ones that reach it, and every refusal
+    -- the corpus writes lives in an @OTHERWISE@ arm — a 'LazyPos' here. Gating
+    -- this on 'StrictPos' would therefore see none of them. The lazy\/strict
+    -- distinction is not lost, it MOVES: it is the CALL SITE's strictness that
+    -- sets @D-REFUSE@'s severity ('L4.Dmn.Lower'\'s @refuseNotes@), on the same
+    -- calibration @D-PARTIAL@ already uses.
+    Refuse _ msg ->
+      [ issue "REFUSE" e ("refuses: " <> refuseMessageText msg) ]
     IfThenElse _ c t f ->
       walkIssues s c <> walkIssues LazyPos t <> walkIssues LazyPos f
     MultiWayIf _ gexprs oth ->
@@ -750,6 +794,17 @@ analyzeSafety inp cg decides =
 
   issue :: Text -> Expr Resolved -> Text -> SafetyIssue
   issue clause e detail = MkSafetyIssue clause (getAnno e).range detail
+
+-- | A @REFUSE@\'s message, as a note or a @\<description\>@ says it.
+--
+-- The type checker requires a STRING literal (@not-ok\/tc\/refuse-nonliteral.l4@
+-- and @refuse-computed-message.l4@ pin both halves of that), so the second arm
+-- is unreachable from a module that type-checks. It exists so that relaxing the
+-- grammar later degrades to a placeholder rather than to a partial function.
+refuseMessageText :: Expr Resolved -> Text
+refuseMessageText = \case
+  Lit _ (StringLit _ t) -> t
+  _                     -> "(a refusal message this analysis could not read)"
 
 -- | Every expression node, the node itself included.
 universeExpr :: Expr Resolved -> [Expr Resolved]
