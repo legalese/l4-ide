@@ -348,6 +348,11 @@ still prints it, and nothing mechanical compares the two — `doc/test-docs.sh` 
 type-checks `.l4` files and has no opinion about the text inside a fence. So **whoever changes a
 diagnostic owns every page that quotes it, in the same PR.**
 
+**This section is not the style guide.** It holds only what is _retired by ruling_ and swept by
+CI. The wording to lead with — the twenty-five substitutions, the introduce-then-bold pattern, the
+audience — is [`doc/STYLE.md`](doc/STYLE.md), and a word moves from there to here only by a
+ruling.
+
 **Adding a word here needs a ruling, not a preference.** Cite the date and the document. The
 distinction that makes this list checkable by plain search is that a retired term is suspect
 _everywhere_, and a merely discouraged one is not. Measured over `doc/`, with the checker's own
