@@ -117,6 +117,19 @@ data CheckError =
     -- declaration it attaches to never uses. Carries the unused parameter name
     -- and the name of the section whose heading it sits under. See
     -- 'L4.Desugar.detectMisattachedSectionGivens'.
+  | UnreadImplicitSupply Resolved Resolved
+    -- ^ A @WITH@ site named a section binder that the callee does not read,
+    -- directly or through anything it calls. Arguments: the callee, the binder.
+    -- Under R1 a @WITH@ may name a binder /in the callee's read-set/; there is
+    -- nowhere to put a value for one outside it, so the override would silently
+    -- do nothing. See 'L4.Discharge.unreadImplicitSupplies'.
+  | ImplicitReaderUsedAsValue Resolved
+    -- ^ A definition that reads a section binder, referred to without being
+    -- applied. Discharge gives it a trailing parameter for the binder, which a
+    -- bare reference cannot carry. See 'L4.Discharge.valueReferenceHazards'.
+  | RestatedSectionBinder Name
+    -- ^ A function's own @GIVEN@ restates a name a section-level @GIVEN@
+    -- already binds (R2). Carries the parameter name.
   | SuppliedComputedField Name
     -- ^ Tried to supply a computed field in a record constructor (field name)
   | ExportFunctionTypeInput Resolved Resolved
@@ -317,6 +330,9 @@ instance HasSrcRange CheckError where
   rangeOf (CheckWarning (PatternClausesMissing r _ _)) = Just r
   rangeOf (SuspiciousBinderPattern b _)     = rangeOf b
   rangeOf (MisattachedSectionGiven n _)     = rangeOf n
+  rangeOf (UnreadImplicitSupply _ b)        = rangeOf b
+  rangeOf (ImplicitReaderUsedAsValue n)     = rangeOf n
+  rangeOf (RestatedSectionBinder n)         = rangeOf n
   rangeOf _                                 = Nothing
 
 -- | A token in a mixfix pattern, representing either a keyword (part of the function name)
@@ -488,6 +504,19 @@ data CheckEnv =
     -- 'KnownType's) so that synonym expansion never touches them — a
     -- cyclic synonym has no finite expansion, and expanding one can
     -- blow up exponentially before the expansion fuel runs out.
+    , sectionBinderNames   :: !(Set RawName)
+    -- ^ The names this module's section-level @GIVEN@s bind (R4), read off the
+    -- parsed module before desugaring. They are the names a @WITH@ site may
+    -- supply /in addition to/ the callee's declared parameters: after
+    -- 'L4.Discharge.dischargeModule' each of them is a trailing parameter of
+    -- every definition that reads it, but the read-set is a whole-module fact
+    -- and is not known while a single body is being checked. So the checker
+    -- accepts the supply on the strength of the name being a binder, and the
+    -- read-set is what 'L4.Discharge' matches it against.
+    --
+    -- Deliberately NOT unioned across imports ('unionImportedCheckEnv' resets
+    -- it): discharge does not cross @IMPORT@, so an imported module's binder is
+    -- not suppliable here.
     , inNonexhaustiveDecide      :: !Bool
     -- ^ Are we checking the body of a definition its author decorated
     -- @\@nonexhaustive@ (deliberately not defined for all inputs)? If so, the
@@ -550,6 +579,7 @@ unionImportedCheckEnv accEnv depEnvironment depEntityInfo depMixfixRegistry =
     , mixfixRegistry = unionMixfixRegistry accEnv.mixfixRegistry depMixfixRegistry
     , computedFields = Map.empty
     , cyclicSynonyms = mempty
+    , sectionBinderNames = mempty
     , inNonexhaustiveDecide = False
     , errorContext = None
     , sectionStack = []
@@ -1763,6 +1793,7 @@ extendEnv cis env =
     , mixfixRegistry = e.mixfixRegistry
     , computedFields = e.computedFields
     , cyclicSynonyms = e.cyclicSynonyms
+    , sectionBinderNames = e.sectionBinderNames
     , inNonexhaustiveDecide = e.inNonexhaustiveDecide
     , sectionStack = e.sectionStack
     , localBindings = e.localBindings
