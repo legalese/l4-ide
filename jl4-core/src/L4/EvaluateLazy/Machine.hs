@@ -872,6 +872,21 @@ forwardExpr env = \ case
   AppNamed _ann _n _nes Nothing ->
     internalException $ RuntimeTypeError
       "named application where the order of arguments is not resolved"
+  AppNamed _ann n _nes (Just order)
+    | any (< 0) order ->
+    -- A negative entry marks a named argument that supplies a SECTION BINDER
+    -- rather than one of the callee's declared parameters (see 'AppNamed' in
+    -- "L4.Syntax"). 'L4.Discharge.dischargeModule' rewrites every such site
+    -- into a plain application; one reaching here means the module skipped
+    -- that pass, and sorting the entry into argument position would silently
+    -- pass the override to the WRONG parameter.
+    internalException $ RuntimeTypeError $
+      "named application supplying an implicit input reached the evaluator undischarged: "
+      <> prettyLayout (TypeCheck.getName n)
+      <> " ("
+      <> Text.pack (show (length (filter (< 0) order)))
+      <> " implicit argument(s)). This is a compiler bug:"
+      <> " L4.Discharge.dischargeModule must run before evaluation."
   AppNamed ann n nes (Just order) ->
     let
      -- move expressions into order, drop names

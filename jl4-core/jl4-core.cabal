@@ -151,6 +151,7 @@ library
     L4.EvaluateLazy.Trace
     L4.StateGraph
     L4.ExactPrint
+    L4.Discharge
     L4.Export
     L4.Export.Document
     L4.Export.Render
