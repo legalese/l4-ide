@@ -827,7 +827,7 @@ forwardExpr env = \ case
   Proj _ann e l ->
     continueExpr env (App emptyAnno l [e]) -- we desugar projection to plain function application
   Var _ann n -> -- still problematic: similarity / overlap between this and App with no args
-    expectTerm env n >>= continueRef
+    expectTerm env n >>= autoApplyDischargedImport
   Cons _ann e1 e2 -> do
     rf1 <- allocate_ e1 env
     rf2 <- allocate_ e2 env
@@ -835,7 +835,7 @@ forwardExpr env = \ case
   Lam _ann givens e ->
     continueBackward (ValClosure givens e env)
   App _ann n [] ->
-    expectTerm env n >>= continueRef
+    expectTerm env n >>= autoApplyDischargedImport
   App ann n es@(_ : _) -> do
     -- Handle temporal context override: EVAL AS OF SYSTEM TIME <serial> <thunk>
     -- The second argument is evaluated under the mutated temporal context.
@@ -866,7 +866,15 @@ forwardExpr env = \ case
               _ -> Nothing
         rs <- traverse (`allocate_` env) es
         pushFrame (App1 rs expectedType)
-        continueExpr env (Var emptyAnno n)
+        -- Fetch the function directly rather than re-entering 'forwardExpr' as
+        -- a 'Var'. The Var case auto-applies a discharged reader that crossed an
+        -- IMPORT ('autoApplyDischargedImport'), which is right for a reference
+        -- in VALUE position and wrong here: this reference is already being
+        -- applied, and applying it twice hands the caller the RESULT where it
+        -- expects a function. Measured: re-entering took
+        -- @legal\/promissory-note.l4@ and @legal\/regcf\/regcf.l4@ red with
+        -- \"expected a function but found: Money OF ...\".
+        expectTerm env n >>= continueRef
   AppNamed ann n [] _ ->
     continueExpr env (App ann n [])
   AppNamed _ann _n _nes Nothing ->
@@ -1931,6 +1939,56 @@ finishRead mode cellVal ledger = do
         ValNil
         storedVals
       continueBackward listVal
+
+-- | A bare reference to a definition in an IMPORTED module that discharge gave
+-- trailing parameters.
+--
+-- The companion to 'matchGivens'''s under-application case, for the references
+-- that never become applications at all. Discharge runs per module, so nothing
+-- rewrote this reference into a call, and handing the consumer the closure gives
+-- a function where a value was asked for: measured on an importer of a module
+-- with a section binder, @#EVAL doubled@ printed @\<function\>@ -- silently,
+-- not as an error -- and @doubled PLUS 1@ died with a runtime type error.
+--
+-- Reads the thunk WITHOUT forcing it. Any definition with parameters is stored
+-- as a 'ValClosure' at 'WHNF' by 'evalDecide', so this needs no evaluation and
+-- leaves laziness exactly as it was; anything still 'Unevaluated' is passed
+-- through untouched.
+--
+-- Guarded exactly as 'matchGivens'' is, and for the same reason: EVERY one of
+-- the closure's parameters must already be a key in its OWN captured
+-- environment, which is true only of parameters discharge appended for that
+-- module's section binders. An ordinary function passed as a value has
+-- parameters bound nowhere, so it is returned unchanged -- including a reader
+-- that still has declared parameters of its own, such as @bump@, which must
+-- stay a function so its caller can apply it.
+autoApplyDischargedImport :: Reference -> Machine Config
+autoApplyDischargedImport r = do
+  needsIt <- dischargedImportClosure r
+  if needsIt
+    then do
+      pushFrame (App1 [] Nothing)
+      continueRef r
+    else continueRef r
+
+-- | Does this reference hold a closure that only discharge could have built --
+-- every one of its parameters already a key in its OWN captured environment?
+--
+-- Reads the thunk without forcing it: 'evalDecide' stores any definition with
+-- parameters as a 'ValClosure' at 'WHNF' already, and anything still
+-- 'Unevaluated' answers 'False' and is left alone.
+--
+-- An ordinary function value fails this test, because its parameters are bound
+-- by the application that has not happened yet, not by the environment it
+-- captured. That is what keeps a genuine higher-order argument a function.
+dischargedImportClosure :: Reference -> Machine Bool
+dischargedImportClosure r = do
+  thunk <- readThunk r
+  pure case thunk of
+    WHNF (ValClosure (MkGivenSig _ otns) _ closureEnv) ->
+      let ps = foldMap (either (const []) (\ x -> [fst x]) . TypeCheck.isQuantifier) otns
+      in not (null ps) && all (\ p -> Map.member (getUnique p) closureEnv) ps
+    _ -> False
 
 matchGivens :: Environment -> GivenSig Resolved -> Frame -> [Reference] -> Machine Environment
 matchGivens closureEnv (MkGivenSig _ann otns) f es = do
@@ -3387,6 +3445,17 @@ preAllocate ns = do
 allocate_ :: Expr Resolved -> Environment -> Machine Reference
 allocate_ (Var _ann n) env = do
   -- special case where we do not actually need to allocate
+  --
+  -- NOT extended to auto-apply a discharged import (see
+  -- 'dischargedImportClosure'). Allocating the application here instead of
+  -- sharing the cell fixes an operand-position reference across an IMPORT, but
+  -- it also fires on every RECORD CONSTRUCTOR: a @DECLARE@'s field names are
+  -- module-level selectors, so a constructor's parameters are keys in its own
+  -- captured environment exactly as a discharged reader's are, and the guard
+  -- cannot tell them apart. Measured 2026-09-05 on the sweep corpus:
+  -- @legal\/promissory-note.l4@ and @legal\/regcf\/regcf.l4@ both went red with
+  -- \"expected a function but found: Money OF ...\". See the operand-position
+  -- limitation recorded in IMPLICIT-PROPS-DESIGN.md.
   expectTerm env n
 allocate_ expr env =
   fst <$> allocateRecursive expr (const env)
