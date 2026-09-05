@@ -14,11 +14,14 @@
 // `parameter` 140 across 49 files. A list that admitted the second word could
 // only ever be advisory; this one can gate CI.
 //
-// It is not hypothetical. On 2026-09-05 the word was removed from
-// `doc/reference/syntax/section-given.md` and put back into the same page five
-// times within hours, by a different pull request, while everyone involved
-// believed the ruling was being followed. Nothing caught it: `doc/test-docs.sh`
-// checks links and type-checks `.l4` files and has no opinion about words.
+// It is not hypothetical, and note the order of events. The ruling is from
+// 2026-09-04. The DAY AFTER, `doc/reference/syntax/section-given.md` had the word
+// removed by one pull request and put back five times by another, while everyone
+// involved believed the ruling was being followed. So the thing this file guards
+// against is not an unclear rule -- it is a clear one silently not being held,
+// which is the one failure a better-worded rule cannot fix. Nothing caught it:
+// `doc/test-docs.sh` checks links and type-checks `.l4` files and has no opinion
+// about words.
 //
 // WHAT IT DOES NOT FLAG, AND WHY THAT IS THE LOAD-BEARING PART. A page that
 // documents an error message has to QUOTE it, and a page that teaches a
@@ -53,8 +56,8 @@ const RETIRED = [
   {
     term: "binder",
     re: /\bbinder/gi,
-    retired: "2026-09-05",
-    ruling: "CLAUDE.md §7 (Retired vocabulary)",
+    retired: "2026-09-04",
+    ruling: "Meng's vocabulary ruling, recorded at CLAUDE.md §7",
     instead:
       'say "section GIVEN" or "rule GIVEN" for the construct, and "input" for what it supplies',
   },

@@ -295,11 +295,24 @@ L4's user-facing text is written for a **non-technical first-time critical think
 is judgement. One part of it is not: a few words are ones **we coined and then retired**, and for
 those, any occurrence in user-facing prose is a defect rather than a style preference.
 
+**This section records rulings; it does not make them.** Each row below is a decision already
+taken, written down here so that `etc/check-retired-terms.mjs` has something to cite. The
+citation points outward — the script cites the ruling, and this section merely holds it. A row
+whose only support is this section is not a ruling, it is a preference wearing one.
+
 **The list, with the date each was retired.** It is short on purpose.
 
 | word       | retired    | say instead                                                                         |
 | ---------- | ---------- | ----------------------------------------------------------------------------------- |
-| **binder** | 2026-09-05 | "section `GIVEN`" or "rule `GIVEN`" for the construct; "input" for what it supplies |
+| **binder** | 2026-09-04 | "section `GIVEN`" or "rule `GIVEN`" for the construct; "input" for what it supplies |
+
+Meng ruled it on **2026-09-04**, and his reason is the one worth keeping, because it is about the
+reader rather than about us:
+
+> never "binder" — to lawyers a binder is a ream of paper with ink and holes.
+
+That is why the word fails **this audience** specifically, which is the only kind of argument that
+survives being re-litigated. "Jargon" would not have been.
 
 **Quoting is not using.** A page that documents an error message has to show it, and a page that
 teaches a construct has to spell it. Fenced blocks, inline code spans and link targets are
@@ -331,10 +344,15 @@ untouched, with a `Note [Vocabulary of the NonDistinct messages]` at the site sa
 sweep that tidies it to match its neighbours would be trading a correct sentence for a consistent
 one. If you have a better sentence, take it; a shorter one is not the same thing.
 
-> **Why.** On 2026-09-05 the word was removed from `doc/reference/syntax/section-given.md` by
-> #336 and put back into that same page **five times within hours** by #338, while everyone
-> involved believed the ruling was being followed. Nothing caught it, and no `paths:` filter could
-> have: the PR that reintroduced it was not a docs PR.
+> **Why.** Note what the incident below is and is not evidence of. The ruling is from 2026-09-04;
+> the incident is from the day after. So this is not a case of a rule being invented after a
+> mistake — it is a case of **an existing ruling not being held, by people who believed they were
+> holding it**. That is a stronger argument for a mechanical check than any new policy would be,
+> because it is the only failure mode a rule cannot fix by being clearer.
+>
+> On 2026-09-05 the word was removed from `doc/reference/syntax/section-given.md` by #336 and put
+> back into that same page **five times within hours** by #338. Nothing caught it, and no
+> `paths:` filter could have: the PR that reintroduced it was not a docs PR.
 >
 > The second half of the incident is the coupling. The same ruling had been enforced on every page
 > a reviewer could reach and **ratified** on the text those pages quote, because quoted tool output
