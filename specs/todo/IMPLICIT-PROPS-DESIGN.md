@@ -748,8 +748,10 @@ across 62 `.l4` files — counted off the branch diff itself (`grep -c '^-ASSUME
 docassemble 2/1, `doc/reference` 62/16. 76 sites are left across those trees, each refused by name
 and line with a per-role reason (keep 39, type 10, refusal 9, app-form 8, overload 7, ditto 2,
 root-section 1); the untouched `blawx` and `relational` trees hold 33 further app-form sites.
-`jl4/experiments` and `jl4/tests-cli` (209 further rewrites against 201 refusals, measured
-2026-09-05) are deliberately held back as a separate, droppable commit. Measured 2026-09-05:
+`jl4/experiments` and `jl4/tests-cli` (204 further rewrites against 206 refusals, measured
+2026-09-05) are deliberately held back as a separate, droppable commit — that tree is in no goldened
+glob, so it is carried on the `--verify` oracle alone (6 identical, 1 differing only in the line
+number quoted by a pre-existing lexer error). Measured 2026-09-05:
 `canon` holds exactly one `ASSUME`, `subjects/sg/child-support/encodings/legalese/sg-csp.l4:79`,
 and it is refusal-role — **no canon change is owed by this item.**
 
@@ -786,13 +788,22 @@ and the migration is the first thing to author a file that reaches it. **It is a
 sequencing item 7 (keyword removal):** if `ASSUME` goes while a section `GIVEN` cannot express an
 overloaded name, L4 loses type-directed name resolution.
 
+A second, independent instance shows the defect changing which program is accepted, not merely how
+one prints. `jl4/experiments/macma3.l4` `ASSUME`s `` `forfeiture` `` at `FROM Order TO BOOLEAN` and
+`forfeiture` at `FROM Action TO BOOLEAN`, likewise `confiscation`; at HEAD the checker reports
+"multiple definitions for the identifier" for both. Migrated, those two errors **disappear** —
+`resolveSectionGiven` collapses each pair onto its first binder, so the ambiguity it was reporting no
+longer exists and uses that wanted the `Action` reading now silently resolve to the `Order` one.
+An error vanishing is the same bug wearing its most persuasive disguise.
+
 Handled on the branch by fixing the _migration_, not the compiler: `etc/migrate-assume.mjs` gained a
 structural `overload` refusal role — a name `ASSUME`d more than once in a file is refused, citing
 `TypeCheck.hs:641` — so `ok/tdnr.l4` is left whole and `ok/misc.l4` migrates only its one
-non-overloaded binder. The guard is structural rather than a path list so that it also protects the
-rewrites still owed in `jl4/experiments` and `jl4/tests-cli` — where it already refuses 6 further
-sites that no path list would have named. The compiler repair is **open**, and it is owed before
-item 7.
+non-overloaded binder. The guard keys on the identifier rather than its spelling, since a backticked
+declaration and a bare one denote the same name; keying on the raw text is what let `macma3.l4`
+through on the first pass. It is structural rather than a path list so that it also protects the
+rewrites still owed in `jl4/experiments` and `jl4/tests-cli`, where it refuses 10 further sites that
+no path list would have named. The compiler repair is **open**, and it is owed before item 7.
 
 #### Finding 2: the IDE's one code action inserts the deprecated spelling. RULED 2026-09-05: it lands with item 5, not with item 6.
 
