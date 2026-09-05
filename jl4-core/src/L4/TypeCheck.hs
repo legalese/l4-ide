@@ -519,7 +519,9 @@ inferDeclare (MkDeclare ann _tysig appForm _t) =
 -- sophisticated here.
 --
 -- In particular, we currently treat assumed types as enumeration types with no known
--- constructors (empty types). It would be better to have a dedicated case for these.
+-- constructors (empty types). The dedicated spelling for that is now a bodiless
+-- @DECLARE T@ ('OpaqueDecl'), which 'inferTypeName' gives the very same entity;
+-- @ASSUME T IS A TYPE@ is its deprecated synonym (IMPLICIT-PROPS-DESIGN.md §11.1).
 --
 -- TODO: I think the checking whether we have a type declaration or a term
 -- declaration is off, because we can have a type declaration of the form
@@ -1253,6 +1255,10 @@ inferTypeDecl _rappForm (SynonymDecl ann t) = do
   let
     td = SynonymDecl ann rt
   pure (td, [])
+inferTypeDecl _rappForm (OpaqueDecl ann) =
+  -- Nothing to check and nothing to bring into scope: no constructors, no
+  -- fields. The type name itself was published by 'inferTypeName'.
+  pure (OpaqueDecl ann, [])
 
 inferTypeName :: AppForm Resolved -> TypeDecl Name -> Check CheckInfo
 inferTypeName rappForm (EnumDecl _ann _conDecls) = do
@@ -1270,6 +1276,15 @@ inferTypeName rappForm (SynonymDecl _ann _t) = do
     rs = appFormHeads rappForm
     -- The 'Nothing' is wrong here, however, we can only insert it, once
     -- we are fully typechecking the 'SynonymDecl'.
+    kt = KnownType (kindOfAppForm rappForm) (view appFormArgs rappForm) Nothing
+  pure $ makeKnownMany rs kt
+inferTypeName rappForm (OpaqueDecl _ann) = do
+  let
+    rs = appFormHeads rappForm
+    -- Deliberately the SAME entity 'scanTyDeclAssume' makes for
+    -- @ASSUME T IS A TYPE@: a 'KnownType' with no expansion, and no
+    -- constructor terms ever published for it. Every consumer that asks
+    -- "is this a nominal type with no body" already answers yes for both.
     kt = KnownType (kindOfAppForm rappForm) (view appFormArgs rappForm) Nothing
   pure $ makeKnownMany rs kt
 

@@ -711,7 +711,18 @@ declare sig =
 
 typeDecl :: Parser (TypeDecl Name)
 typeDecl =
-  recordDecl <|> enumOrSynonymDecl
+  recordDecl <|> enumOrSynonymDecl <|> opaqueDecl
+
+-- | A bodiless @DECLARE T@: an opaque nominal type ('OpaqueDecl'). Tried
+-- LAST, so any body that is present wins, and it consumes no input: a
+-- @DECLARE@ whose body is missing or malformed therefore parses as opaque
+-- and the next token is judged as the start of the following declaration
+-- (megaparsec keeps the @HAS@\/@IS@ hints, so the error still lists them).
+-- The node's 'Anno' is empty — the same shape a 'TypeSig' with no @GIVEN@
+-- already has — which both printers render as nothing.
+opaqueDecl :: Parser (TypeDecl Name)
+opaqueDecl =
+  attachAnno $ pure (OpaqueDecl emptyAnno)
 
 recordDecl :: Parser (TypeDecl Name)
 recordDecl =

@@ -237,6 +237,13 @@ typeToParameter declares visited ty =
               }
           SynonymDecl _ inner ->
             typeToParameter declares (Set.insert typeName visited) inner
+          -- An opaque type has no JSON shape: no fields, no constructors, no
+          -- primitive image. This is the same 'emptyParam "object"' that an
+          -- @ASSUME T IS A TYPE@ name reaches by not being in @declares@ at
+          -- all (measured 2026-09-05 on the base2 binary), so the two
+          -- spellings publish the same parameter.
+          OpaqueDecl _ ->
+            emptyParam "object"
    where
     addDesc :: Maybe Text -> Parameter -> Parameter
     addDesc Nothing p = p

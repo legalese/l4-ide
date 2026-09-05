@@ -319,6 +319,8 @@ nlgTypeDecl = \ case
   SynonymDecl ann ty->
     SynonymDecl ann
       <$> nlgType ty
+  OpaqueDecl ann ->
+    pure (OpaqueDecl ann)
 
 nlgConDecl :: ConDecl Resolved -> Check (ConDecl Resolved)
 nlgConDecl (MkConDecl ann n typedName) =
