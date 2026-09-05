@@ -1912,7 +1912,7 @@ GIVEN gr IS A Grantee
 GIVETH A BOOLEAN
 `a representative willing to act` gr MEANS
     CONSIDER `the individual in` (gr's `the grantee`)
-    WHEN JUST p  THEN NOT (`has died` p) AND p's `willing to act`
+    WHEN JUST p  THEN (NOT (`has died` p)) AND p's `willing to act`
     WHEN NOTHING THEN TRUE
 
 @ref Probate and Administration Act 1934 s 23 — "letters of administration, limited to such property"
