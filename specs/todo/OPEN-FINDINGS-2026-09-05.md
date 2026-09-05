@@ -106,6 +106,13 @@ helper: `Print.hs:588`, `Names.hs:77`, `Export.hs:455`.
 the shape the corpus sweep produces wherever a section acquires a binder while keeping an overloaded
 `ASSUME` of the same name.
 
+**The "zero instances today" bound is dated and expires on a known event.** On `b2a3faac`, 7 `.l4`
+files carry a section binder (13 sites) and none pairs one with a hand-written overloaded `ASSUME`.
+On `props/assume-sweep` it is **76 files / 110 sites** (measured 2026-09-05, counting a `GIVEN`
+indented past a `§` on the line after the heading). The bound expires when that branch lands, or
+sooner if anyone hand-writes the pair. **Do not quote "zero instances" without the date and the
+ref.**
+
 ---
 
 ## OF-3 — `l4 batch`'s generated wrapper lands inside whatever section is open at end of file
@@ -162,9 +169,27 @@ section structure — either by closing the sections in `filteredSource`, or by 
 before rather than after it, or by having `prettyLayout` render an explicit end. Any of the three
 needs a fixture in `jl4/tests-cli` of the shape above.
 
-**Reachability today: low, and that is why it survived.** It needs an export whose read-set names a
-binder from a section that is not the last one open. Section binders exist in seven files, all
-fixtures. It becomes reachable the moment `props/assume-sweep` lands, which is why it is filed now.
+**Reachability: LIVE TODAY, not latent — corrected 2026-09-05 after this entry was first written.**
+The original text here said "low … section binders exist in seven files, all fixtures". One of those
+seven is **`doc/reference/syntax/section-given-example.l4`, a shipped documentation example linked
+from a doc page**, and it is already broken:
+
+```
+$ l4 batch doc/reference/syntax/section-given-example.l4 -i '{"amount":100,"applicable rate":0.1,"surcharge":2}'
+… "status":"error", "output":null …
+  There are multiple definitions for the identifier `applicable rate` …
+    `Ordinary signatures`.`applicable rate` (defined at …batch1.l4:37:1-18) of type NUMBER
+    Rates.`Concessionary rates`.`applicable rate` (defined at …batch1.l4:11:11-28) of type NUMBER
+```
+
+The file's last section is `§ Ordinary signatures`, and that is what the wrapper's redefinition at
+line 37 is qualified by. **Nothing catches this**: `doc/test-docs.sh` runs `l4 check` on the file,
+which succeeds, and never runs `l4 batch`.
+
+**And the population grows by an order of magnitude very soon.** Measured 2026-09-05 by counting a
+`GIVEN` indented past a `§` on the line after the heading: `b2a3faac` has **7 files / 13 sites**;
+`props/assume-sweep` has **76 files / 110 sites**. Every file the sweep gives a section binder to,
+and whose last section is not the one its export reads from, joins this.
 
 ---
 
@@ -354,8 +379,10 @@ all — `jl4-core/libraries/daydate.l4:104`, `jl4/examples/legal/regcf/regcf.l4:
 — and **all four lines are refusal-role**, so none of them is in the discharge population. (The
 card said "every one at `ASSUME` = 0 except regcf's two"; it missed `daydate` and the vendored
 prelude. Its conclusion is unchanged and slightly strengthened: **zero term-role `ASSUME`s live in
-an imported module today.**) Section `GIVEN` exists in only 7 files, all fixtures added by PR #333,
-and none of them is imported. (`gm-discharge` measured the same independently and recorded the same
+an imported module today.**) Section `GIVEN` exists in only 7 files on `b2a3faac`, all fixtures added by
+PR #333, and none of them is imported — **but that is a dated bound on one ref**: on
+`props/assume-sweep` it is 76 files, and any of them that another module imports puts this defect
+in reach. Re-measure before quoting the exposure. (`gm-discharge` measured the same independently and recorded the same
 deferral.) **After discharge the exposed population is
 every file that imports a migrated domain module** — 664 `ASSUME` lines in 105 files become section
 binders in exactly the modules other files import, which is R0's committed cost arriving.
