@@ -1,0 +1,7 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+section-given-import-def.l4:16:1-19:
+  5
+section-given-import-def.l4:17:1-32:
+  assertion satisfied

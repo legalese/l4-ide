@@ -1068,7 +1068,7 @@ backward val = withPoppedFrame $ \ case
   Just f@(App1 rs mTy) -> do
     case val of
       ValClosure givens e env' -> do
-        env'' <- matchGivens givens f rs
+        env'' <- matchGivens env' givens f rs
         continueExpr (Map.union env'' env') e
       ValUnappliedConstructor r ->
         continueBackward (ValConstructor r rs)
@@ -1932,20 +1932,54 @@ finishRead mode cellVal ledger = do
         storedVals
       continueBackward listVal
 
-matchGivens :: GivenSig Resolved -> Frame -> [Reference] -> Machine Environment
-matchGivens (MkGivenSig _ann otns) f es = do
+matchGivens :: Environment -> GivenSig Resolved -> Frame -> [Reference] -> Machine Environment
+matchGivens closureEnv (MkGivenSig _ann otns) f es = do
   let others = foldMap (either (const []) (\x -> [fst x]) . TypeCheck.isQuantifier) otns
-  matchGivens' others f es
+  matchGivens' closureEnv others f es
 
-matchGivens' :: [Resolved] -> Frame -> [Reference] -> Machine Environment
-matchGivens' ns f rs = do
+-- | Bind a closure's parameters to the arguments a call site supplied.
+--
+-- The under-applied case is 'L4.Discharge' crossing an @IMPORT@. Discharge runs
+-- per module, so a definition in an IMPORTED module gains its trailing section
+-- binders when THAT module is discharged, while the importer's call site — which
+-- the checker saw at the callee's original arity, and which declares no binder of
+-- its own to discharge — still passes only the declared arguments. Before this
+-- fallback the result was
+-- @Internal error: given signatures' values' lengths do not match@ on a correct
+-- program: measured on the @ASSUME@ sweep's tree, six sites in
+-- @legal\/regcf\/regcf-wizard.l4@, which @IMPORT@s @regcf@.
+--
+-- Every parameter discharge appends is a section binder of the callee's own
+-- module, so its 0-ary cell is in the closure's captured environment. We
+-- therefore bind only what was supplied and let @Map.union env'' env'@ at the
+-- call site resolve the rest from that environment — the imported module's own
+-- binder cell, which is exactly what the callee would have read before
+-- discharge.
+--
+-- Guarded so it cannot mask a real arity error: it fires only when the call is
+-- UNDER-applied and every missing parameter is a key the closure's environment
+-- already holds. An ordinary parameter the writer forgot is a fresh binding that
+-- no module environment carries, so it still reaches the error below — and the
+-- checker rejects a genuine arity mistake long before evaluation anyway.
+--
+-- What it does NOT give the importer is the ability to @WITH@-supply that
+-- binder: 'L4.TypeCheck.CheckEnv.sectionBinderNames' is per module, so the name
+-- is not suppliable across the boundary. The importer sees whatever the imported
+-- module's own binder evaluates to — its @TYPICALLY@, or \"assumed term\".
+matchGivens' :: Environment -> [Resolved] -> Frame -> [Reference] -> Machine Environment
+matchGivens' closureEnv ns f rs = do
+  let (supplied, missing) = splitAt (length rs) ns
   if length ns == length rs
-    then do
+    then
       pure $ Map.fromList (zipWith (\ r v -> (getUnique r, v)) ns rs)
-    else do
-      pushFrame f -- provides better error context
-      internalException $
-        RuntimeTypeError "given signatures' values' lengths do not match"
+    else if length rs < length ns
+           && all (\ n -> Map.member (getUnique n) closureEnv) missing
+      then
+        pure $ Map.fromList (zipWith (\ r v -> (getUnique r, v)) supplied rs)
+      else do
+        pushFrame f -- provides better error context
+        internalException $
+          RuntimeTypeError "given signatures' values' lengths do not match"
 
 matchBranches :: Reference -> Environment -> [Branch Resolved] -> Machine Config
 matchBranches scrutinee _env [] = do
