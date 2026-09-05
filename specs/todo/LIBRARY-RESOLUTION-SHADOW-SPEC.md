@@ -26,6 +26,23 @@
 >   real target). Warned once per configuration per session.
 > - **§6 (bundle dir)** left open: B′ keeps the bundle as an ambient tier
 >   below the embed, so nothing forces the question yet.
+>
+> **Amended 2026-09-05 — an implicit `IMPORT prelude` would make the dev-regime
+> gate above reachable from every file.** Ruling D8 proposed that every script
+> get the prelude without asking. Measured: 282 of 884 `.l4` files opt into
+> prelude resolution today by writing the import; under an implicit one, all 884
+> would, silently. The failure the repo `CLAUDE.md` §3.1 records — a pinned
+> `JL4_LIBRARY_PATH` at a prelude newer than the binary, which presents as
+> cascading "could not find a definition" errors rather than as a version
+> mismatch — would then be reachable from files that never mentioned the
+> prelude, in the one regime where this spec deliberately stays quiet. Three
+> files in the tree are named `prelude.l4`, and two of them are fixtures pinning
+> this spec's own resolution order (`sibling-wins`, and the vendored copy in
+> `jl4/experiments/thailand-cosmetics/`), so an implicit import would also have
+> to state which prelude it resolves to and be checked against all four
+> `library-shadow` fixtures. This is one of the reasons
+> `specs/todo/MODULE-BOUNDARY-SPEC.md` R3 does not build it; see its §5.6.
+> Nothing in this spec changed.
 
 **Status:** Implemented on branch (2026-07)
 **Author:** Meng Wong, with analysis from Claude
