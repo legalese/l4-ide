@@ -8,11 +8,13 @@
 // ruled them out. Those are different from merely-discouraged jargon, and they
 // are what this file is for -- for a retired term, ANY occurrence in prose is
 // suspect, so a plain search is a sound check. For a merely discouraged word it
-// is not, and that difference is the whole design. Measured over `doc/` with
-// the stripping below, on this branch's base (`props/discharge` @ 3625b533,
+// is not, and that difference is the whole design. Measured over ALL of `doc/`
+// with the stripping below, on this branch's base (`props/discharge` @ 3625b533,
 // before the repairs that ship with this file): `binder` 9 lines,
 // `parameter` 140 across 49 files. A list that admitted the second word could
-// only ever be advisory; this one can gate CI.
+// only ever be advisory; this one can gate CI. (That measurement predates the
+// scoping below, which narrows what CI sweeps but not what makes a term
+// listable.)
 //
 // It is not hypothetical, and note the order of events. The ruling is from
 // 2026-09-04. The DAY AFTER, `doc/reference/syntax/section-given.md` had the word
@@ -22,6 +24,24 @@
 // which is the one failure a better-worded rule cannot fix. Nothing caught it:
 // `doc/test-docs.sh` checks links and type-checks `.l4` files and has no opinion
 // about words.
+//
+// SCOPE, AND AN HONEST GAP IN IT. Meng ruled on 2026-09-05 that the list binds the
+// LEARNING-oriented quadrants and not the rest: retired words are excluded from
+// tutorials and the cookbook, and allowed in a Diataxis-style reference or concepts
+// page IFF the page introduces the term properly. CI therefore runs
+// `--dir doc/tutorials doc/courses`, NOT `--dir doc`.
+//
+// Which means: the regression that motivated this file, five reintroductions in
+// `doc/reference/syntax/section-given.md`, is in a directory this sweep no longer
+// visits. Those five were still wrong -- they used the word bare, with no
+// introduction -- but wrong under the "iff introduced" half of the ruling, which is
+// NOT YET ENFORCED MECHANICALLY. Do not read a green run as cover for a reference
+// page. See CLAUDE.md section 7.
+//
+// The list is also narrower than the ruling's subject matter: the entry matches
+// `binder`, and deliberately not `binding`. "Symbol binding" is the PLT phrase the
+// ruling is about, but "a binding contract" is ordinary legal English and appears
+// throughout the corpus. Only the coined noun was retired.
 //
 // WHAT IT DOES NOT FLAG, AND WHY THAT IS THE LOAD-BEARING PART. A page that
 // documents an error message has to QUOTE it, and a page that teaches a
@@ -40,7 +60,8 @@
 // retiring ruling to cite. So the list has one element, and one element earns
 // its keep: it has a five-instance regression against it from inside a day.
 //
-// Usage:  node etc/check-retired-terms.mjs --dir doc [<dir> ...]
+// Usage:  node etc/check-retired-terms.mjs --dir doc/tutorials doc/courses
+//         node etc/check-retired-terms.mjs --dir <dir> [<dir> ...]
 //         node etc/check-retired-terms.mjs <file.md> ...
 //         node etc/check-retired-terms.mjs --selftest      (also what CI runs)
 // Exit:   0 clean · 1 findings · 2 usage

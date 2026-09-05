@@ -314,6 +314,28 @@ reader rather than about us:
 That is why the word fails **this audience** specifically, which is the only kind of argument that
 survives being re-litigated. "Jargon" would not have been.
 
+**The list binds the learning-oriented pages, not every page.** Meng ruled on **2026-09-05**:
+the retired list is _"excluded from the tutorial and cookbook guides, but if they find their way
+into a Diataxis theory reference we could allow that iff we appropriately introduce PLT
+alongside"_ — `binder` being _"a PLT term for variable binding or symbol binding"_ that "will mean
+nothing to a beginner L4 programmer".
+
+| quadrant                                                      | rule                                                                                                                                                         |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `doc/tutorials/`, `doc/courses/`, the cookbook when it exists | **excluded.** Swept by CI.                                                                                                                                   |
+| `doc/reference/`, `doc/concepts/`                             | **permitted iff the page introduces the term** — lay words first, then the technical label as a bold-quoted defined term, the house pattern from 2026-09-04. |
+
+The mechanical test for "introduces" already exists in prose — _used before a bold-quoted
+definition on the same page_ — but **it is not yet enforced**; there is no script for it in the
+tree. Reference and concepts pages are clean of _unintroduced_ uses today only because two
+sweeps happened to clear them. **A green CI run says nothing about a reference page.** Whoever
+builds that check gets to delete this paragraph.
+
+One narrowing worth stating, because the ruling's subject is broader than the list: the entry
+matches `binder` and deliberately **not** `binding`. "Symbol binding" is the phrase the ruling
+describes, but "a binding contract" is ordinary legal English and is everywhere in the corpus.
+Only the coined noun was retired.
+
 **Quoting is not using.** A page that documents an error message has to show it, and a page that
 teaches a construct has to spell it. Fenced blocks, inline code spans and link targets are
 therefore exempt, and `etc/check-retired-terms.mjs` blanks them before it looks. Where prose must
