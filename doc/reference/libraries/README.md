@@ -47,6 +47,57 @@ IMPORT daydate                   -- Standard/core library
 IMPORT "my-custom-lib.l4"        -- Custom library
 ```
 
+### When an imported name clashes with one of your own
+
+A library hands you its definitions under the names its author chose. If you happen to define
+something under the same name — and of the same shape, so that the compiler cannot tell the two
+apart by what goes in and what comes out — L4 does not guess which you meant. It stops and asks:
+
+```
+There are multiple definitions for the identifier
+
+  EULER
+
+and I do not have sufficient information to make a choice between them.
+The options are:
+
+  `Local Section`.EULER (defined at my-rules.l4:14:1-6) of type NUMBER
+  Math.Constants.EULER (defined at math.l4:12:1-6) of type NUMBER
+```
+
+Each option is written out under the headings it sits beneath, in the file that defines it,
+joined by dots. That longer form is the definition's **full name**, and it is the answer to the
+question the error is asking. Write the full name of the one you meant, and the ambiguity is
+gone:
+
+```l4
+IMPORT math
+
+§ `Local Section`
+GIVETH A NUMBER
+EULER MEANS 3
+
+#EVAL Math.Constants.EULER    -- 2.718281828459045, the library's
+#EVAL `Local Section`.EULER   -- 3, your own
+```
+
+Two things are worth knowing about full names.
+
+**They reach across an `IMPORT`.** The headings you write are the ones in the file where the
+definition lives — `§ Math` and `§§ Constants` in `math.l4` above — not headings in your own
+file. You never name the library itself; the error message shows you the headings to use.
+
+**A heading whose name contains spaces keeps its backticks**, exactly as the error prints them,
+so a full name can be copied out of an error message and pasted into your rules unchanged:
+
+```l4
+IMPORT prelude
+
+#EVAL Prelude.`Numeric Aggregates`.sum (LIST 1, 2)   -- 3
+```
+
+Elsewhere you may see a full name called a _qualified name_; they are the same thing.
+
 ---
 
 ## Library Quick Reference
