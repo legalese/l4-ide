@@ -23,6 +23,14 @@ from a third tree. **Always name the tree with the line.** Twice on 2026-09-05 a
 verification had been taken against the wrong branch — so "which branch" belongs in the same reflex
 as "which line".
 
+**Three branches appended to `IMPLICIT-PROPS-DESIGN.md` §11 on one day, and the numbers collide.**
+As of 2026-09-05: `props/assume-sweep` defines **§11.14** (sequencing item 6), `props/tdnr-collapse`
+defines **§11.15** (the section-binder pairing fix), and `props/rulings` defines **§11.14, §11.15
+and §11.16** (R13, R14, the cross-`IMPORT` defect). A bare "§11.15" is therefore ambiguous until
+those branches have all landed and one of them has renumbered. **Cite the branch with the number
+until then**, and prefer the stable ruling id (`R13`, `R14`) where one exists, since R-numbers do
+not shift when a list grows.
+
 **`grep -c` over an `.l4` file counts comments.** `regcf-denovo.l4` matches its floor binding eight
 times outside the declaration and has seven arms; the eighth, at `:3035`, is inside prose. Drop
 lines whose first non-space characters are `--`.
@@ -45,6 +53,23 @@ order-**in**sensitive; and it **predates section binders**, so it is not a props
 be fixed by anything in that programme.
 
 **Entered here only so that a reader of this file is not told six findings and given five.**
+
+**And one thing worth keeping beyond the finding itself: the wrong cause had reached a test.**
+`props/assume-sweep` §11.14 originally offered `macma3.l4` as a second instance of the
+section-binder collapse — the two "multiple definitions" diagnostics vanish on migration, which is
+true — and attributed the vanishing to that collapse, which is not. `gm-assume-sweep` retracted it
+visibly in `9af84932` ("the effect was real, the cause was not") rather than quietly editing it out,
+and the retraction is what exposed the real damage: **the acceptance test for the fix rested on the
+misattributed symptom.** Its marker had read "`macma3.l4`'s two suppressed 'multiple definitions'
+errors must come back"; a fix could have satisfied that for the wrong reason, or failed it while
+being correct. The repaired marker reads "the printed module must keep every binding rather than
+only the first", and says in terms that `macma3.l4` is **not** part of the acceptance test.
+
+The general shape, which is why it is recorded here and not only in that branch's history: **a
+wrong cause does not stay in the sentence that states it.** It propagates into whatever was built to
+check the claim, and a test written against a misdiagnosed symptom is worse than no test, because it
+reports green. When a mechanism claim is retracted, the retraction is not finished until whatever
+was built on it has been re-derived.
 
 ## 2. `isSectionBinderElaboration` keys on the raw name — ALREADY RECORDED ELSEWHERE
 

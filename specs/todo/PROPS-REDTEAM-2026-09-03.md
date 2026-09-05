@@ -833,7 +833,9 @@ missing them:
 - **`l4 batch`'s generated wrapper is scoped by the last open `§`** (that file's §3). Loud failure,
   reproduced with a control. Unreachable today; reachable the moment `props/assume-sweep` lands.
 - **`L4.Names.isSectionBinderElaboration` keys on the raw name** (§2 there, recorded in full in
-  `IMPLICIT-PROPS-DESIGN.md` §11.15 on `props/tdnr-collapse`). **This blocks §6 item 7 above.**
+  `IMPLICIT-PROPS-DESIGN.md` §11.15 **as numbered on `props/tdnr-collapse`** — not this branch's
+  §11.15, which is R14; see that file's §0 on colliding section numbers). **This blocks §6 item 7
+  above.**
 - **A `WHERE` local silently shadows a section `GIVEN`** (§5 there). Silent wrong answer: with the
   binder supplied as 4, one entrypoint answers 4 and its neighbour answers 51, no diagnostic.
 
