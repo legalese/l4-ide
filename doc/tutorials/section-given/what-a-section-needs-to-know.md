@@ -222,7 +222,7 @@ below it -- and that declaration never uses
 
   `annual income`
 
-If `annual income` was meant as a binder for the whole of
+If `annual income` was meant as an input for the whole of
 
   § `Rule 100(a)(2) — How much may this investor put in?`
 
@@ -232,7 +232,7 @@ indent the GIVEN so that it starts past the § of the heading:
       GIVEN `annual income` IS A <type>
 ```
 
-Two of that message's phrases are the tool's words rather than yours. `the signature of the declaration below it` means the list of inputs belonging to the one rule or `DECLARE` written underneath — a rule GIVEN. `a binder for the whole of § …` means a fact named once for that whole section — a section GIVEN.
+One of that message's phrases is the tool's words rather than yours. `the signature of the declaration below it` means the list of inputs belonging to the one rule or `DECLARE` written underneath — a rule GIVEN.
 
 That check fires where the mistake is unmistakable: a left-margin `GIVEN` stranded above a `DECLARE` or an `ASSUME` that makes no use of the name. It does **not** fire above an ordinary rule, because a rule that ignores one of its own inputs is a normal thing to write and looks identical on the page.
 

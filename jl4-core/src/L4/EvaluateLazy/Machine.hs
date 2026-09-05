@@ -826,8 +826,18 @@ forwardExpr env = \ case
     continueExpr env e1
   Proj _ann e l ->
     continueExpr env (App emptyAnno l [e]) -- we desugar projection to plain function application
-  Var _ann n -> -- still problematic: similarity / overlap between this and App with no args
-    expectTerm env n >>= autoApplyDischargedImport
+  Var _ann n -> do -- still problematic: similarity / overlap between this and App with no args
+    -- Auto-apply a discharged import only in VALUE position. The App case above
+    -- fetches the function it is about to apply by re-entering here, and
+    -- applying it twice would hand the caller the RESULT where it expects a
+    -- function: measured, that took @legal/promissory-note.l4@ and
+    -- @legal/regcf/regcf.l4@ red with "expected a function but found:
+    -- Money OF ...". An argument is never in this position -- arguments are
+    -- allocated, not forwarded -- so an 'App1' carrying arguments on top of the
+    -- stack means this reference is the function of that application.
+    beingApplied <- topFrameAppliesArguments
+    r <- expectTerm env n
+    if beingApplied then continueRef r else autoApplyDischargedImport r
   Cons _ann e1 e2 -> do
     rf1 <- allocate_ e1 env
     rf2 <- allocate_ e2 env
@@ -866,15 +876,12 @@ forwardExpr env = \ case
               _ -> Nothing
         rs <- traverse (`allocate_` env) es
         pushFrame (App1 rs expectedType)
-        -- Fetch the function directly rather than re-entering 'forwardExpr' as
-        -- a 'Var'. The Var case auto-applies a discharged reader that crossed an
-        -- IMPORT ('autoApplyDischargedImport'), which is right for a reference
-        -- in VALUE position and wrong here: this reference is already being
-        -- applied, and applying it twice hands the caller the RESULT where it
-        -- expects a function. Measured: re-entering took
-        -- @legal\/promissory-note.l4@ and @legal\/regcf\/regcf.l4@ red with
-        -- \"expected a function but found: Money OF ...\".
-        expectTerm env n >>= continueRef
+        -- Re-enter as a 'Var'. That extra 'ForwardMachine' step is what the
+        -- evaluation tracer records as the function being entered, so short-
+        -- circuiting it here silently drops a line from every #EVALTRACE (five
+        -- goldens, measured). 'forwardExpr'\'s Var case knows not to
+        -- auto-apply while this 'App1' is on top of the stack.
+        continueExpr env (Var emptyAnno n)
   AppNamed ann n [] _ ->
     continueExpr env (App ann n [])
   AppNamed _ann _n _nes Nothing ->
@@ -1962,6 +1969,18 @@ finishRead mode cellVal ledger = do
 -- parameters bound nowhere, so it is returned unchanged -- including a reader
 -- that still has declared parameters of its own, such as @bump@, which must
 -- stay a function so its caller can apply it.
+-- | Is the top of the stack an application waiting for its function?
+--
+-- 'App1' with a NON-empty argument list. The empty one is what
+-- 'autoApplyDischargedImport' itself pushes, and must not count.
+topFrameAppliesArguments :: Machine Bool
+topFrameAppliesArguments = do
+  stackRef <- asks (.stack)
+  st <- liftIO (readIORef stackRef)
+  pure case st.frames of
+    App1 (_ : _) _ : _ -> True
+    _                  -> False
+
 autoApplyDischargedImport :: Reference -> Machine Config
 autoApplyDischargedImport r = do
   needsIt <- dischargedImportClosure r

@@ -665,14 +665,31 @@ elaborateSectionBinder (MkOptionallyTypedName pAnn nm mTy mTypically) =
 -- function @GIVEN@ names, and no file in which the two sets overlap. So this
 -- rule costs the corpus nothing; it governs the migration state.
 detectRestatedSectionBinders :: Module Name -> [Name]
-detectRestatedSectionBinders m =
-  [ nm
-  | MkTypeSig _ (MkGivenSig _ otns) _ <- Optics.toListOf (Optics.gplate @(TypeSig Name)) m
-  , MkOptionallyTypedName _ nm _ _ <- otns
-  , Set.member (rawName nm) binders
-  ]
+detectRestatedSectionBinders (MkModule _ _ sect) = goSection Set.empty sect
  where
-  binders = collectSectionBinderNames m
+  -- Scoped to the binders VISIBLE at the declaration: its own section's and
+  -- those of its ancestors. Not the whole module.
+  --
+  -- Keying on the raw name module-wide was over-broad, and the cost stopped
+  -- being hypothetical: @doc\/tutorials\/section-given\/what-a-section-needs-to-know.l4@
+  -- is a before-and-after tutorial whose \"before\" section deliberately repeats
+  -- @annual income@ in each rule's own @GIVEN@, and whose \"after\" section --
+  -- a DIFFERENT section, later in the file -- declares it once as a section
+  -- @GIVEN@. Nothing there gives one name two binders in one body; the module
+  -- merely spells the name in two unrelated places, which is the whole point of
+  -- the page.
+  goSection visible (MkSection _ _ _ mgiven decls) =
+    let visible' = visible <> Set.fromList (sectionGivenNames mgiven)
+    in concatMap (goTopDecl visible') decls
+
+  goTopDecl visible = \ case
+    Section _ s -> goSection visible s
+    d ->
+      [ nm
+      | MkTypeSig _ (MkGivenSig _ otns) _ <- Optics.toListOf (Optics.gplate @(TypeSig Name)) d
+      , MkOptionallyTypedName _ nm _ _ <- otns
+      , Set.member (rawName nm) visible
+      ]
 
 -- | The dedent hazard of R4, as a diagnosable shape.
 --
