@@ -241,6 +241,7 @@ doCheckProgramWithDependencies checkState checkEnv program =
               , scopeMap = s'.scopeMap
               , descMap = s'.descMap
               , mixfixRegistry = combinedMixfixRegistry
+              , sectionPaths = s'.sectionPaths
               }
 
 -- | Drop diagnostics that are pure fallout from a name-resolution failure that
