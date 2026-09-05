@@ -143,6 +143,16 @@ see §8 for which files, and for the load-dependence of that set.
 > `D-RULEDATE-UNBOUND` and `D-DATEDCHAIN` (`DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §15) — and have no row
 > here; no EXPORTS/FILES/INSTANCES figures are invented for them. The "never fired" list below is a
 > claim about the **31 codes that existed when the census was taken**, not about the code set today.
+>
+> **Two more postdate it as of 2026-09-05** (ruling D1, `IMPLICIT-PROPS-DESIGN.md` §11.9.1 and
+> §11.9.2; defined in `DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §7): **`D-REFUSE`** — `Blocking` or
+> `Lossy` on the same call-site calibration `D-PARTIAL` uses, one per decide that can decline to
+> answer — and **`D-OUTPUTVALUES-NULL`** — `Lossy`, one per table whose `<outputValues>` was widened
+> by the FEEL keyword `null`. Both fire on `jl4/examples/dmn/refuse.l4` and on nothing else in the
+> tree today (the ten pre-existing DMN golden subjects regenerate byte-identically), so their
+> corpus-wide EXPORTS/FILES/INSTANCES are **unmeasured**, and no figures are invented for them
+> either. When this census is re-run: `D-REFUSE` and `D-PARTIAL` are mutually exclusive per cause by
+> construction, so their counts must not be added together.
 
 | CODE                  | SEV      | TARGET | EXPORTS | FILES | INSTANCES |
 | --------------------- | -------- | ------ | ------- | ----- | --------- |

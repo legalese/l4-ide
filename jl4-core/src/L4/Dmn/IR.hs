@@ -626,6 +626,23 @@ data OutputColumn = MkOutputColumn
   , ocName    :: !Text
   , ocType    :: !DmnType
   , ocValues  :: !(Maybe [Text])
+  , ocAdmitsNull :: !Bool
+    -- ^ does an output entry of this table render as the bare FEEL @null@?
+    --
+    -- When it does and 'ocValues' declares a domain, @null@ joins the emitted
+    -- @\<outputValues\>@ — UNQUOTED, because it is the FEEL keyword and not a
+    -- constructor name, which is exactly why this is a separate field rather
+    -- than the string @\"null\"@ pushed into 'ocValues' (everything in there
+    -- goes through 'quoteFeelString').
+    --
+    -- __MEASURED 2026-09-05: without it the two target engines disagree.__ On a
+    -- refusing enum-valued table KIE 8.44.0.Final enforces @\<outputValues\>@ at
+    -- run time and FAILS the decision (@Value null does not match list of
+    -- allowed values@), while Camunda 8.7.6 (zeebe-dmn) does not check it and
+    -- returns the @null@ silently. Widening reconciles them. The reachable
+    -- producers of a @null@ output entry are D1's @REFUSE@ and R8-d′'s
+    -- @NOTHING@; the condition is written over the RENDERED FEEL so a later
+    -- third producer is covered without another edit.
   , ocDefault :: !(Maybe FeelExpr)
   }
   deriving stock (Eq, Show, Generic)
@@ -849,6 +866,17 @@ data Decision = MkDecision
   { dcnId            :: !Text
   , dcnName          :: !Text
   , dcnFeelName      :: !Text
+  , dcnDescription   :: !(Maybe Text)
+    -- ^ the @\<description\>@ child, emitted only when present.
+    --
+    -- Its one producer today is a REFUSAL (ruling D1, 2026-09-05): a decide
+    -- that can decline to answer lowers to FEEL @null@, and this is where the
+    -- author\'s reason goes so that it survives IN THE ARTIFACT rather than only
+    -- in a fidelity report that travels separately from the @.dmn@. A refusal
+    -- that is a table ROW keeps its reason on the @\<rule\>@\'s own
+    -- @\<description\>@; this field covers the two shapes with no row — a decide
+    -- whose WHOLE body is a @REFUSE@ (a boxed @literalExpression@), and an
+    -- @OTHERWISE@ that became a @defaultOutputEntry@ under @UNIQUE@.
   , dcnDecide        :: !(Maybe Unique)
     -- ^ the @DECIDE@ this decision was lowered from, or 'Nothing' for one this
     -- backend synthesised (a §4.4 hydrator).

@@ -193,20 +193,23 @@ us or from a wrong answer.
   `RAND` / `ROR`.
 - **`#ASSERT REFUSED e BECAUSE "…"` where `e` ends in a `BREACH`**: `BREACH` itself takes an
   optional `BECAUSE`, and it wins. Bracket the expression if you need the outer reading.
-- **The backends do not yet have their designed image for a refusal.** Today every backend but one
-  refuses it loudly and by name, and none emits a refusal as something a caller could be asked to
-  supply. The exception is DMN, which emits a file a real engine rejects:
+- **One backend carries a refusal; the rest refuse the module.** DMN has an image for it as of
+  2026-09-05. No other backend emits a refusal at all, and none emits one as something a caller
+  could be asked to supply.
 
-  - **DMN** is the exception to "none crashes", and it is why no legal-corpus site has been
-    migrated yet. `L4.Dmn.Lower` lowers a refusal as `Refuse {} -> verbatim e`
-    (`Dmn/Lower.hs:2285`), which writes the L4 source text into a FEEL literal expression. That is
-    not merely Blocking: **KIE cannot compile the file at all** — `ERROR [ERR_COMPILING_FEEL] …
-syntax error near '"no Regulation Crowdfunding figure exists before commencement on
-2016-05-16"'`, and the engine verdict is `FAILED`. Measured 2026-09-05 on CI, which runs KIE
-    and Camunda end to end over every DMN-declaring subject; the migration of `regcf.l4` was
-    dropped from the PR that landed `REFUSE` because of it. The designed image — omit the refusing
-    row, report a **non-Blocking** `D-REFUSE`, and add a `MayRefuse` safety kind that does not
-    withdraw `DMN-SAFE` — is not built.
+  - **DMN** lowers a refusal to FEEL `null`, keeps the refusing row, and puts the author's reason
+    on that row's `<description>` — or on the `<decision>`'s own, when the whole body refuses. Every
+    decision that can refuse carries a `D-REFUSE` note naming the reason, `Lossy` when every caller
+    can fence the null from an `IF`/`CONSIDER` arm and `Blocking` when one cannot. What DMN cannot
+    carry is the DISTINCTION: FEEL has one `null` and spells "declined", "absent" and "could not be
+    computed" with it, so no reader of the artifact alone can recover which was meant.
+    [The DMN and BPMN page](../../exports/dmn-bpmn.md#when-a-decision-can-refuse) has the whole
+    image, including the enum case where the two target engines disagreed.
+  - **The dmnmd markdown carrier** (`--to dmn-md`) cannot carry one. Its cell grammar is a number,
+    an integer range, or a bare token, with no `null`, so a refusing table is **omitted**; a bare
+    `null` cell would be read back as the string `"null"`. The markdown says so itself, with an
+    `<!-- OMITTED: … -->` marker per dropped decision, and the fidelity report locates each one.
+    The command still exits 0.
   - **Catala** and **docassemble** refuse the module, naming `REFUSE` (`DA-REFUSE`). The designed
     images (Catala emits no definition; docassemble shows a terminal screen carrying the reason)
     are not built.
@@ -216,7 +219,8 @@ syntax error near '"no Regulation Crowdfunding figure exists before commencement
   - **MLIR / WASM** marks the export unsupported, which routes the request to the fallback
     evaluator — and that one raises the refusal properly.
 
-  The full per-backend image is `specs/todo/PROPS-REDTEAM-2026-09-03.md` §6 item 6.
+  The full per-backend image is `specs/todo/PROPS-REDTEAM-2026-09-03.md` §6 item 6, as amended by
+  `specs/todo/IMPLICIT-PROPS-DESIGN.md` §11.9.1 for DMN.
 
 - **The refusal set `Ref(f)` is not built.** The design calls for every function to carry its
   reachable refusal reasons on hover and in the export schema, the way it already carries its
@@ -224,10 +228,12 @@ syntax error near '"no Regulation Crowdfunding figure exists before commencement
 - **`TBD` is not distinguished from a hand-written refusal.** It reports as an ordinary refusal
   whose reason begins `TBD:`. Warning separately on placeholders needs `Ref(f)` first.
 - **Not every curated refusal in the corpus has been migrated**, and each exception says why at its
-  own site: `jl4-core/libraries/daydate.l4`'s out-of-range `YMD` is invalid INPUT rather than a
-  refusal (a change to that constructor's return type, not a change of bottom), and
-  `jl4/examples/dmn/gst-rate.l4` and `ymd-dates.l4` wait for the DMN image above, because their
-  engine harnesses deliberately query a rule date below commencement.
+  own site. `jl4-core/libraries/daydate.l4`'s out-of-range `YMD` is invalid INPUT rather than a
+  refusal — the fix is that constructor's return type, not a change of bottom. `jl4/examples/legal/
+regcf/regcf.l4`, `jl4/examples/dmn/gst-rate.l4` and `ymd-dates.l4` still spell their
+  pre-commencement floor as an `ASSUME` the engine harness supplies as `-1`; the DMN image they
+  were waiting for now exists, and moving them is a separate change. The worked example of what
+  they will become is `jl4/examples/dmn/refuse.l4`.
 
 ## Related
 

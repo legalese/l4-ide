@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  THE NEGATIVE HALF of the enum-refusal pair (ruling D1, 2026-09-05).
+
+  Byte-identical to `widened.dmn` except that <outputValues> does NOT list
+  `null`, while the OTHERWISE row still answers one. That is what the exporter
+  emitted before D1, and it is where THE TWO TARGET ENGINES DISAGREE — measured
+  2026-09-05:
+
+    KIE 8.44.0.Final      ERROR ... Invalid result value on rule #3, output #1.
+                          Value null does not match list of allowed values.
+                          Decision FAILED.
+    Camunda 8.7.6         the_band = null, 0 error(s). Silently.
+
+  ONE ARTIFACT, TWO MEANINGS, which is why the exporter now widens the list and
+  reports D-OUTPUTVALUES-NULL. This file exists so that a future engine upgrade
+  that changed either side would be caught: if KIE stops rejecting it, the
+  widening's justification is gone and should be re-ruled; if Camunda starts
+  rejecting it, so is the claim that the divergence is one-sided.
+
+  Hand-written, and it has to be: the emitter can no longer produce the
+  un-widened form, so only a fixture can ask whether KIE still rejects it. Same
+  construction, and the same reason, as jl4/tests-cli/fixtures/dmn-date-probe.
+-->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="definitions_refuse_enum_unwidened" name="RefuseEnumUnwidened" namespace="https://legalese.com/l4/dmn/refuse-enum-unwidened" exporter="hand-written fixture">
+  <itemDefinition id="itemdef_band" name="Band">
+    <typeRef>string</typeRef>
+    <allowedValues>
+      <text>"standard","reduced","exempt"</text>
+    </allowedValues>
+  </itemDefinition>
+  <inputData id="input_the_claim_amount" name="the_claim_amount">
+    <variable id="input_the_claim_amount_var" name="the_claim_amount" typeRef="number"/>
+  </inputData>
+  <decision id="decision_the_band" name="the_band">
+    <description>REFUSE: no band is prescribed for a claim below 100</description>
+    <variable id="decision_the_band_var" name="the_band" typeRef="Band"/>
+    <informationRequirement id="decision_the_band_ir1">
+      <requiredInput href="#input_the_claim_amount"/>
+    </informationRequirement>
+    <decisionTable id="decision_the_band_table" hitPolicy="FIRST" preferredOrientation="Rule-as-Row" outputLabel="the band">
+      <input id="decision_the_band_i1" label="the claim amount">
+        <inputExpression id="decision_the_band_i1_expr" typeRef="number">
+          <text>the_claim_amount</text>
+        </inputExpression>
+      </input>
+      <output id="decision_the_band_o1">
+        <outputValues>
+          <text>"standard","reduced","exempt"</text>
+        </outputValues>
+      </output>
+      <rule id="decision_the_band_r1">
+        <description>at least 1000</description>
+        <inputEntry id="decision_the_band_r1_i1">
+          <text>&gt;= 1000</text>
+        </inputEntry>
+        <outputEntry id="decision_the_band_r1_o1">
+          <text>"standard"</text>
+        </outputEntry>
+      </rule>
+      <rule id="decision_the_band_r2">
+        <description>at least 100</description>
+        <inputEntry id="decision_the_band_r2_i1">
+          <text>&gt;= 100</text>
+        </inputEntry>
+        <outputEntry id="decision_the_band_r2_o1">
+          <text>"reduced"</text>
+        </outputEntry>
+      </rule>
+      <rule id="decision_the_band_r3">
+        <description>OTHERWISE — REFUSE: no band is prescribed for a claim below 100</description>
+        <inputEntry id="decision_the_band_r3_i1">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="decision_the_band_r3_o1">
+          <text>null</text>
+        </outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>

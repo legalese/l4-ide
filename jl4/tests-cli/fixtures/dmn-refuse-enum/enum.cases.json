@@ -1,0 +1,31 @@
+{
+  "note": [
+    "Cases for BOTH halves of the enum-refusal pair (widened.dmn, unwidened.dmn).",
+    "",
+    "One cases file for two models on purpose: the halves differ in exactly one",
+    "token, so anything that differs in the RESULTS is attributable to that token",
+    "and to nothing else. Case A is the control (a value inside the enum, which",
+    "both halves and both engines answer identically); case B is the refusal.",
+    "",
+    "`null` in `expect` LICENSES a null answer, so case B asserts that the model",
+    "DECLINED — it is not the absence of an expectation. On unwidened.dmn KIE",
+    "does not get that far: it raises",
+    "  Invalid result value on rule #3, output #1. Value null does not match",
+    "  list of allowed values",
+    "and the decision comes back FAILED, which the harness scores red. That red",
+    "is the assertion, and the workflow step checks the message rather than the",
+    "exit code, because a harness that died before running also exits non-zero."
+  ],
+  "cases": [
+    {
+      "name": "A. control — a claim inside the declared band domain",
+      "context": { "the_claim_amount": 500 },
+      "expect": { "the_band": "reduced" }
+    },
+    {
+      "name": "B. THE REFUSAL — a claim below every band",
+      "context": { "the_claim_amount": 50 },
+      "expect": { "the_band": null }
+    }
+  ]
+}

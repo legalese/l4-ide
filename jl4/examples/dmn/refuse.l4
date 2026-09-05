@@ -1,0 +1,133 @@
+-- The REFUSAL exhibit for the DMN exporter (ruling D1, accepted 2026-09-05;
+-- `specs/todo/IMPLICIT-PROPS-DESIGN.md` §11.9.1).
+--
+-- `REFUSE "…"` is L4's way of saying "the model does not cover this" — a
+-- determinate outcome that is neither a value nor an error, uncatchable by any
+-- rule, observable only at the boundary. DMN has no such outcome. Its whole
+-- vocabulary for "no answer" is FEEL's single `null`, which also spells "there
+-- is none" and "the engine could not compute it".
+--
+-- This module is the regression pin for what the exporter does about that.
+-- Before D1 it wrote the L4 source text `REFUSE "…"` into a `<literalExpression>`,
+-- and KIE 8.44.0.Final then failed to compile the WHOLE FILE
+-- (`ERROR [ERR_COMPILING_FEEL] … syntax error`, `VERDICT … <<< FAILED`), which is
+-- why no legal-corpus refusal could migrate off `ASSUME`. Now a refusal is FEEL
+-- `null`, the author's reason is carried in the artifact, and the fidelity
+-- report says at what cost.
+--
+-- ONE OF EACH POSITION A REFUSAL CAN OCCUPY, because they are different code
+-- paths and each one is measured separately by `refuse.cases.json`:
+--
+--   * `no fee is prescribed before commencement on 1983-01-01`
+--        a nullary decision whose WHOLE BODY is a refusal. It has no rows, so
+--        it becomes a boxed `<literalExpression>` whose text is `null`, and the
+--        reason has nowhere to go but the `<decision>`'s own `<description>`.
+--        This is the Reg CF shape (house style: one named definition per
+--        refusal, PROPS-REDTEAM §2.8);
+--   * `the filing fee`
+--        a dated law-time chain (§15) whose FLOOR ARM is that refusal. The
+--        floor row is KEPT and answers `null`; D1 measured that omitting it is
+--        engine-identical, and keeping it is the arm that keeps the reason
+--        where a reader of the table is already looking;
+--   * `the fee with surcharge`
+--        a plain arithmetic decision downstream of a refusal, so the exhibit
+--        shows what a real engine does with `null * 2` rather than asserting it;
+--   * `the discount`
+--        an INLINE refusal in an `OTHERWISE` arm — no named definition — so the
+--        reason lands on that `<rule>`'s `<description>`;
+--   * `the band`
+--        an ENUM-valued refusal, which is the one shape where the two target
+--        engines disagreed. See the block below.
+--
+-- THE ENUM CASE, AND WHY IT IS HERE. An enum-valued decision emits
+-- `<outputValues>` naming its constructors (§3.1/§3.2), and a refusing row then
+-- answers a value that list does not contain. MEASURED 2026-09-05, before the
+-- repair: KIE 8.44.0.Final enforces `<outputValues>` at RUN TIME and FAILS the
+-- decision — "Invalid result value on rule #3, output #1. Value null does not
+-- match list of allowed values" — while Camunda 8.7.6 (zeebe-dmn) does not
+-- check it at all and returns the null silently, 0 errors. One artifact, two
+-- meanings. The exporter now widens THAT TABLE's `<outputValues>` by the FEEL
+-- keyword `null` (and reports `D-OUTPUTVALUES-NULL`, Lossy); the enum's own
+-- `<itemDefinition>`/`<allowedValues>` is untouched, because a separate probe
+-- measured that widening the type does NOT stop the KIE error and widening the
+-- table does. The pre-repair KIE error is pinned as a negative control in
+-- `not-ok/refuse-enum-unwidened.dmn`, so the divergence cannot quietly return.
+--
+-- THE dmnmd PROJECTION OF THIS MODULE CARRIES NO TABLES, and that is the
+-- finding rather than a defect in the fixture: dmnmd's cell grammar — a number,
+-- an integer range, or a bare token — has no `null` and no date, so every table
+-- here is omitted. A bare `null` cell would be read back by dmnmd as the STRING
+-- "null", which is the one outcome worse than omitting the table.
+--
+-- What `refuse.dmn.md` DOES carry is one `<!-- OMITTED: … -->` marker per
+-- dropped decision, naming it and saying why. That was added 2026-09-05 after
+-- measuring what a user actually gets: `l4 export --to dmn-md` exits 0, prints
+-- a one-line tally on stderr, and used to write a file containing a heading and
+-- nothing else — so the committed artifact, the thing a reader opens and a
+-- reviewer diffs, said nothing whatever about the tables it was missing.
+-- `refuse.md.fidelity.txt` still carries the located list with codes.
+--
+-- WHAT THIS EXHIBIT DOES NOT SHOW. It does not migrate any legal-corpus site:
+-- `regcf.l4`, `dmn/gst-rate.l4` and `dmn/ymd-dates.l4` still spell their
+-- pre-commencement floor as an `ASSUME` the engine harness supplies as `-1`.
+-- That migration is a separate change, and this file is what makes it safe to
+-- attempt.
+--
+-- The heading below is load-bearing: `l4 export --to=dmn` with no
+-- `--model-name` takes the model name from the outermost `§`.
+
+IMPORT prelude
+IMPORT daydate
+
+§ `Refusal`
+    GIVEN `the claim amount` IS A NUMBER
+
+-- Required by the rule-version axis: an unpinned `RULES EFFECTIVE DATE` read
+-- resolves to the localized current day, and localization needs a timezone.
+TIMEZONE IS "Asia/Singapore"
+
+GIVETH A DATE
+`commencement` MEANS YMD 1983 1 1
+
+GIVETH A DATE
+`the transition day` MEANS YMD 2026 1 1
+
+-- Position 1: the whole body is a refusal. House style is one NAMED definition
+-- per refusal, carrying its own `@ref`, so that every arm reaching it reads as
+-- a citation rather than as a repeated sentence.
+@ref ruling R2, CORPUS-TRACK §8 — below commencement there is nothing to answer
+GIVETH A NUMBER
+`no fee is prescribed before commencement on 1983-01-01` MEANS
+    REFUSE "no fee is prescribed before commencement on 1983-01-01"
+
+-- Position 2: a law-time chain whose floor arm is that refusal. This is the
+-- shape `gst-rate.l4` and the Reg CF corpus both have, with the `ASSUME` bottom
+-- replaced by the construct that was designed for it.
+GIVETH A NUMBER
+`the filing fee` MEANS
+    BRANCH IF `RULES EFFECTIVE DATE` AT LEAST `the transition day` THEN 1000
+           IF `RULES EFFECTIVE DATE` AT LEAST `commencement`       THEN 250
+           OTHERWISE `no fee is prescribed before commencement on 1983-01-01`
+
+-- Position 3: what a refusal does to arithmetic downstream of it. FEEL
+-- propagates null through `*`; the cases assert that rather than assuming it.
+GIVETH A NUMBER
+`the fee with surcharge` MEANS `the filing fee` TIMES 2
+
+-- Position 4: an INLINE refusal, with no named definition, so the reason has
+-- only the row's own `<description>` to live on.
+GIVETH A NUMBER
+`the discount` MEANS
+    BRANCH IF `the claim amount` AT LEAST 1000 THEN 100
+           IF `the claim amount` AT LEAST 100  THEN 10
+           OTHERWISE REFUSE "no discount is prescribed for a claim below 100"
+
+-- Position 5: the enum case. `Band` keeps its exact declared domain on its
+-- `<itemDefinition>`; only `the band`'s own `<outputValues>` admits `null`.
+DECLARE Band IS ONE OF standard, reduced, exempt
+
+GIVETH A Band
+`the band` MEANS
+    BRANCH IF `the claim amount` AT LEAST 1000 THEN standard
+           IF `the claim amount` AT LEAST 100  THEN reduced
+           OTHERWISE REFUSE "no band is prescribed for a claim below 100"
