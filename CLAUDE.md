@@ -321,6 +321,16 @@ files. A list that admitted the second word could only ever be advisory; this on
 `discharge` and `assumed term` are current, in-use terms. `read-set`, `elaboration` and
 `section binder` have no retiring ruling to cite, so they are not here.
 
+**Plainer is not always truer, and one diagnostic is kept as evidence of that.**
+`NonDistinctQuantifiers` in `jl4-core/src/L4/TypeCheck.hs` still says "All quantified variables in
+a polymorphic type must have distinct names", sitting between four sibling messages that were
+re-voiced into `constructors` / `fields` / `inputs`. Its subject is the type variables of a
+polymorphic signature rather than a rule's inputs, so "input" there would be _false_, and
+"quantified" and "polymorphic" each carry meaning no shorter word carries. It is deliberately
+untouched, with a `Note [Vocabulary of the NonDistinct messages]` at the site saying so. A future
+sweep that tidies it to match its neighbours would be trading a correct sentence for a consistent
+one. If you have a better sentence, take it; a shorter one is not the same thing.
+
 > **Why.** On 2026-09-05 the word was removed from `doc/reference/syntax/section-given.md` by
 > #336 and put back into that same page **five times within hours** by #338, while everyone
 > involved believed the ruling was being followed. Nothing caught it, and no `paths:` filter could

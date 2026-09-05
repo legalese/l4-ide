@@ -5652,11 +5652,22 @@ prettyFixityDecl (prio, dir) = fixityHerald dir <> " " <> Text.pack (show prio)
 prettyCount :: Int -> Text -> Text
 prettyCount i txt = Text.pack (show i) <> " " <> txt <> (if i == 1 then "" else "s")
 
+-- Note [Vocabulary of the NonDistinct messages]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Four of these five now use words a reader of @doc/@ already has:
+-- @constructors@, @fields@, @inputs@. 'NonDistinctQuantifiers' deliberately
+-- does NOT, and a sweep that "finishes the job" here would make it wrong.
+--
+-- Its subject is the type variables of a polymorphic signature, not a rule's
+-- inputs, so "input" would be false; and "quantified" and "polymorphic" each
+-- carry meaning no plainer word carries. Left as it stands, on purpose, until
+-- someone has a better sentence rather than merely a shorter one.
+-- See CLAUDE.md section 7.
 prettyNonDistinctContext :: NonDistinctContext -> [Text]
 prettyNonDistinctContext NonDistinctConstructors =
   [ "All constructors of an enumeration type must have distinct names." ]
 prettyNonDistinctContext NonDistinctSelectors =
-  [ "All selectors of a record type must have distinct names." ]
+  [ "All fields of a record type must have distinct names." ]
 prettyNonDistinctContext NonDistinctQuantifiers =
   [ "All quantified variables in a polymorphic type must have distinct names." ]
 prettyNonDistinctContext NonDistinctTypeAppForm =
