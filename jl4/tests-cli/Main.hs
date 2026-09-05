@@ -539,6 +539,13 @@ batchEscapeFixture = fixtureDir </> "batch-escape.l4"
 batchEscapeInput   = fixtureDir </> "batch-escape-input.json"
 evalTraceFixture   = fixtureDir </> "evaltrace.l4"
 
+-- | Three zero-arity DECIDEs (mainline -> baseline; deadwood unreachable) and
+-- one #EVAL, so slices and surplusage are both observable; and a module with
+-- no definitions at all, for the degenerate-graph exit-code pin.
+graphFixture, graphEmptyFixture :: FilePath
+graphFixture      = fixtureDir </> "graph.l4"
+graphEmptyFixture = fixtureDir </> "graph-empty.l4"
+
 ----------------------------------------------------------------------------
 -- `l4 docassemble` (M2): the package tree, citations and the glossary
 --
@@ -1161,6 +1168,7 @@ main = do
        , batchEligFixture, batchDataJson, batchDataCsv, batchMixedJson
        , batchCodeFixture, batchExponentCsv, batchMaybeFixture, batchMaybeBadJson
        , batchEscapeFixture, batchEscapeInput, evalTraceFixture
+       , graphFixture, graphEmptyFixture
        , cycle3Entry, cycle2Entry, selfImportEntry, cleanImportEntry
        , embeddedDiamondEntry, shadowEmbeddedEntry, shadowSiblingEntry
        , shadowExtraEntry, shadowImporterEntry
@@ -1209,6 +1217,9 @@ spec bin = do
       sout `shouldSatisfy` ("blawx" `isInfixOf`)
       sout `shouldSatisfy` ("nlg" `isInfixOf`)
       sout `shouldSatisfy` ("verify" `isInfixOf`)
+      -- "graph" is a substring of "state-graph" (asserted above), so pin the
+      -- graph entry by a word unique to its own description instead.
+      sout `shouldSatisfy` ("Mermaid" `isInfixOf`)
 
   describe "l4 run" $ do
     it "succeeds on a clean file" $
@@ -1467,6 +1478,80 @@ spec bin = do
       Output code _ serr <- runL4 bin ["state-graph", cleanFixture]
       code `shouldSatisfy` (/= ExitSuccess)
       serr `shouldSatisfy` ("regulative" `isInfixOf`)
+
+  describe "l4 graph" $ do
+    it "emits DOT on stdout by default and exits 0" $ do
+      Output code sout _ <- runL4 bin ["graph", graphFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("digraph" `isInfixOf`)
+      sout `shouldSatisfy` ("mainline" `isInfixOf`)
+      sout `shouldSatisfy` ("deadwood" `isInfixOf`)   -- unsliced: dead code still drawn
+
+    it "emits Mermaid under --format mermaid, starting with the frozen header" $ do
+      Output code sout _ <- runL4 bin ["graph", graphFixture, "--format", "mermaid"]
+      code `shouldBe` ExitSuccess
+      take 1 (lines sout) `shouldBe` ["flowchart TD"]
+      sout `shouldSatisfy` ("-->" `isInfixOf`)
+
+    it "fails on a typecheck error, with diagnostics on stderr" $ do
+      Output code _ serr <- runL4 bin ["graph", errorFixture]
+      code `shouldSatisfy` (/= ExitSuccess)
+      serr `shouldSatisfy` ("Type checking failed" `isInfixOf`)
+
+    it "writes to a file with -o instead of stdout" $ do
+      tmp <- getTemporaryDirectory
+      let outFile = tmp </> "l4-graph-out.dot"
+      Output code sout _ <- runL4 bin ["graph", graphFixture, "-o", outFile]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` null
+      exists <- doesFileExist outFile
+      exists `shouldBe` True
+      contents <- readFile outFile
+      contents `shouldSatisfy` ("digraph" `isInfixOf`)
+      removeFile outFile
+
+    it "rejects an unknown --format" $ do
+      Output code _ serr <- runL4 bin ["graph", graphFixture, "--format", "bogus"]
+      code `shouldSatisfy` (/= ExitSuccess)
+      serr `shouldSatisfy` ("Invalid format" `isInfixOf`)
+
+    it "slices forward from --root: callees in, unrelated definitions out" $ do
+      Output code sout _ <- runL4 bin ["graph", graphFixture, "--root", "mainline"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("mainline" `isInfixOf`)
+      sout `shouldSatisfy` ("baseline" `isInfixOf`)
+      sout `shouldSatisfy` (not . ("deadwood" `isInfixOf`))
+
+    it "slices against the arrows under --reverse: consumers in" $ do
+      Output code sout _ <- runL4 bin ["graph", graphFixture, "--root", "baseline", "--reverse"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("baseline" `isInfixOf`)
+      sout `shouldSatisfy` ("mainline" `isInfixOf`)
+      sout `shouldSatisfy` (not . ("deadwood" `isInfixOf`))
+
+    it "cuts the slice at --depth (0 = the roots alone)" $ do
+      Output code sout _ <- runL4 bin ["graph", graphFixture, "--root", "mainline", "--depth", "0"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("mainline" `isInfixOf`)
+      sout `shouldSatisfy` (not . ("baseline" `isInfixOf`))
+
+    it "fails loudly on a --root that names no definition" $ do
+      Output code _ serr <- runL4 bin ["graph", graphFixture, "--root", "nonesuch"]
+      code `shouldSatisfy` (/= ExitSuccess)
+      serr `shouldSatisfy` ("nonesuch" `isInfixOf`)
+
+    it "refuses --reverse and --depth without a --root to measure from" $ do
+      Output code _ serr <- runL4 bin ["graph", graphFixture, "--reverse"]
+      code `shouldSatisfy` (/= ExitSuccess)
+      serr `shouldSatisfy` ("--root" `isInfixOf`)
+
+    -- Pinned deliberately (the precedents split: state-graph exits 1 when it
+    -- finds no regulative rules, verify exits 0 when clean): an empty diagram
+    -- is an answer about the module, not a failure of the command.
+    it "exits 0 and emits the empty graph for a module with no definitions" $ do
+      Output code sout _ <- runL4 bin ["graph", graphEmptyFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("digraph" `isInfixOf`)
 
   describe "l4 batch" $ do
     it "serializes a #TRACE breach with correctly-labeled fields" $ do

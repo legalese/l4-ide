@@ -278,11 +278,15 @@ normalizePositionalRecords ctorFields
 -- arguments can be matched to the sentence's @%parameter%@ slots. The @\@nlg@
 -- may attach to the declaration, the function name, or the body, so we look in
 -- all three.
--- | Keyed by @(function name, arity)@ rather than 'Unique': a call site in the
--- importing module and the definition in a dependency module do not share
--- 'Unique's (each module is resolved independently), so a unique-based key
--- would never match across an @IMPORT@. The inner @%param%@ substitution stays
--- 'Unique'-based — those refs are self-consistent within the defining module.
+-- | Keyed by @(function name, arity)@. An earlier version of this comment
+-- justified the key by claiming a call site in the importing module and the
+-- definition in a dependency module do not share 'Unique's; that is wrong —
+-- importer-side resolution hands back the dependency's own 'Unique'
+-- ('L4.TypeCheck.Types.unionImportedCheckEnv' unions the dependency's
+-- environment into the importer's check env; proven by the cross-module test
+-- in @DependencyGraphSpec@). The name+arity key is simply what this map has
+-- always used. The inner @%param%@ substitution stays 'Unique'-based — those
+-- refs are self-consistent within the defining module.
 nlgFnInfo :: [Module Resolved] -> Map.Map (Text, Int) (Nlg, [Unique])
 nlgFnInfo mods = Map.fromList
   [ ((resolvedText headName, length appArgs), (nlg, [ getUnique a | a <- appArgs ]))

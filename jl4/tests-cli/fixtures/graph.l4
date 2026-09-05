@@ -1,0 +1,13 @@
+§ GraphFixture
+
+GIVETH A BOOLEAN
+DECIDE baseline IS TRUE
+
+GIVETH A BOOLEAN
+DECIDE mainline IS baseline OR FALSE
+
+-- Reached by no directive: surplusage, for the slice/dead-code tests.
+GIVETH A BOOLEAN
+DECIDE deadwood IS FALSE
+
+#EVAL mainline
