@@ -801,13 +801,23 @@ and the migration is the first thing to author a file that reaches it. **It is a
 sequencing item 7 (keyword removal):** if `ASSUME` goes while a section `GIVEN` cannot express an
 overloaded name, L4 loses type-directed name resolution.
 
-A second, independent instance shows the defect changing which program is accepted, not merely how
-one prints. `jl4/experiments/macma3.l4` `ASSUME`s `` `forfeiture` `` at `FROM Order TO BOOLEAN` and
-`forfeiture` at `FROM Action TO BOOLEAN`, likewise `confiscation`; at HEAD the checker reports
-"multiple definitions for the identifier" for both. Migrated, those two errors **disappear** —
-`resolveSectionGiven` collapses each pair onto its first binder, so the ambiguity it was reporting no
-longer exists and uses that wanted the `Action` reading now silently resolve to the `Order` one.
-An error vanishing is the same bug wearing its most persuasive disguise.
+**A retracted attribution, kept here because the retraction is the useful part.** An earlier revision
+of this section offered `jl4/experiments/macma3.l4` as a second instance of the collapse: it `ASSUME`s
+`` `forfeiture` `` at `FROM Order TO BOOLEAN` and `forfeiture` at `FROM Action TO BOOLEAN`, likewise
+`confiscation`, and at HEAD the checker reports "multiple definitions for the identifier" for both;
+migrated, those two errors **disappear**. The disappearance is real. **The stated cause was wrong.**
+
+Measured 2026-09-05 while repairing `resolveSectionGiven`: moving only the two `Action`-typed
+`ASSUME` lines under the section heading — **no `GIVEN`, so no collapse is possible** — loses the
+same two diagnostics, and the repaired compiler produces identical numbers across all six variants
+tried. So `macma3.l4` exhibits a **declaration-order sensitivity in TDNR candidate resolution that
+predates section binders altogether**: a separate defect, still unowned, and not evidence for this
+one. Three attempts to reduce it to a minimal witness failed.
+
+What survives the retraction: the collapse described above is real and is demonstrated by
+`ok/tdnr.l4` and `ok/misc.l4`, where the printed module loses every binding after the first; and
+`macma3.l4` remains a correct `overload` refusal, because it does bind one name at two types. What
+does not survive is the claim that this defect is what silences its diagnostics.
 
 Handled on the branch by fixing the _migration_, not the compiler: `etc/migrate-assume.mjs` gained a
 structural `overload` refusal role — a name `ASSUME`d more than once in a file is refused, citing
@@ -823,10 +833,11 @@ Do not migrate them as tidying-up.** They read like two files the sweep missed; 
 condition. The repair is done when `resolveSectionGiven` consumes each elaboration at most once, so
 repeated names map to distinct binders, and those two files come out of the script's `overload`
 refusal list and into the sweep with nothing else changed. The test runs in **both** directions,
-which is why the marker is two files and not one: `macma3.l4`'s two suppressed "multiple
-definitions" errors must come back, **and** `ok/tdnr.l4` — which exists precisely to require that
-two definitions sharing a name at different types coexist and resolve by type — must stay green. A
-fix that revives the first while breaking the second has moved the defect, not repaired it.
+which is why the marker is two files and not one: the printed module must keep every binding rather
+than only the first, **and** `ok/tdnr.l4` — which exists precisely to require that two definitions
+sharing a name at different types coexist and resolve by type — must stay green. A fix that repairs
+the printing while breaking the resolution has moved the defect, not repaired it. (`macma3.l4` is
+**not** part of this acceptance test; see the retracted attribution above.)
 
 #### Finding 2: the IDE's one code action inserts the deprecated spelling. RULED 2026-09-05: it lands with item 5, not with item 6.
 

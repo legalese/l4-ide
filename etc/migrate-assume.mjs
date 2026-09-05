@@ -566,6 +566,20 @@ function migrateFile(file, text) {
   // `FROM Action TO BOOLEAN` (line 188), and likewise `confiscation` — the
   // checker reports "multiple definitions for the identifier" for both, so they
   // are one name, and a guard keyed on the raw spelling let both through.
+  //
+  // THIS GUARD IS MEANT TO BE DELETED. It exists only because the compiler
+  // cannot yet carry an overloaded section binder; when that is repaired the
+  // whole block goes and `ok/tdnr.l4` and `ok/misc.l4` migrate. Those two files
+  // are that repair's acceptance test and are left un-migrated as its marker —
+  // see IMPLICIT-PROPS-DESIGN.md §11.14, Finding 1, which records what "done"
+  // looks like. The repair had NOT landed on `unstable` as of 2026-09-05: check
+  // the tree rather than deleting this on the strength of a comment.
+  //
+  // Note `macma3.l4` is cited above ONLY as evidence that a backticked and a
+  // bare name are one identifier. Its two vanishing "multiple definitions"
+  // diagnostics are a SEPARATE, still-unowned declaration-order sensitivity in
+  // TDNR candidate resolution that predates section binders; an earlier version
+  // of §11.14 blamed them on the collapse and that attribution was retracted.
   const overloadKey = (n) => n.replace(/^`|`$/g, "");
   const overloaded = new Set();
   {
