@@ -227,8 +227,8 @@ doCheckProgramWithDependencies checkState checkEnv program =
                   | (callee, binder) <- Discharge.unreadImplicitSupplies rprog
                   ]
                   ++
-                  [ MkCheckErrorWithContext (ImplicitReaderUsedAsValue n) None
-                  | n <- Discharge.valueReferenceHazards rprog
+                  [ MkCheckErrorWithContext (AmbiguousImplicitSupply callee binder) None
+                  | (callee, binder) <- Discharge.ambiguousImplicitSupplies rprog
                   ]
             in MkCheckResult
               { program = rprog
@@ -5266,13 +5266,17 @@ prettyCheckError (UnreadImplicitSupply callee binder)       =
   , ""
   , "Supply it to whichever definition does read it, or drop it from this call."
   ]
-prettyCheckError (ImplicitReaderUsedAsValue n)             =
-  [ quotedName (getName n) <> " reads a section GIVEN, so it takes that binder as an"
-  , "extra parameter -- and here it is named without being applied, which cannot"
-  , "carry one."
+prettyCheckError (AmbiguousImplicitSupply callee binder)   =
+  [ "This call supplies"
   , ""
-  , "Apply it, or wrap it: write a definition that takes the arguments and calls"
-  , quotedName (getName n) <> ", and pass that instead."
+  , "  " <> quotedName (getName binder)
+  , ""
+  , "but " <> quotedName (getName callee) <> " reads more than one binder of that"
+  , "name, and this one is neither of them, so there is no way to tell which was"
+  , "meant."
+  , ""
+  , "Rename one of them, or hoist them to a common section heading if they are"
+  , "one thing."
   ]
 prettyCheckError (RestatedSectionBinder n)                 =
   [ "A section GIVEN already binds"

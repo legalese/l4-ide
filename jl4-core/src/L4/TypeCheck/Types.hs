@@ -123,10 +123,11 @@ data CheckError =
     -- Under R1 a @WITH@ may name a binder /in the callee's read-set/; there is
     -- nowhere to put a value for one outside it, so the override would silently
     -- do nothing. See 'L4.Discharge.unreadImplicitSupplies'.
-  | ImplicitReaderUsedAsValue Resolved
-    -- ^ A definition that reads a section binder, referred to without being
-    -- applied. Discharge gives it a trailing parameter for the binder, which a
-    -- bare reference cannot carry. See 'L4.Discharge.valueReferenceHazards'.
+  | AmbiguousImplicitSupply Resolved Resolved
+    -- ^ A @WITH@ site named a binder the callee reads under two or more
+    -- same-spelled binders, and its own 'Unique' matched none of them, so there
+    -- is no way to tell which was meant. Arguments: the callee, the supplied
+    -- name. See 'L4.Discharge.ambiguousImplicitSupplies'.
   | RestatedSectionBinder Name
     -- ^ A function's own @GIVEN@ restates a name a section-level @GIVEN@
     -- already binds (R2). Carries the parameter name.
@@ -331,7 +332,7 @@ instance HasSrcRange CheckError where
   rangeOf (SuspiciousBinderPattern b _)     = rangeOf b
   rangeOf (MisattachedSectionGiven n _)     = rangeOf n
   rangeOf (UnreadImplicitSupply _ b)        = rangeOf b
-  rangeOf (ImplicitReaderUsedAsValue n)     = rangeOf n
+  rangeOf (AmbiguousImplicitSupply _ r)     = rangeOf r
   rangeOf (RestatedSectionBinder n)         = rangeOf n
   rangeOf _                                 = Nothing
 

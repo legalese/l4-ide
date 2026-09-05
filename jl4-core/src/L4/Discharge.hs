@@ -30,10 +30,14 @@
 -- is keyed by 'Unique' ('L4.Evaluate.ValueLazy.Environment') and
 -- 'L4.EvaluateLazy.Machine.matchGivens' binds a closure's parameters at exactly
 -- those keys, so a body that already refers to the binder finds the argument
--- with no renaming at all, and the pass never has to mint a 'Unique' or
--- re-resolve a name. It is also what makes the fixpoint sound: because
+-- with no renaming at all, and the pass never has to re-resolve a name. It is
+-- also what makes the fixpoint sound: because
 -- @R(caller) ⊇ R(callee)@, the caller is guaranteed to have the very key its
 -- call site needs to pass on.
+--
+-- The pass mints a 'Unique' in exactly one place: the parameters of the
+-- eta-expansion that lets a reader with parameters of its own be passed as a
+-- value. See 'dischargeModule'.
 --
 -- == What this pass deliberately does not do
 --
@@ -55,12 +59,13 @@ module L4.Discharge
   , readSets
   , implicitSupplySites
   , unreadImplicitSupplies
-  , valueReferenceHazards
+  , ambiguousImplicitSupplies
   ) where
 
 import Base
 import Control.Applicative ((<|>))
 import qualified Base.Map as Map
+import qualified Base.Text as Text
 import qualified Data.Set as Set
 import L4.Annotation (emptyAnno)
 import L4.Export (decideBodiesFromModule, transitiveReferencedUniquesWith)
@@ -111,22 +116,22 @@ readSets mod' binders
   | otherwise =
       Map.mapMaybe (nonEmptyRead . readSetOf) bodies
  where
-  -- A binder's TYPICALLY default is a module-scope expression whose own
-  -- read-set joins the requirement of every root that may use it (R8 rule 3,
-  -- "Closure"), so it is an edge of the call graph like any definition's body.
+  -- ONLY definition bodies. A binder's TYPICALLY default is deliberately NOT an
+  -- edge of this graph, which makes R8 rule 3 ("Closure" -- a default's own
+  -- read-set joins the requirement of every root that may use it) DEFERRED, not
+  -- implemented.
   --
-  -- A default can never itself read a binder, so this edge never keys an entry
-  -- in the result by a BINDER's own 'Unique' — which matters, because
-  -- 'dischargeModule' gives a default's elaborated definition no trailing
-  -- parameters and a caller passing some would be an arity mismatch. Two
-  -- independent guards make it unreachable (probed 2026-09-05): the grammar
-  -- rejects an operator after @TYPICALLY@, and a dedicated check rejects a bare
-  -- identifier ("the TYPICALLY value ... must be a literal: a number, a string,
-  -- or a nullary constructor"). The edge is kept because R8 rule 3 is about the
-  -- default's read-set in general, and the guards are the parser's to relax.
-  bodies =
-    decideBodiesFromModule mod'
-      <> Map.fromList [ (u, e) | (u, b) <- Map.toList binders, Just e <- [b.typically] ]
+  -- Its guard is that a default is literal-only, so it can read nothing: probed
+  -- 2026-09-05, the grammar rejects an operator after TYPICALLY and a dedicated
+  -- check rejects a bare identifier ("the TYPICALLY value ... must be a literal:
+  -- a number, a string, or a nullary constructor"). Adding the edge anyway is
+  -- worse than leaving it out, because it keys an entry in the result by a
+  -- BINDER's own Unique -- and 'dischargeModule' gives a default's elaborated
+  -- definition no trailing parameters, while 'rewriteCall' would then rewrite
+  -- every reference to that binder, including the value-bound parameter
+  -- references inside readers, into an application. If the literal restriction
+  -- is ever lifted, supply-through-defaults has to be built deliberately.
+  bodies = decideBodiesFromModule mod'
   nonEmptyRead [] = Nothing
   nonEmptyRead bs = Just bs
   readSetOf body =
@@ -215,27 +220,45 @@ dischargeModule mod'
   -- Pass them through at every reference. A definition's own body, a WHERE or
   -- LET local inside it, a lambda, a directive: all of them are Expr children
   -- of the module, so one traversal reaches them all.
-  rewriteExprs =
-    Optics.over (Optics.gplate @(Expr Resolved))
-      (Optics.transformOf (Optics.gplate @(Expr Resolved)) rewriteCall)
+  --
+  -- Monadic only to mint the eta-expansion parameters below; the counter is the
+  -- whole state.
+  rewriteExprs m =
+    evalState
+      (Optics.traverseOf (Optics.gplate @(Expr Resolved))
+         (Optics.transformMOf (Optics.gplate @(Expr Resolved)) rewriteCall) m)
+      0
+
+  arities = declaredArities mod'
 
   rewriteCall = \ case
+    -- A bare reference to a definition that takes parameters of its own: it is
+    -- being passed as a VALUE, so the trailing binders cannot simply be appended
+    -- — that would put them in the first argument positions. Eta-expand instead.
+    App ann n []
+      | Just bs <- Map.lookup (getUnique n) rs
+      , Just k  <- Map.lookup (getUnique n) arities
+      , k > 0 -> etaExpand ann n k bs
+    Var ann n
+      | Just bs <- Map.lookup (getUnique n) rs
+      , Just k  <- Map.lookup (getUnique n) arities
+      , k > 0 -> etaExpand ann n k bs
     App ann n args
       | Just bs <- Map.lookup (getUnique n) rs ->
-          App ann n (args <> map flowed bs)
+          pure (App ann n (args <> map flowed bs))
     -- 'Var' and 'App _ n []' are the same thing to the evaluator ("still
     -- problematic: similarity / overlap", 'L4.EvaluateLazy.Machine'), so both
     -- have to grow the same arguments or a 'Var' would reach a closure with
     -- none.
     Var ann n
       | Just bs <- Map.lookup (getUnique n) rs ->
-          App ann n (map flowed bs)
+          pure (App ann n (map flowed bs))
     -- The evaluator desugars a projection to @App _ field [record]@, so a
     -- COMPUTED field whose body reads a binder needs the same treatment as any
     -- other definition: its selector is an ordinary module-level DECIDE.
     Proj ann e f
       | Just bs <- Map.lookup (getUnique f) rs ->
-          App ann f (e : map flowed bs)
+          pure (App ann f (e : map flowed bs))
     -- A named call site supplying an implicit. R1: a site is entirely
     -- positional or entirely named, so the declared parameters are all present
     -- and their permutation is the non-negative half of the order list; the
@@ -247,18 +270,83 @@ dischargeModule mod'
               positional  = map snd (sortOn fst (filter ((>= 0) . fst) paired))
               supplied    = [ ne | (i, ne) <- paired, i < 0 ]
               declared    = [ e | MkNamedExpr _ _ e <- positional ]
-          in App ann n (declared <> map (supply supplied) bs)
-    other -> other
+          in pure (App ann n (declared <> map (supply bs supplied) bs))
+    other -> pure other
+
+  -- @f@, named but not applied, where @f@ takes @k > 0@ parameters of its own
+  -- and reads binders @bs@. A bare name cannot carry the trailing binders, so
+  -- the reference becomes the function the writer meant:
+  --
+  -- > GIVEN _eta0 ... _eta(k-1) YIELD f _eta0 ... _eta(k-1) b1 ... bn
+  --
+  -- This is the one place the pass mints a 'Unique'. They carry the sort char
+  -- @\'d\'@, which no other minter uses (@\'c\'@ is 'L4.TypeCheck', @\'e\'@ the
+  -- evaluator, @\'b\'@ the builtins, @\'x\'@ 'L4.Relational.Lower'), so an
+  -- eta parameter cannot collide with a name the module already had.
+  --
+  -- Measured 2026-09-05: without this, @legal\/british-citizen-act.l4@ on the
+  -- @ASSUME@ sweep's tree loses both its @#EVAL@s — it passes the 1-ary reader
+  -- @\`is a British citizen (variant)\`@ to a higher-order rule, which is
+  -- ordinary L4 and must keep working.
+  etaExpand ann n k bs = do
+    ps <- traverse etaParam [0 .. k - 1]
+    pure
+      (Lam ann
+        (MkGivenSig emptyAnno
+          [ MkOptionallyTypedName emptyAnno p Nothing Nothing | p <- ps ])
+        (App emptyAnno n (map (Var emptyAnno) ps <> map flowed bs)))
+
+  etaParam i = do
+    j <- get
+    put (j + 1)
+    pure
+      (Def
+        (MkUnique 'd' j moduleUriOf)
+        (MkName emptyAnno (NormalName ("_eta" <> Text.pack (show (i :: Int))))))
+
+  moduleUriOf = case mod' of MkModule _ uri _ -> uri
 
   -- The value a call passes on when the writer said nothing: the binder itself,
   -- which inside a discharged caller is that caller's own trailing parameter and
   -- at a root is still the module-level ASSUME.
   flowed b = App emptyAnno b.resolved []
 
-  supply supplied b =
-    case [ e | MkNamedExpr _ r e <- supplied, getUnique r == getUnique b.resolved ] of
+  supply bs supplied b =
+    case [ e | MkNamedExpr _ r e <- supplied, suppliesBinder bs r b ] of
       e : _ -> e
       []    -> flowed b
+
+-- | Which binder in the callee's read-set a supplied name refers to.
+--
+-- By 'Unique' first. Failing that by SPELLING, provided the read-set holds
+-- exactly one binder so spelled.
+--
+-- The spelling case is what makes R3's \"bridge at the call\" work. In
+-- @g WITH foo IS foo@ the name to the LEFT of @IS@ is one of @g@'s implicit
+-- inputs, but 'L4.TypeCheck.implicitSupply' resolved it in the CALLER's scope
+-- to get its type — so when two sibling sections both declare @foo@, its
+-- 'Unique' is the caller's and never matches the callee's. Declared parameters
+-- are already matched this way ('L4.TypeCheck.lookupOptionallyNamedType'
+-- compares raw names), so this makes implicits agree with them rather than
+-- introducing a second rule.
+--
+-- Safe by construction: the spelling case can only fire where the 'Unique' case
+-- failed, and a supply whose 'Unique' is in no read-set is an error today
+-- ('unreadImplicitSupplies'). So it can turn an error into a working program
+-- and can never change an answer a working program already gives.
+suppliesBinder :: [Binder] -> Resolved -> Binder -> Bool
+suppliesBinder bs r b
+  | getUnique r == getUnique b.resolved = True
+  | otherwise =
+      spellingOf r == spellingOf b.resolved
+        && length [ () | x <- bs, spellingOf x.resolved == spellingOf r ] == 1
+
+-- The UNQUALIFIED text: a section binder's name can carry its declaring
+-- section as a qualifier (the ambiguity diagnostic spells them
+-- @toplevel.\`1\`.foo@ and @toplevel.\`2\`.foo@), while a writer supplying one
+-- at a call spells it bare.
+spellingOf :: Resolved -> Text
+spellingOf = unqualifiedRawNameToText . rawName . getOriginal
 
 -- | Call sites that supply a section binder by name — the construct a backend
 -- consuming the undischarged module cannot see, and must therefore refuse by
@@ -284,72 +372,50 @@ implicitSupplySites mod' =
 --
 -- Returns @(callee, binder)@ pairs.
 --
--- Both this and 'valueReferenceHazards' run on every module the checker
--- accepts, so both begin by asking 'sectionBinders' — a walk of the section
--- headings alone — and stop there when the module declares none. Without that
--- guard every file in the corpus would pay two full 'allExprs' traversals to be
--- told there is nothing to report; today that is 305 of the 312 files under
--- @ok\/**@ and @legal\/**@.
+-- This runs on every module the checker accepts, so it begins by asking
+-- 'sectionBinders' — a walk of the section headings alone — and stops there when
+-- the module declares none. Without that guard every file in the corpus would
+-- pay a full 'allExprs' traversal to be told there is nothing to report; today
+-- that is 305 of the 312 files under @ok\/**@ and @legal\/**@.
 unreadImplicitSupplies :: Module Resolved -> [(Resolved, Resolved)]
 unreadImplicitSupplies mod'
   | Map.null binders = []
   | otherwise =
       [ (n, r)
       | (n, r) <- implicitSupplySites mod'
-      , getUnique r `notElem` map (getUnique . (.resolved)) (readSetOf n)
+      , not (any (suppliesBinder (readSetOf n) r) (readSetOf n))
+      , not (ambiguousFor (readSetOf n) r)
       ]
  where
   binders = sectionBinders mod'
   rs      = readSets mod' binders
   readSetOf n = fromMaybe [] (Map.lookup (getUnique n) rs)
 
--- | References to a discharged definition that are /not/ calls: a definition
--- with declared parameters, named but not applied, and so used as a first-class
--- value.
+-- | Supplies whose 'Unique' matches no binder the callee reads and whose
+-- SPELLING matches two or more of them.
 --
--- Discharge appends the binders to such a definition's parameter list, but a
--- bare reference cannot carry them without an eta-expansion this pass does not
--- perform (it would have to mint 'Unique's). Reported so the caller can refuse
--- by name.
---
--- __A @#CHECK@ does not count.__ @#CHECK e@ reports the type @e@ was declared
--- with and never evaluates it (@evalDirective (Check _ _) = pure []@,
--- "L4.EvaluateLazy.Machine"), so a bare mention of a discharged reader there is
--- a question /about/ the rule, not a use of it as a value: nothing has to carry
--- the extra parameter. Measured 2026-09-05 by the oracle below: without this
--- exclusion @ok\/section-given-indented.l4:29@ — @#CHECK \`tax on\`@, green
--- before this pass — turns red, and it is the only site in @ok\/**@,
--- @legal\/**@ or @jl4-core\/libraries@ that this check reaches at all.
-valueReferenceHazards :: Module Resolved -> [Resolved]
-valueReferenceHazards mod'
+-- 'suppliesBinder' deliberately refuses to guess between them, so without this
+-- the value would be dropped in silence. Reported separately from
+-- 'unreadImplicitSupplies' because the fix is different: the writer has to say
+-- which binder is meant, by renaming one or hoisting them to a common ancestor.
+ambiguousImplicitSupplies :: Module Resolved -> [(Resolved, Resolved)]
+ambiguousImplicitSupplies mod'
   | Map.null binders = []
   | otherwise =
-      [ n
-      | App _ n [] <- allExprs (withoutCheckDirectives mod')
-      , Map.member (getUnique n) rs
-      , Just k <- [Map.lookup (getUnique n) arities]
-      , k > 0
+      [ (n, r)
+      | (n, r) <- implicitSupplySites mod'
+      , ambiguousFor (readSetOf n) r
       ]
  where
-  binders  = sectionBinders mod'
-  rs       = readSets mod' binders
-  arities  = declaredArities mod'
+  binders = sectionBinders mod'
+  rs      = readSets mod' binders
+  readSetOf n = fromMaybe [] (Map.lookup (getUnique n) rs)
 
--- | The module with its @#CHECK@ directives dropped.
---
--- Only ever used to narrow a /query/ ('valueReferenceHazards'); the module the
--- evaluator runs is never built this way. 'unreadImplicitSupplies' deliberately
--- does /not/ use it: naming a binder the callee does not read is a mistake
--- wherever it is written, and reporting it there costs nothing.
-withoutCheckDirectives :: Module Resolved -> Module Resolved
-withoutCheckDirectives (MkModule ann uri sect) = MkModule ann uri (goSection sect)
- where
-  goSection (MkSection sann mn maka mgiven decls) =
-    MkSection sann mn maka mgiven (concatMap goTopDecl decls)
-  goTopDecl = \ case
-    Directive _ Check{} -> []
-    Section a s         -> [Section a (goSection s)]
-    other               -> [other]
+-- | No 'Unique' match, and two or more binders in the read-set spelled alike.
+ambiguousFor :: [Binder] -> Resolved -> Bool
+ambiguousFor bs r =
+  getUnique r `notElem` map (getUnique . (.resolved)) bs
+    && length [ () | x <- bs, spellingOf x.resolved == spellingOf r ] >= 2
 
 -- | Every expression anywhere in the module, sub-expressions included.
 allExprs :: Module Resolved -> [Expr Resolved]
