@@ -757,8 +757,33 @@ limit, so D1 carries two opinions and D6 one; the measurement that decides D1 (o
 are engine-identical) applies unchanged to the floor row, so option 3 buys no engine-visible
 loudness while losing the reason string; and two images for one construct inside one exporter is
 the kind of split a later reader gets wrong. **Nothing in D6's own reasoning is contradicted** —
-its deciding measurement is that all nine corpus bottoms are `NUMBER`-typed so the gate cannot live
+its deciding measurement is that every corpus bottom is `NUMBER`-typed so the gate cannot live
 in the return type, which is equally true under D1's image.
+
+**D6's blast-radius counts were wrong, and the re-measurement is below rather than borrowed.**
+D6 as accepted says "9 declarations and 22 floor-arm sites across 9 `.l4` files" and "**0 sites in
+canon**". Re-measured 2026-09-05 by `grep -rn '^ASSUME'` over `jl4/examples`, `jl4-core/libraries`,
+`doc` and `canon`, counting each floor name's occurrences minus its declaration:
+
+| file                                              | floor arms             | declared type |
+| ------------------------------------------------- | ---------------------- | ------------- |
+| `jl4/examples/legal/regcf/regcf.l4`               | 8                      | `NUMBER`      |
+| `jl4/examples/legal/regcf/denovo/regcf-denovo.l4` | 8                      | `NUMBER`      |
+| `jl4/examples/dmn/gst-rate.l4`                    | 2                      | `NUMBER`      |
+| `jl4/examples/dmn/ymd-dates.l4`                   | 1                      | `NUMBER`      |
+| `jl4/examples/dmn/not-ok/dated-chain-*.l4`        | 1 each, **five** files | `NUMBER`      |
+| `canon .../legalese/sg-csp.l4:79`                 | 1                      | `NUMBER`      |
+
+**10 declarations, 25 arms, 10 files.** So: canon is **not** zero — `sg-csp.l4:79`,
+`no Baby Bonus Cash Gift rate is encoded for a birth before 2015-01-01`, is a pre-commencement
+bottom of exactly this shape. There are **five** `dmn/not-ok` fixtures with floor arms, not four.
+And the arm count is 25, one more than the 24 a subsequent correction gave — `gst-rate.l4` carries
+**two** floor arms (`:79` and `:92`), which is easy to miss because both name the same declaration.
+
+**What survives the recount is the load-bearing part**: every one of the ten is `NUMBER`-typed, so
+D6's argument that the gate cannot live in the return type without making each a tagged union
+stands, and stands over a slightly larger population than it claimed. Since D6 is one of the cards
+whose adversarial refuter died, treat its remaining figures as unverified too.
 
 **The measurement, taken 2026-09-05 rather than left owed.** `refuse.dmn`'s floor row was deleted
 by hand from the emitted artifact — the exact shape option 3 asks for — and both engines were run

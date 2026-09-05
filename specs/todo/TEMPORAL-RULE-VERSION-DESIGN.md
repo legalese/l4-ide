@@ -559,7 +559,7 @@ its amendment identity — without runtime machinery.
    _Where the gate lives is now ruled._ D6 (accepted 2026-09-05): the gate is
    a **property of the rule-version axis, answered once at the boundary** —
    this item — and **not** a value in the return type. The deciding
-   measurement is that all nine corpus bottoms are `NUMBER`-typed, so a gate
+   measurement is that every corpus bottom is `NUMBER`-typed, so a gate
    in the return type would make every one a tagged union, which the DMN
    exporter refuses today with `2 blocking D-SUMTYPE`, exactly as it used to
    refuse a `REFUSE`. D6 carries **one opinion, not two** — its adversarial

@@ -1450,7 +1450,7 @@ changed the shape of the fourth; the reasoning is kept so the decision is audita
 
   _The status of the replacement._ D6 rules that the pre-commencement gate belongs to the
   **rule-version axis**, answered once at the boundary, rather than to the return type — the
-  deciding measurement being that all nine corpus bottoms are `NUMBER`-typed, so a gate in the
+  deciding measurement being that every corpus bottom is `NUMBER`-typed, so a gate in the
   return type would be a tagged union, which the DMN exporter refuses today with
   `2 blocking D-SUMTYPE`. Phase 2's generated arm therefore remains the designed replacement and
   its shape is now ruled. D6 also proposed omitting the floor row in DMN as its first half; that

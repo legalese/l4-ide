@@ -1258,7 +1258,8 @@ jobs:
       # the whole 70-decision Reg CF corpus, built and value-checked on both
       # engines. This is deliverable R0's gate — "the execution is the exhibit"
       # — and its counts are pinned to the LOCALLY MEASURED verdict lines
-      # (2026-08-09), not to round numbers. 22 cases x 70 decisions = 1540:
+      # (2026-08-09; recount 2026-09-05), not to round numbers.
+      # 23 cases x 70 decisions = 1610:
       # the base world, the 15 dated cases relocating the rule-date-rebinding
       # fixtures R12 dropped from the artifact (spec §15.12.1), the 4 seed
       # cases that close the total-assets and restricted-period leaves the §8
@@ -1271,6 +1272,17 @@ jobs:
       # '16 case(s) ... 1072/1072 ... 224/224' (2026-08-02, before the seeds)
       # and '1 case(s) ... 67/67' (81ece880); before R12/R13 the file was
       # VALID 16 error(s) on KIE and PARSE INVALID on Camunda.
+      #
+      # 1540 -> 1610 and 22 -> 23 on 2026-09-05, ruling D1. The 23rd case is the
+      # first here to ask a rule date BELOW commencement, and the first to supply
+      # NEITHER refusal — both are explicit JSON nulls instead of the -1 and the
+      # invented assurance level every other case hands the model. Until it
+      # existed this step reported 1540/1540 about a model whose pre-commencement
+      # half had never been evaluated at all, which is the blind spot D1's review
+      # named. Seven of the seventy answers there are LAUNDERED (FEEL's null reads
+      # as false at the first boolean consumer, so the model reports `does not
+      # qualify` where it means `declines to say`); regcf-corpus.cases.json pins
+      # them as evidence and says in terms that they are not endorsed.
       #
       # 67 -> 69 and 20 -> 21 on 2026-08-05, when the resale restriction became
       # a calendar anniversary instead of a flat 365 days. The two decisions are
@@ -1386,19 +1398,24 @@ jobs:
           ./etc/kie-dmn-check/run.sh \
             jl4/examples/dmn/expected/gst-rate.dmn \
             --cases jl4/examples/dmn/gst-rate.cases.json | tee kie-gst.log
-          grep -q 'KIE 8.44.0.Final VERDICT: .*0 error(s), 0 warning(s), 60/60 decision(s) SUCCEEDED, 60/60 value(s) as expected' kie-gst.log
+          grep -q 'KIE 8.44.0.Final VERDICT: .*0 error(s), 0 warning(s), 66/66 decision(s) SUCCEEDED, 66/66 value(s) as expected' kie-gst.log
 
           ./etc/camunda-dmn-check/run.sh \
             jl4/examples/dmn/expected/gst-rate.dmn \
             --cases jl4/examples/dmn/gst-rate.cases.json | tee camunda-gst.log
-          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT: .*1 parsed, 0 error(s), 60/60 decision(s) evaluated, 60/60 value(s) as expected' camunda-gst.log
+          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT: .*1 parsed, 0 error(s), 66/66 decision(s) evaluated, 66/66 value(s) as expected' camunda-gst.log
 
       # The DATE-LITERAL leg (spec §15.4.1). Not redundant with the step above:
       # gst-rate.l4 spells every date `Date d m y`, so nothing there would
       # notice `YMD y m d` regressing back to raw L4 -- which is what it used to
-      # emit, for the constructor daydate.l4 RECOMMENDS. Eight cases x six
-      # decisions = 48, and the counts are pinned to the LOCALLY MEASURED
-      # verdict lines (2026-08-02).
+      # emit, for the constructor daydate.l4 RECOMMENDS. NINE cases x six
+      # decisions = 54, and the counts are pinned to the LOCALLY MEASURED
+      # verdict lines (2026-08-02; case I and the recount 2026-09-05).
+      #
+      # Case I is ruling D1's: the first case here that asks a pre-commencement
+      # rule date WITHOUT handing the model a floor value. F, G and H already
+      # ask below commencement, but they supply -1 and expect -1 back, so they
+      # enter the region and never reach the bottom the floor arm names.
       #
       # Two independent date axes, both fed: `the_application_date` (ordinary
       # decision-table cells) and `RULES_EFFECTIVE_DATE` (law-time intervals),
@@ -1421,12 +1438,12 @@ jobs:
           ./etc/kie-dmn-check/run.sh \
             jl4/examples/dmn/expected/ymd-dates.dmn \
             --cases jl4/examples/dmn/ymd-dates.cases.json | tee kie-ymd.log
-          grep -q 'KIE 8.44.0.Final VERDICT: 1 file(s), 8 case(s), 0 error(s), 0 warning(s), 48/48 decision(s) SUCCEEDED, 48/48 value(s) as expected, 16/16 service output value(s) as expected' kie-ymd.log
+          grep -q 'KIE 8.44.0.Final VERDICT: 1 file(s), 9 case(s), 0 error(s), 0 warning(s), 54/54 decision(s) SUCCEEDED, 54/54 value(s) as expected, 18/18 service output value(s) as expected' kie-ymd.log
 
           ./etc/camunda-dmn-check/run.sh \
             jl4/examples/dmn/expected/ymd-dates.dmn \
             --cases jl4/examples/dmn/ymd-dates.cases.json | tee camunda-ymd.log
-          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT: 1 file(s), 8 case(s), 1 parsed, 0 error(s), 48/48 decision(s) evaluated, 48/48 value(s) as expected' camunda-ymd.log
+          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT: 1 file(s), 9 case(s), 1 parsed, 0 error(s), 54/54 decision(s) evaluated, 54/54 value(s) as expected' camunda-ymd.log
 
       # THE REFUSAL leg (ruling D1, 2026-09-05; IMPLICIT-PROPS-DESIGN §11.9.1).
       #

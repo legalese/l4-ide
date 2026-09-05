@@ -33,10 +33,12 @@ shipped goldens (R12 + R13, spec §15.12/§16, on top of Phase 5's BKM emission;
 2026-08-09 after Rule 501(a)(4) was decomposed):
 **70 decisions (12 decision tables), 10 businessKnowledgeModels, 7 decisionServices,
 15 `inputData`, and ZERO blocking notes (0 blocking / 21 lossy / 133 advisory)** — and
-both engines evaluate it end to end over the 22 cases in `regcf-corpus.cases.json`
+both engines evaluate it end to end over the 23 cases in `regcf-corpus.cases.json`
 (the base world, 15 dated relocation cases per spec §15.12.1, 4 seed cases added
-2026-08-03, the leap case added 2026-08-05, and the escheat case added 2026-08-09),
-1540/1540 values as expected (see "Running it through the real engines" below for the verbatim verdicts). The two blocking families the
+2026-08-03, the leap case added 2026-08-05, the escheat case added 2026-08-09, and
+the PRE-COMMENCEMENT case added 2026-09-05 under ruling D1 — the first that leaves
+the window this corpus models, and the first that supplies neither refusal),
+1610/1610 values as expected (see "Running it through the real engines" below for the verbatim verdicts). The two blocking families the
 2026-08-01 measurement counted (32 notes: the 15 `EVAL UNDER RULES EFFECTIVE AT`
 bodies with their 15 `D-RULEDATE-UNBOUND` companions, and the deontic reporting spine
 with its D-CYCLE) are **gone**: R12 drops the rebinding decides at population time
@@ -160,6 +162,11 @@ that report them:
   Severity keys off the call sites (any strict consumer, or none ⇒ Blocking; all lazy ⇒
   Lossy), the note names the failing clause and range, and says *not certified total* —
   the analysis refuses to certify; it does not prove partiality.
+  **Since ruling D1 (2026-09-05) a decision that can `REFUSE` is not `DMN-SAFE` either**,
+  transitively through the call graph — it answers `null` on part of its domain, which is
+  the exact thing this criterion exists to keep out of an un-lift. It raises `D-REFUSE`
+  rather than `D-PARTIAL`, on the same call-site calibration; the two are disjoint per
+  cause, so their counts must never be added together.
 - **The population filter.** Test fixtures (referenced only from `#EVAL`/`#ASSERT`
   argument positions, no callers here or in any importing sibling) and their
   fixture-side helper closure are **not emitted** — `D-FIXTURE` (Advisory) names each,
@@ -401,13 +408,13 @@ metamodel parser says:
 > Measured 2026-08-09 on the shipped `expected/regcf-corpus.dmn`, verbatim:
 >
 > - KIE 8.44.0.Final: `XSD valid`; `VALID clean`; `BUILD clean`;
->   `KIE 8.44.0.Final VERDICT: 1 file(s), 22 case(s), 0 error(s),
->   0 warning(s), 1540/1540 decision(s) SUCCEEDED, 1540/1540 value(s) as
->   expected, 330/330 service output value(s) as expected`
+>   `KIE 8.44.0.Final VERDICT: 1 file(s), 23 case(s), 0 error(s),
+>   0 warning(s), 1610/1610 decision(s) SUCCEEDED, 1610/1610 value(s) as
+>   expected, 345/345 service output value(s) as expected`
 > - Camunda 8.7.6: `PARSE ok: SEC Regulation Crowdfunding — 17 CFR Part 227
 >   (70 decision(s))`; `Camunda 8.7.6 (zeebe-dmn) VERDICT: 1 file(s),
->   22 case(s), 1 parsed, 0 error(s), 1540/1540 decision(s) evaluated,
->   1540/1540 value(s) as expected`
+>   23 case(s), 1 parsed, 0 error(s), 1610/1610 decision(s) evaluated,
+>   1610/1610 value(s) as expected`
 >   (measured locally on JDK 26; CI runs the Camunda leg on 21, which is the
 >   minimum zeebe-dmn 8.7.6 accepts)
 >

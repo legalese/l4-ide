@@ -5670,14 +5670,28 @@ different code (`constantDay`'s one hop, then the literal fold). It is also wher
 column's limit is visible in a golden: the named arm carries the constant and its `@ref`, the
 literal arm carries only `from 1994-04-01`.
 
-**[E] Amended 2026-07-31.** `jl4/examples/dmn/gst-rate.cases.json` drives it through **both** engines
-with **ten** rule dates: `70/70 value(s) as expected` on KIE 8.44.0.Final (0 errors, 0 warnings) and
-on Camunda 8.7.6 (1 parsed, 0 errors). `GST rate percent` lowers to four rules and therefore **three
-seams** — 2024-01-01, 2023-01-01, 1994-04-01 — and every one is straddled by a day-of/day-before
-pair, plus a case well before commencement for the floor row. The first version straddled only the
-newest seam, so an off-by-one on the middle interval's low end, or on the floor row's
-`< date("1994-04-01")`, would have passed `42/42` green while the cases file claimed to pin the
-convention. This is the OpenFisca parameter file re-expressed as engine-evaluable DMN.
+**[E] Amended 2026-07-31, recounted 2026-09-05.** `jl4/examples/dmn/gst-rate.cases.json` drives it
+through **both** engines with **eleven** rule dates: `66/66 value(s) as expected` on KIE
+8.44.0.Final (0 errors, 0 warnings) and on Camunda 8.7.6 (1 parsed, 0 errors). `GST rate percent`
+lowers to four rules and therefore **three seams** — 2024-01-01, 2023-01-01, 1994-04-01 — and every
+one is straddled by a day-of/day-before pair, plus a case well before commencement for the floor
+row. The first version straddled only the newest seam, so an off-by-one on the middle interval's
+low end, or on the floor row's `< date("1994-04-01")`, would have passed `42/42` green while the
+cases file claimed to pin the convention. This is the OpenFisca parameter file re-expressed as
+engine-evaluable DMN.
+
+> **What the recount corrected.** This paragraph read "**ten** rule dates: `70/70`", which was two
+> errors at once: ten cases over six decisions is 60, not 70, so the figure had drifted from an
+> earlier decision count and nobody re-derived it when the count moved.
+>
+> The eleventh case is ruling D1's, and it is the first one here that asks a pre-commencement rule
+> date **without handing the model a floor value**. F and J already ask below commencement — but
+> they supply the floor as `-1` and expect `-1` back, so they enter the region and never reach the
+> bottom the floor arm names. Case K supplies it as an explicit JSON `null` instead, which is what
+> the model will answer of its own accord once the floor migrates from an `ASSUME` input to a
+> `REFUSE` decision. So the case's ANSWERS do not move under that migration; only the name moves,
+> from `context` to `expect`. `ymd-dates.cases.json` gained the same case (I) for the same reason —
+> nine cases, `54/54`.
 
 Six negative fixtures under `jl4/examples/dmn/not-ok/` are **not** golden subjects, so no `.dmn` is
 emitted for them and `etc/validate-dmn.mjs` is unaffected. All six are asserted from
