@@ -1129,6 +1129,19 @@ jobs:
       # this same tree in the step above. Pinning a path at a tree newer than
       # the binary is the failure documented in CLAUDE.md 3.1, and it presents
       # as the prelude having lost its definitions rather than as a mismatch.
+      #
+      # This job runs in a bare `ubuntu:24.04` container, which has no Node.
+      # Measured on this PR's first run: `node: not found`, exit 127 -- the
+      # one thing the step's author could not verify locally, and it failed
+      # loudly on its own PR, which is the right place. Same major as the Go
+      # Orchestrator job so the selftest sees one Node everywhere. No
+      # package-manager cache: this job runs no `npm install`, and a cache
+      # write per PR is the churn the cache-maintenance note below exists to
+      # prevent.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24.x"
+          package-manager-cache: false
       - name: The go selftest's binary-gated assertions
         run: L4="$(cabal list-bin l4)" node etc/go/selftest.mjs
         env:
