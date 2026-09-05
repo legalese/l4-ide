@@ -4,6 +4,12 @@
 > - Only `UNLESS` exists as a keyword (`Lexer.hs:330`) but without the defeasibility semantics §6.1 proposes. "Next Steps" items 2-5 remain unstarted.
 > - §9 (`APPLIES`, added 2026-08-16) is likewise PROPOSED, not implemented — `APPLIES` is not a lexer keyword, and no per-provision applicability projections are derived anywhere in core.
 > - §10 (corpus survey, added 2026-08-28) is a **measurement of existing corpora**, not a proposal; it discharges "Next Steps" item 1 for the read side. The line references above were re-verified on that date; the 2026-07-03 audit's `Lexer.hs:230-299`/`:298` had drifted.
+> - §11 (rulings, added 2026-09-05) records the one decision taken so far. **It is expressly
+>   provisional** — Meng's own note, quoted verbatim at the head of §11.1, says the decision and its
+>   related work are temporary and that he expects actual keywords in the long run. What was ruled
+>   is that the **first build is a derivation lint over the existing call graph, not syntax**; five
+>   of §6.1's eight constructs are declined on measurement; and §10.8 S3 is narrowed by §11.2. The
+>   lint is **ruled and not built**.
 
 > **Prior art from the backend portfolio (added 2026-08-16):** two independently-implemented,
 > battle-tested target-side defeasibility mechanisms — and one ratified interchange standard —
@@ -472,16 +478,22 @@ The deeper lesson for `SUBJECT TO`: legal negation/override is **never neutral**
 
 The seven semantic functions identified suggest L4 needs multiple distinct constructs, not a single overloaded keyword:
 
-| Function               | Suggested L4 Construct                                |
-| ---------------------- | ----------------------------------------------------- |
-| Priority declaration   | `SUBJECT TO` / `NOTWITHSTANDING` as explicit priority |
-| Exception carve-out    | `EXCEPT WHEN` clause                                  |
-| Condition precedent    | `REQUIRES` or `GIVEN THAT`                            |
-| Output modification    | `QUALIFIED BY` or modifier syntax                     |
-| Preservation           | `WITHOUT AFFECTING`                                   |
-| Domain restriction     | Input type constraints                                |
-| Defeasibility          | `UNLESS` with defeater semantics                      |
-| Applicability citation | `APPLIES` — reads the woven result (§9)               |
+| Function               | Suggested L4 Construct                                | Disposition (2026-09-05, §11.1) |
+| ---------------------- | ----------------------------------------------------- | ------------------------------- |
+| Priority declaration   | `SUBJECT TO` / `NOTWITHSTANDING` as explicit priority | **not ready to be spelled**     |
+| Exception carve-out    | `EXCEPT WHEN` clause                                  | **declined on measurement**     |
+| Condition precedent    | `REQUIRES` or `GIVEN THAT`                            | **declined on measurement**     |
+| Output modification    | `QUALIFIED BY` or modifier syntax                     | **declined on measurement**     |
+| Preservation           | `WITHOUT AFFECTING`                                   | **declined on measurement**     |
+| Domain restriction     | Input type constraints                                | **declined on measurement**     |
+| Defeasibility          | `UNLESS` with defeater semantics                      | separate ruling, not taken      |
+| Applicability citation | `APPLIES` — reads the woven result (§9)               | separate ruling, not taken      |
+
+> **Amended 2026-09-05 — see §11.1.** The sentence above ("L4 needs multiple distinct constructs")
+> is not what was ruled. **Five of the eight are declined on measurement, none of the remaining
+> three is being built as syntax, and the first build is a derivation lint over the call graph that
+> adds no construct at all.** The disposition column is the record; read it before quoting the row
+> beside it. Meng's note scoping the whole ruling as provisional is at the head of §11.1.
 
 ### 6.2 Reader-Friendliness
 
@@ -1059,6 +1071,155 @@ Settled by measurement, and recorded here as the answer to §8 item 1 for the re
   a derived name in a reserved namespace.
 - **Q3.** Whether selector reads (§10.7) are the same construct returning a provision, or a
   different one.
+
+---
+
+## 11. Rulings
+
+### 11.1 D2 — the first build is a derivation lint, not syntax. RULED 2026-09-05.
+
+> **Meng attached a note to this ruling, and it scopes the whole of it. Recorded verbatim:**
+>
+> > Let’s consider this decision and its related work to be temporary, subject to modification after the Subject-To/Notwithstanding spec gets built out; in the long run I expect actual keywords to define relations but we need to figure out semantics first.
+
+Read every paragraph below inside that scope. Nothing here is a settled answer about how override
+should ultimately be spelled; it is a ruling about **what to build first**, taken because the thing
+to build first is a measurement, and the measurement is what a syntax ruling would need.
+
+**Ruling (Meng, 2026-09-05, mark `accept` on rulings-bench card `D2-subject-to-syntax`).** Option
+2: **derive the override edge from the call graph before designing any syntax for it.** Build a
+lint that reads the existing call edges and reports the override relations it finds, using the
+`@ref` prose as the oracle — an `@ref` that says "Subject to section 6" over a body that calls no
+`s 6…` decision is a **missing conjunct**, and the lint says so. **Zero syntax, zero language
+change, zero migration.** Then rule the syntax on what the lint reports.
+
+**This partially answers §8 item 2 ("Propose concrete syntax").** It rules the _first_ build. It
+does not rule the syntax, and under Meng's note above it cannot.
+
+**Status: ruled 2026-09-05; NOT BUILT.** No such lint exists. What would make it true: a pass that
+walks each decision's body for calls to section-named decisions, joins them against the override
+phrases carried in `@ref` annotations and in identifier names, and reports the mismatches.
+
+**What decided it.** The prior recommendation — add an `@subject-to` annotation — rests on the
+premise that the override edge is invisible. **The tree says otherwise.** The witness, read
+2026-09-05:
+
+```l4
+-- jl4/examples/legal/sg-succession/cleanroom-2026-08/probate-administration-act.l4:898-900
+`s 8(3) — probate may be granted to one or more of the persons so appointed, subject to section 6` d g MEANS
+        "Subject to section 6,"
+    ... NOT (`s 6(1) — granted to more than 4 persons in respect of the same property` g)
+```
+
+"Subject to section 6" is discharged by **calling section 6 and negating it** — a type-checked
+call, not a comment and not an annotation. The edge is already data. Three measurements follow, all
+taken 2026-09-05:
+
+- **The machine-readable surface already exists.** `181` distinct section-named identifiers of the
+  form `` `s N(...) — …` `` occur `1072` times across the six `.l4` files of
+  `jl4/examples/legal/sg-succession/cleanroom-2026-08/`. (The card reported 187 distinct / 991
+  occurrences over "the four cleanroom files"; that is a different regex over a different file set,
+  and neither figure is load-bearing — what matters is that the population is in the hundreds and
+  the calls in the thousands.)
+- **An inert annotation adds no checkable content.** Probe, 2026-09-05: a module carrying
+  `@ref Nonexistent Imaginary Act 3099 s 42(9)(z) — https://example.invalid/nope` passes
+  `l4 check` with **exit 0** and no diagnostic. An `@subject-to` naming a provision that does not
+  exist would do the same.
+- **The "teeth" the annotation was sold on do not exist.** The claim was that Catala's Mode B
+  ladder would give the annotation something to check against. `modeBClauses`
+  (`jl4-core/src/L4/Catala/Lower.hs:1356`) derives an **intra-body arm ladder** — its own Haddock
+  at `:1342-1355` lists the three shapes it recognises, all of them within one rule's body
+  (`c UNLESS d`, a `BRANCH` cascade or `IF`, a `CONSIDER` over literals) — and **not** a
+  cross-provision edge. Anything else yields `Nothing`.
+
+**The five constructs declined now.** Of the eight in §6.1, five are **declined on measurement**,
+and §6.1's table is marked in the same change so that it does not go on listing eight while §11
+rules fewer:
+
+| §6.1 function        | construct                        | disposition                         |
+| -------------------- | -------------------------------- | ----------------------------------- |
+| Condition precedent  | `REQUIRES` / `GIVEN THAT`        | **declined 2026-09-05**             |
+| Output modification  | `QUALIFIED BY`                   | **declined 2026-09-05**             |
+| Domain restriction   | input type constraints           | **declined 2026-09-05**             |
+| Exception carve-out  | `EXCEPT WHEN`                    | **declined 2026-09-05**             |
+| Preservation         | `WITHOUT AFFECTING`              | **declined 2026-09-05**             |
+| Defeasibility        | `UNLESS` with defeaters          | separate ruling, not taken here     |
+| Applicability        | `APPLIES` (§9)                   | separate ruling, not taken here     |
+| Priority declaration | `SUBJECT TO` / `NOTWITHSTANDING` | **not ready to be spelled** (below) |
+
+**The priority declaration is NOT ready to be spelled**, which is where this ruling departs from
+the analysis it was taken from. That analysis proposed spelling it now; its case did not survive
+checking. Two of its measurements were inflated; its corpus scope missed 124 lines and 28 files,
+including the one shape no static edge can model; and its 17-relation census is unvalidated.
+
+**Blast radius: none. Zero files change, zero syntax, zero breakage.** The mention surface the lint
+would report over, re-measured 2026-09-05 and reproducing the card exactly:
+
+```
+$ grep -rniE 'subject to|notwithstanding|despite' --include='*.l4' jl4 jl4-core doc paper | wc -l
+345          # across 41 files
+$ ... same over /Users/mengwong/src/legalese/canon
+139          # across 11 files, six of them byte-identical mirrors
+```
+
+The 124 lines the prior analysis omitted sit in `paper/case-studies/charities-jersey-2014/` (58
+across 7 files), `jl4/experiments/` housing-act (29) and PDPA (8).
+
+**Two shapes are out of reach of ANY static edge, and are recorded as such** so that a later lint
+is not written as though it could reach them: **open-class targets** ("notwithstanding any other
+provision"), and the **comparative override** at
+`paper/case-studies/charities-jersey-2014/part-5-governors.l4:219-241`.
+
+**What a derived edge set unblocks.** Catala labels
+(`jl4-core/src/L4/Catala/Lower.hs:1334-1357`), Blawx `overrules`, LegalRuleML `Override`, and the
+§4.2/§7.5 acyclicity check — four consumers that today have nothing to consume.
+
+**If a construct is wanted in this pass anyway**, the ruling prefers **option 3** (standardise the
+two-layer defeat idiom that already works, as a documented house pattern plus a lint) over **option
+4** (the `@subject-to` annotation): the defeat idiom is checked by construction and already runs,
+whereas the inert annotation would be believed by four consumers with nothing able to contradict
+it.
+
+**What review changed.** The prior analysis recommended the annotation. This ruling declines it, on
+the probe above and on `modeBClauses`'s actual scope, and replaces "design the syntax" with "derive
+the edge, then rule the syntax on what you find". The five declined constructs were already the
+prior analysis's recommendation and are unchanged. `§10.8` Q1 and Q3 **stay OPEN**; §10.9 records
+the one correction to §10.8's settled findings.
+
+**Owed, and not done by the author of this change, which has no GitHub write authority:** cross-post
+this ruling to smucclaw/l4-ide#640.
+
+---
+
+### 11.2 §10.9 — the write side IS written down: it is discharged by CALL, not by BRANCH order
+
+**Correction to §10.8 S3, recorded 2026-09-05 with §11.1.** S3 says:
+
+> The weaving is _not_ written down — it lives in comments (§10.3). This is the isomorphism cost of
+> having no write side, and it grows with every subject encoded.
+
+**That is too strong, and the same witness that decided §11.1 is what narrows it.** At
+`probate-administration-act.l4:898-900` the override is discharged by a **type-checked call to the
+overriding provision, negated** — ``NOT (`s 6(1) — …` g)`` — conjoined into the overridden
+provision's own body. That is the weaving, and it is in the code, not in a comment. It is also not
+`BRANCH` order: nothing about the arm sequence carries it.
+
+**S3 narrowed:** _the KIND of the weaving is not written down._ A reader can see **that**
+`s 8(3)` consults `s 6(1)`, because the call is there and the type-checker enforces it; what a
+reader cannot see is **whether** that call is a priority declaration, a carve-out, a proviso or a
+savings clause — §2.1–§2.7's seven roles are indistinguishable at the call site. That is the real
+isomorphism cost, and it is what §11.1's lint is a first step against: the lint can find the edge
+and can say when the `@ref` prose promises an edge the body does not make, but it cannot classify
+the role, and neither can anything else in the tree today.
+
+**The bug class this idiom produces is already documented in the corpus**, which is why the lint
+pays for itself: `probate-administration-act.l4:893-895` records an earlier draft that quoted the
+"Subject to section 6" words in an inert string and tested only the conjuncts either side of them,
+so the decision answered `TRUE` of a sole-executor will — "a subsection reporting itself satisfied
+where its own opening words do not reach". An `@ref` promising an override over a body that calls
+nothing is exactly that bug, and it is machine-detectable.
+
+**Unchanged:** S1, S2, S4, S5 and the open questions Q1, Q2 and Q3 of §10.8.
 
 ---
 
