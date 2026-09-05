@@ -952,3 +952,206 @@ same one: the elaboration has to be identifiable _as_ an elaboration (a marker o
 a `Resolved`-only `Unique` match, which the polymorphic `LayoutPrinterWithName` printer cannot use
 as it stands). This is the shape the sweep will produce wherever a section acquires a binder and
 keeps an overloaded `ASSUME` of the same name, so it wants an owner before item 7.
+### 11.14 Discharge as shipped — 2026-09-05
+
+`PROPS-REDTEAM-2026-09-03.md` §6 item 5. What landed, where it lives, what it
+was measured against, and what it deliberately does not do. Written against the
+tree at `props/discharge`; every claim below was probed on the binary built from
+it.
+
+#### What shipped
+
+**`L4.Discharge` (new module).** `dischargeModule :: Module Resolved -> Module
+Resolved` computes `R(f)` for every module-level definition — the section
+binders it names, plus those named by anything it reaches through the call
+graph — and then, for every `f` with a non-empty read-set, appends those binders
+to `f`'s `AppForm` and `GivenSig` and appends the matching arguments at every
+reference to `f`. The read-set is `L4.Export.transitiveReferencedUniques`, the
+pass PR #328 landed, intersected with the module's section binders; the one
+addition to `L4.Export` is `transitiveReferencedUniquesWith`, the same closure
+against an already-built edge table, so asking for every definition's read-set
+at once is not quadratic. There is still exactly one implementation of the
+read-set.
+
+**The discharged parameter is the binder's own `Resolved`.** The evaluator's
+environment is `Map Unique Reference` and `matchGivens` binds a closure's
+parameters at exactly those keys, so a body that already refers to the binder
+finds the argument with no renaming, and the pass never mints a `Unique`. It is
+also what makes the fixpoint sound: `R(caller) ⊇ R(callee)`, so a caller always
+holds the key its call site has to pass on.
+
+**Where it runs: the evaluation entry points only** —
+`L4.EvaluateLazy.execEvalModuleWithEnv` and `execEvalModuleWithJSON`. The
+checked module the LSP hovers over, the printers re-emit and the six backends
+lower is the module the author wrote. This is a deliberate narrowing of §2.2,
+recorded under "deferred" below.
+
+**`WITH` on a binder (R1).** `L4.TypeCheck.supplyAppNamed` accepts a named
+argument that is not one of the callee's declared parameters when the name is
+one the module's section `GIVEN`s bind (a new `CheckEnv.sectionBinderNames`,
+filled from `L4.Desugar.collectSectionBinderNames` before desugaring), checks it
+against the binder's declared type, and records it with a negative index
+(`implicitSupplyIndex`, documented on `AppNamed` in `L4.Syntax`).
+`inferAppNamed` accepts such a site on a callee with no function type at all,
+which is the common case: before discharge a 0-ary rule is not a function, and
+measured on the pre-change binary the error was `IllegalAppNamed` ("which is not
+a function"), not `IncompleteAppNamed`. `dischargeModule` consumes every
+negative index; one reaching the evaluator is an internal error naming the
+callee, rather than being sorted into some other parameter's position.
+
+**`TYPICALLY` at the root (R8).** A binder declared `TYPICALLY d` has its
+elaboration rewritten from an `ASSUME` into an ordinary 0-ary definition whose
+body is `d`. Every reader takes the binder as a parameter and every call passes
+it on, so the only site that can reach that definition is a root that supplied
+nothing — and a 0-ary definition is a shared thunk, so `d` is forced at most
+once per evaluation and every reader sees the same value. `WITH` still wins,
+being an argument. The default's own read-set joins the call graph, so R8 rule 3
+("Closure") holds by construction. `doc/reference/types/TYPICALLY.md` now says
+this is a change of meaning and says where it stops, which is Meng's own note in
+§11.5.
+
+**R2 as a check error.** `L4.Desugar.detectRestatedSectionBinders` reports a
+declaration's own `GIVEN` that restates a section binder's name. Scope: the
+signatures of `DECIDE`, `ASSUME` and `DECLARE`, including those of `WHERE` and
+`LET` locals — keyed on `TypeSig`, which is exactly what excludes a section's
+own bare `GivenSig` and a lambda's. A lambda parameter that shadows a binder is
+left alone; that is the residual cost §2.3 records, not a second binder.
+
+**Two whole-module checks that `supplyAppNamed` cannot make**, both from
+`L4.Discharge` and both reported like `Export.validateExportInputs`:
+`unreadImplicitSupplies` (a `WITH` naming a binder the callee does not read —
+without it the override would silently do nothing) and `valueReferenceHazards`
+(a rule that reads a binder, named without being applied — discharge gives it a
+trailing parameter a bare reference cannot carry).
+
+#### Measured
+
+| probe (2026-09-05, `props/discharge` binary)                        | before       | after             |
+| ------------------------------------------------------------------- | ------------ | ----------------- |
+| `#EVAL doubled WITH \`the rate\` IS 5`, binder read directly        | check error  | `10`              |
+| `#EVAL quadrupled WITH \`the rate\` IS 5`, binder read via a helper | check error  | `20`              |
+| `#EVAL bump WITH n IS 3, \`the rate\` IS 5`, own parameter + binder | check error  | `15`              |
+| `#EVAL f WITH alpha IS 1, beta IS 2` (§2.2's cross-section example) | check error  | `5`               |
+| in-body `quadrupled WITH \`the rate\` IS 10`                        | check error  | `40`              |
+| `TYPICALLY 3` on a binder, nothing supplied                         | assumed term | `6`               |
+| `WHERE` local reading the binder                                    | assumed term | `5`               |
+| `map (GIVEN x YIELD bump x) (LIST 1, 2, 3)`, binder supplied        | assumed term | `LIST 10, 20, 30` |
+| binder read, nothing supplied, no default                           | assumed term | assumed term      |
+| `#EVAL bump 3 WITH \`the rate\` IS 10`(positional then`WITH`)       | parse error  | parse error       |
+
+The last two rows are the ones that had to NOT change.
+
+#### The oracle, and the one regression it caught
+
+Every `.l4` file under `jl4/examples/ok`, `jl4/examples/legal` and
+`jl4-core/libraries` — **334 files** — was run through `l4 run` twice: once on
+the pre-change binary and once on the post-change binary, over one byte-identical
+corpus, and the outputs diffed. The pre-change binary is the `props/refuse`
+worktree at `6f767daf`, whose tree `git diff` reports as identical to `unstable`
+at `b2a3faac`; it has to be that rather than any older build, because a binary
+predating #334 cannot parse `REFUSE` in the current prelude and fails all 334
+files with cascading "could not find a definition" errors (`CLAUDE.md` §3.1).
+
+**Result: 325 of 334 byte-identical; the remaining 9 are clock-dependent.** The
+control that establishes the second half is that the pre-change binary was run
+twice and disagrees _with itself_ on exactly those 9 files and no others —
+`ok/excel-date/serials.l4`, seven `ok/ledger/bitemporal-*` and `record-*` files,
+and `ok/temporal-thunk-leak-basic.l4`, which stamp wall-clock transaction time.
+That set is the one `CLAUDE.md` §3.2.1 already records as clock-dependent.
+
+The oracle caught one real regression, and it is worth stating because the
+shape will recur as the sweep lands. `valueReferenceHazards` originally reported
+**any** bare reference to a definition with declared parameters that reads a
+binder. `ok/section-given-indented.l4:29` is `#CHECK \`tax on\``, and `#CHECK`
+reports the type its argument was *declared* with and never evaluates it
+(`evalDirective (Check \_ \_) = pure []`), so nothing there has to carry the
+discharged parameter. The check now excludes `#CHECK` directives
+(`L4.Discharge.withoutCheckDirectives`); `unreadImplicitSupplies` deliberately
+does not, because naming a binder the callee does not read is a mistake wherever
+it is written. Before the exclusion that file was the _only_ site in the whole
+oracle corpus this check reached — which is exactly why an oracle and not a
+reading of the code is the gate.
+
+Footprint at the time of writing: twelve section-`GIVEN` sites in seven files,
+all added by #333. The blast radius grows when the `ASSUME` sweep
+(`PROPS-REDTEAM-2026-09-03.md` §6 item 7) rewrites term `ASSUME`s into section
+binders, which is why the oracle is the gate and not the test suite alone.
+
+**What to expect when the sweep lands.** Every file it converts gains section
+binders, so `dischargeModule` stops being the identity on it and the two
+whole-module checks start reporting. Three shapes will break, in falling order
+of likely count: a `#CHECK` on a reader is now _safe_ (above); a reader passed
+as a value (`map f xs`) becomes `ImplicitReaderUsedAsValue` and needs a lambda;
+and a rule whose own `GIVEN` repeats a swept name becomes `RestatedSectionBinder`
+and needs the restatement deleted. The last was measured at zero across 607
+files on 2026-09-04 (235 term-role `ASSUME` names against 2,311 function `GIVEN`
+names, no overlap), so it should stay rare. Re-run this oracle after the sweep
+rebases; it is the cheapest way to find the fourth shape nobody predicted.
+
+#### Ruled here
+
+**An implicit that nothing supplies and nothing defaults is an error AT THE
+ROOT, at evaluation, not at check time.** §2.4 says "an implicit that does
+neither is an error at the root naming the binder and the chain of calls that
+needs it"; the shipped diagnostic is the evaluator's, and it names the binder:
+
+```
+I could not continue evaluating, because I needed to know the value of
+  `the rate`
+but it is an assumed term.
+```
+
+Three things decided it. A check-time version needs the read-set, which is a
+whole-module fact, so it would be the same post-check pass as
+`unreadImplicitSupplies` — but it would have to know which roots are exports,
+where §2.10 says nothing may fail, and getting that wrong turns a working corpus
+red. It would also change the answer for every `ASSUME`-shaped file in the
+corpus the moment the sweep rewrites it, which is exactly what the oracle exists
+to prevent. And the existing diagnostic already satisfies the sentence's
+substance. **Owed:** the chain of calls. The message names the binder but not the
+path of definitions that demanded it, which is the part of §2.4 that is not yet
+built.
+
+#### Deferred, each with why
+
+- **Discharge does not cross `IMPORT`.** §2.2 says nothing implicit should, and
+  the pass is per module, so an imported definition keeps the arity its own
+  module gave it. Unreachable today: no file in `jl4/examples`,
+  `jl4-core/libraries` or `doc/` that declares a section binder is `IMPORT`ed by
+  another (measured 2026-09-05), no library declares one, and the sweep's own
+  measurement is that none of its 46 headingless `ASSUME` files is imported
+  either. If it is ever reached the failure is loud — a length mismatch naming
+  the callee — not a wrong value.
+- **The backends still see the undischarged module.** R10 (§11.10) moves DMN,
+  Catala, Docassemble, OpenFisca, Blawx and MLIR onto the discharged AST, keys
+  the export schema by (name, tier), makes defaulted implicits optional and adds
+  `BatchRequest.world`. Keeping them on the module the author wrote is what lets
+  this change land without moving a single backend golden, and lets the sweep's
+  269 rewrites be gated on their own oracle rather than on this one. The one
+  construct they cannot see is an inner `WITH` on a binder, which
+  `L4.Discharge.implicitSupplySites` names so a backend can refuse rather than
+  answer wrongly; wiring that refusal into each backend is part of the same
+  follow-up.
+- **A rule's own defaulted `GIVEN` still cannot be omitted at a named site.**
+  R8's other half. The default lives on the declaration's `GivenSig`, and
+  `supplyAppNamed` sees only the callee's `Fun` type, which carries names and
+  types but not defaults; supplying it needs the callee's `FunTypeSig` threaded
+  to the call site. `TYPICALLY` therefore has two behaviours today, not the one
+  R8 asks for — but they are two, down from three, and `TYPICALLY.md` says which
+  is which.
+- **R5, field-opening, is not built.** §11.7 already sequences it after
+  discharge, and §11.7's own note is that the sample which motivated it was
+  re-cut as fourteen scalars under R10, so what remains is bare field names
+  inside a rule.
+- **R11, `@reads`, and the hover/index surfaces of §2.9 are not built.** They are
+  §6 item 6 with the backends.
+- **A defaulted binder gets no dedicated trace event.** §2.5 asks for one naming
+  the binder, the declaration line and the value. Because the default becomes an
+  ordinary 0-ary definition, the trace records it as a definition force, which
+  is accurate but is not the "alpha took its default 10" line the directive
+  output was supposed to render from.
+- **A rule that reads a binder cannot be passed as a first-class value.**
+  Eta-expanding the reference would need fresh `Unique`s, which this pass
+  deliberately does not mint. Reported by name
+  (`ImplicitReaderUsedAsValue`); the workaround is a lambda, and
+  `ok/section-given-discharge.l4` shows both spellings side by side.
