@@ -116,10 +116,10 @@ bump n MEANS n TIMES `the rate`
 - **A misspelt name is an error**, and stays one: if the name is neither a
   parameter of the callee nor a section binder it reads, the checker says it
   could not find a definition for it.
-- **A definition that reads a section binder cannot be passed as a value.**
-  It takes the binder as an extra input, which a bare mention of its name
-  cannot carry, so `map bump …` is an error and `map (GIVEN x YIELD bump x) …`
-  is the way to write it.
+- **A `WITH` that names a binder the callee reads under two same-spelled
+  binders is an error**, when the name is neither of them. There is no way to
+  tell which was meant; rename one of them, or hoist them to a common section
+  heading if they are one thing.
 - **A rule's own defaulted parameter cannot yet be omitted at a named site.**
   `TYPICALLY` on a _section_ binder is honoured when nobody supplies it (see
   [TYPICALLY](../types/TYPICALLY.md)); on a rule's own `GIVEN` the checker still

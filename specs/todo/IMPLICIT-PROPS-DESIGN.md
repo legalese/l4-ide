@@ -952,7 +952,8 @@ same one: the elaboration has to be identifiable _as_ an elaboration (a marker o
 a `Resolved`-only `Unique` match, which the polymorphic `LayoutPrinterWithName` printer cannot use
 as it stands). This is the shape the sweep will produce wherever a section acquires a binder and
 keeps an overloaded `ASSUME` of the same name, so it wants an owner before item 7.
-### 11.14 Discharge as shipped — 2026-09-05
+
+### 11.16 Discharge as shipped — 2026-09-05
 
 `PROPS-REDTEAM-2026-09-03.md` §6 item 5. What landed, where it lives, what it
 was measured against, and what it deliberately does not do. Written against the
@@ -1020,9 +1021,9 @@ left alone; that is the residual cost §2.3 records, not a second binder.
 **Two whole-module checks that `supplyAppNamed` cannot make**, both from
 `L4.Discharge` and both reported like `Export.validateExportInputs`:
 `unreadImplicitSupplies` (a `WITH` naming a binder the callee does not read —
-without it the override would silently do nothing) and `valueReferenceHazards`
-(a rule that reads a binder, named without being applied — discharge gives it a
-trailing parameter a bare reference cannot carry).
+without it the override would silently do nothing) and
+`ambiguousImplicitSupplies` (a `WITH` naming a binder the callee reads under two
+same-spelled binders, and matching neither — see "Found by review" below).
 
 #### Measured
 
@@ -1059,34 +1060,32 @@ twice and disagrees _with itself_ on exactly those 9 files and no others —
 and `ok/temporal-thunk-leak-basic.l4`, which stamp wall-clock transaction time.
 That set is the one `CLAUDE.md` §3.2.1 already records as clock-dependent.
 
-The oracle caught one real regression, and it is worth stating because the
-shape will recur as the sweep lands. `valueReferenceHazards` originally reported
-**any** bare reference to a definition with declared parameters that reads a
-binder. `ok/section-given-indented.l4:29` is `#CHECK \`tax on\``, and `#CHECK`
-reports the type its argument was *declared* with and never evaluates it
+The oracle caught one real regression on this corpus, and it is worth stating
+because it is the argument for running it at all. `valueReferenceHazards` — a
+check that no longer exists, see "Found by review" — originally reported **any**
+bare reference to a definition with declared parameters that reads a binder.
+`ok/section-given-indented.l4:29` is `#CHECK \`tax on\``, and `#CHECK` reports the
+type its argument was _declared_ with and never evaluates it
 (`evalDirective (Check \_ \_) = pure []`), so nothing there has to carry the
-discharged parameter. The check now excludes `#CHECK` directives
-(`L4.Discharge.withoutCheckDirectives`); `unreadImplicitSupplies` deliberately
-does not, because naming a binder the callee does not read is a mistake wherever
-it is written. Before the exclusion that file was the _only_ site in the whole
-oracle corpus this check reached — which is exactly why an oracle and not a
-reading of the code is the gate.
+discharged parameter. That one line was the _only_ site in the whole 334-file
+corpus the check reached, and it turned a green file red. Eta-expansion has since
+made the check unnecessary altogether, which is the better fix — but the oracle,
+not a reading of the code, is what found it.
 
 Footprint at the time of writing: twelve section-`GIVEN` sites in seven files,
 all added by #333. The blast radius grows when the `ASSUME` sweep
 (`PROPS-REDTEAM-2026-09-03.md` §6 item 7) rewrites term `ASSUME`s into section
 binders, which is why the oracle is the gate and not the test suite alone.
 
-**What to expect when the sweep lands.** Every file it converts gains section
-binders, so `dischargeModule` stops being the identity on it and the two
-whole-module checks start reporting. Three shapes will break, in falling order
-of likely count: a `#CHECK` on a reader is now _safe_ (above); a reader passed
-as a value (`map f xs`) becomes `ImplicitReaderUsedAsValue` and needs a lambda;
-and a rule whose own `GIVEN` repeats a swept name becomes `RestatedSectionBinder`
-and needs the restatement deleted. The last was measured at zero across 607
-files on 2026-09-04 (235 term-role `ASSUME` names against 2,311 function `GIVEN`
-names, no overlap), so it should stay rare. Re-run this oracle after the sweep
-rebases; it is the cheapest way to find the fourth shape nobody predicted.
+**What to expect when the sweep lands — now measured, not predicted.** The same
+differential was run over the sweep's own corpus (`props/assume-sweep` at
+`a1525a89`, 334 files, its libraries pinned): **333 of 334 agree** once the
+review fixes above are in. The one that does not is `regcf-wizard.l4`, and it is
+the cross-`IMPORT` case recorded under "Found by review" — not a shape anyone had
+to guess at. Before those fixes a second file, `legal/british-citizen-act.l4`,
+also went red. Re-run `oracle/sweeprun.sh` after the sweep rebases rather than
+trusting this paragraph; it is the cheapest way to find the shape nobody
+predicted.
 
 #### Ruled here
 
@@ -1111,6 +1110,54 @@ to prevent. And the existing diagnostic already satisfies the sentence's
 substance. **Owed:** the chain of calls. The message names the binder but not the
 path of definitions that demanded it, which is the part of §2.4 that is not yet
 built.
+
+#### Found by review, after the first gate was green
+
+Four things an independent read of this branch turned up. Each is recorded with
+the probe that settles it, because three of the four are invisible until the
+`ASSUME` sweep (§6 item 7) lands and turns 664 `ASSUME` lines into section
+binders.
+
+**R3's "bridge at the call" did not work, and the page taught it.** Two sibling
+sections both declaring `foo`, with `f MEANS g WITH foo IS foo`: the name left
+of `IS` was matched by `Unique`, but `L4.TypeCheck.implicitSupply` resolves it in
+the _caller's_ scope to get its type, so it was the caller's `foo` and never
+matched the callee's. Now matched by **unqualified spelling** against the
+callee's read-set when exactly one binder is so spelled — which is how declared
+parameters were already matched (`lookupOptionallyNamedType` compares raw names),
+so this removes an inconsistency rather than adding a rule. Safe by construction:
+the spelling case can only fire where the `Unique` case failed, and such a supply
+is an error today, so it can turn an error into a working program and can never
+change an answer a working program already gives. Two same-spelled binders in one
+read-set is `AmbiguousImplicitSupply`, a new error, rather than a guess.
+`ok/section-given-bridge.l4` and `not-ok/tc/section-given-ambiguous-supply.l4`.
+
+**A reader passed as a value was a check error.** See the deferrals below; it is
+now built, and it was a real regression on the sweep's corpus, not a nicety.
+
+**The `TYPICALLY` call-graph edge is gone.** `readSets` used to add each binder's
+default as an edge keyed by the binder's own `Unique`. A default is literal-only
+so the edge is always empty, but if that restriction is ever lifted the edge
+makes `rewriteCall` rewrite every reference to that binder — including the
+value-bound parameter references inside readers — into an application. **R8 rule
+3 ("Closure") is therefore DEFERRED, not implemented**, with the literal
+restriction as its guard. The earlier wording here, that it "holds by
+construction", was a sharpening past the evidence actually gathered.
+
+**Crossing an `IMPORT` is now reachable, and it is the one thing that must be
+decided before this and the sweep both land.** Measured on the sweep tree
+(`a1525a89`): exactly one module declares a section binder _and_ is imported by
+another — `jl4/examples/legal/regcf/regcf.l4:468`, imported by
+`regcf-wizard.l4`. The importer is not discharged (it declares no binder of its
+own), so its calls into `regcf`'s now-discharged definitions pass too few
+arguments and every directive dies with `given signatures' values' lengths do not
+match`. On the pre-sweep corpus this is unreachable; on the post-sweep corpus it
+is one file, and it is the only file in 334 that the differential still flags.
+Four other modules matched a crude `^ +GIVEN` grep and were checked by hand: all
+four are `WHERE` locals or lambda parameters, not section binders. Closing this
+properly needs the importer's pass to see the imported module's read-sets, which
+is §2.2's "discharge happens at the module boundary" and is not in this release;
+the cheap resolution is for the sweep to leave `regcf.l4`'s term `ASSUME`s alone.
 
 #### Deferred, each with why
 
@@ -1139,6 +1186,17 @@ built.
   to the call site. `TYPICALLY` therefore has two behaviours today, not the one
   R8 asks for — but they are two, down from three, and `TYPICALLY.md` says which
   is which.
+- **The read-set subtraction rule of §2.2/§2.4 is not implemented.** Supplying a
+  binder at a call is specified to remove it from the caller's read-set along
+  that path; `readSets` is the plain transitive closure, so
+  `h MEANS alpha PLUS (g WITH beta IS 100)` still takes `beta` as a trailing
+  parameter of its own. The answer is right today because evaluation is lazy and
+  nothing forces it (`ok/section-given-across-sections.l4` gives 201), but the
+  arity is over-approximated — and once the export schema is keyed off the
+  discharged AST in R10, `beta` would be listed as required for `h`. Fixing it
+  means making `readSets` a per-call-site fixpoint, which is a change to the
+  shape of the pass and wants its own measurement of what it costs on the
+  corpus.
 - **R5, field-opening, is not built.** §11.7 already sequences it after
   discharge, and §11.7's own note is that the sample which motivated it was
   re-cut as fourteen scalars under R10, so what remains is bare field names
@@ -1150,8 +1208,11 @@ built.
   ordinary 0-ary definition, the trace records it as a definition force, which
   is accurate but is not the "alpha took its default 10" line the directive
   output was supposed to render from.
-- **A rule that reads a binder cannot be passed as a first-class value.**
-  Eta-expanding the reference would need fresh `Unique`s, which this pass
-  deliberately does not mint. Reported by name
-  (`ImplicitReaderUsedAsValue`); the workaround is a lambda, and
-  `ok/section-given-discharge.l4` shows both spellings side by side.
+- ~~A rule that reads a binder cannot be passed as a first-class value.~~
+  **Built after review.** The pass now eta-expands a bare reference to a reader
+  with parameters of its own, minting `Unique`s with the sort char `'d'` (no
+  other minter uses it). This was not cosmetic: measured on the `ASSUME` sweep's
+  tree, `legal/british-citizen-act.l4:152` passes the 1-ary reader
+  `` `is a British citizen (variant)` `` to a higher-order rule and lost both its
+  `#EVAL`s without it. `ok/section-given-reader-as-value.l4` pins both spellings.
+  `ImplicitReaderUsedAsValue` and its corpus file are gone with it.
