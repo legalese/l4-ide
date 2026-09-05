@@ -457,11 +457,11 @@ rulings are closed; what remains is implementation in the order of `PROPS-REDTEA
 
 **Ruling (Meng, 2026-09-04): `ASSUME` is deprecated.** Its three jobs go to three destinations:
 
-| job                                | destination                                                                  | status                    |
-| ---------------------------------- | ---------------------------------------------------------------------------- | ------------------------- |
-| suppliable term (the ~550 uses)    | a section-level `GIVEN` discharged by the compiler into ordinary parameters  | mechanism pending (R1–R5) |
-| uninterpreted type (`… IS A TYPE`) | an empty `DECLARE T`, which already parses (`ok/set-operators-nested.l4:36`) | available today           |
-| refusal / typed bottom             | `REFUSE "…"`, uncatchable, boundary-only, in no schema                       | spec pending (R7)         |
+| job                                | destination                                                                 | status                    |
+| ---------------------------------- | --------------------------------------------------------------------------- | ------------------------- |
+| suppliable term (the ~550 uses)    | a section-level `GIVEN` discharged by the compiler into ordinary parameters | mechanism pending (R1–R5) |
+| uninterpreted type (`… IS A TYPE`) | a bodiless `DECLARE T`, an opaque nominal type (§11.1.1)                    | built 2026-09-05          |
+| refusal / typed bottom             | `REFUSE "…"`, uncatchable, boundary-only, in no schema                      | spec pending (R7)         |
 
 **What decided it.** Not the design argument but the defect list. Of the eight proposal-independent
 bugs found by the 2026-09-03/04 red teams (`PROPS-REDTEAM-2026-09-03.md` §7), five are
@@ -477,6 +477,70 @@ collapse into the read-set pass plus ordinary parameters.
 **Cost committed to.** 664 `ASSUME` lines in 105 files (legal 54, ok 97, not-ok 20, experiments 418,
 doc 71, libraries 2, tests-cli 2), of which 113 are type-role; most are scriptable
 (`PROPS-REDTEAM-2026-09-03.md` §6 gives the per-role recipe).
+
+#### 11.1.1 The type role: a bodiless `DECLARE T` is an opaque type. RULED 2026-09-05.
+
+**Correction first.** The table row above, and `PROPS-REDTEAM-2026-09-03.md` §1 and §6, said an
+empty `DECLARE T` "already parses" and cited `ok/set-operators-nested.l4:36` and
+`ok/consider-simple.l4:3`. **That was false.** Both citations are ordinary declarations whose body
+sits on the _next_ line (`DECLARE Team` / `HAS members IS A SET OF STRING`;
+`DECLARE TwoNumbers` / `IS ONE OF …`). Probed 2026-09-05 on the `unstable` binary, a genuinely
+bodiless `DECLARE T` was a parse error in every position:
+`unexpected GIVEN|DECLARE|§|end of input, expecting AKA, HAS, IS, OF`. The row's status
+"available today" was wrong, and the migration recipe built on it would not have run.
+
+**Ruling (Meng, 2026-09-05), verbatim: "Bodiless DECLARE T should parse similar to Haskell
+`data T` as opaque type."**
+
+**What shipped.** A fourth `TypeDecl` constructor, `OpaqueDecl`, and a parser alternative tried
+last in `typeDecl` that consumes no input. `inferTypeName` gives it the very same entity
+`scanTyDeclAssume` gives `ASSUME T IS A TYPE` — a `KnownType` with no expansion and no
+constructors — so the two spellings are interchangeable and a file migrates one line at a time.
+Parameterised heads (`DECLARE T x`, with or without an explicit `GIVEN x IS A TYPE`) are in scope
+and work, matching `ASSUME T x IS A TYPE` at `ok/signatures.l4:13`.
+
+**The measurement that mattered.** Because the new alternative always succeeds, the risk was that
+a malformed `DECLARE` would silently parse as opaque instead of reporting its error. An
+eight-case differential against the pre-change binary (2026-09-05) found no such regression: the
+only inputs whose verdict changed are the three that are the new feature (`DECLARE Foo` followed
+by another declaration; `DECLARE Foo AKA Bar`; `GIVEN x IS A TYPE` + `DECLARE Box x`). `DECLARE
+Foo IS` and a bare `DECLARE` still error identically, because the body parsers consume their
+leading keyword before failing and megaparsec does not backtrack over it. Two inputs
+(`DECLARE Foo IS ONE OF` and `DECLARE Foo` + bare `HAS`) were accepted by _both_ binaries: an
+empty constructor list is pre-existing behaviour, not a consequence of this change.
+
+**Correction to the paragraph above, measured on the rebased tree 2026-09-05.** That paragraph
+also claimed "a typo'd body keyword still errors identically". **Too broad, and the eight cases
+did not cover the one that matters.** A typo'd body keyword on an _indented continuation line_
+(`DECLARE Foo` / `  HSA` / `    x IS A NUMBER`) does still error, and so does a truncated body
+(`DECLARE Foo HAS x IS A`); but a typo on the _head line_ does not, because it is absorbed as a
+type parameter. `DECLARE Foo IZ NUMBER` went from one error on the pre-change binary to zero:
+`DECLARE Bag x` and `DECLARE Foo IZ NUMBER` are the same shape, so no rule at the declaration can
+separate a parameterised opaque head from a misspelt `IS`. This is inherent to the ruling, not a
+defect in the implementation of it. **The mistake is still caught, one step later and under a
+different name**: arity is enforced at use sites, so `GIVEN a IS A Foo` reports "The arities of
+the types do not match. I expected 2 arguments, but I found 0." The residual hole is a misspelt
+declaration that nothing uses, which reports nothing. Pinned by the exhibit
+`not-ok/tc/opaque-head-absorbs-typo.l4` and stated as a limit in `doc/reference/types/DECLARE.md`.
+(A related probe, `DECLARE Foo HSA x IS A NUMBER`, is accepted by _both_ binaries — head
+`Foo HSA x`, synonym body `IS A NUMBER` — so it is pre-existing, like the two inputs above.)
+
+**What review changed.** The first draft of the corpus exhibit `ok/opaque-declare.l4` carried an
+`#EVAL` over identifiers that were never declared, which would have failed the `ok/**` glob. It
+was rebuilt around the real limit instead: an opaque type has no constructors, so no expression in
+a module can produce one of its values. The exhibit now evaluates a rule that carries opaque
+values through a record without inspecting them (`TRUE`/`FALSE`), and states in a comment that
+values arrive from outside.
+
+**Deferred, measured.** 16 of the 25 type-role uses in `jl4/examples` were migrated. Nine were
+kept deliberately, because their purpose is to exercise the `ASSUME` spelling, which is deprecated
+but not removed: `lsp/semantic-tokens/assume.l4` (2, the token fixture for the keyword),
+`relational/assumed.l4` (3) and `relational/not-ok/assumed-signatures.l4` (1) and
+`blawx/not-ok/arity-two.l4` (1), whose headers explain why they are written as `ASSUME`,
+`ok/signatures.l4` (1, every declaration in the file is an `ASSUME` signature), and
+`not-ok/tc/typically-on-type.l4` (1, which pins the error for `TYPICALLY` on a type `ASSUME`; the
+opaque spelling has no `TYPICALLY` form, so there is no analogue to move it to). The 88 uses in
+`jl4/experiments` are out of scope for the same reason the sweep leaves that tree alone.
 
 **Sequencing.** (1) the transitive read-set pass, in progress on `fix/export-transitive-readset`,
 which is both a bug fix and step one of discharge; (2) the mechanism rulings R1–R3 and R7;
