@@ -33,6 +33,16 @@ type ScopeMap     = RangeMap (Environment, EntityInfo)
 type NlgMap       = RangeMap Nlg
 type DescMap      = RangeMap Text
 
+-- | For each defined 'Unique', the section stack (module root down to the
+-- innermost enclosing section) at the point it was registered; absence means
+-- top level. See the 'sectionPaths' field of 'CheckState'.
+--
+-- A 'Unique' embeds its defining module ('MkUnique'), so the maps of two
+-- modules have disjoint key sets and 'Map.union' across an import boundary
+-- cannot collide. That is what lets an importer carry its dependencies' paths
+-- beside its own — see 'L4.Import.Resolution.combineResolvedImports'.
+type SectionPaths = Map Unique [NonEmpty Text]
+
 -- | Note that 'KnownType' does not imply this is a new generative type on its own,
 -- because it includes type synonyms now. For type synonyms primarily, we also store
 -- the arguments, so that we can properly substitute when instantiated.
@@ -61,12 +71,20 @@ data CheckState =
       -- ^ Bodies of top-level nullary @DECIDE@/@MEANS@ constants, captured as
       -- they are checked. Used by the rung-3 value-level actor-agreement check
       -- to recover an action constant's actor field from its definition.
-    , sectionPaths :: !(Map Unique [NonEmpty Text])
+    , sectionPaths :: !SectionPaths
     -- ^ For each defined 'Unique', the section stack (path from the module root
     -- down to the innermost enclosing section) at the point it was registered.
     -- Absence means the binding is top-level (empty section path). Used by
     -- 'resolveTerm'' and 'resolveType' to prefer the nearest enclosing section
     -- when resolving unqualified names (lexical scoping / shadowing).
+    --
+    -- Seeded, before this module is checked, with the paths of every binding
+    -- reachable through its imports, so an imported name can be named under the
+    -- section that defines it. Those entries are read by 'sectionQualified'
+    -- (diagnostics) ONLY: both proximity readers, 'ancestorProximity' and
+    -- 'selectByProximity', test the candidate's module URI before they consult
+    -- this map, so an imported 'Unique' never reaches the lookup and cross-module
+    -- candidates stay co-equal for overload resolution (spec §5.5, FIX C).
     , deferredChoices :: !Int
     -- ^ How many times THIS branch of the nondeterministic search resolved a
     -- name to a not-yet-inferred binding off the reference's section ancestry
@@ -641,6 +659,13 @@ data CheckResult =
     , descMap        :: !DescMap
     , mixfixRegistry :: !MixfixRegistry
     -- ^ Registry of mixfix functions from this module (to be propagated to importers)
+    , sectionPaths   :: !SectionPaths
+    -- ^ Where every binding this module can see was defined, section-wise: its
+    -- own bindings and, transitively, those of everything it imports. Carried
+    -- across the import boundary so that an importer can name an imported
+    -- binding under the section that defines it — today in ambiguity
+    -- diagnostics, which otherwise offer the reader an option spelled exactly
+    -- like the ambiguous name. See 'SectionPaths'.
     }
 
 -- -------------------
