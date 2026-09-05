@@ -68,8 +68,8 @@
 -- EXPORT ORDER IS AUTHORING: the interview's goal is the FIRST `@export`, so
 -- provision (1)–(2) comes first.
 
-ASSUME Person IS A TYPE
-ASSUME Premises IS A TYPE
+DECLARE Person
+DECLARE Premises
 
 -- Provision (1)-(2)
 --

@@ -8,21 +8,21 @@
 --      in the locality, and
 --   b. the conduct is unreasonable.
 
-ASSUME Person IS A TYPE
+DECLARE Person
 ASSUME `is authorised`  IS A FUNCTION FROM Person TO BOOLEAN
 
-ASSUME Receiver IS A TYPE
+DECLARE Receiver
 ASSUME `is an individual aged 16 or over` IS A FUNCTION FROM Receiver TO BOOLEAN
 ASSUME `is a body` IS A FUNCTION FROM Receiver TO BOOLEAN
 
-ASSUME Effect IS A TYPE
-ASSUME EffectTarget IS A TYPE
+DECLARE Effect
+DECLARE EffectTarget
 
 ASSUME `is detrimental` IS A FUNCTION FROM Effect TO BOOLEAN
 ASSUME `is of a persistent or continuing nature` IS A FUNCTION FROM Effect TO BOOLEAN
 ASSUME `affects the quality of life of those in the locality` IS A FUNCTION FROM Effect TO BOOLEAN
 
-ASSUME Conduct IS A TYPE
+DECLARE Conduct
 ASSUME conduct IS A FUNCTION FROM Receiver TO Conduct
 ASSUME effect IS A FUNCTION FROM Conduct TO Effect
 ASSUME `is unreasonable` IS A FUNCTION FROM Conduct TO BOOLEAN
