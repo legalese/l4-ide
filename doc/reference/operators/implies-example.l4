@@ -18,9 +18,11 @@
 GIVEN a IS A BOOLEAN
       b IS A BOOLEAN
 
--- These are logically equivalent
+-- These are logically equivalent.
+-- NOTE the brackets around the NOT: without them the NOT would reach over
+-- the OR as well, giving NOT (a OR b), which is a different rule entirely.
 impliesVersion a b MEANS a IMPLIES b
-orVersion a b MEANS NOT a OR b
+orVersion a b MEANS (NOT a) OR b
 
 -- Test equivalence
 #EVAL impliesVersion TRUE TRUE

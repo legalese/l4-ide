@@ -35,20 +35,35 @@ hasAccess isAdmin isRestricted MEANS isAdmin OR NOT isRestricted
 #EVAL hasAccess FALSE FALSE
 #EVAL hasAccess FALSE TRUE
 
--- Negating Compound Expressions
+-- How Far NOT Reaches
 
 GIVEN a IS A BOOLEAN, b IS A BOOLEAN
 
--- NOT binds tighter than AND
-notAThenB a b MEANS NOT a AND b
+-- NOT reaches forward over the AND, so this is the WIDE reading:
+-- it means NOT (a AND b), even though it reads like "not-a, and b".
+wideByDefault a b MEANS NOT a AND b -- NOT-REACH-OK: the wide reading is the point
 
--- Use parentheses to negate compound expression
+-- Spelling the wide reading out. Same rule as wideByDefault.
 notBoth a b MEANS NOT (a AND b)
 
-#EVAL notAThenB TRUE TRUE
-#EVAL notAThenB FALSE TRUE
+-- Brackets around the OPERAND do NOT narrow it -- still NOT (a AND b).
+looksCareful a b MEANS NOT (a) AND b -- NOT-REACH-OK: shows the bracket trap
+
+-- Brackets around the NOT itself DO narrow it. This is (NOT a) AND b.
+narrowedProperly a b MEANS (NOT a) AND b
+
+-- The first three are all the same rule. The fourth is the one you probably
+-- meant. With a = FALSE and b = FALSE the first three give TRUE and the
+-- fourth gives FALSE; with a = TRUE and b = TRUE all four agree on FALSE.
+#EVAL wideByDefault FALSE FALSE
+#EVAL notBoth FALSE FALSE
+#EVAL looksCareful FALSE FALSE
+#EVAL narrowedProperly FALSE FALSE
+
+#EVAL wideByDefault TRUE TRUE
 #EVAL notBoth TRUE TRUE
-#EVAL notBoth FALSE TRUE
+#EVAL looksCareful TRUE TRUE
+#EVAL narrowedProperly TRUE TRUE
 
 -- NOT with Comparisons
 
