@@ -243,6 +243,23 @@ jobs:
       - name: Every subject's declared legs are exercised by CI
         run: node etc/check-subject-ci-coverage.mjs
 
+      # Same lane, same reasoning: a word we coined and then retired can be put
+      # back by a PR touching any page at all, so no `paths:` filter could be
+      # right about which PRs need checking. Measured: on 2026-09-05 #336
+      # removed the word from `doc/reference/syntax/section-given.md`, and #338
+      # put it back into that same page five times hours later -- in a PR whose
+      # filter would never have suggested a docs review. Node-only, 0.06 s over
+      # 141 files, no build.
+      #
+      # The selftest runs FIRST, and it is the reason to trust the sweep at
+      # all. It lives inside the script rather than in a committed fixture
+      # because a page full of deliberately-retired words would fail the very
+      # sweep it exists to validate.
+      - name: The retired-terms checker still detects what it claims to
+        run: node etc/check-retired-terms.mjs --selftest
+      - name: No retired vocabulary in user-facing prose
+        run: node etc/check-retired-terms.mjs --dir doc
+
   # ============================================
   # Repo-wide invariants: unfiltered, no build
   # ============================================

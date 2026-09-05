@@ -286,3 +286,49 @@ Nothing mechanical will tell you this rule was skipped.
 > The trap is that the work felt heavily documented, because it was — in `specs/`, which had grown
 > past a hundred files, none of them addressed to a user. Volume of developer-facing writing is
 > what made the user-facing hole invisible.
+
+---
+
+## 7. Retired vocabulary
+
+L4's user-facing text is written for a **non-technical first-time critical thinker**. Most of that
+is judgement. One part of it is not: a few words are ones **we coined and then retired**, and for
+those, any occurrence in user-facing prose is a defect rather than a style preference.
+
+**The list, with the date each was retired.** It is short on purpose.
+
+| word       | retired    | say instead                                                                         |
+| ---------- | ---------- | ----------------------------------------------------------------------------------- |
+| **binder** | 2026-09-05 | "section `GIVEN`" or "rule `GIVEN`" for the construct; "input" for what it supplies |
+
+**Quoting is not using.** A page that documents an error message has to show it, and a page that
+teaches a construct has to spell it. Fenced blocks, inline code spans and link targets are
+therefore exempt, and `etc/check-retired-terms.mjs` blanks them before it looks. Where prose must
+name a retired word outside those, put `<!-- RETIRED-TERM-OK: reason -->` on the line; the marker
+is honoured only where there was a finding to suppress, and every use is printed so they stay
+countable.
+
+**But quoting couples the page to the wording.** A verbatim screen is only correct while the binary
+still prints it, and nothing mechanical compares the two — `doc/test-docs.sh` checks links and
+type-checks `.l4` files and has no opinion about the text inside a fence. So **whoever changes a
+diagnostic owns every page that quotes it, in the same PR.**
+
+**Adding a word here needs a ruling, not a preference.** Cite the date and the document. The
+distinction that makes this list checkable by plain search is that a retired term is suspect
+_everywhere_, and a merely discouraged one is not. Measured over `doc/`, with the checker's own
+stripping, on `props/discharge` @ `3625b533`: `binder` 9 lines, `parameter` 140 lines across 49
+files. A list that admitted the second word could only ever be advisory; this one can gate CI.
+`discharge` and `assumed term` are current, in-use terms. `read-set`, `elaboration` and
+`section binder` have no retiring ruling to cite, so they are not here.
+
+> **Why.** On 2026-09-05 the word was removed from `doc/reference/syntax/section-given.md` by
+> #336 and put back into that same page **five times within hours** by #338, while everyone
+> involved believed the ruling was being followed. Nothing caught it, and no `paths:` filter could
+> have: the PR that reintroduced it was not a docs PR.
+>
+> The second half of the incident is the coupling. The same ruling had been enforced on every page
+> a reviewer could reach and **ratified** on the text those pages quote, because quoted tool output
+> is exempt — so the compiler went on saying the retired word, and the pages went on glossing it as
+> "L4's own wording". When the diagnostics were finally re-voiced, four quoted screens and four
+> glosses across four pages became false at once, silently. They were repaired in the same PR that
+> re-voiced the messages. That is the rule above, and it is why it is a rule.
