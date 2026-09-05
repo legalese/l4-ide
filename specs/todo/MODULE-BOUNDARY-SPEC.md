@@ -330,7 +330,7 @@ implementation must state its answer here and be checked against all four
 **R3 (ruling). The implicit prelude is not built on this evidence.** 18 files is a migration,
 the brief asked for none, and the opt-out needs grammar surface. §5.4 records the one rule that
 would remove the migration entirely, so the next attempt need not rediscover it. What ships
-instead is the correction described in §5.5 — because the cost of _not_ deciding was that the
+instead is the correction in §5.5 — because the cost of _not_ deciding was that the
 documentation had already promised the feature.
 
 ### 5.4 The design that would make it free, and why it is still not built tonight
@@ -408,6 +408,20 @@ it unchanged at the rebase.
 If the implicit prelude is later built, that correction is what gets reverted — deliberately,
 in the PR that makes it true again, and not before. A doc that promises a feature is not a
 cheaper way of shipping it.
+
+### 5.6 One more reason R3 holds: the shadow warning is gated on the dev regime
+
+`specs/todo/LIBRARY-RESOLUTION-SHADOW-SPEC.md` emits its candidate-order line and its Option E
+shadow warning **only when `JL4_LIBRARY_PATH` is unset**, deliberately — with the variable set
+the operator has taken explicit control, and the golden suites pin it so their captured logs
+stay machine-independent.
+
+Today 283 files opt into prelude resolution by writing `IMPORT prelude`. Make it implicit and
+all 894 do, silently. The repo `CLAUDE.md` §3.1 records the failure that then becomes reachable
+from every file rather than from the ones that asked: a `JL4_LIBRARY_PATH` pinned at a prelude
+newer than the binary does not report a version mismatch, it produces cascading "could not find
+a definition" errors for `setFromList`, `UNION` and every other prelude name — which reads as a
+broken spec. A file that never mentioned the prelude should not be able to fail that way.
 
 ## 6. Open
 
