@@ -464,7 +464,7 @@ projection *cannot* say. What follows is the summary.
 | Target     | Artifact                                                                      | Status                                                       |
 | ---------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | **Ladder** | `figures/*.{svg,txt,mmd,sentences}`, 7 decisions × 4 carriers                  | works; 1 of 7 too wide for a page untrimmed — see `figures/README.md` |
-| **DMN**    | `../../dmn/expected/regcf-corpus.{dmn,dmn.md,fidelity.txt,md.fidelity.txt}`    | emits, validates, **executes 1540/1540 over 22 cases on both engines** — see below |
+| **DMN**    | `../../dmn/expected/regcf-corpus.{dmn,dmn.md,fidelity.txt,md.fidelity.txt}`    | emits, validates, **executes 1610/1610 over 23 cases on both engines** — see below |
 | **BPMN**   | `../../bpmn/expected/regcf-{reporting,advertising,resale}.{bpmn,fidelity.txt}` | cut from this file, three rules, three processes              |
 
 Every BPMN golden, and the DMN **markdown** golden, reproduces byte for byte from a bare
@@ -481,13 +481,15 @@ from this file's own outermost `§` heading.
 this file succeeds, the XML parses under `dmn-moddle` with **zero warnings**, and —
 since R12 dropped the law-time-rebinding scenarios and R13 lowered the deontic
 reporting spine to a verdict decision table — **both engines evaluate it end to end**,
-over the 22 cases in `../../dmn/regcf-corpus.cases.json` (the base world, 15 dated
+over the 23 cases in `../../dmn/regcf-corpus.cases.json` (the base world, 15 dated
 relocation cases carrying the dropped rule-date fixtures' truths — ruling R-C, spec
 §15.12.1 — 4 seed cases added 2026-08-03, the leap case added 2026-08-05, and the
 escheat case added 2026-08-09):
-KIE 8.44.0.Final answers 1540/1540 decisions with 1540/1540 values as expected (plus
-330/330 decision-service output values), and Camunda 8.7.6 (zeebe-dmn) parses it and
-answers 1540/1540. An earlier revision of this section — "102 decisions, 11 tables, and a model no
+KIE 8.44.0.Final answers 1610/1610 decisions with 1610/1610 values as expected (plus
+345/345 decision-service output values), and Camunda 8.7.6 (zeebe-dmn) parses it and
+answers 1610/1610. The counts moved from 22/1540/330 on 2026-09-05, when ruling D1
+added the pre-commencement case — the first here to ask a rule date below the
+2016-05-16 commencement, and the first to supply neither refusal. An earlier revision of this section — "102 decisions, 11 tables, and a model no
 engine can bind" — described the pre-BKM, pre-R12/R13 artifact; that model no longer
 ships.
 
