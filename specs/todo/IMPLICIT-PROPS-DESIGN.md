@@ -943,9 +943,17 @@ becomes a declared absence.
    `regcf-denovo.l4` `:211` → `:226 :232 :240 :246 :252 :258 :264` (7); `gst-rate.l4` `:65` →
    `:79 :92` (2); `ymd-dates.l4` `:86` → `:92` (1); five `dated-chain-*` fixtures, one arm each
    (5); canon `sg-csp.l4` `:79` → `:88` (1). **8+7+2+1+5+1 = 24.** A sixth `dated-chain` fixture,
-   `dated-chain-regulative.l4`, carries no floor declaration and is not in the count. The
+   `dated-chain-regulative.l4`, carries no floor declaration and is not in the count.
+
+   **The trap that has now moved this count three times: `regcf-denovo.l4` grep-matches EIGHT
+   times outside its declaration, but only SEVEN are arms.** The eighth, at `:3035`, is **inside a
+   comment** — ``-- ASSUME `no encoding of Part 227 exists for rule dates before 2022-09-20`,``
+   — part of a prose paragraph explaining what the encoding floor costs at the API boundary. A
+   plain `grep -c` over that file returns 8 and is wrong by one. Any recount must drop lines whose
+   first non-space characters are `--`; that is how the enumeration above was taken. The
    load-bearing half is unaffected either way: **all ten declarations are `NUMBER`-typed**, which
    is the measurement the ruling turns on.
+
 3. The card said **"0 sites in canon — canon has no pre-commencement bottom."** It has one:
    `subjects/sg/child-support/encodings/legalese/sg-csp.l4:79`,
    ``ASSUME `no Baby Bonus Cash Gift rate is encoded for a birth before 2015-01-01` IS A NUMBER``,
