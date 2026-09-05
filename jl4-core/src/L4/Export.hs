@@ -13,6 +13,7 @@ module L4.Export (
   buildTypeDescMap,
   assumesFromModule,
   assumesReadBy,
+  collectReferencedUniques,
   decideBodiesFromModule,
   transitiveReferencedUniques,
   transitiveReferencedUniquesWith,

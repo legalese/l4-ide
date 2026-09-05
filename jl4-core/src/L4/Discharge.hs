@@ -68,7 +68,7 @@ import qualified Base.Map as Map
 import qualified Base.Text as Text
 import qualified Data.Set as Set
 import L4.Annotation (emptyAnno)
-import L4.Export (decideBodiesFromModule, transitiveReferencedUniquesWith)
+import L4.Export (collectReferencedUniques, decideBodiesFromModule)
 import L4.Syntax
 import qualified Optics
 
@@ -106,40 +106,99 @@ sectionBinders (MkModule _ _ sect) =
     ]
 
 -- | The read-set of every module-level definition: the section binders it
--- names, plus those named by anything it reaches through the call graph.
+-- names, plus those named by anything it reaches through the call graph —
+-- less whatever a call site supplies (§2.2's subtraction rule).
 --
--- Cycle-safe, because 'transitiveReferencedUniquesWith' is: a recursive group
--- is discharged as a block, every member carrying the union.
+-- > R(f) = reads(f) ∪ ⋃ { R(g) \ supplied(f → g) | g called from f }
+--
+-- A @WITH@ that pins a binder at a call takes that binder off the caller's
+-- requirement along that path: @h MEANS alpha PLUS (g WITH beta IS 100)@ reads
+-- @alpha@ and nothing else, and a root that evaluates @h@ is not asked for
+-- @beta@. Without the subtraction every caller would carry a dead trailing
+-- parameter for every binder it pins, and the export schema would list it as
+-- required.
+--
+-- Computed as a fixpoint over the whole call graph, so a recursive group is
+-- discharged as a block, every member carrying the union. The iteration is
+-- capped at one round per definition plus one: the sets only ever grow, so the
+-- cap is never reached in practice, and it guarantees termination should the
+-- spelling half of 'suppliesBinder' ever flip a match.
+--
+-- A binder's @TYPICALLY@ default is deliberately NOT an edge here. A default
+-- is literal-only today ('L4.TypeCheck.checkTypically'), so it reads nothing;
+-- and when that restriction is lifted (R8 rule 3) a default that reads another
+-- binder must be reached through the ROOT's supply, which is a different
+-- mechanism from a reader's parameter — adding the edge here would turn every
+-- reference to the defaulted binder, including a reader's own value-bound
+-- parameter, into an application.
 readSets :: Module Resolved -> Map.Map Unique Binder -> Map.Map Unique [Binder]
 readSets mod' binders
   | Map.null binders = Map.empty
   | otherwise =
-      Map.mapMaybe (nonEmptyRead . readSetOf) bodies
+      Map.mapMaybe nonEmptyRead (iterateToFixpoint (Map.size bodies + 1) step direct)
  where
-  -- ONLY definition bodies. A binder's TYPICALLY default is deliberately NOT an
-  -- edge of this graph, which makes R8 rule 3 ("Closure" -- a default's own
-  -- read-set joins the requirement of every root that may use it) DEFERRED, not
-  -- implemented.
-  --
-  -- Its guard is that a default is literal-only, so it can read nothing: probed
-  -- 2026-09-05, the grammar rejects an operator after TYPICALLY and a dedicated
-  -- check rejects a bare identifier ("the TYPICALLY value ... must be a literal:
-  -- a number, a string, or a nullary constructor"). Adding the edge anyway is
-  -- worse than leaving it out, because it keys an entry in the result by a
-  -- BINDER's own Unique -- and 'dischargeModule' gives a default's elaborated
-  -- definition no trailing parameters, while 'rewriteCall' would then rewrite
-  -- every reference to that binder, including the value-bound parameter
-  -- references inside readers, into an application. If the literal restriction
-  -- is ever lifted, supply-through-defaults has to be built deliberately.
   bodies = decideBodiesFromModule mod'
+
+  -- Per definition: the binders its body names, and the definitions it calls
+  -- together with what each call supplies by name.
+  direct = Map.map directReads bodies
+  edges  = Map.map callEdges bodies
+
+  directReads body =
+    [ b | u <- Set.toList (collectReferencedUniques body), Just b <- [Map.lookup u binders] ]
+
+  -- One edge per CALL SITE, because what a site supplies is the site's own:
+  -- a definition called once with @WITH beta IS …@ and once positionally in
+  -- the same body contributes its full read-set through the second call.
+  -- 'collectReferencedUniques' cannot be used for this half; it merges the
+  -- sites of one callee, and the merged edge would re-add what a @WITH@ took
+  -- off.
+  callEdges body =
+    [ (getUnique g, [ r | (i, MkNamedExpr _ r _) <- zip order nes, i < 0 ])
+    | AppNamed _ g nes (Just order) <- subExprs body
+    , Map.member (getUnique g) bodies
+    ]
+    <> [ (getUnique h, [])
+       | e <- subExprs body
+       , h <- case e of
+           App _ h _  -> [h]
+           Var _ h    -> [h]
+           Proj _ _ f -> [f]
+           _          -> []
+       , Map.member (getUnique h) bodies
+       ]
+
+  step current =
+    Map.mapWithKey
+      (\ u own ->
+         canonicalise
+           (own <> concat
+              [ [ b | b <- reached, not (any (\ r -> suppliesBinder reached r b) supplied) ]
+              | (g, supplied) <- Map.findWithDefault [] u edges
+              , let reached = Map.findWithDefault [] g current
+              ]))
+      current
+
+  iterateToFixpoint :: Int -> (Map.Map Unique [Binder] -> Map.Map Unique [Binder]) -> Map.Map Unique [Binder] -> Map.Map Unique [Binder]
+  iterateToFixpoint fuel f x
+    | fuel <= 0 = x
+    | otherwise =
+        let x' = f x
+        in if sameSets x x' then x' else iterateToFixpoint (fuel - 1) f x'
+
+  sameSets a b =
+    Map.keys a == Map.keys b
+      && and (zipWith (\ xs ys -> map key xs == map key ys) (Map.elems a) (Map.elems b))
+  key b = getUnique b.resolved
+
   nonEmptyRead [] = Nothing
   nonEmptyRead bs = Just bs
-  readSetOf body =
-    canonicalise (transitiveReferencedUniquesWith bodies body)
 
-  canonicalise us =
-    sortOn (.position)
-      [ b | u <- Set.toList us, Just b <- [Map.lookup u binders] ]
+  -- Declaration order, once each.
+  canonicalise bs =
+    Map.elems (Map.fromList [ (b.position, b) | b <- bs ])
+
+  subExprs = Optics.toListOf (Optics.cosmosOf (Optics.gplate @(Expr Resolved)))
 
 -- | Discharge a checked module.
 --
