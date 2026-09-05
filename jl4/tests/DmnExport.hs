@@ -3903,6 +3903,7 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
           }
         decNode nm krs body = NodeDecision MkDecision
           { dcnId = "decision_" <> nm, dcnName = nm, dcnFeelName = nm
+          , dcnDescription = Nothing
           , dcnDecide = Nothing
           , dcnType = DmnNumber, dcnLogic = body
           , dcnRequirements = [], dcnKnowledgeReqs = krs
@@ -4103,6 +4104,22 @@ goldenSubjects =
   , ( "dmn" </> "ymd-dates.l4"
     , "ymd-dates"
     , "the date-literal exhibit"
+    )
+    -- The REFUSAL exhibit (ruling D1, 2026-09-05; IMPLICIT-PROPS-DESIGN §11.9.1).
+    -- One of each position a `REFUSE` can occupy — a whole body (a boxed
+    -- literalExpression), the floor arm of a law-time chain, an inline
+    -- `OTHERWISE`, an enum-valued `OTHERWISE`, and a plain arithmetic decision
+    -- downstream of one — because each is a different path through
+    -- 'renderFeelIn', 'datedTable' and 'outputValuesWith'. Before D1 no such
+    -- golden could exist: the exporter wrote raw L4 into a FEEL literal and KIE
+    -- failed to compile the whole file. Its negative control is a HAND-WRITTEN
+    -- fixture (`not-ok/refuse-enum-unwidened.dmn`) rather than a second module,
+    -- for the same reason `ymd-unfoldable-date.l4` is one: the emitter cannot
+    -- produce the un-widened `<outputValues>` any more, so only a fixture can
+    -- ask whether KIE still rejects it.
+  , ( "dmn" </> "refuse.l4"
+    , "refuse"
+    , "the refusal exhibit"
     )
   ]
 

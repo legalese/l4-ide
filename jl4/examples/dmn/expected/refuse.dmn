@@ -1,0 +1,251 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/" xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/" xmlns:di="http://www.omg.org/spec/DMN/20180521/DI/" id="definitions_refusal" name="Refusal" namespace="https://legalese.com/l4/dmn/refusal" exporter="jl4">
+  <itemDefinition id="itemdef_band" name="Band">
+    <typeRef>string</typeRef>
+    <allowedValues>
+      <text>"standard","reduced","exempt"</text>
+    </allowedValues>
+  </itemDefinition>
+  <inputData id="input_the_claim_amount" name="the_claim_amount" label="the claim amount">
+    <variable id="input_the_claim_amount_var" name="the_claim_amount" label="the claim amount" typeRef="number"/>
+  </inputData>
+  <inputData id="input_rules_effective_date" name="RULES_EFFECTIVE_DATE" label="RULES EFFECTIVE DATE">
+    <variable id="input_rules_effective_date_var" name="RULES_EFFECTIVE_DATE" label="RULES EFFECTIVE DATE" typeRef="date"/>
+  </inputData>
+  <decision id="decision_commencement" name="commencement">
+    <variable id="decision_commencement_var" name="commencement" typeRef="date"/>
+    <literalExpression id="decision_commencement_literal">
+      <text>date("1983-01-01")</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_the_transition_day" name="the_transition_day" label="the transition day">
+    <variable id="decision_the_transition_day_var" name="the_transition_day" label="the transition day" typeRef="date"/>
+    <literalExpression id="decision_the_transition_day_literal">
+      <text>date("2026-01-01")</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_no_fee_is_prescribed_before_commencement_on_1983_01_01" name="no_fee_is_prescribed_before_commencement_on_1983_01_01" label="no fee is prescribed before commencement on 1983-01-01">
+    <description>REFUSE: no fee is prescribed before commencement on 1983-01-01</description>
+    <variable id="decision_no_fee_is_prescribed_before_commencement_on_1983_01_01_var" name="no_fee_is_prescribed_before_commencement_on_1983_01_01" label="no fee is prescribed before commencement on 1983-01-01" typeRef="number"/>
+    <literalExpression id="decision_no_fee_is_prescribed_before_commencement_on_1983_01_01_literal">
+      <text>null</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_the_filing_fee" name="the_filing_fee" label="the filing fee">
+    <variable id="decision_the_filing_fee_var" name="the_filing_fee" label="the filing fee" typeRef="number"/>
+    <informationRequirement id="decision_the_filing_fee_ir1">
+      <requiredDecision href="#decision_no_fee_is_prescribed_before_commencement_on_1983_01_01"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_filing_fee_ir2">
+      <requiredInput href="#input_rules_effective_date"/>
+    </informationRequirement>
+    <decisionTable id="decision_the_filing_fee_table" hitPolicy="UNIQUE" preferredOrientation="Rule-as-Row" outputLabel="the filing fee">
+      <input id="decision_the_filing_fee_i1" label="`RULES EFFECTIVE DATE`">
+        <inputExpression id="decision_the_filing_fee_i1_expr" typeRef="date">
+          <text>RULES_EFFECTIVE_DATE</text>
+        </inputExpression>
+      </input>
+      <output id="decision_the_filing_fee_o1"/>
+      <annotation name="regime"/>
+      <rule id="decision_the_filing_fee_r1">
+        <description>`RULES EFFECTIVE DATE` AT LEAST `the transition day`</description>
+        <inputEntry id="decision_the_filing_fee_r1_i1">
+          <text>&gt;= date("2026-01-01")</text>
+        </inputEntry>
+        <outputEntry id="decision_the_filing_fee_r1_o1">
+          <text>1000</text>
+        </outputEntry>
+        <annotationEntry>
+          <text>the transition day (main.l4:87:1-88:40)</text>
+        </annotationEntry>
+      </rule>
+      <rule id="decision_the_filing_fee_r2">
+        <description>`RULES EFFECTIVE DATE` AT LEAST commencement</description>
+        <inputEntry id="decision_the_filing_fee_r2_i1">
+          <text>[date("1983-01-01")..date("2026-01-01"))</text>
+        </inputEntry>
+        <outputEntry id="decision_the_filing_fee_r2_o1">
+          <text>250</text>
+        </outputEntry>
+        <annotationEntry>
+          <text>commencement (main.l4:84:1-85:34)</text>
+        </annotationEntry>
+      </rule>
+      <rule id="decision_the_filing_fee_r3">
+        <description>OTHERWISE</description>
+        <inputEntry id="decision_the_filing_fee_r3_i1">
+          <text>&lt; date("1983-01-01")</text>
+        </inputEntry>
+        <outputEntry id="decision_the_filing_fee_r3_o1">
+          <text>no_fee_is_prescribed_before_commencement_on_1983_01_01</text>
+        </outputEntry>
+        <annotationEntry>
+          <text>no fee is prescribed before commencement on 1983-01-01 — ruling R2, CORPUS-TRACK §8 — below commencement there is nothing to answer (main.l4:94:1-96:68)</text>
+        </annotationEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="decision_the_fee_with_surcharge" name="the_fee_with_surcharge" label="the fee with surcharge">
+    <variable id="decision_the_fee_with_surcharge_var" name="the_fee_with_surcharge" label="the fee with surcharge" typeRef="number"/>
+    <informationRequirement id="decision_the_fee_with_surcharge_ir1">
+      <requiredDecision href="#decision_the_filing_fee"/>
+    </informationRequirement>
+    <literalExpression id="decision_the_fee_with_surcharge_literal">
+      <text>the_filing_fee * 2</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_the_discount" name="the_discount" label="the discount">
+    <description>REFUSE: no discount is prescribed for a claim below 100</description>
+    <variable id="decision_the_discount_var" name="the_discount" label="the discount" typeRef="number"/>
+    <informationRequirement id="decision_the_discount_ir1">
+      <requiredInput href="#input_the_claim_amount"/>
+    </informationRequirement>
+    <decisionTable id="decision_the_discount_table" hitPolicy="FIRST" preferredOrientation="Rule-as-Row" outputLabel="the discount">
+      <input id="decision_the_discount_i1" label="`the claim amount`">
+        <inputExpression id="decision_the_discount_i1_expr" typeRef="number">
+          <text>the_claim_amount</text>
+        </inputExpression>
+      </input>
+      <output id="decision_the_discount_o1"/>
+      <rule id="decision_the_discount_r1">
+        <description>`the claim amount` AT LEAST 1000</description>
+        <inputEntry id="decision_the_discount_r1_i1">
+          <text>&gt;= 1000</text>
+        </inputEntry>
+        <outputEntry id="decision_the_discount_r1_o1">
+          <text>100</text>
+        </outputEntry>
+      </rule>
+      <rule id="decision_the_discount_r2">
+        <description>`the claim amount` AT LEAST 100</description>
+        <inputEntry id="decision_the_discount_r2_i1">
+          <text>&gt;= 100</text>
+        </inputEntry>
+        <outputEntry id="decision_the_discount_r2_o1">
+          <text>10</text>
+        </outputEntry>
+      </rule>
+      <rule id="decision_the_discount_r3">
+        <description>OTHERWISE — REFUSE: no discount is prescribed for a claim below 100</description>
+        <inputEntry id="decision_the_discount_r3_i1">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="decision_the_discount_r3_o1">
+          <text>null</text>
+        </outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="decision_the_band" name="the_band" label="the band">
+    <description>REFUSE: no band is prescribed for a claim below 100</description>
+    <variable id="decision_the_band_var" name="the_band" label="the band" typeRef="Band"/>
+    <informationRequirement id="decision_the_band_ir1">
+      <requiredInput href="#input_the_claim_amount"/>
+    </informationRequirement>
+    <decisionTable id="decision_the_band_table" hitPolicy="FIRST" preferredOrientation="Rule-as-Row" outputLabel="the band">
+      <input id="decision_the_band_i1" label="`the claim amount`">
+        <inputExpression id="decision_the_band_i1_expr" typeRef="number">
+          <text>the_claim_amount</text>
+        </inputExpression>
+      </input>
+      <output id="decision_the_band_o1">
+        <outputValues>
+          <text>"standard","reduced","exempt",null</text>
+        </outputValues>
+      </output>
+      <rule id="decision_the_band_r1">
+        <description>`the claim amount` AT LEAST 1000</description>
+        <inputEntry id="decision_the_band_r1_i1">
+          <text>&gt;= 1000</text>
+        </inputEntry>
+        <outputEntry id="decision_the_band_r1_o1">
+          <text>"standard"</text>
+        </outputEntry>
+      </rule>
+      <rule id="decision_the_band_r2">
+        <description>`the claim amount` AT LEAST 100</description>
+        <inputEntry id="decision_the_band_r2_i1">
+          <text>&gt;= 100</text>
+        </inputEntry>
+        <outputEntry id="decision_the_band_r2_o1">
+          <text>"reduced"</text>
+        </outputEntry>
+      </rule>
+      <rule id="decision_the_band_r3">
+        <description>OTHERWISE — REFUSE: no band is prescribed for a claim below 100</description>
+        <inputEntry id="decision_the_band_r3_i1">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="decision_the_band_r3_o1">
+          <text>null</text>
+        </outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decisionService id="service_refusal" name="Refusal">
+    <variable id="service_refusal_var" name="Refusal" typeRef="Any"/>
+    <outputDecision href="#decision_commencement"/>
+    <outputDecision href="#decision_the_transition_day"/>
+    <outputDecision href="#decision_the_fee_with_surcharge"/>
+    <outputDecision href="#decision_the_discount"/>
+    <outputDecision href="#decision_the_band"/>
+    <encapsulatedDecision href="#decision_no_fee_is_prescribed_before_commencement_on_1983_01_01"/>
+    <encapsulatedDecision href="#decision_the_filing_fee"/>
+    <inputData href="#input_rules_effective_date"/>
+    <inputData href="#input_the_claim_amount"/>
+  </decisionService>
+  <dmndi:DMNDI>
+    <dmndi:DMNDiagram id="definitions_refusal_diagram" name="Refusal">
+      <dmndi:DMNShape id="input_the_claim_amount_shape" dmnElementRef="input_the_claim_amount">
+        <dc:Bounds x="60" y="540" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_rules_effective_date_shape" dmnElementRef="input_rules_effective_date">
+        <dc:Bounds x="280" y="540" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_commencement_shape" dmnElementRef="decision_commencement">
+        <dc:Bounds x="60" y="380" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_the_transition_day_shape" dmnElementRef="decision_the_transition_day">
+        <dc:Bounds x="280" y="380" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_no_fee_is_prescribed_before_commencement_on_1983_01_01_shape" dmnElementRef="decision_no_fee_is_prescribed_before_commencement_on_1983_01_01">
+        <dc:Bounds x="500" y="380" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_the_discount_shape" dmnElementRef="decision_the_discount">
+        <dc:Bounds x="720" y="380" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_the_band_shape" dmnElementRef="decision_the_band">
+        <dc:Bounds x="940" y="380" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_the_filing_fee_shape" dmnElementRef="decision_the_filing_fee">
+        <dc:Bounds x="60" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_the_fee_with_surcharge_shape" dmnElementRef="decision_the_fee_with_surcharge">
+        <dc:Bounds x="60" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="service_refusal_shape" dmnElementRef="service_refusal">
+        <dc:Bounds x="40" y="40" width="1100" height="440"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNEdge id="decision_the_filing_fee_ir1_edge" dmnElementRef="decision_the_filing_fee_ir1">
+        <di:waypoint x="590" y="380"/>
+        <di:waypoint x="150" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_filing_fee_ir2_edge" dmnElementRef="decision_the_filing_fee_ir2">
+        <di:waypoint x="370" y="540"/>
+        <di:waypoint x="150" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_fee_with_surcharge_ir1_edge" dmnElementRef="decision_the_fee_with_surcharge_ir1">
+        <di:waypoint x="150" y="220"/>
+        <di:waypoint x="150" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_discount_ir1_edge" dmnElementRef="decision_the_discount_ir1">
+        <di:waypoint x="150" y="540"/>
+        <di:waypoint x="810" y="460"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_band_ir1_edge" dmnElementRef="decision_the_band_ir1">
+        <di:waypoint x="150" y="540"/>
+        <di:waypoint x="1030" y="460"/>
+      </dmndi:DMNEdge>
+    </dmndi:DMNDiagram>
+  </dmndi:DMNDI>
+</definitions>
