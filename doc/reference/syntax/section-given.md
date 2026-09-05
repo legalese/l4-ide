@@ -144,8 +144,7 @@ ordinary rule's inputs are written, so nothing looks wrong.
 
 Where the section's **first** declaration makes **no use of the name** — and
 it is a `DECLARE` or an `ASSUME`, where the mistake bites — that is a
-check error. The message below is L4's own wording, quoted verbatim;
-it says "binder" for what this page calls a section `GIVEN`:
+check error. The message below is L4's own wording, quoted verbatim:
 
 ```
 This GIVEN starts at column 1, so it is the signature of the declaration
@@ -153,7 +152,7 @@ below it -- and that declaration never uses
 
   `the rate`
 
-If `the rate` was meant as a binder for the whole of
+If `the rate` was meant as an input for the whole of
 
   § S
 

@@ -1,0 +1,20 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: section-given-ambiguous-supply.l4
+  Hidden: no
+  Range: 24:16-24:19
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    This call supplies
+
+      `foo`
+
+    but `g` reads more than one input of that
+    name, and this one is neither of them, so there is no way to tell which was
+    meant.
+
+    Rename one of them, or hoist them to a common section heading if they are
+    one thing.

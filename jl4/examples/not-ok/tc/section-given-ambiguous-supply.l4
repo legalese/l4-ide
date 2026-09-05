@@ -1,0 +1,24 @@
+-- A WITH that names a binder the callee reads under two same-spelled binders,
+-- and is neither of them: there is no way to tell which was meant.
+--
+-- The remedy is R3's other two: rename one of them, or hoist them to a common
+-- section heading if they are one thing.
+
+§ `1`
+    GIVEN foo IS A NUMBER
+GIVETH A NUMBER
+h1 MEANS foo TIMES 1
+
+§ `2`
+    GIVEN foo IS A NUMBER
+GIVETH A NUMBER
+h2 MEANS foo TIMES 100
+
+§ `3`
+    GIVEN foo IS A NUMBER
+
+GIVETH A NUMBER
+g MEANS h1 PLUS h2
+
+GIVETH A NUMBER
+f MEANS g WITH foo IS foo

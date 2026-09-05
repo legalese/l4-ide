@@ -15,6 +15,8 @@ module L4.Desugar (
   --
   desugarSectionGivens,
   detectMisattachedSectionGivens,
+  collectSectionBinderNames,
+  detectRestatedSectionBinders,
   ) where
 
 
@@ -28,6 +30,7 @@ import           L4.Parser.SrcSpan        (SrcPos (MkSrcPos), SrcRange (MkSrcRan
 import           L4.Syntax
 import qualified L4.TypeCheck.Environment as TypeCheck
 import Control.Category ((>>>))
+import qualified Optics
 
 -- ----------------------------------------------------------------------------
 -- Caramelize
@@ -595,6 +598,24 @@ desugarSectionGivens (MkModule ann uri sect) = MkModule ann uri (goSection sect)
 sectionGivenParams :: Maybe (GivenSig n) -> [OptionallyTypedName n]
 sectionGivenParams = maybe [] (\ (MkGivenSig _ otns) -> otns)
 
+-- | Every name a section-level @GIVEN@ binds anywhere in the module.
+--
+-- Read off the /parsed/ module, before 'desugarSectionGivens' turns each
+-- parameter into an @ASSUME@ and before anything is resolved, because the
+-- checker needs it while checking bodies: a @WITH@ site may name a section
+-- binder that is not one of the callee's declared parameters
+-- ('L4.TypeCheck.supplyAppNamed'), and this is the set that distinguishes such
+-- a supply from a misspelt parameter name.
+collectSectionBinderNames :: HasName n => Module n -> Set RawName
+collectSectionBinderNames (MkModule _ _ sect) = goSection sect
+ where
+  goSection (MkSection _ _ _ mgiven decls) =
+    Set.fromList (sectionGivenNames mgiven)
+      <> foldMap goTopDecl decls
+  goTopDecl = \ case
+    Section _ s -> goSection s
+    _           -> Set.empty
+
 -- | One section-binder parameter, as the 0-ary @ASSUME@ that stands for it.
 --
 -- The @extra@ of the parameter's annotation is carried onto the @ASSUME@ so
@@ -621,6 +642,54 @@ elaborateSectionBinder (MkOptionallyTypedName pAnn nm mTy mTypically) =
       (MkAppForm emptyAnno nm [] Nothing)
       mTy
       mTypically)
+
+-- | R2: a declaration's own @GIVEN@ that restates a name a section-level
+-- @GIVEN@ already binds.
+--
+-- After discharge the section binder is a trailing parameter of every
+-- definition that reads it, so a same-named parameter of the same declaration
+-- would give one name two binders in one body and make the answer depend on
+-- which one the resolver picked. The ruling (R2, 2026-09-04) is that this is an
+-- error at the declaration and the fix is to delete the restatement: the value
+-- then flows, and a genuine per-call variation is written @callee WITH x IS y@.
+--
+-- Scope, deliberately: only a /declaration's/ signature. A section's own binder
+-- lives in a bare 'GivenSig' hanging off the heading, and a lambda's parameters
+-- in a bare 'GivenSig' too, so keying on 'TypeSig' picks out exactly the
+-- @DECIDE@, @ASSUME@ and @DECLARE@ signatures the ruling is about — including
+-- those of @WHERE@ and @LET@ locals, which are function signatures like any
+-- other. A lambda parameter that shadows a binder is left alone: it is the
+-- residual cost §2.3 records, not a second binder for the name.
+--
+-- Measured 2026-09-04 across 607 files: 235 term-role @ASSUME@ names and 2,311
+-- function @GIVEN@ names, and no file in which the two sets overlap. So this
+-- rule costs the corpus nothing; it governs the migration state.
+detectRestatedSectionBinders :: Module Name -> [Name]
+detectRestatedSectionBinders (MkModule _ _ sect) = goSection Set.empty sect
+ where
+  -- Scoped to the binders VISIBLE at the declaration: its own section's and
+  -- those of its ancestors. Not the whole module.
+  --
+  -- Keying on the raw name module-wide was over-broad, and the cost stopped
+  -- being hypothetical: @doc\/tutorials\/section-given\/what-a-section-needs-to-know.l4@
+  -- is a before-and-after tutorial whose \"before\" section deliberately repeats
+  -- @annual income@ in each rule's own @GIVEN@, and whose \"after\" section --
+  -- a DIFFERENT section, later in the file -- declares it once as a section
+  -- @GIVEN@. Nothing there gives one name two binders in one body; the module
+  -- merely spells the name in two unrelated places, which is the whole point of
+  -- the page.
+  goSection visible (MkSection _ _ _ mgiven decls) =
+    let visible' = visible <> Set.fromList (sectionGivenNames mgiven)
+    in concatMap (goTopDecl visible') decls
+
+  goTopDecl visible = \ case
+    Section _ s -> goSection visible s
+    d ->
+      [ nm
+      | MkTypeSig _ (MkGivenSig _ otns) _ <- Optics.toListOf (Optics.gplate @(TypeSig Name)) d
+      , MkOptionallyTypedName _ nm _ _ <- otns
+      , Set.member (rawName nm) visible
+      ]
 
 -- | The dedent hazard of R4, as a diagnosable shape.
 --
