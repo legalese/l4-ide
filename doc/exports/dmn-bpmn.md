@@ -92,6 +92,64 @@ The recurring case for BPMN is the unitless deadline: L4 permits a `WITHIN` with
 timers require one. `--deadline-unit days` assumes days and records a note saying it did; `refuse`
 emits no timer and records that instead. Neither silently invents a unit.
 
+## When a decision can refuse
+
+[`REFUSE`](../reference/control-flow/REFUSE.md) is how an L4 rule says **"the model does not cover
+this"** — a determinate outcome that is neither a value nor an error. A rule that reaches one stops,
+with the author's sentence, and no other rule can catch it. It is what you write for the day before
+a statute commenced, or for a case its drafters never addressed.
+
+**DMN has no such outcome.** Its whole vocabulary for "no answer" is FEEL's single `null`, and that
+same `null` also spells "there is none" and "the engine could not compute it". So the export has to
+choose, and this is what it chose.
+
+**A refusal becomes `null`, and the reason travels with it.** A refusing row keeps its place in the
+table and answers `null`; the author's sentence goes on that row's `<description>`, reading
+`OTHERWISE — REFUSE: no fee is prescribed before commencement on 1983-01-01`. A decision whose
+_whole body_ refuses becomes a boxed `null`, and the sentence goes on the `<decision>`'s own
+`<description>`. Nothing is deleted from the artifact: deleting the refusing row answers `null` too
+— that was measured on both engines — and it would take the reason with it.
+
+**The fidelity report names it, at a severity that depends on who reads the answer.** Every decision
+that can refuse — because it contains a `REFUSE`, or because it calls something that does — gets a
+`D-REFUSE` note carrying the reason:
+
+| severity     | when                                                                                |
+| ------------ | ----------------------------------------------------------------------------------- |
+| **Lossy**    | every caller consumes it from an `IF`/`CONSIDER` arm, so a guard can fence the null |
+| **Blocking** | some caller consumes it unconditionally, or nothing calls it at all                 |
+
+The second row is the one to act on: nothing downstream can tell that `null` apart from an answer.
+`--fail-on blocking` turns it into a non-zero exit.
+
+**A refusing decision is evaluated even when nothing reaches it.** A DMN `<decision>` is a node in a
+graph, not a branch of an expression, so an engine evaluates it whenever it evaluates the model. A
+named refusal therefore comes back `null` in _every_ result, including the runs where no rule
+reached it. That is not a defect in the export; it is what a decision requirements graph is.
+
+**One shape needed a repair, and it is why this is measured rather than reasoned about.** When the
+refusing decision returns an enum, its table declares the domain in `<outputValues>` — and `null` is
+not in that list. The two engines disagreed about what that means: KIE 8.44.0.Final enforces the
+list at run time and **fails the decision**, while Camunda 8.7.6 returns the `null` silently. One
+file, two answers. So the export adds `null` to _that table's_ `<outputValues>`, which makes both
+engines agree, and records a `D-OUTPUTVALUES-NULL` note saying it did. The enum type's own declared
+domain is left exactly as L4 wrote it: only the table that can decline says that it can.
+
+**Limits, stated plainly.**
+
+- A DMN engine cannot tell you _which_ refusal it hit, only that the answer is `null`. The reason is
+  in the artifact for a person to read, not in the result for a program to branch on.
+- Refusal is order-dependent under lazy `AND`/`OR` in L4 (`FALSE AND x` answers, `x AND FALSE`
+  refuses) and FEEL's logic is not, so a refusal buried inside a boolean can move.
+- The **markdown carrier** (`--to dmn-md`) cannot carry a refusal at all. dmnmd's cell grammar is a
+  number, an integer range, or a bare token, with no `null`, so a refusing table is **omitted** and
+  the markdown fidelity report says so once per table. A bare `null` cell would be read back as the
+  _string_ `"null"`, which is the one outcome worse than omitting the table.
+- `l4 verify` does not model refusals; see [REFUSE](../reference/control-flow/REFUSE.md).
+
+The worked example is `jl4/examples/dmn/refuse.l4` — one of each position a refusal can occupy — and
+`jl4/examples/dmn/refuse.cases.json` runs it through both engines in CI.
+
 ## Where to look
 
 - **Worked examples:** `jl4/examples/dmn/` and `jl4/examples/bpmn/`, both with goldens and
