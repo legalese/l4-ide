@@ -2,7 +2,7 @@
 
 §§ `Assumptions`
 
-ASSUME Person IS A TYPE
+DECLARE Person
 ASSUME `mother of` IS A FUNCTION FROM Person TO Person
 ASSUME `father of` IS A FUNCTION FROM Person TO Person
 

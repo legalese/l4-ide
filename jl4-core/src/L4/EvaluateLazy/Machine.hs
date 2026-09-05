@@ -3410,6 +3410,8 @@ scanTypeDecl (RecordDecl _ann mcon tns) =
   concat <$> traverse (\ c -> scanConDecl (MkConDecl emptyAnno c tns)) (toList mcon)
 scanTypeDecl (SynonymDecl _ann _t) =
   pure []
+scanTypeDecl (OpaqueDecl _ann) =
+  pure []
 
 scanConDecl :: ConDecl Resolved -> Machine [Resolved]
 scanConDecl (MkConDecl _ann n [])  = pure [n]
@@ -3592,6 +3594,8 @@ evalTypeDecl env (EnumDecl _ann conDecls) =
 evalTypeDecl env (RecordDecl _ann mcon tns) =
   traverse_ (\ c -> evalConDecl env (MkConDecl emptyAnno c tns)) mcon
 evalTypeDecl _env (SynonymDecl _ann _t) =
+  pure ()
+evalTypeDecl _env (OpaqueDecl _ann) =
   pure ()
 
 evalConDecl :: Environment -> ConDecl Resolved -> Machine ()

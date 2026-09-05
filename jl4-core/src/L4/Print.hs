@@ -450,11 +450,14 @@ instance LayoutPrinterWithName a => LayoutPrinter (Declare a) where
       -- same thing inside a `group`, jamming a non-empty GIVEN signature
       -- straight onto `DECLARE` (`... IS TYPEDECLARE ...`), which does not
       -- re-parse. Mirrors the Decide instance below.
-      vcatHard
+      vcatHard $
         [ printWithLayout tySig
         , "DECLARE" <+> printWithLayout appForm
-        , indent 2 (printWithLayout tyDecl)
-        ]
+        ] <> case tyDecl of
+          -- An opaque type has no body: a third line would be an empty line
+          -- under a hard `vcat`, which re-parses but reads as a mistake.
+          OpaqueDecl _ -> []
+          _            -> [indent 2 (printWithLayout tyDecl)]
 
 instance LayoutPrinterWithName a => LayoutPrinter (AppForm a) where
   printWithLayout = \ case
@@ -490,6 +493,7 @@ instance LayoutPrinterWithName a => LayoutPrinter (TypeDecl a) where
         [ "IS"
         , indent 2 (printWithLayout t)
         ]
+    OpaqueDecl _ -> mempty
 
 instance LayoutPrinterWithName a => LayoutPrinter (ConDecl a) where
   printWithLayout = \ case

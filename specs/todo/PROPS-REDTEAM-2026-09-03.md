@@ -25,11 +25,11 @@ compiler **discharges** into an ordinary parameter of every definition that tran
 Its type role becomes an empty `DECLARE`. Its refusal role becomes `REFUSE`, a throw that cannot
 be caught and can be statically analysed.
 
-| job of `ASSUME` today              | destination                                                             | status                    |
-| ---------------------------------- | ----------------------------------------------------------------------- | ------------------------- |
-| suppliable term (~550 uses)        | section `GIVEN`, discharged by the compiler (§2.1–§2.4)                 | mechanism = R1–R5, R8–R11 |
-| uninterpreted type (`… IS A TYPE`) | empty `DECLARE T`, which parses today (`ok/set-operators-nested.l4:36`) | available today           |
-| refusal / typed bottom             | `REFUSE "…"`, uncatchable, boundary-only, in no schema (§2.8)           | specification = R7        |
+| job of `ASSUME` today              | destination                                                   | status                    |
+| ---------------------------------- | ------------------------------------------------------------- | ------------------------- |
+| suppliable term (~550 uses)        | section `GIVEN`, discharged by the compiler (§2.1–§2.4)       | mechanism = R1–R5, R8–R11 |
+| uninterpreted type (`… IS A TYPE`) | bodiless `DECLARE T`, an opaque nominal type                  | built 2026-09-05          |
+| refusal / typed bottom             | `REFUSE "…"`, uncatchable, boundary-only, in no schema (§2.8) | specification = R7        |
 
 What the compiler adds is the threading authors were expected to write by hand: Meng's own
 history of the keyword is that "everybody assumed we would deprecate it in favour of more regular
@@ -748,8 +748,11 @@ Kept so that no later session re-proposes one without meeting its witness.
 **Migration recipe by role** (counts 2026-09-04: 664 `ASSUME` lines in 105 files; legal 54, ok 97,
 not-ok 20, experiments 418, doc 71, libraries 2, tests-cli 2; 113 type-role): term `ASSUME` →
 section `GIVEN` under the nearest heading, the 9 of 39 legal declarations that sit in a sibling
-section hoisting to the title `§`, which is a no-op for visibility under R3; type `ASSUME` → an
-empty `DECLARE T` (parses today: `ok/set-operators-nested.l4:36`, `ok/consider-simple.l4:3`);
+section hoisting to the title `§`, which is a no-op for visibility under R3; type `ASSUME` → a
+bodiless `DECLARE T` (this did **not** parse when the recipe was written — both citations,
+`ok/set-operators-nested.l4:36` and `ok/consider-simple.l4:3`, are ordinary declarations whose
+body is on the next line; the opaque form was ruled and built on 2026-09-05, see
+`IMPLICIT-PROPS-DESIGN.md` §11.1.1);
 refusal `ASSUME` → one named `REFUSE` definition per refusal (`regcf.l4:143, :486`,
 `daydate.l4:104`, prelude `TBD` at `prelude.l4:761`, DMN fixtures `dmn/gst-rate.l4:63`,
 `dmn/ymd-dates.l4:84`). Function-typed `ASSUME` (`anti-social.l4:12-28`, 21 legal, 284 in
