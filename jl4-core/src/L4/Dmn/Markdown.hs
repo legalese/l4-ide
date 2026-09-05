@@ -237,8 +237,19 @@ cellSyntaxReason outTy r
       <> [ "a half-open or non-integer range"
          | any (anyTest isBadRange) r.drInputs
          ]
+      -- A REFUSING ROW, since D1: the output entry is FEEL's `null`. Named
+      -- separately from the generic output gap below for exactly the reason the
+      -- DATE arm above is named separately -- it is not parentheses, not a
+      -- comma, and not an expression, and a reader sent looking for those finds
+      -- nothing. dmnmd's cell grammar has no null: a bare `null` cell would be
+      -- read back as the STRING "null", which is worse than an omitted table.
+      <> [ "a `null` output entry -- the decision can REFUSE, and dmnmd has no way to say \
+           \`declined`; a bare `null` cell would be read back as the STRING \"null\""
+         | r.drOutput.feText == "null"
+         ]
       <> [ "an output dmnmd cannot read: parentheses, a comma, or an expression outside S-FEEL"
-         | isNothing (mdOutput outTy r.drOutput)
+         | r.drOutput.feText /= "null"
+         , isNothing (mdOutput outTy r.drOutput)
          ]
 
   -- 'TestOneOf' nests, so the search must too.
@@ -360,6 +371,26 @@ markdownReport drg =
     ]
 
   decisionNotes d = case d.dcnLogic of
+    -- A whole body that REFUSES (ruling D1, 2026-09-05) arrives here as the
+    -- boxed literal `null`, and "is a formula (null)" would be a false
+    -- description of it: `null` is not a formula, it is the absence of an
+    -- answer. Named separately for the reason 'cellSyntaxReason' names the DATE
+    -- gap separately -- a reader told the enumeration rather than the instance
+    -- goes looking for a defect that is not there. The CODE is unchanged,
+    -- because the loss is the same one dmnmd's table grammar imposes (the
+    -- decision is omitted) and @D-MD-NOLITERAL@ is already carried in
+    -- FIDELITY-SEVERITY-AXIS-SPEC.md with that meaning.
+    LogicLiteral e | e.feText == "null" ->
+      [ note "D-MD-NOLITERAL" Blocking d.dcnId
+          ("`" <> d.dcnName <> "` REFUSES: it declines to answer, which DMN spells as the \
+             \FEEL literal `null` and dmnmd cannot spell at all -- dmnmd has neither a \
+             \boxed-expression form nor any way to say `declined` -- so the decision is \
+             \omitted. The author's reason survives in the XML artifact, on this \
+             \decision's <description>"
+             <> maybe "" (\t -> ": " <> t) d.dcnDescription)
+          "the decision itself, AND the fact that it declines: a reader of the markdown \
+          \alone sees neither the rule nor its absence"
+      ]
     LogicLiteral e ->
       [ note "D-MD-NOLITERAL" Blocking d.dcnId
           ("`" <> d.dcnName <> "` is a formula (" <> e.feText
