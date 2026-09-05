@@ -1475,10 +1475,11 @@ of the tree, not a proposal. Nothing is owed on it, and §5.3 above is retensed 
   desugars to a top-level selector `DECIDE` and "must be walked like any other callee", which is
   why the read-set finds it.
 
-**Blast radius: zero.** No file changes and no program re-means. Computed fields measure **89
-indented-`MEANS` sites in 20 files** by the count taken for this ruling (the card's prior analysis
-used a narrower heuristic and got 50 in 12; neither number is load-bearing here), and **0 in
-`/Users/mengwong/src/legalese/canon`** under both. Four of those 20 are libraries — `prelude.l4`,
+**Blast radius: zero.** No file changes and no program re-means. The card counted computed fields
+two ways — **89 indented-`MEANS` sites in 20 files** on its own heuristic, 50 in 12 on the prior
+analysis's narrower one, and **0 in `/Users/mengwong/src/legalese/canon`** under both. Neither
+count was re-measured here and neither is load-bearing: the ruling is that nothing is owed, and
+that holds at any of these figures. Four of the card's 20 are libraries — `prelude.l4`,
 `math.l4`, `excel-date.l4`, `negation-as-failure.l4` — which 159 and 65 files import, so the
 exposure is wider than a file list suggests even though the count of changes is nil.
 
@@ -1554,10 +1555,16 @@ false green into a **demanded-then-silently-ignored** parameter — the schema w
 callee reads it. `l4 check`/`l4 batch` must **refuse** an export whose read-set crosses an `IMPORT`
 before the closure is allowed to find one.
 
-**Exposure today: zero corpus files.** Measured across all 25 modules named in an `IMPORT` line,
-every one has `ASSUME` = 0 except `regcf.l4`'s two refusal-role lines; and section `GIVEN` exists
-in only 7 files, all fixtures added by PR #333, none of them imported. (`gm-discharge` measured the
-same independently and recorded the same deferral.) **After discharge the exposed population is
+**Exposure today: zero corpus files.** Measured 2026-09-05 over the **25 distinct module names
+appearing in an `IMPORT` line** across `jl4 jl4-core doc`: **three** of them contain an `ASSUME` at
+all — `jl4-core/libraries/daydate.l4:104`, `jl4/examples/legal/regcf/regcf.l4:143` and `:486`, and
+`jl4/experiments/thailand-cosmetics/prelude.l4:665` (`ASSUME TBD`, a vendored copy of the stdlib's)
+— and **all four lines are refusal-role**, so none of them is in the discharge population. (The
+card said "every one at `ASSUME` = 0 except regcf's two"; it missed `daydate` and the vendored
+prelude. Its conclusion is unchanged and slightly strengthened: **zero term-role `ASSUME`s live in
+an imported module today.**) Section `GIVEN` exists in only 7 files, all fixtures added by PR #333,
+and none of them is imported. (`gm-discharge` measured the same independently and recorded the same
+deferral.) **After discharge the exposed population is
 every file that imports a migrated domain module** — 664 `ASSUME` lines in 105 files become section
 binders in exactly the modules other files import, which is R0's committed cost arriving.
 

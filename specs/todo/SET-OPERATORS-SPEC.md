@@ -2275,8 +2275,14 @@ named `perm3 — negation over a group`.
   sample, and **a real census needs the parser**, not a text scan. That census is owed by the first
   PR, because it is also what tells us whether the refusal in step 2 has a hidden cost.
 
-- **Denominator:** 4097 `NOT` tokens (2589 l4-ide + 1508 canon) across 261 `.l4` files;
-  `jl4-core/libraries` is clean across 22 files.
+- **Denominator, stated as an order of magnitude and not a figure.** The card reported "4097 `NOT`
+  tokens (2589 l4-ide + 1508 canon) across 261 `.l4` files". A re-count 2026-09-05 with a
+  word-boundary regex over `jl4 jl4-core doc paper` plus canon gives **4684 across 282 files**
+  (3198 + 1486); neither count separates a `NOT` operator from the letters N-O-T inside a backticked
+  identifier, and nothing here turns on the exact number — what turns on it is that ten bad sites
+  sit in a population of thousands, so a flip is not a small change. `jl4-core/libraries` is
+  **clean in the sense that matters**: the linter reports zero findings there (7 of its 22 `.l4`
+  files contain a `NOT` at all).
 
 **Documents that state the opposite of the implementation, today.** Each is false, not merely
 incomplete, and each is repaired by the first PR:
