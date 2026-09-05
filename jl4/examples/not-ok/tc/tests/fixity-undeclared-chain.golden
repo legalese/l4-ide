@@ -12,5 +12,5 @@ File: fixity-undeclared-chain.l4
 
       PLAIN (predefined)
 
-    expects 2 arguments,
-    but you are applying it to 4 arguments here.
+    expects 2 inputs,
+    but here it is given 4 inputs.

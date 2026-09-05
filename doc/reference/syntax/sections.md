@@ -399,7 +399,7 @@ Two ways out today, and choosing between them is a drafting decision, not a tech
 - **Hoist.** If the two Divisions were always talking about one applicant, delete both declarations and put one `GIVEN` under `§ Part 8`. Every rule beneath it then reads that one.
 - **Rename.** If they are two different applicants, say so: `the individual applicant` and `the corporate applicant`. The error was the file telling you that one word is doing two jobs.
 
-_**A third way out is not available today.** It is planned: saying at the point of use which section's `the applicant` is meant, written `` `name for the Part` WITH `the applicant` IS `the applicant` ``. Writing that now does not work. After a bare name, as here, L4 reads `WITH` as an attempt to build a record and answers `You are trying to apply … (which is not a function)`; after a rule that has already been given its own inputs, L4 cannot read the line at all and answers `unexpected WITH`. Proposed, not landed (2026-09-04); it arrives in a later version of L4. Until then: hoist or rename._
+_**A third way out is not available today.** It is planned: saying at the point of use which section's `the applicant` is meant, written `` `name for the Part` WITH `the applicant` IS `the applicant` ``. Writing that now does not work. After a bare name, as here, L4 reads `WITH` as an attempt to build a record and answers `You are giving named inputs to … but it is not a function`; after a rule that has already been given its own inputs, L4 cannot read the line at all and answers `unexpected WITH`. Proposed, not landed (2026-09-04); it arrives in a later version of L4. Until then: hoist or rename._
 
 ---
 
@@ -512,11 +512,11 @@ The options are:
 Second, at the same place, a complaint that `T` is not a rule and cannot be given inputs. The kind of thing is written as a name L4 made up for itself, which shifts whenever the file changes — ignore it:
 
 ```
-You are trying to apply
+You are giving named inputs to
 
   T (defined at …) of type T15
 
-(which is not a function) to (named) arguments here.
+but it is not a function, so it takes none.
 ```
 
 Third, the same ambiguity again about the field name `f`, whose two candidates also print bare.

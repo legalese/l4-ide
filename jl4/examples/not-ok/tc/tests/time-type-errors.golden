@@ -8,7 +8,7 @@ File: time-type-errors.l4
   Severity: DiagnosticSeverity_Error
   Code: <none>
   Message:
-    The first argument of function 
+    The first input of function 
 
       TIME_FROM_HMS (predefined)
 
@@ -27,7 +27,7 @@ File: time-type-errors.l4
   Severity: DiagnosticSeverity_Error
   Code: <none>
   Message:
-    The first argument of function 
+    The first input of function 
 
       TIME_HOUR (predefined)
 
@@ -46,7 +46,7 @@ File: time-type-errors.l4
   Severity: DiagnosticSeverity_Error
   Code: <none>
   Message:
-    The first argument of function 
+    The first input of function 
 
       TIME_SERIAL (predefined)
 
