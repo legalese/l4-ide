@@ -272,7 +272,16 @@ function parseAssumeHead(tail) {
 function classifyType(type) {
   if (type === null) return "untyped";
   const flat = type.replace(/\s+/g, " ").trim();
-  if (/^(A |AN )?TYPE$/.test(flat)) return "type";
+  // The type role is `IS A TYPE`, and it may carry a BODY:
+  // `ASSUME Person IS A TYPE / HAS ATTRIBUTE \`mother\` IS A Person / …`.
+  // Anchoring this on `TYPE$` — as it was until 2026-09-05 — matched only the
+  // bare form, so the bodied one fell through to `term` and was rewritten.
+  // Measured on `jl4/experiments/britishcitizen.l4`, where that turned a sort
+  // with five attributes into a section-GIVEN parameter, next to the
+  // `DECLARE Person IS A TYPE` already beneath it. Nothing caught it: the
+  // experiments tree is in no goldened glob and the file's error count happened
+  // not to change. The type role is `gm-opaque-declare`'s to migrate, whole.
+  if (/^(A |AN )?TYPE\b/.test(flat)) return "type";
   if (/^(A |AN )?FUNCTION\b/.test(flat) || /^FOR ALL\b/.test(flat))
     return "function";
   return "term";
@@ -550,13 +559,22 @@ function migrateFile(file, text) {
   // type-checks. `ok/tdnr.l4` (foo at NUMBER/BOOLEAN/STRING) and `ok/misc.l4`
   // (coerce at four function types) were the only two files in the authored
   // corpus to reach it, and both failed the `prettyLayout round-trip` block.
+  // Compare names the way the CHECKER does, not the way they are spelled: a
+  // backticked name and a bare one denote the same identifier. Measured on
+  // `jl4/experiments/macma3.l4`, which ASSUMEs `` `forfeiture` `` at
+  // `FROM Order TO BOOLEAN` (line 94) and `forfeiture` at
+  // `FROM Action TO BOOLEAN` (line 188), and likewise `confiscation` — the
+  // checker reports "multiple definitions for the identifier" for both, so they
+  // are one name, and a guard keyed on the raw spelling let both through.
+  const overloadKey = (n) => n.replace(/^`|`$/g, "");
   const overloaded = new Set();
   {
     const seen = new Set();
     for (const d of decls) {
       if (!d.head) continue;
-      if (seen.has(d.head.name)) overloaded.add(d.head.name);
-      seen.add(d.head.name);
+      const k = overloadKey(d.head.name);
+      if (seen.has(k)) overloaded.add(k);
+      seen.add(k);
     }
   }
 
@@ -570,7 +588,7 @@ function migrateFile(file, text) {
       refuse("unparsed", "could not parse the ASSUME head");
       continue;
     }
-    if (overloaded.has(d.head.name)) {
+    if (overloaded.has(overloadKey(d.head.name))) {
       refuse(
         "overload",
         "the name is ASSUMEd more than once in this file, at a different type each time (type-directed name resolution); a section GIVEN collapses every occurrence onto the first parameter's type — see resolveSectionGiven, jl4-core/src/L4/TypeCheck.hs:641",
