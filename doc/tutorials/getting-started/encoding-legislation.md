@@ -109,14 +109,14 @@ So the first job is to name the blanks. Section 3 has seven:
 `IS A BOOLEAN` says what kind of thing each blank holds: a yes-or-no fact, so
 the only two things that can go in it are `TRUE` and `FALSE`.
 
-A name can carry one more thing: `@desc`, the plain question a member of the
-public will be shown when this blank has to be filled in.
+A name can carry one more thing: `@desc`, a plain-words note shown beside
+this blank when a member of the public fills it in.
 
 ```l4
     GIVEN `the person is a body corporate` IS A BOOLEAN @desc Is the person a body corporate?
 ```
 
-The name is what the rules below say; the `@desc` is what the form asks. The
+The rules and the form both use the name; the `@desc` is its help text. The
 downloadable file for this page carries a `@desc` on all seven names, and it is
 worth writing them once you know what the seven names are.
 
@@ -170,12 +170,12 @@ GIVEN `the person is a body corporate` IS A BOOLEAN
 ```
 
 Get it wrong and the first rule below quietly takes the names as its own. The
-rule that then goes wrong is the _next_ one, which can no longer see them:
+rules that then go wrong are the later ones using them, one message each:
 
 ```
 I could not find a definition for the identifier
 
-  `the person is a public house`
+  `the person is a body corporate`
 
 which I have inferred to be of type:
 ...
@@ -185,9 +185,9 @@ An **"identifier"** is L4's word for a name, and the "type" it goes on to
 mention is the kind of thing that name holds. So the message says: _this name
 is used here, and I cannot see anywhere it was declared._
 
-If you meet that error and the name is right there at the top of the section,
-check the column before you check anything else. It is the likeliest cause and
-the quickest to rule out.
+If you meet that error, or `unexpected §` at the `§§` below the names, check
+the column before you check anything else. It is the likeliest cause and the
+quickest to rule out.
 
 ### Migrating an existing `ASSUME`
 
@@ -283,8 +283,8 @@ pin down the shape of section 3: an exempt case, a prohibited case, and a clean
 case. Each gets a named company, so that the reasoning can be followed in
 words.
 
-_Proposed, not landed (2026-09-04): supplying a value with `WITH` at an
-instruction such as `#EVAL` is not in the version of L4 you have. It is being
+_Proposed, not landed (2026-09-04): `WITH` at an instruction such as `#EVAL`
+can supply a rule's own `GIVEN`, but not a section `GIVEN`. It is being
 built now, so the three blocks below will not run until it arrives, and they
 are not in the downloadable file. Until then, supply the facts from outside the
 file instead — from a web form, from `l4 batch`, or from a program asking the
@@ -415,9 +415,9 @@ it one command at a time.
 You get one line of output for each case in the file. It repeats the case it
 was given, under `input`, and gives the answer it worked out, under `output`.
 `diagnostics` lists any complaints L4 has about the file, `status` says whether
-the run got through, and `trace` would hold the step-by-step reasoning if you
-had asked for it. The seven facts echoed back are elided here as `{…}` to keep
-the line readable:
+the run got through, and `trace` is always empty here: `l4 batch` does not
+carry the reasoning. The seven facts echoed back are elided here as `{…}` to
+keep the line readable:
 
 ```
 {"diagnostics":[],"input":{…},"output":[{"result":false,"trace":null}],"status":"success"}
@@ -551,8 +551,7 @@ each deliberate:
   single rule that tracks the clauses of s.3 keeps the name
   `the person must not sell alcohol`, and the version assembled from sub-rules
   is named `the person must not sell alcohol (tidied)`;
-- each of the seven names carries a `@desc`, the question a member of the
-  public is shown;
+- each of the seven names carries a `@desc`, the help text shown beside it;
 - it ends with five `#CHECK` lines, which report what kind of thing each rule
   answers with, rather than working any of them out. `#CHECK` needs no facts
   supplied, so it runs whether or not anybody has filled the blanks in.
@@ -647,8 +646,8 @@ IF  `is commercial enterprise`
 #CHECK `has disqualifying factors`
 ```
 
-_Proposed, not landed (2026-09-04): the tests in step 4 use `#EVAL … WITH`,
-which is not in the version of L4 you have. That is why they are absent from
+_Proposed, not landed (2026-09-04): the tests in step 4 use `#EVAL … WITH` on
+a section `GIVEN`, which L4 cannot do yet. That is why they are absent from
 the file above: they would not run. Until `WITH` arrives, supply the facts from
 outside the file, the way "Supplying a case today" shows._
 
@@ -722,8 +721,8 @@ Naming two things in a row after a rule's name, as
 inputs is asked in L4.
 
 The heading is carried verbatim; the rest is numbered by depth. You pick the
-_style_ per level (`recital scheme` is upper-alpha, then decimal, then
-lower-roman) and the renderer assigns the actual markers:
+_style_ per level and the renderer gives back one line of text per item,
+printed as a single `LIST` and laid out here one to a row:
 
 ```
 RECITALS
@@ -805,7 +804,7 @@ sections, the way the statute has two.
 - How to declare a section's shared facts once, as a section `GIVEN` under the
   heading, indented past the `§`
 - Why the column matters, and what the error looks like when it is wrong
-- How `@desc` turns a name into the question a member of the public is shown
+- How `@desc` adds help text beside a name the form asks about
 - How to encode AND/OR conditions
 - What a rule says when it is asked before its blanks are filled, and why that
   is an answer rather than a failure
