@@ -751,7 +751,7 @@ Kept so that no later session re-proposes one without meeting its witness.
    sort is ever suppliable, before any discharge crosses `IMPORT`. **"Before any discharge crosses
    `IMPORT`" is now a measured requirement, not a precaution: the read-set does not cross an
    `IMPORT` today and neither does the supply path, and the two fail in opposite directions.** See
-   the cross-`IMPORT` defect in §7 below, `IMPLICIT-PROPS-DESIGN.md` §11.18, which rules that
+   the cross-`IMPORT` defect in §7 below, `IMPLICIT-PROPS-DESIGN.md` §11.19, which rules that
    the **refusal** is the first required move and the closure the second, and
    `OPEN-FINDINGS-2026-09-05.md` **OF-7**, which is the defect record.
 4. **Section binder parse** per R4, with the misattachment check error and both printers' goldens.
@@ -806,7 +806,7 @@ the dead `LocalAssume` grammar (§6 item 7); function-typed `ASSUME` refused by 
 
 **NEW 2026-09-05 — the read-set does not cross an `IMPORT`, and neither does the supply path.**
 Filed with R13/R14 (rulings-bench card `D5-computed-fields-purity`, option A′); ruled in
-`IMPLICIT-PROPS-DESIGN.md` §11.18; the full probe and both halves are in
+`IMPLICIT-PROPS-DESIGN.md` §11.19; the full probe and both halves are in
 `OPEN-FINDINGS-2026-09-05.md` **OF-7**. In one line: an export whose read
 crosses an `IMPORT` gets `{"errors":[],"status":"valid"}` from `l4 batch --validate-only` and then
 fails to evaluate, and a value supplied under the binder's name is accepted into the row and

@@ -105,7 +105,7 @@ This is the answer to the closure-opacity problem: with closures you must trace 
 
 ### 4.3 Discover purity; don't annotate it
 
-> **WITHDRAWN 2026-09-05 — see R14 (§11.17).** Nothing below was ever built, and the badge it
+> **WITHDRAWN 2026-09-05 — see R14 (§11.18).** Nothing below was ever built, and the badge it
 > proposes would be uninformative: 95 of the 745 `.l4` files under `jl4/` and `jl4-core/` carry a
 > module-level `ASSUME` at all, so "very pure" would be true of roughly seven files in eight.
 > The read-set that §4.3 wanted as its mechanism is separately real and shipped (PR #328); what is
@@ -154,7 +154,7 @@ The intent is that **the developer never has to write the `props` requirements b
 
 ### 5.3 Computed fields compose with `props`
 
-> **DISCHARGED 2026-09-05 — see R13 (§11.16).** This section turns out to describe the tree
+> **DISCHARGED 2026-09-05 — see R13 (§11.17).** This section turns out to describe the tree
 > rather than propose anything: a computed field reading a section binder type-checks, exports,
 > and evaluates today (probe measured 2026-09-05, answer 109), because
 > `jl4-core/src/L4/TypeCheck.hs:195-199` orders the two desugars so they do not interfere and
@@ -216,7 +216,7 @@ Minimize the surface of the breaking change: existing explicit `GIVEN` threading
 5. **Interaction with `WHERE` closures.** How does the new `props` model relate to the existing `WHERE`-block environment access? Subsume it, coexist, or reframe `WHERE` in terms of `props`?
 6. **Regulative rules.** How does implicit `props` interact with `PARTY`/`MUST`/`HENCE`/`LEST` and with `#TRACE` temporal testing? Does the environment flow through state transitions, and how is it shown in `#TRACE` output?
 7. **Teaching story.** How do we _teach_ `props`? The mental model ("everything the caller knows is passed on, unless you deliberately use `local`") needs a crisp, honest framing that doesn't read as "we brought back globals."
-8. ~~**Purity classification surface.** How is "very pure" exposed — diagnostic, hover, badge in the visualizer, attribute in generated artifacts?~~ **WITHDRAWN 2026-09-05, see R14 (§11.17)** — it asks where to paint a classification that was never built and would not inform; §4.3, which it depends on, is withdrawn with it.
+8. ~~**Purity classification surface.** How is "very pure" exposed — diagnostic, hover, badge in the visualizer, attribute in generated artifacts?~~ **WITHDRAWN 2026-09-05, see R14 (§11.18)** — it asks where to paint a classification that was never built and would not inform; §4.3, which it depends on, is withdrawn with it.
 9. **Error messages.** When a function references a `props` field not available in scope, the diagnostic must stay intelligible across a large call graph. What does a good error look like?
 
 ---
@@ -470,7 +470,7 @@ rulings are closed; what remains is implementation in the order of `PROPS-REDTEA
 **Added 2026-09-05, from a second rulings sheet Meng marked that day.** Four further rulings sit
 below and are **not** part of the 2026-09-04 red team: **R7 is amended** by §11.9.1 (the DMN image
 of a refusal), **R7.1** is added by §11.9.2 (the pre-commencement gate), and **R13** and **R14**
-are added by §11.16 and §11.17 (§5.3 discharged, §4.3 and §8 Q8 withdrawn), and §11.18 rules the
+are added by §11.17 and §11.18 (§5.3 discharged, §4.3 and §8 Q8 withdrawn), and §11.19 rules the
 ORDER in which the cross-`IMPORT` hole is repaired — the refusal before the closure — while the
 defect record itself lives at `OPEN-FINDINGS-2026-09-05.md` **OF-7**, because it spans `Export.hs`,
 `Batch.hs` and `Print.hs` and needs an id that does not move when this section list grows. **Every one of the four authorises work that has not been done**;
@@ -1531,9 +1531,10 @@ boundary", and it is deferred. `ok/section-given-import-def.l4` and
   `` `is a British citizen (variant)` `` to a higher-order rule and lost both its
   `#EVAL`s without it. `ok/section-given-reader-as-value.l4` pins both spellings.
   `ImplicitReaderUsedAsValue` and its corpus file are gone with it.
+
 ---
 
-### 11.16 R13 — §5.3 is discharged: computed fields already compose. RULED 2026-09-05.
+### 11.17 R13 — §5.3 is discharged: computed fields already compose. RULED 2026-09-05.
 
 **Ruling (Meng, 2026-09-05, mark `accept` on rulings-bench card `D5-computed-fields-purity`,
 option A′).** §5.3, "computed fields compose with `props`", is **discharged**: it is a description
@@ -1565,7 +1566,7 @@ exposure is wider than a file list suggests even though the count of changes is 
 
 ---
 
-### 11.17 R14 — §4.3 and §8 Q8 are withdrawn: "very pure" is not built and would not inform. RULED 2026-09-05.
+### 11.18 R14 — §4.3 and §8 Q8 are withdrawn: "very pure" is not built and would not inform. RULED 2026-09-05.
 
 **Ruling (Meng, 2026-09-05, same card, option A′).** §4.3 ("Discover purity; don't annotate it" —
 mark a subtree "very pure" when it never touches the environment) and §8 open question 8 ("Purity
@@ -1592,7 +1593,7 @@ proposal against a read-set that by then exists, not a resumption of this one.
 
 ---
 
-### 11.18 The cross-`IMPORT` hole. RULING here; the defect record is OF-7.
+### 11.19 The cross-`IMPORT` hole. RULING here; the defect record is OF-7.
 
 **Ruling (with R13/R14, card `D5-computed-fields-purity`, option A′).** The measurement pass that
 discharged §5.3 turned up a hole, and it is **filed as a defect rather than silently absorbed**.
@@ -1608,5 +1609,5 @@ replaces.
 [`OPEN-FINDINGS-2026-09-05.md` OF-7](./OPEN-FINDINGS-2026-09-05.md), not this section.** It was
 moved there 2026-09-05 because a defect that spans `Export.hs`, `Batch.hs` and `Print.hs` was never
 a props-spec section, and because `OF-7` is a stable id while a §11 number is not: three branches
-appended to §11 on one day and collided. **Cite `OF-7` for the defect and §11.18 for the ruling.**
+appended to §11 on one day and collided. **Cite `OF-7` for the defect and §11.19 for the ruling.**
 Also recorded in `PROPS-REDTEAM-2026-09-03.md` §7.

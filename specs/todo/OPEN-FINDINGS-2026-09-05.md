@@ -41,11 +41,12 @@ as "which line".
 Resolved 2026-09-05 — recorded because the resolution is the reason the numbers are what they are.**
 `props/tdnr-collapse` took **§11.15** and reached `unstable` in **#338**, leaving a deliberate gap
 at §11.14. `props/assume-sweep` filled that gap with its own **§11.14** (sequencing item 6) and
-reached `unstable` in **#337**. `props/rulings` had also written **§11.14, §11.15 and §11.16**, so
-two of its three headings were duplicates the moment #338 landed; it renumbered to **§11.16 (R13),
-§11.17 (R14), §11.18** (the cross-`IMPORT` ruling). All three of those were free before #337 and
-after it, and the renumber was re-derived against the real post-#337 head rather than a predicted
-one. **The lesson, not the numbers:**
+reached `unstable` in **#337**. `props/rulings` had also written **§11.14, §11.15 and §11.16**, and had to
+renumber **twice**: once when #338 made two of its three headings duplicates, and again when #344
+(discharge) took **§11.16** on `unstable`. It now holds **§11.17 (R13), §11.18 (R14), §11.19** (the
+cross-`IMPORT` ruling), re-derived against the real head each time rather than a predicted one.
+**Twice is the finding**, not the numbers: an append-only numbered list in a file several branches
+edit will keep colliding for as long as the numbers are the handle. **The lesson, not the numbers:**
 a positional handle is not safe under concurrent authorship, so prefer the stable ruling id
 (`R13`, `R14`) where one exists, and — as this file does — give defect records ids of their own
 rather than section numbers.
@@ -357,7 +358,7 @@ applies depends on the base that work is cut from.
 ## OF-7 — the read-set does not cross an `IMPORT`, and neither does the supply path
 
 **Severity: a false green, then a loud failure. Ruled, not built. The ORDERING is ruled in
-`IMPLICIT-PROPS-DESIGN.md` §11.18 — the refusal first, the closure second — and this is the record
+`IMPLICIT-PROPS-DESIGN.md` §11.19 — the refusal first, the closure second — and this is the record
 that ruling points at.** Also listed in `PROPS-REDTEAM-2026-09-03.md` §7.
 
 **The hole, measured 2026-09-05** (probe `scratchpad/consult/adv-d5/cf5.l4` + `lib_c.l4`, run on
@@ -517,7 +518,7 @@ Filed by whoever holds GitHub write authority; **nothing here has been posted**.
 | OF-5       | New issue: a `WHERE` local silently shadows a section `GIVEN`; ask for a warning, not an error.                                                                                                     |
 | OF-4       | No issue yet — measure first. An issue asserting a behaviour nobody has run would be the thing this file exists to prevent.                                                                         |
 | OF-6       | **#948: neither close nor re-open on today's evidence.** Comment the branch split if anything at all.                                                                                               |
-| OF-7       | Nothing yet — the ruling (refusal first) is not built, and an issue before the branch exists would only restate `IMPLICIT-PROPS-DESIGN.md` §11.18.                                                  |
+| OF-7       | Nothing yet — the ruling (refusal first) is not built, and an issue before the branch exists would only restate `IMPLICIT-PROPS-DESIGN.md` §11.19.                                                  |
 | OF-8       | Nothing — a toolchain decision, not a defect; it wants a PR, not an issue.                                                                                                                          |
 | OF-11      | Nothing — a wording change plus a grep, not an issue.                                                                                                                                               |
 | OF-12      | Nothing until it is costed; an issue asking for an unscoped tool is not a request anyone can act on.                                                                                                |

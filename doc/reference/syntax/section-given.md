@@ -238,7 +238,7 @@ repair is ruled and not yet built, and the first part of it is a **refusal** —
 search. Recorded as a defect in
 `specs/todo/OPEN-FINDINGS-2026-09-05.md` as **OF-7** (and listed in
 `specs/todo/PROPS-REDTEAM-2026-09-03.md` §7); the ordering of the repair is ruled in
-`specs/todo/IMPLICIT-PROPS-DESIGN.md` §11.18.
+`specs/todo/IMPLICIT-PROPS-DESIGN.md` §11.19.
 
 ## Example
 
