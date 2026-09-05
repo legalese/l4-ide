@@ -615,11 +615,12 @@ A throw at force, never a value; `#ASSERT REFUSED e` with an optional message an
 assertion outcome; house style one named definition per refusal with its `@ref`, readers
 byte-identical, polymorphic ones declared `GIVEN a IS A TYPE`; `Ref(f)` reported per reason string
 with the prelude's `TBD` excluded and warned separately; the per-backend image of
-`PROPS-REDTEAM-2026-09-03.md` §2.8 (DMN omits the refusing row, non-Blocking `D-REFUSE`,
-`MayRefuse` safety kind; Catala no definition; Docassemble a terminal screen; evaluator, CLI, batch
-and service a `refused` kind); order-dependence under lazy `AND`/`OR` written down. The taxonomy
-row is split: "the law does not apply / is not in force" is a value or gate that savings and
-transitional provisions can reach; "the model does not cover this" is `REFUSE`.
+`PROPS-REDTEAM-2026-09-03.md` §2.8 (~~DMN omits the refusing row, non-Blocking `D-REFUSE`,
+`MayRefuse` safety kind~~ — **DMN's third of that image is SUPERSEDED by §11.9.1 below**; Catala no
+definition; Docassemble a terminal screen; evaluator, CLI, batch and service a `refused` kind);
+order-dependence under lazy `AND`/`OR` written down. The taxonomy row is split: "the law does not
+apply / is not in force" is a value or gate that savings and transitional provisions can reach;
+"the model does not cover this" is `REFUSE`.
 
 **Consequence to carry, so two documents do not contradict.** The split reclassifies Reg CF's
 pre-commencement case, which `specs/todo/lexipedia-superset/CORPUS-TRACK.md` §8 ruling R2 and
@@ -627,6 +628,158 @@ pre-commencement case, which `specs/todo/lexipedia-superset/CORPUS-TRACK.md` §8
 on <day>" arm (`TEMPORAL-RULE-VERSION-DESIGN.md` item 3), which becomes a gate. Neither has a gate
 design yet. Until one exists the commencement arm stays a `REFUSE`, and the PR that lands `REFUSE`
 amends CORPUS-TRACK §8 in the same change.
+
+### 11.9.1 D1 — the DMN image of a refusal. RULED 2026-09-05 (marked accept).
+
+**A `REFUSE` lowers to FEEL `null`. The refusing row is NOT omitted. `DMN-SAFE` is withdrawn from
+any decision that can refuse, and the existing call-site calibration sets the severity of a new
+`D-REFUSE` code. `MayRefuse` is dropped.** This AMENDS §11.9's reference to
+`PROPS-REDTEAM-2026-09-03.md` §2.8; that paragraph's DMN sentence is superseded, and §2.8 and §6
+item 6 say so in this same change.
+
+The reason string is written into the artifact twice, which is the property omission could not
+have had: on the refusing `<rule>`'s `<description>` (`OTHERWISE — REFUSE: …`), and on a new
+`<decision>` `<description>` (`REFUSE: …`) covering the two shapes with no row — a whole body that
+refuses, and an `OTHERWISE` that became a `defaultOutputEntry` under `UNIQUE`.
+
+**What decided it.**
+
+1. **The baseline, reproduced rather than inherited.** Before this change the exporter wrote the L4
+   source text into a FEEL literal (`Dmn/Lower.hs:2285`, `Refuse {} -> verbatim e`), and KIE
+   8.44.0.Final answered `ERROR [ERR_COMPILING_FEEL] … syntax error`, `BUILD 1 error(s)`,
+   `VERDICT … <<< FAILED` — it did not merely mark the file Blocking, it failed to compile it.
+   After the change the same module is `XSD valid / VALID clean / BUILD clean`.
+2. **§2.8's argument for omission cannot choose between the options.** It read "FEEL `null` is
+   already spent on `NOTHING`, so `REFUSE → null` would launder". Measured: an omitted row and a
+   `null` row are **engine-identical under both hit policies this exporter emits** — under
+   `HitFirst` the catch-all is a rule (`Lower.hs:695`) and deleting it leaves nothing matching;
+   under `HitUnique` the `OTHERWISE` is the `defaultOutputEntry` (`Lower.hs:1651`) and deleting it
+   has the same effect. Both answer `null`. Given the equivalence, `null` is the cheaper arm (one
+   case alternative, versus recomputing eight `informationRequirement` sets) and the only one that
+   keeps the author's sentence, because omission deletes the `<rule>` whose `<description>` would
+   hold it.
+3. **What replaces the laundering worry.** Not a promise, three mechanisms: a refusal is a `REFUSE`
+   clause in `analyzeSafety`, so a refusing decide is **not** `DMN-SAFE` and does not un-lift; the
+   clause **propagates to callers** carrying the callee's own reason, which is §2.8's `Ref(f)`
+   fixpoint over the graph that already existed; and `D-REFUSE` is raised at the severity
+   `D-PARTIAL` already uses (extracted into one shared helper, not copied) — `Lossy` when every
+   call site is a lazy arm, `Blocking` on any strict consumer or none at all. §2.8's "non-Blocking
+   `D-REFUSE`" is overruled by the DRG-root case, where a caller gets `null` with status SUCCEEDED
+   and nothing to tell it apart from an answer.
+4. **Neutrality, measured not assumed.** All ten existing DMN golden subjects regenerate
+   byte-identically (`.dmn` and `.fidelity.txt`, 20/20, after normalising the harness's `main.l4:`
+   source prefix). No corpus module contains a `REFUSE` the DMN exporter can see, and
+   `analyzeSafety`'s documented cross-module gap keeps `prelude.l4`'s `TBD` invisible to it.
+
+**The condition Meng's acceptance attached, and what each half became.**
+
+- _A case that evaluates through a refusal, on both engines._ Built as
+  `jl4/examples/dmn/refuse.l4` + `refuse.cases.json`, an eleventh golden subject holding one of
+  each position a refusal can occupy. **KIE: `5 case(s), 0 error(s), 0 warning(s), 35/35 SUCCEEDED,
+35/35 value(s) as expected, 25/25 service output value(s) as expected`. Camunda 8.7.6: `5
+case(s), 1 parsed, 0 error(s), 35/35 evaluated, 35/35 value(s) as expected`.** Wired as its own
+  step in the DMN engine job.
+- _`--fail-on=blocking` actually exercised._ Wired into the `p7-dmn` leg's export
+  (`etc/go/phases/p7-dmn.sh` step 1, gated at step 4b). Measured green first: the Reg CF corpus
+  exports **0 blocking** notes today (21 lossy, 133 advisory), so the gate is not red on arrival.
+- _The enum case._ See §11.9.2, which is where it stopped being a precondition and became a
+  ruling of its own.
+
+**A correction to the precondition as written.** "A pre-commencement case in each of
+`regcf-corpus.cases.json`, `gst-rate.cases.json` and `ymd-dates.cases.json`" was already true of
+two of them: `gst-rate` has cases F (1990-01-01) and J (1994-03-31), `ymd-dates` has F, G and H.
+Only `regcf-corpus` has none — all 22 cases sit at 2016-09-01 or later against a 2016-05-16
+commencement. The substantive half of the finding stands for all three and is **not** discharged by
+this change: none of those cases evaluates through a `REFUSE`, because all three still spell the
+floor as an `ASSUME` the harness supplies as `-1`. `refuse.l4` is what makes that migration safe to
+attempt; the migration itself is the next change, and it is where the `regcf-corpus` case belongs,
+since a case added now would pin the `ASSUME` image it is about to replace.
+
+**Owner's note on the second per-backend image.** The dmnmd/markdown carrier is ruled here too:
+**a refusing table is omitted, loudly.** No code was needed for the omission — `mdOutput` already
+refuses anything outside S-FEEL and FEEL `null` is not S-FEEL — but the message was wrong, naming
+the enumeration ("parentheses, a comma, or an expression outside S-FEEL") rather than the instance,
+which is the mistake `cellSyntaxReason`'s own header records having made once already over dates.
+Both `D-MD-CELLSYNTAX` and `D-MD-NOLITERAL` now name the refusal and carry the reason. The
+projection of `refuse.l4` to markdown is an empty document, and that is the finding rather than a
+defect in the fixture: dmnmd cannot say `null`, and a bare `null` cell would be read back as the
+STRING `"null"`.
+
+### 11.9.2 D1a — `<outputValues>` is widened by `null`. RULED 2026-09-05 on measurement.
+
+**When a decision table's output entry can be FEEL `null` and the table declares an
+`<outputValues>` domain, `null` joins that list — unquoted, as the FEEL keyword. The type's own
+`<itemDefinition>`/`<allowedValues>` is untouched. A `D-OUTPUTVALUES-NULL` note (Lossy) records
+it.**
+
+**What decided it, and it is the finding of this whole change.** D1's third precondition called
+`null`-against-an-enum "the concrete silent-wrong-answer path". It is not silent, and it is not
+loud either — **the two target engines disagree**. Measured 2026-09-05 on a
+`Band IS ONE OF standard, reduced, exempt` table whose `OTHERWISE` refuses:
+
+| engine                    | what it does with `null` against `<outputValues>`                                                                                       |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| KIE 8.44.0.Final          | runtime **ERROR**, decision **FAILED** — `Invalid result value on rule #3, output #1. Value null does not match list of allowed values` |
+| Camunda 8.7.6 (zeebe-dmn) | returns the `null` **silently**, `0 error(s)`, decision evaluated                                                                       |
+
+One artifact, two meanings, which is a stronger reason to act than either engine alone would have
+been. Widening the list reconciles them (re-measured: KIE `2/2 SUCCEEDED`, Camunda `2/2 value(s) as
+expected`) at a cost of exactly one value of domain assertion — a value the table genuinely can
+produce, so declaring it is more accurate than not, not less.
+
+**Isolated by probe, not by argument.** The same enum is declared twice: on the type's
+`<allowedValues>` and on the table's `<outputValues>`. Widening `allowedValues` alone does **not**
+stop the KIE error; widening `outputValues` alone does. So the TYPE keeps its exact L4 domain for
+every other consumer, and only the table that can decline says that it can.
+
+**Not refusal-specific, deliberately.** The condition is "an output entry renders as bare `null`",
+which since R8-d′ is also true of a `MAYBE`-valued table. That case carried the same latent
+divergence and is closed by the same line. No existing golden moves, so the corpus has no such
+table today.
+
+**Kept honest by a pair, not a positive.** `jl4/tests-cli/fixtures/dmn-refuse-enum/` holds
+`widened.dmn` and `unwidened.dmn`, differing in one token, and CI asserts KIE green on the first
+and red-with-that-message on the second, **and Camunda green on both**. The positive alone would be
+equally consistent with KIE having stopped checking `<outputValues>` at all, which is exactly what
+the step claims to exclude. If either half moves, the widening is re-ruled rather than re-blessed.
+
+### 11.9.3 D6's DMN half — NOT taken, and why. Reported 2026-09-05.
+
+D6 (accepted 2026-09-05) rules the pre-commencement gate to be a property of the rule-version axis
+in the long run, and says its DMN half lands first as option 3: **"the refusing row is omitted, and
+the table declares itself incomplete"**. On the one construct where D1 and D6 overlap — a dated
+interval table (§15.3) whose floor arm refuses — **that contradicts D1, which rules the refusing
+row is kept.** Both were accepted, 73 seconds apart.
+
+**D1's image was built, and D6's was not.** Three reasons, stated so a later reader does not
+mistake this for an oversight: D1 was adversarially checked and D6's refuter died on a session
+limit, so D1 carries two opinions and D6 one; the measurement that decides D1 (omission and `null`
+are engine-identical) applies unchanged to the floor row, so option 3 buys no engine-visible
+loudness while losing the reason string; and two images for one construct inside one exporter is
+the kind of split a later reader gets wrong. **Nothing in D6's own reasoning is contradicted** —
+its deciding measurement is that all nine corpus bottoms are `NUMBER`-typed so the gate cannot live
+in the return type, which is equally true under D1's image.
+
+**The measurement, taken 2026-09-05 rather than left owed.** `refuse.dmn`'s floor row was deleted
+by hand from the emitted artifact — the exact shape option 3 asks for — and both engines were run
+over the same five cases:
+
+| image                        | values           | KIE 8.44.0.Final                                                                                                                                      | Camunda 8.7.6        | the reason, in the artifact                                                               |
+| ---------------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- | ----------------------------------------------------------------------------------------- |
+| floor row KEPT, `null` (D1)  | 35/35            | `0 error(s), 0 warning(s)`                                                                                                                            | `0 error(s)`         | row `<description>`, `<decision>` `<description>`, and the arm's `@ref` `annotationEntry` |
+| floor row OMITTED (D6 opt 3) | 35/35, identical | `0 error(s), 4 warning(s)` — `WARN … No rule matched for decision table 'the_filing_fee' and no default values were defined. Setting result to null.` | `0 error(s)`, silent | none — the `<rule>` that held all three is deleted                                        |
+
+**So D1's "engine-identical" claim is confirmed on the VALUES, on both engines, and is incomplete
+on KIE's diagnostics: omission does buy a runtime WARN that the `null` row does not.** That is a
+real point for D6 and it is recorded here rather than argued away. What it buys is one-engine-only
+(zeebe-dmn is silent either way) and per-evaluation; what it costs is the author's sentence, the
+`@ref` citation and the `<description>`, at export time, on both engines. Both images are equally
+loud in the FIDELITY REPORT, which carries `D-REFUSE` either way.
+
+**This is a ruling for Meng, not for the deputy who measured it.** D1 as accepted says do not omit,
+and that is what shipped. If D6's half is preferred on the strength of KIE's WARN, the change is
+one arm of `datedTable`'s `ruleSpecs` and its goldens, and it should be taken as an amendment to
+§11.9.1 rather than as a second image alongside it.
 
 ### 11.10 R10 — Backends. RULED 2026-09-04 (marked accept).
 
