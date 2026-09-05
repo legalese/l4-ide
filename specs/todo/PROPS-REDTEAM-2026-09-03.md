@@ -521,17 +521,20 @@ note above); Catala
 emits no definition (its ladder veto exempts consequences); Docassemble a terminal screen;
 evaluator, CLI, batch and service a `refused` kind on all six surfaces. The temporal design's
 generated "not in force on <day>" arm (`TEMPORAL-RULE-VERSION-DESIGN.md` item 3) is reconsidered as
-a **gate** rather than a refusal, per the split row below.
+a **gate** rather than a refusal, per the split row below. **That gate is now designed: ANSWERED
+2026-09-05, see `IMPLICIT-PROPS-DESIGN.md` §11.9.2 (R7.1)** — a property of the rule-version axis,
+answered once at the boundary, with a structural absence in the table as its DMN half. Ruled, not
+built.
 
-| non-answer                               | construct            | who handles it                                   | catchable       |
-| ---------------------------------------- | -------------------- | ------------------------------------------------ | --------------- |
-| a value that may be absent               | `MAYBE`              | the rule, by matching                            | yes, as a value |
-| an expected failure with a reason        | `EITHER`             | the rule or its caller                           | yes, as a value |
-| a fact not yet known                     | an unsupplied binder | the boundary asks                                | n/a             |
-| the law does not apply / is not in force | a value or gate      | savings and transitional provisions can reach it | yes             |
-| the model does not cover this            | `REFUSE`             | the boundary only                                | no              |
-| a breach                                 | `LEST`               | the obligation's own branch                      | structured      |
-| an overridden conclusion                 | `SUBJECT TO`         | the overriding rule                              | structured      |
+| non-answer                               | construct              | who handles it                                   | catchable       |
+| ---------------------------------------- | ---------------------- | ------------------------------------------------ | --------------- |
+| a value that may be absent               | `MAYBE`                | the rule, by matching                            | yes, as a value |
+| an expected failure with a reason        | `EITHER`               | the rule or its caller                           | yes, as a value |
+| a fact not yet known                     | an unsupplied binder   | the boundary asks                                | n/a             |
+| the law does not apply / is not in force | a gate (R7.1, §11.9.2) | savings and transitional provisions can reach it | yes             |
+| the model does not cover this            | `REFUSE`               | the boundary only                                | no              |
+| a breach                                 | `LEST`                 | the obligation's own branch                      | structured      |
+| an overridden conclusion                 | `SUBJECT TO`           | the overriding rule                              | structured      |
 
 The fourth row was split from the fifth on the legal lens's finding: pre-commencement is
 determinate and reachable by savings provisions (SG Interpretation Act 1965 s 16(1)(b)–(c)), and a

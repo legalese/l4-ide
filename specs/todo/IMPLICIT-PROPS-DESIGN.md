@@ -789,6 +789,94 @@ own taxonomy — an out-of-range month is invalid input, the `EITHER` row, not a
 `jl4/examples/dmn/gst-rate.l4:62-65`, `jl4/examples/dmn/ymd-dates.l4:83-86`,
 `jl4/examples/legal/regcf/regcf.l4:135-143`. `jl4-core/libraries/daydate.l4:102-104` does not.
 
+#### 11.9.2 R7.1 — the pre-commencement gate lives on the rule-version axis. RULED 2026-09-05.
+
+R7's "Consequence to carry" above says the taxonomy split reclassifies Reg CF's pre-commencement
+case and the temporal design's generated "not in force on ⟨day⟩" arm, and that **neither has a gate
+design yet**. This is that design.
+
+**Ruling (Meng, 2026-09-05, mark `accept` on rulings-bench card `D6-precommencement-gate`).**
+
+- The gate is a **property of the rule-version axis, answered once at the boundary** (the card's
+  option 4). That is the design.
+- Its **DMN half lands first as the card's option 3**: the refusing row is **omitted** from the
+  exported table, and the table **declares itself incomplete**.
+- The gate is **not** a value in the return type (option 2, declined on measurement — see below).
+- "Do nothing, leave the arm an `ASSUME` bottom until Phase 2 builds the axis" (option 1) is
+  declined: R0 deprecates `ASSUME`, so doing nothing is not a stable resting place.
+
+**Read this beside §11.9.1, or the two look contradictory.** §11.9.1 rules that a `REFUSE` lowers
+to FEEL `null` and **omits nothing**. R7.1 rules that a pre-commencement gate **omits its row**.
+They do not conflict, because R7's own taxonomy puts them in different rows: _"the law does not
+apply / is not in force"_ is a value or gate — this ruling — and _"the model does not cover this"_
+is `REFUSE` — §11.9.1. The migration is what makes the difference visible: a site that moves to the
+gate stops being a refusal, and §11.9.1 stops reaching it. `regcf.l4:486`, the COVID-19 temporary
+rules, stays a `REFUSE` and is governed by §11.9.1; the model genuinely does not cover it.
+
+**Status: ruled 2026-09-05; NOT BUILT, on either half.** Option 4 needs the rule-version axis of
+`TEMPORAL-RULE-VERSION-DESIGN.md` Phase 2, which is unstarted. Option 3 needs the DMN exporter to
+omit a floor row and to mark the table incomplete, and no code does either today: `§15.3` emits the
+floor row `< date(dₙ)` precisely so the table is **total** over the date axis, and §3.3.1's `SHALL`
+is read as forbidding a default on a complete table. Until both land, the arms stay as they are.
+
+**What decided it.** One measurement rules out the return-type answer, and it is the only one that
+separates the options. **Every pre-commencement bottom in the tree is `NUMBER`-typed** — measured
+2026-09-05, ten declarations across ten `.l4` files, every one `IS A NUMBER`. A gate carried in the
+return type therefore has to widen `NUMBER` into a tagged union, and a payload-carrying
+`IS ONE OF` read by a decision is exactly what the DMN exporter refuses today with a **`Blocking`
+`D-SUMTYPE`** (`DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §7 and §4.2.1) — the same class of "raw L4 that
+no engine can evaluate" that §11.9.1 is repairing for `REFUSE`. Option 2 would buy a gate by
+creating, in nine or ten places, the defect the sibling ruling exists to remove. That leaves the
+shape of the table and the axis itself, which is what was ruled.
+
+**Blast radius, measured 2026-09-05.** Ten declarations and **twenty-four floor-arm sites** across
+ten `.l4` files:
+
+| file                                              | declaration | floor arms |
+| ------------------------------------------------- | ----------- | ---------- |
+| `jl4/examples/legal/regcf/regcf.l4`               | `:143`      | 8          |
+| `jl4/examples/legal/regcf/denovo/regcf-denovo.l4` | `:211`      | 7          |
+| `jl4/examples/dmn/gst-rate.l4`                    | `:65`       | 2          |
+| `jl4/examples/dmn/ymd-dates.l4`                   | `:86`       | 1          |
+| five `jl4/examples/dmn/not-ok/dated-chain-*.l4`   | one each    | 1 each     |
+| `canon` `subjects/sg/child-support/…/sg-csp.l4`   | `:79`       | 1          |
+
+Also: **2 export-schema entries** in `jl4/examples/legal/regcf/denovo/tests/regcf-denovo.schema.golden`
+(`:733` under `/properties`, `:757` under `/required`) and **one `<inputData>` per exported DMN with
+a floor arm** disappear under options 3 and 4. **3 sg-succession sites** already use a value-shaped
+gate for enum-returning sections and are unaffected. Under options 3 and 4 no existing program
+changes meaning: each migrated site moves from a bottom that stops evaluation to a gate that stops
+evaluation, and the only observable difference is at the backends, where a caller-supplied number
+becomes a declared absence.
+
+**Two corrections to the card, both measured.**
+
+1. The card counted **9 declarations, 22 arms, across 9 files, "four `dmn/not-ok` fixtures"**.
+   There are **five** such fixtures (`dated-chain-rolling-date`, `-duplicate-date`, `-misordered`,
+   `-nested-otherwise`, `-mixed`), which makes the l4-ide totals 9 declarations and 23 arms — and
+   the card's own "across 9 `.l4` files" was already counting all five.
+2. The card said **"0 sites in canon — canon has no pre-commencement bottom."** It has one:
+   `subjects/sg/child-support/encodings/legalese/sg-csp.l4:79`,
+   ``ASSUME `no Baby Bonus Cash Gift rate is encoded for a birth before 2015-01-01` IS A NUMBER``,
+   reached from one arm at `:88`. The card's other canon claim is right — `sg-child-support.l4`'s
+   live transitional provision models "born before commencement" as an ordinary value — but that is
+   a different site.
+
+**A distinction the card did not draw, and the migration must.** These ten are not one population.
+Some say _the law was not in force_ (`regcf.l4:143`, `gst-rate.l4:65`, `ymd-dates.l4:86`, the five
+fixtures) and belong in the gate row. Others say _this encoding does not carry that period_ —
+`regcf-denovo.l4:211` ("no encoding of Part 227 exists for rule dates before 2022-09-20") and
+canon's `sg-csp.l4:79` ("this encoding does NOT carry the earlier rates", its own comment at
+`:70-78`) — which is the `REFUSE` row of R7's taxonomy, not the gate row, even though both are
+guarded on a date. Canon's is guarded on the **child's date of birth**, not on
+`RULES EFFECTIVE DATE`, so no rule-version axis can answer it at all. **The migration classifies
+per site against R7's taxonomy; it does not sweep the ten.**
+
+**Adversarial status.** Card D6's refuter died on a session limit, so this ruling rests on **one
+opinion, not two** — unlike D1, D2, D3, D4 and D5. The measurement it turns on (all bottoms
+`NUMBER`-typed; a tagged union is `Blocking D-SUMTYPE`) was re-checked here and holds, but no
+adversary looked for a reading it misses. Treat it accordingly.
+
 ### 11.10 R10 — Backends. RULED 2026-09-04 (marked accept).
 
 The transitive read-set pass lands first; the schema is keyed by (name, tier) with `x-l4-tier`;

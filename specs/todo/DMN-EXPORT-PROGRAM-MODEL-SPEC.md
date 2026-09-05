@@ -5718,6 +5718,21 @@ editor cannot silently un-change one:
 Two harness repairs went with them: the `{"$date": …}` predicate disagreed between the two Java
 checkers (§15.6), and the exhibit's boundary coverage straddled one seam out of three (§15.10).
 
+**Third note, 2026-09-05 — the floor row was decided against a different alternative than the one
+now ruled.** The floor-row bullet above (and R9, which admits the floor row as a third spelling on
+§3.3's own logic) was decided when the choice was "floor row **or** `UNIQUE` +
+`defaultOutputEntry`", both of which answer the pre-commencement day with a value. A third
+alternative has since been ruled: **`IMPLICIT-PROPS-DESIGN.md` §11.9.2 (R7.1, 2026-09-05)** rules
+the pre-commencement gate a property of the rule-version axis, whose **DMN half is a structural
+absence — the refusing row omitted and the table declaring itself incomplete**. That is not a
+spelling of the floor row; it is the opposite move, and it collides with §15.3's stated reason for
+the floor row (that it makes the table "exact, total over the date axis, and pairwise disjoint")
+and with §3.3.1's reading that a default on a complete table declares it incomplete. **Neither
+half of R7.1 is built**, so nothing in §15.3, §15.10, R9 or the goldens changes today. What is
+recorded here is that the floor row's ruling has an alternative it was not weighed against, so a
+later editor does not read §15.11's bullet as having disposed of it. When R7.1's DMN half is
+built, §15.3 and R9 are re-ruled in that PR, not silently overridden.
+
 ### 15.12 Rule-date-rebinding decides are not emitted — R12, ruled 2026-08-02 (Meng)
 
 **The ruling.** A decision carrying `D-RULEDATE-UNBOUND` — a body that evaluates a sub-graph under

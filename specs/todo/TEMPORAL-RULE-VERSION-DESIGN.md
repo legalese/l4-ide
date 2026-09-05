@@ -540,6 +540,24 @@ its amendment identity — without runtime machinery.
    overlapping identical spans. Pre-commencement interval scans then fail
    loudly _only_ if the scan actually reaches an uncovered day and the author
    provided no base arm — and the fix (add a base arm) is in-language.
+
+   **AMENDED 2026-09-05, see `IMPLICIT-PROPS-DESIGN.md` §11.9.2 (R7.1). "A generated final arm
+   raising a curated user error" is the wording R7 overruled and R7.1 replaces.** R7's taxonomy
+   split (`IMPLICIT-PROPS-DESIGN.md` §11.9) puts "the law is not in force" in the value-or-gate
+   row, not the refusal row, so the absence answer is **not** an error raised from inside a
+   generated arm. R7.1 rules it a **property of this axis, answered once at the boundary**, with
+   a **structural absence** as the DMN half — the row omitted, the table declaring itself
+   incomplete — landing first. Ruled 2026-09-05; **not built**, on either half, so nothing in
+   this Phase 2 item has moved from unstarted. What changes is what item 3 must build when it is
+   built: an axis-level gate at the boundary, not a per-family error arm. The rest of item 3 (the
+   gap/overlap lint, the overlapping-identical-spans error) is untouched.
+
+   Two consumers of this wording, corrected in the same change:
+   `specs/todo/lexipedia-superset/CORPUS-TRACK.md` §8 R2 and
+   `jl4/examples/legal/regcf/regcf.l4:135-143`, both of which name item 3 as their designed
+   replacement. R2 is amended; the corpus comment is left for the migration PR, which is the
+   change that will delete the arm it describes.
+
 4. **Round-trip**: TNR/NLG anchors attach to the _arm_ DECIDEs (each keeps
    its own SrcRange and `@label` with the amending instrument), so amendment
    identity, citations, and diffability survive — this answers the
