@@ -99,6 +99,7 @@ import L4.TypeCheck.With as X
 import qualified L4.Utils.IntervalMap as IV
 import L4.Lexer (FixityDirection (..), fixityHerald)
 import L4.Mixfix (MixfixInfo(..), MixfixPatternToken(..), extractMixfixInfo, canonicalMixfixName, firstKeyword, isBinaryInfixPattern, buildCanonicalNameFromKeywords)
+import qualified L4.Discharge as Discharge
 import qualified L4.Export as Export
 
 import Control.Applicative
@@ -115,7 +116,7 @@ import qualified Base.Set as Set
 import Data.Function (on)
 import Control.Exception (assert)
 import Text.Read (readMaybe)
-import L4.Desugar (desugarComputedFields, desugarSectionGivens, detectComputedFieldCycles, detectMisattachedSectionGivens, detectTypeSynonymCycles, extractComputedFieldNames)
+import L4.Desugar (collectSectionBinderNames, desugarComputedFields, desugarSectionGivens, detectComputedFieldCycles, detectMisattachedSectionGivens, detectRestatedSectionBinders, detectTypeSynonymCycles, extractComputedFieldNames)
 
 mkInitialCheckState :: Substitution -> CheckState
 mkInitialCheckState substitution =
@@ -144,6 +145,7 @@ mkInitialCheckEnv moduleUri environment entityInfo =
     , mixfixRegistry = emptyMixfixRegistry
     , computedFields = Map.empty
     , cyclicSynonyms = Set.empty
+    , sectionBinderNames = Set.empty
     , inNonexhaustiveDecide = False
     , moduleUri
     , sectionStack = []
@@ -187,10 +189,18 @@ doCheckProgramWithDependencies checkState checkEnv program =
         [ MkCheckErrorWithContext (MisattachedSectionGiven n mSection) None
         | (n, mSection) <- detectMisattachedSectionGivens program
         ]
+        ++
+        -- R2: one binder per name. A declaration's own GIVEN that restates a
+        -- section binder would give the name two binders in one body once
+        -- discharge makes the binder a parameter.
+        [ MkCheckErrorWithContext (RestatedSectionBinder n) None
+        | n <- detectRestatedSectionBinders program
+        ]
       synonymCycles = detectTypeSynonymCycles program
       checkEnv' = checkEnv
         { computedFields = extractComputedFieldNames program
         , cyclicSynonyms = Set.fromList (rawName <$> concat synonymCycles)
+        , sectionBinderNames = collectSectionBinderNames program
         }
   in -- Section binders are elaborated LAST, so that the ASSUME each one becomes
      -- sits at the very head of its section's declaration list. Computed-field
@@ -210,9 +220,19 @@ doCheckProgramWithDependencies checkState checkEnv program =
                 -- so importing modules can use mixfix functions defined here
                 combinedMixfixRegistry = unionMixfixRegistry localMixfixRegistry env.mixfixRegistry
                 exportErrs = Export.validateExportInputs rprog
+                -- Both need the whole checked module: a read-set is not a fact
+                -- about one body ('L4.Discharge').
+                implicitErrs =
+                  [ MkCheckErrorWithContext (UnreadImplicitSupply callee binder) None
+                  | (callee, binder) <- Discharge.unreadImplicitSupplies rprog
+                  ]
+                  ++
+                  [ MkCheckErrorWithContext (AmbiguousImplicitSupply callee binder) None
+                  | (callee, binder) <- Discharge.ambiguousImplicitSupplies rprog
+                  ]
             in MkCheckResult
               { program = rprog
-              , errors = suppressResolutionCascade (substErrs ++ moreErrs ++ exportErrs)
+              , errors = suppressResolutionCascade (substErrs ++ moreErrs ++ exportErrs ++ implicitErrs)
               , substitution = s'.substitution
               , environment = env.environment
               , entityInfo = env.entityInfo
@@ -221,6 +241,7 @@ doCheckProgramWithDependencies checkState checkEnv program =
               , scopeMap = s'.scopeMap
               , descMap = s'.descMap
               , mixfixRegistry = combinedMixfixRegistry
+              , sectionPaths = s'.sectionPaths
               }
 
 -- | Drop diagnostics that are pure fallout from a name-resolution failure that
@@ -305,8 +326,8 @@ withExtraMixfix mixfixAdds =
     -- positional match: 'mixfixRegistry' is a duplicated field name, so a
     -- record update here would be ambiguous under DuplicateRecordFields
     updateMixfix :: MixfixRegistry -> CheckEnv -> CheckEnv
-    updateMixfix adds (MkCheckEnv a b c d e f g reg cf cs ne h i lb) =
-      MkCheckEnv a b c d e f g (unionMixfixRegistry adds reg) cf cs ne h i lb
+    updateMixfix adds (MkCheckEnv a b c d e f g reg cf cs sb ne h i lb) =
+      MkCheckEnv a b c d e f g (unionMixfixRegistry adds reg) cf cs sb ne h i lb
 
 dedupCheckInfos :: [CheckInfo] -> [CheckInfo]
 dedupCheckInfos = go Set.empty []
@@ -3080,21 +3101,88 @@ inferAppNamed :: Resolved -> Type' Resolved -> [NamedExpr Name] -> Check ([(Int,
 inferAppNamed r (Fun _ onts t) nes = do
   ornes <- supplyAppNamed r (zip [0 ..] onts) nes
   pure (ornes, t)
-inferAppNamed r t _nes = do
-  addError (IllegalAppNamed r t)
-  v <- fresh (NormalName "v")
-  pure ([], v) -- TODO: This is unnecessarily lossy. We could still check the expressions and treat all names as out of scope.
+inferAppNamed r t nes = do
+  -- A definition with no parameters of its own can still be applied to named
+  -- arguments, provided every one of them supplies a SECTION BINDER (R1). It
+  -- has no function type yet because the parameters discharge gives it are a
+  -- whole-module fact ('L4.Discharge'), unknown while this body is checked;
+  -- what the site is asking for is a value of the definition's own type with
+  -- some of its implicit inputs pinned, so that is the type it gets.
+  allBinders <- traverse (isSectionBinderSupply . (\ (MkNamedExpr _ n _) -> n)) nes
+  if not (null nes) && and allBinders
+    then do
+      ornes <- traverse (implicitSupply r) nes
+      pure (ornes, t)
+    else do
+      addError (IllegalAppNamed r t)
+      v <- fresh (NormalName "v")
+      pure ([], v) -- TODO: This is unnecessarily lossy. We could still check the expressions and treat all names as out of scope.
+
+-- | Is this name one the module's section-level @GIVEN@s bind?
+--
+-- The read-set that decides whether the CALLEE actually reads it is a
+-- whole-module fact and is checked after type checking; here we only separate
+-- "a binder the writer is pinning" from "a misspelt parameter name", which
+-- keeps the existing typo guard.
+isSectionBinderSupply :: Name -> Check Bool
+isSectionBinderSupply n = do
+  binders <- asks (.sectionBinderNames)
+  pure (Set.member (rawName n) binders)
+
+-- | Check one named argument that supplies a section binder, against the type
+-- the binder was declared with. The index recorded is 'implicitSupplyIndex':
+-- the binder's position among the callee's discharged parameters is not known
+-- until 'L4.Discharge' computes the read-set.
+implicitSupply :: Resolved -> NamedExpr Name -> Check (Int, NamedExpr Resolved)
+implicitSupply callee (MkNamedExpr ann n e) = do
+  (rn, pt) <- resolveTerm n
+  t <- instantiate pt
+  re <- checkExpr (ExpectNamedArgContext callee rn) e t
+  pure (implicitSupplyIndex, MkNamedExpr ann rn re)
 
 supplyAppNamed :: Resolved -> [(Int, OptionallyNamedType Resolved)] -> [NamedExpr Name] -> Check [(Int, NamedExpr Resolved)]
 supplyAppNamed _r []   [] = pure []
 supplyAppNamed  r onts [] = do
   addError (IncompleteAppNamed r (snd <$> onts))
   pure []
-supplyAppNamed  r onts (MkNamedExpr ann n e : nes) = do
-  (i, rn, t, onts') <- findOptionallyNamedType n onts
-  re <- checkExpr (ExpectNamedArgContext r rn) e t
-  rnes <- supplyAppNamed r onts' nes
-  pure ((i, MkNamedExpr ann rn re) : rnes)
+supplyAppNamed  r onts (ne@(MkNamedExpr ann n e) : nes) =
+  case lookupOptionallyNamedType n onts of
+    Just (i, n', t, onts') -> do
+      rn <- ref n n'
+      re <- checkExpr (ExpectNamedArgContext r rn) e t
+      rnes <- supplyAppNamed r onts' nes
+      pure ((i, MkNamedExpr ann rn re) : rnes)
+    Nothing -> do
+      -- Not one of the callee's own parameters. Under R1 it may still be a
+      -- section binder the callee reads, in which case the site is overriding
+      -- an implicit for the callee's subtree; 'onts' is unchanged, because a
+      -- binder consumes none of the declared parameters and the rest of the
+      -- site must still supply them all.
+      isBinder <- isSectionBinderSupply n
+      if isBinder
+        then do
+          orne <- implicitSupply r ne
+          rnes <- supplyAppNamed r onts nes
+          pure (orne : rnes)
+        else do
+          (i, rn, t, onts') <- findOptionallyNamedType n onts
+          re <- checkExpr (ExpectNamedArgContext r rn) e t
+          rnes <- supplyAppNamed r onts' nes
+          pure ((i, MkNamedExpr ann rn re) : rnes)
+
+-- | The declared parameter this name supplies, if it is one of them, together
+-- with the remaining parameters. Pure: unlike 'findOptionallyNamedType' it
+-- reports nothing and resolves nothing, so a caller can act on the miss.
+lookupOptionallyNamedType
+  :: Name
+  -> [(Int, OptionallyNamedType Resolved)]
+  -> Maybe (Int, Resolved, Type' Resolved, [(Int, OptionallyNamedType Resolved)])
+lookupOptionallyNamedType _ [] = Nothing
+lookupOptionallyNamedType n ((i, MkOptionallyNamedType _ (Just n') t) : onts)
+  | rawName n == rawName (getOriginal n') = Just (i, n', t, onts)
+lookupOptionallyNamedType n (ont : onts) = do
+  (i, n', t, onts') <- lookupOptionallyNamedType n onts
+  pure (i, n', t, ont : onts')
 
 findOptionallyNamedType :: Name -> [(Int, OptionallyNamedType Resolved)] -> Check (Int, Resolved, Type' Resolved, [(Int, OptionallyNamedType Resolved)])
 findOptionallyNamedType n [] = do
@@ -5168,13 +5256,49 @@ prettyCheckError (SuspiciousBinderPattern binder ctor)     =
   , "If you meant the constructor, fix the spelling; if you meant a"
   , "catch-all, consider OTHERWISE or a name unlike any constructor."
   ]
+prettyCheckError (UnreadImplicitSupply callee binder)       =
+  [ "This call supplies"
+  , ""
+  , "  " <> quotedName (getName binder)
+  , ""
+  , "but " <> quotedName (getName callee) <> " does not read it -- not in its own"
+  , "body, and not through anything it calls. There is nowhere for the value to"
+  , "go, so the override would do nothing."
+  , ""
+  , "Supply it to whichever definition does read it, or drop it from this call."
+  ]
+prettyCheckError (AmbiguousImplicitSupply callee binder)   =
+  [ "This call supplies"
+  , ""
+  , "  " <> quotedName (getName binder)
+  , ""
+  , "but " <> quotedName (getName callee) <> " reads more than one input of that"
+  , "name, and this one is neither of them, so there is no way to tell which was"
+  , "meant."
+  , ""
+  , "Rename one of them, or hoist them to a common section heading if they are"
+  , "one thing."
+  ]
+prettyCheckError (RestatedSectionBinder n)                 =
+  [ "A section GIVEN already binds"
+  , ""
+  , "  " <> quotedName n
+  , ""
+  , "so this GIVEN would give one name two inputs. Delete it: the section's"
+  , "value flows into this definition on its own."
+  , ""
+  , "If a different value is meant here, give this one another name, or"
+  , "write the variation at the call:"
+  , ""
+  , "  <callee> WITH " <> prettyLayout n <> " IS <value>"
+  ]
 prettyCheckError (MisattachedSectionGiven n mSection)       =
   [ "This GIVEN starts at column 1, so it is the signature of the declaration"
   , "below it -- and that declaration never uses"
   , ""
   , "  " <> quotedName n
   , ""
-  , "If " <> quotedName n <> " was meant as a binder for the whole of"
+  , "If " <> quotedName n <> " was meant as an input for the whole of"
   , ""
   , "  " <> maybe "this section" (("\167 " <>) . prettyLayout) mSection
   , ""

@@ -33,6 +33,16 @@ type ScopeMap     = RangeMap (Environment, EntityInfo)
 type NlgMap       = RangeMap Nlg
 type DescMap      = RangeMap Text
 
+-- | For each defined 'Unique', the section stack (module root down to the
+-- innermost enclosing section) at the point it was registered; absence means
+-- top level. See the 'sectionPaths' field of 'CheckState'.
+--
+-- A 'Unique' embeds its defining module ('MkUnique'), so the maps of two
+-- modules have disjoint key sets and 'Map.union' across an import boundary
+-- cannot collide. That is what lets an importer carry its dependencies' paths
+-- beside its own — see 'L4.Import.Resolution.combineResolvedImports'.
+type SectionPaths = Map Unique [NonEmpty Text]
+
 -- | Note that 'KnownType' does not imply this is a new generative type on its own,
 -- because it includes type synonyms now. For type synonyms primarily, we also store
 -- the arguments, so that we can properly substitute when instantiated.
@@ -61,12 +71,20 @@ data CheckState =
       -- ^ Bodies of top-level nullary @DECIDE@/@MEANS@ constants, captured as
       -- they are checked. Used by the rung-3 value-level actor-agreement check
       -- to recover an action constant's actor field from its definition.
-    , sectionPaths :: !(Map Unique [NonEmpty Text])
+    , sectionPaths :: !SectionPaths
     -- ^ For each defined 'Unique', the section stack (path from the module root
     -- down to the innermost enclosing section) at the point it was registered.
     -- Absence means the binding is top-level (empty section path). Used by
     -- 'resolveTerm'' and 'resolveType' to prefer the nearest enclosing section
     -- when resolving unqualified names (lexical scoping / shadowing).
+    --
+    -- Seeded, before this module is checked, with the paths of every binding
+    -- reachable through its imports, so an imported name can be named under the
+    -- section that defines it. Those entries are read by 'sectionQualified'
+    -- (diagnostics) ONLY: both proximity readers, 'ancestorProximity' and
+    -- 'selectByProximity', test the candidate's module URI before they consult
+    -- this map, so an imported 'Unique' never reaches the lookup and cross-module
+    -- candidates stay co-equal for overload resolution (spec §5.5, FIX C).
     , deferredChoices :: !Int
     -- ^ How many times THIS branch of the nondeterministic search resolved a
     -- name to a not-yet-inferred binding off the reference's section ancestry
@@ -117,6 +135,20 @@ data CheckError =
     -- declaration it attaches to never uses. Carries the unused parameter name
     -- and the name of the section whose heading it sits under. See
     -- 'L4.Desugar.detectMisattachedSectionGivens'.
+  | UnreadImplicitSupply Resolved Resolved
+    -- ^ A @WITH@ site named a section binder that the callee does not read,
+    -- directly or through anything it calls. Arguments: the callee, the binder.
+    -- Under R1 a @WITH@ may name a binder /in the callee's read-set/; there is
+    -- nowhere to put a value for one outside it, so the override would silently
+    -- do nothing. See 'L4.Discharge.unreadImplicitSupplies'.
+  | AmbiguousImplicitSupply Resolved Resolved
+    -- ^ A @WITH@ site named a binder the callee reads under two or more
+    -- same-spelled binders, and its own 'Unique' matched none of them, so there
+    -- is no way to tell which was meant. Arguments: the callee, the supplied
+    -- name. See 'L4.Discharge.ambiguousImplicitSupplies'.
+  | RestatedSectionBinder Name
+    -- ^ A function's own @GIVEN@ restates a name a section-level @GIVEN@
+    -- already binds (R2). Carries the parameter name.
   | SuppliedComputedField Name
     -- ^ Tried to supply a computed field in a record constructor (field name)
   | ExportFunctionTypeInput Resolved Resolved
@@ -317,6 +349,9 @@ instance HasSrcRange CheckError where
   rangeOf (CheckWarning (PatternClausesMissing r _ _)) = Just r
   rangeOf (SuspiciousBinderPattern b _)     = rangeOf b
   rangeOf (MisattachedSectionGiven n _)     = rangeOf n
+  rangeOf (UnreadImplicitSupply _ b)        = rangeOf b
+  rangeOf (AmbiguousImplicitSupply _ r)     = rangeOf r
+  rangeOf (RestatedSectionBinder n)         = rangeOf n
   rangeOf _                                 = Nothing
 
 -- | A token in a mixfix pattern, representing either a keyword (part of the function name)
@@ -488,6 +523,19 @@ data CheckEnv =
     -- 'KnownType's) so that synonym expansion never touches them — a
     -- cyclic synonym has no finite expansion, and expanding one can
     -- blow up exponentially before the expansion fuel runs out.
+    , sectionBinderNames   :: !(Set RawName)
+    -- ^ The names this module's section-level @GIVEN@s bind (R4), read off the
+    -- parsed module before desugaring. They are the names a @WITH@ site may
+    -- supply /in addition to/ the callee's declared parameters: after
+    -- 'L4.Discharge.dischargeModule' each of them is a trailing parameter of
+    -- every definition that reads it, but the read-set is a whole-module fact
+    -- and is not known while a single body is being checked. So the checker
+    -- accepts the supply on the strength of the name being a binder, and the
+    -- read-set is what 'L4.Discharge' matches it against.
+    --
+    -- Deliberately NOT unioned across imports ('unionImportedCheckEnv' resets
+    -- it): discharge does not cross @IMPORT@, so an imported module's binder is
+    -- not suppliable here.
     , inNonexhaustiveDecide      :: !Bool
     -- ^ Are we checking the body of a definition its author decorated
     -- @\@nonexhaustive@ (deliberately not defined for all inputs)? If so, the
@@ -550,6 +598,7 @@ unionImportedCheckEnv accEnv depEnvironment depEntityInfo depMixfixRegistry =
     , mixfixRegistry = unionMixfixRegistry accEnv.mixfixRegistry depMixfixRegistry
     , computedFields = Map.empty
     , cyclicSynonyms = mempty
+    , sectionBinderNames = mempty
     , inNonexhaustiveDecide = False
     , errorContext = None
     , sectionStack = []
@@ -610,6 +659,13 @@ data CheckResult =
     , descMap        :: !DescMap
     , mixfixRegistry :: !MixfixRegistry
     -- ^ Registry of mixfix functions from this module (to be propagated to importers)
+    , sectionPaths   :: !SectionPaths
+    -- ^ Where every binding this module can see was defined, section-wise: its
+    -- own bindings and, transitively, those of everything it imports. Carried
+    -- across the import boundary so that an importer can name an imported
+    -- binding under the section that defines it — today in ambiguity
+    -- diagnostics, which otherwise offer the reader an option spelled exactly
+    -- like the ambiguous name. See 'SectionPaths'.
     }
 
 -- -------------------
@@ -1763,6 +1819,7 @@ extendEnv cis env =
     , mixfixRegistry = e.mixfixRegistry
     , computedFields = e.computedFields
     , cyclicSynonyms = e.cyclicSynonyms
+    , sectionBinderNames = e.sectionBinderNames
     , inNonexhaustiveDecide = e.inNonexhaustiveDecide
     , sectionStack = e.sectionStack
     , localBindings = e.localBindings

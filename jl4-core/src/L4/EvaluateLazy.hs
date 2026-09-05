@@ -41,6 +41,7 @@ module L4.EvaluateLazy
 where
 
 import Base
+import L4.Discharge (dischargeModule)
 import qualified Base.DList as DList
 import qualified Base.Map as Map
 import qualified Base.Text as Text
@@ -612,7 +613,13 @@ evalAndNF d r = do
 -- the results of the (L)EVAL directives in this module.
 --
 execEvalModuleWithEnv :: EvalConfig -> EntityInfo -> Environment -> Module Resolved -> IO (Environment, [EvalDirectiveResult])
-execEvalModuleWithEnv evalConfig entityInfo env m@(MkModule _ moduleUri _) = do
+execEvalModuleWithEnv evalConfig entityInfo env m0@(MkModule _ moduleUri _) = do
+  -- Discharge is a property of EVALUATION, not of the checked module: the
+  -- checker's job is to say the program is well formed, and this pass says what
+  -- an implicit input means when it is run. Doing it here rather than in
+  -- 'L4.TypeCheck' keeps the module the LSP hovers over, the printers re-emit
+  -- and the backends lower exactly the module the author wrote.
+  let m = dischargeModule m0
   st0 <- mkInitialEvalState evalConfig entityInfo moduleUri
   r <- try (runEval st0 (evalModuleAndDirectives env m))
   case r of
@@ -762,7 +769,12 @@ evalModuleAndDirectivesWithJSON json env m = do
   pure (moduleEnv, results)
 
 execEvalModuleWithJSON :: EvalConfig -> EntityInfo -> Aeson.Value -> Module Resolved -> IO (Environment, [EvalDirectiveResult])
-execEvalModuleWithJSON evalConfig entityInfo json m@(MkModule _ moduleUri _) = do
+execEvalModuleWithJSON evalConfig entityInfo json m0@(MkModule _ moduleUri _) = do
+  -- @l4 batch@: the JSON is written into the module-level References, which are
+  -- the ROOT of the evaluation, so discharge and a JSON supply compose — a
+  -- definition reads its binder through its own parameter, and the value that
+  -- parameter is handed at the root is the one the request supplied.
+  let m = dischargeModule m0
   st0 <- mkInitialEvalState evalConfig entityInfo moduleUri
   r <- try (runEval st0 (evalModuleAndDirectivesWithJSON json emptyEnvironment m))
   case r of

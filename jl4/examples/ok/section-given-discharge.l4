@@ -1,0 +1,55 @@
+-- Discharge: a section binder is an ordinary input of every rule that reads it.
+--
+-- The design is PROPS-REDTEAM-2026-09-03.md §2.2 and rulings R1, R2, R9 and R10
+-- of IMPLICIT-PROPS-DESIGN.md §11. Every rule below reads `the rate` without
+-- declaring it, and the caller supplies it with WITH -- at a directive, at a
+-- call inside another rule, and through a chain of calls that never mentions
+-- it.
+
+IMPORT prelude
+
+§ `Rates`
+    GIVEN `the rate` IS A NUMBER
+
+GIVETH A NUMBER
+doubled MEANS `the rate` TIMES 2
+
+-- `quadrupled` never names the binder. It reads it through `doubled`.
+GIVETH A NUMBER
+quadrupled MEANS doubled TIMES 2
+
+-- A rule with a parameter of its own. The binder trails it.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+bump n MEANS n TIMES `the rate`
+
+-- A WHERE local reads the binder lexically, through the rule that encloses it.
+GIVETH A NUMBER
+`via where` MEANS
+    inner
+    WHERE
+        inner MEANS `the rate` PLUS 1
+
+-- A lambda whose body calls a rule that reads the binder.
+GIVETH A LIST OF NUMBER
+`all bumped` MEANS map (GIVEN x YIELD bump x) (LIST 1, 2, 3)
+
+-- An in-body override (R9): this call, and everything under it, sees 10.
+GIVETH A NUMBER
+`under the strict reading` MEANS quadrupled WITH `the rate` IS 10
+
+#EVAL doubled WITH `the rate` IS 5
+#EVAL quadrupled WITH `the rate` IS 5
+#EVAL bump WITH n IS 3, `the rate` IS 5
+#EVAL `via where` WITH `the rate` IS 4
+#EVAL `all bumped` WITH `the rate` IS 10
+
+-- The override is local to its call: the directive's own supply is unchanged.
+#EVAL `under the strict reading`
+#EVAL quadrupled WITH `the rate` IS 5
+
+-- Nothing supplied: still an assumed term, reported at the point of use.
+#EVAL doubled
+
+#ASSERT (doubled WITH `the rate` IS 5) EQUALS 10
+#ASSERT (quadrupled WITH `the rate` IS 5) EQUALS 20

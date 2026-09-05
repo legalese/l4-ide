@@ -61,7 +61,7 @@ import L4.Lexer (PError(..))
 import L4.Syntax
 import L4.Parser (execProgramParserWithHintPass)
 import L4.TypeCheck (doCheckProgramWithDependencies, initialCheckState, initialCheckEnv, applyFinalSubstitution)
-import L4.TypeCheck.Types (CheckResult(..), CheckErrorWithContext, Substitution, Environment, EntityInfo, MixfixRegistry, InfoMap, ScopeMap, NlgMap, DescMap)
+import L4.TypeCheck.Types (CheckResult(..), CheckErrorWithContext, Substitution, Environment, EntityInfo, MixfixRegistry, InfoMap, ScopeMap, NlgMap, DescMap, SectionPaths)
 import qualified L4.TypeCheck as TypeCheck
 import qualified Data.List as List
 import qualified L4.Utils.IntervalMap as IV
@@ -276,6 +276,9 @@ data TypeCheckWithDepsResult = TypeCheckWithDepsResult
   , tcdSuccess :: Bool
   , tcdResolvedImports :: [ResolvedImport]
   , tcdUri :: NormalizedUri  -- ^ URI of the main module
+  , tcdSectionPaths :: SectionPaths
+    -- ^ Where each visible binding was defined, section-wise, including those
+    -- reached through imports. See 'L4.TypeCheck.Types.SectionPaths'.
   }
   deriving stock (Generic)
 
@@ -332,6 +335,7 @@ typecheckWithDependencies lookupModule uri source = do
             , tcdSuccess = null result.errors
             , tcdResolvedImports = resolvedImports
             , tcdUri = uri
+            , tcdSectionPaths = result.sectionPaths
             }
 
 -- ----------------------------------------------------------------------------
@@ -383,7 +387,14 @@ combineResolvedImports uri imports =
              , TypeCheck.scopeMap = IV.empty
              , TypeCheck.descMap = IV.empty
              , TypeCheck.constBodies = accState.constBodies
-             , TypeCheck.sectionPaths = accState.sectionPaths
+               -- Carry the dependency's section paths across the boundary, so
+               -- that an imported name can be named under the section that
+               -- defines it. 'Unique' embeds its module, so the two maps have
+               -- disjoint keys and the union is order-independent. This does
+               -- NOT reopen cross-module overload resolution: both proximity
+               -- readers check the module URI before consulting the map, so an
+               -- imported 'Unique' is still never ranked (spec §5.5, FIX C).
+             , TypeCheck.sectionPaths = Map.union accState.sectionPaths r.sectionPaths
              , TypeCheck.deferredChoices = 0
              }
          , TypeCheck.unionImportedCheckEnv accEnv r.environment resolvedEntityInfo r.mixfixRegistry

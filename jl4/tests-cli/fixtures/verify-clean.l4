@@ -10,7 +10,7 @@ GIVEN x IS A BOOLEAN
 GIVETH A BOOLEAN
 DECIDE `either but not both` IS
      x AND NOT y
-  OR NOT x AND y
+  OR (NOT x) AND y
 
 GIVEN x IS A BOOLEAN
       y IS A BOOLEAN

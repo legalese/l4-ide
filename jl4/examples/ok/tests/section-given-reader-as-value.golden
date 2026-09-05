@@ -1,0 +1,11 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+section-given-reader-as-value.l4:25:1-41:
+  LIST 10, 20, 30
+section-given-reader-as-value.l4:26:1-54:
+  LIST 10, 20, 30
+section-given-reader-as-value.l4:28:1-70:
+  assertion satisfied
+section-given-reader-as-value.l4:29:1-83:
+  assertion satisfied

@@ -243,6 +243,25 @@ jobs:
       - name: Every subject's declared legs are exercised by CI
         run: node etc/check-subject-ci-coverage.mjs
 
+      # Third instance of the same reasoning. `NOT` in L4 is delimited by
+      # LAYOUT, not by precedence: on one line it swallows every operator that
+      # follows it, so `NOT a AND b` means `NOT (a AND b)` and bracketing the
+      # OPERAND -- `NOT (a) AND b` -- does not narrow it. The failure is silent:
+      # the module parses, typechecks, and returns the wrong BOOLEAN. Nothing
+      # else in CI can see it, and a `.l4` under jl4/examples/ matches no paths
+      # filter, so it must run unfiltered. Node-only, ~1 s, no build.
+      - name: No NOT swallows a same-line connective
+        run: node etc/check-not-precedence.mjs --dir .
+
+      # The checker landed in the same PR as the tree it checks, so it had no
+      # independent test -- and "it passes" is indistinguishable from "it cannot
+      # see anything". It has already been wrong in both directions: it flagged
+      # two `AND`s inside a backticked legal name, and its advice line
+      # recommended the one spelling its own header calls broken. These cases
+      # are regressions, not hypotheticals.
+      - name: The NOT checker can still tell right from wrong
+        run: node etc/check-not-precedence.mjs --selftest
+
   # ============================================
   # Repo-wide invariants: unfiltered, no build
   # ============================================

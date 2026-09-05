@@ -1,0 +1,36 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: section-given-unread-supply.l4
+  Hidden: no
+  Range: 18:22-18:32
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    This call supplies
+
+      `the rate`
+
+    but `unrelated` does not read it -- not in its own
+    body, and not through anything it calls. There is nowhere for the value to
+    go, so the override would do nothing.
+
+    Supply it to whichever definition does read it, or drop it from this call.
+
+File: section-given-unread-supply.l4
+  Hidden: no
+  Range: 19:34-19:44
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    This call supplies
+
+      `the rate`
+
+    but `reads the other one` does not read it -- not in its own
+    body, and not through anything it calls. There is nowhere for the value to
+    go, so the override would do nothing.
+
+    Supply it to whichever definition does read it, or drop it from this call.
