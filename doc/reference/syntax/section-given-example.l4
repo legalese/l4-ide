@@ -17,8 +17,8 @@ GIVETH A BOOLEAN
 `is above the threshold` MEANS
     `applicable rate` AT LEAST 0.2
 
--- A nested section may re-declare the name; that is a DISTINCT binder which
--- shadows only within the child.
+-- A nested section may re-declare the name; that is a DIFFERENT name, and it
+-- takes precedence only inside the child section.
 
 §§ `Concessionary rates`
     GIVEN `applicable rate` IS A NUMBER
@@ -27,7 +27,7 @@ GIVETH A NUMBER
 `concessionary tax on` amount MEANS
     amount TIMES `applicable rate`
 
--- A column-1 GIVEN is still the next declaration's own signature.
+-- A column-1 GIVEN still lists the next declaration's own inputs.
 
 § `Ordinary signatures`
 

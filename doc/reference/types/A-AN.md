@@ -17,6 +17,9 @@ Used in type annotations to improve readability.
 GIVEN name IS A Type
 GIVEN name IS AN Type
 ASSUME name IS A Type
+
+§ `A section`
+    GIVEN name IS A Type
 ```
 
 ### Examples
@@ -33,6 +36,12 @@ GIVEN x IS A NUMBER
 ASSUME account IS AN Account
 GIVEN obj IS AN Object
 ```
+
+A rule is told some facts about the case in front of it (its **"inputs"**).
+`ASSUME` is deprecated as the way to declare one (ruled 2026-09-04) and still
+works; a fact supplied afresh for each case now goes in a
+[`GIVEN` under its section's heading](../syntax/section-given.md) — a
+**"section `GIVEN`"** — where the articles read exactly the same way.
 
 ### Rules
 
@@ -62,7 +71,7 @@ See [Syntax: Genitive](../syntax/genitive-example.l4) for details.
 
 - **[IS](../syntax/README.md)** - Type assertions
 - **[DECLARE](DECLARE.md)** - Type declarations
-- **[GIVEN](../functions/GIVEN.md)** - Function parameters
+- **[GIVEN](../functions/GIVEN.md)** - The inputs of a rule
 
 ## See Also
 

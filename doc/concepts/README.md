@@ -38,8 +38,9 @@ Representing legal concepts in code
 - **[Regulative Rules](legal-modeling/regulative-rules.md)** - Obligations, permissions, prohibitions
 - **[Constitutive vs Regulative Rules](legal-modeling/constitutive-vs-regulative.md)** - Definitions vs duties, and why L4 separates them at the type level
 - **[Default Reasoning and Exceptions](legal-modeling/default-reasoning.md)** - Defeasibility, UNLESS, and encoding general-rule-plus-exception structure
+- **[Five Kinds of No Answer](legal-modeling/non-answers.md)** - What a person can mean by "there is no answer": a value that may be absent, a failure with a reason, a fact nobody has supplied, a law not in force, and a model that does not cover the case
 
-**Key Ideas:** Deontic modalities, legal rules as code, contract patterns, defeasibility
+**Key Ideas:** Deontic modalities, legal rules as code, contract patterns, defeasibility, non-answers
 
 _More topics planned: Deontic Logic, Contract Composition_
 

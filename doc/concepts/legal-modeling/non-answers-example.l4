@@ -1,0 +1,146 @@
+-- Companion examples for "Five Kinds of No Answer" (non-answers.md).
+--
+-- Run it by typing this in a terminal window:  l4 run non-answers-example.l4
+--
+-- The section numbers here match the numbered sections of the page. Row 3 of
+-- the page -- a fact nobody has supplied yet -- is in a second file,
+-- non-answers-not-yet-known.l4, because it uses a different feature.
+
+§ `1. A value that may be absent -- MAYBE`
+
+DECLARE Household
+    HAS `income of the applicant` IS A NUMBER
+        `income of the spouse` IS A MAYBE NUMBER
+
+GIVEN household IS A Household
+GIVETH A NUMBER
+`assessed income of` household MEANS
+    household's `income of the applicant`
+    PLUS
+    CONSIDER household's `income of the spouse`
+    WHEN JUST OF income THEN income
+    WHEN NOTHING THEN 0
+
+-- Alex Tan has no spouse. That is not a gap in the file; it is a fact about
+-- the household, and the rule says what to do with it.
+`the Tan household` MEANS
+    Household WITH `income of the applicant` IS 30000, `income of the spouse` IS NOTHING
+
+-- Bina Lim has a spouse who earns 12000.
+`the Lim household` MEANS
+    Household WITH `income of the applicant` IS 30000, `income of the spouse` IS JUST OF 12000
+
+#EVAL `assessed income of` `the Tan household`      -- 30000
+#EVAL `assessed income of` `the Lim household`      -- 42000
+
+§ `2. An expected failure with a reason -- EITHER`
+
+-- EITHER STRING NUMBER: the failure kind first (text saying what went wrong),
+-- the success kind second (the number this gives when it worked). LEFT OF
+-- builds the first, RIGHT OF builds the second.
+GIVEN month IS A NUMBER
+GIVETH AN EITHER STRING NUMBER
+`checked month` month MEANS
+    IF   month AT LEAST 1 AND month AT MOST 12
+    THEN RIGHT OF month
+    ELSE LEFT OF "a month must be between 1 and 12"
+
+-- The rule that uses it acts on the failure. The failure is a value, so it can
+-- be read, reported to Alex, and counted. CONCAT joins two pieces of text end
+-- to end: the fixed opening, then whatever the reason turned out to be.
+GIVEN month IS A NUMBER
+GIVETH A STRING
+`what the clerk tells Alex about` month MEANS
+    CONSIDER `checked month` month
+    WHEN LEFT  OF reason THEN CONCAT "returned for correction: ", reason
+    WHEN RIGHT OF m      THEN "accepted"
+
+#EVAL `what the clerk tells Alex about` 6    -- "accepted"
+#EVAL `what the clerk tells Alex about` 13   -- "returned for correction: ..."
+
+§ `4. The law does not apply, or is not in force -- a value or a gate`
+
+DECLARE Claim
+    HAS `year of the transaction` IS A NUMBER
+        `right accrued under the repealed Act` IS A BOOLEAN
+
+-- The commencement date is an ordinary fact in the file.
+GIVEN year IS A NUMBER
+GIVETH A BOOLEAN
+`the 2016 scheme is in force in` year MEANS
+    year AT LEAST 2016
+
+-- The savings provision reaches past the commencement gate: a right accrued
+-- under the repealed Act survives the repeal.
+GIVEN claim IS A Claim
+GIVETH A STRING
+`the scheme that governs` claim MEANS
+    IF   `the 2016 scheme is in force in` (claim's `year of the transaction`)
+    THEN "the 2016 scheme"
+    ELSE IF   claim's `right accrued under the repealed Act`
+         THEN "the repealed Act, preserved by the savings provision"
+         ELSE "no scheme applies to this transaction"
+
+#EVAL `the scheme that governs`
+        (Claim WITH `year of the transaction` IS 2019, `right accrued under the repealed Act` IS FALSE)
+#EVAL `the scheme that governs`
+        (Claim WITH `year of the transaction` IS 2014, `right accrued under the repealed Act` IS TRUE)
+#EVAL `the scheme that governs`
+        (Claim WITH `year of the transaction` IS 2014, `right accrued under the repealed Act` IS FALSE)
+
+§ `5. The model does not cover this -- REFUSE`
+
+-- The scheme charges a levy when a vessel changes hands. This file works out
+-- the levy for vessels on the local register only. Whether the scheme reaches
+-- a vessel registered abroad is a question about the Act; whoever wrote this
+-- file never got there, and says so here rather than guessing.
+
+@ref The Act may well reach foreign-registered vessels. This file does not.
+GIVETH A NUMBER
+`this file does not cover vessels registered outside Singapore` MEANS
+    REFUSE "this file does not cover vessels registered outside Singapore"
+
+DECLARE Transfer
+    HAS `price in dollars` IS A NUMBER
+        `the vessel is registered abroad` IS A BOOLEAN
+
+GIVEN transfer IS A Transfer
+GIVETH A NUMBER
+`the levy on` transfer MEANS
+    IF   transfer's `the vessel is registered abroad`
+    THEN `this file does not cover vessels registered outside Singapore`
+    ELSE transfer's `price in dollars` TIMES 0.002
+
+`the Tan sale` MEANS
+    Transfer WITH `price in dollars` IS 400000, `the vessel is registered abroad` IS FALSE
+
+`the Lim sale` MEANS
+    Transfer WITH `price in dollars` IS 400000, `the vessel is registered abroad` IS TRUE
+
+#EVAL `the levy on` `the Tan sale`   -- 800
+#EVAL `the levy on` `the Lim sale`   -- refuses
+
+-- Testing that a case refuses. These are two alternatives, not two steps: the
+-- first checks only that the answer is a refusal, the second pins the sentence
+-- as well.
+#ASSERT REFUSED `the levy on` `the Lim sale`
+#ASSERT REFUSED `the levy on` `the Lim sale`
+        BECAUSE "this file does not cover vessels registered outside Singapore"
+
+§ `6. Not a non-answer at all: a breach -- LEST`
+
+-- DECLARE ... IS ONE OF lists every value a kind of thing may take, the way a
+-- definitions clause lists the parties or the permitted acts. An Actor here is
+-- the issuer or the regulator, and nothing else.
+DECLARE Actor IS ONE OF `the issuer`, `the regulator`
+DECLARE Act   IS ONE OF `file the annual report`
+
+-- A missed deadline is an answer, and the obligation itself says what that
+-- answer is. It is not the absence of one.
+GIVETH A DEONTIC Actor Act
+`the reporting obligation` MEANS
+    PARTY  `the issuer`
+    MUST   `file the annual report`
+    WITHIN 120
+    HENCE  FULFILLED
+    LEST   BREACH BY `the issuer`

@@ -320,6 +320,13 @@ change the answer, and stops as soon as the outcome is determined — turning a
 flat form into a guided interview. The planner is built on a
 [Reduced Ordered Binary Decision Diagram](../../reference/query-planning/robdd.md).
 
+A published rule may also decline to answer. When a case falls outside what the
+encoding covers, the rule gives back a refusal — an outcome of its own, neither
+`FALSE` nor zero nor a fact still to be supplied, carrying the sentence that says
+why the model stops there, so that nothing downstream can mistake it for a
+decision. [When a Rule Cannot Answer](../../tutorials/refuse/when-a-rule-cannot-answer.md)
+shows how to write one, when not to, and how to test that a case does refuse.
+
 #### Default values with TYPICALLY
 
 Many facts have a usual answer. Rather than make the user confirm every one, mark

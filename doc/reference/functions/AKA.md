@@ -81,6 +81,21 @@ DECLARE Value Added Tax AKA VAT, `sales tax`
   IS NUMBER
 ```
 
+## Limits
+
+An `AKA` on a record declaration names the kind of thing only, not the way a
+value of it is built. After
+
+```l4
+DECLARE Ticket AKA Coupon HAS price IS A NUMBER
+```
+
+a rule may say `GIVETH A Coupon`, but a value must still be written
+`Ticket WITH price IS 3`. Writing `Coupon WITH price IS 4` reports that L4
+could not find a definition for `Coupon`. (Measured 2026-09-04; the alias
+resolves the same way whether or not a section heading sits between the
+declaration and the use.)
+
 ## Related Keywords
 
 - **[DECLARE](../types/DECLARE.md)** - Type declarations

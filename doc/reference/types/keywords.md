@@ -45,6 +45,13 @@ ASSUME x IS A NUMBER
 ASSUME f IS A FUNCTION FROM NUMBER TO NUMBER
 ```
 
+A rule is told some facts about the case in front of it (its **"inputs"**).
+`ASSUME` is deprecated as the way to declare one (ruled 2026-09-04) and still
+works: a fact supplied afresh for each case is now written with the same
+`IS A Type` spelling in a
+[`GIVEN` under its section's heading](../syntax/section-given.md) — a
+**"section `GIVEN`"**.
+
 ### In Definitions
 
 ```l4
@@ -180,10 +187,10 @@ FUNCTION FROM Type1 AND Type2 TO ResultType
 ### Examples
 
 ```l4
--- Single parameter
+-- One input
 ASSUME f IS A FUNCTION FROM NUMBER TO NUMBER
 
--- Multiple parameters (using AND)
+-- Several inputs (joined with AND)
 ASSUME g IS A FUNCTION FROM NUMBER AND STRING TO BOOLEAN
 ```
 
@@ -204,8 +211,8 @@ identity x MEANS x
 ## Related Pages
 
 - **[DECLARE](DECLARE.md)** - Type declarations
-- **[GIVEN](../functions/GIVEN.md)** - Type parameters in functions
-- **[GIVETH](../functions/GIVETH.md)** - Return type declarations
+- **[GIVEN](../functions/GIVEN.md)** - The inputs of a rule, including inputs that are kinds of thing
+- **[GIVETH](../functions/GIVETH.md)** - The kind of thing a rule gives back
 - **[ARTICLES](A-AN.md)** - A, AN
 
 ## See Also

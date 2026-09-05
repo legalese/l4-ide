@@ -10,6 +10,7 @@
 - [Debugging Type Errors](getting-started/debugging-type-errors.md)
 - [Version Control for Rules](getting-started/version-control-for-rules.md)
 - [Encoding Legislation](getting-started/encoding-legislation.md)
+- [What a Section Needs to Know](section-given/what-a-section-needs-to-know.md)
 - [Wedding Vows](getting-started/wedding-vows.md)
 
 ## Set Operators
@@ -48,3 +49,7 @@
 - [Getting Started with LLM](llm-integration/llm-getting-started.md)
 - [Legislative Ingestion](llm-integration/legislative-ingestion.md)
 - [Composing L4 with AI](llm-integration/composing-l4-with-ai.md)
+
+## When a Rule Cannot Answer
+
+- [When a Rule Cannot Answer](refuse/when-a-rule-cannot-answer.md)

@@ -1,21 +1,37 @@
-# Legislative Ingestion with LLM
+# Legislative Ingestion with a Large Language Model
 
-Use LLMs to help encode legislation in L4.
+Use a large language model (**"LLM"**) to help encode legislation in L4.
 
-**Prerequisites:** [LLM Getting Started](llm-getting-started.md), intermediate L4 knowledge
+**Prerequisites:** [Getting Started with Large Language Models](llm-getting-started.md), intermediate L4 knowledge
+
+---
+
+## The words this page uses
+
+A rule is told some facts about the case in front of it — the names listed
+after `GIVEN` (its **"inputs"**) — and works out one answer from them (its
+**"output"**, whose kind of thing is named after `GIVETH`). An input written
+immediately above one rule is that rule's own (a **"rule GIVEN"**); an input
+written once under a section heading, indented past the `§`, is shared by every
+rule in the section (a **"section GIVEN"**).
+
+Every example person on this page has a name — Alex — for the same reason a
+law-school problem question names its parties: a worked example that says "the
+person" six times is one nobody can follow. Where the statute's own words are
+quoted, the statute's wording stands.
 
 ---
 
 ## The Challenge
 
-Converting legislation to L4 involves:
+Converting legislation to L4 involves four jobs:
 
 1. **Understanding** the legal text
-2. **Identifying** types and rules
-3. **Translating** to L4 syntax
+2. **Identifying** the kinds of thing it talks about, and the rules it lays down
+3. **Writing** it out in L4
 4. **Verifying** the encoding
 
-LLMs can help with steps 1-3, but humans must verify step 4.
+An LLM can help with the first three. A person must do the fourth.
 
 ---
 
@@ -28,7 +44,7 @@ LLMs can help with steps 1-3, but humans must verify step 4.
                       │
                       ▼
 ┌──────────────────────────────────────────────┐
-│ 2. EXTRACT: LLM identifies types & rules     │
+│ 2. EXTRACT: LLM finds the kinds and the rules│
 └──────────────────────────────────────────────┘
                       │
                       ▼
@@ -38,7 +54,7 @@ LLMs can help with steps 1-3, but humans must verify step 4.
                       │
                       ▼
 ┌──────────────────────────────────────────────┐
-│ 4. VALIDATE: Human reviews & L4 type-checks  │
+│ 4. VALIDATE: a person reviews; L4 accepts it │
 └──────────────────────────────────────────────┘
                       │
                       ▼
@@ -55,12 +71,12 @@ Break legislation into manageable chunks. Each chunk should be:
 
 - Self-contained (one concept)
 - Referenced by section/article number
-- Small enough for LLM context
+- Small enough for the LLM to hold in view at once
 
 Segment inert passages — recitals, preambles, purpose clauses — _separately_
 from operative rules, and flag them as such. They gate no decision and compute
-nothing, so they're encoded as a `hierarchy` outline rather than a `DECIDE` or
-`ASSUME`. See
+nothing, so they are encoded as a `hierarchy` outline rather than as a `DECIDE`
+or a `GIVEN`. See
 [Encoding Legislation → Carry Inert Text](../getting-started/encoding-legislation.md#2-carry-inert-text--recitals-preambles-purpose-clauses).
 
 ### Example Legislation
@@ -161,10 +177,12 @@ Output as JSON:
 ```
 You are generating L4 code from legislative requirements.
 
-L4 syntax reference:
-- Types: DECLARE TypeName HAS field IS A FieldType
-- Enums: DECLARE TypeName IS ONE OF Variant1, Variant2
+L4 reference:
+- Kinds of thing: DECLARE TypeName HAS field IS A FieldType
+- Fixed lists of choices: DECLARE TypeName IS ONE OF Variant1, Variant2
 - Rules: DECIDE `rule name` IF condition1 AND condition2
+- Facts every rule in an article needs: a GIVEN on the line after the
+  § heading, indented past the §
 
 Requirement:
 """
@@ -179,9 +197,9 @@ Types already defined:
 - Purpose: enumeration of charitable purposes
 
 Generate L4 code with:
-1. Type declarations if needed
+1. Declarations for any new kinds of thing
 2. The main rule
-3. Comments referencing the article
+3. Comments citing the article
 ```
 
 ### Expected LLM Response
@@ -192,32 +210,46 @@ Generate L4 code with:
 -- (a) all of its purposes are charitable purposes; and
 -- (b) it satisfies the public benefit requirement.
 
-GIVEN entity IS A Charity
+-- Both facts the Article works from, declared once for the whole Article:
+-- the GIVEN is indented past the §, so it belongs to the section rather
+-- than to the declaration below it.
+§ `Article 5 - Charity test`
+    GIVEN entity IS A Charity
+          `satisfies public benefit` IS A BOOLEAN
+
 GIVETH A BOOLEAN
 DECIDE `meets charity test` IF
-    `all purposes are charitable` entity    -- Art 5(a)
-    AND `satisfies public benefit` entity   -- Art 5(b)
+    `all purposes are charitable`        -- Art 5(a)
+    AND `satisfies public benefit`       -- Art 5(b), see Art 7
 
 -- Art 5(a): All purposes must be charitable
-GIVEN entity IS A Charity
 GIVETH A BOOLEAN
 `all purposes are charitable` MEANS
     all (GIVEN p YIELD `is charitable purpose` p) (entity's purposes)
 
--- Art 5(b): Public benefit requirement (see Art 7)
-GIVEN entity IS A Charity
-GIVETH A BOOLEAN
-ASSUME `satisfies public benefit` IS BOOLEAN
--- Note: Full definition requires Article 7 encoding
+-- Art 5(b) is not encoded yet. Until Article 7 is written, the public
+-- benefit requirement is a fact the caller supplies for each case.
 ```
+
+`satisfies public benefit` is left as an unfilled blank on purpose. L4 accepts
+the file as it stands, and a rule marked `@export` — published as a service
+people and other programs can ask — asks the caller for that fact alongside the
+entity. The blank is honest: it says the public benefit requirement has not been
+encoded yet, rather than pretending an answer.
+
+Earlier drafts of this tutorial declared such blanks with `ASSUME` at the left
+margin. `ASSUME` is deprecated for that job (ruled 2026-09-04) and still works,
+so files written that way keep running; new encodings put the blank under the
+heading of the article that reads it, as a section `GIVEN`. See
+[the section `GIVEN`](../../reference/syntax/section-given.md).
 
 ---
 
 ## Step 4: Validate and Refine
 
-### Check Type Correctness
+### Check That L4 Accepts It
 
-Run the L4 type checker:
+Run the checker:
 
 ```bash
 l4 check charity-test.l4
@@ -228,12 +260,12 @@ cabal run l4 -- check charity-test.l4
 
 ### Common Issues
 
-| LLM Output              | Problem        | Fix                                       |
-| ----------------------- | -------------- | ----------------------------------------- |
-| `purposes IS A Purpose` | Should be LIST | `purposes IS A LIST OF Purpose`           |
-| Missing GIVETH          | No return type | Add `GIVETH A BOOLEAN`                    |
-| `IF x = TRUE`           | Redundant      | Just `IF x`                               |
-| Wrong field access      | Missing 's     | `entity's purposes` not `entity purposes` |
+| LLM Output              | Problem                             | Fix                                        |
+| ----------------------- | ----------------------------------- | ------------------------------------------ |
+| `purposes IS A Purpose` | Should be a list                    | `purposes IS A LIST OF Purpose`            |
+| Missing GIVETH          | The rule's output has no kind named | Add `GIVETH A BOOLEAN`                     |
+| `IF x = TRUE`           | Redundant                           | Write `IF x`                               |
+| Wrong field access      | Missing 's                          | `entity's purposes`, not `entity purposes` |
 
 ### Human Review Checklist
 
@@ -242,7 +274,7 @@ cabal run l4 -- check charity-test.l4
 - [ ] Inert text (recitals, preambles) is carried as an outline, not dropped
 - [ ] Cross-references are correct
 - [ ] Edge cases are handled
-- [ ] Code compiles without errors
+- [ ] L4 accepts the file with no errors
 
 ---
 
@@ -251,7 +283,7 @@ cabal run l4 -- check charity-test.l4
 Feed validation errors back to LLM:
 
 ```
-The L4 type checker found this error:
+The L4 checker reported this error:
 
 Error: Type 'Purpose' not in scope
 Location: line 12
@@ -309,39 +341,45 @@ DECLARE Conviction
         involvesDishonesty IS A BOOLEAN
 
 -- Article 19(1)(a): Bankruptcy
-GIVEN person IS A Person
+GIVEN alex IS A Person
 GIVETH A BOOLEAN
-`is undischarged bankrupt` MEANS person's isBankrupt
+`is undischarged bankrupt` MEANS alex's isBankrupt
 
 -- Article 19(1)(b): Unspent conviction for dishonesty
-GIVEN person IS A Person
+GIVEN alex IS A Person
 GIVETH A BOOLEAN
 `has disqualifying conviction` MEANS
     any (GIVEN c YIELD
         c's involvesDishonesty
         AND NOT c's isSpent
-    ) (person's convictions)
+    ) (alex's convictions)
 
 -- Article 19(1)(c): Director disqualification
-GIVEN person IS A Person
+GIVEN alex IS A Person
 GIVETH A BOOLEAN
-`is director disqualified` MEANS person's isDirectorDisqualified
+`is director disqualified` MEANS alex's isDirectorDisqualified
 
 -- Article 19(1)(d): Disqualification order
-GIVEN person IS A Person
+GIVEN alex IS A Person
 GIVETH A BOOLEAN
 `has disqualification order` MEANS
-    length (person's disqualificationOrders) > 0
+    length (alex's disqualificationOrders) > 0
 
 -- Main rule: Article 19(1)
-GIVEN person IS A Person
+GIVEN alex IS A Person
 GIVETH A BOOLEAN
 DECIDE `is disqualified as governor` IF
-    `is undischarged bankrupt` person          -- (a)
-    OR `has disqualifying conviction` person   -- (b)
-    OR `is director disqualified` person       -- (c)
-    OR `has disqualification order` person     -- (d)
+    `is undischarged bankrupt` alex          -- (a)
+    OR `has disqualifying conviction` alex   -- (b)
+    OR `is director disqualified` alex       -- (c)
+    OR `has disqualification order` alex     -- (d)
 ```
+
+Note the name. `GIVEN alex IS A Person` reads as a name and a kind — Alex, who
+is a person — where `GIVEN person IS A Person` reads as a tautology and hides
+which of the two words is the name. Article 19 itself says "a person", and
+keeps saying it, because the Article is addressed to whoever turns up. A worked
+encoding is addressed to a reader, and a reader needs somebody to picture.
 
 ---
 
@@ -360,9 +398,9 @@ DECIDE `is disqualified as governor` IF
 
 ### 3. Human-in-the-Loop
 
-- Always validate LLM output
-- Run type checker
-- Test with #EVAL/#TRACE
+- Always check the LLM's output yourself
+- Run the checker
+- Try real cases with `#EVAL` and `#EVALTRACE`
 
 ### 4. Version Control
 
@@ -374,24 +412,24 @@ DECIDE `is disqualified as governor` IF
 
 ## Limitations
 
-- LLMs can hallucinate legal interpretations
-- Complex cross-references may be missed
-- Human expertise still essential
-- Output needs validation
+- An LLM can invent a legal interpretation that sounds right and is not
+- Complicated cross-references are often missed
+- Human expertise is still essential
+- Every output needs checking
 
 ---
 
 ## What You Learned
 
-- Workflow for LLM-assisted legislation encoding
-- Prompt design for type extraction
-- Prompt design for L4 generation
-- Validation and iteration
+- A workflow for encoding legislation with an LLM's help
+- How to prompt for the kinds of thing a statute talks about
+- How to prompt for the L4 itself
+- How to check the result and go round again
 
 ---
 
 ## Next Steps
 
-- [LLM Getting Started](llm-getting-started.md) - Basics of LLM integration
+- [Getting Started with Large Language Models](llm-getting-started.md) - The basics
 - [Advanced Course Module A1](../../courses/advanced/module-a1-regulatory.md) - Manual legislative encoding
 - Practice with real legislation from your jurisdiction
