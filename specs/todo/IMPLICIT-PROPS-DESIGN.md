@@ -734,6 +734,129 @@ corpus's only hypothetical, `EVAL UNDER RULES EFFECTIVE AT`, has nineteen uses a
 position of a directive, measured 2026-09-04). The cost, terseness when several calls share one
 override, is met by a helper. Detail: `PROPS-REDTEAM-2026-09-03.md` §2.6.
 
+### 11.14 Sequencing item 6 — the corpus and docs migration: what it swept, and the two things it found
+
+**Status 2026-09-05: built on branch `props/assume-sweep`, rebased onto `props/opaque-declare`
+(PR #335), NOT merged.** Everything below describes that branch, not `unstable`. The migration is
+driven by `etc/migrate-assume.mjs`, which is committed with it: the script is idempotent and never
+writes without `--write`, so the tree it produces is re-derivable — re-running it over the swept
+trees is a no-op, and that is the intended way to review the mechanical half of the diff.
+
+**One exception to that no-op, measured after the rebase**, so a reviewer who runs the script is not
+misled by it: `props/opaque-declare` added two fixtures that did not exist when the sweep ran, and
+the script reports **4 term-role sites** in them — `ok/opaque-declare.l4:84-85`
+(`` `some person` ``, `` `some premises` ``) and `doc/reference/types/opaque-example.l4:40-41`
+(`` `the applicant` ``, `` `the premises` ``). **They are deliberately not swept here.** Both files
+name the keyword in their own prose — "a value arrives from outside — an `ASSUME` here, a JSON input
+at a service boundary in production" — so rewriting the declarations without rewriting the
+surrounding explanation would leave each page contradicting its own example, which is the drift this
+migration repaired in `legal/anti-social.l4` and `legal/british-citizen-act.l4`. Whether those two
+fixtures should teach the section-`GIVEN` spelling is a question about what the opaque-type
+documentation says, and it belongs to whoever owns that page — sequencing item 5's documentation
+pass, alongside `doc/reference/types/ASSUME.md`'s deprecation notice — not to a mechanical sweep.
+
+**Swept.** 207 term- and function-role `ASSUME` declarations rewritten to the R4 section `GIVEN`
+across 62 `.l4` files — counted off the branch diff itself (`grep -c '^-ASSUME '` over the changed
+`.l4` files), by tree as rewrites/files: legal 46/6, ok 65/22, not-ok 13/8, dmn 12/8, lsp 7/1,
+docassemble 2/1, `doc/reference` 62/16. 76 sites are left across those trees, each refused by name
+and line with a per-role reason (keep 39, type 10, refusal 9, app-form 8, overload 7, ditto 2,
+root-section 1); the untouched `blawx` and `relational` trees hold 33 further app-form sites.
+`jl4/experiments` and `jl4/tests-cli` (204 further rewrites against 206 refusals, measured
+2026-09-05) are deliberately held back as a separate, droppable commit — that tree is in no goldened
+glob, so it is carried on the `--verify` oracle alone (6 identical, 1 differing only in the line
+number quoted by a pre-existing lexer error). Measured 2026-09-05:
+`canon` holds exactly one `ASSUME`, `subjects/sg/child-support/encodings/legalese/sg-csp.l4:79`,
+and it is refusal-role — **no canon change is owed by this item.**
+
+**Answer-preservation.** An oracle (`--verify`) diffs `l4 run --json` for every changed file, HEAD
+against worktree: 58 identical, 1 reordered, 4 different, and all five non-identical results are one
+benign class — a file that gained a section now qualifies the name in its diagnostic
+(`` `Assert directive ambiguity`.foo ``), same error, same count, same types.
+
+#### Finding 1: a section `GIVEN` cannot yet carry an overloaded name, and this blocks item 7
+
+`resolveSectionGiven` (`jl4-core/src/L4/TypeCheck.hs:641`) pairs each `GivenSig` parameter with the
+0-ary `ASSUME` elaboration that `desugarSectionGivens` prepended, keyed on the **raw name alone**
+(`List.lookup (rawName nm) elaborations`), and takes that elaboration's type, resolved binder and
+`TYPICALLY`. When a section `GIVEN` binds one name more than once at different types — type-directed
+name resolution, R0's suppliable-term role at its most general — every occurrence finds the **first**
+elaboration and inherits its type. The function's own comment claims the printed `GivenSig` "stays a
+faithful re-spelling of the source"; that holds only while the names are distinct.
+
+Measured 2026-09-05. The rewritten files `l4 check` clean (`Check succeeded`, zero diagnostics) and
+evaluate identically, because the elaborations stay distinct and they are what runs; the goldens and
+the oracle above are therefore both blind to it. Only the checked module's `GivenSig` node is wrong
+— and `L4.Print.prettyLayout` prints exactly that node, so `l4 batch` and the REPL re-emit
+`GIVEN foo IS NUMBER` once per parameter and the re-emitted module fails to type-check with
+"multiple definitions for the identifier". The 2nd..nth occurrence is also `ref`'d to the first
+binder, so IDE go-to-definition on them lands on the wrong parameter. Scope: dumping the printer's
+output for all 333 files the round-trip block covers (`JL4_PRETTY_DUMP_DIR`) and diffing each
+section `GIVEN` block against its source found exactly two files whose parameter types are lost —
+`ok/tdnr.l4` (`foo` at `NUMBER`/`BOOLEAN`/`STRING`) and `ok/misc.l4` (`coerce` at four function
+types) — and those are precisely the two files the `prettyLayout round-trip` block fails on, each
+arrived at independently.
+
+This is not a defect of the migration: it shipped latent with the section binder (legalese/l4-ide#333),
+and the migration is the first thing to author a file that reaches it. **It is a blocker for
+sequencing item 7 (keyword removal):** if `ASSUME` goes while a section `GIVEN` cannot express an
+overloaded name, L4 loses type-directed name resolution.
+
+**A retracted attribution, kept here because the retraction is the useful part.** An earlier revision
+of this section offered `jl4/experiments/macma3.l4` as a second instance of the collapse: it `ASSUME`s
+`` `forfeiture` `` at `FROM Order TO BOOLEAN` and `forfeiture` at `FROM Action TO BOOLEAN`, likewise
+`confiscation`, and at HEAD the checker reports "multiple definitions for the identifier" for both;
+migrated, those two errors **disappear**. The disappearance is real. **The stated cause was wrong.**
+
+Measured 2026-09-05 while repairing `resolveSectionGiven`: moving only the two `Action`-typed
+`ASSUME` lines under the section heading — **no `GIVEN`, so no collapse is possible** — loses the
+same two diagnostics, and the repaired compiler produces identical numbers across all six variants
+tried. So `macma3.l4` exhibits a **declaration-order sensitivity in TDNR candidate resolution that
+predates section binders altogether**: a separate defect, still unowned, and not evidence for this
+one. Three attempts to reduce it to a minimal witness failed.
+
+What survives the retraction: the collapse described above is real and is demonstrated by
+`ok/tdnr.l4` and `ok/misc.l4`, where the printed module loses every binding after the first; and
+`macma3.l4` remains a correct `overload` refusal, because it does bind one name at two types. What
+does not survive is the claim that this defect is what silences its diagnostics.
+
+Handled on the branch by fixing the _migration_, not the compiler: `etc/migrate-assume.mjs` gained a
+structural `overload` refusal role — a name `ASSUME`d more than once in a file is refused, citing
+`TypeCheck.hs:641` — so `ok/tdnr.l4` is left whole and `ok/misc.l4` migrates only its one
+non-overloaded binder. The guard keys on the identifier rather than its spelling, since a backticked
+declaration and a bare one denote the same name; keying on the raw text is what let `macma3.l4`
+through on the first pass. It is structural rather than a path list so that it also protects the
+rewrites still owed in `jl4/experiments` and `jl4/tests-cli`, where it refuses 10 further sites that
+no path list would have named. The compiler repair is **open**, and it is owed before item 7.
+
+**`ok/tdnr.l4` and `ok/misc.l4` are left un-migrated deliberately, as that repair's acceptance test.
+Do not migrate them as tidying-up.** They read like two files the sweep missed; they are the pass
+condition. The repair is done when `resolveSectionGiven` consumes each elaboration at most once, so
+repeated names map to distinct binders, and those two files come out of the script's `overload`
+refusal list and into the sweep with nothing else changed. The test runs in **both** directions,
+which is why the marker is two files and not one: the printed module must keep every binding rather
+than only the first, **and** `ok/tdnr.l4` — which exists precisely to require that two definitions
+sharing a name at different types coexist and resolve by type — must stay green. A fix that repairs
+the printing while breaking the resolution has moved the defect, not repaired it. (`macma3.l4` is
+**not** part of this acceptance test; see the retracted attribution above.)
+
+#### Finding 2: the IDE's one code action inserts the deprecated spelling. RULED 2026-09-05: it lands with item 5, not with item 6.
+
+`jl4-lsp` has exactly one code action, `outOfScopeAssumeQuickFix`
+(`jl4-lsp/app/LSP/L4/Handlers.hs:1009`), and it **inserts a new `ASSUME`** for an out-of-scope name.
+The IDE therefore offers, as its only automated repair, the spelling R0 deprecates.
+
+**Ruling: repointing it belongs to sequencing item 5, together with the deprecation warning, and not
+to this item.** Item 5 already requires that "the warning does not land before the code action can";
+this finding widens that requirement from _adding_ a rewrite action to also _repointing_ the
+existing insert action, since a quick fix that generates code the same release starts warning about
+is worse than no quick fix. Three things decided the placement rather than the principle. The
+migration branch is corpus-only — 129 files, all `.l4`, goldens and reference prose, no Haskell —
+and a compiler or LSP change would alter both its review character and which CI jobs it fires.
+`Handlers.hs` is also edited by `props/opaque-declare`, which lands ahead of it. And the repointing
+is not mechanical: an out-of-scope name at a position with no enclosing `§` heading has no section
+to receive a `GIVEN` at all — the migration script measures that case as its `root-section` and
+`no heading` refusals — so the action needs a stated fallback, which is design work for item 5.
+
 ### 11.15 The section binder is paired with its elaboration by identity, not by raw name. FIXED 2026-09-05.
 
 `L4.TypeCheck.resolveSectionGiven` paired each section-`GIVEN` parameter with the 0-ary `ASSUME`

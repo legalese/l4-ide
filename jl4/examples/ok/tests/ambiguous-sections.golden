@@ -1,10 +1,10 @@
 Parsing successful
 Typechecking successful
-ambiguous-sections.l4:80:1-24:
+ambiguous-sections.l4:78:1-24:
   BOOLEAN
-ambiguous-sections.l4:81:1-24:
+ambiguous-sections.l4:79:1-24:
   NUMBER
-ambiguous-sections.l4:82:1-24:
+ambiguous-sections.l4:80:1-24:
   NUMBER
-ambiguous-sections.l4:83:1-27:
+ambiguous-sections.l4:81:1-27:
   NUMBER

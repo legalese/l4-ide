@@ -2,7 +2,8 @@
 -- TIMEZONE IS must produce an AmbiguousTermError diagnostic, not crash the
 -- typechecker with "internal error: expected unique result, got several".
 
-ASSUME foo IS A FUNCTION FROM BOOLEAN TO BOOLEAN
+§ `Timezone directive ambiguity`
+    GIVEN foo IS A FUNCTION FROM BOOLEAN TO BOOLEAN
 
 GIVEN p IS A BOOLEAN
 DECIDE foo OF p

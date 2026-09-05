@@ -1,5 +1,11 @@
 -- IMPLIES keyword examples
 
+§ `IMPLIES keyword examples`
+    GIVEN isEmployee IS A BOOLEAN
+          hasBadge IS A BOOLEAN
+          personAge IS A NUMBER
+          hasParentalConsent IS A BOOLEAN
+
 -- Basic IMPLIES Operations
 
 #EVAL TRUE IMPLIES TRUE
@@ -37,16 +43,12 @@ orVersion a b MEANS (NOT a) OR b
 -- Legal Rule Examples
 
 -- "If you are an employee, you must have a badge"
-ASSUME isEmployee IS A BOOLEAN
-ASSUME hasBadge IS A BOOLEAN
 
 DECIDE badgeRule IS isEmployee IMPLIES hasBadge
 
 #CHECK badgeRule
 
 -- "A minor must have parental consent"
-ASSUME personAge IS A NUMBER
-ASSUME hasParentalConsent IS A BOOLEAN
 
 DECIDE consentRule IS (personAge < 18) IMPLIES hasParentalConsent
 

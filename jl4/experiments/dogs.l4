@@ -33,7 +33,6 @@ any pred xxx MEANS
     WHEN Nil       THEN FALSE
     WHEN Cons x xs THEN pred x OR any pred xs
 
-
 GIVEN  a      IS A TYPE
        pred   IS A FUNCTION FROM a TO BOOLEAN
        xxx    IS A List OF a
@@ -42,7 +41,6 @@ all pred xxx MEANS
   CONSIDER xxx
     WHEN Nil       THEN FALSE
     WHEN Cons x xs THEN pred x AND all pred xs
-
 
 DECLARE OPTIONAL a
   IS ONE OF
@@ -60,8 +58,8 @@ DECLARE Animal
         owner     IS A Person
 
 § `many-to-many relations between Person and Animal`
-ASSUME `is liable for the control of the` IS A FUNCTION FROM Person AND Animal TO BOOLEAN
-ASSUME `owns`                             IS A FUNCTION FROM Person AND Animal TO BOOLEAN
+    GIVEN `is liable for the control of the` IS A FUNCTION FROM Person AND Animal TO BOOLEAN
+          `owns` IS A FUNCTION FROM Person AND Animal TO BOOLEAN
 
 § `two kinds of possible victims`
 DECLARE Victim IS ONE OF VictimP HAS p IS A  Person
@@ -109,6 +107,34 @@ GIVETH A Penalty
                       ELSE Fine ^    ^       ^  10000, minimum IS Nothing
 
 § `Dogs Act - 33D.2A`
+    GIVEN `identified by` IS FUNCTION FROM Person AND Person TO BOOLEAN
+          teasing IS BOOLEAN
+          tormenting IS BOOLEAN
+          abuse IS BOOLEAN
+          `assault_on` IS BOOLEAN
+          `cruelty_towards` IS BOOLEAN
+          entry IS BOOLEAN
+          `lawful excuse` IS BOOLEAN
+          land IS BOOLEAN
+          premises IS BOOLEAN
+          `an occupier` IS BOOLEAN
+          `ordinarily kept` IS BOOLEAN
+          intrusion IS BOOLEAN
+          into IS BOOLEAN
+          upon IS BOOLEAN
+          vehicle IS BOOLEAN
+          in IS BOOLEAN
+          on IS BOOLEAN
+          which IS BOOLEAN
+          present IS BOOLEAN
+          `aggressively rushing at` IS BOOLEAN
+          harassing IS BOOLEAN
+          biting IS BOOLEAN
+          `otherwise causing physical injury to` IS BOOLEAN
+          `tearing clothing on` IS BOOLEAN
+          `otherwise causing damage to the property of` IS BOOLEAN
+          `attempting to attack` IS BOOLEAN
+          `behaving in such a manner toward a person as would cause a reasonable person to fear physical injury` IS BOOLEAN
 @ref Dog Act 058 of 1976 (WA) s2
 GIVEN dp     IS A Person
       dog    IS AN Animal
@@ -133,8 +159,6 @@ say str b MEANS b
 
 above x MEANS TRUE
 
-ASSUME `identified by` IS FUNCTION FROM Person AND Person TO BOOLEAN
-
 GIVEN dp     IS A Person
       dog    IS AN Animal
       victim IS A Victim
@@ -143,7 +167,6 @@ GIVEN dp     IS A Person
       droving IS A BOOLEAN
       removal IS A BOOLEAN
       `of any animal found trespassing` IS A BOOLEAN
-      `ordinarily kept` IS A BOOLEAN
       `ordinarily permitted to live` IS A BOOLEAN
       `the occupier of premises` IS A FUNCTION FROM Person AND Animal AND BOOLEAN TO BOOLEAN
       otherOwner IS A Person
@@ -156,8 +179,6 @@ IF    above dog
      AND [at the material time] `owns` otherOwner dog [was owned by another person who had reached 18 years of age]
      AND `identified by` otherOwner dp
 
-
-
 of_ x MEANS TRUE
 of__ x MEANS TRUE
 of_which_ x MEANS TRUE
@@ -166,26 +187,6 @@ by_ x MEANS TRUE
 said_ x MEANS TRUE
 where_said_ x MEANS TRUE
 is_   x MEANS TRUE
-
-ASSUME teasing IS BOOLEAN
-ASSUME tormenting IS BOOLEAN
-ASSUME abuse IS BOOLEAN
-ASSUME `assault_on` IS BOOLEAN
-ASSUME `cruelty_towards` IS BOOLEAN
-ASSUME entry IS BOOLEAN
-ASSUME `lawful excuse` IS BOOLEAN
-ASSUME land IS BOOLEAN
-ASSUME premises IS BOOLEAN
-ASSUME `an occupier` IS BOOLEAN
-ASSUME `ordinarily kept` IS BOOLEAN
-ASSUME intrusion IS BOOLEAN
-ASSUME into IS BOOLEAN
-ASSUME upon IS BOOLEAN
-ASSUME vehicle IS BOOLEAN
-ASSUME in IS BOOLEAN
-ASSUME on IS BOOLEAN
-ASSUME which IS BOOLEAN
-ASSUME present IS BOOLEAN
 
 GIVEN dog IS AN Animal
       dp  IS A Person   -- the dog-walker  person
@@ -217,8 +218,6 @@ provocation MEANS
                &&  which
             &&     said_ dog && is_ present
 
-
-
 -- provocation, in relation to the behaviour of a dog, includes —
 --                  (a)    on the part of a person, other than a person liable for the control of the dog —
 --                              (i)    any teasing, tormenting, or abuse of the dog; or
@@ -237,26 +236,12 @@ provocation MEANS
 --                  (b)    a dangerous dog (restricted breed); or
 --                  (c)    a commercial security dog;
 
-
-
 -- attack, in relation to the behaviour of a dog, does not include behaviour which was an immediate response to, and was induced by, provocation, but includes —
 --                  (a)    aggressively rushing at or harassing any person or animal; or
 --                  (b)    biting, or otherwise causing physical injury to, a person or an animal; or
 --                  (c)    tearing clothing on, or otherwise causing damage to the property of, the person attacked; or
 --                  (d)    attempting to attack, or behaving in such a manner toward a person as would cause a reasonable person to fear physical injury,
 --               unless the owner establishes that the behaviour was justified by a reasonable cause;
-
-ASSUME `aggressively rushing at` IS BOOLEAN
-ASSUME harassing IS BOOLEAN
-ASSUME biting IS BOOLEAN
-ASSUME `otherwise causing physical injury to` IS BOOLEAN
-ASSUME `tearing clothing on` IS BOOLEAN
-ASSUME `otherwise causing damage to the property of` IS BOOLEAN
-ASSUME `attempting to attack` IS BOOLEAN
-ASSUME `behaving in such a manner toward a person as would cause a reasonable person to fear physical injury` IS BOOLEAN
-
-
-
 
 GIVEN dog IS AN Animal
       dp  IS A Person   -- the dog-walker  person
@@ -269,11 +254,6 @@ attacks MEANS
         OR  (biting OR `otherwise causing physical injury to`) [a person or an animal]
         OR  (`tearing clothing on` OR `otherwise causing damage to the property of`) [the person attacked]
         OR  (`attempting to attack` OR `behaving in such a manner toward a person as would cause a reasonable person to fear physical injury`)
-
-
-
-
-
 
 --   (2A)    If a dog attacks or chases any person or animal without causing physical injury to the person or animal that is attacked or chased, every person liable for the control of the dog commits an offence.
 --               Penalty:

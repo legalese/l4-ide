@@ -26,7 +26,8 @@ NOT turns TRUE into FALSE and vice versa. In legal rules it typically encodes ne
 ### Basic Negation
 
 ```l4
-ASSUME hasCriminalRecord IS A BOOLEAN
+§ `Basic negation`
+    GIVEN hasCriminalRecord IS A BOOLEAN
 
 DECIDE isClean IS NOT hasCriminalRecord
 ```
@@ -34,8 +35,9 @@ DECIDE isClean IS NOT hasCriminalRecord
 ### Combined with AND
 
 ```l4
-ASSUME personAge IS A NUMBER
-ASSUME isBlocked IS A BOOLEAN
+§ `Combined with AND`
+    GIVEN personAge IS A NUMBER
+          isBlocked IS A BOOLEAN
 
 DECIDE canAccess IS personAge >= 18 AND NOT isBlocked
 ```

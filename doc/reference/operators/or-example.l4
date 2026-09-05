@@ -1,5 +1,12 @@
 -- OR keyword examples
 
+§ `OR keyword examples`
+    GIVEN isStudent IS A BOOLEAN
+          isSenior IS A BOOLEAN
+          isAdmin IS A BOOLEAN
+          isOwner IS A BOOLEAN
+          hasPermission IS A BOOLEAN
+
 -- Basic OR Operations
 
 #EVAL TRUE OR TRUE
@@ -13,9 +20,6 @@
 #EVAL TRUE || FALSE
 
 -- In Conditional Logic
-
-ASSUME isStudent IS A BOOLEAN
-ASSUME isSenior IS A BOOLEAN
 
 DECIDE getsDiscount IS isStudent OR isSenior
 
@@ -32,10 +36,6 @@ anyTrue a b c MEANS a OR b OR c
 #EVAL anyTrue FALSE TRUE FALSE
 
 -- Layout-Sensitive OR (Vertical Format)
-
-ASSUME isAdmin IS A BOOLEAN
-ASSUME isOwner IS A BOOLEAN
-ASSUME hasPermission IS A BOOLEAN
 
 DECIDE hasAccess IS
       isAdmin

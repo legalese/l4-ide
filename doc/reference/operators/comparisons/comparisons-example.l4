@@ -1,5 +1,8 @@
 -- Comparison keyword examples
 
+§ `Comparison keyword examples`
+    GIVEN age IS A NUMBER
+
 -- EQUALS
 
 -- Numeric equality
@@ -51,8 +54,6 @@
 #EVAL 10 <= 10
 
 -- Combined Comparisons
-
-ASSUME age IS A NUMBER
 
 DECIDE isWorkingAge IS
       age AT LEAST 18

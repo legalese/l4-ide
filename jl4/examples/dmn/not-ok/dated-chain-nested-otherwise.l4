@@ -20,6 +20,7 @@ IMPORT prelude
 IMPORT daydate
 
 § `nested otherwise under a dated arm`
+    GIVEN `the transitional relief applies` IS A BOOLEAN
 
 TIMEZONE IS "Asia/Singapore"
 
@@ -27,8 +28,6 @@ GIVETH A DATE
 `the 2024 rate change` MEANS Date 1 1 2024
 
 ASSUME `no GST rate exists before commencement` IS A NUMBER
-
-ASSUME `the transitional relief applies` IS A BOOLEAN
 
 GIVETH A NUMBER
 `GST rate percent` MEANS

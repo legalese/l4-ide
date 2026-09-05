@@ -3,7 +3,22 @@ Typechecking successful
 Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
 File: typically-type-mismatch.l4
   Hidden: no
-  Range: 5:34-5:36
+  Range: 4:50-4:52
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The TYPICALLY value for `applicable law` is expected to be of type
+
+      STRING
+
+    but is here of type
+
+      NUMBER
+
+File: typically-type-mismatch.l4
+  Hidden: no
+  Range: 8:34-8:36
   Source: check
   Severity: DiagnosticSeverity_Error
   Code: <none>
@@ -18,7 +33,7 @@ File: typically-type-mismatch.l4
 
 File: typically-type-mismatch.l4
   Hidden: no
-  Range: 9:27-9:32
+  Range: 12:27-12:32
   Source: check
   Severity: DiagnosticSeverity_Error
   Code: <none>
@@ -33,7 +48,7 @@ File: typically-type-mismatch.l4
 
 File: typically-type-mismatch.l4
   Hidden: no
-  Range: 13:27-13:31
+  Range: 16:27-16:31
   Source: check
   Severity: DiagnosticSeverity_Error
   Code: <none>
@@ -45,21 +60,6 @@ File: typically-type-mismatch.l4
     but is here of type
 
       BOOLEAN
-
-File: typically-type-mismatch.l4
-  Hidden: no
-  Range: 16:47-16:49
-  Source: check
-  Severity: DiagnosticSeverity_Error
-  Code: <none>
-  Message:
-    The TYPICALLY value for `applicable law` is expected to be of type
-
-      STRING
-
-    but is here of type
-
-      NUMBER
 
 File: typically-type-mismatch.l4
   Hidden: no

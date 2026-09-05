@@ -1,9 +1,13 @@
+§ `Contract`
+    GIVEN `owns car` IS A FUNCTION FROM A Person TO A BOOLEAN
+          `wallet content` IS A FUNCTION FROM A Person TO A NUMBER
+          `wants to buy car` IS FUNCTION FROM Person TO BOOLEAN
+          `has enough money` IS FUNCTION FROM Person TO BOOLEAN
+          `owns the car` IS FUNCTION FROM Person TO BOOLEAN
+
 DECLARE Person
     HAS
         name IS A STRING
-
-ASSUME `owns car` IS A FUNCTION FROM A Person TO A BOOLEAN
-ASSUME `wallet content` IS A FUNCTION FROM A Person TO A NUMBER
 
 GIVEN `the buyer` IS A Person @nlg
       `the seller` IS A Person @nlg
@@ -47,14 +51,9 @@ DECIDE `can transfer car ownership`
      `owns car` OF `the seller`
  AND `wants to buy car` OF `the buyer`
 
-ASSUME `wants to buy car` IS FUNCTION FROM Person TO BOOLEAN
-
-
 {-
 `The seller` `can transfer car ownership` to `the buyer` if `the seller` `owns car` and `the buyer` `wants to buy car`
 -}
-
-ASSUME `has enough money` IS FUNCTION FROM Person TO BOOLEAN
 
 GIVEN `the buyer` IS A Person
 GIVETH A BOOLEAN
@@ -63,8 +62,6 @@ DECIDE `can purchase car from Magnus` IF
 {-
 `A Person`, known as the `the buyer`, `can purchase car from Magnus` if `the buyer` `has enough money`
 -}
-
-ASSUME `owns the car` IS FUNCTION FROM Person TO BOOLEAN
 
 GIVEN `the seller` IS A Person
 DECIDE `is allowed to sell the car` `the seller` IF
