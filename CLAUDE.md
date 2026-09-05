@@ -67,6 +67,22 @@ agents committed goldens and corpus files, which need no build at all.
 > of phantom compile failures. The rule costs a little parallelism and buys back an entire class of
 > unreproducible error.
 
+**Wait on a PID, never on a process name.** The obvious way to honour the rule above is
+`until ! pgrep -f 'cabal test'; do sleep 20; done` — and it never exits, because **the waiting shell
+is itself a process whose command line contains that string**, so `pgrep` matches the waiter. It
+does not hang visibly: it reports "still running" forever, which is indistinguishable from a slow
+build and is therefore believed. Use `until ! kill -0 <pid> 2>/dev/null`, which cannot self-match,
+or wait on a file the run itself creates. A bracketed class (`pgrep -f '[c]abal test'`) works but is
+a trick that survives only as long as the next person copying the line knows why the bracket is
+there.
+
+> **Why.** 2026-09-05: **sixteen deadlocked waiter shells across four deputies**, two with a
+> `cabal test` queued behind a wait that would never fire. At least two "still running" status
+> reports were about runs that had never started, and one build was reported finished when it had
+> barely begun. Nothing looks wrong from inside the waiter; `ps` was the only thing that disagreed
+> with it. Same family as §3.2.1's snapshot rule — a probe that reads a name rather than a fact
+> reports confidently about a world it is not observing.
+
 ---
 
 ## 3. Build and test facts
