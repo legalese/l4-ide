@@ -825,6 +825,22 @@ crosses an `IMPORT`, before the closure is allowed to find one. Zero corpus file
 lines; the 7 files with a section `GIVEN` are all fixtures and none is imported), which is why this
 is a defect on a schedule rather than a stop-work.
 
+**Findings from 2026-09-05 that are NOT props defects, and live in their own file.**
+`specs/todo/OPEN-FINDINGS-2026-09-05.md` collects six open items found while the 2026-09-05 rulings
+were being recorded. Three of them touch this programme and are named here so a reader of §7 is not
+missing them:
+
+- **`l4 batch`'s generated wrapper is scoped by the last open `§`** (that file's §3). Loud failure,
+  reproduced with a control. Unreachable today; reachable the moment `props/assume-sweep` lands.
+- **`L4.Names.isSectionBinderElaboration` keys on the raw name** (§2 there, recorded in full in
+  `IMPLICIT-PROPS-DESIGN.md` §11.15 on `props/tdnr-collapse`). **This blocks §6 item 7 above.**
+- **A `WHERE` local silently shadows a section `GIVEN`** (§5 there). Silent wrong answer: with the
+  binder supplied as 4, one entrypoint answers 4 and its neighbour answers 51, no diagnostic.
+
+The other three — a TDNR declaration-order sensitivity that predates section binders, an unmeasured
+BPMN question, and the branch-dependent state of smucclaw/l4-ide#948 — are in that file and are not
+this programme's.
+
 ## 8. Measurements relied on
 
 | what                                                                                                                              | value                                       | date       | scope                                                       |
