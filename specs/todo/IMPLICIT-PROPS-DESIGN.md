@@ -797,6 +797,13 @@ enumeration above gives 7. `gst-rate.l4`'s two arms were never in dispute. Count
 subtracting the ones you know about is not enumeration: it cannot tell an arm from a comment, and it
 fails silently, in the direction of over-counting. That is why the table above lists line numbers.
 
+**The second grep was wrong too, in the other direction.** The re-enumeration that produced that
+table classified each occurrence by keyword, and keyed on `OTHERWISE` — so it dropped
+`dated-chain-nested-otherwise.l4:38`, which is an **`ELSE`**, and reported 23. Two greps in a row,
+two different wrong answers, neither of them careless. What caught it was printing the
+**unclassified residue** rather than the total: a classifier that reports a number and not what it
+failed to classify cannot tell you what it dropped. If a count matters, print the leftovers.
+
 **What survives the recount is the load-bearing part**: every one of the ten is `NUMBER`-typed, so
 D6's argument that the gate cannot live in the return type without making each a tagged union
 stands, and stands over a slightly larger population than it claimed. Since D6 is one of the cards
