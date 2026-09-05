@@ -22,9 +22,10 @@ FOR ALL typeVar1 AND typeVar2 AND typeVar3 ...
 
 ```l4
 -- A function that works for any type 'a'
-ASSUME identity IS
-  FOR ALL a
-  A FUNCTION FROM a TO a
+§ `Identity`
+    GIVEN identity IS
+              FOR ALL a
+              A FUNCTION FROM a TO a
 ```
 
 This declares `identity` as a function that takes a value of any type and returns a value of the same type.
@@ -33,12 +34,13 @@ This declares `identity` as a function that takes a value of any type and return
 
 ```l4
 -- The classic 'map' function for lists
-ASSUME map IS
-  FOR ALL a AND b
-  A FUNCTION
-    FROM      FUNCTION FROM a TO b
-          AND LIST OF a
-    TO    LIST OF b
+§ `Mapping`
+    GIVEN map IS
+              FOR ALL a AND b
+              A FUNCTION
+                FROM      FUNCTION FROM a TO b
+                      AND LIST OF a
+                TO    LIST OF b
 ```
 
 This says: "For all types `a` and `b`, `map` is a function that takes:
@@ -57,31 +59,33 @@ DECLARE Choice OF a, b
     Right HAS payload IS A  b
 
 -- A function that handles either alternative
-ASSUME choose IS
-  FOR ALL a AND b AND c
-  A FUNCTION
-    FROM      FUNCTION FROM a TO c
-          AND FUNCTION FROM b TO c
-          AND Choice OF a, b
-    TO    c
+§ `Choosing`
+    GIVEN choose IS
+              FOR ALL a AND b AND c
+              A FUNCTION
+                FROM      FUNCTION FROM a TO c
+                      AND FUNCTION FROM b TO c
+                      AND Choice OF a, b
+                TO    c
 ```
 
 ## Usage Context
 
-`FOR ALL` is used with `ASSUME` to declare the type of external or primitive functions. It's the declaration-style way to express polymorphism.
+`FOR ALL` declares the type of an external or primitive function — one the section takes in rather than works out. It is the declaration-style way to express polymorphism.
 
-### ASSUME vs GIVEN
+### Declaring a function versus defining one
 
 There are two ways to write polymorphic functions:
 
-**Declaration style (FOR ALL):** Declares a type signature without implementation
+**Declaration style (FOR ALL):** names a type signature the section is given, with no implementation
 
 ```l4
-ASSUME map IS
-  FOR ALL a AND b
-  A FUNCTION
-    FROM FUNCTION FROM a TO b AND LIST OF a
-    TO LIST OF b
+§ `Mapping`
+    GIVEN map IS
+              FOR ALL a AND b
+              A FUNCTION
+                FROM FUNCTION FROM a TO b AND LIST OF a
+                TO LIST OF b
 ```
 
 **Definition style (GIVEN ... IS A TYPE):** Defines a function with implementation
@@ -136,47 +140,49 @@ FOR ALL a AND b AND c
 ### Identity Function
 
 ```l4
-ASSUME identity IS
-  FOR ALL a
-  A FUNCTION FROM a TO a
+§ `Identity`
+    GIVEN identity IS
+              FOR ALL a
+              A FUNCTION FROM a TO a
 ```
 
 ### Constant Function
 
 ```l4
-ASSUME const IS
-  FOR ALL a AND b
-  A FUNCTION FROM a AND b TO a
+§ `Constant`
+    GIVEN const IS
+              FOR ALL a AND b
+              A FUNCTION FROM a AND b TO a
 ```
 
 ### Function Composition
 
 ```l4
-ASSUME compose IS
-  FOR ALL a AND b AND c
-  A FUNCTION
-    FROM      FUNCTION FROM b TO c
-          AND FUNCTION FROM a TO b
-    TO    FUNCTION FROM a TO c
+§ `Composition`
+    GIVEN compose IS
+              FOR ALL a AND b AND c
+              A FUNCTION
+                FROM      FUNCTION FROM b TO c
+                      AND FUNCTION FROM a TO b
+                TO    FUNCTION FROM a TO c
 ```
 
 ### List Operations
 
 ```l4
-ASSUME head IS
-  FOR ALL a
-  A FUNCTION FROM LIST OF a TO MAYBE a
-
-ASSUME tail IS
-  FOR ALL a
-  A FUNCTION FROM LIST OF a TO LIST OF a
-
-ASSUME filter IS
-  FOR ALL a
-  A FUNCTION
-    FROM      FUNCTION FROM a TO BOOLEAN
-          AND LIST OF a
-    TO    LIST OF a
+§ `List operations`
+    GIVEN head IS
+              FOR ALL a
+              A FUNCTION FROM LIST OF a TO MAYBE a
+          tail IS
+              FOR ALL a
+              A FUNCTION FROM LIST OF a TO LIST OF a
+          filter IS
+              FOR ALL a
+              A FUNCTION
+                FROM      FUNCTION FROM a TO BOOLEAN
+                      AND LIST OF a
+                TO    LIST OF a
 ```
 
 ## NOT a Runtime Quantifier
@@ -203,7 +209,7 @@ any (GIVEN x YIELD x > 0) myList    -- Check if any element
 
 - **[GIVEN](../functions/GIVEN.md)** - The inputs of a rule, including inputs that are kinds of thing
 - **[TYPE](keywords.md)** - The kind of types
-- **[ASSUME](ASSUME.md)** - Declare types without implementation
+- **[ASSUME](ASSUME.md)** - the older spelling of the same declaration
 - **[FUNCTION](keywords.md)** - Function type constructor
 
 ## See Also

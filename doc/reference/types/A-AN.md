@@ -28,13 +28,16 @@ ASSUME name IS A Type
 
 ```l4
 -- "A" before consonant sounds
-ASSUME age IS A NUMBER
-ASSUME name IS A STRING
 GIVEN x IS A NUMBER
 
 -- "AN" before vowel sounds
-ASSUME account IS AN Account
 GIVEN obj IS AN Object
+
+-- the same articles, on the facts a section takes in
+§ `Applicant`
+    GIVEN age IS A NUMBER
+          name IS A STRING
+          account IS AN Account
 ```
 
 A rule is told some facts about the case in front of it (its **"inputs"**).
@@ -58,7 +61,8 @@ DECLARE Person HAS
   name IS A STRING
   age IS A NUMBER
 
-ASSUME john IS A Person
+§ `John`
+    GIVEN john IS A Person
 
 -- Access fields with genitive
 DECIDE johnsName IS john's name

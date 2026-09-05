@@ -83,6 +83,7 @@
 IMPORT prelude
 
 § `Hydration`
+    GIVEN `the submission` IS A Submission
 
 -- The computed fields are declared in the order `band`, `total income`,
 -- `band width` ON PURPOSE. `band` reads `total income`, so declaration order is
@@ -132,8 +133,6 @@ GIVETH A NUMBER
 DECLARE Submission
   HAS `primary`   IS AN Applicant
       `secondary` IS AN Applicant
-
-ASSUME `the submission` IS A Submission
 
 GIVETH AN Applicant
 `the leading applicant` MEANS
