@@ -955,6 +955,10 @@ keeps an overloaded `ASSUME` of the same name, so it wants an owner before item 
 
 ### 11.16 Discharge as shipped — 2026-09-05
 
+> **Section number, on rebase.** The `ASSUME` sweep takes §11.14 and
+> `props/tdnr-collapse` has also claimed §11.15. Whoever rebases this branch last
+> must renumber rather than assume the number is free.
+
 `PROPS-REDTEAM-2026-09-03.md` §6 item 5. What landed, where it lives, what it
 was measured against, and what it deliberately does not do. Written against the
 tree at `props/discharge`; every claim below was probed on the binary built from
@@ -1135,6 +1139,17 @@ read-set is `AmbiguousImplicitSupply`, a new error, rather than a guess.
 **A reader passed as a value was a check error.** See the deferrals below; it is
 now built, and it was a real regression on the sweep's corpus, not a nicety.
 
+**§2.2's read-set subtraction is implemented.** `readSets` is a fixpoint over
+per-call-site edges in which a `WITH` removes what it supplies from the callee's
+contribution, so `h MEANS alpha PLUS (g WITH beta IS 100)` no longer carries
+`beta` as a dead trailing parameter — which matters for R10, where the export
+schema is keyed off the discharged AST and would otherwise list it as required.
+Edges are per call site, not per callee: a definition called once with a `WITH`
+and once positionally in the same body still contributes its full read-set
+through the second call. Measured cost on `legal/regcf/regcf.l4` (86 directives):
+0.70 s, against 0.73 s undischarged — none. Ported from the review branch's
+`69cbbef6`, whose own measurement was 0.77 s.
+
 **The `TYPICALLY` call-graph edge is gone.** `readSets` used to add each binder's
 default as an edge keyed by the binder's own `Unique`. A default is literal-only
 so the edge is always empty, but if that restriction is ever lifted the edge
@@ -1144,20 +1159,32 @@ value-bound parameter references inside readers — into an application. **R8 ru
 restriction as its guard. The earlier wording here, that it "holds by
 construction", was a sharpening past the evidence actually gathered.
 
-**Crossing an `IMPORT` is now reachable, and it is the one thing that must be
-decided before this and the sweep both land.** Measured on the sweep tree
-(`a1525a89`): exactly one module declares a section binder _and_ is imported by
-another — `jl4/examples/legal/regcf/regcf.l4:468`, imported by
-`regcf-wizard.l4`. The importer is not discharged (it declares no binder of its
-own), so its calls into `regcf`'s now-discharged definitions pass too few
-arguments and every directive dies with `given signatures' values' lengths do not
-match`. On the pre-sweep corpus this is unreachable; on the post-sweep corpus it
-is one file, and it is the only file in 334 that the differential still flags.
-Four other modules matched a crude `^ +GIVEN` grep and were checked by hand: all
-four are `WHERE` locals or lambda parameters, not section binders. Closing this
-properly needs the importer's pass to see the imported module's read-sets, which
-is §2.2's "discharge happens at the module boundary" and is not in this release;
-the cheap resolution is for the sweep to leave `regcf.l4`'s term `ASSUME`s alone.
+**Crossing an `IMPORT` was reachable and crashed; it is now handled in the
+evaluator.** Measured on the sweep tree (`a1525a89`): exactly one module declares
+a section binder _and_ is imported by another —
+`jl4/examples/legal/regcf/regcf.l4:468`, imported by `regcf-wizard.l4`. The
+importer declares no binder, so `dischargeModule` is the identity on it and its
+call sites still pass the callee's _original_ arity, while the callee gained
+trailing parameters when its own module was discharged. Six sites in that file
+died with `Internal error: given signatures' values' lengths do not match` — an
+internal error, on a correct program, in the flagship's wizard.
+
+`L4.EvaluateLazy.Machine.matchGivens'` now takes the closure's captured
+environment and, when a call is UNDER-applied and **every** missing parameter is
+a key that environment already holds, binds only what was supplied and lets the
+rest resolve from there. Every parameter discharge appends is a section binder of
+the callee's own module, so that is precisely the imported module's own binder
+cell — what the callee read before discharge. It cannot mask a real arity
+mistake: an ordinary parameter the writer forgot is a fresh binding no module
+environment carries, and the checker rejects genuine arity errors long before
+evaluation.
+
+What the importer still cannot do is `WITH`-supply that binder:
+`CheckEnv.sectionBinderNames` is per module, so the name is not suppliable across
+the boundary and the imported module's own `TYPICALLY` (or "assumed term")
+applies. That is the remaining half of §2.2's "discharge happens at the module
+boundary", and it is deferred. `ok/section-given-import-def.l4` and
+`ok/section-given-import-call.l4` pin both the fix and the limit.
 
 #### Deferred, each with why
 
@@ -1186,17 +1213,6 @@ the cheap resolution is for the sweep to leave `regcf.l4`'s term `ASSUME`s alone
   to the call site. `TYPICALLY` therefore has two behaviours today, not the one
   R8 asks for — but they are two, down from three, and `TYPICALLY.md` says which
   is which.
-- **The read-set subtraction rule of §2.2/§2.4 is not implemented.** Supplying a
-  binder at a call is specified to remove it from the caller's read-set along
-  that path; `readSets` is the plain transitive closure, so
-  `h MEANS alpha PLUS (g WITH beta IS 100)` still takes `beta` as a trailing
-  parameter of its own. The answer is right today because evaluation is lazy and
-  nothing forces it (`ok/section-given-across-sections.l4` gives 201), but the
-  arity is over-approximated — and once the export schema is keyed off the
-  discharged AST in R10, `beta` would be listed as required for `h`. Fixing it
-  means making `readSets` a per-call-site fixpoint, which is a change to the
-  shape of the pass and wants its own measurement of what it costs on the
-  corpus.
 - **R5, field-opening, is not built.** §11.7 already sequences it after
   discharge, and §11.7's own note is that the sample which motivated it was
   re-cut as fourteen scalars under R10, so what remains is bare field names

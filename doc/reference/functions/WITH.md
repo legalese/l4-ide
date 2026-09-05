@@ -35,7 +35,7 @@ form. Writing a positional argument and then a `WITH` is a parse error:
 The same function may be called positionally at one site and by name at
 another. The rule is about a single call, not about the definition.
 
-## Supplying a section binder
+## Supplying a section `GIVEN`
 
 A [section `GIVEN`](../syntax/section-given.md) declares a name once for a whole
 section, and every rule that reads it takes it as an input without saying so.
@@ -56,12 +56,12 @@ quadrupled MEANS doubled TIMES 2
 ```
 
 `quadrupled` never mentions `the rate`. It reads it through `doubled`, so
-supplying it at `quadrupled` reaches `doubled` too. This is the one way an
-implicit input is supplied, and it works the same at three kinds of site: a
+supplying it at `quadrupled` reaches `doubled` too. This is the one way a section `GIVEN`
+is supplied, and it works the same at three kinds of site: a
 directive, an ordinary call inside another rule, and a helper's call to a
 helper.
 
-A binder is suppliable at a call **only if the callee reads it**, directly or
+A section `GIVEN` can be supplied at a call **only if the rule being called reads it**, directly or
 through anything it calls. Naming one it does not read is an error, because
 there would be nowhere for the value to go:
 
@@ -77,7 +77,7 @@ go, so the override would do nothing.
 
 ### Overriding for part of a rule
 
-Because a `WITH` supplies the binder to that call and everything under it, it
+Because a `WITH` supplies the input to that call and everything under it, it
 is also how a rule asks a question under a different assumption:
 
 ```l4
@@ -86,19 +86,19 @@ GIVETH A NUMBER
 ```
 
 Everything `quadrupled` reaches sees `10`. Everywhere else in the module the
-binder is unchanged. `LET` does not do this: a `LET` binds a name for the
+input is unchanged. `LET` does not do this: a `LET` binds a name for the
 expression it encloses and never reaches inside a definition that expression
 calls.
 
-### Naming one binder does not mean naming them all
+### Naming one input does not mean naming them all
 
-A `WITH` names only what it is overriding. Every other binder the callee reads
+A `WITH` names only what it is overriding. Every other section `GIVEN` the rule reads
 keeps flowing from wherever it was already coming from — the enclosing rule's
 own supply, a default, or the request at the entry point.
 
-The declared parameters are a different matter: because a call is all-named or
-all-positional, a site that names one implicit must also name every ordinary
-parameter of the callee.
+The rule's own inputs are a different matter: because a call is all-named or
+all-positional, a site that names a section `GIVEN` must also name every one of the rule's own
+inputs.
 
 ```l4
 GIVEN n IS A NUMBER
@@ -114,14 +114,14 @@ bump n MEANS n TIMES `the rate`
   end of the line, so `#ASSERT f WITH a IS 3 EQUALS 4` parses as
   `a IS (3 EQUALS 4)`. Put the comparison outside, or parenthesise the value.
 - **A misspelt name is an error**, and stays one: if the name is neither a
-  parameter of the callee nor a section binder it reads, the checker says it
+  input of the rule being called, nor a section `GIVEN` it reads, you are told it
   could not find a definition for it.
-- **A `WITH` that names a binder the callee reads under two same-spelled
-  binders is an error**, when the name is neither of them. There is no way to
+- **A `WITH` that names a input the rule reads under two same-spelled
+  inputs is an error**, when the name is neither of them. There is no way to
   tell which was meant; rename one of them, or hoist them to a common section
   heading if they are one thing.
 - **A rule's own defaulted parameter cannot yet be omitted at a named site.**
-  `TYPICALLY` on a _section_ binder is honoured when nobody supplies it (see
+  `TYPICALLY` on a _section_ input is honoured when nobody supplies it (see
   [TYPICALLY](../types/TYPICALLY.md)); on a rule's own `GIVEN` the checker still
   asks for the argument.
 
@@ -137,5 +137,5 @@ Every call on this page, in one file you can run:
   for a whole section
 - [`GIVEN`](GIVEN.md) — a signature for one definition
 - [`LET`](LET.md) and [`WHERE`](WHERE.md) — local definitions, which do not
-  reach into callees
+  reach into the rules a definition calls
 - [`TYPICALLY`](../types/TYPICALLY.md) — a default for an input nobody supplies
