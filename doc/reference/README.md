@@ -65,7 +65,7 @@ Turning a Boolean decision into an interactive question-and-answer wizard:
 
 Core libraries shipped with L4:
 
-- **prelude:** Standard functions (auto-imported)
+- **prelude:** Standard functions (`IMPORT prelude`, like every other library)
 - **daydate:** Date calculations and temporal logic
 - **time:** Wall-clock time-of-day operations
 - **datetime:** Absolute points in time with timezones

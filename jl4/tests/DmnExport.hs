@@ -1090,7 +1090,12 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       -- `double OF n` satisfies dmnmd's varname grammar (letters and spaces) by
       -- accident. The fragment, not the spelling, is what decides.
       let drg = drgOf nonSFeelColumn
-      emitMarkdown drg `shouldNotSatisfy` Text.isInfixOf "double"
+      -- Two halves, and both are needed: the phrase never reaches a table
+      -- line, AND `tier` is on the record as omitted rather than silently
+      -- gone. See 'mdTableLines' and 'mdOmits'.
+      let md = emitMarkdown drg
+      mdTableLines md `shouldNotSatisfy` Text.isInfixOf "double"
+      md `shouldSatisfy` mdOmits "tier"
       let notes = [n | n <- (markdownReport drg).notes, n.code == "D-MD-NONIDENTCOLUMN"]
       map (.severity) notes `shouldBe` [Blocking]
       map (.message) notes `shouldSatisfy` all (Text.isInfixOf "L4 source, not FEEL")
@@ -2189,7 +2194,9 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
 
     it "omits a table whose column is an EXPRESSION, since a header is a variable name" $ do
       let drg = drgOf nonSFeelColumn
-      emitMarkdown drg `shouldNotSatisfy` Text.isInfixOf "double"
+      let md = emitMarkdown drg
+      mdTableLines md `shouldNotSatisfy` Text.isInfixOf "double"
+      md `shouldSatisfy` mdOmits "tier"
       [n.code | n <- (markdownReport drg).notes] `shouldContain` ["D-MD-NONIDENTCOLUMN"]
 
     it "omits a decision with no table shape, and names it" $ do
@@ -2775,7 +2782,12 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
     it "gives dmnmd no form for a date cell" $ do
       drg <- gstDrg
       let md = emitMarkdown drg
-      md `shouldSatisfy` (not . Text.isInfixOf "date(")
+      -- ...in a CELL. The marker for each omitted decision quotes the FEEL it
+      -- could not render, so `date(` is present in the comments by design — and
+      -- the date-interval table itself must be ON THE RECORD as omitted, not
+      -- merely absent.
+      mdTableLines md `shouldSatisfy` (not . Text.isInfixOf "date(")
+      md `shouldSatisfy` mdOmits "GST rate percent"
       [ n.code
         | n <- (markdownReport drg).notes
         , n.code == "D-MD-CELLSYNTAX"
@@ -3903,6 +3915,7 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
           }
         decNode nm krs body = NodeDecision MkDecision
           { dcnId = "decision_" <> nm, dcnName = nm, dcnFeelName = nm
+          , dcnDescription = Nothing
           , dcnDecide = Nothing
           , dcnType = DmnNumber, dcnLogic = body
           , dcnRequirements = [], dcnKnowledgeReqs = krs
@@ -4104,6 +4117,22 @@ goldenSubjects =
     , "ymd-dates"
     , "the date-literal exhibit"
     )
+    -- The REFUSAL exhibit (ruling D1, 2026-09-05; IMPLICIT-PROPS-DESIGN §11.9.1).
+    -- One of each position a `REFUSE` can occupy — a whole body (a boxed
+    -- literalExpression), the floor arm of a law-time chain, an inline
+    -- `OTHERWISE`, an enum-valued `OTHERWISE`, and a plain arithmetic decision
+    -- downstream of one — because each is a different path through
+    -- 'renderFeelIn', 'datedTable' and 'outputValuesWith'. Before D1 no such
+    -- golden could exist: the exporter wrote raw L4 into a FEEL literal and KIE
+    -- failed to compile the whole file. Its negative control is a HAND-WRITTEN
+    -- fixture (`not-ok/refuse-enum-unwidened.dmn`) rather than a second module,
+    -- for the same reason `ymd-unfoldable-date.l4` is one: the emitter cannot
+    -- produce the un-widened `<outputValues>` any more, so only a fixture can
+    -- ask whether KIE still rejects it.
+  , ( "dmn" </> "refuse.l4"
+    , "refuse"
+    , "the refusal exhibit"
+    )
   ]
 
 -- | The `.kie.` golden pairs (§13.6): ONLY the subjects whose bytes actually
@@ -4169,6 +4198,37 @@ isUniqueTable = \case
 ------------------------------------------------------------------------
 -- helpers
 ------------------------------------------------------------------------
+
+-- | The markdown's TABLE lines only — every line that starts with @|@.
+--
+-- Three assertions below mean "this never reached a column header or a cell",
+-- and used to spell that as "this string is absent from the whole document".
+-- That proxy stopped being equivalent once an omitted decision began leaving an
+-- @\<!-- OMITTED: … --\>@ marker that NAMES it and quotes the FEEL it could not
+-- render ("L4.Dmn.Markdown"): the name is now deliberately present, in a
+-- comment, and only its absence from the TABLES is the property being claimed.
+--
+-- __This is more precise, and on its own it is not stronger.__ Scoping to the
+-- tables says exactly what each test means instead of over-reaching, but it is
+-- no better than the whole-document form at catching the failure that matters:
+-- a decision dropped SILENTLY puts its name in neither a cell nor a comment, so
+-- both forms pass. 'mdOmits' is the half that closes that, and each of the
+-- three assertions pairs the two.
+mdTableLines :: Text -> Text
+mdTableLines =
+  Text.unlines . filter (Text.isPrefixOf "|") . map Text.stripStart . Text.lines
+
+-- | Does the markdown carry an @OMITTED@ marker naming this decision?
+--
+-- The companion to 'mdTableLines', and the half that makes these assertions
+-- genuinely stronger than what they replaced. "The name never reaches a table
+-- line" is satisfied just as well by a decision that vanished without a word —
+-- which is the outcome the marker was added to prevent — so asserting the
+-- marker too is what separates \"correctly omitted, and said so\" from
+-- \"silently gone\". If a later change drops or renames the marker, these three
+-- tests are the ones that should notice.
+mdOmits :: Text -> Text -> Bool
+mdOmits name = Text.isInfixOf ("<!-- OMITTED: `" <> name <> "` ")
 
 drgOf :: Text -> Drg
 drgOf = drgNamed "Test"

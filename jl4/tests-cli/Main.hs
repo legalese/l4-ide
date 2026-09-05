@@ -2220,7 +2220,11 @@ spec bin = do
     -- fixtures R12 dropped (ruling R-C, spec §15.12.1: "the model owns the law
     -- under a date; the harness owns the dates"), the 4 seed cases that close
     -- the total-assets and restricted-period leaves the §8 diff oracle reported
-    -- structurally inert, THE LEAP CASE, and THE ESCHEAT CASE. 22 x 70 = 1540.
+    -- structurally inert, THE LEAP CASE, THE ESCHEAT CASE, and (2026-09-05,
+    -- ruling D1) THE PRE-COMMENCEMENT CASE, which is the first here to ask a
+    -- rule date below Reg CF's 2016-05-16 commencement AND the first to supply
+    -- NEITHER refusal -- both are explicit JSON nulls rather than the -1 and the
+    -- invented assurance level every other case hands the model. 23 x 70 = 1610.
     -- All counts below are MEASURED (2026-08-09, this machine, both harnesses),
     -- not aspirational: before R12/R13 KIE refused with 16 build errors and
     -- Camunda refused the file at parse() on the raw-L4 deontic body.
@@ -2245,39 +2249,42 @@ spec bin = do
       dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
         corpusGolden [corpusGolden, "--cases", corpusEngineCases] \out -> do
           out `shouldSatisfy` ("KIE 8.44.0.Final VERDICT" `isInfixOf`)
-          out `shouldSatisfy` ("22 case(s)" `isInfixOf`)
+          out `shouldSatisfy` ("23 case(s)" `isInfixOf`)
           out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
           out `shouldSatisfy` ("0 warning(s)" `isInfixOf`)
-          out `shouldSatisfy` ("1540/1540 decision(s) SUCCEEDED" `isInfixOf`)
-          out `shouldSatisfy` ("1540/1540 value(s) as expected" `isInfixOf`)
+          out `shouldSatisfy` ("1610/1610 decision(s) SUCCEEDED" `isInfixOf`)
+          out `shouldSatisfy` ("1610/1610 value(s) as expected" `isInfixOf`)
           -- the SVC leg is a value check since 2026-08-02 (each service fed
           -- its inputDecisions' computed values, each outputDecision compared
           -- against the same expect entry): 7 services, 15 declared outputs,
           -- per case
-          out `shouldSatisfy` ("330/330 service output value(s) as expected" `isInfixOf`)
+          out `shouldSatisfy` ("345/345 service output value(s) as expected" `isInfixOf`)
 
     it "Camunda parses and answers the whole Reg CF corpus (R12/R13)" $
       dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
         corpusGolden [corpusGolden, "--cases", corpusEngineCases] \out -> do
           out `shouldSatisfy` ("Camunda 8.7.6 (zeebe-dmn) VERDICT" `isInfixOf`)
-          out `shouldSatisfy` ("22 case(s)" `isInfixOf`)
+          out `shouldSatisfy` ("23 case(s)" `isInfixOf`)
           out `shouldSatisfy` ("1 parsed" `isInfixOf`)
           out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
-          out `shouldSatisfy` ("1540/1540 decision(s) evaluated" `isInfixOf`)
-          out `shouldSatisfy` ("1540/1540 value(s) as expected" `isInfixOf`)
+          out `shouldSatisfy` ("1610/1610 decision(s) evaluated" `isInfixOf`)
+          out `shouldSatisfy` ("1610/1610 value(s) as expected" `isInfixOf`)
 
   -- The LAW-TIME legs (spec §15). What is being asserted here that nothing
   -- else asserts: the SAME model answers DIFFERENTLY for different rule dates,
   -- in a real engine, driven only by half-open date intervals on a UNIQUE
-  -- table. `60/60 value(s) as expected` over ten cases is the claim -- ten rule
-  -- dates x six decisions (Phase 5 moved the seventh, `the rules in force
+  -- table. `66/66 value(s) as expected` over ELEVEN cases is the claim -- eleven
+  -- rule dates x six decisions (Phase 5 moved the seventh, `the rules in force
   -- include`, to a businessKnowledgeModel, which the cases schema cannot
   -- assert -- its logic is exercised through the interval endpoints D2 inlined
   -- it into) -- and seven of those ten cases exist purely to pin the interval
   -- convention: a day-of/day-before pair on each of the three seams, plus a
-  -- rule date well before commencement.
+  -- rule date well before commencement. The eleventh (2026-09-05, ruling D1) is
+  -- the first that does NOT supply the floor value: F and J ask below
+  -- commencement but hand the model -1 and expect -1 back, so they never reach
+  -- the bottom the floor arm names.
   describe "law time on a date axis (opt-in: L4_DMN_ENGINE_CHECK=1)" $ do
-    it "KIE answers the dated-regime exhibit correctly for ten rule dates" $
+    it "KIE answers the dated-regime exhibit correctly for eleven rule dates" $
       dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
         gstGolden [gstGolden, "--cases", gstEngineCases] \out -> do
           out `shouldSatisfy` ("KIE 8.44.0.Final VERDICT" `isInfixOf`)
@@ -2286,17 +2293,17 @@ spec bin = do
           -- DMNShape, or KIE raises WARN [DMNDI_MISSING_DIAGRAM] (measured
           -- 2026-08-01; the shape row above the decisions exists for this).
           out `shouldSatisfy` ("0 warning(s)" `isInfixOf`)
-          out `shouldSatisfy` ("60/60 decision(s) SUCCEEDED" `isInfixOf`)
-          out `shouldSatisfy` ("60/60 value(s) as expected" `isInfixOf`)
+          out `shouldSatisfy` ("66/66 decision(s) SUCCEEDED" `isInfixOf`)
+          out `shouldSatisfy` ("66/66 value(s) as expected" `isInfixOf`)
 
-    it "Camunda answers the dated-regime exhibit correctly for ten rule dates" $
+    it "Camunda answers the dated-regime exhibit correctly for eleven rule dates" $
       dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
         gstGolden [gstGolden, "--cases", gstEngineCases] \out -> do
           out `shouldSatisfy` ("Camunda 8.7.6 (zeebe-dmn) VERDICT" `isInfixOf`)
           out `shouldSatisfy` ("1 parsed" `isInfixOf`)
           out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
-          out `shouldSatisfy` ("60/60 decision(s) evaluated" `isInfixOf`)
-          out `shouldSatisfy` ("60/60 value(s) as expected" `isInfixOf`)
+          out `shouldSatisfy` ("66/66 decision(s) evaluated" `isInfixOf`)
+          out `shouldSatisfy` ("66/66 value(s) as expected" `isInfixOf`)
 
     -- The hand-written probe PAIR. It is NOT redundant with the exhibit above:
     -- the emitter cannot generate an <annotationEntry> carrying an @id, so only

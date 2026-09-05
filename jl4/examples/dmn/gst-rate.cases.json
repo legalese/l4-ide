@@ -29,7 +29,17 @@
     "  * the floor row's answer is the ASSUME bottom, which L4 refuses to",
     "    evaluate. Here it is an ordinary DMN input, and -1 is a sentinel chosen",
     "    because no real rate could be negative, so a floor-row hit is",
-    "    unmistakable in the harness output."
+    "    unmistakable in the harness output.",
+    "",
+    "CASE K IS THE ONE THAT ACTUALLY TESTS THE PRE-COMMENCEMENT REGION, added",
+    "2026-09-05 under ruling D1. F and J already ask a rule date below commencement",
+    "-- but they HAND THE MODEL the floor value as -1 and expect -1 back, so they",
+    "enter the region and never reach the bottom the floor arm names. K supplies the",
+    "floor as an explicit JSON null instead: nothing is invented, the floor row",
+    "answers null, and FEEL propagates it through the arithmetic. That is what the",
+    "model will do of its own accord once the floor migrates from an ASSUME input to",
+    "a REFUSE decision, so this case's ANSWERS do not move under that migration --",
+    "only the name moves, from `context` to `expect`."
   ],
   "cases": [
     {
@@ -270,6 +280,30 @@
         "GST_rate_percent": -1,
         "tourist_refund_minimum_spend": -1,
         "GST_payable_on": -10
+      }
+    },
+    {
+      "name": "K. THE FLOOR ITSELF -- pre-commencement, and the floor is NOT supplied",
+      "context": {
+        "RULES_EFFECTIVE_DATE": {
+          "$date": "1990-01-01"
+        },
+        "supply_value": 1000,
+        "no_GST_rate_exists_before_commencement_on_1994_04_01": null
+      },
+      "expect": {
+        "the_2024_rate_change": {
+          "$date": "2024-01-01"
+        },
+        "the_2023_rate_change": {
+          "$date": "2023-01-01"
+        },
+        "GST_commenced": {
+          "$date": "1994-04-01"
+        },
+        "GST_rate_percent": null,
+        "tourist_refund_minimum_spend": null,
+        "GST_payable_on": null
       }
     }
   ]

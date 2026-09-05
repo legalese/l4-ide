@@ -1430,6 +1430,32 @@ changed the shape of the fourth; the reasoning is kept so the decision is audita
   **not** catch the two failure modes that actually bit — a constant left undated _inside_
   the window (trap 5) and an omitted boundary _inside_ the window (2017-04-12). Those need
   closure discipline and primary-source verification respectively, not a floor.
+
+  **AMENDED 2026-09-05 (rulings D1 and D6; `IMPLICIT-PROPS-DESIGN.md` §11.9.1, §11.9.3).** R7
+  obliged the PR landing `REFUSE` to amend this ruling in the same change; this is that
+  amendment, in two halves.
+
+  _The spelling of the bottom._ "A curated refusal" is now a construct rather than a
+  description. `REFUSE "…"` exists, and as of 2026-09-05 the DMN exporter has an image for it:
+  the refusal lowers to FEEL `null`, the floor ROW is kept, and the author's sentence rides on
+  that row's `<description>` and on the `<decision>`'s. **`regcf.l4` has NOT moved yet** — its
+  floor is still the `ASSUME` at `:143`, which the engine harness supplies as `-1`, and all 22
+  engine cases sit at 2016-09-01 or later, so nothing in CI has ever evaluated through this
+  ruling's own region. The worked example of what the migration produces is
+  `jl4/examples/dmn/refuse.l4`, executed by both engines on five cases including a
+  pre-commencement one. Migrating `regcf.l4` — and with it adding the pre-commencement case to
+  `regcf-corpus.cases.json` that would finally make this ruling engine-checked — is the next
+  change, and is where that case belongs: added now it would pin the `ASSUME` image it is about
+  to replace.
+
+  _The status of the replacement._ D6 rules that the pre-commencement gate belongs to the
+  **rule-version axis**, answered once at the boundary, rather than to the return type — the
+  deciding measurement being that every corpus bottom is `NUMBER`-typed, so a gate in the
+  return type would be a tagged union, which the DMN exporter refuses today with
+  `2 blocking D-SUMTYPE`. Phase 2's generated arm therefore remains the designed replacement and
+  its shape is now ruled. D6 also proposed omitting the floor row in DMN as its first half; that
+  was **measured and not built**, and §11.9.3 records the numbers and the reason.
+
 - **R3 — Do C0's 55 existing assertions get pinned? — RESOLVED 2026-07-29: pin none,
   document the dependency.** The 55 assertions state the _current_ law and stay unpinned;
   the dependency on the harness clock (`jl4/tests/Main.hs:64-66`, fixed `2025-01-31`, which
