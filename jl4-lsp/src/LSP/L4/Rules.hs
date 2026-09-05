@@ -133,6 +133,11 @@ data TypeCheckResult = TypeCheckResult
   , errors :: [TypeCheck.CheckErrorWithContext]  -- ^ Actual errors ('SError' only, e.g. OutOfScopeError) for implicit ASSUME extraction
   , dependencies :: [TypeCheckResult]
   , mixfixRegistry :: TypeCheck.MixfixRegistry
+  , sectionPaths :: TypeCheck.SectionPaths
+    -- ^ Where each binding this module can see was defined, section-wise,
+    -- including those reached through its imports. Propagated to importers by
+    -- 'unionCheckStates' so an imported name can be named under its defining
+    -- section. See 'L4.TypeCheck.Types.SectionPaths'.
   }
   deriving stock (Generic)
 
@@ -152,6 +157,7 @@ instance NFData TypeCheckResult where
     `seq` rnf errors
     `seq` rnf dependencies
     `seq` rnf mixfixRegistry
+    `seq` rnf sectionPaths
 
 type instance RuleResult EvaluateLazy = [EvaluateLazy.EvalDirectiveResult]
 data EvaluateLazy = EvaluateLazy
@@ -691,7 +697,13 @@ jl4Rules evalConfig rootDirectory recorder = do
           , scopeMap = IV.empty
           , descMap = IV.empty
           , constBodies = cState.constBodies
-          , sectionPaths = cState.sectionPaths
+            -- Carry the dependency's section paths across the import boundary
+            -- (mirrors 'L4.Import.Resolution.combineResolvedImports'; the two
+            -- merge sites must not drift). 'Unique' embeds its module, so the
+            -- keys are disjoint. Read only by 'sectionQualified': the proximity
+            -- readers test the module URI first, so imported candidates remain
+            -- co-equal for overload resolution (spec §5.5, FIX C).
+          , sectionPaths = Map.union cState.sectionPaths tcRes.sectionPaths
           , deferredChoices = 0
           }
         -- NOTE: tcRes.entityInfo is already zonked (the final substitution is
@@ -724,6 +736,7 @@ jl4Rules evalConfig rootDirectory recorder = do
         , descMap = result.descMap
         , dependencies = dependencies <> foldMap (.dependencies) dependencies
         , mixfixRegistry = result.mixfixRegistry
+        , sectionPaths = result.sectionPaths
         }
       )
 

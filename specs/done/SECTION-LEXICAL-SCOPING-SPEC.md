@@ -28,6 +28,12 @@ param-not-shadowed.l4`, `section-scoping-forward-ref.l4`,
 > brought into line with it. Ambiguity diagnostics now list each candidate under its
 > section-qualified spelling (`a.b.x`), so the reader can see why the candidates are co-equal
 > and which spelling disambiguates.
+>
+> **Amended 2026-09-05**: FIX C's **Residual** is partly discharged — an imported binding's
+> section path now crosses the import boundary, so a candidate defined in another module is
+> listed under that module's own sections (`Math.Constants.EULER`) instead of bare. FIX C's
+> ranking rule is unchanged; only the naming is new. §8 gains open question 6. Both point at
+> `specs/todo/MODULE-BOUNDARY-SPEC.md`, which owns the module-boundary question from here on.
 
 # Section Lexical Scoping Specification
 
@@ -626,6 +632,13 @@ pass without modification.
    outer definition), should the compiler emit a hint? E.g., "Note: `x` resolves to
    consulting.x; employment.x is shadowed." This is useful but not required for v1.
 
+6. **Do sections bound a module as well as scope it?** ANSWERED IN PART 2026-09-05 —
+   `specs/todo/MODULE-BOUNDARY-SPEC.md` owns this question and ruling D8. An imported
+   binding's section path now crosses the import boundary, so the compiler can name an
+   imported definition under the section that defines it (§4 there). Sections still export
+   everything — nothing can be made private — and an `IMPORT` written inside a section is
+   still not scoped to it. Both stay open there, not here.
+
 ---
 
 ## 9. Audit-Grade Traceability (Desugaring Step)
@@ -799,16 +812,33 @@ a defect: writing`base's l`when`l` is a local function of the base's type is a g
   `AmbiguousTermError` (spec §5.5), while a nearer current-module section binding still
   correctly shadows a farther current-module (non-import) binding.
 
-  **Residual:** FIX C keys "is this an import?" purely on the candidate's module URI, not on
-  a merged import section-path (the reviewer's `combineOne` in `Import/Resolution.hs` still
-  does not merge `r.sectionPaths`). This is correct for the current design — a wildcard can
-  only ever be a current-module forward reference, and imported bindings are already fully
-  type-checked/concrete — but it means imports are treated as a single flat namespace with
-  no notion of _their_ internal section structure when viewed from an importer. Qualified
-  access across modules is unaffected; only the (rare) case of proximity ranking _among
-  bindings imported from different sections of another module_ is not modelled. Left as-is
-  to avoid regressing the standard-library overload resolution that depends on cross-module
-  candidates remaining co-equal.
+  **Residual: PARTLY DISCHARGED 2026-09-05** — `specs/todo/MODULE-BOUNDARY-SPEC.md` §4 owns
+  this question from here on.
+
+  FIX C keys "is this an import?" purely on the candidate's module URI, and **that has not
+  changed**: cross-module candidates remain co-equal, and the standard-library overload
+  resolution that depends on it is untouched. What did change is that `combineOne` in
+  `Import/Resolution.hs` now DOES merge `r.sectionPaths` (as does the LSP's
+  `unionCheckStates`), so an imported binding can be named under the section that defines it.
+  The merged entries are read by `sectionQualified` alone — both proximity readers test the
+  module URI **before** they consult the map, so an imported `Unique` never reaches the
+  lookup and the ranking behaviour is bit-for-bit as described above.
+
+  The original wording of this residual said imports were "treated as a single flat namespace
+  with no notion of _their_ internal section structure when viewed from an importer".
+  Measured 2026-09-05, that overstated the hole: **qualified access across modules already
+  worked**, through `qualifiedAliases` registering a second environment key that
+  `unionImportedCheckEnv` unions across the boundary — `IMPORT math` then
+  `#EVAL Math.Constants.EULER` answers on the pre-change binary. What was genuinely missing is
+  that the compiler could not **name** that spelling: an ambiguity between an import and a
+  local binding listed the imported candidate as bare `EULER`, i.e. spelled exactly like the
+  name that was ambiguous. It now lists `Math.Constants.EULER`, a spelling you can paste.
+
+  Still not modelled, and now recorded as undefined rather than merely unimplemented:
+  proximity ranking _among bindings imported from different sections of another module_. The
+  importer's section stack and the imported module's section tree are unrelated trees, so
+  `isPrefixOf` between them has nothing to mean. See MODULE-BOUNDARY-SPEC §3 for the two
+  designs that could give it a meaning, neither of which is ruled.
 
 - **FIX D — an off-ancestry binding that is not yet inferred never out-competes an ancestor
   whose own branch type-checks (`jl4/examples/ok/section-scoping-descendant-rebind.l4`,
