@@ -1,5 +1,9 @@
 -- DECIDE keyword examples
 
+§ `DECIDE keyword examples`
+    GIVEN `person age` IS A NUMBER
+          `has valid ID` IS A BOOLEAN
+
 -- Simple Named Values
 
 DECIDE `the answer` IS 42
@@ -38,8 +42,6 @@ GIVEN age IS A NUMBER
 
 -- Boolean Decisions with IF
 
-ASSUME `person age` IS A NUMBER
-ASSUME `has valid ID` IS A BOOLEAN
 DECIDE `can enter venue` IF
   `person age` >= 21 AND `has valid ID`
 
