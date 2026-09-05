@@ -5718,20 +5718,29 @@ editor cannot silently un-change one:
 Two harness repairs went with them: the `{"$date": …}` predicate disagreed between the two Java
 checkers (§15.6), and the exhibit's boundary coverage straddled one seam out of three (§15.10).
 
-**Third note, 2026-09-05 — the floor row was decided against a different alternative than the one
-now ruled.** The floor-row bullet above (and R9, which admits the floor row as a third spelling on
-§3.3's own logic) was decided when the choice was "floor row **or** `UNIQUE` +
-`defaultOutputEntry`", both of which answer the pre-commencement day with a value. A third
-alternative has since been ruled: **`IMPLICIT-PROPS-DESIGN.md` §11.9.2 (R7.1, 2026-09-05)** rules
-the pre-commencement gate a property of the rule-version axis, whose **DMN half is a structural
-absence — the refusing row omitted and the table declaring itself incomplete**. That is not a
-spelling of the floor row; it is the opposite move, and it collides with §15.3's stated reason for
-the floor row (that it makes the table "exact, total over the date axis, and pairwise disjoint")
-and with §3.3.1's reading that a default on a complete table declares it incomplete. **Neither
-half of R7.1 is built**, so nothing in §15.3, §15.10, R9 or the goldens changes today. What is
-recorded here is that the floor row's ruling has an alternative it was not weighed against, so a
-later editor does not read §15.11's bullet as having disposed of it. When R7.1's DMN half is
-built, §15.3 and R9 are re-ruled in that PR, not silently overridden.
+**Third note, 2026-09-05 — an alternative to the floor row was raised, and then ruled against.**
+The floor-row bullet above (and R9, which admits the floor row as a third spelling on §3.3's own
+logic) was decided when the choice was "floor row **or** `UNIQUE` + `defaultOutputEntry`", both of
+which answer the pre-commencement day with a value. Earlier on 2026-09-05 a third alternative was
+ruled in — **`IMPLICIT-PROPS-DESIGN.md` §11.9.2 (R7.1) took a structural absence, the refusing row
+omitted and the table declaring itself incomplete, as the DMN half of the pre-commencement gate** —
+which is not a spelling of the floor row but the opposite move, and which collides with §15.3's
+stated reason for the floor row (that it makes the table "exact, total over the date axis, and
+pairwise disjoint").
+
+**That alternative was withdrawn the same day.** `IMPLICIT-PROPS-DESIGN.md` §11.9.1a records Meng's
+ruling that where R7.1's omission image overlapped R7's `REFUSE` image — precisely on **a dated
+interval table whose floor arm refuses** — **the row is KEPT and answers FEEL `null`**. So **R9 and
+§15.3 stand**: the floor row is not re-ruled, and R7.1 keeps its long-run option 4 (the gate as a
+property of the rule-version axis) with no separate DMN half of its own.
+
+**What this note is for.** The floor row's own ruling was taken against two alternatives, a third
+was raised against it and lost, and the reason it lost is measured rather than argued: omission and
+an explicit `null` give **identical values on both engines**, so omission's only gain is a KIE
+runtime warning it does not get from Camunda, against the cost of deleting the `<description>` and
+the `@ref` `annotationEntry` that the row carries. The measurements are `gm-dmn-refusal`'s and live
+on branch `props/dmn-refusal`; they are not restated here. A later editor should read this note as
+"R9 survived a challenge", not as "R9 is unsettled".
 
 ### 15.12 Rule-date-rebinding decides are not emitted — R12, ruled 2026-08-02 (Meng)
 

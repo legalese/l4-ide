@@ -523,8 +523,10 @@ evaluator, CLI, batch and service a `refused` kind on all six surfaces. The temp
 generated "not in force on <day>" arm (`TEMPORAL-RULE-VERSION-DESIGN.md` item 3) is reconsidered as
 a **gate** rather than a refusal, per the split row below. **That gate is now designed: ANSWERED
 2026-09-05, see `IMPLICIT-PROPS-DESIGN.md` §11.9.2 (R7.1)** — a property of the rule-version axis,
-answered once at the boundary, with a structural absence in the table as its DMN half. Ruled, not
-built.
+answered once at the boundary. Its first-written DMN half, a structural absence in the table, was
+withdrawn the same day: §11.9.1a rules that a dated interval table whose floor arm refuses **keeps**
+the row and answers FEEL `null`, per R7's amended image, so R7.1 has no separate DMN half. Ruled,
+not built.
 
 | non-answer                               | construct              | who handles it                                   | catchable       |
 | ---------------------------------------- | ---------------------- | ------------------------------------------------ | --------------- |

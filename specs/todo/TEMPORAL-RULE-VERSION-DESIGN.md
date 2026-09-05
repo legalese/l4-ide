@@ -654,9 +654,13 @@ its amendment identity — without runtime machinery.
    raising a curated user error" is the wording R7 overruled and R7.1 replaces.** R7's taxonomy
    split (`IMPLICIT-PROPS-DESIGN.md` §11.9) puts "the law is not in force" in the value-or-gate
    row, not the refusal row, so the absence answer is **not** an error raised from inside a
-   generated arm. R7.1 rules it a **property of this axis, answered once at the boundary**, with
+   generated arm. R7.1 rules it a **property of this axis, answered once at the boundary**. ~~with
    a **structural absence** as the DMN half — the row omitted, the table declaring itself
-   incomplete — landing first. Ruled 2026-09-05; **not built**, on either half, so nothing in
+   incomplete — landing first.~~ **That DMN half was withdrawn the same day — ANSWERED 2026-09-05,
+   see `IMPLICIT-PROPS-DESIGN.md` §11.9.1a**, which rules that where it overlapped R7's `REFUSE`
+   image (a dated interval table whose floor arm refuses) the row is **kept** and answers FEEL
+   `null`. R7.1 therefore has **no separate DMN half**; what it rules is the axis.
+   Ruled 2026-09-05; **not built**, so nothing in
    this Phase 2 item has moved from unstarted. What changes is what item 3 must build when it is
    built: an axis-level gate at the boundary, not a per-family error arm. The rest of item 3 (the
    gap/overlap lint, the overlapping-identical-spans error) is untouched.

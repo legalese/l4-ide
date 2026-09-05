@@ -1437,9 +1437,12 @@ changed the shape of the fourth; the reasoning is kept so the decision is audita
      split (`IMPLICIT-PROPS-DESIGN.md` §11.9) separates _"the law is not in force"_ — a value or
      gate — from _"the model does not cover this"_ — a `REFUSE`. Reg CF's commencement floor is
      the first, not the second. R7.1 rules the gate: **a property of the rule-version axis,
-     answered once at the boundary**, with its DMN half landing first as a **structural absence**
-     — the refusing row omitted and the table declaring itself incomplete. Ruled 2026-09-05;
-     **neither half is built**, so the eight hand-written arms in `regcf.l4` stand exactly as R2
+     answered once at the boundary**. ~~with its DMN half landing first as a **structural absence**
+     — the refusing row omitted and the table declaring itself incomplete.~~ **That DMN half was
+     withdrawn the same day — ANSWERED 2026-09-05, see `IMPLICIT-PROPS-DESIGN.md` §11.9.1a:**
+     where it overlapped R7's `REFUSE` image, the row is **kept** and answers FEEL `null`. R7.1
+     rules the axis and has no separate DMN half of its own. Ruled 2026-09-05;
+     **not built**, so the eight hand-written arms in `regcf.l4` stand exactly as R2
      wrote them, and the "delete this when Phase 2 lands" instruction at `regcf.l4:135-143` is
      still the standing instruction.
   2. **`regcf-denovo.l4:211` is a different animal and does not migrate with them.** Its floor
