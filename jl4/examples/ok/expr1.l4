@@ -1,7 +1,6 @@
 § `Expression priority`
-
-ASSUME foo IS A BOOLEAN
-ASSUME bar IS A BOOLEAN
+    GIVEN foo IS A BOOLEAN
+          bar IS A BOOLEAN
 
 DECIDE x1 IS     foo
              AND bar

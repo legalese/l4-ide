@@ -1,6 +1,5 @@
 § `Examples of polymorphism`
-
-ASSUME choice IS A BOOLEAN
+    GIVEN choice IS A BOOLEAN
 
 GIVEN a IS A TYPE
       x IS AN a

@@ -22,5 +22,5 @@ File: section-scoping-ambiguous.l4
     and I do not have sufficient information to make a choice between them.
     The options are:
 
-      a.c.x (defined at section-scoping-ambiguous.l4:18:8-9) of type NUMBER
-      a.b.x (defined at section-scoping-ambiguous.l4:15:8-9) of type BOOLEAN
+      a.c.x (defined at section-scoping-ambiguous.l4:18:11-12) of type NUMBER
+      a.b.x (defined at section-scoping-ambiguous.l4:15:11-12) of type BOOLEAN

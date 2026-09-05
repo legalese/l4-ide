@@ -97,8 +97,9 @@ Alternative keywords for greater/less than.
 Comparisons return BOOLEAN values and can be combined with logical operators.
 
 ```l4
-ASSUME age IS A NUMBER
-ASSUME income IS A NUMBER
+§ `Eligibility`
+    GIVEN age IS A NUMBER
+          income IS A NUMBER
 
 -- Combined conditions
 DECIDE isEligible IS
