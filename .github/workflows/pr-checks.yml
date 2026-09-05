@@ -899,6 +899,7 @@ jobs:
           zlib1g-dev
           liblzma-dev
           xz-utils
+          zip
       - name: Update git config
         run: git config --global --add safe.directory $GITHUB_WORKSPACE
       - uses: actions/checkout@v5
@@ -1124,6 +1125,15 @@ jobs:
       # (`idempotence under replay`) drives the whole G1 pipeline, which is a
       # different order of cost and a separate decision. Do not fold it in
       # because it is the last one left.
+      #
+      # `zip` is in the container's apt list above for this step and nothing
+      # else: the selftest's three `doctor` assertions for p7-mcp start by
+      # asking whether zip is on PATH (etc/go/lib/doctor.mjs:170), and when it
+      # is not, that finding pre-empts the service-URL checks the assertions
+      # are actually about. Measured on this PR's second run: all three failed
+      # in the container and all three pass on any machine that has zip. The
+      # doctor was right about the container; the assertions assume a machine
+      # that can build the deployable, so the container is given one.
       #
       # JL4_LIBRARY_PATH is safe to pin ONLY because the binary is built from
       # this same tree in the step above. Pinning a path at a tree newer than
