@@ -828,7 +828,7 @@ lines; the 7 files with a section `GIVEN` are all fixtures and none is imported)
 is a defect on a schedule rather than a stop-work.
 
 **Findings from 2026-09-05 that are NOT props defects, and live in their own file.**
-`specs/todo/OPEN-FINDINGS-2026-09-05.md` collects seven open items (`OF-1` … `OF-7`) found while the 2026-09-05 rulings
+`specs/todo/OPEN-FINDINGS-2026-09-05.md` collects ten open items (`OF-1` … `OF-10`) found while the 2026-09-05 rulings
 were being recorded. Three of them touch this programme and are named here so a reader of §7 is not
 missing them:
 

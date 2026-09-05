@@ -395,6 +395,53 @@ known false green documented as unknown for the length of a queue is the drift t
 
 ---
 
+## OF-8 — the KIE/Camunda DMN harness compiles with `--release 11`
+
+**Severity: toolchain. A fix is identified and deliberately NOT applied.**
+
+`etc/kie-dmn-check/run.sh:81` compiles the harness's Java source with
+`javac -nowarn --release 11`. Raising it to `--release 21` is the identified fix and was **held
+back on purpose**: it changes what every CI run compiles, so it is not a change to make inside an
+unrelated PR.
+
+**Recorded so the decision is not re-litigated from scratch.** The next person to hit this should
+know that the number is deliberate, that the reason is blast radius rather than compatibility, and
+that the change wants its own PR with the DMN engine jobs run green on it.
+
+---
+
+## OF-9 — R3 root-form placement dependence — REPORTED, NOT REPRODUCED HERE
+
+**Severity: unknown until reproduced. Recorded on report, and labelled as such.**
+
+Reported 2026-09-05: a directive of the form `#EVAL f WITH foo IS 4` answers **40** when placed
+under `§§ 1` and stops with **"… is an assumed term"** when placed under `§§ 2`, in a module whose
+subtraction rule is absent. If that holds, it is a placement dependence in how a root's requirement
+is resolved under R3 — the same _shape_ as OF-1 (an answer that depends on where a line sits) but a
+different mechanism, since R3 is about section visibility rather than about scan-time candidate
+types.
+
+**This entry carries no witness file and was not re-measured for this record**, unlike OF-3, OF-5,
+OF-6 and OF-7. Treat it as a lead to reproduce, not as a measured finding — and when it is
+reproduced, replace this paragraph with the file and the two outputs.
+
+---
+
+## OF-10 — `jl4-lsp`'s out-of-scope quick fix inserts an `ASSUME`, which R0 deprecates
+
+**Severity: low. Already scheduled, recorded so it is not forgotten between now and then.**
+
+`outOfScopeAssumeQuickFix` (`jl4-lsp/app/LSP/L4/Handlers.hs:1010`, offered at `:336`) resolves an
+out-of-scope name by offering to insert an `ASSUME`. R0 (`IMPLICIT-PROPS-DESIGN.md` §11.1)
+deprecates `ASSUME`, so the editor's own quick fix will be generating the deprecated spelling for as
+long as it stands.
+
+**Ruled to land with `PROPS-REDTEAM-2026-09-03.md` §6 item 5 (discharge), not before** — the quick
+fix cannot offer a section `GIVEN` until the section-binder path is the one the compiler discharges.
+Entered here only because "scheduled" and "remembered" are different states.
+
+---
+
 ## Owed upstream
 
 Filed by whoever holds GitHub write authority; **nothing here has been posted**.
@@ -406,4 +453,7 @@ Filed by whoever holds GitHub write authority; **nothing here has been posted**.
 | OF-4       | No issue yet — measure first. An issue asserting a behaviour nobody has run would be the thing this file exists to prevent.                                                                         |
 | OF-6       | **#948: neither close nor re-open on today's evidence.** Comment the branch split if anything at all.                                                                                               |
 | OF-7       | Nothing yet — the ruling (refusal first) is not built, and an issue before the branch exists would only restate `IMPLICIT-PROPS-DESIGN.md` §11.16.                                                  |
+| OF-8       | Nothing — a toolchain decision, not a defect; it wants a PR, not an issue.                                                                                                                          |
+| OF-9       | Nothing until it is reproduced. It is recorded on report and says so.                                                                                                                               |
+| OF-10      | Nothing — scheduled behind discharge.                                                                                                                                                               |
 | OF-1, OF-2 | Nothing new — they live in `IMPLICIT-PROPS-DESIGN.md` §11.15 on `props/tdnr-collapse`.                                                                                                              |
