@@ -70,6 +70,22 @@ jobs:
               - 'cabal.project'
               - 'cabal.project.local'
               - 'jl4-core/libraries/**'
+              # `etc/go/**` is here for one reason: the step below runs the go
+              # selftest's four BINARY-GATED assertions, and they are worthless
+              # if the PRs most likely to break them cannot reach this job. The
+              # Go Orchestrator job is deliberately Node-only and builds no
+              # `l4`, so without this line a PR editing only `etc/go/selftest.mjs`
+              # would run the selftest WITHOUT a binary -- reporting "all checks
+              # passed (5 skipped)" -- and the four assertions would stay dark in
+              # their new home exactly as they were in their old one. Moving a
+              # check into a job the change cannot trigger does not un-dark it.
+              #
+              # The price is that a go-only PR now costs a full Haskell build.
+              # That is the same trade the `.mjs`, `etc/**` and `.claude/**`
+              # entries below already bought, and it is bought here for a
+              # sharper reason: those closed a gate that could not run at all,
+              # this one closes a gate that runs and says PASS.
+              - 'etc/go/**'
               - '.github/workflows/pr-checks.yml'
             typescript:
               - '**/*.ts'
@@ -1084,6 +1100,34 @@ jobs:
 
       - name: Run documentation tests
         run: ./doc/test-docs.sh
+
+      # The four assertions the Go Orchestrator job cannot reach. That job is
+      # Node-only by design and says so at its own selftest step; the cost of
+      # that design was four checks reporting `skip ... $L4 is unset or missing`
+      # on every run, which reads as a pass. Two of them name the cause in their
+      # own skip text ("CI's Go Orchestrator job builds no binary"), so the
+      # darkness was known to the code and invisible in the log.
+      #
+      # Measured on `bf567bd0`: bare, the selftest ends `all checks passed
+      # (5 skipped)`. Four of those five need only a binary on disk --
+      # `the identity run agrees with itself`, `the shipped Reg CF surface map
+      # validates`, `p3-encode typechecks a deposited module`, and `per-origin
+      # floor selection over a deposited module`. Here the binary already
+      # exists, so lighting them up costs a `cabal list-bin` and no build.
+      #
+      # `--with-driver` is STILL not passed, here or anywhere. The fifth skip
+      # (`idempotence under replay`) drives the whole G1 pipeline, which is a
+      # different order of cost and a separate decision. Do not fold it in
+      # because it is the last one left.
+      #
+      # JL4_LIBRARY_PATH is safe to pin ONLY because the binary is built from
+      # this same tree in the step above. Pinning a path at a tree newer than
+      # the binary is the failure documented in CLAUDE.md 3.1, and it presents
+      # as the prelude having lost its definitions rather than as a mismatch.
+      - name: The go selftest's binary-gated assertions
+        run: L4="$(cabal list-bin l4)" node etc/go/selftest.mjs
+        env:
+          JL4_LIBRARY_PATH: ${{ github.workspace }}/jl4-core/libraries
 
       # ---- Cache maintenance (base-branch push only) --------------------------
       # PR and merge_group runs are pure cache CONSUMERS: they RESTORE the base
