@@ -56,7 +56,6 @@ IMPORT daydate
                               `Account Number` IS "120-643240-1"
                               `SWIFT`          IS "DBSSSGSG"
 
-
 §§ `Repayment Terms`
 
 `Monthly Interest Rate` MEANS                               -- How to do simple math in a function
@@ -163,7 +162,6 @@ GIVEN `Outstanding Payment Amount` IS A Money
     perfectly formatted, printed and signed note agreement to check how the terms actually work out... just a little wrong. :)
 -}
 
-
 #EVAL `Total Interest Amount` -- Hover the blue scribbled #EVAL to see what they return. This one should be [Money OF "USD", 2077.49370354708]
 
 #EVAL `Total Repayment Amount` -- [Money OF "USD", 27077.49370354708]
@@ -171,7 +169,6 @@ GIVEN `Outstanding Payment Amount` IS A Money
 #EVAL `Monthly Interest Rate` -- [0.0125]
 
 #EVAL `Monthly Installment Amount` -- [Money OF "USD", 2256.4578086289234]
-
 
 -- The following #TRACE runs the `Payment Obligation` function that returns the state of the current contract
 -- after a set of actions have been completed at a certain amount of days.
@@ -213,19 +210,15 @@ GIVEN `Outstanding Payment Amount` IS A Money
 -- MUST `pay monthly installment to` EXACTLY `The Lender`
 --                                   `Amount Transferred` PROVIDED `is money at least equal within error` OF `Amount Transferred`, `All Outstanding Debts`
 
-
 § `Promissory Appendix`
 
 -- This file contains definitions and helper functions that are used in the note
 -- to help destructure more complex types and relationships or make the note
 -- use syntax that is more readable for humans.
 
-
 §§ `Type Definitions`
-
-ASSUME NaN IS A NUMBER                      -- JS coders rejoice :D
-
-ASSUME NO_COLLATERAL IS A STRING
+    GIVEN NaN IS A NUMBER  -- JS coders rejoice :D
+          NO_COLLATERAL IS A STRING
 
 DECLARE Money                               -- Defining a Money Type might actually only be helpful for multi-currency constracts.
     HAS Currency            IS A STRING     -- In this case it is probably too much detail and it could've been solved easier by
@@ -274,7 +267,6 @@ DECLARE Penalty
 DECLARE `pay monthly installment to`        -- It's useful to have variables that define actions as part of
     HAS Recipient           IS A Lender     -- obligations to contain verbs and start lower case. It's not a
         Amount              IS A Money      -- hard language requirement, but good practice.
-
 
 §§ `Useful Functions`
 
