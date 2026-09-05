@@ -299,6 +299,8 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (TypeDecl n) where
     SynonymDecl ann ty -> do
       ty' <- addNlg ty
       pure $ SynonymDecl ann ty'
+    OpaqueDecl ann ->
+      pure $ OpaqueDecl ann
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (TypedName n) where
   addNlg a = extendNlgA a $ case a of
@@ -705,6 +707,8 @@ instance HasDesc (TypeDecl n) where
       EnumDecl ann <$> traverse addDesc cons
     SynonymDecl ann ty ->
       SynonymDecl ann <$> addDesc ty
+    OpaqueDecl ann ->
+      pure (OpaqueDecl ann)
 
 instance HasDesc (ConDecl n) where
   addDesc (MkConDecl ann name names) =
@@ -1287,6 +1291,7 @@ instance (HasSrcRange n, HasRef n) => HasRef (TypeDecl n) where
       EnumDecl ann' <$> traverse addRef conDecls
     SynonymDecl ann ty -> attachRef a ann >>= \ann' ->
       SynonymDecl ann' <$> addRef ty
+    OpaqueDecl ann -> OpaqueDecl <$> attachRef a ann
 
 instance (HasSrcRange n, HasRef n) => HasRef (TypedName n) where
   addRef a@(MkTypedName ann n ty mExpr typically) = do

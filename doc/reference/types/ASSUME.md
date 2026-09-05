@@ -134,6 +134,27 @@ definition, a `GIVEN` indented under the section's heading declares it once for
 that section. It resolves, evaluates and exports exactly as a same-section
 `ASSUME` term does. See [the section `GIVEN`](../syntax/section-given.md).
 
+## Assuming a type: use `DECLARE` instead
+
+`ASSUME TypeName IS A TYPE` declares a type rather than a value — a type that
+is named but not described:
+
+```l4
+ASSUME Person IS A TYPE       -- works, but no longer the preferred spelling
+```
+
+A bodiless `DECLARE` says the same thing, and is now the spelling to reach for:
+
+```l4
+DECLARE Person
+```
+
+The two produce the same entity in the type checker, so a file can be migrated
+one line at a time and nothing downstream changes. `DECLARE` is preferred
+because it puts every type declaration under one keyword, and leaves `ASSUME`
+for what its name suggests — assuming a _value_ you have not defined. See
+[opaque types](DECLARE.md#opaque-types).
+
 ## Related Keywords
 
 - **[DECIDE](../functions/DECIDE.md)** - Define a value or function with a body

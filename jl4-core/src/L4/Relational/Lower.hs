@@ -792,11 +792,20 @@ buildCtx ei exps m = ctx
 
   assumeDecls = [ (ann, a) | Assume ann a <- decls ]
 
-  -- ASSUME T IS A TYPE: a category with no fields ('RAbstractDef').
-  abstractPairs =
-    [ (getUnique r, rName r, rangeOf a)
-    | (_, a@(MkAssume _ _ (MkAppForm _ r _ _) _ _)) <- assumeDecls
-    , assumesCategory a
+  -- ASSUME T IS A TYPE, or its ruled successor, a bodiless DECLARE T: a
+  -- category with no fields ('RAbstractDef'). One pass over the declarations
+  -- so 'ctxAbstractOrder' stays source order when the spellings are mixed.
+  -- Nullary only, in both spellings: a parameterised opaque type
+  -- (@DECLARE T x@) has no category image, exactly as @ASSUME T x IS A TYPE@
+  -- has none ('assumesCategory').
+  abstractPairs = concat
+    [ case d of
+        Assume _ a@(MkAssume _ _ (MkAppForm _ r _ _) _ _)
+          | assumesCategory a -> [(getUnique r, rName r, rangeOf a)]
+        Declare _ dc@(MkDeclare _ _ (MkAppForm _ r [] _) (OpaqueDecl _)) ->
+          [(getUnique r, rName r, rangeOf dc)]
+        _ -> []
+    | d <- decls
     ]
 
   -- Everything else an ASSUME can be: a term, admitted or refused.

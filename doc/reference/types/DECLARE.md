@@ -1,6 +1,6 @@
 # DECLARE
 
-Declares a new type in L4. Types can be records (product types), enums (sum types), or type synonyms.
+Declares a new type in L4. Types can be records (product types), enums (sum types), type synonyms, or **opaque types** — a type that is named but not described.
 
 ## Syntax
 
@@ -8,6 +8,7 @@ Declares a new type in L4. Types can be records (product types), enums (sum type
 DECLARE TypeName IS ...
 DECLARE TypeName HAS ...
 DECLARE TypeName IS ONE OF ...
+DECLARE TypeName
 ```
 
 ## Forms
@@ -78,6 +79,94 @@ Create an alias for an existing type:
 DECLARE Age IS NUMBER
 DECLARE PersonName IS STRING
 ```
+
+### Opaque Types
+
+Leave the body off entirely and you get an **opaque type**: a type that has a
+name and nothing else. It has no fields, no alternatives, and no synonym body,
+so nothing in your file can say what one of its values looks like.
+
+```l4
+DECLARE Applicant
+DECLARE Premises
+```
+
+That is more useful than it sounds. A licensing rule usually cares that an
+applicant and a premises are different kinds of thing, and that a decision
+about one is never accidentally applied to the other. It does not care what
+either is made of. An opaque type says exactly that much and stops.
+
+```l4
+DECLARE Applicant
+DECLARE Premises
+
+GIVEN a IS AN Applicant
+      p IS A Premises
+GIVETH A BOOLEAN
+DECIDE `may be licensed` a p IS TRUE
+```
+
+The two types are distinct, so writing the arguments in the wrong order is a
+type error, caught before anything runs. An opaque type can also be a record
+field, carry an `AKA` alias, or take type parameters:
+
+```l4
+DECLARE Applicant AKA Candidate
+
+DECLARE Application
+  HAS applicant IS AN Applicant
+      premises  IS A Premises
+
+DECLARE Bag x
+```
+
+**Example file:** [opaque-example.l4](opaque-example.l4)
+
+#### Where the values come from
+
+An opaque type has no constructors, so no expression in your file can produce
+one. Values arrive from outside: an `ASSUME` while you are drafting, or a JSON
+input at a service boundary once the rules are deployed. A rule that never
+looks inside an opaque value still evaluates normally.
+
+```l4
+ASSUME `the applicant` IS AN Applicant
+```
+
+#### Limits
+
+- **You cannot write down a value.** There is no literal, no constructor, and
+  no `WITH` form for an opaque type. A directive that has to inspect one stops
+  with "I could not continue evaluating, because I needed to know the value
+  of ... but it is an assumed term". Rules that only pass the value along, or
+  that read a record's other fields, evaluate fine.
+- **The exporters carry the name, not a shape.** In a JSON schema an opaque
+  type publishes as an object with no declared properties; in Decision Model
+  and Notation (DMN) it produces no item definition, and a parameter of that
+  type is typed `Any`. Nothing is lost relative to the older
+  `ASSUME TypeName IS A TYPE` spelling, which behaved the same way, but no
+  structure is gained either. If a downstream system needs the fields, declare
+  a record instead.
+- **`TYPICALLY` does not apply.** A default value would have to be a value of
+  the type, and there are none.
+- **A misspelt body keyword becomes a type parameter.** `DECLARE Bag x` and
+  `DECLARE Conduct IZ STRING` are the same shape — a name followed by more
+  names — so nothing in the declaration itself can tell a parameterised opaque
+  head from a typo for `IS`. The second one declares an opaque `Conduct` of
+  arity two. You still find out, but one step later and under a different
+  name: `GIVEN c IS A Conduct` then reports "The arities of the types do not
+  match. I expected 2 arguments, but I found 0." The case that reports nothing
+  at all is a misspelt declaration that nothing uses. If you meant a synonym,
+  check that the keyword reads `IS`.
+
+#### The older spelling
+
+`ASSUME TypeName IS A TYPE` declares the same thing and still works. The two
+produce the same entity in the type checker, so you can migrate a file one
+line at a time. `DECLARE` is now the preferred spelling: it puts type
+declarations under one keyword, and it keeps `ASSUME` for what its name
+suggests — assuming a _value_ you have not defined. See
+[ASSUME](ASSUME.md).
 
 ## Examples
 

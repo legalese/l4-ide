@@ -1,0 +1,22 @@
+-- A bodiless `DECLARE T` is an opaque type, and a bodiless `DECLARE T x y` is
+-- an opaque type of arity two. Those two facts together mean the parser cannot
+-- tell a parameterised opaque head from a head whose body keyword is misspelt:
+-- both are just a sequence of names after `DECLARE`.
+--
+-- So `DECLARE Conduct IZ STRING` -- a typo for `IS` -- does not fail here. It
+-- declares an opaque `Conduct` whose two type parameters happen to be named
+-- `IZ` and `STRING`. The mistake still gets caught, but one step later and
+-- under a different name: every use site that supplies the wrong number of
+-- arguments reports "I expected 2 arguments", which is what this file pins.
+--
+-- The corollary worth knowing is the case this file cannot show: a misspelt
+-- declaration that is never used reports nothing at all.
+--
+-- See doc/reference/types/DECLARE.md ("Limits") and
+-- specs/todo/IMPLICIT-PROPS-DESIGN.md §11.1.1.
+
+DECLARE Conduct IZ STRING
+
+GIVEN c IS A Conduct
+GIVETH A BOOLEAN
+DECIDE `is antisocial` c IS TRUE
