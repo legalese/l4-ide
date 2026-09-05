@@ -27,7 +27,7 @@ File: section-given-misattached.l4
 
       `the rate`
 
-    If `the rate` was meant as a binder for the whole of
+    If `the rate` was meant as an input for the whole of
 
       § S
 
@@ -62,7 +62,7 @@ File: section-given-misattached.l4
 
       `the other rate`
 
-    If `the other rate` was meant as a binder for the whole of
+    If `the other rate` was meant as an input for the whole of
 
       § T
 

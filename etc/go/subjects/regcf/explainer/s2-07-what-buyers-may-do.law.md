@@ -1,13 +1,13 @@
 Whoever buys in a Regulation Crowdfunding offering may not resell for one year.
 Rule 501(a) restricts transfer
-"[during the one-year period beginning when the securities were issued](src:jl4/examples/legal/regcf/regcf.l4#L784-L785 "verbatim")",
-[unless such securities are transferred:](src:jl4/examples/legal/regcf/regcf.l4#L842 "verbatim")
+"[during the one-year period beginning when the securities were issued](src:jl4/examples/legal/regcf/regcf.l4#L783-L784 "verbatim")",
+[unless such securities are transferred:](src:jl4/examples/legal/regcf/regcf.l4#L841 "verbatim")
 
-1. [to the issuer of the securities](src:jl4/examples/legal/regcf/regcf.l4#L843 "verbatim");
-2. [to an accredited investor](src:jl4/examples/legal/regcf/regcf.l4#L844 "verbatim");
-3. [as part of an offering registered with the Commission](src:jl4/examples/legal/regcf/regcf.l4#L845 "verbatim"); or
-4. [To a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent,](src:jl4/examples/legal/regcf/regcf.l4#L829 "verbatim")
-   [or in connection with the death or divorce of the purchaser or other similar circumstance.](src:jl4/examples/legal/regcf/regcf.l4#L833 "verbatim")
+1. [to the issuer of the securities](src:jl4/examples/legal/regcf/regcf.l4#L842 "verbatim");
+2. [to an accredited investor](src:jl4/examples/legal/regcf/regcf.l4#L843 "verbatim");
+3. [as part of an offering registered with the Commission](src:jl4/examples/legal/regcf/regcf.l4#L844 "verbatim"); or
+4. [To a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent,](src:jl4/examples/legal/regcf/regcf.l4#L828 "verbatim")
+   [or in connection with the death or divorce of the purchaser or other similar circumstance.](src:jl4/examples/legal/regcf/regcf.l4#L832 "verbatim")
 
 This is the restriction a member of the public is most likely to run into, and
 it is easy to under-read. It is not a rule about selling on a stock exchange; it

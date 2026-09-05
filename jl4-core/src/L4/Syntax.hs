@@ -68,6 +68,12 @@ traverseResolved f =  \ case
   Ref r u o -> Ref <$> f r <*> pure u <*> pure o
   OutOfScope u n -> OutOfScope u <$> f n
 
+-- | The order-list entry 'L4.TypeCheck.supplyAppNamed' writes for a named
+-- argument that supplies a section binder instead of one of the callee's
+-- declared parameters. See 'AppNamed'.
+implicitSupplyIndex :: Int
+implicitSupplyIndex = -1
+
 -- | Extract the raw name from a name.
 rawName :: Name -> RawName
 rawName (MkName _ raw) = raw
@@ -261,7 +267,19 @@ data Expr n =
   | Proj       Anno (Expr n) n -- record projection, we could consider making this yet another function application syntax
   | Lam        Anno (GivenSig n) (Expr n)
   | App        Anno n [Expr n]
-  | AppNamed   Anno n [NamedExpr n] (Maybe [Int]) -- we store the order of arguments during type checking
+  | AppNamed   Anno n [NamedExpr n] (Maybe [Int])
+    -- ^ Named application. The @Maybe [Int]@ is the order of the arguments,
+    -- filled in by the type checker: entry @k@ says which of the callee's
+    -- parameters argument @k@ supplies.
+    --
+    -- Declared parameters are numbered from zero. A NEGATIVE entry
+    -- ('implicitSupplyIndex') marks an argument that supplies a /section
+    -- binder/ rather than a declared parameter — a name the callee does not
+    -- take but transitively reads (R1). 'L4.Discharge.dischargeModule' turns
+    -- every such site into a plain 'App' by putting the supplied value in the
+    -- binder's discharged parameter position, so a negative entry surviving
+    -- into evaluation means the module was not discharged, which
+    -- 'L4.EvaluateLazy.Machine' reports rather than sorting into place.
   | IfThenElse Anno (Expr n) (Expr n) (Expr n)
   | MultiWayIf Anno [GuardedExpr n] (Expr n)
   | Regulative Anno (Deonton n)
