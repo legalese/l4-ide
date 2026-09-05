@@ -39,11 +39,13 @@ as "which line".
 
 **Three branches appended to `IMPLICIT-PROPS-DESIGN.md` §11 on one day, and two of them collided.
 Resolved 2026-09-05 — recorded because the resolution is the reason the numbers are what they are.**
-`props/tdnr-collapse` took **§11.15** and reached `unstable` in #338, leaving a deliberate gap at
-§11.14. `props/assume-sweep` fills that gap with its own **§11.14** (sequencing item 6).
-`props/rulings` had also written **§11.14, §11.15 and §11.16**, so two of its three headings were
-duplicates the moment #338 landed; it renumbered to **§11.16 (R13), §11.17 (R14), §11.18** (the
-cross-`IMPORT` ruling), which is free under either landing order. **The lesson, not the numbers:**
+`props/tdnr-collapse` took **§11.15** and reached `unstable` in **#338**, leaving a deliberate gap
+at §11.14. `props/assume-sweep` filled that gap with its own **§11.14** (sequencing item 6) and
+reached `unstable` in **#337**. `props/rulings` had also written **§11.14, §11.15 and §11.16**, so
+two of its three headings were duplicates the moment #338 landed; it renumbered to **§11.16 (R13),
+§11.17 (R14), §11.18** (the cross-`IMPORT` ruling). All three of those were free before #337 and
+after it, and the renumber was re-derived against the real post-#337 head rather than a predicted
+one. **The lesson, not the numbers:**
 a positional handle is not safe under concurrent authorship, so prefer the stable ruling id
 (`R13`, `R14`) where one exists, and — as this file does — give defect records ids of their own
 rather than section numbers.
@@ -89,7 +91,8 @@ be fixed by anything in that programme.
 **Entered here only so that a reader of this file is not told seven findings and given six.**
 
 **And one thing worth keeping beyond the finding itself: the wrong cause had reached a test.**
-`props/assume-sweep` §11.14 originally offered `macma3.l4` as a second instance of the
+`IMPLICIT-PROPS-DESIGN.md` §11.14 (written on `props/assume-sweep`, on `unstable` since #337)
+originally offered `macma3.l4` as a second instance of the
 section-binder collapse — the two "multiple definitions" diagnostics vanish on migration, which is
 true — and attributed the vanishing to that collapse, which is not. `gm-assume-sweep` retracted it
 visibly in `9af84932` ("the effect was real, the cause was not") rather than quietly editing it out,
