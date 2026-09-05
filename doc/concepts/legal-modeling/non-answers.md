@@ -66,7 +66,7 @@ The person says: **"What you gave me is not usable, and here is why."**
 
 Every intake process has this: a month outside 1 to 12, an identification number that fails its check digit, a date of birth after today. The rule sees it coming, and the reason is something a human is entitled to be told.
 
-`EITHER STRING NUMBER` says the answer is one of two kinds of thing. `STRING` is L4's word for text; `NUMBER` is a number. **The failure kind is written first and the success kind second**, and the two ways of building the value line up with that order in the same way: `LEFT OF` builds the first, the failure, and `RIGHT OF` builds the second, the success. So `EITHER STRING NUMBER` here means "either text saying what went wrong, or the number this gives when it worked", and reading `LEFT` as the left-hand kind in the pair, `RIGHT` as the right-hand kind, will keep you straight. Both halves are ordinary values, so a later rule can act on either. One more word appears in the second rule below: `CONCAT` joins two pieces of text end to end, so `CONCAT "returned for correction: ", reason` is the fixed opening followed by whatever the reason turned out to be.
+`EITHER STRING NUMBER` says the answer is one of two kinds of thing. `STRING` is L4's word for text; `NUMBER` is a number. **Write the failure kind first and the success kind second**, and the two ways of building the value line up with that order in the same way: `LEFT OF` builds the first, the failure, and `RIGHT OF` builds the second, the success. So `EITHER STRING NUMBER` here means "either text saying what went wrong, or the number this gives when it worked", and reading `LEFT` as the left-hand kind in the pair, `RIGHT` as the right-hand kind, will keep you straight. Both halves are ordinary values, so a later rule can act on either. One more word appears in the second rule below: `CONCAT` joins two pieces of text end to end, so `CONCAT "returned for correction: ", reason` is the fixed opening followed by whatever the reason turned out to be.
 
 ```l4
 GIVEN month IS A NUMBER
@@ -80,8 +80,8 @@ GIVEN month IS A NUMBER
 GIVETH A STRING
 `what the clerk tells Alex about` month MEANS
     CONSIDER `checked month` month
-    WHEN RIGHT OF m      THEN "accepted"
     WHEN LEFT  OF reason THEN CONCAT "returned for correction: ", reason
+    WHEN RIGHT OF m      THEN "accepted"
 ```
 
 Running that second rule on 13 prints:
@@ -221,7 +221,7 @@ Result:
 
 That is neither zero nor false nor unknown. It is a distinct outcome carrying the encoder's own sentence.
 
-Real encodings show the cost of not having this. The Regulation Crowdfunding rules that ship with L4 encode part 227 of title 17 of the United States Code of Federal Regulations, which commenced on 16 May 2016. They are asked for a dollar figure "as at" a rule date. For a date before commencement there is no figure to give, because the rules did not yet exist — and to this day that gap is written there as a blank, so the web form asks whoever is using the rules to supply a figure nobody has. Rewriting it as the refusal `no Regulation Crowdfunding figure exists before commencement on 2016-05-16` is drafted, and waiting on one export format that cannot carry a refusal yet.
+Real encodings show the cost of not having this. The Regulation Crowdfunding rules that ship with L4 encode part 227 of title 17 of the United States Code of Federal Regulations, which commenced on 16 May 2016. They are asked for a dollar figure "as at" a rule date. For a date before commencement there is no figure to give, because the rules did not yet exist — and to this day that gap is written there as a blank, so a pre-commencement date stops the run instead of declining to answer. Rewriting it as the refusal `no Regulation Crowdfunding figure exists before commencement on 2016-05-16` is drafted, and waiting on one export format that cannot carry a refusal yet.
 
 Compare rows 4 and 5 closely, because they are one sentence apart. **Row 4 is a claim about the law: this transaction is outside it. Row 5 is a claim about the file: the encoder did not go there.** The first is legal knowledge, the second an admission. A refusal is a judge recusing herself — the case is not decided, no party may treat the recusal as a win, and the matter goes to another bench.
 
@@ -229,7 +229,7 @@ Compare rows 4 and 5 closely, because they are one sentence apart. **Row 4 is a 
 
 Nothing. A refusal travels to the boundary on its own.
 
-In the terminal window it prints the block above. Asked of L4 running as a service — over an application programming interface (an **"API"**), the way another system would ask — the reply comes back written in the notation programs use to exchange data with one another, JavaScript Object Notation (JSON). It says its kind is `refused` and carries the sentence as the reason:
+In the terminal window it prints the block above. Asked for the same answer in the form another system would read — add `--json` to the instruction — the reply comes back written in the notation programs use to exchange data with one another, JavaScript Object Notation (JSON). It says its kind is `refused` and carries the sentence as the reason:
 
 ```json
 {
@@ -245,7 +245,7 @@ The real reply also records where in the file the refusal happened. What matters
 
 Look again at row 1: a later rule quietly turned `NOTHING` into `0`, and that was correct — the drafter said so. The same move on a refusal would be a forgery: a rule three layers away deciding, on its own authority, that "nobody encoded this" means "zero".
 
-So no later rule can deal with a refusal or turn it into an answer. `CONSIDER` cannot match on one, `IF` cannot test it, and `AND` and `OR` cannot see it. Those three are not a list of the ways in, with a fourth waiting to be discovered: **there is nothing anywhere in L4 that takes a refusal and hands back a value.** It travels intact to the boundary — the instruction you gave, the terminal window, the service's reply, the form — and whoever reads the result sees the sentence the encoder wrote. An absent value can be given a stand-in; a refusal cannot be laundered.
+So no later rule can deal with a refusal or turn it into an answer. `CONSIDER` cannot match on one, `IF` cannot test it, and `AND` and `OR` cannot see it. Those three are not a list of the ways in, with a fourth waiting to be discovered: **there is nothing anywhere in L4 that takes a refusal and hands back a value.** It travels intact to the boundary — the instruction you gave, the terminal window, a program's reply, the form — and whoever reads the result sees the sentence the encoder wrote. An absent value can be given a stand-in; a refusal cannot be laundered.
 
 One subtlety follows from ordinary left-to-right reading, and it does not weaken that promise. Let `r` be a piece of a rule that refuses. Then:
 
@@ -302,7 +302,7 @@ Those words read the way the obligation does: `PARTY` who is bound, `MUST` what 
 
 **7. An overridden conclusion.** "Subject to section 9" does not mean section 9 leaves a hole. A rule reached a conclusion and another rule displaced it — a structured outcome, with a named rule that did the displacing. [Default Reasoning and Exceptions](default-reasoning.md) teaches this properly.
 
-Drafting marks that relationship from either end, and the two markings point opposite ways. "Section 4 is subject to section 9" means section 9 wins. "Section 4 applies notwithstanding section 9" means section 4 wins. Same relationship, two ends of it: the rule that is _subject to_ another is the one that gives way, and the rule that applies _notwithstanding_ another is the one that prevails. **The marking goes on the rule that gives way.** So a section 4 which says "notwithstanding section 3" is encoded by writing the displacement into the encoding of section 3 — section 3's rule holds unless section 4's condition is met — and section 4 itself is written as an ordinary rule. Today that is written with `UNLESS`, and the page just linked shows the shape.
+Drafting marks that relationship from either end, and the two markings point opposite ways. "Section 4 is subject to section 9" means section 9 wins. "Section 4 applies notwithstanding section 9" means section 4 wins. Same relationship, two ends of it: the rule that is _subject to_ another is the one that gives way, and the rule that applies _notwithstanding_ another is the one that prevails. **The encoding marks the rule that gives way.** So a section 4 which says "notwithstanding section 3" is encoded by writing the displacement into the encoding of section 3 — section 3's rule holds unless section 4's condition is met — and section 4 itself is written as an ordinary rule. Today that is written with `UNLESS`, and the page just linked shows the shape.
 
 _Proposed, not landed (2026-09-04): a `SUBJECT TO` construct in the language, so that an override can be written at the end the drafting writes it at, rather than turned round by hand._
 
@@ -324,7 +324,7 @@ An override, however it is spelled, overrides a _conclusion_. It cannot override
 
 Read the last column first, because it is the one that matters at the point of encoding: **who is allowed to do something about this?** A refusal is the only row where the answer is nobody.
 
-The blank's entry needs its own sentence. The question does not arise there because a blank is filled before any rule runs at all: the boundary asks, the case answers, and by the time the rules are working the blank is an ordinary fact. There is never an unanswered blank sitting inside a running file for a later rule to act on.
+The blank's entry needs its own sentence. The question does not arise there because the boundary asks first: the case answers, and by the time the rules are working the blank is an ordinary fact. Asked before that, as in section 3, the rule stops and names the blank, so no later rule ever gets one.
 
 That is also what separates the blank from the first row, the pair easiest to confuse: a `MAYBE` is an absence the case has already reported, and a blank is a question the case has not been asked yet. Section 3 above works the test through.
 

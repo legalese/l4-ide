@@ -141,7 +141,7 @@ DECLARE `Form C filing`
     HAS `has the required financial statements` IS A BOOLEAN
         `is signed` IS A BOOLEAN
 
-@ref 17 CFR 227.203 — the offering statement and its required contents
+@ref 17 CFR 227.203(a)(1) — the Form C and what it must include
 GIVEN filing IS A `Form C filing`
 GIVETH AN EITHER STRING BOOLEAN
 `the filing is accepted` filing MEANS

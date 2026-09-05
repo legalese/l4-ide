@@ -42,10 +42,10 @@ DECIDE `is eligible for benefit` IS
 
 #CHECK `is eligible for benefit`
 
--- Binding Assumed Values
+-- Supplying assumed values
 
 -- No directive binds an ASSUME inside a file; values arrive at deployment.
--- To test in the file, make the input a GIVEN parameter and supply it by name.
+-- To test in the file, make the input a rule GIVEN and supply it by name.
 
 GIVEN `applicant age for test` IS A NUMBER
 DECIDE `is adult` IF `applicant age for test` >= 18

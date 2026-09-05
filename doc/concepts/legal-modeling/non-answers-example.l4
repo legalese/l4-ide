@@ -52,8 +52,8 @@ GIVEN month IS A NUMBER
 GIVETH A STRING
 `what the clerk tells Alex about` month MEANS
     CONSIDER `checked month` month
-    WHEN RIGHT OF m      THEN "accepted"
     WHEN LEFT  OF reason THEN CONCAT "returned for correction: ", reason
+    WHEN RIGHT OF m      THEN "accepted"
 
 #EVAL `what the clerk tells Alex about` 6    -- "accepted"
 #EVAL `what the clerk tells Alex about` 13   -- "returned for correction: ..."

@@ -62,7 +62,7 @@ There is no closing mark. A section ends when the next heading tells it to, or a
 | a heading with more `§`               | the section does not end; the new one is its child                        |
 | the end of the file                   | the section ends, and so does every section enclosing it                  |
 
-**A deeper heading always nests exactly one level, whatever the difference in `§` count.** `§§§§ Rule 12` written under `§ Part 2` is a child of `Part 2`, not a great-grandchild of it; no invisible sections are created in between. Skipping levels this way is accepted but hard to read, so keep the counts consecutive.
+**A deeper heading always nests exactly one level, whatever the difference in `§` count.** `§§§§ Rule 12` written under `§ Part 2` is a child of `Part 2`, not a great-grandchild of it; no invisible sections are created in between. A skipped level makes the next heading of that count a child, not a sibling.
 
 **Repeating a heading name re-opens the same section.** A second `§ Part 1` further down the file adds to `Part 1` rather than starting a second, separate `Part 1`. Definitions written under either spelling live at the same place, and two definitions of one name across the two spellings collide exactly as two written side by side would.
 
@@ -255,7 +255,7 @@ which I have inferred to be of type:
   NUMBER
 ```
 
-The same holds for a parent naming its own child: `Part 3` writing `` `Division 5`.`the fee` `` gets the same message, and has to write the full chain too. The outermost heading need not be spelled with a single `§`: in a file whose headings run `§§` and `§§§` throughout, the chain starts at the outermost `§§`.
+The same holds for a parent naming its own child: `Part 3` writing `` `Division 5`.`the fee` `` gets the same message, and has to write the full chain too. Start the outermost heading at one `§` and keep the counts consecutive: a skipped level makes the next heading of that count a child, not a sibling.
 
 ### Aliases
 
@@ -421,7 +421,7 @@ The options are:
   `Part 4`.`Division 7`.`age of majority` (defined at …) of type NUMBER
 ```
 
-**What it means.** Nothing on the using rule's ancestry declares the name, and the whole-file fallback found more than one declaration of the same kind. L4's messages say **identifier** where this page says **name**; the two words mean the same thing here. Three things to know when reading it:
+**What it means.** Nothing on the using rule's ancestry settled the name, and more than one declaration of it was left in the running. L4's messages say **identifier** where this page says **name**; the two words mean the same thing here. Three things to know when reading it:
 
 - it is reported **at the place the name was used**. Neither declaration is flagged; `(defined at …)` beside each candidate is how you find them;
 - each candidate is printed under its **section-qualified spelling**, which is the fix, copy-able as it stands. Ordinary definitions, rules, section `GIVEN`s and kinds of thing declared with `DECLARE` all print that way. A record's field name and the name used to build a record do not: they print bare, with no section in front (see [Three errors from one ambiguous `DECLARE`](#three-errors-from-one-ambiguous-declare) below);
@@ -485,13 +485,13 @@ indent the GIVEN so that it starts past the § of the heading:
 
 **What it means.** A `GIVEN` belongs to the section only when it starts at a column past the heading's `§` — that is, when the word `GIVEN` sits further from the left margin than the `§` above it. At column 1, hard against the left margin, it is the next declaration's own inputs instead; this is usually the result of a paste or a re-indent.
 
-The message uses L4's internal words for two things. The first is its own name for what this page calls a section `GIVEN`, quoted in the message above. The second is **signature**, which is L4's word for the list of a rule's own inputs — so "the signature of the declaration below it" means "the list of inputs belonging to the declaration written below it". The shape the message prints at the end is the correction. Expect it to arrive with one or two neighbouring errors about names in a signature not matching the names the definition uses; they are the same fault seen from the other side.
+The message uses two of L4's internal words. **"Binder"** is its name for what this page calls a section `GIVEN`. **Signature** is its word for the list of a rule's own inputs — so "the signature of the declaration below it" means "the list of inputs belonging to the declaration written below it". The shape the message prints at the end is the correction. Above a `DECLARE` it arrives with two neighbouring errors about names in a signature not matching the definition's; above an `ASSUME`, alone.
 
 **The fix.** Indent the `GIVEN` line, as the message shows. This check fires only when the declaration below is a `DECLARE` or an `ASSUME` that never uses the name; it deliberately does not fire on a `DECIDE`, because a rule that ignores one of its own inputs is an ordinary thing to write.
 
 ### Three errors from one ambiguous `DECLARE`
 
-Two sections declare a kind of thing under one name — `DECLARE T HAS f IS A NUMBER` in each — and a rule elsewhere writes `T WITH f IS 4` to build one. That single line reports three errors, in this order.
+Two sections declare a kind of thing under one name — `DECLARE T HAS f IS A NUMBER` in each — and a rule elsewhere writes `(T WITH f IS 4)'s f`. That one line reports three errors, in this order.
 
 First, the ambiguity about the name used to build the record. Note that the two candidates print **bare**, with no section in front, so this message's spelling is not the fix:
 
@@ -509,7 +509,7 @@ The options are:
 
 (`FUNCTION FROM NUMBER TO T` is how L4 writes "something that is given a number and gives back a `T`". That is a description of the two `DECLARE`s — a kind of thing with one field is completed by giving that field a value — not a fault of its own.)
 
-Second, at the same place, a complaint that `T` is not a rule and cannot be given inputs. The kind of thing is written as a name L4 made up for itself, and that name changes each time the file is checked — ignore it:
+Second, at the same place, a complaint that `T` is not a rule and cannot be given inputs. The kind of thing is written as a name L4 made up for itself, which shifts whenever the file changes — ignore it:
 
 ```
 You are trying to apply
@@ -585,7 +585,7 @@ $ l4 batch charges.l4 --inputs case.json
 
 — `limit note` gives 500. Move `§ Part 10` above `§ Part 9`, changing nothing else, and the same rule is an error naming both candidates. The advice is not to memorise which way round it goes: **do not use one name for two different kinds of thing in one file.** Qualify, or rename.
 
-**Two sections that declare the same name cannot both be filled in for one case.** Inside the file the two names behave as the table says: each section's rules read their own. But a fact arrives from outside the file under the name as written, and both are written `the applicant`, so nothing in what arrives says which of the two is meant. Measured on a file whose `Division 14` and `Division 15` each declare `the applicant` and each publish a rule that reads it: `l4 batch` answers neither rule, reporting the same ambiguity error the file itself would give. Rename one of them if both have to be filled in; the two names were doing two jobs anyway.
+**Two sections that declare the same name cannot both be filled in for one case.** Inside the file the two names behave as the table says: each section's rules read their own. But a fact arrives from outside the file under the name as written, and both are written `the applicant`, so nothing in what arrives says which of the two is meant. Measured on a file whose `Division 14` and `Division 15` each declare `the applicant` and each publish a rule that reads it: `l4 batch` answers neither rule, though the file itself checks clean. Rename one of them if both have to be filled in; the two names were doing two jobs anyway.
 
 **A name declared twice in the same section has no qualified way out.** Both candidates carry the same qualified spelling. Delete or rename one.
 

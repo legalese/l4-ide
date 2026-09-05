@@ -4,7 +4,7 @@ Teaching a rule to decline — and telling a declined answer apart from the four
 
 **Prerequisites:** the [Foundation Course](../../courses/foundation/README.md), or at the least [Your First L4 File](../getting-started/first-l4-file.md); and [Testing Your Rules](../getting-started/testing-your-rules.md), which is where `#ASSERT` is introduced. Step 8 of this page picks `#ASSERT` up again and assumes you have met it once.
 
-**Companion file:** [when-a-rule-cannot-answer.l4](when-a-rule-cannot-answer.l4). Every example on this page that runs today is in that file, the refusals included, and running it produces the screens in Step 3 — the thing this page is about, on your own machine, rather than on trust. Two short italic notes further down mark additions that are proposed and have not landed. One example, in Step 4, is run in a neighbouring tutorial instead of here; that step says so at the point it arises, and says why.
+**Companion file:** [when-a-rule-cannot-answer.l4](when-a-rule-cannot-answer.l4). Every example on this page that runs today is in that file, the refusals included, and running it produces the screens in Step 3 — the thing this page is about, on your own machine, rather than on trust. Two short italic notes further down mark additions that are proposed and have not landed. One screen, in Step 4, no companion can run; that step says so at the point it arises, and says why.
 
 **How to run it.** Save the companion file, open a terminal in the folder that holds it, and type one line:
 
@@ -183,7 +183,7 @@ A refusal is a correct outcome of a correct file. A mistake in the rules is not,
        OTHERWISE `the offering maximum before 2021`
 ```
 
-That one is deliberately wrong, and so it is not in the companion file: a companion that would not run is a poor advertisement. Running it prints, before any result at all:
+That one is deliberately wrong, and so it is not in the companion file: a companion that would not run is a poor advertisement. Running it prints, instead of any result:
 
 ```
   Severity: DiagnosticSeverity_Error
@@ -264,7 +264,7 @@ A Form C offering statement can be rejected, and the ground of rejection is what
 `LEFT` and `RIGHT` mean no more than "the first one" and "the second one", and the order is the order you wrote: in `EITHER STRING BOOLEAN`, `STRING` is named first, so `STRING` — text — is what a `LEFT` carries, and `BOOLEAN` — a yes-or-no fact — is what a `RIGHT` carries. L4 files put the failure on the left by convention, so that the successful case is the right-hand one in both senses of the word.
 
 ```l4
-@ref 17 CFR 227.203 — the offering statement and its required contents
+@ref 17 CFR 227.203(a)(1) — the Form C and what it must include
 GIVEN filing IS A `Form C filing`
 GIVETH AN EITHER STRING BOOLEAN
 `the filing is accepted` filing MEANS
@@ -295,7 +295,7 @@ Written on a rule, as in the recap above, a `GIVEN` names that rule's own inputs
 § `A fact nobody has supplied yet`
     GIVEN `the issuer's annual revenue` IS A NUMBER
 
-@ref 17 CFR 227.201(t) — the revenue figure the review tiering turns on
+@ref 17 CFR 229.10(f)(1) — the smaller reporting company revenue test
 GIVETH A BOOLEAN
 `the issuer is a smaller reporting company` MEANS
     `the issuer's annual revenue` LESS THAN 100000000
@@ -315,7 +315,7 @@ This is not a refusal and must never be written as one. It is a question with an
 
 The field test, and the most portable sentence on this page: **name the person who could supply the missing thing.** If you can name them, it is a fact nobody has supplied yet. If nobody could — because the fact does not exist — then it is not a fact about the case at all, and you are looking at a refusal.
 
-The section `GIVEN` has a tutorial of its own, [What a Section Needs to Know](../section-given/what-a-section-needs-to-know.md), and it is that tutorial's file which runs this example; the companion here holds the refusals. The reference page is [the section `GIVEN`](../../reference/syntax/section-given.md).
+The section `GIVEN` has a tutorial of its own, [What a Section Needs to Know](../section-given/what-a-section-needs-to-know.md), which explains that screen; no companion runs it, because such a run counts as failed. The reference page is [the section `GIVEN`](../../reference/syntax/section-given.md).
 
 The field test also sorts out an `ASSUME`, which you will meet in older files. `ASSUME` is deprecated — it still works, and it is still how a good deal of existing L4 is written, but it is no longer the way to write new rules — and it was used for both jobs at once. Apply the same test to one you find. If a person could supply the value, the `ASSUME` was standing in for a fact nobody has supplied yet, and it becomes a `GIVEN` under the section heading. If nobody could, it was standing in for a refusal, and it becomes a `REFUSE`. See [`ASSUME`](../../reference/types/ASSUME.md).
 
@@ -472,7 +472,7 @@ That sentence is worth knowing by sight, because it is the only sign on the scre
 
 _Proposed, not landed (2026-09-04): reporting a `TBD` differently from a hand-written `REFUSE`, so that unfinished drafting can be listed apart from the boundaries an author drew on purpose._ So today nothing in the report marks a `TBD` as a different kind of thing, and the only clue is the wording above. That clue is a weak one: nothing stops an author writing much the same sentence by hand, and no tool can count the unfinished provisions in a file for you. To be sure which you are looking at, open the file — a `TBD` is the unwritten one — or ask whoever maintains it.
 
-_Proposed, not landed (2026-09-04): a listing of the refusals a rule may reach, offered as you hover over it and in the list of facts a published rule asks for. Today, when a rule containing a refusal is converted for another system — L4 can turn a file into the formats that other rule tools and question-asking systems read, so that the same rules can drive them — and that other system has no way to represent a refusal, the conversion stops and says so, naming `REFUSE`. It never turns the refusal into something a person or another program could be asked to supply._
+_Proposed, not landed (2026-09-04): a listing of the refusals a rule may reach, offered as you hover over it and in the list of facts a published rule asks for._ Today, when a rule containing a refusal is converted for another system — L4 can turn a file into the formats that other rule tools and question-asking systems read — most conversions stop rather than emit anything, saying so and naming `REFUSE`; the ones that do not stop write out a file that cannot be used. None turns the refusal into something a person or another program could be asked to supply.
 
 ---
 

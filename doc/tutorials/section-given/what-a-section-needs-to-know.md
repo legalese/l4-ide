@@ -10,7 +10,7 @@ Say once, under the heading, which facts a whole run of rules is about — and e
 
 ## What You'll Build
 
-Two questions out of Regulation Crowdfunding, the United States rules that let a company raise money from the public through a funding portal. They live at Part 227 of the Code of Federal Regulations (CFR) and were made by the Securities and Exchange Commission (SEC):
+Two questions out of Regulation Crowdfunding, the United States rules that let a company raise money from the public through a funding portal. They live at Part 227 of title 17 of the Code of Federal Regulations, made by the Securities and Exchange Commission:
 
 - **How much may this investor put in over twelve months?** — Rule 100(a)(2)
 - **May this company raise money through crowdfunding?** — Rule 100(b)
@@ -214,7 +214,7 @@ DECLARE Investor
     HAS name IS A STRING
 ```
 
-The wrong version does not slip past you. Run `l4 check` and this message appears, telling you what to type instead:
+The wrong version does not slip past you. Run `l4 check` and among its errors this one tells you what to type:
 
 ```
 This GIVEN starts at column 1, so it is the signature of the declaration
@@ -288,7 +288,7 @@ One line of answer comes back per case:
 {"diagnostics":[],"input":{"annual income":300000,"net worth":900000},"output":[{"result":90000,"trace":null}],"status":"success"}
 ```
 
-Five things are written on each of those lines, and only one of them is the answer. `input` repeats the case that was asked, so that what was asked and what was decided stay on one line. `result` is the answer. `status` says whether the case ran at all, and `success` means it did. `diagnostics` is the list of things that went wrong, and the empty pair of square brackets `[]` means that list is empty — nothing went wrong. `output` sits inside square brackets because the tool always writes it as a list, even where, as here, the list holds one answer. `trace` would hold a step-by-step working of how the answer was reached, which nobody asked for here; the word beside it is the tool's way of writing _there is none_ (**"null"**). Nothing on either line is a warning, and nothing is missing.
+Six things are written on each of those lines, and only one of them is the answer. `input` repeats the case that was asked, so that what was asked and what was decided stay on one line. `result` is the answer. `status` says whether the case ran at all, and `success` means it did. `diagnostics` is the list of things that went wrong, and the empty pair of square brackets `[]` means that list is empty — nothing went wrong. `output` sits inside square brackets because the tool always writes it as a list, even where, as here, the list holds one answer. `trace` would hold a step-by-step working of how the answer was reached, which nobody asked for here; the word beside it is the tool's way of writing _there is none_ (**"null"**). Nothing on either line is a warning, and nothing is missing.
 
 Alex is below the cut point on both measures, so five per cent applies: five per cent of $40,000 is $2,000, under the floor, so the floor of $2,500 governs. The second investor is above it on both, so ten per cent of the larger measure applies: $90,000, below the ceiling. Each line carries the case alongside the answer, so what was asked and what was decided is one line, not two files.
 
@@ -321,7 +321,7 @@ What you _can_ do with no facts at all is ask what kind of answer a rule gives:
 
 which reports `NUMBER`. Checking that the rules fit together needs no facts about anybody; producing an answer needs the facts.
 
-Run the companion file whole, and this is all that comes back:
+Run the file whole, and among the tool's notes this comes back:
 
 ```
 Evaluation[1] @ what-a-section-needs-to-know.l4:40:1-35
@@ -336,9 +336,9 @@ Trace:
 
 One block, because the file holds one `#EVAL`: the recap from Step 1. The two `#CHECK` lines answer `NUMBER` and `BOOLEAN`, and they report as information among the file's other messages rather than as blocks of their own; in an editor they appear against the line you wrote them on. The run ends successfully, which is the point of putting `#CHECK` in a file and keeping `#EVAL` out of one whose facts nobody has supplied.
 
-What you cannot do today is keep a handful of worked cases — three or four applicants you re-run after every edit, as a standing check on your encoding — inside the `.l4` file beside the rules they test. That is what the proposed spelling below is for. Until it is built, those cases live in a `.json` file next to the `.l4` file and run with `l4 batch`: the same discipline, kept in two files instead of one.
+What you cannot do today is keep worked cases against a section's facts — three or four applicants you re-run after every edit, as a standing check on your encoding — inside the `.l4` file. That is what the proposed spelling below is for. Until it is built, those cases live in a `.json` file next to the `.l4` file and run with `l4 batch`: the same discipline, kept in two files instead of one.
 
-_Proposed, not landed (2026-09-04) — designed and written down, but not yet built: supplying a fact inside the file itself, by writing `WITH` after the rule's name and then the fact's name, `IS`, and the value — for example ``#EVAL `the investor's 12-month limit` WITH `annual income` IS 40000``, and the same spelling where one rule uses another. Write that line today and the file is rejected: L4 reports that the rule you named is not something that takes inputs of its own, and the run ends in an error. It is not quietly ignored. Until it is built, facts come from outside the file: a web form, `l4 batch`, or the published service — the same rules put behind a web address, where other people and other programs can ask them._
+_Proposed, not landed (2026-09-04) — designed and written down, but not yet built: supplying a fact inside the file itself, by writing `WITH` after the rule's name and then the fact's name, `IS`, and the value — for example ``#EVAL `the investor's 12-month limit` WITH `annual income` IS 40000``, and the same spelling where one rule uses another. Write that line today and the file is rejected: L4 answers `(which is not a function) to (named) arguments here.`, meaning the rule takes no inputs of its own. It is not quietly ignored. Until it is built, facts come from outside the file: a web form, `l4 batch`, or the published service — the same rules put behind a web address, where other people and other programs can ask them._
 
 ### Two questions, two forms
 
@@ -436,7 +436,7 @@ GIVETH A BOOLEAN
 
 (`§§` is a heading one level down from `§`, the way a subsection sits under a section. `p` and `f` are ordinary L4 names — a single letter is as good a name as `alex`, and here it is the name the statute itself chose. `DECLARE Person` says what kind of thing a person is in this encoding, and `` p's `offered an advantage` `` reads one of those facts off `p`, the way the apostrophe reads in English.)
 
-Those are **two different `p`s**. `P offered an advantage` sits under section 1's heading, so the `p` it reads is section 1's; `F is a foreign public official` sits under section 6's heading, so the people it can reach are section 6's `p` and `f`. Neither rule could reach the other section's, because section 1 ends where section 6's heading begins.
+Those are **two different `p`s**. `P offered an advantage` sits under section 1's heading, so the `p` it reads is section 1's; `F is a foreign public official` sits under section 6's heading, so the people it can reach are section 6's `p` and `f`. Neither rule reaches the other section's `p`: each finds the `p` its own heading declares.
 
 The same happens with words. Two sections may each name a fact `the fee`:
 
@@ -505,7 +505,7 @@ Do not instead lean on the allowance mentioned in Step 3, where a rule under no 
 
 ## Migrating a File That Uses `ASSUME`
 
-Older L4 files name their per-case facts with `ASSUME`, at the left margin, anywhere in the file. **Those files still work**: `ASSUME` parses, checks, publishes and runs exactly as it always has, and no warning is reported for it. It is deprecated for this job as of 2026-09-04, because the one keyword was doing three unrelated jobs at once and a reader could not tell from the keyword which was meant. To move one, put it under the heading of the section whose rules use it, indent it past the `§`, and change the word. Nothing else changes — not the fact's name, not the rule's name, not a line of any rule that uses it:
+Older L4 files name their per-case facts with `ASSUME`, at the left margin, anywhere in the file. **Those files still work**: `ASSUME` reads, checks, publishes and runs exactly as it always has, and no warning is reported for it. It is deprecated for this job as of 2026-09-04, because the one keyword was doing three unrelated jobs at once and a reader could not tell from the keyword which was meant. To move one, put it under the heading of the section whose rules use it, indent it past the `§`, and change the word. Nothing else changes — not the fact's name, not the rule's name, not a line of any rule that uses it:
 
 ```l4
 § `Intermediaries, before migration`

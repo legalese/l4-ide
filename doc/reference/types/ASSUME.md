@@ -7,21 +7,21 @@ A rule is told some facts about the case in front of it (its **"inputs"**) and
 works out one answer from them. An `ASSUME`d name is one of those facts, left
 open at the top of the file for somebody outside the file to supply.
 
-**`ASSUME` is deprecated (ruled 2026-09-04), and it still works.** It parses,
+**`ASSUME` is deprecated (ruled 2026-09-04), and it still works.**
 L4 still accepts it, it still runs and it still exports exactly as it always
-has; no warning is
-emitted, and nothing already written stops working. New rules should use the
-constructs in the table below, because one keyword was carrying three unrelated
-jobs.
+has; no warning is emitted, and nothing already written stops working. New
+rules should use the constructs in the table below, because one keyword was
+carrying four unrelated jobs.
 
-| The job the `ASSUME` was doing                                    | Where that job goes now                                                                                         |
+| The job the `ASSUME` was doing                                    | Where that job goes                                                                                             |
 | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
 | a fact supplied afresh for each case (the applicant's age)        | a [`GIVEN` under the section heading](../syntax/section-given.md) whose rules read it — a **"section `GIVEN`"** |
 | a kind of thing the model treats as opaque (`ASSUME T IS A TYPE`) | `DECLARE T` — see the status note below, and keep the `ASSUME` until that spelling lands                        |
 | a case the encoding deliberately does not cover                   | [`REFUSE "..."`](../control-flow/REFUSE.md)                                                                     |
+| a rule defined elsewhere (`… IS A FUNCTION FROM …`)               | not yet ruled — keep the `ASSUME`, and see "Function-typed inputs" below                                        |
 
 _Proposed, not landed (2026-09-04): the bare `DECLARE T` spelling for an opaque
-type. It does not parse today, so `ASSUME T IS A TYPE` is still how you write
+type. L4 does not accept it today, so `ASSUME T IS A TYPE` is still how you write
 one._
 
 ## Migrating a term `ASSUME`
@@ -46,13 +46,13 @@ After:
 
 Behaviour is identical in this release: both behave as assumed terms, and both
 appear as inputs of any `@export`ed rule that reads them. The indentation is what
-makes the difference between the two spellings — a `GIVEN` at column 1 lists the
-inputs of the declaration below it, as it has always done. See
+makes a GIVEN the section's rather than one rule's — a `GIVEN` at column 1 lists
+the inputs of the declaration below it, as it has always done. See
 [the section `GIVEN`](../syntax/section-given.md) for the column rule and the
 check error that reports a mis-indented one. A runnable version of the section
 form is at the end of [assume-example.l4](assume-example.l4).
 
-> `ASSUME` is for a fact the boundary SUPPLIES — it becomes a required input in the export schema. If what you mean is that the model declines to answer, that is a refusal, and it is spelled [`REFUSE`](../control-flow/REFUSE.md). A refusal is not an input anyone can supply, and no rule can convert it into an answer.
+> `ASSUME` is for a fact the boundary supplies — it becomes a required input of the published rule. If what you mean is that the model declines to answer, that is a refusal, and it is spelled [`REFUSE`](../control-flow/REFUSE.md). A refusal is not an input anyone can supply, and no rule can convert it into an answer.
 
 ## Syntax
 
@@ -60,15 +60,6 @@ form is at the end of [assume-example.l4](assume-example.l4).
 ASSUME name IS A Type
 ASSUME name IS A FUNCTION FROM Type1 TO Type2
 ```
-
-## Purpose
-
-ASSUME declares:
-
-1. Facts a rule is told about the case — deprecated for this job; declare them
-   with a section `GIVEN` instead
-2. Rules defined elsewhere, whose definition this file does not carry
-3. Kinds of thing the model treats as opaque (`ASSUME T IS A TYPE`)
 
 ## Examples
 
@@ -90,7 +81,7 @@ ASSUME applicantName IS A STRING
 ### Assuming a rule defined elsewhere
 
 ```l4
--- Assume an external function
+-- Assume a rule defined elsewhere
 ASSUME calculateTax IS A FUNCTION FROM NUMBER TO NUMBER
 
 -- A rule with several inputs (joined with AND)
@@ -133,17 +124,17 @@ place that asked the question:
   reads.
 
 Neither `#CHECK ... WITH ...` nor `#EVAL ... WITH ...` binds an assumed value
-today, and the two spellings fail in two different ways. Where the name takes no
+today, and the failure takes more than one shape. Where the name takes no
 inputs of its own, both `#CHECK isAdult WITH age IS 25` and `#EVAL isAdult WITH
-age IS 25` report the same check error — that `isAdult`, which is not a
-function, is being applied to named arguments. Where a value is written before
-the `WITH`, as in ``#EVAL `tax on` 100 WITH rate IS 0.2``, the file does not
-parse at all: `unexpected WITH`.
+age IS 25` report the same check error: `isAdult … (which is not a function)
+to (named) arguments here.` Where a value is written before the `WITH`, as in
+``#EVAL `tax on` 100 WITH rate IS 0.2``, the file does not parse at all:
+`unexpected WITH`.
 
-_Proposed, not landed (2026-09-04): supplying a value inside the file, as
-`#EVAL isAdult WITH age IS 25`. This lands with the discharge pull request;
-until then supply values from outside the file (web form, `l4 batch`,
-application programming interface)._
+_Proposed, not landed (2026-09-04): supplying an ASSUMEd value inside the file,
+as `#EVAL isAdult WITH age IS 25` where `age` is assumed. This lands with the
+discharge pull request; until then supply values from outside the file (web
+form, `l4 batch`, application programming interface)._
 
 ## ASSUME and `@export`
 
@@ -167,7 +158,7 @@ A published rule cannot accept an input that is itself a rule, whether it is
 declared as a `GIVEN` input or as an ASSUME the rule reads:
 
 ```l4
--- ✘ Rejected at typecheck / deploy time
+-- ✘ Rejected when the file is checked, and again at deploy time
 ASSUME predicate IS A FUNCTION FROM NUMBER TO BOOLEAN
 @export Apply the predicate
 DECIDE `applies` IF predicate OF 42
@@ -197,7 +188,7 @@ DECIDE isAdult IF age >= 18
 
 For a name that is an input to every rule in a section rather than to one
 definition, a `GIVEN` indented under the section's heading declares it once for
-that section. It resolves, evaluates and exports exactly as a same-section
+that section. It resolves, runs and exports exactly as a same-section
 `ASSUME` term does. See [the section `GIVEN`](../syntax/section-given.md).
 
 ## Related Keywords
@@ -205,7 +196,7 @@ that section. It resolves, evaluates and exports exactly as a same-section
 - **[GIVEN](../functions/GIVEN.md)** - List a rule's own inputs (a "rule `GIVEN`")
 - **[The section `GIVEN`](../syntax/section-given.md)** - Declare a name once for
   a whole section: where a term `ASSUME` goes now
-- **[DECIDE](../functions/DECIDE.md)** - Define a value or function with a body
+- **[DECIDE](../functions/DECIDE.md)** - Define a value or rule with a body
 - **[TYPE-KEYWORDS](keywords.md)** - Type syntax (IS, FUNCTION, and the rest)
 
 ## See Also
