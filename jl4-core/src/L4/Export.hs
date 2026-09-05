@@ -13,7 +13,9 @@ module L4.Export (
   buildTypeDescMap,
   assumesFromModule,
   assumesReadBy,
+  decideBodiesFromModule,
   transitiveReferencedUniques,
+  transitiveReferencedUniquesWith,
   AssumeRewrite (..),
   rewriteModuleAssumes,
   extractAssumeParamTypes,
@@ -396,9 +398,20 @@ decideBodiesFromModule (MkModule _ _ section) =
 -- schema, the direct evaluator, the batch wrapper and the WASM ABI all
 -- agree on what a request must supply.
 transitiveReferencedUniques :: Module Resolved -> Expr Resolved -> Set.Set Unique
-transitiveReferencedUniques mod' = go Set.empty . Set.toList . collectReferencedUniques
+transitiveReferencedUniques mod' =
+  transitiveReferencedUniquesWith (decideBodiesFromModule mod')
+
+-- | 'transitiveReferencedUniques' against an already-built edge table.
+--
+-- Same closure, same answer; the only difference is that the caller keeps the
+-- table. 'L4.Discharge' asks for the read-set of every definition in a module
+-- at once, and rebuilding 'decideBodiesFromModule' per definition would make
+-- that quadratic in the size of the module.
+transitiveReferencedUniquesWith
+  :: Map.Map Unique (Expr Resolved) -> Expr Resolved -> Set.Set Unique
+transitiveReferencedUniquesWith defs =
+  go Set.empty . Set.toList . collectReferencedUniques
  where
-  defs = decideBodiesFromModule mod'
   go seen [] = seen
   go seen (u : us)
     | Set.member u seen = go seen us
