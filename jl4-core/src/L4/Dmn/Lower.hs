@@ -5987,6 +5987,16 @@ lowerModule opts modul@(MkModule _ uri _) =
    where
     sites = Map.findWithDefault [] u callGraph.cgCalls
 
+  -- Which of the two uncertified-ness codes actually names this decide, for a
+  -- message that forwards a reader to one of them. D1 made the pair disjoint
+  -- per cause: a decide whose ONLY safety issues are refusals raises @D-REFUSE@
+  -- and no @D-PARTIAL@, so a forward reference has to ask rather than assume.
+  uncertifiedNoteCode :: Unique -> Text
+  uncertifiedNoteCode u =
+    case Map.findWithDefault [] u safetyIssues of
+      is | all (\i -> i.safClause == "REFUSE") is, not (null is) -> "D-REFUSE"
+         | otherwise                                             -> "D-PARTIAL"
+
   -- D-REFUSE (ruling D1, 2026-09-05; @IMPLICIT-PROPS-DESIGN.md@ §11.9.1).
   --
   -- The decide can decline to answer — either because its own body contains a
@@ -6063,7 +6073,13 @@ lowerModule opts modul@(MkModule _ uri _) =
                <> (if null callerNames
                      then ""
                      else " by " <> Text.intercalate ", " (map tick callerNames))
-               <> ", but it could not be certified total (see its D-PARTIAL note), so it \
+               -- Which note to send the reader to is COMPUTED, not assumed. A
+               -- decide uncertified only because it can refuse raises D-REFUSE
+               -- and NOT D-PARTIAL (D1), so a hard-coded "see its D-PARTIAL
+               -- note" would point at an element that is not in the report.
+               <> ", but it could not be certified total (see its "
+               <> uncertifiedNoteCode u
+               <> " note), so it \
                   \keeps its <decision> node and its call sites stay verbatim")
             "the invocation: an uncertified body inside a BKM would answer the same silent \
             \null one element kind later, so the emission is refused rather than degraded"
