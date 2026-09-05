@@ -1,0 +1,16 @@
+-- A rule that reads a section binder takes it as an extra input, which a bare
+-- mention of the rule's name cannot carry. Passing such a rule as a value is a
+-- check error naming it; the way to write it is a lambda that applies it,
+-- `map (GIVEN x YIELD bump x) …`, which ok/section-given-discharge.l4 shows.
+
+IMPORT prelude
+
+§ `Rates`
+    GIVEN `the rate` IS A NUMBER
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+bump n MEANS n TIMES `the rate`
+
+GIVETH A LIST OF NUMBER
+`all bumped` MEANS map bump (LIST 1, 2, 3)
