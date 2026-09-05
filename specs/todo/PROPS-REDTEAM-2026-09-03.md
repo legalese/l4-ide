@@ -501,11 +501,23 @@ be zero at release. **Refusal is order-dependent under lazy `AND`/`OR`** (`FALSE
 `x AND FALSE` refuses) and so diverges from FEEL's commutative Kleene logic; the region is
 well-defined only if the verifier models left-to-right demand. This is written down, not fixed.
 
+> **The DMN clause of the next paragraph is SUPERSEDED. ANSWERED 2026-09-05, see
+> `IMPLICIT-PROPS-DESIGN.md` §11.9.1** (ruling card `D1-dmn-refuse-image`, mark accept). DMN
+> lowers a reachable `REFUSE` to FEEL **`null`** and omits **nothing**; the export **withdraws
+> `DMN-SAFE`**; `D-REFUSE` carries two severities set by the strictness calibration; and
+> **`MayRefuse` is dropped**. The "`REFUSE → null` would launder" argument below is what the
+> ruling overturned: omission and `null` were measured engine-identical under both hit policies
+> (`Dmn/Lower.hs:695`, `:1645-1655`), so it cannot choose between them. The rest of the paragraph —
+> Catala, Docassemble, evaluator, CLI, batch, service — stands unchanged. The **dmnmd/Markdown**
+> carrier is a second per-backend image that neither this paragraph nor the ruling decides; §11.9.1
+> records the measured consequence and leaves it open.
+
 **Per-backend image**, which no backend has today (every one lowers the refusal `ASSUME` as a
-suppliable input, run-verified 2026-09-04): DMN omits the refusing row, reports a non-Blocking
+suppliable input, run-verified 2026-09-04): ~~DMN omits the refusing row, reports a non-Blocking
 `D-REFUSE` with the reason, and adds a `MayRefuse` safety kind that does not withdraw `DMN-SAFE`
 (FEEL `null` is already spent on `NOTHING`, so `REFUSE → null` would launder; `analyzeSafety`
-deliberately treats an assumed term as not partial, so `D-PARTIAL` is the wrong class); Catala
+deliberately treats an assumed term as not partial, so `D-PARTIAL` is the wrong class)~~ (see the
+note above); Catala
 emits no definition (its ladder veto exempts consequences); Docassemble a terminal screen;
 evaluator, CLI, batch and service a `refused` kind on all six surfaces. The temporal design's
 generated "not in force on <day>" arm (`TEMPORAL-RULE-VERSION-DESIGN.md` item 3) is reconsidered as
@@ -737,7 +749,11 @@ Kept so that no later session re-proposes one without meeting its witness.
    honoured per R8; `WITH`/`LET` per R9; field-opening per R5 with the elaborated-AST stage.
 6. **Consumers**: hover, index, `@reads`; schema tiers; `BatchRequest.world`; DMN, Catala,
    Docassemble, OpenFisca, MLIR per R10; trace needs nothing new, a supplied binder being an
-   ordinary bound argument.
+   ordinary bound argument. **The DMN refusal image this step builds is the one ruled 2026-09-05 in
+   `IMPLICIT-PROPS-DESIGN.md` §11.9.1 (FEEL `null`, nothing omitted, `DMN-SAFE` withdrawn, no
+   `MayRefuse`), not §2.8's**, and it does not ship without §11.9.1's three conditions.
+   `jl4-core/src/L4/Dmn/Lower.hs:2285` cites "§6 item 6" for this work; that citation still points
+   here, and here now points at §11.9.1.
 7. **Migration and deprecation**: a warning in `l4 check` with a code action that rewrites a term
    `ASSUME` to the ruled spelling, the warning not landing before the code action can; then corpus
    and docs, `doc/reference/types/ASSUME.md` carrying the notice and the recipe (`CLAUDE.md` §6);

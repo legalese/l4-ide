@@ -692,6 +692,103 @@ on <day>" arm (`TEMPORAL-RULE-VERSION-DESIGN.md` item 3), which becomes a gate. 
 design yet. Until one exists the commencement arm stays a `REFUSE`, and the PR that lands `REFUSE`
 amends CORPUS-TRACK §8 in the same change.
 
+#### 11.9.1 R7 AMENDED 2026-09-05 — the DMN image of a refusal is FEEL `null`, and it withdraws `DMN-SAFE`
+
+**Ruling (Meng, 2026-09-05, mark `accept` on rulings-bench card `D1-dmn-refuse-image`).** The DMN
+half of R7's per-backend image above — "DMN omits the refusing row, non-Blocking `D-REFUSE`,
+`MayRefuse` safety kind" — is **superseded**. The image is now:
+
+- `l4 export --to dmn` lowers a reachable `REFUSE` to FEEL **`null`**, and **omits nothing**;
+- the reason string rides on the surviving `OTHERWISE` row's `<description>`, under a new
+  `D-REFUSE` code;
+- the export **withdraws `DMN-SAFE`**;
+- severity is set by the existing strictness calibration — `Lossy` when only lazy positions
+  consume the refusal, `Blocking` from any strict consumer;
+- **`MayRefuse` is dropped.** A safety kind that does not withdraw `DMN-SAFE` certifies a decision
+  total when we can see it is not, which is the thing this ruling exists to stop.
+
+Every other backend in R7's list (Catala no definition, Docassemble a terminal screen; evaluator,
+CLI, batch and service a `refused` kind) is unchanged.
+
+**Status: ruled 2026-09-05; NOT BUILT.** What is in the tree today is neither the old image nor
+this one: `L4.Dmn.Lower` lowers `Refuse {} -> verbatim e` (`jl4-core/src/L4/Dmn/Lower.hs:2285`),
+writing L4 source text into a FEEL literal, and KIE 8.44.0.Final then fails to compile the whole
+DMN file (`ERR_COMPILING_FEEL`, measured 2026-09-05 while repairing PR #334; recorded in §10.6 and
+in `doc/reference/control-flow/REFUSE.md`). What would make this ruling true: the `Refuse` arm at
+`Lower.hs:2285` emitting `null`; a `D-REFUSE` row in `DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §7;
+`analyzeSafety` withdrawing `DMN-SAFE` on a reachable refusal; and the three conditions below.
+
+**The three conditions. The ruling is not shipped without them** — Meng accepted the
+recommendation _as written_, and it was written as "C, conditional on three things landing with
+it", because C on its own ships a green pipeline over a region no test evaluates:
+
+1. **A pre-commencement engine-differential case that does _not_ supply the floor**, in each of
+   `jl4/examples/dmn/regcf-corpus.cases.json`, `gst-rate.cases.json` and `ymd-dates.cases.json`,
+   with both engines' answers recorded in `jl4/examples/dmn/expected/regcf-corpus.engine-baseline.txt`.
+   **Corrected against the tree 2026-09-05:** the condition as originally worded ("a
+   pre-commencement case in each of the three") is already met by two of them and would have been
+   discharged without testing anything. `gst-rate.cases.json` has two pre-commencement cases (F, J
+   — rule dates 1990-01-01 and 1994-03-31 against commencement 1994-04-01) and `ymd-dates.cases.json`
+   has three (F, G, H), whose rule dates are 1900-01-01 and 1982-12-31 against commencement
+   1983-01-01 — and **every one of
+   them supplies the floor itself as `-1` and expects `-1` back**, so the engines see a supplied
+   number and never a refusal. `regcf-corpus.cases.json` has none at all: all 22 cases carry a
+   rule date of 2016-09-01 or later, against commencement 2016-05-16. The condition that bites is
+   therefore the un-supplied one.
+2. **`--fail-on=blocking` actually passed by the `p7-dmn` leg** of `etc/go/go.sh`. Measured
+   2026-09-05: the flag exists (`jl4/app/L4/Cli/Export.hs:234`, `Docassemble.hs:107`) and occurs in
+   **no** `.github/workflows/*` file and **no** file under `etc/go/`. Until it is passed, a
+   `Blocking` `D-REFUSE` is a line of report text that fails nothing.
+3. **The enum-typed COVID refusal covered by its own case.** `regcf.l4:486` declares the refusal at
+   type `FinancialStatementRequirement`, a nullary `IS ONE OF` (`regcf.l4:471-474`), and it is
+   reached from one arm, `regcf.l4:501`. `null`-against-an-enum is the concrete silent-wrong-answer
+   path, and no option on the card was designed with it in view.
+
+**What decided it.** Not the design argument; the measurement that §2.8's reasoning turns on.
+§2.8 rejected `null` on the ground that "FEEL `null` is already spent on `NOTHING`, so
+`REFUSE → null` would launder". The D1 review measured that omission and `null` are
+**engine-identical under both hit policies**, which leaves that argument unable to choose between
+them: under `UNIQUE` the `OTHERWISE` is a `defaultOutputEntry` (`jl4-core/src/L4/Dmn/Lower.hs:695`)
+and under the dated-chain form it is a floor row with no default (`Lower.hs:1645-1655`), and in
+both an absent answer and an explicit `null` reach a consumer the same way. _(The two code sites
+were re-verified 2026-09-05; the engine-level equivalence is the D1 review's measurement and was
+not re-run here — running it needs the KIE and Camunda images.)_ Once they are equivalent, `null`
+is the cheaper half — one arm at `Lower.hs:2285`, against recomputing the `informationRequirement`
+edges of the eight output entries that reach `regcf.l4:143` (`regcf.l4:154, :166, :175, :185,
+:195, :205, :215, :409`) — and it is the only half that keeps the reason string in the artifact at
+all, because omitting the row deletes the very `<rule>` whose `<description>` would carry it.
+
+The finding that decides how confident anyone should be is condition 1's: the two-engine check
+reports `1540/1540 decision(s) SUCCEEDED, 1540/1540 value(s) as expected` on both KIE 8.44.0.Final
+and Camunda 8.7.6, over 22 cases, **none of which evaluates through a refusal**. That number is
+not evidence about this ruling.
+
+**The second per-backend image, which R7 did not name: the dmnmd/Markdown carrier.** It is a
+separate lowering (`jl4-core/src/L4/Dmn/Markdown.hs`) with **20 goldens of its own** under
+`jl4/examples/dmn/expected/` — 10 `.dmn.md` renderings and 10 `.md.fidelity.txt` reports, beside
+the DMN backend's 11 `.dmn` and 11 `.fidelity.txt` (counted 2026-09-05) — and its cell
+grammar is S-FEEL only: `mdOutput` refuses anything that is not S-FEEL, and the code already
+records that a `null` catch-all is the reachable case (`Dmn/Markdown.hs:404-412`, the R8-d′ note).
+So ruling C, applied unchanged, makes a refusing table emit `D-MD-CELLSYNTAX` (Blocking, dmnmd
+only) rather than a `null` cell. **Whether that is the wanted dmnmd image is OPEN and is not
+decided here** — Meng ruled the DMN image, not this one. Recording it so the implementing PR does
+not discover it in a golden.
+
+**What review changed.** The card's own recommendation was C _with conditions_, and the conditions
+are the substance: read without them, C ships a green pipeline over an untested region, which is
+what an earlier reading of the prior analysis would have done. The card's adversarial pass had
+already corrected the prior analysis on one count — `regcf.l4` carries **two distinct refusals**,
+one `NUMBER`-typed reached from eight output-entry sites and one
+`FinancialStatementRequirement`-typed reached from one, not "one refusal" — and re-measurement on
+2026-09-05 confirms both figures. The one thing this record changes against the card is condition
+1's wording, which was already satisfied in two of the three files by cases that supply the floor,
+and is restated above as "does not supply the floor". `daydate.l4:104` stays out of scope by R7's
+own taxonomy — an out-of-range month is invalid input, the `EITHER` row, not a refusal.
+
+**Corpus sites that cite the superseded image by name**, and migrate with the implementing PR:
+`jl4/examples/dmn/gst-rate.l4:62-65`, `jl4/examples/dmn/ymd-dates.l4:83-86`,
+`jl4/examples/legal/regcf/regcf.l4:135-143`. `jl4-core/libraries/daydate.l4:102-104` does not.
+
 ### 11.10 R10 — Backends. RULED 2026-09-04 (marked accept).
 
 The transitive read-set pass lands first; the schema is keyed by (name, tier) with `x-l4-tier`;
