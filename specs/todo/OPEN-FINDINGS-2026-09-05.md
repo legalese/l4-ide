@@ -399,11 +399,11 @@ known false green documented as unknown for the length of a queue is the drift t
 
 Filed by whoever holds GitHub write authority; **nothing here has been posted**.
 
-| finding    | what to file                                                                                                                                       |
-| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| OF-3       | New issue: `l4 batch`'s wrapper is scoped by the last open `§`. Witness and control are in OF-3 above.                                             |
-| OF-5       | New issue: a `WHERE` local silently shadows a section `GIVEN`; ask for a warning, not an error.                                                    |
-| OF-4       | No issue yet — measure first. An issue asserting a behaviour nobody has run would be the thing this file exists to prevent.                        |
-| OF-6       | **#948: neither close nor re-open on today's evidence.** Comment the branch split if anything at all.                                              |
-| OF-7       | Nothing yet — the ruling (refusal first) is not built, and an issue before the branch exists would only restate `IMPLICIT-PROPS-DESIGN.md` §11.16. |
-| OF-1, OF-2 | Nothing new — they live in `IMPLICIT-PROPS-DESIGN.md` §11.15 on `props/tdnr-collapse`.                                                             |
+| finding    | what to file                                                                                                                                                                                        |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| OF-3       | New issue, and **live on a shipped doc example** rather than latent: `l4 batch`'s wrapper is scoped by the last open `§`. Witness, control and the `section-given-example.l4` instance are in OF-3. |
+| OF-5       | New issue: a `WHERE` local silently shadows a section `GIVEN`; ask for a warning, not an error.                                                                                                     |
+| OF-4       | No issue yet — measure first. An issue asserting a behaviour nobody has run would be the thing this file exists to prevent.                                                                         |
+| OF-6       | **#948: neither close nor re-open on today's evidence.** Comment the branch split if anything at all.                                                                                               |
+| OF-7       | Nothing yet — the ruling (refusal first) is not built, and an issue before the branch exists would only restate `IMPLICIT-PROPS-DESIGN.md` §11.16.                                                  |
+| OF-1, OF-2 | Nothing new — they live in `IMPLICIT-PROPS-DESIGN.md` §11.15 on `props/tdnr-collapse`.                                                                                                              |
