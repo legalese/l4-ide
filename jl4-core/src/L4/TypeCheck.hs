@@ -5243,7 +5243,7 @@ prettyCheckErrorContext (WhileCheckingType _t ctx)       e = prettyCheckErrorCon
 
 prettyCheckError :: CheckError -> [Text]
 prettyCheckError (SuspiciousBinderPattern binder ctor)     =
-  [ "This CONSIDER branch binds a new variable"
+  [ "This CONSIDER branch introduces a new name"
   , ""
   , "  " <> quotedName (getName binder)
   , ""
@@ -5316,8 +5316,8 @@ prettyCheckError (OutOfScopeError n t)                     =
   , "  " <> prettyLayout t
   ]
 prettyCheckError (KindError k ts)                          =
-  [ "The arities of the types do not match."
-  , "I expected " <> Text.textShow k <> " arguments, but I found " <> Text.textShow (length ts) <> "."
+  [ "This type is given the wrong number of inputs."
+  , "I expected " <> Text.textShow k <> ", but I found " <> Text.textShow (length ts) <> "."
   ]
 prettyCheckError (TypeMismatch ec expected given)          =
   prettyTypeMismatch ec expected given
@@ -5392,29 +5392,29 @@ prettyCheckError (IncorrectArgsNumberApp r expected given)   =
   , ""
   , "  " <> prettyResolvedWithRange r
   , ""
-  , "expects " <> prettyCount expected "argument" <> ","
-  , "but you are applying it to " <> prettyCount given "argument" <> " here."
+  , "expects " <> prettyCount expected "input" <> ","
+  , "but here it is given " <> prettyCount given "input" <> "."
   ]
 prettyCheckError (IllegalApp r t n)                          =
-  [ "You are trying to apply"
+  [ "You are giving " <> prettyCount n "input" <> " to"
   , ""
   , "  " <> prettyResolvedWithRange r <> " of type " <> prettyLayout t
   , ""
-  , "(which is not a function) to " <> prettyCount n "argument" <> " here."
+  , "but it is not a function, so it takes none."
   ]
 prettyCheckError (IllegalAppNamed r t)                       =
-  [ "You are trying to apply"
+  [ "You are giving named inputs to"
   , ""
   , "  " <> prettyResolvedWithRange r <> " of type " <> prettyLayout t
   , ""
-  , "(which is not a function) to (named) arguments here."
+  , "but it is not a function, so it takes none."
   ]
 prettyCheckError (IncompleteAppNamed r onts)               =
-  [ "In the application of"
+  [ "In this use of"
   , ""
   , "  " <> prettyResolvedWithRange r
   , ""
-  , "you forgot to supply the following arguments:"
+  , "you have not supplied these inputs:"
   , ""
   ] ++ map (\ ont -> "  " <> prettyOptionallyNamedType ont) onts
 -- A '#CHECK' over a polymorphic term carries residual inference variables,
@@ -5423,7 +5423,7 @@ prettyCheckError (IncompleteAppNamed r onts)               =
 -- stable @a@, @b@, … by order of first appearance, exactly as hover does.
 prettyCheckError (CheckInfo t _)                           = [prettyTypeForDisplay t]
 prettyCheckError (IllegalTypeInKindSignature t)            =
-  [ "In a signature of a type declaration, all parameters must be of type"
+  [ "In the signature of a type declaration, every input must be of type"
   , ""
   , "  TYPE"
   , ""
@@ -5440,14 +5440,13 @@ prettyCheckError (MissingEntityInfo r)                     =
   , "This is an error in this system and should be reported as a bug."
   ]
 prettyCheckError (DesugarAnnoRewritingError context errorInfo) =
-  [ "Error while desugaring:"
-  , "While trying to desugar the expression"
+  [ "I could not attach this expression's original text to its parts:"
   , ""
   , "  " <> prettyLayout context
   , ""
-  , "We ran into the error:"
-  , "The source annotation are not matching the expected number of arguments."
-  , "Expected " <> Text.textShow (errorInfo.expected) <> " holes but got: " <> Text.textShow (errorInfo.got)
+  , "Its annotation has " <> Text.textShow (errorInfo.got) <> " holes where "
+      <> Text.textShow (errorInfo.expected) <> " were needed."
+  , "This is an error in this system and should be reported as a bug."
   ]
 prettyCheckError (CheckWarning warning) = prettyCheckWarning warning
 prettyCheckError (MixfixMatchErrorCheck funcName err) =
@@ -5461,7 +5460,7 @@ prettyCheckError (FixityAnnotationMalformed _ raw) =
   , "priority between 1 and 9, for example: @infixl 6"
   ]
 prettyCheckError (FixityConflict op fixities) =
-  [ "The operator " <> quotedName (MkName emptyAnno op) <> " has conflicting fixity declarations in scope:"
+  [ "The operator " <> quotedName (MkName emptyAnno op) <> " has conflicting fixity declarations visible here:"
   , ""
   ]
   <> map (("  " <>) . prettyFixityDecl) fixities
@@ -5513,20 +5512,20 @@ prettyCheckError (TypicallyRequiresType n) =
   ]
 prettyCheckError (TypicallyOnTypeVariable n) =
   [ quotedName n <> " is a type, which cannot carry a TYPICALLY default value."
-  , "TYPICALLY defaults apply to term-level fields, parameters and assumptions."
+  , "TYPICALLY can give a default to a DECLARE field, a GIVEN input, or an ASSUME."
   ]
 prettyCheckError (ExportFunctionTypeInput _fnName paramName) =
   [ "Function type inputs are not supported for @export."
-  , "The parameter "
+  , "The input "
       <> quotedName (getActual paramName)
       <> " has a function type."
   ]
 prettyCheckError (ExportAssumeNameClash fnName paramName) =
   [ "The @export function " <> quotedName (getActual fnName)
-      <> " has a GIVEN parameter " <> quotedName (getActual paramName)
+      <> " has a GIVEN input " <> quotedName (getActual paramName)
       <> " with the same name as an ASSUME it reads."
   , "Both would be one input field, so a request could not supply them separately."
-  , "Rename the parameter or the ASSUME."
+  , "Rename the input or the ASSUME."
   ]
 prettyCheckError (RegulativeActorMismatch party performer actionName) =
   [ "An actor may only perform its own actions."
@@ -5560,8 +5559,8 @@ prettyMixfixMatchError funcName = \case
     , "In expression involving: " <> prettyLayout funcName
     ]
   ArityMismatch expected actual ->
-    [ "Wrong number of arguments in mixfix expression"
-    , "Expected " <> Text.textShow expected <> " arguments but got " <> Text.textShow actual
+    [ "Wrong number of inputs in mixfix expression"
+    , "Expected " <> Text.textShow expected <> " inputs but got " <> Text.textShow actual
     , "In expression involving: " <> prettyLayout funcName
     ]
   where
@@ -5599,7 +5598,7 @@ prettyCheckWarning = \ case
     , ""
     , "  a OP b MEANS ..."
     , ""
-    , "where a and b are the GIVEN parameters."
+    , "where a and b are the GIVEN inputs."
     ]
 
 -- | Render a synthesized missing branch as valid, pasteable L4 (the
@@ -5661,31 +5660,31 @@ prettyNonDistinctContext NonDistinctSelectors =
 prettyNonDistinctContext NonDistinctQuantifiers =
   [ "All quantified variables in a polymorphic type must have distinct names." ]
 prettyNonDistinctContext NonDistinctTypeAppForm =
-  [ "In a type declaration, the type and all its parameters must have distinct names." ]
+  [ "In a type declaration, the type and all its inputs must have distinct names." ]
 prettyNonDistinctContext NonDistinctTermAppForm =
-  [ "In a definition, the defined term and all its parameters must have distinct names." ]
+  [ "In a definition, the defined term and all its inputs must have distinct names." ]
 
 prettyTypeMismatch :: ExpectationContext -> Type' Resolved -> Type' Resolved -> [Text]
 prettyTypeMismatch ExpectIfConditionContext expected given =
   standardTypeMismatch [ "The condition in IF-THEN-ELSE and BRANCH-IF-THEN-OTHERWISE constructs is expected to be of type" ] expected given
 prettyTypeMismatch ExpectNotArgumentContext expected given =
-  standardTypeMismatch [ "The argument of NOT is expected to be of type" ] expected given
+  standardTypeMismatch [ "The input to NOT is expected to be of type" ] expected given
 prettyTypeMismatch ExpectPercentArgumentContext expected given =
-  standardTypeMismatch [ "The argument of '%' is expected to be of type" ] expected given
+  standardTypeMismatch [ "The input to '%' is expected to be of type" ] expected given
 prettyTypeMismatch ExpectPostUrlContext expected given =
-  standardTypeMismatch [ "The URL argument of POST is expected to be of type" ] expected given
+  standardTypeMismatch [ "The URL given to POST is expected to be of type" ] expected given
 prettyTypeMismatch ExpectPostHeadersContext expected given =
-  standardTypeMismatch [ "The headers argument of POST is expected to be of type" ] expected given
+  standardTypeMismatch [ "The headers given to POST are expected to be of type" ] expected given
 prettyTypeMismatch ExpectPostBodyContext expected given =
-  standardTypeMismatch [ "The body argument of POST is expected to be of type" ] expected given
+  standardTypeMismatch [ "The body given to POST is expected to be of type" ] expected given
 prettyTypeMismatch ExpectConcatArgumentContext expected given =
-  standardTypeMismatch [ "The argument of CONCAT is expected to be of type" ] expected given
+  standardTypeMismatch [ "The input to CONCAT is expected to be of type" ] expected given
 prettyTypeMismatch ExpectAsStringArgumentContext _expected given =
-  [ "The argument of AS STRING is expected to be NUMBER, BOOLEAN, DATE, or STRING."
-  , "I inferred the argument to have type " <> prettyLayout given
+  [ "The input to AS STRING is expected to be NUMBER, BOOLEAN, DATE, or STRING."
+  , "I inferred this input to have type " <> prettyLayout given
   ]
 prettyTypeMismatch ExpectConsArgument2Context expected given =
-  standardTypeMismatch [ "The second argument of FOLLOWED BY is expected to be of type" ] expected given
+  standardTypeMismatch [ "The second input to FOLLOWED BY is expected to be of type" ] expected given
 prettyTypeMismatch (ExpectPatternScrutineeContext scrutinee) expected given =
   let (e, g) = prettyMismatchedTypes expected given in
   [ "A pattern in a WHEN-clause of a CONSIDER construct is expected to have the type of the expression being matched."
@@ -5746,15 +5745,15 @@ prettyTypeMismatch (ExpectTypicallyValueContext n) expected given =
   standardTypeMismatch [ "The TYPICALLY value for " <> quotedName n <> " is expected to be of type" ] expected given
 prettyTypeMismatch (ExpectAppArgContext True r _i) expected given =
   standardTypeMismatch
-    [ "The argument of the projection "
+    [ "The value that the field"
     , ""
     , "  " <> prettyResolvedWithRange r
     , ""
-    , "is expected to be of type"
+    , "is read from is expected to be of type"
     ] expected given
 prettyTypeMismatch (ExpectAppArgContext False r i) expected given =
   standardTypeMismatch
-    [ "The " <> prettyOrdinal i <> " argument of function "
+    [ "The " <> prettyOrdinal i <> " input of function "
     , ""
     , "  " <> prettyResolvedWithRange r
     , ""
@@ -5762,7 +5761,7 @@ prettyTypeMismatch (ExpectAppArgContext False r i) expected given =
     ] expected given
 prettyTypeMismatch (ExpectNamedArgContext r nr) expected given =
   standardTypeMismatch
-    [ "The argument"
+    [ "The input"
     , ""
     , "  " <> prettyResolvedWithRange nr
     , ""
@@ -5774,7 +5773,7 @@ prettyTypeMismatch (ExpectNamedArgContext r nr) expected given =
     ] expected given
 prettyTypeMismatch (ExpectBinOpArgContext txt i) expected given =
   standardTypeMismatch
-    [ "The " <> prettyOrdinal i <> " argument of the " <> txt <> " operator is expected to be" ]
+    [ "The " <> prettyOrdinal i <> " input to the " <> txt <> " operator is expected to be" ]
     expected given
 prettyTypeMismatch ExpectRegulativePartyContext expected given =
   standardTypeMismatch [ "The PARTY clause of a regulative rule is expected to be of type" ] expected given
@@ -5869,7 +5868,7 @@ prettyMismatchedTypes expected given
 
 prettyOptionallyNamedType :: OptionallyNamedType Resolved -> Text
 prettyOptionallyNamedType (MkOptionallyNamedType _ Nothing  t) =
-  "an unnamed argument of type " <> prettyLayout t <> " (this is most likely an internal error)"
+  "an unnamed input of type " <> prettyLayout t <> " (this is most likely an internal error)"
 prettyOptionallyNamedType (MkOptionallyNamedType _ (Just r) t) =
   prettyLayout r <> " of type " <> prettyLayout t
 

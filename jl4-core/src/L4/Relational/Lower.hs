@@ -395,8 +395,8 @@ preArgs env rng sig = traverse look sig.csPre
     Just v  -> pure (RTVar v)
     Nothing ->
       bailIn env rng LEUnbound
-        ( "`" <> sig.csName.rnBase <> "` is a local helper that needs an enclosing binder"
-            <> " which is not a variable at this call site" )
+        ( "`" <> sig.csName.rnBase <> "` is a local helper that needs an input from the rule"
+            <> " around it, but at this call site that input is not a simple name" )
 
 -- ---------------------------------------------------------------------------
 -- Sorts

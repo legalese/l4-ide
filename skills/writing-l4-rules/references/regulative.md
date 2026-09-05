@@ -171,7 +171,7 @@ entry 4.3, for the measured forms.
 
 **There is no `BEFORE` for an absolute deadline in this release.** `MUST pay BEFORE 30` does not
 read as a deadline at all — the parser takes it as applying the action to two arguments, and the
-check fails with `You are trying to apply pay … (which is not a function) to 2 arguments here`
+check fails with `You are giving 2 inputs to pay … but it is not a function, so it takes none`
 (probe `g14-before-deadline.l4`, exit 1). Use `WITHIN`.
 
 ---

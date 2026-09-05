@@ -238,7 +238,7 @@ There are two placements:
 
 The per-argument form comes with two constraints:
 
-- **Parenthesize the EXACTLY argument** whenever the action has more than one argument. EXACTLY greedily consumes everything to its right, so `MUST transfer EXACTLY 100 recipient` is read as a single EXACTLY expression spanning `100 recipient` and fails to typecheck ("transfer expects 2 arguments, but you are applying it to 1"). Write `MUST transfer (EXACTLY 100) recipient` instead. For a single-argument action, `MUST pay EXACTLY 100` needs no parentheses.
+- **Parenthesize the EXACTLY argument** whenever the action has more than one argument. EXACTLY greedily consumes everything to its right, so `MUST transfer EXACTLY 100 recipient` is read as a single EXACTLY expression spanning `100 recipient` and fails to typecheck ("transfer expects 2 inputs, but here it is given 1 input"). Write `MUST transfer (EXACTLY 100) recipient` instead. For a single-argument action, `MUST pay EXACTLY 100` needs no parentheses.
 - **Order EXACTLY arguments before pattern binders.** A binder to the left of an EXACTLY argument -- e.g. `MUST transfer amt (EXACTLY Bob)` -- is currently rejected at evaluation time with an internal "not in scope" error. Until that limitation is lifted, put the exact arguments first: `MUST transfer (EXACTLY 100) recip` works, matching the amount exactly while still binding `recip`.
 
 ### Syntax

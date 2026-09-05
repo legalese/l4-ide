@@ -724,11 +724,11 @@ Three parts of the ruling that are easy to get wrong:
    node whose head is a record binder:
 
    ```
-   You are trying to apply
+   You are giving 1 input to
 
      transfer (defined at single-line.l4:9:21-29) of type Transfer
 
-   (which is not a function) to 1 argument here.
+   but it is not a function, so it takes none.
    ```
 
    Measured 2026-08-03 (`l4 check` exit 1). The `...` form checks clean, preserves the OR semantics
