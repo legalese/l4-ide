@@ -5271,7 +5271,7 @@ prettyCheckError (AmbiguousImplicitSupply callee binder)   =
   , ""
   , "  " <> quotedName (getName binder)
   , ""
-  , "but " <> quotedName (getName callee) <> " reads more than one binder of that"
+  , "but " <> quotedName (getName callee) <> " reads more than one input of that"
   , "name, and this one is neither of them, so there is no way to tell which was"
   , "meant."
   , ""
@@ -5283,10 +5283,10 @@ prettyCheckError (RestatedSectionBinder n)                 =
   , ""
   , "  " <> quotedName n
   , ""
-  , "so this GIVEN would give one name two binders. Delete it: the section's"
+  , "so this GIVEN would give one name two inputs. Delete it: the section's"
   , "value flows into this definition on its own."
   , ""
-  , "If a different value is meant here, name the parameter something else, or"
+  , "If a different value is meant here, give this one another name, or"
   , "write the variation at the call:"
   , ""
   , "  <callee> WITH " <> prettyLayout n <> " IS <value>"
@@ -5297,7 +5297,7 @@ prettyCheckError (MisattachedSectionGiven n mSection)       =
   , ""
   , "  " <> quotedName n
   , ""
-  , "If " <> quotedName n <> " was meant as a binder for the whole of"
+  , "If " <> quotedName n <> " was meant as an input for the whole of"
   , ""
   , "  " <> maybe "this section" (("\167 " <>) . prettyLayout) mSection
   , ""

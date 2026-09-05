@@ -12,7 +12,7 @@ File: section-given-ambiguous-supply.l4
 
       `foo`
 
-    but `g` reads more than one binder of that
+    but `g` reads more than one input of that
     name, and this one is neither of them, so there is no way to tell which was
     meant.
 

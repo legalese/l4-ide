@@ -12,10 +12,10 @@ File: section-given-restated.l4
 
       `the rate`
 
-    so this GIVEN would give one name two binders. Delete it: the section's
+    so this GIVEN would give one name two inputs. Delete it: the section's
     value flows into this definition on its own.
 
-    If a different value is meant here, name the parameter something else, or
+    If a different value is meant here, give this one another name, or
     write the variation at the call:
 
       <callee> WITH `the rate` IS <value>
