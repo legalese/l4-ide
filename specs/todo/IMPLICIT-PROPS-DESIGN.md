@@ -805,6 +805,16 @@ through on the first pass. It is structural rather than a path list so that it a
 rewrites still owed in `jl4/experiments` and `jl4/tests-cli`, where it refuses 10 further sites that
 no path list would have named. The compiler repair is **open**, and it is owed before item 7.
 
+**`ok/tdnr.l4` and `ok/misc.l4` are left un-migrated deliberately, as that repair's acceptance test.
+Do not migrate them as tidying-up.** They read like two files the sweep missed; they are the pass
+condition. The repair is done when `resolveSectionGiven` consumes each elaboration at most once, so
+repeated names map to distinct binders, and those two files come out of the script's `overload`
+refusal list and into the sweep with nothing else changed. The test runs in **both** directions,
+which is why the marker is two files and not one: `macma3.l4`'s two suppressed "multiple
+definitions" errors must come back, **and** `ok/tdnr.l4` — which exists precisely to require that
+two definitions sharing a name at different types coexist and resolve by type — must stay green. A
+fix that revives the first while breaking the second has moved the defect, not repaired it.
+
 #### Finding 2: the IDE's one code action inserts the deprecated spelling. RULED 2026-09-05: it lands with item 5, not with item 6.
 
 `jl4-lsp` has exactly one code action, `outOfScopeAssumeQuickFix`
