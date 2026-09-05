@@ -233,11 +233,20 @@ allowed values`); Camunda 8.7.6 returns the `null` **silently**. One artifact, t
   error and widening the table does. The pre-repair shape is kept as a negative control in
   `jl4/tests-cli/fixtures/dmn-refuse-enum/unwidened.dmn`.
 
-**The dmnmd projection of this module is an empty document**, and that is the second
-per-backend image rather than a defect in the fixture: dmnmd's cell grammar is a number, an
-integer range, or a bare token, with no `null` and no date, so all three tables are omitted
-and `refuse.md.fidelity.txt` says so ten times by name. A bare `null` cell would be read
-back as the _string_ `"null"`, which is the one outcome worse than omission.
+**The dmnmd projection of this module carries no tables**, and that is the second per-backend
+image rather than a defect in the fixture: dmnmd's cell grammar is a number, an integer
+range, or a bare token, with no `null` and no date, so all three tables are omitted. A bare
+`null` cell would be read back as the _string_ `"null"`, which is the one outcome worse than
+omission.
+
+What `refuse.dmn.md` **does** carry is one `<!-- OMITTED: … -->` marker per dropped decision.
+That was added 2026-09-05 on a measurement: `l4 export --to dmn-md` exits 0, prints a
+one-line tally on stderr, and used to write a file holding a heading and nothing else — so
+the committed artifact said nothing whatever about what was missing, and a reader or a
+reviewer diffing it had no way to tell. Every `.dmn.md` golden in this directory gained
+markers in the same change; the `dmnmd -f md -t l4` round trip was verified byte-identical
+on all eleven, because dmnmd separates tables on any line not starting with `|` and names a
+table from the last heading before it, so a comment is inert to both rules.
 
 ## The fidelity report
 

@@ -53,14 +53,19 @@
 -- table does. The pre-repair KIE error is pinned as a negative control in
 -- `not-ok/refuse-enum-unwidened.dmn`, so the divergence cannot quietly return.
 --
--- THE dmnmd PROJECTION OF THIS MODULE IS EMPTY, and that is the finding rather
--- than a defect in the fixture. `refuse.dmn.md` is a heading and nothing else,
--- because dmnmd's cell grammar — a number, an integer range, or a bare token —
--- has no `null` and no date, so every table here is omitted. `refuse.md.
--- fidelity.txt` says so ten times, by name. Read that pair together: the second
--- per-backend image of a refusal is "the markdown carrier cannot carry it at
--- all", stated loudly, and a bare `null` cell would have been read back by
--- dmnmd as the STRING "null", which is the one outcome worse than omission.
+-- THE dmnmd PROJECTION OF THIS MODULE CARRIES NO TABLES, and that is the
+-- finding rather than a defect in the fixture: dmnmd's cell grammar — a number,
+-- an integer range, or a bare token — has no `null` and no date, so every table
+-- here is omitted. A bare `null` cell would be read back by dmnmd as the STRING
+-- "null", which is the one outcome worse than omitting the table.
+--
+-- What `refuse.dmn.md` DOES carry is one `<!-- OMITTED: … -->` marker per
+-- dropped decision, naming it and saying why. That was added 2026-09-05 after
+-- measuring what a user actually gets: `l4 export --to dmn-md` exits 0, prints
+-- a one-line tally on stderr, and used to write a file containing a heading and
+-- nothing else — so the committed artifact, the thing a reader opens and a
+-- reviewer diffs, said nothing whatever about the tables it was missing.
+-- `refuse.md.fidelity.txt` still carries the located list with codes.
 --
 -- WHAT THIS EXHIBIT DOES NOT SHOW. It does not migrate any legal-corpus site:
 -- `regcf.l4`, `dmn/gst-rate.l4` and `dmn/ymd-dates.l4` still spell their

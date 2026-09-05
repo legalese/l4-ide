@@ -4178,8 +4178,9 @@ cast to BusinessKnowledgeModel` inside `parse()` and rejects the entire DRG**, i
   (`No rule matched for decision table … Setting result to null`) and nothing at all on zeebe-dmn.
   R9's completeness argument is untouched by either: an omitted floor row makes the table
   incomplete over the date axis, which is the trade §3.3.1 consequence 1 already told R9 not to
-  make. If D6's half is preferred on the strength of KIE's warning, it is an amendment to R9 and to
-  §11.9.1, not a second spelling alongside them.
+  make. **Ruled by Meng 2026-09-05 on the conflict, with that warning and its cost in hand: R9's
+  floor row stands.** Were it ever revisited it would be an amendment to R9 and to §11.9.1, not a
+  second spelling alongside them.
 
 - **R10 — the interval-table recogniser is a peephole over two idioms, and refuses loudly.
   ANSWERED 2026-07-30, see §15.3. AMENDED 2026-08-02 by §15.4.1: `YMD` moved OUT of the

@@ -743,7 +743,14 @@ and red-with-that-message on the second, **and Camunda green on both**. The posi
 equally consistent with KIE having stopped checking `<outputValues>` at all, which is exactly what
 the step claims to exclude. If either half moves, the widening is re-ruled rather than re-blessed.
 
-### 11.9.3 D6's DMN half — NOT taken, and why. Reported 2026-09-05.
+### 11.9.3 D6's DMN half — NOT taken. RULED by Meng 2026-09-05 on the conflict.
+
+**THE RULING. Keep D1's image: the refusing row stays and answers `null`.** Ruled by Meng
+2026-09-05 on the conflict between D1 and D6 option 3, **having been shown the omission variant's
+per-evaluation KIE warning and its cost in the reason string and the `@ref`** — that is, decided
+_with_ the counter-evidence in hand, not in ignorance of it. The table of measurements below is
+what he was shown. D6's long-run option 4 (the gate is a property of the rule-version axis) stands
+unchanged.
 
 D6 (accepted 2026-09-05) rules the pre-commencement gate to be a property of the rule-version axis
 in the long run, and says its DMN half lands first as option 3: **"the refusing row is omitted, and
@@ -801,10 +808,11 @@ real point for D6 and it is recorded here rather than argued away. What it buys 
 `@ref` citation and the `<description>`, at export time, on both engines. Both images are equally
 loud in the FIDELITY REPORT, which carries `D-REFUSE` either way.
 
-**This is a ruling for Meng, not for the deputy who measured it.** D1 as accepted says do not omit,
-and that is what shipped. If D6's half is preferred on the strength of KIE's WARN, the change is
-one arm of `datedTable`'s `ruleSpecs` and its goldens, and it should be taken as an amendment to
-§11.9.1 rather than as a second image alongside it.
+**Ruled 2026-09-05: D1's image stands.** The KIE warning is real and one-engine-only and
+per-evaluation; what omission costs is the author's sentence, the `@ref` and the `<description>`,
+at export time, on both engines. Meng saw both sides and kept the row. Should this ever be
+revisited, the change is one arm of `datedTable`'s `ruleSpecs` and its goldens, and it would be an
+amendment to §11.9.1 rather than a second image alongside it.
 
 ### 11.10 R10 — Backends. RULED 2026-09-04 (marked accept).
 

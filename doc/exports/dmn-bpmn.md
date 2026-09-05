@@ -142,9 +142,12 @@ domain is left exactly as L4 wrote it: only the table that can decline says that
 - Refusal is order-dependent under lazy `AND`/`OR` in L4 (`FALSE AND x` answers, `x AND FALSE`
   refuses) and FEEL's logic is not, so a refusal buried inside a boolean can move.
 - The **markdown carrier** (`--to dmn-md`) cannot carry a refusal at all. dmnmd's cell grammar is a
-  number, an integer range, or a bare token, with no `null`, so a refusing table is **omitted** and
-  the markdown fidelity report says so once per table. A bare `null` cell would be read back as the
-  _string_ `"null"`, which is the one outcome worse than omitting the table.
+  number, an integer range, or a bare token, with no `null`, so a refusing table is **omitted**. A
+  bare `null` cell would be read back as the _string_ `"null"`, which is the one outcome worse than
+  omitting the table. The omission is not silent: the markdown itself carries an
+  `<!-- OMITTED: … -->` marker naming each dropped decision and why, and the fidelity report
+  carries the located list with codes. Note that `--to dmn-md` still **exits 0** — read the marker,
+  or pass `--fail-on blocking`.
 - `l4 verify` does not model refusals; see [REFUSE](../reference/control-flow/REFUSE.md).
 
 The worked example is `jl4/examples/dmn/refuse.l4` — one of each position a refusal can occupy — and
