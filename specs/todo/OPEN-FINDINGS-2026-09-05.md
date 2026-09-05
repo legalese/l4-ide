@@ -131,12 +131,15 @@ helper: `Print.hs:588`, `Names.hs:77`, `Export.hs:455`.
 the shape the corpus sweep produces wherever a section acquires a binder while keeping an overloaded
 `ASSUME` of the same name.
 
-**The "zero instances today" bound is dated and expires on a known event.** On `b2a3faac`, 7 `.l4`
-files carry a section binder (13 sites) and none pairs one with a hand-written overloaded `ASSUME`.
-On `props/assume-sweep` it is **76 files / 110 sites** (measured 2026-09-05, counting a `GIVEN`
-indented past a `§` on the line after the heading). The bound expires when that branch lands, or
-sooner if anyone hand-writes the pair. **Do not quote "zero instances" without the date and the
-ref.**
+**The "zero instances today" bound HAS EXPIRED. Restated from the current tree.** It was written
+against `b2a3faac`, where 7 `.l4` files carried a section binder (13 sites). Re-measured on
+`origin/unstable` **`063ddd34`** (after #337 and #344): **93 files / 140 sites** of 854 `.l4` files,
+counting a `GIVEN` indented past a `§` on the line after the heading. That is a thirteen-fold
+growth in the population this defect needs, in one evening. What has **not** been re-measured is
+how many of the 93 pair a section binder with a hand-written overloaded `ASSUME` of the same name,
+which is the actual trigger — so the honest statement is that the _bound_ is gone and the _count_
+is unknown, not that the count is still zero. **Do not quote "zero instances"; it was a property of
+a tree that no longer exists.**
 
 ---
 
@@ -404,10 +407,19 @@ all — `jl4-core/libraries/daydate.l4:104`, `jl4/examples/legal/regcf/regcf.l4:
 — and **all four lines are refusal-role**, so none of them is in the discharge population. (The
 card said "every one at `ASSUME` = 0 except regcf's two"; it missed `daydate` and the vendored
 prelude. Its conclusion is unchanged and slightly strengthened: **zero term-role `ASSUME`s live in
-an imported module today.**) Section `GIVEN` exists in only 7 files on `b2a3faac`, all fixtures added by
-PR #333, and none of them is imported — **but that is a dated bound on one ref**: on
-`props/assume-sweep` it is 76 files, and any of them that another module imports puts this defect
-in reach. Re-measure before quoting the exposure. (`gm-discharge` measured the same independently and recorded the same
+an imported module today.**) ~~Section `GIVEN` exists in only 7 files on `b2a3faac`, all fixtures added by PR #333, and none of
+them is imported.~~ **THAT BOUND HAS EXPIRED, and the exposure is no longer zero.** Re-measured on
+`origin/unstable` **`063ddd34`**: **93 files carry a section binder** (140 sites), and **one of them
+is imported** — `jl4/examples/legal/regcf/regcf.l4`, which acquired a section `GIVEN` at `:468` in
+the sweep and is imported by `jl4/examples/legal/regcf/regcf-wizard.l4`, a file carrying **eight**
+`@export`s. That is the first time the two halves of this defect have met in the corpus rather than
+in a probe.
+
+**Whether it bites is a separate question and is NOT yet measured.** `regcf.l4`'s binder is the
+COVID refusal, reached from one arm, so an exported decision in the wizard only trips this if its
+read-set actually reaches that name. The decisive test is
+`l4 batch jl4/examples/legal/regcf/regcf-wizard.l4 --validate-only` against a row for each of the
+eight exports, compared with what an actual run does. **Run it before quoting either answer.** (`gm-discharge` measured the same independently and recorded the same
 deferral.) **After discharge the exposed population is
 every file that imports a migrated domain module** — 664 `ASSUME` lines in 105 files become section
 binders in exactly the modules other files import, which is R0's committed cost arriving.

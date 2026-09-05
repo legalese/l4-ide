@@ -1445,9 +1445,25 @@ contribution, so `h MEANS alpha PLUS (g WITH beta IS 100)` no longer carries
 schema is keyed off the discharged AST and would otherwise list it as required.
 Edges are per call site, not per callee: a definition called once with a `WITH`
 and once positionally in the same body still contributes its full read-set
-through the second call. Measured cost on `legal/regcf/regcf.l4` (86 directives):
-0.70 s, against 0.73 s undischarged — none. Ported from the review branch's
-`69cbbef6`, whose own measurement was 0.77 s.
+through the second call.
+
+**Cost, corrected 2026-09-05.** An earlier version of this section said "0.70 s
+against 0.73 s undischarged — none", and cited the review branch's 0.77 s as
+agreeing. Both figures were real and neither was comparable: they were taken
+_before_ the `ASSUME` sweep gave `legal/regcf/regcf.l4` a section `GIVEN` at line
+468, when `dischargeModule` was the identity on that file and genuinely free.
+Re-measured post-sweep, five interleaved pairs on one machine under one load:
+**baseline median 0.77 s against 1.19 s, so ~1.6x, +0.44 s.** Corpus-wide it is
+invisible — all 344 files under `jl4/examples/ok`, `jl4/examples/legal` and
+`jl4-core/libraries`, alternating runs, 86 s/88 s baseline against 87 s/88 s —
+because only a file that carries a section `GIVEN` and has a large call graph
+pays; the rest hit `dischargeModule`'s empty-binder early exit. **Not isolated:**
+whether the 1.6x is this fixpoint or discharge as a whole is unmeasured.
+
+The rule this cost us, worth more than the number: **a performance figure without
+the corpus it was taken on is not a figure.** Two true measurements disagreed for
+a week's worth of confusion in one evening because neither said which corpus it
+ran on.
 
 **The `TYPICALLY` call-graph edge is gone.** `readSets` used to add each binder's
 default as an edge keyed by the binder's own `Unique`. A default is literal-only
