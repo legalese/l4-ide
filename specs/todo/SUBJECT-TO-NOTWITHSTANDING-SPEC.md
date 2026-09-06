@@ -1063,6 +1063,7 @@ Settled by measurement, and recorded here as the answer to §8 item 1 for the re
   a derived name in a reserved namespace.
 - **Q3.** Whether selector reads (§10.7) are the same construct returning a provision, or a
   different one.
+
 ## 11. Defeasance by Recorded Act: the Discretionary Override
 
 > Added 2026-08-28, distilled from a design conversation (session `paper-residuals`) building on
