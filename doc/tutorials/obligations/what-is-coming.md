@@ -62,6 +62,8 @@ The specification calls this shape a **"fork"**: the group splits into its membe
 
 _A note on the words, because it is the part most likely to change. The specification's own discussion records that `EVERY` and `EACH` may not survive contact with a first-time reader, and it records a proposal to call the two shapes "jointly" and "severally" instead — The research done that night recommends against it, and no ruling has yet been made. Those words carry a settled legal meaning, about who may be sued and whether one person's payment discharges the rest, which is not this distinction — and on the point of discharge it is the opposite: a joint promisor's payment discharges the others, where under everyone-then-one-thing nobody's act does anything for anyone else. The alternative the research prefers is to mark the shape on the follow-on line itself, so that one word serves for both: `HENCE ONCE ALL HAVE …` for everyone-then-one-thing, and `HENCE FOR EACH …` for each-with-its-own. Which spelling ships is not decided. What is decided is the pair of shapes._
 
+_One thing about the words is settled (7 September 2026). The word after `EVERY` or `EACH` names the kind of party, as `Flatmate` does above, and it is that word which picks out the group; `EVERY f` with no kind word means every party there is. Whether the two words themselves stay `EVERY` and `EACH` is the part still open._
+
 ---
 
 ## 3. Enough of Them

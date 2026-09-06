@@ -239,6 +239,8 @@ _When the same obligation falls on everyone in a group, what can be said about t
 
 _Proposed, not landed (2026-09-06): everything in this section. The design is `specs/todo/EVERY-EACH-QUANTIFIER-SPEC.md`; its section on "enough of them" was added on 2026-09-06. Nothing here runs, and the spellings are the design document's current ones. [What Is Coming](../../tutorials/obligations/what-is-coming.md) gives each piece a page's worth of explanation._
 
+_Settled on 7 September 2026: the word after `EVERY` or `EACH` names the kind of party and picks out the group, as `Flatmate` does in the table; `EVERY f` with no kind word means every party there is._
+
 Three pieces, each answering a question the others do not:
 
 | Piece                    | Question                                              | Proposed spelling                                                     |
