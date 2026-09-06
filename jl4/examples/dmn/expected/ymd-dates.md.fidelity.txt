@@ -20,6 +20,9 @@ fidelity report — dmnmd
   [D-MD-CELLSYNTAX] blocking — decision_the_regime_that_applies
       rule decision_the_regime_that_applies_r3 has a cell dmnmd cannot read (a DATE cell -- dmnmd's cell grammar has no date datatype at all), so this table is omitted
       lost: the whole table
+  [D-MD-NOLITERAL] blocking — decision_no_fee_is_prescribed_before_commencement_on_1983_01_01
+      `no fee is prescribed before commencement on 1983-01-01` REFUSES: it declines to answer, which DMN spells as the FEEL literal `null` and dmnmd cannot spell at all -- dmnmd has neither a boxed-expression form nor any way to say `declined` -- so the decision is omitted. The author's reason survives in the XML artifact, on this decision's <description>: REFUSE: no fee is prescribed before commencement on 1983-01-01
+      lost: the decision itself, AND the fact that it declines: a reader of the markdown alone sees neither the rule nor its absence
   [D-MD-CELLSYNTAX] blocking — decision_the_filing_fee
       rule decision_the_filing_fee_r1 has a cell dmnmd cannot read (a DATE cell -- dmnmd's cell grammar has no date datatype at all), so this table is omitted
       lost: the whole table

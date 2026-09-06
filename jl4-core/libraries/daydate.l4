@@ -99,9 +99,13 @@ GIVETH A DATE
 -- The pair is deliberate: YMD is the STRICT constructor for literals;
 -- `Date d m y` is unchanged as the LENIENT, rolling constructor, which date
 -- arithmetic relies on (`Date 1 (month PLUS 6) year` is idiomatic). The
--- refusal is a deliberate ASSUME bottom: evaluation that reaches it stops
--- with "... is an assumed term", naming the binding below.
-ASSUME `YMD refused an out-of-range month or day` IS A DATE
+-- refusal is a deliberate REFUSE: evaluation that reaches it stops with the
+-- reason below, and no rule can turn it back into a date. (Until 2026-09-06
+-- this was an `ASSUME … IS A DATE` bottom, which displayed as its own name
+-- and only stopped evaluation when forced.)
+GIVETH A DATE
+`YMD refused an out-of-range month or day` MEANS
+    REFUSE "YMD refused an out-of-range month or day"
 
 GIVEN year  IS A NUMBER
       month IS A NUMBER

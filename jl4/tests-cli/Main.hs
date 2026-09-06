@@ -2273,16 +2273,17 @@ spec bin = do
   -- The LAW-TIME legs (spec §15). What is being asserted here that nothing
   -- else asserts: the SAME model answers DIFFERENTLY for different rule dates,
   -- in a real engine, driven only by half-open date intervals on a UNIQUE
-  -- table. `66/66 value(s) as expected` over ELEVEN cases is the claim -- eleven
-  -- rule dates x six decisions (Phase 5 moved the seventh, `the rules in force
-  -- include`, to a businessKnowledgeModel, which the cases schema cannot
-  -- assert -- its logic is exercised through the interval endpoints D2 inlined
-  -- it into) -- and seven of those ten cases exist purely to pin the interval
-  -- convention: a day-of/day-before pair on each of the three seams, plus a
-  -- rule date well before commencement. The eleventh (2026-09-05, ruling D1) is
-  -- the first that does NOT supply the floor value: F and J ask below
-  -- commencement but hand the model -1 and expect -1 back, so they never reach
-  -- the bottom the floor arm names.
+  -- table. `77/77 value(s) as expected` over ELEVEN cases is the claim -- eleven
+  -- rule dates x seven decisions (Phase 5 moved `the rules in force include`
+  -- to a businessKnowledgeModel, which the cases schema cannot assert -- its
+  -- logic is exercised through the interval endpoints D2 inlined it into; and
+  -- since 2026-09-06 the pre-commencement floor is a REFUSE, so it is a
+  -- decision answering null in every case rather than an input handed in as
+  -- -1: 66 became 77) -- and seven of those cases exist purely to pin the
+  -- interval convention: a day-of/day-before pair on each of the three seams,
+  -- plus a rule date well before commencement. F, J and K all reach the floor
+  -- now; until the migration F and J handed the model -1 and expected -1 back,
+  -- so only K (2026-09-05, ruling D1) reached the bottom the floor arm names.
   describe "law time on a date axis (opt-in: L4_DMN_ENGINE_CHECK=1)" $ do
     it "KIE answers the dated-regime exhibit correctly for eleven rule dates" $
       dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
@@ -2293,8 +2294,8 @@ spec bin = do
           -- DMNShape, or KIE raises WARN [DMNDI_MISSING_DIAGRAM] (measured
           -- 2026-08-01; the shape row above the decisions exists for this).
           out `shouldSatisfy` ("0 warning(s)" `isInfixOf`)
-          out `shouldSatisfy` ("66/66 decision(s) SUCCEEDED" `isInfixOf`)
-          out `shouldSatisfy` ("66/66 value(s) as expected" `isInfixOf`)
+          out `shouldSatisfy` ("77/77 decision(s) SUCCEEDED" `isInfixOf`)
+          out `shouldSatisfy` ("77/77 value(s) as expected" `isInfixOf`)
 
     it "Camunda answers the dated-regime exhibit correctly for eleven rule dates" $
       dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
@@ -2302,8 +2303,8 @@ spec bin = do
           out `shouldSatisfy` ("Camunda 8.7.6 (zeebe-dmn) VERDICT" `isInfixOf`)
           out `shouldSatisfy` ("1 parsed" `isInfixOf`)
           out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
-          out `shouldSatisfy` ("66/66 decision(s) evaluated" `isInfixOf`)
-          out `shouldSatisfy` ("66/66 value(s) as expected" `isInfixOf`)
+          out `shouldSatisfy` ("77/77 decision(s) evaluated" `isInfixOf`)
+          out `shouldSatisfy` ("77/77 value(s) as expected" `isInfixOf`)
 
     -- The hand-written probe PAIR. It is NOT redundant with the exhibit above:
     -- the emitter cannot generate an <annotationEntry> carrying an @id, so only

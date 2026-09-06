@@ -8,6 +8,8 @@
 
 <!-- OMITTED: `GST commenced` — a formula (date("1994-04-01")), and dmnmd has no boxed-expression form. Located, with its code, in the fidelity report. -->
 
+<!-- OMITTED: `no GST rate exists before commencement on 1994-04-01` — this decision REFUSES, and dmnmd has no way to say `declined` (REFUSE: no GST rate exists before commencement on 1994-04-01). Located, with its code, in the fidelity report. -->
+
 <!-- OMITTED: `GST rate percent` — a cell outside dmnmd's grammar. Located, with its code, in the fidelity report. -->
 
 <!-- OMITTED: `tourist refund minimum spend` — a cell outside dmnmd's grammar. Located, with its code, in the fidelity report. -->

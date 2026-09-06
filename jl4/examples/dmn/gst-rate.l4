@@ -60,9 +60,13 @@ GIVETH A DATE
 `GST commenced` MEANS Date 1 4 1994
 
 -- Before commencement there is no GST to answer for, so a rule date earlier
--- than 1994-04-01 is a curated refusal rather than an answer. Same device, and
--- the same reasoning, as the Reg CF corpus's ASSUME floor.
-ASSUME `no GST rate exists before commencement on 1994-04-01` IS A NUMBER
+-- than 1994-04-01 is a curated refusal rather than an answer. Same device as
+-- the Reg CF corpus's floor, spelled as one named REFUSE, which the exporter
+-- lowers to FEEL `null` with the reason on the refusing row (ruling D1;
+-- `refuse.l4` is the exhibit; REFUSE.md says why the corpus itself waits).
+GIVETH A NUMBER
+`no GST rate exists before commencement on 1994-04-01` MEANS
+    REFUSE "no GST rate exists before commencement on 1994-04-01"
 
 GIVEN change IS A DATE
 GIVETH A BOOLEAN
