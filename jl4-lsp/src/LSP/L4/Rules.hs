@@ -974,7 +974,12 @@ jl4Rules evalConfig rootDirectory recorder = do
         , _codeDescription = Nothing
         , _source = Just "check"
         , _message = Text.unlines (TypeCheck.prettyCheckError checkError.kind)
-        , _tags = Nothing
+          -- The deprecation warning is tagged so that editors render the
+          -- ASSUME the way they render any other deprecated spelling
+          -- (typically struck through), on top of the warning squiggle.
+        , _tags = case checkError.kind of
+            TypeCheck.CheckWarning (TypeCheck.DeprecatedAssume {}) -> Just [LSP.DiagnosticTag_Deprecated]
+            _                                                      -> Nothing
         , _relatedInformation = Nothing
         , _data_ = Nothing
         }

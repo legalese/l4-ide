@@ -442,3 +442,141 @@ typeFunction :: Kind -> Type' Resolved
 typeFunction 0 = Type emptyAnno
 typeFunction n | n > 0 = Fun emptyAnno (replicate n (MkOptionallyNamedType emptyAnno Nothing (Type emptyAnno))) (Type emptyAnno)
 typeFunction _ = error "Internal error: negative arity of type constructor"
+
+-- ----------------------------------------------------------------------------
+-- The out-of-scope quick fix: declare the name as a GIVEN
+-- ----------------------------------------------------------------------------
+
+-- | What the out-of-scope quick fix does: a title for the editor's menu and
+-- the one insertion that carries it out. See 'outOfScopeGivenFix'.
+data GivenFix = MkGivenFix
+  { title :: Text
+  , edit  :: TextEdit
+  }
+  deriving stock (Eq, Show)
+
+-- | The quick fix for a name @n@ that no definition supplies, of inferred
+-- type @ty@.
+--
+-- Until 2026-09-06 this inserted @ASSUME n IS A ty@ above the enclosing
+-- declaration — the spelling IMPLICIT-PROPS-DESIGN.md §11.1 deprecates and
+-- the checker now warns about ('L4.TypeCheck.Types.DeprecatedAssume'), so the
+-- IDE's one automated repair generated code the same release warns about
+-- (§11.14 Finding 2). It now declares the name the ruled way:
+--
+--  * under the nearest enclosing @§@ heading, as a parameter of that section's
+--    @GIVEN@ (R4): appended to the section's existing @GIVEN@ block, aligned
+--    with its first parameter, or as a new @GIVEN@ line right after the
+--    heading, indented four columns past the @§@ — the spelling
+--    @doc/reference/syntax/section-given.md@ teaches;
+--
+--  * where the use sits under no heading at all — the case the migration
+--    script refuses as @root-section@ — as a parameter of the enclosing
+--    declaration's own @GIVEN@, the rule @GIVEN@ that
+--    @doc/reference/types/ASSUME.md@ teaches for exercising a rule inside the
+--    file: appended to an existing @GIVEN@, or inserted as a new line above
+--    the declaration's own first line (the @GIVETH@ when it has one, else the
+--    head), so that any annotation above the declaration stays above it.
+--
+-- 'Nothing' when the type still has an inference variable (there is no
+-- snippet support to leave a hole for the author), or when no @DECIDE@ or
+-- @MEANS@ encloses the use.
+outOfScopeGivenFix :: Module Resolved -> Name -> Type' Resolved -> Maybe GivenFix
+outOfScopeGivenFix (MkModule _ _ rootSection) name ty = do
+  guard (not (hasTypeInferenceVars ty))
+  target <- rangeOf name
+  let param = prettyLayout name <> " IS A " <> prettyLayout ty
+  case innermostNamedSection target.start rootSection of
+    Just sec -> sectionGivenFix sec param
+    Nothing  -> do
+      decide <- enclosingDecide target.start rootSection
+      ruleGivenFix decide param
+  where
+    shown = quotedName name
+
+    -- The named section nearest to the use: sections nest by containment, so
+    -- the last named one whose range holds the position wins.
+    innermostNamedSection :: SrcPos -> Section Resolved -> Maybe (Section Resolved)
+    innermostNamedSection pos = go Nothing
+      where
+        go best sec@(MkSection _ mn _ _ decls) =
+          let best' = case (mn, rangeOf sec) of
+                (Just _, Just r) | pos `inRange` r -> Just sec
+                _                                  -> best
+          in List.foldl' (\ b d -> case d of Section _ s -> go b s; _ -> b) best' decls
+
+    enclosingDecide :: SrcPos -> Section Resolved -> Maybe (Decide Resolved)
+    enclosingDecide pos (MkSection _ _ _ _ decls) = asum (map go decls)
+      where
+        go = \ case
+          Decide _ d | Just r <- rangeOf d, pos `inRange` r -> Just d
+          Section _ s                                        -> enclosingDecide pos s
+          _                                                  -> Nothing
+
+    sectionGivenFix :: Section Resolved -> Text -> Maybe GivenFix
+    sectionGivenFix sec@(MkSection _ mn maka mgiven _) param = do
+      heading <- mn
+      let headingShown = "§ " <> quotedName (getName heading)
+      case mgiven of
+        Just (MkGivenSig _ otns@(_ : _)) -> do
+          ins <- appendParameter otns param
+          pure (MkGivenFix ("Add " <> shown <> " to the GIVEN of " <> headingShown) ins)
+        _ -> do
+          secRange     <- rangeOf sec
+          headingRange <- rangeOf heading
+          let lastHeadingLine = maximum (headingRange.end.line : [ r.end.line | Just aka <- [maka], Just r <- [rangeOf aka] ])
+              col   = secRange.start.column + 4
+              text  = Text.replicate (col - 1) " " <> "GIVEN " <> param <> "\n"
+          pure (MkGivenFix ("Declare " <> shown <> " as a GIVEN of " <> headingShown)
+                           (insertAtLineStart (lastHeadingLine + 1) text))
+
+    ruleGivenFix :: Decide Resolved -> Text -> Maybe GivenFix
+    ruleGivenFix (MkDecide _ (MkTypeSig _ (MkGivenSig _ otns) mGiveth) appForm _) param = do
+      let ruleShown = quotedName (getName appForm)
+      case otns of
+        (_ : _) -> do
+          ins <- appendParameter otns param
+          pure (MkGivenFix ("Add " <> shown <> " to the GIVEN of " <> ruleShown) ins)
+        [] -> do
+          -- The line the declaration's own text starts on, and its column:
+          -- the GIVETH if there is one, else the head. An annotation above
+          -- the declaration is not part of either, so it stays above.
+          anchor <- case mGiveth of
+            Just giveth -> (.start) <$> rangeOf giveth
+            Nothing     -> (.start) <$> rangeOf appForm
+          let col  = case mGiveth of
+                Just _  -> anchor.column
+                Nothing -> 1
+              text = Text.replicate (col - 1) " " <> "GIVEN " <> param <> "\n"
+          pure (MkGivenFix ("Declare " <> shown <> " as a GIVEN of " <> ruleShown)
+                           (insertAtLineStart anchor.line text))
+
+    -- A further parameter line after the last one, aligned with the first.
+    appendParameter :: [OptionallyTypedName Resolved] -> Text -> Maybe TextEdit
+    appendParameter [] _ = Nothing
+    appendParameter (firstP : rest) param = do
+      firstRange <- rangeOf firstP
+      lastRange  <- rangeOf (List.foldl' (\ _ p -> p) firstP rest)
+      let col = firstRange.start.column
+      pure (insertAtLineStart (lastRange.end.line + 1) (Text.replicate (col - 1) " " <> param <> "\n"))
+
+    insertAtLineStart :: Int -> Text -> TextEdit
+    insertAtLineStart line text =
+      TextEdit
+        { _range = pointRange (srcPosToLspPosition (MkSrcPos line 1))
+        , _newText = text
+        }
+
+-- | Does the type still carry an inference variable? A quick fix cannot
+-- spell one (LSP 3.17 has no snippet support for code actions).
+hasTypeInferenceVars :: Type' Resolved -> Bool
+hasTypeInferenceVars = \ case
+  Type   _ -> False
+  TyApp  _ _n ns -> any hasTypeInferenceVars ns
+  Fun    _ opts ty -> any hasNamedTypeInferenceVars opts || hasTypeInferenceVars ty
+  Forall _ _ ty -> hasTypeInferenceVars ty
+  InfVar {} -> True
+
+hasNamedTypeInferenceVars :: OptionallyNamedType Resolved -> Bool
+hasNamedTypeInferenceVars = \ case
+  MkOptionallyNamedType _ _ ty -> hasTypeInferenceVars ty

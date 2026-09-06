@@ -555,6 +555,104 @@ recipe (CLAUDE.md §6); (7) keyword removal, together with the dead `LocalAssume
 CORPUS-TRACK §8 amendment (§11.9). Consistent with §10.7 above and the handoff's §7 ("`ASSUME` is not simply
 to be deleted"): the refusal and type roles get their own constructs _before_ the keyword goes.
 
+#### 11.1.2 The deprecation warning, and the code action that stops offering `ASSUME`. BUILT 2026-09-06.
+
+**Ruling (Meng, 2026-09-06), verbatim: "Yes the checker should have an ASSUME deprecation warning
+but we should also just rewrite all our code to the new system using REFUSE and section givens
+etc."** This addendum is the warning half — sequencing item 5 — together with the repointing of
+the one code action that §11.14 Finding 2 tied to it. The rewrite half is the sibling branch
+`props/assume-rewrite`, which records its own sweep here when it lands.
+
+**What the warning is.** `DeprecatedAssume` in `CheckWarning`
+(`jl4-core/src/L4/TypeCheck/Types.hs`), emitted once per author-written `ASSUME` from
+`inferAssume` (`jl4-core/src/L4/TypeCheck.hs`), severity `SWarn` and never `SError`, so nothing
+that checked before stops checking and `l4 check` still exits 0. The 0-ary `ASSUME`s that
+`desugarSectionGivens` prepends for a section `GIVEN` pass through the same `inferAssume`; they
+are told apart by `isSectionBinderElaboration` — the name-based test every other consumer of the
+elaborations already uses — and never draw it, which `ok/assume-deprecated.l4` pins with a section
+`GIVEN` that must stay silent. A `WHERE`-local `ASSUME` (`LocalAssume`, the grammar item 7 removes)
+draws it too.
+
+**What it says.** The first line is fixed — _"ASSUME is an older way of introducing a name, and it
+is being retired."_ — and the rest is phrased by the job the declaration's shape says it was doing,
+read off the checked signature alone (`assumeRoleOf`):
+
+| shape                                                                                      | role     | the line it offers, pasteable                                                                                                           |
+| ------------------------------------------------------------------------------------------ | -------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `… IS A TYPE`, or `GIVETH A TYPE` above a bare `ASSUME T`                                  | type     | `DECLARE T` (with the head's parameters, `DECLARE T x`), citing §11.1.1                                                                 |
+| result type is one of the declaration's own type variables, or no type written             | any-type | none: nothing can ever supply it, so `REFUSE "<the reason>"` alone                                                                      |
+| everything else — a value, or a function (`… IS A FUNCTION FROM …`, or a head with inputs) | term     | `GIVEN name IS A type`, function type spelled out from the head's inputs, `TYPICALLY` carried across; `REFUSE` named as the alternative |
+
+The term role names `REFUSE` as well because a term-shaped refusal (`regcf.l4:143`,
+`daydate.l4:104`) is indistinguishable from a suppliable fact by shape; the rewrite half is what
+resolves those. The type role's `DECLARE T` and the term role's `GIVEN` line are what
+`etc/migrate-assume.mjs` writes, so the warning and the sweep agree. Function-typed `ASSUME` is
+warned toward a section `GIVEN` of function type, which is what the item-6 sweep did with every one
+it met (its plan carries both `term` and `function` roles to the same rewrite); no separate ruling
+exists for that role, and `doc/reference/types/ASSUME.md` said "not yet ruled — keep the `ASSUME`"
+until this addendum aligned the page with the sweep. Wording follows the diagnostic-voice rules of
+PR #349: inputs, never binders; the name on its own line, as every neighbouring message does. In the
+IDE the diagnostic additionally carries `DiagnosticTag_Deprecated`
+(`jl4-lsp/src/LSP/L4/Rules.hs`), so editors strike the `ASSUME` through.
+
+**"Never an error" had to be made true at three gates, not only in the checker.** Measured
+2026-09-07 by running `jl4-core-test` over the tree: two `UnifySpec` cases that carry an `ASSUME`
+and assert a successful check went red, because `checkWithImports`'s `tcdSuccess`
+(`jl4-core/src/L4/Import/Resolution.hs`) was `null result.errors` — "no diagnostics at all", so
+any warning, and even a `#CHECK` info, made the module unsuccessful through that one API while the
+Shake rule, `l4 check` and `jl4-service` all key on `SError`. Two more gates in
+`jl4-core/src/L4/API.hs` had the same blindness: `l4Eval` failed on anything that was not `SInfo`
+(so every warning), and `l4VisualizeByName` on any diagnostic at all; `jl4-wasm`'s `l4QueryPlan`
+copies the latter. All four now count `SError` only, which is what the checker's own `severity`
+already said. The exhaustiveness warning had been tripping them for as long as it has existed;
+the deprecation warning, which lands on far more files, is what made it visible.
+`jl4-core/test/DeprecatedAssumeSpec.hs` pins the gate (a warning-bearing module has
+`tcdSuccess = True` and exactly one `SWarn`) alongside the role classification of each shape and
+the `TYPICALLY` carry. `jl4-wasm` is not in `cabal.project`, so its edit was not compiled locally;
+the wasm CI job is the check.
+
+**Where it is tested.** `jl4/examples/ok/assume-deprecated.l4`: one `ASSUME` per role (a value, a
+function, a head with an input, a type, a type-variable result) plus the silent section `GIVEN`, and
+its four goldens; `jl4-core/test/DeprecatedAssumeSpec.hs` for the API boundary and the roles.
+Every other corpus file still carrying an `ASSUME` after the item-6 sweep gained
+the warning in its check golden and nothing else — 18 files, each diff read before blessing:
+13 under `ok/` (`assume-as-given`, `assumes`, `check-display-typevars`, `ditto`, `inert/grounding-variants`,
+`misc`, `opaque-declare`, `section-scoping-descendant-rebind`, `sections`, `signatures`, `tbd`,
+`tdnr`, `typically-basic`), `legal/regcf/regcf.l4` and `legal/regcf/denovo/regcf-denovo.l4`,
+`jl4-core/libraries/daydate.l4`, and `not-ok/tc/section-given-misattached.l4` and
+`not-ok/tc/typically-on-type.l4` (the two `not-ok/tc` files with a parse error never reach the
+checker, so their goldens are unchanged). The `lsp/semantic-tokens` fixtures keep the keyword and
+are unaffected, since token goldens carry no diagnostics. Only the entry file's own diagnostics
+reach a golden, so `daydate.l4`'s warning appears in its own golden and in none of its importers'.
+Documented for users at `doc/reference/errors/README.md` ("ASSUME is being retired", quoting the
+term-role text verbatim) and `doc/reference/types/ASSUME.md`.
+
+**The code action (§11.14 Finding 2).** `jl4-lsp`'s one code action, `outOfScopeAssumeQuickFix`,
+inserted `ASSUME n IS A ty` for an out-of-scope name. Measured 2026-09-06 before touching it: 80
+lines in `jl4-lsp/app/LSP/L4/Handlers.hs`, no test of any kind (`jl4-lsp-test` had two specs, hover
+display and library resolution, and depends on the `jl4-lsp` library, which the `app/` handler is
+not part of). It now declares the name the ruled way, and the stated fallback Finding 2 asked for is
+the rule `GIVEN` that `doc/reference/types/ASSUME.md` teaches for exercising a rule inside the file:
+
+- under the nearest enclosing `§` heading, as a parameter of that section's `GIVEN` — appended to
+  an existing block, aligned with its first parameter, or as a new `GIVEN` line right after the
+  heading, four columns past the `§` (R4);
+- under no heading at all — the migration script's `root-section` refusal — as a parameter of the
+  enclosing `DECIDE`/`MEANS`'s own `GIVEN`: appended, or inserted on the line above the
+  declaration's own first line (its `GIVETH` if it has one, else its head), so an annotation above
+  the declaration stays above it.
+
+The edit is computed by a pure function, `outOfScopeGivenFix` in `jl4-lsp/src/LSP/L4/Actions.hs`,
+so that it is testable without an IDE; the handler only fetches the checked module and wraps the
+result. `jl4-lsp/test/OutOfScopeGivenFixSpec.hs` type-checks four small modules through the real
+oneshot pipeline and asserts the position, indentation and text of each edit, plus that no edit
+ever contains the keyword. One pre-existing limit is kept and now documented in the spec: a use
+whose type is left as an inference variable (the overloaded `>=` does this to `age >= 18`) earns no
+fix, since LSP 3.17 has no snippet support to leave a hole; the old action had the same guard.
+
+**What this does not decide.** Nothing new. The compiler repair of §11.14 Finding 1 is still owed
+before item 7, and item 7 itself (keyword removal, with `LocalAssume`) is unchanged.
+
 ### 11.2 R1 — A call site is entirely positional or entirely named. RULED 2026-09-04.
 
 **Ruling (Meng, 2026-09-04, in conversation: "i'm minded to allow all positional or all by-name but
