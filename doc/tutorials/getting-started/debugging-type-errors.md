@@ -258,7 +258,7 @@ File:     err-export.l4
   Severity: DiagnosticSeverity_Error
   Message:
     Function type inputs are not supported for @export.
-    The parameter `p` has a function type.
+    The input `p` has a function type.
 ```
 
 Fix by removing the `@export` (keep the higher-order function internal) or by restructuring the exported rule to take plain data — for example, an enum value selecting among known predicates.

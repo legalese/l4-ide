@@ -123,7 +123,7 @@ bump n MEANS n TIMES `the rate`
 - **A rule's own defaulted parameter cannot yet be omitted at a named site.**
   `TYPICALLY` on a _section_ input is honoured when nobody supplies it (see
   [TYPICALLY](../types/TYPICALLY.md)); on a rule's own `GIVEN` the checker still
-  asks for the argument.
+  asks for the input.
 
 ## Example
 

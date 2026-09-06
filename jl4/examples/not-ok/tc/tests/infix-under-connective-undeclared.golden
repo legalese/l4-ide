@@ -8,7 +8,7 @@ File: infix-under-connective-undeclared.l4
   Severity: DiagnosticSeverity_Error
   Code: <none>
   Message:
-    The first argument of function 
+    The first input of function 
 
       `__OR__` (predefined)
 
@@ -31,5 +31,5 @@ File: infix-under-connective-undeclared.l4
 
       PLAIN (predefined)
 
-    expects 2 arguments,
-    but you are applying it to 4 arguments here.
+    expects 2 inputs,
+    but here it is given 4 inputs.

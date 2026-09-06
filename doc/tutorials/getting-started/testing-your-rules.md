@@ -228,7 +228,7 @@ This is useful for pinning down what a rule asks for and gives back: if a tidy-u
 File:     failing-check.l4
   Severity: DiagnosticSeverity_Error
   Message:
-    The first argument of function
+    The first input of function
 
       twice (defined at failing-check.l4:3:8-15)
 

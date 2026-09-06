@@ -2,6 +2,7 @@
 
 - [Home](README.md)
 - [Glossary](reference/GLOSSARY.md)
+- [Style: the words we lead with](STYLE.md)
 
 ## Reference
 

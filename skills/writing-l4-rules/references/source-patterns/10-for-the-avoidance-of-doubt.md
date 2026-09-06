@@ -357,11 +357,11 @@ Without one, it parses and the type checker reports two things — the rule's re
 and the name you tried to bind undefined (probe `a9-with-named.l4`, exit 1):
 
 ```
-In the application of
+In this use of
 
   `the appeal must be registered` (defined at a9-with-named.l4:8:8-39)
 
-you forgot to supply the following arguments:
+you have not supplied these inputs:
 
   `the amount solicited` of type NUMBER
 ```

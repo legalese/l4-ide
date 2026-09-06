@@ -223,11 +223,11 @@ DECLARE `Employment terms` HAS
 rejected:
 
 ```
-In the application of
+In this use of
 
   `Employment terms` (defined at …)
 
-you forgot to supply the following arguments:
+you have not supplied these inputs:
 
   `days of notice the contract requires` of type NUMBER
 ```

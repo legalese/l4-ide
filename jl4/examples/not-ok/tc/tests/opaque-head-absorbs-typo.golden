@@ -8,5 +8,5 @@ File: opaque-head-absorbs-typo.l4
   Severity: DiagnosticSeverity_Error
   Code: <none>
   Message:
-    The arities of the types do not match.
-    I expected 2 arguments, but I found 0.
+    This type is given the wrong number of inputs.
+    I expected 2, but I found 0.

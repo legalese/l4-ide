@@ -1139,8 +1139,8 @@ nlgChunks who rng vars sentence
                 <> " slot(s), but its Blawx declaration block has "
                 <> Text.textShow (length vars)
                 <> ". Write one slot per argument, in the block's order — "
-                <> "either an L4 parameter reference (`%p%`) or, where the "
-                <> "argument has no L4 binder (a record field, or a GIVETH "
+                <> "either a reference to an L4 input (`%p%`) or, where the "
+                <> "argument has no L4 input behind it (a record field, or a GIVETH "
                 <> "result), Blawx's own placeholder: " <> wantTxt ) ]
       else
         [ err

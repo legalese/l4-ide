@@ -10,6 +10,6 @@ fixity-ignored-nonbinary.l4:4:1-10:
     
       a OP b MEANS ...
     
-    where a and b are the GIVEN parameters.
+    where a and b are the GIVEN inputs.
 fixity-ignored-nonbinary.l4:9:1-19:
   42

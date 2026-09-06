@@ -154,8 +154,8 @@ ASSUME `the applicant` IS AN Applicant
   names — so nothing in the declaration itself can tell a parameterised opaque
   head from a typo for `IS`. The second one declares an opaque `Conduct` of
   arity two. You still find out, but one step later and under a different
-  name: `GIVEN c IS A Conduct` then reports "The arities of the types do not
-  match. I expected 2 arguments, but I found 0." The case that reports nothing
+  name: `GIVEN c IS A Conduct` then reports "This type is given the wrong
+  number of inputs. I expected 2, but I found 0." The case that reports nothing
   at all is a misspelt declaration that nothing uses. If you meant a synonym,
   check that the keyword reads `IS`.
 

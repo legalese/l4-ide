@@ -3,7 +3,7 @@ Typechecking successful
 Evaluation successful
 typo-binder-case.l4:9:8-15:
   I found a problem while checking the definition of `f`:
-    This CONSIDER branch binds a new variable
+    This CONSIDER branch introduces a new name
     
       `nothing`
     

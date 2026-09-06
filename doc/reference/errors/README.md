@@ -22,7 +22,7 @@ If you already know what error you are looking at, use the table of contents bel
 - [Type Errors](#type-errors)
   - [Branch type mismatch](#branch-type-mismatch)
   - [Undefined field access](#undefined-field-access)
-  - [Function arity mismatch](#function-arity-mismatch)
+  - [Wrong number of inputs](#wrong-number-of-inputs)
   - [APPEND vs append](#append-vs-append)
 - [Compiler Warnings](#compiler-warnings)
   - [Non-exhaustive pattern match](#non-exhaustive-pattern-match)
@@ -346,15 +346,15 @@ result MEANS
 
 ---
 
-### Function arity mismatch
+### Wrong number of inputs
 
-**Error message:** `Error: function expects N arguments, got M`
+**Error message:** `The function … expects 2 inputs, but here it is given 1 input.`
 
-**What you wrote:** A function call with too many or too few arguments.
+**What you wrote:** A rule used with too many or too few inputs.
 
-**What went wrong:** The function was defined with a certain number of GIVEN parameters, and you provided a different number of arguments.
+**What went wrong:** The rule was defined with a certain number of `GIVEN` inputs, and a different number was supplied where it was used.
 
-**How to fix it:** Check the function's definition to see how many arguments it expects, and provide exactly that many. If you intentionally want to supply fewer arguments (partial application), make sure the context supports it.
+**How to fix it:** Check the rule's definition to see how many inputs it expects, and supply exactly that many. If you meant to supply fewer (partial application), make sure the context supports it.
 
 ---
 
@@ -513,7 +513,7 @@ but it is an assumed term.
 - _The fact is fixed for everyone._ Define it instead of leaving it open — `` `rate` MEANS 0.2 `` — and it stops being a blank.
 - _You only wanted to see the rule's shape._ Use `#CHECK`, which reports the type without evaluating anything, rather than `#EVAL`.
 
-There is no way to fill a blank inside the file today, and `WITH` fails in two different ways depending on where it is written. ``#EVAL `tax on` 100 WITH rate IS 0.2``, with a value before the `WITH`, does not parse: `unexpected WITH`. Where the name takes no inputs of its own, `#EVAL isAdult WITH age IS 25` and `#CHECK isAdult WITH age IS 25` both parse and then report a check error, that `isAdult`, which is not a function, is being applied to named arguments.
+There is no way to fill a blank inside the file today, and `WITH` fails in two different ways depending on where it is written. ``#EVAL `tax on` 100 WITH rate IS 0.2``, with a value before the `WITH`, does not parse: `unexpected WITH`. Where the name takes no inputs of its own, `#EVAL isAdult WITH age IS 25` and `#CHECK isAdult WITH age IS 25` both parse and then report a check error, that `isAdult` is being given named inputs but is not a function.
 
 _Proposed, not landed (2026-09-04): supplying a value at the directive or the point of use with `WITH`, and the discharge that works out which blanks an entry point reads and asks for exactly those. This lands with the discharge pull request; until then supply values from outside the file (web form, `l4 batch`, application programming interface (API))._
 

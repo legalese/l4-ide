@@ -197,7 +197,7 @@ visualise mtcRes (getRecVis, setRecVis) verTextDocId msrcPos = do
     Just (srcPos, simp) -> do
       tcRes <- do
         case mtcRes of
-          Nothing -> defaultResponseError $ "Failed to typecheck " <> Text.pack (show uri.getUri) <> "."
+          Nothing -> defaultResponseError $ "Could not check " <> Text.pack (show uri.getUri) <> "."
           Just tcRes -> pure tcRes
       case foldTopLevelDecides (\d -> [d | decideNodeStartsAtPos srcPos d]) tcRes.module' of
         [decide] ->
