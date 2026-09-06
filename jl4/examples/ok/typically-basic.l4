@@ -1,3 +1,4 @@
+-- Kept on ASSUME deliberately (IMPLICIT-PROPS-DESIGN.md §11.1, R0: ASSUME is deprecated): TYPICALLY on an ASSUME declaration is one of the three surfaces this file covers.
 -- Test file for the TYPICALLY keyword: metadata-only default values.
 -- TYPICALLY stores a default on DECLARE fields, GIVEN parameters and
 -- ASSUME declarations; the value is type-checked against the annotated

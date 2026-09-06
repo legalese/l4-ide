@@ -1,3 +1,4 @@
+-- Kept on ASSUME deliberately (IMPLICIT-PROPS-DESIGN.md §11.1, R0: ASSUME is deprecated): jl4-service's implicit-ASSUME extraction is the thing under test.
 -- Test file for implicit ASSUME extraction in jl4-service
 --
 -- This file tests the "dynamic mode" where undeclared variables with

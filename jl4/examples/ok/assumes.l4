@@ -1,3 +1,4 @@
+-- Kept on ASSUME deliberately (IMPLICIT-PROPS-DESIGN.md §11.1, R0: ASSUME is deprecated): an #EVAL stuck on an assumed term, and the exit code it produces, is the thing under test.
 -- `l4 run` EXITS 1 ON THIS FILE, BY DESIGN. Every #EVAL below names an assumed
 -- term, so evaluation gets Stuck rather than producing a value, and a module
 -- that cannot evaluate should not report success (ruled by Meng 2026-08-01; see

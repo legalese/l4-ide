@@ -1,3 +1,4 @@
+-- Kept on ASSUME deliberately (IMPLICIT-PROPS-DESIGN.md §11.1, R0: ASSUME is deprecated): a nullary top-level ASSUME is the rejected shape under test.
 -- The subjectless-input rejection fixture, in the shape of
 -- `jl4/examples/legal/imaginary-alcohol-act.l4`: a nullary top-level `ASSUME`
 -- referenced from a nullary `@export`ed decision.

@@ -1,3 +1,4 @@
+-- Kept on ASSUME deliberately (IMPLICIT-PROPS-DESIGN.md §11.1, R0: ASSUME is deprecated): l4 batch supplying a module-level ASSUME is the thing under test.
 § `Export reads an ASSUME directly`
 ASSUME x IS A NUMBER
 

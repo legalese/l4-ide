@@ -1,3 +1,4 @@
+-- Kept on ASSUME deliberately (IMPLICIT-PROPS-DESIGN.md §11.1, R0: ASSUME is deprecated): l4 batch supplying a module-level ASSUME read through a helper is the thing under test.
 § `Helper reads an ASSUME`
 ASSUME x IS A NUMBER
 g MEANS x PLUS 1

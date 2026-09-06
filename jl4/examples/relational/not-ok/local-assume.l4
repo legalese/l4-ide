@@ -1,3 +1,4 @@
+-- Kept on ASSUME deliberately (IMPLICIT-PROPS-DESIGN.md §11.1, R0: ASSUME is deprecated): the local ASSUME grammar itself is the shape under test.
 -- Named rejection: a LOCAL ASSUME, which the top-level widening deliberately
 -- did not travel to.
 --

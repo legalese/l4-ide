@@ -1,3 +1,4 @@
+-- Kept on ASSUME deliberately (IMPLICIT-PROPS-DESIGN.md §11.1, R0: ASSUME is deprecated): the docassemble exporter's handling of a module-level ASSUME read through an inlined helper is the repair this file pins.
 -- Review repair pinned by this corpus (2026-08-16): a module-level ASSUME
 -- referenced ONLY from inside an inlined parameterized DECIDE must still
 -- survive as a question block. Before the repair, the emitted code resolved

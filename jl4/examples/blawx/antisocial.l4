@@ -1,3 +1,4 @@
+-- Kept on ASSUME deliberately (IMPLICIT-PROPS-DESIGN.md §11.1, R0: ASSUME is deprecated): the Blawx leg lowers signature-style ASSUME input predicates; their section-GIVEN image is function-typed and refused on the export path (see header).
 § `Anti-social Behaviour, Crime and Policing Act 2014 — section 43`
 
 -- The P4b showcase: a module with NO `DECLARE` at all, whose entire ontology

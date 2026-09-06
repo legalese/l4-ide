@@ -1,3 +1,4 @@
+-- Kept on ASSUME deliberately (IMPLICIT-PROPS-DESIGN.md §11.1, R0: ASSUME is deprecated): the regression is about a fully annotated ASSUME's inference-variable type.
 -- Regression test for lexical section scoping — FIX D (the other half of FIX B).
 --
 -- A section's OWN reference to a name must resolve to the nearest

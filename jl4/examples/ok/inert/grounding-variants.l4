@@ -1,3 +1,4 @@
+-- Kept on ASSUME deliberately (IMPLICIT-PROPS-DESIGN.md §11.1, R0: ASSUME is deprecated): the ladder visualizer prints a section-declared name fully qualified, and these atoms must stay at the left margin to keep the box labels readable.
 -- Fixture for the two EPISTEMIC knobs in the ladder visualizer:
 --
 --   * grounding        — how to read an atom nobody answered:

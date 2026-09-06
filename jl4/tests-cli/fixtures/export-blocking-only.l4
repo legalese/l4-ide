@@ -1,3 +1,4 @@
+-- Kept on ASSUME deliberately (IMPLICIT-PROPS-DESIGN.md §11.1, R0: ASSUME is deprecated): this report must be blocking-ONLY, and measured 2026-09-06 a section GIVEN's heading adds one advisory note (D-FLAVOR-NOSERVICE) and a rule GIVEN adds two.
 -- Fixture for the `l4 export --to=dmn --fail-on` threshold tests: a DMN
 -- report that is blocking-ONLY (2 blocking, 0 lossy, 0 advisory).
 --
