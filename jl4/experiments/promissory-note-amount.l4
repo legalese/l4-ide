@@ -1,7 +1,6 @@
 IMPORT prelude
 IMPORT daydate
 
-
 § `Promissory Note`
 
 `Note Date` MEANS Feb 4 2025
@@ -21,7 +20,6 @@ IMPORT daydate
                                 `Grace Period Days` IS 10
 
 `Governing Law` MEANS "Republic of Singapore"
-
 
 §§ `Parties`
 
@@ -50,7 +48,6 @@ IMPORT daydate
                               `Account Name`   IS "The Lender"
                               `Account Number` IS "120-643240-1"
                               `SWIFT`          IS "DBSSSGSG"
-
 
 §§ `Repayment Terms`
 
@@ -110,7 +107,6 @@ GIVEN `Outstanding Payment Amount` IS A Money
                                               `Amount Transferred`'s Currency EQUALS `All Outstanding Debts`'s Currency
                                                    AND `Amount Transferred`'s Value AT LEAST `All Outstanding Debts`'s Value
         ELSE  FULFILLED
-      
 
     WHERE
         `Installments Covered Since Commencement` MEANS
@@ -151,8 +147,8 @@ GIVEN `Outstanding Payment Amount` IS A Money
                                  PLUS `Next Payment Due Amount With Penalty`'s Value
                                     MINUS `Next Payment Due`'s Amount's Value
 
-
 §§§ `Definitions`
+    GIVEN NaN IS A NUMBER
 
 DECLARE Money
     HAS Currency            IS A STRING
@@ -208,15 +204,12 @@ DECLARE `pay monthly installment to`
     HAS Recipient           IS A Lender
         Amount              IS A Money
 
-
 GIVEN a IS A NUMBER
       b IS A NUMBER
 `The lesser of` MEANS
     IF a GREATER THAN b
         THEN b
         ELSE a
-
-ASSUME NaN IS A NUMBER
 
 GIVEN base  IS A NUMBER
       exp   IS A NUMBER
@@ -232,8 +225,6 @@ GIVEN base  IS A NUMBER
                     ELSE    IF      exp GREATER THAN 0
                             THEN    base TIMES `Base to the power of` base (exp MINUS 1)
                             ELSE    1 DIVIDED BY `Base to the power of` base (0 MINUS exp)
-
-
 
 §§§ `Testing`
 

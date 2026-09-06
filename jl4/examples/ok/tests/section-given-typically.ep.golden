@@ -1,0 +1,26 @@
+-- R8: a defaulted section binder is filled in once, at the root.
+--
+-- Nothing has to supply `the rate`. When nothing does, every rule that reads it
+-- sees the default, and sees the SAME value -- the default is one shared
+-- definition, not a copy per reader. An explicit WITH overrides it for that
+-- call and everything under it.
+
+§ `Rates`
+    GIVEN `the rate` IS A NUMBER TYPICALLY 3
+
+GIVETH A NUMBER
+doubled MEANS `the rate` TIMES 2
+
+GIVETH A NUMBER
+tripled MEANS `the rate` TIMES 3
+
+GIVETH A NUMBER
+`both readers agree` MEANS (doubled TIMES 3) MINUS (tripled TIMES 2)
+
+#EVAL doubled
+#EVAL doubled WITH `the rate` IS 5
+#EVAL `both readers agree`
+
+#ASSERT doubled EQUALS 6
+#ASSERT (doubled WITH `the rate` IS 5) EQUALS 10
+#ASSERT `both readers agree` EQUALS 0

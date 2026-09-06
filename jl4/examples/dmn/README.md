@@ -33,10 +33,12 @@ shipped goldens (R12 + R13, spec §15.12/§16, on top of Phase 5's BKM emission;
 2026-08-09 after Rule 501(a)(4) was decomposed):
 **70 decisions (12 decision tables), 10 businessKnowledgeModels, 7 decisionServices,
 15 `inputData`, and ZERO blocking notes (0 blocking / 21 lossy / 133 advisory)** — and
-both engines evaluate it end to end over the 22 cases in `regcf-corpus.cases.json`
+both engines evaluate it end to end over the 23 cases in `regcf-corpus.cases.json`
 (the base world, 15 dated relocation cases per spec §15.12.1, 4 seed cases added
-2026-08-03, the leap case added 2026-08-05, and the escheat case added 2026-08-09),
-1540/1540 values as expected (see "Running it through the real engines" below for the verbatim verdicts). The two blocking families the
+2026-08-03, the leap case added 2026-08-05, the escheat case added 2026-08-09, and
+the PRE-COMMENCEMENT case added 2026-09-05 under ruling D1 — the first that leaves
+the window this corpus models, and the first that supplies neither refusal),
+1610/1610 values as expected (see "Running it through the real engines" below for the verbatim verdicts). The two blocking families the
 2026-08-01 measurement counted (32 notes: the 15 `EVAL UNDER RULES EFFECTIVE AT`
 bodies with their 15 `D-RULEDATE-UNBOUND` companions, and the deontic reporting spine
 with its D-CYCLE) are **gone**: R12 drops the rebinding decides at population time
@@ -160,6 +162,11 @@ that report them:
   Severity keys off the call sites (any strict consumer, or none ⇒ Blocking; all lazy ⇒
   Lossy), the note names the failing clause and range, and says *not certified total* —
   the analysis refuses to certify; it does not prove partiality.
+  **Since ruling D1 (2026-09-05) a decision that can `REFUSE` is not `DMN-SAFE` either**,
+  transitively through the call graph — it answers `null` on part of its domain, which is
+  the exact thing this criterion exists to keep out of an un-lift. It raises `D-REFUSE`
+  rather than `D-PARTIAL`, on the same call-site calibration; the two are disjoint per
+  cause, so their counts must never be added together.
 - **The population filter.** Test fixtures (referenced only from `#EVAL`/`#ASSERT`
   argument positions, no callers here or in any importing sibling) and their
   fixture-side helper closure are **not emitted** — `D-FIXTURE` (Advisory) names each,
@@ -181,6 +188,65 @@ Phase 5's work.
 
 `financial statements required` flattens; `annual limit basis` and the floor inside
 `investor limit` do not.
+
+### The refusal exhibit (`refuse.l4`)
+
+A rule that reaches `REFUSE "…"` stops with the author's sentence: **the model does not
+cover this**, which is neither a value nor an error, and no rule can catch it. DMN has no
+such outcome. Its entire vocabulary for "no answer" is FEEL's single `null`, which also
+spells "there is none" and "the engine could not compute it".
+
+Ruling D1 (2026-09-05, `specs/todo/IMPLICIT-PROPS-DESIGN.md` §11.9.1): **the refusal
+becomes `null`, the refusing row is kept, and the reason travels in the artifact** — on
+that row's `<description>` (`OTHERWISE — REFUSE: …`) and, when a whole body refuses, on
+the `<decision>`'s own. Nothing is deleted, because deleting the row answers `null` too
+(measured on both engines) and would take the reason with it. `DMN-SAFE` is **withdrawn**
+from any decision that can refuse — including transitively, through the call graph — and
+`D-REFUSE` carries the reason at the same severity `D-PARTIAL` uses: `Lossy` when every
+consumer is a lazy arm that can fence the null, `Blocking` when one is strict or when
+nothing consumes it at all.
+
+Before that ruling this exhibit could not exist. The exporter wrote the L4 text
+`REFUSE "…"` into a `<literalExpression>`, and KIE 8.44.0.Final failed to compile the
+**whole file** (`ERROR [ERR_COMPILING_FEEL] … syntax error`, verdict `FAILED`), which is
+why every legal-corpus refusal site is still spelled `ASSUME`.
+
+The module holds one of each **position** a refusal can occupy, because each is a
+different code path: a whole body (a boxed `null`), the floor arm of a law-time chain, an
+inline `OTHERWISE`, an enum-valued `OTHERWISE`, and a plain arithmetic decision downstream
+of one. `refuse.cases.json` runs all five through both engines.
+
+**Two things this exhibit pins that are easy to get wrong.**
+
+- **A refusing decision is evaluated even when nothing reaches it.** A DMN `<decision>` is
+  a node in a graph, not a branch of an expression, so `no fee is prescribed before
+  commencement on 1983-01-01` answers `null` in _every_ case, including the ones where the
+  floor row never fires. That is what `D-REFUSE`'s severity calibration is about.
+- **The enum case is where the two engines disagreed.** An enum-valued table declares its
+  domain in `<outputValues>`, and a refusing row answers a value that list does not
+  contain. Measured 2026-09-05: KIE enforces the list at run time and **FAILS** the
+  decision (`Invalid result value on rule #3, output #1. Value null does not match list of
+allowed values`); Camunda 8.7.6 returns the `null` **silently**. One artifact, two
+  meanings. The exporter now widens _that table's_ `<outputValues>` by the FEEL keyword
+  `null` and reports `D-OUTPUTVALUES-NULL` (Lossy); the enum's own `<itemDefinition>` is
+  untouched, because a separate probe measured that widening the type does not stop the KIE
+  error and widening the table does. The pre-repair shape is kept as a negative control in
+  `jl4/tests-cli/fixtures/dmn-refuse-enum/unwidened.dmn`.
+
+**The dmnmd projection of this module carries no tables**, and that is the second per-backend
+image rather than a defect in the fixture: dmnmd's cell grammar is a number, an integer
+range, or a bare token, with no `null` and no date, so all three tables are omitted. A bare
+`null` cell would be read back as the _string_ `"null"`, which is the one outcome worse than
+omission.
+
+What `refuse.dmn.md` **does** carry is one `<!-- OMITTED: … -->` marker per dropped decision.
+That was added 2026-09-05 on a measurement: `l4 export --to dmn-md` exits 0, prints a
+one-line tally on stderr, and used to write a file holding a heading and nothing else — so
+the committed artifact said nothing whatever about what was missing, and a reader or a
+reviewer diffing it had no way to tell. Every `.dmn.md` golden in this directory gained
+markers in the same change; the `dmnmd -f md -t l4` round trip was verified byte-identical
+on all eleven, because dmnmd separates tables on any line not starting with `|` and names a
+table from the last heading before it, so a comment is inert to both rules.
 
 ## The fidelity report
 
@@ -351,13 +417,13 @@ metamodel parser says:
 > Measured 2026-08-09 on the shipped `expected/regcf-corpus.dmn`, verbatim:
 >
 > - KIE 8.44.0.Final: `XSD valid`; `VALID clean`; `BUILD clean`;
->   `KIE 8.44.0.Final VERDICT: 1 file(s), 22 case(s), 0 error(s),
->   0 warning(s), 1540/1540 decision(s) SUCCEEDED, 1540/1540 value(s) as
->   expected, 330/330 service output value(s) as expected`
+>   `KIE 8.44.0.Final VERDICT: 1 file(s), 23 case(s), 0 error(s),
+>   0 warning(s), 1610/1610 decision(s) SUCCEEDED, 1610/1610 value(s) as
+>   expected, 345/345 service output value(s) as expected`
 > - Camunda 8.7.6: `PARSE ok: SEC Regulation Crowdfunding — 17 CFR Part 227
 >   (70 decision(s))`; `Camunda 8.7.6 (zeebe-dmn) VERDICT: 1 file(s),
->   22 case(s), 1 parsed, 0 error(s), 1540/1540 decision(s) evaluated,
->   1540/1540 value(s) as expected`
+>   23 case(s), 1 parsed, 0 error(s), 1610/1610 decision(s) evaluated,
+>   1610/1610 value(s) as expected`
 >   (measured locally on JDK 26; CI runs the Camunda leg on 21, which is the
 >   minimum zeebe-dmn 8.7.6 accepts)
 >

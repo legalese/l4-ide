@@ -1,19 +1,25 @@
 § `VerifyNestedFixture`
 
--- Accounting control: a WHERE-local definition is a DECIDE, and `l4 verify`
--- does not descend into one — "LSP.L4.Viz.Ladder"'s entry point does not
--- either, and a verifier that disagreed with the ladder about what a rule is
--- would be reporting on a program the wizard never shows anyone.
+-- Accounting control, and the tripwire that caught a real defect.
 --
--- The point of this fixture is that the exclusion is COUNTED. `analysed +
--- skipped` does not total the file, and `summary.nestedNotVisited` says by how
--- much. Without the count, a reader cannot tell whether the remainder is two
--- definitions or two hundred — and in the Reg CF corpus a hand-count of the
--- source got it wrong (5 and 0, against the AST's 5 and 2).
+-- A WHERE-local definition is a DECIDE. `l4 verify` still does not visit one as
+-- a decision OF ITS OWN, and the point of this fixture is that the exclusion is
+-- COUNTED: `analysed + skipped` does not total the file, and
+-- `summary.nestedNotVisited` says by how much. Without the count, a reader
+-- cannot tell whether the remainder is two definitions or two hundred — and in
+-- the Reg CF corpus a hand-count of the source got it wrong (5 and 0, against
+-- the AST's 5 and 2).
 --
--- `the inner one` is deliberately CONTRADICTORY. If verify ever starts
--- descending, this fixture goes red on a finding rather than silently changing
--- meaning, which is the failure a bare count would not catch.
+-- `the inner one` is deliberately CONTRADICTORY. This comment used to say that
+-- if verify ever started descending, the fixture would go red on a finding
+-- rather than silently change meaning. That is exactly what happened, and the
+-- finding was correct: `x AND (y AND NOT y)` is unsatisfiable however it is
+-- spelled, and reporting nothing was the bug.
+--
+-- Since 2026-08-27 the zero-arity binding is INLINED before analysis
+-- (specs/todo/WHERE-INLINING-SPEC.md), so this file now yields [unsat] on `the
+-- outer one` — while `nestedNotVisited` stays at 1, because inlining is not
+-- descent.
 
 GIVEN x IS A BOOLEAN
       y IS A BOOLEAN

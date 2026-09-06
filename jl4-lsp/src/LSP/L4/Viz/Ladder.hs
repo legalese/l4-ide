@@ -405,6 +405,12 @@ translateExpr shouldSimplify = top
                 InertCtxNone -> InertAnd   -- default to AND context (evaluates to True)
           pure $ V.InertE vid txt inertCtx
 
+        -- A refusal is drawn as an ordinary leaf, labelled with its own source
+        -- (@REFUSE "…"@). Explicit above the wildcard because the wildcard
+        -- would first try 'normaliseGuarded' on it, and a refusal is not
+        -- ladder STRUCTURE — it is a terminal. (Mirrors "L4.Viz.Ladder".)
+        Refuse{} -> leafFromExpr e
+
         -- 'var'
         App _ resolved [] -> do
           vid <- getFresh

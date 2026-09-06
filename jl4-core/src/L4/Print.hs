@@ -450,11 +450,14 @@ instance LayoutPrinterWithName a => LayoutPrinter (Declare a) where
       -- same thing inside a `group`, jamming a non-empty GIVEN signature
       -- straight onto `DECLARE` (`... IS TYPEDECLARE ...`), which does not
       -- re-parse. Mirrors the Decide instance below.
-      vcatHard
+      vcatHard $
         [ printWithLayout tySig
         , "DECLARE" <+> printWithLayout appForm
-        , indent 2 (printWithLayout tyDecl)
-        ]
+        ] <> case tyDecl of
+          -- An opaque type has no body: a third line would be an empty line
+          -- under a hard `vcat`, which re-parses but reads as a mistake.
+          OpaqueDecl _ -> []
+          _            -> [indent 2 (printWithLayout tyDecl)]
 
 instance LayoutPrinterWithName a => LayoutPrinter (AppForm a) where
   printWithLayout = \ case
@@ -490,6 +493,7 @@ instance LayoutPrinterWithName a => LayoutPrinter (TypeDecl a) where
         [ "IS"
         , indent 2 (printWithLayout t)
         ]
+    OpaqueDecl _ -> mempty
 
 instance LayoutPrinterWithName a => LayoutPrinter (ConDecl a) where
   printWithLayout = \ case
@@ -554,6 +558,9 @@ instance LayoutPrinterWithName a => LayoutPrinter (Directive a) where
       map (indent 2 . printWithLayout) stmts
     Assert _ e ->
       "#ASSERT" <+> printWithLayout e
+    AssertRefused _ e mmsg ->
+      "#ASSERT REFUSED" <+> printWithLayout e <>
+        maybe mempty (\m -> " BECAUSE" <+> printWithLayout m) mmsg
 
 instance LayoutPrinterWithName a => LayoutPrinter (Import a) where
   printWithLayout = \ case
@@ -568,18 +575,37 @@ instance (LayoutPrinterWithName a, n ~ Int) => LayoutPrinter (n, Section a) wher
     -- resolving in the re-emitted `cross-section-qualified-additive.l4` for
     -- exactly this reason, and re-resolved as soon as the headings were shifted
     -- back by one.
-    (i, MkSection _ Nothing _ ds)    ->
+    --
+    -- The parser cannot put a section binder on the anonymous root section
+    -- (there is no § to indent past), so there is nothing to print here.
+    (i, MkSection _ Nothing _ _ ds)    ->
       vcatHard (map (printWithLayout . (i ,)) ds)
-    (i, MkSection _ name maka ds) ->
+    (i, MkSection _ name maka mgiven ds) ->
+      let
+        -- In a desugared module each section-GIVEN parameter also has a 0-ary
+        -- ASSUME elaboration at the head of this section's declarations (see
+        -- the invariant on 'desugarSectionGivens' in "L4.Desugar"). The
+        -- GivenSig is the declaration of record, so print it and suppress the
+        -- elaborations: printing both would emit the binder twice, and the
+        -- re-parsed module would be a duplicate definition.
+        binders = sectionGivenNames mgiven
+        visible = filter (not . isSectionBinderElaboration binders) ds
+      in
       vcatHard $
         [ pretty (replicate i '§') <+>
           case maka of
             Nothing  -> maybe mempty printWithLayout name
             Just aka -> maybe mempty printWithLayout name <+> printWithLayout aka
         ]
-        <> case ds of
+        -- The taught spelling: on the line below the heading, indented past the
+        -- §. 'indent' wraps only the signature -- wrapping the rest would nest
+        -- every following declaration, which prints flat at column 1.
+        <> (case mgiven of
+              Just g@(MkGivenSig _ (_ : _)) -> [indent 4 (printWithLayout g)]
+              _                             -> [])
+        <> case visible of
           [] -> mempty
-          _ -> map (printWithLayout . (i + 1 ,)) ds
+          _ -> map (printWithLayout . (i + 1 ,)) visible
 
 instance LayoutPrinterWithName a => LayoutPrinter (Module  a) where
   printWithLayout = \ case
@@ -763,6 +789,8 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
     -- again on re-parse. `...` is NOT a prefix marker for one — it is the
     -- infix AND operator ('TEllipsis'), so the old rendering printed a binary
     -- operator with no left operand.
+    Refuse _ msg ->
+      "REFUSE" <+> printWithLayout msg
     Inert _ txt _ctx ->
       surround (pretty $ escapeStringLiteral txt) "\"" "\""
 
@@ -773,6 +801,8 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
     Var{} -> printWithLayout e
     -- A BREACH with neither BY nor BECAUSE is a single keyword, i.e. an atom.
     Breach _ Nothing Nothing -> printWithLayout e
+    -- REFUSE is a keyword followed by a literal: an atom.
+    Refuse{} -> printWithLayout e
     _ -> surround (printWithLayout e) "(" ")"
 
 -- | Bracket a conjunct of an @AND@/@OR@/@RAND@/@ROR@ chain, but only when its
@@ -846,6 +876,7 @@ parensIfOpenTailed e
       Lam{}         -> True  -- the YIELD body keeps consuming
       Breach _ Nothing Nothing -> False -- a bare BREACH is an atom
       Breach{}      -> True  -- open BY/BECAUSE clauses
+      Refuse{}      -> False -- REFUSE plus a literal: no open tail
       -- `NOT` binds LOOSER than the connectives, not tighter: measured,
       -- `NOT TRUE AND FALSE` evaluates as `NOT (TRUE AND FALSE)`. So a negated
       -- conjunct is always bracketed — inheriting the operand's tail was not

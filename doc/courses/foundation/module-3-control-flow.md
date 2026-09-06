@@ -150,27 +150,54 @@ DECIDE `the person is a minor` IF NOT age >= 18
 DECIDE `the rule holds` IF `has a permit` IMPLIES `paid the fee`
 ```
 
-### Operator Precedence
+### Which Operator Goes First
 
-From highest to lowest precedence:
+When two of these words appear in the same rule, the tighter one is worked out first. From tightest to loosest:
 
-1. `NOT` (tightest)
-2. `AND`
-3. `OR`
-4. `IMPLIES` (loosest)
+1. `AND` (tightest)
+2. `OR`
+3. `IMPLIES` (loosest)
 
 This means:
 
 ```l4
 a OR b AND c        -- means: a OR (b AND c)
-NOT a AND b         -- means: (NOT a) AND b
 ```
 
-Use parentheses to make precedence explicit:
+Use parentheses to say something different:
 
 ```l4
 (a OR b) AND c      -- clear: OR first, then AND
 ```
+
+### NOT is the exception, and it will surprise you
+
+`NOT` is not on that list, because it does not work that way at all. It is not "tighter" or "looser" than AND — instead it **reaches forward and swallows everything after it on the line**:
+
+```l4
+NOT a AND b         -- means: NOT (a AND b)   <-- NOT the other reading!
+```
+
+Most people read that as "not-a, and b". It is not. The `NOT` took the `AND b` along with it.
+
+Putting brackets around what you are negating does not rescue it, because the closing bracket is not what stops the reach:
+
+```l4
+NOT (a) AND b       -- STILL means: NOT (a AND b)
+```
+
+The form that works puts the brackets around the `NOT` itself:
+
+```l4
+(NOT a) AND b       -- now it means what it looks like
+```
+
+Two habits keep you out of trouble:
+
+- Put `NOT` at the **end** of a line whenever you can — `a AND NOT b` is fine, because there is nothing left for the `NOT` to swallow.
+- Otherwise, **bracket the `NOT`**, not the thing it negates.
+
+The full rule, including what happens when a rule runs over several lines, is in the [NOT reference page](../../reference/operators/NOT.md#how-far-does-not-reach).
 
 ---
 

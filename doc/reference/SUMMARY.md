@@ -39,6 +39,8 @@
   - [Arithmetic](operators/arithmetic/README.md)
   - [Comparisons](operators/comparisons/README.md)
 - [Syntax](syntax/README.md)
+  - [Sections](syntax/sections.md)
+  - [Section GIVEN](syntax/section-given.md)
 - [Regulative](regulative/README.md)
   - [PARTY](regulative/PARTY.md)
   - [MUST](regulative/MUST.md)

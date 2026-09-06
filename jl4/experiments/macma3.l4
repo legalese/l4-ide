@@ -7,34 +7,90 @@ DECLARE Date
 commencement MEANS Date OF 2000, 4, 1
 
 § `Assumptions`
+    GIVEN `is authorised officer` IS A FUNCTION FROM Person TO BOOLEAN
+          `Attorney-General is satisfied is authorised under the law of that country`
+          `to make that request` IS A FUNCTION FROM Person TO BOOLEAN
+          `to receive that request` IS A FUNCTION FROM Person TO BOOLEAN
+          `the Director, a Deputy Director, a Divisional Director or any other officer, of the Central Narcotics Bureau, appointed under section 3(1) of the Misuse of Drugs Act 1973` IS A FUNCTION FROM Person TO BOOLEAN
+          `any special investigator of the Corrupt Practices Investigation Bureau appointed under section 3(2) of the Prevention of Corruption Act 1960` IS A FUNCTION FROM Person TO BOOLEAN
+          `any Commercial Affairs Officer appointed under section 64 of the Police Force Act 2004` IS A FUNCTION FROM Person TO BOOLEAN
+          `any police officer` IS A FUNCTION FROM Person TO BOOLEAN
+          `any other person or class of persons appointed by the Minister as an authorised officer or authorised officers for the purposes of this Act` IS A FUNCTION FROM Person TO BOOLEAN
+          `is a Singapore offence` IS A FUNCTION FROM Offence TO BOOLEAN
+          `is a foreign offence` IS A FUNCTION FROM Offence TO BOOLEAN
+          `is drug dealing offence` IS A FUNCTION FROM Offence TO BOOLEAN
+          `is foreign offence` IS A FUNCTION FROM Offence TO BOOLEAN
+          `is foreign tax evasion offence` IS A FUNCTION FROM Offence TO BOOLEAN
+          `is a serious offence` IS A FUNCTION FROM Offence TO BOOLEAN
+          `is criminal matter` IS A FUNCTION FROM Matter TO BOOLEAN
+          `the restraining of dealing with, or the seizure, forfeiture or confiscation of, property in connection with a Singapore offence or foreign offence`
+          `the obtaining, enforcement or satisfaction of a Singapore confiscation order or foreign confiscation order`
+          `is criminal proceedings` IS A FUNCTION FROM Matter TO BOOLEAN
+          `is investigation into a Singapore offence` IS A FUNCTION FROM Investigation TO BOOLEAN
+          `is investigation into a foreign offence` IS A FUNCTION FROM Investigation TO BOOLEAN
+          `is investigation for the purposes of an ancillary criminal matter` IS A FUNCTION FROM Investigation TO BOOLEAN
+          `a trial of a person for a Singapore offence` IS A FUNCTION FROM Proceedings TO BOOLEAN
+          `a trial of a person for a foreign offence` IS A FUNCTION FROM Proceedings TO BOOLEAN
+          `any proceeding to determine whether a particular person should be tried for the offence` IS A FUNCTION FROM Proceedings TO BOOLEAN
+          `is a financial institution` IS A FUNCTION FROM Organisation TO BOOLEAN
+          `Person as Authority` IS A FUNCTION FROM Person TO Authority
+          `Organisation as Authority` IS A FUNCTION FROM Organisation TO Authority
+          `is a foreign confiscation order` IS A FUNCTION FROM Order TO BOOLEAN
+          `is instrumentality forfeiture order` IS A FUNCTION FROM Order TO BOOLEAN
+          `is a Singapore confiscation order` IS A FUNCTION FROM Order TO BOOLEAN
+          `made by court or competent authority of foreign country` IS A FUNCTION FROM Order TO BOOLEAN
+          `on appointed date for that country` IS A FUNCTION FROM Order TO BOOLEAN
+          `after appointed date` IS A FUNCTION FROM Order TO BOOLEAN
+          `for recovery` IS A FUNCTION FROM Order TO BOOLEAN
+          `any property obtained in connection with an offence against the law of that country` IS A FUNCTION FROM Order TO BOOLEAN
+          `received in connection with such an offence` IS A FUNCTION FROM Order TO BOOLEAN
+          `the value of that property` IS A FUNCTION FROM Order TO BOOLEAN
+          `any property derived from any property` IS A FUNCTION FROM Order TO BOOLEAN
+          `realised from any property mentioned` IS A FUNCTION FROM Order TO BOOLEAN
+          `derived directly` IS A FUNCTION FROM Order TO BOOLEAN
+          `derived indirectly` IS A FUNCTION FROM Order TO BOOLEAN
+          `instrumentality forfeiture order` IS A FUNCTION FROM Order TO BOOLEAN
+          `is a foreign law immunity certificate` IS A FUNCTION FROM Certificate TO BOOLEAN
+          `is a VCC or variable capital company` IS A FUNCTION FROM Company TO BOOLEAN
+          `corresponding drug law` IS A FUNCTION FROM Law TO BOOLEAN
+          `in relation to a foreign country` IS A FUNCTION FROM Law TO BOOLEAN
+          `law of that foreign country providing for control and regulation of` IS A FUNCTION FROM Law TO BOOLEAN
+          `in that country` IS A FUNCTION FROM Law TO BOOLEAN
+          `the production, supply, use, export and import of drugs and other substances in accordance with the provisions of the Single Convention on Narcotic Drugs signed at New York on 30 March 1961` IS A FUNCTION FROM Law TO BOOLEAN
+          `the production, supply, use, export and import of dangerous or otherwise harmful drugs pursuant to any treaty, convention or other agreement or arrangement to which the Government and the government of that country are for the time being parties` IS A FUNCTION FROM Law TO BOOLEAN
+          `the benefits of trafficking in the drugs or substances referred to in paragraph (a) or (b)` IS A FUNCTION FROM Law TO BOOLEAN
+          `a reference to a foreign country` IS A FUNCTION FROM Reference TO BOOLEAN
+          `a reference to the law of a foreign country` IS A FUNCTION FROM Reference TO BOOLEAN
+          `a territory of that country, other than a territory that is itself a prescribed foreign country` IS A FUNCTION FROM Reference TO BOOLEAN
+          `a ship or aircraft of, or registered in, that country` IS A FUNCTION FROM Reference TO BOOLEAN
+          `the law in force in any part of that country` IS A FUNCTION FROM Reference TO BOOLEAN
+          seizure IS A FUNCTION FROM Action TO BOOLEAN
+          `of property in connection with` IS
+              A FUNCTION FROM
+                  A FUNCTION FROM Action  TO BOOLEAN
+              AND A FUNCTION FROM Offence TO BOOLEAN
+              TO  A FUNCTION FROM Matter  TO BOOLEAN
+          `authority of foreign country` IS A FUNCTION FROM Organisation TO BOOLEAN
+          `competent under laws of that country` IS A FUNCTION FROM Organisation TO BOOLEAN
+          `in relation to a foreign confiscation order` IS A FUNCTION FROM Order TO BOOLEAN
+          `person against whom` IS A FUNCTION FROM Person TO BOOLEAN
+          `in relation to whose property` IS A FUNCTION FROM Person TO BOOLEAN
+          `a foreign confiscation order has been made` IS A FUNCTION FROM Order TO BOOLEAN
+          `any Singapore offence specified in First Schedule` IS A FUNCTION FROM Offence TO BOOLEAN
+          `conspiracy to commit any such offence` IS A FUNCTION FROM Offence TO BOOLEAN
+          `inciting another to commit any such offence` IS A FUNCTION FROM Offence TO BOOLEAN
+          `attempting to commit any such offence` IS A FUNCTION FROM Offence TO BOOLEAN
+          `aiding, abetting, counselling or procuring the commission of any such offence` IS A FUNCTION FROM Offence TO BOOLEAN
 ASSUME Person IS A TYPE
-ASSUME `is authorised officer` IS A FUNCTION FROM Person TO BOOLEAN
 -- for the following section: see notes in the DECIDE below
 ASSUME `is an appropriate authority` IS A FUNCTION FROM Person TO BOOLEAN
-ASSUME `Attorney-General is satisfied is authorised under the law of that country`
-ASSUME `to make that request` IS A FUNCTION FROM Person TO BOOLEAN
-ASSUME `to receive that request` IS A FUNCTION FROM Person TO BOOLEAN
-ASSUME `the Director, a Deputy Director, a Divisional Director or any other officer, of the Central Narcotics Bureau, appointed under section 3(1) of the Misuse of Drugs Act 1973` IS A FUNCTION FROM Person TO BOOLEAN
-ASSUME `any special investigator of the Corrupt Practices Investigation Bureau appointed under section 3(2) of the Prevention of Corruption Act 1960` IS A FUNCTION FROM Person TO BOOLEAN
-ASSUME `any Commercial Affairs Officer appointed under section 64 of the Police Force Act 2004` IS A FUNCTION FROM Person TO BOOLEAN
-ASSUME `any police officer` IS A FUNCTION FROM Person TO BOOLEAN
-ASSUME `any other person or class of persons appointed by the Minister as an authorised officer or authorised officers for the purposes of this Act` IS A FUNCTION FROM Person TO BOOLEAN
 
 ASSUME Action IS A TYPE
 ASSUME ActionTarget IS A TYPE
 
 ASSUME Offence IS A TYPE
-ASSUME `is a Singapore offence` IS A FUNCTION FROM Offence TO BOOLEAN
-ASSUME `is a foreign offence` IS A FUNCTION FROM Offence TO BOOLEAN
-ASSUME `is drug dealing offence` IS A FUNCTION FROM Offence TO BOOLEAN
-ASSUME `is foreign offence` IS A FUNCTION FROM Offence TO BOOLEAN
-ASSUME `is foreign tax evasion offence` IS A FUNCTION FROM Offence TO BOOLEAN
-ASSUME `is a serious offence` IS A FUNCTION FROM Offence TO BOOLEAN
 
 ASSUME Matter IS A TYPE
-ASSUME `is criminal matter` IS A FUNCTION FROM Matter TO BOOLEAN
-ASSUME `the restraining of dealing with, or the seizure, forfeiture or confiscation of, property in connection with a Singapore offence or foreign offence`
-ASSUME `the obtaining, enforcement or satisfaction of a Singapore confiscation order or foreign confiscation order`
 -- not so clear whether this setup is correct.
 -- this pattern is common in the legislation, but it is not clear how to model it.
 -- where a definition sets up tests, rather than going into the substance of the test in the provisions
@@ -44,28 +100,15 @@ ASSUME `the obtaining, enforcement or satisfaction of a Singapore confiscation o
 -- enforcement  - of - a Singapore confiscation order
 -- satisfaction /    \ a foreign confiscantion order
 
-
-ASSUME `is criminal proceedings` IS A FUNCTION FROM Matter TO BOOLEAN
-
-
 ASSUME Investigation IS A TYPE
 
-ASSUME `is investigation into a Singapore offence` IS A FUNCTION FROM Investigation TO BOOLEAN
-ASSUME `is investigation into a foreign offence` IS A FUNCTION FROM Investigation TO BOOLEAN
-ASSUME `is investigation for the purposes of an ancillary criminal matter` IS A FUNCTION FROM Investigation TO BOOLEAN
-
 ASSUME Proceedings IS A TYPE
-ASSUME `a trial of a person for a Singapore offence` IS A FUNCTION FROM Proceedings TO BOOLEAN
-ASSUME `a trial of a person for a foreign offence` IS A FUNCTION FROM Proceedings TO BOOLEAN
-ASSUME `any proceeding to determine whether a particular person should be tried for the offence` IS A FUNCTION FROM Proceedings TO BOOLEAN
 
 ASSUME Organisation IS A TYPE
-ASSUME `is a financial institution` IS A FUNCTION FROM Organisation TO BOOLEAN
 -- Do I put appropriate authority here too, or define Authority as a Type?
 
 -- If you already some type, such as Organisation
 -- and then you have properties of Organisations that identify "suitable" organisations
-
 
 -- see notes on Person and Organisation, especially in relation to appropriate authority
 DECLARE Authority IS ONE OF
@@ -73,34 +116,16 @@ DECLARE Authority IS ONE OF
   `Organisation Authority` HAS organisation IS AN Organisation
 ASSUME `is an appropriate authority` IS A FUNCTION FROM Authority TO BOOLEAN
 
-ASSUME `Person as Authority` IS A FUNCTION FROM Person TO Authority
-ASSUME `Organisation as Authority` IS A FUNCTION FROM Organisation TO Authority
-
 ASSUME Order IS A TYPE
 ASSUME OrderType IS A TYPE
-ASSUME `is a foreign confiscation order` IS A FUNCTION FROM Order TO BOOLEAN
-ASSUME `is instrumentality forfeiture order` IS A FUNCTION FROM Order TO BOOLEAN
-ASSUME `is a Singapore confiscation order` IS A FUNCTION FROM Order TO BOOLEAN
 
 -- “foreign confiscation order” —
 -- (a)	means an order made by a court or other competent authority of a foreign country, on or after the appointed date for that country, for the recovery, forfeiture or confiscation of —
 -- (i)	any property obtained or received in connection with an offence against the law of that country, or the value of that property; or
 -- (ii)	any property derived or realised, directly or indirectly, from any property mentioned in sub‑paragraph (i), or the value of the derived or realised property; and
 -- (b)	includes an instrumentality forfeiture order;
-ASSUME `made by court or competent authority of foreign country` IS A FUNCTION FROM Order TO BOOLEAN
-ASSUME `on appointed date for that country` IS A FUNCTION FROM Order TO BOOLEAN
-ASSUME `after appointed date` IS A FUNCTION FROM Order TO BOOLEAN
-ASSUME `for recovery` IS A FUNCTION FROM Order TO BOOLEAN
 ASSUME `forfeiture` IS A FUNCTION FROM Order TO BOOLEAN
 ASSUME `confiscation` IS A FUNCTION FROM Order TO BOOLEAN
-ASSUME `any property obtained in connection with an offence against the law of that country` IS A FUNCTION FROM Order TO BOOLEAN
-ASSUME `received in connection with such an offence` IS A FUNCTION FROM Order TO BOOLEAN
-ASSUME `the value of that property` IS A FUNCTION FROM Order TO BOOLEAN
-ASSUME `any property derived from any property` IS A FUNCTION FROM Order TO BOOLEAN
-ASSUME `realised from any property mentioned` IS A FUNCTION FROM Order TO BOOLEAN
-ASSUME `derived directly` IS A FUNCTION FROM Order TO BOOLEAN
-ASSUME `derived indirectly` IS A FUNCTION FROM Order TO BOOLEAN
-ASSUME `instrumentality forfeiture order` IS A FUNCTION FROM Order TO BOOLEAN
 -- this is very tedious to do: should I be doing it as a WHERE instead?
 -- also, as you can see below, many intra-provision references, how do I model this?
 -- Given the number of condition branches in this particular definition provision, I'm glad for the visualizer.
@@ -125,23 +150,14 @@ DECIDE `is a foreign confiscation order` IS
 
 ASSUME Country IS A TYPE
 ASSUME Certificate IS A TYPE
-ASSUME `is a foreign law immunity certificate` IS A FUNCTION FROM Certificate TO BOOLEAN
 
 ASSUME Material IS A TYPE
 
 ASSUME Premises IS A TYPE
 ASSUME CourtOrder IS A TYPE
 ASSUME Company IS A TYPE
-ASSUME `is a VCC or variable capital company` IS A FUNCTION FROM Company TO BOOLEAN
 
 ASSUME Law IS A TYPE
-ASSUME `corresponding drug law` IS A FUNCTION FROM Law TO BOOLEAN
-ASSUME `in relation to a foreign country` IS A FUNCTION FROM Law TO BOOLEAN
-ASSUME `law of that foreign country providing for control and regulation of` IS A FUNCTION FROM Law TO BOOLEAN
-ASSUME `in that country` IS A FUNCTION FROM Law TO BOOLEAN
-ASSUME `the production, supply, use, export and import of drugs and other substances in accordance with the provisions of the Single Convention on Narcotic Drugs signed at New York on 30 March 1961` IS A FUNCTION FROM Law TO BOOLEAN
-ASSUME `the production, supply, use, export and import of dangerous or otherwise harmful drugs pursuant to any treaty, convention or other agreement or arrangement to which the Government and the government of that country are for the time being parties` IS A FUNCTION FROM Law TO BOOLEAN
-ASSUME `the benefits of trafficking in the drugs or substances referred to in paragraph (a) or (b)` IS A FUNCTION FROM Law TO BOOLEAN
 
 ASSUME Item IS A TYPE
 ASSUME Client IS A TYPE
@@ -153,11 +169,6 @@ ASSUME Property IS A TYPE
 ASSUME LegalDefinition IS A TYPE
 
 ASSUME Reference IS A TYPE
-ASSUME `a reference to a foreign country` IS A FUNCTION FROM Reference TO BOOLEAN
-ASSUME `a reference to the law of a foreign country` IS A FUNCTION FROM Reference TO BOOLEAN
-ASSUME `a territory of that country, other than a territory that is itself a prescribed foreign country` IS A FUNCTION FROM Reference TO BOOLEAN
-ASSUME `a ship or aircraft of, or registered in, that country` IS A FUNCTION FROM Reference TO BOOLEAN
-ASSUME `the law in force in any part of that country` IS A FUNCTION FROM Reference TO BOOLEAN
 
 DECLARE dealing
   HAS action IS A Action
@@ -184,15 +195,8 @@ DECIDE `is ancillary criminal matter` IS
 -- how do I capture relationships with 'dealing', 'Singapore offence', 'foreign offence', etc.?
 -}
 
-ASSUME seizure IS A FUNCTION FROM Action TO BOOLEAN
 ASSUME forfeiture IS A FUNCTION FROM Action TO BOOLEAN
 ASSUME confiscation IS A FUNCTION FROM Action TO BOOLEAN
-
-ASSUME `of property in connection with` IS
-  A FUNCTION FROM
-      A FUNCTION FROM Action  TO BOOLEAN
-  AND A FUNCTION FROM Offence TO BOOLEAN
-  TO  A FUNCTION FROM Matter  TO BOOLEAN
 
 -- cartesian product of the two list, using f as the pairing function
 -- this can be defined in a library
@@ -224,7 +228,6 @@ DECIDE `is ancillary criminal matter` acm IS
     actions  MEANS LIST `seizure`, `forfeiture`, `confiscation`
     offences MEANS LIST `is a Singapore offence`, `is a foreign offence`
 
-
 -- actions :: [Action -> Bool]
 -- actions =
 -- [ `the restraining of` `dealing`
@@ -245,8 +248,6 @@ DECIDE `is ancillary criminal matter` acm IS
 -- of_property_in_connection_with :: (Action -> Bool) -> (Offence -> Bool) -> (Matter -> Bool)
 
 -- lifted_or [ of_property_in_connection_with a o | a <- actions, o <- offences ] :: Matter -> Bool
-
-
 
 {-
 GIVEN acm  IS A Matter
@@ -347,11 +348,6 @@ DECIDE `is a reference to the law of a foreign country` IS
 
 -- March 2025 updates
 
- -- define a separate type for Authority, which is distinct from Organisation or Person?
-ASSUME `authority of foreign country` IS A FUNCTION FROM Organisation TO BOOLEAN
-ASSUME `competent under laws of that country` IS A FUNCTION FROM Organisation TO BOOLEAN
-ASSUME `in relation to a foreign confiscation order` IS A FUNCTION FROM Order TO BOOLEAN
-
 -- “competent authority”, in relation to a foreign confiscation order, means an authority of a foreign country that is competent under the laws of that foreign country to make the foreign confiscation order;
 GIVEN compAuth IS AN Organisation
       m IS AN Order
@@ -362,11 +358,6 @@ DECIDE `competent authority` IS
       AND `in relation to a foreign confiscation order` m
 
 -- “defendant” means a person against whom, or in relation to whose property, a foreign confiscation order is or may be made;
-
-ASSUME `person against whom` IS A FUNCTION FROM Person TO BOOLEAN
-ASSUME `in relation to whose property` IS A FUNCTION FROM Person TO BOOLEAN
-ASSUME `a foreign confiscation order has been made` IS A FUNCTION FROM Order TO BOOLEAN
-
 
 GIVEN d IS A Person
       m IS AN Order
@@ -384,12 +375,6 @@ DECIDE `defendant` IS
 -- (d)	attempting to commit any such offence; or
 -- (e)	aiding, abetting, counselling or procuring the commission of any such offence;
 
-ASSUME `any Singapore offence specified in First Schedule` IS A FUNCTION FROM Offence TO BOOLEAN
-ASSUME `conspiracy to commit any such offence` IS A FUNCTION FROM Offence TO BOOLEAN
-ASSUME `inciting another to commit any such offence` IS A FUNCTION FROM Offence TO BOOLEAN
-ASSUME `attempting to commit any such offence` IS A FUNCTION FROM Offence TO BOOLEAN
-ASSUME `aiding, abetting, counselling or procuring the commission of any such offence` IS A FUNCTION FROM Offence TO BOOLEAN
-
 GIVEN d IS AN Offence
 GIVETH A BOOLEAN
 DECIDE `is drug dealing offence` IS
@@ -401,4 +386,3 @@ DECIDE `is drug dealing offence` IS
 
 -- https://sso.agc.gov.sg/Act/MACMA2000?WholeDoc=1#Sc1-
 -- FIRST SCHEDULE -> HOW DO I MODEL THIS?
-

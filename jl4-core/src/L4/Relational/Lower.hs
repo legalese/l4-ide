@@ -395,8 +395,8 @@ preArgs env rng sig = traverse look sig.csPre
     Just v  -> pure (RTVar v)
     Nothing ->
       bailIn env rng LEUnbound
-        ( "`" <> sig.csName.rnBase <> "` is a local helper that needs an enclosing binder"
-            <> " which is not a variable at this call site" )
+        ( "`" <> sig.csName.rnBase <> "` is a local helper that needs an input from the rule"
+            <> " around it, but at this call site that input is not a simple name" )
 
 -- ---------------------------------------------------------------------------
 -- Sorts
@@ -481,16 +481,16 @@ fragmentSortError _ = Nothing
 topDecls :: Module Resolved -> [TopDecl Resolved]
 topDecls (MkModule _ _ sec) = goSection sec
  where
-  goSection (MkSection _ _ _ decls) = concatMap goDecl decls
+  goSection (MkSection _ _ _ _ decls) = concatMap goDecl decls
   goDecl d = case d of
     Section _ sub -> d : goSection sub
     _             -> [d]
 
 moduleTitleOf :: Module Resolved -> Maybe Text
-moduleTitleOf (MkModule _ _ (MkSection _ mName _ decls)) =
+moduleTitleOf (MkModule _ _ (MkSection _ mName _ _ decls)) =
   listToMaybe
     ( [ nm n | Just n <- [mName] ]
-        <> [ nm n | Section _ (MkSection _ (Just n) _ _) <- decls ]
+        <> [ nm n | Section _ (MkSection _ (Just n) _ _ _) <- decls ]
     )
  where nm = rawNameToText . rawName . getOriginal
 
@@ -548,7 +548,16 @@ descFromAnno ann = do
          else cur
 
 -- | An @\@nlg@ annotation as one line of text, with each @%parameter%@ slot
--- rendered as the bare parameter name.
+-- kept in its @%…%@ delimiters.
+--
+-- __The delimiters are load-bearing and were restored on 2026-09-02.__ This
+-- function used to render a slot as the bare parameter name, which made the
+-- sentence undecomposable: a consumer that has to know /where/ the arguments
+-- go — Blawx stores an attribute's NLG as prefix\/infix\/postfix around two
+-- fixed slots, never as a sentence — could not tell a slot from an ordinary
+-- word, and "L4.Blawx.Lower" recorded that as its reason for ignoring
+-- @\@nlg@ entirely (BLAWX-EXPORT-SPEC §11 W4). 'rpNlg' already documented the
+-- markers as present; the implementation is now what that doc says.
 --
 -- __A resolved annotation is NOT put through @simpleLinearizer@__, and the
 -- reason is a measured one rather than a preference: that function linearises a
@@ -571,7 +580,7 @@ linearNlg = \case
   squash = Text.unwords . Text.words
   frag = \case
     MkNlgText _ t -> t
-    MkNlgRef  _ r -> rawNameToText (rawName (getActual r))
+    MkNlgRef  _ r -> "%" <> rawNameToText (rawName (getActual r)) <> "%"
 
 -- | The @\@nlg@ attached to a @DECIDE@, __wherever it landed__.
 --
@@ -783,11 +792,20 @@ buildCtx ei exps m = ctx
 
   assumeDecls = [ (ann, a) | Assume ann a <- decls ]
 
-  -- ASSUME T IS A TYPE: a category with no fields ('RAbstractDef').
-  abstractPairs =
-    [ (getUnique r, rName r, rangeOf a)
-    | (_, a@(MkAssume _ _ (MkAppForm _ r _ _) _ _)) <- assumeDecls
-    , assumesCategory a
+  -- ASSUME T IS A TYPE, or its ruled successor, a bodiless DECLARE T: a
+  -- category with no fields ('RAbstractDef'). One pass over the declarations
+  -- so 'ctxAbstractOrder' stays source order when the spellings are mixed.
+  -- Nullary only, in both spellings: a parameterised opaque type
+  -- (@DECLARE T x@) has no category image, exactly as @ASSUME T x IS A TYPE@
+  -- has none ('assumesCategory').
+  abstractPairs = concat
+    [ case d of
+        Assume _ a@(MkAssume _ _ (MkAppForm _ r _ _) _ _)
+          | assumesCategory a -> [(getUnique r, rName r, rangeOf a)]
+        Declare _ dc@(MkDeclare _ _ (MkAppForm _ r [] _) (OpaqueDecl _)) ->
+          [(getUnique r, rName r, rangeOf dc)]
+        _ -> []
+    | d <- decls
     ]
 
   -- Everything else an ASSUME can be: a term, admitted or refused.
@@ -883,11 +901,30 @@ buildCtx ei exps m = ctx
     , ctxEnt = ei
     }
 
+  -- __Where a field's @\@nlg@ actually lands__ (measured 2026-09-02, against
+  -- the Blawx seeds of BLAWX-EXPORT-SPEC §11 W4, and the reason those seeds
+  -- could not be annotated until now): a trailing annotation on a
+  -- @DECLARE … HAS@ row — @\`facial hair on chin\` IS A BOOLEAN \@nlg …@ —
+  -- attaches to the row's __type-constructor name__. Not to the row, not to
+  -- the field name, and not to the 'Type'' node either; @l4 ast@ puts the
+  -- @nlg = Just@ on the @MkName@ of @BOOLEAN@, and the type checker says so out
+  -- loud when two rows collide ("More than one NLG annotation attached to:
+  -- Sign"). Two traps sat behind that: with only 'fAnn' and 'fRes' searched,
+  -- every field annotation in the corpus read as 'Nothing'; and the name has to
+  -- be reached through 'getActual', because 'getOriginal' on a @Ref@ hands back
+  -- the /defining/ occurrence — the @DECLARE Sign@ header, which carries no
+  -- annotation — so a search that used it stayed silently empty. All four
+  -- positions are searched here for the same reason 'decideNlg' searches five.
   fieldDef fAnn fRes fTy = MkRFieldDef
     { rfName = rName fRes
     , rfSort = sortOfType sortEnv (Just fTy)
     , rfDesc = getDesc <$> (fAnn ^. annDesc)
-    , rfNlg  = linearNlg <$> ((fAnn ^. annNlg) <|> (getOriginal fRes ^. annoOf % annNlg))
+    , rfNlg  = linearNlg <$> foldr (<|>) Nothing
+        (  [ fAnn ^. annNlg
+           , getOriginal fRes ^. annoOf % annNlg
+           , fTy ^. annoOf % annNlg
+           ]
+        <> [ getActual r ^. annoOf % annNlg | r <- toList fTy ] )
     }
 
   tops = [ mkTopDef ei exps ann d | Decide ann d <- decls ]
@@ -974,7 +1011,7 @@ bBool False = BFalse
 -- would be silently unusable the moment M2 admits dates — and its output would
 -- still typecheck.
 toBForm :: Ctx -> LEnv -> Bool -> Expr Resolved -> L BForm
-toBForm ctx _env = go
+toBForm ctx env0 = go
  where
   go neg e
     | Just b <- literalBool e = pure (bBool (if neg then not b else b))
@@ -1003,6 +1040,11 @@ toBForm ctx _env = go
     -- context was annotated by carameliseExprWithContext. Without this the
     -- whole inert-style corpus is out of fragment.
     Inert _ _ ictx -> pure (bBool (applyNeg neg (inertIdentity ictx)))
+    -- A refusal must NEVER become a relational atom. The wildcard below would
+    -- make it 'APExpr', i.e. a proposition the Blawx/Prolog path can assert or
+    -- negate — which is exactly the conversion a refusal must not admit, on
+    -- the one backend whose whole surface is propositional.
+    Refuse {} -> bailIn env0 (rangeOf e) (kindOfExpr e) (msgOfExpr e)
     -- A guarded chain nested inside boolean structure. The top-level case is
     -- split into clauses by 'expandRows'; here the chain has to become a
     -- formula, by the same law (GuardedRows.hs:229-240).
@@ -2186,6 +2228,7 @@ kindOfExpr = \case
   Record{}     -> LELedger
   ReadCell{}   -> LELedger
   Breach{}     -> LEBreach
+  Refuse{}     -> LEUnsupported "REFUSE"
   Concat{}     -> LEString
   AsString{}   -> LEString
   Lam{}        -> LEHigherOrder
@@ -2212,6 +2255,8 @@ msgOfExpr = \case
   Record{}   -> "a ledger write has no image in a clause body"
   ReadCell{} -> "a ledger read has no image in a clause body"
   Breach{}   -> "BREACH is a deontic outcome, not a proposition"
+  Refuse{}   -> "REFUSE is a declined answer, not a proposition: a Horn clause could only \
+                \assert or negate it, which is precisely the conversion a refusal forbids"
   Concat{}   -> "M1 admits strings only as literal-equality atoms"
   AsString{} -> "M1 admits strings only as literal-equality atoms"
   Lam{}      -> "first-order Horn clauses cannot carry a function as a value; M1 admits a lambda only inside a recognised aggregate"
@@ -2236,6 +2281,7 @@ constructorName = \case
   Record{}     -> "RECORD/COMMIT/ATTEST"
   ReadCell{}   -> "RECALL"
   Breach{}     -> "BREACH"
+  Refuse{}     -> "REFUSE"
   Concat{}     -> "string concatenation"
   AsString{}   -> "string coercion"
   Lam{}        -> "lambda"
@@ -2288,6 +2334,9 @@ lowerQueries ctx m = do
     LazyEval _ ex      -> Just (RQEval, ex)
     LazyEvalTrace _ ex -> Just (RQEval, ex)
     Assert _ ex        -> Just (RQAssert, ex)
+    -- A refusal assertion has no image as a Horn-clause query: there is no
+    -- proposition \"this refuses\" for the relational fragment to hold.
+    AssertRefused{}    -> Nothing
     Check{}            -> Nothing
     Contract{}         -> Nothing
 

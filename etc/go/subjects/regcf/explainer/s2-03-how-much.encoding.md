@@ -11,14 +11,14 @@ An encoding has to do something with that. What this one does is refuse to pick:
 the measure is a **dated function** that selects `greater of` from the amendment
 date and `lesser of` before it, and both readings stay live and testable
 forever. The consequence is asserted at both ends — the same investor is capped
-at [$10,000](src:jl4/examples/legal/regcf/regcf.l4#L1035) at time of writing ({{as_of}}) and was capped at
-[$3,000](src:jl4/examples/legal/regcf/regcf.l4#L1394) under the earlier rule, a
+at [$10,000](src:jl4/examples/legal/regcf/regcf.l4#L1034) at time of writing ({{as_of}}) and was capped at
+[$3,000](src:jl4/examples/legal/regcf/regcf.l4#L1393) under the earlier rule, a
 factor of more than three.
 
 **An exhaustiveness claim the prose does not make.** Limb (i) applies "if
 either…"; limb (ii) applies "if both…". The encoding notes, and then relies on,
 the observation that
-[The two are exhaustive and mutually exclusive, so one boolean selects between them.](src:jl4/examples/legal/regcf/regcf.l4#L414-L415 "verbatim")
+[The two are exhaustive and mutually exclusive, so one boolean selects between them.](src:jl4/examples/legal/regcf/regcf.l4#L413-L414 "verbatim")
 That is a reading. It happens to be an obviously correct one, but it is the kind
 of step that vanishes into prose and cannot vanish into code: something has to
 decide what happens when neither limb matches, and here the answer is that

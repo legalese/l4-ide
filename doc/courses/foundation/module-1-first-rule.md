@@ -41,6 +41,8 @@ Let's break this down:
 | `MUST`                                      | This creates a legal obligation            |
 | `` `file the annual return` ``              | This is what they must do                  |
 
+You will later see `GIVEN` written once for a whole section, indented under the heading, so that every rule in that section is told the same fact without repeating the line — see [What a Section Needs to Know](../../tutorials/section-given/what-a-section-needs-to-know.md).
+
 ### Backtick Names
 
 Notice the backticks around `file the annual return`. In L4, backticks let you use spaces and special characters in names. These are called **quoted identifiers**.

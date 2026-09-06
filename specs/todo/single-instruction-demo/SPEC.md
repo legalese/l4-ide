@@ -156,8 +156,8 @@ enforces them:
   `p3-check.sh` reads the surviving labels and **warns** (never fails) when a rule quotes them out
   of order; gaps are counted and reported as information, because a repealed limb is a legitimate
   gap in a consolidated text;
-- `GIVEN` preferred to `ASSUME` (unbound assumed terms stall `#EVAL` — they evaluate only when
-  bound via `#CHECK … WITH` / `#TRACE … WITH` or promoted to caller-supplied parameters by
+- `GIVEN` preferred to `ASSUME` (unbound assumed terms stall `#EVAL` — no directive binds them in-file; they evaluate only when
+  promoted to caller-supplied parameters by
   `@export` — so plain `#EVAL` goldens over ASSUME-style modules do not exercise the logic;
   this same distinction drives P6's carrier choice);
 - `BRANCH` preferred to `ELSE IF` chains;

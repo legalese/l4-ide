@@ -558,6 +558,14 @@ Do not ship the argument without this, or it reads as a lobbying document.
 ## 8. Where it sits in the series
 
 - **This paper (§3, §4.8, §5)** — the primary home; second enclosure, asymmetric incidence.
+- [**`SIDEBAR-who-acts.md`**](SIDEBAR-who-acts.md) — the agency half, written after this one and
+  **carrying three corrections to it** (see its §9): the will carve-out shelters the instrument and
+  leaves the _explanation_ exposed, which cuts against the natural reading of §1(c); the indirection
+  argument at §5b fails at entity level but is materially weaker at individual level, because
+  s 33(7) needs a named actor and s 33(8)'s deeming provision reaches firms and not companies; and
+  whether _authoring_ a rule system amounts to _applying_ it at each later execution is unresolved
+  in Singapore, so §5b should not be read as settling it. It also adds the Hansard record, the
+  s 33(6)–(8) corporate-form finding, and the type-discipline repair of the information/advice line.
 - [**`../formal-methods-in-law/`**](../formal-methods-in-law/) — the auditability argument in §6's
   third bullet is that paper's ladder pointed at a regulatory question: what makes a machine's
   subsumption checkable is what could make it exemptible. **§5d is on loan from that paper and

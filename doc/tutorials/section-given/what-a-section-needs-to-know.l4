@@ -1,0 +1,230 @@
+-- Companion file for the tutorial "What a Section Needs to Know".
+--
+-- The scenario is Regulation Crowdfunding, at Part 227 of title 17 of the Code
+-- of Federal Regulations (CFR): the United States Securities and Exchange
+-- Commission rules that let a company raise money from the public through a
+-- funding portal. Two questions are encoded here:
+--
+--   Rule 100(a)(2)  -- how much may Alex, an investor, put in over 12 months?
+--   Rule 100(b)     -- may this company raise money through crowdfunding?
+--
+-- The dollar figures are the ones in force after the inflation adjustment of
+-- 2022-09-20, published at volume 87 of the Federal Register (FR), page 57394.
+--
+-- Every example on the tutorial page that runs today also lives here. The
+-- examples the page shows in order to reject them -- the column-1 mistake, a
+-- rule that can see two facts of the same name, and an #EVAL of a rule whose
+-- facts nobody has supplied -- are deliberately NOT here, because they do not
+-- pass the check or do not produce an answer.
+--
+-- Run it with:
+--     l4 run what-a-section-needs-to-know.l4
+
+
+-- ====================================================================
+-- Recap. Two small rules of the ordinary kind: each is told its inputs
+-- and gives one output. The GIVEN is at column 1, so `a` and `b` belong
+-- to the one rule written below it.
+-- ====================================================================
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+`the greater of` a b MEANS IF a AT LEAST b THEN a ELSE b
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+`the lesser of` a b MEANS IF a AT MOST b THEN a ELSE b
+
+#EVAL `the greater of` 40000 20000
+
+
+-- ====================================================================
+-- The three dollar figures Rule 100(a)(2) turns on. The regulation
+-- settles all three for everybody, so all three are written with MEANS
+-- and nobody is ever asked for one.
+-- ====================================================================
+
+GIVETH A NUMBER
+`the cut point` MEANS 124000
+
+GIVETH A NUMBER
+`the per-investor ceiling` MEANS 124000
+
+GIVETH A NUMBER
+`the minimum permitted investment` MEANS 2500
+
+
+-- ====================================================================
+-- Concept 1, before. Rule 100(a)(2) as almost everyone encodes it the
+-- first time: three rules, each declaring the same two facts about the
+-- investor all over again, and the last one handing both facts on to
+-- the two rules it relies on.
+-- ====================================================================
+
+§ `Rule 100(a)(2) as first drafted`
+
+GIVEN `annual income` IS A NUMBER
+      `net worth`     IS A NUMBER
+GIVETH A NUMBER
+`the larger measure (first draft)` MEANS
+    `the greater of` `annual income` `net worth`
+
+GIVEN `annual income` IS A NUMBER
+      `net worth`     IS A NUMBER
+GIVETH A BOOLEAN
+`both measures reach the cut point (first draft)` MEANS
+        `annual income` AT LEAST `the cut point`
+    AND `net worth`     AT LEAST `the cut point`
+
+GIVEN `annual income` IS A NUMBER
+      `net worth`     IS A NUMBER
+GIVETH A NUMBER
+`the 12-month limit (first draft)` MEANS
+    IF `both measures reach the cut point (first draft)` `annual income` `net worth`
+    THEN `the lesser of`
+             ((`the larger measure (first draft)` `annual income` `net worth`) TIMES 0.10)
+             `the per-investor ceiling`
+    ELSE `the greater of`
+             ((`the larger measure (first draft)` `annual income` `net worth`) TIMES 0.05)
+             `the minimum permitted investment`
+
+
+-- ====================================================================
+-- Concept 1, after, and concept 2. The same two facts, declared once
+-- under the heading. The GIVEN starts past the § of the heading, which
+-- is what makes it the section's and not the next rule's.
+--
+-- Note that `the investor's 12-month limit` names neither fact itself.
+-- It reads both through the two rules it relies on.
+-- ====================================================================
+
+§ `Rule 100(a)(2) — How much may this investor put in?`
+    GIVEN `annual income` IS A NUMBER @desc The investor's income over the last 12 months
+          `net worth`     IS A NUMBER @desc The investor's net worth
+
+GIVETH A NUMBER
+`the larger measure` MEANS `the greater of` `annual income` `net worth`
+
+GIVETH A BOOLEAN
+`both measures reach the cut point` MEANS
+        `annual income` AT LEAST `the cut point`
+    AND `net worth`     AT LEAST `the cut point`
+
+@export How much may this investor invest across all offerings in 12 months?
+GIVETH A NUMBER
+`the investor's 12-month limit` MEANS
+    IF `both measures reach the cut point`
+    THEN `the lesser of` (`the larger measure` TIMES 0.10) `the per-investor ceiling`
+    ELSE `the greater of` (`the larger measure` TIMES 0.05) `the minimum permitted investment`
+
+
+-- ====================================================================
+-- A second question, about entirely different facts, under its own
+-- heading with its own six. Nothing here asks about income, and nothing
+-- in Rule 100(a)(2) asks about business plans.
+-- ====================================================================
+
+§ `Rule 100(b) — May this company raise money?`
+    GIVEN `the company is organized under the law of a State` IS A BOOLEAN @desc Is the company organized under the law of a State or territory of the United States, or the District of Columbia?
+          `the company reports under the Exchange Act` IS A BOOLEAN @desc Is the company required to file reports under section 13 or 15(d) of the Exchange Act?
+          `the company is an investment company` IS A BOOLEAN @desc Is the company an investment company?
+          `the company is disqualified under Rule 503(a)` IS A BOOLEAN @desc Is the company disqualified under Rule 503(a)?
+          `the company has filed its two most recent annual reports` IS A BOOLEAN @desc Has the company filed the annual reports required by Rule 202 for the two most recent years?
+          `the company has a specific business plan` IS A BOOLEAN @desc Does the company have a specific business plan, other than to merge with or acquire an unidentified company?
+
+GIVETH A BOOLEAN
+`the company is excluded by Rule 100(b)` MEANS
+        NOT `the company is organized under the law of a State`
+    OR      `the company reports under the Exchange Act`
+    OR      `the company is an investment company`
+    OR      `the company is disqualified under Rule 503(a)`
+    OR  NOT `the company has filed its two most recent annual reports`
+    OR  NOT `the company has a specific business plan`
+
+@export May this company raise money through crowdfunding?
+GIVETH A BOOLEAN
+`the company may use the crowdfunding exemption` MEANS
+    NOT `the company is excluded by Rule 100(b)`
+
+
+-- ====================================================================
+-- Concept 3, the statute's own letter form. Sections 1 and 6 of the
+-- Bribery Act 2010 each open by introducing "a person ('P')", and the P
+-- of section 1 is not the P of section 6. Each section's GIVEN is its
+-- own.
+-- ====================================================================
+
+DECLARE Person
+    HAS `offered an advantage`         IS A BOOLEAN
+        `is a foreign public official` IS A BOOLEAN
+
+§ `Bribery Act 2010`
+
+§§ `1. Offences of bribing another person`
+    GIVEN p IS A Person
+
+GIVETH A BOOLEAN
+`P offered an advantage` MEANS p's `offered an advantage`
+
+§§ `6. Bribery of foreign public officials`
+    GIVEN p IS A Person
+          f IS A Person
+
+GIVETH A BOOLEAN
+`F is a foreign public official` MEANS f's `is a foreign public official`
+
+
+-- ====================================================================
+-- Concept 3, the same word for two things. Two sections may each name a
+-- fact `the fee`, and they are two different facts, each read by its own
+-- section's rules.
+-- ====================================================================
+
+§ `Fees`
+
+§§ `2. Application fee`
+    GIVEN `the fee` IS A NUMBER
+
+GIVETH A NUMBER
+`the application fee payable` MEANS `the fee`
+
+§§ `5. Renewal fee`
+    GIVEN `the fee` IS A NUMBER
+
+GIVETH A NUMBER
+`the renewal fee payable` MEANS `the fee`
+
+
+-- ====================================================================
+-- Migrating an ASSUME: the before, and the after. The fact keeps its
+-- name; only the keyword and the indent change. Both still work; the
+-- second one has a stated home. The rule names differ only so that both
+-- versions can live in this one file.
+-- ====================================================================
+
+§ `Intermediaries, before migration`
+
+ASSUME `the funding portal is registered` IS A BOOLEAN
+
+GIVETH A BOOLEAN
+`the intermediary requirement is met (before)` MEANS
+    `the funding portal is registered`
+
+§ `Intermediaries, after migration`
+    GIVEN `the funding portal is registered` IS A BOOLEAN
+
+GIVETH A BOOLEAN
+`the intermediary requirement is met (after)` MEANS
+    `the funding portal is registered`
+
+
+-- ====================================================================
+-- #CHECK reports what kind of answer a rule gives. It needs no facts at
+-- all, which is why it runs here where an #EVAL of the same rule would
+-- not.
+-- ====================================================================
+
+#CHECK `the investor's 12-month limit`
+#CHECK `the company may use the crowdfunding exemption`

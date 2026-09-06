@@ -23,7 +23,7 @@ File: unify-sibling-rebind.l4
   Severity: DiagnosticSeverity_Error
   Code: <none>
   Message:
-    The first argument of function 
+    The first input of function 
 
       firstOf (defined at unify-sibling-rebind.l4:14:1-8)
 

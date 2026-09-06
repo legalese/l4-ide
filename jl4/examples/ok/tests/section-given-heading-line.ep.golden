@@ -1,0 +1,12 @@
+-- The heading-line spelling of a section binder, `§ NAME GIVEN …`, falls under
+-- the same column rule (the GIVEN keyword sits at a column greater than the §)
+-- and the parser accepts it. It is NOT the house style: prettyLayout re-emits
+-- the indented form, and this file's .ep.golden is the witness that exact
+-- printing keeps whichever form was written.
+
+§ `S` GIVEN a IS A NUMBER
+
+GIVETH A NUMBER
+`a plus one` MEANS a PLUS 1
+
+#CHECK `a plus one`

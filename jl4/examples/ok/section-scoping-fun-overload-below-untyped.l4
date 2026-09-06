@@ -1,0 +1,24 @@
+-- Regression test for lexical section scoping — FIX D must not lose a
+-- differently-typed overload defined BELOW the reference (spec §12).
+--
+-- `big` over NUMBER is an ancestor of the reference in §§ users; `big` over
+-- STRING is defined in a LATER sibling section with no signature at all, so
+-- at the reference it is not yet inferred. The reference `big "hello"` cannot
+-- use the ancestor, and the per-type rule (spec §3.3.4 step 4) keeps the
+-- sibling overload visible to type-directed resolution. Deferral preserves
+-- that: the ancestor fails, the deferred candidate is consulted, and the
+-- reference resolves to strings.big.
+
+§ ops
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+big n MEANS n GREATER THAN 10
+
+§§ users
+GIVETH A BOOLEAN
+test MEANS big "hello"
+
+§§ strings
+big s MEANS s EQUALS "hello"
+
+#EVAL ops.users.test   -- TRUE

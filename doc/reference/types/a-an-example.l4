@@ -1,11 +1,13 @@
 -- Type articles: A, AN, THE
 
--- Using A with Types
+§ `Type articles: A, AN, THE`
+    GIVEN age IS A NUMBER
+          name IS A STRING
+          employed IS A BOOLEAN
+          myAccount IS AN Account
+          agreement IS A Contract
 
--- A before consonant sounds
-ASSUME age IS A NUMBER
-ASSUME name IS A STRING
-ASSUME employed IS A BOOLEAN
+-- Using A with Types
 
 -- A with function parameters
 GIVEN x IS A NUMBER
@@ -19,8 +21,6 @@ double x MEANS x TIMES 2
 DECLARE Account HAS
   balance IS A NUMBER
   holder IS A STRING
-
-ASSUME myAccount IS AN Account
 
 -- Both A and AN are syntactically valid
 -- AN just reads better before vowels
@@ -56,8 +56,6 @@ DECIDE nameViaGenitive IS john's personName
 DECLARE Contract HAS
   effectiveDate IS A NUMBER
   amount IS A NUMBER
-
-ASSUME agreement IS A Contract
 
 -- Field access via genitive
 DECIDE contractDate IS agreement's effectiveDate

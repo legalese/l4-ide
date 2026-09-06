@@ -43,7 +43,7 @@ import System.Directory (removeDirectoryRecursive, doesDirectoryExist, doesFileE
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -74,6 +74,38 @@ spec = describe "integration" do
         assertSuccess resp \r ->
           Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool False)
 
+    -- REFUSE (R7): the model declined to answer. It must reach the caller as
+    -- a refusal, NOT as an 'InterpreterError' — that reads as a server fault,
+    -- and it is exactly the conflation REFUSE exists to prevent. The answering
+    -- input in the twin test proves the refusal is the input's doing and not a
+    -- broken deployment.
+    it "reports a REFUSE as a refusal, not as an interpreter error" do
+      withServiceFromSources "refuse-eval" [("fee.l4", refuseJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "refuse-eval" "fee"
+          (Aeson.object [ "arguments" Aeson..= Aeson.object [ "y" Aeson..= (1999 :: Int) ] ])
+        case Aeson.decode (responseBody resp) :: Maybe SimpleResponse of
+          Just (SimpleError e@(EvaluatorRefused _)) ->
+            prettyEvaluatorError e `shouldBe`
+              "The model refuses to answer: this schedule is not encoded for years before 2000"
+          other -> expectationFailure ("Expected a refusal error, got: " <> show other)
+        -- And the distinction is MACHINE-readable on the wire, not merely
+        -- legible in the prose: 'EvaluatorError''s derived encoding tags the
+        -- constructor, so a consumer separates refused from error by reading
+        -- contents.tag rather than by string-matching the message prefix.
+        let constructorTag = case Aeson.decode (responseBody resp) :: Maybe Aeson.Value of
+              Just (Aeson.Object o)
+                | Just (Aeson.Object c) <- Aeson.KeyMap.lookup "contents" o ->
+                    Aeson.KeyMap.lookup "tag" c
+              _ -> Nothing
+        constructorTag `shouldBe` Just (Aeson.String "EvaluatorRefused")
+
+    it "answers normally for an input the same function does cover" do
+      withServiceFromSources "refuse-eval-ok" [("fee.l4", refuseJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "refuse-eval-ok" "fee"
+          (Aeson.object [ "arguments" Aeson..= Aeson.object [ "y" Aeson..= (2001 :: Int) ] ])
+        assertSuccess resp \r ->
+          Map.lookup "value" r.fnResult `shouldBe` Just (FnLitInt 100)
+
     it "promotes referenced ASSUMEs to parameters on @export (true case)" do
       -- Verifies the direct-AST path binds module-level ASSUMEs from the
       -- caller's input via a LET wrapper around the call.
@@ -99,6 +131,56 @@ spec = describe "integration" do
             ])
         assertSuccess resp \r ->
           Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool False)
+
+    -- The read-set is transitive: an ASSUME read only by a helper the
+    -- export calls is bound for the helper too. Before, the value was
+    -- bound with a LET around the inlined export body, which the helper's
+    -- closure never saw, so evaluation got stuck on "an assumed term".
+    it "binds an ASSUME read only by a helper of the @export (true case)" do
+      withServiceFromSources "assume-helper-true" [("drive.l4", assumeHelperJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "assume-helper-true" "may_drive"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "licensed" Aeson..= True
+                , "age" Aeson..= (25 :: Int)
+                ]
+            ])
+        assertSuccess resp \r ->
+          Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool True)
+
+    it "binds an ASSUME read only by a helper of the @export (false case)" do
+      withServiceFromSources "assume-helper-false" [("drive.l4", assumeHelperJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "assume-helper-false" "may_drive"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "licensed" Aeson..= True
+                , "age" Aeson..= (15 :: Int)
+                ]
+            ])
+        assertSuccess resp \r ->
+          Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool False)
+
+    it "lists a helper-read ASSUME as a required parameter in the schema" do
+      withServiceFromSources "assume-helper-schema" [("drive.l4", assumeHelperJL4)] \baseUrl mgr -> do
+        req <- parseRequest (baseUrl <> "/deployments?functions=full")
+        resp <- httpLbs req mgr
+        statusCode' resp `shouldBe` 200
+        let body = Aeson.decode @Aeson.Value (responseBody resp)
+        case body of
+          Just (Aeson.Array deployments) -> do
+            let findRequired = do
+                  Aeson.Object deploy <- toList deployments
+                  Aeson.Object meta <- toList $ Aeson.KeyMap.lookup "metadata" deploy
+                  Aeson.Array fns <- toList $ Aeson.KeyMap.lookup "functions" meta
+                  Aeson.Object fn <- toList fns
+                  guard (Aeson.KeyMap.lookup "name" fn == Just (Aeson.String "may_drive"))
+                  Aeson.Object params <- toList $ Aeson.KeyMap.lookup "parameters" fn
+                  Aeson.Array reqArr <- toList $ Aeson.KeyMap.lookup "required" params
+                  pure [t | Aeson.String t <- toList reqArr]
+            case findRequired of
+              (reqList:_) -> reqList `shouldBe` ["licensed", "age"]
+              [] -> expectationFailure "Could not find may_drive function in deployment response"
+          other -> expectationFailure ("Expected JSON array of deployments, got: " <> show other)
 
     it "lists functions for a deployment" do
       withServiceFromSources "list-fns" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do

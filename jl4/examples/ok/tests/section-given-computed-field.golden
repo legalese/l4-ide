@@ -1,0 +1,11 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+section-given-computed-field.l4:23:1-55:
+  7
+section-given-computed-field.l4:27:1-31:
+  5
+section-given-computed-field.l4:34:1-68:
+  assertion satisfied
+section-given-computed-field.l4:35:1-42:
+  assertion satisfied

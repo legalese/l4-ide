@@ -1,0 +1,51 @@
+-- Regression test for lexical section scoping — FIX D, function-shaped
+-- rebindings (spec §12).
+--
+-- The FIX D fixtures section-scoping-descendant-rebind.l4 and
+-- section-scoping-sibling-later.l4 rebind ZERO-arity names, whose type is a
+-- bare inference variable until the definition is inferred. A function-shaped
+-- definition with a GIVEN but no GIVETH — the common L4 style — instead has
+-- type FUNCTION FROM NUMBER TO <not yet inferred>, and one with no signature
+-- at all has both ends open. Either shape, defined in a section BELOW the
+-- reference, used to make the ancestor's own reference to the function
+-- ambiguous:
+--
+--     There are multiple definitions for the identifier f
+--
+-- while the same rebinding placed ABOVE the reference resolved. The rule now
+-- is that the branch choosing a not-yet-inferred off-ancestry candidate is
+-- marked, and the forcing point prefers an unmarked success (spec §12, FIX D).
+
+-- 1. GIVEN, no GIVETH; rebound in a child section below the reference.
+§ a
+GIVEN n IS A NUMBER
+f n MEANS n PLUS 1
+g MEANS f 1                   -- 2: a's f, although §§ b rebinds f below
+
+§§ b
+GIVEN n IS A NUMBER
+f n MEANS n PLUS 2
+
+-- 2. No signature at all; rebound in a child section below the reference.
+§ c
+h n MEANS n PLUS 10
+k MEANS h 1                   -- 11: c's h, although §§ d rebinds h below
+
+§§ d
+h n MEANS n PLUS 20
+
+-- 3. Two SIBLING sections, GIVEN only; each references its own.
+§ `Title`
+GIVEN n IS A NUMBER
+p n MEANS n PLUS 100
+q MEANS p 1                   -- 101: Title's p, although `One` rebinds p below
+
+§ `One`
+GIVEN n IS A NUMBER
+p n MEANS n PLUS 200
+r MEANS p 1                   -- 201: One's own p (same section first)
+
+#EVAL a.g          -- 2
+#EVAL c.k          -- 11
+#EVAL Title.q      -- 101
+#EVAL One.r        -- 201

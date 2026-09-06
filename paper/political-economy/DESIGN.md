@@ -334,6 +334,14 @@ provisions (LPA ss 32–36), the two _Turner_ tests, the judicial rationale on t
 taxi-medallion analogy breaks, the steelman against the argument, and the exemption power at
 s 34(2) that already exists and appears never to have been used.
 
+And its companion [`SIDEBAR-who-acts.md`](SIDEBAR-who-acts.md), which asks the other half of the
+question: not who is _allowed_ to subsume, but **who is doing it** when the applier is a program.
+It carries the parliamentary record (the guild's ask and MinLaw's answer, in Hansard), the finding
+that s 33(6)–(8) allocate individual liability by entity form so that the incidence runs backwards
+from capital, the argument that a prohibition defined over an operation cannot be lawfully inquired
+about, and the constructive move: replace the status test with a capability test, and make advice
+_untypeable_ rather than merely disclaimed.
+
 ## 5. The constructive half: what closes the attack surface
 
 The paper must not be only a warning; it must name the defence, and the defence is the L4 thesis

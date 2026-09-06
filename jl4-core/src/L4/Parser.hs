@@ -444,18 +444,46 @@ anonymousSection =
     MkSection emptyAnno
       <$> annoHole (pure Nothing)
       <*> annoHole (pure Nothing)
+      -- The anonymous root section has no '\u00a7' to indent past, so it can never
+      -- carry a section binder; the hole is still emitted so that the
+      -- 'ToConcreteNodes' \/ 'ToSemTokens' hole order is the same for both
+      -- section parsers.
+      <*> annoHole (pure Nothing)
       <*> annoHole (lsepBy (const (topdeclWithRecovery 0)) (spacedSymbol_ TSemicolon))
 
 section :: Int -> Parser (Section Name)
-section n = attachAnno $
-  MkSection emptyAnno
-    <$> (wrapAnnoParser (try do
-           wa@WithAnno {payload = syms} <- unwrapAnnoParser sectionSymbols
-           guard (syms >= n)
-           pure wa) *> annoHole (optional name)
-        )
-    <*> annoHole (optional aka)
-    <*> annoHole (lsepBy (const (topdeclWithRecovery n)) (spacedSymbol_ TSemicolon))
+section n = do
+  -- 'Lexer.indentLevel' reports the column of the NEXT token -- here, of the
+  -- '\u00a7' itself, because it peeks and never consumes (see 'withIndent'). That
+  -- single fact is what lets ONE combinator accept both ruled spellings of a
+  -- section binder: the taught form on the next line indented past the '\u00a7',
+  -- and the heading-line form '\u00a7 NAME GIVEN ...', whose GIVEN also sits at a
+  -- column greater than the '\u00a7'.
+  headingCol <- Lexer.indentLevel
+  attachAnno $
+    MkSection emptyAnno
+      <$> (wrapAnnoParser (try do
+             wa@WithAnno {payload = syms} <- unwrapAnnoParser sectionSymbols
+             guard (syms >= n)
+             pure wa) *> annoHole (optional name)
+          )
+      <*> annoHole (optional aka)
+      -- A GIVEN whose keyword column is greater than the heading's belongs to
+      -- the section (R4). 'indented' peeks and fails WITHOUT consuming, so a
+      -- column-1 GIVEN falls straight through to 'lsepBy' and stays the next
+      -- declaration's signature, exactly as it always was.
+      --
+      -- The 'try' is load-bearing: 'givens' consumes the GIVEN keyword before
+      -- its parameter list can fail, and without backtracking a malformed
+      -- section-level parameter list would kill the whole section instead of
+      -- falling back to today's reading.
+      --
+      -- Consuming the binder here also restores the section body's alignment
+      -- column: 'lsepBy' \/ 'manyLines' fixes that column from the first token
+      -- it sees, so eating a heading-line GIVEN leaves the body at column 1
+      -- where it belongs.
+      <*> annoHole (optional (try (indented givens headingCol)))
+      <*> annoHole (lsepBy (const (topdeclWithRecovery n)) (spacedSymbol_ TSemicolon))
 
 sectionSymbols :: AnnoParser Int
 sectionSymbols =
@@ -612,6 +640,24 @@ directive =
           <*> annoHole singleLineExpr
           <* annoLexeme (spacedKeyword_ TKWith)
           <*> contractEvents
+      -- #ASSERT REFUSED e [BECAUSE "message"].  'tryParser' is load-bearing:
+      -- this alternative consumes the #ASSERT token before it can discover
+      -- there is no REFUSED, and without backtracking the plain #ASSERT
+      -- alternative below would never be reached.
+      --
+      -- The BECAUSE payload is a LITERAL ('lit'), matching 'refuse' -- REFUSE's
+      -- own message is a literal for the same reason, and the two must agree.
+      -- The directive's job is to pin a refusal's reason, and the comparison is
+      -- decided statically in 'evalDirective' without evaluating the payload; a
+      -- payload the evaluator cannot read statically would silently degrade to
+      -- "no constraint", i.e. an assertion that holds for ANY refusal reason.
+      -- So a non-literal payload is a parse error, not a vacuous success.
+      , tryParser $
+          AssertRefused emptyAnno
+          <$ annoLexeme (spacedToken_ (TDirectives TAssertDirective))
+          <* annoLexeme (spacedKeyword_ TKRefused)
+          <*> annoHole singleLineExpr
+          <*> optionalWithHole (annoLexeme (spacedKeyword_ TKBecause) *> annoHole lit)
       , Assert emptyAnno
           <$ annoLexeme (spacedToken_ (TDirectives TAssertDirective))
           <*> annoHole singleLineExpr
@@ -665,7 +711,18 @@ declare sig =
 
 typeDecl :: Parser (TypeDecl Name)
 typeDecl =
-  recordDecl <|> enumOrSynonymDecl
+  recordDecl <|> enumOrSynonymDecl <|> opaqueDecl
+
+-- | A bodiless @DECLARE T@: an opaque nominal type ('OpaqueDecl'). Tried
+-- LAST, so any body that is present wins, and it consumes no input: a
+-- @DECLARE@ whose body is missing or malformed therefore parses as opaque
+-- and the next token is judged as the start of the following declaration
+-- (megaparsec keeps the @HAS@\/@IS@ hints, so the error still lists them).
+-- The node's 'Anno' is empty — the same shape a 'TypeSig' with no @GIVEN@
+-- already has — which both printers render as nothing.
+opaqueDecl :: Parser (TypeDecl Name)
+opaqueDecl =
+  attachAnno $ pure (OpaqueDecl emptyAnno)
 
 recordDecl :: Parser (TypeDecl Name)
 recordDecl =
@@ -1296,6 +1353,13 @@ whereExpr p =
 --   #EVAL 1            -- parses "1 + 2" as one expression
 --   # + 2              -- continuation line with # prefix
 --
+-- CAVEAT (pre-existing): the HEAD of a directive expression parses via
+-- 'mixfixChainExpr', which accepts an aligned mixfix chain keyword on the
+-- next line even without a '#' marker — so a directive head can absorb an
+-- unmarked continuation line that starts with a chain keyword at the right
+-- column. Operand positions ('singleLineExpressionCont') use
+-- 'mixfixChainOperand' (same-line only) and do not have this hole.
+--
 -- IMPORTANT: When stripping directives with grep (e.g., `grep -v '^#'`), be aware
 -- that L4 supports multiline strings with literal newlines. If a string literal
 -- contains a line starting with '#', that line would be incorrectly stripped.
@@ -1326,10 +1390,12 @@ singleLineExpressionCont startLine = try $ do
   guard (sameLine || isContinuation)
   -- If it's a continuation marker, consume it
   when isContinuation $ void $ spacedToken_ (TDirectives TDirectiveContinue)
-  -- Now parse the operator and argument (use regular baseExpr)
+  -- Now parse the operator and argument (mixfixChainOperand, in lockstep with
+  -- expressionCont, so #EVAL operands admit user-defined infix operators too;
+  -- same-line keywords only, preserving the directive's line discipline)
   (prio, assoc, op) <- operator
   l <- currentLine
-  arg <- baseExpr
+  arg <- mixfixChainOperand
   pure (MkCont op prio assoc l (mkPos 1) arg)
 
 data Stack a =
@@ -1511,8 +1577,18 @@ cont pop pbase p =
 currentLine :: Parser Pos
 currentLine = sourceLine <$> getSourcePos
 
+-- | The operand after a built-in operator parses via 'mixfixChainOperand' —
+-- the chain-head production ('indentedExpr', 'singleLineExpr') restricted to
+-- same-line chain keywords — so a user-defined infix operator is admitted on
+-- both sides of every built-in operator and binds tighter than all of them,
+-- exactly as prefix application already does. The assembled chain reaches
+-- 'combine' as a single pre-built operand. Before this, a user-defined
+-- infix call was admitted only at the outermost level of an expression or
+-- inside parentheses (SET-OPERATORS-SPEC §17.3). Same-line only, because
+-- operand position lacks the @withIndent GT@ column guard that protects
+-- chain heads from capturing an aligned next-line declaration.
 expressionCont :: Pos -> Parser (Cont Expr)
-expressionCont p = cont operator baseExpr p
+expressionCont p = cont operator mixfixChainOperand p
 
 data ExprLineInfo =
   MkExprLineInfo
@@ -1713,10 +1789,25 @@ peekNextTokenLayout = do
       , exprIndentColumn = Just tok.range.start.column
       }
 
+-- | Chain-head positions ('indentedExpr', 'singleLineExpr', 'implicitSeq')
+-- admit an aligned chain keyword on the following line: their operand column
+-- is guarded by @withIndent GT@, so a following sibling declaration can never
+-- align with the operand and be captured. Operand position after a built-in
+-- operator has no such column guard — an aligned next-line token there is
+-- routinely the NEXT declaration's head, or an unmarked next line of a
+-- directive — so 'mixfixChainOperand' forms chains from same-line keywords
+-- only. (Found by adversarial review: cross-line capture turned
+-- previously-valid programs into parse errors.)
 mixfixChainExpr :: Parser (Expr Name)
-mixfixChainExpr = do
+mixfixChainExpr = mixfixChainExprNextLine True
+
+mixfixChainOperand :: Parser (Expr Name)
+mixfixChainOperand = mixfixChainExprNextLine False
+
+mixfixChainExprNextLine :: Bool -> Parser (Expr Name)
+mixfixChainExprNextLine nextLineOk = do
   hints <- asks (.mixfixHints)
-  let allowNextLine = hasMixfixHints hints
+  let allowNextLine = nextLineOk && hasMixfixHints hints
   firstLayoutHint <- peekNextTokenLayout
   firstExpr <- baseExpr
   -- Compute end-line + indentation info for alignment-aware keywords.
@@ -1784,7 +1875,9 @@ mixfixChainExpr = do
     mixfixKeywordAligned :: Bool -> MixfixHintRegistry -> ExprLineInfo -> Parser (Epa Name)
     mixfixKeywordAligned allowNextLine hints anchorInfo = do
       tok <- lookAhead (spaceOrAnnotations *> anySingle)
-      let allowWithToken = allowNextLine || isQuotedIdentifierToken tok
+      -- The quoted-token allowance also rides the position's next-line policy:
+      -- in operand position even a backticked keyword must be same-line.
+      let allowWithToken = allowNextLine || (nextLineOk && isQuotedIdentifierToken tok)
       guard (keywordAlignedWith allowWithToken anchorInfo tok.range.start)
       kw <- (MkName emptyAnno . NormalName) <<$>>
         (spacedToken (#_TIdentifiers % #_TQuoted) "mixfix keyword"
@@ -1841,6 +1934,7 @@ baseExpr' =
   <|> try event
   <|> regulative
   <|> breach
+  <|> refuse
   <|> lam
   <|> consider
   <|> try namedApp -- This is not nice
@@ -2389,6 +2483,19 @@ breach = do
       <$  annoLexeme (spacedKeyword_ TKBreach)
       <*> optionalWithHole (annoLexeme (spacedKeyword_ TKBy) *> annoHole (indentedExpr current))
       <*> optionalWithHole (annoLexeme (spacedKeyword_ TKBecause) *> annoHole (indentedExpr current))
+
+-- | Parse @REFUSE "message"@.
+--
+-- The message is a LITERAL, not an arbitrary expression. That is deliberate:
+-- a refusal's reason is meant to be statically readable (so it can be reported
+-- without running the program), and a literal payload means 'Refuse' needs no
+-- machine 'Frame' and so no 'unwindFrame' arm. @REFUSE 42@ parses and is
+-- rejected by the type checker; @REFUSE (something computed)@ does not parse.
+refuse :: Parser (Expr Name)
+refuse = attachAnno $
+  Refuse emptyAnno
+    <$  annoLexeme (spacedKeyword_ TKRefuse)
+    <*> annoHole lit
 
 optionalWithHole :: HasSrcRange a => AnnoParser a -> AnnoParser (Maybe a)
 optionalWithHole p = Just <$> p <|> annoHole (pure Nothing)

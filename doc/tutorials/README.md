@@ -12,6 +12,7 @@ New to L4? Start here:
 - **[Debugging Type Errors](getting-started/debugging-type-errors.md)** - Understand and fix the type checker's error messages
 - **[Version Control for Rules](getting-started/version-control-for-rules.md)** - Manage L4 files with git
 - **[Encoding Legislation](getting-started/encoding-legislation.md)** - Turn legal text into L4
+- **[What a Section Needs to Know](section-given/what-a-section-needs-to-know.md)** - Name the facts a whole run of rules needs once, under the heading, instead of repeating them in every rule
 - **[Wedding Vows](getting-started/wedding-vows.md)** - Fun intro to regulative rules
 - **[Grouping and Precedence](getting-started/grouping-and-precedence.md)** - What binds to what, why L4 groups by indentation, and three cases where a comma was the whole dispute
 
@@ -49,6 +50,14 @@ Export your L4 rules as live REST API endpoints:
 - **[Exporting L4 to Blawx (and Importing Back)](blawx/l4-to-blawx.md)** - Compile L4 decisions into a Blawx project with `l4 blawx`, run them under s(CASP) with English justification trees, and lift Blawx projects back into L4
 
 **Prerequisites:** Basic L4 knowledge
+
+## When a Rule Cannot Answer
+
+An uncommon construct, kept apart from the primary material because you can encode a dozen Acts and contracts without needing it:
+
+- **[When a Rule Cannot Answer](refuse/when-a-rule-cannot-answer.md)** - Say `REFUSE` where your model stops, and tell a refusal apart from the other kinds of "no answer"
+
+**Prerequisites:** Testing Your Rules, What a Section Needs to Know
 
 ## LLM Integration
 

@@ -109,13 +109,24 @@ parseErrorToDiagnostic err = SimpleDiagnostic
 
 -- | Convert an evaluation result to a platform-agnostic diagnostic.
 --
--- Failed assertions get Error severity, successful evaluations get Info.
+-- Failed assertions, and assertions whose expression raised, get Error
+-- severity; a REFUSED assertion gets Warning; successful evaluations get Info.
 evalResultToDiagnostic :: EL.EvalDirectiveResult -> SimpleDiagnostic
 evalResultToDiagnostic r@(EL.MkEvalDirectiveResult mrange res _mtrace _ledger) = SimpleDiagnostic
   { sdLocation = RangeLoc <$> mrange
   , sdSeverity = case res of
-      EL.Assertion False -> DSError
-      _                  -> DSInformation
+      -- A refusal is a DESIGNED outcome, not a defect: the model declined to
+      -- answer and said why. Error severity would squiggle every deliberate
+      -- refusal in the editor and read as a broken program.
+      EL.Assertion (EL.Refused _)      -> DSWarning
+      EL.Assertion EL.Fails            -> DSError
+      EL.Assertion (EL.FailsBecause _) -> DSError
+      EL.Assertion (EL.Errored _)      -> DSError
+      EL.Assertion EL.Holds            -> DSInformation
+      -- Reductions keep their pre-existing uniform Information severity —
+      -- including a raising one. That asymmetry with assertions predates
+      -- REFUSE and is deliberately not changed here.
+      EL.Reduction _                   -> DSInformation
   , sdMessage  = EL.prettyEvalDirectiveResult r
   , sdSource   = "eval"
   }

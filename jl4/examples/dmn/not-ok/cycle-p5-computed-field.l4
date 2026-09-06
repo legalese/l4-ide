@@ -40,13 +40,12 @@
 IMPORT prelude
 
 § `cycle through a computed field`
+    GIVEN `the case file` IS AN Assessment
 
 DECLARE Assessment
   HAS `declared`  IS A NUMBER
       `grossed`   IS A NUMBER
         MEANS `the assessed total` PLUS `declared`
-
-ASSUME `the case file` IS AN Assessment
 
 GIVETH A NUMBER
 `the assessed total` MEANS

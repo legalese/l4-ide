@@ -1,0 +1,88 @@
+-- A bodiless `DECLARE T` is an opaque nominal type, like Haskell's `data T`
+-- with no constructors: no fields, no alternatives, no synonym body. It names
+-- a type and says nothing about its values. This is the ruled spelling for the
+-- type role of `ASSUME T IS A TYPE` (IMPLICIT-PROPS-DESIGN.md §11.1, RULED
+-- 2026-09-05); the two produce the same entity in the type checker.
+--
+-- Every parser position is exercised below: a bodiless DECLARE followed by
+-- another DECLARE, by a GIVEN, by a DECIDE, by a section header, and at the
+-- very end of input; nullary and parameterised; with and without an explicit
+-- GIVEN on the head; and one carrying an AKA alias.
+
+§ `Opaque types`
+
+DECLARE Person
+DECLARE Premises
+
+-- A function over an opaque type type-checks: the type is nominal, so `Person`
+-- unifies only with `Person`.
+GIVEN p IS A Person
+GIVETH A BOOLEAN
+DECIDE `is a person` p IS TRUE
+
+-- An alias works on the bodiless form too.
+DECLARE Applicant AKA Candidate
+
+GIVEN a IS AN Applicant
+GIVETH A BOOLEAN
+DECIDE `is an applicant` a IS TRUE
+
+GIVEN c IS A Candidate
+GIVETH A BOOLEAN
+DECIDE `is a candidate` c IS TRUE
+
+§ `Parameterised opaque types`
+
+-- The head's argument is a type variable. An explicit `GIVEN x IS A TYPE` is
+-- optional, exactly as it is for a record head.
+DECLARE Bag x
+
+GIVEN x IS A TYPE
+DECLARE Pair x
+
+GIVEN bag IS A Bag OF NUMBER
+      pr  IS A Pair OF STRING
+GIVETH A BOOLEAN
+DECIDE `holds both` bag pr IS TRUE
+
+§ `Mixing with records and enums`
+
+DECLARE Licence IS ONE OF granted, refused
+
+DECLARE Application
+  HAS applicant IS A Person
+      premises  IS A Premises
+      outcome   IS A Licence
+
+-- A rule that never inspects the opaque fields evaluates normally, even though
+-- no value of `Person` or `Premises` can be written down in this module.
+GIVEN app IS AN Application
+GIVETH A BOOLEAN
+DECIDE `was granted` app IF app's outcome EQUALS granted
+
+§ `Under a section, and last in the file`
+
+DECLARE Officer
+
+GIVEN o IS AN Officer
+GIVETH A BOOLEAN
+DECIDE `is on duty` o IS TRUE
+
+#CHECK `is a person`
+#CHECK `is an applicant`
+#CHECK `is a candidate`
+#CHECK `holds both`
+#CHECK `was granted`
+#CHECK `is on duty`
+
+#EVAL `was granted` (Application WITH applicant IS `some person`, premises IS `some premises`, outcome IS granted)
+#EVAL `was granted` (Application WITH applicant IS `some person`, premises IS `some premises`, outcome IS refused)
+
+-- Values of an opaque type come from outside the module: an ASSUME term here,
+-- a JSON input at a service boundary in production. They cannot be evaluated
+-- in-module, which is why the two directives above never look at them.
+ASSUME `some person` IS A Person
+ASSUME `some premises` IS A Premises
+
+-- The bodiless form at the very end of input.
+DECLARE Sentinel

@@ -193,11 +193,15 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Module n) where
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Section n) where
   addNlg a = extendNlgA a $ case a of
-    MkSection ann lbl maka topDecls -> do
+    MkSection ann lbl maka mgiven topDecls -> do
       lbl' <- traverse addNlg lbl
       maka' <- traverse addNlg maka
+      -- The section's own GIVEN is traversed BEFORE the declarations: these
+      -- passes consume a range-sorted annotation list in source order, and the
+      -- section binder is written above the first declaration.
+      mgiven' <- traverse addNlg mgiven
       topDecls' <- traverse addNlg topDecls
-      pure (MkSection ann lbl' maka' topDecls')
+      pure (MkSection ann lbl' maka' mgiven' topDecls')
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (TopDecl n) where
   addNlg a = extendNlgA a $ case a of
@@ -265,6 +269,10 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Directive n) where
     Assert ann e -> do
       e' <- addNlg e
       pure $ Assert ann e'
+    AssertRefused ann e mmsg -> do
+      e' <- addNlg e
+      mmsg' <- traverse addNlg mmsg
+      pure $ AssertRefused ann e' mmsg'
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Event n) where
   addNlg a@(MkEvent ann party act timestamp atFirst) = extendNlgA a do
@@ -291,6 +299,8 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (TypeDecl n) where
     SynonymDecl ann ty -> do
       ty' <- addNlg ty
       pure $ SynonymDecl ann ty'
+    OpaqueDecl ann ->
+      pure $ OpaqueDecl ann
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (TypedName n) where
   addNlg a = extendNlgA a $ case a of
@@ -538,6 +548,7 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Expr n) where
       mParty' <- traverse addNlg mParty
       mReason' <- traverse addNlg mReason
       pure $ Breach ann mParty' mReason'
+    Refuse ann msg -> Refuse ann <$> addNlg msg
     Inert ann txt ctx -> pure $ Inert ann txt ctx
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Deonton n) where
@@ -609,9 +620,14 @@ instance HasDesc (Module n) where
     MkModule uri ann <$> addDesc sect
 
 instance HasDesc (Section n) where
-  addDesc (MkSection ann lbl maka decls) = do
+  addDesc (MkSection ann lbl maka mgiven decls) = do
+    -- Source order: the section's own GIVEN precedes the declarations, and
+    -- 'addDesc' consumes a range-sorted list, so it must be traversed first —
+    -- otherwise a @desc written above a section-GIVEN parameter is handed to
+    -- the section's first declaration instead.
+    mgiven' <- traverse addDesc mgiven
     decls' <- traverse addDesc decls
-    pure $ MkSection ann lbl maka decls'
+    pure $ MkSection ann lbl maka mgiven' decls'
 
 instance HasDesc (TopDecl n) where
   addDesc = \ case
@@ -658,6 +674,7 @@ instance HasDesc (Directive n) where
     Check ann e -> Check ann <$> addDesc e
     Contract ann e t evs -> Contract ann <$> addDesc e <*> addDesc t <*> traverse addDesc evs
     Assert ann e -> Assert ann <$> addDesc e
+    AssertRefused ann e mmsg -> AssertRefused ann <$> addDesc e <*> traverse addDesc mmsg
 
 instance HasDesc (Import n) where
   addDesc a = pure a
@@ -690,6 +707,8 @@ instance HasDesc (TypeDecl n) where
       EnumDecl ann <$> traverse addDesc cons
     SynonymDecl ann ty ->
       SynonymDecl ann <$> addDesc ty
+    OpaqueDecl ann ->
+      pure (OpaqueDecl ann)
 
 instance HasDesc (ConDecl n) where
   addDesc (MkConDecl ann name names) =
@@ -778,6 +797,7 @@ instance HasDesc (Expr n) where
     Concat     ann es    -> Concat     ann <$> traverse addDesc es
     AsString   ann e     -> AsString   ann <$> addDesc e
     Breach     ann mp mr -> Breach     ann <$> traverse addDesc mp <*> traverse addDesc mr
+    Refuse     ann msg   -> Refuse     ann <$> addDesc msg
     Inert      ann t c   -> pure (Inert ann t c)
 
 instance HasDesc (GuardedExpr n) where
@@ -984,9 +1004,12 @@ instance HasFixity (Section n) where
   -- claims the annotations that precede it. A fixity above a section header
   -- therefore becomes the leading annotation of the section's first
   -- declaration — the nearest following construct.
-  addFixity (MkSection ann lbl maka decls) = do
+  -- The section's own GIVEN is deliberately NOT traversed: only DECIDE and
+  -- ASSUME can define an operator, so a fixity annotation between a heading and
+  -- its section GIVEN still belongs to the first declaration below it.
+  addFixity (MkSection ann lbl maka mgiven decls) = do
     decls' <- traverse addFixity decls
-    pure $ MkSection ann lbl maka decls'
+    pure $ MkSection ann lbl maka mgiven decls'
 
 instance HasFixity (TopDecl n) where
   -- Only DECIDE/ASSUME can define a binary operator, so only they honor a
@@ -1192,11 +1215,13 @@ instance (HasSrcRange n, HasRef n) => HasRef (Module n) where
 instance (HasSrcRange n, HasRef n) => HasRef (Section n) where
   -- As with 'HasRef (Module n)', do NOT attach at the container level; recurse
   -- only so a leading @ref reaches the first child declaration.
-  addRef (MkSection ann lbl maka decls) = do
+  addRef (MkSection ann lbl maka mgiven decls) = do
     lbl' <- traverse addRef lbl
     maka' <- traverse addRef maka
+    -- Before the declarations, for the source-order reason given on 'addDesc'.
+    mgiven' <- traverse addRef mgiven
     decls' <- traverse addRef decls
-    pure $ MkSection ann lbl' maka' decls'
+    pure $ MkSection ann lbl' maka' mgiven' decls'
 
 instance (HasSrcRange n, HasRef n) => HasRef (TopDecl n) where
   addRef a = case a of
@@ -1241,6 +1266,8 @@ instance (HasSrcRange n, HasRef n) => HasRef (Directive n) where
     Contract ann e t evs -> attachRef a ann >>= \ann' ->
       Contract ann' <$> addRef e <*> addRef t <*> traverse addRef evs
     Assert ann e -> attachRef a ann >>= \ann' -> Assert ann' <$> addRef e
+    AssertRefused ann e mmsg -> attachRef a ann >>= \ann' ->
+      AssertRefused ann' <$> addRef e <*> traverse addRef mmsg
 
 instance (HasSrcRange n, HasRef n) => HasRef (Event n) where
   addRef a@(MkEvent ann party act timestamp atFirst) = do
@@ -1264,6 +1291,7 @@ instance (HasSrcRange n, HasRef n) => HasRef (TypeDecl n) where
       EnumDecl ann' <$> traverse addRef conDecls
     SynonymDecl ann ty -> attachRef a ann >>= \ann' ->
       SynonymDecl ann' <$> addRef ty
+    OpaqueDecl ann -> OpaqueDecl <$> attachRef a ann
 
 instance (HasSrcRange n, HasRef n) => HasRef (TypedName n) where
   addRef a@(MkTypedName ann n ty mExpr typically) = do
@@ -1440,6 +1468,7 @@ instance (HasSrcRange n, HasRef n) => HasRef (Expr n) where
       mParty' <- traverse addRef mParty
       mReason' <- traverse addRef mReason
       pure $ Breach ann' mParty' mReason'
+    Refuse ann msg -> attachRef expr ann >>= \ann' -> Refuse ann' <$> addRef msg
     Inert ann txt ctx -> attachRef expr ann >>= \ann' -> pure (Inert ann' txt ctx)
    where
     bin f ann e1 e2 = do

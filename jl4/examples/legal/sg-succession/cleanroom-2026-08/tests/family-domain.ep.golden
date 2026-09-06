@@ -1,0 +1,2081 @@
+IMPORT prelude
+IMPORT daydate
+
+§ `Singapore family and succession — the shared ontology`
+
+-- ===========================================================================
+-- FAMILY-DOMAIN — the nouns shared by four Singapore Acts.
+--
+--   Wills Act 1838                       (WA)   2020 Rev Ed, in force 28/10/2022
+--   Intestate Succession Act 1967        (ISA)  2020 Rev Ed, in force 31/12/2021
+--   Probate and Administration Act 1934  (PAA)  2020 Rev Ed, in force 15/10/2024
+--   Guardianship of Infants Act 1934     (GIA)  2020 Rev Ed, in force 2/1/2025
+--
+-- WHAT THIS MODULE IS. The four Acts are not four subjects. They are four
+-- views of one event — a death in a family — and they share their nouns. The
+-- same human being is the PAA's "deceased", the WA's "testator" and the ISA's
+-- "intestate"; the same child is a beneficiary under a will, an heir on
+-- intestacy, an "infant" whose guardian the GIA appoints, and a "minority"
+-- that forces a second administrator under PAA s 6(2). This module declares
+-- those nouns once so that all four Act modules read the same facts about the
+-- same people.
+--
+-- WHAT THIS MODULE IS NOT. It states NO RULE. There is not a single DECIDE,
+-- MEANS, IF, deontic or #EVAL below: only DECLARE. A field here records a
+-- FACT about the world — "signed at the foot or end thereof" — and whether
+-- that fact makes the will valid is WA s 6's business, in wills-act.l4. The
+-- test applied to every field was: could a witness of ordinary competence
+-- depose to this, or does answering it require reading the Act? Only the
+-- first kind is here. Where a field does carry a legal
+-- characterisation that none of the four Acts defines — `the date on which
+-- the person attains the age of majority`, `a legitimate child of the person
+-- whose child he is`, `domiciled in Singapore at the time of his death` — it
+-- is marked as an ALREADY-CONSTRUED INPUT and the provision that consumes it
+-- is cited. (Those three are field names, not quotations.)
+--
+-- ISOMORPHISM. Field names carry the statute's own words so that a domain
+-- expert can read a DECLARE against the section it came from, and @ref
+-- annotations pin type and field to the provision. Where the Acts use
+-- different words for the same fact, the field takes the words of the Act
+-- that is most specific about it, and the comment names the others.
+--
+-- RELATIONS ARE RECORDS, AND PEOPLE HAVE IDENTITY. Two disciplines, and the
+-- second is what makes the first work.
+--
+--   (1) A fact that is true only BETWEEN two people is a record wrapping the
+--       edge, never a flag on one of them. `Blood tie` inside `Collateral
+--       relative` was always drawn this way; `Child` (ISA s 3's legitimacy
+--       and adoption limbs), `Guardian` (the GIA's appointment and jointness),
+--       `Disposition` (the WA's and PAA's donees), `Creditor` and `Grantee`
+--       are drawn the same way for the same reason. A boolean on a person
+--       cannot say WHOM he is legitimate to, adopted by, joint with, or owed
+--       money by, and every one of those provisions asks exactly that.
+--
+--   (2) `Person` carries `the reference for this person`, and EQUALITY OF
+--       THAT FIELD IS IDENTITY. Records are values in L4, so without it the
+--       same human embedded in two places is two unrelated copies that can
+--       silently disagree — and the four Acts join across records constantly
+--       (WA s 10(1) must know that the witness's spouse is the donee; GIA
+--       s 7(6) that the court's appointee and the parent's appointee are
+--       guardians of the same infant; PAA s 25(1) that the executor who died
+--       is one of the grantees).
+--
+--       The convention that follows, and it is load-bearing: a record that
+--       embeds a whole `Person` is that person's PRIMARY HOME, and a field
+--       named `the reference for ...` is a POINTER to a person whose facts
+--       live in some other record. There is no registry in a DECLARE-only
+--       module, so a pointer is only ever used where the target is already
+--       embedded somewhere reachable from `Deceased person`; everywhere else
+--       the person is embedded, because a dangling reference would be worse
+--       than a copy.
+--
+-- HOUSE STYLE. Inert: nothing is @export'ed. Quotations in comments are
+-- copied from the extracted PDF text under source/ in this directory, with
+-- the running headers, page numbers and Informal Consolidation watermark
+-- lines discarded and line-wrapping normalised to single spaces.
+-- ===========================================================================
+
+
+§§ `Money, shares and periodical sums — three units, deliberately not one`
+
+-- The brief's hardest question, and it has a three-part answer, because the
+-- four Acts count money in three DIFFERENT units and conflating them is how a
+-- distribution goes wrong:
+--
+--   (1) an AMOUNT — a quantity of Singapore dollars. Every estate threshold
+--       in the PAA is one: "$3 million" (s 35(1)), "$500" (s 56(2)),
+--       "$50,000" (s 62(1)), "$25,000" (s 63(1)-(2)), "$10,000" (s 64(1)).
+--       (Two further dollar figures in these Acts are MAXIMUM CRIMINAL FINES,
+--       not estate thresholds — PAA s 42's "$1,000" and the GIA's "$20,000"
+--       in s 5A(3)(e) — and both sit in material this module puts out of
+--       scope. An earlier draft cited them here and in the @ref below, which
+--       made `Money` look better anchored in these four Acts than it is.)
+--
+--   (2) a SHARE — a dimensionless fraction of an estate. The ISA never names
+--       a dollar figure. It divides: "the spouse shall be entitled to
+--       one-half of the estate" (s 7 rule 2), "by equal portions per stirpes"
+--       (rule 3), "in equal portions if there be 2 parents" (rule 5), "the
+--       whole of the estate" (rules 1, 7, 8, 9). A share times an amount is
+--       an amount; a share plus an amount is nonsense.
+--
+--   (3) a RATE — dollars per unit of time. The GIA is the only Act that has
+--       one, and it has it twice: "such weekly or other periodical sum"
+--       (s 7(4), s 8(b)) and the cap "no sum exceeding $100 per month may be
+--       so applied without the permission of the court" (s 18(1)). A rate is
+--       not an amount: $100 per month is not $100, and the cap bites on the
+--       rate, not on the total eventually applied.
+--
+-- (1) and (2) are declared as NUMBER synonyms — the signature then says which
+-- unit it means. BE HONEST ABOUT WHAT THAT BUYS: L4's `DECLARE X IS A NUMBER`
+-- is a TRANSPARENT synonym, not a checked newtype. Measured on this tree: a
+-- function `GIVEN a IS A Money, b IS A Money GIVETH A Money` accepts a
+-- `Share` for `a` and `l4 check` succeeds. So these names document intent
+-- and cost nothing; they do not stop you adding a fraction to a dollar. The
+-- guard against that is (3): a rate genuinely carries a second component, so
+-- it gets a real record, and the type system does then keep it apart.
+--
+-- (4) One more unit appears once and is NOT declared here: a PERCENTAGE, in
+--     PAA s 66(1), "a commission not exceeding 5% on the value of the assets
+--     collected by them". It is read by the PAA alone and belongs there.
+
+@ref Probate and Administration Act 1934 ss 35(1), 56(2), 62(1), 63(1)-(2), 64(1)
+-- An amount of money, in Singapore dollars. Every dollar figure in all four
+-- Acts is in Singapore dollars; no Act contemplates another currency.
+DECLARE Money IS A NUMBER
+
+@ref Intestate Succession Act 1967 s 7 rules 1-9; s 8
+-- A fraction of an estate: 1 is "the whole of the estate" (rules 1, 7, 8, 9),
+-- 0.5 is "one-half of the estate" (rules 2, 4). L4 NUMBER arithmetic is EXACT
+-- RATIONAL, so an unrepresentable per stirpes fraction loses nothing and no
+-- rounding rule is needed — which is right, because the ISA supplies none.
+-- Measured on this tree with `l4 run`: `0.1 PLUS 0.2 EQUALS 0.3` and
+-- `(1 DIVIDED BY 49) TIMES 49 EQUALS 1` both evaluate TRUE, where IEEE
+-- double arithmetic makes both FALSE. Do not be misled by the PRINTER: an
+-- #EVAL of `1 DIVIDED BY 3` displays `0.3333333333333333`, which is a decimal
+-- rendering of an exact value, not the value itself — `300000 TIMES
+-- (1 DIVIDED BY 3)` evaluates to exactly `100000`.
+DECLARE Share IS A NUMBER
+
+@ref Guardianship of Infants Act 1934 s 7(4), s 8(b) — "such weekly or other periodical sum"; s 18(1) — "no sum exceeding $100 per month"
+-- `weekly` and `other periodical` are s 7(4)'s and s 8(b)'s own words.
+-- `monthly` is NOT in either of those subsections; it comes from s 18(1),
+-- which is the cap this type exists to make applicable, so s 18(1) is cited
+-- here as well.
+DECLARE `Period of a periodical sum` IS ONE OF
+    `weekly`
+    `monthly`
+    `other periodical`
+
+@ref Guardianship of Infants Act 1934 s 18(1) — "no sum exceeding $100 per month may be so applied without the permission of the court"; s 7(4), s 8(b) — "such weekly or other periodical sum"
+-- Amount and period travel together or the s 18(1) cap cannot be applied:
+-- $100 per month is not $100, and the cap bites on the rate.
+--
+-- WHERE IT IS USED, because an earlier draft justified this type at length
+-- and then gave no field the type at all — which is the exact failure the
+-- justification warned about. It is used ONCE, by `Guardian`'s field `the
+-- provision made out of the income of the property of the infant for his
+-- maintenance and education`, which is the sum s 18(1) measures its cap
+-- against. It is deliberately NOT used for the sums s 7(4) and s 8(b) let
+-- the court ORDER a parent to pay: those are made "as ... the court may
+-- consider reasonable", so their amount is the output of a discretion, and
+-- this module records no discretionary outputs. Those two subsections are
+-- cited because they are where the phrase comes from.
+DECLARE `A periodical sum` HAS
+    `the sum`     IS A Money
+    `the period`  IS A `Period of a periodical sum`
+
+
+§§ `The court`
+
+@ref Probate and Administration Act 1934 s 2; Guardianship of Infants Act 1934 s 2; Wills Act 1838 s 28(7)
+-- Three of the four Acts define "court" in the SAME words:
+--   PAA s 2    — "court" means the General Division of the High Court or a Family Court
+--   GIA s 2    — "court" means the General Division of the High Court or a Family Court
+--   WA s 28(7) — "court" means the General Division of the High Court or a Family Court
+-- The fourth, the ISA, has no court at all: its only mention of one is
+-- s 3's "an order of court under any written law", in the definition of
+-- "child", and it defines no forum because it confers no jurisdiction.
+--
+-- THE THREE DEFINITIONS ARE IN THE SAME WORDS BUT NOT OF THE SAME SCOPE.
+-- PAA s 2 opens "In this Act, unless there is something repugnant in the
+-- subject or context" and GIA s 2 opens "In this Act, unless the context
+-- otherwise requires" — both Act-wide. WA s 28(7) opens "In this section —",
+-- so the Wills Act has NO Act-wide definition of "court"; any other WA
+-- reference to a court is not governed by this type.
+--
+-- If each Act declared its own, three identical enums would drift the first
+-- time one Act's forum provision was amended and the others were not — and
+-- these three have been amended on different tracks. Their legislative
+-- histories, at the foot of the source texts, show the GIA and the PAA
+-- amended by the Family Justice Act 2014 (by its section 58 and its
+-- section 69 respectively) while the Wills Act was not; and then all three
+-- amended by the Supreme Court of Judicature (Amendment) Act 2019, section
+-- 28(1), read with item 65 (GIA), item 125 (PAA) and item 164 (WA) of its
+-- Schedule.
+--
+-- The DISTRICT COURT is deliberately NOT a member of THIS type, because it is
+-- outside all three definitions. But it IS a grantor: WA s 28(7)(a)-(b)
+-- ("granted before 1 January 2015 by a District Court") and PAA s 35(1) ("No
+-- probate or letters of administration granted by a District Court before
+-- 1 January 2015") both put it in the same slot as the other two. An earlier
+-- draft made `Grant` carry `the court IS A Court` beside a separate BOOLEAN
+-- for the District Court, which left a pre-2015 District Court grant — a case
+-- both Acts name expressly — with NO truthful value for the required field:
+-- the file had to assert a court that had not made the grant. `The court that
+-- made the grant` below fixes that by widening the SLOT, not the defined term.
+--
+-- A Magistrate's Court (PAA s 42, GIA s 5A(7)) is likewise not a "court"
+-- for these Acts, and unlike a District Court it never makes a grant, so it
+-- is not modelled at all.
+DECLARE Court IS ONE OF
+    `the General Division of the High Court`
+    `a Family Court`
+
+@ref Wills Act 1838 s 28(7)(a)-(b) — "any probate granted by the General Division of the High Court or a Family Court, or granted before 1 January 2015 by a District Court"; Probate and Administration Act 1934 s 35(1)
+-- The grantor slot, three-valued where `Court` is two-valued. The wrapper
+-- keeps `Court` itself exactly as the three Acts define it while letting a
+-- `Grant` say truthfully who made it.
+DECLARE `The court that made the grant` IS ONE OF
+    `a court within the meaning of these Acts`  HAS `the court` IS A Court
+    `a District Court, the grant having been made before 1 January 2015`
+
+
+§§ `A person — living or dead, and when`
+
+@ref Intestate Succession Act 1967 s 7 rule 3 — "in case any of those children be then dead"; Wills Act 1838 s 26 — "shall die in the lifetime of the testator"; "living at the time of the death of the testator"; Guardianship of Infants Act 1934 s 6(1) — "the mother, if surviving"; Probate and Administration Act 1934 s 13(1)(c) — "no executor survives the testator"
+-- Every "surviving" question in the four Acts is RELATIVE — surviving whom,
+-- at what moment — so survivorship cannot be a boolean on a person. The ISA
+-- asks whether a child was dead at the INTESTATE's death (rule 3); the GIA
+-- asks whether the mother is alive now that the FATHER has died (s 6(1)); the
+-- PAA asks whether an executor outlived the TESTATOR (s 13(1)(c)) and whether
+-- a co-representative has since died (s 25(1)). One absolute fact — a date of
+-- death — answers all four by comparison; a `surviving` flag answers none of
+-- them without saying surviving whom.
+--
+-- The type is TOTAL and has no MAYBE. `NOTHING` would have to mean both that
+-- the person is still living and that we were never told, and those are
+-- different: a case file for a long-missing sibling records the second, not
+-- the first. The third member names that gap instead of hiding it, and forces
+-- each Act module to rule on what it does with an undated death rather than
+-- defaulting silently.
+DECLARE `Vital status` IS ONE OF
+    `living`
+    `died on`                          HAS `the date of death` IS A DATE
+    `dead, the date of death not known`
+
+@ref Intestate Succession Act 1967 s 3 ("child", "issue"), s 6(a), s 9; Wills Act 1838 s 4, s 26; Probate and Administration Act 1934 s 21, s 22, ss 14-15, s 19; Guardianship of Infants Act 1934 ss 6-8, ss 15-20
+--
+-- WHY SHARED. This is the type the whole cleanroom turns on. All four Acts
+-- speak about the same human beings and none of them can be encoded without
+-- the others' view of those people: the PAA grants to an executor who is a
+-- person, the WA voids a gift to a witness who is a person, the ISA gives a
+-- share to a child who is a person, the GIA appoints a guardian over an
+-- infant who is a person. If each Act declared its own person type, a case
+-- file would have to state a child's date of birth four times, and the WA
+-- ("under 21 years of age", s 4), the PAA ("while he is an infant", s 21(1))
+-- and the GIA ("infant", throughout) would be free to disagree about the same
+-- child on the same day.
+--
+-- WHY RECURSIVE. `children IS A LIST OF Child`, and a `Child` holds a
+-- `Person` — a person is a NODE IN A TREE, not a row. ISA s 7 rule 3
+-- distributes "by equal portions per stirpes
+-- to and amongst the children of the person dying intestate and such persons
+-- as legally represent those children, in case any of those children be then
+-- dead", and its Proviso No. (2) says "Descendants of the intestate to the
+-- remotest degree stand in the place of their parent or other ancestor, and
+-- take according to their stocks the share which he or she would have taken".
+-- "to the remotest degree" is an unbounded recursion: to divide a predeceased
+-- child's stock you ask, of that child, the same question you asked of the
+-- intestate, and again of any of THEIR children who is also dead. A flat list
+-- of children plus a flat list of grandchildren cannot express it, because it
+-- loses which grandchild belongs to which stock — and per stirpes is nothing
+-- but that grouping. Proviso No. (1) fixes who the recursion runs
+-- over: "The persons who legally represent the children of an intestate are
+-- their descendants and not their next-of-kin", so the recursion is down the
+-- `children` edge only and never sideways.
+--
+-- The same edge is read one level deep by ISA s 7 rule 6 — "the children of
+-- any deceased brother or sister shall take according to their stocks the
+-- share which the deceased brother or sister would have taken" (note: rule 6
+-- says CHILDREN, not descendants; the ISA module owns that difference) — and
+-- by WA s 26, whose lapse-saving turns on issue of a predeceased devisee
+-- "living at the time of the death of the testator".
+--
+-- NO UPWARD EDGE. A person has no `father`/`mother` field. Parent links plus
+-- child links would let a case file build a cycle, and every parent the four
+-- Acts actually name is named from a fixed root: the deceased's parents sit
+-- on `Family` and the infant's parents sit on `Infant` below.
+DECLARE Person HAS
+    `name`                                            IS A STRING
+
+    -- IDENTITY, and the only field here that quotes no statute. See the
+    -- header: equality of this field is identity, and it exists because the
+    -- four Acts join across records constantly and L4 records are values, so
+    -- without it the same human in two places is two copies that can disagree.
+    -- `name` cannot do the work — two people in one estate may share one.
+    `the reference for this person`                   IS A STRING
+
+    @ref Wills Act 1838 s 4 — "No will made by any person under 21 years of age shall be valid"
+    -- Read by the WA, which states its own numeric test and so needs the date
+    -- itself. The PAA's and the GIA's infancy question is answered by the
+    -- majority date below, not from here.
+    --
+    -- NOTHING where the date is not in evidence; many parties to a probate
+    -- file (witnesses, creditors, a consular officer) have no relevant age.
+    `date of birth`                                   IS A MAYBE DATE
+
+    `vital status`                                    IS A `Vital status`
+
+    @ref Intestate Succession Act 1967 s 7 rule 3 and Proviso No. (2); s 3 ("child", "issue")
+    -- The per stirpes edge. Empty for anyone with no children of record.
+    -- A LIST OF `Child`, not of `Person`, because ISA s 3 defines "child"
+    -- RELATIONALLY — see `Child` below.
+    `children`                                        IS A LIST OF Child
+
+    @ref Intestate Succession Act 1967 s 6(a) — "those who at the date of his death were only conceived in the womb but who have subsequently been born alive"
+    -- Read by the ISA alone, but it is a fact about a HUMAN BEING and so it
+    -- belongs on the person rather than in a parallel ISA-only person type.
+    --
+    -- WHY THIS LIMB OF s 6(a) GETS A FIELD WHEN THE OTHER ONE DOES NOT. The
+    -- paternal/maternal limb is refused a field on `Family` below, on the
+    -- ground that recording a distinction s 6(a) abolishes would invite it
+    -- back. The two limbs are not alike, and the difference is worth stating
+    -- because on its face this looks inconsistent. The first limb abolishes a
+    -- RANKING between two classes who both qualify. The second limb settles
+    -- MEMBERSHIP: a child conceived in the womb at the death and later born
+    -- alive is in, and a child conceived AFTER the death is out — so the fact
+    -- is a gate on inclusion and something has to carry it. Recording it does
+    -- not reintroduce any distinction, because s 6(a) makes such a child rank
+    -- exactly as one born in the lifetime.
+    `at the date of the death only conceived in the womb but subsequently born alive` IS A BOOLEAN
+
+    @ref Intestate Succession Act 1967 s 9 — "no money or other property which the intestate may during his life have given, paid or settled to or for the advancement of the child by whom or by whose descendant the claim is made shall be taken into account in estimating such distributive share"
+    -- Recorded so that s 9 can be encoded as the RULE it is. A section which
+    -- says that "no money or other property ... shall be taken into account"
+    -- can only be encoded if the thing exists in the model to not be taken
+    -- into account; dropping the field would make s 9 vacuous and
+    -- indistinguishable from silence.
+    `money or other property given, paid or settled by the intestate during his life to or for the advancement of the person` IS A Money
+
+    @ref Probate and Administration Act 1934 s 21(1) — "No probate or letters of administration shall be granted to a person while he is an infant"; s 21(2) — "limited until the infant obtains a grant to himself"; s 6(2) — "if there is a minority"; Guardianship of Infants Act 1934 — "infant", used throughout and defined nowhere in the Act
+    -- ALREADY-CONSTRUED INPUT. None of the four Acts defines "infant", and
+    -- the age of majority comes from outside them — so it cannot be settled
+    -- here, in a module that states no rule at all. The PAA and the GIA
+    -- therefore take the age of majority as given. The WA is different and
+    -- must NOT read this field: s 4 states its own numeric test, "under 21
+    -- years of age", and s 27(1) disapplies it for "any soldier being in
+    -- actual military service, or any mariner or seaman being at sea" — so
+    -- the wills module computes from `date of birth` instead.
+    --
+    -- A DATE, NOT A BOOLEAN, for the reason `Vital status` is not a
+    -- `surviving` flag: the PAA asks about a MOMENT. s 21(1) bars a grant
+    -- "while he is an infant" and s 21(2) limits one "until the infant obtains
+    -- a grant to himself"; infancy ends, and a timeless boolean cannot say
+    -- when. One absolute date, compared with `the date of the grant`, answers
+    -- both. NOTHING where the date is not in evidence — the same reading as
+    -- `date of birth` above.
+    `the date on which the person attains the age of majority` IS A MAYBE DATE
+
+    @ref Wills Act 1838 s 27(1) — "any soldier being in actual military service, or any mariner or seaman being at sea"; s 27(4); s 27(5)
+    -- WA s 27 IS IN SCOPE ONLY FOR s 27(3), and s 27(3) cannot be evaluated
+    -- without these. s 27(3) saves the testamentary guardian appointed by "a
+    -- will which is, or which, if it had been a disposition of property,
+    -- would have been rendered valid by this section" — so the privileged
+    -- status is the antecedent of the one limb of s 27 this cleanroom keeps.
+    -- An earlier draft retained s 27(3) and declared none of its gate.
+    --
+    -- Three fields because s 27 has three routes in. s 27(4) extends the
+    -- section to "any member of any naval or marine forces not only when he
+    -- is at sea but also when he is so circumstanced that if he were a
+    -- soldier he would be in actual military service". s 27(5) is not a
+    -- fourth route but a widening of the first: "“soldier” includes a member
+    -- of an air force and a serviceman serving in the digital and
+    -- intelligence service of the Singapore Armed Forces", so an airman in
+    -- actual military service answers the first field TRUE.
+    `a soldier being in actual military service`      IS A BOOLEAN
+    `a mariner or seaman being at sea`                IS A BOOLEAN
+    `a member of any naval or marine forces so circumstanced that if he were a soldier he would be in actual military service` IS A BOOLEAN
+
+    @ref Probate and Administration Act 1934 s 18(4)(d)(i) — "the next of kin of any person dying intestate, or the greater number of such next of kin, so desire"
+    -- "so desire" refers forward to the grant s 18(4)(d) then permits —
+    -- letters of administration "to such person as the court thinks fit".
+    -- Recorded per person because s 18(4)(d)(i) COUNTS: it is satisfied by
+    -- the next of kin "or the greater number of such next of kin", which
+    -- cannot be answered by one flag on the estate.
+    `so desires that letters of administration be granted to such person as the court thinks fit` IS A BOOLEAN
+
+    @ref Probate and Administration Act 1934 s 22(1)
+    -- ALREADY-CONSTRUED INPUT: the test is in the Mental Capacity Act 2008,
+    -- which is out of scope; s 22(1) imports it wholesale.
+    `lacks mental capacity (within the meaning of the Mental Capacity Act 2008) to make decisions with respect to the management and administration of the person's property and affairs` IS A BOOLEAN
+
+    @ref Probate and Administration Act 1934 s 14, s 15, s 19 — "absent from Singapore"
+    `absent from Singapore`                           IS A BOOLEAN
+
+    @ref Probate and Administration Act 1934 s 14 — "there is no other executor within Singapore willing to act"; s 19 — "no person equally entitled is willing to act"
+    `willing to act`                                  IS A BOOLEAN
+
+@ref Intestate Succession Act 1967 s 3 — "“child” means a legitimate child and includes any child adopted by virtue of an order of court under any written law for the time being in force in Singapore, Malaysia or Brunei Darussalam"; s 7 rule 3 and Proviso No. (1)-(2); s 7 rule 6; Wills Act 1838 s 26
+--
+-- WHY A WRAPPER RATHER THAN TWO FIELDS ON `Person`, and this is the same
+-- argument `Collateral relative` makes about blood: ISA s 3 defines "child"
+-- RELATIONALLY. Legitimacy is legitimacy AS BETWEEN a child and particular
+-- parents; adoption is adoption BY a particular adopter. An earlier draft put
+-- both limbs on `Person` as unrooted booleans, and the consequence was a real
+-- error, not an inelegance: a child of the intestate who had been adopted
+-- AWAY by strangers read TRUE on the adoption limb and so qualified as the
+-- INTESTATE's “child”. Wrapping the edge makes each limb say whose.
+--
+-- TWO LIMBS, NOT ONE, because s 3's definition has two and they are proved
+-- differently: legitimacy from the status of the parents, adoption from an
+-- order of court in one of three named jurisdictions. An adopted child
+-- satisfies s 3 whether or not the first limb is made out, so an ISA module
+-- that ANDed them would be wrong; keeping them apart makes the disjunction
+-- visible where it belongs.
+--
+-- THE RECURSION STILL RUNS THROUGH IT. `Person`'s `children` is a LIST OF
+-- `Child`, and each `Child` holds a `Person` who has `children` of his own,
+-- so ISA s 7 rule 3's Proviso No. (2) — "Descendants of the intestate to the
+-- remotest degree" — is reached by `the child`'s own edge, exactly as before.
+DECLARE Child HAS
+    `the child`                                       IS A Person
+
+    -- ALREADY-CONSTRUED INPUT. Legitimacy is not defined in any of the four
+    -- Acts; ISA s 3 defines "child" BY REFERENCE to it and stops there, and
+    -- the status comes from outside these Acts entirely (the Legitimacy Act
+    -- 1934 and the status of the parents' marriage). ISA s 3 is the consuming
+    -- provision. An earlier draft named this field in the header as one of
+    -- the three worked examples of an already-construed input and then did
+    -- not mark it.
+    `a legitimate child of the person whose child he is`  IS A BOOLEAN
+
+    `adopted by that person by virtue of an order of court under any written law for the time being in force in Singapore, Malaysia or Brunei Darussalam` IS A BOOLEAN
+
+
+§§ `The family of the deceased`
+
+@ref Intestate Succession Act 1967 s 6(b) — "those related to a person deceased by the half blood shall rank immediately after those of the whole blood related to him in the same degree"
+DECLARE `Blood tie` IS ONE OF
+    `of the whole blood`
+    `of the half blood`
+
+@ref Intestate Succession Act 1967 s 6(b)
+--
+-- WHY A WRAPPER RATHER THAN A FIELD ON `Person`. Whole or half blood is not
+-- an attribute of a human being; it is a RELATION between two of them, and it
+-- only exists relative to the deceased. A child of the intestate has no
+-- whole-or-half blood tie to the intestate at all, so a `Blood tie` field on
+-- `Person` would have to be filled with a meaningless value for every lineal
+-- descendant. Wrapping only the two classes where s 6(b) can bite —
+-- s 7 rule 6's brothers and sisters, and rule 8's uncles and aunts — keeps
+-- the fact where it is true and out of the places where it is not.
+--
+-- NO `degree` FIELD HERE, AND THAT IS DELIBERATE. Review put it that s 6(b)
+-- speaks of persons "related to him in the same degree" and that nothing in
+-- this module records a degree, so "in the same degree" cannot be tested.
+-- The degree is not missing — it is STRUCTURAL, and storing it again is the
+-- duplication this module refuses everywhere else. A relative in `Family`'s
+-- `the brothers and sisters of the deceased` is in the second degree by
+-- construction; one reached through that relative's own `children` edge is
+-- one degree further out per step; `the uncles and aunts of the deceased`
+-- are in the third. A stored `degree` could contradict the position the same
+-- record already occupies, and then a case file would disagree with itself
+-- about kinship — the very failure the `ISSUE ARE NOT HERE` note on `Family`
+-- below gives as its reason. The comparison s 6(b) needs is available to the
+-- ISA module from position and depth alone.
+--
+-- WHY SHARED, not left to the ISA. The PAA grants letters of administration
+-- to "the next of kin" (s 18(4)(a)) and to "the next of kin ... or the
+-- greater number of such next of kin" (s 18(4)(d)(i)) without ever saying who
+-- they are; who they are is settled by the ISA's ranking, and s 6(b) is part
+-- of that ranking. The two Acts must read the same fact or the PAA will grant
+-- to a person the ISA does not pay.
+DECLARE `Collateral relative` HAS
+    `the relative`                             IS A Person
+    `of the whole blood or of the half blood`  IS A `Blood tie`
+
+@ref Wills Act 1838 s 13(1)-(2); Intestate Succession Act 1967 s 7 rules 1, 2, 4, s 8; Probate and Administration Act 1934 s 18(4)(a), s 56(2)
+--
+-- WHY A MARRIAGE AND NOT JUST A SPOUSE. Three of the four Acts need something
+-- the bare identity of a spouse does not carry:
+--   WA s 13(1) needs the DATE — "Every will made by a man or woman shall be
+--     revoked by his or her marriage" — which on the ordinary reading bites
+--     only on a marriage solemnised after the will was executed, so the
+--     will's date of execution has to be comparable with the marriage's.
+--     Note that the limitation is a GLOSS and not the subsection's own words:
+--     s 13(1) contains nothing about the order of the two events, and the
+--     restriction comes from the general law of revocation. The field is
+--     needed either way, because s 13(2) supplies a date test on its face
+--     ("a will made on or after 29 August 1938").
+--   ISA s 8 needs the COUNT — "If any person so dying intestate leaves
+--     surviving him more than one wife, such wives shall share among them
+--     equally the share that the wife of the intestate would have been
+--     entitled to, had the intestate left only one wife surviving him" —
+--     so the list is plural even though ISA s 7 rules 1, 2 and 4 say "a
+--     surviving spouse" in the singular.
+--   PAA s 18(4)(a) and s 56(2) need only the identity ("the husband or widow";
+--     "widower, widow").
+--
+-- SUBSISTENCE IS AN INPUT, AND IT MEANS ONE THING ONLY: not dissolved or
+-- annulled before the death. None of the four Acts provides for divorce,
+-- annulment or judicial separation; a marriage that has ended that way is
+-- simply not a marriage for their purposes, and the law that ends it (the
+-- Women's Charter 1961) is out of scope. So the fact arrives already
+-- construed rather than being inferred from a date.
+--
+-- It does NOT mean that both parties were alive. A marriage also ends on either
+-- party's death, and if `subsisting` carried that too then a widow's marriage
+-- and a predeceased spouse's marriage would both read FALSE and the field
+-- would answer two questions at once. It carries only the first, so that —
+--
+-- SURVIVORSHIP IS NOT STORED HERE. The "surviving" of ISA rules 1, 2 and 4,
+-- and the count in s 8 of wives "surviving him", are computed from the
+-- spouse's own `vital status` against the deceased's — see the note on
+-- `Vital status` above. WA s 13(1) reads the same field for a different
+-- purpose, a marriage that revoked a will and has since been dissolved, and
+-- gets a straight answer only because the two readings are kept apart.
+DECLARE Marriage HAS
+    `the spouse`                                     IS A Person
+    `the date of the solemnisation of the marriage`  IS A MAYBE DATE
+    `subsisting at the death of the deceased, in the sense of not dissolved or annulled before the death` IS A BOOLEAN
+
+@ref Intestate Succession Act 1967 s 7 rules 1-8; Probate and Administration Act 1934 s 18(4)(a), s 56(2); Guardianship of Infants Act 1934 s 6, s 7; Wills Act 1838 s 26, s 27(3)
+--
+-- WHY SHARED. The roster of relatives is read by three Acts for three
+-- different purposes over the same people: the ISA to find who takes
+-- (s 7 rules 1-8), the PAA to find who may be granted letters of
+-- administration ("the husband or widow or next of kin or any of them",
+-- s 18(4)(a); "widower, widow, child, father, mother, brother or sister of
+-- the deceased", s 56(2)), and the GIA to find who is left to be guardian of
+-- a surviving child (s 6). If each Act built its own roster, the same funeral
+-- would seat different families.
+--
+-- THE ORDER OF THE FIELDS IS THE ORDER IN WHICH s 7 FIRST NAMES EACH CLASS.
+-- Spouse (rules 1, 2, 4), parents (rules 4, 5), brothers and sisters and
+-- their children (rule 6), grandparents (rule 7), uncles and aunts (rule 8).
+--
+-- BUT IT IS NOT A LADDER, and an earlier draft said it was — that reading DOWN
+-- the DECLARE walks the statutory ladder, and that a field left empty is a
+-- rung the estate falls through. Both halves are wrong and the second is
+-- wrong in a way that could mislead a drafter. First, the rung s 7 spends
+-- three rules on — issue, rule 3 — is deliberately not in this record at all
+-- (see the next paragraph), so the sequence has a hole in it. Second, rules
+-- 2, 4 and 5 divide the estate between two classes CONCURRENTLY rather than
+-- falling through: under rule 2 "the spouse shall be entitled to one-half of
+-- the estate" and the issue take the other half; under rule 4 the spouse
+-- takes one-half "and the parent or parents to the other half"; rule 5 gives
+-- the parents the estate expressly "subject to the rights of the surviving
+-- spouse (if any) as provided in rule 4". An occupied rung does not stop the
+-- next one being occupied too. Only rules 6, 7, 8 and 9 fall through, and
+-- each says so in its own words ("If there are no ...", "In default of ...").
+--
+-- ISSUE ARE NOT HERE, ON PURPOSE. There is no `the children of the deceased`
+-- field, because the deceased is a `Person` and a `Person` already carries
+-- `children`. Putting descendants in two places is how a case file comes to
+-- disagree with itself about who a child is.
+--
+-- THE PROPOSITUS IS THE DECEASED. Every field says "of the deceased" because
+-- kinship is only meaningful from a root, and this record's root is the dead
+-- person. The GIA's root is a different person — the infant — so it gets its
+-- own record, `Infant`, below, rather than reusing this one upside down.
+--
+-- s 6(a) IS DELIBERATELY NOT MODELLED IN THE SHAPE. "there shall be no
+-- distinction between those who are related to a person deceased through his
+-- father and those who are related to him through his mother": grandparents
+-- and uncles and aunts are therefore FLAT lists, with no paternal/maternal
+-- split. Recording a side and then telling the ISA module to ignore it would
+-- invite exactly the distinction s 6(a) abolishes.
+DECLARE Family HAS
+    @ref Intestate Succession Act 1967 s 7 rules 1, 2, 4; s 8
+    `the marriages of the deceased`             IS A LIST OF Marriage
+
+    @ref Intestate Succession Act 1967 s 7 rules 4, 5; Guardianship of Infants Act 1934 s 6, s 7; Probate and Administration Act 1934 s 56(2)
+    -- Named separately, rather than as one list of parents, because the GIA turns on
+    -- WHICH parent died: s 6(1) "On the death of the father of an infant, the
+    -- mother, if surviving, shall ... be guardian of the infant", s 6(2) the
+    -- mirror. ISA rule 5's "in equal portions if there be 2 parents" is
+    -- satisfied by counting the two fields.
+    --
+    -- WHAT `NOTHING` MEANS HERE: the parent is NOT IN EVIDENCE. It does not
+    -- mean the deceased had no parent — everyone has two — and it must not be
+    -- read as saying the parent is dead, which `vital status` answers.
+    -- Saying so matters because the `Vital status` note above refuses exactly
+    -- this conflation for death, and the same discipline has to hold here or
+    -- ISA rule 5's count is taken over a field that means two things.
+    `the father of the deceased`                IS A MAYBE Person
+    `the mother of the deceased`                IS A MAYBE Person
+
+    @ref Intestate Succession Act 1967 s 7 rule 6; s 6(b); Probate and Administration Act 1934 s 56(2)
+    -- Their children come from each relative's own `children` edge.
+    `the brothers and sisters of the deceased`  IS A LIST OF `Collateral relative`
+
+    @ref Intestate Succession Act 1967 s 7 rule 7 — "the grandparents shall take the whole of the estate in equal portions"
+    `the grandparents of the deceased`          IS A LIST OF Person
+
+    @ref Intestate Succession Act 1967 s 7 rule 8 — "the uncles and aunts shall take the whole of the estate in equal portions"
+    `the uncles and aunts of the deceased`      IS A LIST OF `Collateral relative`
+
+
+§§ `Who can hold and who can take — individuals, the Public Trustee, a trust company, the Government`
+
+@ref Probate and Administration Act 1934 s 2 ("Public Trustee"), s 6(2), s 6(6); Intestate Succession Act 1967 s 7 rule 9 — "the Government shall be entitled to the whole of the estate"
+--
+-- WHY SHARED. Not every taker or grantee is a human being, and the two Acts
+-- that say so say it about the same estate. PAA s 6(2) — "Letters of
+-- administration shall, if there is a minority or if a life interest arises
+-- under the will, be granted either to a trust corporation, with or without
+-- an individual, or to not less than 2 individuals" — is a rule that COUNTS
+-- individuals and distinguishes them from corporations, so "individual" has
+-- to be a distinguishable case and not a convention. s 6(6) then fixes what a
+-- trust corporation is: "“trust corporation” means the Public Trustee or a
+-- corporation licensed as a trust company under the Trust Companies Act
+-- 2005" — two members, not one, because the Public Trustee has powers a trust
+-- company does not (ss 37, 55, 62-65, 68) and is excused security (s 29(4)).
+--
+-- REACHABILITY DIFFERS BY ACT, and that is intended. The ISA reaches
+-- `the Government` (rule 9) and never reaches the other three by name; the
+-- PAA reaches all but `the Government`. A sum type that over-covers is safe
+-- here — an unreachable member costs an OTHERWISE arm — where a type that
+-- under-covers would force one of the two Acts to invent a stand-in.
+DECLARE `Person or corporation` IS ONE OF
+    `an individual`       HAS `the individual` IS A Person
+    `the Public Trustee`
+    `a corporation licensed as a trust company under the Trust Companies Act 2005` HAS `the name of the corporation` IS A STRING
+    `the Government`
+
+
+§§ `An infant, and the guardianship of an infant`
+
+@ref Guardianship of Infants Act 1934 s 6(3), s 16, s 17, s 18; Probate and Administration Act 1934 s 21(2)
+DECLARE `Kind of guardianship` IS ONE OF
+    -- GIA s 6(3) speaks of "no guardian of the person"; ss 16(1), 17 and
+    -- 18(1) each open "A guardian of the property of an infant"; PAA s 21(2)
+    -- speaks of "the guardian of the person and property of the infant".
+    -- The @ref names those provisions and no others. An earlier draft said
+    -- the property formula runs "throughout" ss 15-20 and cited only the GIA:
+    -- both were wrong. s 15(1) words it differently ("Where a person
+    -- appointed by the court is the guardian of an infant's property") and
+    -- s 20 is not confined to guardians of property at all ("Any guardian may
+    -- apply to the court for the court's opinion"); and two of the three
+    -- members below come from provisions the old @ref did not cite.
+    `guardian of the person of the infant`
+    `guardian of the property of the infant`
+    `guardian of the person and property of the infant`
+
+@ref Guardianship of Infants Act 1934 s 6(1)-(3), s 7(1)-(2), s 7(6), s 10; Wills Act 1838 s 27(3)
+--
+-- s 7(6) IS WHY THE COURT MEMBERS ARE SPLIT. "If a guardian has been
+-- appointed by the court to act jointly with a surviving parent, he shall
+-- continue to act as guardian after the death of the surviving parent; but if
+-- the surviving parent has appointed a guardian, the guardian appointed by
+-- the court shall act jointly with the guardian appointed by the surviving
+-- parent." That rule fires for ONE of the court's appointment routes and must
+-- not fire for the others: a guardian appointed under s 6(3), over an infant
+-- who has no parent at all, was never appointed "to act jointly with a
+-- surviving parent". An earlier draft had a single `appointed by the court`
+-- member whose own comment listed four provisions as though they were one
+-- thing, and s 7(6) could not be stated over it.
+--
+-- s 7(4) IS NOT AN APPOINTMENT ROUTE, which is why it is not a member. Under
+-- s 7(4) the court does not appoint anyone: it rules on a guardian already
+-- appointed by deed or will, and may "refuse to make any order (in which case
+-- the mother or father shall remain sole guardian) or make an order that the
+-- guardian so appointed shall act jointly with the mother or father, or that
+-- he shall be sole guardian of the infant". How he was appointed is unchanged
+-- by that order; what changes is whether he acts alone or jointly, and that
+-- is `alone or jointly` on `Guardian` below.
+--
+-- DEED AND WILL ARE SPLIT because they are proved differently and only one of
+-- them has a document in this module. A will-appointed guardian appears in
+-- `Will`'s `the guardians of infant children appointed by the will`, with its
+-- execution facts and its date; a deed-appointed guardian has no instrument
+-- anywhere here, and a reader needs to be able to see which case he is in.
+DECLARE `How the guardian was appointed` IS ONE OF
+    -- s 6(1)-(2): the surviving parent is guardian by force of the section,
+    -- without any appointment at all.
+    `guardian by virtue of surviving the other parent`
+    -- s 7(1): "The father of an infant may by deed or will appoint any person
+    -- to be guardian of the infant after his death."
+    `appointed by the father by deed`
+    `appointed by the father by will`
+    -- s 7(2): the mirror, for the mother.
+    `appointed by the mother by deed`
+    `appointed by the mother by will`
+    -- s 6(1): "the court may if it thinks fit appoint a guardian to act
+    -- jointly with the mother"; s 6(2) the mirror, for the father. This is
+    -- s 7(6)'s antecedent.
+    `appointed by the court to act jointly with the surviving parent`
+    -- s 6(3): "Where an infant has no parent, no guardian of the person and
+    -- no other person having parental rights with respect to him, the court,
+    -- on the application of any person, may, if it thinks fit, appoint the
+    -- applicant to be the guardian of the infant." s 7(6) must NOT fire here.
+    `appointed by the court where the infant has no parent`
+    -- s 10: "The court may remove from his guardianship any guardian, and may
+    -- appoint another guardian in his place."
+    `appointed by the court in place of a removed guardian`
+
+@ref Guardianship of Infants Act 1934 s 6(1)-(2), s 7(3)-(6), s 8
+--
+-- JOINTNESS IS A RELATION AND IT IS OPERATIVE, so it gets a payload naming
+-- the other guardians rather than a flag. The GIA draws the sole/joint line
+-- four times: s 6(1) "either alone or jointly with any guardian appointed by
+-- the father", and s 6(2) the mirror; s 7(3) "Any guardian so appointed shall act
+-- jointly with the mother or father"; s 7(4) the court may order "that he
+-- shall be sole guardian of the infant"; s 7(5) "Where guardians are
+-- appointed by both parents, the guardians so appointed shall after the death
+-- of the surviving parent act jointly". And s 8 quantifies over the set:
+-- "Where 2 or more persons act as joint guardians of an infant and they are
+-- unable to agree on any question affecting the welfare of the infant".
+--
+-- MEMBERSHIP OF `Infant`'s `the guardians of the infant` IS NOT JOINTNESS.
+-- An earlier draft had nothing but that list, on the footing that two
+-- guardians in one list act together. They do not: a guardian of the person
+-- and a guardian of the property are both guardians of the same infant and
+-- act separately, and s 7(4) expressly contemplates one appointee being made
+-- SOLE guardian while the parent stays in the picture. So s 8's "act as joint
+-- guardians" could not be tested at all.
+DECLARE `Alone or jointly` IS ONE OF
+    `alone`
+    -- PERSONS, not guardians. s 7(3) makes a testamentary guardian "act
+    -- jointly with the mother or father ... so long as the mother or father
+    -- remains alive", and while the parent is alive the parent is not yet a
+    -- guardian: s 6(1) and s 6(2) make the survivor guardian only "On the
+    -- death of" the other. So the co-actor is identified by `the reference
+    -- for this person`, which every `Person` carries.
+    `jointly with`  HAS `the references for the persons with whom he acts jointly` IS A LIST OF STRING
+
+@ref Guardianship of Infants Act 1934 s 6, s 7, s 8, ss 15-20; Probate and Administration Act 1934 s 6(4), s 21(2); Wills Act 1838 s 27(3)
+--
+-- WHY SHARED. Three of the four Acts create or read a guardian over the same
+-- child. The GIA appoints one (ss 6, 7, 10). The PAA grants to one — s 21(2):
+-- "Where an infant would, but for his infancy, be entitled to probate or
+-- letters of administration, letters of administration with or without the
+-- will annexed may, subject to section 6(1), be granted to the guardian of
+-- the person and property of the infant" — and s 6(4) lets "the guardian,
+-- committee or receiver of any such person" apply for an additional personal
+-- representative. The WA makes one — s 27(3): "any appointment contained in
+-- that will of any person as guardian of the infant children of the testator
+-- shall be of full force and effect". If the WA declared its own guardian
+-- type, a soldier's will could appoint a guardian the PAA could not then
+-- grant to.
+--
+-- `refuses to act` IS RECORDED BECAUSE THE GIA TURNS ON IT. s 6(1): "When no
+-- guardian has been appointed by the father or if the guardian or guardians
+-- appointed by the father is or are dead or refuses or refuse to act, the
+-- court may if it thinks fit appoint a guardian to act jointly with the
+-- mother." Death of the guardian is read from the guardian's own
+-- `vital status`; refusal is not derivable from anything else.
+--
+-- THE INFANT IS A POINTER, NOT A COPY. `Infant` below is the infant's primary
+-- home; a `Guardian` reached through `Infant`'s `the guardians of the infant`
+-- that also embedded a whole `Person` would be a second copy of the same
+-- child, free to disagree with the first. See the header on identity.
+--
+-- ss 15-18 ARE HERE IN FULL, because they are the GIA's operative rules with
+-- determinate outputs and a shared ontology that stops short of them leaves
+-- the guardianship module nothing to state. Each is a prohibition with a
+-- dispensation, and BOTH halves have to be recorded or the encoding says
+-- something the Act does not: an earlier draft had `has given security` with
+-- no field for s 15(1)'s "unless the court otherwise orders", so a guardian
+-- lawfully excused security was indistinguishable from one in breach.
+DECLARE Guardian HAS
+    `the guardian`                       IS A Person
+    `the reference for the infant`       IS A STRING
+    `how the guardian was appointed`     IS A `How the guardian was appointed`
+    `of the person or of the property`   IS A `Kind of guardianship`
+
+    @ref Guardianship of Infants Act 1934 s 6(1)-(2), s 7(3)-(6), s 8
+    `alone or jointly`                   IS AN `Alone or jointly`
+
+    @ref Guardianship of Infants Act 1934 s 6(1)-(2) — "refuses or refuse to act"
+    `refuses to act`                     IS A BOOLEAN
+
+    @ref Guardianship of Infants Act 1934 s 7(3) — "unless the mother or father objects to his so acting"
+    -- s 7(3) makes a testamentary guardian act jointly with the surviving
+    -- parent by default and takes that away on the parent's objection; s 7(4)
+    -- then opens the court to him "If the mother or father so objects, or if
+    -- the guardian so appointed as aforesaid considers that the mother or
+    -- father is unfit to have the custody of the infant". Neither of these is
+    -- a discretion — one is what a named person said, the other what a named
+    -- person believes — and neither was recorded in an earlier draft, so the
+    -- whole of s 7(4) had no antecedent at all.
+    `the mother or father objects to his so acting`  IS A BOOLEAN
+    @ref Guardianship of Infants Act 1934 s 7(4) — "if the guardian so appointed as aforesaid considers that the mother or father is unfit to have the custody of the infant"
+    `considers that the mother or father is unfit to have the custody of the infant` IS A BOOLEAN
+
+    @ref Guardianship of Infants Act 1934 s 10 — "The court may remove from his guardianship any guardian, and may appoint another guardian in his place"
+    -- Without this a removed guardian sits in `the guardians of the infant`
+    -- indistinguishable from a serving one.
+    `removed from his guardianship by the court`     IS A BOOLEAN
+
+    @ref Guardianship of Infants Act 1934 s 15(1) — "he shall unless the court otherwise orders, give security in such sum as may be appointed for the due performance of his duties as such guardian"
+    `has given security`                 IS A BOOLEAN
+    `the court has otherwise ordered as to security` IS A BOOLEAN
+
+    @ref Guardianship of Infants Act 1934 s 16(1)(a) — "sell, mortgage, exchange, or otherwise part with the possession of any of the movable or immovable property of the infant"
+    `has sold, mortgaged, exchanged, or otherwise parted with the possession of any of the movable or immovable property of the infant` IS A BOOLEAN
+    @ref Guardianship of Infants Act 1934 s 16(1)(b) — "lease any land belonging to the infant for a term exceeding one year"
+    -- The term is separate because s 16(1)(b) bites only on a term
+    -- "exceeding one year"; a shorter lease is not within the prohibition.
+    -- NOTHING where no land has been leased.
+    `has leased land belonging to the infant`        IS A BOOLEAN
+    `the term of the lease, in years`                IS A MAYBE NUMBER
+    @ref Guardianship of Infants Act 1934 s 16(1) — "shall not, without the permission of the court"
+    `has the permission of the court to deal with the property of the infant` IS A BOOLEAN
+
+    @ref Guardianship of Infants Act 1934 s 17 — "A guardian of the property of an infant shall not, unless in any case the court otherwise orders, be empowered to give a good discharge for any legacy or other capital moneys payable to or receivable by an infant"
+    `has given a good discharge for a legacy or other capital moneys payable to or receivable by the infant` IS A BOOLEAN
+    `the court has otherwise ordered as to giving a good discharge` IS A BOOLEAN
+
+    @ref Guardianship of Infants Act 1934 s 18(1) — "A guardian of the property of an infant may make reasonable provision out of the income of such property for his maintenance and education, having regard to his station in life; but no sum exceeding $100 per month may be so applied without the permission of the court"
+    -- THE ONE FIELD THAT USES `A periodical sum`, and the reason that type
+    -- exists. s 18(1)'s cap is a RATE — "$100 per month" — so it can only be
+    -- applied to a sum that carries its own period. What the court considers
+    -- "reasonable provision" is not recorded; what was actually applied is,
+    -- because that is what the cap measures.
+    `the provision made out of the income of the property of the infant for his maintenance and education` IS AN `A periodical sum`
+    @ref Guardianship of Infants Act 1934 s 18(1) — "without the permission of the court"
+    `has the permission of the court to apply a sum exceeding $100 per month` IS A BOOLEAN
+
+@ref Guardianship of Infants Act 1934 s 3, s 4, s 6, s 7, s 11, s 16, s 18, s 19; Probate and Administration Act 1934 s 6(2), s 21, s 63; Wills Act 1838 s 27(3)
+--
+-- WHY A SECOND ROOT. `Family` is rooted at the deceased and answers who this
+-- dead person's relatives are. The GIA asks a different question about a
+-- different root: who THIS CHILD's parents are, and which of them is left.
+-- The two roots coincide in the ordinary case — the infant is a child of the
+-- deceased — but they are not the same record, and forcing the GIA to read
+-- `Family` upside down would break the moment the surviving parent is not
+-- the deceased's spouse (a child of an earlier marriage, GIA s 7(3)-(4)).
+--
+-- WHY SHARED. The PAA needs the same child: s 6(2) makes a "minority" among
+-- the beneficiaries force a second administrator, and s 21 bars a grant to an
+-- infant while routing it to the infant's guardian. The GIA needs the child's
+-- property (ss 16-19). The two are the same property, because it is the share
+-- the ISA gave the child out of the estate the PAA administered.
+--
+-- AND IT IS REACHABLE FROM THE ROOT. `Deceased person` carries `the infants
+-- concerned in the estate IS A LIST OF Infant`. An earlier draft declared
+-- this record and gave no field anywhere its type, so PAA s 6(2)'s minority,
+-- s 21(2)'s grant to the infant's guardian and every GIA property provision
+-- were cut off from the one record each Act module takes as its GIVEN. The
+-- infant is USUALLY one of the deceased's descendants and is then also a
+-- `Person` inside the `children` tree; `the reference for this person` is
+-- what ties the two, and this record remains the infant's primary home
+-- because s 21(2)'s infant ("would, but for his infancy, be entitled to
+-- probate") need not be a relative of the deceased at all.
+DECLARE Infant HAS
+    `the infant`                                          IS A Person
+    @ref Guardianship of Infants Act 1934 s 6(1)-(2), s 7(1)-(4), s 11(a)
+    -- `NOTHING` means the parent is NOT IN EVIDENCE, exactly as on `Family`.
+    -- It does not mean the infant "has no parent" within s 6(3) — that is
+    -- answered by both parents' `vital status`; a missing record must not be
+    -- allowed to read as a dead parent and satisfy a jurisdictional gate.
+    `the father of the infant`                            IS A MAYBE Person
+    `the mother of the infant`                            IS A MAYBE Person
+    @ref Guardianship of Infants Act 1934 s 6, s 7, s 8 — joint guardians
+    -- Membership of this list is NOT jointness; see `Alone or jointly` above.
+    `the guardians of the infant`                         IS A LIST OF Guardian
+
+    @ref Guardianship of Infants Act 1934 s 6(3) — "Where an infant has no parent, no guardian of the person and no other person having parental rights with respect to him"
+    -- The third limb of s 6(3)'s gate, and the only one of the three that is
+    -- not already answered elsewhere: "no parent" comes from the parents'
+    -- `vital status`, "no guardian of the person" from `the guardians of the
+    -- infant` and their `of the person or of the property`, and this from
+    -- nothing at all until now.
+    `some other person has parental rights with respect to him` IS A BOOLEAN
+
+    @ref Guardianship of Infants Act 1934 s 18(1) — "may make reasonable provision out of the income of such property"
+    `the income of the property of the infant`            IS A Money
+    @ref Guardianship of Infants Act 1934 s 18(2) — "the capital of the infant's property"; s 19(1) — "the value of his property"
+    `the capital of the property of the infant`           IS A Money
+
+    @ref Guardianship of Infants Act 1934 s 11(b) — "where the infant is of an age to express an independent opinion — the wishes of the infant"
+    -- ALREADY-CONSTRUED INPUT: s 11(b) fixes no age, and the court's duty
+    -- under s 11 is to "consider" the wishes, which is not a determinate
+    -- output; only the antecedent fact is recorded here.
+    `of an age to express an independent opinion`         IS A BOOLEAN
+
+-- GIA s 19(1) HAS NO TYPE HERE, AND THE OBJECTION IS RECORDED RATHER THAN
+-- ACTED ON. Review put it that s 19(1) creates an appointee who is expressly
+-- NOT a guardian — "the court may, instead of appointing a guardian of the
+-- property of the infant, order that all the property of the infant of
+-- whatsoever description shall be placed in the hands of a person to be
+-- appointed by the court" — and that he has no home in `Kind of guardianship`
+-- or `How the guardian was appointed`. That is true, and he is deliberately
+-- left without one. Both ends of s 19(1) are pure discretion: the order is
+-- made only if it "appears that ... it would be expedient", and the appointee
+-- then deals with the property "in his sole and uncontrolled discretion".
+-- Giving him a member of either enum would put a discretionary office beside
+-- offices the Act creates by rule, and would invite a downstream module to
+-- treat him as a guardian, which s 19(1) says he is not. He is named in the
+-- closing out-of-scope section instead, which is where a reader should be
+-- able to find him.
+
+
+§§ `A will, its witnesses and its executors`
+
+@ref Wills Act 1838 s 6(2), s 9, s 10, s 11, s 12
+--
+-- WHY IT LIVES HERE, even though only the WA reads it. The witnesses are constitutive
+-- of the will's EXECUTION (s 6(2): "those witnesses shall subscribe the will
+-- in the presence of the testator"), and the will is shared by all four Acts.
+-- Splitting the execution facts across two records — some on a shared `Will`,
+-- some in a wills-only witness record — would leave a reader holding s 6(2)
+-- unable to find half of its own subsection.
+--
+-- s 10 IS TWO FIELDS, NOT ONE. s 10(1) voids a gift given "to whom or to
+-- whose wife or husband", and s 10(3) disregards the attestation "by a person
+-- to whom or to whose spouse there is given or made any disposition" where
+-- the will is duly executed without it. The gift to the witness and the gift
+-- to the witness's spouse are separately provable, and s 10(1) makes the gift
+-- void only "so far only as concerns the person attesting ... or the wife or
+-- husband of that person", so which one received it decides whose gift falls.
+DECLARE `Attesting witness` HAS
+    `the witness`                                                  IS A Person
+
+    @ref Wills Act 1838 s 6(2) — "those witnesses shall subscribe the will in the presence of the testator"
+    `subscribed the will in the presence of the testator`          IS A BOOLEAN
+
+    @ref Wills Act 1838 s 9 — "If any person who attests the execution of a will shall, at the time of the execution thereof or at any time afterwards, be incompetent to be admitted a witness to prove the execution thereof, the will shall not on that account be invalid"; and, as the source of the residue, s 10(2), s 11, s 12
+    -- ALREADY-CONSTRUED INPUT, AND NARROWER THAN IT LOOKS. Competency to give
+    -- evidence is a question of the law of evidence, which is outside all four
+    -- Acts and is where this field comes from. But the Wills Act decides three
+    -- slices of it ITSELF, from facts recorded in this same record, and this
+    -- field must NOT be used to answer them or a case file could assert an
+    -- incompetency the Act has just abolished:
+    --   s 10(2) — the attesting witness given a gift under s 10(1) "shall be
+    --     admitted as a witness to prove the execution of the will ...
+    --     notwithstanding the devise, legacy, estate, interest, gift or
+    --     appointment mentioned in the will";
+    --   s 11 — where an estate is charged with a debt and the creditor or the
+    --     creditor's spouse attests, "the creditor notwithstanding the charge
+    --     shall be admitted a witness to prove the execution of the will or to
+    --     prove the validity or invalidity thereof";
+    --   s 12 — "No person shall, on account of his being an executor of a
+    --     will, be incompetent to be admitted a witness".
+    -- So the field carries incompetency arising OUTSIDE ss 10-12, and
+    -- wills-act.l4 applies those three subsections itself, over the gift, the
+    -- charged-debt and the executor facts below. An earlier draft recorded
+    -- both the inputs to ss 11-12 and their output side by side, with nothing
+    -- to say which won.
+    `incompetent to be admitted a witness to prove the execution thereof, otherwise than by reason of sections 10(2), 11 and 12` IS A BOOLEAN
+
+    @ref Wills Act 1838 s 10(1) — "any beneficial devise, legacy, estate, interest, gift or appointment of or affecting any real or personal estate, other than and except charges and directions for the payment of any debt, shall be thereby given or made"
+    -- THE CARVE-OUT IS IN THE NAME. s 10(1) excepts "charges and directions
+    -- for the payment of any debt", and a charge is on its face an "interest
+    -- ... affecting any real or personal estate", so a field name that stopped
+    -- at "interest" would read TRUE for a witness given only a charge and
+    -- avoid a gift s 10(1) leaves standing. The second field carries
+    -- "beneficial" too, which an earlier draft dropped from it while keeping
+    -- it on the first.
+    --
+    -- WHAT WAS GIVEN is `Will`'s `the dispositions made by the will`, matched
+    -- to this witness by `the reference for this person`. These two booleans
+    -- survive alongside it because the WITNESS'S SPOUSE is not otherwise in
+    -- the model at all: `Marriage` is rooted at the deceased, so there is no
+    -- edge from an attesting witness to his wife or husband, and s 10(1)
+    -- turns on exactly that edge.
+    `given or made a beneficial devise, legacy, estate, interest, gift or appointment by the will, other than and except charges and directions for the payment of any debt`             IS A BOOLEAN
+    `the wife or husband of the witness given or made such a beneficial devise, legacy, estate, interest, gift or appointment` IS A BOOLEAN
+
+    @ref Wills Act 1838 s 11 — "any creditor, or the wife or husband of any creditor, whose debt is so charged, shall attest the execution of the will"
+    `a creditor, or the wife or husband of a creditor, whose debt is charged on the estate by the will`        IS A BOOLEAN
+
+-- WA s 12's FACT IS NOT A FIELD HERE, and that is a repair rather than an
+-- omission. "No person shall, on account of his being an executor of a will,
+-- be incompetent to be admitted a witness to prove the execution of the will
+-- or to prove the validity or invalidity thereof." Whether this witness is an
+-- executor of this will is MEMBERSHIP of `Will`'s `the executors appointed by
+-- the will`, matched by `the reference for this person`. An earlier draft
+-- carried it as a second boolean here, which was a copy of that membership
+-- with nothing binding the two — precisely the duplication the header's
+-- identity note exists to stop.
+
+@ref Probate and Administration Act 1934 s 8(2) — "The appointment may be express or implied"
+DECLARE `Mode of appointment` IS ONE OF
+    `express`
+    `implied`
+
+@ref Probate and Administration Act 1934 s 8, s 13(1), s 14, s 25(1); Wills Act 1838 s 12
+--
+-- WHY SHARED. The executor is named in the will (WA's document) and grants
+-- probate (PAA's business), so neither Act owns him alone. PAA s 13(1) then
+-- reads five separate facts off him to decide whether letters of
+-- administration with the will annexed may issue instead — "(a) no executor
+-- is appointed by a will; (b) the executor or all the executors appointed by
+-- will are legally incapable of acting as such, or have renounced the right
+-- to act as such; (c) no executor survives the testator; (d) all the
+-- executors die before obtaining probate or before having administered all
+-- the estate of the deceased; or (e) the executors appointed by any will do
+-- not appear and extract probate" — and every one of those is a fact about a
+-- named person in the will.
+--
+-- WHICH LIMB IS COMPUTED WHERE, corrected. An earlier draft said that (c) and
+-- (d) both come from `vital status` compared with the testator's, which is
+-- right about (c) and wrong about (d): only (c) turns on outliving the
+-- testator.
+--   (c) "no executor survives the testator" — the executor's `vital status`
+--       against the testator's. Nothing here.
+--   (d) "all the executors die before obtaining probate or before having
+--       administered all the estate of the deceased" — two comparisons,
+--       neither with the death of the testator. The first is the executor's
+--       date of death against `the date of the grant` on the `Grant` whose
+--       grantees include him in the capacity `as executor`; the second is his
+--       date of death against `has administered all the estate of the
+--       deceased`, which IS here.
+--   (a), (b) and (e) are otherwise here.
+DECLARE `Executor appointed by a will` HAS
+    `the executor`                                     IS A Person
+    @ref Probate and Administration Act 1934 s 8(2)
+    `the appointment, express or implied`              IS A `Mode of appointment`
+    @ref Probate and Administration Act 1934 s 13(1)(b) — "legally incapable of acting as such"; and, as the source of the two limbs excluded from it, s 21(1) and s 22(1)
+    -- ALREADY-CONSTRUED INPUT, AND A RESIDUE. Being "legally incapable of
+    -- acting as such" is in part the PAA's OWN conclusion, from facts already on
+    -- `Person`: s 21(1) "No probate or letters of administration shall be
+    -- granted to a person while he is an infant" and s 22(1) "No probate or
+    -- letters of administration are to be granted to a person who lacks
+    -- mental capacity (within the meaning of the Mental Capacity Act 2008)".
+    -- Both are computed by probate-administration-act.l4 from `the date on
+    -- which the person attains the age of majority` and the s 22(1) field. So
+    -- this field carries only incapacity from a source OUTSIDE the PAA; an
+    -- earlier draft took it as the whole of s 13(1)(b), which let a file say
+    -- an executor was an infant and simultaneously not legally incapable.
+    `legally incapable of acting as such, otherwise than under section 21(1) or section 22(1)` IS A BOOLEAN
+    @ref Probate and Administration Act 1934 s 13(1)(b) — "have renounced the right to act as such"; ss 3-5, the renunciation machinery that produces the fact
+    `has renounced the right to act as such`           IS A BOOLEAN
+    @ref Probate and Administration Act 1934 s 13(1)(e) — "the executors appointed by any will do not appear and extract probate"
+    `appeared and extracted probate`                   IS A BOOLEAN
+    @ref Probate and Administration Act 1934 s 13(1)(d) — "before having administered all the estate of the deceased"
+    `has administered all the estate of the deceased`  IS A BOOLEAN
+
+@ref Wills Act 1838 s 10(1), s 20, s 26; Probate and Administration Act 1934 s 13(2)(a), s 13(2)(d), Second Schedule paras 1-2, 5-7
+--
+-- THE KINDS THE TWO ACTS ACTUALLY NAME, and no others. PAA s 13(2)'s ranked
+-- class is stated in these terms — "(a) a universal or residuary legatee ...
+-- (d) a legatee having a beneficial interest" — and the Second Schedule's
+-- order of application distinguishes property "undisposed of by will" (para
+-- 1), property "included ... in a residuary gift" (para 2), "pecuniary
+-- legacies" (paras 1, 5), property "specifically devised or bequeathed"
+-- (para 6) and property "appointed by will under a general power" (para 7).
+-- The last member is not a gift at all: WA s 10(1) excepts "charges and
+-- directions for the payment of any debt" from the gifts it avoids, so a
+-- charge has to be recordable as something the will contains and s 10(1)
+-- does not touch.
+DECLARE `Kind of disposition` IS ONE OF
+    `a universal gift`
+    `a residuary gift`
+    `a specific devise or bequest`
+    `a pecuniary legacy`
+    `an appointment by will under a power`
+    `a charge or direction for the payment of a debt`
+
+@ref Wills Act 1838 s 10(1), s 26; Probate and Administration Act 1934 s 6(2), s 13(2)(a), s 13(2)(c)-(d); Intestate Succession Act 1967 s 3 ("intestate"), s 10
+--
+-- WHY THIS EXISTS AT ALL, and it is the largest thing adversarial review
+-- added. An earlier draft had a `Will` that carried execution facts,
+-- witnesses and executors and DISPOSED OF NOTHING: there was no devise, no
+-- legacy, no gift, no bequest and no beneficiary anywhere in the module, and
+-- the whole dispositive content of a will was one scalar on `Estate`. Four
+-- provisions could not be encoded at all as a result —
+--   PAA s 13(2)(a) and (d): three of the five rungs of the prior-right class
+--     ("a universal or residuary legatee", "a legal personal representative
+--     of a deceased universal or residuary legatee", "a legatee having a
+--     beneficial interest") name classes of donee that did not exist here.
+--   PAA s 6(2): "Letters of administration shall, if there is a minority ...
+--     be granted either to a trust corporation ... or to not less than 2
+--     individuals" — with no beneficiary list, there was nowhere to look for
+--     the minority.
+--   WA s 10(1): the module could record THAT a witness or the witness's
+--     spouse took a gift, but not WHAT, so "shall ... be utterly null and
+--     void" had no object and could not be applied to the estate.
+--   ISA s 10: "subject to the provisions contained in the will" had nothing
+--     to defer to.
+--
+-- IT ALSO REPLACES A LEGAL CONCLUSION WITH THE FACTS UNDER IT. An earlier
+-- draft carried an `Extent of the beneficial disposition` enum on `Will`
+-- (whole / part / no part) BESIDE `Estate`'s `the value of the property
+-- beneficially disposed of by the will`, so the same question was recorded
+-- twice — once as a three-way characterisation and once as a quantity — with
+-- nothing tying them, and a file could say a will disposed of no part while
+-- giving a non-zero disposed value. The characterisation is what ISA s 3
+-- ("“intestate” includes any person who leaves a will but dies intestate as
+-- to some beneficial interest in his property") and s 10 are the provisions
+-- to DECIDE, and intestate-succession-act.l4 now decides it from this list: a
+-- universal or residuary gift disposes of the whole, dispositions without one
+-- dispose of part, and no beneficial disposition at all leaves the whole
+-- estate on intestacy. That last case is real and is why the old enum had a
+-- third member — WA s 27(3) contemplates a will whose only operative content
+-- is an appointment of a guardian, which is admissible to probate and
+-- disposes of nothing — and it is now simply a will with no beneficial
+-- disposition in this list.
+DECLARE Disposition HAS
+    `the donee`                                  IS A `Person or corporation`
+    `the kind of disposition`                    IS A `Kind of disposition`
+    `the value of the disposition`               IS A Money
+
+    @ref Wills Act 1838 s 10(1) — "any beneficial devise, legacy, estate, interest, gift or appointment"; Probate and Administration Act 1934 s 13(2)(d) — "a legatee having a beneficial interest"
+    `beneficial`                                 IS A BOOLEAN
+
+    @ref Wills Act 1838 s 26 — "to whom any real or personal estate shall be devised or bequeathed for any estate or interest not determinable at or before the death of that person"
+    -- s 26's lapse-saving has three operative facts and this is the only one
+    -- that is not already elsewhere: that the donee was "a child or other
+    -- issue of the testator" is read off the testator's `children` edge and
+    -- the `Child` relation, and that the donee died in the testator's
+    -- lifetime leaving issue living at the testator's death is read off
+    -- `Vital status`. The contrary intention that s 26 closes with is
+    -- wills-act.l4's, per provision — see the closing section.
+    `not determinable at or before the death of the donee`  IS A BOOLEAN
+
+@ref Probate and Administration Act 1934 s 6(2) — "if there is a minority or if a life interest arises under the will"; s 6(4) — "during the minority of a beneficiary or the subsistence of a life interest and until the estate is fully administered"
+--
+-- A LIFE INTEREST NEEDS A LIFE. s 6(2) asks only whether one arises, and a
+-- boolean answers that; s 6(4) asks whether one SUBSISTS, and a boolean
+-- cannot, because subsistence ends with the life tenant. Naming the tenant
+-- makes s 6(4) fall out of his own `vital status`, which is the same move
+-- `Vital status` makes for survivorship. An earlier draft had the boolean
+-- alone, so s 6(4) had no way to end.
+DECLARE `Life interest` HAS
+    `the life tenant`                            IS A Person
+    `the value of the property in which the life interest subsists` IS A Money
+
+@ref Wills Act 1838 s 2 ("will"), s 6, s 13, s 27(3); Probate and Administration Act 1934 s 2 ("will" includes any codicil or other testamentary document), s 6(2), s 8, s 13; Intestate Succession Act 1967 s 3, s 10; Guardianship of Infants Act 1934 s 7(1)-(2)
+--
+-- WHY SHARED — this record is read by ALL FOUR Acts, and each reads a
+-- different part of it:
+--   WA   s 6 — whether it was executed at all (the fields below).
+--   PAA  s 8(1) "Probate may be granted to any executor appointed by a will";
+--        s 13(1)(a) "no executor is appointed by a will"; s 6(2) "if ... a
+--        life interest arises under the will".
+--   ISA  s 3 and s 10 — how much of the property it disposes of, and the
+--        s 10 proviso's "unless it appears by the will that the personal
+--        representative is entitled to take that part beneficially".
+--   GIA  s 7(1) "The father of an infant may by deed or will appoint any
+--        person to be guardian of the infant after his death"; s 7(2) the
+--        mirror for the mother.
+-- If each Act declared its own will type, the executor the PAA grants to and
+-- the will the WA validates would be two documents in the same file.
+--
+-- WHY CODICILS ARE A LIST OF `Will`. PAA s 2: "“will” includes any codicil or
+-- other testamentary document" — the PAA does not distinguish them at all.
+-- The WA does, but only to say they are made and unmade the same way:
+-- s 15(b) revocation "by another will or codicil executed in the manner by
+-- this Act required", s 17(1) revival "by a codicil executed in the manner
+-- required by this Act". A codicil is therefore a will with the same
+-- execution facts, and self-similarity is the honest shape. A codicil to a
+-- codicil is unusual and the recursion permits it rather than forbidding it.
+--
+-- THREE FIELDS ARE NOT READ OF A CODICIL, and this is the answer to a review
+-- objection rather than a silent gap. The objection: the recursion forces
+-- every codicil to answer questions that belong to the testamentary
+-- disposition read AS A WHOLE, so a file can record a codicil that disposes
+-- of the whole estate inside a will that disposes of none. That is right,
+-- and the self-similarity argument above is made only about EXECUTION facts,
+-- which is where it holds. Working through the fields, only three are
+-- whole-disposition questions:
+--     `the life interests arising under the will`   PAA s 6(2), s 6(4)
+--     `it appears by the will that the personal representative is entitled
+--      to take that part beneficially`              ISA s 10 proviso
+--     `the dispositions made by the will` READ CUMULATIVELY — each instrument
+--      makes its own, but whether the disposition is universal, residuary or
+--      partial is a question about all of them together (ISA s 3, s 10).
+-- Everything else is genuinely per-instrument: a codicil is executed,
+-- attested, dated, may itself appoint or revoke executors (PAA s 12(2)) and
+-- guardians (GIA s 7(1) "by deed or will", PAA s 2), and may itself be made
+-- in exercise of a power (WA s 13(1)) or in contemplation of a marriage
+-- (s 13(2)).
+--
+-- So the three above are recorded on the PRINCIPAL instrument and are not to
+-- be read off a member of `the codicils`. A `Testamentary instrument` record
+-- holding the execution facts alone, with `Will` wrapping it, would enforce
+-- that rather than merely stating it; it was not built because it buys the
+-- guarantee for three fields at the cost of a second type in every Act
+-- module's path to the execution facts, and because a codicil is in every
+-- other respect a will and the shape should say so. If a fourth
+-- whole-disposition field ever appears, build it.
+--
+-- THE FIELDS ARE FACTS, NOT VALIDITY. s 6(1) says "No will shall be valid
+-- unless it is in writing and executed in the manner mentioned in
+-- subsection (2)". `in writing` records the antecedent; the prohibition with
+-- an exception — "No will shall be valid unless" — is wills-act.l4's to
+-- encode, and it must be encoded that way round, with the burden on the
+-- propounder, not softened into a permission.
+DECLARE Will HAS
+    `the testator`                                     IS A Person
+
+    @ref Wills Act 1838 s 13(1); s 5(2)(b)(i) — "when the will was executed"
+    -- NOTHING where the date is not in evidence, which is a live case: PAA
+    -- ss 9-10 contemplate a will lost, mislaid or destroyed and proved by
+    -- copy, draft or contents.
+    `the date of execution`                            IS A MAYBE DATE
+
+    @ref Wills Act 1838 s 6(1) — "No will shall be valid unless it is in writing"
+    `in writing`                                       IS A BOOLEAN
+
+    @ref Wills Act 1838 s 6(2) — "Every will shall be signed at the foot or end thereof by the testator, or by some other person in his presence and by his direction"
+    -- Two limbs, kept apart: s 6(2) offers the testator's own signature OR a
+    -- signature by another, and only the second carries the "in his presence
+    -- and by his direction" conditions — which s 15(d) then reuses ALMOST
+    -- verbatim for destruction ("by the testator, or by some person in his
+    -- presence and by his direction"). s 15(d) drops s 6(2)'s "other", and
+    -- the difference is worth a reader's attention rather than papering over:
+    -- "some other person" in s 6(2) excludes the testator, who has his own
+    -- limb; "some person" in s 15(d) sits beside a limb that already names
+    -- the testator, so it is the same class by a different route.
+    `signed at the foot or end thereof by the testator` IS A BOOLEAN
+    `signed at the foot or end thereof by some other person in his presence and by his direction` IS A BOOLEAN
+
+    @ref Wills Act 1838 s 6(2) — "the signature shall be made or acknowledged by the testator as the signature to his will or codicil in the presence of 2 or more witnesses present at the same time"
+    `the signature made or acknowledged by the testator as the signature to his will or codicil in the presence of 2 or more witnesses present at the same time` IS A BOOLEAN
+
+    @ref Wills Act 1838 s 6(3) — "it shall be apparent on the face of the will that the testator intended to give effect by such his signature to the writing signed as his will"
+    -- The s 6(3) deeming turns on this one fact; the five circumstances in
+    -- s 6(3)(a)-(e), of which s 6(3) says "no such will shall be affected by
+    -- the circumstance", are position facts about one document and stay in
+    -- wills-act.l4 (see the closing section).
+    `apparent on the face of the will that the testator intended to give effect by such his signature to the writing signed as his will` IS A BOOLEAN
+
+    @ref Wills Act 1838 s 6(2), ss 9-12
+    `the attesting witnesses`                          IS A LIST OF `Attesting witness`
+
+    @ref Probate and Administration Act 1934 s 8(1)-(3), s 13(1)(a)
+    `the executors appointed by the will`              IS A LIST OF `Executor appointed by a will`
+
+    @ref Guardianship of Infants Act 1934 s 7(1)-(2); Wills Act 1838 s 27(3)
+    -- A LIST OF `Guardian`, not of `Person`. WA s 27(3) speaks of "any
+    -- appointment contained in that will of any person as guardian of the
+    -- infant children of the testator" and GIA s 7(1) of an appointment "to
+    -- be guardian of the infant" — both identify the CHILD as well as the
+    -- appointee, and a bare list of people cannot say which infant child each
+    -- appointee is guardian of, nor whether of the person or of the property.
+    -- Making it a `Guardian` also makes the will-side and the GIA-side one
+    -- thing: an earlier draft had this list beside a `Guardian` whose `how
+    -- the guardian was appointed` said `appointed by the father by deed or
+    -- will`, which were two representations of one appointment with nothing
+    -- tying them together.
+    `the guardians of infant children appointed by the will` IS A LIST OF Guardian
+
+    @ref Wills Act 1838 s 13(1)-(2); Probate and Administration Act 1934 s 6(2); Intestate Succession Act 1967 s 10
+    -- The dispositive content, without which this record disposes of nothing.
+    -- See `Disposition` above for what four provisions could not be stated
+    -- while it was missing.
+    `the dispositions made by the will`                IS A LIST OF Disposition
+
+    @ref Wills Act 1838 s 13(2) — "where a will made on or after 29 August 1938 is expressed to be made in contemplation of a marriage, the will shall not be revoked by the solemnisation of the marriage contemplated; and this subsection shall apply notwithstanding that the marriage contemplated may be the first, second or subsequent marriage of a person lawfully practising polygamy"
+    -- THAT a marriage was contemplated, AND WHICH. s 13(2) saves the will
+    -- only against "the marriage contemplated"; a later marriage to someone
+    -- else still revokes it under s 13(1). With the boolean alone, a will
+    -- contemplating marriage to A wrongly survived a subsequent marriage to
+    -- B — and s 13(2)'s closing words put it squarely in the plural-marriage
+    -- cohort, the same population as ISA s 8, where that is not a corner case.
+    --
+    -- Two fields rather than one, because the boolean IS s 13(2)'s own
+    -- antecedent and the identity may not be in evidence even where the
+    -- antecedent is admitted. `NOTHING` in the second field therefore means
+    -- the intended spouse is not identified, NOT that no marriage was
+    -- contemplated; where it is NOTHING, s 13(2) cannot be applied marriage
+    -- by marriage against `the marriages of the deceased` and wills-act.l4
+    -- must say what it does about that.
+    `expressed to be made in contemplation of a marriage` IS A BOOLEAN
+    `the reference for the person with whom the marriage contemplated was to be solemnised` IS A MAYBE STRING
+
+    @ref Wills Act 1838 s 13(1) — the exception: "except a will made in exercise of a power of appointment, when the real or personal estate thereby appointed would not in default of such appointment pass to his or her heir, executor or administrator or the person entitled under the Intestate Succession Act 1967"
+    -- The WA's only textual cross-reference to the ISA, and the reason the
+    -- exception is a fact and not a computation: whether the appointed estate
+    -- would pass to the person entitled under the ISA "in default of such
+    -- appointment" is a question about a counterfactual instrument, not about
+    -- this estate.
+    `made in exercise of a power of appointment`       IS A BOOLEAN
+    `the estate thereby appointed would not in default of such appointment pass to his or her heir, executor or administrator or the person entitled under the Intestate Succession Act 1967` IS A BOOLEAN
+
+    @ref Probate and Administration Act 1934 s 6(2) — "if there is a minority or if a life interest arises under the will"; s 6(4) — "the subsistence of a life interest"
+    -- A LIST, so that s 6(2)'s gate is the list being non-empty and s 6(4)'s
+    -- subsistence is a question about a named life. NOT read off a codicil;
+    -- see the note above.
+    `the life interests arising under the will`        IS A LIST OF `Life interest`
+
+    @ref Intestate Succession Act 1967 s 10 proviso — "unless it appears by the will that the personal representative is entitled to take that part beneficially"
+    -- NOT read off a codicil; see the note above.
+    `it appears by the will that the personal representative is entitled to take that part beneficially` IS A BOOLEAN
+
+    @ref Probate and Administration Act 1934 s 2; Wills Act 1838 s 15(b), s 17(1)
+    `the codicils`                                     IS A LIST OF Will
+
+
+§§ `The estate`
+
+@ref Probate and Administration Act 1934 s 4(1), s 13(2)(e), s 18(4)(c), s 30, s 50(1), s 57(2), First Schedule para 2; Wills Act 1838 s 11
+--
+-- A CREDITOR IS A PARTY, and in an earlier draft he was not. The only
+-- creditor anywhere in the module was a BOOLEAN on an attesting witness (WA
+-- s 11), which is the one context in these four Acts where a creditor is NOT
+-- a party to the administration; the estate's creditors were one lump sum.
+-- So a creditor could not be granted letters ("when no such person applies,
+-- letters of administration may be granted to a creditor of the deceased",
+-- PAA s 18(4)(c)), could not be ranked ("a creditor of the deceased",
+-- s 13(2)(e), the fifth rung of the prior-right class), could not cite an
+-- executor ("any creditor of a deceased person, may, without applying for
+-- probate or letters of administration, cause to be issued a citation",
+-- s 4(1)), and could not apply for security under s 50(1) — although
+-- `Deceased person` carries the s 50(1) twelve-month fact precisely so that
+-- s 50 can be encoded, and s 50 is an application by a creditor.
+--
+-- `the debts and liabilities of the deceased` STAYS on `Estate` beside this
+-- list. It is the aggregate PAA s 57 branches on, and it is the figure a
+-- probate file swears to; this list is who is owed what. Where both are
+-- present the PAA module should check them against each other rather than
+-- silently preferring one.
+--
+-- SECURED IS RECORDED because the First Schedule para 2 applies the law of
+-- bankruptcy "as to the respective rights of secured and unsecured
+-- creditors"; RESIDENCE because s 50(1) secures "the payment of debts due to
+-- creditors residing in Singapore" and no other class.
+DECLARE Creditor HAS
+    `the creditor`                       IS A `Person or corporation`
+    `the debt`                           IS A Money
+    `secured`                            IS A BOOLEAN
+    `residing in Singapore`              IS A BOOLEAN
+
+@ref Intestate Succession Act 1967 s 4, s 5, s 7 rule 3, s 10; Probate and Administration Act 1934 s 18(2), s 56(2), s 57, s 58, s 62, s 64, s 67(1), First Schedule, Second Schedule; Wills Act 1838 s 2 ("personal estate", "real estate"), s 3(1); Guardianship of Infants Act 1934 s 16(1)(a)
+--
+-- WHY SHARED, and this is the tightest seam in the whole cleanroom. ISA s 5
+-- distributes the property "after payment thereout of the expenses of due
+-- administration as prescribed by the Probate and Administration Act 1934".
+-- The ISA's dividend is literally defined by subtracting a PAA quantity. Two
+-- Acts computing that quantity from two different records would produce two
+-- different residues for one estate.
+--
+-- THE SPLITS ARE THE ONES THE ACTS THEMSELVES MAKE, and they cross-cut:
+--   movable / immovable         ISA s 4(1) "The distribution of the movable
+--                               property of a person deceased shall be
+--                               regulated by the law of the country in which
+--                               he was domiciled at the time of his death";
+--                               s 4(2) the immovable mirror, "regulated by
+--                               this Act wherever he may have been
+--                               domiciled".
+--   in Singapore / outside      ISA s 5(a) "domiciled in Singapore and
+--                               possessed beneficially of property, whether
+--                               movable or immovable, or both, situated in
+--                               Singapore"; s 5(b) "domiciled outside
+--                               Singapore and possessed beneficially of
+--                               immovable property situated in Singapore".
+--                               PAA s 62(1) "property in Singapore not
+--                               exceeding $50,000 in value".
+--   beneficially / as trustee   PAA s 62(2)(a) and s 64(1) both exclude "any
+--                               property which the deceased possessed or was
+--                               entitled to as trustee and not beneficially";
+--                               s 23 grants a limited administration over it.
+-- Four value fields therefore, not two — but NOT for the reason an earlier
+-- draft gave. It said that s 5(b) needs the immovable/outside cell that
+-- s 4(1) does not, and that reads s 5(b) backwards: its "outside Singapore"
+-- qualifies DOMICILE, not situs, and the property s 5(b) speaks of is
+-- "immovable property situated in Singapore" — situated IN, so it is the same
+-- cell s 5(a) already needs. The cell that genuinely has no other home is immovable property
+-- situated OUTSIDE Singapore, which ISA s 4(2) reaches: "The distribution of
+-- the immovable property of a person deceased shall be regulated by this Act
+-- wherever he may have been domiciled at the time of his death."
+--
+-- THE EXCLUSIONS GET THE SAME GRID AS THE ASSETS, and this too was a repair.
+-- PAA s 62(1) tests "property in Singapore not exceeding $50,000 in value"
+-- and s 62(2) then says "the amount of $50,000 shall not include" the trustee
+-- property. Subtracting one undivided trustee figure from a Singapore-only
+-- base OVER-SUBTRACTS whenever any of that trustee property sits outside
+-- Singapore, and computes the $50,000 threshold — and s 64(1)'s $10,000 —
+-- wrong. So the trustee exclusion is split by situs like everything else.
+-- The DPI exclusion is NOT split, because moneys payable by an appointed
+-- insurer under a scheme "maintained by the Central Provident Fund Board
+-- under the Central Provident Fund Act 1953" are Singapore moneys by the
+-- nature of the scheme; s 62(2)(b) carries no situs qualifier because it
+-- needs none.
+--
+-- ONE EXPENSES FIELD, NOT TWO, AND THAT IS A READING RATHER THAN A TEXTUAL
+-- IDENTITY. ISA s 5 says the property is distributed "after payment thereout
+-- of the expenses of due administration as prescribed by the Probate and
+-- Administration Act 1934"; PAA First Schedule para 1 says "The funeral,
+-- testamentary and administration expenses shall have priority". The two
+-- phrases are not coextensive on their face, and an earlier draft asserted
+-- that they were. What is true is narrower and enough: the ISA does not
+-- define its phrase at all — it points at the PAA — and the PAA's own
+-- priority rule is the thing it points at, so one field is right and two
+-- would double-count the funeral. PAA s 67(1) adds a further head that the
+-- field name does not carry, "all reasonable expenses of subsequent religious
+-- ceremonies suitable to the station in life of the deceased", and it is
+-- taken to fall inside this field rather than beside it.
+--
+-- ISA s 7 rule 3's PARENTHETICAL GETS NO FIELD, and review is owed the
+-- reason. Rule 3 distributes "the estate (both as to the undistributed
+-- portion and the reversionary interest)". That parenthetical does not create
+-- an asset class the four value fields do not already cover: it directs that
+-- a reversionary interest is not held back from the per stirpes division, and
+-- a reversionary interest is property the deceased was beneficially entitled
+-- to at death, so it is inside whichever of the four cells its situs and
+-- nature put it in. What rule 3 forecloses is a rule that would distribute
+-- the possessory estate now and the reversion later, and there is no such
+-- rule to foreclose here.
+--
+-- EVERY VALUE IS AN AMOUNT IN SINGAPORE DOLLARS (see `Money` above).
+DECLARE Estate HAS
+    @ref Intestate Succession Act 1967 s 4(1), s 5(a); Probate and Administration Act 1934 s 62(1)
+    `the value of the movable property situated in Singapore`          IS A Money
+    @ref Intestate Succession Act 1967 s 4(2), s 5(a), s 5(b)
+    `the value of the immovable property situated in Singapore`        IS A Money
+    @ref Intestate Succession Act 1967 s 4(1)
+    `the value of the movable property situated outside Singapore`     IS A Money
+    @ref Intestate Succession Act 1967 s 4(2)
+    `the value of the immovable property situated outside Singapore`   IS A Money
+
+    @ref Probate and Administration Act 1934 s 62(2)(a) and s 64(1) — "any property which the deceased possessed or was entitled to as trustee and not beneficially"; s 23 — "leaving property in which he had no beneficial interest on his own account"
+    -- Split by situs, so that the s 62(1) and s 64(1) subtractions come off
+    -- the right base. See the note above.
+    `the value of any property which the deceased possessed or was entitled to as trustee and not beneficially, situated in Singapore` IS A Money
+    `the value of any property which the deceased possessed or was entitled to as trustee and not beneficially, situated outside Singapore` IS A Money
+
+    @ref Probate and Administration Act 1934 s 62(2)(b) — "any moneys payable by an appointed insurer pursuant to the Dependants' Protection Insurance Scheme or any other equivalent scheme maintained by the Central Provident Fund Board under the Central Provident Fund Act 1953"
+    -- The whole exclusion, not half of it: s 62(2)(b) excludes DPI Scheme
+    -- moneys OR moneys under any other equivalent CPF Board scheme, and a
+    -- field named only for the first would leave the second nowhere to go and
+    -- compute the $50,000 test on too large a base.
+    `the value of any moneys payable by an appointed insurer pursuant to the Dependants’ Protection Insurance Scheme or any other equivalent scheme maintained by the Central Provident Fund Board` IS A Money
+
+    @ref Probate and Administration Act 1934 s 64(1) — "the total value of any property ... administered by the Public Trustee, whether by virtue of a grant of letters of administration to him or by virtue of the powers conferred on him by this Act"
+    -- s 64(1) measures what the Public Trustee administers, which is not the
+    -- same quantity as the estate: he may hold part of it (s 62(1)) or all of
+    -- it, and nothing else here records which.
+    `the value of the property administered by the Public Trustee`     IS A Money
+
+    @ref Probate and Administration Act 1934 s 56(2) — "whose assets do not exceed $500, including the amount of the funds directed to be so paid, transferred or delivered to him"
+    -- s 56(2)'s $500 test measures the deceased payee's assets INCLUDING the
+    -- funds in court that the order directs to him, so the test cannot be
+    -- formed without this figure. The module cites s 56(2) three times above
+    -- as a reason `Marriage`, `Family` and `Money` are shared; it plainly
+    -- means the subsection to be encodable.
+    `the amount of the funds in court directed to be paid, transferred or delivered to him` IS A Money
+
+    @ref Probate and Administration Act 1934 s 18(2) — "in regard to land settled previously to the death of the deceased, letters of administration may be granted to the trustees of the settlement"
+    -- Without these two, the one grantee s 18(2) names expressly cannot be
+    -- identified at all: nothing said the estate contained settled land and
+    -- nobody could be recorded as a trustee of the settlement.
+    `the value of land settled previously to the death of the deceased` IS A Money
+    `the trustees of the settlement`                                   IS A LIST OF `Person or corporation`
+
+    @ref Probate and Administration Act 1934 s 58(1) — "an interest in property which at the time of his death is charged with the payment of money, whether by way of legal mortgage, equitable charge or otherwise (including lien for unpaid purchase money)"; s 58(3)
+    -- s 57(4) applies a solvent estate to its debts "subject to the Rules of
+    -- Court and section 58 as to charges on property of the deceased", so the
+    -- s 57 application test cannot be stated completely without s 58's own
+    -- facts. An earlier draft did not mention s 58 anywhere — not in a type,
+    -- not in an @ref, not in the omissions list.
+    --
+    -- BOTH QUANTITIES, because s 58(1) makes the charged interest "primarily
+    -- liable for the payment of the charge" and s 58(2) apportions "according
+    -- to its value", so the interest and the charge are separately measured
+    -- and either may be the smaller.
+    `the value of the interest in property which at the time of his death is charged with the payment of money` IS A Money
+    `the amount of the charge on that interest`                        IS A Money
+    -- s 58 applies only where "the deceased has not by will, deed or other
+    -- document signified a contrary or other intention". s 58(3) then says
+    -- what does NOT signify one, which is a rule and belongs in the PAA
+    -- module; the fact is here.
+    `the deceased has by will, deed or other document signified a contrary or other intention` IS A BOOLEAN
+
+    @ref Probate and Administration Act 1934 s 57(1) — "Where the estate of a deceased person is insolvent"; s 57(4) — "Where the estate of a deceased person is solvent"; the two provisions that branch on solvency and choose between the First and Second Schedules
+    `the debts and liabilities of the deceased`                        IS A Money
+
+    @ref Probate and Administration Act 1934 s 57(4), First Schedule para 1, s 67(1); Intestate Succession Act 1967 s 5
+    -- PAA First Schedule para 1: "The funeral, testamentary and
+    -- administration expenses shall have priority." ISA s 5 calls the same
+    -- money "the expenses of due administration as prescribed by the Probate
+    -- and Administration Act 1934".
+    `the funeral, testamentary and administration expenses`            IS A Money
+
+    @ref Probate and Administration Act 1934 s 4(1), s 13(2)(e), s 18(4)(c), s 30, s 50(1)
+    `the creditors of the deceased`                                    IS A LIST OF Creditor
+
+    @ref Probate and Administration Act 1934 s 6(4) — "until the estate is fully administered"; s 25(2) — "any estate not fully administered"; s 27 — "there is still some part of the deceased's estate unadministered"
+    -- Three provisions ask this of the ESTATE, not of any one representative.
+    -- `Executor appointed by a will` carries s 13(1)(d)'s per-executor
+    -- version; without this one, s 6(4)'s window ("during the minority of a
+    -- beneficiary or the subsistence of a life interest and until the estate
+    -- is fully administered") had no closing edge.
+    `fully administered`                                               IS A BOOLEAN
+
+    @ref Intestate Succession Act 1967 s 10; Probate and Administration Act 1934 Second Schedule para 1 — "Property of the deceased undisposed of by will"
+    -- The quantity. What KIND of disposition produced it — and therefore
+    -- whether the will disposes of the whole, of part or of no part for ISA
+    -- s 3 and s 10 — is read off `Will`'s `the dispositions made by the will`;
+    -- see `Disposition`. The two must agree, and intestate-succession-act.l4
+    -- is where they are made to.
+    `the value of the property beneficially disposed of by the will`   IS A Money
+
+
+§§ `Grants of probate and letters of administration`
+
+@ref Probate and Administration Act 1934 s 2 — the three definitions
+DECLARE `Kind of grant` IS ONE OF
+    -- s 2 "probate" means a grant under the seal of the court issuing the
+    --     same, authorising the executor or executors expressly or impliedly
+    --     appointed by a testator's will, or one or more of them, to
+    --     administer the testator's estate in compliance with the directions
+    --     contained in his will, and in accordance with law
+    `probate`
+    -- s 2 "letters of administration" means a grant under the seal of the
+    --     court issuing the same, authorising the person or persons therein
+    --     named to administer an intestate's estate in accordance with law
+    `letters of administration`
+    -- s 2 "letters of administration with the will annexed" means a grant
+    --     under the seal of the court issuing the same, authorising the
+    --     person or persons therein named to administer a testator's estate
+    --     in compliance with the directions contained in his will, and in
+    --     accordance with law
+    `letters of administration with the will annexed`
+
+@ref Wills Act 1838 s 28(4)(a)-(c); Probate and Administration Act 1934 ss 9, 14, 17, 20, 21(2)-(3), 23, 24, 26, 27, 59(2)
+--
+-- A TOTAL ENUM, and the source names the absent case. WA s 28(4) lists three
+-- kinds of grant that "are to be disregarded when considering ... when a
+-- grant authorising the administration of the testator's estate is first
+-- made", so the six-month rectification clock in s 28(2) runs from the first
+-- grant that is NOT one of these. An unlimited grant is therefore a named
+-- outcome, not an absence, and `MAYBE` would hide the very case the
+-- subsection is about.
+--
+-- s 28(4) CLASSIFIES BY EFFECT, NOT BY WHICH ACT NAMED THE LIMITATION, and an
+-- earlier draft got this backwards — it sent every PAA limitation to the
+-- catch-all on the ground that they are not among the three WA s 28(4)
+-- disregards, which is a claim about provenance where s 28(4) speaks about
+-- character. The
+-- consequence was not academic: routing such a grant to the catch-all starts
+-- the s 28(2) six-month rectification clock on a grant s 28(4) says must be
+-- disregarded. Three PAA limitations fall squarely inside the disregards —
+--   s 23 "letters of administration, limited to such property" over property
+--     "in which he had no beneficial interest on his own account" — that is
+--     s 28(4)(a)'s "grant limited to ... trust property";
+--   s 20 "limited so that the administrator shall not be empowered to
+--     distribute the estate" — s 28(4)(b) in as many words;
+--   s 24 "letters of administration limited to the collection and
+--     preservation of the property of the deceased" — likewise s 28(4)(b).
+-- The catch-all is for the PAA's `limited until ...` grants only: s 9(a),
+-- s 14, s 17, s 21(2)-(3) and s 59(2).
+DECLARE `Limitation on the grant` IS ONE OF
+    `not limited`
+    @ref Wills Act 1838 s 28(4)(a) — "a grant limited to settled land or to trust property"; Probate and Administration Act 1934 s 23
+    `limited to settled land or to trust property`
+    @ref Wills Act 1838 s 28(4)(b) — "any other grant that does not permit the distribution of the testator's estate"; Probate and Administration Act 1934 s 20, s 24
+    `a grant that does not permit the distribution of the testator’s estate`
+    @ref Wills Act 1838 s 28(4)(c) — "a grant limited to a part only of the testator's estate, unless a grant limited to the remainder of the testator's estate has previously been made or is made at the same time"
+    -- THE PART IS NAMED. PAA s 6(1) caps grantees at four "in respect of the
+    -- same property", and two grants of three grantees each cannot be told
+    -- from two grants over different parts unless each says which part it
+    -- covers. s 28(4)(c)'s own proviso needs the same thing, since it asks
+    -- whether a grant limited to THE REMAINDER has been or is being made.
+    `limited to a part only of the testator’s estate`  HAS `the part of the estate to which the grant is limited` IS A STRING
+    -- The PAA's `limited until ...` grants: "limited until the original is
+    -- admitted to probate" (s 9(a)), "limited until he obtains probate for
+    -- himself" (s 14), "limited until the will or an authenticated copy
+    -- thereof is produced" (s 17), "limited until the infant obtains a grant
+    -- to himself" (s 21(2)), "limited until any of them obtains a grant"
+    -- (s 21(3)), "limited in such manner and for such time as to the court
+    -- seems fit" (s 59(2)).
+    --
+    -- THE TERMS ARE CARRIED, because PAA s 27's antecedent is "the happening
+    -- of the event or contingency on which it was limited" and a payload-free
+    -- catch-all cannot say which event that was.
+    `limited in some other way`  HAS `the terms of the limitation` IS A STRING
+
+@ref Probate and Administration Act 1934 s 6(4), s 14, s 15, s 19, s 21(2), s 22(2), s 25(1)
+--
+-- WHO IS GRANTED WHAT, IN WHAT CAPACITY. PAA s 25(1) states DIFFERENT accrual
+-- rules for executors and for administrators over one and the same list of
+-- grantees — "the representation of the estate shall accrue to the surviving
+-- executor or executors or, except in cases to which section 6 applies,
+-- administrator or administrators" — so a bare `LIST OF Person or
+-- corporation`, which is what an earlier draft had, cannot state s 25(1) at
+-- all. The same list also has to hold three grantees who take on someone
+-- else's behalf, and "on whose behalf" is a relation to a named principal:
+--   s 14 — "a duly authorised attorney of the absent executor" (s 15 and
+--     s 19 the same shape for an absent person entitled to administration);
+--   s 21(2) — a grant "to the guardian of the person and property of the
+--     infant ... limited until the infant obtains a grant to himself";
+--   s 22(2) — a grant to "the person to whom the care of the estate of the
+--     person who lacks mental capacity has been lawfully committed", made
+--     "for the use and benefit of the person who lacks mental capacity".
+-- The last of these is also PAA s 6(4)'s "committee": s 6(4) lets "the
+-- guardian, committee or receiver of any such person" apply for an additional
+-- personal representative, and of those three the guardian is `Guardian`, the
+-- committee is this capacity, and the receiver is a Part 9 office this module
+-- puts out of scope.
+DECLARE `Capacity in which the grant is made` IS ONE OF
+    `as executor`
+    `as administrator`
+    `as a duly authorised attorney of an absent person`
+    `as the guardian of the person and property of the infant`
+    `as the person to whom the care of the estate of the person who lacks mental capacity has been lawfully committed`
+
+@ref Probate and Administration Act 1934 s 6(1), s 14, s 21(2), s 22(2), s 25(1)
+DECLARE Grantee HAS
+    `the grantee`                                      IS A `Person or corporation`
+    `the capacity in which the grant is made`          IS A `Capacity in which the grant is made`
+    @ref Probate and Administration Act 1934 s 22(2) — "for the use and benefit of the person who lacks mental capacity"; s 14; s 21(2)
+    -- NOTHING for a grantee who takes in his own right, which is every
+    -- executor and every administrator; JUST a reference for the three
+    -- capacities above that are exercised on another's behalf.
+    `the reference for the person for whose use and benefit the grant is made` IS A MAYBE STRING
+
+@ref Probate and Administration Act 1934 s 2 ("probate application", "probate applicant"), s 18(4)(b)-(d), s 55(1)(a)-(b), s 62(1)
+--
+-- NOBODY COULD BE SAID TO HAVE APPLIED. PAA s 18(4)'s ordering of who may be
+-- granted letters of administration on intestacy is conditioned end to end on
+-- who applies — "(b) when such persons apply for letters of administration
+-- ...; (c) when no such person applies, letters of administration may be
+-- granted to a creditor of the deceased" — and an earlier draft recorded no
+-- application anywhere. (`Person`'s `willing to act` is a different fact,
+-- from ss 14 and 19.) Three more provisions turn on the same record: s 55(1)
+-- (a) "no application has been made for probate or letters of administration
+-- to his estate" after six months, (b) an application "not within that period
+-- been proceeded with, or has been withdrawn or refused", and s 62(1), where
+-- the Public Trustee acts only "after satisfying himself that no application
+-- for letters of administration is pending".
+DECLARE `What became of the application` IS ONE OF
+    `still pending`
+    `proceeded with`
+    `not proceeded with`
+    `withdrawn`
+    `refused`
+
+@ref Probate and Administration Act 1934 s 2, s 18(4)(b)-(c), s 55(1)(a)-(b), s 62(1)
+DECLARE `Probate application` HAS
+    `the applicant`                                    IS A `Person or corporation`
+    `the grant applied for`                            IS A `Kind of grant`
+    -- NOTHING where the date is not in evidence. s 55(1)(a)-(b) measure six
+    -- months from the death against it, so an undated application cannot be
+    -- placed inside or outside that window and the PAA module must say what
+    -- it does about one.
+    `the date of the application`                      IS A MAYBE DATE
+    `what became of the application`                   IS A `What became of the application`
+
+@ref Probate and Administration Act 1934 s 2, s 6(1)-(2), s 26, s 27, s 32, s 47, s 55(1)(c), s 55(1)(e); Wills Act 1838 s 28(2), s 28(4)-(5), s 28(7)
+--
+-- WHY SHARED. The PAA makes grants; the WA reads them. WA s 28(2): "Except
+-- with the permission of a court, an application for an order under
+-- subsection (1) must be made no later than 6 months after the date on which
+-- a grant authorising the administration of the testator's estate is first
+-- made" — a WA deadline measured off a PAA event, filtered by the WA's own
+-- s 28(4) list of grants to disregard, and re-dated by s 28(5) where the
+-- grant was re-sealed.
+DECLARE Grant HAS
+    `the kind of grant`                                IS A `Kind of grant`
+    @ref Probate and Administration Act 1934 s 6(1) — "Probate or letters of administration shall not be granted to more than 4 persons in respect of the same property"; s 25(1)
+    `the grantees`                                     IS A LIST OF Grantee
+    `the date of the grant`                            IS A MAYBE DATE
+    `the limitation`                                   IS A `Limitation on the grant`
+
+    @ref Wills Act 1838 s 28(7)(a)-(b); Probate and Administration Act 1934 s 2, s 35(1) — "No probate or letters of administration granted by a District Court before 1 January 2015 shall be invalid by reason of the assets and effects of the deceased being subsequently found to be of a value which exceeds $3 million"
+    -- One field, three values. An earlier draft had `the court IS A Court`
+    -- beside a separate `granted before 1 January 2015 by a District Court`
+    -- BOOLEAN, which left the case both Acts name expressly with no truthful
+    -- value for the required field. See `The court that made the grant`.
+    `the court that made the grant`                    IS A `The court that made the grant`
+
+    @ref Probate and Administration Act 1934 s 26(1) — "A grant of probate or letters of administration may be made subject to such exception as the will or the circumstances of the case require"; s 26(2)
+    -- An exception is not a limitation, and s 26(2) then allows "A further
+    -- grant ... of the part of the estate excepted", so the excepted part has
+    -- to be nameable. Whether a grant subject to an exception is also a grant
+    -- "limited to a part only of the testator's estate" for WA s 28(4)(c) is
+    -- wills-act.l4's question, not this module's; both facts are here for it.
+    `the exception subject to which the grant is made` IS A MAYBE STRING
+
+    @ref Probate and Administration Act 1934 s 27 — "When a limited grant has expired by effluxion of time or the happening of the event or contingency on which it was limited, and there is still some part of the deceased's estate unadministered"
+    -- s 27's other limb, "some part of the deceased's estate unadministered",
+    -- is the negation of `Estate`'s `fully administered`.
+    `expired by effluxion of time or by the happening of the event or contingency on which it was limited` IS A BOOLEAN
+
+    @ref Probate and Administration Act 1934 s 32 — "Any probate or letters of administration may be revoked or amended for any sufficient cause"; s 12(2), s 35(3)
+    -- WHY THIS HAD TO BE ADDED: the comment on `the grants made in respect of
+    -- the estate` below already gave revocation and re-grant (s 32, s 12(2))
+    -- as one of its reasons for being a LIST, and nothing on a `Grant` said
+    -- which of them had been revoked. WHAT the sufficient cause was is not
+    -- recorded — s 32 leaves that at large.
+    `revoked`                                          IS A BOOLEAN
+
+    @ref Probate and Administration Act 1934 s 55(1)(c) — "neglects within one month of the date of the grant to give such security as he is lawfully required to furnish"; s 29(1)-(8), s 35(2)(b), s 49(1)
+    `has given such security as is lawfully required to be furnished` IS A BOOLEAN
+    @ref Probate and Administration Act 1934 s 55(1)(e) — "where an administrator has failed to extract the grant of letters of administration"
+    -- The administrator's counterpart of `Executor appointed by a will`'s
+    -- `appeared and extracted probate` (s 13(1)(e)), which had none.
+    `has been extracted`                               IS A BOOLEAN
+
+    @ref Wills Act 1838 s 28(5) — "where a grant consists of any probate, or letters of administration with the will annexed, sealed under section 47(1) of the Probate and Administration Act 1934, the grant is deemed to be made on the date of sealing"; Probate and Administration Act 1934 s 47(1)-(2)
+    `sealed under section 47(1) of the Probate and Administration Act 1934` IS A BOOLEAN
+    `the date of the sealing`                          IS A MAYBE DATE
+
+
+§§ `The deceased — one record, four views`
+
+@ref Probate and Administration Act 1934 s 2 and throughout ("the deceased"); s 18(1), s 37, s 55; Intestate Succession Act 1967 s 2, s 3 ("intestate"), s 4, s 5; Wills Act 1838 s 19 ("the death of the testator"), s 28; Guardianship of Infants Act 1934 s 6, s 7
+--
+-- THE ONE EVENT. This is the record every Act module takes as its single
+-- GIVEN parameter, and the whole reason the four Acts are one cleanroom: the
+-- PAA's "deceased", the WA's "testator" and the ISA's "intestate" are the
+-- same field of the same record.
+--
+-- AND IT REACHES EVERYTHING THE FOUR ACTS NEED. An earlier draft made that
+-- claim while three of the GIA's and PAA's subject matters had no route from
+-- here at all: `Infant` was declared and no field anywhere had its type, so
+-- PAA s 6(2)'s minority and every GIA property provision were orphaned; no
+-- record said that anyone had applied for a grant, which empties PAA s 18(4);
+-- and the creditors were one scalar on `Estate`. `the infants concerned in
+-- the estate`, `the probate applications made in respect of the estate` and
+-- `Estate`'s `the creditors of the deceased` close those three.
+--
+-- `the will` IS A MAYBE. NOTHING means the deceased died wholly intestate,
+-- which is PAA s 18(1)'s premise ("When a person has died intestate, the
+-- court may grant letters of administration of his estate") and the ISA's.
+-- A will that is present but disposes of only part is NOT this case — that
+-- is ISA s 3 and s 10, read off `the dispositions made by the will`.
+-- What NOTHING does NOT mean is that no will has been produced: PAA s 17
+-- ("When no will of the deceased is forthcoming, but there is reason to
+-- believe that there is a will in existence") and ss 9-10 (lost, mislaid or
+-- destroyed wills) are about the EVIDENCE of a will, and those facts belong
+-- to probate-administration-act.l4.
+DECLARE `Deceased person` HAS
+    `the deceased`                                  IS A Person
+    `the family`                                    IS A Family
+    `the estate`                                    IS AN Estate
+    `the will`                                      IS A MAYBE Will
+
+    @ref Intestate Succession Act 1967 s 4(2), s 5(a)-(b); Probate and Administration Act 1934 s 7(1)-(2), s 47(3)
+    -- ALREADY-CONSTRUED INPUT. Domicile is a common-law characterisation that
+    -- none of the four Acts defines; PAA s 7(2) has the registrar satisfy
+    -- himself of it "by affidavit and by such further evidence as he may
+    -- require", i.e. it arrives as proved fact.
+    --
+    -- ONLY THE SINGAPORE / NOT-SINGAPORE BINARY IS RECORDED, and an earlier
+    -- draft justified that too broadly — it said the binary was all that ISA
+    -- s 4 and s 5 and PAA s 7 ever ask. s 5 and PAA s 7 do ask only that. ISA
+    -- s 4(1) does not: "The distribution of the movable property of a person
+    -- deceased shall be regulated by the law of the country in which he was
+    -- domiciled at the time of his death" asks WHICH COUNTRY, because that
+    -- country's law is the operative referent. The binary can decide whether
+    -- the ISA governs; it cannot say what governs when the ISA does not.
+    --
+    -- That branch of s 4(1) is therefore OUT OF SCOPE and named as such in
+    -- the closing section, for the same reason WA s 5 is: a foreign internal
+    -- law is not computable from a place name, and this cleanroom does not
+    -- model a named territory or state anywhere. The Act these four modules
+    -- encode is the Singapore one, and s 4(1)'s referral out is a boundary,
+    -- not a gap in the ontology.
+    --
+    -- PAA s 47(4) IS NOT CITED HERE, and an earlier draft cited it. It asks
+    -- whether "the deceased was ... domiciled within the jurisdiction of the
+    -- court from which the grant was issued" — a foreign jurisdiction, on
+    -- which a Singapore/not-Singapore binary is silent. Only s 47(3) ("such
+    -- evidence as it thinks fit as to the domicile of the deceased person")
+    -- is neutral enough for this field.
+    `domiciled in Singapore at the time of his death` IS A BOOLEAN
+
+    @ref Probate and Administration Act 1934 s 50(1) — "Where the deceased has carried on business or resided in Singapore within 12 months of his death"
+    `carried on business or resided in Singapore within 12 months of his death` IS A BOOLEAN
+
+    @ref Intestate Succession Act 1967 s 2 — "Nothing in this Act shall apply to the estate of any Muslim or shall affect any rules of the Muslim law in respect of the distribution of the estate of any such person"; Probate and Administration Act 1934 s 18(5) — "Nothing in this section shall affect any law by which special provision is made regarding the estates of persons of a particular religion or race"
+    -- Two Acts, one fact. ISA s 2 is a hard application gate that switches the
+    -- whole Act off; PAA s 18(5) is a wider saving, and the PAA module carries
+    -- that width itself rather than this field pretending to it.
+    `a Muslim`                                      IS A BOOLEAN
+
+    @ref Wills Act 1838 s 28(2), s 28(4); Probate and Administration Act 1934 ss 25-27, s 32
+    -- A LIST, because WA s 28(2) needs the FIRST grant after the s 28(4)
+    -- disregards, and the PAA contemplates several over one estate: a further
+    -- grant of an excepted part (s 26(2)), a grant of what a limited grant
+    -- left unadministered (s 27), a fresh grant on the death of an
+    -- administrator (s 25(2)), and revocation and re-grant (s 32, s 12(2)).
+    `the grants made in respect of the estate`      IS A LIST OF Grant
+
+    @ref Probate and Administration Act 1934 s 18(4)(b)-(c), s 55(1)(a)-(b), s 62(1)
+    -- Empty means nobody has applied, which is s 18(4)(c)'s antecedent ("when
+    -- no such person applies") and s 55(1)(a)'s ("no application has been made
+    -- for probate or letters of administration to his estate").
+    `the probate applications made in respect of the estate` IS A LIST OF `Probate application`
+
+    @ref Probate and Administration Act 1934 s 18(4)(d)(ii) — "no next of kin or creditor or other person appears and makes out a claim to letters of administration"
+    -- NOT the same fact as the applications list being empty. s 18(4)(d)(ii)
+    -- is about appearing and making out a claim, which a person may do
+    -- without applying and may fail to do having applied.
+    `a next of kin, creditor or other person has appeared and made out a claim to letters of administration` IS A BOOLEAN
+
+    @ref Guardianship of Infants Act 1934 ss 6-8, ss 15-20; Probate and Administration Act 1934 s 6(2), s 6(4), s 21(2)-(3), s 63(1)
+    -- THE GIA'S SUBJECT MATTER, ATTACHED TO THE ROOT. Without this list the
+    -- `Infant` record was unreachable from the one record every Act module
+    -- takes as its GIVEN, and with it PAA s 6(2)'s minority, s 21(2)'s grant
+    -- to "the guardian of the person and property of the infant" and the
+    -- whole of GIA ss 15-20. A LIST because s 21(3) contemplates "2 or more
+    -- infant executors or persons so entitled" and because a deceased may
+    -- leave several infant children.
+    --
+    -- These are not a second copy of anybody: an infant who is also a
+    -- descendant of the deceased appears in the `children` tree as well, and
+    -- `the reference for this person` is what says they are the same child.
+    `the infants concerned in the estate`           IS A LIST OF Infant
+
+
+§§ `What anyone is entitled to`
+
+@ref Intestate Succession Act 1967 s 5, s 7 rules 1-9, s 8, s 10; Probate and Administration Act 1934 s 6(2), s 13(2)(c), s 63(1), s 64(1); Guardianship of Infants Act 1934 s 16, s 18
+--
+-- WHY SHARED — the PAA calls the ISA by name. s 13(2)(c) gives a prior right
+-- to letters of administration with the will annexed to "such person or
+-- persons, being beneficiaries under the will, as would have been entitled to
+-- a grant of letters of administration if the deceased had died intestate";
+-- s 6(2) makes "a minority" among those entitled force a second
+-- administrator; s 64(1) lets the Public Trustee "convey or distribute the
+-- estate or any part thereof to or among the persons entitled thereto". The
+-- ISA computes who they are; the PAA acts on the answer; the GIA then
+-- protects an infant's slice of it (s 16 restraint on dealing, s 18(1) the
+-- $100-per-month maintenance cap). One shape, or the three Acts are talking
+-- about three different lists.
+--
+-- A FRACTION, NOT AN AMOUNT. The ISA never converts to dollars — it stops at
+-- "one-half of the estate" and "equal portions". Storing the answer as a
+-- `Share` keeps the conversion where the estate's value is known, and keeps
+-- ISA s 9's "no money or other property ... shall be taken into account"
+-- meaningful, since an advancement is an amount and a share is not.
+--
+-- `Person or corporation`, NOT `Person`, because ISA s 7 rule 9 ends the
+-- ladder with a taker who is not a human being: "In default of distribution
+-- under rules 1 to 8, the Government shall be entitled to the whole of the
+-- estate."
+--
+-- A FRACTION OF WHAT. Not, in general, of the estate: ISA s 10 says that
+-- where a person "dies leaving a will beneficially disposing of part of his
+-- property, the provisions of this Act shall have effect as respects the part
+-- of his property not so disposed of", so in a partial intestacy every share
+-- s 7 computes is a fraction of THAT PART and not of the whole. An earlier
+-- draft named the field `the fraction of the estate`, which is right only on
+-- a total intestacy and silently wrong on the case this module models
+-- expressly.
+--
+-- NO `rank` FIELD, AND REVIEW IS OWED THE REASON. ISA s 6(b) states a
+-- RANKING — "those related to a person deceased by the half blood shall rank
+-- immediately after those of the whole blood related to him in the same
+-- degree" — and review put it that a record holding only a share cannot say
+-- that one class ranks immediately after another, only that it takes nothing,
+-- which is exclusion and loses the fact that the half blood take on the whole
+-- blood's failure. The
+-- observation is right about the two being different things. The conclusion
+-- is declined because ranking is not an OUTPUT of these Acts, it is a step in
+-- computing one: the ISA distributes, and what it distributes is shares. The
+-- inputs the ranking needs are all present and structural — `Blood tie` on
+-- each `Collateral relative`, and degree from position and depth (see the
+-- note on `Collateral relative`) — so intestate-succession-act.l4 can order
+-- the class and then divide, in that order, without this record carrying a
+-- number that a case file could set inconsistently with the share beside it.
+-- The same answer goes for PAA s 13(2) and s 18(4): those rank applicants for
+-- a GRANT, which is a different question from who takes, and their ordering
+-- belongs in the PAA module over `the probate applications made in respect of
+-- the estate`.
+DECLARE Entitlement HAS
+    `the person entitled`                           IS A `Person or corporation`
+    `the fraction of the property distributable under this Act` IS A Share
+
+
+§§ `What is deliberately NOT declared here, and why`
+
+-- A reader who cannot tell a provision that is not in the Act from one that
+-- is merely not encoded has been misled, so this section names what was left
+-- out. Everything below is real statutory material; none of it is here.
+--
+-- LEFT TO ONE ACT'S OWN MODULE, because only that Act reads it:
+--
+--   WA s 5 (rules as to formal validity) — the entire conflict-of-laws
+--     apparatus: "internal law" and "state" (s 2), the four connecting
+--     factors in s 5(2)(a)-(d), the vessel/aircraft, immovables, revocation
+--     and power-of-appointment routes in s 5(3)(a)-(d), the multi-system
+--     tie-breaks in s 5(8), and the s 5(9) commencement. Not shared because
+--     conformity to a foreign internal law is not computable from a place
+--     name — it arrives at wills-act.l4 as one proved fact per limb — and
+--     because no other Act asks where a will was executed. Only the
+--     Singapore/not-Singapore domicile binary that ISA s 5 and PAA s 7 need
+--     is here, on `Deceased person`.
+--
+--   ISA s 4(1)'s REFERRAL OUT — "The distribution of the movable property of
+--     a person deceased shall be regulated by the law of the country in which
+--     he was domiciled at the time of his death". Where that country is not
+--     Singapore, the operative rule is another country's law, and this
+--     cleanroom models no named territory or state (see the WA s 5 note). So
+--     `domiciled in Singapore at the time of his death` decides whether the
+--     ISA governs and stops there. An earlier draft claimed the binary was
+--     all that ISA s 4 and s 5 and PAA s 7 ever ask, which was true of the
+--     last two and not of s 4(1).
+--
+--   PAA s 47(4) — "If it appears that the deceased was not, at the time of
+--     his death, domiciled within the jurisdiction of the court from which
+--     the grant was issued". A domicile within a FOREIGN court's
+--     jurisdiction, which the Singapore binary cannot answer, for the same
+--     reason. s 47(3) is cited on that field; s 47(4) is not.
+--
+--   WA s 6(3)(a)-(e) — the five signature-position circumstances of which
+--     s 6(3) says "no such will shall be affected by the circumstance".
+--     Facts, but facts about one sheet of paper, read only by s 6(3). The
+--     apparent-intention fact that they qualify IS here.
+--
+--   WA ss 14-18 (revocation, obliteration, revival, subsequent conveyance)
+--     and ss 19-25 (the construction rules). MOST of those hinge on a
+--     contrary intention appearing by the will, and each needs its own
+--     contrary-intention fact, all wills-only — but not all of them, and an
+--     earlier draft over-counted by generalising across ss 19-26. s 20 words
+--     it differently ("Unless a contrary intention appears by the will,"
+--     rather than "unless a contrary intention shall appear by the will");
+--     s 24 has no contrary-intention limb at all, only "unless a definite
+--     term of years, absolute or determinable, or an estate of freehold,
+--     shall thereby be given to him expressly or by implication"; and s 25
+--     has no such limb of any kind.
+--
+--   WA s 26's RULE, though not its facts — and the earlier draft's treatment
+--     of s 26 was self-contradictory, claiming it in scope on `Person` and on
+--     `Vital status` while listing it among the construction rules left out.
+--     Resolved in favour of scope. s 26 needs four things and this module now
+--     has three of them: a devisee who is "a child or other issue of the
+--     testator" (the `children` edge and the `Child` relation), a devise "for
+--     any estate or interest not determinable at or before the death of that
+--     person" (`Disposition`), and a devisee who "shall die in the lifetime
+--     of the testator leaving issue, and any such issue of that person shall
+--     be living at the time of the death of the testator" (`Vital status`
+--     down the tree). The fourth, "unless a contrary intention shall appear
+--     by the will", is wills-act.l4's, like every other contrary intention.
+--
+--   WA s 27 (soldiers and mariners) BEYOND ITS GATE. s 27(3)'s testamentary
+--     guardian is in scope, and s 27(3) applies only to a will "which is, or
+--     which, if it had been a disposition of property, would have been
+--     rendered valid by this section" — so the s 27(1) and s 27(4) status
+--     facts ARE here, on `Person`. What is not here is s 27(1)'s substantive
+--     power ("may dispose of his personal estate as he might have done before
+--     the making of this Act") or s 27(2)'s validation of testamentary
+--     dispositions of real property, both of which are wills-only rules
+--     rather than shared facts. And WA s 28 (rectification) beyond the grant
+--     facts that s 28(2) and s 28(4)-(5) measure time against.
+--
+--   PAA Part 2 (renunciation) — express renunciation and its attestation
+--     (s 3(2)), the citation, the notice of intention to contest, and the
+--     deemed renunciation for failing to file (s 4(2)-(3)). Only the
+--     resulting fact — s 13(1)(b)'s "have renounced the right to act as such"
+--     — is here, on `Executor appointed by a will`.
+--
+--   PAA Part 4 (oath), Part 5 (administration bond, sureties, assignment) —
+--     except the bare fact that the security lawfully required was given,
+--     which s 55(1)(c) reads and which is on `Grant` — Part 7 (caveats),
+--     Part 9 (receivers pending grant), Part 10 (re-sealing) except the
+--     s 47(1) sealing fact that WA s 28(5) reads AND the s 50(1) business-or-
+--     residence fact on `Deceased person` (an earlier draft excepted the
+--     s 47(1) sealing fact alone, while declaring the s 50(1) fact five
+--     paragraphs earlier — and s 50 is in Part 10), ss 59-61 and the Third
+--     Schedule (consular officers), the machinery of ss 62-65 and s 68 (the
+--     Public Trustee's small-estate powers — the VALUES those sections
+--     measure are on `Estate`, because their thresholds are computable and
+--     their exercise is not), and the First and Second Schedules (order of
+--     payment of debts and application of assets).
+--
+--   PAA s 58(2)-(3), the apportionment of a charge "according to its value"
+--     and the two things that shall NOT be deemed to signify a contrary
+--     intention. Rules, both of them, and PAA-only; the facts they operate on
+--     are on `Estate`, because s 57(4) is expressly subject to s 58 and the
+--     s 57 application test cannot otherwise be stated.
+--
+--   GIA s 5 and s 5A (custody, access and the enforcement of an access order),
+--     s 9 (attachment of pension or income), s 12 (variation of trusts),
+--     ss 13-14 (production and return of the infant), s 19 (the small-estate
+--     order and the person appointed under it — see the note after `Infant`),
+--     s 21 (money paid into a District Court).
+--
+-- LEFT OUT BECAUSE THERE IS NO DETERMINATE OUTPUT TO RECORD. These are
+-- discretions, and a boolean field for a discretion is a lie:
+--
+--   GIA s 3 — the court "shall regard the welfare of the infant as the first
+--     and paramount consideration"; s 11 — it "must have regard primarily to
+--     the welfare of the infant"; s 11A — it "shall, whenever it is
+--     practicable, have regard to the advice of a person ... but shall not be
+--     bound to follow such advice". s 5 — "make orders as it may think fit".
+--     s 8 — "such order regarding the matters in difference as it may think
+--     proper". s 19(1) — "in his sole and uncontrolled discretion".
+--     The only s 11 antecedent recorded here is the s 11(b) fact, "of an age
+--     to express an independent opinion", on `Infant`.
+--   PAA s 13(1) — "such person or persons as the court considers the fittest
+--     to administer the estate"; s 18(4)(b) — "it shall be in the discretion
+--     of the court"; s 32 — "for any sufficient cause"; s 66(1) — "may in its
+--     or his discretion allow ... a commission not exceeding 5%".
+--   WA s 28(1) — "A court may order that a will be rectified".
+--
+-- DELIBERATELY NOT MODELLED AT ALL:
+--
+--   SEX AND GENDER. The 1838 and 1934 drafting is full of gendered nouns —
+--     "the husband or widow" (PAA s 18(4)(a)), "widower, widow" (s 56(2)),
+--     "more than one wife" (ISA s 8), "to whose wife or husband" (WA s 10(1)),
+--     "made by a man or woman" (WA s 13(1)) — but not one of them needs a sex
+--     field. WA s 13(1) is symmetric on its face. WA s 10(1) is discharged
+--     by a second field on the attesting witness, for a gift made to that
+--     witness's wife or husband, one field either way. PAA s 18(4)(a) and
+--     s 56(2) mean the surviving spouse. ISA s 8's "more than one wife" is
+--     discharged by COUNTING subsisting marriages, because s 8's own test is
+--     a count — "more than one wife", against the share "the wife of the
+--     intestate would have been entitled to, had the intestate left only one
+--     wife surviving him" — and its remedy is an equal division among however
+--     many there are. Where the identity of the parent genuinely matters —
+--     GIA s 6(1) versus s 6(2) — it is carried STRUCTURALLY, by naming
+--     `the father` and `the mother` as separate fields.
+--
+--   A NAMED TERRITORY OR STATE. See the WA s 5 note above.
+--
+--   COMMENCEMENT AND TRANSITION DATES. Each is a constant belonging to one
+--     Act and is bound in that Act's own module: ISA s 5 "after 2 June 1967";
+--     PAA s 6(5) "grants made after 1 January 1935", s 35(1) "before
+--     1 January 2015", s 47(1)(a) "before, on or after 25 February 1999",
+--     s 62(2)(b) "on or after 17 September 2005", s 70 "As from 8 March
+--     2004"; WA s 5(9) "died before 26 June 1992", s 10(4) "dying after
+--     29 May 1992", s 13(2) and s 27(2)-(3) "29 August 1938"; GIA
+--     s 5A(8) "1 October 2014". A DECLARE-only module cannot bind a constant
+--     and should not want to.
+--
+--   THE ORDER OF THE COURT. The GIA, the PAA and the WA all make orders, but
+--     they share nothing except the word: an access order (GIA s 5A), an
+--     order assigning an administration bond (PAA s 31), an order to bring in
+--     a will (PAA s 54) and an order rectifying a will (WA s 28(1)) have no
+--     common content worth typing. Each module declares what it needs.
+--
+--   A PERCENTAGE TYPE. One occurrence, PAA s 66(1)'s 5% commission.
+--
+--   INSOLVENCY RANKING. PAA s 57(1) and the First Schedule route an insolvent
+--     estate to "the law of bankruptcy", which is outside these four Acts.
+--     Only the INPUTS the branch needs are here — debts and liabilities, the
+--     creditors and whether each is secured, the expenses, and the s 58
+--     charge facts that s 57(4) is expressly subject to — so that
+--     probate-administration-act.l4 can state s 57 completely.
+
+
+§§ `What adversarial review changed, and what it did not`
+
+-- Two independent adversarial reads of this module, one on expressiveness and
+-- one on quotation and justification. Recorded so that a later editor can see
+-- which shapes are deliberate and does not silently un-change a repair.
+--
+-- WHAT WAS ADDED, and in every case because a provision could not otherwise
+-- be stated at all:
+--   `Child`                          ISA s 3's two limbs, rooted (the old
+--                                    unrooted booleans made a child adopted
+--                                    AWAY count as the intestate's child)
+--   `Disposition`, `Kind of disposition`
+--                                    PAA s 13(2)(a),(d); s 6(2)'s minority;
+--                                    WA s 10(1)'s object; ISA s 10
+--   `Life interest`                  PAA s 6(4)'s subsistence
+--   `Creditor`                       PAA s 4(1), 13(2)(e), 18(4)(c), 50(1)
+--   `Probate application`, `What became of the application`
+--                                    PAA s 18(4)(b)-(d), 55(1)(a)-(b), 62(1)
+--   `Grantee`, `Capacity in which the grant is made`
+--                                    PAA s 25(1), and ss 14/21(2)/22(2)
+--   `Alone or jointly`               GIA ss 6(1)-(2), 7(3)-(6), 8
+--   `The court that made the grant`  WA s 28(7)(a)-(b); PAA s 35(1)
+--   `the reference for this person`  identity, without which none of the
+--                                    cross-record joins above can be made
+--
+-- WHAT WAS REMOVED:
+--   `Extent of the beneficial disposition` — a three-way legal conclusion
+--     recorded beside the quantity it is drawn from, with nothing tying them.
+--     Now derived by intestate-succession-act.l4 from `the dispositions made
+--     by the will`.
+--   `Attesting witness`.`an executor of the will` — a copy of membership of
+--     `the executors appointed by the will`.
+--   `Guardian`.`the infant` as a whole `Person` — a copy of `Infant`.`the
+--     infant`; now a reference.
+--   `Grant`.`granted before 1 January 2015 by a District Court` — folded into
+--     `the court that made the grant`, which can now be true.
+--
+-- THREE OBJECTIONS SURVIVE HERE RATHER THAN IN THE CODE, each argued at the
+-- place it bites, and each is a place where the reviewer's observation was
+-- accepted and the proposed remedy was not:
+--   a `degree` field on `Collateral relative` (ISA s 6(b)) — degree is
+--     structural, and storing it invites contradiction;
+--   a `rank` field on `Entitlement` (ISA s 6(b), PAA ss 13(2), 18(4)) —
+--     ranking is a step in computing a share, not an output beside it;
+--   splitting `Will` into a `Testamentary instrument` (PAA s 2, ISA s 10) —
+--     the three whole-disposition fields are named instead, and the split is
+--     the right move if a fourth ever appears.
+--
+-- And one shape was left alone on the Act's own words: GIA s 19(1)'s
+-- appointee gets no member of `Kind of guardianship`, because s 19(1) says he
+-- is appointed INSTEAD of a guardian and acts "in his sole and uncontrolled
+-- discretion".

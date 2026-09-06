@@ -247,6 +247,13 @@ declareToJsonSchema ctx (MkDeclare ann _ _ typeDecl) =
         SynonymDecl _ ty ->
           let (schema, defs) = typeToJsonSchema ctx ty
            in (addDescToSchema schema desc, defs)
+        -- An opaque type has no JSON shape; publish it as an object with no
+        -- declared properties, which is what 'L4.FunctionSchema' does for the
+        -- same type. (An @ASSUME T IS A TYPE@ name, having no 'Declare', falls
+        -- through to a bare '$ref' with no definition behind it — a dangling
+        -- reference. The opaque spelling gets a definition instead.)
+        OpaqueDecl _ ->
+          (SObject [] desc, ctx.ctxCollectedDefs)
  where
   addField :: SchemaContext -> TypedName Resolved -> ([(Text, SchemaType, Bool, Maybe Aeson.Value)], Map Text SchemaType) -> ([(Text, SchemaType, Bool, Maybe Aeson.Value)], Map Text SchemaType)
   addField ctx' (MkTypedName fieldAnn fieldName fieldTy mTypically _mMeans) (acc, defs) =

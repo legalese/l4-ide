@@ -6,8 +6,9 @@
 -- DAErrorMissingVariable on `seam_rule` (the direct-reference control is
 -- already refused; this fixture pins the inlined path).
 
-ASSUME `scope flag` IS A BOOLEAN
-ASSUME `req flag` IS A BOOLEAN
+§ `Seam ref via fn`
+    GIVEN `scope flag` IS A BOOLEAN
+          `req flag` IS A BOOLEAN
 
 @export the main gate
 GIVEN amount IS A NUMBER

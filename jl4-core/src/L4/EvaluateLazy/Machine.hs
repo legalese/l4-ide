@@ -35,6 +35,7 @@ module L4.EvaluateLazy.Machine
 , matchPattern
 , backward
 , EvalDirective (..)
+, AssertKind (..)
 , evalModule
 , initialEnvironment
 , evalRef
@@ -457,6 +458,21 @@ userException = raiseException . UserEvalException
 stuckOnAssumed :: Resolved -> Eval a
 stuckOnAssumed assumedResolved = userException (Stuck assumedResolved)
 
+-- | REFUSE: stop evaluation with the author's reason.
+--
+-- UNCATCHABLE, and that is the point. 'tryEval' is the only @try@ over an
+-- 'EvalException' anywhere in the tree, and it is used only at the directive
+-- boundary ('L4.EvaluateLazy.nfDirective') and in @withEvalClauses@ (which
+-- rethrows). There is no user-facing catch construct, so nothing between a
+-- 'Refuse' and the directive that demanded it can observe the refusal or turn
+-- it into a value: not a CONSIDER arm, not a boolean connective, not a
+-- WHERE\/LET binding. THIS IS AN INVARIANT, not an accident of the current
+-- code: a static refusal analysis is only sound while it holds. Anything that
+-- adds a second @try@ (a TRY\/RECOVER construct, a service-level resume)
+-- breaks it, and would also have to reckon with 'unwindFrame'\'s docstring.
+refuseWith :: Refusal -> Eval a
+refuseWith = raiseException . RefusalException
+
 pushFrame :: Frame -> Eval ()
 pushFrame frame = do
   stackRef <- asks (.stack)
@@ -810,8 +826,18 @@ forwardExpr env = \ case
     continueExpr env e1
   Proj _ann e l ->
     continueExpr env (App emptyAnno l [e]) -- we desugar projection to plain function application
-  Var _ann n -> -- still problematic: similarity / overlap between this and App with no args
-    expectTerm env n >>= continueRef
+  Var _ann n -> do -- still problematic: similarity / overlap between this and App with no args
+    -- Auto-apply a discharged import only in VALUE position. The App case above
+    -- fetches the function it is about to apply by re-entering here, and
+    -- applying it twice would hand the caller the RESULT where it expects a
+    -- function: measured, that took @legal/promissory-note.l4@ and
+    -- @legal/regcf/regcf.l4@ red with "expected a function but found:
+    -- Money OF ...". An argument is never in this position -- arguments are
+    -- allocated, not forwarded -- so an 'App1' carrying arguments on top of the
+    -- stack means this reference is the function of that application.
+    beingApplied <- topFrameAppliesArguments
+    r <- expectTerm env n
+    if beingApplied then continueRef r else autoApplyDischargedImport r
   Cons _ann e1 e2 -> do
     rf1 <- allocate_ e1 env
     rf2 <- allocate_ e2 env
@@ -819,7 +845,7 @@ forwardExpr env = \ case
   Lam _ann givens e ->
     continueBackward (ValClosure givens e env)
   App _ann n [] ->
-    expectTerm env n >>= continueRef
+    expectTerm env n >>= autoApplyDischargedImport
   App ann n es@(_ : _) -> do
     -- Handle temporal context override: EVAL AS OF SYSTEM TIME <serial> <thunk>
     -- The second argument is evaluated under the mutated temporal context.
@@ -850,12 +876,32 @@ forwardExpr env = \ case
               _ -> Nothing
         rs <- traverse (`allocate_` env) es
         pushFrame (App1 rs expectedType)
+        -- Re-enter as a 'Var'. That extra 'ForwardMachine' step is what the
+        -- evaluation tracer records as the function being entered, so short-
+        -- circuiting it here silently drops a line from every #EVALTRACE (five
+        -- goldens, measured). 'forwardExpr'\'s Var case knows not to
+        -- auto-apply while this 'App1' is on top of the stack.
         continueExpr env (Var emptyAnno n)
   AppNamed ann n [] _ ->
     continueExpr env (App ann n [])
   AppNamed _ann _n _nes Nothing ->
     internalException $ RuntimeTypeError
       "named application where the order of arguments is not resolved"
+  AppNamed _ann n _nes (Just order)
+    | any (< 0) order ->
+    -- A negative entry marks a named argument that supplies a SECTION BINDER
+    -- rather than one of the callee's declared parameters (see 'AppNamed' in
+    -- "L4.Syntax"). 'L4.Discharge.dischargeModule' rewrites every such site
+    -- into a plain application; one reaching here means the module skipped
+    -- that pass, and sorting the entry into argument position would silently
+    -- pass the override to the WRONG parameter.
+    internalException $ RuntimeTypeError $
+      "named application supplying an implicit input reached the evaluator undischarged: "
+      <> prettyLayout (TypeCheck.getName n)
+      <> " ("
+      <> Text.pack (show (length (filter (< 0) order)))
+      <> " implicit argument(s)). This is a compiler bug:"
+      <> " L4.Discharge.dischargeModule must run before evaluation."
   AppNamed ann n nes (Just order) ->
     let
      -- move expressions into order, drop names
@@ -944,6 +990,16 @@ forwardExpr env = \ case
     mPartyRef <- traverse (\p -> allocate_ p env) mParty
     mReasonRef <- traverse (\r -> allocate_ r env) mReason
     continueBackward (ValBreached (ExplicitBreach mPartyRef mReasonRef))
+  -- REFUSE only ever reaches 'forwardExpr' when the machine actually REDUCES
+  -- it, so a refusal inside an unforced thunk is never entered. That is what
+  -- makes @FALSE AND <refusing>@ answer FALSE while @<refusing> AND FALSE@
+  -- refuses: 'And' desugars to an 'IfThenElse' whose scrutinee is forced first.
+  Refuse _ann (Lit _ (StringLit _ txt)) ->
+    refuseWith (MkRefusal txt)
+  Refuse _ann _msg ->
+    -- Unreachable: the parser accepts only a literal message and the type
+    -- checker requires that literal to be a STRING.
+    internalException (RuntimeTypeError "the message of a REFUSE is not a string literal")
   Inert _ann _txt ctx ->
     -- Inert elements are grammatical scaffolding with context-aware evaluation
     -- In AND context: True (identity), in OR context: False (identity)
@@ -1027,7 +1083,7 @@ backward val = withPoppedFrame $ \ case
   Just f@(App1 rs mTy) -> do
     case val of
       ValClosure givens e env' -> do
-        env'' <- matchGivens givens f rs
+        env'' <- matchGivens env' givens f rs
         continueExpr (Map.union env'' env') e
       ValUnappliedConstructor r ->
         continueBackward (ValConstructor r rs)
@@ -1891,20 +1947,116 @@ finishRead mode cellVal ledger = do
         storedVals
       continueBackward listVal
 
-matchGivens :: GivenSig Resolved -> Frame -> [Reference] -> Machine Environment
-matchGivens (MkGivenSig _ann otns) f es = do
-  let others = foldMap (either (const []) (\x -> [fst x]) . TypeCheck.isQuantifier) otns
-  matchGivens' others f es
+-- | A bare reference to a definition in an IMPORTED module that discharge gave
+-- trailing parameters.
+--
+-- The companion to 'matchGivens'''s under-application case, for the references
+-- that never become applications at all. Discharge runs per module, so nothing
+-- rewrote this reference into a call, and handing the consumer the closure gives
+-- a function where a value was asked for: measured on an importer of a module
+-- with a section binder, @#EVAL doubled@ printed @\<function\>@ -- silently,
+-- not as an error -- and @doubled PLUS 1@ died with a runtime type error.
+--
+-- Reads the thunk WITHOUT forcing it. Any definition with parameters is stored
+-- as a 'ValClosure' at 'WHNF' by 'evalDecide', so this needs no evaluation and
+-- leaves laziness exactly as it was; anything still 'Unevaluated' is passed
+-- through untouched.
+--
+-- Guarded exactly as 'matchGivens'' is, and for the same reason: EVERY one of
+-- the closure's parameters must already be a key in its OWN captured
+-- environment, which is true only of parameters discharge appended for that
+-- module's section binders. An ordinary function passed as a value has
+-- parameters bound nowhere, so it is returned unchanged -- including a reader
+-- that still has declared parameters of its own, such as @bump@, which must
+-- stay a function so its caller can apply it.
+-- | Is the top of the stack an application waiting for its function?
+--
+-- 'App1' with a NON-empty argument list. The empty one is what
+-- 'autoApplyDischargedImport' itself pushes, and must not count.
+topFrameAppliesArguments :: Machine Bool
+topFrameAppliesArguments = do
+  stackRef <- asks (.stack)
+  st <- liftIO (readIORef stackRef)
+  pure case st.frames of
+    App1 (_ : _) _ : _ -> True
+    _                  -> False
 
-matchGivens' :: [Resolved] -> Frame -> [Reference] -> Machine Environment
-matchGivens' ns f rs = do
-  if length ns == length rs
+autoApplyDischargedImport :: Reference -> Machine Config
+autoApplyDischargedImport r = do
+  needsIt <- dischargedImportClosure r
+  if needsIt
     then do
+      pushFrame (App1 [] Nothing)
+      continueRef r
+    else continueRef r
+
+-- | Does this reference hold a closure that only discharge could have built --
+-- every one of its parameters already a key in its OWN captured environment?
+--
+-- Reads the thunk without forcing it: 'evalDecide' stores any definition with
+-- parameters as a 'ValClosure' at 'WHNF' already, and anything still
+-- 'Unevaluated' answers 'False' and is left alone.
+--
+-- An ordinary function value fails this test, because its parameters are bound
+-- by the application that has not happened yet, not by the environment it
+-- captured. That is what keeps a genuine higher-order argument a function.
+dischargedImportClosure :: Reference -> Machine Bool
+dischargedImportClosure r = do
+  thunk <- readThunk r
+  pure case thunk of
+    WHNF (ValClosure (MkGivenSig _ otns) _ closureEnv) ->
+      let ps = foldMap (either (const []) (\ x -> [fst x]) . TypeCheck.isQuantifier) otns
+      in not (null ps) && all (\ p -> Map.member (getUnique p) closureEnv) ps
+    _ -> False
+
+matchGivens :: Environment -> GivenSig Resolved -> Frame -> [Reference] -> Machine Environment
+matchGivens closureEnv (MkGivenSig _ann otns) f es = do
+  let others = foldMap (either (const []) (\x -> [fst x]) . TypeCheck.isQuantifier) otns
+  matchGivens' closureEnv others f es
+
+-- | Bind a closure's parameters to the arguments a call site supplied.
+--
+-- The under-applied case is 'L4.Discharge' crossing an @IMPORT@. Discharge runs
+-- per module, so a definition in an IMPORTED module gains its trailing section
+-- binders when THAT module is discharged, while the importer's call site — which
+-- the checker saw at the callee's original arity, and which declares no binder of
+-- its own to discharge — still passes only the declared arguments. Before this
+-- fallback the result was
+-- @Internal error: given signatures' values' lengths do not match@ on a correct
+-- program: measured on the @ASSUME@ sweep's tree, six sites in
+-- @legal\/regcf\/regcf-wizard.l4@, which @IMPORT@s @regcf@.
+--
+-- Every parameter discharge appends is a section binder of the callee's own
+-- module, so its 0-ary cell is in the closure's captured environment. We
+-- therefore bind only what was supplied and let @Map.union env'' env'@ at the
+-- call site resolve the rest from that environment — the imported module's own
+-- binder cell, which is exactly what the callee would have read before
+-- discharge.
+--
+-- Guarded so it cannot mask a real arity error: it fires only when the call is
+-- UNDER-applied and every missing parameter is a key the closure's environment
+-- already holds. An ordinary parameter the writer forgot is a fresh binding that
+-- no module environment carries, so it still reaches the error below — and the
+-- checker rejects a genuine arity mistake long before evaluation anyway.
+--
+-- What it does NOT give the importer is the ability to @WITH@-supply that
+-- binder: 'L4.TypeCheck.CheckEnv.sectionBinderNames' is per module, so the name
+-- is not suppliable across the boundary. The importer sees whatever the imported
+-- module's own binder evaluates to — its @TYPICALLY@, or \"assumed term\".
+matchGivens' :: Environment -> [Resolved] -> Frame -> [Reference] -> Machine Environment
+matchGivens' closureEnv ns f rs = do
+  let (supplied, missing) = splitAt (length rs) ns
+  if length ns == length rs
+    then
       pure $ Map.fromList (zipWith (\ r v -> (getUnique r, v)) ns rs)
-    else do
-      pushFrame f -- provides better error context
-      internalException $
-        RuntimeTypeError "given signatures' values' lengths do not match"
+    else if length rs < length ns
+           && all (\ n -> Map.member (getUnique n) closureEnv) missing
+      then
+        pure $ Map.fromList (zipWith (\ r v -> (getUnique r, v)) supplied rs)
+      else do
+        pushFrame f -- provides better error context
+        internalException $
+          RuntimeTypeError "given signatures' values' lengths do not match"
 
 matchBranches :: Reference -> Environment -> [Branch Resolved] -> Machine Config
 matchBranches scrutinee _env [] = do
@@ -3312,6 +3464,17 @@ preAllocate ns = do
 allocate_ :: Expr Resolved -> Environment -> Machine Reference
 allocate_ (Var _ann n) env = do
   -- special case where we do not actually need to allocate
+  --
+  -- NOT extended to auto-apply a discharged import (see
+  -- 'dischargedImportClosure'). Allocating the application here instead of
+  -- sharing the cell fixes an operand-position reference across an IMPORT, but
+  -- it also fires on every RECORD CONSTRUCTOR: a @DECLARE@'s field names are
+  -- module-level selectors, so a constructor's parameters are keys in its own
+  -- captured environment exactly as a discharged reader's are, and the guard
+  -- cannot tell them apart. Measured 2026-09-05 on the sweep corpus:
+  -- @legal\/promissory-note.l4@ and @legal\/regcf\/regcf.l4@ both went red with
+  -- \"expected a function but found: Money OF ...\". See the operand-position
+  -- limitation recorded in IMPLICIT-PROPS-DESIGN.md.
   expectTerm env n
 allocate_ expr env =
   fst <$> allocateRecursive expr (const env)
@@ -3340,7 +3503,7 @@ evalRecLocalDecls env decls = do
 
 -- | Just collect all defined names; could plausibly be done generically.
 scanSection :: Section Resolved -> Machine [Resolved]
-scanSection (MkSection _ann _mn _maka topdecls) =
+scanSection (MkSection _ann _mn _maka _ topdecls) =
   concat <$> traverse scanTopDecl topdecls
 
 -- | Just collect all defined names; could plausibly be done generically.
@@ -3384,13 +3547,15 @@ scanTypeDecl (RecordDecl _ann mcon tns) =
   concat <$> traverse (\ c -> scanConDecl (MkConDecl emptyAnno c tns)) (toList mcon)
 scanTypeDecl (SynonymDecl _ann _t) =
   pure []
+scanTypeDecl (OpaqueDecl _ann) =
+  pure []
 
 scanConDecl :: ConDecl Resolved -> Machine [Resolved]
 scanConDecl (MkConDecl _ann n [])  = pure [n]
 scanConDecl (MkConDecl _ann n tns) = pure (n : ((\ (MkTypedName _ n' _ _ _) -> n') <$> tns))
 
 evalSection :: Environment -> Section Resolved -> Machine [EvalDirective]
-evalSection env (MkSection _ann _mn _maka topdecls) =
+evalSection env (MkSection _ann _mn _maka _ topdecls) =
   concat <$> traverse (evalTopDecl env) topdecls
 
 evalTopDecl :: Environment -> TopDecl Resolved -> Machine [EvalDirective]
@@ -3433,13 +3598,13 @@ evalDirective env (LazyEval ann expr) = do
   let shouldTrace = case tracePolicy.evalDirectiveTrace of
         TracePolicy.NoTrace -> False
         TracePolicy.CollectTrace _ -> True
-  pure [MkEvalDirective (rangeOf ann) shouldTrace False expr env]
+  pure [MkEvalDirective (rangeOf ann) shouldTrace NotAnAssert expr env]
 evalDirective env (LazyEvalTrace ann expr) = do
   tracePolicy <- getTracePolicy
   let shouldTrace = case tracePolicy.evaltraceDirectiveTrace of
         TracePolicy.NoTrace -> False
         TracePolicy.CollectTrace _ -> True
-  pure [MkEvalDirective (rangeOf ann) shouldTrace False expr env]
+  pure [MkEvalDirective (rangeOf ann) shouldTrace NotAnAssert expr env]
 evalDirective _env (Check _ann _expr) =
   pure []
 evalDirective env (Contract ann expr t evs) =
@@ -3449,7 +3614,27 @@ evalDirective env (Assert ann expr) = do
   let shouldTrace = case tracePolicy.evalDirectiveTrace of
         TracePolicy.NoTrace -> False
         TracePolicy.CollectTrace _ -> True
-  pure [MkEvalDirective (rangeOf ann) shouldTrace True expr env]
+  pure [MkEvalDirective (rangeOf ann) shouldTrace AssertHolds expr env]
+evalDirective env (AssertRefused ann expr mmsg) = do
+  tracePolicy <- getTracePolicy
+  let shouldTrace = case tracePolicy.evalDirectiveTrace of
+        TracePolicy.NoTrace -> False
+        TracePolicy.CollectTrace _ -> True
+  -- The BECAUSE message is a literal, so the comparison the directive asks for
+  -- is decided statically here rather than evaluated.
+  --
+  -- 'Nothing' here means "the directive imposes no constraint on the reason",
+  -- so the wildcard MUST be unreachable for a payload the author wrote: a
+  -- payload we cannot read would otherwise become an assertion that holds for
+  -- every refusal reason. Two upstream checks make it so -- 'Parser.directive'
+  -- accepts only a 'lit' after BECAUSE, and 'TypeCheck.inferDirective' requires
+  -- that literal to be a STRING -- which leaves the wildcard reachable only for
+  -- a module that never type-checked. If you widen either of those, decide what
+  -- an unreadable payload means before you land it.
+  let wanted = case mmsg of
+        Just (Lit _ (StringLit _ t)) -> Just t
+        _                            -> Nothing
+  pure [MkEvalDirective (rangeOf ann) shouldTrace (AssertRefuses wanted) expr env]
 
 contractToEvalDirective :: Expr Resolved -> Expr Resolved -> [Expr Resolved] -> Machine (Expr Resolved)
 contractToEvalDirective contract t evs = do
@@ -3546,6 +3731,8 @@ evalTypeDecl env (EnumDecl _ann conDecls) =
 evalTypeDecl env (RecordDecl _ann mcon tns) =
   traverse_ (\ c -> evalConDecl env (MkConDecl emptyAnno c tns)) mcon
 evalTypeDecl _env (SynonymDecl _ann _t) =
+  pure ()
+evalTypeDecl _env (OpaqueDecl _ann) =
   pure ()
 
 evalConDecl :: Environment -> ConDecl Resolved -> Machine ()
@@ -3647,11 +3834,26 @@ eventCVal = ValUnappliedConstructor TypeCheck.eventCRef
 emptyEnvironment :: Environment
 emptyEnvironment = Map.empty
 
+-- | What kind of assertion (if any) a directive is.
+--
+-- Replaces a bare @isAssert :: Bool@, so that adding @#ASSERT REFUSED@ made
+-- every consumer decide what it means rather than inheriting the plain
+-- assertion's answer.
+data AssertKind
+  = NotAnAssert
+    -- ^ @#EVAL@ \/ @#EVALTRACE@ \/ @#TRACE@: reduce and report the value.
+  | AssertHolds
+    -- ^ @#ASSERT e@: @e@ must evaluate to TRUE.
+  | AssertRefuses !(Maybe Text)
+    -- ^ @#ASSERT REFUSED e [BECAUSE m]@: @e@ must refuse, and when @m@ is
+    -- present the refusal's reason must equal it.
+  deriving stock (Generic, Show)
+
 data EvalDirective =
   MkEvalDirective
     { range    :: Maybe SrcRange -- ^ of the (L)EVAL directive
     , trace    :: !Bool -- ^ whether a trace is wanted
-    , isAssert :: !Bool -- ^ whether it is to be treated as an assertion
+    , assertKind :: !AssertKind -- ^ whether, and how, it is to be treated as an assertion
     , expr     :: !(Expr Resolved) -- ^ expression to evaluate
     , env      :: !Environment -- ^ environment to evaluate the expression in
     }

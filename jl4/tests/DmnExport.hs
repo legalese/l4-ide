@@ -1090,7 +1090,12 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       -- `double OF n` satisfies dmnmd's varname grammar (letters and spaces) by
       -- accident. The fragment, not the spelling, is what decides.
       let drg = drgOf nonSFeelColumn
-      emitMarkdown drg `shouldNotSatisfy` Text.isInfixOf "double"
+      -- Two halves, and both are needed: the phrase never reaches a table
+      -- line, AND `tier` is on the record as omitted rather than silently
+      -- gone. See 'mdTableLines' and 'mdOmits'.
+      let md = emitMarkdown drg
+      mdTableLines md `shouldNotSatisfy` Text.isInfixOf "double"
+      md `shouldSatisfy` mdOmits "tier"
       let notes = [n | n <- (markdownReport drg).notes, n.code == "D-MD-NONIDENTCOLUMN"]
       map (.severity) notes `shouldBe` [Blocking]
       map (.message) notes `shouldSatisfy` all (Text.isInfixOf "L4 source, not FEEL")
@@ -2189,7 +2194,9 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
 
     it "omits a table whose column is an EXPRESSION, since a header is a variable name" $ do
       let drg = drgOf nonSFeelColumn
-      emitMarkdown drg `shouldNotSatisfy` Text.isInfixOf "double"
+      let md = emitMarkdown drg
+      mdTableLines md `shouldNotSatisfy` Text.isInfixOf "double"
+      md `shouldSatisfy` mdOmits "tier"
       [n.code | n <- (markdownReport drg).notes] `shouldContain` ["D-MD-NONIDENTCOLUMN"]
 
     it "omits a decision with no table shape, and names it" $ do
@@ -2775,7 +2782,12 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
     it "gives dmnmd no form for a date cell" $ do
       drg <- gstDrg
       let md = emitMarkdown drg
-      md `shouldSatisfy` (not . Text.isInfixOf "date(")
+      -- ...in a CELL. The marker for each omitted decision quotes the FEEL it
+      -- could not render, so `date(` is present in the comments by design — and
+      -- the date-interval table itself must be ON THE RECORD as omitted, not
+      -- merely absent.
+      mdTableLines md `shouldSatisfy` (not . Text.isInfixOf "date(")
+      md `shouldSatisfy` mdOmits "GST rate percent"
       [ n.code
         | n <- (markdownReport drg).notes
         , n.code == "D-MD-CELLSYNTAX"
@@ -3612,6 +3624,120 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
         let drg = drgOf (corpus body)
         [n.code | n <- (dmnReport drg).notes, n.severity == Blocking] `shouldBe` []
 
+  -- A BRANCH in EXPRESSION position, and prelude `elem`. Two lowerings, one
+  -- block, because the reference corpus exhibits them together and neither
+  -- alone rescues it: the chubb model has a CONSIDER over a MAYBE whose JUST
+  -- arm is a BRANCH whose guards are `elem` calls, and while either was
+  -- verbatim the R8-c arm correctly declined to compose and both KIE and
+  -- Camunda refused the whole model.
+  describe "BRANCH in expression position, and prelude elem" $ do
+    -- The chubb composition, minimised. A BRANCH as a whole decision body
+    -- becomes a TABLE (normaliseGuarded), so it has to be nested to reach
+    -- renderFeelIn at all.
+    let branchUnderMaybe =
+          "IMPORT prelude\n\
+          \GIVEN m IS A MAYBE NUMBER\n\
+          \GIVETH A STRING\n\
+          \`the answer` m MEANS\n\
+          \  CONSIDER m\n\
+          \  WHEN JUST n THEN\n\
+          \    BRANCH\n\
+          \      IF n AT LEAST 100 THEN \"high\"\n\
+          \      IF n AT LEAST 10 THEN \"mid\"\n\
+          \      OTHERWISE \"low\"\n\
+          \  WHEN NOTHING THEN \"none\"\n"
+        answerOf src = case (decisionNamed "the answer" (drgOf src)).dcnLogic of
+          LogicLiteral e -> e
+          _              -> error "expected a boxed literal for `the answer`"
+
+    it "composes a nested BRANCH into the R8-c absence test as one FEEL literal" $ do
+      let e = answerOf branchUnderMaybe
+      e.feFragment `shouldBe` FullFeel
+      e.feText `shouldBe`
+        "if m != null then (if m >= 100 then \"high\" else if m >= 10 then \"mid\" else \"low\") else \"none\""
+
+    it "raises nothing Blocking for a composed BRANCH" $
+      [n.code | n <- (dmnReport (drgOf branchUnderMaybe)).notes, n.severity == Blocking]
+        `shouldBe` []
+
+    -- The refusal half: one verbatim sub-render takes the WHOLE chain verbatim.
+    -- `p AT LEAST q` on booleans is outside FEEL's Table 54 ordering, which is
+    -- the module's own standing example of a verbatim leaf.
+    it "refuses the whole chain when one arm is not FEEL" $ do
+      let src =
+            "IMPORT prelude\n\
+            \GIVEN m IS A MAYBE BOOLEAN, q IS A BOOLEAN\n\
+            \GIVETH A BOOLEAN\n\
+            \`the answer` m q MEANS\n\
+            \  CONSIDER m\n\
+            \  WHEN JUST p THEN\n\
+            \    BRANCH\n\
+            \      IF p AT LEAST q THEN TRUE\n\
+            \      OTHERWISE FALSE\n\
+            \  WHEN NOTHING THEN FALSE\n"
+      (answerOf src).feFragment `shouldBe` L4Verbatim
+
+    -- `elem` is FEEL's `list contains`, and the ARGUMENTS SWAP. The assertion
+    -- is on the whole text, not an isInfixOf, precisely because emitting the
+    -- operands in source order would still contain both names.
+    let elemCorpus =
+          "IMPORT prelude\n\
+          \DECLARE Peril IS ONE OF skydiving, `military service`, driving\n\
+          \DECLARE Claim HAS causes IS A LIST OF Peril\n\
+          \GIVEN c IS A Claim\n\
+          \GIVETH A BOOLEAN\n\
+          \`excluded` c MEANS elem skydiving (c's causes)\n"
+
+    it "lowers prelude elem to list contains, list first" $ do
+      let e = case (decisionNamed "excluded" (drgOf elemCorpus)).dcnLogic of
+                LogicLiteral x -> x
+                _              -> error "expected a boxed literal for `excluded`"
+      e.feFragment `shouldBe` FullFeel
+      e.feText `shouldBe` "list contains(c.causes, \"skydiving\")"
+
+    -- The table position. Each BRANCH guard becomes an <inputExpression>, and
+    -- before this lowering each was raw L4 and so D-NONFEELINPUT Blocking.
+    let elemTable =
+          "IMPORT prelude\n\
+          \DECLARE Peril IS ONE OF skydiving, `military service`, driving\n\
+          \DECLARE Claim HAS causes IS A LIST OF Peril\n\
+          \GIVEN c IS A Claim\n\
+          \GIVETH A BOOLEAN\n\
+          \`any exclusion applies` c MEANS\n\
+          \  BRANCH\n\
+          \    IF elem skydiving (c's causes) THEN TRUE\n\
+          \    IF elem `military service` (c's causes) THEN TRUE\n\
+          \    OTHERWISE FALSE\n"
+
+    it "puts list contains in the input expressions of a BRANCH table" $ do
+      let t = tableOf "any exclusion applies" elemTable
+      map (.icExpr.feText) t.dtInputs `shouldBe`
+        [ "list contains(c.causes, \"skydiving\")"
+        , "list contains(c.causes, \"military service\")"
+        ]
+      map (.icExpr.feFragment) t.dtInputs `shouldSatisfy` all (/= L4Verbatim)
+
+    it "raises no D-NONFEELINPUT for elem guards" $
+      [n.code | n <- (dmnReport (drgOf elemTable)).notes, n.severity == Blocking]
+        `shouldBe` []
+
+    -- Provenance, not the name string: a module that defines its own `elem`
+    -- must not be lowered as though it were the prelude's. This is the R8-f
+    -- guard that `listQuantKeyword` above carries for `all`/`any`.
+    it "declines a locally defined elem" $ do
+      let src =
+            "DECLARE Claim HAS causes IS A LIST OF BOOLEAN\n\
+            \GIVEN x IS A BOOLEAN, l IS A LIST OF BOOLEAN\n\
+            \GIVETH A BOOLEAN\n\
+            \elem x l MEANS FALSE\n\
+            \GIVEN c IS A Claim\n\
+            \GIVETH A BOOLEAN\n\
+            \`excluded` c MEANS elem TRUE (c's causes)\n"
+      case (decisionNamed "excluded" (drgOf src)).dcnLogic of
+        LogicLiteral e -> e.feText `shouldSatisfy` (not . Text.isInfixOf "list contains")
+        LogicTable _   -> expectationFailure "expected a boxed literal for `excluded`"
+        LogicContext _ -> expectationFailure "expected a boxed literal for `excluded`"
+
   describe "golden" $ forM_ goldenSubjects \(srcPath, stem, label) -> do
     it (label <> ", as DMN 1.3 XML") $
       goldenOf examplesRoot srcPath (stem <> ".dmn") emitDrg
@@ -3789,6 +3915,7 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
           }
         decNode nm krs body = NodeDecision MkDecision
           { dcnId = "decision_" <> nm, dcnName = nm, dcnFeelName = nm
+          , dcnDescription = Nothing
           , dcnDecide = Nothing
           , dcnType = DmnNumber, dcnLogic = body
           , dcnRequirements = [], dcnKnowledgeReqs = krs
@@ -3990,6 +4117,22 @@ goldenSubjects =
     , "ymd-dates"
     , "the date-literal exhibit"
     )
+    -- The REFUSAL exhibit (ruling D1, 2026-09-05; IMPLICIT-PROPS-DESIGN §11.9.1).
+    -- One of each position a `REFUSE` can occupy — a whole body (a boxed
+    -- literalExpression), the floor arm of a law-time chain, an inline
+    -- `OTHERWISE`, an enum-valued `OTHERWISE`, and a plain arithmetic decision
+    -- downstream of one — because each is a different path through
+    -- 'renderFeelIn', 'datedTable' and 'outputValuesWith'. Before D1 no such
+    -- golden could exist: the exporter wrote raw L4 into a FEEL literal and KIE
+    -- failed to compile the whole file. Its negative control is a HAND-WRITTEN
+    -- fixture (`not-ok/refuse-enum-unwidened.dmn`) rather than a second module,
+    -- for the same reason `ymd-unfoldable-date.l4` is one: the emitter cannot
+    -- produce the un-widened `<outputValues>` any more, so only a fixture can
+    -- ask whether KIE still rejects it.
+  , ( "dmn" </> "refuse.l4"
+    , "refuse"
+    , "the refusal exhibit"
+    )
   ]
 
 -- | The `.kie.` golden pairs (§13.6): ONLY the subjects whose bytes actually
@@ -4055,6 +4198,37 @@ isUniqueTable = \case
 ------------------------------------------------------------------------
 -- helpers
 ------------------------------------------------------------------------
+
+-- | The markdown's TABLE lines only — every line that starts with @|@.
+--
+-- Three assertions below mean "this never reached a column header or a cell",
+-- and used to spell that as "this string is absent from the whole document".
+-- That proxy stopped being equivalent once an omitted decision began leaving an
+-- @\<!-- OMITTED: … --\>@ marker that NAMES it and quotes the FEEL it could not
+-- render ("L4.Dmn.Markdown"): the name is now deliberately present, in a
+-- comment, and only its absence from the TABLES is the property being claimed.
+--
+-- __This is more precise, and on its own it is not stronger.__ Scoping to the
+-- tables says exactly what each test means instead of over-reaching, but it is
+-- no better than the whole-document form at catching the failure that matters:
+-- a decision dropped SILENTLY puts its name in neither a cell nor a comment, so
+-- both forms pass. 'mdOmits' is the half that closes that, and each of the
+-- three assertions pairs the two.
+mdTableLines :: Text -> Text
+mdTableLines =
+  Text.unlines . filter (Text.isPrefixOf "|") . map Text.stripStart . Text.lines
+
+-- | Does the markdown carry an @OMITTED@ marker naming this decision?
+--
+-- The companion to 'mdTableLines', and the half that makes these assertions
+-- genuinely stronger than what they replaced. "The name never reaches a table
+-- line" is satisfied just as well by a decision that vanished without a word —
+-- which is the outcome the marker was added to prevent — so asserting the
+-- marker too is what separates \"correctly omitted, and said so\" from
+-- \"silently gone\". If a later change drops or renames the marker, these three
+-- tests are the ones that should notice.
+mdOmits :: Text -> Text -> Bool
+mdOmits name = Text.isInfixOf ("<!-- OMITTED: `" <> name <> "` ")
 
 drgOf :: Text -> Drg
 drgOf = drgNamed "Test"

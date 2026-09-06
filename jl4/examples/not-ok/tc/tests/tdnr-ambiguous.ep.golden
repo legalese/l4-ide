@@ -1,13 +1,11 @@
 § `Type-directed name resolution`
-
-ASSUME foo IS A NUMBER
-ASSUME foo IS A BOOLEAN
+    GIVEN foo IS A NUMBER
+          foo IS A BOOLEAN
+          baz IS A NUMBER
+          baz IS A BOOLEAN
 
 DECIDE bar
   IS foo
-
-ASSUME baz IS A NUMBER
-ASSUME baz IS A BOOLEAN
 
 -- In the following, foo is ambiguous, yet baz should not be.
 DECIDE another

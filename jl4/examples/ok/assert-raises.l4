@@ -1,0 +1,26 @@
+
+§ `Assert raises`
+    GIVEN x IS A NUMBER
+          b IS A BOOLEAN
+
+-- raises: division by zero — both polarities "could not be evaluated"
+#ASSERT (1 DIVIDED BY 0) EQUALS 1
+#ASSERT NOT ((1 DIVIDED BY 0) EQUALS 1)
+
+-- raises: stuck on an assumed term — both polarities "could not be evaluated"
+#ASSERT x EQUALS 1
+#ASSERT NOT (x EQUALS 1)
+
+-- does not raise: the disjunction short-circuits before x is forced
+#ASSERT TRUE OR (x EQUALS 1)
+
+-- a bare assumed BOOLEAN is no verdict either — neither TRUE nor FALSE.
+-- `#ASSERT NOT b` forces b and raises; `#ASSERT b` reduces to the symbolic b
+-- WITHOUT raising, and used to fall through to "assertion failed", so the
+-- two polarities disagreed. Both "could not be evaluated".
+#ASSERT b
+#ASSERT NOT b
+
+-- the two clean verdicts, for contrast
+#ASSERT 1 EQUALS 2
+#ASSERT 1 EQUALS 1

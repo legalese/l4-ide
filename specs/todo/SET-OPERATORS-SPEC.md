@@ -1978,7 +1978,7 @@ already models `And`/`Or` as **n-ary**.
 
 ### 17.3 Recommended style — the NY/NJ example, five ways
 
-All verified green. `alice` resides in NY, `carol` in NJ, `dave` in CT.
+Styles 1, 2, 4 and 5 re-verified green on 2026-08-27 against the 4 Aug `l4` build (Style 2 via `l4 run` on a reconstruction taken verbatim from the July probe file — setSize 2, carol `is in` TRUE, dave `is in` FALSE). **Style 3 is green as of the infix-under-connective grammar change** (2026-08-27, branch `mengwong/infix-under-connective`): both forms — the two-element `OR` form and the four-element `..` chain with caret dittos — parse and evaluate, pinned with all their goldens by `jl4/examples/ok/infix-under-connective.l4`. `alice` resides in NY, `carol` in NJ, `dave` in CT.
 
 **Style 1 — enumerated values + membership (the default recommendation).** When the statute
 enumerates _attribute values_ (states), the enumeration is the object and membership is the
@@ -2040,6 +2040,48 @@ dittos + layout bracketing — is the stylistic form the language features were 
 compose into (Meng, 2026-07-29, recording original design intent).** It is the closest L4 comes
 to transcribing an enumeration as the list it is (§17.1) while remaining an honest boolean
 disjunction for every consumer in §17.4.
+
+#### Style 3 implementation note (2026-08-27)
+
+A user-defined infix operator is now admitted as an operand of the built-in operator chain
+(`AND` / `OR` / `..` / comparisons / arithmetic), binding tighter than every built-in operator —
+the same grouping prefix application always had. The change is confined to the parser
+(`expressionCont` and `singleLineExpressionCont` parse their operand via `mixfixChainOperand` —
+the chain-head production restricted to same-line keywords); the typechecker, both printers, and
+the fixity machinery needed nothing, because parentheses leave no AST trace on this tree — the
+new operands are indistinguishable from the parenthesized ones that always worked. **Operand
+chains are same-line only**: chain-head positions sit behind a `withIndent GT` column guard, but
+operand position does not, and adversarial review showed an aligned next-line keyword there is
+routinely the _next declaration's head_ (or an unmarked continuation of a `#EVAL`) — cross-line
+capture turned previously-valid programs into parse errors before the restriction. Fixity still governs
+grouping _among_ user operators (typechecker re-association); user-vs-built-in grouping is fixed
+at "user binds tighter", and an undeclared user-op chain under a connective stays an error
+(pinned by `not-ok/tc/infix-under-connective-undeclared.l4`). Two residual truths worth keeping
+now that the defect is gone:
+
+- **Diagnostics.** A parse error caused by a _resolved_ ditto now names the copied token —
+  ``unexpected ^ (resolved to `resides in`)`` — fixed at the megaparsec `showTokens` seam only;
+  `displayPosToken` still prints the `^` the user wrote, because exactprint byte-identity
+  reconstructs source text through it. The old bare-`^` rendering is what mis-recorded this
+  defect as "a ditto cannot copy a mixfix operator" for three weeks.
+- **Hint-registry facts, corrected by adversarial re-verification (2026-08-27).** Two claims an
+  earlier draft of this note made were wrong, and one live bug hid behind them. (1) The CLI is
+  _not_ module-local: `l4 run` drives the same Shake rules as the LSP (`jl4/app/L4/Cli/Run.hs`
+  uses `Rules.SuccessfulTypeCheck`, whose `GetMixfixRegistry` merges imported hints). The
+  genuinely module-local path is `typecheckWithDependencies` in `L4/Import/Resolution.hs`, used
+  only by the VirtualFS API (`L4/API/VirtualFS.hs`). (2) "Outcomes converge (both parse
+  everywhere)" was false in the one configuration that exercises the machinery: the hint gate is
+  _skipped_ when a module's merged registry is empty (any identifier chain parses permissively,
+  failing only at scope-check), so import-merge severing is silent in an importer with no local
+  operators — and in an importer _with_ a local operator, prelude word operators (`` `is in` ``)
+  were a parse error, live, because `buildMixfixHintRegistry` used one-layer `foldTopDecls` and
+  the prelude wraps everything in `§ Prelude`: **section-nested `DECIDE`s contributed zero
+  hints**. Fixed in the same PR (registry recursion into `Section`); pinned by
+  `ok/infix-under-connective-imported.l4`, which now declares a local operator precisely so its
+  registry is non-empty and the gate is active — severing the import merge or the section
+  recursion turns its `#EVAL`s into loud parse errors. Verdict trail: the review finding
+  "imported infix operator under a connective is unpinned" survived its 3-refuter panel 2–1 and
+  the strengthened pin is its discharge.
 
 **Style 4 — `any`-fold over the enumeration.** The list-shaped form for _predicate_ limbs; the
 prelude's `any`/`all` carry `@nlg` templates already. NOTE: L4 functions are **not curried** —
@@ -2114,3 +2156,96 @@ factored set form is token isomorphism, and Style 5 serves token isomorphism _be
 overloads did — without the `AND`/`OR` collapse, without the silent ∪ choice. Restoring the
 overloads would sanctify the agreement morpheme as an operator: encoding the one token in the
 sentence that carries no meaning.
+
+---
+
+## 18. Rulings
+
+### 18.2 R-NOT-1, step 1 of 2: option C is BUILT. 2026-09-05.
+
+> **Read §18.1 first — it carries the ruling and the boundary rule.** This section does not restate
+> either. It records what the first PR actually did, and corrects three counts in §18.1 that the
+> build itself measured differently.
+>
+> **Status: option C BUILT on branch `props/not-precedence`, not landed. Option B (the language
+> change) is still NOT BUILT** — nothing in the parser rejects the single-line form.
+
+**The boundary rule reproduced independently**, from the parser rather than from the card, and then
+by probe on a binary built in this worktree. It holds exactly as §18.1 states it. Two things are
+worth adding to it:
+
+- **The threshold is _strictly_ greater, and one column is enough.** A connective indented a single
+  space past the `NOT` is already swallowed. §18.1's table jumps from column 5 to column 9, which
+  leaves the reader free to imagine a tolerance. There is none.
+- **The reach is over EVERY binary operator, not just `AND`/`OR`/`IMPLIES`.** `NOT n EQUALS 0` means
+  `NOT (n EQUALS 0)` — measured, `0 ↦ FALSE` and `5 ↦ TRUE`. `L4.Parser`'s `operator` production
+  puts comparisons and arithmetic through the same `expressionCont` threshold as the connectives.
+  This is not academic: `NOT.md` shipped a bullet asserting that comparisons _need_ parentheses
+  "or the `NOT` applies to `n` alone", which is the same error pointing the other way.
+
+The mechanism, for the next reader: `negation` (`jl4-core/src/L4/Parser.hs:2403`) captures
+`Lexer.indentLevel` — the column of the `NOT` token itself — and parses `indentedExpr current`;
+`indentedExpr p` (`:1313`) is `withIndent GT p` followed by `many (expressionCont p)`; and
+`expressionCont p` (`:1579`) is `cont … p`, `withIndent GT p` again. One threshold, threaded through
+three productions. There is no precedence table to consult because `NOT` never reaches one.
+
+**What the ten same-line sites were actually returning.** §18.1 counts the sites; it does not say
+what they computed. This is the part worth keeping, because it is the argument for the ruling:
+
+| site                                                          | it returned                                                                                 |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| the five-fold XOR snippet (`ok/xor.l4:7` and its four copies) | `xor FALSE FALSE` = `TRUE`. A decision named `xor`, wrong on one of its four inputs.        |
+| `tests-cli/fixtures/verify-clean.l4:13`                       | the same, under a decision named `` `either but not both` `` — which it was not.            |
+| `query-planner-tests/03` and `/06`                            | `TRUE` on **all four** probed inputs; wrong on two. Degenerate as relevance fixtures.       |
+| `probate-administration-act.l4:1915`                          | a representative who had **died** and was **not willing** came out `TRUE` — willing to act. |
+
+Every one of them was the tight reading written in the obvious way, and every one of them parsed,
+type-checked and shipped. That is the case §18.1's one-sentence rationale is compressing.
+
+**Three corrections to §18.1's counts.**
+
+1. **The documentation sites are six, not "three documents".** Beyond `NOT.md`,
+   `operators/README.md`, `module-3-control-flow.md` and `not-example.l4`, the same falsehood was
+   live in **`IMPLIES.md:23`** ("`A IMPLIES B` is logically equivalent to `NOT A OR B`" — wrong if
+   copied into L4) and in **`implies-example.l4:23`**, where `orVersion a b MEANS NOT a OR b` sat
+   under the comment "These are logically equivalent" while its own `#EVAL`s printed `TRUE` and
+   `FALSE` side by side. `operators/README.md` carried the claim **twice**: the precedence rank and
+   the IMPLIES note. All six are corrected.
+2. **The two `paper/` false positives are fixed at source, not documented as a caveat.**
+   `stripNoise` blanked double-quoted strings and `--` comments but not **backtick-quoted
+   identifiers**, so the `AND` inside `` `Article 18(4)(d) — the governor knew … AND concealed …` ``
+   read as an operator and the `(4)(d)` read as nesting. It now blanks backticks too. This was
+   load-bearing rather than cosmetic: **wiring the checker into CI without it would have turned the
+   build red permanently on the first run.**
+3. **The clean sweep is repo-wide.** `--dir` now takes several directories and skips build and
+   vendor trees, so `--dir .` is meaningful: **885 `.l4` files, clean**, with two declared
+   suppressions.
+
+**A new convention this PR introduces: `NOT-REACH-OK`.** A page that _teaches_ this trap has to be
+able to print the broken form next to the fixed one, so the checker skips any line whose comment
+contains `NOT-REACH-OK`. Every suppression is listed in the run's output, so they cannot accumulate
+quietly. There are two, both in `doc/reference/operators/not-example.l4`, which now demonstrates
+`wideByDefault` / `notBoth` / `looksCareful` / `narrowedProperly` and shows the first three agreeing.
+
+**The checker now runs.** §18.1 recorded that `check-not-precedence` "appears in no workflow file
+and in no `package.json` script, so today it protects nothing". It is now a step in the
+`corpus-goldens` job of `.github/workflows/pr-checks.yml` — the job with no `needs`, no `if` and no
+paths filter, firing on `pull_request`, `push` and `merge_group` — for the reason its two neighbours
+are there: a `.l4` under `jl4/examples/` matches no paths filter, so nothing else in CI can see this
+class of failure.
+
+**Also corrected in passing.** The message the checker printed on every finding ended
+`Write NOT (x) AND … if that is what you meant` — the exact spelling its own header calls "exactly
+as wrong as `NOT x AND y`". It now names `(NOT x) AND …` and says why the operand bracket does not
+help.
+
+**What is still owed.**
+
+- **Option B**, the language change: `NOT` followed by a connective on the same physical line
+  becomes a check error. Unstarted.
+- **canon**, one site, at
+  `subjects/sg/succession/encodings/cleanroom-2026-08/probate-administration-act.l4:1915:23` on
+  `mengwong/drafts` — the mirror of the jl4 file, confirmed same line and same column. It is a
+  separate repo and needs its own branch.
+- The **continuation sites** remain deliberately untouched and deliberately unreported by the
+  checker; §18.1's account of why is unchanged by this work.

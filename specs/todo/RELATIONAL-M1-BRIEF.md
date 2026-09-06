@@ -7,6 +7,14 @@ drives this implementation and that findall/DNF live here, not in emitters). Thi
 coordinator's cut-down of both for the implementing agents; where it conflicts with either
 spec, the spec wins and the conflict is a finding to report._
 
+_**Discharged.** M1 landed 2026-08-18 as legalese/l4-ide#272 —
+`jl4-core/src/L4/Relational/{IR,Lower,Debug}.hs`, cabal-registered, goldens, and no CLI verb,
+as scoped below — and its first consumer, the Blawx s(CASP) emitter, followed on 2026-08-19
+(#273). The brief is retained because the fragment boundaries and the close-out rulings at the
+end of this file are cited by that code and by `BLAWX-EXPORT-SPEC.md`; read "What M1 delivers"
+as the record of what was built, not as work pending. Verified against `origin/unstable`,
+2026-08-28._
+
 ## What M1 delivers
 
 `jl4-core/src/L4/Relational/{IR,Lower,Debug}.hs`, cabal-registered, with golden tests — **no

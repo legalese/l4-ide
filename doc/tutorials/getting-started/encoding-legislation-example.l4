@@ -1,0 +1,87 @@
+-- Companion file for encoding-legislation.md
+--
+-- Section 3 of the Imaginary Alcohol Act 2024, encoded twice: once as a single
+-- rule that mirrors the provision clause by clause, and once broken into named
+-- sub-rules that say each idea once.
+--
+-- The seven facts about the person -- the inputs of section 3 -- are declared
+-- once, as a section GIVEN indented under the section heading. Every rule below
+-- reads them; none of them repeats the list.
+
+§ `Imaginary Alcohol Act - Section 3`
+    GIVEN `the person is a body corporate` IS A BOOLEAN @desc Is the person a body corporate?
+          `the person engages in business for profit` IS A BOOLEAN @desc Does the person engage in business for profit?
+          `the person is a public house` IS A BOOLEAN @desc Is the person a public house?
+          `the person is a hotel` IS A BOOLEAN @desc Is the person a hotel?
+          `the person has an unspent conviction for fraud` IS A BOOLEAN @desc Does the person have an unspent conviction for fraud?
+          `the person has an unspent conviction for providing misleading information` IS A BOOLEAN @desc Does the person have an unspent conviction for providing misleading information?
+          `the person has an alcohol banning order` IS A BOOLEAN @desc Is the person subject to an alcohol banning order?
+
+{-
+Imaginary Alcohol Act 2024
+==========================
+
+Section 3 - Prohibition on Sale of Alcohol
+
+This section implements the prohibition in s.3, which prevents certain
+commercial entities from selling alcohol if they have disqualifying factors
+(fraud, misleading information, or banning orders).
+
+Exemptions:
+- Public houses (s.3(c))
+- Hotels (s.3(c))
+
+"Unspent conviction" follows the Rehabilitation of Offenders Act
+interpretation - see s.2 for definitions.
+-}
+
+§§ `Main rule`
+
+@export Decide whether a person is prohibited from selling alcohol under s.3
+DECIDE `the person must not sell alcohol`
+IF  `the person is a body corporate`
+    AND `the person engages in business for profit`
+    AND NOT `the person is a public house`
+    AND NOT `the person is a hotel`
+    AND (
+        `the person has an unspent conviction for fraud`
+        OR `the person has an unspent conviction for providing misleading information`
+        OR `the person has an alcohol banning order`
+    )
+
+§§ `Sub-rules`
+
+-- Sub-rule: Is this a commercial enterprise?
+DECIDE `is commercial enterprise`
+IF  `the person is a body corporate`
+    AND `the person engages in business for profit`
+
+-- Sub-rule: Is this an exempt establishment?
+DECIDE `is exempt establishment`
+IF  `the person is a public house`
+    OR `the person is a hotel`
+
+-- Sub-rule: Does the person have disqualifying factors?
+DECIDE `has disqualifying factors`
+IF  `the person has an unspent conviction for fraud`
+    OR `the person has an unspent conviction for providing misleading information`
+    OR `the person has an alcohol banning order`
+
+-- The same prohibition, assembled from the sub-rules.
+DECIDE `the person must not sell alcohol (tidied)`
+IF  `is commercial enterprise`
+    AND NOT `is exempt establishment`
+    AND `has disqualifying factors`
+
+§§ `Checks`
+
+-- #CHECK reports what kind of thing a rule answers with. Every rule below
+-- answers a yes-or-no question (a BOOLEAN), and every one of them has the same
+-- seven blanks, filled from outside the file: by a web form, by
+-- `l4 batch FILE --inputs cases.json`, or by a caller of the published service.
+
+#CHECK `the person must not sell alcohol`
+#CHECK `the person must not sell alcohol (tidied)`
+#CHECK `is commercial enterprise`
+#CHECK `is exempt establishment`
+#CHECK `has disqualifying factors`

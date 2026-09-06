@@ -204,6 +204,7 @@ nlgExpr = \ case
       mParty' <- traverse nlgExpr mParty
       mReason' <- traverse nlgExpr mReason
       pure $ Breach ann mParty' mReason'
+    Refuse ann msg -> Refuse ann <$> nlgExpr msg
     Inert ann txt ctx -> pure $ Inert ann txt ctx
 
 nlgPattern :: Pattern Resolved -> Check (Pattern Resolved)
@@ -318,6 +319,8 @@ nlgTypeDecl = \ case
   SynonymDecl ann ty->
     SynonymDecl ann
       <$> nlgType ty
+  OpaqueDecl ann ->
+    pure (OpaqueDecl ann)
 
 nlgConDecl :: ConDecl Resolved -> Check (ConDecl Resolved)
 nlgConDecl (MkConDecl ann n typedName) =

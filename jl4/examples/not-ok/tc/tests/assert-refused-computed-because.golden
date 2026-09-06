@@ -1,0 +1,14 @@
+Parsing successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: assert-refused-computed-because.l4
+  Hidden: no
+  Range: 18:32-18:46
+  Source: parser
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+       |
+    18 | #ASSERT REFUSED `nope` BECAUSE `wrong reason`
+       |                                ^^^^^^^^^^^^^^
+    unexpected `wrong reason`
+    expecting Float Literal, Numeric Literal, String Literal, or space token

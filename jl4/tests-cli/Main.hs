@@ -18,6 +18,7 @@ import qualified Data.ByteString.Lazy.Char8 as BSL8
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import Data.Aeson (Value(..), eitherDecode)
+import Data.Foldable (toList)
 import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.Aeson.Key as Key
 import System.Directory
@@ -474,6 +475,25 @@ garbageFixture = fixtureDir </> "garbage.l4"
 evalCrashFixture :: FilePath
 evalCrashFixture = fixtureDir </> "eval-crash.l4"
 
+-- | Typechecks cleanly; every @#ASSERT@ in it RAISES instead of deciding.
+assertRaisesFixture :: FilePath
+assertRaisesFixture = fixtureDir </> "assert-raises.l4"
+
+-- | REFUSE: a determinate non-answer. @l4 run@ exits 0 on it, and @--json@
+-- gives it its own kind rather than folding it into a value or an error.
+refuseRunFixture :: FilePath
+refuseRunFixture = fixtureDir </> "refuse-run.l4"
+
+-- | An @export whose helper refuses for one row and answers for the next.
+refuseBatchFixture, refuseBatchJson :: FilePath
+refuseBatchFixture = fixtureDir </> "refuse-batch.l4"
+refuseBatchJson    = fixtureDir </> "refuse-batch.json"
+
+-- | Typechecks cleanly; both @#ASSERT@s are on a bare assumed BOOLEAN — one
+-- polarity raises, the other reduces to the symbolic term without raising.
+assertAssumedFixture :: FilePath
+assertAssumedFixture = fixtureDir </> "assert-assumed.l4"
+
 breachTraceFixture, breachInputsFixture :: FilePath
 breachTraceFixture  = fixtureDir </> "breach-trace.l4"
 breachInputsFixture = fixtureDir </> "breach-inputs.json"
@@ -489,6 +509,14 @@ batchCodeFixture  = fixtureDir </> "batch-code.l4"
 batchExponentCsv  = fixtureDir </> "batch-exponent.csv"
 batchMaybeFixture = fixtureDir </> "batch-maybe.l4"
 batchMaybeBadJson = fixtureDir </> "batch-maybe-bad.json"
+
+-- | An @export reading a module-level ASSUME: directly, or only through a
+-- helper it calls. The rows either supply the ASSUME (@x@) or omit it.
+batchAssumeDirectFixture, batchAssumeHelperFixture, batchAssumeFullJson, batchAssumeMissingJson :: FilePath
+batchAssumeDirectFixture = fixtureDir </> "batch-assume-direct.l4"
+batchAssumeHelperFixture = fixtureDir </> "batch-assume-helper.l4"
+batchAssumeFullJson      = fixtureDir </> "batch-assume-full.json"
+batchAssumeMissingJson   = fixtureDir </> "batch-assume-missing.json"
 
 -- | Decode stdout as a single JSON array (for @l4 batch --format json@).
 decodeArray :: String -> IO [Value]
@@ -1083,6 +1111,13 @@ verifyVacuousGuardFixture = fixtureDir </> "verify-vacuous-guard.l4"
 verifySeamFixture         = fixtureDir </> "verify-seam.l4"
 verifyNestedFixture       = fixtureDir </> "verify-nested.l4"
 
+-- Referential transparency (specs/todo/WHERE-INLINING-SPEC.md): a zero-arity
+-- WHERE/LET binding is inlined before analysis, so a rule means the same thing
+-- however its limbs are named. The recursive file is the termination control.
+verifyWhereTransparencyFixture, verifyWhereRecursiveFixture :: FilePath
+verifyWhereTransparencyFixture = fixtureDir </> "verify-where-transparency.l4"
+verifyWhereRecursiveFixture    = fixtureDir </> "verify-where-recursive.l4"
+
 -- The `l4 nlg` differential pair. These goldens are written by
 -- jl4-test's `jl4NlgAnnotationsGolden`, and `l4 nlg` must reproduce them BYTE
 -- FOR BYTE — that equality is the whole reason the orchestrator's p7-tnr leg
@@ -1131,6 +1166,7 @@ main = do
        , shadowExtraEntry, shadowImporterEntry
        , verifyCleanFixture, verifyUnsatFixture, verifyDeadBranchFixture
        , verifyVacuousGuardFixture, verifySeamFixture, verifyNestedFixture
+       , verifyWhereTransparencyFixture, verifyWhereRecursiveFixture
        , nlgRegcfSource, nlgRegcfGolden, nlgWizardSource, nlgWizardGolden
        , exportTwoRulesFixture, exportNothingFixture
        , exportBlockingOnlyFixture, exportAdvisoryOnlyFixture
@@ -1145,7 +1181,7 @@ main = do
        , hydrationGolden, hydrationEngineCases, sumtypeGolden
        , bkmSource, bkmDmnGolden, bkmEngineCases
        , svcSource, svcGolden, svcKieDmnGolden, svcEngineCases
-       , daCitationsSource ] \fp -> do
+       , daCitationsSource, assertRaisesFixture, assertAssumedFixture ] \fp -> do
     ok <- doesFileExist fp
     unless ok $ do
       putStrLn ("Missing fixture: " ++ fp)
@@ -1223,6 +1259,102 @@ spec bin = do
     -- does not, is unaffected.
     it "still typechecks the crashing fixture — l4 check succeeds on it" $
       expectOk bin ["check", evalCrashFixture] "Check succeeded."
+
+    -- An #ASSERT whose expression RAISES is a distinct outcome from one that
+    -- evaluates to FALSE. Before this was pinned, `#ASSERT P` and
+    -- `#ASSERT NOT P` both reported "assertion failed" whenever P raised
+    -- (division by zero, an assumed term, …), so a test suite could not tell
+    -- a wrong answer from an error.
+    it "reports an #ASSERT that raises as unevaluable, with the reason, never as failed" $ do
+      Output _ sout _ <- runL4 bin ["run", assertRaisesFixture]
+      sout `shouldSatisfy` ("assertion could not be evaluated" `isInfixOf`)
+      sout `shouldSatisfy` ("Division by zero" `isInfixOf`)
+      sout `shouldSatisfy` ("assumed term" `isInfixOf`)
+      sout `shouldNotSatisfy` ("assertion failed" `isInfixOf`)
+
+    -- It did not evaluate cleanly, so it is the crash the 2026-08-01 ruling
+    -- covers — unlike a clean FALSE, which stays exit 0.
+    it "fails the run when an #ASSERT raises" $
+      expectFail bin ["run", assertRaisesFixture]
+
+    it "keeps kind \"assertion\", a null value and the reason in JSON when an #ASSERT raises" $ do
+      env <- jsonEnvelope bin ["run", assertRaisesFixture, "--json"]
+      objField env "ok" `shouldBe` Just (Bool False)
+      case objField env "results" of
+        Just (Array v) -> do
+          length v `shouldBe` 2
+          mapM_ (\r -> do
+                   objField r "kind"  `shouldBe` Just (String "assertion")
+                   objField r "value" `shouldBe` Just Null
+                   case objField r "error" of
+                     Just (String s) -> s `shouldSatisfy` ("assertion could not be evaluated" `T.isInfixOf`)
+                     other -> expectationFailure ("Expected an error string, got " ++ show other))
+                (toList v)
+        other -> expectationFailure ("Expected results array, got " ++ show other)
+
+    it "still typechecks the raising fixture — l4 check succeeds on it" $
+      expectOk bin ["check", assertRaisesFixture] "Check succeeded."
+
+    -- REFUSE (R7). A refusal is neither a value, nor an evaluation error, nor
+    -- an unknown fact: it is the model declining to answer, with a reason. The
+    -- three tests below pin the three ways that distinction could be lost.
+
+    -- (1) A refusal must not be treated as a crash. `l4 run` exits 0.
+    it "exits 0 when a directive REFUSES — a refusal is an answer, not a crash" $
+      expectOk bin ["run", refuseRunFixture] "The model refuses to answer"
+
+    -- (2) --json gives a refusing #EVAL its own kind, and a refused #ASSERT its
+    -- reason under "refused" rather than "error". A consumer that reads every
+    -- non-boolean assertion out of "error" would otherwise report a designed
+    -- outcome as a defect.
+    it "emits kind \"refused\" for a refusing #EVAL and a refused field for a refused #ASSERT" $ do
+      env <- jsonEnvelope bin ["run", refuseRunFixture, "--json"]
+      objField env "ok" `shouldBe` Just (Bool True)
+      case objField env "results" of
+        Just (Array v) -> case toList v of
+          [ev, assertRefused, assertPlain] -> do
+            objField ev "kind"   `shouldBe` Just (String "refused")
+            objField ev "value"  `shouldBe` Just Null
+            objField ev "reason" `shouldBe` Just (String "this case is not modelled")
+            -- #ASSERT REFUSED holds: it is an ordinary satisfied assertion.
+            objField assertRefused "kind"  `shouldBe` Just (String "assertion")
+            objField assertRefused "value" `shouldBe` Just (Bool True)
+            -- A PLAIN #ASSERT whose expression refuses is neither true nor
+            -- false, and its reason is NOT under "error".
+            objField assertPlain "kind"  `shouldBe` Just (String "assertion")
+            objField assertPlain "value" `shouldBe` Just Null
+            objField assertPlain "error" `shouldBe` Nothing
+            case objField assertPlain "refused" of
+              Just r  -> objField r "reason" `shouldBe` Just (String "this case is not modelled")
+              other   -> expectationFailure ("Expected a refused object, got " ++ show other)
+          other -> expectationFailure ("Expected 3 results, got " ++ show (length other))
+        other -> expectationFailure ("Expected results array, got " ++ show other)
+
+    -- (3) A refused BATCH row is a third terminal status, and it does NOT stop
+    -- the batch: the row after it is still processed. Folding it into "error"
+    -- would both mislabel it and truncate the run.
+    it "gives a refusing batch row status \"refused\" and does not stop the batch" $ do
+      Output code sout _ <-
+        runL4 bin ["batch", refuseBatchFixture, "--inputs", refuseBatchJson]
+      code `shouldBe` ExitSuccess
+      nonBlankLines sout `shouldBe` 2
+      sout `shouldSatisfy` ("\"status\":\"refused\"" `isInfixOf`)
+      sout `shouldSatisfy` ("\"status\":\"success\"" `isInfixOf`)
+      sout `shouldSatisfy` ("this schedule is not encoded for years before 2000" `isInfixOf`)
+
+    -- A bare assumed BOOLEAN is neither TRUE nor FALSE. `#ASSERT NOT b`
+    -- forces b and raises; `#ASSERT b` reduces to the symbolic b WITHOUT
+    -- raising, and used to fall through to "assertion failed" — so the two
+    -- polarities disagreed about the same undecidable term.
+    it "reports both polarities of an #ASSERT on a bare assumed BOOLEAN as undecided" $ do
+      Output _ sout _ <- runL4 bin ["run", assertAssumedFixture]
+      length (filter ("assertion could not be evaluated" `isInfixOf`) (lines sout)) `shouldBe` 2
+      sout `shouldSatisfy` ("assumed term" `isInfixOf`)
+      sout `shouldNotSatisfy` ("assertion failed" `isInfixOf`)
+      sout `shouldNotSatisfy` ("assertion satisfied" `isInfixOf`)
+
+    it "fails the run when an #ASSERT is stuck on a bare assumed BOOLEAN" $
+      expectFail bin ["run", assertAssumedFixture]
 
     it "falls through from a bare positional argument (backward-compat)" $
       expectOk bin [cleanFixture] "Checking succeeded."
@@ -1458,6 +1590,33 @@ spec bin = do
       sout `shouldSatisfy` ("\"status\":\"invalid\"" `isInfixOf`)
       sout `shouldSatisfy` ("Type mismatch for field 'premium'" `isInfixOf`)
       sout `shouldSatisfy` ("expected NUMBER" `isInfixOf`)
+
+    -- An ASSUME the export reads is a schema field, not a call argument.
+    -- Before: the batch wrapper applied the export to every schema field
+    -- positionally ("f expects 1 argument, but you are applying it to 2").
+    it "binds a directly-read ASSUME by name, not as a positional argument" $ do
+      env <- jsonEnvelope bin ["batch", batchAssumeDirectFixture, "--inputs", batchAssumeFullJson]
+      objField env "status" `shouldBe` Just (String "success")
+      Output _ sout _ <- runL4 bin ["batch", batchAssumeDirectFixture, "--inputs", batchAssumeFullJson]
+      sout `shouldSatisfy` ("\"result\":21" `isInfixOf`)
+
+    -- The read-set is transitive: an ASSUME read only by a helper the
+    -- export calls is still a required field. Before: the schema was one
+    -- body deep, so --validate-only accepted a row without it and
+    -- evaluation then got stuck on "an assumed term".
+    it "validate-only rejects a row missing an ASSUME read only by a helper" $ do
+      Output code sout _ <-
+        runL4 bin [ "batch", batchAssumeHelperFixture, "--inputs", batchAssumeMissingJson
+                  , "--validate-only" ]
+      code `shouldSatisfy` (/= ExitSuccess)
+      sout `shouldSatisfy` ("\"status\":\"invalid\"" `isInfixOf`)
+      sout `shouldSatisfy` ("Missing required field: 'x'" `isInfixOf`)
+
+    it "evaluates through a helper that reads a supplied ASSUME" $ do
+      env <- jsonEnvelope bin ["batch", batchAssumeHelperFixture, "--inputs", batchAssumeFullJson]
+      objField env "status" `shouldBe` Just (String "success")
+      Output _ sout _ <- runL4 bin ["batch", batchAssumeHelperFixture, "--inputs", batchAssumeFullJson]
+      sout `shouldSatisfy` ("\"result\":22" `isInfixOf`)
 
     -- Regression tests for target T11 (CLI injection / corruption).
     it "escapes payloads with backslashes, quotes and control chars (no lexer break)" $ do
@@ -2061,7 +2220,11 @@ spec bin = do
     -- fixtures R12 dropped (ruling R-C, spec §15.12.1: "the model owns the law
     -- under a date; the harness owns the dates"), the 4 seed cases that close
     -- the total-assets and restricted-period leaves the §8 diff oracle reported
-    -- structurally inert, THE LEAP CASE, and THE ESCHEAT CASE. 22 x 70 = 1540.
+    -- structurally inert, THE LEAP CASE, THE ESCHEAT CASE, and (2026-09-05,
+    -- ruling D1) THE PRE-COMMENCEMENT CASE, which is the first here to ask a
+    -- rule date below Reg CF's 2016-05-16 commencement AND the first to supply
+    -- NEITHER refusal -- both are explicit JSON nulls rather than the -1 and the
+    -- invented assurance level every other case hands the model. 23 x 70 = 1610.
     -- All counts below are MEASURED (2026-08-09, this machine, both harnesses),
     -- not aspirational: before R12/R13 KIE refused with 16 build errors and
     -- Camunda refused the file at parse() on the raw-L4 deontic body.
@@ -2086,39 +2249,42 @@ spec bin = do
       dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
         corpusGolden [corpusGolden, "--cases", corpusEngineCases] \out -> do
           out `shouldSatisfy` ("KIE 8.44.0.Final VERDICT" `isInfixOf`)
-          out `shouldSatisfy` ("22 case(s)" `isInfixOf`)
+          out `shouldSatisfy` ("23 case(s)" `isInfixOf`)
           out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
           out `shouldSatisfy` ("0 warning(s)" `isInfixOf`)
-          out `shouldSatisfy` ("1540/1540 decision(s) SUCCEEDED" `isInfixOf`)
-          out `shouldSatisfy` ("1540/1540 value(s) as expected" `isInfixOf`)
+          out `shouldSatisfy` ("1610/1610 decision(s) SUCCEEDED" `isInfixOf`)
+          out `shouldSatisfy` ("1610/1610 value(s) as expected" `isInfixOf`)
           -- the SVC leg is a value check since 2026-08-02 (each service fed
           -- its inputDecisions' computed values, each outputDecision compared
           -- against the same expect entry): 7 services, 15 declared outputs,
           -- per case
-          out `shouldSatisfy` ("330/330 service output value(s) as expected" `isInfixOf`)
+          out `shouldSatisfy` ("345/345 service output value(s) as expected" `isInfixOf`)
 
     it "Camunda parses and answers the whole Reg CF corpus (R12/R13)" $
       dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
         corpusGolden [corpusGolden, "--cases", corpusEngineCases] \out -> do
           out `shouldSatisfy` ("Camunda 8.7.6 (zeebe-dmn) VERDICT" `isInfixOf`)
-          out `shouldSatisfy` ("22 case(s)" `isInfixOf`)
+          out `shouldSatisfy` ("23 case(s)" `isInfixOf`)
           out `shouldSatisfy` ("1 parsed" `isInfixOf`)
           out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
-          out `shouldSatisfy` ("1540/1540 decision(s) evaluated" `isInfixOf`)
-          out `shouldSatisfy` ("1540/1540 value(s) as expected" `isInfixOf`)
+          out `shouldSatisfy` ("1610/1610 decision(s) evaluated" `isInfixOf`)
+          out `shouldSatisfy` ("1610/1610 value(s) as expected" `isInfixOf`)
 
   -- The LAW-TIME legs (spec §15). What is being asserted here that nothing
   -- else asserts: the SAME model answers DIFFERENTLY for different rule dates,
   -- in a real engine, driven only by half-open date intervals on a UNIQUE
-  -- table. `60/60 value(s) as expected` over ten cases is the claim -- ten rule
-  -- dates x six decisions (Phase 5 moved the seventh, `the rules in force
+  -- table. `66/66 value(s) as expected` over ELEVEN cases is the claim -- eleven
+  -- rule dates x six decisions (Phase 5 moved the seventh, `the rules in force
   -- include`, to a businessKnowledgeModel, which the cases schema cannot
   -- assert -- its logic is exercised through the interval endpoints D2 inlined
   -- it into) -- and seven of those ten cases exist purely to pin the interval
   -- convention: a day-of/day-before pair on each of the three seams, plus a
-  -- rule date well before commencement.
+  -- rule date well before commencement. The eleventh (2026-09-05, ruling D1) is
+  -- the first that does NOT supply the floor value: F and J ask below
+  -- commencement but hand the model -1 and expect -1 back, so they never reach
+  -- the bottom the floor arm names.
   describe "law time on a date axis (opt-in: L4_DMN_ENGINE_CHECK=1)" $ do
-    it "KIE answers the dated-regime exhibit correctly for ten rule dates" $
+    it "KIE answers the dated-regime exhibit correctly for eleven rule dates" $
       dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
         gstGolden [gstGolden, "--cases", gstEngineCases] \out -> do
           out `shouldSatisfy` ("KIE 8.44.0.Final VERDICT" `isInfixOf`)
@@ -2127,17 +2293,17 @@ spec bin = do
           -- DMNShape, or KIE raises WARN [DMNDI_MISSING_DIAGRAM] (measured
           -- 2026-08-01; the shape row above the decisions exists for this).
           out `shouldSatisfy` ("0 warning(s)" `isInfixOf`)
-          out `shouldSatisfy` ("60/60 decision(s) SUCCEEDED" `isInfixOf`)
-          out `shouldSatisfy` ("60/60 value(s) as expected" `isInfixOf`)
+          out `shouldSatisfy` ("66/66 decision(s) SUCCEEDED" `isInfixOf`)
+          out `shouldSatisfy` ("66/66 value(s) as expected" `isInfixOf`)
 
-    it "Camunda answers the dated-regime exhibit correctly for ten rule dates" $
+    it "Camunda answers the dated-regime exhibit correctly for eleven rule dates" $
       dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
         gstGolden [gstGolden, "--cases", gstEngineCases] \out -> do
           out `shouldSatisfy` ("Camunda 8.7.6 (zeebe-dmn) VERDICT" `isInfixOf`)
           out `shouldSatisfy` ("1 parsed" `isInfixOf`)
           out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
-          out `shouldSatisfy` ("60/60 decision(s) evaluated" `isInfixOf`)
-          out `shouldSatisfy` ("60/60 value(s) as expected" `isInfixOf`)
+          out `shouldSatisfy` ("66/66 decision(s) evaluated" `isInfixOf`)
+          out `shouldSatisfy` ("66/66 value(s) as expected" `isInfixOf`)
 
     -- The hand-written probe PAIR. It is NOT redundant with the exhibit above:
     -- the emitter cannot generate an <annotationEntry> carrying an @id, so only
@@ -2689,13 +2855,45 @@ spec bin = do
         Just (Number n) -> n `shouldBe` 1
         other -> expectationFailure ("expected summary.nestedNotVisited, got " ++ show other)
 
-    -- The nested body is `y AND NOT y`. It stays invisible, and this test
-    -- exists so that a future change which starts descending announces itself
-    -- here rather than by silently altering what a clean run means.
-    it "does not report a contradiction that lives only in a WHERE clause" $ do
+    -- This test used to assert the OPPOSITE, as a tripwire: "a future change
+    -- which starts descending announces itself here rather than by silently
+    -- altering what a clean run means". It announced itself, and the change was
+    -- the right one (specs/todo/WHERE-INLINING-SPEC.md), so the assertion is
+    -- inverted rather than deleted — the tripwire did its job and the new
+    -- behaviour deserves the same guard the old one had.
+    --
+    -- The nested body is `y AND NOT y`, and `the outer one` is `x AND` it. The
+    -- pass substitutes the zero-arity binding before analysis, so the whole
+    -- decision is unsatisfiable and says so. Note this is NOT descent: the
+    -- inner definition is still not analysed as a decision of its own, which is
+    -- why the count above is unchanged.
+    it "reports a contradiction that a WHERE clause used to hide" $ do
       Output code sout _ <- runL4 bin ["verify", verifyNestedFixture, "--format", "json"]
+      code `shouldBe` ExitFailure 1
+      sout `shouldSatisfy` ("unsat" `isInfixOf`)
+
+    -- Referential transparency. Four spellings of `m AND NOT m`, three of which
+    -- put a limb behind a local name; all four must report the contradiction,
+    -- because they are the same rule. `parameterised` is the control: a binding
+    -- that takes arguments is NOT inlined, so it stays two atoms and clean.
+    it "analyses a rule the same however its limbs are named" $ do
+      env <- jsonEnvelope bin ["verify", verifyWhereTransparencyFixture, "--format", "json"]
+      let unsats =
+            [ nm
+            | Just (Array ds) <- [objField env "decisions"]
+            , d <- toList ds
+            , Just (String nm) <- [objField d "name"]
+            , Just (Array fs) <- [objField d "findings"]
+            , any (\ f -> objField f "kind" == Just (String "unsat")) (toList fs)
+            ]
+      sort unsats `shouldBe`
+        sort ["flat", "`behind a where`", "`behind a let`", "`behind two hops`"]
+
+    -- Termination, not correctness: a cycle among local bindings must be
+    -- detected rather than substituted. A regression here hangs the suite.
+    it "terminates on recursive and mutually recursive local bindings" $ do
+      Output code _ _ <- runL4 bin ["verify", verifyWhereRecursiveFixture, "--format", "json"]
       code `shouldBe` ExitSuccess
-      sout `shouldSatisfy` (not . ("unsat" `isInfixOf`))
 
     -- The corpus figure the p8-verify receipt now carries.
     it "reports the Reg CF corpus's own nested count" $ do
@@ -2980,10 +3178,84 @@ spec bin = do
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("unstratified negation (Blawx v1)" `isInfixOf`)
 
+    it "rejects EQUALS on record-typed operands (§11 W1, the silent one)" $ do
+      -- This fixture is Jason Morris's own reading of RPS s.4 and it USED to
+      -- lower clean: L4 answered TRUE, the tier-1 harness found no model,
+      -- because R11's flattening emits one object per occurrence of a record
+      -- value. A wrong answer with a green exit code is the worst outcome a
+      -- transpiler has, so the refusal is loud and both operand positions of
+      -- the IF/ELSE (the REq and its complement RNeq) are covered.
+      Output code _ serr <- runL4 bin ["blawx", "examples/blawx/not-ok/record-identity.l4"]
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("record identity (Blawx)" `isInfixOf`)
+      serr `shouldSatisfy` ("EQUALS on operands of record type `Player`" `isInfixOf`)
+      serr `shouldSatisfy` ("a disequality on operands of record type `Player`" `isInfixOf`)
+      serr `shouldSatisfy` ("once per slot" `isInfixOf`)
+
+    it "rejects it inside a container too (LIST OF, and LIST OF MAYBE)" $ do
+      -- The first cut of the §11 W1 refusal tested the operand sort for a
+      -- record at the top only, so `a's members EQUALS b's members` over a
+      -- `LIST OF Player` lowered clean and emitted `Members = Members2`. Both
+      -- rules in this fixture are refused now, and each diagnostic names the
+      -- operand's OWN sort, because "of record type `Player`" would be a false
+      -- description of a list.
+      Output code _ serr <- runL4 bin ["blawx", "examples/blawx/not-ok/record-identity-list.l4"]
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("type `LIST OF Player`, which contains the record type `Player`" `isInfixOf`)
+      serr `shouldSatisfy` ("type `LIST OF MAYBE Player`, which contains the record type `Player`" `isInfixOf`)
+
+    -- Integration, 2026-09-02 (§11 W1). W1's note said the `RSOpaque` escape
+    -- was "not known to be reachable in the M1 fragment, and none was
+    -- constructed". It is reachable through `IMPORT`, and this is the
+    -- construction: a record DECLAREd in an imported module arrives as
+    -- `RSOpaque "Shared Ontology.Player"` — a printed name with no `RName`
+    -- behind it — so `recordInSort` had nothing to look up and the comparison
+    -- lowered at exit 0, emitting the `A = B` identity W1 exists to refuse.
+    it "rejects EQUALS on an IMPORTed record, whose sort reaches us opaque" $ do
+      Output code _ serr <- runL4 bin
+        ["blawx", "tests-cli/fixtures/blawx-opaque/imported-record-identity.l4"]
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("record identity (Blawx)" `isInfixOf`)
+      serr `shouldSatisfy` ("opaque type `Shared Ontology.Player`" `isInfixOf`)
+      serr `shouldSatisfy` ("no name to look up" `isInfixOf`)
+
     it "rejects a relationship above the arity-10 block ceiling" $ do
       Output code _ serr <- runL4 bin ["blawx", "examples/blawx/not-ok/arity.l4"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("above the block ceiling of 10" `isInfixOf`)
+
+    -- Spec §11 W3(b): a pinned section whose text opens with a SECOND index is
+    -- a sub-provision, and emitting it hands clean-law the insert index `4. 5`
+    -- -- eId sec_4_5 against the workspace sec_4_section we wrote, i.e. an
+    -- orphaned canvas in a document that imports and stores without complaint.
+    it "rejects a pinned section whose text opens with another index" $ do
+      Output code _ serr <- runL4 bin ["blawx", "examples/blawx/not-ok/sub-provision-index.l4"]
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("sub-provision index (Blawx v1)" `isInfixOf`)
+      serr `shouldSatisfy` ("orphaning" `isInfixOf`)
+
+    -- Integration, 2026-09-02 (§8.4, §11 W3). The number/eId invariant W3 built
+    -- has a third road into it: clean-law's `legal_text` is pyparsing
+    -- `printables`, which is ASCII-only, so ANY character above U+007F ends the
+    -- parse there and orphans every later canvas. `asciiFold` folds what
+    -- legislation actually contains; the residue is refused.
+    it "rejects a section text carrying a character clean-law cannot lex" $ do
+      Output code _ serr <- runL4 bin ["blawx", "examples/blawx/not-ok/section-text-non-ascii.l4"]
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("non-ASCII section text (Blawx v1)" `isInfixOf`)
+      serr `shouldSatisfy` ("U+00A3" `isInfixOf`)
+      serr `shouldSatisfy` ("orphaned" `isInfixOf`)
+
+    -- ... and the characters legislation.gov.uk actually serves are FOLDED, not
+    -- refused: a curly apostrophe would otherwise make every UK statute paste
+    -- unemittable. The fixture above pins the refusal; this pins the fold, on
+    -- the seed corpus, which carries ten U+2014 em dashes across five files.
+    it "folds the punctuation legislation carries rather than refusing it" $ do
+      Output code sout _ <- runL4 bin ["blawx", "examples/blawx/antisocial.l4"]
+      code `shouldBe` ExitSuccess
+      -- the ten U+2014 em dashes across the seed corpus become hyphens, and
+      -- none of them reaches the emitted rule_text
+      sout `shouldSatisfy` (not . ("\x2014" `isInfixOf`))
 
     it "fails on a file that does not typecheck" $
       expectFail bin ["blawx", errorFixture]
@@ -3092,11 +3364,108 @@ spec bin = do
       -- not have to fix them one at a time.
       serr `shouldSatisfy` ("go/4" `isInfixOf`)
 
-    it "refuses a non-boolean attribute by name and value type" $ do
+    -- BLAWX-EXPORT-SPEC §11 W5 made `number` attributes liftable — as an
+    -- input field plus an accessor — so the claim this test used to pin
+    -- ("a non-boolean attribute is refused") is no longer true. What still
+    -- has no image is a rule that DERIVES a value-typed attribute
+    -- (benefit.blawx concludes `benefit_amount(A, Tmp)` from `Tmp is
+    -- 1000 + Bonus`), and it is refused by its own name.
+    it "refuses a value-typed attribute a rule CONCLUDES, by name" $ do
       Output code _ serr <- runL4 bin ["blawx", "--import", "examples/blawx/expected/benefit.blawx"]
       code `shouldBe` ExitFailure 1
-      serr `shouldSatisfy` ("blawx-lift/attribute-type" `isInfixOf`)
-      serr `shouldSatisfy` ("has value type number" `isInfixOf`)
+      serr `shouldSatisfy` ("blawx-lift/value-attribute-concluded" `isInfixOf`)
+      serr `shouldSatisfy` ("blawx-lift/conclusion-shape" `isInfixOf`)
+
+    -- Jason Morris's own Beard Tax Act, the second of the two shipped
+    -- examples §11 W5 sized the lift against. Everything this asserts was
+    -- refused by name before that increment: the `number` attribute, the
+    -- binary attribute goal, `blawx_comparison(L,gte,5)`, the paragraph
+    -- workspaces, and the free-variable test query.
+    it "lifts Blawx's own beard_tax, comparisons and paragraphs included" $ do
+      Output code sout serr <- runL4 bin
+        ["blawx", "--import", "examples/blawx/imported/beard_tax.blawx"]
+      unless (code == ExitSuccess) $
+        expectationFailure ("beard_tax did not lift\n--- stderr ---\n" ++ serr)
+      -- the number attribute: one MAYBE NUMBER field, one definedness
+      -- decision, one accessor
+      sout `shouldSatisfy` ("facial_hair_length_mm           IS A MAYBE NUMBER" `isInfixOf`)
+      sout `shouldSatisfy` ("IF isJust (x's facial_hair_length_mm)" `isInfixOf`)
+      sout `shouldSatisfy` ("MEANS fromMaybe 0 (x's facial_hair_length_mm)" `isInfixOf`)
+      -- blawx_comparison(Length, gte, 5)
+      sout `shouldSatisfy` ("AND `the facial_hair_length_mm of` x AT LEAST 5" `isInfixOf`)
+      -- two attributed_rules concluding `bearded` in s.1: one decision each,
+      -- OR-ed by `according_to`
+      sout `shouldSatisfy` ("`according to BTA 1, x is bearded (clause 1)` x" `isInfixOf`)
+      sout `shouldSatisfy` ("OR `according to BTA 1, x is bearded (clause 2)` x" `isInfixOf`)
+      -- the paragraph rules are filed under the parent section, and say so
+      serr `shouldSatisfy` ("blawx-lift/rule-section-flattened" `isInfixOf`)
+      sout `shouldSatisfy` ("sec_1__para_a_section attributed_rule" `isInfixOf`)
+      -- `?- bearded(Person)` over an empty universe: provenance, no #EVAL
+      serr `shouldSatisfy` ("blawx-lift/unbound-query-empty-universe" `isInfixOf`)
+      sout `shouldSatisfy` ("-- blawxtest are_they_bearded" `isInfixOf`)
+      length (filter ("#EVAL" `isPrefixOf`) (lines sout)) `shouldBe` 0
+
+    -- __The defect the paragraph fold shipped with__ (§11 W5), and the reason
+    -- these two fixtures exist. Both are Jason Morris's `beard_tax.yaml` with
+    -- the two `sec_1__para_a_section` rules made `defeasible TRUE` and one
+    -- `overrules` block appended to `sec_1_section`'s XML, defeating
+    -- `qualifies_s1a`; they differ only in which section the DEFEATING
+    -- `doc_selector` names.
+    --
+    -- `paragraph-defeat-ok.blawx` names `sec_1__para_b_section`, the
+    -- paragraph that actually concludes `qualifies_s1b`. The fold is
+    -- extension-preserving, so the defeat survives it. Before the fix the
+    -- rules were filed under the FOLDED section while the `overrules` was
+    -- keyed on the RAW paragraph: the `AND NOT <defeated>` conjunct was never
+    -- emitted, the `… is defeated` decision was defined and never used, and
+    -- the lift exited 0 with warnings only.
+    it "keeps a defeat whose sections are paragraphs (§11 W5)" $ do
+      Output code sout serr <- runL4 bin
+        ["blawx", "--import", "tests-cli/fixtures/blawx-import/paragraph-defeat-ok.blawx"]
+      unless (code == ExitSuccess) $
+        expectationFailure ("paragraph-defeat-ok did not lift\n--- stderr ---\n" ++ serr)
+      sout `shouldSatisfy`
+        ("AND NOT `the conclusion in BTA 1 that x qualifies under section 1 a is defeated` x" `isInfixOf`)
+      -- the sentence the old artifact printed in its place, which was false
+      sout `shouldSatisfy` (not . ("no overrules names BTA 1 as defeated" `isInfixOf`))
+      -- and the fold is disclosed on the defeat too, not only on the rules
+      serr `shouldSatisfy` ("blawx-lift/defeat-section-flattened" `isInfixOf`)
+      serr `shouldSatisfy` ("sec_1__para_a_section" `isInfixOf`)
+
+    -- `paragraph-defeat.blawx` is the review counterexample verbatim: its
+    -- DEFEATING `doc_selector` names `sec_1_section`, the flat parent, which
+    -- no rule is attributed to. s(CASP) keys `holds/3` on the exact section,
+    -- so `holds(sec_1_section,qualifies_s1b,X)` has no clause and the defeat
+    -- never fires in Blawx — measured with swipl over the re-emitted program:
+    -- `?- qualifies_s1a(p).` answers MODEL in all four scenarios. Folding it
+    -- would give the defeat a body the source does not have, so it is refused
+    -- by name instead.
+    it "refuses an `overrules` the fold would activate, by name (§11 W5)" $ do
+      Output code _ serr <- runL4 bin
+        ["blawx", "--import", "tests-cli/fixtures/blawx-import/paragraph-defeat.blawx"]
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("blawx-lift/defeat-target" `isInfixOf`)
+      serr `shouldSatisfy` ("holds(sec_1_section,qualifies_s1b,X)" `isInfixOf`)
+
+    -- __The APPLICABILITY layer's half of the same fold hazard__, found in
+    -- review of W5a and closed at integration (2026-09-02). The fixture is
+    -- Jason Morris's own bird.yaml with ONE empty workspace
+    -- (`sec_5__para_a_section`) added and two `doc_selector` section_references
+    -- repointed at it, so the `inapplicable TRUE` attributed_rule is attributed
+    -- to a PARAGRAPH. `scasp_generator.js:1188-1194` injects
+    -- `blawx_applies(<the rule's own section>, X)`, so Blawx asks
+    -- `blawx_applies(sec_5__para_a_section, X)`, which has no clause at all;
+    -- the lift injected the PARENT's gate, which is derivable. Measured before
+    -- the fix: exit 0, warnings only, `l4 check` clean, and the two engines
+    -- disagreed — L4 TRUE, s(CASP) NOMODEL, with a hand-added
+    -- `blawx_applies(sec_5__para_a_section,A) :- not -blawx_applies(...)`
+    -- flipping it back. Refused by name now, exactly as `defeat-target` is.
+    it "refuses an `inapplicable` rule the fold would re-gate, by name" $ do
+      Output code _ serr <- runL4 bin
+        ["blawx", "--import", "tests-cli/fixtures/blawx-import/paragraph-applies.blawx"]
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("blawx-lift/applies-target" `isInfixOf`)
+      serr `shouldSatisfy` ("blawx_applies(sec_5__para_a_section,X)" `isInfixOf`)
 
     it "--reemit writes the .blawx regenerated from the parsed blocks" $ do
       Output code sout serr <- runL4 bin

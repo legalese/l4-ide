@@ -1,0 +1,14 @@
+-- `#CHECK` over a polymorphic term carries a residual inference variable. The
+-- checker names those with a global counter (`a24`, `x13`) — not an identifier
+-- in any scope, and different after every edit. The display form is `a`, `b`,
+-- … by order of first appearance, the same rendering hover uses.
+
+GIVEN a IS A TYPE
+GIVETH a
+ASSUME bottom
+
+#CHECK bottom
+#CHECK GIVEN x YIELD x
+#CHECK GIVEN x, y YIELD x
+#CHECK LIST bottom, bottom
+#CHECK GIVEN x YIELD 1 + bottom

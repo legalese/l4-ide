@@ -1,0 +1,32 @@
+-- A refusal is not an error and not an unknown fact: the model declines to
+-- answer, and no rule can convert that into an answer.
+--
+-- House style: one NAMED definition per refusal, whose name says what is not
+-- covered, so that the arms which reach it stay byte-identical to the statute
+-- they encode.
+
+IMPORT prelude
+
+GIVETH A NUMBER
+`this schedule is not encoded for years before 2000` MEANS
+    REFUSE "this schedule is not encoded for years before 2000"
+
+GIVEN y IS A NUMBER
+GIVETH A NUMBER
+`the fee in year` y MEANS
+    IF y AT LEAST 2000
+    THEN 100
+    ELSE `this schedule is not encoded for years before 2000`
+
+-- Inside the encoded range the decision answers normally.
+#ASSERT `the fee in year` 2001 EQUALS 100
+
+-- Outside it, the decision REFUSES. Both spellings of the directive hold.
+#ASSERT REFUSED `the fee in year` 1999
+#ASSERT REFUSED `the fee in year` 1999 BECAUSE "this schedule is not encoded for years before 2000"
+
+-- A plain #ASSERT over a refusing expression reports "refused", in BOTH
+-- polarities: NOT forces its operand, so negation cannot turn a refusal into
+-- a verdict.
+#ASSERT `the fee in year` 1999 EQUALS 100
+#ASSERT NOT (`the fee in year` 1999 EQUALS 100)

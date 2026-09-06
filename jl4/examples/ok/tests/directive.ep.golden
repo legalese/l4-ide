@@ -1,4 +1,7 @@
 § `Directive Examples`
+    GIVEN walks IS A FUNCTION FROM Person TO BOOLEAN
+          eats IS A FUNCTION FROM Person TO BOOLEAN
+          drinks IS A FUNCTION FROM Person TO BOOLEAN
 
 GIVEN x IS A NUMBER
       y IS A NUMBER
@@ -11,10 +14,6 @@ adder x y MEANS y + x
 
 DECLARE Person
   HAS name IS A STRING
-
-ASSUME walks  IS A FUNCTION FROM Person TO BOOLEAN
-ASSUME eats   IS A FUNCTION FROM Person TO BOOLEAN
-ASSUME drinks IS A FUNCTION FROM Person TO BOOLEAN
 
 GIVEN p IS A Person
 DECIDE `must sing` OF p

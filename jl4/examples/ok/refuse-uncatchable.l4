@@ -1,0 +1,56 @@
+-- Nothing in the language observes a refusal or converts it into an answer:
+-- not a CONSIDER over a MAYBE, not a boolean connective, not a LET, not a
+-- WHERE. The only thing that "catches" one is the directive boundary, which
+-- reports it as its own outcome.
+--
+-- The ONE thing that changes the answer is DEMAND ORDER. AND and OR are lazy
+-- and left to right, so `FALSE AND <refusing>` answers FALSE while
+-- `<refusing> AND FALSE` refuses. That is documented, not fixed.
+
+IMPORT prelude
+
+GIVETH A BOOLEAN
+`not modelled (boolean)` MEANS REFUSE "not modelled: the boolean case"
+
+GIVETH A NUMBER
+`not modelled (number)` MEANS REFUSE "not modelled: the number case"
+
+GIVETH A MAYBE NUMBER
+`not modelled (maybe)` MEANS REFUSE "not modelled: the maybe case"
+
+-- A CONSIDER must force its scrutinee, so neither arm is reached.
+GIVETH A NUMBER
+`consider over a refusing maybe` MEANS
+    CONSIDER `not modelled (maybe)`
+      WHEN NOTHING THEN 0
+      WHEN JUST n  THEN n
+
+#ASSERT REFUSED `consider over a refusing maybe`
+
+-- Boolean connectives, in the order that forces the refusal.
+#ASSERT REFUSED (TRUE AND `not modelled (boolean)`)
+#ASSERT REFUSED (`not modelled (boolean)` AND FALSE)
+#ASSERT REFUSED (FALSE OR `not modelled (boolean)`)
+#ASSERT REFUSED (NOT `not modelled (boolean)`)
+
+-- ...and the order that does not. These are ordinary verdicts, and pinning
+-- them here is what makes the order-dependence a documented property rather
+-- than a surprise.
+#ASSERT NOT (FALSE AND `not modelled (boolean)`)
+#ASSERT TRUE OR `not modelled (boolean)`
+
+-- A binding does not launder it either.
+GIVETH A NUMBER
+`let over a refusal` MEANS
+    LET x MEANS `not modelled (number)`
+    IN x PLUS 1
+
+#ASSERT REFUSED `let over a refusal`
+
+GIVETH A NUMBER
+`where over a refusal` MEANS
+    y PLUS 1
+    WHERE
+        y MEANS `not modelled (number)`
+
+#ASSERT REFUSED `where over a refusal`

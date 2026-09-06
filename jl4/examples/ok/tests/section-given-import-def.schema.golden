@@ -1,0 +1,18 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+        "amount": {
+            "type": "number"
+        },
+        "the rate": {
+            "default": 5.0e-2,
+            "type": "number"
+        }
+    },
+    "required": [
+        "amount",
+        "the rate"
+    ],
+    "title": "tax on",
+    "type": "object"
+}

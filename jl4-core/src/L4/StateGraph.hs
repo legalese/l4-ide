@@ -384,7 +384,7 @@ extractStateGraph m = case extractStateGraphs m of
 
 -- | Extract state graphs from a section
 extractFromSection :: Section Resolved -> [StateGraph]
-extractFromSection (MkSection _ mName _ decls) =
+extractFromSection (MkSection _ mName _ _ decls) =
   let sectionName = maybe "contract" resolvedToText mName
   in concatMap (extractFromTopDecl sectionName) decls
 
@@ -531,6 +531,12 @@ extractExpr mFromState expr = case expr of
   Breach _ _ _ -> do
     _ <- getTerminalState "Breach" TerminalBreach
     pure ()
+
+  -- A refusal is not a deontic terminal: it is the model declining to answer,
+  -- which has no state in the lifecycle graph. Deliberately no state is
+  -- created (the wildcard below would do the same; the arm is explicit so
+  -- that the decision is recorded rather than inherited).
+  Refuse _ _ -> pure ()
 
   _ -> pure ()  -- Skip other expressions
 
@@ -855,6 +861,8 @@ classifyTarget self = \case
   App _ name [] | isFulfilled name -> TargetFulfilled
   App _ name _ | Just u <- self, getUnique name == u -> TargetSelf
   Breach{} -> TargetBreach
+  -- Not a breach: a refusal is not a deontic outcome at all.
+  Refuse{} -> TargetOther
   Regulative _ obl -> TargetDeonton obl
   Where _ e _ -> classifyTarget self e
   LetIn _ _ e -> classifyTarget self e

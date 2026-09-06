@@ -11,6 +11,12 @@ module L4.Desugar (
   -- * Type Synonyms
   --
   detectTypeSynonymCycles,
+  -- * Section binders
+  --
+  desugarSectionGivens,
+  detectMisattachedSectionGivens,
+  collectSectionBinderNames,
+  detectRestatedSectionBinders,
   ) where
 
 
@@ -18,11 +24,13 @@ import           Base
 import           Data.Graph               (stronglyConnComp, SCC(..))
 import qualified Data.Map.Strict          as Map
 import qualified Data.Set                 as Set
-import           L4.Annotation            (HasAnno (..), emptyAnno)
+import           L4.Annotation            (Anno_ (..), HasAnno (..), HasSrcRange (..), emptyAnno, mkHoleWithSrcRangeHint)
 import           L4.Names
+import           L4.Parser.SrcSpan        (SrcPos (MkSrcPos), SrcRange (MkSrcRange))
 import           L4.Syntax
 import qualified L4.TypeCheck.Environment as TypeCheck
 import Control.Category ((>>>))
+import qualified Optics
 
 -- ----------------------------------------------------------------------------
 -- Caramelize
@@ -78,6 +86,9 @@ carameliseExprWithContext ctx = carameliseNode >>> \ case
   Concat     ann es -> Concat ann (fmap (carameliseExprWithContext InertCtxNone) es)
   AsString   ann e -> AsString ann (carameliseExprWithContext InertCtxNone e)
   Breach     ann mParty mReason -> Breach ann (fmap (carameliseExprWithContext InertCtxNone) mParty) (fmap (carameliseExprWithContext InertCtxNone) mReason)
+  -- The REFUSE message is a string literal and must not be turned into an
+  -- 'Inert' node by an enclosing AND/OR context.
+  Refuse     ann msg -> Refuse ann (carameliseExprWithContext InertCtxNone msg)
   -- Inert elements: update the context based on the desugaring context.
   -- The evaluator (Machine.hs) will read this context to determine the value.
   Inert      ann txt _oldCtx -> Inert ann txt ctx
@@ -235,8 +246,8 @@ desugarComputedFields (MkModule ann imports section) =
   MkModule ann imports (desugarCFSection section)
 
 desugarCFSection :: Section Name -> Section Name
-desugarCFSection (MkSection sAnn sMn sMaka topDecls) =
-  MkSection sAnn sMn sMaka (concatMap desugarCFTopDecl topDecls)
+desugarCFSection (MkSection sAnn sMn sMaka sMgiven topDecls) =
+  MkSection sAnn sMn sMaka sMgiven (concatMap desugarCFTopDecl topDecls)
 
 desugarCFTopDecl :: TopDecl Name -> [TopDecl Name]
 desugarCFTopDecl (Declare dAnn decl) = desugarCFDeclare dAnn decl
@@ -371,6 +382,7 @@ rewriteFieldRefs fields self = go fields
       Record ann mp c v off mh -> Record ann (fmap (go flds) mp) (go flds c) (go flds v) off (fmap (go flds) mh)
       ReadCell ann mp off mode c -> ReadCell ann (fmap (go flds) mp) off mode (go flds c)
       Breach ann mp mr    -> Breach ann (fmap (go flds) mp) (fmap (go flds) mr)
+      Refuse ann msg      -> Refuse ann (go flds msg)
       Event {}            -> expr  -- regulative events are complex; leave as-is
       Regulative {}       -> expr  -- regulative rules: leave as-is
       Inert {}            -> expr
@@ -421,7 +433,7 @@ detectComputedFieldCycles :: Module Name -> [(Name, [Name])]
 detectComputedFieldCycles (MkModule _ _ section) = detectCFCSection section
 
 detectCFCSection :: Section Name -> [(Name, [Name])]
-detectCFCSection (MkSection _ _ _ topDecls) = concatMap detectCFCTopDecl topDecls
+detectCFCSection (MkSection _ _ _ _ topDecls) = concatMap detectCFCTopDecl topDecls
 
 detectCFCTopDecl :: TopDecl Name -> [(Name, [Name])]
 detectCFCTopDecl (Declare _ decl) = detectCFCDeclare decl
@@ -504,7 +516,7 @@ detectTypeSynonymCycles (MkModule _ _ section) =
 -- | All type synonym declarations in a section (recursively):
 -- name, AKA aliases, type parameters, body.
 synonymsInSection :: Section Name -> [(Name, [RawName], Set RawName, Type' Name)]
-synonymsInSection (MkSection _ _ _ topDecls) = concatMap go topDecls
+synonymsInSection (MkSection _ _ _ _ topDecls) = concatMap go topDecls
   where
     go (Declare _ (MkDeclare _ _ (MkAppForm _ n args mAka) (SynonymDecl _ ty))) =
       [(n, akaNames mAka, Set.fromList (rawName <$> args), ty)]
@@ -525,7 +537,7 @@ extractComputedFieldNames :: Module Name -> Map.Map RawName (Set RawName)
 extractComputedFieldNames (MkModule _ _ section) = extractCFNSection section
 
 extractCFNSection :: Section Name -> Map.Map RawName (Set RawName)
-extractCFNSection (MkSection _ _ _ topDecls) =
+extractCFNSection (MkSection _ _ _ _ topDecls) =
   Map.unionsWith Set.union (map extractCFNTopDecl topDecls)
 
 extractCFNTopDecl :: TopDecl Name -> Map.Map RawName (Set RawName)
@@ -535,3 +547,220 @@ extractCFNTopDecl (Declare _ (MkDeclare _ _ (MkAppForm _ recName _ _) (RecordDec
     in Map.singleton (rawName recName) cfNames
 extractCFNTopDecl (Section _ section) = extractCFNSection section
 extractCFNTopDecl _ = Map.empty
+
+-- ----------------------------------------------------------------------------
+-- Section binders (the section-level GIVEN, R4)
+-- ----------------------------------------------------------------------------
+
+-- | Elaborate each section-level @GIVEN@ parameter into a synthetic 0-ary
+-- @ASSUME@ prepended to that section's declaration list.
+--
+-- INVARIANT (cited from "L4.Print" and "L4.Export"). In a /parsed/ module a
+-- section's 'GivenSig' stands alone. In a /desugared/ module the 'GivenSig' is
+-- the declaration of record — it is what 'L4.Print.prettyLayout' re-emits —
+-- and, for each of its parameters, there is exactly one 0-ary @ASSUME@ at the
+-- head of that section's declaration list bearing the same name: the
+-- parameter's /elaboration/. Any pass that drops or replaces an elaboration
+-- must drop the matching parameter, or what 'L4.Print.prettyLayout' re-emits
+-- stops being a faithful source of the module it holds.
+--
+-- Why elaborate at all: R3\/R4 rule that a section binder resolves, evaluates
+-- and exports exactly as a same-section term @ASSUME@ does. Making the checker
+-- literally see an @ASSUME@ in that section buys the resolution rules
+-- (nearest-ancestor tiebreak, child shadows ancestor, ambiguity when a parent
+-- reaches two children), the @ValAssumed@ evaluation path, the export schema
+-- entry and all six backends by construction, instead of by a dozen parallel
+-- edits that could each drift from the behaviour they mirror.
+--
+-- The elaboration is deliberately /token-free/: every annotation it introduces
+-- is empty, so no traversal that walks concrete syntax (exact printing,
+-- semantic tokens) descends into it and the binder's tokens are emitted once,
+-- by the 'GivenSig' the section keeps. The parameter's own 'Name', type and
+-- @TYPICALLY@ nodes are reused as-is, so the binder's defining occurrence still
+-- carries the source range of the @GIVEN@ line — which is what makes
+-- diagnostics, hover and go-to-definition point at the heading's binder rather
+-- than at @1:1@.
+desugarSectionGivens :: Module Name -> Module Name
+desugarSectionGivens (MkModule ann uri sect) = MkModule ann uri (goSection sect)
+ where
+  goSection :: Section Name -> Section Name
+  goSection (MkSection sAnn mn maka mgiven decls) =
+    MkSection sAnn mn maka mgiven
+      (map elaborateSectionBinder (sectionGivenParams mgiven) <> map goTopDecl decls)
+
+  goTopDecl :: TopDecl Name -> TopDecl Name
+  goTopDecl = \ case
+    Section a s -> Section a (goSection s)
+    other       -> other
+
+-- | The parameters a section's own @GIVEN@ declares (none when it has no
+-- @GIVEN@).
+sectionGivenParams :: Maybe (GivenSig n) -> [OptionallyTypedName n]
+sectionGivenParams = maybe [] (\ (MkGivenSig _ otns) -> otns)
+
+-- | Every name a section-level @GIVEN@ binds anywhere in the module.
+--
+-- Read off the /parsed/ module, before 'desugarSectionGivens' turns each
+-- parameter into an @ASSUME@ and before anything is resolved, because the
+-- checker needs it while checking bodies: a @WITH@ site may name a section
+-- binder that is not one of the callee's declared parameters
+-- ('L4.TypeCheck.supplyAppNamed'), and this is the set that distinguishes such
+-- a supply from a misspelt parameter name.
+collectSectionBinderNames :: HasName n => Module n -> Set RawName
+collectSectionBinderNames (MkModule _ _ sect) = goSection sect
+ where
+  goSection (MkSection _ _ _ mgiven decls) =
+    Set.fromList (sectionGivenNames mgiven)
+      <> foldMap goTopDecl decls
+  goTopDecl = \ case
+    Section _ s -> goSection s
+    _           -> Set.empty
+
+-- | One section-binder parameter, as the 0-ary @ASSUME@ that stands for it.
+--
+-- The @extra@ of the parameter's annotation is carried onto the @ASSUME@ so
+-- that a @\@desc@ written above a section-@GIVEN@ parameter reaches
+-- 'L4.Export.assumeToParam', which reads the description off exactly this node.
+-- The concrete-syntax payload is dropped, for the token-freeness reason given
+-- on 'desugarSectionGivens'. The @range@ is NOT: the checker keys a
+-- declaration's scanned signature by its annotation's source range
+-- ('lookupFunTypeSigByAnno'), and a range-less declaration is a fatal
+-- @MissingSrcRangeForDeclaration@. Each parameter has a distinct range, so the
+-- keys stay distinct.
+--
+-- 'rangeOf' on an 'Anno' is computed from its payload, not read off the @range@
+-- field, so the range has to be carried by exactly ONE 'AnnoHole'. One, not
+-- four: 'flattenConcreteNodes' pairs holes with child node-lists positionally
+-- and drops the surplus, so a single hole is filled by the (empty) TypeSig and
+-- the reused type and @TYPICALLY@ nodes emit nothing — which is what keeps the
+-- elaboration token-free.
+elaborateSectionBinder :: OptionallyTypedName Name -> TopDecl Name
+elaborateSectionBinder (MkOptionallyTypedName pAnn nm mTy mTypically) =
+  Assume (Anno mempty pAnn.range [mkHoleWithSrcRangeHint pAnn.range])
+    (MkAssume (Anno pAnn.extra pAnn.range [mkHoleWithSrcRangeHint pAnn.range])
+      (MkTypeSig emptyAnno (MkGivenSig emptyAnno []) Nothing)
+      (MkAppForm emptyAnno nm [] Nothing)
+      mTy
+      mTypically)
+
+-- | R2: a declaration's own @GIVEN@ that restates a name a section-level
+-- @GIVEN@ already binds.
+--
+-- After discharge the section binder is a trailing parameter of every
+-- definition that reads it, so a same-named parameter of the same declaration
+-- would give one name two binders in one body and make the answer depend on
+-- which one the resolver picked. The ruling (R2, 2026-09-04) is that this is an
+-- error at the declaration and the fix is to delete the restatement: the value
+-- then flows, and a genuine per-call variation is written @callee WITH x IS y@.
+--
+-- Scope, deliberately: only a /declaration's/ signature. A section's own binder
+-- lives in a bare 'GivenSig' hanging off the heading, and a lambda's parameters
+-- in a bare 'GivenSig' too, so keying on 'TypeSig' picks out exactly the
+-- @DECIDE@, @ASSUME@ and @DECLARE@ signatures the ruling is about — including
+-- those of @WHERE@ and @LET@ locals, which are function signatures like any
+-- other. A lambda parameter that shadows a binder is left alone: it is the
+-- residual cost §2.3 records, not a second binder for the name.
+--
+-- Measured 2026-09-04 across 607 files: 235 term-role @ASSUME@ names and 2,311
+-- function @GIVEN@ names, and no file in which the two sets overlap. So this
+-- rule costs the corpus nothing; it governs the migration state.
+detectRestatedSectionBinders :: Module Name -> [Name]
+detectRestatedSectionBinders (MkModule _ _ sect) = goSection Set.empty sect
+ where
+  -- Scoped to the binders VISIBLE at the declaration: its own section's and
+  -- those of its ancestors. Not the whole module.
+  --
+  -- Keying on the raw name module-wide was over-broad, and the cost stopped
+  -- being hypothetical: @doc\/tutorials\/section-given\/what-a-section-needs-to-know.l4@
+  -- is a before-and-after tutorial whose \"before\" section deliberately repeats
+  -- @annual income@ in each rule's own @GIVEN@, and whose \"after\" section --
+  -- a DIFFERENT section, later in the file -- declares it once as a section
+  -- @GIVEN@. Nothing there gives one name two binders in one body; the module
+  -- merely spells the name in two unrelated places, which is the whole point of
+  -- the page.
+  goSection visible (MkSection _ _ _ mgiven decls) =
+    let visible' = visible <> Set.fromList (sectionGivenNames mgiven)
+    in concatMap (goTopDecl visible') decls
+
+  goTopDecl visible = \ case
+    Section _ s -> goSection visible s
+    d ->
+      [ nm
+      | MkTypeSig _ (MkGivenSig _ otns) _ <- Optics.toListOf (Optics.gplate @(TypeSig Name)) d
+      , MkOptionallyTypedName _ nm _ _ <- otns
+      , Set.member (rawName nm) visible
+      ]
+
+-- | The dedent hazard of R4, as a diagnosable shape.
+--
+-- A section binder that a paste or a hand-edit pushes back to column 1 stops
+-- being the section's and silently becomes the signature of the declaration
+-- below it: the checker rewrites a 0-ary head to take the GIVEN's names as its
+-- arguments, so nothing complains. Reported here are the cases where that
+-- reading cannot have been meant, because the declaration makes no use of the
+-- name anywhere — not in its head, not in its result type, not in its body, and
+-- not in another parameter's type.
+--
+-- The test is deliberately this narrow, in two ways, both of them measured
+-- rather than reasoned.
+--
+-- First, a column-1 @GIVEN@ opening a section is how 736 declarations in this
+-- tree spell an ordinary function signature, so flagging a name merely because
+-- the /written/ head does not bind it would report every one of them (the
+-- checker rewrites a 0-ary head to take the GIVEN's term names as arguments,
+-- 'checkTermAppFormTypeSigConsistency'). Hence \"used nowhere at all\".
+--
+-- Second, only a @DECLARE@ or an @ASSUME@ is considered. Extending the same
+-- test to @DECIDE@ was built and measured on 2026-09-04 and reports five
+-- existing files — @jl4-core\/libraries\/actus.l4@ (@state@),
+-- @legal\/ceo-performance-award.l4@ (@tranche number@),
+-- @legal\/sg-succession\/cleanroom-2026-08\/wills-act.l4@ and
+-- @family-cases.l4@ (@the will@) and @not-ok\/tc\/sing.l4@ (@p@) — each an
+-- ordinary function that simply does not use one of its parameters, which is
+-- indistinguishable from a dedented binder and is not this check's business.
+-- Restricted to @DECLARE@ and @ASSUME@ the rule fires on no existing file under
+-- @jl4\/examples@, @jl4-core\/libraries@ or @doc@.
+--
+-- The third shape the design names, a column-1 @GIVEN@ followed by another
+-- heading, needs no check: it is a parse error already.
+--
+-- Returns the unused parameter and the heading it sits under.
+detectMisattachedSectionGivens :: Module Name -> [(Name, Maybe Name)]
+detectMisattachedSectionGivens (MkModule _ _ sect) = goSection sect
+ where
+  goSection :: Section Name -> [(Name, Maybe Name)]
+  goSection (MkSection _ mn _ _ decls) =
+    -- Only a section with a heading has a § to indent past; the anonymous root
+    -- section's first GIVEN is an ordinary module-level signature.
+    (case (mn, decls) of
+       (Just _, d : _) -> misattachedIn mn d
+       _               -> [])
+    <> concat [ goSection s | Section _ s <- decls ]
+
+  misattachedIn :: Maybe Name -> TopDecl Name -> [(Name, Maybe Name)]
+  misattachedIn mn d = case typeSigOf d of
+    Just (MkTypeSig _ (MkGivenSig gann params@(_ : _)) _)
+      | startsAtColumnOne gann ->
+          [ (nm, mn)
+          | MkOptionallyTypedName _ nm _ _ <- params
+          , occurrences (rawName nm) d <= 1
+          ]
+    _ -> []
+
+  startsAtColumnOne :: Anno -> Bool
+  startsAtColumnOne gann = case rangeOf gann of
+    Just (MkSrcRange (MkSrcPos _ col) _ _ _) -> col == 1
+    Nothing                                  -> False
+
+  -- How many times this raw name occurs anywhere in the declaration. The
+  -- parameter's own binding occurrence is one of them, so a name used nowhere
+  -- else has a count of exactly one.
+  occurrences :: RawName -> TopDecl Name -> Int
+  occurrences rn d = length [ () | n <- toList d, rawName n == rn ]
+
+  -- DECIDE is deliberately absent; see the note above.
+  typeSigOf :: TopDecl Name -> Maybe (TypeSig Name)
+  typeSigOf = \ case
+    Declare _ (MkDeclare _ tysig _ _)   -> Just tysig
+    Assume  _ (MkAssume  _ tysig _ _ _) -> Just tysig
+    _                                   -> Nothing

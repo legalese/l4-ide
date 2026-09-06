@@ -1,48 +1,67 @@
 -- FOR ALL Examples
 -- Universal quantifier for polymorphic type signatures
 
+§ `FOR ALL Examples`
+    GIVEN identity IS
+              FOR ALL a
+              A FUNCTION FROM a TO a
+          const IS
+              FOR ALL a AND b
+              A FUNCTION FROM a AND b TO a
+          map IS
+              FOR ALL a AND b
+              A FUNCTION
+                FROM      FUNCTION FROM a TO b
+                      AND LIST OF a
+                TO    LIST OF b
+          filter IS
+              FOR ALL a
+              A FUNCTION
+                FROM      FUNCTION FROM a TO BOOLEAN
+                      AND LIST OF a
+                TO    LIST OF a
+          foldl IS
+              FOR ALL a AND b
+              A FUNCTION
+                FROM      FUNCTION FROM b AND a TO b
+                      AND b
+                      AND LIST OF a
+                TO    b
+          either IS
+              FOR ALL a AND b AND c
+              A FUNCTION
+                FROM      FUNCTION FROM a TO c
+                      AND FUNCTION FROM b TO c
+                      AND Choice OF a, b
+                TO    c
+          fromOptional IS
+              FOR ALL a
+              A FUNCTION
+                FROM      a
+                      AND Optional OF a
+                TO    a
+          makePair IS
+              FOR ALL a AND b
+              A FUNCTION FROM a AND b TO Pair OF a, b
+          compose IS
+              FOR ALL a AND b AND c
+              A FUNCTION
+                FROM      FUNCTION FROM b TO c
+                      AND FUNCTION FROM a TO b
+                TO    FUNCTION FROM a TO c
+          flip IS
+              FOR ALL a AND b AND c
+              A FUNCTION
+                FROM      FUNCTION FROM a AND b TO c
+                TO    FUNCTION FROM b AND a TO c
+
 --------------------------------------------------------------------------------
 -- Basic Polymorphic Type Declarations
 --------------------------------------------------------------------------------
 
--- Identity function: works for any type
-ASSUME identity IS
-  FOR ALL a
-  A FUNCTION FROM a TO a
-
--- Constant function: ignores second argument
-ASSUME const IS
-  FOR ALL a AND b
-  A FUNCTION FROM a AND b TO a
-
 --------------------------------------------------------------------------------
 -- List Operations (Polymorphic)
 --------------------------------------------------------------------------------
-
--- Map: apply function to each element
-ASSUME map IS
-  FOR ALL a AND b
-  A FUNCTION
-    FROM      FUNCTION FROM a TO b
-          AND LIST OF a
-    TO    LIST OF b
-
--- Filter: keep elements matching predicate
-ASSUME filter IS
-  FOR ALL a
-  A FUNCTION
-    FROM      FUNCTION FROM a TO BOOLEAN
-          AND LIST OF a
-    TO    LIST OF a
-
--- Fold: reduce list to single value
-ASSUME foldl IS
-  FOR ALL a AND b
-  A FUNCTION
-    FROM      FUNCTION FROM b AND a TO b
-          AND b
-          AND LIST OF a
-    TO    b
 
 --------------------------------------------------------------------------------
 -- Custom Algebraic Types with Type Parameters
@@ -68,28 +87,6 @@ DECLARE Pair OF a, b
 --------------------------------------------------------------------------------
 -- Functions Using Custom Types
 --------------------------------------------------------------------------------
-
--- Handle either alternative of a Choice
-ASSUME either IS
-  FOR ALL a AND b AND c
-  A FUNCTION
-    FROM      FUNCTION FROM a TO c
-          AND FUNCTION FROM b TO c
-          AND Choice OF a, b
-    TO    c
-
--- Extract value from Optional with default
-ASSUME fromOptional IS
-  FOR ALL a
-  A FUNCTION
-    FROM      a
-          AND Optional OF a
-    TO    a
-
--- Create a pair
-ASSUME makePair IS
-  FOR ALL a AND b
-  A FUNCTION FROM a AND b TO Pair OF a, b
 
 --------------------------------------------------------------------------------
 -- Implementing Polymorphic Functions with GIVEN
@@ -155,21 +152,6 @@ double n MEANS n TIMES 2
 --------------------------------------------------------------------------------
 -- Higher-Order Polymorphic Functions
 --------------------------------------------------------------------------------
-
--- Function composition
-ASSUME compose IS
-  FOR ALL a AND b AND c
-  A FUNCTION
-    FROM      FUNCTION FROM b TO c
-          AND FUNCTION FROM a TO b
-    TO    FUNCTION FROM a TO c
-
--- Flip argument order
-ASSUME flip IS
-  FOR ALL a AND b AND c
-  A FUNCTION
-    FROM      FUNCTION FROM a AND b TO c
-    TO    FUNCTION FROM b AND a TO c
 
 --------------------------------------------------------------------------------
 -- Polymorphic Tree Type

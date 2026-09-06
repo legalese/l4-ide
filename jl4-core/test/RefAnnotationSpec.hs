@@ -28,7 +28,7 @@ moduleAndFirstDeclRefs src = do
     Left errs -> do
       expectationFailure $ "Parser failed: " <> show errs
       error "unreachable"
-    Right (m@(MkModule _ _ (MkSection _ _ _ decls)), _, _) -> do
+    Right (m@(MkModule _ _ (MkSection _ _ _ _ decls)), _, _) -> do
       let moduleRef = fmap getRef (view annRef (getAnno m))
       firstDeclRef <- case decls of
         (d : _) -> pure $ fmap getRef (view annRef (getAnno d))
@@ -50,7 +50,7 @@ decideBodyRefs' uriStr src = do
     Left errs -> do
       expectationFailure $ "Parser failed: " <> show errs
       error "unreachable"
-    Right (MkModule _ _ (MkSection _ _ _ decls), _, _) ->
+    Right (MkModule _ _ (MkSection _ _ _ _ decls), _, _) ->
       pure
         [ (body, fmap getRef (view annRef (getAnno body)))
         | Decide _ (MkDecide _ _ _ body) <- decls

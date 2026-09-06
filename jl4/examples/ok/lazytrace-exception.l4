@@ -1,10 +1,11 @@
 
+§ `Lazytrace exception`
+    GIVEN something IS A BOOLEAN
+
 and list MEANS
   CONSIDER list
   WHEN EMPTY THEN TRUE
   WHEN x FOLLOWED BY xs THEN x AND and xs
-
-ASSUME something IS A BOOLEAN
 
 -- #EVALTRACE and (LIST TRUE)
 #EVALTRACE and (LIST TRUE, FALSE OR TRUE, TRUE, something, FALSE)

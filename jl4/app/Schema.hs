@@ -103,7 +103,7 @@ buildContext (MkModule _ _ section) =
   emptyContext{ctxDeclares = collectDeclares section}
  where
   collectDeclares :: Section Resolved -> Map.Map Text (Declare Resolved)
-  collectDeclares (MkSection _ _ _ decls) =
+  collectDeclares (MkSection _ _ _ _ decls) =
     Map.fromList $ concatMap collectDecl decls
 
   collectDecl :: TopDecl Resolved -> [(Text, Declare Resolved)]

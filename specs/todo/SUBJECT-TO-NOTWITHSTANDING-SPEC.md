@@ -1,9 +1,10 @@
-> **Status (audited 2026-07-03):** OPEN — analysis-only; none of the proposed override constructs are implemented.
+> **Status (re-audited 2026-08-28):** OPEN — analysis-only; none of the proposed override constructs are implemented.
 >
-> - `SUBJECT TO`/`NOTWITHSTANDING`/`DESPITE`/`EXCEPT WHEN`/`WITHOUT AFFECTING` are not lexer keywords (`jl4-core/src/L4/Lexer.hs:230-299`) and appear nowhere in core; no priority-graph or defeater machinery.
-> - Only `UNLESS` exists as a keyword (`Lexer.hs:298`) but without the defeasibility semantics §6.1 proposes. "Next Steps" remain unstarted.
+> - `SUBJECT TO`/`NOTWITHSTANDING`/`DESPITE`/`EXCEPT WHEN`/`WITHOUT AFFECTING` are not lexer keywords (the `keywords` table is `jl4-core/src/L4/Lexer.hs:245-332`) and appear nowhere in core; no priority-graph or defeater machinery.
+> - Only `UNLESS` exists as a keyword (`Lexer.hs:330`) but without the defeasibility semantics §6.1 proposes. "Next Steps" items 2-5 remain unstarted.
 > - §9 (`APPLIES`, added 2026-08-16) is likewise PROPOSED, not implemented — `APPLIES` is not a lexer keyword, and no per-provision applicability projections are derived anywhere in core.
-> - §10 (defeasance by recorded act, added 2026-08-28) is likewise PROPOSED, not implemented — no power/immunity constructs and no ledger-consulting defeasible nodes exist in core.
+> - §10 (corpus survey, added 2026-08-28) is a **measurement of existing corpora**, not a proposal; it discharges "Next Steps" item 1 for the read side. The line references above were re-verified on that date; the 2026-07-03 audit's `Lexer.hs:230-299`/`:298` had drifted.
+> - §11 (defeasance by recorded act, added 2026-08-28) is likewise PROPOSED, not implemented — no power/immunity constructs and no ledger-consulting defeasible nodes exist in core.
 
 > **Prior art from the backend portfolio (added 2026-08-16):** two independently-implemented,
 > battle-tested target-side defeasibility mechanisms — and one ratified interchange standard —
@@ -35,9 +36,10 @@
 **Revised:** 2026-06-17 — added §2.8–2.9 (override as aspect-oriented _advice_; amendment as homoiconic source rewrite + the modular-verification boundary), §5.5–5.6 (AOP; PROLEG / negation-as-failure), §6.5–6.6 (advice as the organizing principle; relationship to `TYPICALLY`).
 **Revised:** 2026-08-16 — added §9 (`APPLIES`: the read side of override — the four-conjunct applicability decomposition, post-weaving semantics, closed-world elaboration and its cliff into homoiconicity, the _-plies_ philology) plus §9 references.
 **Revised:** 2026-08-19 — §9.4 corpus quotes upgraded from schematic/paraphrase to verbatim: Companies Act 2006 s 724 replaces the invented two-step example, HRA 1998 s 10(1)(a)/(4) now quoted rather than paraphrased; both verified against legislation.gov.uk (in-browser — direct fetches are bot-walled).
-**Revised:** 2026-08-28 — added §10 (defeasance by recorded act: the discretionary override — Hohfeldian power/immunity typing, the three strengths of fiat, the ledger as defeater store, the control-effect / intuitionistic reading) plus §10 references. Same-day companions: `doc/concepts/legal-modeling/residual.md` (the residual bridge) and `paper/hohfeld-higher-order/DESIGN.md` (2026-08-28 addendum).
-**Revised:** 2026-08-28 (later, same day) — §8.7's prior-art pass **run**; findings in new §10.6.2. The §10.6.1 citations are verified and five are corrected; the claim that the received view "did not go intuitionistic" is **demoted** (iALC; MIND), and the delta narrows to the control-effect join. §8.7 discharged; §10 references extended.
-**Branch:** mengwong/spec-notwithstanding
+**Revised:** 2026-08-28 — added §10, the corpus survey (559 sites across `legalese/canon` and `legalese/l4-ide`): `appl*` is four verbs of which only half are applicability; encoders already hand-roll §9.5's projections; a Boolean `applies` was measured insufficient (a six-member verdict, arrived at by adversarial review); four Acts encode "cannot be applied on this evidence" four incompatible ways; all three R10 escapes have witnesses. Discharges "Next Steps" item 1 for the read side, answers §7.1 and §9.9.1 (which had cited a §8.1 that never existed), and re-verifies the drifted `Lexer.hs` line references.
+**Branch:** mengwong/applies-corpus-survey (§10); docs/residual-sidebar (§11, PR #318); mengwong/spec-notwithstanding (original)
+**Revised:** 2026-08-28 — added §11 (defeasance by recorded act: the discretionary override — Hohfeldian power/immunity typing, the three strengths of fiat, the ledger as defeater store, the control-effect / intuitionistic reading) plus §11 references. Same-day companions: `doc/concepts/legal-modeling/residual.md` (the residual bridge) and `paper/hohfeld-higher-order/DESIGN.md` (2026-08-28 addendum).
+**Revised:** 2026-08-28 (later, same day) — §8.7's prior-art pass **run**; findings in new §11.6.2. The §11.6.1 citations are verified and five are corrected; the claim that the received view "did not go intuitionistic" is **demoted** (iALC; MIND), and the delta narrows to the control-effect join. §8.7 discharged; §11 references extended.
 
 ---
 
@@ -548,7 +550,10 @@ Defaults, provisos, and overrides are therefore not separate features but points
 
 ## 7. Open Questions
 
-1. **Granularity:** Should override apply to entire rules or individual conclusions?
+1. **Granularity:** Should override apply to entire rules or individual conclusions? On the read
+   side this is **measured** (§10.7): the corpus cites whole Acts, sections, subsections,
+   paragraphs, lettered limbs and separate instruments, so projections must attach to every
+   labelled node. The write side is not yet measured.
 
 2. **Temporal dynamics:** Can priority change over time? (e.g., grace periods)
 
@@ -566,13 +571,16 @@ Defaults, provisos, and overrides are therefore not separate features but points
 
 ## 8. Next Steps
 
-1. **Gather corpus examples:** Collect real statutory and contract examples using each pattern
+1. **Gather corpus examples:** Collect real statutory and contract examples using each pattern —
+   **done for the read side, §10** (559 sites across two corpora, 2026-08-28); the write-side
+   classification into the seven roles of §2.1-2.7 is still outstanding, for the reason §10.2
+   gives
 2. **Propose concrete syntax:** Design L4 keyword syntax for each semantic function
 3. **Define formal semantics:** Specify evaluation rules precisely
 4. **Implement prototype:** Add to L4 parser and evaluator
 5. **Test with real documents:** Validate against British Nationality Act, PDPA, etc.
 6. **Prototype the read side (§9):** derive per-provision `inScope` / `excluded` / `triggered` / `applies` / `satisfied` projections during elaboration, and pilot them on the Contracts (Rights of Third Parties) Act 2001 (§9.4), whose nine sections exercise every role in the design.
-7. **Prior-art verification pass for §10 (research) — RUN 2026-08-28; findings in §10.6.2.** The pass confirmed the §10.6.1 mirror, corrected five citations, demoted the "the received view did not go intuitionistic" claim, and left the control-effect join (§8.7(b)) as the surviving delta. Unresolved paywalled items are listed as dead ends at the end of §10.6.2 and still block the specific citations they name. What was searched: (a) deontic logic / normative systems in constructive type theory, (b) control operators or algebraic effects applied to legal or normative reasoning, (c) LogiKEy (Benzmüller–Parent–van der Torre — expected classical HOL, confirm), (d) Agda/Coq/Lean deontic formalisations, (e) **authorization logics** (§10.6.1: ABLP `says`/speaks-for; `says` as lax modality/monad via DCC and Garg–Abadi; Garg–Pfenning constructive authorization logic; Appel–Felten proof-carrying authorization; Aura; Delegation Logic; SPKI/SDSI; SecPAL/DKAL/Binder), and (f) **database authorization semantics** (Griffiths–Wade 1976; Fagin 1978 revocation correction; SQL-standard `CASCADE`/`RESTRICT`; XACML combining algorithms) — verifying the recalled citations in §10.6.1 and executing its repositioning instruction if they hold. Posture per `paper/hohfeld-higher-order/DESIGN.md`, whose own deep-research pass demoted its headline claim: concede-then-claim must be re-earned here. **It was: the pass demoted one claim and widened another.**
+7. **Prior-art verification pass for §11 (research) — RUN 2026-08-28; findings in §11.6.2.** The pass confirmed the §11.6.1 mirror, corrected five citations, demoted the "the received view did not go intuitionistic" claim, and left the control-effect join (§8.7(b)) as the surviving delta. Unresolved paywalled items are listed as dead ends at the end of §11.6.2 and still block the specific citations they name. What was searched: (a) deontic logic / normative systems in constructive type theory, (b) control operators or algebraic effects applied to legal or normative reasoning, (c) LogiKEy (Benzmüller–Parent–van der Torre — expected classical HOL, confirm), (d) Agda/Coq/Lean deontic formalisations, (e) **authorization logics** (§11.6.1: ABLP `says`/speaks-for; `says` as lax modality/monad via DCC and Garg–Abadi; Garg–Pfenning constructive authorization logic; Appel–Felten proof-carrying authorization; Aura; Delegation Logic; SPKI/SDSI; SecPAL/DKAL/Binder), and (f) **database authorization semantics** (Griffiths–Wade 1976; Fagin 1978 revocation correction; SQL-standard `CASCADE`/`RESTRICT`; XACML combining algorithms) — verifying the recalled citations in §11.6.1 and executing its repositioning instruction if they hold. Posture per `paper/hohfeld-higher-order/DESIGN.md`, whose own deep-research pass demoted its headline claim: concede-then-claim must be re-earned here. **It was: the pass demoted one claim and widened another.**
 
 ---
 
@@ -814,7 +822,9 @@ to **unfold**.
 ### 9.9 Open questions specific to the read side
 
 1. **Default projection:** which prefix of the four conjuncts does a bare `APPLIES` denote?
-   Needs the corpus survey of §8.1; explicit qualifiers are the conservative interim answer.
+   **Measured in §10** (2026-08-28), which finds that no single prefix serves and that a Boolean
+   return is the wrong shape — see §10.4. The design choice that follows is open, and is being
+   taken with Meng as part of the concrete-syntax work (§8 item 2).
 2. **Defeasible reads:** Reason-Based Logic says applicability is only a _reason_ for
    application. Should `S APPLIES` return the defeasible Boolean of §6.4 rather than a plain one,
    so a later defeater can rebut the read itself?
@@ -832,7 +842,228 @@ to **unfold**.
 
 ---
 
-## 10. Defeasance by Recorded Act: the Discretionary Override
+## 10. Corpus survey (measured 2026-08-28)
+
+> **Status:** MEASUREMENT, not a design. Every number below was counted on `legalese/canon`
+> @ `2589fdd` (branch `mengwong/drafts`) and `legalese/l4-ide` @ `81f0f752` (`origin/unstable`),
+> and every quotation was read in its source file. Nothing here is implemented; §10.8 separates
+> what the measurement settles from what it hands to the syntax decision (§8 item 2).
+
+§8 item 1 has asked since January for a corpus of real override and applicability usage, and
+§9.9.1 could not be answered without one. This section is that survey. It also discharges §8
+item 1 for the read side; the write-side role classification (§2.1–2.7) remains partly open, for
+the reason given in §10.2.
+
+### 10.1 What was surveyed
+
+Two corpora, all `.l4` files:
+
+| Corpus                                                               | Files | Files touching the idiom | Matching lines |
+| -------------------------------------------------------------------- | ----- | ------------------------ | -------------- |
+| `legalese/canon` (`subjects/**`)                                     | 20    | 10                       | 274            |
+| `legalese/l4-ide` (`jl4/examples/legal/**`, `paper/case-studies/**`) | 20    | 20                       | 285            |
+
+reproducible with
+
+```bash
+grep -rn --include='*.l4' -iE '(subject to|notwithstanding|despite|(section|subsection|paragraph|this [A-Za-z]+) applies|applies (to|where|if|in|for)|does not apply|shall not apply)' <paths>
+```
+
+Six jurisdictions are represented (Singapore, Jersey, England & Wales, the United States, and the
+Jersey COVID orders' references to the Mental Health (Jersey) Law), across primary legislation,
+subordinate legislation, and one federal regulation.
+
+### 10.2 `appl*` is four verbs, and only half of them are applicability
+
+Deduplicating every backtick-quoted L4 identifier containing `appl*` across both corpora gives
+**130 distinct names**. Hand-classified, they divide:
+
+| Sense                                                          | Count | Example                                                                    |
+| -------------------------------------------------------------- | ----- | -------------------------------------------------------------------------- |
+| **applicability read** — does provision P reach case c?        | 64    | `` `s 27 — this section applies to the person` ``                          |
+| **applicability write** — another instrument dis/applies P     | 3     | `` `an Order under Article 5(3) disapplies paragraph (2) …` ``             |
+| **applicability, epistemically blocked** (§10.5)               | 2     | `` `… not being in evidence, section 4 cannot be applied` ``               |
+| _subtotal: applicability_                                      | _69_  |                                                                            |
+| **petition** — to apply _to a court or registrar_ for an order | 41    | `` `the guardian may apply to the court under section 7(4)` ``             |
+| **appropriation** — to apply _property or funds_ to a purpose  | 15    | `` `apply the remaining property for the preserved charitable purposes` `` |
+| **execution** — to apply _a rule or test_ to facts             | 5     | `` `The charity test applied` ``                                           |
+
+**47% of `appl*` identifiers in the corpus have nothing to do with applicability.** The same holds
+of the write-side keyword: of the occurrences of "subject to", the majority are the ordinary
+predicate ("an issuer _subject to_ a disqualification", "_subject to_ a court order") rather than
+the drafting connective ("_subject to_ section 6"), and the two are not lexically separable — the
+predicate sense frequently cites a section too ("subject to a disqualification as specified in
+section 227.503(a)").
+
+This is the survey's first finding and it is about syntax, not semantics: **`APPLIES` and
+`SUBJECT TO` are homonyms of high-frequency corpus vocabulary**, and both senses already appear
+inside identifier text that the parser sees. Compare the known mixfix/identifier collision traps
+(smucclaw/l4-ide#944, #948). Any keyword design under §8 item 2 has to survive this.
+
+### 10.3 Encoders already hand-roll the projections of §9.5
+
+§9.5 proposes deriving `inScope` / `excluded` / `triggered` / `applies` per labelled provision.
+Encoders write them by hand today, with the citation baked into a backtick name:
+
+```l4
+`s 5(9) — this section applies to the will of this testator` `the case` MEANS …
+`s 6(5) — this section applies to the grant` g MEANS …
+`s 10(4) — subsection (3) applies to the will of this testator` `the case` MEANS …
+`s 27 — this section applies to the person` `the person` MEANS …
+`s 35(1) — the saving in section 35(1) applies to this grant` d g MEANS …
+`Article 12(4) — a ground in paragraph (1)(a) to (d) applies to the proposed name` c MEANS …
+`Article 17(4) — the carve-out applies to the act` g a MEANS …
+```
+
+Nobody instructed this; it is what the two-step drafting idiom of §9.4 forces once you try to be
+isomorphic. Three of our own encodings contain the source-side idiom verbatim — Guardianship of
+Infants Act s 5A(1) "This section applies where —", Charities (Jersey) Law Art 27(1) "Paragraph
+(2) applies if the Commissioner believes that -", and Art 10(4) "Paragraph (5) applies if …" —
+which, with CA 2006 s 724 and HRA s 10 (§9.4), puts the pattern in four jurisdictions.
+
+The weaving, by contrast, is **not** written down. It is done in the encoder's head and recorded
+in a comment. Two witnesses, both from cleanroom encodings whose authors were being careful:
+
+> "The words 'subject to the provisions of this Act' are carried, not dropped: they are why the
+> composition below reads s 7(3)'s objection limb and s 10's removal."
+> — `guardianship-of-infants-act.l4`
+
+> "The nine rules are mutually exclusive once read together, but the Act does not say so … rule 3
+> is expressed 'subject to the rights of the surviving spouse, if any' … BRANCH gives the reading
+> its own shape."
+> — `sg-isa.l4`
+
+In both, a global `SUBJECT TO` was discharged by manually chasing which other provisions could
+bite and hard-wiring the result into a composition or a branch order. The override survives as
+prose beside code that no longer contains it — precisely the isomorphism loss
+Bench-Capon & Coenen warn against, and precisely what §2.8's advice model exists to avoid.
+
+### 10.4 A Boolean `applies` was measured insufficient — twice, by review
+
+The sharpest result. `intestate-succession-act.l4`'s consumer needed to say what the Act does with
+an estate, and arrived — after two rounds of adversarial review — at a **six-member verdict**, not
+a Boolean:
+
+```l4
+DECLARE `What this corpus can say about the distribution of an estate` IS ONE OF
+    `the Intestate Succession Act 1967 governs the distribution, and its rules have been applied`
+    `nothing in the Intestate Succession Act 1967 applies to this estate, and no other Act in this corpus distributes it`
+    `the Intestate Succession Act 1967 applies to the estate but has no effect on these facts`
+    `the deceased was domiciled outside Singapore and left no immovable property here, so section 4(1) sends the distribution of his movable property to the law of his domicile, and no Act in this corpus is that law`
+    `the deceased was domiciled in Singapore and was possessed beneficially of no property situated here, so section 4(1) names the law of Singapore and section 5 reaches no property to distribute`
+    `the death is not proved to be after 2 June 1967, so section 5 does not reach this estate, and no other Act in this corpus distributes it`
+```
+
+The file records why it grew. An earlier three-member draft collapsed the renvoi case and the
+pre-commencement case into "applies to the estate but has no effect on these facts" — and the
+review found that verdict actively misleading, because it "suggests that other facts might have
+produced one, and on those two it is another law that governs."
+
+Mapped onto §9.2, the six members are: all four conjuncts plus effect; conjunct 2 failing at
+instrument level; **conjuncts 1–3 holding while the effect is vacuous**; a conjunct-2 read that
+_refers out of the corpus entirely_ (renvoi); in-scope with an empty domain; and conjunct 1
+unresolved on the evidence. Only the first two are expressible as `applies = TRUE/FALSE`.
+
+Two consequences for §9.9.1. First, **no prefix of the four conjuncts is the right default**,
+because the distinctions the corpus needed do not lie along that axis alone — "applies but is
+inert" and "applies but refers out" both have conjuncts 1–3 true. Second, and more usefully:
+the reason a reader asks whether a section applies is almost always to obtain a **verdict with a
+because**, and a bare Boolean discards exactly the part they came for. §9.5's projections remain
+the right decomposition; what is now in doubt is the return type of the top-level read.
+
+### 10.5 Four Acts, four incompatible answers to "not on this evidence"
+
+One case (`the Menon will`: age and date of death nowhere in evidence) was put to four Acts in the
+same cleanroom corpus. Each encoded the resulting non-application differently:
+
+| Act                      | Encoding of "cannot be applied for want of evidence"                                |
+| ------------------------ | ----------------------------------------------------------------------------------- |
+| Wills Act                | a named third value: `` `… section 4 cannot be applied` ``                          |
+| Probate & Administration | plain `FALSE` — "the s 21(1) bar does not bite and nothing is said about the doubt" |
+| Guardianship of Infants  | `NOTHING` (a `MAYBE`), with a named outcome downstream                              |
+| Intestate Succession     | a verdict member: `` `the death is not proved to be after 2 June 1967 …` ``         |
+
+The encoder chose consciously each time — the comments argue each choice — which is the point:
+four defensible conventions, mutually incomparable, in one corpus by one author in one week.
+Applicability-under-uncertainty is a language-level question that the language currently declines
+to answer, so it is re-answered per file. This connects the read side to the ladder's
+FALSE-vs-UNKNOWN axis (PR #191) and to §6.4's defeasible Boolean.
+
+### 10.6 All three escapes of §9.5 have corpus witnesses
+
+§9.5 routes three constructs to `HOMOICONICITY-SPEC` R10 as beyond closed-world elaboration. Each
+occurs in the corpus, and in each the encoder's workaround is visible and lossy:
+
+1. **Open quantification over provisions.** Charities (Jersey) Law Art 18(3): the duties "apply
+   despite any contrary provision in the constitution … except to any extent that such provision
+   imposes a more onerous duty." Encoded by making the target a value —
+   `GIVEN p IS AN Article18ConstitutionalProvision` — i.e. provisions reified as data by hand,
+   which is R10 done manually. Note also that this priority is **not static**: which of the two
+   provisions wins depends on comparing their strictness, so `priority(A, B) = A` (§2.1) does not
+   model it.
+2. **Application with modification.** The Jersey COVID orders reach admission "under Article 6, 7
+   or 7A **as applied by** Article 14" of the Mental Health Law. Encoded as a string inside an
+   enum constructor: the modification is named, not modelled.
+3. **Runtime dis/application.** Art 5(3): "The Minister may by Order disapply paragraph (2) in
+   relation to any entity or description of entity specified in the Order." Encoded as an input
+   boolean on the entity record —
+   `` `an Order under Article 5(3) disapplies paragraph (2) in relation to this entity` `` — so the
+   Order's own conditions, its scope, and its quantification over "description of entity" are all
+   unmodelled, and the user is asked to assert the conclusion.
+
+The spec previously asserted these three escapes analytically. They are now measured, and each has
+a named cost.
+
+### 10.7 Granularity: every structural level is cited, and some reads are not Boolean
+
+Answering §7.1 from the data. Reads in the corpus cite, at minimum: a whole Act
+(`` `this Act applies to the estate` ``), a section (`` `s 27 — this section applies …` ``), a
+subsection (`` `s 10(4) — subsection (3) applies …` ``), a paragraph
+(`` `Article 10(4) — paragraph (5) applies` ``), a lettered limb
+(`` `a ground in paragraph (1)(a) to (d) applies …` ``), and a separate instrument
+(`` `an Order under Article 13(9)(c) applies to the registered charity` ``). §9.4's requirement
+that projections attach to **every labelled node, not only `§` provisions**, is confirmed.
+
+Five reads are not Boolean at all but **selectors**, returning which provision governs:
+
+| Name                                            | Returns                                   |
+| ----------------------------------------------- | ----------------------------------------- |
+| `` `the schedule that applies in` ``            | `"First Schedule"` / `"Second Schedule"`  |
+| `` `which limb applies` ``                      | which paragraph of Rule 100(a)(2) governs |
+| `` `the law that applies` ``                    | the Act governing the distribution        |
+| `` `the provision applied` ``                   | the provision reached                     |
+| `` `which part of Rule 501(a)(4) applies to` `` | prose naming the limb and why it excepts  |
+
+The last is worth its own note: its `GIVETH` is a `STRING` of explanation, so the applicability
+read and the explanation channel are the same function. That is a hint about what §10.4's "verdict
+with a because" should carry.
+
+### 10.8 What this settles, and what it does not
+
+Settled by measurement, and recorded here as the answer to §8 item 1 for the read side:
+
+- **S1.** The two-step drafting idiom is not an English or a UK peculiarity: it is in four
+  jurisdictions in our own corpus (§10.3), so `APPLIES` is not a niche construct.
+- **S2.** The projections of §9.5 are already being written by hand, at every structural level,
+  with the citation encoded in the identifier (§10.3, §10.7). The design does not need to be
+  motivated; it needs to be mechanised.
+- **S3.** The weaving is _not_ written down — it lives in comments (§10.3). This is the isomorphism
+  cost of having no write side, and it grows with every subject encoded.
+- **S4.** All three R10 escapes are real and each currently costs modelled content (§10.6).
+- **S5.** Applicability-under-uncertainty has no house answer and is being re-invented per file
+  (§10.5).
+
+**Not settled, and deliberately left to the concrete-syntax decision (§8 item 2):**
+
+- **Q1.** The return type of a top-level applicability read: Boolean, the defeasible Boolean of
+  §6.4, a three-valued answer, or a verdict-with-reason. §10.4 shows the corpus needed the last of
+  these; whether the _language primitive_ should be that rich, or should be Boolean with the
+  richness built above it, is a design call.
+- **Q2.** How to spell it, given §10.2's homonymy — a keyword, an annotation on the cited label, or
+  a derived name in a reserved namespace.
+- **Q3.** Whether selector reads (§10.7) are the same construct returning a provision, or a
+  different one.
+## 11. Defeasance by Recorded Act: the Discretionary Override
 
 > Added 2026-08-28, distilled from a design conversation (session `paper-residuals`) building on
 > the residual-obligation / residual-control-rights bridge in
@@ -840,7 +1071,7 @@ to **unfold**.
 > exists in core. The paper-facet record of the same material is the 2026-08-28 addendum in
 > `paper/hohfeld-higher-order/DESIGN.md`.
 
-### 10.1 The phenomenon: a third defeater source
+### 11.1 The phenomenon: a third defeater source
 
 §2's taxonomy defeats provision A with provision B — rule against rule. §2.9 defeats A by
 rewriting its text. There is a third defeater source, pervasive in both private and public law,
@@ -862,7 +1093,7 @@ differ in kind: **the defeater is not resident in the rulebook.** It is a speech
 may not have happened, performed by an actor the rule names, on grounds the rule constrains.
 Call this **defeasance by recorded act**.
 
-### 10.2 The Hohfeldian type: powers and immunities over the advice lattice
+### 11.2 The Hohfeldian type: powers and immunities over the advice lattice
 
 `paper/hohfeld-higher-order/DESIGN.md` reads Hohfeld's second-order square as operators over
 first-order deontic positions: a power is a `MAY` whose argument is another deontic position.
@@ -870,7 +1101,7 @@ The discretionary override is that arrow applied to _this spec's_ defeat lattice
 actor holds a `MAY` over whether A `proceed()`s (§2.8). The adviser is an actor's act rather
 than a provision; the advice-kind taxonomy of §2.8 carries over unchanged, and what is new is an
 **authorisation index** (who may install the advice) and an **evidence requirement** (the act
-must be on the record — §10.4).
+must be on the record — §11.4).
 
 The dual constructor is entrenchment, Hohfeld's immunity/disability axis: a savings clause
 (§2.5) indexed by _actor_ rather than by provision. Sketch syntax, to be bikeshed:
@@ -886,16 +1117,16 @@ A IMMUNE FROM VARIATION BY `the Registrar`
 So the wrapper is not `Rule -> Rule` but `Power actor grounds procedure -> Rule -> Rule`, with
 `Immune actor` as its negation at the same order. The same constructor pair serves private law
 ("we reserve the right…") and public law (the Minister's determination); the two differ only in
-the review standard attached to the exercise (§10.7.2).
+the review standard attached to the exercise (§11.7.2).
 
-### 10.3 The three strengths of fiat
+### 11.3 The three strengths of fiat
 
 A single "Fiat" mechanism would flatten three legally distinct acts. They differ in what the act
 fixes, in scope, in mechanism, and — decisively — in the standard a reviewing court applies:
 
 | strength          | the act fixes                       | advice kind (§2.8)                    | mechanism                                            | scope                   | public-law review                    | private-law review     |
 | ----------------- | ----------------------------------- | ------------------------------------- | ---------------------------------------------------- | ----------------------- | ------------------------------------ | ---------------------- |
-| **determination** | the _answer_, for one case          | `around`, declining `proceed()`       | ledger event + early return (§10.4–10.5)             | instant case only       | procedural fairness                  | _Braganza_ rationality |
+| **determination** | the _answer_, for one case          | `around`, declining `proceed()`       | ledger event + early return (§11.4–10.5)             | instant case only       | procedural fairness                  | _Braganza_ rationality |
 | **variation**     | the _rule_, prospectively           | none — this is §2.9 amendment         | materialised rewrite A′, version-tagged              | class-wide, prospective | vires                                | unfair-terms control   |
 | **dispensation**  | _applicability_, for a named person | `before` guard (`UNLESS exempted(p)`) | ledger-backed exemption predicate; rule stays intact | named person(s)         | consistency / legitimate expectation | waiver, estoppel       |
 
@@ -914,7 +1145,7 @@ new version along an _authority_ axis exactly parallel to the temporal axis the 
 gives us; evaluation under a variation is evaluation under the version the empowered actor
 enacted.
 
-### 10.4 Mechanism: the ledger is the defeater store
+### 11.4 Mechanism: the ledger is the defeater store
 
 A discretionary act is an **event in the state ledger** — machinery L4 already has
 (`RECORD`/`COMMIT`/`ATTEST`/`RECALL`; see `skills/writing-l4-rules/references/state-ledger.md`).
@@ -923,7 +1154,7 @@ the grounds asserted, and the content decided. Evaluation of a defeasible node t
 
 1. `RECALL` the official record for a valid exercise of the governing power over this node and
    these facts;
-2. if one exists, return the fiat content, **labelled as fiat** (§10.5's design rule);
+2. if one exists, return the fiat content, **labelled as fiat** (§11.5's design rule);
 3. otherwise fall through to ordinary derivation.
 
 Morally: `ReaderT Ledger (Either Fiat)`. No new runtime state is required; the novelty is (a)
@@ -941,7 +1172,7 @@ unrepresentable — it evaluates to an **invalid exercise**, a first-class outco
 to _reason about_ unlawful exercises; a representation that cannot express them cannot check
 them.
 
-### 10.5 The intuitionistic reading: discretion as a control effect
+### 11.5 The intuitionistic reading: discretion as a control effect
 
 Ordinary L4 derivation is constructive: the evaluation trace is a proof term, and an answer
 carries the evidence that produced it. A defeasible conclusion that is neither established nor
@@ -964,9 +1195,9 @@ law). The architecture that falls out:
 Slogan: _fiat is double-negation elimination as an act of state — classical reasoning admitted
 into an intuitionistic system only at named points, by named actors, leaving a named trace._
 
-### 10.6 Prior art and the claimed delta
+### 11.6 Prior art and the claimed delta
 
-The neighbouring formalisms, and what each lacks for §10's purposes:
+The neighbouring formalisms, and what each lacks for §11's purposes:
 
 - **Jones & Sergot (1996)** — institutional power via the counts-as conditional. Classical
   modal; no proof objects, no exercise semantics.
@@ -988,36 +1219,36 @@ The delta this section claims: **actor-indexed defeasance with control-operator 
 proof-term provenance** — powers as handlers, fiat as a provenanced classical hole in an
 intuitionistic derivation.
 
-> **Amended 2026-08-28 by the §8.7 pass (§10.6.2).** The paragraph above originally read "we
+> **Amended 2026-08-28 by the §8.7 pass (§11.6.2).** The paragraph above originally read "we
 > have not found this move in the legal-logic literature", which was true but was carrying more
 > weight than it could bear: _intuitionistic legal reasoning_ and _intuitionistic deontic logic_
-> are both **occupied** (iALC; MIND — §10.6.2), and the constructive turn in authorization logic
+> are both **occupied** (iALC; MIND — §11.6.2), and the constructive turn in authorization logic
 > is **dated and attributable** (Garg & Pfenning 2006). What the pass did not find is the
 > **join**: the _exercise_ of a power as a control effect over a constructive derivation, with
 > the actor as handler and the fiat as a provenanced proof term. That join, not intuitionism as
-> such, is what §10 may claim — and it must concede the three neighbours by name in the same
+> such, is what §11 may claim — and it must concede the three neighbours by name in the same
 > breath. Catala's mechanisation is also narrower than stated below: see correction 4.
 
-#### 10.6.1 The access-control mirror (citations verified 2026-08-28 — corrections in §10.6.2)
+#### 11.6.1 The access-control mirror (citations verified 2026-08-28 — corrections in §11.6.2)
 
 Hohfeldian power has a **fifty**-year-old engineering mirror: **database and
 distributed-systems authorization**. Meng's instinct — "I'd always thought of Hohfeld power as
-akin to an SQL `GRANT`/`REVOKE`" — is not an analogy but a partial occupation of §10's
+akin to an SQL `GRANT`/`REVOKE`" — is not an analogy but a partial occupation of §11's
 territory, and it both strengthens and repositions the claimed delta. The correspondences were
 recalled from memory on 2026-08-28 and **verified the same day**; the text below has been
-rewritten to say what the sources actually say, and §10.6.2 records every correction the pass
+rewritten to say what the sources actually say, and §11.6.2 records every correction the pass
 forced.
 
 - **The grant graph is the ledger.** System R's authorization mechanism (Griffiths & Wade,
   _TODS_ 1(3) (1976) 242–255) records every `GRANT` as a **timestamped** edge of a directed
   graph — grantor, grantee, privilege — and computes current authority as a view over that
-  history: §10.4's defeater store, deployed in 1976. Fagin (_TODS_ 3(3) (1978) 310–319) then
+  history: §11.4's defeater store, deployed in 1976. Fagin (_TODS_ 3(3) (1978) 310–319) then
   corrected it, and the _direction_ of the error is the instructive part: Fagin showed by
   example that the original mechanism could **forbid a user from exercising or granting a
   privilege he should have been allowed** — i.e. it over-revoked — and repaired it by admitting
   multiple edges of each type between two nodes, with a correctness proof. Even the database
   community got revocation wrong on the first try, and got it wrong in the over-cascading
-  direction: precedent both for §10's care and for the reliance-protecting instinct of the next
+  direction: precedent both for §11's care and for the reliance-protecting instinct of the next
   bullet.
 - **`REVOKE … CASCADE` vs `RESTRICT` gestures at annulment vs abrogation — but SQL is missing
   the option law actually uses.** The recalled gloss ("unwinds everything derived through it,
@@ -1032,7 +1263,7 @@ forced.
   primitive with no access-control counterpart. The reason is the eager/lazy split — SQL
   validates exercises _eagerly_ at execution time, law validates them _lazily_, on review, after
   reliance has accreted. An eager system can afford cascade-or-abort because nothing has
-  accreted yet; a lazy one must represent the questionable act, which is why §10.4's
+  accreted yet; a lazy one must represent the questionable act, which is why §11.4's
   invalid-exercise-is-a-verdict rule matters.
 - **`WITH GRANT OPTION` is the degenerate tower.** SQL does have second-order power — but only
   as a uniform boolean: the option to re-grant _the same privilege_, a fixed point `μX. Grant(X
@@ -1047,7 +1278,7 @@ forced.
   construct over Datalog, alongside k-out-of-n threshold principals, and SPKI/SDSI reduces it to
   a single delegation bit — never as free higher-order structure over rules. (The threshold
   principals are worth noting for a different reason: they are quorum rules, which law also has,
-  and which §10 does not yet type.)
+  and which §11 does not yet type.)
 - **Priority precedents.** SQL Server's `DENY` overriding `GRANT` is a hardcoded lex superior;
   XACML's rule- and policy-combining algorithms are §2's priority taxonomy ratified as an OASIS
   access-control standard — a sibling to the LegalRuleML note in this spec's header. There are
@@ -1072,10 +1303,10 @@ forced.
   _ICFP_ 2006) supplies the lattice-indexed family of strong monads, and Garg & Abadi
   (_FoSSaCS_ 2008) give a sound and complete translation of `says` into S4. Add
   **proof-carrying authentication** (Appel & Felten, _CCS_ 1999 — note: _authentication_, see
-  §10.6.2 correction 1), where the requester literally presents a proof term checked by a small
+  §11.6.2 correction 1), where the requester literally presents a proof term checked by a small
   kernel, and **Aura** (Jia et al., _ICFP_ 2008), a dependently-typed language for
-  _authorization and audit_ built on polymorphic DCC, whose logged evidence terms are §10.4's
-  provenanced fiat, almost exactly. Aura is the closest prior art §10 has, and it is a security
+  _authorization and audit_ built on polymorphic DCC, whose logged evidence terms are §11.4's
+  provenanced fiat, almost exactly. Aura is the closest prior art §11 has, and it is a security
   language.
 
 **Repositioning — executed 2026-08-28, the pass having confirmed the above.** The claim is not
@@ -1094,7 +1325,7 @@ this material to DEON itself** — "Variations in Access Control Logic", _DEON_ 
 communities have already met, at the venue the Hohfeld facet is considering. A DEON referee will
 know the `says` line, so conceding it early is not merely honest but expected.
 
-#### 10.6.2 The verification pass (run 2026-08-28; discharges §8.7 item 7)
+#### 11.6.2 The verification pass (run 2026-08-28; discharges §8.7 item 7)
 
 Areas (a)–(f) of §8.7 were searched. The pass **confirms the access-control mirror, corrects
 five citations, and demotes one claim**: the answer to "did the received view go
@@ -1106,19 +1337,19 @@ copies, see dead ends):
 | citation                                                                | verified as                                                                                                              |
 | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | Griffiths & Wade, "An Authorization Mechanism…"                         | _TODS_ 1(3) (Sept 1976) 242–255 — grant graph, timestamped edges, two edge types (with/without grant option)             |
-| Fagin, "On an Authorization Mechanism"                                  | _TODS_ 3(3) (Sept 1978) 310–319 — corrects the above; see §10.6.1                                                        |
+| Fagin, "On an Authorization Mechanism"                                  | _TODS_ 3(3) (Sept 1978) 310–319 — corrects the above; see §11.6.1                                                        |
 | Abadi, Burrows, Lampson & Plotkin, "A Calculus for Access Control…"     | _TOPLAS_ **15(4)** (1993) 706–734 (not 15(3), as one index reports)                                                      |
-| Garg & Pfenning, "Non-Interference in Constructive Authorization Logic" | _CSFW_ 19 (2006) 283–296 — read in full; quotations in §10.6.1 are from the paper                                        |
+| Garg & Pfenning, "Non-Interference in Constructive Authorization Logic" | _CSFW_ 19 (2006) 283–296 — read in full; quotations in §11.6.1 are from the paper                                        |
 | Abadi, "Access Control in a Core Calculus of Dependency"                | _ICFP_ (2006) — DCC's lattice-indexed family of strong monads                                                            |
 | Garg & Abadi, "A Modal Deconstruction of Access Control Logics"         | _FoSSaCS_ (2008) — sound and complete translation of `says` into S4                                                      |
 | Jia et al., "AURA: A Programming Language for Authorization and Audit"  | _ICFP_ (2008) — polymorphic DCC, dependent types, mechanically verified soundness                                        |
 | Li, Grosof & Feigenbaum, "Delegation Logic"                             | _TISSEC_ 6(1) (2003) 128–171 — delegation **depth** and k-out-of-n thresholds as explicit constructs                     |
 | XACML combining algorithms                                              | OASIS; twelve standard operators incl. deny-overrides, permit-overrides, first-applicable, only-one-applicable           |
-| SQL `REVOKE … CASCADE` / `RESTRICT`                                     | standard semantics confirmed — and they are **not** what §10.6.1 recalled; see correction 3                              |
+| SQL `REVOKE … CASCADE` / `RESTRICT`                                     | standard semantics confirmed — and they are **not** what §11.6.1 recalled; see correction 3                              |
 | Griffin, "A Formulae-as-**Type** Notion of Control"                     | _POPL_ (1990) — singular _type_ in the title; the plural is the usual miscitation                                        |
 | Plotkin & Pretnar, "Handlers of Algebraic Effects"                      | _ESOP_ (2009) 80–94                                                                                                      |
 | Benzmüller, Parent & van der Torre, LogiKEy                             | _Artificial Intelligence_ 287 (2020) 103348 — **classical** HOL, shallow embeddings in Isabelle/HOL, as §8.7(c) expected |
-| eFLINT                                                                  | van Binsbergen, Liu, van Doesburg & van Engers, _GPCE_ (2020) — transition systems + Hohfeld, as §10.6 says              |
+| eFLINT                                                                  | van Binsbergen, Liu, van Doesburg & van Engers, _GPCE_ (2020) — transition systems + Hohfeld, as §11.6 says              |
 | Catala                                                                  | Merigoux, Chataing & Protzenko, _PACMPL_ 5(ICFP) art. 77 (2021) 1–29 — but see correction 4                              |
 
 **Corrected.** Five recalled claims did not survive contact with the sources:
@@ -1130,13 +1361,13 @@ copies, see dead ends):
    right about the line and wrong about its origin. The constructive turn is **2006**
    (Garg & Pfenning), not 1993, and it must be conceded to them by name — they claim the first
    such logic in terms, and their stated motivation (keep the evidence in the proof) is
-   §10.5's.
+   §11.5's.
 3. **`REVOKE … RESTRICT` does not "let downstream positions stand"** — it makes the revocation
    _fail_ when dependents exist. SQL offers cascade-or-abort and has **no** revoke-but-preserve
    operation. This _widens_ the delta: law's reliance-protecting middle option has no
-   access-control counterpart at all. §10.6.1's bullet is rewritten accordingly.
+   access-control counterpart at all. §11.6.1's bullet is rewritten accordingly.
 4. **Catala's F\* result is compiler correctness, not mechanised metatheory.** The ICFP 2021
-   abstract claims proofs of "the correctness of its core compilation steps". §10.6 above and
+   abstract claims proofs of "the correctness of its core compilation steps". §11.6 above and
    the Hohfeld addendum both overstated it; the accurate phrase is "compilation correctness
    proven in F\*".
 5. **`says`-as-lax-modality is Garg & Pfenning's framing** (relating their logic to lax logic
@@ -1177,7 +1408,7 @@ neighbourhood semantics, defeasible proof tags (+∂/−∂), argumentation fixp
 propositions-as-types. Neither iALC nor MIND nor LogiKEy treats a derivation as a proof _term_,
 and none puts an **actor index** on the defeater.
 
-So the defensible residue of §10.5 is **not** "discretion is intuitionistic" — that is taken —
+So the defensible residue of §11.5 is **not** "discretion is intuitionistic" — that is taken —
 but the conjunction:
 
 > the **exercise** of a discretionary power read as a **control effect** over an otherwise
@@ -1187,14 +1418,14 @@ but the conjunction:
 Every half of that is old: intuitionistic legal reasoning (iALC), intuitionistic deontics
 (MIND), constructive authority with proof terms (Garg–Pfenning, Aura), control operators as
 classical axioms (Griffin), handlers (Plotkin–Pretnar). **The join has not been made.** The join
-is what §10 claims, and it concedes all five neighbours in the same breath.
+is what §11 claims, and it concedes all five neighbours in the same breath.
 
 **§8.7(d): no proof-assistant deontic corpus to concede.** No substantial Agda, Coq or Lean
 deontic or normative formalisation surfaced. Isabelle/HOL is the vehicle for this area, through
 LogiKEy, and it is classical (§8.7(c) confirmed as expected). Catala's F\* is the nearest
 dependently-typed neighbour and is a compiler proof (correction 4). **Aura** is the closest
 thing anywhere to a dependently-typed, proof-carrying normative language — and it is a security
-language, which is precisely §10.6.1's point.
+language, which is precisely §11.6.1's point.
 
 **Dead ends.** Not resolved by this pass; do not assert what they gate until a session with more
 reach (or a human at a browser) clears them:
@@ -1206,13 +1437,13 @@ reach (or a human at a browser) clears them:
   the MIND paper are therefore unknown to this pass** — venue and content come from syndicated
   abstract text, not the chapter. Cite MIND only after the authors are confirmed.
 - **Garg & Abadi (_FoSSaCS_ 2008)** was verified to abstract level only, behind the same wall.
-  The S4 translation is confirmed; their internal treatment of lax logic is not, so §10.6.1
+  The S4 translation is confirmed; their internal treatment of lax logic is not, so §11.6.1
   attributes the lax reading to Garg & Pfenning, where it was read directly.
 - A search engine reported MIND as **DEON 2023**; the ISBN resolves to **WoLLIC 2022**, and
   dblp's DEON 2023 listing does not contain it. Syndicated venue metadata is not evidence — this
   one would have gone into print wrong.
 
-### 10.7 Open questions specific to discretion
+### 11.7 Open questions specific to discretion
 
 1. **Procedure index.** Many powers are conditional on procedure (consultation, laying before
    Parliament, giving reasons). Is procedure a type index on `Power`, a runtime guard, or both?
@@ -1297,20 +1528,20 @@ reach (or a human at a browser) clears them:
 
 - Etymonline: [apply](https://www.etymonline.com/word/apply), [imply](https://www.etymonline.com/word/imply), [comply](https://www.etymonline.com/word/comply); OED "comply, v.²" — _apply_ / _imply_ < Latin _plicare_ (fold); _comply_ < Latin _complēre_ (fill up), the _-ply_ spelling by attraction to "ply".
 
-### Discretionary Power and Control (§10)
+### Discretionary Power and Control (§11)
 
 - Hohfeld, W.N. "Some Fundamental Legal Conceptions as Applied in Judicial Reasoning." _Yale Law Journal_ 23 (1913) 16–59 — the power/liability and immunity/disability axes.
 - Jones, A.J.I. & Sergot, M. "A Formal Characterisation of Institutionalised Power." _Journal of the IGPL_ 4(3) (1996) 427–443 — the counts-as conditional.
 - Gelati, J., Governatori, G., Rotolo, A. & Sartor, G. "Normative Autonomy and Normative Co-ordination: Declarative Power, Representation, and Mandate." _Artificial Intelligence and Law_ 12 (2004) 53–81.
 - Griffin, T. "A Formulae-as-Types Notion of Control." _POPL_ (1990) — `call/cc` inhabits Peirce's law; classical axioms as control operators.
-- Plotkin, G. & Pretnar, M. "Handlers of Algebraic Effects." _ESOP_ (2009) — the handler-stack reading of §10.5.
-- Merigoux, D., Chataing, N. & Protzenko, J. "Catala: A Programming Language for the Law." _PACMPL_ 5(ICFP) art. 77 (2021) 1–29 — the typed default calculus; **compilation** correctness proven in F\* (§10.6.2 correction 4).
+- Plotkin, G. & Pretnar, M. "Handlers of Algebraic Effects." _ESOP_ (2009) — the handler-stack reading of §11.5.
+- Merigoux, D., Chataing, N. & Protzenko, J. "Catala: A Programming Language for the Law." _PACMPL_ 5(ICFP) art. 77 (2021) 1–29 — the typed default calculus; **compilation** correctness proven in F\* (§11.6.2 correction 4).
 - van Binsbergen, L.T., Liu, L.-C., van Doesburg, R. & van Engers, T. "eFLINT: a Domain-Specific Language for Executable Norm Specifications." _GPCE_ (2020).
-- _Braganza v BP Shipping Ltd_ [2015] UKSC 17 — rationality review imported into _contractual_ discretion; the private/public unification of §10.7.2.
+- _Braganza v BP Shipping Ltd_ [2015] UKSC 17 — rationality review imported into _contractual_ discretion; the private/public unification of §11.7.2.
 - _Associated Provincial Picture Houses Ltd v Wednesbury Corp_ [1948] 1 KB 223.
 - Grossman, S. & Hart, O. (1986); Hart, O. & Moore, J. (1990) — residual control rights; full citations and the incomplete-contracts bridge in `doc/concepts/legal-modeling/residual.md`.
 
-#### The access-control mirror and the verification pass (§10.6.1–10.6.2, verified 2026-08-28)
+#### The access-control mirror and the verification pass (§11.6.1–10.6.2, verified 2026-08-28)
 
 - Griffiths, P.P. & Wade, B.W. "An Authorization Mechanism for a Relational Database System." _ACM TODS_ 1(3) (1976) 242–255 — the grant graph with timestamped edges.
 - Fagin, R. "On an Authorization Mechanism." _ACM TODS_ 3(3) (1978) 310–319 — corrects the above; the original could refuse a privilege the holder should have kept.
@@ -1319,14 +1550,14 @@ reach (or a human at a browser) clears them:
 - Abadi, M. "Access Control in a Core Calculus of Dependency." _ICFP_ (2006) — DCC's lattice-indexed strong monads.
 - Garg, D. & Abadi, M. "A Modal Deconstruction of Access Control Logics." _FoSSaCS_ (2008) — `says` translated soundly and completely into S4.
 - Abadi, M. "Variations in Access Control Logic." _DEON_ 2008, LNCS 5076, 96–109 — the access-control line presented **at the deontic venue**.
-- Appel, A.W. & Felten, E.W. "Proof-Carrying **Authentication**." _ACM CCS_ 6 (1999) 52–62 — note the title (§10.6.2 correction 1).
-- Jia, L., Vaughan, J.A., Mazurak, K., Zhao, J., Zarko, L., Schorr, J. & Zdancewic, S. "AURA: A Programming Language for Authorization and Audit." _ICFP_ (2008) — dependently typed, proof-carrying, audit-logging; §10's closest prior art.
+- Appel, A.W. & Felten, E.W. "Proof-Carrying **Authentication**." _ACM CCS_ 6 (1999) 52–62 — note the title (§11.6.2 correction 1).
+- Jia, L., Vaughan, J.A., Mazurak, K., Zhao, J., Zarko, L., Schorr, J. & Zdancewic, S. "AURA: A Programming Language for Authorization and Audit." _ICFP_ (2008) — dependently typed, proof-carrying, audit-logging; §11's closest prior art.
 - Li, N., Grosof, B.N. & Feigenbaum, J. "Delegation Logic: A Logic-based Approach to Distributed Authorization." _ACM TISSEC_ 6(1) (2003) 128–171 — delegation depth as a numeric parameter; k-out-of-n thresholds.
 - Fairtlough, M. & Mendler, M. "Propositional Lax Logic." (cited by Garg & Pfenning for the lax reading of `says`.)
 - Moggi, E. "Notions of Computation and Monads." (cited by Garg & Pfenning for `K says A` as a strong monad.)
 - OASIS. _eXtensible Access Control Markup Language (XACML) Version 3.0_ — twelve combining algorithms; `deny-unless-permit` / `permit-unless-deny` are §9.5's world defaults, `only-one-applicable` is a §9.6-style check.
 - Haeusler, E.H., de Paiva, V. & Rademaker, A. "Intuitionistic Description Logic for Legal Reasoning." (2011); and Haeusler, E.H. & Rademaker, A. "On How Kelsenian Jurisprudence and Intuitionistic Logic help to avoid Contrary-to-Duty paradoxes in Legal Ontologies." arXiv:1803.07543 (2018) — **iALC**; intuitionistic + legal, occupied.
-- "Towards an Intuitionistic Deontic Logic Tolerating Conflicting Obligations." _WoLLIC_ 2022, LNCS 13468, ch. 18 — **MIND**; intuitionistic + deontic, occupied. _Authors unverified — Springer auth-wall; see §10.6.2 dead ends._
+- "Towards an Intuitionistic Deontic Logic Tolerating Conflicting Obligations." _WoLLIC_ 2022, LNCS 13468, ch. 18 — **MIND**; intuitionistic + deontic, occupied. _Authors unverified — Springer auth-wall; see §11.6.2 dead ends._
 - Benzmüller, C., Parent, X. & van der Torre, L. "Designing normative theories for ethical and legal reasoning: LogiKEy framework, methodology, and tool support." _Artificial Intelligence_ 287 (2020) 103348 — classical HOL in Isabelle/HOL.
 
 ### Related L4 Documentation
@@ -1336,6 +1567,13 @@ reach (or a human at a browser) clears them:
 - `jl4/experiments/Singapore-Data-Protection-Act.l4` - Example using "subject to" informally
 - `specs/todo/TEMPORAL_EVAL_SPEC.md` - the `EVAL … UNDER RULES EFFECTIVE AT` axis (§9.2 conjunct 1)
 - `specs/todo/HOMOICONICITY-SPEC.md` - R10 owns the citation forms that escape §9.5's closed world
+
+### Corpus Surveyed (§10)
+
+Measured 2026-08-28. Counts in §10 are reproducible at these commits with the `grep` in §10.1.
+
+- `legalese/canon` @ `2589fdd` (`mengwong/drafts`) — `subjects/sg/{succession,pdpa-2012,penal-code-1871,child-support}`. Chief witnesses: `cleanroom-2026-08/family-cases.l4` (the six-member verdict, §10.4; the four-Act evidence comparison, §10.5), `cleanroom-2026-08/guardianship-of-infants-act.l4` ("carried, not dropped", §10.3; s 5A(1)'s two-step), `cleanroom-2026-08/wills-act.l4` (hand-rolled projections, §10.3).
+- `legalese/l4-ide` @ `81f0f752` (`origin/unstable`) — `jl4/examples/legal/**`, `paper/case-studies/**`. Chief witnesses: `charities-jersey-2014/part-3-charity-test.l4` (Art 5(3) runtime disapplication, §10.6), `part-5-governors.l4` (Art 18(3) open quantification and non-static priority, §10.6), `gco-jersey-covid/MHO-as-at-20210115.l4` ("as applied by Article 14", §10.6), `regcf/regcf-wizard.l4` (selector reads, §10.7), `sg-succession/sg-isa.l4` (hand-woven `SUBJECT TO`, §10.3).
 
 ---
 

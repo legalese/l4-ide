@@ -1,0 +1,25 @@
+-- Companion example for row 3 of "Five Kinds of No Answer" (non-answers.md):
+-- a fact nobody has supplied yet.
+--
+-- Run it with:  l4 run non-answers-not-yet-known.l4
+--
+-- It lives in its own file because it uses the section GIVEN, and the other
+-- five rows of the page live in non-answers-example.l4.
+
+§ `3. A fact nobody has supplied yet -- a section GIVEN`
+    GIVEN `the applicant's age in years` IS A NUMBER @desc Age at the date of the claim
+
+-- Alex's age is the case's contribution, not the law's. The file names the
+-- blank; whoever brings a case fills it in.
+GIVETH A BOOLEAN
+`is of pensionable age` MEANS
+    `the applicant's age in years` AT LEAST 65
+
+-- L4 accepts the rule whether or not anyone has filled the blank. #CHECK asks
+-- what kind of answer the rule gives, without working the answer out: a
+-- yes-or-no fact, BOOLEAN.
+--
+-- Asking for the answer itself with #EVAL would stop and name the blank. That
+-- message is quoted on the page; it cannot be shown here, because a file under
+-- doc/ has to run cleanly.
+#CHECK `is of pensionable age`

@@ -1,0 +1,43 @@
+-- A STRING-sorted PARAMETER on a derived predicate that Blawx never declares.
+--
+-- This is the sibling of `string-field.l4`, and it exists because the first cut
+-- of the STRING refusal did not catch it. The refusal lives in
+-- `blawxValueType` (L4.Blawx.Lower), but that function is only reached from the
+-- two arms of `classifyPred` that build a DECLARATION BLOCK: the attribute arm
+-- and the arity-3-and-up relationship arm. A predicate of total arity 2 that is
+-- not attribute-shaped falls through to `PCUndeclared` — rules only, no block —
+-- and so was never asked what its parameters were sorted at.
+--
+-- Measured on this module before the fix (2026-09-02): `l4 blawx` exited 0 and
+-- wrote an s(CASP) dump containing
+--
+--     according_to(sec_1_section,throws_named,P,S) :- player(P), S = zebra.
+--
+-- with no `blawx_attribute` or `blawx_relationship` line for `throws_named` at
+-- all — and it re-saved clean through Blawx's own generator. Raising the same
+-- predicate to total arity 3 was refused, which is what kept the hole out of
+-- sight. `classifyPred` now runs a STRING pre-pass over the whole signature
+-- before classifying, so all three positions — field, parameter, result — give
+-- the same named diagnostic:
+--
+--   in `throws named`: STRING-sorted field or argument (Blawx): `throws named`
+--   has a STRING-sorted field, parameter or result, and Blawx's ontology has no
+--   string attribute type — …
+--
+-- The remedy is the one `string-field.l4` spells out: an enum for a fixed
+-- vocabulary, a category for identity. String LITERALS in a rule body are still
+-- fine — it is the sort in the signature that has nowhere to go
+-- (BLAWX-EXPORT-SPEC §4.7).
+
+§ `String-typed parameter`
+
+DECLARE Sign IS ONE OF Rock, Paper, Scissors
+
+DECLARE Player HAS
+    throws IS A Sign
+
+@export 1. A player throws under a given name.
+GIVEN p IS A Player
+      s IS A STRING
+GIVETH A BOOLEAN
+DECIDE `throws named` p s IF s EQUALS "zebra"

@@ -154,7 +154,7 @@ checkModuleAndOrDepth (MkModule _ _ section) = checkSection section
 
 -- | Check a section for AND/OR warnings.
 checkSection :: Section n -> [AndOrWarning]
-checkSection (MkSection _ _ _ decls) = foldMap checkTopDecl decls
+checkSection (MkSection _ _ _ _ decls) = foldMap checkTopDecl decls
 
 -- | Check a top-level declaration for AND/OR warnings.
 checkTopDecl :: TopDecl n -> [AndOrWarning]
@@ -173,6 +173,7 @@ checkDirective (LazyEvalTrace _ e) = dedupeWarnings $ checkExprAndOr e
 checkDirective (Check _ e) = dedupeWarnings $ checkExprAndOr e
 checkDirective (Contract _ e1 e2 es) = dedupeWarnings $ checkExprAndOr e1 <> checkExprAndOr e2 <> foldMap checkExprAndOr es
 checkDirective (Assert _ e) = dedupeWarnings $ checkExprAndOr e
+checkDirective (AssertRefused _ e _mmsg) = dedupeWarnings $ checkExprAndOr e
 
 -- | Convenience function to check a parsed module.
 -- Returns all AND/OR depth warnings found.

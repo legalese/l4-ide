@@ -225,11 +225,17 @@ nodeXml = \case
       -- then knowledgeRequirement*, then the expression. Getting the KR after
       -- the IRs and before the expression is a Xerces-checked sequence
       -- constraint of the same class the dmn-xsd-order fixture pins.
-      [ Elem "variable"
-          (namedAttrs (d.dcnId <> "_var") d.dcnFeelName d.dcnName
-             <> [("typeRef", dmnTypeAttr d.dcnType)])
-          []
-      ]
+      --
+      -- <description> is INHERITED from tDMNElement and precedes every one of
+      -- them (DMN13.xsd: description?, extensionElements?, then the type's own
+      -- particles), so it is prepended rather than appended — same position,
+      -- and the same Xerces-checked reason, as <rule>'s in 'ruleXml'.
+      [Elem "description" [] [Chars t] | t <- maybeToList d.dcnDescription]
+      <> [ Elem "variable"
+             (namedAttrs (d.dcnId <> "_var") d.dcnFeelName d.dcnName
+                <> [("typeRef", dmnTypeAttr d.dcnType)])
+             []
+         ]
       -- 'emittedRequirements' / 'emittedKnowledgeReqs', not the raw fields: a
       -- self-edge stays in the IR (so 'checkDrg' reports it) and stays out of
       -- the XML (DMN §7.3.1 forbids it, and an unloadable file is not an
@@ -409,7 +415,15 @@ outputXml o =
     -- an `IS ONE OF`, where the domain is the declaration. Not for a boolean
     -- either: there the domain IS the typeRef, so restating it would add no
     -- information while making every computed boolean entry violate §8.2.7.
-    [valuesXml "outputValues" vs | vs <- maybeToList o.ocValues]
+    -- Not 'valuesXml': every item there goes through 'quoteFeelString', and the
+    -- widening this table may need is the FEEL KEYWORD null, not a value called
+    -- "null". See 'ocAdmitsNull' for the two-engine measurement behind it.
+    [ Elem "outputValues" []
+        [ Elem "text" []
+            [Chars (Text.intercalate "," (map quoteFeelString vs <> ["null" | o.ocAdmitsNull]))]
+        ]
+    | vs <- maybeToList o.ocValues
+    ]
       <> [ Elem "defaultOutputEntry" [("id", o.ocId <> "_default")]
              [Elem "text" [] [Chars d.feText]]
          | d <- maybeToList o.ocDefault

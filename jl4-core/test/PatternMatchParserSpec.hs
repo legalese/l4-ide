@@ -84,7 +84,7 @@ parseDecides src =
   case execProgramParser (toNormalizedUri (Uri "file:///pattern-match-spec")) src of
     Left errs ->
       fail ("Parser failed with: " <> show (NE.toList errs))
-    Right (MkModule _ _ (MkSection _ _ _ decls), _warnings) ->
+    Right (MkModule _ _ (MkSection _ _ _ _ decls), _warnings) ->
       pure [ d | Decide _ d <- decls ]
 
 decideHeadText :: Decide Name -> T.Text

@@ -1,0 +1,17 @@
+-- An @export whose helper REFUSES for one input row and answers for another.
+-- The refusing row gets status "refused" (not "error"), and the batch does NOT
+-- stop on it: the row after it is still processed.
+
+§ `Export reaching a refusal for some inputs`
+
+GIVETH A NUMBER
+`this schedule is not encoded for years before 2000` MEANS
+    REFUSE "this schedule is not encoded for years before 2000"
+
+@export f the fee for a rule year
+GIVEN y IS A NUMBER
+GIVETH A NUMBER
+f y MEANS
+    IF y AT LEAST 2000
+    THEN 100
+    ELSE `this schedule is not encoded for years before 2000`

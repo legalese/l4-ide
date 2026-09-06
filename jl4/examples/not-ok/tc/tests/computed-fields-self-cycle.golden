@@ -23,7 +23,7 @@ File: computed-fields-self-cycle.l4
   Severity: DiagnosticSeverity_Error
   Code: <none>
   Message:
-    The first argument of function 
+    The first input of function 
 
       `__PLUS__` (predefined)
 

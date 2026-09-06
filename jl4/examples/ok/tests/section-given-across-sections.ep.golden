@@ -1,0 +1,29 @@
+-- A call passes a binder upward without the caller having to see it.
+--
+-- PROPS-REDTEAM-2026-09-03.md §2.2, "Across sections": `f` reads `alpha` from
+-- its own section and inherits `beta` through `g`, which is declared in a
+-- section `f` does not sit under. The read-set is the union, so the directive
+-- supplies both.
+
+§ `1`
+    GIVEN alpha IS A NUMBER
+
+GIVETH A NUMBER
+f MEANS alpha PLUS g
+
+§ `2`
+    GIVEN beta IS A NUMBER
+
+GIVETH A NUMBER
+g MEANS beta TIMES 2
+
+#EVAL f WITH alpha IS 1, beta IS 2
+#EVAL g WITH beta IS 10
+
+-- Overriding only `beta` at the call to `g`: `alpha` keeps flowing to `f`.
+§ `3`
+
+GIVETH A NUMBER
+h MEANS alpha PLUS (g WITH beta IS 100)
+
+#EVAL h WITH alpha IS 1

@@ -390,6 +390,8 @@ WHEN JUST `the end date` THEN ...      -- there is one: use `the end date`
 
 The type system forces you to say what happens in **both** cases—no "null pointer" surprises, and no silently ignored edge case.
 
+A value that may be absent is only one of the things a person means by "there is no answer": a fact nobody has supplied yet, a law that was not in force when the events happened, and a case the encoding simply never covered are three further kinds, and none of them is a `MAYBE`. The rest of them, with a legal example of each and the L4 construct that carries it, are set out in [Five Kinds of No Answer](../../concepts/legal-modeling/non-answers.md).
+
 ### Working with Dates
 
 L4 has a built-in `DATE` type. With `IMPORT daydate`, you can construct dates as `Date day month year` (for example, `Date 15 4 2024`) and compare them directly with `<`, `>=`, and so on.

@@ -59,17 +59,32 @@ import qualified LSP.Core.Shake as Shake
 import qualified LSP.L4.Rules as Rules
 import Language.LSP.Protocol.Types (normalizedFilePathToUri, toNormalizedFilePath)
 
-import L4.Export (ExportedFunction(..), ExportedParam(..), getDefaultFunction, getExportedFunctions)
+import L4.Export
+  ( AssumeRewrite(..)
+  , ExportedFunction(..)
+  , ExportedParam(..)
+  , extractAssumeParamResolveds
+  , getDefaultFunction
+  , getExportedFunctions
+  , rewriteModuleAssumes
+  )
 import L4.DirectiveFilter (filterIdeDirectives)
 import L4.EvaluateLazy
   ( EvalConfig
   , EvalDirectiveResult(..)
   , EvalDirectiveValue(..)
+  , AssertionOutcome(..)
+  , ReductionOutcome(..)
   , prettyEvalException
+  , prettyRefusal
   )
 import L4.Lexer (showStringLit)
 import L4.Print (prettyLayout)
-import L4.Syntax (Module, Resolved, Type'(..), getUnique)
+import qualified Data.Set as Set
+import L4.Syntax
+  ( AppForm(..), Assume(..), Decide(..), GivenSig(..), Module, Resolved
+  , Type'(..), TypeSig(..), getUnique
+  )
 import L4.TypeCheck.Environment (maybeUnique)
 
 import L4.Cli.Common
@@ -203,14 +218,30 @@ batchCmd opts = do
     Left err -> do
       TIO.putStrLn $ "Error: " <> err
       exitFailure
-  let filteredModule = filterIdeDirectives tcRes.module'
+  -- 'getExportedFunctions' lists the GIVEN parameters first and then the
+  -- ASSUMEs the export reads (directly or through any helper it reaches).
+  -- Only the GIVENs are call arguments; each read ASSUME is bound by
+  -- redefining it over the decoded row in the wrapper (see
+  -- 'generateBatchWrapper'), and dropped from the printed module so the
+  -- wrapper's definition takes its place. Redefining at the ASSUME's own
+  -- name is what lets a helper see the value: a LET around the call
+  -- would only be visible to the call expression, not to the closures
+  -- the module's definitions captured.
+  let MkDecide _ (MkTypeSig _ (MkGivenSig _ givenNames) _) _ _ = exportFn.exportDecide
+      (givenParams, assumeParams) =
+        List.splitAt (length givenNames) (extractParamsFromExport exportFn)
+      readAssumes    = Set.fromList
+        [ getUnique r | (r, _) <- extractAssumeParamResolveds tcRes.module' exportFn.exportDecide ]
+      unbindRead (MkAssume _ _ (MkAppForm _ r _ _) _ _)
+        | getUnique r `Set.member` readAssumes = DropAssume
+        | otherwise                            = KeepAssume
+      filteredModule = rewriteModuleAssumes unbindRead (filterIdeDirectives tcRes.module')
       filteredSource = prettyLayout filteredModule
-      params         = extractParamsFromExport exportFn
       schema         = exportFn.exportParams
 
   -- Step 3: process each row into an envelope, honoring stop-on-error, and
   -- write the results in the requested format.
-  let process = processRow opts evalConfig filteredSource exportFn params schema
+  let process = processRow opts evalConfig filteredSource exportFn givenParams assumeParams schema
   withOutputHandle opts.batchOutput \h ->
     case opts.batchOutputFormat of
       -- NDJSON streams line-by-line so huge batches stay memory-flat: we emit
@@ -290,12 +321,13 @@ processRow
   -> EvalConfig
   -> Text                                    -- ^ filtered source
   -> ExportedFunction
-  -> [(Text, Maybe (Type' Resolved))]        -- ^ params for wrapper gen
+  -> [(Text, Maybe (Type' Resolved))]        -- ^ GIVEN params (call arguments)
+  -> [(Text, Maybe (Type' Resolved))]        -- ^ read ASSUMEs (bound by name)
   -> [ExportedParam]                         -- ^ full schema for validation
   -> Int
   -> Aeson.Value
   -> IO (Aeson.Value, Bool)
-processRow opts evalConfig filteredSource exportFn params schema idx input
+processRow opts evalConfig filteredSource exportFn givenParams assumeParams schema idx input
   | opts.batchValidateOnly =
       let errs = validateRow schema input
           ok   = null errs
@@ -306,7 +338,7 @@ processRow opts evalConfig filteredSource exportFn params schema idx input
             ]
       in pure (env, not ok)
   | otherwise = do
-      let wrapperCode     = generateBatchWrapper exportFn.exportName params input
+      let wrapperCode     = generateBatchWrapper exportFn.exportName givenParams assumeParams input
           combinedProgram = filteredSource <> wrapperCode
           virtualPath     = opts.batchFile ++ ".batch" ++ show idx ++ ".l4"
       (evalErrs, mEval) <- runOneshot evalConfig virtualPath \nfp -> do
@@ -322,9 +354,16 @@ processRow opts evalConfig filteredSource exportFn params schema idx input
               -- an exception (e.g. JSONDECODE could not coerce a cell to the
               -- declared type). Those surface as `Reduction (Left …)`.
               let excMsgs = concatMap resultExceptionMsgs evalResults
-              in if null excMsgs
-                   then ("success", Aeson.toJSON evalResults, Aeson.Array mempty)
-                   else ("error",   Aeson.toJSON evalResults, Aeson.toJSON excMsgs)
+                  refMsgs = concatMap resultRefusalMsgs evalResults
+              in if not (null excMsgs)
+                   then ("error",   Aeson.toJSON evalResults, Aeson.toJSON excMsgs)
+                   -- A REFUSED row is a determinate answer, not a failure: the
+                   -- model declined to answer this input and said why. It gets
+                   -- its own terminal status and, crucially, does NOT stop the
+                   -- batch (see the 'status == "error"' test below).
+                   else if not (null refMsgs)
+                   then ("refused", Aeson.toJSON evalResults, Aeson.toJSON refMsgs)
+                   else ("success", Aeson.toJSON evalResults, Aeson.Array mempty)
           env = Aeson.object
             [ Key.fromString "input"       Aeson..= input
             , Key.fromString "output"      Aeson..= outputJson
@@ -337,8 +376,19 @@ processRow opts evalConfig filteredSource exportFn params schema idx input
 -- to an evaluation exception. An empty list means the row evaluated cleanly.
 resultExceptionMsgs :: EvalDirectiveResult -> [Text]
 resultExceptionMsgs (MkEvalDirectiveResult _ res _ _) = case res of
-  Reduction (Left exc) -> prettyEvalException exc
-  _                    -> []
+  Reduction (ReducedErrored exc) -> prettyEvalException exc
+  Assertion (Errored exc)        -> prettyEvalException exc
+  -- A refusal is deliberately NOT counted here: it is not an exception, and
+  -- counting it would both mark the row an error and stop the batch.
+  _                              -> []
+
+-- | Refusal reasons for any directive in the row that REFUSED. An empty list
+-- means nothing in the row declined to answer.
+resultRefusalMsgs :: EvalDirectiveResult -> [Text]
+resultRefusalMsgs (MkEvalDirectiveResult _ res _ _) = case res of
+  Reduction (ReducedRefused r) -> prettyRefusal r
+  Assertion (Refused r)        -> prettyRefusal r
+  _                            -> []
 
 ----------------------------------------------------------------------------
 -- Row validation (for --validate-only)
@@ -548,13 +598,20 @@ cellText = \case
 -- Wrapper code generation
 ----------------------------------------------------------------------------
 
+-- | The wrapper decodes the row into an @InputArgs@ record holding every
+-- schema field (GIVENs and read ASSUMEs alike), applies the export to the
+-- GIVEN fields, and redefines each read ASSUME as a definition over the
+-- decoded row ('generateAssumeBinding') — the ASSUME itself having been
+-- dropped from the printed module by 'batchCmd', so the module's other
+-- definitions now resolve the name to this binding.
 generateBatchWrapper
   :: Text
-  -> [(Text, Maybe (Type' Resolved))]
+  -> [(Text, Maybe (Type' Resolved))]        -- ^ GIVEN params (call arguments)
+  -> [(Text, Maybe (Type' Resolved))]        -- ^ read ASSUMEs (bound by name)
   -> Aeson.Value
   -> Text
-generateBatchWrapper funName params inputJson
-  | null params =
+generateBatchWrapper funName givenParams assumeParams inputJson
+  | null givenParams && null assumeParams =
       Text.unlines
         [ ""
         , "-- ========== GENERATED WRAPPER =========="
@@ -562,18 +619,32 @@ generateBatchWrapper funName params inputJson
         , "#EVAL " <> quoteIdent funName
         ]
   | otherwise =
-      Text.unlines
+      Text.unlines $
         [ ""
         , "-- ========== GENERATED WRAPPER =========="
         , ""
-        , generateInputRecord params
+        , generateInputRecord (givenParams <> assumeParams)
         , ""
         , generateDecoder
         , ""
         , generateJsonPayload inputJson
         , ""
-        , generateEvalDirective funName params
         ]
+        ++ map generateAssumeBinding assumeParams
+        ++ [ generateEvalDirective funName givenParams ]
+
+-- | Bind one read ASSUME to its field of the decoded row. Only the
+-- @RIGHT@ branch is needed: the @#EVAL@ directive decodes the row first
+-- and returns @NOTHING@ on a decode failure without ever forcing this
+-- binding, so the missing @LEFT@ branch is unreachable — @\@nonexhaustive@
+-- records that and keeps the checker quiet about it.
+generateAssumeBinding :: (Text, Maybe (Type' Resolved)) -> Text
+generateAssumeBinding (name, _) = Text.unlines
+  [ "@nonexhaustive ASSUME " <> name <> ", bound from the input row"
+  , quoteIdent name <> " MEANS"
+  , "  CONSIDER decodeArgs inputJson"
+  , "    WHEN RIGHT args THEN args's " <> quoteIdent name
+  ]
 
 generateInputRecord :: [(Text, Maybe (Type' Resolved))] -> Text
 generateInputRecord params = Text.unlines $

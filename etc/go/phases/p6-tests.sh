@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 # P6 — tests, without trusting the exit code.
 #
-# MEASURED (see etc/go/lib/assert-report.mjs for the capture): `l4 run` exits 0
-# on a failed #ASSERT, on a runtime exception, and on a Stuck evaluation. Only a
-# TYPECHECK error produces exit 1, and the `ok` field in --json tracks
-# typechecking too. So the exit code is not the oracle here; results[] is.
+# MEASURED (see etc/go/lib/assert-report.mjs for the capture and the 2026-09-04
+# re-measure): `l4 run` exits 0 on a failed #ASSERT — a clean FALSE — with
+# ok:true, and that is the case the exit code cannot see. A TYPECHECK error
+# exits 1 with results[] empty; a directive that CRASHES — a raising #EVAL, and
+# since fix/assert-check-reporting an #ASSERT that raises or is stuck on an
+# assumed term — exits 1 with the full envelope still on stdout. So the exit
+# code is not the oracle here; results[] is.
 #
 # The module set carries its tests as #ASSERT directives inside the .l4 files.
 # This stage runs them and reports what they say. It does NOT write new tests —
@@ -112,12 +115,17 @@ for m in "${MODULES[@]}"; do
   "$L4" run "$m" --json --fixed-now "$GO_FIXED_NOW" >"$GO_OUT/$stem.run.json" 2>"$GO_OUT/$stem.run.stderr"
   rc=$?
   set -e
-  # A non-zero exit from `l4 run` means a TYPECHECK failure, which the earlier
-  # check stage over the same module set (p3-check; and p3-encode when the run
-  # is about an additional encoding) should already have caught. If it appears
-  # here the run is inconsistent with itself.
-  if [[ $rc -ne 0 ]]; then
-    go_broken "l4 run exited $rc on $(basename "$m") (typecheck failure) — the earlier check stage reported this module set checking clean, so the run is inconsistent with itself"
+  # A non-zero exit from `l4 run` is one of two things. With results[] EMPTY it
+  # is a TYPECHECK failure, which the earlier check stage over the same module
+  # set (p3-check; and p3-encode when the run is about an additional encoding)
+  # should already have caught — if it appears here the run is inconsistent
+  # with itself. With results[] NON-EMPTY the module got past the typechecker
+  # and a directive CRASHED during evaluation: a raising #EVAL (kind "error"),
+  # or — since fix/assert-check-reporting — an #ASSERT that raises or is stuck
+  # on an assumed term (kind "assertion", value null). That is an assertion
+  # finding, and assert-report.mjs reads results[], so it is routed there.
+  if [[ $rc -ne 0 ]] && ! node -e 'const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); process.exit(Array.isArray(r.results) && r.results.length > 0 ? 0 : 1)' "$GO_OUT/$stem.run.json" 2>/dev/null; then
+    go_broken "l4 run exited $rc on $(basename "$m") with no evaluation results (typecheck failure) — the earlier check stage reported this module set checking clean, so the run is inconsistent with itself"
   fi
   ENVELOPES+=("$GO_OUT/$stem.run.json")
 done

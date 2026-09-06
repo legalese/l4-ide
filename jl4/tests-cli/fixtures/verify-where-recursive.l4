@@ -1,0 +1,20 @@
+-- Termination control. A self-referential or mutually referential local binding
+-- cannot be substituted — the substitution would not terminate — so the pass
+-- must detect the cycle, leave the binding opaque, and finish.
+--
+-- If this file ever hangs the suite, that is the regression.
+
+GIVEN m IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `self referential` IF
+    loop
+    WHERE
+        loop MEANS loop AND m
+
+GIVEN m IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `mutually referential` IF
+    ping
+    WHERE
+        ping MEANS pong AND m
+        pong MEANS ping OR m

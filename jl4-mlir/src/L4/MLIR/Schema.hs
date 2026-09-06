@@ -526,14 +526,14 @@ collectAllDecidesWithArity (MkModule _ _ section) = goSection topNames section
       ]
     topLevelDecides = goSectionTop section
       where
-        goSectionTop (MkSection _ _ _ decls) = concatMap goDeclTop decls
+        goSectionTop (MkSection _ _ _ _ decls) = concatMap goDeclTop decls
         goDeclTop = \case
           Decide _ d  -> [d]
           Section _ s -> goSectionTop s
           _           -> []
 
     goSection :: Set.Set Text -> Section Resolved -> [(Decide Resolved, Int)]
-    goSection scope (MkSection _ _ _ decls) = concatMap (goDecl scope) decls
+    goSection scope (MkSection _ _ _ _ decls) = concatMap (goDecl scope) decls
 
     goDecl :: Set.Set Text -> TopDecl Resolved -> [(Decide Resolved, Int)]
     goDecl scope = \case
@@ -1547,6 +1547,8 @@ collectTraceNodes infoMap declares paramTypes fnReturnTypes unannotatedParams un
       Record{}               -> (a, r, n)
       ReadCell{}             -> (a, r, n)
       Breach{}               -> (a, r, n)
+      -- A refusal has no trace children: it stops evaluation.
+      Refuse{}               -> (a, r, n)
       Inert{}                -> (a, r, n)
 
     -- M5 — force-trace a CONSIDER branch body when it's a 'Lit' or

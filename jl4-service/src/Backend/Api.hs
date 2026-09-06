@@ -250,6 +250,10 @@ emptyTree = emptyReasoning
 -- The error message may contain hints of what might have gone wrong.
 data EvaluatorError
   = InterpreterError !Text
+  | EvaluatorRefused !Text
+    -- ^ The L4 program REFUSED: it declined to answer, with the reason the
+    -- author wrote. Deliberately NOT an 'InterpreterError' — that reads as a
+    -- server fault, and a refusal is a designed answer of the model.
   | RequiredParameterMissing !ParameterMismatch
   | UnknownArguments ![Text]
   | CannotHandleParameterType !FnLiteral
@@ -260,6 +264,7 @@ data EvaluatorError
 prettyEvaluatorError :: EvaluatorError -> Text
 prettyEvaluatorError = \case
   InterpreterError msg -> msg
+  EvaluatorRefused reason -> "The model refuses to answer: " <> reason
   RequiredParameterMissing pm ->
     "Required parameter missing: expected " <> Text.pack (show pm.expected)
     <> " parameter(s), but got " <> Text.pack (show pm.actual)

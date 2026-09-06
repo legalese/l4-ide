@@ -21,12 +21,13 @@ New to L4? Start here:
 
 Our documentation is organized by **what you need**:
 
-| Type                                 | Purpose                | When to Use                 |
-| ------------------------------------ | ---------------------- | --------------------------- |
-| **[Courses](courses/README.md)**     | Learning-oriented      | "Teach me L4"               |
-| **[Tutorials](tutorials/README.md)** | Task-oriented          | "How do I do X?"            |
-| **[Reference](reference/README.md)** | Information-oriented   | "What is X?"                |
-| **[Concepts](concepts/README.md)**   | Understanding-oriented | "Why does X work this way?" |
+| Type                                 | Purpose                | When to Use                            |
+| ------------------------------------ | ---------------------- | -------------------------------------- |
+| **[Courses](courses/README.md)**     | Learning-oriented      | "Teach me L4"                          |
+| **[Tutorials](tutorials/README.md)** | Task-oriented          | "How do I do X?"                       |
+| **[Reference](reference/README.md)** | Information-oriented   | "What is X?"                           |
+| **[Exports](exports/README.md)**     | Integration-oriented   | "How do I run this in _their_ system?" |
+| **[Concepts](concepts/README.md)**   | Understanding-oriented | "Why does X work this way?"            |
 
 ---
 
@@ -109,6 +110,20 @@ Look up specific features:
 - **[Cheat Sheet](reference/cheat-sheet.md)** - One-page syntax summary
 
 [View full reference →](reference/README.md)
+
+---
+
+## Exports
+
+Run your L4 rules inside systems that already have users:
+
+- **[docassemble](exports/docassemble.md)** - Guided interviews for members of the public
+- **[OpenFisca](exports/openfisca.md)** - Microsimulation of tax and benefit rules
+- **[Catala](exports/catala.md)** - Literate law, with machine-checked agreement
+- **[Blawx](exports/blawx.md)** - Visual rules with natural-language justifications
+- **[DMN and BPMN](exports/dmn-bpmn.md)** - OMG decision tables and process models
+
+[View all exports →](exports/README.md)
 
 ---
 

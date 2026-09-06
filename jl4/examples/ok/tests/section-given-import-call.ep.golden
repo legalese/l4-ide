@@ -1,0 +1,22 @@
+-- Calling, from another module, a rule that reads a section GIVEN.
+--
+-- The call below passes one argument, which is the arity written in the file
+-- that defines `tax on`. That rule gained a second, trailing input when its own
+-- module was discharged. Nothing bridges the two -- discharge does not cross
+-- IMPORT -- so the evaluator binds the missing input from the imported module's
+-- own cell, which is where the rule would have read it before discharge.
+--
+-- Without that, this file used to stop with
+-- "Internal error: given signatures' values' lengths do not match".
+--
+-- What this does NOT give you: supplying `the rate` from here. The name is not
+-- in scope across the IMPORT, so the imported file's own TYPICALLY is what
+-- applies -- 0.05, hence 5 rather than anything this file could choose.
+
+IMPORT `section-given-import-def`
+
+GIVETH A NUMBER
+`tax on a hundred` MEANS `tax on` 100
+
+#EVAL `tax on a hundred`
+#ASSERT `tax on a hundred` EQUALS 5

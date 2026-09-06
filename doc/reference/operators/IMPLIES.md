@@ -20,7 +20,9 @@ expression1 => expression2
 
 ## Semantics
 
-`A IMPLIES B` is logically equivalent to `NOT A OR B`.
+`A IMPLIES B` is logically equivalent to `(NOT A) OR B`.
+
+The brackets are doing real work there, and leaving them out changes the meaning. Written as `NOT A OR B`, the NOT reaches over the OR as well and you get `NOT (A OR B)` — a different rule, which disagrees with IMPLIES on half its inputs. See [How Far Does NOT Reach?](NOT.md#how-far-does-not-reach).
 
 In legal terms: "If A, then B" - the rule is violated only when A is true but B is false.
 

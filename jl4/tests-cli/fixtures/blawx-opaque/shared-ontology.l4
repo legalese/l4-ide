@@ -1,0 +1,7 @@
+-- The imported half of the §11 W1 `RSOpaque` fixture (integrated 2026-09-02).
+§ `Shared Ontology`
+
+DECLARE Sign IS ONE OF Rock, Paper, Scissors
+
+DECLARE Player HAS
+    throws IS A Sign

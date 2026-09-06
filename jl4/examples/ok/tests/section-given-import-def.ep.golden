@@ -1,0 +1,17 @@
+-- The definition half of the cross-IMPORT pair. See
+-- ok/section-given-import-call.l4, which imports this file.
+--
+-- A section GIVEN, and a rule that reads it. Discharge runs per module, so this
+-- rule gains a trailing input for `the rate` when THIS file is discharged --
+-- while an importer's call site was checked against the arity written here.
+
+§ `Rates`
+    GIVEN `the rate` IS A NUMBER TYPICALLY 0.05
+
+@export
+GIVEN amount IS A NUMBER
+GIVETH A NUMBER
+`tax on` amount MEANS amount TIMES `the rate`
+
+#EVAL `tax on` 100
+#ASSERT (`tax on` 100) EQUALS 5

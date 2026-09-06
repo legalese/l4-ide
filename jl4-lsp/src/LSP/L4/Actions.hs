@@ -64,11 +64,11 @@ buildCompletionItem raw = \ case
     pure (defaultTopDeclCompletionItem (typeFunction kind))
       { CompletionItem._kind = Just CompletionItemKind_Class
       }
-  KnownSection (MkSection _ (Just n) _ _) ->
+  KnownSection (MkSection _ (Just n) _ _ _) ->
     pure (defaultCompletionItem $  nameToText $ getOriginal n)
       { CompletionItem._kind = Just CompletionItemKind_Module
       }
-  KnownSection (MkSection _ Nothing _ _) ->
+  KnownSection (MkSection _ Nothing _ _ _) ->
     -- NOTE: a section without name is just the toplevel section - we don't need to
     -- autocomplete anything there
     []
@@ -139,16 +139,24 @@ evalApp evalConfig entityInfo contextModule evalParams recentViz =
   where
     evalResultToLadderEvalAppResult :: EL.EvalDirectiveResult -> ExceptT (TResponseError method) m EvalAppResult
     evalResultToLadderEvalAppResult (EL.MkEvalDirectiveResult _ res _mtrace _ledger) = case res of
-      EL.Assertion True  -> pure $ EvalAppResult (toUBoolValue True)
-      EL.Assertion False -> pure $ EvalAppResult (toUBoolValue False)
+      EL.Assertion EL.Holds   -> pure $ EvalAppResult (toUBoolValue True)
+      EL.Assertion EL.Fails   -> pure $ EvalAppResult (toUBoolValue False)
+      EL.Assertion a@(EL.FailsBecause _) -> defaultResponseError $ EL.prettyAssertionOutcome a
+      -- A refusal has NO ladder value: the visualiser is a boolean evaluator
+      -- and 'UnknownV' means "not yet supplied", which a refusal is not. So it
+      -- is reported by name, with the author's reason, rather than drawn as
+      -- either verdict.
+      EL.Assertion (EL.Refused r) -> defaultResponseError $ Text.unlines $ EL.prettyRefusal r
+      EL.Assertion a@(EL.Errored _) -> defaultResponseError $ EL.prettyAssertionOutcome a
       EL.Reduction v ->
         case v of
-          Right (EL.MkNF val) ->
+          EL.Reduced (EL.MkNF val) ->
             case EL.boolView val of
               Just b  -> pure $ EvalAppResult (toUBoolValue b)
               Nothing -> throwExpectBoolResultError
-          Right EL.Omitted   -> defaultResponseError "Evaluation exceeded maximum depth limit"
-          Left err           -> defaultResponseError $ Text.unlines $ EL.prettyEvalException err
+          EL.Reduced EL.Omitted    -> defaultResponseError "Evaluation exceeded maximum depth limit"
+          EL.ReducedRefused r      -> defaultResponseError $ Text.unlines $ EL.prettyRefusal r
+          EL.ReducedErrored err    -> defaultResponseError $ Text.unlines $ EL.prettyEvalException err
 
     throwExpectBoolResultError :: ExceptT (TResponseError method) m a
     throwExpectBoolResultError = defaultResponseError "Ladder visualizer is expecting a boolean result (and it should be impossible to have got a fn with a non-bool return type in the first place)"
@@ -189,7 +197,7 @@ visualise mtcRes (getRecVis, setRecVis) verTextDocId msrcPos = do
     Just (srcPos, simp) -> do
       tcRes <- do
         case mtcRes of
-          Nothing -> defaultResponseError $ "Failed to typecheck " <> Text.pack (show uri.getUri) <> "."
+          Nothing -> defaultResponseError $ "Could not check " <> Text.pack (show uri.getUri) <> "."
           Just tcRes -> pure tcRes
       case foldTopLevelDecides (\d -> [d | decideNodeStartsAtPos srcPos d]) tcRes.module' of
         [decide] ->

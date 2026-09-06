@@ -1,0 +1,9 @@
+-- A refusal is a determinate answer, so `l4 run` on this file exits 0 — unlike
+-- a raising #ASSERT, which exits 1. The two must not be conflated.
+
+GIVETH A NUMBER
+`this case is not modelled` MEANS REFUSE "this case is not modelled"
+
+#EVAL `this case is not modelled`
+#ASSERT REFUSED `this case is not modelled`
+#ASSERT `this case is not modelled` EQUALS 1

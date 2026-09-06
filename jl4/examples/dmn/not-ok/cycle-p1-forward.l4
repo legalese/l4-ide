@@ -26,8 +26,7 @@
 IMPORT prelude
 
 § `forward reference only`
-
-ASSUME `the reported amount` IS A NUMBER
+    GIVEN `the reported amount` IS A NUMBER
 
 GIVETH A NUMBER
 `the headline figure` MEANS

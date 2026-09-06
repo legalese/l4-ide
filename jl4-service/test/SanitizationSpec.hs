@@ -283,6 +283,13 @@ spec = describe "Sanitization" $ do
       prettyEvaluatorError CannotHandleUnknownVars
         `shouldBe` "Cannot handle unknown variables in input"
 
+    -- A refusal is NOT an interpreter error: the L4 program declined to
+    -- answer and said why. Rendering it under the interpreter's banner would
+    -- report a designed outcome as a server fault.
+    it "formats EvaluatorRefused as a refusal, not as an interpreter error" $
+      prettyEvaluatorError (EvaluatorRefused "the commencement date is not modelled")
+        `shouldBe` "The model refuses to answer: the commencement date is not modelled"
+
 -- | Helper to create a simple Parameter with no nested properties.
 simpleParam :: Text -> Parameter
 simpleParam ty = Parameter ty Nothing Nothing [] "" Nothing Nothing Nothing Nothing Nothing Nothing

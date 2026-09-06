@@ -23,7 +23,7 @@ predicates:
     discount rate(M_0, 10) :- [ proj(M_0, band, Band_3), Band_3 \== gold, proj(M_0, band, Band_4), Band_4 \== silver ].  % tiers.l4:54:22-24
   computed exported loyalty bonus/1 : NUMBER  % tiers.l4:57:1-65:16
     params: Member
-    nlg: the loyalty bonus earned by m
+    nlg: the loyalty bonus earned by %m%
     loyalty bonus(M_5, 100) :- proj(M_5, years, Years_6), Years_6 >= 10.  % tiers.l4:62:35-38
     loyalty bonus(M_5, 50) :- [ proj(M_5, years, Years_7), Years_7 < 10 ], proj(M_5, years, Years_8), Years_8 >= 5.  % tiers.l4:63:35-37
     loyalty bonus(M_5, 10) :- [ proj(M_5, years, Years_9), Years_9 < 10, proj(M_5, years, Years_10), Years_10 < 5 ], proj(M_5, years, Years_11), Years_11 >= 1.  % tiers.l4:64:35-37

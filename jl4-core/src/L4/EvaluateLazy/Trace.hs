@@ -7,7 +7,7 @@ import qualified Base.Map as Map
 import qualified Base.Text as Text
 import L4.Syntax
 import L4.Evaluate.ValueLazy
-import L4.EvaluateLazy.Exceptions (EvalException(..), InternalEvalException(..), UserEvalException(..), prettyEvalException)
+import L4.EvaluateLazy.Exceptions (EvalException(..), InternalEvalException(..), UserEvalException(..), Refusal(..), prettyEvalException)
 import L4.Print
 import L4.TypeCheck.Environment.TH (builtinUri)
 import L4.Utils.RevList
@@ -292,6 +292,10 @@ printExceptionOrNF (Right v) = printWithLayout v
 printEvalExceptionShort :: EvalException -> Doc ann
 printEvalExceptionShort (InternalEvalException e) = printInternalEvalExceptionShort e
 printEvalExceptionShort (UserEvalException e)     = printUserEvalExceptionShort e
+-- A refusal is a designed outcome, so the trace names it as one and carries the
+-- author's reason. 'raiseException' emits an @Exit (Left e)@ before unwinding,
+-- so a refusal is already a first-class trace event.
+printEvalExceptionShort (RefusalException r)     = "refused: " <> pretty (r.message :: Text)
 
 printInternalEvalExceptionShort :: InternalEvalException -> Doc ann
 printInternalEvalExceptionShort (RuntimeScopeError _) = "run-time scope error"

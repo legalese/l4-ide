@@ -1,0 +1,29 @@
+-- R3's third way out: bridge at the call.
+--
+-- Two sibling sections each declare `foo`. A rule under one of them calls a
+-- rule under the other, and says "my foo is yours, for this call". That is the
+-- remedy `doc/reference/syntax/section-given.md` offers alongside hoisting the
+-- binder and renaming one of them.
+--
+-- The name to the LEFT of IS is one of the CALLEE's implicit inputs, so it is
+-- matched against what the callee reads, the same way a declared parameter's
+-- name is. The expression to the right is ordinary, and resolves here.
+
+§ `1`
+    GIVEN foo IS A NUMBER TYPICALLY 4
+
+GIVETH A NUMBER
+f MEANS g WITH foo IS foo
+
+§ `2`
+    GIVEN foo IS A NUMBER TYPICALLY 99
+
+GIVETH A NUMBER
+g MEANS foo TIMES 10
+
+-- 40: section 1's foo reached g. Not 990, which is what g gets on its own.
+#EVAL f
+#EVAL g
+
+#ASSERT f EQUALS 40
+#ASSERT g EQUALS 990

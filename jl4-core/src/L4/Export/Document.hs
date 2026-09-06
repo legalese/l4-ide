@@ -55,6 +55,7 @@ import L4.Export (isExportedDecide)
 import L4.Mixfix (MixfixInfo (..), MixfixPatternToken (..))
 import L4.Nlg (simpleLinearizer)
 import L4.Syntax
+import L4.Names (stripSectionBinderElaborations)
 import L4.TypeCheck.Types (CheckInfo (..), FunTypeSig (..), MixfixRegistry (..))
 import L4.Utils.Ratio (prettyRatio)
 
@@ -204,7 +205,7 @@ data Unit = MkUnit
 extractUnits :: Module Resolved -> [Unit]
 extractUnits (MkModule _ _ section) = goSection section
  where
-  goSection (MkSection _ _ _ decls) = concatMap goDecl decls
+  goSection (MkSection _ _ _ _ decls) = concatMap goDecl decls
   goDecl :: TopDecl Resolved -> [Unit]
   goDecl = \case
     Decide _ d  -> [mkUnit RuleUnit (decideApp d) (UDecide d)]
@@ -256,7 +257,7 @@ recordCtorFields mods = Map.fromList
 topDeclsRec :: Module Resolved -> [TopDecl Resolved]
 topDeclsRec (MkModule _ _ sec) = go sec
  where
-  go (MkSection _ _ _ ds) = concatMap (\d -> d : nested d) ds
+  go (MkSection _ _ _ _ ds) = concatMap (\d -> d : nested d) ds
   nested = \case Section _ s -> go s; _ -> []
 
 -- | Rewrite a positional record construction (@App ctor [a, b]@) into the named
@@ -477,7 +478,7 @@ resolveDisposition cfg u =
 -- ----------------------------------------------------------------------------
 
 buildDocument :: ExportConfig -> Module Resolved -> [Module Resolved] -> Document
-buildDocument cfg mainModule deps =
+buildDocument cfg mainModule0 deps0 =
   MkDocument
     { docTitle    = title
     -- Number after pruning, so dropped (e.g. test-fixture) sections never
@@ -485,6 +486,11 @@ buildDocument cfg mainModule deps =
     , docSections = renumberSections "" (mainSections <> importedSections)
     }
  where
+  -- A section binder's elaboration is machinery for the checker and the
+  -- evaluator, not a provision of the document; rendering it would add a
+  -- phantom ASSUME line under every heading whose source says GIVEN.
+  mainModule = stripSectionBinderElaborations mainModule0
+  deps       = map stripSectionBinderElaborations deps0
   (title, bodySection) = documentTitleAndBody mainModule
   mainUri = moduleUri' mainModule
   units   = allUnits cfg.mixfixHeadings mainModule deps
@@ -568,7 +574,7 @@ buildDocument cfg mainModule deps =
 -- | Build one section subtree, leaving 'sectionNumber' blank — numbering is a
 -- separate post-pass ('renumberSections') run after empty sections are pruned.
 toDocSection :: (Block -> Int) -> Map.Map Unique Block -> Section Resolved -> DocSection
-toDocSection rankOf bmap (MkSection _ mName _ decls) =
+toDocSection rankOf bmap (MkSection _ mName _ _ decls) =
   MkDocSection
     { sectionNumber  = ""
     , sectionHeading = fmap resolvedText mName
@@ -581,7 +587,7 @@ toDocSection rankOf bmap (MkSection _ mName _ decls) =
 -- carry a § number and a TOC entry); any explicit @SECTION@ markers follow as
 -- further top-level sections.
 bodyToSections :: (Block -> Int) -> Map.Map Unique Block -> Section Resolved -> [DocSection]
-bodyToSections rankOf bmap (MkSection _ _ _ decls) =
+bodyToSections rankOf bmap (MkSection _ _ _ _ decls) =
   let groupSecs =
         [ MkDocSection
             { sectionNumber  = ""
@@ -663,7 +669,7 @@ pruneSection s =
 directiveRefsOf :: Module Resolved -> Set.Set Unique
 directiveRefsOf (MkModule _ _ section) = goSection section
  where
-  goSection (MkSection _ _ _ decls) = Set.unions (map goDecl decls)
+  goSection (MkSection _ _ _ _ decls) = Set.unions (map goDecl decls)
   goDecl = \case
     Directive _ d -> Set.fromList (map getUnique (toList d))
     Section _ s   -> goSection s
@@ -759,6 +765,10 @@ unitRendering u = case u.uDecl of
       RecordDecl _ _ (_ : _) -> ("means a record with", declareClause tyDecl)
       EnumDecl _ cons
         | longEnum cons -> ("means one of", CFields [ (conName c, "") | c <- cons ])
+      -- An opaque type says nothing about its values, so the sentence has
+      -- no object: "Person is a kind of thing." (the @ASSUME@ spelling of the
+      -- same declaration reads "Person is assumed to be given.").
+      OpaqueDecl _           -> ("is a kind of thing", CLeaf "")
       _                      -> ("means", declareClause tyDecl)
  where
   conName (MkConDecl _ n _) = resolvedText n
@@ -936,6 +946,7 @@ declareClause = \case
   EnumDecl _ [c]        -> CLeaf (conName c)
   EnumDecl _ cons       -> CLeaf ("one of " <> oxford "or" (map conName cons))
   SynonymDecl _ ty      -> CLeaf (typeText ty)
+  OpaqueDecl _          -> CLeaf "a kind of thing"
  where
   recordField (MkTypedName _ n ty _mTypically Nothing)     = (resolvedText n, typeText ty)
   recordField (MkTypedName _ n ty _mTypically (Just expr)) =
@@ -1101,6 +1112,8 @@ deonticClause (MkDeonton _ party (MkAction _ modal actPat mprov) mdue mhence mle
     Breach _ _ mReason ->
       CLeaf ("the obligation is breached"
                <> maybe "" (\r -> " because “" <> inlineProse r <> "”") mReason)
+    Refuse _ msg ->
+      CLeaf ("the model refuses to answer: “" <> inlineProse msg <> "”")
     _ -> toClause e
 
 modalWord :: DeonticModal -> Text
@@ -1211,6 +1224,9 @@ formulaText e
     Percent _ x     -> do (_, t) <- go x; Just (4, t <> "%")
     App _ n []      -> Just (4, resolvedText n)
     Inert _ t _     -> Just (4, t)   -- a substituted parameter phrase
+    -- A refusal has no arithmetic reading; rendering it as prose inside a
+    -- formula would read as a quantity. Bail out of formula mode entirely.
+    Refuse{}        -> Nothing
     Proj _ a nm     -> do (_, t) <- go a; Just (4, t <> "'s " <> resolvedText nm)
     -- A non-arithmetic operand (a function call, projection chain, parameter …)
     -- becomes an inline atom rendered as prose, so a formula that mixes
@@ -1393,12 +1409,15 @@ oxford conj = \case
 -- ----------------------------------------------------------------------------
 
 buildPlan :: ExportConfig -> Module Resolved -> [Module Resolved] -> ExportPlan
-buildPlan cfg mainModule deps =
+buildPlan cfg mainModule0 deps0 =
   MkExportPlan
     { planMainModule = uriText mainUri
     , planModules    = mainPlanModule : importedPlanModules
     }
  where
+  -- As in 'buildDocument': the elaborations are not provisions.
+  mainModule = stripSectionBinderElaborations mainModule0
+  deps       = map stripSectionBinderElaborations deps0
   mainUri = moduleUri' mainModule
   units   = allUnits cfg.mixfixHeadings mainModule deps
   graph   = buildGraph mainUri units
@@ -1446,7 +1465,7 @@ buildPlan cfg mainModule deps =
 -- (so a @§ Part 4@ wrapper titles the document and its @§§@ children become
 -- the top-level sections). Otherwise the title is the title-cased file name.
 documentTitleAndBody :: Module Resolved -> (Text, Section Resolved)
-documentTitleAndBody m@(MkModule _ _ root@(MkSection _ mName _ _)) =
+documentTitleAndBody m@(MkModule _ _ root@(MkSection _ mName _ _ _)) =
   case mName of
     Just n  -> (resolvedText n, root)
     Nothing -> case leadingSection root of
@@ -1457,7 +1476,7 @@ documentTitleAndBody m@(MkModule _ _ root@(MkSection _ mName _ _)) =
 -- present before any code), otherwise the file name. Mirrors
 -- 'documentTitleAndBody' but with a file-name (not title-cased) fallback.
 importHeadingAndBody :: NormalizedUri -> Module Resolved -> (Text, Section Resolved)
-importHeadingAndBody uri (MkModule _ _ root@(MkSection _ mName _ _)) =
+importHeadingAndBody uri (MkModule _ _ root@(MkSection _ mName _ _ _)) =
   case mName of
     Just n  -> (resolvedText n, root)
     Nothing -> case leadingSection root of
@@ -1469,16 +1488,16 @@ importHeadingAndBody uri (MkModule _ _ root@(MkSection _ mName _ _)) =
 -- file name to label it by. Drives whether it is wrapped under the generic
 -- "Imported definitions" appendix.
 importHasSectionTitle :: Module Resolved -> Bool
-importHasSectionTitle (MkModule _ _ root@(MkSection _ mName _ _)) =
+importHasSectionTitle (MkModule _ _ root@(MkSection _ mName _ _ _)) =
   isJust mName || isJust (leadingSection root)
 
 -- | If a section is just a single named subsection with no loose declarations
 -- before it, return that subsection's name and the subsection itself — the
 -- "first section marker" used as a title/heading.
 leadingSection :: Section Resolved -> Maybe (Text, Section Resolved)
-leadingSection (MkSection _ _ _ decls) =
+leadingSection (MkSection _ _ _ _ decls) =
   case (any isUnitDecl decls, [ s | Section _ s <- decls ]) of
-    (False, [s@(MkSection _ (Just sn) _ _)]) -> Just (resolvedText sn, s)
+    (False, [s@(MkSection _ (Just sn) _ _ _)]) -> Just (resolvedText sn, s)
     _ -> Nothing
  where
   isUnitDecl = \case
@@ -1491,7 +1510,7 @@ leadingSection (MkSection _ _ _ decls) =
 buildImportSection
   :: (Block -> Int) -> Map.Map Unique Block -> NormalizedUri -> Module Resolved -> DocSection
 buildImportSection rankOf bmap uri m =
-  let (heading, MkSection _ _ _ decls) = importHeadingAndBody uri m
+  let (heading, MkSection _ _ _ _ decls) = importHeadingAndBody uri m
   in MkDocSection
     { sectionNumber  = ""
     , sectionHeading = Just heading

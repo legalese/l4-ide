@@ -33,6 +33,16 @@ type ScopeMap     = RangeMap (Environment, EntityInfo)
 type NlgMap       = RangeMap Nlg
 type DescMap      = RangeMap Text
 
+-- | For each defined 'Unique', the section stack (module root down to the
+-- innermost enclosing section) at the point it was registered; absence means
+-- top level. See the 'sectionPaths' field of 'CheckState'.
+--
+-- A 'Unique' embeds its defining module ('MkUnique'), so the maps of two
+-- modules have disjoint key sets and 'Map.union' across an import boundary
+-- cannot collide. That is what lets an importer carry its dependencies' paths
+-- beside its own — see 'L4.Import.Resolution.combineResolvedImports'.
+type SectionPaths = Map Unique [NonEmpty Text]
+
 -- | Note that 'KnownType' does not imply this is a new generative type on its own,
 -- because it includes type synonyms now. For type synonyms primarily, we also store
 -- the arguments, so that we can properly substitute when instantiated.
@@ -61,12 +71,28 @@ data CheckState =
       -- ^ Bodies of top-level nullary @DECIDE@/@MEANS@ constants, captured as
       -- they are checked. Used by the rung-3 value-level actor-agreement check
       -- to recover an action constant's actor field from its definition.
-    , sectionPaths :: !(Map Unique [NonEmpty Text])
+    , sectionPaths :: !SectionPaths
     -- ^ For each defined 'Unique', the section stack (path from the module root
     -- down to the innermost enclosing section) at the point it was registered.
     -- Absence means the binding is top-level (empty section path). Used by
     -- 'resolveTerm'' and 'resolveType' to prefer the nearest enclosing section
     -- when resolving unqualified names (lexical scoping / shadowing).
+    --
+    -- Seeded, before this module is checked, with the paths of every binding
+    -- reachable through its imports, so an imported name can be named under the
+    -- section that defines it. Those entries are read by 'sectionQualified'
+    -- (diagnostics) ONLY: both proximity readers, 'ancestorProximity' and
+    -- 'selectByProximity', test the candidate's module URI before they consult
+    -- this map, so an imported 'Unique' never reaches the lookup and cross-module
+    -- candidates stay co-equal for overload resolution (spec §5.5, FIX C).
+    , deferredChoices :: !Int
+    -- ^ How many times THIS branch of the nondeterministic search resolved a
+    -- name to a not-yet-inferred binding off the reference's section ancestry
+    -- while a binding on the ancestry was available (spec §12, FIX D; see
+    -- 'resolveTermFilteredIn'). Only ever compared between the outcomes of one
+    -- 'prune', which all start from the same state, so the absolute value is
+    -- meaningless and is never reset: 'prune' prefers the viable outcome with
+    -- the fewest such choices when exactly one has the fewest.
     }
   deriving stock (Generic)
 
@@ -104,12 +130,36 @@ data CheckError =
     -- ^ Circular dependency between computed fields (record name, cycle of field names)
   | CyclicTypeSynonyms [Name]
     -- ^ Circular dependency between type synonym declarations (cycle members)
+  | MisattachedSectionGiven Name (Maybe Name)
+    -- ^ A column-1 @GIVEN@ that opens a section and declares a name the
+    -- declaration it attaches to never uses. Carries the unused parameter name
+    -- and the name of the section whose heading it sits under. See
+    -- 'L4.Desugar.detectMisattachedSectionGivens'.
+  | UnreadImplicitSupply Resolved Resolved
+    -- ^ A @WITH@ site named a section binder that the callee does not read,
+    -- directly or through anything it calls. Arguments: the callee, the binder.
+    -- Under R1 a @WITH@ may name a binder /in the callee's read-set/; there is
+    -- nowhere to put a value for one outside it, so the override would silently
+    -- do nothing. See 'L4.Discharge.unreadImplicitSupplies'.
+  | AmbiguousImplicitSupply Resolved Resolved
+    -- ^ A @WITH@ site named a binder the callee reads under two or more
+    -- same-spelled binders, and its own 'Unique' matched none of them, so there
+    -- is no way to tell which was meant. Arguments: the callee, the supplied
+    -- name. See 'L4.Discharge.ambiguousImplicitSupplies'.
+  | RestatedSectionBinder Name
+    -- ^ A function's own @GIVEN@ restates a name a section-level @GIVEN@
+    -- already binds (R2). Carries the parameter name.
   | SuppliedComputedField Name
     -- ^ Tried to supply a computed field in a record constructor (field name)
   | ExportFunctionTypeInput Resolved Resolved
     -- ^ An @export-decorated DECIDE has a function-typed input (GIVEN or
     -- referenced ASSUME). Arguments: exported-function name, offending
     -- parameter/assume name.
+  | ExportAssumeNameClash Resolved Resolved
+    -- ^ An @export-decorated DECIDE has a GIVEN parameter spelled the same
+    -- as a module-level ASSUME it (or a helper it reaches) reads. Both
+    -- would be one JSON property, so a request could not supply them
+    -- separately. Arguments: exported-function name, the clashing GIVEN.
   | RegulativeActorMismatch Resolved Resolved Resolved
     -- ^ A regulative @PARTY p MUST a@ (or a @PARTY p DOES a@ event) binds a
     -- party to an action belonging to a different actor. In a value-actor
@@ -216,6 +266,7 @@ data ExpectationContext =
   | ExpectAsStringArgumentContext -- argument of AS STRING
   | ExpectTypicallyValueContext Name -- TYPICALLY value must match the declared type
   | ExpectBreachReasonContext -- reason argument of BREACH
+  | ExpectRefuseMessageContext -- message argument of REFUSE
   | ExpectRecordCellContext -- cell (path) argument of RECORD/COMMIT/ATTEST
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
@@ -297,6 +348,10 @@ instance HasSrcRange CheckError where
   -- WhileCheckingDecide context range via @rangeOf e <|> rangeOf ctx@ above.
   rangeOf (CheckWarning (PatternClausesMissing r _ _)) = Just r
   rangeOf (SuspiciousBinderPattern b _)     = rangeOf b
+  rangeOf (MisattachedSectionGiven n _)     = rangeOf n
+  rangeOf (UnreadImplicitSupply _ b)        = rangeOf b
+  rangeOf (AmbiguousImplicitSupply _ r)     = rangeOf r
+  rangeOf (RestatedSectionBinder n)         = rangeOf n
   rangeOf _                                 = Nothing
 
 -- | A token in a mixfix pattern, representing either a keyword (part of the function name)
@@ -468,6 +523,19 @@ data CheckEnv =
     -- 'KnownType's) so that synonym expansion never touches them — a
     -- cyclic synonym has no finite expansion, and expanding one can
     -- blow up exponentially before the expansion fuel runs out.
+    , sectionBinderNames   :: !(Set RawName)
+    -- ^ The names this module's section-level @GIVEN@s bind (R4), read off the
+    -- parsed module before desugaring. They are the names a @WITH@ site may
+    -- supply /in addition to/ the callee's declared parameters: after
+    -- 'L4.Discharge.dischargeModule' each of them is a trailing parameter of
+    -- every definition that reads it, but the read-set is a whole-module fact
+    -- and is not known while a single body is being checked. So the checker
+    -- accepts the supply on the strength of the name being a binder, and the
+    -- read-set is what 'L4.Discharge' matches it against.
+    --
+    -- Deliberately NOT unioned across imports ('unionImportedCheckEnv' resets
+    -- it): discharge does not cross @IMPORT@, so an imported module's binder is
+    -- not suppliable here.
     , inNonexhaustiveDecide      :: !Bool
     -- ^ Are we checking the body of a definition its author decorated
     -- @\@nonexhaustive@ (deliberately not defined for all inputs)? If so, the
@@ -530,6 +598,7 @@ unionImportedCheckEnv accEnv depEnvironment depEntityInfo depMixfixRegistry =
     , mixfixRegistry = unionMixfixRegistry accEnv.mixfixRegistry depMixfixRegistry
     , computedFields = Map.empty
     , cyclicSynonyms = mempty
+    , sectionBinderNames = mempty
     , inNonexhaustiveDecide = False
     , errorContext = None
     , sectionStack = []
@@ -590,6 +659,13 @@ data CheckResult =
     , descMap        :: !DescMap
     , mixfixRegistry :: !MixfixRegistry
     -- ^ Registry of mixfix functions from this module (to be propagated to importers)
+    , sectionPaths   :: !SectionPaths
+    -- ^ Where every binding this module can see was defined, section-wise: its
+    -- own bindings and, transitively, those of everything it imports. Carried
+    -- across the import boundary so that an importer can name an imported
+    -- binding under the section that defines it — today in ambiguity
+    -- diagnostics, which otherwise offer the reader an option spelled exactly
+    -- like the ambiguous name. See 'SectionPaths'.
     }
 
 -- -------------------
@@ -686,15 +762,35 @@ outOfScope n t = do
 
 ambiguousTerm :: Name -> [(Resolved, Type' Resolved)] -> Check Resolved
 ambiguousTerm n xs = do
-  addError (AmbiguousTermError n xs)
+  xs' <- traverse (\(r, t) -> (, t) <$> sectionQualified r) xs
+  addError (AmbiguousTermError n xs')
   u <- newUnique
   pure (OutOfScope u n)
 
 ambiguousType :: Name -> [(Resolved, Kind)] -> Check Resolved
 ambiguousType n xs = do
-  addError (AmbiguousTypeError n xs)
+  xs' <- traverse (\(r, k) -> (, k) <$> sectionQualified r) xs
+  addError (AmbiguousTypeError n xs')
   u <- newUnique
   pure (OutOfScope u n)
+
+-- | Re-spell a resolution candidate under its defining section, for the
+-- ambiguity diagnostics only: an @x@ defined in @§ a@ \/ @§§ b@ is listed as
+-- @a.b.x@. That is at once the section the reader needs in order to see why
+-- the candidates are co-equal (two siblings, say, neither on the reference's
+-- ancestry) and the spelling that disambiguates. Top-level and imported
+-- candidates (no recorded section path) and already-qualified names are left
+-- alone. Only the referring spelling changes: the 'Unique' and the original
+-- (defining) occurrence — hence the "defined at" range — are untouched.
+sectionQualified :: Resolved -> Check Resolved
+sectionQualified r = do
+  paths <- use #sectionPaths
+  pure case (r, Map.lookup (getUnique r) paths) of
+    (Ref n u o, Just secs)
+      | NormalName t <- rawName n
+      , Just qual <- nonEmpty ((\(h :| _) -> h) <$> secs)
+      -> Ref (MkName (getAnno n) (QualifiedName qual t)) u o
+    _ -> r
 
 -- | Is this 'Resolved' the sentinel that 'outOfScope', 'ambiguousTerm' and
 -- 'ambiguousType' mint to make progress after a name-resolution failure?
@@ -961,6 +1057,20 @@ isInfVarKey :: TypeKey -> Bool
 isInfVarKey (TyKInfVar _) = True
 isInfVarKey _             = False
 
+-- | Whether a 'TypeKey' still contains an unresolved inference variable
+-- ANYWHERE — the mark of a candidate whose definition has not yet been
+-- inferred at the point of reference (a function-shaped @DECIDE@ with a
+-- @GIVEN@ but no @GIVETH@ has key @TyKFun [..] (TyKInfVar _)@ until then).
+-- Used to mark the branch that chooses such a candidate, never to shadow;
+-- see 'resolveTermFilteredIn' and 'prune'.
+hasInfVarKey :: TypeKey -> Bool
+hasInfVarKey = \ case
+  TyKType       -> False
+  TyKApp _ ks   -> any hasInfVarKey ks
+  TyKFun ks k   -> any hasInfVarKey ks || hasInfVarKey k
+  TyKForall _ k -> hasInfVarKey k
+  TyKInfVar _   -> True
+
 -- | Stable grouping by an equality key (first-seen order preserved, both for
 -- the groups and within each group). Small candidate lists, so the quadratic
 -- cost is irrelevant.
@@ -1022,7 +1132,7 @@ ancestorProximity curUri current paths u
   | otherwise             = sectionProximity current (Map.findWithDefault [] u paths)
 
 isTopLevelBindingInSection :: Unique -> Section Resolved -> Bool
-isTopLevelBindingInSection u (MkSection _a  _mn _maka decls) = any (elem u . map getUnique . relevantResolveds) decls
+isTopLevelBindingInSection u (MkSection _a  _mn _maka _ decls) = any (elem u . map getUnique . relevantResolveds) decls
   where
   relevantResolveds = \ case
     Declare _ (MkDeclare _ _ af _) -> appFormHeads af
@@ -1033,7 +1143,12 @@ isTopLevelBindingInSection u (MkSection _a  _mn _maka decls) = any (elem u . map
     Timezone _ _ -> []
     -- NOTE: Sections are a toplevel binding in the current section but can also contain further
     -- toplevel bindings
-    Section _ (MkSection _ mr maka decls') -> toResolved mr <> toResolved maka <> foldMap relevantResolveds decls'
+    --
+    -- The section's own GIVEN is deliberately NOT collected here: a section
+    -- binder is already present as the 0-ary ASSUME its GivenSig elaborates to
+    -- (see 'L4.Desugar.desugarSectionGivens'), so adding the GivenSig would
+    -- count the same binding twice.
+    Section _ (MkSection _ mr maka _ decls') -> toResolved mr <> toResolved maka <> foldMap relevantResolveds decls'
 
 resolveTerm' :: (TermKind -> Bool) -> Name -> Check (Resolved, Type' Resolved)
 resolveTerm' p n = resolveTermFiltered False p (const True) n pure
@@ -1196,7 +1311,54 @@ resolveTermFilteredIn shadowing preambleErr p viab n kont = do
         case (wildValueAncestorProx, prox u) of
           (Just w, Just d) | isVal -> d <= w
           _                        -> True
-      candidates = [ (k, u, a) | (k, _isVal, u, a) <- filter keepCand candidates0 ]
+      -- FIX D — the other half of FIX B. A same-module VALUE binding that is
+      -- OFF the ancestry (in a sibling or a descendant section) and whose type
+      -- still contains an inference variable is a definition NOT YET INFERRED
+      -- at this reference: in practice any same-named definition further down
+      -- the file. Its 'typeKey' cannot be compared with the ancestor's, so it
+      -- lands in a group of its own, where 'selectByProximity' finds no
+      -- ancestor and falls back to the flat scope; it therefore survived
+      -- beside a concrete ancestor and turned the ancestor's OWN reference
+      -- into an ambiguity — one that depended on textual order, because the
+      -- same rebinding placed ABOVE the reference is concrete by then, shares
+      -- the ancestor's group, and is dropped by proximity as intended.
+      --
+      -- Such a candidate stays in the running — the flat fallback is what
+      -- lets a differently-typed sibling overload be found by type-directed
+      -- resolution (spec §3.3.4 step 4), and whether it is that or a
+      -- same-typed rebinding cannot be known here — but the branch that
+      -- chooses it is MARKED ('deferredChoices'), and at the forcing point
+      -- 'prune' lets an unmarked success beat a marked one. So: if the
+      -- ancestor's branch survives, the not-yet-inferred candidate was either
+      -- a same-typed rebinding, shadowed by proximity (§5.3), or a
+      -- differently-typed one the reference did not need; if the ancestor's
+      -- branch fails (@big "hello"@ against an ancestor @big@ over NUMBER,
+      -- @x PLUS 1@ against a STRING ancestor), the marked branch is the only
+      -- success and is chosen exactly as the flat fallback always chose it.
+      -- The decision is made at 'prune', not here, because type context can
+      -- arrive after resolution — a bare variable's expected type, an
+      -- application's result type — so no local test at this point can see
+      -- whether the ancestor will survive. Dropping the candidate here was
+      -- tried first and measured order-dependent (spec §12, FIX D). Imports
+      -- are untouched (they carry no ancestry and are fully typed), as are
+      -- selectors and constructors.
+      --
+      -- 'hasInfVarKey', not 'isInfVarKey': a function-shaped definition with a
+      -- GIVEN but no GIVETH (the common L4 style) has key
+      -- @TyKFun [NUMBER] (TyKInfVar _)@ until it is inferred, and the bare
+      -- test missed it. FIX B keeps the bare test: it SHADOWS, and a nearer
+      -- @Fun [STRING] _@ must not shadow a farther @Fun [NUMBER] BOOLEAN@
+      -- that type-direction would have selected.
+      hasValueAncestor =
+        or [ isVal && isJust (prox u) | (_, isVal, u, _) <- candidates0 ]
+      isDeferred (k, isVal, u) =
+        isVal && hasInfVarKey k && u.moduleUri == curUri
+          && isNothing (prox u) && hasValueAncestor
+      markDeferred (t', act)
+        = (t', modifying #deferredChoices (+ 1) >> act)
+      candidates =
+        [ (k, u, if isDeferred (k, isVal, u) then markDeferred a else a)
+        | (k, isVal, u, a) <- filter keepCand candidates0 ]
   case selectByProximityPerType curUri current paths candidates of
     [] -> do
       v <- fresh (rawName n)
@@ -1511,6 +1673,25 @@ prune m = do
       candidates :: [(With CheckErrorWithContext a, CheckState)]
       candidates = runCheck m s env
 
+      -- Lexical scoping across a forward reference (spec §12, FIX D). A
+      -- branch that resolved a name to a not-yet-inferred binding OFF its
+      -- section ancestry, although a binding ON the ancestry existed, carries
+      -- a higher 'deferredChoices' than a branch that took the ancestor. When
+      -- several branches are viable and exactly one made the fewest such
+      -- choices, that one wins: the ancestor shadows the rebinding, just as it
+      -- would had the rebinding been placed above the reference and grouped
+      -- by its (then known) type. Ties, and outcomes that made no such
+      -- choice at all, fall through to the ordinary rule, so a program with
+      -- no such forward reference is handled byte-for-byte as before.
+      viable = filter (viableCandidate . fst) candidates
+      leastDeferred = case viable of
+        _ : _ : _ ->
+          let least = minimum [ st.deferredChoices | (_, st) <- viable ]
+          in case [ c | c@(_, st) <- viable, st.deferredChoices == least ] of
+               [c] -> Just c
+               _   -> Nothing
+        _ -> Nothing
+
       proc []       = [] -- should never occur
       proc [a]      = [a]
       proc (a : cs)
@@ -1535,7 +1716,9 @@ prune m = do
         | otherwise               = procFailed c cs
 
     in
-      proc candidates
+      case leastDeferred of
+        Just c  -> [c]
+        Nothing -> proc candidates
 
 -- | Prune to one result if there's a clearly best one at this point,
 -- but don't force it.
@@ -1636,6 +1819,7 @@ extendEnv cis env =
     , mixfixRegistry = e.mixfixRegistry
     , computedFields = e.computedFields
     , cyclicSynonyms = e.cyclicSynonyms
+    , sectionBinderNames = e.sectionBinderNames
     , inNonexhaustiveDecide = e.inNonexhaustiveDecide
     , sectionStack = e.sectionStack
     , localBindings = e.localBindings

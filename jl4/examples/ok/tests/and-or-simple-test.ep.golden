@@ -1,8 +1,8 @@
--- Simple test for AND/OR linter
 
-ASSUME a IS BOOLEAN
-ASSUME b IS BOOLEAN
-ASSUME c IS BOOLEAN
+§ `Simple test for AND/OR linter`
+    GIVEN a IS BOOLEAN
+          b IS BOOLEAN
+          c IS BOOLEAN
 
 -- Case 1: This SHOULD trigger a warning (AND and OR at same column 5 on different lines)
 DECIDE `case1`

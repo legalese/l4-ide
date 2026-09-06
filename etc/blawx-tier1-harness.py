@@ -117,7 +117,7 @@ TWINS = {"antisocial": "antisocial-twin", "alcohol": "alcohol-twin"}
 
 # The import direction's seeds: <stem> -> the subdirectory of jl4/examples/blawx
 # holding BOTH `<stem>.l4` (lifted) and `<stem>.blawx` (re-emitted).
-IMPORTED = {"bird": "imported"}
+IMPORTED = {"bird": "imported", "rps": "imported"}
 
 # UPSTREAM FINDING (legalese/blawx; belongs beside the quirk-fix issue #1).
 #
@@ -231,6 +231,29 @@ def parse_blawx(path):
 
 # --- oracle parsing --------------------------------------------------------
 
+def parse_unlifted(path):
+    """Test names the lift REFUSED, read off the `-- NOT LIFTED` lines it wrote.
+
+    `l4 blawx --import` drops a test canvas it cannot lift — `rps`'s
+    `hypothetical` declares `#abducible`s, and abduction is not evaluation — and
+    says so in the artifact where the `#EVAL` would have gone, so the .l4 has no
+    directive for it. The .blawx beside it still carries the test, because the
+    re-emission is of the PARSED BLOCKS and the parse read it fine. Excluding it
+    here BY NAME is what keeps the positional pairing honest; without it the
+    counts differ and the whole seed is skipped, which is a silent loss of the
+    tests that DID lift.
+    """
+    names, current = set(), None
+    for line in path.read_text(encoding="utf-8").splitlines():
+        s = line.strip()
+        m = re.match(r"-- blawxtest (\S+)", s)
+        if m:
+            current = m.group(1)
+        elif s.startswith("-- NOT LIFTED") and current is not None:
+            names.add(current)
+    return names
+
+
 def parse_oracles(path):
     """[(directive_line, expected_text)] in directive order."""
     oracles, pending = [], None
@@ -330,6 +353,16 @@ def run_test(swipl, seed, test_name, query, program_body, oracle, keep_dir,
         capture_output=True, text=True, timeout=300,
     )
     rows = [split_row(m) for m in re.findall(r"^ROW (\[.*\])$", r.stdout, re.M)]
+    return compare_answer(seed, test_name, goal, out_vars, oracle, rows)
+
+
+def compare_answer(seed, test_name, goal, out_vars, oracle, rows):
+    """Compare one query's s(CASP) answer rows against the L4 oracle.
+
+    Split out of `run_test` so that the comparison ladder — which is where the
+    judgement lives — can be exercised without swipl, by `self_test` below.
+    `run_test` is then only program assembly and execution.
+    """
     model = bool(rows)
 
     if oracle is None:
@@ -341,6 +374,21 @@ def run_test(swipl, seed, test_name, query, program_body, oracle, keep_dir,
         return (model, f"expected a model; got {'model' if model else 'NO model'}")
     if oracle == "FALSE":
         return (not model, f"expected no model; got {'model' if model else 'NO model'}")
+    if oracle == "EMPTY":
+        # The lift renders an enumerating query as a `filter`/`map` over the
+        # world, so "no answers" is the empty L4 list and "no model" is
+        # s(CASP)'s way of saying the same thing.
+        return (not rows, f"expected no answers; got {[tuple(r) for r in rows]}")
+    if len(out_vars) > 1:
+        # A query with two or more free variables (`?- winner(Game,Player).`)
+        # lifts to a nested comprehension whose elements are k-tuples of names.
+        want = parse_tuple_oracle(oracle, len(out_vars))
+        if want is None:
+            return False, (
+                f"could not read a {len(out_vars)}-tuple oracle from {oracle!r}"
+            )
+        got = sorted({tuple(row) for row in rows})
+        return (got == sorted(set(want)), f"expected {sorted(set(want))}; got {got}")
     if len(out_vars) != 1:
         return False, f"expected one output variable in {goal!r}, saw {out_vars}"
     got = sorted({row[0] for row in rows})
@@ -367,6 +415,35 @@ def run_test(swipl, seed, test_name, query, program_body, oracle, keep_dir,
         f" (+ pinned s(CASP) surplus {pinned}, see KNOWN_SURPLUS)" if pinned else ""
     )
     return (oracle in got, detail)
+
+
+def parse_tuple_oracle(oracle, k):
+    """The L4 rendering of a list of k-tuples of names, read back as tuples.
+
+    `l4 run` prints a `LIST OF (LIST OF STRING)` FLAT — `LIST LIST "a", "b",
+    LIST "c", "d"` — so the grouping is recoverable only with the arity in
+    hand, which this harness has (the query's output variables). Every k-th
+    field carries the inner `LIST` marker; anything else is a rendering this
+    function was not written for, and it returns None rather than guessing.
+    """
+    if oracle == "EMPTY":
+        return []
+    if not oracle.startswith("LIST "):
+        return None
+    fields = [f.strip() for f in oracle[len("LIST "):].split(",")]
+    if not fields or len(fields) % k:
+        return None
+    rows, cur = [], []
+    for i, f in enumerate(fields):
+        if i % k == 0:
+            if not f.startswith("LIST "):
+                return None
+            f = f[len("LIST "):].strip()
+        cur.append(f.strip().strip('"'))
+        if len(cur) == k:
+            rows.append(tuple(cur))
+            cur = []
+    return rows
 
 
 def split_row(text):
@@ -454,7 +531,99 @@ def twin_preflight(seed, twin):
     )
 
 
+# --- self-test: the comparison ladder, without swipl -----------------------
+#
+# WHY THIS EXISTS.  The k-tuple oracle reader (`parse_tuple_oracle`, and the
+# `len(out_vars) > 1` branch of `compare_answer`) is reached by NO shipped
+# seed: the corpus's only two-free-variable query, rps/who_wins, has oracle
+# EMPTY, and `compare_answer` answers EMPTY before it ever looks at the arity.
+# So the branch that reads a NON-EMPTY k-tuple answer had zero in-repo
+# coverage — new code whose first exercise would have been a future corpus.
+#
+# The row marked (*) below is not invented.  It is a measurement, taken on
+# 2026-09-02, and here is how to retake it: copy Jason's `rps.yaml`, and in the
+# `bobjane` test's `xml_content` replace the query's `first_element` -- the
+# `object_selector` block naming `testgame` -- with a `variable` block named
+# `Game`, so the query reads `?- winner(Game,Winner).` with BOTH places free.
+# `l4 blawx --import` lifts that to the nested comprehension and records the
+# oracle `LIST LIST "testgame", "jane"`; registered here as an IMPORTED seed it
+# runs 2/2, real s(CASP) answering `[('testgame','jane')]`.  The fixture is not
+# committed -- it is a document Jason did not write, and its `.blawx` would be
+# a re-emission of an XML we edited -- so the datapoint is kept here instead.
+#
+# These are PURE cases over `compare_answer` and `parse_tuple_oracle`: no
+# swipl, no s(CASP), no goldens.  They run on every invocation, before the
+# `have_scasp` skip, so the coverage does not depend on a machine having the
+# pack installed.
+SELF_TESTS = [
+    # (label, out_vars, oracle, rows, expect_pass)
+    ("(*) two free variables, non-empty: the measured rps open query",
+     ["Game", "Winner"], 'LIST LIST "testgame", "jane"',
+     [["testgame", "jane"]], True),
+    ("two free variables, two answer rows, order-insensitive",
+     ["Game", "Winner"], 'LIST LIST "g2", "alice", LIST "g1", "bob"',
+     [["g1", "bob"], ["g2", "alice"]], True),
+    ("two free variables, s(CASP) misses a row",
+     ["Game", "Winner"], 'LIST LIST "g1", "bob", LIST "g2", "alice"',
+     [["g1", "bob"]], False),
+    ("two free variables, s(CASP) has a row L4 does not",
+     ["Game", "Winner"], 'LIST LIST "g1", "bob"',
+     [["g1", "bob"], ["g2", "alice"]], False),
+    ("two free variables, EMPTY on both sides",
+     ["Game", "Winner"], "EMPTY", [], True),
+    ("two free variables, EMPTY oracle but s(CASP) answers",
+     ["Game", "Winner"], "EMPTY", [["g1", "bob"]], False),
+    ("two free variables, an oracle this reader was not written for",
+     ["Game", "Winner"], "TRUE and FALSE", [["g1", "bob"]], False),
+    ("one free variable is still the LIST path, not the k-tuple one",
+     ["Player"], 'LIST "jane"', [["jane"]], True),
+]
+
+# (oracle, k) -> expected reader output; None means "refuse to guess"
+TUPLE_ORACLE_CASES = [
+    ('LIST LIST "testgame", "jane"', 2, [("testgame", "jane")]),
+    ('LIST LIST "g1", "bob", LIST "g2", "alice"', 2,
+     [("g1", "bob"), ("g2", "alice")]),
+    ('LIST LIST "a", "b", "c"', 3, [("a", "b", "c")]),
+    ("EMPTY", 2, []),
+    ('LIST "g1", "bob"', 2, None),          # no inner LIST marker
+    ('LIST LIST "g1", "bob", "g2"', 2, None),  # field count not a multiple of k
+    ("TRUE", 2, None),                      # not a list rendering at all
+]
+
+
+def self_test():
+    """Exercise the comparison ladder on cases no shipped seed reaches."""
+    failures = []
+    for oracle, k, want in TUPLE_ORACLE_CASES:
+        got = parse_tuple_oracle(oracle, k)
+        if got != want:
+            failures.append(
+                f"parse_tuple_oracle({oracle!r}, {k}) = {got!r}, expected {want!r}"
+            )
+    for label, out_vars, oracle, rows, expect in SELF_TESTS:
+        goal = "winner(" + ",".join(out_vars) + ")"
+        passed, detail = compare_answer("self-test", label, goal, out_vars,
+                                        oracle, rows)
+        if passed != expect:
+            failures.append(
+                f"{label}: compare_answer returned {passed} "
+                f"({detail}), expected {expect}"
+            )
+    for f in failures:
+        print(f"blawx-tier1: SELF-TEST FAIL {f}")
+    n = len(TUPLE_ORACLE_CASES) + len(SELF_TESTS)
+    print(
+        f"blawx-tier1: self-test {n - len(failures)}/{n} "
+        f"(the k-tuple oracle reader and the comparison ladder; no seed "
+        f"reaches the k-tuple branch)"
+    )
+    return not failures
+
+
 def main():
+    if not self_test():
+        return 1
     ok, why = have_scasp()
     if not ok:
         print(f"blawx-tier1: SKIP ({why}) — the harness is optional-when-present")
@@ -481,9 +650,12 @@ def main():
         # BOTH were produced by the pipeline rather than one being a golden.
         subdir = IMPORTED.get(seed)
         bridge = IMPORT_BRIDGE if subdir else ""
+        unlifted = set()
         if subdir:
             l4 = EXAMPLES / subdir / f"{seed}.l4"
             blawx = EXAMPLES / subdir / f"{seed}.blawx"
+            if l4.exists():
+                unlifted = parse_unlifted(l4)
         else:
             l4 = EXAMPLES / f"{seed}.l4"
             blawx = EXAMPLES / "expected" / f"{seed}.blawx"
@@ -494,8 +666,15 @@ def main():
         workspaces, tests = parse_blawx(blawx)
         # the "interview" test (#abducible declarations + a free-variable
         # query) has no L4 oracle — abduction is not evaluation — so it is
-        # excluded from the directive pairing below
+        # excluded from the directive pairing below ...
         tests = [(n, e) for n, e in tests if n != "interview"]
+        # ... and neither has a test the lift refused: see `parse_unlifted`.
+        if unlifted:
+            print(
+                f"blawx-tier1: {seed}: not lifted, so not paired: "
+                + ", ".join(sorted(unlifted))
+            )
+            tests = [(n, e) for n, e in tests if n not in unlifted]
         oracles = parse_oracles(l4)
         prefix = ""
         twin = TWINS.get(seed)

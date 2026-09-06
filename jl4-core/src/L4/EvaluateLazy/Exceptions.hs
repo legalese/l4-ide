@@ -5,7 +5,9 @@ module L4.EvaluateLazy.Exceptions
 ( EvalException (..)
 , InternalEvalException (..)
 , UserEvalException (..)
+, Refusal (..)
 , prettyEvalException
+, prettyRefusal
 , maximumStackSize
 , maximumFrameDepth
 )
@@ -23,8 +25,32 @@ import L4.Utils.Ratio
 data EvalException =
     InternalEvalException InternalEvalException
   | UserEvalException UserEvalException
+  | RefusalException Refusal
+    -- ^ The program REFUSED: it declined to answer, with the reason the author
+    -- wrote. This is a THIRD TOP-LEVEL ARM rather than another
+    -- 'UserEvalException' constructor, and deliberately so: it makes every
+    -- total match over 'EvalException' a compile error until it decides
+    -- whether a refusal is an error, and it keeps refusals out of
+    -- 'prettyEvalException'\'s internal-error banner. A refusal is not a
+    -- defect in the program and not an unknown fact the boundary can supply;
+    -- it is a determinate outcome of its own kind.
   deriving stock (Generic, Show)
   deriving anyclass NFData
+
+-- | The payload of a refusal: the author's reason for declining to answer.
+--
+-- The reason is a string literal in the source ('L4.Syntax.Refuse'), so it is
+-- statically known and can be reported without running the program.
+newtype Refusal =
+  MkRefusal
+    { message :: Text
+    }
+  deriving stock (Generic, Show)
+  deriving anyclass NFData
+
+-- | Render a refusal for a user. Deliberately does NOT say \"error\".
+prettyRefusal :: Refusal -> [Text]
+prettyRefusal r = [ "The model refuses to answer:", indentSingle r.message ]
 
 -- | Thrown as a (synchronous) IO exception by the evaluation machine and
 -- caught at directive boundaries; see 'L4.EvaluateLazy.Machine'.
@@ -57,6 +83,7 @@ prettyEvalException (InternalEvalException exc) = wrapInternal (prettyInternalEv
     wrapInternal :: [Text] -> [Text]
     wrapInternal msgs = [ "Internal error:" ] <> msgs <> [ "Please report this as a bug." ]
 prettyEvalException (UserEvalException exc)     = prettyUserEvalException exc
+prettyEvalException (RefusalException r)       = prettyRefusal r
 
 prettyInternalEvalException :: InternalEvalException -> [Text]
 prettyInternalEvalException = \ case

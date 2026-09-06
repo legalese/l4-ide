@@ -68,6 +68,12 @@ traverseResolved f =  \ case
   Ref r u o -> Ref <$> f r <*> pure u <*> pure o
   OutOfScope u n -> OutOfScope u <$> f n
 
+-- | The order-list entry 'L4.TypeCheck.supplyAppNamed' writes for a named
+-- argument that supplies a section binder instead of one of the callee's
+-- declared parameters. See 'AppNamed'.
+implicitSupplyIndex :: Int
+implicitSupplyIndex = -1
+
 -- | Extract the raw name from a name.
 rawName :: Name -> RawName
 rawName (MkName _ raw) = raw
@@ -190,6 +196,12 @@ data Directive n =
   | Check Anno (Expr n)
   | Contract Anno (Expr n) (Expr n) [Expr n]
   | Assert Anno (Expr n)
+  | AssertRefused Anno (Expr n) (Maybe (Expr n))
+    -- ^ @#ASSERT REFUSED e [BECAUSE "message"]@ — @e@ must refuse, and when the
+    -- optional @BECAUSE@ clause is present the refusal's reason must equal it.
+    -- A separate constructor rather than a flag on 'Assert', so that every total
+    -- match over 'Directive' is a compile error until it decides what a refusal
+    -- assertion means on its surface.
   deriving stock (GHC.Generic, Eq, Ord, Show, Functor, Foldable, Traversable)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
@@ -213,6 +225,16 @@ data TypeDecl n =
     RecordDecl Anno (Maybe n) [TypedName n]
   | EnumDecl Anno [ConDecl n]
   | SynonymDecl Anno (Type' n)
+  | OpaqueDecl Anno
+    -- ^ A bodiless @DECLARE T@ (or @DECLARE T x@): an opaque nominal type,
+    -- like Haskell's @data T@ with no constructors. It has no constructors and
+    -- no fields, so a value of it arises only as a parameter (a @GIVEN@, a
+    -- section @GIVEN@, an @ASSUME@ term, or a JSON input at a service
+    -- boundary). This is the ruled spelling for the type role of
+    -- @ASSUME T IS A TYPE@ (@specs/todo/IMPLICIT-PROPS-DESIGN.md@ §11.1);
+    -- the type checker gives both the same entity, a 'KnownType' with no
+    -- expansion and no constructors. Its 'Anno' is empty: the parser's
+    -- alternative consumes no token.
   deriving stock (GHC.Generic, Eq, Ord, Show, Functor, Foldable, Traversable)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
@@ -245,7 +267,19 @@ data Expr n =
   | Proj       Anno (Expr n) n -- record projection, we could consider making this yet another function application syntax
   | Lam        Anno (GivenSig n) (Expr n)
   | App        Anno n [Expr n]
-  | AppNamed   Anno n [NamedExpr n] (Maybe [Int]) -- we store the order of arguments during type checking
+  | AppNamed   Anno n [NamedExpr n] (Maybe [Int])
+    -- ^ Named application. The @Maybe [Int]@ is the order of the arguments,
+    -- filled in by the type checker: entry @k@ says which of the callee's
+    -- parameters argument @k@ supplies.
+    --
+    -- Declared parameters are numbered from zero. A NEGATIVE entry
+    -- ('implicitSupplyIndex') marks an argument that supplies a /section
+    -- binder/ rather than a declared parameter — a name the callee does not
+    -- take but transitively reads (R1). 'L4.Discharge.dischargeModule' turns
+    -- every such site into a plain 'App' by putting the supplied value in the
+    -- binder's discharged parameter position, so a negative entry surviving
+    -- into evaluation means the module was not discharged, which
+    -- 'L4.EvaluateLazy.Machine' reports rather than sorting into place.
   | IfThenElse Anno (Expr n) (Expr n) (Expr n)
   | MultiWayIf Anno [GuardedExpr n] (Expr n)
   | Regulative Anno (Deonton n)
@@ -324,6 +358,17 @@ data Expr n =
   | Concat     Anno [Expr n] -- string concatenation
   | AsString   Anno (Expr n) -- type coercion to string
   | Breach     Anno (Maybe (Expr n)) (Maybe (Expr n))  -- BREACH [BY party] [BECAUSE reason]
+  | Refuse     Anno (Expr n)
+    -- ^ @REFUSE "message"@ — the model declines to answer. Evaluating a
+    -- 'Refuse' raises a refusal: a determinate outcome that is neither a value,
+    -- nor an evaluation error, nor an unknown fact the boundary can supply, and
+    -- that no rule in the language can observe or convert into an answer.
+    --
+    -- The message is parsed as a literal (see 'L4.Parser.refuse') and checked
+    -- against STRING, so a refusal's reason is statically known. That keeps the
+    -- payload out of the machine's frame stack ('L4.EvaluateLazy.Machine.unwindFrame'
+    -- is deliberately wildcard-free) and keeps a per-reason static analysis
+    -- possible.
   | Inert      Anno Text InertContext  -- ... "inert text" - grammatical scaffolding with context-aware evaluation
   deriving stock (GHC.Generic, Eq, Ord, Show, Functor, Foldable, Traversable)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
@@ -432,8 +477,16 @@ data Module n =
   deriving stock (GHC.Generic, Eq, Ord, Show, Functor, Foldable, Traversable)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
+-- | A section: its heading name, an optional @AKA@, an optional section-level
+-- @GIVEN@ (the /section binder/, R4), and its declarations.
+--
+-- The @GIVEN@ field sits between the @AKA@ and the declarations because that is
+-- source order in both accepted spellings — @\u00a7 NAME [AKA ...] GIVEN ...@ on the
+-- heading line, and the taught form on the next line indented past the
+-- @\u00a7@. Every hole-order-sensitive traversal ('ToConcreteNodes',
+-- @ToSemTokens@) must list it in that position.
 data Section n =
-  MkSection Anno (Maybe n) (Maybe (Aka n)) [TopDecl n]
+  MkSection Anno (Maybe n) (Maybe (Aka n)) (Maybe (GivenSig n)) [TopDecl n]
   deriving stock (GHC.Generic, Eq, Ord, Show, Functor, Foldable, Traversable)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
@@ -507,9 +560,9 @@ updateImport imported i@(MkImport ann n _) = case mapMaybe (\(importName, import
 
 moduleTopDecls :: Lens' (Module n) [TopDecl n]
 moduleTopDecls = lens
-                 (\(MkModule _ _ (MkSection _ _ _ decls)) -> decls)
-                 (\(MkModule ann nuri (MkSection sann sresolved maka _oldDecls)) decls ->
-                     MkModule ann nuri (MkSection sann sresolved maka decls))
+                 (\(MkModule _ _ (MkSection _ _ _ _ decls)) -> decls)
+                 (\(MkModule ann nuri (MkSection sann sresolved maka mgiven _oldDecls)) decls ->
+                     MkModule ann nuri (MkSection sann sresolved maka mgiven decls))
 
 -- ----------------------------------------------------------------------------
 -- Source Annotations
@@ -722,8 +775,8 @@ deriving via L4Syntax (LocalDecl n)
 
 -- Generic instance does not apply because we exclude the level.
 instance ToConcreteNodes PosToken (Section Name) where
-  toNodes (MkSection ann name maka decls) =
-    flattenConcreteNodes ann [toNodes name, toNodes maka, toNodes decls]
+  toNodes (MkSection ann name maka mgiven decls) =
+    flattenConcreteNodes ann [toNodes name, toNodes maka, toNodes mgiven, toNodes decls]
 
 deriving anyclass instance ToConcreteNodes PosToken (TopDecl Name)
 deriving anyclass instance ToConcreteNodes PosToken (Assume Name)
@@ -775,8 +828,8 @@ instance ToConcreteNodes PosToken NormalizedUri where
 
 -- Generic instance does not apply because we exclude the level.
 instance ToConcreteNodes PosToken (Section Resolved) where
-  toNodes (MkSection ann name maka decls) =
-    flattenConcreteNodes ann [toNodes name, toNodes maka, toNodes decls]
+  toNodes (MkSection ann name maka mgiven decls) =
+    flattenConcreteNodes ann [toNodes name, toNodes maka, toNodes mgiven, toNodes decls]
 
 deriving anyclass instance ToConcreteNodes PosToken (TopDecl Resolved)
 deriving anyclass instance ToConcreteNodes PosToken (Assume Resolved)

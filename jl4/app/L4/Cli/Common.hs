@@ -70,7 +70,8 @@ import L4.EvaluateLazy
   , EvalDirectiveResult(..)
   , EvalDirectiveValue(..)
   , parseFixedNow
-  , prettyEvalException
+  , prettyAssertionOutcome
+  , prettyReductionOutcome
   , prettyLedger
   , readFixedNowEnv
   , resolveEvalConfig
@@ -326,10 +327,8 @@ renderEvalOutput traceMode idx MkEvalDirectiveResult{range = mRange, result, tra
 
 renderEvalValue :: EvalDirectiveValue -> Text
 renderEvalValue = \case
-  Assertion True -> "assertion satisfied"
-  Assertion False -> "assertion failed"
-  Reduction (Left exc) -> Text.unlines (prettyEvalException exc)
-  Reduction (Right val) -> prettyLayout val
+  Assertion a -> prettyAssertionOutcome a
+  Reduction r -> prettyReductionOutcome r
 
 indentBlockText :: Text -> Text
 indentBlockText txt =

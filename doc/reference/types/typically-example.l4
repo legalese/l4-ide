@@ -1,21 +1,32 @@
--- TYPICALLY: metadata-only default values (rebuttable presumptions)
+-- TYPICALLY: default values, recorded but not applied (rebuttable presumptions)
 
--- Record fields with defaults
+-- Fields of a record, with defaults
 DECLARE Person HAS
   name IS A STRING
   has_capacity IS A BOOLEAN TYPICALLY TRUE
   is_under_duress IS A BOOLEAN TYPICALLY FALSE
   jurisdiction IS A STRING TYPICALLY "Singapore"
 
--- Assumed external values with defaults
+-- An assumed name, with a default
 ASSUME `applicable law` IS A STRING TYPICALLY "Singapore"
 
--- Function parameters with defaults
+-- A rule's own inputs, with defaults
 GIVEN
   age IS A NUMBER TYPICALLY 18
   married IS A BOOLEAN TYPICALLY FALSE
 GIVETH A BOOLEAN
 DECIDE `may purchase alcohol` IF age >= 18
 
--- Defaults do not change evaluation: all arguments are still required.
+-- Defaults change nothing when the rule is run: every input is still required.
 #EVAL `may purchase alcohol` 21 FALSE
+
+-- A section GIVEN with a default: one name for every rule in the section
+§ `Part 3 -- Capacity`
+    GIVEN `governing law` IS A STRING TYPICALLY "Singapore"
+          `person has capacity` IS A BOOLEAN TYPICALLY TRUE
+
+DECIDE `contract is binding` IF
+      `person has capacity`
+  AND `governing law` EQUALS "Singapore"
+
+#CHECK `contract is binding`

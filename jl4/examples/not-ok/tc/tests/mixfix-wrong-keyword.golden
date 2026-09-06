@@ -23,8 +23,8 @@ File: mixfix-wrong-keyword.l4
 
       myif (predefined)
 
-    expects 3 arguments,
-    but you are applying it to 5 arguments here.
+    expects 3 inputs,
+    but here it is given 5 inputs.
 
 File: mixfix-wrong-keyword.l4
   Hidden: no

@@ -4966,7 +4966,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
         p6undecl.exit === 0 &&
           p6undecl.row?.status === "PASS" &&
           (p6undecl.row.notes ?? []).some((n) =>
-            /declares no denovo\.checks\.min_assertions/.test(n.text),
+            /declares no encodings\.[^.]+\.checks\.min_assertions/.test(n.text),
           ),
       );
       // The vacuous-pass hole under that default (RED, measured 2026-08-09):
@@ -4998,7 +4998,9 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
   // A floor is a verdict input the stage reads out of the sidecar (via GO_S_*
   // env), so an edit to it must re-run the oracle, never replay the old
   // verdict. RED, measured before the fix: both stages' --inputs listed only
-  // modules + script (+ assert-report.mjs), so denovo.checks.min_assertions
+  // modules + script (+ assert-report.mjs), so the assertion floor — spelled
+  // denovo.checks.min_assertions when this was measured, and
+  // encodings.<id>.checks.min_assertions since —
   // 39 → 1000 followed by a --run-id resume printed "p6-tests: PASS
   // (replayed)" — a verdict the edited configuration would refuse. No $L4
   // needed: --inputs executes nothing.

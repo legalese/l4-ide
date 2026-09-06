@@ -91,6 +91,12 @@ GIVETH AN a
 `the first of` MEANS x
 ```
 
+### Later: the same GIVEN, written once for a whole section
+
+Every `GIVEN` above sits directly on one rule and lists the facts that this one rule is told about the case in front of it (its **"inputs"**). Sometimes a whole run of rules is about the same thing — three rules under one heading that each open `GIVEN alex IS A Person` — and the line is then written three times to say one thing once. When that happens, the same `GIVEN` can be lifted out and written once, indented under the section heading; every rule in the section is then told that fact without naming it again. The ordinary form taught on this page is the **"rule GIVEN"**; the one written under a heading is the **"section GIVEN"**.
+
+The section form also decides what a published rule asks the world for: the list of facts under the heading is the list of boxes on the web form and the list of fields a caller has to send. [What a Section Needs to Know](../../tutorials/section-given/what-a-section-needs-to-know.md) works this through on a real regulation.
+
 ---
 
 ## Calling Functions

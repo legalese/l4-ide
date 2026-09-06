@@ -14,6 +14,7 @@
 - [Regulative Rules](legal-modeling/regulative-rules.md)
 - [Constitutive vs Regulative Rules](legal-modeling/constitutive-vs-regulative.md)
 - [Default Reasoning and Exceptions](legal-modeling/default-reasoning.md)
+- [Five Kinds of No Answer](legal-modeling/non-answers.md)
 
 ## Type System
 

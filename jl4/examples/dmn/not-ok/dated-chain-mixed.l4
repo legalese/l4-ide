@@ -19,6 +19,7 @@ IMPORT prelude
 IMPORT daydate
 
 § `mixed dated chain`
+    GIVEN `the transitional relief applies` IS A BOOLEAN
 
 TIMEZONE IS "Asia/Singapore"
 
@@ -29,8 +30,6 @@ GIVETH A DATE
 `GST commenced` MEANS Date 1 4 1994
 
 ASSUME `no GST rate exists before commencement` IS A NUMBER
-
-ASSUME `the transitional relief applies` IS A BOOLEAN
 
 GIVEN change IS A DATE
 GIVETH A BOOLEAN

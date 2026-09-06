@@ -7,6 +7,8 @@ module L4.EvaluateLazy
 , readFixedNowEnv
 , EvalDirectiveResult (..)
 , EvalDirectiveValue(..)
+, AssertionOutcome(..)
+, ReductionOutcome(..)
 , EntityInfo
 , getTemporalContext
 , setTemporalContext
@@ -15,8 +17,12 @@ module L4.EvaluateLazy
 , execEvalModuleWithJSON
 , execEvalExprInContextOfModule
 , prettyEvalException
+, prettyRefusal
+, Refusal(..)
 , prettyEvalDirectiveResult
 , prettyEvalDirectiveResultWithFields
+, prettyAssertionOutcome
+, prettyReductionOutcome
 , postprocessTrace
 , safePostprocessTrace
 , tracePostprocessFailed
@@ -35,6 +41,7 @@ module L4.EvaluateLazy
 where
 
 import Base
+import L4.Discharge (dischargeModule)
 import qualified Base.DList as DList
 import qualified Base.Map as Map
 import qualified Base.Text as Text
@@ -196,7 +203,7 @@ runConfig = \ case
 -- | Evaluate an EVAL directive. For this, we evaluate to normal form,
 -- not just WHNF.
 nfDirective :: EvalDirective -> Eval EvalDirectiveResult
-nfDirective (MkEvalDirective r traced isAssert expr env) = withFreshLedger $ do
+nfDirective (MkEvalDirective r traced assertKind expr env) = withFreshLedger $ do
   -- T6: open a fresh, directive-local context-read span. (Exceptional
   -- unwinding closes spans as it pops UpdateThunk frames — see
   -- 'unwindFrame' — but a successful directive legitimately leaves its own
@@ -233,13 +240,50 @@ nfDirective (MkEvalDirective r traced isAssert expr env) = withFreshLedger $ do
   -- 'Assign' is already in here.
   directiveLedger <- currentStore
   let
-    v' =
-      if isAssert
-        then Assertion
-          case v of
-            Right (MkNF (ValBool True)) -> True
-            _                           -> False
-        else Reduction v
+    v' = case assertKind of
+      NotAnAssert -> Reduction
+        case v of
+          -- A refusal is NOT an evaluation error: the model declined to
+          -- answer, and every surface must be able to say so without calling
+          -- the program broken.
+          Left (RefusalException ref) -> ReducedRefused ref
+          Left exc                    -> ReducedErrored exc
+          Right nfv                   -> Reduced nfv
+      AssertHolds -> Assertion
+        case v of
+          -- A refusal is a determinate outcome of the assertion, distinct
+          -- both from a failure and from an error. '#ASSERT NOT e' where e
+          -- refuses lands here too: 'NOT' desugars to an 'IfThenElse' that
+          -- forces its scrutinee, so the refusal propagates and BOTH
+          -- polarities report "refused" rather than one of them collapsing.
+          Left (RefusalException ref) -> Refused ref
+          -- An assertion whose expression RAISED is neither satisfied nor
+          -- failed: the evaluator could not decide it. Collapsing the
+          -- exception into 'False' made '#ASSERT P' and '#ASSERT NOT P'
+          -- both report "assertion failed" whenever P raised, so a test
+          -- suite could not tell a wrong answer from an error.
+          Left exc                    -> Errored exc
+          Right (MkNF (ValBool True)) -> Holds
+          -- A result that is a bare assumed term did not raise, but it is
+          -- no verdict either — neither TRUE nor FALSE. Report it exactly as
+          -- the raising polarity does ('#ASSERT NOT b' forces b and raises
+          -- 'Stuck'), so both polarities of an '#ASSERT' on an assumed
+          -- BOOLEAN agree instead of one of them collapsing to "failed".
+          Right (MkNF (ValAssumed a)) -> Errored (UserEvalException (Stuck a))
+          Right _                     -> Fails
+      AssertRefuses mwanted -> Assertion
+        case v of
+          Left (RefusalException ref)
+            | Just wanted <- mwanted, wanted /= ref.message ->
+                FailsBecause
+                  ( "expected the refusal " <> quoted wanted
+                    <> ", got " <> quoted ref.message )
+            | otherwise -> Holds
+          -- An error is not a refusal. Conflating them would destroy exactly
+          -- the distinction '#ASSERT REFUSED' exists to test.
+          Left exc -> Errored exc
+          Right _  -> FailsBecause "expected a refusal, but the expression produced a value"
+    quoted t = "\"" <> t <> "\""
   pure (MkEvalDirectiveResult r v' finalTrace directiveLedger)
 
 -- | 'postprocessTrace', guarded so it can never escape an exception: if trace
@@ -294,16 +338,68 @@ data EvalDirectiveResult =
   deriving anyclass NFData
 
 data EvalDirectiveValue =
-    Assertion Bool
-  | Reduction (Either EvalException NF)
+    Assertion AssertionOutcome
+    -- ^ @#ASSERT@ and @#ASSERT REFUSED@.
+  | Reduction ReductionOutcome
+    -- ^ @#EVAL@ \/ @#EVALTRACE@ \/ @#TRACE@.
+  deriving stock (Generic, Show)
+  deriving anyclass NFData
+
+-- | What an @#ASSERT@ (of either kind) came to.
+--
+-- Four outcomes, not two, and the fourth is the point of @REFUSE@: a refused
+-- assertion is neither satisfied, nor failed, nor an evaluation error. Every
+-- consumer must render all four distinctly — collapsing 'Refused' into 'Fails'
+-- launders a declined answer into a determinate FALSE, and collapsing it into
+-- 'Errored' reports a designed outcome as a defect.
+data AssertionOutcome
+  = Holds
+    -- ^ The assertion is satisfied.
+  | Fails
+    -- ^ The assertion is not satisfied.
+  | FailsBecause !Text
+    -- ^ Not satisfied, with a specific explanation (what @#ASSERT REFUSED@
+    -- reports when the expression produced a value, or refused with a
+    -- different reason than the @BECAUSE@ clause named).
+  | Refused !Refusal
+    -- ^ The expression REFUSED: the model declined to answer.
+  | Errored !EvalException
+    -- ^ The expression raised before it could be decided.
+  deriving stock (Generic, Show)
+  deriving anyclass NFData
+
+-- | What an @#EVAL@ came to. The refusal arm exists for the same reason as
+-- 'AssertionOutcome'\'s: a refusal reaching a surface as an ordinary
+-- 'EvalException' is rendered as a crash, which is the wrong answer.
+data ReductionOutcome
+  = Reduced !NF
+  | ReducedRefused !Refusal
+  | ReducedErrored !EvalException
   deriving stock (Generic, Show)
   deriving anyclass NFData
 
 prettyEvalDirectiveValue :: EvalDirectiveValue -> Text
-prettyEvalDirectiveValue (Assertion True)       = "assertion satisfied"
-prettyEvalDirectiveValue (Assertion False)      = "assertion failed"
-prettyEvalDirectiveValue (Reduction (Left exc)) = Text.unlines (prettyEvalException exc)
-prettyEvalDirectiveValue (Reduction (Right v))  = prettyLayout v
+prettyEvalDirectiveValue (Assertion a) = prettyAssertionOutcome a
+prettyEvalDirectiveValue (Reduction v) = prettyReductionOutcome v
+
+-- | The outcomes of an @#ASSERT@, as the user sees them. The exception case
+-- keeps the exception's own lines verbatim under a header, so the reason
+-- (division by zero, an assumed term, a CONSIDER with no matching branch, …)
+-- is never lost. Every surface that renders an assertion goes through here.
+prettyAssertionOutcome :: AssertionOutcome -> Text
+prettyAssertionOutcome Holds            = "assertion satisfied"
+prettyAssertionOutcome Fails            = "assertion failed"
+prettyAssertionOutcome (FailsBecause t) = "assertion failed: " <> t
+prettyAssertionOutcome (Refused r)      =
+  Text.unlines ("assertion refused:" : prettyRefusal r)
+prettyAssertionOutcome (Errored exc)    =
+  Text.unlines ("assertion could not be evaluated:" : prettyEvalException exc)
+
+-- | The outcomes of an @#EVAL@, as the user sees them.
+prettyReductionOutcome :: ReductionOutcome -> Text
+prettyReductionOutcome (Reduced v)          = prettyLayout v
+prettyReductionOutcome (ReducedRefused r)   = Text.unlines (prettyRefusal r)
+prettyReductionOutcome (ReducedErrored exc) = Text.unlines (prettyEvalException exc)
 
 -- | STATE-AS-LEDGER M2/M4: render the per-party store a directive produced, as
 -- labelled sections. Returns the empty 'Text' when the directive wrote nothing,
@@ -404,20 +500,46 @@ instance Aeson.ToJSON EvalDirectiveResult where
     ]
 
 instance Aeson.ToJSON EvalDirectiveValue where
-  toJSON (Assertion b) = Aeson.object
+  toJSON (Assertion Holds) = Aeson.object
     [ "type"  Aeson..= ("assertion" :: Text)
-    , "value" Aeson..= b
+    , "value" Aeson..= True
     ]
-  toJSON (Reduction (Right val)) = Aeson.toJSON val
-  toJSON (Reduction (Left exc)) = Aeson.object
+  toJSON (Assertion Fails) = Aeson.object
+    [ "type"  Aeson..= ("assertion" :: Text)
+    , "value" Aeson..= False
+    ]
+  toJSON (Assertion a@(FailsBecause _)) = Aeson.object
+    [ "type"  Aeson..= ("assertion" :: Text)
+    , "value" Aeson..= False
+    , "error" Aeson..= prettyAssertionOutcome a
+    ]
+  -- Still an assertion (consumers counting them must see it), with a value
+  -- that is neither true nor false. A refusal is reported under its own key,
+  -- NOT under "error": a consumer that treats every non-boolean assertion as
+  -- a broken program is exactly what REFUSE exists to prevent.
+  toJSON (Assertion (Refused r)) = Aeson.object
+    [ "type"    Aeson..= ("assertion" :: Text)
+    , "value"   Aeson..= Aeson.Null
+    , "refused" Aeson..= Aeson.object [ "reason" Aeson..= r.message ]
+    ]
+  toJSON (Assertion a@(Errored _)) = Aeson.object
+    [ "type"  Aeson..= ("assertion" :: Text)
+    , "value" Aeson..= Aeson.Null
+    , "error" Aeson..= prettyAssertionOutcome a
+    ]
+  toJSON (Reduction (Reduced val)) = Aeson.toJSON val
+  toJSON (Reduction (ReducedRefused r)) = Aeson.object
+    [ "refused" Aeson..= Aeson.object [ "reason" Aeson..= r.message ]
+    ]
+  toJSON (Reduction (ReducedErrored exc)) = Aeson.object
     [ "error" Aeson..= Text.unlines (prettyEvalException exc)
     ]
 
 prettyEvalDirectiveValueWithFields :: ConstructorFieldNames -> EvalDirectiveValue -> Text
-prettyEvalDirectiveValueWithFields _fields (Assertion True)        = "assertion satisfied"
-prettyEvalDirectiveValueWithFields _fields (Assertion False)       = "assertion failed"
-prettyEvalDirectiveValueWithFields _fields (Reduction (Left exc))  = Text.unlines (prettyEvalException exc)
-prettyEvalDirectiveValueWithFields fields  (Reduction (Right v))   = prettyLayoutNF fields v
+prettyEvalDirectiveValueWithFields _fields (Assertion a)                    = prettyAssertionOutcome a
+prettyEvalDirectiveValueWithFields _fields (Reduction (ReducedErrored exc)) = Text.unlines (prettyEvalException exc)
+prettyEvalDirectiveValueWithFields _fields (Reduction (ReducedRefused r))   = Text.unlines (prettyRefusal r)
+prettyEvalDirectiveValueWithFields fields  (Reduction (Reduced v))          = prettyLayoutNF fields v
 
 -- | Evaluate WHNF to NF, with a cutoff (which possibly could be made configurable).
 nf :: WHNF -> Eval NF
@@ -491,7 +613,13 @@ evalAndNF d r = do
 -- the results of the (L)EVAL directives in this module.
 --
 execEvalModuleWithEnv :: EvalConfig -> EntityInfo -> Environment -> Module Resolved -> IO (Environment, [EvalDirectiveResult])
-execEvalModuleWithEnv evalConfig entityInfo env m@(MkModule _ moduleUri _) = do
+execEvalModuleWithEnv evalConfig entityInfo env m0@(MkModule _ moduleUri _) = do
+  -- Discharge is a property of EVALUATION, not of the checked module: the
+  -- checker's job is to say the program is well formed, and this pass says what
+  -- an implicit input means when it is run. Doing it here rather than in
+  -- 'L4.TypeCheck' keeps the module the LSP hovers over, the printers re-emit
+  -- and the backends lower exactly the module the author wrote.
+  let m = dischargeModule m0
   st0 <- mkInitialEvalState evalConfig entityInfo moduleUri
   r <- try (runEval st0 (evalModuleAndDirectives env m))
   case r of
@@ -641,7 +769,12 @@ evalModuleAndDirectivesWithJSON json env m = do
   pure (moduleEnv, results)
 
 execEvalModuleWithJSON :: EvalConfig -> EntityInfo -> Aeson.Value -> Module Resolved -> IO (Environment, [EvalDirectiveResult])
-execEvalModuleWithJSON evalConfig entityInfo json m@(MkModule _ moduleUri _) = do
+execEvalModuleWithJSON evalConfig entityInfo json m0@(MkModule _ moduleUri _) = do
+  -- @l4 batch@: the JSON is written into the module-level References, which are
+  -- the ROOT of the evaluation, so discharge and a JSON supply compose — a
+  -- definition reads its binder through its own parameter, and the value that
+  -- parameter is handed at the root is the one the request supplied.
+  let m = dischargeModule m0
   st0 <- mkInitialEvalState evalConfig entityInfo moduleUri
   r <- try (runEval st0 (evalModuleAndDirectivesWithJSON json emptyEnvironment m))
   case r of
@@ -682,8 +815,8 @@ filterDirectivesFromModule (MkModule ann uri section) =
   MkModule ann uri (filterDirectivesFromSection section)
 
 filterDirectivesFromSection :: Section Resolved -> Section Resolved
-filterDirectivesFromSection (MkSection sann sresolved maka decls) =
-  MkSection sann sresolved maka (mapMaybe filterTopDecl decls)
+filterDirectivesFromSection (MkSection sann sresolved maka mgiven decls) =
+  MkSection sann sresolved maka mgiven (mapMaybe filterTopDecl decls)
   where
     filterTopDecl :: TopDecl Resolved -> Maybe (TopDecl Resolved)
     filterTopDecl (Directive _ _) = Nothing  -- Remove directives

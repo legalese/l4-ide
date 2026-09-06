@@ -1,0 +1,24 @@
+-- One refusal, used at two types. REFUSE is an expression at ANY type, so a
+-- single polymorphic placeholder serves a NUMBER-valued rule and a
+-- BOOLEAN-valued one without being written twice.
+--
+-- (Deliberately no #CHECK here: a #CHECK on a polymorphic definition prints an
+-- inference-variable gensym, whose name moves with unrelated changes and would
+-- make this file's golden unstable.)
+
+IMPORT prelude
+
+GIVEN a IS A TYPE
+GIVETH AN a
+`this rule has not been written yet` MEANS
+    REFUSE "this rule has not been written yet"
+
+GIVETH A NUMBER
+`the amount` MEANS 1 PLUS `this rule has not been written yet`
+
+GIVETH A BOOLEAN
+`is eligible` MEANS TRUE AND `this rule has not been written yet`
+
+#ASSERT REFUSED `the amount`
+#ASSERT REFUSED `is eligible`
+#ASSERT REFUSED `the amount` BECAUSE "this rule has not been written yet"

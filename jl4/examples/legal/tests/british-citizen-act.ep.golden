@@ -1,15 +1,14 @@
 § `British Citizen Act`
 
 §§ `Assumptions`
+    GIVEN `mother of` IS A FUNCTION FROM Person TO Person
+          `father of` IS A FUNCTION FROM Person TO Person
+          `is born in the United Kingdom after commencement` IS A FUNCTION FROM Person TO BOOLEAN
+          `is born in a qualifying territory after the appointed day` IS A FUNCTION FROM Person TO BOOLEAN
+          `is settled in the United Kingdom` IS A FUNCTION FROM Person TO BOOLEAN
+          `is settled in the qualifying territory in which the person is born` IS A FUNCTION FROM Person TO BOOLEAN
 
-ASSUME Person IS A TYPE
-ASSUME `mother of` IS A FUNCTION FROM Person TO Person
-ASSUME `father of` IS A FUNCTION FROM Person TO Person
-
-ASSUME `is born in the United Kingdom after commencement` IS A FUNCTION FROM Person TO BOOLEAN
-ASSUME `is born in a qualifying territory after the appointed day` IS A FUNCTION FROM Person TO BOOLEAN
-ASSUME `is settled in the United Kingdom` IS A FUNCTION FROM Person TO BOOLEAN
-ASSUME `is settled in the qualifying territory in which the person is born` IS A FUNCTION FROM Person TO BOOLEAN
+DECLARE Person
 
 §§ `Improved Readability Version`
 
@@ -104,8 +103,8 @@ GIVEN a IS A NUMBER
 §§ `Expanded version`
 
 -- Note: this function is NOT @export. The legal modelling uses function-typed
--- ASSUMEs (mother of, father of, is born in the United Kingdom after
--- commencement, …) as uninterpreted predicates. A function-typed ASSUME
+-- section GIVENs (mother of, father of, is born in the United Kingdom after
+-- commencement, …) as uninterpreted predicates. A function-typed binder
 -- can't be evaluated to a concrete value at runtime, so exporting such
 -- a function would fail with "assumed term" errors on invocation.
 GIVEN p IS A Person @desc Attributes of Person in question and everything we should ever know about this person is here.

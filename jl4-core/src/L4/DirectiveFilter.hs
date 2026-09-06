@@ -22,8 +22,8 @@ filterIdeDirectives (MkModule anno imports section) =
   MkModule anno imports (filterSection section)
 
 filterSection :: Section n -> Section n
-filterSection (MkSection anno lvl heading decls) =
-  MkSection anno lvl heading (mapMaybe filterTopDecl decls)
+filterSection (MkSection anno lvl heading mgiven decls) =
+  MkSection anno lvl heading mgiven (mapMaybe filterTopDecl decls)
 
 filterTopDecl :: TopDecl n -> Maybe (TopDecl n)
 filterTopDecl = \case
@@ -37,4 +37,5 @@ isIdeDirective = \case
   LazyEvalTrace{} -> True   -- #EVALTRACE
   Check{}         -> True   -- #CHECK
   Assert{}        -> True   -- #ASSERT
+  AssertRefused{} -> True   -- #ASSERT REFUSED
   Contract{}      -> False  -- Keep #CONTRACT

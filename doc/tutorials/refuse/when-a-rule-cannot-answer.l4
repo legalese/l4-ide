@@ -1,0 +1,208 @@
+-- Companion file for the tutorial "When a Rule Cannot Answer".
+--
+-- The page's subject is Regulation Crowdfunding, part 227 of title 17 of the
+-- Code of Federal Regulations, which commenced on 2016-05-16. This file holds
+-- every example the page shows that runs today: the recap, the careless
+-- encoding of Step 1, the refusal that repairs it in Step 2, the screens of
+-- Step 3, the look-alikes of Steps 4 and 5, the uncatchability of Step 6, the
+-- ordering of Step 7 and the tests of Step 8.
+--
+--     l4 run when-a-rule-cannot-answer.l4
+
+IMPORT prelude
+IMPORT daydate
+
+§ `0. What a rule is`
+
+-- A rule is told some facts about the case in front of it -- its inputs, the
+-- names listed after GIVEN -- and works out one answer, its output, whose kind
+-- of thing is named after GIVETH. This one is told a person and answers
+-- yes-or-no. Alex is 17, so the answer is FALSE.
+
+DECLARE Person
+    HAS name IS A STRING
+        age IS A NUMBER
+
+GIVEN alex IS A Person
+GIVETH A BOOLEAN
+`is over 18` alex MEANS alex's age AT LEAST 18
+
+`Alex, aged 17` MEANS Person WITH name IS "Alex", age IS 17
+
+#EVAL `is over 18` `Alex, aged 17`   -- FALSE
+
+§ `1. A confident wrong answer`
+
+-- The offering limit has had three regimes. Encoded with no floor under the
+-- oldest arm, the commencement-day figure is handed out for every date before
+-- commencement as well -- including dates on which part 227 did not exist.
+
+@ref 17 CFR 227.100(a)(1) — the offering maximum, encoded without a floor
+GIVEN `rule date` IS A DATE
+GIVETH A NUMBER
+`unfloored offering maximum` MEANS
+    BRANCH
+       IF `rule date` AT LEAST Date 15 3 2021 THEN 5000000
+       IF `rule date` AT LEAST Date 12 4 2017 THEN 1070000
+       OTHERWISE 1000000
+
+#EVAL `unfloored offering maximum` (Date 1 6 2016)   -- 1000000, correct
+#EVAL `unfloored offering maximum` (Date 1 1 2016)   -- 1000000, and wrong
+
+§ `2. The refusal, and the rule that uses it`
+
+-- One named definition per refusal; the name is the message; an @ref above it
+-- says why the encoding stops here; every rule that needs it uses the name.
+
+@ref 80 FR 71388 (Rel. 33-9974) — 17 CFR part 227 commences on 2016-05-16
+GIVETH A NUMBER
+`no Regulation Crowdfunding figure exists before commencement on 2016-05-16` MEANS
+    REFUSE "no Regulation Crowdfunding figure exists before commencement on 2016-05-16"
+
+@ref 17 CFR 227.100(a)(1) — offering maximum in a 12-month period
+GIVEN `rule date` IS A DATE
+GIVETH A NUMBER
+`offering maximum in a 12-month period` MEANS
+    BRANCH
+       IF `rule date` AT LEAST Date 15 3 2021 THEN 5000000
+       IF `rule date` AT LEAST Date 12 4 2017 THEN 1070000
+       IF `rule date` AT LEAST Date 16 5 2016 THEN 1000000
+       OTHERWISE `no Regulation Crowdfunding figure exists before commencement on 2016-05-16`
+
+#EVAL `offering maximum in a 12-month period` (Date 1 6 2016)   -- 1000000
+#EVAL `offering maximum in a 12-month period` (Date 1 1 2016)   -- refused
+
+#ASSERT REFUSED (`offering maximum in a 12-month period` (Date 1 1 2016))
+#ASSERT REFUSED (`offering maximum in a 12-month period` (Date 1 1 2016)) BECAUSE "no Regulation Crowdfunding figure exists before commencement on 2016-05-16"
+
+§ `3. The law does not apply: a value, not a refusal`
+
+-- "Was it in force?" has an answer on every date there has ever been. It is
+-- determinate, so it is an ordinary value that other rules can read.
+
+@ref 80 FR 71388 (Rel. 33-9974) — part 227 is in force from 2016-05-16
+GIVEN `rule date` IS A DATE
+GIVETH A BOOLEAN
+`Regulation Crowdfunding is in force on` `rule date` MEANS
+    `rule date` AT LEAST Date 16 5 2016
+
+#ASSERT NOT (`Regulation Crowdfunding is in force on` (Date 1 1 2016))
+#ASSERT `Regulation Crowdfunding is in force on` (Date 1 6 2016)
+
+-- The same shape carries a savings provision. This licensing regime is
+-- invented, to keep the example short: it is repealed on 2024-01-01, and an
+-- application filed before the repeal is still decided under the old Act,
+-- because the law says so. That rule is a rule, and it answers.
+
+DECLARE Application
+    HAS `filed on` IS A DATE
+
+GIVETH A DATE
+`the repeal took effect` MEANS Date 1 1 2024
+
+GIVEN application IS AN Application
+GIVETH A BOOLEAN
+`is decided under the old Act` application MEANS
+    NOT (application's `filed on` AT LEAST `the repeal took effect`)
+
+`the November application` MEANS Application WITH `filed on` IS Date 3 11 2023
+
+#ASSERT `is decided under the old Act` `the November application`
+
+§ `4. A value that may be absent`
+
+-- A first-time issuer has raised nothing in the previous 12 months. The
+-- absence is a fact about that issuer, and the rule knows what to do with it.
+
+DECLARE Issuer
+    HAS name IS A STRING
+        `amount raised in the previous 12 months` IS A MAYBE NUMBER
+
+GIVEN issuer IS AN Issuer
+GIVETH A NUMBER
+`prior raises counted against the limit` issuer MEANS
+    CONSIDER issuer's `amount raised in the previous 12 months`
+    WHEN NOTHING THEN 0
+    WHEN JUST amount THEN amount
+
+`Foundry Labs, a first-time issuer` MEANS Issuer WITH name IS "Foundry Labs", `amount raised in the previous 12 months` IS NOTHING
+`Ellsworth Tools, a returning issuer` MEANS Issuer WITH name IS "Ellsworth Tools", `amount raised in the previous 12 months` IS JUST 400000
+
+#EVAL `prior raises counted against the limit` `Foundry Labs, a first-time issuer`     -- 0
+#EVAL `prior raises counted against the limit` `Ellsworth Tools, a returning issuer`   -- 400000
+
+§ `5. A failure with a reason`
+
+-- A rejected filing is not the absence of an answer. It is an answer, and it
+-- carries the ground of rejection, which the rule that relies on it reads and
+-- acts on.
+
+DECLARE `Form C filing`
+    HAS `has the required financial statements` IS A BOOLEAN
+        `is signed` IS A BOOLEAN
+
+@ref 17 CFR 227.203(a)(1) — the Form C and what it must include
+GIVEN filing IS A `Form C filing`
+GIVETH AN EITHER STRING BOOLEAN
+`the filing is accepted` filing MEANS
+    BRANCH
+       IF NOT filing's `has the required financial statements`
+           THEN LEFT "rejected: the required financial statements are missing"
+       IF NOT filing's `is signed`
+           THEN LEFT "rejected: the filing is not signed"
+       OTHERWISE RIGHT TRUE
+
+GIVEN filing IS A `Form C filing`
+GIVETH A STRING
+`what the intermediary tells the issuer` filing MEANS
+    CONSIDER `the filing is accepted` filing
+    WHEN LEFT reason THEN reason
+    WHEN RIGHT accepted THEN "accepted"
+
+`Foundry Labs' unsigned filing` MEANS `Form C filing` WITH `has the required financial statements` IS TRUE, `is signed` IS FALSE
+
+#EVAL `what the intermediary tells the issuer` `Foundry Labs' unsigned filing`
+
+§ `6. Nothing downstream can turn a refusal into an answer`
+
+-- Wrapping the refusal in a MAYBE and defaulting the absent case does not
+-- soften it: to choose an arm, CONSIDER has to look, and looking is what
+-- refuses. The refusal reaches the boundary unchanged.
+
+GIVETH A MAYBE NUMBER
+`the figure, if the model has one` MEANS
+    JUST `no Regulation Crowdfunding figure exists before commencement on 2016-05-16`
+
+GIVETH A NUMBER
+`an attempt to default the refusal` MEANS
+    CONSIDER `the figure, if the model has one`
+    WHEN JUST amount THEN amount
+    WHEN NOTHING THEN 0
+
+#EVAL `an attempt to default the refusal`
+#ASSERT REFUSED `an attempt to default the refusal` BECAUSE "no Regulation Crowdfunding figure exists before commencement on 2016-05-16"
+
+§ `7. Order matters, a little`
+
+@ref 17 CFR 227.100(b)(1) — foreign private issuers are outside part 227
+GIVETH A BOOLEAN
+`the model does not cover offerings by foreign private issuers` MEANS
+    REFUSE "the model does not cover offerings by foreign private issuers"
+
+#ASSERT NOT (FALSE AND `the model does not cover offerings by foreign private issuers`)
+#ASSERT REFUSED (`the model does not cover offerings by foreign private issuers` AND FALSE)
+
+§ `8. The drafting placeholder`
+
+-- TBD comes from the prelude. It is a refusal that says the rule has not been
+-- written yet, so a half-finished file gives an honest non-answer instead of a
+-- placeholder TRUE someone later mistakes for a conclusion.
+
+@ref 17 CFR 227.202 — ongoing reporting requirements, not yet encoded
+GIVETH A BOOLEAN
+`the issuer's ongoing reporting obligations are satisfied` MEANS TBD
+
+-- The message a TBD carries is the prelude's own, not one this file wrote:
+--   TBD: this rule has not been written yet
+#EVAL `the issuer's ongoing reporting obligations are satisfied`
+#ASSERT REFUSED `the issuer's ongoing reporting obligations are satisfied`

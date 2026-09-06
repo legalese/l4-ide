@@ -100,6 +100,20 @@ Sum types with named constructors.
 - Discriminated unions
 - **Examples:** Status values, categories, variants
 
+### Opaque Types
+
+A type that is named but not described: no fields, no alternatives, no body.
+
+**Example:** [opaque-example.l4](opaque-example.l4)
+
+- Written as a `DECLARE` with nothing after the name
+- Distinct from every other type, so arguments cannot be swapped by mistake
+- No way to write a value down; values arrive as inputs
+- **Examples:** `Applicant`, `Premises`, and other parties or things a rule
+  must tell apart without needing their internals
+- Replaces the older `ASSUME TypeName IS A TYPE` spelling. See
+  [opaque types](DECLARE.md#opaque-types)
+
 ### PAIR
 
 Two-element product type from prelude.

@@ -131,8 +131,9 @@ Standard mathematical precedence:
 Arithmetic results can be used with comparisons and logic:
 
 ```l4
-ASSUME price IS A NUMBER
-ASSUME quantity IS A NUMBER
+§ `Line total`
+    GIVEN price IS A NUMBER
+          quantity IS A NUMBER
 
 -- Calculate total and check threshold
 DECIDE total IS price TIMES quantity

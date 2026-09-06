@@ -199,7 +199,7 @@ collectEnums (MkModule _ _ section) =
   )
  where
   defs = goSection section
-  goSection (MkSection _ _ _ decls) = decls >>= goDecl
+  goSection (MkSection _ _ _ _ decls) = decls >>= goDecl
   goDecl = \case
     Declare _ (MkDeclare _ _ (MkAppForm _ tyRes _ _) (EnumDecl _ conDecls)) ->
       let allNames = [ resolvedToText c | MkConDecl _ c _ <- conDecls ]
@@ -215,7 +215,7 @@ collectEnums (MkModule _ _ section) =
 collectRecords :: Module Resolved -> Map Unique RecordSpec
 collectRecords (MkModule _ _ section) = Map.fromList (goSection section)
  where
-  goSection (MkSection _ _ _ decls) = decls >>= goDecl
+  goSection (MkSection _ _ _ _ decls) = decls >>= goDecl
   goDecl = \case
     Declare _ (MkDeclare _ _ (MkAppForm _ recRes _ _) (RecordDecl _ _ fields)) ->
       [ ( getUnique recRes
@@ -233,7 +233,7 @@ collectRecords (MkModule _ _ section) = Map.fromList (goSection section)
 collectTopDecides :: Module Resolved -> [TopDecide]
 collectTopDecides (MkModule _ _ section) = goSection section
  where
-  goSection (MkSection _ _ _ decls) = decls >>= goDecl
+  goSection (MkSection _ _ _ _ decls) = decls >>= goDecl
   goDecl = \case
     Decide topAnn d ->
       let (ps, b) = decideFunShape d
@@ -331,7 +331,7 @@ collectGlossary (MkModule _ _ section) =
       (kept, collided)      = dedupOnTerm regexSafe
   in (kept, regexBad <> collided)
  where
-  goSection (MkSection _ _ _ decls) = decls >>= goDecl
+  goSection (MkSection _ _ _ _ decls) = decls >>= goDecl
   goDecl = \case
     Declare _ (MkDeclare ann _ (MkAppForm _ nm _ _) _) ->
       [ (resolvedToText nm, t) | Just t <- [plainDescOf ann] ]
@@ -426,7 +426,7 @@ exprRefs =
 collectAssumes :: Module Resolved -> Map Unique (Assume Resolved)
 collectAssumes (MkModule _ _ section) = Map.fromList (goSection section)
  where
-  goSection (MkSection _ _ _ decls) = decls >>= goDecl
+  goSection (MkSection _ _ _ _ decls) = decls >>= goDecl
   goDecl = \case
     Assume _ a@(MkAssume _ _ (MkAppForm _ nmRes _ _) _ _) -> [(getUnique nmRes, a)]
     Section _ sub -> goSection sub
@@ -2219,6 +2219,13 @@ refuse = \case
   Breach {} -> LFBlocked "DA-DEONTIC"
     "BREACH has no docassemble form"
     "the breach verdict of the deontic machine"
+  -- The designed image (a terminal screen that shows the reason and stops the
+  -- interview) is PROPS-REDTEAM-2026-09-03 §6 item 6 and is not built. Until
+  -- it is, a refusal blocks its block rather than becoming a question or a
+  -- value the interview could answer with.
+  Refuse {} -> LFBlocked "DA-REFUSE"
+    "REFUSE has no docassemble form in v1"
+    "a declined answer (the designed image, a terminal screen carrying the reason, is PROPS-REDTEAM §6 item 6)"
   RAnd {} -> LFBlocked "DA-DEONTIC"
     "regulative AND has no docassemble form"
     "deontic composition"

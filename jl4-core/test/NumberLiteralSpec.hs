@@ -24,7 +24,7 @@ firstDecideLit src = do
     Left errs -> do
       expectationFailure $ "Parser failed: " <> show errs
       error "unreachable"
-    Right (MkModule _ _ (MkSection _ _ _ decls), _, _) ->
+    Right (MkModule _ _ (MkSection _ _ _ _ decls), _, _) ->
       case decls of
         Decide _ (MkDecide _ _ _ (Lit _ lit)) : _ -> pure lit
         _ -> do

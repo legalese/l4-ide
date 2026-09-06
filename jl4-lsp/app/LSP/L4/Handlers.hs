@@ -414,6 +414,7 @@ handlers evalConfig recorder =
             Check{}         -> "#CHECK"
             Contract{}      -> "#CHECK"
             Assert{}        -> "#ASSERT"
+            AssertRefused{} -> "#ASSERT REFUSED"
 
           mkRenderResultCodeLens srcPos label = CodeLens
             { _command = Just Command
@@ -436,7 +437,7 @@ handlers evalConfig recorder =
           -- foldTopDecls only visits the top-level section; directives can be
           -- nested inside §§ sub-sections, so we recurse through all sections.
           collectFromSection :: Section Resolved -> [CodeLens]
-          collectFromSection (MkSection _ _ _ topDecls) = concatMap collectFromTopDecl topDecls
+          collectFromSection (MkSection _ _ _ _ topDecls) = concatMap collectFromTopDecl topDecls
 
           collectFromTopDecl :: TopDecl Resolved -> [CodeLens]
           collectFromTopDecl td = directiveToCodeLens td ++ case td of
@@ -475,12 +476,12 @@ handlers evalConfig recorder =
                 in sectionToSymbols moduleNuri subst entInfo section
 
             sectionToSymbols :: NormalizedUri -> Substitution -> EntityInfo -> Section Resolved -> [DocumentSymbol]
-            sectionToSymbols moduleNuri subst entInfo (MkSection _ _ _ topDecls) =
+            sectionToSymbols moduleNuri subst entInfo (MkSection _ _ _ _ topDecls) =
               concatMap (topDeclToSymbol moduleNuri subst entInfo) topDecls
 
             topDeclToSymbol :: NormalizedUri -> Substitution -> EntityInfo -> TopDecl Resolved -> [DocumentSymbol]
             topDeclToSymbol moduleNuri subst entInfo = \case
-              Section _ s@(MkSection _ mName _ _) ->
+              Section _ s@(MkSection _ mName _ _ _) ->
                 case rangeOfNode s of
                   Just rng ->
                     let name = maybe "§" (nameToText . getOriginal) mName
@@ -514,6 +515,14 @@ handlers evalConfig recorder =
                       SynonymDecl _ ty ->
                         let detail = prettyLayout ty
                         in [ mkSymbol originalName (Just detail) SymbolKind_Variable lspRange selRange ]
+                      -- An opaque type has no body to describe, so no detail.
+                      -- 'SymbolKind_TypeParameter' is what the @ASSUME T IS A
+                      -- TYPE@ spelling of the same declaration already yields
+                      -- ('typeToSymbolKind' falls through on @"TYPE"@), and is
+                      -- what a record yields; a migration between the two
+                      -- spellings leaves the outline unchanged.
+                      OpaqueDecl _ ->
+                        [ mkSymbol originalName Nothing SymbolKind_TypeParameter lspRange selRange ]
                   Nothing -> []
 
               Decide _ decide@(MkDecide _ (MkTypeSig _ (MkGivenSig _ givenParams) _) (MkAppForm _ n _ _) body) ->
@@ -556,6 +565,7 @@ handlers evalConfig recorder =
                           Check _ e         -> ("#CHECK", e)
                           Contract _ e _ _  -> ("#CHECK", e)
                           Assert _ e        -> ("#ASSERT", e)
+                          AssertRefused _ e _ -> ("#ASSERT REFUSED", e)
                         detail = prettyLayout dExpr
                     in [ mkSymbol label (Just detail) SymbolKind_Operator lspRange lspRange ]
                   Nothing -> []

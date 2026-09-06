@@ -1,0 +1,21 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+refuse-uncatchable.l4:28:1-49:
+  assertion satisfied
+refuse-uncatchable.l4:31:1-52:
+  assertion satisfied
+refuse-uncatchable.l4:32:1-53:
+  assertion satisfied
+refuse-uncatchable.l4:33:1-52:
+  assertion satisfied
+refuse-uncatchable.l4:34:1-47:
+  assertion satisfied
+refuse-uncatchable.l4:39:1-49:
+  assertion satisfied
+refuse-uncatchable.l4:40:1-41:
+  assertion satisfied
+refuse-uncatchable.l4:48:1-37:
+  assertion satisfied
+refuse-uncatchable.l4:56:1-39:
+  assertion satisfied

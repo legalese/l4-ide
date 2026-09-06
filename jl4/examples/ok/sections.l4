@@ -2,13 +2,10 @@
 ASSUME zero IS A NUMBER
 
 § `Section title`
-
-ASSUME one IS A NUMBER
+    GIVEN one IS A NUMBER
 
 § §
-
-ASSUME two IS A NUMBER
+    GIVEN two IS A NUMBER
 
 §§§§ `A sub-sub-subsection`
-
-ASSUME three IS A NUMBER
+    GIVEN three IS A NUMBER

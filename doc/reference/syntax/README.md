@@ -158,8 +158,9 @@ Only functions carrying `@export` are exported; everything else stays internal.
 ### @infixl / @infixr / @infix
 
 Declare the precedence and associativity of a binary infix operator, so that
-unparenthesized chains of such operators group the way you declare —
-GHC-style fixity for L4's identifier operators.
+unparenthesized chains of such operators group the way you declare — the same
+kind of fixity declaration Haskell offers, applied to L4's identifier
+operators.
 
 ```l4
 @infixl 6
@@ -183,7 +184,7 @@ p INTERSECT q MEANS ...
   else it is ignored with a warning.
 - **No default fixity.** An operator without a declaration cannot be chained
   without parentheses (you get the usual arity error). This is a deliberate
-  divergence from GHC's `infixl 9` default: existing programs keep their
+  divergence from Haskell's `infixl 9` default: existing programs keep their
   meaning exactly.
 - Fixity travels with the operator across `IMPORT`, so a library can declare
   it once and every client gets bare chains. Conflicting imported
@@ -191,8 +192,16 @@ p INTERSECT q MEANS ...
 - Chaining operators of equal priority requires them to associate in the
   same direction; mixed `@infixl`/`@infixr` at one priority is an error.
 - Keyword operators (`PLUS`, `AND`, ...) have their own built-in precedence
-  table; mixing keyword and identifier operators in one unparenthesized
-  expression is not re-associated — parenthesize.
+  table, and identifier operators may appear unparenthesized on either side
+  of them. An identifier-operator chain **binds tighter than every keyword
+  operator** — ``10 PLUS 2 `scaledby` 3`` is ``10 PLUS (2 `scaledby` 3)``,
+  and ``p `resides in` "NY" OR p `resides in` "NJ"`` is a disjunction of the
+  two calls. Declared priority numbers govern grouping **among**
+  identifier operators only; they do not interleave with the keyword table
+  (even an `@infixl 1` operator binds tighter than `TIMES`). In operand
+  position (after a keyword operator) chain keywords must be on the same
+  line as the operand; at the head of an expression an aligned continuation
+  line is also accepted.
 
 ---
 
@@ -273,6 +282,7 @@ Assert that an expression evaluates to TRUE. Used for automated testing.
 
 ```l4
 #ASSERT expression
+#ASSERT NOT expression
 ```
 
 **Example:**
@@ -280,6 +290,54 @@ Assert that an expression evaluates to TRUE. Used for automated testing.
 ```l4
 #ASSERT 2 PLUS 2 EQUALS 4
 ```
+
+**Outcomes.** An assertion reports one of four things: `assertion satisfied`; `assertion failed`;
+`assertion could not be evaluated`, when working the expression out stopped part-way — most often because it
+needed the value of a name nobody supplied; and _refused_, when the expression is one the model declines to answer (see
+[REFUSE](../control-flow/REFUSE.md)). A refusal is neither satisfied nor failed, and a plain
+`#ASSERT` is not the way to test for one:
+
+```
+Result:
+  assertion refused:
+  The model refuses to answer:
+    no Regulation Crowdfunding figure exists before commencement in 2016
+```
+
+### #ASSERT REFUSED
+
+Assert that an expression _refuses_ — that the case is one the model declines to answer, and that
+declining is the expected outcome.
+
+**Syntax:**
+
+```l4
+#ASSERT REFUSED expression
+#ASSERT REFUSED expression BECAUSE "message"
+```
+
+`#ASSERT REFUSED e` passes when `e` refuses, whatever the message it carries. Adding
+`BECAUSE "message"` also requires the refusal to carry exactly that message, which pins down _which_
+refusal was reached when a rule has more than one.
+
+**Example:**
+
+```l4
+#ASSERT REFUSED `funding limit for` 2015
+#ASSERT REFUSED `funding limit for` 2015 BECAUSE "no Regulation Crowdfunding figure exists before commencement in 2016"
+```
+
+**Outcomes:**
+
+```
+assertion satisfied
+assertion failed: expected a refusal, but the expression produced a value
+assertion failed: expected the refusal "x", got "y"
+```
+
+The first is what a `#ASSERT REFUSED` reports when the expression refused and any `BECAUSE` message
+matched; the second when the expression produced an ordinary value instead; the third when it
+refused, but carrying a different message.
 
 ---
 
@@ -354,7 +412,7 @@ Record field access using `'s`.
 
 ### Section Markers (§)
 
-Organize code into named, nested scopes using `§`, similar to sections in legislation. Definitions in different sections do not shadow each other; the compiler creates fully qualified name bindings for disambiguation.
+Organize code into named, nested sections using `§`, the way Parts and Divisions divide a statute. A name is looked for first along the using rule's own ancestry — its own section, then each enclosing section, then the root — and the nearest declaration of it wins; if nothing on that ancestry declares the name, every declaration of it anywhere in the file is a candidate, and one candidate resolves while two of the same kind is an error. L4 also gives every declaration a fully qualified name, so any of them can be named explicitly. [Sections](sections.md) states the whole rule, with the table of cases and the diagnostics.
 
 **Levels:**
 
@@ -364,7 +422,7 @@ Organize code into named, nested scopes using `§`, similar to sections in legis
 
 **Example:** [section-example.l4](section-example.l4)
 
-**Qualified access:** When the same name exists in multiple sections, consumers must qualify to disambiguate. This parallels how legislation scopes definitions ("for purposes of subsection 2, X means ...").
+**Qualified access:** A bare name resolves whenever exactly one declaration of it is in reach, whatever section that is in. Qualification is _required_ only where two declarations of the same kind are equally far from the rule using them — and is worth writing anyway across Parts, so a reader can see where the name comes from. This parallels how legislation scopes definitions ("for purposes of subsection 2, X means ..."). In the example below, `is adult under sub 2` sits inside `Subsection 3`, which declares its own `age of majority`, so reaching `Subsection 2`'s must be spelled out.
 
 ```l4
 § `Part VII`
@@ -379,6 +437,8 @@ Organize code into named, nested scopes using `§`, similar to sections in legis
 DECIDE `is adult under sub 2` IF
     age >= `Part VII`'s `Subsection 2`'s `age of majority`
 ```
+
+**The section `GIVEN`:** A rule is told some facts about the case in front of it (its **"inputs"**, the names listed after `GIVEN`). A `GIVEN` indented under a section heading declares one of those names once for the whole section — a **"section `GIVEN`"** — instead of every rule in the section repeating it in its own `GIVEN`. See [The section `GIVEN`](section-given.md) and [section-given-example.l4](section-given-example.l4).
 
 **Section aliases:** Use AKA to create shorter names for qualified references:
 
@@ -425,7 +485,7 @@ Examples: `(age PLUS 5) TIMES 2`, `PAIR OF 1, 2`
 
 ### Brackets
 
-`[ ]` - Inline NLG annotations.
+`[ ]` - Inline natural language generation (NLG) annotations.
 
 Example: `The applicant [is %age% years old].`
 

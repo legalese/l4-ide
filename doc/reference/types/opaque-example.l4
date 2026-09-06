@@ -1,0 +1,66 @@
+-- Opaque types: `DECLARE T` with no body.
+--
+-- Run this file with:  l4 run doc/reference/types/opaque-example.l4
+
+§ `Naming a type without describing it`
+
+-- A licensing rule cares that an applicant and a premises are DIFFERENT KINDS
+-- of thing, and that a decision about one is not accidentally applied to the
+-- other. It does not care what either is made of. An opaque type says exactly
+-- that much and no more.
+DECLARE Applicant
+DECLARE Premises
+
+-- These type-check. `Applicant` and `Premises` are distinct types, so swapping
+-- the two arguments below would be a type error.
+GIVEN a IS AN Applicant
+      p IS A Premises
+GIVETH A BOOLEAN
+DECIDE `may be licensed` a p IS TRUE
+
+§ `Opaque types inside records`
+
+DECLARE Outcome IS ONE OF granted, refused
+
+DECLARE Application
+  HAS applicant IS AN Applicant
+      premises  IS A Premises
+      outcome   IS AN Outcome
+
+-- A rule that never looks inside the opaque fields evaluates normally.
+GIVEN app IS AN Application
+GIVETH A BOOLEAN
+DECIDE `was granted` app IF app's outcome EQUALS granted
+
+§ `Where the values come from`
+
+-- No expression in this file can produce an `Applicant`: an opaque type has no
+-- constructors. A value arrives from outside — an ASSUME here, a JSON input at
+-- a service boundary in production.
+ASSUME `the applicant` IS AN Applicant
+ASSUME `the premises` IS A Premises
+
+#EVAL `was granted` (Application WITH applicant IS `the applicant`,
+                                 premises  IS `the premises`,
+                                 outcome   IS granted)
+
+#EVAL `was granted` (Application WITH applicant IS `the applicant`,
+                                 premises  IS `the premises`,
+                                 outcome   IS refused)
+
+#CHECK `may be licensed`
+
+§ `Opaque types with parameters`
+
+-- The head's arguments are type variables, as they are for a record head.
+DECLARE Bag x
+
+GIVEN a IS A TYPE
+DECLARE Register a
+
+GIVEN b IS A Bag OF NUMBER
+      r IS A Register OF STRING
+GIVETH A BOOLEAN
+DECIDE `both present` b r IS TRUE
+
+#CHECK `both present`

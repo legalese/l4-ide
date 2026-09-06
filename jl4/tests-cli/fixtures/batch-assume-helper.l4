@@ -1,0 +1,8 @@
+§ `Helper reads an ASSUME`
+ASSUME x IS A NUMBER
+g MEANS x PLUS 1
+
+@export f adds y to the helper's value
+GIVEN y IS A NUMBER
+GIVETH A NUMBER
+f y MEANS g PLUS y

@@ -1,0 +1,19 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+opaque-declare.l4:71:1-21:
+  FUNCTION FROM Person TO BOOLEAN
+opaque-declare.l4:72:1-25:
+  FUNCTION FROM Applicant TO BOOLEAN
+opaque-declare.l4:73:1-24:
+  FUNCTION FROM Candidate TO BOOLEAN
+opaque-declare.l4:74:1-20:
+  FUNCTION FROM Bag OF NUMBER AND Pair OF STRING TO BOOLEAN
+opaque-declare.l4:75:1-21:
+  FUNCTION FROM Application TO BOOLEAN
+opaque-declare.l4:76:1-20:
+  FUNCTION FROM Officer TO BOOLEAN
+opaque-declare.l4:78:1-115:
+  TRUE
+opaque-declare.l4:79:1-115:
+  FALSE

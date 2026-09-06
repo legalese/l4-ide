@@ -173,21 +173,21 @@ of the second-order square. To map before drafting:
       **authorization logics** (ABLP speaks-for; `says` as lax monad; Garg–Pfenning;
       proof-carrying authorization; Aura; Delegation Logic) and **database
       authorization** (Griffiths–Wade; Fagin; CASCADE/RESTRICT ↔ annulment/abrogation)
-      per the spec's §10.6.1 access-control mirror — expected outcome: the
+      per the spec's §11.6.1 access-control mirror — expected outcome: the
       intuitionistic square is partially occupied by security, and the claim narrows to
       _generative higher-order deontics_ (powers over rules, not atomic permissions;
       the `GRANT (… GRANT (… REVOKE …))` tower of `HOMOICONICITY-SPEC.md`) plus lazy
       validation, review standards, defeasibility, and the appeal tower.
       This **blocked** claiming part (2) of the delta in print; it no longer does, for the
       narrowed claim recorded below. Unresolved paywalled items still block the specific
-      citations they name (`SUBJECT-TO-NOTWITHSTANDING-SPEC.md` §10.6.2, "Dead ends").
+      citations they name (`SUBJECT-TO-NOTWITHSTANDING-SPEC.md` §11.6.2, "Dead ends").
 
 ---
 
 ## Addendum 2026-08-28: discretion as a control effect (the intuitionistic delta)
 
 > Distilled from the `paper-residuals` design conversation. The language-design decisions this
-> produced are owned by `specs/todo/SUBJECT-TO-NOTWITHSTANDING-SPEC.md` §10 (defeasance by
+> produced are owned by `specs/todo/SUBJECT-TO-NOTWITHSTANDING-SPEC.md` §11 (defeasance by
 > recorded act); the documentation-facing bridge is `doc/concepts/legal-modeling/residual.md`.
 > This addendum records what the material adds to **this paper's** claim.
 
@@ -215,7 +215,7 @@ defensible residue. This addendum sharpens that residue with a second, distinct 
 ### What this settles from the open questions above
 
 The "decide the **type** of a power" checkbox splits three ways rather than two — the
-`DP→DP` vs `NormState→NormState` tension dissolves once fiat is disaggregated (spec §10.3):
+`DP→DP` vs `NormState→NormState` tension dissolves once fiat is disaggregated (spec §11.3):
 
 | strength of fiat  | what the act fixes          | type                                                       |
 | ----------------- | --------------------------- | ---------------------------------------------------------- |
@@ -261,7 +261,7 @@ intuitionistic/classical boundary as the codified/discretionary boundary.
 ### Verification pass, run 2026-08-28 (what it changed)
 
 Full record, with citations and dead ends, in `specs/todo/SUBJECT-TO-NOTWITHSTANDING-SPEC.md`
-§10.6.2, which owns it. What this facet must carry:
+§11.6.2, which owns it. What this facet must carry:
 
 **Two concessions this section did not have.** "Part (2) appears unoccupied" was too broad,
 because "intuitionistic" was doing work that "control effect" should have been doing:

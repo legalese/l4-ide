@@ -133,13 +133,13 @@ expectBody target modu =
     Just body -> pure body
 
 decideNames :: Module Name -> [T.Text]
-decideNames (MkModule _ _ (MkSection _ _ _ decls)) =
+decideNames (MkModule _ _ (MkSection _ _ _ _ decls)) =
   [ rawNameText fn
   | Decide _ (MkDecide _ _ (MkAppForm _ fn _ _) _) <- decls
   ]
 
 lookupDecideBody :: T.Text -> Module Name -> Maybe (Expr Name)
-lookupDecideBody target (MkModule _ _ (MkSection _ _ _ decls)) =
+lookupDecideBody target (MkModule _ _ (MkSection _ _ _ _ decls)) =
   listToMaybe
     [ body
     | Decide _ (MkDecide _ _ (MkAppForm _ fn _ _) body) <- decls

@@ -1,11 +1,11 @@
 § Example
+    GIVEN walks IS A BOOLEAN
+          drinks IS A BOOLEAN
+          eats IS A BOOLEAN
 
 DECLARE Person
     HAS
         name IS A STRING
-ASSUME walks  IS A BOOLEAN
-ASSUME drinks IS A BOOLEAN
-ASSUME eats   IS A BOOLEAN
 
 GIVEN p [person] IS A Person
 DECIDE `must sing`
@@ -16,4 +16,3 @@ DECIDE `must sing`
 #CHECK `must sing`
     WITH p IS A Person
         WITH name IS "Karl"
-

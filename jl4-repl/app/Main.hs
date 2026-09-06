@@ -33,7 +33,7 @@ import qualified LSP.L4.Viz.Ladder as LadderViz
 import qualified LSP.L4.Viz.QueryPlan as LspQueryPlan
 import qualified LSP.L4.Viz.VizExpr as VizExpr
 
-import L4.EvaluateLazy (EvalConfig, resolveEvalConfig, EvalDirectiveResult(..), EvalDirectiveValue(..), prettyEvalException)
+import L4.EvaluateLazy (EvalConfig, resolveEvalConfig, EvalDirectiveResult(..), EvalDirectiveValue(..), AssertionOutcome(..), ReductionOutcome(..), Refusal(..), prettyEvalException, prettyAssertionOutcome, prettyRefusal)
 import qualified L4.EvaluateLazy.GraphViz2 as GraphViz
 import L4.EvaluateLazy.GraphVizOptions (defaultGraphVizOptions)
 import L4.TracePolicy (replDefaultPolicy)
@@ -364,7 +364,7 @@ processInput st input
 decidesInModule :: Module Resolved -> [(Text, Decide Resolved)]
 decidesInModule (MkModule _ _ sect) = goSection sect
  where
-  goSection (MkSection _ _ _ decls) =
+  goSection (MkSection _ _ _ _ decls) =
     decls >>= goTopDecl
 
   goTopDecl = \case
@@ -644,10 +644,15 @@ formatResults results = Text.unlines $ map formatResult results
 
 formatResult :: EvalDirectiveResult -> Text
 formatResult (MkEvalDirectiveResult _range res _trace _ledger) = case res of
-  Assertion True  -> "True (assertion passed)"
-  Assertion False -> "False (assertion failed)"
-  Reduction (Right nf) -> Print.prettyLayout nf
-  Reduction (Left err) -> "Error: " <> Text.unlines (prettyEvalException err)
+  Assertion Holds            -> "True (assertion passed)"
+  Assertion Fails            -> "False (assertion failed)"
+  Assertion a@(FailsBecause _) -> "False (" <> prettyAssertionOutcome a <> ")"
+  -- A refusal is not an error: the model declined to answer and said why.
+  Assertion (Refused r)      -> "Refused: " <> r.message
+  Assertion a@(Errored _)    -> "Error: " <> prettyAssertionOutcome a
+  Reduction (Reduced nf)     -> Print.prettyLayout nf
+  Reduction (ReducedRefused r) -> "Refused: " <> r.message
+  Reduction (ReducedErrored err) -> "Error: " <> Text.unlines (prettyEvalException err)
 
 -- | Evaluate an expression and show its GraphViz trace
 evalWithTrace :: ReplState -> FilePath -> Text -> IO Text
@@ -754,10 +759,14 @@ formatAsciiTraceResults results = Text.unlines $ map formatAsciiTraceResult resu
 formatAsciiTraceResult :: EvalDirectiveResult -> Text
 formatAsciiTraceResult (MkEvalDirectiveResult _range res mtrace _ledger) =
   let resultText = case res of
-        Assertion True  -> "Result: True (assertion passed)"
-        Assertion False -> "Result: False (assertion failed)"
-        Reduction (Right nf) -> "Result: " <> Print.prettyLayout nf
-        Reduction (Left err) -> "Error: " <> Text.unlines (prettyEvalException err)
+        Assertion Holds              -> "Result: True (assertion passed)"
+        Assertion Fails              -> "Result: False (assertion failed)"
+        Assertion a@(FailsBecause _) -> "Result: False (" <> prettyAssertionOutcome a <> ")"
+        Assertion (Refused r)        -> "Refused: " <> r.message
+        Assertion a@(Errored _)      -> "Error: " <> prettyAssertionOutcome a
+        Reduction (Reduced nf)         -> "Result: " <> Print.prettyLayout nf
+        Reduction (ReducedRefused r)   -> "Refused: " <> r.message
+        Reduction (ReducedErrored err) -> "Error: " <> Text.unlines (prettyEvalException err)
   in case mtrace of
     Nothing -> resultText <> "\n(no trace available)"
     Just tr -> resultText <> "\n\nTrace:\n" <> Print.prettyLayout tr
@@ -829,10 +838,15 @@ inlineSingleLine txt =
 
 summarizeEvalResult :: EvalDirectiveResult -> Text
 summarizeEvalResult (MkEvalDirectiveResult _range res _trace _ledger) = case res of
-  Assertion True  -> "True (assertion passed)"
-  Assertion False -> "False (assertion failed)"
-  Reduction (Right nf) -> Print.prettyLayout nf
-  Reduction (Left err)  ->
+  Assertion Holds              -> "True (assertion passed)"
+  Assertion Fails              -> "False (assertion failed)"
+  Assertion a@(FailsBecause _) -> "False (" <> prettyAssertionOutcome a <> ")"
+  Assertion (Refused r)        -> Text.intercalate "; " ("Refused" : prettyRefusal r)
+  Assertion (Errored err)      ->
+    Text.intercalate "; " ("Error" : "assertion could not be evaluated" : prettyEvalException err)
+  Reduction (Reduced nf)         -> Print.prettyLayout nf
+  Reduction (ReducedRefused r)   -> Text.intercalate "; " ("Refused" : prettyRefusal r)
+  Reduction (ReducedErrored err) ->
     Text.intercalate "; " ("Error" : prettyEvalException err)
 
 -- | Get information about a name (type and definition)
@@ -962,7 +976,10 @@ getExpressionType st contextFile exprText = do
       -- Look for CheckInfo in the infos list - #CHECK adds the type as a CheckInfo
       let checkInfoTypes = [ty | MkCheckErrorWithContext (CheckInfo ty _) _ <- tc.infos]
       case checkInfoTypes of
-        (ty:_) -> pure $ Print.prettyLayout ty
+        -- Residual inference variables carry an edit-order-dependent gensym
+        -- (@res184@); render them as stable type-variable names (@a@, @b@, …)
+        -- exactly as #CHECK and hover do.
+        (ty:_) -> pure $ Print.prettyTypeForDisplay ty
         [] | not tc.success -> do
           -- Type error - report the first few errors
           let errors = tc.infos

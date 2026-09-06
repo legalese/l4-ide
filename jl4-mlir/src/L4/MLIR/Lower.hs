@@ -403,19 +403,36 @@ callL4Direct callee args retTy = do
   unboxABI retTy boxedResult
 
 -- | For callees that were registered with extra ASSUME-derived parameters
--- (see 'exportAssumeArgs'), append one extern call per extra parameter so
--- the call site matches the callee's extended arity.
+-- (see 'exportAssumeArgs'), append one value per extra parameter so the
+-- call site matches the callee's extended arity. When the function being
+-- lowered has that ASSUME as one of its /own/ extra parameters (it reads
+-- it transitively, so 'collectExportAssumeArgs' gave it the parameter),
+-- the bound parameter is passed through; otherwise the ASSUME's extern is
+-- called, preserving the pre-@\@export@ behaviour (the wasm host satisfies
+-- the import). The pass-through is gated on the caller's own registered
+-- extras rather than on a bare 'lookupVar': a lambda-lifted WHERE\/LET
+-- helper is lowered with its enclosing function's bindings still in scope,
+-- and handing it an SSA value from another @func.func@ would be invalid.
 appendAssumeExternArgs :: Text -> [(Value, MLIRType)] -> LowerM [(Value, MLIRType)]
 appendAssumeExternArgs callee args = do
   extras <- Map.findWithDefault [] callee <$> gets (.exportAssumeArgs)
   if null extras then pure args
   else do
     env <- gets (.typeEnv)
+    mCaller <- gets (.currentFunction)
+    callerExtras <- case mCaller of
+      Nothing     -> pure []
+      Just caller -> Map.findWithDefault [] caller <$> gets (.exportAssumeArgs)
+    let callerHas r = any (\(r', _) -> getUnique r' == getUnique r) callerExtras
     extraPairs <- forM extras $ \(assumeRes, assumeTy) -> do
-      let externName = sanitizeName (resolvedName assumeRes)
+      let name = resolvedName assumeRes
           mlTy = l4TypeToMLIR env assumeTy
-      v <- emitVal $ \vid -> funcCall [vid] externName [] [] [l4Value]
-      pure (v, mlTy)
+      mBound <- if callerHas assumeRes then lookupVar name else pure Nothing
+      case mBound of
+        Just v  -> pure (v, mlTy)
+        Nothing -> do
+          v <- emitVal $ \vid -> funcCall [vid] (sanitizeName name) [] [] [l4Value]
+          pure (v, mlTy)
     pure (args ++ extraPairs)
 
 -- | Allocate a fresh SSA value.
@@ -604,7 +621,7 @@ knownTermTypes = Map.mapMaybe $ \(_, entity) -> case entity of
 collectTypeSynonyms :: Module Resolved -> Map Text (Type' Resolved)
 collectTypeSynonyms (MkModule _ _ section) = Map.fromList (goSection section)
   where
-    goSection (MkSection _ _ _ decls) = concatMap goDecl decls
+    goSection (MkSection _ _ _ _ decls) = concatMap goDecl decls
     goDecl = \case
       Declare _ (MkDeclare _ _ (MkAppForm _ name _ _) (SynonymDecl _ inner)) ->
         [(resolvedName name, inner)]
@@ -670,27 +687,36 @@ propagateDiagnostics cg direct = Map.unionWith (++) direct propagated
 -- ASSUME declarations it references. These get promoted to function-level
 -- parameters at the ABI boundary so hosts can supply their values without
 -- going through the extern-import mechanism used by non-exported DECIDEs.
+--
+-- The read-set is transitive ('Export.extractAssumeParamResolveds'): an
+-- export whose helper reads an ASSUME takes that ASSUME as an ABI
+-- parameter, matching the schema. For the value to reach the helper, the
+-- helper takes it as an extra parameter too — so every main-module
+-- DECIDE that (transitively) reads a promoted ASSUME is entered here, not
+-- only the exports, and a call site that has the ASSUME bound as its own
+-- parameter passes it on ('appendAssumeExternArgs').
 collectExportAssumeArgs :: Module Resolved -> Map Text [(Resolved, Type' Resolved)]
 collectExportAssumeArgs mod' = Map.fromList
   [ (sanitizeName (resolvedName fnName), args)
-  | decide@(MkDecide _ _ (MkAppForm _ fnName _ _) _) <- exportedDecides
-  , let args = Export.extractAssumeParamResolveds mod' decide
+  | decide@(MkDecide _ _ (MkAppForm _ fnName _ _) _) <- allDecides
+  , let args = [ a | a@(r, _) <- Export.extractAssumeParamResolveds mod' decide
+                   , Set.member (getUnique r) promoted ]
   , not (null args)
   ]
  where
-  exportedDecides = goSection sect
-  MkModule _ _ sect = mod'
-  goSection (MkSection _ _ _ decls) = decls >>= goDecl
-  goDecl = \case
-    Decide _ d | Export.isExportedDecide d -> [d]
-    Section _ s -> goSection s
-    _ -> []
+  allDecides = allModuleDecides mod'
+  -- The ASSUMEs some export promotes to a parameter.
+  promoted = Set.fromList
+    [ getUnique r
+    | d <- allDecides, Export.isExportedDecide d
+    , (r, _) <- Export.extractAssumeParamResolveds mod' d
+    ]
 
 -- | Every DECIDE in a module, descending into nested sections.
 allModuleDecides :: Module Resolved -> [Decide Resolved]
 allModuleDecides (MkModule _ _ sect) = goSection sect
   where
-    goSection (MkSection _ _ _ decls) = concatMap goDecl decls
+    goSection (MkSection _ _ _ _ decls) = concatMap goDecl decls
     goDecl (Decide _ d)  = [d]
     goDecl (Section _ s) = goSection s
     goDecl _             = []
@@ -944,7 +970,7 @@ allOps = concatMap walk
 collectLocalNames :: Module Resolved -> Set.Set Text
 collectLocalNames (MkModule _ _ section) = goSection section
   where
-    goSection (MkSection _ _ _ decls) = foldr (Set.union . goDecl) Set.empty decls
+    goSection (MkSection _ _ _ _ decls) = foldr (Set.union . goDecl) Set.empty decls
     goDecl = \case
       Decide _ (MkDecide _ _ appForm _) ->
         Set.singleton (sanitizeName (resolvedName (appFormHead' appForm)))
@@ -960,7 +986,7 @@ collectLocalNames (MkModule _ _ section) = goSection section
 registerDependencyModule :: Set.Set Text -> Module Resolved -> LowerM ()
 registerDependencyModule skipLocal (MkModule _ _ section) = go section
   where
-    go (MkSection _ _ _ decls) = forM_ decls processDep
+    go (MkSection _ _ _ _ decls) = forM_ decls processDep
 
     processDep :: TopDecl Resolved -> LowerM ()
     processDep = \case
@@ -1052,7 +1078,7 @@ lowerModuleDecls :: Module Resolved -> LowerM ()
 lowerModuleDecls (MkModule _ _ section) = lowerSection section
 
 lowerSection :: Section Resolved -> LowerM ()
-lowerSection (MkSection _ _ _ decls) = do
+lowerSection (MkSection _ _ _ _ decls) = do
   -- Three-pass: (1) register types, (2) register function signatures, (3) lower bodies
   forM_ decls registerTypeDecl
   forM_ decls registerFuncSig
@@ -1062,7 +1088,7 @@ lowerSection (MkSection _ _ _ decls) = do
 registerTypeDecl :: TopDecl Resolved -> LowerM ()
 registerTypeDecl (Declare _ decl) = lowerDeclare decl
 registerTypeDecl (Section _ sect) = do
-  let MkSection _ _ _ ds = sect
+  let MkSection _ _ _ _ ds = sect
   forM_ ds registerTypeDecl
 registerTypeDecl _ = pure ()
 
@@ -1086,7 +1112,7 @@ registerFuncSig (Decide _ (MkDecide _ typeSig appForm body)) = do
     , funcListElems = Map.insert name (argListElems ++ extraListElems) s.funcListElems
     }
 registerFuncSig (Section _ sect) = do
-  let MkSection _ _ _ ds = sect
+  let MkSection _ _ _ _ ds = sect
   forM_ ds registerFuncSig
 registerFuncSig _ = pure ()
 
@@ -1190,6 +1216,9 @@ lowerDeclare (MkDeclare _ _ appForm typeDecl) = do
       modify' $ \s -> s { typeEnv = registerEnum name variantInfos s.typeEnv }
 
     SynonymDecl _ _ -> pure ()  -- Type synonyms are erased
+    OpaqueDecl _ -> pure ()     -- No fields, no variants: nothing to register.
+                                -- A parameter of the type lowers exactly as one
+                                -- of an ASSUMEd type did (no Declare to read).
   where
     fieldName :: TypedName Resolved -> Text
     fieldName (MkTypedName _ n _ _ _) = resolvedName n
@@ -2185,6 +2214,11 @@ lowerExprCases expr expectedTy = case expr of
   Breach{}     -> emitVal $ \vid -> arithConstantFloat vid 0.0
   -- Event / IO constructs still aren't supported — they don't have a
   -- runtime interpretation in the schema yet.
+  -- REFUSE has no WASM image: the compiled module has no way to stop with a
+  -- reason. 'markUnsupported' marks the export @supported:false@, which routes
+  -- the request to the fallback evaluator — and that one raises the refusal
+  -- properly. Never lowered to a value.
+  Refuse{}     -> markUnsupported "REFUSE is not supported by the WASM backend"
   Event{}      -> markUnsupported "EVENT construct not supported by the WASM backend"
   Fetch{}      -> markUnsupported "FETCH (IO) not supported by the WASM backend"
   Post{}       -> markUnsupported "POST (IO) not supported by the WASM backend"
@@ -3264,6 +3298,8 @@ freeVarsOfExpr expr0 bound0 = go bound0 expr0
         in Set.unions (self : map (go bound) args)
       AppNamed _ _ named _ ->
         Set.unions [go bound e | MkNamedExpr _ _ e <- named]
+      -- The REFUSE message is a literal; it binds and mentions nothing.
+      Refuse{} -> Set.empty
       And _ a b        -> Set.union (go bound a) (go bound b)
       Or _ a b         -> Set.union (go bound a) (go bound b)
       RAnd _ a b       -> Set.union (go bound a) (go bound b)

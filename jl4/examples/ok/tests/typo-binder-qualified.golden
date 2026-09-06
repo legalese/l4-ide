@@ -3,7 +3,7 @@ Typechecking successful
 Evaluation successful
 typo-binder-qualified.l4:12:8-17:
   I found a problem while checking the definition of `f`:
-    This CONSIDER branch binds a new variable
+    This CONSIDER branch introduces a new name
     
       `foo.green`
     

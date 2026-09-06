@@ -32,19 +32,17 @@
 -- section, so the model is named once, here, by the file that is the model.
 
 § `Regulation Crowdfunding`
-
-ASSUME `annual income` IS A NUMBER
-ASSUME `net worth` IS A NUMBER
-ASSUME `offering amount` IS A NUMBER
-ASSUME `first-time issuer` IS A BOOLEAN
+    GIVEN `annual income` IS A NUMBER
+          `net worth` IS A NUMBER
+          `offering amount` IS A NUMBER
+          `first-time issuer` IS A BOOLEAN
+          `class` IS A `Investor Class`
 
 DECLARE `Investor Class`
   IS ONE OF
     `accredited`
     `retail`
     `institutional`
-
-ASSUME `class` IS A `Investor Class`
 
 -- A CONSIDER over distinct nullary constructors: the guards cannot both hold,
 -- so the table is honestly Unique and OTHERWISE becomes the default output.

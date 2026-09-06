@@ -1,0 +1,13 @@
+-- R2: one binder per name. A rule's own GIVEN may not restate a name a section
+-- GIVEN already binds -- after discharge the binder is a parameter of every
+-- rule that reads it, so the restatement would give one name two binders.
+--
+-- The fix is to delete the restatement, at which point the section's value
+-- flows in; a genuine per-call variation is written `callee WITH x IS y`.
+
+§ `Rates`
+    GIVEN `the rate` IS A NUMBER
+
+GIVEN `the rate` IS A NUMBER
+GIVETH A NUMBER
+restated MEANS `the rate` TIMES 2

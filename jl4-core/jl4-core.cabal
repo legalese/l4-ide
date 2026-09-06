@@ -151,6 +151,7 @@ library
     L4.EvaluateLazy.Trace
     L4.StateGraph
     L4.ExactPrint
+    L4.Discharge
     L4.Export
     L4.Export.Document
     L4.Export.Render
@@ -220,6 +221,7 @@ test-suite jl4-core-test
     PatternMatchParserSpec
     BulletParserSpec
     UUID5Spec
+    ExportReadSetSpec
     ExportValidationSpec
     CatalaLowerSpec
     NumberLiteralSpec
@@ -230,6 +232,7 @@ test-suite jl4-core-test
     TracePostprocessSpec
     EdgeCrashSpec
     PrintRoundtripSpec
+    SectionGivenTdnrSpec
     LedgerSubstrateSpec
     LedgerThunkCacheSpec
     RecordLedgerSpec
@@ -243,6 +246,7 @@ test-suite jl4-core-test
     StateGraphSpec
     RelationalSpec
     BlawxAssumeSpec
+    BlawxNlgSpec
     BlawxImportImageSpec
     BlawxLiftSpec
     BlawxParseSpec

@@ -57,6 +57,7 @@ import L4.Evaluate.ValueLazy (NF (..), Value (..))
 import L4.EvaluateLazy
   ( EvalDirectiveResult (..)
   , EvalDirectiveValue (..)
+  , ReductionOutcome (..)
   , execEvalModuleWithEnv
   , prettyEvalDirectiveResult
   , resolveEvalConfig
@@ -212,7 +213,7 @@ spec = describe "STATE-AS-LEDGER M5: deontic sequencing of state effects (p HENC
     it "the directive FULFILLs over a trace where both parties act" $ do
       [res] <- runDirectives coreSrc
       case res.result of
-        Reduction (Right nf) -> do
+        Reduction (Reduced nf) -> do
           isBreachedNF nf `shouldBe` False
           prettyEvalDirectiveResult res `shouldSatisfy` Text.isInfixOf "FULFILLED"
         other -> expectationFailure ("expected a FULFILLED reduction, got " <> show other)
@@ -259,7 +260,7 @@ spec = describe "STATE-AS-LEDGER M5: deontic sequencing of state effects (p HENC
         `shouldBe` [["a"], ["b"]]
       -- And the directive FULFILLs (q eventually matched the later target event).
       case res.result of
-        Reduction (Right nf) -> do
+        Reduction (Reduced nf) -> do
           isBreachedNF nf `shouldBe` False
           prettyEvalDirectiveResult res `shouldSatisfy` Text.isInfixOf "FULFILLED"
         other -> expectationFailure ("expected FULFILLED, got " <> show other)
@@ -269,7 +270,7 @@ spec = describe "STATE-AS-LEDGER M5: deontic sequencing of state effects (p HENC
       [res] <- runDirectives eventFreeSrc
       -- If the RECORD had consumed the lone event, the MUST would have breached.
       case res.result of
-        Reduction (Right nf) -> do
+        Reduction (Reduced nf) -> do
           isBreachedNF nf `shouldBe` False
           prettyEvalDirectiveResult res `shouldSatisfy` Text.isInfixOf "FULFILLED"
         other -> expectationFailure ("expected FULFILLED, got " <> show other)
@@ -281,7 +282,7 @@ spec = describe "STATE-AS-LEDGER M5: deontic sequencing of state effects (p HENC
     it "the chain BREACHES, and the pre-step Assign is still in Alice's own ledger" $ do
       [res] <- runDirectives d5Src
       case res.result of
-        Reduction (Right nf) -> isBreachedNF nf `shouldBe` True
+        Reduction (Reduced nf) -> isBreachedNF nf `shouldBe` True
         other               -> expectationFailure ("expected a ValBreached reduction, got " <> show other)
       let store = res.ledger
       Map.keys store.ownLedgers `shouldBe` ["Alice"]

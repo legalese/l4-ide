@@ -1,33 +1,33 @@
 § a
 §§ aa
 §§§ aaa
-ASSUME a3 IS A BOOLEAN
+    GIVEN a3 IS A BOOLEAN
 
 § a
 §§ aa
 §§§ aaa
-ASSUME a3 IS A BOOLEAN
+    GIVEN a3 IS A BOOLEAN
 
 § a
 §§ aa
 §§§ aaa
-ASSUME a3 IS A BOOLEAN
+    GIVEN a3 IS A BOOLEAN
 
 § a
 §§ aa
 §§§ aaa
-ASSUME a3 IS A BOOLEAN
+    GIVEN a3 IS A BOOLEAN
 
 § a
 §§ aa
 §§§ aaa
-ASSUME a3 IS A BOOLEAN
+    GIVEN a3 IS A BOOLEAN
 
 § a
 §§ aa
 §§§ aaa
 §§§§ aaaa
-ASSUME a3 IS A BOOLEAN
+    GIVEN a3 IS A BOOLEAN
 
 § b
 §§ aa
@@ -63,17 +63,15 @@ ASSUME a3 IS A BOOLEAN
 §§ aa
 §§§ aaa
 §§§§ aaaa
-
-ASSUME a3 IS A NUMBER
-ASSUME a4 IS A NUMBER
+    GIVEN a3 IS A NUMBER
+          a4 IS A NUMBER
 
 § b
 §§ aa
 §§§ aaa
 §§§§ aaaa
 §§§§§ aa
-
-ASSUME a4 IS A NUMBER
+    GIVEN a4 IS A NUMBER
 
 § c
 

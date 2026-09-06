@@ -116,8 +116,11 @@ DECIDE  seller's ready -- this is an ad-hoc method, or a predicate upon the sell
              AND    expiry IS NoDate
                  OR expiry >= deal's item's expiry
 
-
 § buyer preparation
+    GIVEN plant IS AN ACTION
+          `apply for loan` IS AN ACTION
+          `grant loan` IS AN ACTION
+          `visit` IS AN ACTION
 -- the details of the loan are not fully specified here; the loan process is treated "off to the side" of the main transaction
 -- even though the bank as a separate person would get its own swimlane in a BPMN visualization of this situation.
 GIVEN  buyer  IS A Party
@@ -133,10 +136,6 @@ HENCE  PARTY   bank
        LEST Fulfilled
 LEST Fulfilled
 
-ASSUME plant IS AN ACTION
-ASSUME `apply for loan` IS AN ACTION
-ASSUME `grant loan` IS AN ACTION
-ASSUME `visit` IS AN ACTION
 -- the parameters to the actions can be typed or left untyped, and left to the operationalizations to worry about
 
 § seller preparation
@@ -180,7 +179,5 @@ HENCE  § seller preparation - de Bruijn 1
 -- As the seller, if I want to get the money from the buyer, must I harvest the plants?
 
 -- As the buyer, if I want to get the product delivered from the seller, must I go to the bank? When is the earliest I can go and when is the latest I must go?
-
-
 
 -- [TODO] some example CTL formulas

@@ -1,0 +1,19 @@
+-- A WITH may name a section binder the callee READS. Naming one it does not
+-- read is the same mistake as naming a parameter it does not take: there is
+-- nowhere to put the value, so the override would silently do nothing.
+--
+-- `unrelated` reads no binder at all; `reads the other one` reads a different
+-- binder in the same module.
+
+§ `Rates`
+    GIVEN `the rate` IS A NUMBER
+          surcharge  IS A NUMBER
+
+GIVETH A NUMBER
+unrelated MEANS 7
+
+GIVETH A NUMBER
+`reads the other one` MEANS surcharge PLUS 1
+
+#EVAL unrelated WITH `the rate` IS 5
+#EVAL `reads the other one` WITH `the rate` IS 5

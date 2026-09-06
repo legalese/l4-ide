@@ -71,7 +71,7 @@ gain(X) = H(before) − [ w_X · H(after X = TRUE) + (1 − w_X) · H(after X = 
 
 where `H` is Boolean entropy and `w_X` is a per-atom prior — the probability the
 atom is `TRUE`. The weights come from [TYPICALLY](../types/TYPICALLY.md): a
-binder declared `IS A BOOLEAN TYPICALLY TRUE` supplies `w_X` close to `1`.
+fact declared `IS A BOOLEAN TYPICALLY TRUE` supplies `w_X` close to `1`.
 
 This subsumes the current policy and adds a prior-aware ordering for free: a
 strongly presumed atom carries almost no expected information, so a greedy

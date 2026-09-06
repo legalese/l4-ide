@@ -140,6 +140,7 @@ Boolean operations for conditions and logic.
 - **Keyword:** [NOT](NOT.md)
 - **Type:** `BOOLEAN -> BOOLEAN`
 - **Example:** `NOT TRUE` → `FALSE`
+- **Note:** NOT reaches forward over whatever follows it on the line, so `NOT a AND b` means `NOT (a AND b)`. Write `(NOT a) AND b` for the narrow reading. See [How Far Does NOT Reach?](NOT.md#how-far-does-not-reach)
 
 ### Implication
 
@@ -147,7 +148,7 @@ Boolean operations for conditions and logic.
 - **Symbol:** `=>`
 - **Type:** `BOOLEAN -> BOOLEAN -> BOOLEAN`
 - **Example:** `FALSE IMPLIES TRUE` → `TRUE`
-- **Note:** `p IMPLIES q` is equivalent to `NOT p OR q`
+- **Note:** `p IMPLIES q` is equivalent to `(NOT p) OR q` — the brackets matter, see [NOT](NOT.md#how-far-does-not-reach)
 
 ### Exception
 
@@ -223,19 +224,34 @@ Time-based operations for dates and deadlines.
 
 ## Operator Precedence
 
-Operators are evaluated in the following order (highest to lowest precedence):
+Operators are evaluated in the following order (highest to lowest precedence). Every entry below either joins two things (`AND`, `PLUS`, `EQUALS`) or applies a function to its arguments — see the next heading for the one operator that does neither:
 
 1. **Function application** (highest)
-2. **Unary operators** (NOT)
-3. **Multiplicative** (TIMES, DIVIDED BY, MODULO)
-4. **Additive** (PLUS, MINUS)
-5. **Comparison** (EQUALS, GREATER THAN, LESS THAN, etc.)
-6. **Logical AND**
-7. **Logical OR**
-8. **UNLESS** (exception clause)
-9. **IMPLIES** (lowest)
+2. **Multiplicative** (TIMES, DIVIDED BY, MODULO)
+3. **Additive** (PLUS, MINUS)
+4. **Comparison** (EQUALS, GREATER THAN, LESS THAN, etc.)
+5. **Logical AND**
+6. **Logical OR**
+7. **UNLESS** (exception clause)
+8. **IMPLIES** (lowest)
 
 Use parentheses `()` to override precedence.
+
+### NOT is not on this list
+
+[NOT](NOT.md) is deliberately absent, and it is the one operator you cannot look up here. It does not join two things, and it has no place in the ordering above. Instead it **reaches forward** and takes everything after it, until it meets a word that starts at its own column or further left:
+
+```l4
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN
+
+-- NOT reaches over the AND: this means NOT (a AND b)
+wide a b MEANS NOT a AND b
+
+-- Brackets around the NOT itself are what stop it: (NOT a) AND b
+narrow a b MEANS (NOT a) AND b
+```
+
+Bracketing the operand — `NOT (a) AND b` — does **not** narrow it. Read [How Far Does NOT Reach?](NOT.md#how-far-does-not-reach) before writing a rule that puts NOT anywhere but at the end of a line.
 
 ### Examples
 

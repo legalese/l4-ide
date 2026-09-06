@@ -1,0 +1,37 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+infix-under-connective.l4:41:1-24:
+  TRUE
+infix-under-connective.l4:42:1-24:
+  TRUE
+infix-under-connective.l4:43:1-23:
+  FALSE
+infix-under-connective.l4:44:1-31:
+  TRUE
+infix-under-connective.l4:45:1-31:
+  FALSE
+infix-under-connective.l4:56:1-27:
+  16
+infix-under-connective.l4:57:1-27:
+  16
+infix-under-connective.l4:58:1-37:
+  TRUE
+infix-under-connective.l4:69:1-25:
+  TRUE
+infix-under-connective.l4:70:1-25:
+  FALSE
+infix-under-connective.l4:87:1-31:
+  TRUE
+infix-under-connective.l4:88:1-31:
+  TRUE
+infix-under-connective.l4:89:1-30:
+  FALSE
+infix-under-connective.l4:107:1-31:
+  7
+infix-under-connective.l4:108:1-48:
+  TRUE
+infix-under-connective.l4:109:1-55:
+  TRUE
+infix-under-connective.l4:124:1-9:
+  3

@@ -599,6 +599,90 @@ resolveMaybePredicates (MkModule _ selfUri _) env info = do
     _           -> False
 
 ------------------------------------------------------------------------
+-- Refusals (ruling D1, 2026-09-05)
+------------------------------------------------------------------------
+
+-- | The author's reason, when this expression IS a refusal at its root.
+--
+-- Root only, deliberately: this answers "does THIS row's output entry decline
+-- to answer", which is what a @\<rule\>@\'s @\<description\>@ is being asked.
+-- The transitive question — "can this decision refuse at all" — is
+-- 'A.analyzeSafety'\'s, over the call graph, and is reported as @D-REFUSE@.
+refuseReasonOf :: Expr Resolved -> Maybe Text
+refuseReasonOf = \case
+  Refuse _ m -> Just (A.refuseMessageText m)
+  _          -> Nothing
+
+-- | Every refusal reachable in this expression WITHOUT leaving it, innermost
+-- last, with the reason and the range of each.
+--
+-- Cross-decision refusals are deliberately NOT here: they arrive through
+-- 'A.analyzeSafety'\'s fixpoint, which is the only thing that can see them
+-- (and which records the same known cross-MODULE gap).
+refusalsIn :: Expr Resolved -> [(Text, Maybe SrcRange)]
+refusalsIn e =
+  [ (r, (getAnno e').range)
+  | e' <- toListOf (cosmosOf (gplate @(Expr Resolved))) e
+  , Just r <- [refuseReasonOf e']
+  ]
+
+-- | @\<outputValues\>@ for a table, widened by @null@ when the table can
+-- actually answer @null@.
+--
+-- __MEASURED 2026-09-05, and the two target engines DISAGREE without this.__
+-- On a @Band IS ONE OF standard, reduced, exempt@ table whose @OTHERWISE@
+-- refuses:
+--
+-- * KIE 8.44.0.Final enforces @\<outputValues\>@ AT RUNTIME and REFUSES the
+--   @null@ — @ERROR … Invalid result value on rule #3, output #1. Value null
+--   does not match list of allowed values@, decision __FAILED__;
+-- * Camunda 8.7.6 (zeebe-dmn) does not check it at all and returns the @null@
+--   silently, 0 errors.
+--
+-- One artifact, two meanings, which is the strongest possible reason not to
+-- ship it. Adding @null@ to the list makes both engines agree (re-measured:
+-- KIE @2/2 SUCCEEDED@) and costs exactly one value of domain assertion — a
+-- value the table genuinely can produce, so saying so is more accurate than
+-- not saying so, not less.
+--
+-- __Isolated to @\<outputValues\>@ on purpose.__ The same enum is also declared
+-- as the type's @\<allowedValues\>@ on its @\<itemDefinition\>@. Probed
+-- separately (@p2a@ vs @p2b@): widening @allowedValues@ alone does NOT stop the
+-- KIE error, and widening @outputValues@ alone does — so the TYPE keeps its
+-- exact domain for every other consumer, and only the table that can decline
+-- says that it can.
+--
+-- Not refusal-specific, deliberately: the condition is "an output entry renders
+-- as bare @null@", which since R8-d′ is also true of a @MAYBE@-valued table.
+-- That case had the same latent divergence and this closes it too.
+outputValuesWith :: TableCtx -> Maybe [Text]
+outputValuesWith ctx
+  -- Only when the DECLARED type is what won; unchanged (§3.2: a type recovered
+  -- from the cells says what this table happens to mention, which is exactly
+  -- the domain we must not assert).
+  | ctx.tcOutputType == DmnAny = Nothing
+  | otherwise                  = ctx.tcOutputValues
+
+-- | Does any output entry of this table render as the bare FEEL @null@?
+--
+-- Feeds 'ocAdmitsNull'. The keyword is compared against the RENDERED FEEL, not
+-- against the L4, so it catches every producer of a @null@ output entry at once
+-- — D1's refusal, R8-d′'s @NOTHING@, and anything later that renders one.
+tableAdmitsNull :: [FeelExpr] -> Bool
+tableAdmitsNull = any (\o -> o.feText == "null")
+
+-- | A row\'s @\<description\>@, with the refusal reason appended when that
+-- row\'s OUTPUT declines to answer.
+--
+-- This is the half of D1 that omission could not have: the artifact keeps the
+-- author's sentence, in the element a reader is already looking at, rather than
+-- only in a fidelity report that travels separately from the @.dmn@.
+withRefuseReason :: Expr Resolved -> Text -> Text
+withRefuseReason body d = case refuseReasonOf body of
+  Nothing -> d
+  Just r  -> d <> " \8212 REFUSE: " <> r
+
+------------------------------------------------------------------------
 -- rowsToDmn
 ------------------------------------------------------------------------
 
@@ -653,7 +737,7 @@ rowsToDmnWith' ctx inlined cappedBodies rows = do
     -- rule output has never quoted constructors, unlike `defaultOut` below);
     -- only the oracle is new here.
     , drOutput      = renderFeelIn ctx.tcNames Set.empty (oracleOf ctx) body
-    , drDescription = Just (oneLine (prettyLayout guardE))
+    , drDescription = Just (withRefuseReason body (oneLine (prettyLayout guardE)))
     , drAnnotations = []
     }
 
@@ -666,7 +750,7 @@ rowsToDmnWith' ctx inlined cappedBodies rows = do
           { drId          = ctx.tcIdPrefix <> "_r" <> tshow (length rowRules + 1)
           , drInputs      = map (const TestAny) columnKeys
           , drOutput      = renderFeelIn ctx.tcNames ctx.tcConstructors (oracleOf ctx) b0
-          , drDescription = Just "OTHERWISE"
+          , drDescription = Just (withRefuseReason b0 "OTHERWISE")
           , drAnnotations = []
           }
       ]
@@ -691,7 +775,9 @@ rowsToDmnWith' ctx inlined cappedBodies rows = do
       -- Only when the DECLARED type is what won: a type recovered from the
       -- cells says what this table happens to mention, which is exactly the
       -- domain we must not assert (§3.2).
-    , ocValues  = if ctx.tcOutputType /= DmnAny then ctx.tcOutputValues else Nothing
+    , ocValues  = outputValuesWith ctx
+    , ocAdmitsNull =
+        tableAdmitsNull (map (.drOutput) allRules <> maybeToList defaultOut)
     , ocDefault = if policy == HitUnique then defaultOut else Nothing
     }
 
@@ -1601,11 +1687,21 @@ datedTable ctx refs ranges rows arms oth lawRef inlined = table
   -- every output entry is byte-identical to today's, and the golden diff is
   -- confined to columns and cells. Unifying the two is a separate change.
   ruleSpecs =
-    [ (t, Just (oneLine (prettyLayout a.daGuard)), a.daBody, Set.empty, armAnnotation a)
+    [ ( t
+      , Just (withRefuseReason a.daBody (oneLine (prettyLayout a.daGuard)))
+      , a.daBody
+      , Set.empty
+      , armAnnotation a
+      )
     | (t, a) <- zip tests arms
     ]
+      -- D1: a refusing FLOOR arm keeps its row, and the row keeps the reason.
+      -- The row is where the pre-commencement gate is visible to a reader of
+      -- the artifact, and to a DMN gap analysis: dropping it would leave the
+      -- date axis silently uncovered below the earliest modelled day, which is
+      -- engine-identical (both answer null) but says less.
       <> [ ( last tests
-           , Just "OTHERWISE"
+           , Just (withRefuseReason oth "OTHERWISE")
            , oth
            , ctx.tcConstructors
            , floorAnnotation
@@ -1647,7 +1743,8 @@ datedTable ctx refs ranges rows arms oth lawRef inlined = table
     { ocId      = ctx.tcIdPrefix <> "_o1"
     , ocName    = ctx.tcFeelName
     , ocType    = resolveOutputType ctx (map (.drOutput) allRules)
-    , ocValues  = if ctx.tcOutputType /= DmnAny then ctx.tcOutputValues else Nothing
+    , ocValues  = outputValuesWith ctx
+    , ocAdmitsNull = tableAdmitsNull (map (.drOutput) allRules)
       -- R9: the OTHERWISE is a floor ROW, so there is no defaultOutputEntry.
       -- §3.3.1's SHALL then REQUIRES omitting it: the rules already cover the
       -- input space, and a default on a complete table declares it incomplete.
@@ -2001,6 +2098,36 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
       | Just (fn, a, b) <- selectIdiomIn oracle e -> call e fn [a, b]
       | otherwise ->
           triple e FullFeel (\tc tt tf -> "(if " <> tc <> " then " <> tt <> " else " <> tf <> ")") c t f
+    -- A @BRANCH@ in EXPRESSION position is a right-nested FEEL @if@. FEEL has no
+    -- multi-way conditional, so the chain is the only spelling; guard order is
+    -- preserved, which is what keeps first-match semantics ("L4.Viz.GuardedRows"
+    -- documents the same ordering constraint on the table path).
+    --
+    -- This case CANNOT capture a table. A @BRANCH@ that is a whole decision body
+    -- reaches 'normaliseGuarded' and becomes rows; 'renderFeelIn' sees only the
+    -- nested occurrences, which before this case fell to 'verbatim' and so
+    -- raised @D-NONFEELINPUT@ \/ @D-NONFEELOUTPUT@ \/ @D-LITERALEXPR@ Blocking.
+    -- Nothing is added to 'selectShape' for the same reason: the veto that reads
+    -- it keeps chains ON the table path.
+    --
+    -- Composition is the point, as it is for R8-c below: the reference corpus
+    -- has a @CONSIDER@ over a MAYBE whose JUST arm is a @BRANCH@, and the R8-c
+    -- arm correctly declined to splice L4 text into FEEL while this arm was
+    -- missing. No 'hasEffectfulNode' guard: every guard and arm is rendered
+    -- once, so nothing here duplicates a subterm's text.
+    --
+    -- MEASURED, not assumed: a three-arm chain nested inside the R8-c @!= null@
+    -- test builds clean and takes the arm it looks like it takes, on both
+    -- KIE 8.44.0.Final (XSD + validator + KieBuilder + runtime) and
+    -- zeebe-dmn 8.7.6. On the reference corpus model, whose verbatim arm was
+    -- exactly this shape, KIE reported 3 validator and 3 build errors and
+    -- zeebe-dmn failed to PARSE the model at all, quoting the raw L4 back.
+    MultiWayIf _ guardeds fallback ->
+      let chain (tg : tb : rest) = "if " <> tg <> " then " <> tb <> " else " <> chain rest
+          chain [tf]             = tf
+          chain []               = ""  -- unreachable: the fallback is always present
+      in nary e FullFeel (\ts -> "(" <> chain ts <> ")")
+           (concat [[g, b] | MkGuardedExpr _ g b <- guardeds] <> [fallback])
     -- A call to an L4 function is NOT a FEEL function invocation, and this used
     -- to be rendered @f(args)@ and labelled 'FullFeel' -- a claim of
     -- executability the exporter cannot honour. FEEL resolves an invocation
@@ -2067,6 +2194,31 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
                             <> " satisfies " <> bodyR.feText <> ")"
                         , FullFeel
                         )
+    -- Prelude @elem@ is FEEL's @list contains@ builtin (DMN 1.3 Table 76).
+    --
+    -- The ARGUMENTS SWAP: L4 is @elem element list@, FEEL is
+    -- @list contains(list, element)@. Emitting them in source order would be a
+    -- well-formed call that answers the wrong question wherever both operands
+    -- are lists, and a type error otherwise.
+    --
+    -- Recognised by PROVENANCE then name, exactly as 'listQuantKeyword'
+    -- recognises `all`\/`any` and for the same reason: prelude @elem@ is an
+    -- ordinary @DECIDE@ with no `Unique` to match on, and a module that defines
+    -- its own @elem@ must not be lowered as though it were the prelude's.
+    -- 'fromPrelude' is also what supplies the "not defined in the module being
+    -- exported" guard that 'resolveMaybePredicates' has to establish by hand.
+    --
+    -- Unlike the quantifiers above, @elem@ BINDS NOTHING, so #936's
+    -- parameter-read-under-a-binder unsoundness does not arise and no binder
+    -- environment is installed.
+    --
+    -- MEASURED on both engines, in both positions this reaches -- a boxed
+    -- literal and a table @\<inputExpression\>@ -- over a string-enum list:
+    -- KIE 8.44.0.Final and zeebe-dmn 8.7.6 each answer membership correctly,
+    -- including the negative case, so the operand order above is checked and
+    -- not merely reasoned about.
+    App _ r [xE, listE]
+      | preludeElem r -> call e "list contains" [listE, xE]
     -- #936 Gap 2, the saturated-call half. Checked BEFORE un-lifting, because
     -- un-lifting is what discards the argument: under a binder that argument is
     -- the bound element and discarding it is the defect.
@@ -2216,6 +2368,36 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
                   , "if " <> parenIf (ps < 5) ts <> " != null then " <> ta <> " else " <> tb
                   , maximum [FullFeel, fs, fa, fb]
                   )
+    -- REFUSE lowers to FEEL @null@ — ruling D1, accepted 2026-09-05
+    -- (@IMPLICIT-PROPS-DESIGN.md@ §11.9.1).
+    --
+    -- __What this replaces, and why.__ Until D1 this arm was @verbatim e@,
+    -- which wrote the L4 source text @REFUSE "…"@ into a FEEL literal. That is
+    -- not a Blocking-but-harmless fallback: KIE 8.44.0.Final fails to compile
+    -- the WHOLE file (@ERROR [ERR_COMPILING_FEEL] … syntax error@, verdict
+    -- FAILED), so one refusal anywhere made the module un-exportable — which is
+    -- why no legal-corpus refusal site could migrate off @ASSUME@.
+    --
+    -- __Why @null@ and not omission.__ §2.8 proposed omitting the refusing row
+    -- instead, on the ground that @null@ is "already spent on @NOTHING@" and so
+    -- @REFUSE → null@ would launder. Measured, that argument cannot choose
+    -- between them: an omitted row and a @null@ row are ENGINE-IDENTICAL under
+    -- both hit policies this exporter emits — under 'HitFirst' a deleted
+    -- catch-all leaves no rule matching, and an unmatched table answers @null@;
+    -- under 'HitUnique' the @OTHERWISE@ IS the @defaultOutputEntry@, and
+    -- deleting it answers @null@ for the same reason. Given the equivalence,
+    -- @null@ is the arm that KEEPS the author's reason in the artifact, because
+    -- omission deletes the very @\<rule\>@ whose @\<description\>@ would hold it.
+    --
+    -- __What stops it laundering.__ @null@ on its own would be exactly the
+    -- silent wrong answer §2.4 exists to close, so the honesty is carried by the
+    -- other three halves of the ruling, all in this module or "L4.Dmn.Analysis":
+    -- a refusal WITHDRAWS @DMN-SAFE@ ('A.analyzeSafety'\'s @REFUSE@ clause, and
+    -- its propagation to callers), it raises a @D-REFUSE@ note at the severity
+    -- the existing call-site calibration sets ('refuseNotes'), and the reason
+    -- string is written onto the row's and the decision's @\<description\>@
+    -- ('refuseReasonOf', 'refusalsIn').
+    Refuse {} -> (atomPrec, "null", FullFeel)
     _ -> verbatim e
    where
     atomPrec = 9 :: Int
@@ -2369,6 +2551,12 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
     | otherwise           = Nothing
    where
     named ns = nameOf r `elem` ns || unqualifiedNameToText (getActual r) `elem` ns
+
+  -- The prelude's list-membership @DECIDE@, and nothing else of that name.
+  preludeElem :: Resolved -> Bool
+  preludeElem r =
+    fromPrelude r
+      && (nameOf r == "elem" || unqualifiedNameToText (getActual r) == "elem")
 
   -- The predicate's binder and the body to render under it. Three shapes, and
   -- nothing else — an unrecognised predicate falls to 'verbatim', which is the
@@ -3058,12 +3246,25 @@ builtinType u
 -- [@D-DATEDCHAIN@ (Blocking)] the decision is a chain of rule-date guards that
 --   could not be lowered to a date-interval table, so it shipped as boolean
 --   columns over raw L4 that no engine can evaluate (spec §15.3, R10).
+-- [@D-REFUSE@ (Blocking or Lossy)] the decide can decline to answer — a
+--   @REFUSE@ in its own body, or a call to something that has one. It is
+--   emitted as FEEL @null@ (ruling D1), which DMN does not distinguish from an
+--   absent value; the severity is the same call-site calibration @D-PARTIAL@
+--   uses, because the question is the same one (can any consumer fence the
+--   null). Never both codes for one cause: a decide uncertified ONLY because it
+--   refuses raises this and not @D-PARTIAL@.
 -- [@D-RULEDATE-UNBOUND@ (Lossy)] the decide rebinds law time with
 --   @EVAL UNDER RULES EFFECTIVE AT@; a DRG has one global rule-date input and no
 --   scoped rebinding, so no faithful @<decision>@ exists and the decide is
 --   dropped at population time and not emitted at all (R12, spec §15.12).
 --   ONE message form; re-severed Blocking → Lossy 2026-08-02 when R12 removed
 --   the emission (and with it the thing that was broken).
+-- [@D-OUTPUTVALUES-NULL@ (Lossy)] a table's @\<outputValues\>@ was widened by
+--   @null@ because a rule of it answers one (a @REFUSE@, or a @MAYBE@\'s absent
+--   case). Without the widening KIE FAILS the decision at run time and
+--   zeebe-dmn returns the null silently — one artifact, two meanings
+--   (measured 2026-09-05; see 'outputValuesWith'). The type's own
+--   @\<allowedValues\>@ is untouched.
 -- [@D-SCOPE@ (Lossy)] two differently-scoped L4 terms collide on one DMN
 --   @inputData@ name.
 -- [@D-RULEDATE@ (Advisory)] the model is temporally parameterised: the rule-date
@@ -3600,6 +3801,7 @@ lowerModule opts modul@(MkModule _ uri _) =
       RecordDecl _ _ fs -> [ty | MkTypedName _ _ ty _ _ <- fs]
       EnumDecl _ cds    -> [ty | MkConDecl _ _ fs <- cds, MkTypedName _ _ ty _ _ <- fs]
       SynonymDecl _ ty  -> [ty]
+      OpaqueDecl _      -> []
 
   popVerdict :: A.PopulationVerdict
   popVerdict =
@@ -3768,6 +3970,7 @@ lowerModule opts modul@(MkModule _ uri _) =
     EnumDecl _ cds    -> [n | MkConDecl _ n _ <- cds]
     RecordDecl _ mn _ -> maybeToList mn
     SynonymDecl _ _   -> []
+    OpaqueDecl _      -> []
 
   -- Field selectors are references in the AST but are not terms; a record
   -- projection must not conjure an inputData element for the field name.
@@ -3785,6 +3988,7 @@ lowerModule opts modul@(MkModule _ uri _) =
     EnumDecl _ cds    -> [n | MkConDecl _ _ fs <- cds, MkTypedName _ n _ _ _ <- fs]
     RecordDecl _ _ fs -> [n | MkTypedName _ n _ _ _ <- fs]
     SynonymDecl _ _   -> []
+    OpaqueDecl _      -> []
 
   -- §5.2 SCOPE 2: the record-field namespace. One 'uniquifyIn' PER DECLARED
   -- TYPE, in field source order, because that is the namespace DMN has -- an
@@ -3975,6 +4179,10 @@ lowerModule opts modul@(MkModule _ uri _) =
         , length cds > 1 && any (\(MkConDecl _ _ cfs) -> not (null cfs)) cds
         )
     SynonymDecl _ _ -> Nothing
+    -- An opaque type gets no itemDefinition, exactly as an @ASSUME T IS A
+    -- TYPE@ name gets none by having no 'Declare' to read; a parameter of
+    -- that type is an inputData with @typeRef="Any"@ on both spellings.
+    OpaqueDecl _    -> Nothing
 
   itemDefIds   = assignIds "itemdef_" (map (.itdName) itemDecls)
 
@@ -4162,6 +4370,10 @@ lowerModule opts modul@(MkModule _ uri _) =
         { dcnId           = hid
         , dcnName         = nm
         , dcnFeelName     = feel
+        -- A hydrator carries no refusal of its own: its entries are the record's
+        -- fields, and a refusing field body is a refusal of the DECIDE the field
+        -- became, reported there.
+        , dcnDescription  = Nothing
         -- A hydrator is synthesised, not lowered from a decide, so there is no
         -- DECIDE for a sibling backend to look it up by.
         , dcnDecide       = Nothing
@@ -5035,7 +5247,7 @@ lowerModule opts modul@(MkModule _ uri _) =
    where
     MkModule _ _ topSec = modul
     (assigns, secs, _) = goSec Nothing (0 :: Int) topSec
-    goSec cur idx (MkSection _ mName _ ds) =
+    goSec cur idx (MkSection _ mName _ _ ds) =
       let (cur', idx', secs0) = case mName of
             Just n  -> (Just idx, idx + 1, [(idx, nameOf n)])
             Nothing -> (cur, idx, [])
@@ -5526,13 +5738,13 @@ lowerModule opts modul@(MkModule _ uri _) =
     [getUnique n | MkAssume _ _ (MkAppForm _ n _ _) _ _ <- assumes]
 
   ------------------------------------------------------------------------
-  -- Phase 4 notes: the population filter, the merge, and D-PARTIAL
+  -- Phase 4 notes: the population filter, the merge, D-PARTIAL and D-REFUSE
   ------------------------------------------------------------------------
 
   phase4Notes :: [FidelityNote]
   phase4Notes =
     populationNotes <> paramTypeNotes <> paramAsInputNotes
-      <> partialNotes <> bkmNotes <> bkmConsumerNotes
+      <> partialNotes <> refuseNotes <> bkmNotes <> bkmConsumerNotes
 
   allDecideByUnique :: Map Unique (Decide Resolved)
   allDecideByUnique =
@@ -5745,7 +5957,13 @@ lowerModule opts modul@(MkModule _ uri _) =
             \outside the decision's domain answers null with status SUCCEEDED, not an error"
     | d <- decides
     , let u = getUnique (decideResolved d)
-    , Just issues <- [Map.lookup u safetyIssues]
+    , Just allIssues <- [Map.lookup u safetyIssues]
+      -- The REFUSE clauses are LIFTED OUT and reported as D-REFUSE below, so
+      -- one cause raises one note (D1). A decide uncertified only because it
+      -- refuses is therefore not also a D-PARTIAL; a decide with both keeps
+      -- both, each naming only its own clauses.
+    , let issues = [i | i <- allIssues, i.safClause /= "REFUSE"]
+    , not (null issues)
     , let did = Map.findWithDefault (decideName d) u decideByUnique
     , let headIssue = listToMaybe issues
     , let clauseText = case issues of
@@ -5757,14 +5975,78 @@ lowerModule opts modul@(MkModule _ uri _) =
                 <> (if null rest
                       then ""
                       else "; and " <> tshow (length rest) <> " further clause(s)")
-    , let sites = Map.findWithDefault [] u callGraph.cgCalls
-    , let (sev, fallbackText)
-            | null sites =
-                (Blocking, ". No call site consumes it (it is a DRG root), so no guard can fence the null")
-            | any (\s -> s.csStrict == A.StrictPos) sites =
-                (Blocking, ". At least one call site consumes it from a strict position, so no guard fences the null")
-            | otherwise =
-                (Lossy, ". Every call site consumes it from a lazy position (an IF/CONSIDER arm), so a guard in the consumer can fence the null")
+    , let (sev, fallbackText) = nullFenceSeverity u
+    ]
+
+  -- The call-site calibration §2.4.2 ruled for D-PARTIAL, extracted so
+  -- D-REFUSE uses THE SAME one rather than a second copy of it (D1: "let the
+  -- existing strictness calibration set the severity"). The question both codes
+  -- ask is identical — can any consumer fence the null this node may answer —
+  -- so a second implementation would be a place for the two to drift apart.
+  nullFenceSeverity :: Unique -> (FidelitySeverity, Text)
+  nullFenceSeverity u
+    | null sites =
+        (Blocking, ". No call site consumes it (it is a DRG root), so no guard can fence the null")
+    | any (\s -> s.csStrict == A.StrictPos) sites =
+        (Blocking, ". At least one call site consumes it from a strict position, so no guard fences the null")
+    | otherwise =
+        (Lossy, ". Every call site consumes it from a lazy position (an IF/CONSIDER arm), so a guard in the consumer can fence the null")
+   where
+    sites = Map.findWithDefault [] u callGraph.cgCalls
+
+  -- Which of the two uncertified-ness codes actually names this decide, for a
+  -- message that forwards a reader to one of them. D1 made the pair disjoint
+  -- per cause: a decide whose ONLY safety issues are refusals raises @D-REFUSE@
+  -- and no @D-PARTIAL@, so a forward reference has to ask rather than assume.
+  uncertifiedNoteCode :: Unique -> Text
+  uncertifiedNoteCode u =
+    case Map.findWithDefault [] u safetyIssues of
+      is | all (\i -> i.safClause == "REFUSE") is, not (null is) -> "D-REFUSE"
+         | otherwise                                             -> "D-PARTIAL"
+
+  -- D-REFUSE (ruling D1, 2026-09-05; @IMPLICIT-PROPS-DESIGN.md@ §11.9.1).
+  --
+  -- The decide can decline to answer — either because its own body contains a
+  -- REFUSE, or because it calls something that does. DMN has no vocabulary for
+  -- "declined": the emitted FEEL is `null`, which is the same token FEEL uses
+  -- for "absent" and for "the engine could not compute it". THIS NOTE IS THE
+  -- ONLY THING IN THE ARTIFACT THAT KEEPS THOSE APART, together with the
+  -- reason string on the row's and the decision's <description>.
+  --
+  -- Severity is not a property of the refusal, it is a property of who reads
+  -- it: 'Lossy' when every consumer is a lazy arm that can guard the null,
+  -- 'Blocking' when one consumer is strict or when nothing consumes it at all.
+  -- §2.8 proposed a NON-Blocking D-REFUSE unconditionally; that is overruled,
+  -- because the DRG-root case is exactly the one where a caller gets `null`
+  -- with status SUCCEEDED and no way to tell it apart from an answer.
+  refuseNotes =
+    [ dmnNote "D-REFUSE" sev did (listToMaybe [r | (_, Just r) <- own])
+        ("`" <> decideName d <> "` can decline to answer ("
+           <> reasonText
+           <> "). A refusal has no DMN image, so it is emitted as FEEL `null`, \
+              \which DMN 1.3 does not distinguish from an absent value or from a \
+              \computation the engine could not perform. The author's reason is \
+              \carried on the <description> of the refusing row, and of this \
+              \<decision> when its whole body refuses"
+           <> fallbackText)
+        "the distinction between `the model declines to answer this` and `the answer \
+        \is absent`: FEEL has one null and spells both with it, so no reader or \
+        \analyser of the artifact alone can recover which was meant"
+    | d <- decides
+    , let u = getUnique (decideResolved d)
+    , Just allIssues <- [Map.lookup u safetyIssues]
+    , let refusals = [i | i <- allIssues, i.safClause == "REFUSE"]
+    , not (null refusals)
+    , let did = Map.findWithDefault (decideName d) u decideByUnique
+    , let own = refusalsIn (carameliseExpr (view decideBody d))
+    , let reasonText = case refusals of
+            [] -> "unknown reason"
+            (i : rest) ->
+              i.safDetail
+                <> (if null rest
+                      then ""
+                      else "; and " <> tshow (length rest) <> " further refusal(s)")
+    , let (sev, fallbackText) = nullFenceSeverity u
     ]
 
   -- D-BKM (Phase 5, §6.2): the tier-2 classification, now carried out. The
@@ -5798,7 +6080,13 @@ lowerModule opts modul@(MkModule _ uri _) =
                <> (if null callerNames
                      then ""
                      else " by " <> Text.intercalate ", " (map tick callerNames))
-               <> ", but it could not be certified total (see its D-PARTIAL note), so it \
+               -- Which note to send the reader to is COMPUTED, not assumed. A
+               -- decide uncertified only because it can refuse raises D-REFUSE
+               -- and NOT D-PARTIAL (D1), so a hard-coded "see its D-PARTIAL
+               -- note" would point at an element that is not in the report.
+               <> ", but it could not be certified total (see its "
+               <> uncertifiedNoteCode u
+               <> " note), so it \
                   \keeps its <decision> node and its call sites stay verbatim")
             "the invocation: an uncertified body inside a BKM would answer the same silent \
             \null one element kind later, so the emission is refused rather than degraded"
@@ -6192,7 +6480,31 @@ lowerModule opts modul@(MkModule _ uri _) =
     -- ever sees it, and 'populationNotes' carries the (now Lossy) note. The
     -- per-decision two-message machinery that lived here described an emitted
     -- element that no longer exists.
-    notes = tableNotes' <> sumTypeLossyNotes <> decisionMaybeNotes
+    -- D-OUTPUTVALUES-NULL (Lossy): this table's DECLARED output domain was
+    -- widened by `null`, because a rule of it answers one. 'outputValuesWith'
+    -- carries the two-engine measurement that forces the widening; this is the
+    -- note that stops it being silent. Lossy rather than Advisory, per §7's
+    -- line: something the SOURCE says is gone from the artifact -- the L4
+    -- return type admits exactly the enum's constructors, and the emitted
+    -- domain admits one value more.
+    outputValuesNullNotes =
+      [ dmnNote "D-OUTPUTVALUES-NULL" Lossy did Nothing
+          ("`" <> decideName d <> "`'s <outputValues> declares `null` alongside "
+             <> Text.intercalate ", " vs
+             <> ", because a rule of this table answers `null` (a REFUSE, or a MAYBE's \
+                \absent case). Without it the two target engines disagree: KIE 8.44.0.Final \
+                \enforces <outputValues> at run time and FAILS the decision (\"Value null \
+                \does not match list of allowed values\") while zeebe-dmn does not check it \
+                \and returns the null silently. The TYPE's own <allowedValues> is unchanged \
+                \and still declares exactly the L4 domain")
+          "the artifact's claim that this decision answers only a value of its declared \
+          \type: its emitted output domain now admits `null` as well"
+      | LogicTable t <- [logic]
+      , t.dtOutput.ocAdmitsNull
+      , Just vs <- [t.dtOutput.ocValues]
+      ]
+
+    notes = tableNotes' <> sumTypeLossyNotes <> decisionMaybeNotes <> outputValuesNullNotes
 
     -- Computed ONCE and shared by 'plainLowering' and the requirement rewrite
     -- below, so the emitted logic and the emitted DRG edges cannot disagree.
@@ -6382,10 +6694,26 @@ lowerModule opts modul@(MkModule _ uri _) =
             \that NO engine can evaluate"
         | otherwise = ""
 
+    -- D1: the author's reasons, kept IN THE ARTIFACT rather than only in a
+    -- fidelity report that travels separately from the .dmn.
+    --
+    -- Every refusal in this decide's own body, not only the ones with no row.
+    -- The overlap with a refusing row's own <description> is deliberate and is
+    -- redundancy at two granularities, not noise: the row says "these inputs
+    -- decline", the decision says "this decision can decline, for these
+    -- reasons", and a reader looking at the node — or a diff of it — should not
+    -- have to scan every rule to learn the second. It is also what covers the
+    -- two shapes that have NO row: a whole body that refuses (a boxed
+    -- literalExpression) and an OTHERWISE that became a defaultOutputEntry.
+    decisionRefuseDescription = case map fst (refusalsIn body) of
+      [] -> Nothing
+      rs -> Just ("REFUSE: " <> Text.intercalate "; " (nubOrd rs))
+
     decision = MkDecision
       { dcnId           = did
       , dcnName         = decideName d
       , dcnFeelName     = feelName
+      , dcnDescription  = decisionRefuseDescription
       -- The same key 'decideByUnique' is built on, kept on the emitted node so
       -- a consumer holding the DRG never has to reconstruct the mapping.
       , dcnDecide       = Just (getUnique (decideResolved d))
@@ -6624,16 +6952,16 @@ sanitiseId t
 -- across three files and stale in at least two of them is the exact defect
 -- this exhibit exists to criticise.
 moduleTitle :: Module Resolved -> Maybe Text
-moduleTitle (MkModule _ _ (MkSection _ mName _ decls)) =
+moduleTitle (MkModule _ _ (MkSection _ mName _ _ decls)) =
   listToMaybe
     ( [nameOf n | Just n <- [mName]]
-        <> [nameOf n | Section _ (MkSection _ (Just n) _ _) <- decls]
+        <> [nameOf n | Section _ (MkSection _ (Just n) _ _ _) <- decls]
     )
 
 topDecls :: Module Resolved -> [TopDecl Resolved]
 topDecls (MkModule _ _ sec) = section sec
  where
-  section (MkSection _ _ _ ds) = concatMap decl ds
+  section (MkSection _ _ _ _ ds) = concatMap decl ds
   decl d = case d of
     Section _ sub -> d : section sub
     _             -> [d]

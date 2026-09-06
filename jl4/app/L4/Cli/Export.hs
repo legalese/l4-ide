@@ -339,7 +339,7 @@ siblingExternalRefs fp modul = do
 moduleDecideNames :: Module Resolved -> [Text]
 moduleDecideNames (MkModule _ _ sec) = goSec sec
  where
-  goSec (MkSection _ _ _ ds) = concatMap goDecl ds
+  goSec (MkSection _ _ _ _ ds) = concatMap goDecl ds
   goDecl = \case
     Decide _ (MkDecide _ _ (MkAppForm _ n _ _) _) ->
       [unqualifiedNameToText (getOriginal n)]

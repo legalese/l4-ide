@@ -89,7 +89,7 @@ import qualified Base.Text as Text
 import L4.Annotation
 import L4.Names
 import L4.Parser.SrcSpan (prettySrcRange, prettySrcRangeM, SrcRange (..), zeroSrcPos)
-import L4.Print (prettyLayout, quotedName)
+import L4.Print (prettyLayout, prettyTypeForDisplay, quotedName)
 import L4.Syntax
 import L4.TypeCheck.Annotation
 import L4.TypeCheck.Environment as X
@@ -99,6 +99,7 @@ import L4.TypeCheck.With as X
 import qualified L4.Utils.IntervalMap as IV
 import L4.Lexer (FixityDirection (..), fixityHerald)
 import L4.Mixfix (MixfixInfo(..), MixfixPatternToken(..), extractMixfixInfo, canonicalMixfixName, firstKeyword, isBinaryInfixPattern, buildCanonicalNameFromKeywords)
+import qualified L4.Discharge as Discharge
 import qualified L4.Export as Export
 
 import Control.Applicative
@@ -115,7 +116,7 @@ import qualified Base.Set as Set
 import Data.Function (on)
 import Control.Exception (assert)
 import Text.Read (readMaybe)
-import L4.Desugar (desugarComputedFields, detectComputedFieldCycles, detectTypeSynonymCycles, extractComputedFieldNames)
+import L4.Desugar (collectSectionBinderNames, desugarComputedFields, desugarSectionGivens, detectComputedFieldCycles, detectMisattachedSectionGivens, detectRestatedSectionBinders, detectTypeSynonymCycles, extractComputedFieldNames)
 
 mkInitialCheckState :: Substitution -> CheckState
 mkInitialCheckState substitution =
@@ -128,6 +129,7 @@ mkInitialCheckState substitution =
     , descMap      = IV.empty
     , constBodies  = Map.empty
     , sectionPaths = Map.empty
+    , deferredChoices = 0
     }
 
 mkInitialCheckEnv :: NormalizedUri -> Environment -> EntityInfo -> CheckEnv
@@ -143,6 +145,7 @@ mkInitialCheckEnv moduleUri environment entityInfo =
     , mixfixRegistry = emptyMixfixRegistry
     , computedFields = Map.empty
     , cyclicSynonyms = Set.empty
+    , sectionBinderNames = Set.empty
     , inNonexhaustiveDecide = False
     , moduleUri
     , sectionStack = []
@@ -178,12 +181,32 @@ doCheckProgramWithDependencies checkState checkEnv program =
         [ MkCheckErrorWithContext (CyclicTypeSynonyms cyc) (WhileCheckingDeclare synName None)
         | cyc@(synName : _) <- synonymCycles
         ]
+        ++
+        -- The dedent hazard of R4: a section binder pushed back to column 1
+        -- silently becomes the next declaration's parameter. Reported only
+        -- where the declaration makes no use of the name at all, which is the
+        -- one shape that cannot be a deliberately written function signature.
+        [ MkCheckErrorWithContext (MisattachedSectionGiven n mSection) None
+        | (n, mSection) <- detectMisattachedSectionGivens program
+        ]
+        ++
+        -- R2: one binder per name. A declaration's own GIVEN that restates a
+        -- section binder would give the name two binders in one body once
+        -- discharge makes the binder a parameter.
+        [ MkCheckErrorWithContext (RestatedSectionBinder n) None
+        | n <- detectRestatedSectionBinders program
+        ]
       synonymCycles = detectTypeSynonymCycles program
       checkEnv' = checkEnv
         { computedFields = extractComputedFieldNames program
         , cyclicSynonyms = Set.fromList (rawName <$> concat synonymCycles)
+        , sectionBinderNames = collectSectionBinderNames program
         }
-  in case runCheckUnique (checkProgram (desugarComputedFields program)) checkEnv' checkState of
+  in -- Section binders are elaborated LAST, so that the ASSUME each one becomes
+     -- sits at the very head of its section's declaration list. Computed-field
+     -- desugaring only ever inserts DECIDEs after a DECLARE, so the two passes
+     -- do not interfere.
+     case runCheckUnique (checkProgram (desugarSectionGivens (desugarComputedFields program))) checkEnv' checkState of
     (w, s) ->
       let
         (errs, (rprog, topEnv, localMixfixRegistry)) = runWith w
@@ -197,9 +220,19 @@ doCheckProgramWithDependencies checkState checkEnv program =
                 -- so importing modules can use mixfix functions defined here
                 combinedMixfixRegistry = unionMixfixRegistry localMixfixRegistry env.mixfixRegistry
                 exportErrs = Export.validateExportInputs rprog
+                -- Both need the whole checked module: a read-set is not a fact
+                -- about one body ('L4.Discharge').
+                implicitErrs =
+                  [ MkCheckErrorWithContext (UnreadImplicitSupply callee binder) None
+                  | (callee, binder) <- Discharge.unreadImplicitSupplies rprog
+                  ]
+                  ++
+                  [ MkCheckErrorWithContext (AmbiguousImplicitSupply callee binder) None
+                  | (callee, binder) <- Discharge.ambiguousImplicitSupplies rprog
+                  ]
             in MkCheckResult
               { program = rprog
-              , errors = suppressResolutionCascade (substErrs ++ moreErrs ++ exportErrs)
+              , errors = suppressResolutionCascade (substErrs ++ moreErrs ++ exportErrs ++ implicitErrs)
               , substitution = s'.substitution
               , environment = env.environment
               , entityInfo = env.entityInfo
@@ -208,6 +241,7 @@ doCheckProgramWithDependencies checkState checkEnv program =
               , scopeMap = s'.scopeMap
               , descMap = s'.descMap
               , mixfixRegistry = combinedMixfixRegistry
+              , sectionPaths = s'.sectionPaths
               }
 
 -- | Drop diagnostics that are pure fallout from a name-resolution failure that
@@ -292,8 +326,8 @@ withExtraMixfix mixfixAdds =
     -- positional match: 'mixfixRegistry' is a duplicated field name, so a
     -- record update here would be ambiguous under DuplicateRecordFields
     updateMixfix :: MixfixRegistry -> CheckEnv -> CheckEnv
-    updateMixfix adds (MkCheckEnv a b c d e f g reg cf cs ne h i lb) =
-      MkCheckEnv a b c d e f g (unionMixfixRegistry adds reg) cf cs ne h i lb
+    updateMixfix adds (MkCheckEnv a b c d e f g reg cf cs sb ne h i lb) =
+      MkCheckEnv a b c d e f g (unionMixfixRegistry adds reg) cf cs sb ne h i lb
 
 dedupCheckInfos :: [CheckInfo] -> [CheckInfo]
 dedupCheckInfos = go Set.empty []
@@ -506,7 +540,9 @@ inferDeclare (MkDeclare ann _tysig appForm _t) =
 -- sophisticated here.
 --
 -- In particular, we currently treat assumed types as enumeration types with no known
--- constructors (empty types). It would be better to have a dedicated case for these.
+-- constructors (empty types). The dedicated spelling for that is now a bodiless
+-- @DECLARE T@ ('OpaqueDecl'), which 'inferTypeName' gives the very same entity;
+-- @ASSUME T IS A TYPE@ is its deprecated synonym (IMPLICIT-PROPS-DESIGN.md §11.1).
 --
 -- TODO: I think the checking whether we have a type declaration or a term
 -- declaration is off, because we can have a type declaration of the form
@@ -568,6 +604,13 @@ inferDirective (Contract ann e t evs) = errorContext (WhileCheckingExpression e)
   rt <- prune $ checkExpr ExpectRegulativeTimestampContext t number
   revs <- traverse (prune . flip (checkExpr ExpectRegulativeEventContext) eventT) evs
   pure (Contract ann re rt revs)
+inferDirective (AssertRefused ann e mmsg) = errorContext (WhileCheckingExpression e) do
+  -- NOT checked against BOOLEAN: the asserted expression is expected to refuse,
+  -- and a refusal is at any type, so the expression may have any type at all.
+  -- The 'prune' is load-bearing for the same T4 reason as the sibling cases.
+  (e', _) <- prune $ inferExpr e
+  mmsg' <- traverse (\m -> prune $ checkExpr ExpectRefuseMessageContext m string) mmsg
+  pure (AssertRefused ann e' mmsg')
 inferDirective (Assert ann e) = errorContext (WhileCheckingExpression e) do
   -- The 'prune' is load-bearing: like the sibling directive cases above, we must
   -- collapse candidate results here, so that an ambiguous-but-well-typed expression
@@ -585,7 +628,7 @@ inferImport (MkImport ann n mr) = do
   pure (MkImport ann rn mr)
 
 inferSection :: Section Name -> Check (Section Resolved, [CheckInfo])
-inferSection (MkSection ann mn maka topdecls) = do
+inferSection (MkSection ann mn maka mgiven topdecls) = do
   -- NOTE: we currently treat section names as defining occurrences, but they play no further role
   rmn <- traverse def mn
   rmaka <-
@@ -598,7 +641,71 @@ inferSection (MkSection ann mn maka topdecls) = do
   (rtopdecls, topDeclExtends) <- withSectionStack mn maka $
     unzip <$> traverse inferTopDecl topdecls
 
-  pure (MkSection ann rmn rmaka rtopdecls, concat topDeclExtends)
+  rmgiven <- traverse (resolveSectionGiven rtopdecls) mgiven
+
+  pure (MkSection ann rmn rmaka rmgiven rtopdecls, concat topDeclExtends)
+
+-- | Resolve a section's own @GIVEN@ (the section binder, R4) against the
+-- elaborations that 'desugarSectionGivens' prepended to that section's
+-- declarations.
+--
+-- The binder is DEFINED by its elaboration, so this must not 'def' anything: a
+-- second defining occurrence of the same name in the same section would make
+-- every reader ambiguous, which is precisely the failure R3 depends on
+-- avoiding. Instead the elaboration's already-resolved name, type and
+-- @TYPICALLY@ are reused, and the 'GivenSig' occurrence is recorded as a
+-- reference to it — so the printed 'GivenSig' stays a faithful re-spelling of
+-- the source and the binder keeps exactly one binding occurrence.
+--
+-- A parameter with no elaboration cannot arise while the invariant on
+-- 'desugarSectionGivens' holds; it is dropped rather than reported, because a
+-- diagnostic here would be about an internal inconsistency, not about the
+-- user's program.
+--
+-- Each elaboration is consumed by AT MOST ONE parameter. A raw name is not a
+-- key here: L4 has type-directed name resolution, so one spelling may be bound
+-- several times at different types in a single @GIVEN@
+-- (@ok\/section-given-tdnr.l4@), and 'desugarSectionGivens' then prepends one
+-- elaboration per parameter, all of them sharing that spelling. Keying on the
+-- name alone (@List.lookup@) sent every such parameter to the FIRST
+-- elaboration, so the 'GivenSig' the checker produced held one binder repeated
+-- at one type instead of n binders at n types — and since
+-- 'L4.Print.prettyLayout' prints exactly this node while suppressing the
+-- elaborations, @l4 batch@ and the REPL re-emitted a module that had lost every
+-- binding after the first and no longer type-checked. Consuming the list
+-- restores the one-to-one pairing the invariant already guarantees, while still
+-- tolerating a pass that drops an elaboration: the orphaned parameter finds no
+-- match and is dropped, as before.
+resolveSectionGiven :: [TopDecl Resolved] -> GivenSig Name -> Check (GivenSig Resolved)
+resolveSectionGiven rdecls (MkGivenSig gann otns) =
+  MkGivenSig gann <$> resolveParams elaborations otns
+ where
+  elaborations :: [(RawName, (Resolved, Maybe (Type' Resolved), Maybe (Expr Resolved)))]
+  elaborations =
+    [ (rawName (getName rn), (rn, rmTy, rmTypically))
+    | Assume _ (MkAssume _ _ (MkAppForm _ rn [] _) rmTy rmTypically) <- rdecls
+    ]
+
+  resolveParams ::
+       [(RawName, (Resolved, Maybe (Type' Resolved), Maybe (Expr Resolved)))]
+    -> [OptionallyTypedName Name]
+    -> Check [OptionallyTypedName Resolved]
+  resolveParams _ [] = pure []
+  resolveParams unmatched (MkOptionallyTypedName pann nm _mTy _mTypically : otns') =
+    case takeFirstNamed (rawName nm) unmatched of
+      Nothing -> resolveParams unmatched otns'
+      Just ((rn, rmTy, rmTypically), unmatched') -> do
+        rnm <- ref nm rn
+        (MkOptionallyTypedName pann rnm rmTy rmTypically :) <$> resolveParams unmatched' otns'
+
+  -- 'List.lookup', but also returning the list with the matched entry removed.
+  takeFirstNamed :: RawName -> [(RawName, a)] -> Maybe (a, [(RawName, a)])
+  takeFirstNamed wanted = search []
+   where
+    search _       []                 = Nothing
+    search skipped ((k, v) : rest)
+      | k == wanted                   = Just (v, reverse skipped <> rest)
+      | otherwise                     = search ((k, v) : skipped) rest
 
 inferLocalDecl :: LocalDecl Name -> Check (LocalDecl Resolved, [CheckInfo])
 inferLocalDecl (LocalDecide ann decide) = do
@@ -1198,6 +1305,10 @@ inferTypeDecl _rappForm (SynonymDecl ann t) = do
   let
     td = SynonymDecl ann rt
   pure (td, [])
+inferTypeDecl _rappForm (OpaqueDecl ann) =
+  -- Nothing to check and nothing to bring into scope: no constructors, no
+  -- fields. The type name itself was published by 'inferTypeName'.
+  pure (OpaqueDecl ann, [])
 
 inferTypeName :: AppForm Resolved -> TypeDecl Name -> Check CheckInfo
 inferTypeName rappForm (EnumDecl _ann _conDecls) = do
@@ -1215,6 +1326,15 @@ inferTypeName rappForm (SynonymDecl _ann _t) = do
     rs = appFormHeads rappForm
     -- The 'Nothing' is wrong here, however, we can only insert it, once
     -- we are fully typechecking the 'SynonymDecl'.
+    kt = KnownType (kindOfAppForm rappForm) (view appFormArgs rappForm) Nothing
+  pure $ makeKnownMany rs kt
+inferTypeName rappForm (OpaqueDecl _ann) = do
+  let
+    rs = appFormHeads rappForm
+    -- Deliberately the SAME entity 'scanTyDeclAssume' makes for
+    -- @ASSUME T IS A TYPE@: a 'KnownType' with no expansion, and no
+    -- constructor terms ever published for it. Every consumer that asks
+    -- "is this a nominal type with no body" already answers yes for both.
     kt = KnownType (kindOfAppForm rappForm) (view appFormArgs rappForm) Nothing
   pure $ makeKnownMany rs kt
 
@@ -2913,6 +3033,19 @@ inferExpr' g =
       mParty' <- traverse (\p -> checkExpr ExpectRegulativePartyContext p partyT) mParty
       mReason' <- traverse (\r -> checkExpr ExpectBreachReasonContext r string) mReason
       pure (Breach ann mParty' mReason', contract partyT actionT)
+    Refuse ann msg -> do
+      -- REFUSE is an expression AT ANY TYPE. That is not a special typing rule:
+      -- 'checkExpr' falls through to infer-then-'expect'
+      -- (see the catch-all of 'checkExpr' below), and a fresh inference
+      -- variable unifies with whatever type the context expects. So a refusal
+      -- can sit in an OTHERWISE arm of a NUMBER-valued decision and equally in
+      -- one at a user-declared record type.
+      --
+      -- ('Breach' is NOT the model for this: it returns a concrete
+      -- @CONTRACT party action@ built from two fresh variables.)
+      rmsg <- checkExpr ExpectRefuseMessageContext msg string
+      t <- fresh (NormalName "refused")
+      pure (Refuse ann rmsg, t)
     Inert ann txt ctx -> do
       -- Inert elements are grammatical scaffolding with context-aware evaluation
       -- In AND context: True (identity), in OR context: False (identity)
@@ -2968,21 +3101,88 @@ inferAppNamed :: Resolved -> Type' Resolved -> [NamedExpr Name] -> Check ([(Int,
 inferAppNamed r (Fun _ onts t) nes = do
   ornes <- supplyAppNamed r (zip [0 ..] onts) nes
   pure (ornes, t)
-inferAppNamed r t _nes = do
-  addError (IllegalAppNamed r t)
-  v <- fresh (NormalName "v")
-  pure ([], v) -- TODO: This is unnecessarily lossy. We could still check the expressions and treat all names as out of scope.
+inferAppNamed r t nes = do
+  -- A definition with no parameters of its own can still be applied to named
+  -- arguments, provided every one of them supplies a SECTION BINDER (R1). It
+  -- has no function type yet because the parameters discharge gives it are a
+  -- whole-module fact ('L4.Discharge'), unknown while this body is checked;
+  -- what the site is asking for is a value of the definition's own type with
+  -- some of its implicit inputs pinned, so that is the type it gets.
+  allBinders <- traverse (isSectionBinderSupply . (\ (MkNamedExpr _ n _) -> n)) nes
+  if not (null nes) && and allBinders
+    then do
+      ornes <- traverse (implicitSupply r) nes
+      pure (ornes, t)
+    else do
+      addError (IllegalAppNamed r t)
+      v <- fresh (NormalName "v")
+      pure ([], v) -- TODO: This is unnecessarily lossy. We could still check the expressions and treat all names as out of scope.
+
+-- | Is this name one the module's section-level @GIVEN@s bind?
+--
+-- The read-set that decides whether the CALLEE actually reads it is a
+-- whole-module fact and is checked after type checking; here we only separate
+-- "a binder the writer is pinning" from "a misspelt parameter name", which
+-- keeps the existing typo guard.
+isSectionBinderSupply :: Name -> Check Bool
+isSectionBinderSupply n = do
+  binders <- asks (.sectionBinderNames)
+  pure (Set.member (rawName n) binders)
+
+-- | Check one named argument that supplies a section binder, against the type
+-- the binder was declared with. The index recorded is 'implicitSupplyIndex':
+-- the binder's position among the callee's discharged parameters is not known
+-- until 'L4.Discharge' computes the read-set.
+implicitSupply :: Resolved -> NamedExpr Name -> Check (Int, NamedExpr Resolved)
+implicitSupply callee (MkNamedExpr ann n e) = do
+  (rn, pt) <- resolveTerm n
+  t <- instantiate pt
+  re <- checkExpr (ExpectNamedArgContext callee rn) e t
+  pure (implicitSupplyIndex, MkNamedExpr ann rn re)
 
 supplyAppNamed :: Resolved -> [(Int, OptionallyNamedType Resolved)] -> [NamedExpr Name] -> Check [(Int, NamedExpr Resolved)]
 supplyAppNamed _r []   [] = pure []
 supplyAppNamed  r onts [] = do
   addError (IncompleteAppNamed r (snd <$> onts))
   pure []
-supplyAppNamed  r onts (MkNamedExpr ann n e : nes) = do
-  (i, rn, t, onts') <- findOptionallyNamedType n onts
-  re <- checkExpr (ExpectNamedArgContext r rn) e t
-  rnes <- supplyAppNamed r onts' nes
-  pure ((i, MkNamedExpr ann rn re) : rnes)
+supplyAppNamed  r onts (ne@(MkNamedExpr ann n e) : nes) =
+  case lookupOptionallyNamedType n onts of
+    Just (i, n', t, onts') -> do
+      rn <- ref n n'
+      re <- checkExpr (ExpectNamedArgContext r rn) e t
+      rnes <- supplyAppNamed r onts' nes
+      pure ((i, MkNamedExpr ann rn re) : rnes)
+    Nothing -> do
+      -- Not one of the callee's own parameters. Under R1 it may still be a
+      -- section binder the callee reads, in which case the site is overriding
+      -- an implicit for the callee's subtree; 'onts' is unchanged, because a
+      -- binder consumes none of the declared parameters and the rest of the
+      -- site must still supply them all.
+      isBinder <- isSectionBinderSupply n
+      if isBinder
+        then do
+          orne <- implicitSupply r ne
+          rnes <- supplyAppNamed r onts nes
+          pure (orne : rnes)
+        else do
+          (i, rn, t, onts') <- findOptionallyNamedType n onts
+          re <- checkExpr (ExpectNamedArgContext r rn) e t
+          rnes <- supplyAppNamed r onts' nes
+          pure ((i, MkNamedExpr ann rn re) : rnes)
+
+-- | The declared parameter this name supplies, if it is one of them, together
+-- with the remaining parameters. Pure: unlike 'findOptionallyNamedType' it
+-- reports nothing and resolves nothing, so a caller can act on the miss.
+lookupOptionallyNamedType
+  :: Name
+  -> [(Int, OptionallyNamedType Resolved)]
+  -> Maybe (Int, Resolved, Type' Resolved, [(Int, OptionallyNamedType Resolved)])
+lookupOptionallyNamedType _ [] = Nothing
+lookupOptionallyNamedType n ((i, MkOptionallyNamedType _ (Just n') t) : onts)
+  | rawName n == rawName (getOriginal n') = Just (i, n', t, onts)
+lookupOptionallyNamedType n (ont : onts) = do
+  (i, n', t, onts') <- lookupOptionallyNamedType n onts
+  pure (i, n', t, ont : onts')
 
 findOptionallyNamedType :: Name -> [(Int, OptionallyNamedType Resolved)] -> Check (Int, Resolved, Type' Resolved, [(Int, OptionallyNamedType Resolved)])
 findOptionallyNamedType n [] = do
@@ -3732,7 +3932,7 @@ inferTyDeclModule (MkModule _ _ sects) =
   inferTyDeclSection sects
 
 inferTyDeclSection :: Section Name -> Check [DeclChecked DeclareOrAssume]
-inferTyDeclSection (MkSection _ name maka topDecls) =
+inferTyDeclSection (MkSection _ name maka _ topDecls) =
   -- Keep the section stack accurate while inferring type-declaration bodies so
   -- that type references resolve with the correct nearest-enclosing-section
   -- preference.
@@ -3811,7 +4011,7 @@ scanTyDeclModule (MkModule _ _ sects) =
   scanTyDeclSection sects
 
 scanTyDeclSection :: Section Name -> Check [DeclTypeSig]
-scanTyDeclSection (MkSection _ name maka topDecls) =
+scanTyDeclSection (MkSection _ name maka _ topDecls) =
   -- NOTE: previously this phase did NOT push the section, so DECLARE/type-ASSUME
   -- names defined inside sections received neither qualified-name variants nor a
   -- recorded section path (unlike DECIDE/term-ASSUME, handled in
@@ -4675,7 +4875,7 @@ scanFunSigModule (MkModule _ _ sects) =
   scanFunSigSection sects
 
 scanFunSigSection :: Section Name -> Check [FunTypeSig]
-scanFunSigSection (MkSection _ name maka topDecls) =
+scanFunSigSection (MkSection _ name maka _ topDecls) =
   withSectionStack name maka $ concat <$> traverse scanFunSigTopLevel topDecls
 
 scanFunSigTopLevel :: TopDecl Name -> Check [FunTypeSig]
@@ -4902,6 +5102,11 @@ setInertContext = go True  -- True = we're at top level or direct boolean operan
       Concat ann es -> Concat ann (map (go False ctx) es)
       AsString ann e -> AsString ann (go False ctx e)
       Breach ann mp mr -> Breach ann (fmap (go False ctx) mp) (fmap (go False ctx) mr)
+      -- 'go False' on the message, NOT 'go True': the REFUSE message is a string
+      -- literal and must STAY one. Converting it to an 'Inert' node here would
+      -- make @TRUE AND REFUSE "x"@ carry a non-literal message, which the type
+      -- checker rejects and the machine cannot read.
+      Refuse ann m -> Refuse ann (go False ctx m)
       -- Other leaves don't need transformation
       e@Lit{} -> e
 
@@ -5039,7 +5244,7 @@ prettyCheckErrorContext (WhileCheckingType _t ctx)       e = prettyCheckErrorCon
 
 prettyCheckError :: CheckError -> [Text]
 prettyCheckError (SuspiciousBinderPattern binder ctor)     =
-  [ "This CONSIDER branch binds a new variable"
+  [ "This CONSIDER branch introduces a new name"
   , ""
   , "  " <> quotedName (getName binder)
   , ""
@@ -5051,6 +5256,57 @@ prettyCheckError (SuspiciousBinderPattern binder ctor)     =
   , "If you meant the constructor, fix the spelling; if you meant a"
   , "catch-all, consider OTHERWISE or a name unlike any constructor."
   ]
+prettyCheckError (UnreadImplicitSupply callee binder)       =
+  [ "This call supplies"
+  , ""
+  , "  " <> quotedName (getName binder)
+  , ""
+  , "but " <> quotedName (getName callee) <> " does not read it -- not in its own"
+  , "body, and not through anything it calls. There is nowhere for the value to"
+  , "go, so the override would do nothing."
+  , ""
+  , "Supply it to whichever definition does read it, or drop it from this call."
+  ]
+prettyCheckError (AmbiguousImplicitSupply callee binder)   =
+  [ "This call supplies"
+  , ""
+  , "  " <> quotedName (getName binder)
+  , ""
+  , "but " <> quotedName (getName callee) <> " reads more than one input of that"
+  , "name, and this one is neither of them, so there is no way to tell which was"
+  , "meant."
+  , ""
+  , "Rename one of them, or hoist them to a common section heading if they are"
+  , "one thing."
+  ]
+prettyCheckError (RestatedSectionBinder n)                 =
+  [ "A section GIVEN already binds"
+  , ""
+  , "  " <> quotedName n
+  , ""
+  , "so this GIVEN would give one name two inputs. Delete it: the section's"
+  , "value flows into this definition on its own."
+  , ""
+  , "If a different value is meant here, give this one another name, or"
+  , "write the variation at the call:"
+  , ""
+  , "  <callee> WITH " <> prettyLayout n <> " IS <value>"
+  ]
+prettyCheckError (MisattachedSectionGiven n mSection)       =
+  [ "This GIVEN starts at column 1, so it is the signature of the declaration"
+  , "below it -- and that declaration never uses"
+  , ""
+  , "  " <> quotedName n
+  , ""
+  , "If " <> quotedName n <> " was meant as an input for the whole of"
+  , ""
+  , "  " <> maybe "this section" (("\167 " <>) . prettyLayout) mSection
+  , ""
+  , "indent the GIVEN so that it starts past the \167 of the heading:"
+  , ""
+  , "  \167 <heading>"
+  , "      GIVEN " <> prettyLayout n <> " IS A <type>"
+  ]
 prettyCheckError (OutOfScopeError n t)                     =
   [ "I could not find a definition for the identifier"
   , ""
@@ -5061,8 +5317,8 @@ prettyCheckError (OutOfScopeError n t)                     =
   , "  " <> prettyLayout t
   ]
 prettyCheckError (KindError k ts)                          =
-  [ "The arities of the types do not match."
-  , "I expected " <> Text.textShow k <> " arguments, but I found " <> Text.textShow (length ts) <> "."
+  [ "This type is given the wrong number of inputs."
+  , "I expected " <> Text.textShow k <> ", but I found " <> Text.textShow (length ts) <> "."
   ]
 prettyCheckError (TypeMismatch ec expected given)          =
   prettyTypeMismatch ec expected given
@@ -5137,34 +5393,38 @@ prettyCheckError (IncorrectArgsNumberApp r expected given)   =
   , ""
   , "  " <> prettyResolvedWithRange r
   , ""
-  , "expects " <> prettyCount expected "argument" <> ","
-  , "but you are applying it to " <> prettyCount given "argument" <> " here."
+  , "expects " <> prettyCount expected "input" <> ","
+  , "but here it is given " <> prettyCount given "input" <> "."
   ]
 prettyCheckError (IllegalApp r t n)                          =
-  [ "You are trying to apply"
+  [ "You are giving " <> prettyCount n "input" <> " to"
   , ""
   , "  " <> prettyResolvedWithRange r <> " of type " <> prettyLayout t
   , ""
-  , "(which is not a function) to " <> prettyCount n "argument" <> " here."
+  , "but it is not a function, so it takes none."
   ]
 prettyCheckError (IllegalAppNamed r t)                       =
-  [ "You are trying to apply"
+  [ "You are giving named inputs to"
   , ""
   , "  " <> prettyResolvedWithRange r <> " of type " <> prettyLayout t
   , ""
-  , "(which is not a function) to (named) arguments here."
+  , "but it is not a function, so it takes none."
   ]
 prettyCheckError (IncompleteAppNamed r onts)               =
-  [ "In the application of"
+  [ "In this use of"
   , ""
   , "  " <> prettyResolvedWithRange r
   , ""
-  , "you forgot to supply the following arguments:"
+  , "you have not supplied these inputs:"
   , ""
   ] ++ map (\ ont -> "  " <> prettyOptionallyNamedType ont) onts
-prettyCheckError (CheckInfo t _)                           = [prettyLayout t]
+-- A '#CHECK' over a polymorphic term carries residual inference variables,
+-- and the raw layout prints them as the checker's gensyms (@a24@) — not a name
+-- in any scope, and different after every edit. Render for display instead:
+-- stable @a@, @b@, … by order of first appearance, exactly as hover does.
+prettyCheckError (CheckInfo t _)                           = [prettyTypeForDisplay t]
 prettyCheckError (IllegalTypeInKindSignature t)            =
-  [ "In a signature of a type declaration, all parameters must be of type"
+  [ "In the signature of a type declaration, every input must be of type"
   , ""
   , "  TYPE"
   , ""
@@ -5181,14 +5441,13 @@ prettyCheckError (MissingEntityInfo r)                     =
   , "This is an error in this system and should be reported as a bug."
   ]
 prettyCheckError (DesugarAnnoRewritingError context errorInfo) =
-  [ "Error while desugaring:"
-  , "While trying to desugar the expression"
+  [ "I could not attach this expression's original text to its parts:"
   , ""
   , "  " <> prettyLayout context
   , ""
-  , "We ran into the error:"
-  , "The source annotation are not matching the expected number of arguments."
-  , "Expected " <> Text.textShow (errorInfo.expected) <> " holes but got: " <> Text.textShow (errorInfo.got)
+  , "Its annotation has " <> Text.textShow (errorInfo.got) <> " holes where "
+      <> Text.textShow (errorInfo.expected) <> " were needed."
+  , "This is an error in this system and should be reported as a bug."
   ]
 prettyCheckError (CheckWarning warning) = prettyCheckWarning warning
 prettyCheckError (MixfixMatchErrorCheck funcName err) =
@@ -5202,7 +5461,7 @@ prettyCheckError (FixityAnnotationMalformed _ raw) =
   , "priority between 1 and 9, for example: @infixl 6"
   ]
 prettyCheckError (FixityConflict op fixities) =
-  [ "The operator " <> quotedName (MkName emptyAnno op) <> " has conflicting fixity declarations in scope:"
+  [ "The operator " <> quotedName (MkName emptyAnno op) <> " has conflicting fixity declarations visible here:"
   , ""
   ]
   <> map (("  " <>) . prettyFixityDecl) fixities
@@ -5254,13 +5513,20 @@ prettyCheckError (TypicallyRequiresType n) =
   ]
 prettyCheckError (TypicallyOnTypeVariable n) =
   [ quotedName n <> " is a type, which cannot carry a TYPICALLY default value."
-  , "TYPICALLY defaults apply to term-level fields, parameters and assumptions."
+  , "TYPICALLY can give a default to a DECLARE field, a GIVEN input, or an ASSUME."
   ]
 prettyCheckError (ExportFunctionTypeInput _fnName paramName) =
   [ "Function type inputs are not supported for @export."
-  , "The parameter "
+  , "The input "
       <> quotedName (getActual paramName)
       <> " has a function type."
+  ]
+prettyCheckError (ExportAssumeNameClash fnName paramName) =
+  [ "The @export function " <> quotedName (getActual fnName)
+      <> " has a GIVEN input " <> quotedName (getActual paramName)
+      <> " with the same name as an ASSUME it reads."
+  , "Both would be one input field, so a request could not supply them separately."
+  , "Rename the input or the ASSUME."
   ]
 prettyCheckError (RegulativeActorMismatch party performer actionName) =
   [ "An actor may only perform its own actions."
@@ -5294,8 +5560,8 @@ prettyMixfixMatchError funcName = \case
     , "In expression involving: " <> prettyLayout funcName
     ]
   ArityMismatch expected actual ->
-    [ "Wrong number of arguments in mixfix expression"
-    , "Expected " <> Text.textShow expected <> " arguments but got " <> Text.textShow actual
+    [ "Wrong number of inputs in mixfix expression"
+    , "Expected " <> Text.textShow expected <> " inputs but got " <> Text.textShow actual
     , "In expression involving: " <> prettyLayout funcName
     ]
   where
@@ -5333,7 +5599,7 @@ prettyCheckWarning = \ case
     , ""
     , "  a OP b MEANS ..."
     , ""
-    , "where a and b are the GIVEN parameters."
+    , "where a and b are the GIVEN inputs."
     ]
 
 -- | Render a synthesized missing branch as valid, pasteable L4 (the
@@ -5387,39 +5653,50 @@ prettyFixityDecl (prio, dir) = fixityHerald dir <> " " <> Text.pack (show prio)
 prettyCount :: Int -> Text -> Text
 prettyCount i txt = Text.pack (show i) <> " " <> txt <> (if i == 1 then "" else "s")
 
+-- Note [Vocabulary of the NonDistinct messages]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Four of these five now use words a reader of @doc/@ already has:
+-- @constructors@, @fields@, @inputs@. 'NonDistinctQuantifiers' deliberately
+-- does NOT, and a sweep that "finishes the job" here would make it wrong.
+--
+-- Its subject is the type variables of a polymorphic signature, not a rule's
+-- inputs, so "input" would be false; and "quantified" and "polymorphic" each
+-- carry meaning no plainer word carries. Left as it stands, on purpose, until
+-- someone has a better sentence rather than merely a shorter one.
+-- See CLAUDE.md section 7.
 prettyNonDistinctContext :: NonDistinctContext -> [Text]
 prettyNonDistinctContext NonDistinctConstructors =
   [ "All constructors of an enumeration type must have distinct names." ]
 prettyNonDistinctContext NonDistinctSelectors =
-  [ "All selectors of a record type must have distinct names." ]
+  [ "All fields of a record type must have distinct names." ]
 prettyNonDistinctContext NonDistinctQuantifiers =
   [ "All quantified variables in a polymorphic type must have distinct names." ]
 prettyNonDistinctContext NonDistinctTypeAppForm =
-  [ "In a type declaration, the type and all its parameters must have distinct names." ]
+  [ "In a type declaration, the type and all its inputs must have distinct names." ]
 prettyNonDistinctContext NonDistinctTermAppForm =
-  [ "In a definition, the defined term and all its parameters must have distinct names." ]
+  [ "In a definition, the defined term and all its inputs must have distinct names." ]
 
 prettyTypeMismatch :: ExpectationContext -> Type' Resolved -> Type' Resolved -> [Text]
 prettyTypeMismatch ExpectIfConditionContext expected given =
   standardTypeMismatch [ "The condition in IF-THEN-ELSE and BRANCH-IF-THEN-OTHERWISE constructs is expected to be of type" ] expected given
 prettyTypeMismatch ExpectNotArgumentContext expected given =
-  standardTypeMismatch [ "The argument of NOT is expected to be of type" ] expected given
+  standardTypeMismatch [ "The input to NOT is expected to be of type" ] expected given
 prettyTypeMismatch ExpectPercentArgumentContext expected given =
-  standardTypeMismatch [ "The argument of '%' is expected to be of type" ] expected given
+  standardTypeMismatch [ "The input to '%' is expected to be of type" ] expected given
 prettyTypeMismatch ExpectPostUrlContext expected given =
-  standardTypeMismatch [ "The URL argument of POST is expected to be of type" ] expected given
+  standardTypeMismatch [ "The URL given to POST is expected to be of type" ] expected given
 prettyTypeMismatch ExpectPostHeadersContext expected given =
-  standardTypeMismatch [ "The headers argument of POST is expected to be of type" ] expected given
+  standardTypeMismatch [ "The headers given to POST are expected to be of type" ] expected given
 prettyTypeMismatch ExpectPostBodyContext expected given =
-  standardTypeMismatch [ "The body argument of POST is expected to be of type" ] expected given
+  standardTypeMismatch [ "The body given to POST is expected to be of type" ] expected given
 prettyTypeMismatch ExpectConcatArgumentContext expected given =
-  standardTypeMismatch [ "The argument of CONCAT is expected to be of type" ] expected given
+  standardTypeMismatch [ "The input to CONCAT is expected to be of type" ] expected given
 prettyTypeMismatch ExpectAsStringArgumentContext _expected given =
-  [ "The argument of AS STRING is expected to be NUMBER, BOOLEAN, DATE, or STRING."
-  , "I inferred the argument to have type " <> prettyLayout given
+  [ "The input to AS STRING is expected to be NUMBER, BOOLEAN, DATE, or STRING."
+  , "I inferred this input to have type " <> prettyLayout given
   ]
 prettyTypeMismatch ExpectConsArgument2Context expected given =
-  standardTypeMismatch [ "The second argument of FOLLOWED BY is expected to be of type" ] expected given
+  standardTypeMismatch [ "The second input to FOLLOWED BY is expected to be of type" ] expected given
 prettyTypeMismatch (ExpectPatternScrutineeContext scrutinee) expected given =
   let (e, g) = prettyMismatchedTypes expected given in
   [ "A pattern in a WHEN-clause of a CONSIDER construct is expected to have the type of the expression being matched."
@@ -5480,15 +5757,15 @@ prettyTypeMismatch (ExpectTypicallyValueContext n) expected given =
   standardTypeMismatch [ "The TYPICALLY value for " <> quotedName n <> " is expected to be of type" ] expected given
 prettyTypeMismatch (ExpectAppArgContext True r _i) expected given =
   standardTypeMismatch
-    [ "The argument of the projection "
+    [ "The value that the field"
     , ""
     , "  " <> prettyResolvedWithRange r
     , ""
-    , "is expected to be of type"
+    , "is read from is expected to be of type"
     ] expected given
 prettyTypeMismatch (ExpectAppArgContext False r i) expected given =
   standardTypeMismatch
-    [ "The " <> prettyOrdinal i <> " argument of function "
+    [ "The " <> prettyOrdinal i <> " input of function "
     , ""
     , "  " <> prettyResolvedWithRange r
     , ""
@@ -5496,7 +5773,7 @@ prettyTypeMismatch (ExpectAppArgContext False r i) expected given =
     ] expected given
 prettyTypeMismatch (ExpectNamedArgContext r nr) expected given =
   standardTypeMismatch
-    [ "The argument"
+    [ "The input"
     , ""
     , "  " <> prettyResolvedWithRange nr
     , ""
@@ -5508,7 +5785,7 @@ prettyTypeMismatch (ExpectNamedArgContext r nr) expected given =
     ] expected given
 prettyTypeMismatch (ExpectBinOpArgContext txt i) expected given =
   standardTypeMismatch
-    [ "The " <> prettyOrdinal i <> " argument of the " <> txt <> " operator is expected to be" ]
+    [ "The " <> prettyOrdinal i <> " input to the " <> txt <> " operator is expected to be" ]
     expected given
 prettyTypeMismatch ExpectRegulativePartyContext expected given =
   standardTypeMismatch [ "The PARTY clause of a regulative rule is expected to be of type" ] expected given
@@ -5535,6 +5812,8 @@ prettyTypeMismatch ExpectAssertContext expected given =
   standardTypeMismatch [ "An ASSERT directive is expected to be of type" ] expected given
 prettyTypeMismatch ExpectBreachReasonContext expected given =
   standardTypeMismatch [ "The BECAUSE clause of a BREACH is expected to be of type" ] expected given
+prettyTypeMismatch ExpectRefuseMessageContext expected given =
+  standardTypeMismatch [ "The message of a REFUSE is expected to be a string literal, of type" ] expected given
 prettyTypeMismatch ExpectRecordCellContext expected given =
   standardTypeMismatch [ "The cell of a RECORD/COMMIT/ATTEST is expected to be of type" ] expected given
 
@@ -5601,7 +5880,7 @@ prettyMismatchedTypes expected given
 
 prettyOptionallyNamedType :: OptionallyNamedType Resolved -> Text
 prettyOptionallyNamedType (MkOptionallyNamedType _ Nothing  t) =
-  "an unnamed argument of type " <> prettyLayout t <> " (this is most likely an internal error)"
+  "an unnamed input of type " <> prettyLayout t <> " (this is most likely an internal error)"
 prettyOptionallyNamedType (MkOptionallyNamedType _ (Just r) t) =
   prettyLayout r <> " of type " <> prettyLayout t
 
