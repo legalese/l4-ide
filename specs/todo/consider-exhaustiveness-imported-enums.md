@@ -1,5 +1,11 @@
 # DONE: exhaustiveness checking for `CONSIDER` over _imported_ enums
 
+> **D7.4 (upstream #909): `PatternMatchesMissing` is promoted to a check ERROR — RULED
+> 2026-09-06, subject to the hosted-deployment scan.** The ruling, the 13-file / 52-golden
+> migration and the amendments the adversarial pass forced are in
+> `consider-exhaustiveness-scope-hardening.md`; this family's false-positive-freeness result is its
+> precondition.
+
 ## Status
 
 **Resolved** on branch `mengwong/consider-exhaustiveness`, together with the

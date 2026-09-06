@@ -477,6 +477,46 @@ tests are treated as specifications); **HG2**, Meng's go on anything outward-fac
 the corpus repo, publishing the report, any lexipedia contact. Everything else runs
 autonomously.
 
+#### 7.3.1 HG1 is expected to be WAIVED, and the pipeline must not wait for it. RULED 2026-09-06.
+
+Rulings-bench card `D10-corpus-selection`, marked **accept** by Meng 2026-09-06. **This is a design
+position, not a caveat**, and it is recorded here because §7.3 is the text that defines the gate.
+His words, verbatim:
+
+> We should get used to the new normal: HG1 is unlikely to arrive from humans in a timely fashion so
+> waiving it is expected. The rest of the system should accommodate that fact and not wait for human
+> HG1 to appear if critical functionality would thus be delayed.
+
+**What follows for the design.** A waived HG1 is an **ordinary outcome**, not a degraded one, and no
+part of the pipeline may block on it where blocking would delay critical functionality. What the
+system owes instead is that the waiver be **visible in the artifact** rather than inferred from a
+row that never advanced: that is what the `review` gate-state field below is for. All nine existing
+canon rows carry HG1 waived or not sought, so this ruling describes what already happens and stops
+it being read as a backlog.
+
+**What it does not change.** HG1 still exists and is still the domain-expert review; a waiver is
+still recorded per row with who waived it and when. Nothing here delegates the review — §7.3 already
+does not name a particular reviewer, and enrolling one is a line in `gate-allowed-signers`, which
+waits on a key that does not yet exist.
+
+#### 7.3.2 The `review` gate-state field. RULED 2026-09-06.
+
+Each gate carries a **`review`** state rather than a bare granted/withheld flag, so that "waived"
+and "never sought" are distinguishable from "pending" — the distinction the ruling above turns on.
+Schema: `schemas/gate-state.schema.json`. **The schema file is the whole of what this PR adds**; no
+canon row is backfilled here.
+
+**Owed, and deliberately not done in this change** (each is a different repo or a code change, and
+bundling them would make this ruling unreviewable):
+
+- **canon** — `subjects/LONGLIST.md`'s header made the authority on who may act on a row; a link
+  from `subjects/README.md`; a link from the `running-the-l4-pipeline` skill. A selection rule that
+  lives only in an orphaned markdown file has already been shown here not to reach an agent.
+- **code** — `go.sh new-subject --longlist-row` enforcement (`cmd_new_subject`) and
+  `etc/go/lib/new-subject.mjs`, so the rule is checked rather than published.
+- **corpus** — C′'s subjects: Penal Code s 302/304 and the PDPA Part VIA sections.
+- **The WIP cap is DECLINED**, and is not owed.
+
 ## 8. Acceptance test — the diff oracle
 
 The de novo run (G2) re-derives Reg CF from source **without reading the existing corpus**,
