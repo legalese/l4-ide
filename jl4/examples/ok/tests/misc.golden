@@ -12,72 +12,76 @@ misc.l4:67:1-43:
 misc.l4:83:8-14:
   I found a problem while checking the assumption of `coerce`:
     ASSUME is an older way of introducing a name, and it is being retired.
+    Nothing is broken: the file still checks, runs and exports as before.
     This one leaves
     
       `coerce`
     
-    open for somebody outside the file to supply. Say that with a GIVEN
-    indented under the heading of the section whose rules read it:
+    open for somebody outside the file to supply. Say that
+    with a GIVEN indented under the heading of the section whose rules
+    read it (add a § heading if the file has none):
     
       § <heading>
           GIVEN coerce IS A FUNCTION FROM NUMBER TO BOOLEAN
     
-    If it instead marks a case the rules cannot answer, write in its place
+    (If this ASSUME instead marked a case the rules cannot answer, that is
+    REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
     
-      REFUSE "<the reason>"
-    
-    See doc/reference/types/ASSUME.md for the recipe.
+    The manual explains the move: doc/reference/types/ASSUME.md.
 misc.l4:84:8-14:
   I found a problem while checking the assumption of `coerce`:
     ASSUME is an older way of introducing a name, and it is being retired.
+    Nothing is broken: the file still checks, runs and exports as before.
     This one leaves
     
       `coerce`
     
-    open for somebody outside the file to supply. Say that with a GIVEN
-    indented under the heading of the section whose rules read it:
+    open for somebody outside the file to supply. Say that
+    with a GIVEN indented under the heading of the section whose rules
+    read it (add a § heading if the file has none):
     
       § <heading>
           GIVEN coerce IS A FUNCTION FROM BOOLEAN TO NUMBER
     
-    If it instead marks a case the rules cannot answer, write in its place
+    (If this ASSUME instead marked a case the rules cannot answer, that is
+    REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
     
-      REFUSE "<the reason>"
-    
-    See doc/reference/types/ASSUME.md for the recipe.
+    The manual explains the move: doc/reference/types/ASSUME.md.
 misc.l4:85:8-14:
   I found a problem while checking the assumption of `coerce`:
     ASSUME is an older way of introducing a name, and it is being retired.
+    Nothing is broken: the file still checks, runs and exports as before.
     This one leaves
     
       `coerce`
     
-    open for somebody outside the file to supply. Say that with a GIVEN
-    indented under the heading of the section whose rules read it:
+    open for somebody outside the file to supply. Say that
+    with a GIVEN indented under the heading of the section whose rules
+    read it (add a § heading if the file has none):
     
       § <heading>
           GIVEN coerce IS A FUNCTION FROM NUMBER TO STRING
     
-    If it instead marks a case the rules cannot answer, write in its place
+    (If this ASSUME instead marked a case the rules cannot answer, that is
+    REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
     
-      REFUSE "<the reason>"
-    
-    See doc/reference/types/ASSUME.md for the recipe.
+    The manual explains the move: doc/reference/types/ASSUME.md.
 misc.l4:86:8-14:
   I found a problem while checking the assumption of `coerce`:
     ASSUME is an older way of introducing a name, and it is being retired.
+    Nothing is broken: the file still checks, runs and exports as before.
     This one leaves
     
       `coerce`
     
-    open for somebody outside the file to supply. Say that with a GIVEN
-    indented under the heading of the section whose rules read it:
+    open for somebody outside the file to supply. Say that
+    with a GIVEN indented under the heading of the section whose rules
+    read it (add a § heading if the file has none):
     
       § <heading>
           GIVEN coerce IS A FUNCTION FROM STRING TO NUMBER
     
-    If it instead marks a case the rules cannot answer, write in its place
+    (If this ASSUME instead marked a case the rules cannot answer, that is
+    REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
     
-      REFUSE "<the reason>"
-    
-    See doc/reference/types/ASSUME.md for the recipe.
+    The manual explains the move: doc/reference/types/ASSUME.md.

@@ -15,7 +15,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import L4.API.VirtualFS
 import qualified L4.TypeCheck as TC
-import L4.TypeCheck.Types (AssumeRole (..), CheckError (..), CheckErrorWithContext (..), CheckWarning (..), Severity (..))
+import L4.TypeCheck.Types (AssumeRole (..), CheckError (..), CheckErrorWithContext (..), CheckWarning (..), DeprecatedAssumeInfo (..), Severity (..))
 
 -- | The deprecation warnings a module draws, as (role, suggested line).
 deprecations :: Text -> IO (Bool, [(AssumeRole, Maybe Text)])
@@ -23,8 +23,8 @@ deprecations source = case checkWithImports emptyVFS source of
   Left errs -> fail ("parse/import: " <> Text.unpack (Text.unlines errs))
   Right r -> pure
     ( r.tcdSuccess
-    , [ (role, line)
-      | MkCheckErrorWithContext (CheckWarning (DeprecatedAssume _ role line)) _ <- r.tcdErrors
+    , [ (info.role, info.replacement)
+      | MkCheckErrorWithContext (CheckWarning (DeprecatedAssume info)) _ <- r.tcdErrors
       ]
     )
 
@@ -68,6 +68,49 @@ spec = describe "ASSUME deprecation warning" $ do
       , "ASSUME bottom"
       ]
     ws `shouldBe` [(AssumeAnyTypeRole, Nothing), (AssumeAnyTypeRole, Nothing)]
+
+  it "still warns on an author-written ASSUME that shares a section GIVEN's name (refuted 2026-09-07)" $ do
+    (ok, ws) <- deprecations $ Text.unlines
+      [ "§ `Rates`"
+      , "    GIVEN income IS A NUMBER"
+      , ""
+      , "ASSUME income IS A STRING"
+      ]
+    ok `shouldBe` True
+    ws `shouldBe` [(AssumeTermRole, Just "GIVEN income IS A STRING")]
+
+  it "names the keyword head of an infix pattern, not its first input" $ do
+    (_, ws) <- deprecations $ Text.unlines
+      [ "GIVEN a IS A NUMBER"
+      , "      b IS A NUMBER"
+      , "ASSUME a `plus` b IS A NUMBER"
+      ]
+    ws `shouldBe` [(AssumeTermRole, Just "GIVEN plus IS A FUNCTION FROM NUMBER AND NUMBER TO NUMBER")]
+
+  it "treats a function over its own type variable as a term, with a <type> hole" $ do
+    (_, ws) <- deprecations $ Text.unlines
+      [ "GIVEN a IS A TYPE"
+      , "      x IS AN a"
+      , "ASSUME identity x IS AN a"
+      , "GIVEN b IS A TYPE"
+      , "ASSUME age IS A NUMBER"
+      , "ASSUME w"
+      ]
+    ws `shouldBe`
+      [ (AssumeTermRole, Just "GIVEN identity IS A <type>")
+      , (AssumeTermRole, Just "GIVEN age IS A NUMBER")
+      , (AssumeUntypedRole, Just "GIVEN w IS A <type>")
+      ]
+
+  it "spells a FOR ALL type without the article, and quotes a keyword name" $ do
+    (_, ws) <- deprecations $ Text.unlines
+      [ "ASSUME pick IS FOR ALL a A FUNCTION FROM a TO a"
+      , "ASSUME `LIST` IS A NUMBER"
+      ]
+    ws `shouldBe`
+      [ (AssumeTermRole, Just "GIVEN pick IS FOR ALL a FUNCTION FROM a TO a")
+      , (AssumeTermRole, Just "GIVEN `LIST` IS A NUMBER")
+      ]
 
   it "spells the function type out from the head's inputs, and carries TYPICALLY across" $ do
     (_, ws) <- deprecations $ Text.unlines

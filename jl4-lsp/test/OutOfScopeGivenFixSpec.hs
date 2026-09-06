@@ -99,7 +99,7 @@ spec =
         ] <> pins <>
         [ "DECIDE `is adult` IF `at least eighteen` age"
         ]
-      fmap (.title) mFix `shouldBe` Just "Declare `age` as a GIVEN of § `Adults`"
+      fmap (.title) mFix `shouldBe` Just "Start a GIVEN for `age` under § `Adults`"
       fmap (.edit) mFix `shouldBe` Just (insertion 1 "    GIVEN age IS A NUMBER\n")
 
     it "appends to the rule's own GIVEN when no heading encloses the use" $ do
@@ -108,7 +108,7 @@ spec =
         [ "GIVEN income IS A NUMBER"
         , "DECIDE `is well off` IF income > 0 AND `at least eighteen` age"
         ]
-      fmap (.title) mFix `shouldBe` Just "Add `age` to the GIVEN of `is well off`"
+      fmap (.title) mFix `shouldBe` Just "Add `age` to the GIVEN of the rule `is well off`"
       fmap (.edit) mFix `shouldBe` Just (insertion 5 "      age IS A NUMBER\n")
 
     it "opens a rule GIVEN above the declaration, keeping its annotation above it" $ do
@@ -118,7 +118,7 @@ spec =
         , "GIVETH A BOOLEAN"
         , "DECIDE `is adult` IF `at least eighteen` age"
         ]
-      fmap (.title) mFix `shouldBe` Just "Declare `age` as a GIVEN of `is adult`"
+      fmap (.title) mFix `shouldBe` Just "Start a GIVEN for `age` on the rule `is adult`"
       fmap (.edit) mFix `shouldBe` Just (insertion 5 "GIVEN age IS A NUMBER\n")
 
     it "never spells the deprecated keyword" $ do

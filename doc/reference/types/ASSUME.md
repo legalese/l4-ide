@@ -9,19 +9,19 @@ open at the top of the file for somebody outside the file to supply.
 
 **`ASSUME` is deprecated (ruled 2026-09-04), and it still works.**
 L4 still accepts it, it still runs and it still exports exactly as it always
-has, and nothing already written stops working. Since 2026-09-06 the checker
+has, and nothing already written stops working. Since 2026-09-07 the checker
 says so: every `ASSUME` draws a warning, never an error, that reads the shape
 of the declaration and names the spelling to use instead — see
 [ASSUME is being retired](../errors/README.md#assume-is-being-retired) for the
 text and the three shapes it tells apart. New rules should use the constructs
 in the table below, because one keyword was carrying four unrelated jobs.
 
-| The job the `ASSUME` was doing                                    | Where that job goes                                                                                                                                                           |
-| ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| a fact supplied afresh for each case (the applicant's age)        | a [`GIVEN` under the section heading](../syntax/section-given.md) whose rules read it — a **"section `GIVEN`"**                                                               |
-| a kind of thing the model treats as opaque (`ASSUME T IS A TYPE`) | [`DECLARE T`](DECLARE.md#opaque-types) — a name with no stated contents                                                                                                       |
-| a case the encoding deliberately does not cover                   | [`REFUSE "..."`](../control-flow/REFUSE.md)                                                                                                                                   |
-| a rule defined elsewhere (`… IS A FUNCTION FROM …`)               | a section `GIVEN` of function type, as the corpus migration of 2026-09-05 did and as the warning suggests; `@export` refuses it either way, see "Function-typed inputs" below |
+| The job the `ASSUME` was doing                                    | Where that job goes                                                                                                                                                                                                                                             |
+| ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| a fact supplied afresh for each case (the applicant's age)        | a [`GIVEN` under the section heading](../syntax/section-given.md) whose rules read it — a **"section `GIVEN`"**                                                                                                                                                 |
+| a kind of thing the model treats as opaque (`ASSUME T IS A TYPE`) | [`DECLARE T`](DECLARE.md#opaque-types) — a name with no stated contents                                                                                                                                                                                         |
+| a case the encoding deliberately does not cover                   | [`REFUSE "..."`](../control-flow/REFUSE.md)                                                                                                                                                                                                                     |
+| a rule defined elsewhere (`… IS A FUNCTION FROM …`)               | a section `GIVEN` of function type, as the warning suggests; note that `@export` refuses a function-typed input spelled `… IS A FUNCTION FROM …` but not one spelled with its inputs on the head (`ASSUME f p IS A BOOLEAN`), see "Function-typed inputs" below |
 
 ## Migrating a term `ASSUME`
 

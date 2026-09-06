@@ -3,6 +3,7 @@ Typechecking successful
 tbd.l4:5:8-12:
   I found a problem while checking the assumption of `TBD1`:
     ASSUME is an older way of introducing a name, and it is being retired.
+    Nothing is broken: the file still checks, runs and exports as before.
     This one gives
     
       `TBD1`
@@ -12,10 +13,11 @@ tbd.l4:5:8-12:
     
       REFUSE "<the reason>"
     
-    See doc/reference/control-flow/REFUSE.md.
+    The manual explains the move: doc/reference/control-flow/REFUSE.md.
 tbd.l4:13:8-12:
   I found a problem while checking the assumption of `TBD2`:
     ASSUME is an older way of introducing a name, and it is being retired.
+    Nothing is broken: the file still checks, runs and exports as before.
     This one gives
     
       `TBD2`
@@ -25,10 +27,11 @@ tbd.l4:13:8-12:
     
       REFUSE "<the reason>"
     
-    See doc/reference/control-flow/REFUSE.md.
+    The manual explains the move: doc/reference/control-flow/REFUSE.md.
 tbd.l4:21:8-12:
   I found a problem while checking the assumption of `TBD3`:
     ASSUME is an older way of introducing a name, and it is being retired.
+    Nothing is broken: the file still checks, runs and exports as before.
     This one gives
     
       `TBD3`
@@ -38,7 +41,7 @@ tbd.l4:21:8-12:
     
       REFUSE "<the reason>"
     
-    See doc/reference/control-flow/REFUSE.md.
+    The manual explains the move: doc/reference/control-flow/REFUSE.md.
 tbd.l4:26:1-12:
   a
 tbd.l4:27:1-12:

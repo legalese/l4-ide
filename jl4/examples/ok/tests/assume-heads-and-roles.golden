@@ -1,173 +1,179 @@
 Parsing successful
 Typechecking successful
-grounding-variants.l4:25:8-42:
-  I found a problem while checking the assumption of `a prohibition notice is in force`:
+assume-heads-and-roles.l4:23:10-16:
+  I found a problem while checking the assumption of `plus`:
     ASSUME is an older way of introducing a name, and it is being retired.
     Nothing is broken: the file still checks, runs and exports as before.
     This one leaves
     
-      `a prohibition notice is in force`
+      `plus`
     
     open for somebody outside the file to supply. Say that
     with a GIVEN indented under the heading of the section whose rules
     read it (add a § heading if the file has none):
     
       § <heading>
-          GIVEN `a prohibition notice is in force` IS A BOOLEAN
+          GIVEN plus IS A FUNCTION FROM NUMBER AND NUMBER TO NUMBER
     
     (If this ASSUME instead marked a case the rules cannot answer, that is
     REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
     
     The manual explains the move: doc/reference/types/ASSUME.md.
-grounding-variants.l4:26:8-40:
-  I found a problem while checking the assumption of `the visitor holds a valid pass`:
+assume-heads-and-roles.l4:27:8-16:
+  I found a problem while checking the assumption of `identity`:
     ASSUME is an older way of introducing a name, and it is being retired.
     Nothing is broken: the file still checks, runs and exports as before.
     This one leaves
     
-      `the visitor holds a valid pass`
+      `identity`
     
     open for somebody outside the file to supply. Say that
     with a GIVEN indented under the heading of the section whose rules
     read it (add a § heading if the file has none):
     
       § <heading>
-          GIVEN `the visitor holds a valid pass` IS A BOOLEAN
+          GIVEN identity IS A <type>
     
     (If this ASSUME instead marked a case the rules cannot answer, that is
     REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
     
     The manual explains the move: doc/reference/types/ASSUME.md.
-grounding-variants.l4:27:8-39:
-  I found a problem while checking the assumption of `the site is a restricted area`:
+assume-heads-and-roles.l4:30:8-11:
+  I found a problem while checking the assumption of `age`:
     ASSUME is an older way of introducing a name, and it is being retired.
     Nothing is broken: the file still checks, runs and exports as before.
     This one leaves
     
-      `the site is a restricted area`
+      `age`
     
     open for somebody outside the file to supply. Say that
     with a GIVEN indented under the heading of the section whose rules
     read it (add a § heading if the file has none):
     
       § <heading>
-          GIVEN `the site is a restricted area` IS A BOOLEAN
+          GIVEN age IS A NUMBER
     
     (If this ASSUME instead marked a case the rules cannot answer, that is
     REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
     
     The manual explains the move: doc/reference/types/ASSUME.md.
-grounding-variants.l4:29:8-30:
-  I found a problem while checking the assumption of `the return was filed`:
+assume-heads-and-roles.l4:32:8-12:
+  I found a problem while checking the assumption of `pick`:
     ASSUME is an older way of introducing a name, and it is being retired.
     Nothing is broken: the file still checks, runs and exports as before.
     This one leaves
     
-      `the return was filed`
+      `pick`
     
     open for somebody outside the file to supply. Say that
     with a GIVEN indented under the heading of the section whose rules
     read it (add a § heading if the file has none):
     
       § <heading>
-          GIVEN `the return was filed` IS A BOOLEAN
+          GIVEN pick IS FOR ALL v FUNCTION FROM v TO v
     
     (If this ASSUME instead marked a case the rules cannot answer, that is
     REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
     
     The manual explains the move: doc/reference/types/ASSUME.md.
-grounding-variants.l4:30:8-27:
-  I found a problem while checking the assumption of `the levy was paid`:
+assume-heads-and-roles.l4:35:8-18:
+  I found a problem while checking the assumption of `is large`:
     ASSUME is an older way of introducing a name, and it is being retired.
     Nothing is broken: the file still checks, runs and exports as before.
     This one leaves
     
-      `the levy was paid`
+      `is large`
     
     open for somebody outside the file to supply. Say that
     with a GIVEN indented under the heading of the section whose rules
     read it (add a § heading if the file has none):
     
       § <heading>
-          GIVEN `the levy was paid` IS A BOOLEAN
+          GIVEN `is large` IS A <type>
     
     (If this ASSUME instead marked a case the rules cannot answer, that is
     REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
     
     The manual explains the move: doc/reference/types/ASSUME.md.
-grounding-variants.l4:31:8-34:
-  I found a problem while checking the assumption of `an extension was granted`:
+assume-heads-and-roles.l4:37:8-9:
+  I found a problem while checking the assumption of `w`:
     ASSUME is an older way of introducing a name, and it is being retired.
     Nothing is broken: the file still checks, runs and exports as before.
     This one leaves
     
-      `an extension was granted`
+      `w`
+    
+    with no type written. Say what kind of thing it is,
+    with a GIVEN indented under the heading of the section whose rules
+    read it (add a § heading if the file has none):
+    
+      § <heading>
+          GIVEN w IS A <type>
+    
+    (If this ASSUME instead marked a case the rules cannot answer, that is
+    REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
+    
+    The manual explains the move: doc/reference/types/ASSUME.md.
+assume-heads-and-roles.l4:39:8-12:
+  I found a problem while checking the assumption of `rate`:
+    ASSUME is an older way of introducing a name, and it is being retired.
+    Nothing is broken: the file still checks, runs and exports as before.
+    This one leaves
+    
+      `rate`
     
     open for somebody outside the file to supply. Say that
     with a GIVEN indented under the heading of the section whose rules
     read it (add a § heading if the file has none):
     
       § <heading>
-          GIVEN `an extension was granted` IS A BOOLEAN
+          GIVEN rate IS A NUMBER
+    
+    The ASSUME also names it `interest rate`.
+    A GIVEN cannot carry an AKA, so write `rate` wherever the other
+    name was used.
     
     (If this ASSUME instead marked a case the rules cannot answer, that is
     REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
     
     The manual explains the move: doc/reference/types/ASSUME.md.
-grounding-variants.l4:33:8-38:
-  I found a problem while checking the assumption of `the premises are residential`:
+assume-heads-and-roles.l4:42:8-20:
+  I found a problem while checking the assumption of `filing fee`:
     ASSUME is an older way of introducing a name, and it is being retired.
     Nothing is broken: the file still checks, runs and exports as before.
     This one leaves
     
-      `the premises are residential`
+      `filing fee`
     
     open for somebody outside the file to supply. Say that
     with a GIVEN indented under the heading of the section whose rules
     read it (add a § heading if the file has none):
     
       § <heading>
-          GIVEN `the premises are residential` IS A BOOLEAN
+          GIVEN `filing fee` IS A NUMBER TYPICALLY 100
+    
+    Keep any @desc or @ref written above it: they go above the GIVEN line
+    the same way.
     
     (If this ASSUME instead marked a case the rules cannot answer, that is
     REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
     
     The manual explains the move: doc/reference/types/ASSUME.md.
-grounding-variants.l4:34:8-33:
-  I found a problem while checking the assumption of `smoke alarms are fitted`:
-    ASSUME is an older way of introducing a name, and it is being retired.
-    Nothing is broken: the file still checks, runs and exports as before.
-    This one leaves
-    
-      `smoke alarms are fitted`
-    
-    open for somebody outside the file to supply. Say that
-    with a GIVEN indented under the heading of the section whose rules
-    read it (add a § heading if the file has none):
-    
-      § <heading>
-          GIVEN `smoke alarms are fitted` IS A BOOLEAN
-    
-    (If this ASSUME instead marked a case the rules cannot answer, that is
-    REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
-    
-    The manual explains the move: doc/reference/types/ASSUME.md.
-grounding-variants.l4:35:8-35:
-  I found a problem while checking the assumption of `the escape route is clear`:
-    ASSUME is an older way of introducing a name, and it is being retired.
-    Nothing is broken: the file still checks, runs and exports as before.
-    This one leaves
-    
-      `the escape route is clear`
-    
-    open for somebody outside the file to supply. Say that
-    with a GIVEN indented under the heading of the section whose rules
-    read it (add a § heading if the file has none):
-    
-      § <heading>
-          GIVEN `the escape route is clear` IS A BOOLEAN
-    
-    (If this ASSUME instead marked a case the rules cannot answer, that is
-    REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
-    
-    The manual explains the move: doc/reference/types/ASSUME.md.
+assume-heads-and-roles.l4:50:1-14:
+  FUNCTION FROM NUMBER AND NUMBER TO NUMBER
+assume-heads-and-roles.l4:51:1-16:
+  FUNCTION FROM a TO a
+assume-heads-and-roles.l4:52:1-11:
+  NUMBER
+assume-heads-and-roles.l4:53:1-12:
+  FOR ALL v FUNCTION FROM v TO v
+assume-heads-and-roles.l4:54:1-18:
+  FUNCTION FROM a TO BOOLEAN
+assume-heads-and-roles.l4:55:1-9:
+  NUMBER
+assume-heads-and-roles.l4:56:1-23:
+  NUMBER
+assume-heads-and-roles.l4:57:1-20:
+  NUMBER
+assume-heads-and-roles.l4:58:1-11:
+  NUMBER

@@ -4,41 +4,43 @@ Evaluation successful
 section-scoping-descendant-rebind.l4:32:8-9:
   I found a problem while checking the assumption of `y`:
     ASSUME is an older way of introducing a name, and it is being retired.
+    Nothing is broken: the file still checks, runs and exports as before.
     This one leaves
     
       `y`
     
-    open for somebody outside the file to supply. Say that with a GIVEN
-    indented under the heading of the section whose rules read it:
+    open for somebody outside the file to supply. Say that
+    with a GIVEN indented under the heading of the section whose rules
+    read it (add a § heading if the file has none):
     
       § <heading>
           GIVEN y IS A NUMBER
     
-    If it instead marks a case the rules cannot answer, write in its place
+    (If this ASSUME instead marked a case the rules cannot answer, that is
+    REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
     
-      REFUSE "<the reason>"
-    
-    See doc/reference/types/ASSUME.md for the recipe.
+    The manual explains the move: doc/reference/types/ASSUME.md.
 section-scoping-descendant-rebind.l4:33:1-9:
   NUMBER
 section-scoping-descendant-rebind.l4:37:8-9:
   I found a problem while checking the assumption of `y`:
     ASSUME is an older way of introducing a name, and it is being retired.
+    Nothing is broken: the file still checks, runs and exports as before.
     This one leaves
     
       `y`
     
-    open for somebody outside the file to supply. Say that with a GIVEN
-    indented under the heading of the section whose rules read it:
+    open for somebody outside the file to supply. Say that
+    with a GIVEN indented under the heading of the section whose rules
+    read it (add a § heading if the file has none):
     
       § <heading>
           GIVEN y IS A NUMBER
     
-    If it instead marks a case the rules cannot answer, write in its place
+    (If this ASSUME instead marked a case the rules cannot answer, that is
+    REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
     
-      REFUSE "<the reason>"
-    
-    See doc/reference/types/ASSUME.md for the recipe.
+    The manual explains the move: doc/reference/types/ASSUME.md.
 section-scoping-descendant-rebind.l4:45:1-14:
   10
 section-scoping-descendant-rebind.l4:46:1-12:

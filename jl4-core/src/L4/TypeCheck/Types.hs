@@ -213,36 +213,64 @@ data CheckWarning
     -- ^ A fixity annotation was attached to a definition that is not a plain
     -- binary infix operator (pattern @_ op _@); the annotation is ignored.
     -- Carries the definition's name and the annotation's source range.
-  | DeprecatedAssume Name AssumeRole (Maybe Text)
+  | DeprecatedAssume DeprecatedAssumeInfo
     -- ^ An author-written @ASSUME@. The keyword is deprecated
     -- (IMPLICIT-PROPS-DESIGN.md §11.1), and this is the warning that says so
     -- — a warning, never an error, so nothing that checked before stops
-    -- checking. Carries the declared name (the warning's anchor), the job the
-    -- declaration's shape says it was doing, and, when that shape lets one be
-    -- spelled, the pasteable line that replaces it (@GIVEN age IS A NUMBER@,
-    -- @DECLARE Person@). Emitted once per declaration from
-    -- 'L4.TypeCheck.inferAssume'; the elaborations
-    -- 'L4.Desugar.desugarSectionGivens' prepends for a section @GIVEN@ reach
-    -- the same code and never draw it.
+    -- checking. Emitted once per declaration from 'L4.TypeCheck.inferAssume';
+    -- the elaborations 'L4.Desugar.desugarSectionGivens' prepends for a
+    -- section @GIVEN@ reach the same code and never draw it
+    -- ('L4.Names.isSectionBinderElaboration').
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
--- | Which of @ASSUME@'s three jobs a declaration was doing, read off its
--- checked signature alone — no use-site analysis — so 'DeprecatedAssume' can
--- name the spelling that replaces it. The one job this cannot see is a
--- term-shaped refusal (@ASSUME `no figure exists before commencement` IS A
--- NUMBER@), which is why the term-role message names @REFUSE@ as well.
+-- | Everything 'DeprecatedAssume' needs to phrase its advice.
+data DeprecatedAssumeInfo = MkDeprecatedAssumeInfo
+  { name :: Name
+    -- ^ The declared name, restructured to the head keyword for a mixfix or
+    -- infix pattern (@a `plus` b@ is named @plus@); the warning's anchor.
+  , role :: AssumeRole
+  , place :: AssumePlace
+  , replacement :: Maybe Text
+    -- ^ The pasteable line that replaces it (@GIVEN age IS A NUMBER@,
+    -- @DECLARE Person@), when the shape lets one be spelled; a line with a
+    -- @<type>@ hole when the type cannot be written down at the destination.
+  , aliases :: [Name]
+    -- ^ Names the @ASSUME@'s own @AKA@ gave it. A @GIVEN@ cannot carry an
+    -- @AKA@, so the advice names them.
+  , annotated :: Bool
+    -- ^ A @\@desc@ or @\@ref@ was written above the @ASSUME@; it moves with it.
+  }
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass NFData
+
+-- | Which of @ASSUME@'s jobs a declaration was doing, read off its checked
+-- signature alone — no use-site analysis — so 'DeprecatedAssume' can name the
+-- spelling that replaces it. The one job this cannot see is a term-shaped
+-- refusal (@ASSUME `no figure exists before commencement` IS A NUMBER@),
+-- which is why the term-role message names @REFUSE@ as well.
 data AssumeRole
   = AssumeTypeRole
     -- ^ @ASSUME T IS A TYPE@ (or @GIVETH A TYPE@ above a bare @ASSUME T@): a
     -- bodiless @DECLARE T@, the opaque type of §11.1.1.
   | AssumeAnyTypeRole
-    -- ^ The result type is one of the declaration's own type variables
-    -- (@GIVEN a IS A TYPE@ then @ASSUME gap IS AN a@), or no type was written
-    -- at all: nothing can ever supply a value, so the only replacement is a
-    -- @REFUSE@.
+    -- ^ No inputs, and the result type is one of the declaration's own type
+    -- variables (@GIVEN a IS A TYPE@ then @ASSUME gap IS AN a@): nothing can
+    -- ever supply a value, so the only replacement is a @REFUSE@. A
+    -- /function/ over its own type variables (@ASSUME identity x IS AN a@) is
+    -- suppliable and is a term.
+  | AssumeUntypedRole
+    -- ^ No result type was written at all (@ASSUME w@ with neither @IS A@
+    -- nor @GIVETH@). The checker may still infer one from the uses, but the
+    -- author has to write it at the destination.
   | AssumeTermRole
     -- ^ A value or a function the boundary supplies: a section @GIVEN@.
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass NFData
+
+-- | Where the @ASSUME@ was written. A @WHERE@-local one has no section to
+-- move to; its destination is the enclosing rule's own @GIVEN@.
+data AssumePlace = AtTopLevel | InWhere
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
@@ -377,7 +405,7 @@ instance HasSrcRange CheckError where
   -- The clause-head hull anchors the warning; it wins over the enclosing
   -- WhileCheckingDecide context range via @rangeOf e <|> rangeOf ctx@ above.
   rangeOf (CheckWarning (PatternClausesMissing r _ _)) = Just r
-  rangeOf (CheckWarning (DeprecatedAssume n _ _)) = rangeOf n
+  rangeOf (CheckWarning (DeprecatedAssume info)) = rangeOf info.name
   rangeOf (SuspiciousBinderPattern b _)     = rangeOf b
   rangeOf (MisattachedSectionGiven n _)     = rangeOf n
   rangeOf (UnreadImplicitSupply _ b)        = rangeOf b

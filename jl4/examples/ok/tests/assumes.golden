@@ -4,21 +4,22 @@ Evaluation successful
 assumes.l4:10:8-11:
   I found a problem while checking the assumption of `foo`:
     ASSUME is an older way of introducing a name, and it is being retired.
+    Nothing is broken: the file still checks, runs and exports as before.
     This one leaves
     
       `foo`
     
-    open for somebody outside the file to supply. Say that with a GIVEN
-    indented under the heading of the section whose rules read it:
+    open for somebody outside the file to supply. Say that
+    with a GIVEN indented under the heading of the section whose rules
+    read it (add a § heading if the file has none):
     
       § <heading>
           GIVEN foo IS A FUNCTION FROM NUMBER TO BOOLEAN
     
-    If it instead marks a case the rules cannot answer, write in its place
+    (If this ASSUME instead marked a case the rules cannot answer, that is
+    REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
     
-      REFUSE "<the reason>"
-    
-    See doc/reference/types/ASSUME.md for the recipe.
+    The manual explains the move: doc/reference/types/ASSUME.md.
 assumes.l4:11:1-12:
   I could not continue evaluating, because I needed to know the value of
     foo
@@ -26,21 +27,22 @@ assumes.l4:11:1-12:
 assumes.l4:13:8-11:
   I found a problem while checking the assumption of `bar`:
     ASSUME is an older way of introducing a name, and it is being retired.
+    Nothing is broken: the file still checks, runs and exports as before.
     This one leaves
     
       `bar`
     
-    open for somebody outside the file to supply. Say that with a GIVEN
-    indented under the heading of the section whose rules read it:
+    open for somebody outside the file to supply. Say that
+    with a GIVEN indented under the heading of the section whose rules
+    read it (add a § heading if the file has none):
     
       § <heading>
           GIVEN bar IS A BOOLEAN
     
-    If it instead marks a case the rules cannot answer, write in its place
+    (If this ASSUME instead marked a case the rules cannot answer, that is
+    REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
     
-      REFUSE "<the reason>"
-    
-    See doc/reference/types/ASSUME.md for the recipe.
+    The manual explains the move: doc/reference/types/ASSUME.md.
 assumes.l4:15:1-14:
   I could not continue evaluating, because I needed to know the value of
     bar

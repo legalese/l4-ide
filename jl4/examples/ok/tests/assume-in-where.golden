@@ -1,0 +1,60 @@
+Parsing successful
+Typechecking successful
+assume-in-where.l4:12:12-21:
+  I found a problem while checking the assumption of `threshold`:
+    I found a problem while checking the definition of `above the threshold`:
+      ASSUME is an older way of introducing a name, and it is being retired.
+      Nothing is broken: the file still checks, runs and exports as before.
+      This one leaves
+      
+        `threshold`
+      
+      open for somebody outside the file to supply. Say that
+      as an input of the rule, on its own GIVEN, since this ASSUME sits
+      inside a WHERE and a section GIVEN cannot reach it:
+      
+        GIVEN threshold IS A NUMBER
+      
+      (If this ASSUME instead marked a case the rules cannot answer, that is
+      REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
+      
+      The manual explains the move: doc/reference/types/ASSUME.md.
+assume-in-where.l4:17:12-18:
+  I found a problem while checking the assumption of `Widget`:
+    I found a problem while checking the definition of `has a widget`:
+      ASSUME is an older way of introducing a name, and it is being retired.
+      Nothing is broken: the file still checks, runs and exports as before.
+      This one names a kind of thing
+      
+        `Widget`
+      
+      without saying what it is made of. Write that as a DECLARE with no
+      parts listed, at the top of the file, since a WHERE cannot hold one:
+      
+        DECLARE Widget
+      
+      The manual explains the move: doc/reference/types/DECLARE.md,
+      under Opaque Types (a type that is named but not described).
+assume-in-where.l4:18:12-36:
+  I found a problem while checking the assumption of `some widget is present`:
+    I found a problem while checking the definition of `has a widget`:
+      ASSUME is an older way of introducing a name, and it is being retired.
+      Nothing is broken: the file still checks, runs and exports as before.
+      This one leaves
+      
+        `some widget is present`
+      
+      open for somebody outside the file to supply. Say that
+      as an input of the rule, on its own GIVEN, since this ASSUME sits
+      inside a WHERE and a section GIVEN cannot reach it:
+      
+        GIVEN `some widget is present` IS A BOOLEAN
+      
+      (If this ASSUME instead marked a case the rules cannot answer, that is
+      REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
+      
+      The manual explains the move: doc/reference/types/ASSUME.md.
+assume-in-where.l4:20:1-29:
+  FUNCTION FROM NUMBER TO BOOLEAN
+assume-in-where.l4:21:1-22:
+  BOOLEAN

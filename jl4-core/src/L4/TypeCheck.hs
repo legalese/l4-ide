@@ -89,7 +89,7 @@ import qualified Base.Text as Text
 import L4.Annotation
 import L4.Names
 import L4.Parser.SrcSpan (prettySrcRange, prettySrcRangeM, SrcRange (..), zeroSrcPos)
-import L4.Print (prettyLayout, prettyTypeForDisplay, quotedName)
+import L4.Print (hasInferenceVariable, prettyLayout, prettyTypeForDisplay, quotedName)
 import L4.Syntax
 import L4.TypeCheck.Annotation
 import L4.TypeCheck.Environment as X
@@ -98,6 +98,7 @@ import L4.TypeCheck.Unify
 import L4.TypeCheck.With as X
 import qualified L4.Utils.IntervalMap as IV
 import L4.Lexer (FixityDirection (..), fixityHerald)
+import qualified L4.Lexer as Lexer
 import L4.Mixfix (MixfixInfo(..), MixfixPatternToken(..), extractMixfixInfo, canonicalMixfixName, firstKeyword, isBinaryInfixPattern, buildCanonicalNameFromKeywords)
 import qualified L4.Discharge as Discharge
 import qualified L4.Export as Export
@@ -544,6 +545,9 @@ inferDeclare (MkDeclare ann _tysig appForm _t) =
 -- other consumer of the elaborations uses.
 data AssumeOrigin
   = WrittenAssume
+    -- ^ Author-written, at the top level of a section.
+  | WrittenLocalAssume
+    -- ^ Author-written, inside a @WHERE@: no section to move it to.
   | SectionGivenElaboration
 
 -- | We allow assumptions for types, but we could potentially be more
@@ -570,13 +574,19 @@ inferAssume origin (MkAssume ann _tysig appForm (Just (Type _tann)) _mTypically)
   errorContext (WhileCheckingAssume (getName appForm)) do
     d <- lookupAssumeCheckedByAnno ann
     let MkAssume _ _ rappForm _ _ = d.payload
-    warnDeprecatedAssume origin (getName appForm) AssumeTypeRole
-      (Just ("DECLARE " <> prettyLayout rappForm))
+    warnDeprecatedAssume origin ann (getName appForm) AssumeTypeRole
+      (Just ("DECLARE " <> prettyLayout rappForm)) []
     pure (d.payload, d.publicNames)
 inferAssume origin (MkAssume ann _tysig appForm mt mTypically) = do
   -- declaration of a term
-  errorContext (WhileCheckingAssume (getName appForm)) do
-    lookupFunTypeSigByAnno ann >>= \ dHead -> do
+  dHead <- lookupFunTypeSigByAnno ann
+  -- The signature scan restructures a mixfix or infix head to its keyword
+  -- (@a `plus` b@ becomes head @plus@, inputs @a b@), so the checked
+  -- 'rappForm' is what names the declaration. The source 'appForm' still
+  -- starts with whatever token the author wrote first — for an infix pattern
+  -- that is the first input, which is not a name of anything.
+  let headName = getName dHead.rappForm
+  errorContext (WhileCheckingAssume headName) do
         -- check that the given result type matches the result type in the type signature
         extendKnownMany dHead.arguments do
           rmt <- case mt of
@@ -597,8 +607,9 @@ inferAssume origin (MkAssume ann _tysig appForm mt mTypically) = do
           -- the suggested line: a section @GIVEN@ carries one the same way.
           let declaredType = fromMaybe dHead.resultType rmt
               role = assumeRoleOf dHead declaredType
-          warnDeprecatedAssume origin (getName appForm) role
+          warnDeprecatedAssume origin ann headName role
             (assumeReplacementLine dHead declaredType rTypically role)
+            (assumeAliases dHead.rappForm)
 
           -- See Note [Adding type information to all binders]
           assume <-
@@ -612,10 +623,23 @@ inferAssume origin (MkAssume ann _tysig appForm mt mTypically) = do
 
 -- | The deprecation warning for an author-written @ASSUME@ ('DeprecatedAssume');
 -- nothing for the checker's own section-@GIVEN@ elaborations.
-warnDeprecatedAssume :: AssumeOrigin -> Name -> AssumeRole -> Maybe Text -> Check ()
-warnDeprecatedAssume SectionGivenElaboration _ _ _ = pure ()
-warnDeprecatedAssume WrittenAssume n role mReplacement =
-  addWarning (DeprecatedAssume n role mReplacement)
+warnDeprecatedAssume :: AssumeOrigin -> Anno -> Name -> AssumeRole -> Maybe Text -> [Name] -> Check ()
+warnDeprecatedAssume SectionGivenElaboration _ _ _ _ _ = pure ()
+warnDeprecatedAssume origin ann n role mReplacement aliases =
+  addWarning $ DeprecatedAssume MkDeprecatedAssumeInfo
+    { name = n
+    , role
+    , place = case origin of
+        WrittenLocalAssume -> InWhere
+        _                  -> AtTopLevel
+    , replacement = mReplacement
+    , aliases
+    , annotated = isJust ann.extra.desc || isJust ann.extra.ref
+    }
+
+-- | The names an @AKA@ on the head gave the declaration.
+assumeAliases :: AppForm Resolved -> [Name]
+assumeAliases (MkAppForm _ _ _ maka) = maybe [] (\ (MkAka _ ns) -> map getName ns) maka
 
 -- | Read the job a term-form @ASSUME@ was doing off its checked signature
 -- (see 'AssumeRole'). The type form, @… IS A TYPE@, never reaches here: it is
@@ -624,38 +648,67 @@ warnDeprecatedAssume WrittenAssume n role mReplacement =
 assumeRoleOf :: FunTypeSig -> Type' Resolved -> AssumeRole
 assumeRoleOf dHead declaredType =
   case declaredType of
-    Type _                                                 -> AssumeTypeRole
-    InfVar {}                                              -> AssumeAnyTypeRole
-    TyApp _ r [] | getUnique r `elem` ownTypeVariables     -> AssumeAnyTypeRole
-    _                                                      -> AssumeTermRole
-  where
-    ownTypeVariables =
-      [ getUnique n | MkCheckInfo ns KnownTypeVariable <- dHead.arguments, n <- ns ]
+    Type _    -> AssumeTypeRole
+    InfVar {} -> AssumeUntypedRole
+    TyApp _ r []
+      | getUnique r `elem` ownTypeVariablesOf dHead
+      , null (termInputTypesOf dHead) -> AssumeAnyTypeRole
+    _         -> AssumeTermRole
+
+-- | The declaration's own type variables (@GIVEN a IS A TYPE@ on its head).
+ownTypeVariablesOf :: FunTypeSig -> [Unique]
+ownTypeVariablesOf dHead =
+  [ getUnique n | MkCheckInfo ns KnownTypeVariable <- dHead.arguments, n <- ns ]
+
+-- | The types of the declaration's term inputs, in head order.
+termInputTypesOf :: FunTypeSig -> [Type' Resolved]
+termInputTypesOf dHead = [ ty | MkCheckInfo _ (KnownTerm ty _) <- dHead.arguments ]
 
 -- | The pasteable line 'DeprecatedAssume' offers in place of a term-form
--- @ASSUME@, when its shape lets one be spelled. A term becomes
--- @GIVEN name IS A type@ (the article is optional to the parser and is the
--- spelling every page teaches); a head with inputs (@ASSUME f x IS A BOOLEAN@ under
--- @GIVEN x IS A BOOLEAN@) becomes a @GIVEN@ of the corresponding function
--- type. A signature that quantifies its own type variables has no section
--- @GIVEN@ spelling (the message then shows the shape with a @<type>@ hole),
--- and the any-type role has no replacement line at all.
+-- @ASSUME@. A term becomes @GIVEN name IS A type@ (the article is optional to
+-- the parser and is the spelling every page teaches; a @FOR ALL@ type takes
+-- none, because @IS A FOR ALL …@ does not parse); a head with inputs
+-- (@ASSUME f x IS A BOOLEAN@ under @GIVEN x IS A BOOLEAN@) becomes a @GIVEN@ of
+-- the corresponding function type; a @TYPICALLY@ default is carried across.
+-- The type is replaced by a @<type>@ hole when it cannot be written down at
+-- the destination: it mentions one of the declaration's own type variables
+-- (a section @GIVEN@ has no @GIVEN a IS A TYPE@ of its own), it still holds
+-- an inference variable (an input written without a type, @GIVEN n@, whose
+-- gensym would otherwise reach the line), or no type was written at all. The
+-- any-type role has no replacement line.
+--
+-- A name that is also a keyword usable in type-head position (@LIST@) is
+-- printed bare by 'prettyLayout' and must be quoted here, since a @GIVEN@
+-- parameter is not a type head.
 assumeReplacementLine :: FunTypeSig -> Type' Resolved -> Maybe (Expr Resolved) -> AssumeRole -> Maybe Text
 assumeReplacementLine dHead declaredType mTypically = \ case
   AssumeTypeRole    -> Just ("DECLARE " <> prettyLayout dHead.rappForm)
   AssumeAnyTypeRole -> Nothing
+  AssumeUntypedRole -> Just (givenLine "A <type>")
   AssumeTermRole
-    | any isTypeVariable dHead.arguments -> Nothing
-    | otherwise ->
-        Just ("GIVEN " <> prettyLayout (getName dHead.rappForm) <> " IS A " <> prettyLayout fullType <> typically)
+    | mentionsOwnTypeVariable fullType || hasInferenceVariable fullType -> Just (givenLine "A <type>")
+    | otherwise -> Just (givenLine (spellType fullType) <> typically)
   where
+    givenLine t = "GIVEN " <> headText <> " IS " <> t
+    headText =
+      let n = getName dHead.rappForm
+      in case rawName n of
+           NormalName t | Map.member t Lexer.keywords -> "`" <> t <> "`"
+           _                                    -> prettyLayout n
+    spellType t = case t of
+      Forall {} -> prettyLayout t
+      _         -> "A " <> prettyLayout t
     typically = maybe "" (\ e -> " TYPICALLY " <> prettyLayout e) mTypically
-    isTypeVariable (MkCheckInfo _ KnownTypeVariable) = True
-    isTypeVariable _                                 = False
-    inputTypes = [ ty | MkCheckInfo _ (KnownTerm ty _) <- dHead.arguments ]
-    fullType = case inputTypes of
+    fullType = case termInputTypesOf dHead of
       [] -> declaredType
-      _  -> Fun emptyAnno [ MkOptionallyNamedType emptyAnno Nothing ty | ty <- inputTypes ] declaredType
+      tys -> Fun emptyAnno [ MkOptionallyNamedType emptyAnno Nothing ty | ty <- tys ] declaredType
+    own = ownTypeVariablesOf dHead
+    mentionsOwnTypeVariable = \ case
+      Type _         -> False
+      TyApp _ r ts   -> getUnique r `elem` own || any mentionsOwnTypeVariable ts
+      Fun _ opts t'  -> any (\ (MkOptionallyNamedType _ _ ty) -> mentionsOwnTypeVariable ty) opts || mentionsOwnTypeVariable t'
+      Forall _ _ t'  -> mentionsOwnTypeVariable t'
+      InfVar {}      -> False
 
 inferDirective :: Directive Name -> Check (Directive Resolved)
 inferDirective (LazyEval ann e) = errorContext (WhileCheckingExpression e) do
@@ -789,7 +842,7 @@ inferLocalDecl (LocalDecide ann decide) = do
   (rdecide, extends) <- softprune $ inferDecide decide
   pure (LocalDecide ann rdecide, extends)
 inferLocalDecl (LocalAssume ann assume) = do
-  (rassume, extends) <- softprune $ inferAssume WrittenAssume assume
+  (rassume, extends) <- softprune $ inferAssume WrittenLocalAssume assume
   pure (LocalAssume ann rassume, extends)
 
 -- | The 'AssumeOrigin' is read only by the 'Assume' case; 'inferSection'
@@ -5680,50 +5733,79 @@ prettyCheckWarning = \ case
     , ""
     , "where a and b are the GIVEN inputs."
     ]
-  DeprecatedAssume n role mReplacement ->
-    "ASSUME is an older way of introducing a name, and it is being retired."
-    : case role of
-      AssumeTermRole ->
-        [ "This one leaves"
-        , ""
-        , "  " <> quotedName n
-        , ""
-        , "open for somebody outside the file to supply. Say that with a GIVEN"
-        , "indented under the heading of the section whose rules read it:"
-        , ""
-        , "  § <heading>"
-        , "      " <> fromMaybe ("GIVEN " <> prettyLayout n <> " IS A <type>") mReplacement
-        , ""
-        , "If it instead marks a case the rules cannot answer, write in its place"
-        , ""
-        , "  REFUSE \"<the reason>\""
-        , ""
-        , "See doc/reference/types/ASSUME.md for the recipe."
+  DeprecatedAssume info ->
+    [ "ASSUME is an older way of introducing a name, and it is being retired."
+    , "Nothing is broken: the file still checks, runs and exports as before."
+    ] <> body
+    where
+      n = info.name
+      shown = "  " <> quotedName n
+      line = fromMaybe ("GIVEN " <> prettyLayout n <> " IS A <type>") info.replacement
+      -- Where the value goes, by where the ASSUME sits. Each alternative
+      -- completes the sentence its role started ("Say that", "Say what kind
+      -- of thing it is").
+      givenAdvice = case info.place of
+        AtTopLevel ->
+          [ "with a GIVEN indented under the heading of the section whose rules"
+          , "read it (add a § heading if the file has none):"
+          , ""
+          , "  § <heading>"
+          , "      " <> line
+          ]
+        InWhere ->
+          [ "as an input of the rule, on its own GIVEN, since this ASSUME sits"
+          , "inside a WHERE and a section GIVEN cannot reach it:"
+          , ""
+          , "  " <> line
+          ]
+      annotationsNote
+        | info.annotated =
+            [ ""
+            , "Keep any @desc or @ref written above it: they go above the GIVEN line"
+            , "the same way."
+            ]
+        | otherwise = []
+      aliasNote = case info.aliases of
+        [] -> []
+        as ->
+          [ ""
+          , "The ASSUME also names it " <> Text.intercalate ", " (map quotedName as) <> "."
+          , "A GIVEN cannot carry an AKA, so write " <> quotedName n <> " wherever the other"
+          , "name was used."
+          ]
+      refuseAside =
+        [ ""
+        , "(If this ASSUME instead marked a case the rules cannot answer, that is"
+        , "REFUSE \"<the reason>\" -- see doc/reference/control-flow/REFUSE.md.)"
         ]
-      AssumeTypeRole ->
-        [ "This one names a kind of thing,"
-        , ""
-        , "  " <> quotedName n
-        , ""
-        , "without saying what it is made of. Write that as a DECLARE with nothing"
-        , "after the name:"
-        , ""
-        , "  " <> fromMaybe ("DECLARE " <> prettyLayout n) mReplacement
-        , ""
-        , "See doc/reference/types/DECLARE.md, under opaque types."
-        ]
-      AssumeAnyTypeRole ->
-        [ "This one gives"
-        , ""
-        , "  " <> quotedName n
-        , ""
-        , "a type that could be anything, so no value can ever be supplied for it."
-        , "If it marks a case the rules cannot answer, write in its place"
-        , ""
-        , "  REFUSE \"<the reason>\""
-        , ""
-        , "See doc/reference/control-flow/REFUSE.md."
-        ]
+      manual page = ["", "The manual explains the move: " <> page]
+      body = case info.role of
+        AssumeTermRole ->
+          [ "This one leaves", "", shown, ""
+          , "open for somebody outside the file to supply. Say that"
+          ] <> givenAdvice <> annotationsNote <> aliasNote <> refuseAside
+            <> manual "doc/reference/types/ASSUME.md."
+        AssumeUntypedRole ->
+          [ "This one leaves", "", shown, ""
+          , "with no type written. Say what kind of thing it is,"
+          ] <> givenAdvice <> annotationsNote <> aliasNote <> refuseAside
+            <> manual "doc/reference/types/ASSUME.md."
+        AssumeTypeRole ->
+          [ "This one names a kind of thing", "", shown, ""
+          , "without saying what it is made of. Write that as a DECLARE with no"
+          ] <> (case info.place of
+                  AtTopLevel -> [ "parts listed:" ]
+                  InWhere    -> [ "parts listed, at the top of the file, since a WHERE cannot hold one:" ])
+            <> [ "", "  " <> fromMaybe ("DECLARE " <> prettyLayout n) info.replacement ]
+            <> manual "doc/reference/types/DECLARE.md,"
+            <> [ "under Opaque Types (a type that is named but not described)." ]
+        AssumeAnyTypeRole ->
+          [ "This one gives", "", shown, ""
+          , "a type that could be anything, so no value can ever be supplied for it."
+          , "If it marks a case the rules cannot answer, write in its place"
+          , ""
+          , "  REFUSE \"<the reason>\""
+          ] <> manual "doc/reference/control-flow/REFUSE.md."
 
 -- | Render a synthesized missing branch as valid, pasteable L4 (the
 -- pattern rendering itself is 'prettyMissingPattern').

@@ -527,12 +527,12 @@ outOfScopeGivenFix (MkModule _ _ rootSection) name ty = do
           let lastHeadingLine = maximum (headingRange.end.line : [ r.end.line | Just aka <- [maka], Just r <- [rangeOf aka] ])
               col   = secRange.start.column + 4
               text  = Text.replicate (col - 1) " " <> "GIVEN " <> param <> "\n"
-          pure (MkGivenFix ("Declare " <> shown <> " as a GIVEN of " <> headingShown)
+          pure (MkGivenFix ("Start a GIVEN for " <> shown <> " under " <> headingShown)
                            (insertAtLineStart (lastHeadingLine + 1) text))
 
     ruleGivenFix :: Decide Resolved -> Text -> Maybe GivenFix
     ruleGivenFix (MkDecide _ (MkTypeSig _ (MkGivenSig _ otns) mGiveth) appForm _) param = do
-      let ruleShown = quotedName (getName appForm)
+      let ruleShown = "the rule " <> quotedName (getName appForm)
       case otns of
         (_ : _) -> do
           ins <- appendParameter otns param
@@ -548,7 +548,7 @@ outOfScopeGivenFix (MkModule _ _ rootSection) name ty = do
                 Just _  -> anchor.column
                 Nothing -> 1
               text = Text.replicate (col - 1) " " <> "GIVEN " <> param <> "\n"
-          pure (MkGivenFix ("Declare " <> shown <> " as a GIVEN of " <> ruleShown)
+          pure (MkGivenFix ("Start a GIVEN for " <> shown <> " on " <> ruleShown)
                            (insertAtLineStart anchor.line text))
 
     -- A further parameter line after the last one, aligned with the first.

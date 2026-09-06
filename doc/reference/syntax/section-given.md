@@ -130,11 +130,14 @@ nothing is a "multiple definitions" error naming both candidates. It is
 supported because the `ASSUME`s a section `GIVEN` replaces support it, and a
 migration that lost it would silently change which programs compile.
 
-**Limit.** A section that binds a name on its heading and _also_ writes its own
-`ASSUME` of that name in its body type-checks, but does not survive being
-re-printed: the printer treats the hand-written `ASSUME` as the section's own and
-drops it, so `l4 batch` and the REPL rebuild a module that has lost it. Write
-the second binding as another `GIVEN` parameter on the heading instead.
+**A hand-written `ASSUME` of a name the heading already binds.** A section that
+binds a name on its heading and _also_ writes its own `ASSUME` of that name in
+its body type-checks when the two are at different types (L4 resolves names by
+type), and the `ASSUME` draws the usual deprecation warning. Until 2026-09-07
+the printer took the hand-written `ASSUME` for the section's own and dropped
+it, so `l4 batch` and the REPL rebuilt a module that had lost it; it now tells
+the two apart and keeps it. Write the second binding as another `GIVEN`
+parameter on the heading anyway — that is what the warning asks for.
 
 ## The dedent hazard
 

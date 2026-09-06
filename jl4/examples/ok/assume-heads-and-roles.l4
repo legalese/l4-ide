@@ -1,0 +1,58 @@
+-- The shapes the 2026-09-07 refuters showed the deprecation warning getting
+-- wrong, one per finding (IMPLICIT-PROPS-DESIGN.md §11.1.2), each now pinned:
+--
+--  * an infix head is named by its keyword (`plus`), not by its first input;
+--  * a function over its own type variable is a term, not "a type that could
+--    be anything", and gets a <type> hole since a section GIVEN cannot bind
+--    the type variable;
+--  * a type variable the type never mentions does not withhold the line;
+--  * a FOR ALL type is spelled without the article;
+--  * an input written without a type leaves a <type> hole, never a gensym;
+--  * a bare ASSUME with no type at all is asked for its type;
+--  * an AKA on the head is named, since a GIVEN cannot carry one;
+--  * a @desc above the ASSUME is mentioned, since it moves with it.
+--
+-- A keyword usable as a name (`LIST`) is quoted on the suggested line too,
+-- pinned in jl4-core/test/DeprecatedAssumeSpec.hs rather than here: the
+-- layout printer prints such a name bare wherever it stands, so a file that
+-- declares one does not survive the prettyLayout round-trip this directory
+-- is held to.
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+ASSUME a `plus` b IS A NUMBER
+
+GIVEN t IS A TYPE
+      x IS A t
+ASSUME identity x IS A t
+
+GIVEN u IS A TYPE
+ASSUME age IS A NUMBER
+
+ASSUME pick IS FOR ALL v A FUNCTION FROM v TO v
+
+GIVEN n
+ASSUME `is large` n IS A BOOLEAN
+
+ASSUME w
+
+ASSUME rate AKA `interest rate` IS A NUMBER
+
+@desc the fee the court charges to file
+ASSUME `filing fee` IS A NUMBER TYPICALLY 100
+
+GIVETH A NUMBER
+DECIDE sum IS 1 `plus` 2
+
+GIVETH A NUMBER
+DECIDE `one more` IS w PLUS 1
+
+#CHECK `plus`
+#CHECK identity
+#CHECK age
+#CHECK pick
+#CHECK `is large`
+#CHECK w
+#CHECK `interest rate`
+#CHECK `filing fee`
+#CHECK sum

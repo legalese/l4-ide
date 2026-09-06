@@ -650,6 +650,63 @@ ever contains the keyword. One pre-existing limit is kept and now documented in 
 whose type is left as an inference variable (the overloaded `>=` does this to `age >= 18`) earns no
 fix, since LSP 3.17 has no snippet support to leave a hole; the old action had the same guard.
 
+**Refuted and repaired, 2026-09-07.** Under the standing authorisation for adversarial workflows
+(BRIEF §14), ten Opus refuters attacked three claims about the warning — the role and line are right
+(A), every author-written `ASSUME` warns exactly once (B), nothing else ever warns (C) — plus a
+voice review of the texts against `doc/STYLE.md` and CLAUDE.md §7. Claim C held: 856 corpus files
+swept, every warning traced to an `ASSUME` keyword or a ditto row continuing one; every CLI verb
+exits the same with and without the `ASSUME`; the three severity gates above really are
+severity-aware. Claims A and B did not hold. What they found, and what changed:
+
+| finding (independent refuters)                                                                                                                                                                                                                                             | repair                                                                                                                                                                                                                                                                               |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| An author-written 0-ary `ASSUME` sharing a name with its own section's `GIVEN` drew no warning, was dropped by the printer and by `l4 render` (7 of 10 refuters; TDNR makes it legal)                                                                                      | `isSectionBinderElaboration` (`jl4-core/src/L4/Names.hs`) now requires identity as well as name: the elaboration carries no concrete tokens (`isSynthesisedAnno`). Its comment claiming "no reachable false positive" was false and is replaced. `ok/assume-beside-section-given.l4` |
+| An infix or postfix head (`ASSUME a `plus` b …`) was named and anchored on its first input, which is not a name of anything (2)                                                                                                                                            | the warning and its context take the head from the checked, restructured `rappForm`                                                                                                                                                                                                  |
+| A function over its own type variable (`ASSUME identity x IS AN a`) was called "a type that could be anything"; a bare `ASSUME w` whose type the uses pin was told the same (2)                                                                                            | any-type only with no inputs; a bare `ASSUME w` is a new `AssumeUntypedRole` that asks for the type                                                                                                                                                                                  |
+| `IS A FOR ALL …` does not parse; a type variable the type never mentions withheld the line; an untyped input (`GIVEN n`) put a gensym (`n2`) on the line; a keyword name (`` `LIST` ``) printed bare; an `AKA` was dropped; `@desc`/`@ref` were not mentioned (A1, A2, A3) | `FOR ALL` takes no article; the hole is used only when the type mentions an own type variable or still holds an inference variable; keyword names are quoted; the `AKA` names and any annotation are named in the message                                                            |
+| A `WHERE`-local `ASSUME` was sent to a section `GIVEN` it cannot reach (A1, A2, A3)                                                                                                                                                                                        | `AssumePlace`: a local `ASSUME` is sent to the rule's own `GIVEN`, a local type `ASSUME` to the top of the file. `ok/assume-in-where.l4`                                                                                                                                             |
+| Voice: no line said nothing is broken; `REFUSE` had equal weight to the primary answer (§6 sequestration); "with nothing after the name" was false for `DECLARE T x`; "opaque" was unglossed; the tutorial and the skill still said "no warning"                           | line 2 now says so; `REFUSE` is one parenthetical; "with no parts listed"; glossed; both pages corrected                                                                                                                                                                             |
+
+`ok/assume-heads-and-roles.l4` pins the middle rows; `jl4-core/test/DeprecatedAssumeSpec.hs` pins
+each repair at the API. Held on re-measurement over the whole tree (`jl4/`, `jl4-core/`, `doc/`,
+`jl4/experiments/` included): 333 live `ASSUME` declarations across the 58 files that reach the
+checker, 333 warnings; the six files with a parse error never reach it.
+
+**Found and NOT repaired here — owed elsewhere, each with its witness in the refuters' scratch.**
+
+- **The `@export` gate treats the two function spellings differently.** `ASSUME f p IS A BOOLEAN`
+  (inputs on the head) read by an `@export` rule passes `validateExportInputs`; the section `GIVEN`
+  the warning offers for it, `GIVEN f IS A FUNCTION FROM Person TO BOOLEAN`, is refused with
+  "Function type inputs are not supported for @export". Measured by rewriting every corpus
+  `ASSUME` by its own suggested line: 34 of 38 head-form sites, in `blawx/alcohol.l4`,
+  `blawx/antisocial.l4`, `blawx/not-ok/arity-two.l4`, `relational/assumed.l4` and
+  `relational/not-ok/assumed-signatures.l4`, turn a clean file into an export error. So the ruled
+  destination for a head-form function `ASSUME` has no spelling `@export` accepts, and
+  `doc/reference/types/ASSUME.md`'s "refuses it either way" was false (corrected). **Needs a ruling**
+  before the sibling rewrite touches those five files: widen the gate to the head form (consistent,
+  and breaks those files' exports), or accept function-typed section `GIVEN`s that only helpers read.
+- **`l4 batch` re-prints a TDNR section `GIVEN` wrongly.** `Export.rewriteModuleAssumes` keeps the
+  surviving binders by raw name (`filterGivenSigTo`), so dropping one of two same-named
+  elaborations keeps both `GivenSig` parameters and the reprint declares the name three times. Same
+  family as §11.14 Finding 1's owed repair.
+- **The quick fix can trade one error for another**: a section `GIVEN` for a name a sibling rule
+  already takes as its own input raises R2 (`RestatedSectionBinder`), and appending to a called
+  rule's `GIVEN` changes its arity at every call. Both edits parse and declare the name the ruled
+  way; neither is a wrong edit, but the fix could prefer the rule `GIVEN` when a sibling rule
+  declares the name. Not done.
+- **The layout printer prints a keyword-usable name bare in every position.** `quoteIfNeeded`
+  (`jl4-core/src/L4/Print.hs`) exempts `LIST` because a type head may spell it bare, but a
+  `GIVEN` parameter or an `ASSUME`/`DECLARE` head may not, so a module declaring `` `LIST` `` does not
+  survive `prettyLayout` ("unexpected LIST, expecting identifier"). The warning quotes it on its
+  own line (pinned in `DeprecatedAssumeSpec`); the printer is not repaired here, which is why
+  `ok/assume-heads-and-roles.l4` carries no such name — the `ok/**` round-trip would reject it.
+- Pre-existing, unrelated: an imported module's diagnostics print once per import path (diamond
+  imports triple them); `GIVEN a IS A TYPE / GIVETH A TYPE / ASSUME B a` is an error while the
+  three neighbouring spellings pass; a `FOR ALL` type declares but is not applicable at a call site;
+  `#CHECK` on a type name leaks a gensym; Catala and Blawx call a section `GIVEN` a "module-level
+  ASSUME" in their own messages; `l4 batch` never surfaces a warning; `check --json` carries no
+  structured severity.
+
 **What this does not decide.** Nothing new. The compiler repair of §11.14 Finding 1 is still owed
 before item 7, and item 7 itself (keyword removal, with `LocalAssume`) is unchanged.
 

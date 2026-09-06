@@ -440,24 +440,25 @@ OTHERWISE "unknown"
 
 ```
 ASSUME is an older way of introducing a name, and it is being retired.
+Nothing is broken: the file still checks, runs and exports as before.
 This one leaves
 
   `age`
 
-open for somebody outside the file to supply. Say that with a GIVEN
-indented under the heading of the section whose rules read it:
+open for somebody outside the file to supply. Say that
+with a GIVEN indented under the heading of the section whose rules
+read it (add a § heading if the file has none):
 
   § <heading>
       GIVEN age IS A NUMBER
 
-If it instead marks a case the rules cannot answer, write in its place
+(If this ASSUME instead marked a case the rules cannot answer, that is
+REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
 
-  REFUSE "<the reason>"
-
-See doc/reference/types/ASSUME.md for the recipe.
+The manual explains the move: doc/reference/types/ASSUME.md.
 ```
 
-`l4 check` and `l4 run` print it under a `Severity: DiagnosticSeverity_Warning` header and still exit 0. In the editor it is a warning, not an error, and the `ASSUME` line is marked as deprecated (most editors strike it through).
+`l4 check` and `l4 run` print it under a `Severity: DiagnosticSeverity_Warning` header and still exit 0. In the editor it is a warning, not an error, and the declared name is marked as deprecated (most editors strike it through).
 
 **What you wrote:**
 
@@ -467,11 +468,11 @@ ASSUME age IS A NUMBER
 DECIDE `is adult` IF age >= 18
 ```
 
-**What went wrong:** Nothing is broken. The file still checks, runs and exports exactly as it did, and it will until the keyword is removed. `ASSUME` was one keyword doing three unrelated jobs, and each job now has a spelling of its own ([ASSUME](../types/ASSUME.md) has the table). The warning reads the shape of the declaration to tell which job this one was doing, and names that spelling:
+**What went wrong:** Nothing is broken. The file still checks, runs and exports exactly as it did, and it will until the keyword is removed. `ASSUME` was one keyword doing four unrelated jobs, three of which the warning can tell apart from the shape of the declaration alone ([ASSUME](../types/ASSUME.md) has the table). The warning reads that shape and names the spelling that replaces it:
 
-- _A fact to be supplied for each case_ (`ASSUME age IS A NUMBER`, or a rule defined elsewhere, `ASSUME rate IS A FUNCTION FROM NUMBER TO NUMBER`): a [section `GIVEN`](../syntax/section-given.md), indented under the heading of the section whose rules read it. The suggested `GIVEN` line is pasteable as written; it carries a `TYPICALLY` default across, and spells the function type out when the `ASSUME` wrote its inputs on the head (`GIVEN n IS A NUMBER` above `ASSUME `is large` n IS A BOOLEAN` becomes `GIVEN `is large` IS A FUNCTION FROM NUMBER TO BOOLEAN`).
-- _A kind of thing with no stated parts_ (`ASSUME Person IS A TYPE`): a bodiless [`DECLARE Person`](../types/DECLARE.md#opaque-types). That message ends "See doc/reference/types/DECLARE.md, under opaque types."
-- _A name that could be of any type_ (`GIVEN a IS A TYPE` followed by `ASSUME gap IS AN a`, or an `ASSUME` with no type at all): no value can ever be supplied for it, so that message offers [`REFUSE`](../control-flow/REFUSE.md) alone and ends "See doc/reference/control-flow/REFUSE.md."
+- _A fact to be supplied for each case_ (`ASSUME age IS A NUMBER`, or a rule defined elsewhere, `ASSUME rate IS A FUNCTION FROM NUMBER TO NUMBER`): a [section `GIVEN`](../syntax/section-given.md), indented under the heading of the section whose rules read it. The suggested `GIVEN` line is pasteable as written; it carries a `TYPICALLY` default across, and spells the function type out when the `ASSUME` wrote its inputs on the head (`GIVEN n IS A NUMBER` above ``ASSUME `is large` n IS A BOOLEAN`` becomes ``GIVEN `is large` IS A FUNCTION FROM NUMBER TO BOOLEAN``). Where the type cannot be written down at the destination — it names a type variable the `ASSUME` declared for itself with `GIVEN a IS A TYPE`, or an input was written without a type — the line shows a `<type>` hole for you to fill in. An `ASSUME` inside a `WHERE` has no section to move to, so the message offers the rule's own `GIVEN` instead; an `AKA` on the `ASSUME` is named, since a `GIVEN` cannot carry one; and a `@desc` or `@ref` above it is mentioned, since it moves with it.
+- _A kind of thing with no stated parts_ (`ASSUME Person IS A TYPE`): a [`DECLARE Person`](../types/DECLARE.md#opaque-types) with nothing after the name — what the DECLARE page calls an **"opaque type"**, a type that is named but not described. That message ends "The manual explains the move: doc/reference/types/DECLARE.md, under Opaque Types".
+- _A name that could be of any type_ (`GIVEN a IS A TYPE` followed by `ASSUME gap IS AN a`, with no inputs): no value can ever be supplied for it, so that message offers [`REFUSE`](../control-flow/REFUSE.md) alone and ends "The manual explains the move: doc/reference/control-flow/REFUSE.md." An `ASSUME` with no type written at all (`ASSUME w`) is a different case: the message asks you to write the type in, on a `GIVEN` line with a `<type>` hole.
 
 **How to fix it:** Move the declaration under the heading of the section whose rules read it, and indent it past the `§`:
 
@@ -482,7 +483,7 @@ DECIDE `is adult` IF age >= 18
 DECIDE `is adult` IF age >= 18
 ```
 
-The warning is given once per `ASSUME`, on the declared name. A `GIVEN` under a section heading never draws it, although the checker treats the two alike.
+The warning is given once per `ASSUME`, on the declared name (for an infix pattern such as ``ASSUME a `plus` b IS A NUMBER``, that is the keyword `plus`). A `GIVEN` under a section heading never draws it — not even when an `ASSUME` in the same section happens to share its name.
 
 ---
 

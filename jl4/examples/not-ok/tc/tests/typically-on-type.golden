@@ -19,16 +19,18 @@ File: typically-on-type.l4
   Code: <none>
   Message:
     ASSUME is an older way of introducing a name, and it is being retired.
-    This one names a kind of thing,
+    Nothing is broken: the file still checks, runs and exports as before.
+    This one names a kind of thing
 
       `some type`
 
-    without saying what it is made of. Write that as a DECLARE with nothing
-    after the name:
+    without saying what it is made of. Write that as a DECLARE with no
+    parts listed:
 
       DECLARE `some type`
 
-    See doc/reference/types/DECLARE.md, under opaque types.
+    The manual explains the move: doc/reference/types/DECLARE.md,
+    under Opaque Types (a type that is named but not described).
 
 File: typically-on-type.l4
   Hidden: no

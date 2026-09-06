@@ -4,21 +4,22 @@ Evaluation successful
 regcf-denovo.l4:211:8-73:
   I found a problem while checking the assumption of `no encoding of Part 227 exists for rule dates before 2022-09-20`:
     ASSUME is an older way of introducing a name, and it is being retired.
+    Nothing is broken: the file still checks, runs and exports as before.
     This one leaves
     
       `no encoding of Part 227 exists for rule dates before 2022-09-20`
     
-    open for somebody outside the file to supply. Say that with a GIVEN
-    indented under the heading of the section whose rules read it:
+    open for somebody outside the file to supply. Say that
+    with a GIVEN indented under the heading of the section whose rules
+    read it (add a § heading if the file has none):
     
       § <heading>
           GIVEN `no encoding of Part 227 exists for rule dates before 2022-09-20` IS A NUMBER
     
-    If it instead marks a case the rules cannot answer, write in its place
+    (If this ASSUME instead marked a case the rules cannot answer, that is
+    REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
     
-      REFUSE "<the reason>"
-    
-    See doc/reference/types/ASSUME.md for the recipe.
+    The manual explains the move: doc/reference/types/ASSUME.md.
 regcf-denovo.l4:3337:1-101:
   assertion satisfied
 regcf-denovo.l4:3341:1-112:

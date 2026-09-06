@@ -3,73 +3,79 @@ Typechecking successful
 assume-deprecated.l4:11:8-11:
   I found a problem while checking the assumption of `age`:
     ASSUME is an older way of introducing a name, and it is being retired.
+    Nothing is broken: the file still checks, runs and exports as before.
     This one leaves
     
       `age`
     
-    open for somebody outside the file to supply. Say that with a GIVEN
-    indented under the heading of the section whose rules read it:
+    open for somebody outside the file to supply. Say that
+    with a GIVEN indented under the heading of the section whose rules
+    read it (add a § heading if the file has none):
     
       § <heading>
           GIVEN age IS A NUMBER
     
-    If it instead marks a case the rules cannot answer, write in its place
+    (If this ASSUME instead marked a case the rules cannot answer, that is
+    REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
     
-      REFUSE "<the reason>"
-    
-    See doc/reference/types/ASSUME.md for the recipe.
+    The manual explains the move: doc/reference/types/ASSUME.md.
 assume-deprecated.l4:14:8-16:
   I found a problem while checking the assumption of `tax on`:
     ASSUME is an older way of introducing a name, and it is being retired.
+    Nothing is broken: the file still checks, runs and exports as before.
     This one leaves
     
       `tax on`
     
-    open for somebody outside the file to supply. Say that with a GIVEN
-    indented under the heading of the section whose rules read it:
+    open for somebody outside the file to supply. Say that
+    with a GIVEN indented under the heading of the section whose rules
+    read it (add a § heading if the file has none):
     
       § <heading>
           GIVEN `tax on` IS A FUNCTION FROM NUMBER TO NUMBER
     
-    If it instead marks a case the rules cannot answer, write in its place
+    (If this ASSUME instead marked a case the rules cannot answer, that is
+    REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
     
-      REFUSE "<the reason>"
-    
-    See doc/reference/types/ASSUME.md for the recipe.
+    The manual explains the move: doc/reference/types/ASSUME.md.
 assume-deprecated.l4:19:8-18:
   I found a problem while checking the assumption of `is large`:
     ASSUME is an older way of introducing a name, and it is being retired.
+    Nothing is broken: the file still checks, runs and exports as before.
     This one leaves
     
       `is large`
     
-    open for somebody outside the file to supply. Say that with a GIVEN
-    indented under the heading of the section whose rules read it:
+    open for somebody outside the file to supply. Say that
+    with a GIVEN indented under the heading of the section whose rules
+    read it (add a § heading if the file has none):
     
       § <heading>
           GIVEN `is large` IS A FUNCTION FROM NUMBER TO BOOLEAN
     
-    If it instead marks a case the rules cannot answer, write in its place
+    (If this ASSUME instead marked a case the rules cannot answer, that is
+    REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
     
-      REFUSE "<the reason>"
-    
-    See doc/reference/types/ASSUME.md for the recipe.
+    The manual explains the move: doc/reference/types/ASSUME.md.
 assume-deprecated.l4:22:8-14:
   I found a problem while checking the assumption of `Person`:
     ASSUME is an older way of introducing a name, and it is being retired.
-    This one names a kind of thing,
+    Nothing is broken: the file still checks, runs and exports as before.
+    This one names a kind of thing
     
       `Person`
     
-    without saying what it is made of. Write that as a DECLARE with nothing
-    after the name:
+    without saying what it is made of. Write that as a DECLARE with no
+    parts listed:
     
       DECLARE Person
     
-    See doc/reference/types/DECLARE.md, under opaque types.
+    The manual explains the move: doc/reference/types/DECLARE.md,
+    under Opaque Types (a type that is named but not described).
 assume-deprecated.l4:27:8-11:
   I found a problem while checking the assumption of `gap`:
     ASSUME is an older way of introducing a name, and it is being retired.
+    Nothing is broken: the file still checks, runs and exports as before.
     This one gives
     
       `gap`
@@ -79,7 +85,7 @@ assume-deprecated.l4:27:8-11:
     
       REFUSE "<the reason>"
     
-    See doc/reference/control-flow/REFUSE.md.
+    The manual explains the move: doc/reference/control-flow/REFUSE.md.
 assume-deprecated.l4:31:1-18:
   BOOLEAN
 assume-deprecated.l4:32:1-16:
