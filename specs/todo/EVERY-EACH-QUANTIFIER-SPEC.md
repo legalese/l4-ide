@@ -1,7 +1,18 @@
-> **Status (audited 2026-07-03):** OPEN — no `EVERY`/`EACH` quantifiers; regulative rules bind a single `PARTY` only.
+> **Status (re-audited 2026-09-07 on `unstable` `5dc0ca19`; first audited 2026-07-03):** OPEN — nothing
+> quantified is built; regulative rules bind a single `PARTY` only.
 >
-> - `EVERY`/`EACH`/`NO` are not lexer keywords (`jl4-core/src/L4/Lexer.hs`); `ALL` exists only for `FOR ALL`.
-> - `obligation` parser takes exactly one party expr (`Parser.hs:1774-1775`); no barrier/fork semantics, `WHO`-filter, or `BarrierObligation` runtime. Syntax appears only in non-compiling aspirational examples (`jl4/experiments/regulative-powers.l4:4`).
+> - `EVERY`, `EACH`, `NO`, `ONCE`, `HAVE`, `WHO`, `WHOSE` and `SOME` are not lexer keywords (the keyword
+>   table in `jl4-core/src/L4/Lexer.hs`; `identifierOrKeyword` at `Lexer.hs:654-659` is an exact map
+>   lookup, so there are no soft keywords). `ALL` is `TKAll` (`Lexer.hs:317`), consumed by `FOR ALL`
+>   (`Parser.hs:1244-1245`) and `RECALL ALL` (`Parser.hs:2375`).
+> - `obligation` takes exactly one party expression after `PARTY` (`Parser.hs:2503-2513`); `HENCE` and
+>   `LEST` are parsed there and nowhere else (`Parser.hs:2538-2544`). No barrier, fork, filter or
+>   `BarrierObligation` runtime exists. The syntax appears only in non-compiling sketches under
+>   `jl4/experiments/` (`regulative-powers.l4:4`, `deontic-may.l4:99-101`, `jerseyAlcohol.l4:42`).
+> - **Rulings so far:** R-T1–R-T6 (§2.2.7.8, 2026-09-06); the pattern spelling (§2.4, 2026-09-07);
+>   **R-Q1–R-Q7 (§2.5, 2026-09-07)**. Under R-Q1 there is one quantifier word, `EVERY`; `EACH`
+>   survives only inside the fork's join spelling, `ONCE EACH HAS`, whose words are provisional. The
+>   file keeps its historical name.
 
 # EVERY/EACH Quantifier Specification
 
@@ -60,17 +71,27 @@ DECLARE Action IS ONE OF
 
 GIVETH DEONTIC Person Action
 example MEANS
-    EVERY p                         -- p has type Person (from DEONTIC)
-        WHO    predicate            -- predicate : Person -> Boolean
+    EVERY p                         -- p has type Person (from DEONTIC); EVERY Person p selects a cast (§2.4)
+        WHO    condition            -- a Boolean expression in which p is free (R-Q4)
         MUST   action
         WITHIN deadline
+        ONCE   ALL HAVE             -- the join; mandatory when a HENCE or LEST follows (R-Q1)
         HENCE  success_continuation
         LEST   failure_continuation
 ```
 
-The `WHO` clause takes a predicate expression. The bound variable `p` is implicitly inserted as the **first** argument to this predicate. This follows natural English where the person is the subject of the predicate.
+> **Rewritten 2026-09-07 under R-Q4 (§2.5).** Until that date this section said the `WHO` slot held
+> a point-free predicate with the bound variable inserted as its **first** argument
+> (`WHO member_of signatories` → `member_of p signatories`). The refuters found that the rule cannot
+> type this section's own advertised example, `WHO is_adult AND is_shareholder AND NOT is_conflicted`:
+> `AND` and `NOT` are Boolean connectives, and under insertion they would be applied to functions,
+> not to Booleans. The insertion rule is withdrawn; nothing else in this section changes its intent.
 
-For set membership, use `member_of` (Haskell's `elem`):
+The `WHO` clause takes a **Boolean expression in which the bound variable is free**. The variable is
+written where it is used, as in any other L4 expression; nothing is inserted for the drafter.
+
+For set membership, apply the prelude's `elem` (`jl4-core/libraries/prelude.l4:465`) to the variable
+(this document's `member_of` is `elem` under an illustrative name):
 
 ```l4
 GIVEN signatories IS A LIST OF Person
@@ -78,22 +99,31 @@ GIVEN signatories IS A LIST OF Person
 GIVETH DEONTIC Person Action
 sign_all MEANS
     EVERY p
-        WHO    member_of signatories    -- expands to: member_of p signatories
+        WHO    elem p signatories       -- "is p one of the signatories?"
         MUST   sign
         WITHIN 30 days
+        ONCE   ALL HAVE
         HENCE  closing_complete
         LEST   deal_falls_through
 ```
 
-The predicate `member_of signatories` expands to `member_of p signatories` where `member_of : a -> List a -> Boolean` (exactly Haskell's `elem`). This reads naturally as "is p a member of signatories?"
-
 This design is more expressive than explicit set binding because:
 
-1. **Type inference**: No redundant type annotation; `p`'s type comes from the deontic context
-2. **Predicate is first-class**: Any `PartyType -> Boolean` function works
-3. **Predicate subsumes sets**: `WHO member_of some_list` achieves explicit set binding
-4. **Richer constraints**: `WHO is_adult AND is_shareholder AND NOT is_conflicted`
-5. **Composable**: Predicates can be combined with AND/OR/NOT
+1. **Type inference**: no redundant type annotation; `p`'s type comes from the deontic context, or
+   from the constructor in the pattern form `EVERY Person p` (§2.4)
+2. **Any Boolean expression works**: a field comparison (`WHO t's arrears > 0`), a prelude call, a
+   named helper applied to the variable (``WHO `owes rent` t``)
+3. **Sets are one case of it**: `WHO elem p some_list` is explicit set binding
+4. **Richer constraints**: `WHO is_adult p AND is_shareholder p AND NOT is_conflicted p`
+5. **Composable**: conditions combine with `AND`/`OR`/`NOT` as Booleans, which is what they are
+
+One scoping fact the refuters measured and this section must state: a helper that needs the bound
+variable is **parameterised**, not closed over. A trailing `WHERE` block is attached to the completed
+expression (`Parser.hs:1334-1338`, the only consumer of `TKWhere`) and cannot see a binder inside it —
+probed 2026-09-07 with a `CONSIDER` pattern binder referenced from a trailing `WHERE`: `I could not
+find a definition for the identifier r`. So ``WHO `owes rent` t`` with `` `owes rent` x MEANS x's
+arrears > 0 `` in the `WHERE` is right, and `` WHO `owes rent` `` with a `WHERE` that mentions `t` is
+not.
 
 ### 2.2 Distributive vs Collective: Real-World Legal Patterns
 
@@ -267,10 +297,61 @@ CONF(p) = (work.p → CONF(p))  -- disclose.p is simply not offered
 **L4 formalization:**
 
 ```l4
-EACH p_x
+EVERY p_x
     SHANT  solicit_employees_of p_y
-    WHERE  differs_from p_x p_y
+    WHO    differs_from p_x p_y      -- WHO, not WHERE (R-Q4, 2026-09-07); p_y is bound by an
+                                     -- enclosing EVERY, as in §2.3
 ```
+
+(Until 2026-09-07 this example wrote `EACH p_x … WHERE …`; it was the only `WHERE` filter in the
+document against nine `WHO` spellings, and R-Q1 retired `EACH` as a quantifier word.)
+
+**`NO` as sugar over the prohibition — RULED 2026-09-07 (R-Q3, §2.5).** The contract idiom "No
+tenant may sublet" is admitted, as sugar and not as a third prohibition mechanism:
+
+```l4
+NO Tenant t WHO elem t tenants MAY sublet WITHIN term
+    ONCE  EACH HAS                                -- the fork join, fixed by the sugar (words provisional, R-Q1)
+    LEST  BREACH BY t                             -- the violator; the others are untouched
+    HENCE `the term ended without a sublet`       -- SHANT's HENCE: the prohibition held
+
+-- exactly:
+EVERY Tenant t WHO elem t tenants SHANT sublet WITHIN term
+    ONCE  EACH HAS
+    LEST  BREACH BY t
+    HENCE `the term ended without a sublet`
+```
+
+Two things the sugar must get right, both found by the refuters (the first draft of the ruling said
+"no new semantics"; that was withdrawn):
+
+1. **The continuation table is keyed off the modal.** Under `SHANT` (`DMustNot`) the deadline passing
+   without the act routes to `HENCE` (`jl4-core/src/L4/EvaluateLazy/Machine.hs:1592-1595`) and the act
+   itself routes to `LEST` (`Machine.hs:1648-1651`); under `MAY` the act routes to `HENCE`
+   (`Machine.hs:1669-1671`) and expiry to `LEST` (`Machine.hs:1596-1600`). The reader sees `MAY`; the
+   machine runs `SHANT`. A `HENCE` under `NO` therefore means what `SHANT`'s does — the prohibition
+   held to the deadline — and the page that introduces `NO` teaches the polarity in the same paragraph
+   that introduces the word.
+2. **A prohibition on a class fails on the first violation by one member.** That is the fork's blame
+   (§6.3), not the barrier's set (§6.1); the sugar fixes the join as `ONCE EACH HAS`.
+
+**Refused**, with a message that names what the sentence is: `NO … MUST` ("no tenant is obliged to
+pay" — a liberty, Hohfeld's privilege, which L4 does not model), `NO … SHANT` and `NO … MUST NOT`
+(double negatives). `NO … MAY NOT` cannot arise: there is no `MAY NOT` production (`Parser.hs:2520-2527`
+parses `MUST NOT` and `SHANT` to `DMustNot`, and `MAY` alone).
+
+**Meng's note on the mark, verbatim:** _"The NO P MUST A form feels like it belongs more to the
+bounded deontics discussion of dominators."_ So the liberty form is **deferred**, not refused for
+good. Its home is the "Deontics as Domination" paper (`paper/bounded-deontics/`, listed at
+`paper/README.md:18`), whose second-order section reads a `MUST` as a fact about a fixed transition
+system — the obligated act is the graph dominator of the goal
+(`paper/hohfeld-higher-order/section-powers-as-higher-order-deontics.tex:23-25`). "No P is obliged
+to a" is the statement that no act of P's dominates the goal: a claim about the graph, not a clause
+to arm, and that discussion is where it is to be taken up.
+
+**Owed regardless:** `SHANT` appears nowhere in §3–§9. The barrier and fork rules there are written
+over `MUST` completion, and extending them to the polarity flip — a `SHANT` fails at the act and
+succeeds at the deadline — is owed before this sugar is built.
 
 #### 2.2.4 Representing These Patterns in Current L4
 
@@ -384,15 +465,43 @@ EVERY d
 
 #### 2.2.6 EVERY vs EACH: Barrier vs Fork Semantics
 
-`EVERY` and `EACH` are **not synonyms**—they have distinct continuation semantics:
+> **SUPERSEDED 2026-09-07 by R-Q1 (§2.5).** The two-word scheme this section describes — `EVERY` for
+> the barrier, `EACH` for the fork — is no longer the design. There is **one quantifier word,
+> `EVERY`**, and the join is written on a **mandatory `ONCE` line** between the quantified act and its
+> continuation:
+>
+> ```l4
+> EVERY Director d WHO elem d board MUST sign WITHIN 30 days
+>     ONCE ALL HAVE                        -- barrier: fires once, when the last has signed
+>     HENCE `resolution passes`
+>     LEST  BREACH                         -- blame = the non-signers (§6.1)
+>
+> EVERY Director d WHO elem d board MAY approve WITHIN 30 days
+>     ONCE EACH HAS                        -- fork: once per approval, d bound to the approver
+>     HENCE PARTY company MUST notify d WITHIN 24 hours
+>
+> EVERY Director d WHO elem d board MAY approve
+>     HENCE PARTY company MUST notify d    -- REFUSED: a bare HENCE or LEST directly under EVERY
+>                                          -- is a check error that names the two spellings above
+> ```
+>
+> The **structure** is ruled: one quantifier, a mandatory join line, no silent default in either
+> direction. The fork's **words** — `ONCE EACH HAS`, Meng's proposal — are **PROVISIONAL**; see §2.5
+> for the alternatives put to him. `HENCE FOR EACH` (the memo's spelling, used in §2.2.7 until this
+> date) is withdrawn. What follows in this section is kept as the record of the two-word scheme and of
+> the research that ruled it out; read its `EACH … HENCE …` as `EVERY … ONCE EACH HAS HENCE …` and its
+> bare `EVERY … HENCE …` as `EVERY … ONCE ALL HAVE HENCE …`.
+
+`EVERY` and `EACH` were, until 2026-09-07, **not synonyms**—they had distinct continuation semantics:
 
 | Quantifier | Semantics         | HENCE behavior                                               |
 | ---------- | ----------------- | ------------------------------------------------------------ |
 | `EVERY`    | Barrier/Join      | Collects all completions, fires HENCE **once** when all done |
 | `EACH`     | Fork/Distributive | Fires HENCE **for each** completion independently            |
 
-> **Proposed vocabulary — Meng, 2026-09-06, not yet ruled; researched the same night and the
-> research recommends against.** _"The EVERY vs EACH semantics may not stand up to scrutiny from a
+> **Proposed vocabulary — Meng, 2026-09-06; researched the same night and the research recommended
+> against; RULED 2026-09-07 by R-Q1 (§2.5) in the research's favour — one word, join on the
+> continuation.** _"The EVERY vs EACH semantics may not stand up to scrutiny from a
 > noob persona — we may prefer to say 'jointly' vs 'severally' for the barrier join vs the
 > distributive semantics."_ The first reading of this (recorded here for an hour, and wrong) mapped
 > the pair onto the classical joint-vs-several obligation distinction. The research memo,
@@ -474,10 +583,10 @@ EACH director
 
 If 5 directors approve, company must send 5 notifications.
 
-**Formal distinction:**
+**Formal distinction** (spellings as ruled 2026-09-07; the CSP is unchanged):
 
-- `EVERY p ... HENCE h` ≈ `(P1 ||| P2 ||| P3) ; h` (CSP sequential composition after interleaving)
-- `EACH p ... HENCE h` ≈ `(P1 ; h) ||| (P2 ; h) ||| (P3 ; h)` (CSP interleaving of each with its continuation)
+- `EVERY p ... ONCE ALL HAVE HENCE h` ≈ `(P1 ||| P2 ||| P3) ; h` (CSP sequential composition after interleaving) — WCP-14
+- `EVERY p ... ONCE EACH HAS HENCE h` ≈ `(P1 ; h) ||| (P2 ; h) ||| (P3 ; h)` (CSP interleaving of each with its continuation) — WCP-12
 
 **Without HENCE/LEST, both behave identically** (pure distributive):
 
@@ -551,10 +660,15 @@ One construct with a parameter, whose endpoints are the two folds this spec alre
 | `ALL OF` ≡ `N OF N`                             | count = cast                    | the `RAND` fold; `EVERY` with one continuation (§3.1); WCP-14                                                         |
 | `ONCE sum OF amount AT LEAST rent`              | a measure over the performances | the rent; Pattern C's primary obligation; § 293's "amount or value applied"                                           |
 | `ONCE count AT LEAST 2 AND shares AT LEAST 10%` | two measures at once            | Singapore Companies Act s 177 quorum ("two or more members holding ≥ 10 %"), `corporate-resolutions/SPEC-NOTES.md:74` |
+| `ONCE EACH HAS` (words provisional)             | per performance; no join at all | the fork (§3.2); WCP-12; the old `EACH` quantifier, retired by R-Q1 (2026-09-07)                                      |
 
-The measure defaults to a count of performers. `EVERY` and `EACH` are **orthogonal** to this table:
-they say where the continuation attaches (§3.1–3.2), the table says when the join fires. `EACH` with
-a threshold is meaningless (a fork has no join); `EVERY` is `ALL OF` plus one continuation.
+The measure defaults to a count of performers. Under R-Q1 (2026-09-07) the quantifier word is
+**orthogonal** to this table: `EVERY` names the cast, and the `ONCE` line says when — and how often —
+the continuation fires. The fork is the table's degenerate row (every performance, separately; nothing
+accumulates), and the barrier is `ALL OF` plus one continuation. Before R-Q1 the fork was a second
+quantifier word, `EACH`, and "`EACH` with a threshold is meaningless" was the way this paragraph said
+that a fork has no join; the same fact now reads: a deonton carries at most one `ONCE EACH HAS` line,
+and a state threshold over it is a second, outer `ONCE` line (§2.2.7.6).
 
 ##### 2.2.7.4 Syntax
 
@@ -567,20 +681,36 @@ ThresholdJoin ::= QuantifiedDeonton 'ONCE' Threshold [TemporalConstraint] [Hence
 
 Threshold     ::= 'ALL' 'HAVE'
                 | 'ANY' 'HAS'
+                | 'EACH' 'HAS'                     -- the fork (R-Q1, 2026-09-07); WORDS PROVISIONAL, see §2.5
                 | Count 'OF' Cast 'HAVE'           -- SOME 2 OF Director HAVE
                 | Measure Comparison Expr          -- sum OF amount AT LEAST rent
                 | Threshold 'AND' Threshold        -- the s 177 quorum
 
-Count         ::= 'SOME' Number | 'AT' 'LEAST' Number       -- synonyms, see below
+Count         ::= 'ALL'                            -- added under R-Q2 (2026-09-07): the N-of-N endpoint
+                | 'SOME' Number | 'AT' 'LEAST' Number       -- synonyms, see below
 Measure       ::= 'count' | Aggregate 'OF' Binder            -- the Binder is a name bound in the action pattern
 ```
+
+Under R-Q1 the `ONCE` line is not only the threshold's home but **the only place a continuation may
+hang under a quantifier**: a `HENCE` or `LEST` written directly under `EVERY … Action [WITHIN …]`
+with no `ONCE` line is a check error naming the two spellings (`ONCE ALL HAVE`, `ONCE EACH HAS`).
+§2.4 carries the production.
 
 A quantifier-prefix spelling is sugar for the same thing when there is no per-act continuation:
 
 ```l4
 SOME 2 OF Director d DO sign WITHIN 30 HENCE `resolution passes`
 -- ≡  EVERY Director d DO sign  ONCE SOME 2 HAVE  WITHIN 30 HENCE `resolution passes`
+
+ALL OF Director d DO sign WITHIN 30 HENCE `resolution passes`          -- R-Q2: the unanimity endpoint
+-- ≡  EVERY Director d DO sign  ONCE ALL HAVE     WITHIN 30 HENCE `resolution passes`
 ```
+
+`ALL OF` costs no new keyword (`TKAll` at `Lexer.hs:317`, `TKOf` at `Lexer.hs:268`). Without it the
+only prefix spelling for unanimity would be `SOME n OF` with a literal `n`, which silently turns a
+unanimous-assent clause into a majority rule when the register changes (refuters, R-Q2). The
+`ANY OF` row of §2.2.7.3's table has no `Count` alternative here either; it is `SOME 1 OF` by that
+table and is left for the build to add beside `ALL`.
 
 `DO`, not `MUST`, in the prefix form — R-T5's style note (Meng, 2026-09-06): no single director owes a
 signature, so the act is stated neutrally and the obligation lives on the join.
@@ -598,16 +728,18 @@ Name collisions were checked. `SOME` is not a keyword (`jl4-core/src/L4/Lexer.hs
 (`specs/done/DEONTIC-PARTY-ACTION-AGREEMENT-SPEC.md`, "Do NOT make the contract head
 actor-agnostic"); that was a type, not a quantifier, and the rejection does not reach this use —
 said here so that a later reader who greps for `SOME` does not conclude the quantifier was ruled
-out. `ALL` and `NO` already appear in §2.4's `Quantifier` production with no semantics given
-anywhere in this document; under this section `ALL` is the `N OF N` spelling and `NO` is still
-unspecified.
+out. `ALL` and `NO` stood in §2.4's `Quantifier` production with no semantics given anywhere in this
+document until 2026-09-07, when both were ruled out of it: `ALL` is not a quantifier — it is the
+`N OF N` spelling inside the join (`ONCE ALL HAVE`) and the `ALL OF` head of the prefix family
+(R-Q2, §2.5) — and `NO` is sugar over `EVERY … SHANT` with the fork join (R-Q3, §2.5, §2.2.3).
 
 ##### 2.2.7.5 Semantics, in six points
 
 1. **The join is over an accumulator.** Each performance that matches the quantified pattern adds
    to a per-contract accumulator (a count, or the bound measure); the `ONCE` condition is evaluated
-   against it after every matching event. A `HENCE FOR EACH` continuation still fires per event
-   (fork), independently of the join.
+   against it after every matching event. A per-act continuation — written under the act's own
+   `ONCE EACH HAS` line (R-Q1, 2026-09-07; until then spelled `HENCE FOR EACH`) — still fires per
+   event (fork), independently of the state join.
 2. **Acts inside, state outside.** In a threshold obligation the quantified modal is typically
    `MAY` — no single obligor owes any single act — and the `MUST` lives on the state at the `ONCE`
    line. This is the ought-to-do / ought-to-be split the A&B memo found (its §6.3): an ought-to-be
@@ -656,23 +788,29 @@ rent        MEANS 1500
 GIVEN due IS A NUMBER
 GIVETH A DEONTIC Actor Action
 `rent owed jointly` MEANS
-    EVERY Tenant t WHO member_of tenants
+    EVERY Tenant t WHO elem t tenants
         MAY    Pay t theLandlord amount
-        HENCE FOR EACH                               -- fork: one receipt per cheque
-               PARTY theLandlord MUST Receipt theLandlord t amount WITHIN 5
-    ONCE   sum OF amount AT LEAST rent               -- the join is a measure over the cheques
+        ONCE   EACH HAS                              -- fork: one receipt per cheque (words provisional, R-Q1)
+        HENCE  PARTY theLandlord MUST Receipt theLandlord t amount WITHIN 5
+    ONCE   sum OF amount AT LEAST rent               -- the state join is a measure over the cheques
     WITHIN due                                       -- one deadline, on the state
     HENCE  FULFILLED
     LEST   BREACH BY EVERY Tenant                    -- joint: everyone
 
 -- divided rent: each tenant owes a share; no threshold; blame narrows
 `rent owed severally` MEANS
-    EACH Tenant t WHO member_of tenants
+    EVERY Tenant t WHO elem t tenants
         MUST   Pay t theLandlord amount PROVIDED amount AT LEAST share t
         WITHIN due
+        ONCE   EACH HAS                              -- fork
         HENCE  PARTY theLandlord MUST Receipt theLandlord t amount WITHIN 5
         LEST   BREACH BY t
 ```
+
+(Respelled 2026-09-07 under R-Q1 and R-Q4: `HENCE FOR EACH` → `ONCE EACH HAS … HENCE`, `EACH Tenant t`
+→ `EVERY Tenant t … ONCE EACH HAS`, `WHO member_of tenants` → `WHO elem t tenants`. The two `ONCE` lines
+of the joint form are the two layers R-T2 and R-Q5 distinguish: the inner one is the act layer, the
+outer one the state.)
 
 For contrast, the only form that runs today — a contract recursing on the balance, one `ROR`
 alternative per tenant, `amount` bound as a fresh pattern name and related in `PROVIDED` (the idiom
@@ -711,7 +849,7 @@ reader need not open the artifact, and so that the measurements can be re-run.
 | R-T3 — `BY` takes a party or a list of parties; a compound breach collects the set of unfulfilled operands                                   | **RULED 2026-09-06**, accept            |
 | R-T4 — `Aggregate OF Binder` is sugar over a general Boolean condition; `AND` of thresholds is Boolean `AND`                                 | **RULED 2026-09-06**, accept            |
 | R-T5 — the prefix `SOME m OF Cast …` is sugar only without a per-act continuation; the pattern spelling it needs was ruled 2026-09-07 (§2.4) | **RULED 2026-09-06**, accept, with note |
-| R-T6 — the cast is fixed at arming; a change of cast is an explicit event                                                                    | **RULED 2026-09-06**, accept, with note |
+| R-T6 — the cast is fixed at arming; a change of cast is an explicit event; extended to `EVERY` and given its event shape by R-Q6 (§13.4)     | **RULED 2026-09-06**, accept, with note |
 | `SOME m OF` ≡ `AT LEAST m OF`                                                                                                                | ruled 2026-09-06 (Meng, in passing)     |
 
 **What decided each.** Measurements dated 2026-09-06 on `unstable` `cdc11501`.
@@ -769,17 +907,19 @@ illustration.
 ### 2.3 Cross-Party References
 
 ```l4
-EACH p_x
+EVERY p_x
     MAY    terminate
+    ONCE   EACH HAS                              -- fork: once per termination (R-Q1; words provisional)
     HENCE  EVERY p_y
-               WHO  differs_from p_x   -- differs_from : a -> a -> Boolean
+               WHO  differs_from p_y p_x         -- a Boolean expression naming p_y (R-Q4)
                MUST settle_outstanding_accounts_with p_x
-               WITHIN 30 days
+               WITHIN 30 days                    -- no continuation, so no ONCE line (§3.3)
 ```
 
-The predicate `differs_from p_x` expands to `differs_from p_y p_x` (i.e., `p_y /= p_x`), reading as "does p_y differ from p_x?" This filters the inner quantifier's domain to exclude the outer-bound variable.
-
-Note: Since `/=` is symmetric, the argument order doesn't affect the result. The key point is that `differs_from : a -> a -> Boolean` with `p_y` inserted as the first argument and `p_x` as the second.
+The filter `differs_from p_y p_x` (i.e., `p_y /= p_x`) reads "does p_y differ from p_x?" and narrows
+the inner quantifier's domain to exclude the outer-bound variable. Until 2026-09-07 this section wrote
+`WHO differs_from p_x` and relied on §2.1's first-argument insertion; that rule was withdrawn under
+R-Q4 and the variable is now written out.
 
 ### 2.4 Full Grammar
 
@@ -788,22 +928,38 @@ QuantifiedDeonton ::=
     Quantifier Pattern [Filter]
         DeonticModal Action
         [TemporalConstraint]
-        [HenceClause]
-        [LestClause]
+        [Join]                        -- REQUIRED whenever a HENCE or LEST follows (R-Q1, 2026-09-07);
+                                      -- a bare HenceClause/LestClause here is a check error that
+                                      -- names the two spellings
 
-Quantifier ::= 'EVERY' | 'EACH' | 'ALL' | 'NO'
+Join ::= 'ONCE' Threshold [TemporalConstraint] [HenceClause] [LestClause]
+                                      -- Threshold is §2.2.7.4's: 'ALL' 'HAVE' is the barrier (§3.1),
+                                      -- 'EACH' 'HAS' the fork (§3.2; WORDS PROVISIONAL), the rest are
+                                      -- thresholds. A state join written over a deonton that already
+                                      -- carries a fork join is §2.2.7.4's ThresholdJoin (§2.2.7.6).
+
+Quantifier ::= 'EVERY'                -- R-Q1: EACH is not a quantifier; R-Q2: nor is ALL; R-Q3: nor is NO
+
+NoProhibition ::= 'NO' Pattern [Filter] 'MAY' Action [TemporalConstraint] [Join]
+                                      -- R-Q3: sugar for  EVERY Pattern [Filter] SHANT Action … , with the
+                                      -- Join fixed to ONCE EACH HAS; NO … MUST, NO … SHANT and
+                                      -- NO … MUST NOT are refused with a naming message (§2.2.3)
 
 Pattern ::= Constructor Variable      -- EVERY Tenant t   : the primary form; the constructor selects the cast
           | Variable                  -- EVERY t          : the unfiltered case; every value of the actor type
 
-Filter ::= 'WHO' Predicate
-         | 'WHERE' Predicate
+Filter ::= 'WHO' Expr                 -- R-Q4: a Boolean expression in which the bound variable is free;
+                                      -- WHERE is not a filter word (it opens a where-block, Parser.hs:1334-1338).
+                                      -- 'WHOSE' Expr is PROPOSED, not ruled (§2.5, R-Q4)
 
-DeonticModal ::= 'MUST' | 'MAY' | 'SHANT'
+DeonticModal ::= 'MUST' | 'MAY' | 'SHANT' | 'DO'   -- 'DO' added 2026-09-07 (R-Q2; §2.2.7.4's house style)
 
-TemporalConstraint ::= 'WITHIN' Duration
-                     | 'BEFORE' Deadline
-                     | 'BY' Deadline
+TemporalConstraint ::= 'WITHIN' Duration ['OF' Anchor]   -- 'OF' Anchor: the named anchor of R-Q7 (§5.1); unbuilt
+                     | 'BEFORE' Deadline                  -- documented as planned, unbuilt (doc/reference/regulative/README.md:102)
+                     | 'BY' Deadline                      -- unruled and unbuilt; TKBy serves FOLLOWED BY, DIVIDED BY, BREACH BY
+
+Anchor ::= `the join's firing` | `the missed deadline` | `the arming` | Event
+                                      -- R-Q7: the four anchors the machine must expose; their spellings are not ruled
 
 HenceClause ::= 'HENCE' Continuation
 
@@ -812,8 +968,16 @@ LestClause ::= 'LEST' Continuation
 Continuation ::= Deonton
                | QuantifiedDeonton
                | 'FULFILLED'
-               | 'BREACH'
+               | 'BREACH' ['BY' PartyOrList]   -- R-T3: a party or a list of parties
 ```
+
+If the fork's words are ruled as `UPON EACH` (§2.5, R-Q1, candidate 4), `'EACH' 'HAS'` leaves
+`Threshold` and the fork becomes a second `Join` alternative, `'UPON' 'EACH' [HenceClause] [LestClause]`;
+the rule that a continuation under a quantifier needs a join line is unchanged either way.
+
+(Until 2026-09-07 this grammar read `Quantifier ::= 'EVERY' | 'EACH' | 'ALL' | 'NO'`,
+`Filter ::= 'WHO' Predicate | 'WHERE' Predicate`, and put `HenceClause`/`LestClause` directly under the
+quantified act with no join. R-Q1–R-Q4 and R-Q7 changed it as marked; §2.5 records why.)
 
 **RULED 2026-09-07 (Meng, in session, on the GM's measured recommendation), verbatim:** _"Ok: the
 pattern form as primary, EVERY Tenant t, with EVERY t as the unfiltered case."_
@@ -830,17 +994,218 @@ throughout. **The bare-form examples below remain valid as the unfiltered case**
 the pattern form where a cast is meant. This ruling unblocks R-T5's prefix sugar (§2.2.7.8).
 Nothing is built.
 
+### 2.5 Rulings R-Q1–R-Q7 (2026-09-07)
+
+Seven cards — "the Quantifier Bench", an artifact of 2026-09-06/07, **not in the tree**
+(<https://claude.ai/code/artifact/fb431448-4363-47d8-bda2-f03d9e658bd6>) — were put to Meng after an
+adversarial pass, and marked between 18:21 and 18:28 UTC on 6 September 2026. The marks are quoted
+verbatim; where the general-manager session's reading of a mark goes beyond the mark, the text says
+"GM's reading, 2026-09-07". Everything below is a design record: **nothing is built** (status header).
+Measurements are dated 2026-09-07 on `unstable` `5dc0ca19` unless stated; every file:line was
+re-opened on that tree when this section was written.
+
+| id   | question, in a phrase                                        | mark, verbatim                                                                                                              | ruling, in a sentence                                                                                                                                                                                                            | recorded in                                |
+| ---- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| R-Q1 | the join word: two quantifiers, or one word and a marker?    | **alternative** — _"E but with “ONCE EACH HAS \n HENCE”?"_                                                                  | One quantifier, `EVERY`; under it a continuation requires a `ONCE` line: `ONCE ALL HAVE` (barrier), `ONCE EACH HAS` (fork; **words provisional**); a bare `HENCE`/`LEST` is a check error. `HENCE FOR EACH` withdrawn.           | §2.2.6, §2.2.7.3–.6, §2.4, §3.1–§3.3, §15  |
+| R-Q2 | does a bare `ALL Pattern` mean anything?                     | **accept** — _"How do the quantifies interact with RAND ROR combinators? Docs need to show an example."_                    | Not a quantifier. `ALL` keeps `FOR ALL`, `RECALL ALL`, `ONCE ALL HAVE`, and becomes the `ALL OF` head of the prefix family. `DO` joins `DeonticModal`. The note is a docs requirement: §8.3 gains the example.                   | §2.2.7.4, §2.4, §8.3, §15                  |
+| R-Q3 | is `NO Tenant t MAY sublet` a form, and of what?             | **accept** — _"The NO P MUST A form feels like it belongs more to the bounded deontics discussion of dominators."_          | Sugar for `EVERY … SHANT` with the fork join; `HENCE` keeps `SHANT`'s meaning; `NO … MUST`/`SHANT`/`MUST NOT` refused with a naming message; the liberty form deferred to the bounded-deontics discussion.                       | §2.2.3, §2.2.7.4, §2.4, §15, status header |
+| R-Q4 | the filter word, and what the slot holds                     | **accept** — _"Perhaps the WHOSE projection could take advantage of the field-opening logic from the section-givens work."_ | `WHO` only; the slot is a Boolean expression naming the bound variable; §2.1's insertion rule withdrawn. `WHOSE` is **PROPOSED**, sequenced after `IMPLICIT-PROPS-DESIGN.md` §11.7 R5 is built.                                  | §2.1, §2.2.3, §2.3, §2.4, §15              |
+| R-Q5 | early failure: `LEST` at detection, or at the deadline?      | **accept** — _"d"_                                                                                                          | No modifier. The failure time is fixed by the layer the `LEST` attaches to — the state's deadline on the `ONCE … WITHIN` line; on the act layer, by the modal. Success time by modal. §13.1 closed.                              | §3.4, §5.2, §13.1                          |
+| R-Q6 | does R-T6's fixed cast bind `EVERY`; what on leave/join?     | **accept** — _"d"_                                                                                                          | Cast evaluated once at arming for the whole family; changes only on an explicit **edit** event (release / substitute / join) applied to the running barrier, completions and accumulator preserved. Events proposed, unbuilt.    | §2.2.7.8 (R-T6 row), §13.4                 |
+| R-Q7 | the continuation clock: `HENCE` from what, `LEST` from what? | **modify** — _"e but with a as default when no OF?"_                                                                        | A drafter may name the anchor (`WITHIN 5 days OF …`); unanchored, `HENCE` counts from the join's firing (today's rule) and `LEST` from the missed deadline (§5.2) — the latter a **change** from today's revealing-event anchor. | §2.4, §5.1, §5.2                           |
+
+**What decided each.**
+
+- **R-Q1.** §3.3 already conceded that without a continuation the barrier and the fork coincide, so
+  the distinction is a property of the continuation, not of the quantifier; keeping `EACH` as a second
+  quantifier beside the accepted `ONCE` line (R-T1) left two mechanisms for one distinction. The
+  refuters then showed why the marker must be **mandatory** rather than defaulted: today a `MAY …
+HENCE` fires when the permission is exercised (`Machine.hs:1669-1671`), so a drafter who upgrades
+  `PARTY p MAY approve HENCE notify` to `EVERY Director p MAY approve HENCE notify` under a barrier
+  default would get one notification after all have approved, silently — and that upgrade is the very
+  move §2.2.4–§2.2.5 sell the quantifier for. A fork default fails the other way (n closings for one)
+  but at least visibly. Refusing the bare form has the shape of a non-exhaustive `CONSIDER` refusal:
+  the language declines to guess. Both spellings are new machinery: today's `RAND` fold is a join
+  with **no continuation slot** — `HENCE` is parsed only inside `obligation` (`Parser.hs:2538-2540`),
+  so `(A RAND B) HENCE k` is a parse error (refuters' probe). Meng's mark chose option e's structure
+  and proposed the fork's words. **The words are provisional**: his note carries a question mark, and
+  "once each has signed" reads in ordinary English as the barrier ("once each of them has signed,
+  then …"), the very reading the line is meant to exclude. **The fork's words are OPEN with Meng**,
+  with four candidates; until one is ruled this document writes the first and marks it provisional:
+
+  1. `ONCE EACH HAS` — Meng's mark. Hazard: English reads it as the barrier.
+  2. `AS EACH HAS` — put to him by the GM.
+  3. `EACH TIME ONE HAS` — put to him by the GM.
+  4. `UPON EACH` — Meng, 2026-09-07 06:00 SGT, "noodling". `UPON` is the keyword of
+     `specs/todo/UPON-EXTERNAL-EVENTS-SPEC.md` (status OPEN, audited 2026-07-03; smucclaw/l4-ide#490):
+     synchronisation with an event of a distinguished `Environment` party, desugaring to
+     `PARTY Environment MAY e HENCE …` (that spec, lines 23, 61 and 124). Measured 2026-09-07: no
+     `UPON` token in `Lexer.hs`, `Parser.hs` or `Syntax.hs`; natural4 had it (`smucclaw/dsl`,
+     `lib/haskell/natural4/src/LS/TokenTable.hs:82`, and `LS/Rule.hs:283`'s `rbupon`, with an open
+     TODO on how multiple `UPON`s join); zero `UPON` in the goldened corpus, `doc/` and canon; five
+     non-comment lines in `jl4/experiments` (`purchase.l4:92`; `deontic-may.l4:16`, `:25`, `:100`,
+     `:135`). The design point in its favour: every `ONCE` threshold is **level-triggered** and fires
+     once, while the fork is **edge-triggered** and fires per completion, so a distinct keyword encodes
+     once-versus-each in the word itself rather than in a `Threshold` alternative; if chosen, the fork
+     leaves `Threshold` and becomes its own `Join` alternative (§2.4), and the structure is unchanged.
+
+  Not ruled. (GM's reading of the mark, 2026-09-07.)
+
+- **R-Q2.** `ALL` already has two jobs (`Parser.hs:1244-1245`, `:2375`) and R-T1's `ONCE ALL HAVE`
+  gives it a third inside the join. Nothing in §3–§9 ever gave a bare `ALL Pattern` a meaning distinct
+  from `EVERY`, and the refuters supplied the reason it must not get one: in the common law "all"
+  reads collectively by default (Restatement (Second) of Contracts § 288(2), as the joint/several memo
+  quotes it, `EVERY-EACH-JOINT-SEVERAL-MEMO.md:105`), so "all the directors shall sign" is not the same
+  sentence as "every director shall sign", and a language should give `ALL` the collective slot. The
+  `ALL OF` head of the prefix family was added so the ruling does not foreclose the unanimity
+  endpoint (§2.2.7.4). Meng's note is a documentation requirement, not a re-decision: §8.3 now carries
+  a worked example of a quantified obligation as an operand of `RAND` and of `ROR`, and of a barrier
+  whose `HENCE` is itself a `RAND`, with the breach naming under R-T3; **the build's `doc/` page owes
+  the same example** (owed list below).
+- **R-Q3.** `NO` is free — not a keyword, 0 bare identifier uses in the corpus (the refuters' count:
+  62 non-comment lines in 5 files, all inside strings or backticked `§` headings; canon 0) — and the
+  prohibition already exists twice (`MUST NOT` → `DMustNot`, `SHANT` → `DMustNot`,
+  `Parser.hs:2520-2527`), so a third mechanism was never on the table; the question was whether the
+  contract idiom earns sugar. The refuters measured our own statutory sources and found the statutory
+  "No …" sentences are mostly nullity, capacity and evidentiary rules ("No will shall be valid
+  unless …"), out of the sugar's reach; the idiom earns its keep in contracts. Two amendments came
+  from review and are in §2.2.3: the `HENCE` polarity under `SHANT` (`Machine.hs:1592-1595`,
+  `:1648-1651`) and the fork join. Meng's note deferred the liberty form (`NO P MUST a`) to the
+  bounded-deontics discussion of dominators (§2.2.3 gives the citations).
+- **R-Q4.** `WHERE` is `TKWhere` (`Lexer.hs:276`) with exactly one consumer, the where-block of a
+  completed expression (`Parser.hs:1334-1338`); a `WHERE` filter would sit immediately before a legal
+  `WHERE` block, and `EVERY t WHERE p WHERE q MEANS …` is a garden path the layout rule cannot
+  backtrack across. Nine of the document's ten filter examples already wrote `WHO`; the tenth (§2.2.3
+  Pattern J) is corrected. The slot question was added by review: §2.1's first-argument insertion
+  cannot type its own `WHO a AND b` example, and the recommended example of the first draft did not
+  compile either (a trailing `WHERE` cannot see the binder — probed, §2.1). Meng's note proposes
+  `WHOSE`; searched and not found in any commit of this repository's history, in the upstream drafts,
+  or in any upstream issue (refuters, `git log --all -S`). Recorded as **PROPOSED, not ruled
+  syntax**: a filter in which the payload field names of the pattern's constructor resolve as
+  projections of the bound variable —
+
+  ```l4
+  EVERY Tenant t WHOSE arrears > 0
+      MUST Pay t theLandlord arrears WITHIN 7 days       -- ≡ WHO t's arrears > 0; `arrears` in the body is still t's
+
+  EVERY Director d WHOSE `term expires` < closing AND NOT conflicted
+      MUST sign WITHIN 30 days                           -- ≡ WHO d's `term expires` < closing AND NOT d's conflicted
+  ```
+
+  with five rules: (1) only the payload fields of the pattern's constructor are captured
+  (`Tenant HAS name, arrears`); a name that is both a field and a global resolves to the field and the
+  checker warns, as for any shadowing; (2) the variable stays mandatory, because the action needs it
+  (`Pay t …`); (3) `WHO` and `WHOSE` are exclusive on one obligation; (4) the bare `EVERY t` form has
+  no constructor, so `WHOSE` is a check error there naming the pattern form; (5) elaboration is
+  textual — `WHOSE e` → `WHO e[f ↦ t's f]` for every captured field `f` free in `e` — so the machine
+  never sees it. Whether the capture extends into the action and continuations (as the first example
+  assumes) is the one open design choice. Per Meng's note the elaboration is the **field-opening**
+  logic of the section-givens work: `IMPLICIT-PROPS-DESIGN.md` §11.7 R5, "Field-opening is lexical
+  only", RULED 2026-09-04 (`IMPLICIT-PROPS-DESIGN.md:701`) and **not built**
+  (`IMPLICIT-PROPS-DESIGN.md:1539`); `WHOSE` is therefore sequenced after R5 lands, and shares its
+  lexical-only rule. Cost: one keyword (`WHOSE` has 0 corpus uses, comments included), the scoping
+  rule, nothing in the machine.
+
+- **R-Q5.** §3.4 had a "party fails" transition with no event behind it, and §13.1 recommended
+  opt-in early failure. The refuters established that L4 has **no party-failure event**: the machine's
+  only event is party + action + timestamp (`jl4-core/src/L4/Syntax.hs:208-215`); `REFUSE`, on which
+  the first draft leaned, is the model declining to answer — "no rule in the language can observe or
+  convert into an answer" (`Syntax.hs:361-371`) — not a party's act. So a modifier would have nothing
+  to trigger on, and "early failure by default" would need a new repudiation event; and anticipatory
+  repudiation, the counter-rule, gives the innocent party an _election_ to accept or affirm, which an
+  automatic early failure would take away (refuters, unverified in-tree). "Fixed by the modal" alone
+  was then found to contradict R-T2 on this document's own flagship example, where the `LEST` hangs off
+  the `ONCE … WITHIN` state line with `MAY` acts inside — hence option d: **layer first, then modal**.
+  Two corrections to what "today" means are recorded in §5.2: a `MUST` breaches only when a
+  later-stamped event _reveals_ the miss, and the breach carries that event's stamp
+  (`Machine.hs:1522`, `:1601-1606`), so "at the deadline" is a change to the stamp; time alone
+  breaches nothing. Success time by modal (`MUST`/`DO` at the last performance; `SHANT`/`MAY` at the
+  deadline) is what R-Q7's anchor needs.
+- **R-Q6.** R-T6's row is not scoped to `SOME m OF`, and `EVERY` is `ALL OF` plus one continuation
+  (§2.2.7.3), so the freeze already reached `EVERY` on a literal reading; §4.1's `boParties` and
+  §6.1's `bo.parties` are fields captured at arming, and §3.4's `pending` only shrinks — the document
+  had been assuming it. What review added was the **mechanism**: the first draft's "a novation clause
+  re-arms" discards completions and reopens the deadline, which is the cost it charged against the
+  re-arm option and the re-arming `WITHIN` R-T2 was ruled to kill; option d replaces it with an
+  incremental edit. `StateGraph.hs` draws a fixed fan (`AllOf`/`OneOf`, `jl4-core/src/L4/StateGraph.hs:133-134`,
+  extracted syntactically at `:511` and `:514`); a run-time-width fan is already needed for `EVERY`,
+  and a width that changes mid-run has no drawing at all. §13.4 has the rule, its scope and its escape
+  hatch.
+- **R-Q7.** §5.1 proposed the last completion and nothing had ruled it. The refuters probed the
+  installed binary: a single-party `HENCE` continuation is anchored at the completing event's own
+  stamp (the matched scan sets `time = ev'time`, `Machine.hs:1612`; it is handed to
+  `continueWithFollowup`, `:1669-1671`, which applies the followup to `[time, events]`,
+  `:1798-1804`) — so "from the join's firing" is today's rule generalised, and the only option under
+  which a cast of one behaves like today's `PARTY`. The `LEST` half is the opposite of today: the
+  machine anchors a `LEST` continuation at the **revealing** event's stamp (`Machine.hs:1550-1552`,
+  the comment; `:1583-1589`, the mechanism), which lets the defaulting party choose when its own cure
+  period starts. Meng's mark chose the named-anchor mechanism (option e) with option a as the default
+  for an unanchored `WITHIN`; the GM reads "a" as covering both halves of option a — `HENCE` from the
+  firing, `LEST` from the missed deadline, the latter recorded in §5.2 as a change (GM's reading,
+  2026-09-07). The card's earlier `BY date` escape hatch is struck: R-T2 says nothing about `BY`, a
+  deadline `BY` is unruled and unbuilt, and `TKBy` today serves only `FOLLOWED BY`, `DIVIDED BY`
+  (`Parser.hs:1659`, `:1663`) and `BREACH … BY` (`:2484`). The example is §5.1's escrow chain.
+
+**What review changed.** Fourteen Opus refuters (workflow `wf_1f84100a-c6b`, 7 September 2026), two
+per card — a facts lens that re-ran every count, opened every file:line and probed the machine where a
+claim was about behaviour, and a design lens that tried to construct a legal scenario or a language
+interaction where the recommendation gives a wrong result — with the tree at `unstable` `2e1e5b17`
+read-only and this document at `0af4a369`. Their verdicts: thirteen "weakened", one "holds" (R-Q6's
+facts). What moved: R-Q1's recommendation from a silent barrier default to the mandatory marker, and
+`ONCE` to its own line per §2.2.7.4 rather than the memo's `HENCE ONCE ALL HAVE`; R-Q2's corpus count
+(4 lines, not 8), its precedent (§ 288(2)), and the `ALL OF` head; R-Q3's "no new semantics" withdrawn
+in favour of the polarity and the fork join, `NO … MUST` recognised as a liberty, counts corrected; R-Q4
+gained the slot question and lost its non-compiling example; R-Q5 lost `REFUSE`, gained the layer
+rule and the corrected breach stamp; R-Q6 gained the incremental-edit mechanism and R-T6's escape
+hatch; R-Q7 was split, with the `LEST` half stated as a change and the named anchor added. The GM
+re-verified every borrowed claim it repeated before the cards went to Meng, and this section re-opened
+each citation again.
+
+**Examples elsewhere in this document that still write the old spellings.** `EACH` as a quantifier
+survives at §5.3, §6.3, §7.3, §9.1, §9.3 and §12.3; bare
+`EVERY … HENCE …` without a `ONCE` line at §5.1's diagram sections, §9.2 and §12. They are left as
+written — they are the history of the two-word scheme, and their semantics are unchanged — and are to
+be read as: `EACH p … HENCE h` ≡ `EVERY p … ONCE EACH HAS HENCE h`; `EVERY p … HENCE h` ≡
+`EVERY p … ONCE ALL HAVE HENCE h`. §9's heading, "EVERY (Barrier) vs EACH (Fork)", is now "the
+`ALL HAVE` join vs the `EACH HAS` join"; its number is kept because it is cited.
+
+**Owed, from these rulings** (repo `CLAUDE.md` §6: a feature is not done until `doc/` explains it;
+none of the docs edits below were made in the change that recorded this section, because the docs
+branch was in the merge queue at the time):
+
+- `doc/tutorials/obligations/what-is-coming.md` (lines 54, 63, 65, 79, 102 at `5dc0ca19`) and
+  `doc/concepts/legal-modeling/regulative-layer-whole.md` (lines 242, 249, 260) teach an
+  `EVERY`/`EACH` pair and the `HENCE FOR EACH` spelling. Both already hedge the words; the correction
+  is the one-word scheme, the mandatory `ONCE` line, and `ONCE EACH HAS` marked provisional. The
+  "Six Ways to Owe One Debt" page (an artifact, §2.2.7.6) describes the same pair.
+- The build's `doc/` page for the quantifier owes the `RAND`/`ROR` worked example of §8.3 (R-Q2,
+  Meng's note).
+- `doc/reference/regulative/README.md:82-95` documents `WITHIN 5 days OF notice` as an anchored form.
+  **Probed 2026-09-07:** it is a parse error (`unexpected OF` at the `OF`) on the installed binary of
+  27 August and on the 4 September probe binary, with or without `days`. The page is owed a correction
+  in the PR that builds the anchor of R-Q7 (§5.1), or sooner.
+- `doc/tutorials/obligations/what-follows.md:153` and `:470` teach today's `LEST` anchor (the first
+  event after the deadline) and a `WITHIN 13` workaround built on it. When R-Q7's `LEST` default is
+  built (§5.2) that page changes and the trace goldens re-bless.
+- In this document: extend §3–§9 to `SHANT` (R-Q3); define the release / substitute / join events
+  (R-Q6, §13.4); rule the fork's words (R-Q1); rule the anchor spellings (R-Q7).
+
 ## 3. Semantics Overview
 
 ### 3.1 EVERY: The Barrier Model
 
-`EVERY` with HENCE/LEST has **barrier semantics**:
+> Spelling as ruled 2026-09-07 (R-Q1, §2.5): the barrier is the **`ONCE ALL HAVE`** join under
+> `EVERY`. In the workflow-patterns catalogue it is **WCP-14**, multiple instances with
+> synchronisation (the joint/several memo's §7.5 asked for the citation here).
+
+`EVERY` with a `ONCE ALL HAVE` join has **barrier semantics**:
 
 - **HENCE fires** when ALL parties complete (join point)
-- **LEST fires** when the barrier becomes unachievable (deadline or early failure)
+- **LEST fires** when the barrier becomes unachievable — at the deadline for `MUST`/`DO`/`MAY`
+  members, at the act for a `SHANT` member (R-Q5, §3.4)
 
 ```l4
-EVERY p MUST X HENCE shared_h LEST shared_l
+EVERY p MUST X ONCE ALL HAVE HENCE shared_h LEST shared_l
 -- Desugars to barrier structure, NOT simple conjunction
 ```
 
@@ -854,13 +1219,18 @@ EVERY p MUST X HENCE shared_h LEST shared_l
 
 ### 3.2 EACH: The Fork Model
 
-`EACH` with HENCE/LEST has **fork semantics**:
+> Spelling as ruled 2026-09-07 (R-Q1, §2.5): the fork is the **`ONCE EACH HAS`** join under `EVERY`
+> — the words are provisional, with four candidates in §2.5 — and `EACH` is no longer a quantifier
+> word. In the workflow-patterns catalogue it is **WCP-12**, multiple instances without
+> synchronisation.
+
+`EVERY` with a fork join has **fork semantics**:
 
 - **HENCE fires** independently for each party that completes
 - **LEST fires** independently for each party that fails
 
 ```l4
-EACH p MUST X HENCE h(p) LEST l(p)
+EVERY p MUST X ONCE EACH HAS HENCE h(p) LEST l(p)
 -- Desugars to: (p1 MUST X HENCE h(p1) LEST l(p1)) ||| (p2 MUST X HENCE h(p2) LEST l(p2)) ||| ...
 ```
 
@@ -874,11 +1244,15 @@ EACH p MUST X HENCE h(p) LEST l(p)
 
 ### 3.3 Without HENCE/LEST: Both Equivalent
 
-When there is no continuation clause, EVERY and EACH are semantically equivalent—both produce distributive obligations:
+When there is no continuation there is no join to write, and the barrier and the fork coincide: a
+quantified obligation with no `ONCE` line is the plain distributive obligation. Unchanged in
+substance by R-Q1 (2026-09-07) — it is the observation R-Q1 rests on, since it shows the distinction
+is a property of the continuation and not of the quantifier.
 
 ```l4
-EVERY p MUST X    ≡    EACH p MUST X    -- when no HENCE/LEST
--- Both desugar to: (p1 MUST X) ||| (p2 MUST X) ||| ...
+EVERY p MUST X                          -- no ONCE line, no HENCE/LEST
+-- Desugars to: (p1 MUST X) ||| (p2 MUST X) ||| ...
+-- (Until 2026-09-07 this read: EVERY p MUST X  ≡  EACH p MUST X.)
 ```
 
 ### 3.4 State Transitions (EVERY Barrier)
@@ -904,6 +1278,38 @@ EVERY p MUST X    ≡    EACH p MUST X    -- when no HENCE/LEST
       HENCE fires
     (clock starts at t_last)
 ```
+
+**The "party fails" transition — RULED 2026-09-07 (R-Q5, §2.5; Meng's mark: _"d"_).** The diagram
+had a `party fails` edge with no event behind it. L4 has no party-failure event: the machine's only
+event is party + action + timestamp (`jl4-core/src/L4/Syntax.hs:208-215`), and `REFUSE` is the model
+declining to answer, "that no rule in the language can observe or convert into an answer"
+(`Syntax.hs:361-371`) — not a party's act. So the edge is taken as follows, **by the layer the `LEST`
+attaches to, then by the modal**:
+
+- On the **state layer** — a `LEST` after an `ONCE … WITHIN` line (R-T2) — the failure time is the
+  state's deadline, whatever the acts' modals; the `LEST` fires once, at that deadline, and the blame
+  is the set (§6.1; a set-valued `BY` under R-T3). §2.2.7.6's `rent owed jointly` is the case: `MAY`
+  acts inside, one `LEST` at `due`.
+- On the **act layer** — a `LEST` under the fork join, or a barrier with no state `WITHIN` — the modal
+  fixes it: **`SHANT` fails at the act** (the violating event's own stamp; today's single-party
+  behaviour at `Machine.hs:1648-1651`); **`MUST`, `DO` and `MAY` fail at the deadline**.
+- **No modifier.** §13.1's opt-in early failure is declined: there is nothing for it to trigger on;
+  and "early failure by default" would take away the innocent party's election under anticipatory
+  repudiation — accept the repudiation and sue at once, or affirm and wait for the day of performance
+  (the refuters' point, unverified in-tree). A drafter who wants an earlier consequence writes an
+  earlier milestone obligation and composes it with `RAND`, which reports the compound breach as soon
+  as one operand breaches (`Machine.hs:1742-1754`; the refuters' probe: breach at day 7 with the
+  sibling's deadline at day 100).
+- **Success time**, which R-Q7's anchor needs (§5.1): a `MUST`/`DO` barrier achieves at the last
+  performance (`t_last`, as the diagram has it); a `SHANT` or `MAY` barrier achieves at the deadline,
+  because for those modals the machine's success event is expiry (`Machine.hs:1592-1600`).
+
+What "at the deadline" costs, measured by the refuters and recorded in §5.2: today a `MUST` breaches
+only when a later-stamped event **reveals** the miss, and the breach carries the revealing event's
+stamp (`stamp` bound at `Machine.hs:1522`, written into the breach at `:1606`); time alone breaches
+nothing. Dating the failure to the deadline changes that stamp, and the trace goldens that print it.
+§4.1's `boFailed` ("parties who cannot complete") is therefore populated by a `SHANT` violation
+before the deadline and by every non-completer at the deadline, and by nothing else.
 
 ## 4. Formal Semantics
 
@@ -1004,13 +1410,50 @@ The party type `P` is determined by the deontic context (`GIVETH DEONTIC P A`):
 
 ### 5.1 Reference Time for Continuations
 
-When HENCE fires, continuation deadlines are relative to **last completion time**:
+**RULED 2026-09-07 (R-Q7, §2.5; Meng's mark: modify — _"e but with a as default when no OF?"_).**
+Two things, the mechanism and the default (GM's reading of the mark, 2026-09-07: mechanism, not
+policy — the drafter names the anchor, and the language supplies a default when none is named):
+
+1. **The mechanism: a named anchor on the continuation.** A drafter may write the anchor —
+   `` WITHIN 5 days OF `the last signature` ``, `` WITHIN 5 days OF `the closing date` `` — and the
+   machine must expose four: **the join's firing**, **the missed deadline**, **the arming time**, and
+   **any recorded event**. Their spellings are not ruled; §2.4 carries the production as
+   `'WITHIN' Duration ['OF' Anchor]`.
+2. **The default for an unanchored `WITHIN`.** Under `HENCE`, the continuation's clock starts at the
+   **join's firing** — the last completion for a barrier, the k-th performance for `SOME m OF`, the
+   moment the `ONCE` condition holds for a measure. This is today's single-party rule generalised: on
+   the matched event the scan sets `time = ev'time` (`Machine.hs:1612`), the success branch hands that
+   `time` to `continueWithFollowup` (`:1669-1671`), and the followup is applied to `[time, events]`
+   (`:1798-1804`). The refuters' probe on the installed binary: `sign AT 3` with `HENCE … WITHIN 5`
+   reports the continuation's deadline as 8 — act + `WITHIN`, not 5 (from arming) and not 15 (from
+   the barrier's own deadline) — and an intervening `WAIT UNTIL` leaves it unmoved. It is the only
+   option under which a cast of one behaves like today's `PARTY`. Under `LEST`, the default is the
+   **missed deadline** — §5.2, where it is recorded as a change.
+
+The cost the ruling accepts: an early-completing cast gives the continuation an early deadline
+("within five days of the last signature", not "on the completion date"); the named anchor is what
+makes the other clause writable. The card's earlier escape hatch, "write an absolute `BY date`", is
+struck: R-T2 ruled nothing about `BY` (its subject is `WITHIN` in two positions), and a deadline `BY`
+is unruled and unbuilt (§2.4).
+
+**The manual's `OF` form does not run.** `doc/reference/regulative/README.md:82-95` documents
+`WITHIN 5 days OF notice` and `` WITHIN 5 days OF `order confirmation` `` as an anchored form.
+Probed 2026-09-07 on the installed binary of 27 August and on the 4 September probe binary,
+`JL4_LIBRARY_PATH` unset: both report `unexpected OF` at the `OF`, with or without `days`. The
+`deadline` production is `WITHIN` followed by one expression (`Parser.hs:2534-2536`), and `OF` is not
+an operator inside an expression. The page is owed a correction (§2.5's owed list, not made in the
+change that recorded this section); this ruling is the design that would make its sentence true.
+
+When `HENCE` fires, an unanchored continuation deadline is relative to the join's firing — for a
+barrier, the **last completion time**:
 
 ```
 EVERY p
     MUST   sign
     WITHIN 30
-    HENCE  escrow_agent MUST release_funds WITHIN 5
+    ONCE   ALL HAVE
+    HENCE  PARTY escrow_agent MUST release_funds WITHIN 5
+    LEST   PARTY escrow_agent MUST return_funds  WITHIN 5   -- from day 30, the missed deadline (§5.2)
 
 Timeline:
 t=0:  Obligation entered
@@ -1023,20 +1466,45 @@ t=25: HENCE spawns with reference time = 25
 
 ### 5.2 LEST Reference Time
 
-When LEST fires, continuation deadlines are relative to **failure time**:
+**RULED 2026-09-07 (R-Q7 for the anchor, R-Q5 for the failure time; §2.5) — and recorded as a
+CHANGE from what the tree does.** When `LEST` fires, an unanchored continuation deadline is relative
+to the **failure time**, which R-Q5 fixes by layer and then by modal (§3.4):
 
-- If deadline failure: `t_ref = deadline`
-- If early failure: `t_ref = detection_time`
+- state layer: `t_ref` = the state's deadline (the `WITHIN` on the `ONCE` line, R-T2);
+- act layer, `MUST`/`DO`/`MAY`: `t_ref` = the act's deadline;
+- act layer, `SHANT`: `t_ref` = the violating event's stamp.
+
+The text of this section before 2026-09-07 — "deadline failure: `t_ref = deadline`; early failure:
+`t_ref = detection_time`" — assumed an early-failure event the tree does not have (R-Q5); the
+`SHANT` line above is what "early failure" turns out to mean.
+
+**What the machine does today, and why this is a change.** The machine anchors a `LEST`
+continuation at the stamp of the event that **revealed** the miss, not at the deadline. The comment
+at `Machine.hs:1550-1552` says so in terms — "the continuation's clock is anchored at the revealing
+event's stamp (the README is silent on the anchor; this is the historical behavior)" — and
+`:1583-1589` implements it, carrying the revealing event's `ev'timeR` into the continuation's frame.
+The refuters' probe: `PARTY P MUST sign WITHIN 10 LEST PARTY Q MUST release WITHIN 5`, the miss
+revealed by an event at 14, reports Q's deadline as 19 (14 + 5), not 15 (10 + 5); a release at 18
+comes back `FULFILLED`. Under that rule the defaulting party controls when its own cure period starts
+— a maker who misses the date and then stays silent has no return-of-funds deadline until someone
+else acts — which is why the deadline anchor was chosen over the status quo (listed on the bench as
+its own option so that choosing this was visibly a decision). The anchor is a timestamp computed
+when the miss is revealed; firing still waits for an event, so no timer is needed.
+
+Blast radius when built: the single-party `LEST` anchor and every trace golden that prints a
+reparation deadline; and `doc/tutorials/obligations/what-follows.md:153` and `:470`, which teach
+today's rule and a `WITHIN 13` workaround built on it (§2.5's owed list).
 
 ### 5.3 Temporal Forking (MAY Exercise)
 
 When a party exercises a MAY, the HENCE obligations activate relative to exercise time:
 
 ```l4
-EACH p_x
+EVERY p_x
     MAY   terminate
+    ONCE  EACH HAS                          -- fork (R-Q1; words provisional)
     HENCE EVERY p_y
-              WHO    differs_from p_x
+              WHO    differs_from p_y p_x   -- R-Q4
               MUST   settle_with p_x
               WITHIN 30
 ```
@@ -1159,12 +1627,60 @@ Standard conditional; the quantified deontons are in the branches.
 ### 8.3 With RAND/ROR
 
 ```l4
-(EVERY seller MUST deliver HENCE ...)
+(EVERY seller s MUST deliver ONCE ALL HAVE HENCE ...)
 RAND
-(EVERY buyer MUST pay HENCE ...)
+(EVERY buyer b MUST pay ONCE ALL HAVE HENCE ...)
 ```
 
 Both quantified obligations must be satisfied (regulative conjunction).
+
+**Worked example — PROPOSED, not built; added 2026-09-07 for R-Q2 (§2.5).** Meng's note on R-Q2,
+verbatim: _"How do the quantifies interact with RAND ROR combinators? Docs need to show an
+example."_ The composition is stated above in one line each way; nothing showed it worked. Three
+shapes, in the value-actor style of §2.2.7.6, with the breach naming under R-T3's set-valued `BY`:
+
+```l4
+-- (1) a quantified obligation as one operand of RAND: the board signs AND the secretary files
+`board signs and secretary files` MEANS
+    (EVERY Director d WHO elem d board MUST sign WITHIN 30
+        ONCE ALL HAVE
+        HENCE FULFILLED
+        LEST  BREACH)                     -- blame = the non-signers (§6.1), a set under R-T3
+    RAND
+    (PARTY secretary MUST file WITHIN 30
+        HENCE FULFILLED
+        LEST  BREACH BY secretary)
+-- Two directors miss the date and the secretary files: the compound breach names the two
+-- directors. Today's fold would name ONE operand by timestamp tie-break (Machine.hs:1699-1730).
+
+-- (2) a quantified obligation as one operand of ROR: unanimous written consent OR a chair's decision
+`consent or decision` MEANS
+    (EVERY Director d WHO elem d board DO consent WITHIN 14
+        ONCE ALL HAVE
+        HENCE `resolution passes`)
+    ROR
+    (PARTY chair MUST decide WITHIN 14
+        HENCE `resolution passes`)
+-- Either branch fulfils the compound (Machine.hs:1757-1764); it is breached only when BOTH are
+-- lost (:1699-1706), and then names both operands' non-performers under R-T3.
+
+-- (3) a barrier whose HENCE is itself a RAND: after the last signature, two things follow in parallel
+`sign then close` MEANS
+    EVERY Director d WHO elem d board MUST sign WITHIN 30
+        ONCE  ALL HAVE
+        HENCE (PARTY escrow    MUST `release funds`       WITHIN 5
+               RAND
+               PARTY secretary MUST `file the resolution` WITHIN 7)
+        LEST  BREACH
+-- Both continuation clocks start at the join's firing, the last signature (R-Q7, §5.1).
+```
+
+What this needs before it can be a golden: the `ONCE` line (R-Q1); the set-valued `BY` (R-T3); and,
+for shapes (1) and (2) with a continuation on the compound, a `HENCE` slot that compounds do not have
+— `HENCE` is parsed only inside `obligation` (`Parser.hs:2538-2540`), so `(A RAND B) HENCE k` is a
+parse error (`unexpected HENCE`; probed 2026-09-07 on the installed binary). Shape (3) puts the `RAND`
+**inside** the `HENCE`, which is legal today for a single `PARTY`. **The build's `doc/` page owes this
+same example** (§2.5's owed list).
 
 ### 8.4 With Pattern Matching
 
@@ -1362,6 +1878,13 @@ Should early failure detection (before deadline) be:
 
 **Recommendation:** Opt-in, as legal systems typically allow cure until deadline.
 
+**CLOSED 2026-09-07 by R-Q5 (§2.5, §3.4; Meng's mark: _"d"_): none of the three.** No modifier and no
+configuration; the failure time is fixed by the layer the `LEST` attaches to, then by the modal. The
+recommendation's reason — cure until the deadline — holds for a `MUST` and is false for a `SHANT`,
+which fails at the act, and it was silent about the state line R-T2 ruled. And an opt-in would have
+nothing to observe: the machine has no party-failure event (`Syntax.hs:208-215`), and `REFUSE` is not
+one (`Syntax.hs:361-371`).
+
 ### 13.2 Partial Completion Visibility
 
 Should intermediate completion state be observable to other parts of the contract?
@@ -1386,6 +1909,68 @@ EVERY p
 
 **Recommendation:** Defer to future iteration; current design covers common cases.
 
+### 13.4 Cast Survivorship — RULED 2026-09-07 (R-Q6, §2.5; Meng's mark: _"d"_)
+
+The joint/several memo raised the question §13 did not list
+(`EVERY-EACH-JOINT-SEVERAL-MEMO.md:101`, `:429-431`): what happens to an armed barrier when the
+inhabitant set changes after arming — a member released, substituted, or joined mid-window? The
+workflow-patterns catalogue splits here: WCP-14 (instance count fixed once started) against, by
+analogy only, WCP-15 (count may change while running — a creation-side pattern; nothing in it
+licenses withdrawal).
+
+**The rule.** The cast is evaluated **once, at arming**, for the whole family — R-T6 (§2.2.7.8)
+extended to `EVERY`, which is `ALL OF` plus one continuation (§2.2.7.3). It changes only on an
+explicit **edit** event applied to the running barrier — a **release**, a **substitution**, or a
+**joinder** — which adjusts the pending set and the blame set while **preserving the completions and
+the accumulator**, and leaves the deadline where it was:
+
+```l4
+EVERY Director d WHO elem d board MUST sign WITHIN 30 days
+    ONCE ALL HAVE
+    HENCE `resolution passes`
+    LEST  BREACH
+-- `board` is read once, here: {Alice, Bob, Carol}.
+-- day 2: Alice signs                        (completed = {Alice})
+-- day 3: an explicit RELEASE of Bob         (illustrative; no such event exists yet):
+--        pending = {Carol}; the blame set excludes Bob; Alice's signature kept; deadline unchanged.
+-- day 9: Carol signs → ONCE ALL HAVE holds → HENCE fires.
+-- Without the release: the barrier waits for Bob; day 30 → LEST, blame = {Bob} (§6.1).
+```
+
+**Why an edit and not a re-arm.** The first draft of the ruling said a novation clause "re-arms" the
+barrier. A re-arm discards Alice's signature and reopens the deadline — the two costs that
+disqualified the re-arm-on-any-change option — and a re-arming `WITHIN` is the very defect R-T2 was
+ruled to remove (§2.2.7.5 point 3). Doctrine's release rule (Restatement (Second) of Contracts § 294,
+as the memo records it at `:99`) is what the edit event models at the `ANY OF` end of the family,
+where leaving a released obligor in the blame set would contradict a release the creditor has signed
+— visible now that R-T3's breach carries a set.
+
+**Why not a live re-read.** Who is blamed would change silently with the cast expression; a cast that
+depends on the ledger would be re-evaluated after every event; and a member could escape blame by
+leaving. §4.1's `boParties` and §6.1's `bo.parties` are fields captured at arming, and §3.4's
+`pending` only shrinks — the document had been assuming the freeze. The state graph is drawable
+statically only under it: `StateGraph.hs` draws a fixed fan (`AllOf`/`OneOf`,
+`jl4-core/src/L4/StateGraph.hs:133-134`, taken from the operands of `RAND`/`ROR` at `:511` and `:514`);
+a run-time-width fan is already needed for `EVERY`, and a width that changes mid-run has no drawing at
+all. The refuters' strongest attack — a shareholder vote, where a record date fixes the eligible roll
+and later transfers do not change it — turned out to be the freeze exactly (Delaware DGCL § 213, from
+the refuter's memory, unverified).
+
+**Scope, and R-T6's escape hatch (stated here because §2.2.7.8 did not state it).** The rule bites
+only on **computed casts** — a `WHO` filter, a `GIVEN` list, a ledger read; for a closed actor type the
+bare `EVERY t` form makes it a no-op. And a population written as a cast filter is **frozen**, but a
+**measure over the ledger** (`ONCE sum OF amount …`, a count over the member list) is **live** by
+construction, so two spellings a drafter reads as synonyms answer differently — the s 177 quorum of
+§2.2.7.3 can be written either way with no cue which you got. The page that introduces the join must
+say which to use.
+
+**Until the events exist**, the behaviour is "fixed at arming, no edits": a change of party is a new
+agreement (Meng's R-T6 note, _"This is why novations etc are a thing"_), written as a clause. The
+three events — their syntax, ledger entries and state-graph edges — are **proposed, not built**, and
+R-T6's own low confidence carries over to the survivorship half. The memo's release-of-one-discharges-
+all gap (`:99`) stays open: at the `ANY OF` end it needs a discharge operation the language does not
+have.
+
 ## 14. Related Work
 
 - **Hvitved's CSL**: Trace-based contract semantics, blame assignment
@@ -1396,35 +1981,43 @@ EVERY p
 
 ## 15. Appendix: Formal Grammar
 
+Brought into line with §2.4 on 2026-09-07 (R-Q1–R-Q4 and R-Q7, §2.5). Until then this appendix still
+carried a `variable 'IN' set_expr` head that §2.4 had already replaced with the pattern form, four
+quantifier words, a `WHERE` filter, and a `predicate` sub-grammar that only the withdrawn insertion
+rule needed.
+
 ```ebnf
 quantified_deonton ::=
-    quantifier variable 'IN' set_expr [filter]
+    quantifier pattern [filter]
     deontic_modal action_expr
     [temporal_constraint]
-    [hence_clause]
-    [lest_clause]
+    [join]                          (* required whenever a continuation follows; R-Q1 *)
 
-quantifier ::= 'EVERY' | 'EACH' | 'ALL' | 'NO'
+join ::= 'ONCE' threshold [temporal_constraint] [hence_clause] [lest_clause]
+                                    (* threshold as §2.2.7.4: 'ALL' 'HAVE' is the barrier,
+                                       'EACH' 'HAS' the fork — the fork's words are provisional,
+                                       four candidates in §2.5 R-Q1 *)
 
-filter ::= 'WHO' predicate | 'WHERE' predicate
+quantifier ::= 'EVERY'              (* EACH, ALL, NO are not quantifiers: R-Q1, R-Q2, R-Q3 *)
 
-deontic_modal ::= 'MUST' | 'MAY' | 'SHANT'
+no_prohibition ::= 'NO' pattern [filter] 'MAY' action_expr [temporal_constraint] [join]
+                                    (* sugar for EVERY pattern [filter] SHANT …, join fixed to
+                                       ONCE EACH HAS; R-Q3, §2.2.3 *)
 
-temporal_constraint ::= 'WITHIN' duration_expr
-                      | 'BEFORE' time_expr
-                      | 'BY' time_expr
+pattern ::= constructor variable | variable
+
+filter ::= 'WHO' boolean_expr       (* the bound variable is free in boolean_expr; R-Q4 *)
+                                    (* 'WHOSE' boolean_expr: proposed, not ruled; §2.5 R-Q4 *)
+
+deontic_modal ::= 'MUST' | 'MAY' | 'SHANT' | 'DO'
+
+temporal_constraint ::= 'WITHIN' duration_expr ['OF' anchor]   (* anchor: R-Q7, §5.1; unbuilt *)
+                      | 'BEFORE' time_expr                      (* planned, unbuilt *)
+                      | 'BY' time_expr                          (* unruled, unbuilt *)
 
 hence_clause ::= 'HENCE' continuation
 
 lest_clause ::= 'LEST' continuation
 
-continuation ::= deonton | quantified_deonton | 'FULFILLED' | 'BREACH'
-
-predicate ::= 'is' 'not' variable
-            | 'is' 'in' set_expr
-            | 'meets' predicate_name
-            | predicate 'AND' predicate
-            | predicate 'OR' predicate
-            | 'NOT' predicate
-            | '(' predicate ')'
+continuation ::= deonton | quantified_deonton | 'FULFILLED' | 'BREACH' ['BY' party_or_list]
 ```
