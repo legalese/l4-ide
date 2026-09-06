@@ -528,7 +528,8 @@ printed it. The claim is threefold and each part is checkable:
 3. **Nothing below the earliest modelled date is safe.** With only the 2022-09-20 boundary
    encoded, `EVAL UNDER RULES EFFECTIVE AT (DATE_SERIAL (Date 1 1 2019))` returns the "greater
    of" shape, which was not the law. Phase 2's generated "not in force on ⟨day⟩" arm
-   (`TEMPORAL-RULE-VERSION-DESIGN.md:348-352`) is the designed answer and is **not built**.
+   (`TEMPORAL-RULE-VERSION-DESIGN.md` Phase 2 item 3, `:540-546`; the `:348-352` this cited until
+   2026-09-05 had drifted onto an unrelated list) is the designed answer and is **not built**.
    C1 must hand-write a floor arm. **Settled at R2: the floor is 2016-05-16**, Reg CF's
    commencement — not "whatever the earliest encoded boundary happens to be".
 4. **Per-arm citation has no home.** The inert-prose idiom the corpus uses everywhere
@@ -1424,8 +1425,11 @@ changed the shape of the fourth; the reasoning is kept so the decision is audita
   constant carries an explicit floor arm at Reg CF's commencement (80 FR 71388 instr. 4,
   "Effective May 16, 2016"), and a rule date below it is a curated refusal, not an answer.
   Phase 2's generated "not in force on ⟨day⟩" arm
-  (`TEMPORAL-RULE-VERSION-DESIGN.md:348-352`) remains the designed replacement and is not
+  (`TEMPORAL-RULE-VERSION-DESIGN.md` Phase 2 item 3, `:540-546` — the citation here read
+  `:348-352` until 2026-09-05, by which date those lines held an unrelated critique-disposition
+  list) remains the designed replacement and is not
   built; the hand-written arm is the interim and should be written so Phase 2 can delete it.
+
   **Note the limit of this ruling:** a floor arm catches queries _below_ the window. It does
   **not** catch the two failure modes that actually bit — a constant left undated _inside_
   the window (trap 5) and an omitted boundary _inside_ the window (2017-04-12). Those need
@@ -1455,6 +1459,12 @@ changed the shape of the fourth; the reasoning is kept so the decision is audita
   `2 blocking D-SUMTYPE`. Phase 2's generated arm therefore remains the designed replacement and
   its shape is now ruled. D6 also proposed omitting the floor row in DMN as its first half; that
   was **measured and not built**, and §11.9.3 records the numbers and the reason.
+
+  _One site does **not** migrate with them, folded in from the rulings branch 2026-09-05._
+  `regcf-denovo.l4:211`'s floor says "no encoding of Part 227 exists for rule dates before
+  2022-09-20" — the _encoding_ has no sources for that period, not that the law was not in
+  force. That is the `REFUSE` row of R7's taxonomy, not the gate row, even though it is
+  guarded on a rule date. The migration classifies per site; it does not sweep.
 
 - **R3 — Do C0's 55 existing assertions get pinned? — RESOLVED 2026-07-29: pin none,
   document the dependency.** The 55 assertions state the _current_ law and stay unpinned;

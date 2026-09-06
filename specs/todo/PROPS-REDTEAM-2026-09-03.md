@@ -539,7 +539,7 @@ the split row below; D6 (2026-09-05) rules that gate to be a property of the rul
 | a value that may be absent               | `MAYBE`              | the rule, by matching                            | yes, as a value |
 | an expected failure with a reason        | `EITHER`             | the rule or its caller                           | yes, as a value |
 | a fact not yet known                     | an unsupplied binder | the boundary asks                                | n/a             |
-| the law does not apply / is not in force | a value or gate      | savings and transitional provisions can reach it | yes             |
+| the law does not apply / is not in force | a gate (D6, §11.9.3) | savings and transitional provisions can reach it | yes             |
 | the model does not cover this            | `REFUSE`             | the boundary only                                | no              |
 | a breach                                 | `LEST`               | the obligation's own branch                      | structured      |
 | an overridden conclusion                 | `SUBJECT TO`         | the overriding rule                              | structured      |
@@ -754,7 +754,12 @@ Kept so that no later session re-proposes one without meeting its witness.
 2. **Shipped section-scoping repairs**: the parent-ambiguity defect and the §3.3.4 drift. Built on
    `fix/section-scoping-ambiguity` (§7).
 3. **`REFUSE`** (R7) and the empty-`DECLARE` migration of the type role, so that no refusal and no
-   sort is ever suppliable, before any discharge crosses `IMPORT`.
+   sort is ever suppliable, before any discharge crosses `IMPORT`. **"Before any discharge crosses
+   `IMPORT`" is now a measured requirement, not a precaution: the read-set does not cross an
+   `IMPORT` today and neither does the supply path, and the two fail in opposite directions.** See
+   the cross-`IMPORT` defect in §7 below, `IMPLICIT-PROPS-DESIGN.md` §11.19, which rules that
+   the **refusal** is the first required move and the closure the second, and
+   `OPEN-FINDINGS-2026-09-05.md` **OF-7**, which is the defect record.
 4. **Section binder parse** per R4, with the misattachment check error and both printers' goldens.
 5. **Discharge** = elaboration; `supplyAppNamed` relaxed per R1; resolution per R2; `TYPICALLY`
    honoured per R8; `WITH`/`LET` per R9; field-opening per R5 with the elaborated-AST stage.
@@ -767,6 +772,8 @@ Kept so that no later session re-proposes one without meeting its witness.
    withdrawn, `D-REFUSE` takes the call-site severity calibration, and `MayRefuse` is dropped.
    The dmnmd markdown carrier is a second image and is ruled with it (a refusing table is omitted,
    loudly). Read §2.8 with its strikethrough, not as originally written.
+   `jl4-core/src/L4/Dmn/Lower.hs` cited "§6 item 6" for this work while it was unbuilt; if that
+   comment survives anywhere, it points here, and here now points at §11.9.1.
 7. **Migration and deprecation**: a warning in `l4 check` with a code action that rewrites a term
    `ASSUME` to the ruled spelling, the warning not landing before the code action can; then corpus
    and docs, `doc/reference/types/ASSUME.md` carrying the notice and the recipe (`CLAUDE.md` §6);
@@ -806,6 +813,46 @@ were built against `origin/unstable` (`7ed1589e`) by a two-round fix-and-verify 
 Still open, filed here and not yet on a branch: `TYPICALLY`'s three images (§2.5, folded into R8);
 the dead `LocalAssume` grammar (§6 item 7); function-typed `ASSUME` refused by every backend
 (§6 recipe).
+
+**NEW 2026-09-05 — the read-set does not cross an `IMPORT`, and neither does the supply path.**
+Filed with R13/R14 (rulings-bench card `D5-computed-fields-purity`, option A′); ruled in
+`IMPLICIT-PROPS-DESIGN.md` §11.19; the full probe and both halves are in
+`OPEN-FINDINGS-2026-09-05.md` **OF-7**. In one line: an export whose read
+crosses an `IMPORT` gets `{"errors":[],"status":"valid"}` from `l4 batch --validate-only` and then
+fails to evaluate, and a value supplied under the binder's name is accepted into the row and
+ignored (measured 2026-09-05, `scratchpad/consult/adv-d5/cf5.l4` on the `l4-base2` binary).
+**Both halves have to be named or the wrong one gets fixed first:**
+
+- **the read-set collector**, whose three sites are per-module by type signature —
+  `assumesFromModule` (`Export.hs:300`), `decideBodiesFromModule` (`Export.hs:377`) and
+  `rewriteModuleAssumes` (`Export.hs:441`);
+- **the supply path**, which rewrites the module's own source (`Batch.hs:221-236`, `:340-342`) and
+  therefore cannot reach an imported module at all, because `prettyLayout` re-emits the `IMPORT`
+  (`Print.hs:561-563`) and the file is re-resolved from disk.
+
+Closing the collector alone turns a false green into a demanded-then-silently-ignored parameter, so
+**the refusal is the first required move**: `l4 check`/`l4 batch` refuse an export whose read-set
+crosses an `IMPORT`, before the closure is allowed to find one. Zero corpus files are exposed today
+(every one of the 25 imported modules has `ASSUME` = 0 apart from `regcf.l4`'s two refusal-role
+lines; the 7 files with a section `GIVEN` are all fixtures and none is imported), which is why this
+is a defect on a schedule rather than a stop-work.
+
+**Findings from 2026-09-05 that are NOT props defects, and live in their own file.**
+`specs/todo/OPEN-FINDINGS-2026-09-05.md` collects twelve open items (`OF-1` … `OF-12`) found while the 2026-09-05 rulings
+were being recorded. Three of them touch this programme and are named here so a reader of §7 is not
+missing them:
+
+- **`l4 batch`'s generated wrapper is scoped by the last open `§`** (**OF-3**). Loud failure,
+  reproduced with a control. Unreachable today; reachable the moment `props/assume-sweep` lands.
+- **`L4.Names.isSectionBinderElaboration` keys on the raw name** (**OF-2**, recorded in full in
+  `IMPLICIT-PROPS-DESIGN.md` §11.15, which reached `unstable` in #338). **This blocks §6 item 7
+  above.**
+- **A `WHERE` local silently shadows a section `GIVEN`** (**OF-5**). Silent wrong answer: with the
+  binder supplied as 4, one entrypoint answers 4 and its neighbour answers 51, no diagnostic.
+
+The other four — a TDNR declaration-order sensitivity that predates section binders (**OF-1**), an
+unmeasured BPMN question (**OF-4**), the branch-dependent state of smucclaw/l4-ide#948 (**OF-6**),
+and the cross-`IMPORT` hole this section already carries (**OF-7**) — are in that file.
 
 ## 8. Measurements relied on
 

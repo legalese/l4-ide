@@ -5748,6 +5748,32 @@ editor cannot silently un-change one:
 Two harness repairs went with them: the `{"$date": …}` predicate disagreed between the two Java
 checkers (§15.6), and the exhibit's boundary coverage straddled one seam out of three (§15.10).
 
+**Third note, 2026-09-05 — an alternative to the floor row was raised, and then ruled against.**
+The floor-row bullet above (and R9, which admits the floor row as a third spelling on §3.3's own
+logic) was decided when the choice was "floor row **or** `UNIQUE` + `defaultOutputEntry`", both of
+which answer the pre-commencement day with a value. Earlier on 2026-09-05 a third alternative was
+ruled in — **D6 took a structural absence, the refusing row omitted and the table declaring itself
+incomplete, as the DMN half of the pre-commencement gate** —
+which is not a spelling of the floor row but the opposite move, and which collides with §15.3's
+stated reason for the floor row (that it makes the table "exact, total over the date axis, and
+pairwise disjoint").
+
+**That alternative was withdrawn the same day, and the withdrawal was measured rather than argued.**
+`IMPLICIT-PROPS-DESIGN.md` **§11.9.3** records Meng's ruling that where D6's omission image
+overlapped D1's `REFUSE` image — precisely on **a dated interval table whose floor arm refuses** —
+**the row is KEPT and answers FEEL `null`**, taken with the omission variant's per-evaluation KIE
+warning in hand rather than in ignorance of it. So **R9 and §15.3 stand**: the floor row is not
+re-ruled, and D6 keeps its long-run option 4 (the gate as a property of the rule-version axis) with
+no separate DMN half of its own.
+
+**What this note is for.** The floor row's own ruling was taken against two alternatives, a third
+was raised against it and lost, and the reason it lost is measured rather than argued: omission and
+an explicit `null` give **identical values on both engines**, so omission's only gain is a KIE
+runtime warning it does not get from Camunda, against the cost of deleting the `<description>` and
+the `@ref` `annotationEntry` that the row carries. The measurements are `gm-dmn-refusal`'s and live
+on branch `props/dmn-refusal`; they are not restated here. A later editor should read this note as
+"R9 survived a challenge", not as "R9 is unsettled".
+
 ### 15.12 Rule-date-rebinding decides are not emitted — R12, ruled 2026-08-02 (Meng)
 
 **The ruling.** A decision carrying `D-RULEDATE-UNBOUND` — a body that evaluates a sub-graph under
