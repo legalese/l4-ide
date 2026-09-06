@@ -175,21 +175,39 @@ Use parentheses to say something different:
 `NOT` is not on that list, because it does not work that way at all. It is not "tighter" or "looser" than AND — instead it **reaches forward and swallows everything after it on the line**:
 
 ```l4
-NOT a AND b         -- means: NOT (a AND b)   <-- NOT the other reading!
+NOT a AND b         -- would mean: NOT (a AND b)   <-- NOT the other reading!
 ```
 
-Most people read that as "not-a, and b". It is not. The `NOT` took the `AND b` along with it.
+Most people read that as "not-a, and b". It is not. The `NOT` would take the `AND b` along with it — so L4 **refuses this line**, and tells you both spellings:
 
-Putting brackets around what you are negating does not rescue it, because the closing bracket is not what stops the reach:
+```
+On one line, NOT reaches to the end of the line, so this reads as
+
+  NOT (a AND b)
+
+If that is the meaning, write those brackets in. If only
+
+  a
+
+is negated, put the brackets around the NOT and that alone:
+
+  (NOT a) AND b
+
+or move the AND to a line of its own, starting in the same
+column as the NOT or further left.
+```
+
+Putting brackets around what you are negating does not rescue it, because the closing bracket is not what stops the reach, and that spelling is refused too:
 
 ```l4
-NOT (a) AND b       -- STILL means: NOT (a AND b)
+NOT (a) AND b       -- refused: it would STILL mean NOT (a AND b)
 ```
 
 The form that works puts the brackets around the `NOT` itself:
 
 ```l4
-(NOT a) AND b       -- now it means what it looks like
+(NOT a) AND b       -- accepted: it means what it looks like
+NOT (a AND b)       -- accepted: the wide reading, spelled out
 ```
 
 Two habits keep you out of trouble:
