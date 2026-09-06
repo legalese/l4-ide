@@ -1,0 +1,76 @@
+§ `The accepted spellings of NOT (SET-OPERATORS-SPEC §18.1, R-NOT-1)`
+
+-- The checker refuses `NOT a AND b` and `NOT (a) AND b` on one line
+-- (not-ok/tc/not-same-line-connective.l4, not-bracketed-operand.l4). These
+-- are the spellings it accepts, evaluated with a = FALSE and b = FALSE so
+-- that the two readings give different answers: the narrow reading
+-- (NOT a) AND b is FALSE, and the wide reading NOT (a AND b) is TRUE.
+
+-- brackets around the NOT itself: the narrow reading
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN
+narrow a b MEANS (NOT a) AND b
+
+-- brackets around the whole group: the wide reading, spelled out
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN
+wide a b MEANS NOT (a AND b)
+
+-- AND on its own line, starting in the NOT's column: it stops the NOT. Narrow.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN
+stopped a b MEANS
+    NOT a
+    AND b
+
+-- AND on its own line, further right: the NOT reaches over it. Wide.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN
+swallowed a b MEANS
+    NOT a
+        AND b
+
+-- AND on its own line, further left: it stops the NOT. Narrow.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN
+stoppedLeft a b MEANS
+        NOT a
+    AND b
+
+-- NOT last on its line: there is nothing after it to reach over
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN
+lastOnLine a b MEANS a AND NOT b
+
+-- NOT over a bracketed group, then a connective on the NEXT line and further
+-- right: the connective is reached over by layout, and that is accepted —
+-- it reads as NOT ((a AND b) OR b)
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN
+groupThenNextLine a b MEANS
+    NOT (a AND b)
+          OR b
+
+-- UNLESS is `AND NOT` with the NOT written by the parser, not by the
+-- reader: no NOT keyword is on the page, so there is nothing to misread and
+-- nothing is refused. This is a AND NOT (b AND c).
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN, c IS A BOOLEAN
+exception a b c MEANS a UNLESS b AND c
+
+-- comparisons are outside the ruling: only one of the two readings is
+-- well-typed, so there is nothing to warn about
+GIVEN n IS A NUMBER
+isNotZero n MEANS NOT n EQUALS 0
+
+#EVAL narrow FALSE FALSE
+#EVAL wide FALSE FALSE
+#EVAL stopped FALSE FALSE
+#EVAL swallowed FALSE FALSE
+#EVAL stoppedLeft FALSE FALSE
+#EVAL lastOnLine TRUE FALSE
+#EVAL groupThenNextLine FALSE FALSE
+#EVAL exception TRUE TRUE FALSE
+#EVAL exception TRUE TRUE TRUE
+#EVAL isNotZero 0
+#EVAL isNotZero 5
+
+-- the six rows of the ruling's table, as assertions
+#ASSERT NOT (narrow FALSE FALSE)
+#ASSERT wide FALSE FALSE
+#ASSERT NOT (stopped FALSE FALSE)
+#ASSERT swallowed FALSE FALSE
+#ASSERT NOT (stoppedLeft FALSE FALSE)
+#ASSERT lastOnLine TRUE FALSE
