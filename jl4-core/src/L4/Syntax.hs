@@ -406,16 +406,61 @@ data GuardedExpr n =
 -- of deontic logic. Encompasses obligations, permissions, and prohibitions.
 --
 -- Structure: PARTY ... MUST/MAY/SHANT ... BEFORE ... HENCE ... LEST
+--
+-- The field order is the source order, and it is load-bearing: the exactprint
+-- and semantic-token traversals zip a node's 'AnnoHole's against its fields
+-- positionally ('flattenConcreteNodes', 'traverseCsnWithHoles'), so 'forEach'
+-- sits before 'hence' because the @FOR EACH@ marker sits between the @HENCE@
+-- keyword and the continuation it qualifies.
 data Deonton n
   = MkDeonton
   { anno :: Anno
-  , party :: Expr n
+  , subject :: Subject n
+    -- ^ who is bound: one @PARTY@, or @EVERY@ member of a cast (see 'Subject')
   , action :: RAction n
   , due :: Maybe (Expr n)
+  , forEach :: Maybe ForEach
+    -- ^ @HENCE FOR EACH …@: the continuation forks, firing once per completed
+    -- member rather than once at the barrier. Only meaningful under an 'Every'
+    -- subject; the type checker rejects it under 'Party'.
+    -- PROVISIONAL R-Q1 (EVERY-EACH-QUANTIFIER-SPEC, bench 2026-09-07): if the
+    -- ruling spells the fork on the quantifier instead, this field goes and
+    -- 'Every' grows a quantifier tag.
   , hence :: Maybe (Expr n)
   , lest :: Maybe (Expr n)
   }
   deriving stock (GHC.Generic, Eq, Ord, Show, Functor, Foldable, Traversable)
+  deriving anyclass (SOP.Generic, ToExpr, NFData)
+
+-- | The subject of a 'Deonton': who the deontic position binds.
+--
+-- EVERY-EACH-QUANTIFIER-SPEC §2.4 (RULED 2026-09-07): @Quantifier Pattern [Filter]@,
+-- @Pattern ::= Constructor Variable | Variable@, the variable last.
+data Subject n
+  = Party Anno (Expr n)
+    -- ^ @PARTY e@: one party, an expression of the contract's party type.
+  | Every Anno (Maybe n) n (Maybe (Expr n))
+    -- ^ @EVERY [Cast] v [WHO filter]@: one obligation per inhabitant of the
+    -- party type, narrowed to those built by the constructor @Cast@ when it is
+    -- given (@EVERY Tenant t@ — 'Tenant' is a /constructor/ of the party type
+    -- under the value-actor encoding, not a type) and to those satisfying
+    -- @filter@ when it is given. The variable @v@ is bound, at the party type,
+    -- in the filter, the action, the deadline, @HENCE@ and @LEST@.
+    --
+    -- The bare form @EVERY v@ ranges over every value of the party type.
+    --
+    -- Phase 1 (front end): parsed, scoped, typed, printed. Evaluation is
+    -- phase 2 (barrier: @HENCE@ fires once at the last completion; @LEST@ at
+    -- the deadline with blame = the set of non-completers, spec §3.1/§6.1).
+  deriving stock (GHC.Generic, Eq, Ord, Show, Functor, Foldable, Traversable)
+  deriving anyclass (SOP.Generic, ToExpr, NFData)
+
+-- | The @FOR EACH@ marker after @HENCE@. It carries no payload: its 'Anno'
+-- holds the two source tokens, which is what lets the derived exactprint and
+-- semantic-token instances place them without a hand-written arm.
+-- PROVISIONAL R-Q1 — see 'Deonton'.
+data ForEach = MkForEach Anno
+  deriving stock (GHC.Generic, Eq, Ord, Show)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
 -- | Deontic modal operators for regulative rules
@@ -749,6 +794,10 @@ deriving via L4Syntax (GuardedExpr n)
   instance HasAnno (GuardedExpr n)
 deriving via L4Syntax (Deonton n)
   instance HasAnno (Deonton n)
+deriving via L4Syntax (Subject n)
+  instance HasAnno (Subject n)
+deriving via L4Syntax ForEach
+  instance HasAnno ForEach
 deriving via L4Syntax (RAction n)
   instance HasAnno (RAction n)
 deriving via L4Syntax (Event n)
@@ -793,6 +842,8 @@ deriving anyclass instance ToConcreteNodes PosToken (Aka Name)
 deriving anyclass instance ToConcreteNodes PosToken (Expr Name)
 deriving anyclass instance ToConcreteNodes PosToken (GuardedExpr Name)
 deriving anyclass instance ToConcreteNodes PosToken (Deonton Name)
+deriving anyclass instance ToConcreteNodes PosToken (Subject Name)
+deriving anyclass instance ToConcreteNodes PosToken ForEach
 -- DeonticModal has no source tokens, so return empty list
 instance ToConcreteNodes PosToken DeonticModal where
   toNodes _ = pure []
@@ -846,6 +897,7 @@ deriving anyclass instance ToConcreteNodes PosToken (Aka Resolved)
 deriving anyclass instance ToConcreteNodes PosToken (Expr Resolved)
 deriving anyclass instance ToConcreteNodes PosToken (GuardedExpr Resolved)
 deriving anyclass instance ToConcreteNodes PosToken (Deonton Resolved)
+deriving anyclass instance ToConcreteNodes PosToken (Subject Resolved)
 -- Manual instance for RAction to skip the modal field (which has no source tokens)
 instance ToConcreteNodes PosToken (RAction Resolved) where
   toNodes (MkAction ann _modal action provided) =
@@ -1047,6 +1099,8 @@ deriving anyclass instance HasSrcRange (Aka a)
 deriving anyclass instance HasSrcRange (Expr a)
 deriving anyclass instance HasSrcRange (GuardedExpr a)
 deriving anyclass instance HasSrcRange (Deonton a)
+deriving anyclass instance HasSrcRange (Subject a)
+deriving anyclass instance HasSrcRange ForEach
 deriving anyclass instance HasSrcRange (LocalDecl a)
 deriving anyclass instance HasSrcRange (NamedExpr a)
 deriving anyclass instance HasSrcRange (Branch a)
@@ -1125,6 +1179,8 @@ deriving anyclass instance Serialise InertContext
 deriving anyclass instance Serialise RecallMode
 deriving anyclass instance Serialise n => Serialise (GuardedExpr n)
 deriving anyclass instance Serialise n => Serialise (Deonton n)
+deriving anyclass instance Serialise n => Serialise (Subject n)
+deriving anyclass instance Serialise ForEach
 deriving anyclass instance Serialise DeonticModal
 deriving anyclass instance Serialise n => Serialise (RAction n)
 deriving anyclass instance Serialise n => Serialise (NamedExpr n)

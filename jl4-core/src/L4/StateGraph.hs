@@ -63,6 +63,7 @@ import L4.Syntax
   , TopDecl(..)
   , Decide(..)
   , Deonton(..)
+  , Subject(..)
   , RAction(..)
   , DeonticModal(..)
   , Pattern(..)
@@ -676,7 +677,7 @@ extractDeonton mFromState MkDeonton{..} = do
     Nothing  -> newState "initial" InitialState
 
   -- Build the transition label
-  let partyText = Just $ prettyLayout party
+  let partyText = Just (subjectText subject)
       modalVal  = Just (action.modal)
       actionText = prettyPattern action.action
       deadlineText = fmap prettyLayout due
@@ -871,7 +872,7 @@ classifyTarget self = \case
 -- | Generate a descriptive name for an obligation (for intermediate states)
 describeDeonton :: Deonton Resolved -> Text
 describeDeonton MkDeonton{..} =
-  let partyT = prettyLayout party
+  let partyT = subjectText subject
       modalT = case action.modal of
         DMust    -> "must"
         DMay     -> "may"
@@ -879,6 +880,22 @@ describeDeonton MkDeonton{..} =
         DDo      -> "do"
       actionT = prettyPattern action.action
   in partyT <> " " <> modalT <> " " <> actionT
+
+-- | The subject of a deonton as label text.
+--
+-- An @EVERY@ is rendered as ONE node labelled with the quantifier. Phase 1 of
+-- EVERY-EACH-QUANTIFIER-SPEC does not fan the cast out into per-member
+-- transitions here (the cast is only known at run time, once evaluated — R-T6),
+-- so the state graph, and the BPMN lowered from it, show a single task for the
+-- whole cast. The @HENCE FOR EACH@ fork marker is likewise not drawn.
+subjectText :: Subject Resolved -> Text
+subjectText = \case
+  Party _ p -> prettyLayout p
+  Every _ mCast v mFilter -> Text.unwords $
+    [ "EVERY" ]
+    <> maybe [] (\c -> [prettyLayout c]) mCast
+    <> [ prettyLayout v ]
+    <> maybe [] (\f -> [ "WHO", prettyLayout f ]) mFilter
 
 -- | Pretty-print a pattern to text
 prettyPattern :: Pattern Resolved -> Text

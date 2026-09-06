@@ -222,16 +222,26 @@ instance Linearize (Expr Resolved) where
     MultiWayIf _ conds o -> hcat $
       foldMap (\(MkGuardedExpr _ c f) -> ["if", lin c, "then", lin f]) conds
       <> ["otherwise", lin o ]
-    Regulative _ (MkDeonton _ party (MkAction _ modal rule mprovided) mdeadline mfollowup mlest) -> hcat $
-      [ text "party"
-      , lin party
-      , text (deonticModalText modal)
-      , lin rule
-      ]
+    Regulative _ (MkDeonton _ subj (MkAction _ modal rule mprovided) mdeadline mForEach mfollowup mlest) -> hcat $
+      linSubject subj
+      <> [ text (deonticModalText modal)
+         , lin rule
+         ]
       <> maybe [] (\ provided -> [ text "provided that", lin provided ]) mprovided
       <> maybe [] (\ deadline -> [ text "within", lin deadline ]) mdeadline
-      <> maybe [] (\ followup -> [ text "hence",  lin followup ]) mfollowup
+      <> maybe [] (\ followup -> [ text "hence" ] <> forEachWords <> [ lin followup ]) mfollowup
       <> maybe [] (\ lest -> [ text "lest",  lin lest ]) mlest
+      where
+        -- "hence, for each," — the fork marker (PROVISIONAL R-Q1).
+        forEachWords = maybe [] (const [ text "for", text "each" ]) mForEach
+        linSubject = \ case
+          Party _ party -> [ text "party", lin party ]
+          Every _ mCast v mFilter ->
+            [ text "every" ]
+            -- Resolved can't use 'lin', as it doesn't have an 'Anno'
+            <> maybe [] (\ c -> [ linearize c ]) mCast
+            <> [ linearize v ]
+            <> maybe [] (\ f -> [ text "who", lin f ]) mFilter
     Consider _ e br -> hcat
       [ text "consider"
       , text "the"

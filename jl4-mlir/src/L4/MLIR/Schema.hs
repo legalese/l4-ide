@@ -63,7 +63,7 @@ import L4.Syntax
   , Section(..), TopDecl(..), LocalDecl(..)
   , TypeSig(..), GivenSig(..), GivethSig(..), OptionallyTypedName(..)
   , Pattern(..), BranchLhs(..)
-  , Deonton(..), RAction(..), DeonticModal(..)
+  , Deonton(..), Subject(..), RAction(..), DeonticModal(..)
   , Lit(..)
   , rawName, rawNameToText, getActual, getUnique
   )
@@ -926,8 +926,13 @@ deontonToContract deonton = do
   -- Fail closed on a present-but-unextractable HENCE / LEST branch.
   dcHence_ <- traverse exprToContract deonton.hence
   dcLest_  <- traverse exprToContract deonton.lest
+  -- Fail closed on a quantified subject (@EVERY …@): the WASM runtime binds
+  -- one party per obligation and has no barrier (EVERY-EACH-QUANTIFIER-SPEC).
+  partyE <- case deonton.subject of
+    Party _ p -> Just p
+    Every{}   -> Nothing
   Just DCObligation
-    { dcParty    = exprToDeonticParty (deonton.party)
+    { dcParty    = exprToDeonticParty partyE
     , dcAction   = patternToDeonticExpr (deonton.action.action)
     , dcModal    = modalToText deonton.action.modal
     , dcDeadline = dcDeadline_

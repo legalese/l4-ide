@@ -160,6 +160,17 @@ data CheckError =
     -- as a module-level ASSUME it (or a helper it reaches) reads. Both
     -- would be one JSON property, so a request could not supply them
     -- separately. Arguments: exported-function name, the clashing GIVEN.
+  | QuantifierVariableRebound Resolved Resolved
+    -- ^ The action pattern of an @EVERY v …@ binds a fresh pattern variable
+    -- spelled like the quantifier's own variable (@EVERY Tenant t MUST Sign t@).
+    -- An action is a pattern, so that @t@ would be a NEW binder matching any
+    -- signer — silently discharging tenant @t@'s duty by a stranger's act.
+    -- Arguments: the pattern's binder, the quantifier's binder.
+  | ForEachWithoutEvery ForEach
+    -- ^ @HENCE FOR EACH@ under a @PARTY@ subject. The fork marker says the
+    -- continuation fires once per member of a cast, and a single party is
+    -- not a cast. Carries the marker for its source range.
+    -- PROVISIONAL R-Q1 (EVERY-EACH-QUANTIFIER-SPEC).
   | RegulativeActorMismatch Resolved Resolved Resolved
     -- ^ A regulative @PARTY p MUST a@ (or a @PARTY p DOES a@ event) binds a
     -- party to an action belonging to a different actor. In a value-actor
@@ -268,6 +279,8 @@ data ExpectationContext =
   | ExpectBreachReasonContext -- reason argument of BREACH
   | ExpectRefuseMessageContext -- message argument of REFUSE
   | ExpectRecordCellContext -- cell (path) argument of RECORD/COMMIT/ATTEST
+  | ExpectQuantifierCastContext -- the constructor after EVERY must build values of the party type
+  | ExpectQuantifierFilterContext -- the WHO clause of an EVERY is a predicate on the bound variable
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
@@ -341,6 +354,8 @@ instance HasSrcRange CheckError where
   rangeOf (InconsistentNameInAppForm n _)   = rangeOf n
   rangeOf (CheckInfo _ mr)                  = mr
   rangeOf (RegulativeActorMismatch p _ _)   = rangeOf p
+  rangeOf (ForEachWithoutEvery fe)          = rangeOf fe
+  rangeOf (QuantifierVariableRebound b _)   = rangeOf b
   rangeOf (FixityAnnotationMalformed mr _)  = mr
   rangeOf (FixityReassociationClash mr _ _) = mr
   rangeOf (CheckWarning (FixityIgnoredNonBinary _ mr)) = mr

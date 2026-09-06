@@ -552,13 +552,19 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Expr n) where
     Inert ann txt ctx -> pure $ Inert ann txt ctx
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Deonton n) where
-  addNlg (MkDeonton ann' party event deadline followup lest) = do
-    party' <- addNlg party
+  addNlg (MkDeonton ann' subj event deadline forEach followup lest) = do
+    subj' <- addNlg subj
     event' <- addNlg event
     deadline' <- traverse addNlg deadline
     followup' <- traverse addNlg followup
     lest' <- traverse addNlg lest
-    pure $  MkDeonton ann' party' event' deadline' followup' lest'
+    pure $  MkDeonton ann' subj' event' deadline' forEach followup' lest'
+
+instance (HasSrcRange n, HasNlg n) => HasNlg (Subject n) where
+  addNlg = \ case
+    Party ann party -> Party ann <$> addNlg party
+    Every ann mCast v mFilter ->
+      Every ann <$> traverse addNlg mCast <*> addNlg v <*> traverse addNlg mFilter
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (RAction n) where
   addNlg (MkAction ann modal rule provided) = do
@@ -823,13 +829,20 @@ instance HasDesc (NamedExpr n) where
   addDesc (MkNamedExpr ann n e) = MkNamedExpr ann n <$> addDesc e
 
 instance HasDesc (Deonton n) where
-  addDesc (MkDeonton ann party act due hence lest) =
+  addDesc (MkDeonton ann subj act due forEach hence lest) =
     MkDeonton ann
-      <$> addDesc party
+      <$> addDesc subj
       <*> addDesc act
       <*> traverse addDesc due
+      <*> pure forEach
       <*> traverse addDesc hence
       <*> traverse addDesc lest
+
+instance HasDesc (Subject n) where
+  addDesc = \ case
+    Party ann party -> Party ann <$> addDesc party
+    -- The cast and the bound variable are names, which carry no @desc.
+    Every ann mCast v mFilter -> Every ann mCast v <$> traverse addDesc mFilter
 
 instance HasDesc (RAction n) where
   addDesc (MkAction ann modal act provided) =
@@ -1478,14 +1491,20 @@ instance (HasSrcRange n, HasRef n) => HasRef (Expr n) where
       pure $ f ann' e1' e2'
 
 instance (HasSrcRange n, HasRef n) => HasRef (Deonton n) where
-  addRef (MkDeonton ann party event deadline followup lest) = do
+  addRef (MkDeonton ann subj event deadline forEach followup lest) = do
     -- 'Deonton' has no 'HasSrcRange' handle of its own here; attach via children.
-    party' <- addRef party
+    subj' <- addRef subj
     event' <- addRef event
     deadline' <- traverse addRef deadline
     followup' <- traverse addRef followup
     lest' <- traverse addRef lest
-    pure $ MkDeonton ann party' event' deadline' followup' lest'
+    pure $ MkDeonton ann subj' event' deadline' forEach followup' lest'
+
+instance (HasSrcRange n, HasRef n) => HasRef (Subject n) where
+  addRef = \ case
+    Party ann party -> Party ann <$> addRef party
+    Every ann mCast v mFilter ->
+      Every ann <$> traverse addRef mCast <*> addRef v <*> traverse addRef mFilter
 
 instance (HasSrcRange n, HasRef n) => HasRef (RAction n) where
   addRef (MkAction ann modal rule provided) = do

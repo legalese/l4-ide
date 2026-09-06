@@ -201,6 +201,9 @@ instance ToSemTokens Context PosToken (Event Name) where
 instance ToSemTokens Context PosToken (Expr Name) where
 instance ToSemTokens Context PosToken (GuardedExpr Name) where
 instance ToSemTokens Context PosToken (Deonton Name) where
+instance ToSemTokens Context PosToken (Subject Name) where
+-- ForEach has no children; its FOR EACH tokens live in its own Anno
+instance ToSemTokens Context PosToken ForEach where
 -- DeonticModal has no tokens to highlight
 instance ToSemTokens Context PosToken DeonticModal where
   toSemTokens _ = pure []
@@ -318,6 +321,9 @@ instance ToSemTokens () PosToken (Type' Resolved) where
 instance ToSemTokens () PosToken (AppForm Resolved) where
 
 instance ToSemTokens () PosToken (Deonton Resolved) where
+instance ToSemTokens () PosToken (Subject Resolved) where
+-- ForEach has no children; its FOR EACH tokens live in its own Anno
+instance ToSemTokens () PosToken ForEach where
 -- DeonticModal has no tokens to highlight
 instance ToSemTokens () PosToken DeonticModal where
   toSemTokens _ = pure []

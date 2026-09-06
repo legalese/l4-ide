@@ -140,14 +140,16 @@ nlgExpr = \ case
         pure $ MkGuardedExpr ann' c' f'
       e' <- nlgExpr e
       pure $ MultiWayIf ann es' e'
-    Regulative ann (MkDeonton ann'' party (MkAction ann' modal rule provided) deadline followup lest) -> do
-      party' <- nlgExpr party
+    Regulative ann (MkDeonton ann'' subj (MkAction ann' modal rule provided) deadline forEach followup lest) -> do
+      subj' <- case subj of
+        Party sann party -> Party sann <$> nlgExpr party
+        Every sann mCast v mFilter -> Every sann mCast v <$> traverse nlgExpr mFilter
       rule' <- nlgPattern rule
       provided' <- traverse nlgExpr provided
       deadline' <- traverse nlgExpr deadline
       followup' <- traverse nlgExpr followup
       lest' <- traverse nlgExpr lest
-      pure $ Regulative ann (MkDeonton ann'' party' (MkAction ann' modal rule' provided') deadline' followup' lest')
+      pure $ Regulative ann (MkDeonton ann'' subj' (MkAction ann' modal rule' provided') deadline' forEach followup' lest')
     Consider ann e branches  -> do
       e' <- nlgExpr e
       -- Since the bindings in the branches bring new variables into

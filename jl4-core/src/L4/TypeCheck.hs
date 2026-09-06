@@ -1706,19 +1706,86 @@ checkMultiWayIf ann es e t = do
   pure (MultiWayIf ann es' e')
 
 checkDeonton
-  :: Anno -> Expr Name -> RAction Name
-  -> Maybe (Expr Name) -> Maybe (Expr Name) -> Maybe (Expr Name)
+  :: Anno -> Subject Name -> RAction Name
+  -> Maybe (Expr Name) -> Maybe ForEach -> Maybe (Expr Name) -> Maybe (Expr Name)
   -> Type' Resolved -> Type' Resolved -> Check (Deonton Resolved)
-checkDeonton ann party action due hence lest partyT actionT = do
-  partyR <- checkExpr ExpectRegulativePartyContext party partyT
+checkDeonton ann subject action due forEach hence lest partyT actionT =
+  case subject of
+    Party sann party -> do
+      partyR <- checkExpr ExpectRegulativePartyContext party partyT
+      -- A fork marker needs a cast to fork over; one PARTY is not a cast.
+      -- PROVISIONAL R-Q1 (EVERY-EACH-QUANTIFIER-SPEC).
+      forM_ forEach (addError . ForEachWithoutEvery)
+      (actionR, dueR, henceR, lestR) <-
+        checkDeontonBody (Just partyR) partyT actionT action due hence lest
+      pure (MkDeonton ann (Party sann partyR) actionR dueR forEach henceR lestR)
+    Every sann mCast v mFilter -> do
+      -- EVERY-EACH-QUANTIFIER-SPEC §2.1/§2.4: the bound variable has the
+      -- contract's party type (from @GIVETH DEONTIC Party Action@, or inferred
+      -- from the action and the events) and scopes over the WHO filter, the
+      -- action, the deadline, HENCE and LEST. The cast, when given, is a
+      -- constructor of that party type (value-actor encoding: @Tenant@ is a
+      -- constructor of @Actor@, not a type).
+      mCastR <- traverse (checkQuantifierCast partyT) mCast
+      rv <- def v
+      rv' <- setAnnResolvedTypeOfResolved partyT (Just Local) rv
+      extendKnown (makeKnown rv (KnownTerm partyT Local)) do
+        filterR <- traverse (\e -> checkExpr ExpectQuantifierFilterContext e boolean) mFilter
+        -- The performer/actor agreement check ('checkRegulativeActorAgreement')
+        -- is silent for a computed party (actors-and-actions.md §7); a bound
+        -- variable is one, so it is not run here. Phase 2 checks agreement at
+        -- run time, per member.
+        (actionR, dueR, henceR, lestR) <-
+          checkDeontonBody Nothing partyT actionT action due hence lest
+        -- An action is a pattern, so @MUST Sign t@ would bind a NEW @t@ over
+        -- any signer rather than refer to the member. Refuse the silent
+        -- shadowing and say how to spell the reference (@Sign (EXACTLY t)@).
+        forM_ (patternBinders actionR.action) \ b ->
+          when (rawName (getName b) == rawName v) $
+            addError (QuantifierVariableRebound b rv')
+        pure (MkDeonton ann (Every sann mCastR rv' filterR) actionR dueR forEach henceR lestR)
+
+-- | The part of a deonton after its subject: the action (with its PROVIDED
+-- guard), the deadline, and the two continuations. Shared by both subjects.
+checkDeontonBody
+  :: Maybe (Expr Resolved) -> Type' Resolved -> Type' Resolved
+  -> RAction Name -> Maybe (Expr Name) -> Maybe (Expr Name) -> Maybe (Expr Name)
+  -> Check (RAction Resolved, Maybe (Expr Resolved), Maybe (Expr Resolved), Maybe (Expr Resolved))
+checkDeontonBody mPartyR partyT actionT action due hence lest = do
   (actionR, boundByPattern) <- checkAction action actionT
   checkPartyActionAgreement partyT actionT
-  checkRegulativeActorAgreement partyT partyR (actionExprOfPattern actionR.action)
+  forM_ mPartyR \partyR ->
+    checkRegulativeActorAgreement partyT partyR (actionExprOfPattern actionR.action)
   let rTy = contract partyT actionT
   dueR <- traverse (\e -> checkExpr ExpectRegulativeDeadlineContext e number) due
   henceR <- traverse (\e -> extendKnownMany boundByPattern $ checkExpr ExpectRegulativeFollowupContext e rTy) hence
   lestR <- traverse (\e -> checkExpr ExpectRegulativeFollowupContext e rTy) lest
-  pure (MkDeonton ann partyR actionR dueR henceR lestR)
+  pure (actionR, dueR, henceR, lestR)
+
+-- | The variables an action pattern binds (its 'PatVar's), in source order.
+patternBinders :: Pattern Resolved -> [Resolved]
+patternBinders = \ case
+  PatVar _ b       -> [b]
+  PatApp _ _ ps    -> concatMap patternBinders ps
+  PatCons _ p1 p2  -> patternBinders p1 <> patternBinders p2
+  PatExpr _ _      -> []
+  PatLit _ _       -> []
+
+-- | The cast of an @EVERY Cast v@: a data constructor whose result type is the
+-- party type. A constructor with a payload (@Tenant HAS name IS A STRING@) has
+-- a function type; only its result must agree, since the quantifier ranges
+-- over the values it builds, not over its fields.
+checkQuantifierCast :: Type' Resolved -> Name -> Check Resolved
+checkQuantifierCast partyT c = do
+  (rc, ct) <- resolveConstructor c
+  t <- instantiate ct
+  expect ExpectQuantifierCastContext partyT (resultType t)
+  setAnnResolvedTypeOfResolved t (Just Constructor) rc
+  where
+    resultType = \ case
+      Forall _ _ t' -> resultType t'
+      Fun _ _ t'    -> resultType t'
+      t'            -> t'
 
 checkAction :: RAction Name -> Type' Resolved -> Check (RAction Resolved, [CheckInfo])
 checkAction MkAction {anno, modal, action, provided = mprovided} actionT = do
@@ -2902,10 +2969,10 @@ inferExpr' g =
       v <- fresh (NormalName "multiwayif")
       re <- checkMultiWayIf ann es e v
       pure (re, v)
-    Regulative ann (MkDeonton ann'' e1 e2 me3 me4 me5) -> do
+    Regulative ann (MkDeonton ann'' subj e2 me3 mfe me4 me5) -> do
       party <- fresh (NormalName "party")
       action <- fresh (NormalName "action")
-      ob <- checkDeonton ann'' e1 e2 me3 me4 me5 party action
+      ob <- checkDeonton ann'' subj e2 me3 mfe me4 me5 party action
       pure (Regulative ann ob, contract party action)
     Consider ann e branches -> do
       v <- fresh (NormalName "consider")
@@ -5112,8 +5179,11 @@ setInertContext = go True  -- True = we're at top level or direct boolean operan
 
     goNamed ctx' (MkNamedExpr ann n e) = MkNamedExpr ann n (go False ctx' e)
     goGuarded ctx' (MkGuardedExpr ann c f) = MkGuardedExpr ann (go True ctx' c) (go False ctx' f)
-    goObl ctx' (MkDeonton ann party action due hence lest) =
-      MkDeonton ann (go False ctx' party) (goRAction ctx' action) (fmap (go False ctx') due) (fmap (go False ctx') hence) (fmap (go False ctx') lest)
+    goObl ctx' (MkDeonton ann subj action due forEach hence lest) =
+      MkDeonton ann (goSubject ctx' subj) (goRAction ctx' action) (fmap (go False ctx') due) forEach (fmap (go False ctx') hence) (fmap (go False ctx') lest)
+    goSubject ctx' = \ case
+      Party ann party -> Party ann (go False ctx' party)
+      Every ann mCast v mFilter -> Every ann mCast v (fmap (go True ctx') mFilter)
     goRAction ctx' (MkAction ann modal pat provided) =
       MkAction ann modal pat (fmap (go False ctx') provided)
     goBranch ctx' (MkBranch ann lhs e) = MkBranch ann lhs (go False ctx' e)
@@ -5528,6 +5598,26 @@ prettyCheckError (ExportAssumeNameClash fnName paramName) =
   , "Both would be one input field, so a request could not supply them separately."
   , "Rename the input or the ASSUME."
   ]
+prettyCheckError (QuantifierVariableRebound b q) =
+  [ "The action of this EVERY binds a new name"
+  , ""
+  , "  " <> quotedName (getName b)
+  , ""
+  , "which is spelled like the quantifier's own variable " <> quotedName (getName q) <> "."
+  , "An action is a pattern, so this would be a fresh name matching anyone,"
+  , "not a reference to the member. To mean the member, write"
+  , ""
+  , "  EXACTLY " <> quotedName (getName q)
+  , ""
+  , "in that position; to mean a fresh name, choose a different spelling."
+  ]
+prettyCheckError (ForEachWithoutEvery _) =
+  [ "HENCE FOR EACH needs an EVERY to fork over."
+  , ""
+  , "FOR EACH says the continuation fires once per member of the cast an EVERY"
+  , "ranges over. This rule binds a single PARTY, so there is nothing to fork:"
+  , "write HENCE without FOR EACH, or quantify the subject with EVERY."
+  ]
 prettyCheckError (RegulativeActorMismatch party performer actionName) =
   [ "An actor may only perform its own actions."
   , ""
@@ -5816,6 +5906,13 @@ prettyTypeMismatch ExpectRefuseMessageContext expected given =
   standardTypeMismatch [ "The message of a REFUSE is expected to be a string literal, of type" ] expected given
 prettyTypeMismatch ExpectRecordCellContext expected given =
   standardTypeMismatch [ "The cell of a RECORD/COMMIT/ATTEST is expected to be of type" ] expected given
+prettyTypeMismatch ExpectQuantifierCastContext expected given =
+  standardTypeMismatch
+    [ "The cast of an EVERY must be a constructor of the party type."
+    , "This rule's party type is"
+    ] expected given
+prettyTypeMismatch ExpectQuantifierFilterContext expected given =
+  standardTypeMismatch [ "The WHO clause of an EVERY is expected to be of type" ] expected given
 
 -- | Best effort, only small numbers will occur"
 prettyOrdinal :: Int -> Text
