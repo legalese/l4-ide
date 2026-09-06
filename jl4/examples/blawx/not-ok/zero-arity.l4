@@ -1,6 +1,7 @@
--- Kept on ASSUME deliberately (IMPLICIT-PROPS-DESIGN.md §11.1, R0: ASSUME is deprecated): a nullary top-level ASSUME is the rejected shape under test.
 -- The subjectless-input rejection fixture, in the shape of
--- `jl4/examples/legal/imaginary-alcohol-act.l4`: a nullary top-level `ASSUME`
+-- `jl4/examples/legal/imaginary-alcohol-act.l4`: three nullary facts declared
+-- once for the section (a section GIVEN; a top-level `ASSUME` until
+-- 2026-09-06, and the two lower to the same arity-0 input predicate) and
 -- referenced from a nullary `@export`ed decision.
 --
 -- The middle end ADMITS this. A nullary `RInput` is a perfectly good Horn
@@ -31,9 +32,10 @@
 -- needs at this arity: every `ASSUME` takes the thing it is about as its one
 -- parameter.
 
-ASSUME `the person is a body corporate` IS BOOLEAN
-ASSUME `the person engages in business for profit` IS BOOLEAN
-ASSUME `the person has an alcohol banning order` IS BOOLEAN
+§ `Imaginary Alcohol Act, written without a subject`
+    GIVEN `the person is a body corporate` IS BOOLEAN
+          `the person engages in business for profit` IS BOOLEAN
+          `the person has an alcohol banning order` IS BOOLEAN
 
 @export Imaginary Alcohol Act ss (1)-(2), written without a subject.
 GIVETH A BOOLEAN

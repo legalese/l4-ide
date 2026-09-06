@@ -331,75 +331,50 @@ function classifyType(type) {
   return "term";
 }
 
-// Files that must keep their `ASSUME`s because their subject IS the keyword.
-// Rewriting these would delete the exhibit the page or the test exists to show.
+// Files that must keep their `ASSUME`s because their subject IS the keyword,
+// or because no ASSUME-free spelling exists for what they declare. The list is
+// explicit, one entry per file, after two independent Opus refuters
+// (2026-09-07) produced working rewrites for thirteen files an earlier version
+// of this list had kept on a name pattern; what remains is what neither could
+// rewrite (IMPLICIT-PROPS-DESIGN.md §11.1.2). Each file carries the reason on
+// its first line (last line for the semantic-token fixture).
 const KEEP = [
-  // A file NAMED for the keyword exists to exercise the keyword. That covers
-  // `doc/reference/types/assume-example.l4` (the worked example on the page that
-  // documents ASSUME), `ok/assumes.l4`, `ok/assume-as-given.l4` (the fixture for
-  // jl4-service's ASSUME-to-API-parameter promotion), `lsp/semantic-tokens/assume.l4`,
-  // `relational/assumed*.l4`, `relational/not-ok/local-assume.l4` (the dead
-  // LocalAssume grammar), `docassemble/assume-via-fn.l4` and
-  // `implicit-assume-test.l4`. They migrate when the keyword goes, not before.
   [
-    /(^|\/)[^/]*assume[^/]*\.l4$/i,
-    "the file is named for the keyword: it exists to exercise ASSUME's own behaviour, so rewriting it would delete the exhibit",
+    /(^|\/)doc\/reference\/types\/assume-example\.l4$/,
+    "the deprecation page's own example of what the keyword did",
   ],
-  // The Blawx seeds and the arity fixture beside them. Their input predicates
-  // are written `GIVEN p IS A Person` / `ASSUME f p IS A BOOLEAN` because that
-  // is the shape `L4.Relational.Lower` lowers to an RInput predicate and
-  // `L4.Blawx.Lower` hangs off a category; the section-GIVEN image of the same
-  // predicate is function-typed, and `L4.Export.validateExportInputs` rejects a
-  // function-typed input on an `@export`ed decision, so the module would have
-  // no export root and no Blawx image at all. Each file's header records the
-  // measurement. They migrate when those two legs read the section binder.
+  [
+    /(^|\/)jl4\/examples\/lsp\/semantic-tokens\/assume\.l4$/,
+    "the semantic-token fixture for the keyword",
+  ],
+  // The relational middle end lowers a SIGNATURE-style ASSUME (`GIVEN p …` /
+  // `ASSUME f p IS A T`) to an input predicate; that spelling has no section
+  // GIVEN form (the signature form is a parse error under a heading, and the
+  // function-typed section GIVEN is refused on the export path). A NULLARY
+  // fact lowers identically from either spelling and migrates.
+  [
+    /(^|\/)jl4\/examples\/relational\/(assumed|not-ok\/assumed-signatures)\.l4$/,
+    "the relational middle end's lowering of signature-style ASSUME input predicates is the exhibit; that spelling has no section-GIVEN form",
+  ],
+  [
+    /(^|\/)jl4\/examples\/relational\/not-ok\/local-assume\.l4$/,
+    "the dead LocalAssume grammar is the shape under test; a WHERE block cannot hold a § heading",
+  ],
   [
     /(^|\/)jl4\/examples\/blawx\/(alcohol|antisocial|not-ok\/arity-two)\.l4$/,
-    "a Blawx seed: its input predicates are the ASSUME shape the relational and Blawx legs lower (an RInput predicate, a category attribute); the section-GIVEN image is function-typed and rejected on the export path, so the file keeps the deprecated form until those legs read the section binder",
+    "a Blawx seed: its input predicates are signature-style ASSUMEs; the section-GIVEN image is function-typed and refused on the export path (measured 2026-09-06 and 2026-09-07)",
   ],
-  // Signature-syntax fixtures: every declaration in `ok/signatures.l4` is an
-  // ASSUME signature in one of its spellings, and `ok/tbd.l4` is three
-  // spellings of a polymorphic ASSUME signature ("this used not to work").
-  // The spellings are the subject.
   [
     /(^|\/)jl4\/examples\/ok\/(signatures|tbd)\.l4$/,
-    "a fixture for ASSUME's signature spellings (GIVEN … / GIVETH … / ASSUME f x …): the spelling is the thing under test",
-  ],
-  // The R4 dedent-hazard fixture tests the misattached-GIVEN check on a
-  // DECLARE and on an ASSUME by name ("Only DECLARE and ASSUME are tested this
-  // way"), and the TYPICALLY-on-a-type fixture pins an error the opaque
-  // spelling has no analogue for.
-  [
-    /(^|\/)jl4\/examples\/not-ok\/tc\/(section-given-misattached|typically-on-type)\.l4$/,
-    "a diagnostic fixture whose error is reported on the ASSUME declaration itself; migrating it would change what the file exhibits",
-  ],
-  // The `--fail-on` threshold fixture must report blocking-ONLY. Measured
-  // 2026-09-06: the section-GIVEN spelling needs a heading, and the heading
-  // adds a D-FLAVOR-NOSERVICE advisory; the rule-GIVEN spelling adds two
-  // advisories. Either would turn the fixture's own assertion red.
-  [
-    /(^|\/)jl4\/tests-cli\/fixtures\/export-blocking-only\.l4$/,
-    "the --fail-on threshold fixture: its DMN report must be blocking-ONLY, and any GIVEN spelling of its two facts adds an advisory note (measured 2026-09-06)",
-  ],
-  [
-    /(^|\/)jl4\/examples\/not-ok\/tc\/parse-error[23]\.l4$/,
-    "a deliberate parse-error exhibit whose error is anchored on the ASSUME line itself; migrating it would change what the file exhibits",
-  ],
-  [
-    /(^|\/)jl4\/examples\/blawx\/not-ok\/zero-arity\.l4$/,
-    "the subjectless-input rejection fixture: its own comment names 'a nullary top-level ASSUME' as the shape under test",
-  ],
-  [
-    /(^|\/)jl4\/examples\/ok\/inert\/grounding-variants\.l4$/,
-    "the file says in its own comment that it is deliberately NOT under a section, because the visualizer reports a name declared in one fully qualified and the box labels become unreadably wide",
-  ],
-  [
-    /(^|\/)jl4\/examples\/ok\/section-scoping-descendant-rebind\.l4$/,
-    "the regression is about a fully annotated ASSUME's inference-variable type falling into its own type group; the ASSUME spelling is the thing under test",
+    "the ASSUME signature spellings are the subject, and the polymorphic ones (GIVEN a IS A TYPE … GIVETH a … ASSUME f) have no section-GIVEN image: an explicit FOR ALL type is not instantiated at a use site",
   ],
   [
     /(^|\/)jl4\/examples\/ok\/typically-basic\.l4$/,
-    "covers TYPICALLY on all three surfaces it can appear on, one of which is an ASSUME declaration; migrating drops that third of the coverage while the keyword still exists",
+    "jl4-service/test/QueryPlanSpec.hs pins ladder atomIds captured from this file; moving the declarations moves them",
+  ],
+  [
+    /(^|\/)jl4\/examples\/not-ok\/tc\/(section-given-misattached|parse-error[23])\.l4$/,
+    "a diagnostic fixture whose error is reported on the ASSUME declaration itself (a GIVEN spelling reports a different error)",
   ],
 ];
 

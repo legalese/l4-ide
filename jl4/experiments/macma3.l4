@@ -87,9 +87,6 @@ commencement MEANS Date OF 2000, 4, 1
           `confiscation` IS A FUNCTION FROM Order TO BOOLEAN
           forfeiture IS A FUNCTION FROM Action TO BOOLEAN
           confiscation IS A FUNCTION FROM Action TO BOOLEAN
-          -- cartesian product of the two lists, using f as the pairing function; this could live in a library
-          combine IS FOR ALL a AND b AND c A FUNCTION FROM (A FUNCTION FROM a AND b TO c) AND A LIST OF a AND A LIST OF b TO A LIST OF c
-          `lifted or` IS FOR ALL a A FUNCTION FROM A LIST OF (FUNCTION FROM a TO BOOLEAN) AND a TO BOOLEAN
 DECLARE Person
 -- for the following section: see notes in the DECIDE below
 
@@ -199,6 +196,26 @@ DECIDE `is ancillary criminal matter` IS
           OR `the obtaining, enforcement or satisfaction of a Singapore confiscation order or foreign confiscation order` acm
 -- how do I capture relationships with 'dealing', 'Singapore offence', 'foreign offence', etc.?
 -}
+
+-- cartesian product of the two lists, using f as the pairing function
+-- this can be defined in a library. Kept on ASSUME: a polymorphic assumed
+-- function has no ASSUME-free spelling — an explicit `FOR ALL` type is not
+-- instantiated at a use site in either spelling (measured 2026-09-07), and
+-- only this GIVEN-a-IS-A-TYPE signature form generalises.
+GIVEN a IS A TYPE
+      b IS A TYPE
+      c IS A TYPE
+      f IS A FUNCTION FROM a AND b TO c
+      xs IS A LIST OF a
+      ys IS A LIST OF b
+GIVETH A LIST OF c
+ASSUME combine
+
+GIVEN  a  IS A TYPE
+       xs IS A LIST OF FUNCTION FROM a TO BOOLEAN
+       x  IS AN a
+GIVETH A BOOLEAN
+ASSUME `lifted or`
 
 GIVEN acm IS A Matter
 GIVETH A BOOLEAN

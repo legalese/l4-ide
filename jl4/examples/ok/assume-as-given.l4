@@ -1,35 +1,33 @@
--- Kept on ASSUME deliberately (IMPLICIT-PROPS-DESIGN.md §11.1, R0: ASSUME is deprecated): jl4-service's ASSUME-to-API-parameter promotion is the thing under test.
--- Test file for automatic ASSUME-to-GIVEN conversion in jl4-service
--- When @export functions reference ASSUME declarations, those should be
--- automatically exposed as API input parameters.
+-- Test file for the promotion of section-level facts to API inputs in
+-- jl4-service. When @export functions read a fact declared once for the
+-- section (a section GIVEN; a module-level ASSUME until 2026-09-06, promoted
+-- the same way), that fact is exposed as an API input parameter.
 
--- Simple value ASSUMEs should become API params
-ASSUME temperature IS A NUMBER
-ASSUME humidity IS A NUMBER
+§ `Environment`
+    GIVEN temperature IS A NUMBER  -- simple values become API params
+          humidity IS A NUMBER
+          `is authorized` IS A FUNCTION FROM NUMBER TO BOOLEAN  -- function-typed ones are skipped (per design decision)
 
--- Function ASSUMEs should be skipped (per design decision)
-ASSUME `is authorized` IS A FUNCTION FROM NUMBER TO BOOLEAN
-
--- Test 1: Simple function referencing one ASSUME
+-- Test 1: Simple function referencing one section-level fact
 -- Expected: API exposes `temperature` as input parameter
 @export default Is the temperature warm?
 `is warm` MEANS temperature > 25
 
--- Test 2: Function referencing multiple ASSUMEs
+-- Test 2: Function referencing several section-level facts
 -- Expected: API exposes both `temperature` and `humidity`
 @export Is the environment comfortable?
 `is comfortable` MEANS
   temperature > 18 AND temperature < 26 AND humidity < 70
 
--- Test 3: Function with explicit GIVEN plus implicit ASSUME
--- Expected: API exposes `threshold` (GIVEN) and `temperature` (ASSUME)
+-- Test 3: Function with its own GIVEN plus a section-level fact
+-- Expected: API exposes `threshold` (rule GIVEN) and `temperature` (section GIVEN)
 @export Does temperature exceed threshold?
 GIVEN threshold IS A NUMBER
 `exceeds threshold` threshold MEANS temperature > threshold
 
--- Test 4: Referencing a function-typed ASSUME from an @export is rejected
--- at typecheck — a function-typed ASSUME can't be evaluated (it stays as
--- an assumed term), so the exported function would fail at runtime.
+-- Test 4: Referencing a function-typed section-level fact from an @export is
+-- rejected at typecheck — it can't be evaluated (it stays as an assumed
+-- term), so the exported function would fail at runtime.
 -- We therefore call the predicate only from a non-exported helper, and
 -- the exported wrapper just returns TRUE for the schema test.
 `check auth` MEANS `is authorized` 42

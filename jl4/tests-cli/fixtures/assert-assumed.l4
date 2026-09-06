@@ -1,8 +1,8 @@
--- Kept on ASSUME deliberately (IMPLICIT-PROPS-DESIGN.md §11.1, R0: ASSUME is deprecated): an #ASSERT over a bare assumed BOOLEAN is the thing under test.
--- Typechecks cleanly; neither #ASSERT can be decided. A bare assumed BOOLEAN
+-- Typechecks cleanly; neither #ASSERT can be decided. A bare unsupplied BOOLEAN
 -- is neither TRUE nor FALSE: `#ASSERT NOT b` forces b and RAISES (stuck on an
 -- assumed term), while `#ASSERT b` reduces to the symbolic b WITHOUT raising.
 -- Both must report the same undecided outcome.
-ASSUME b IS A BOOLEAN
+§ `An undecidable assertion`
+    GIVEN b IS A BOOLEAN
 #ASSERT b
 #ASSERT NOT b

@@ -165,9 +165,8 @@ and [`REFUSE`](../control-flow/REFUSE.md).
 ## Function-typed inputs
 
 `ASSUME f IS A FUNCTION FROM NUMBER TO BOOLEAN` declared a rule defined
-elsewhere. The section `GIVEN` accepts the same type, including the polymorphic
-`FOR ALL` form, and a rule that reads such a name type-checks and runs exactly
-as it did:
+elsewhere. The section `GIVEN` accepts the same type, and a rule that reads
+such a name type-checks and runs exactly as it did:
 
 ```l4
 § `Helpers assumed to exist`
@@ -178,6 +177,15 @@ as it did:
 
 One name may be declared at several types, as the second and third lines show;
 each use resolves to whichever type its context needs.
+
+**A rule that works for any kind of thing** (what programming language theory
+calls **polymorphic**) has no section `GIVEN` form. Writing its type with
+`FOR ALL` is accepted, but a use of the name is then rejected as "not a
+function" — and the same is true of `ASSUME f IS FOR ALL …`, so this is not a
+loss the migration causes. The one spelling that works is the older signature
+form, a `GIVEN a IS A TYPE` and a `GIVETH` heading an `ASSUME f` with no type
+of its own; `jl4/examples/ok/tbd.l4` keeps it for that reason. Write the rule
+out instead of assuming it wherever you can.
 
 **The limit is at the export boundary.** A published rule cannot accept an
 input that is itself a rule, because a rule cannot be sent as JavaScript Object

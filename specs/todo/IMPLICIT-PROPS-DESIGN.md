@@ -572,14 +572,15 @@ and this section records what it did.
 **Measured, before and after** (comment-stripped `^\s*ASSUME\b` over `jl4`, `jl4-core` and
 `doc`, on `unstable` at `cdc11501`):
 
-| tree              | before        | after                                                                                                                                                                                  |
-| ----------------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `jl4/experiments` | 214 in 12     | 15 in 2: 14 inside `{- -}` blocks in `macma2.l4` (commented-out code), 1 bodied `ASSUME Person IS A TYPE / HAS ATTRIBUTE …` in `britishcitizen.l4`, a file that does not parse at HEAD |
-| everything else   | 127 in 48     | 100 in 28: 99 in 27 files kept deliberately (below), and 1 in `regcf.l4` blocked by the DMN finding below                                                                              |
-| total             | **341 in 60** | **115 in 30**                                                                                                                                                                          |
+| tree              | before        | after                                                                                                                                                                                                                                                   |
+| ----------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `jl4/experiments` | 214 in 12     | 17 in 3: 14 inside `{- -}` blocks in `macma2.l4` (commented-out code), 1 bodied `ASSUME Person IS A TYPE / HAS ATTRIBUTE …` in `britishcitizen.l4`, a file that does not parse at HEAD, and 2 polymorphic placeholders in `macma3.l4` (the limit below) |
+| everything else   | 127 in 48     | 70 in 15: 69 in 14 files kept deliberately (below), and 1 in `regcf.l4` blocked by the DMN finding below                                                                                                                                                |
+| total             | **341 in 60** | **87 in 18**                                                                                                                                                                                                                                            |
 
-The 226 migrated lines, by role: **86 type** (`ASSUME T IS A TYPE` → `DECLARE T`, in place),
-**115 function** and **14 term** (→ a section `GIVEN` under the declaring section's own heading, or
+The 254 migrated lines, by role: **87 type** (86 as `ASSUME T IS A TYPE` → `DECLARE T`, in place;
+one, `not-ok/tc/typically-on-type.l4`'s `IS A TYPE TYPICALLY 42`, as a section `GIVEN … IS A TYPE`,
+the one spelling that reproduces its error), **115 function** and **41 term** (→ a section `GIVEN` under the declaring section's own heading, or
 under a synthesised title heading where the file had none or where every heading was `§§`-deep),
 and **11 refusal** (→ one named definition per refusal whose body is `REFUSE "…"`, readers
 unchanged): the encoding floor in `regcf-denovo.l4`, the DMN exhibits `gst-rate.l4` and
@@ -617,10 +618,12 @@ reordered, 5 different**. The five: `not-ok/tc/parse-error2.l4` and `parse-error
 files whose one-line keep comment moved the line number quoted inside their pre-existing parse
 error; and `seatbelt.l4`, `purchase.l4` and `macma3.l4`, which fail to check at HEAD and whose
 only differences are the line numbers quoted inside their pre-existing errors' caret excerpts
-and, in `macma3.l4`, diagnostics that now qualify `forfeiture`/`confiscation` by section
-(`Assumptions.forfeiture`), the benign class §11.14 already recorded. Every one of the 154 files
-in `jl4/experiments` keeps its HEAD `l4 check` exit code and error count exactly (127 clean and
-27 failing, before and after, per file). Every goldened file's `.golden` was read: outside the
+and, in `macma3.l4`, two "multiple definitions" diagnostics for `forfeiture`/`confiscation` that
+disappear because both declaration pairs now sit in the heading's `GIVEN` above the use site —
+exactly the declaration-order sensitivity §11.15's retracted attribution names, so a spurious
+diagnostic gone, not a meaning changed. Every one of the 154 files in `jl4/experiments` keeps its
+HEAD `l4 check` exit code (127 clean and 27 failing, before and after, per file), and every one
+but `macma3.l4` keeps its diagnostics. Every goldened file's `.golden` was read: outside the
 refusal sites the changes are the moved declaration in the exactprint, and line-number shifts
 from a one-line keep comment. The refusal sites change what the reader is told, which is the
 point: `ymd-constructor.l4` prints `The model refuses to answer: YMD refused an out-of-range
@@ -667,23 +670,71 @@ refusal reaching it as a knowledge requirement? — and not a corpus rewrite, so
 byte-identical to HEAD in this PR and its two sites are the ones the DMN half of item 6 still
 owes.
 
-**Kept on `ASSUME`, deliberately — 27 files, each with a one-line comment saying so** (and,
-separately, `regcf.l4`'s floor, blocked as above). Their
-purpose is to exercise the deprecated keyword's own syntax, diagnostics or tooling, and rewriting
-them would delete the exhibit: the deprecation page's own example
-(`doc/reference/types/assume-example.l4`); the semantic-token fixture; the parse-error and
-misattached-`GIVEN` and `TYPICALLY`-on-a-type diagnostic fixtures; `ok/signatures.l4` and
-`ok/tbd.l4` (the signature spellings are the subject); `ok/assumes.l4`, `ok/assume-as-given.l4`,
-`implicit-assume-test.l4`, `docassemble/assume-via-fn.l4` and four `tests-cli` fixtures —
-`assert-assumed`, `batch-assume-direct`, `batch-assume-helper`, which pin how `l4 run`,
-`l4 batch` and jl4-service treat an `ASSUME`, and `export-blocking-only`, whose DMN report must
-be blocking-ONLY and gains an advisory note under either `GIVEN` spelling (measured); `ok/typically-basic.l4`
-(one of three `TYPICALLY` surfaces); `ok/section-scoping-descendant-rebind.l4` (a regression about
-an `ASSUME`'s inference variable); `ok/inert/grounding-variants.l4` (the ladder visualizer prints a
-section-declared name fully qualified, so its atoms must stay at the left margin); and the
-**relational and Blawx trees** — `relational/assumed.l4`, `assumed-nullary.l4`,
+**Kept on `ASSUME`, deliberately — 14 files, each with a one-line comment saying so** (and,
+separately, `regcf.l4`'s floor, blocked as above, and `macma3.l4`'s two polymorphic placeholders,
+blocked by the limit recorded under "Refuted, and what changed"). The list was 27 files at the
+first pass; the refuters below cut it to 14. Their
+purpose is to exercise the deprecated keyword's own syntax, diagnostics or tooling, or they declare
+something no `ASSUME`-free spelling can: the deprecation page's own example
+(`doc/reference/types/assume-example.l4`); the semantic-token fixture; the two parse-error
+fixtures and the misattached-`GIVEN` fixture (`not-ok/tc/parse-error2.l4`, `parse-error3.l4`,
+`section-given-misattached.l4` — a `GIVEN` spelling reports a _different_ error, measured);
+`ok/signatures.l4` and `ok/tbd.l4` (the signature spellings, and the polymorphic ones have no
+section-`GIVEN` image, below); `ok/typically-basic.l4` (`jl4-service/test/QueryPlanSpec.hs`
+pins ladder atom ids captured from it, and a TypeScript fixture in another repository pins the
+same ids); and the **relational and Blawx trees** — `relational/assumed.l4`,
 `not-ok/assumed-signatures.l4`, `not-ok/local-assume.l4`, `blawx/alcohol.l4`, `antisocial.l4`,
-`not-ok/zero-arity.l4`, `not-ok/arity-two.l4`.
+`not-ok/arity-two.l4` — whose input predicates are signature-style `ASSUME`s (next finding).
+
+**Refuted, and what changed (2026-09-07).** Per the standing authorisation (BRIEF §14), seven
+agents were run against this branch before it was reported: five Sonnet differentials, one per
+tree, comparing `l4 run` (and `l4 check`) on every file — importers included — between
+`cdc11501` and this head, and two independent Opus refuters each trying to produce a working
+`ASSUME`-free rewrite of every kept file. The differentials: **933 files, 0 unexpected
+differences** — libraries plus their 112 importers 128/0, `legal` 26/0, `ok`+`not-ok`+`lsp`
+375/0, `experiments`+`dmn`+`docassemble`+`relational`+`blawx`+fixtures+`doc` 376/1, the keep-list
+28/0 — the one being `macma3.l4`, where this PR's first rewrite of two polymorphic placeholders
+(`combine`, `lifted or`) as `FOR ALL`-typed section-`GIVEN` parameters had replaced two
+diagnostics with two different ones. Measured on the repair: **an explicit `FOR ALL` type on an
+assumed term is not instantiated at a use site in either spelling** (`GIVEN pick IS FOR ALL a A
+FUNCTION FROM a AND a TO a` and `ASSUME pick IS FOR ALL …` both report "You are giving 2 inputs
+to pick … but it is not a function"); only the signature form (`GIVEN a IS A TYPE … GIVETH … ASSUME
+f`) generalises, and that form has no section-`GIVEN` image. The two placeholders are back in that
+form, `ASSUME.md` no longer claims the `FOR ALL` carry, and `ok/tbd.l4`'s keep reason is this
+limit. The same differential found `ok/ymd-constructor.l4`'s own comment still describing the
+pre-`REFUSE` "assumed term" stop; corrected.
+
+The keep-list refuters produced working rewrites — same `l4 run`/`l4 check` output modulo
+positions, and the same tool output where a tool is the fixture's subject — for **thirteen** of
+the 27 files, each re-measured here before it moved: `blawx/not-ok/zero-arity.l4` (the same three
+arity-0 rejections from `l4 blawx`), `docassemble/assume-via-fn.l4` (YAML and fidelity byte-identical
+to the shipped golden), `not-ok/tc/typically-on-type.l4` (`GIVEN … IS A TYPE TYPICALLY 42` under a
+heading reports the identical error — the stated reason had considered only `DECLARE`),
+`ok/assumes.l4`, `relational/assumed-nullary.l4` (a nullary section `GIVEN` lowers to the identical
+`RInput`), `tests-cli/fixtures/assert-assumed.l4`, `batch-assume-direct.l4`, `batch-assume-helper.l4`
+(byte-identical NDJSON, including `Missing required field: 'x'`), `implicit-assume-test.l4` (whose
+header claimed an implicit-extraction case that no longer existed: every name was declared),
+`ok/assume-as-given.l4` (identical required-input sets on all four exports),
+`ok/section-scoping-descendant-rebind.l4` (byte-identical, and by construction: the section
+binder's elaboration _is_ the fully annotated 0-ary `ASSUME` the regression is about),
+`tests-cli/fixtures/export-blocking-only.l4` (two rule `GIVEN`s with **distinct** names — `p q` and
+`r s` — keep the report at `2 blocking` with no advisory; and the stated cause was wrong twice
+over: the note a heading adds is `D-SVCEMPTY`, not `D-FLAVOR-NOSERVICE`, and it is caused by the
+`§` heading alone, `ASSUME`s or not), and `ok/inert/grounding-variants.l4` (each decision now
+declares its atoms as its own rule `GIVEN`s; measured through `jl4-lsp`'s decision-graph command,
+all 42 box labels are byte-identical to HEAD, whereas a section `GIVEN` prefixes each with its
+heading — the comment's quoted "(qualified at section X)" rendering was stale, `Print.hs` retired
+it for the dotted form). Where the two refuters disagreed, measurement decided: `parse-error2.l4`
+stays because the `GIVEN` spelling's error reads `unexpected GIVEN`, not the fixture's error;
+`typically-basic.l4` stays for the atom-id pin above, which neither refuter could see.
+
+**What survives is structural, not lexical** (the refuters' summary, confirmed): a section
+`GIVEN` desugars to the very `ASSUME` node every tool reads, so no fixture of the form "how tool
+X treats an `ASSUME`" keeps the keyword on its own account. The four things with no
+`ASSUME`-free spelling are the signature form `GIVEN p IS A T / ASSUME f p IS A U` (a parse error
+under a heading; the function-typed section `GIVEN` is refused on the export path), the
+`GIVETH`-headed polymorphic form, the `WHERE`-local form, and the `§` heading a section `GIVEN`
+drags in (which the DMN exporter and the ladder visualizer both react to).
 
 **Finding: the Blawx bridge and the relational middle end are built on the `ASSUME` node, and that
 blocks sequencing item 7.** `L4.Relational.Lower` lowers a top-level `ASSUME` to an `RInput`

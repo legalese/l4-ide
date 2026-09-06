@@ -1,4 +1,3 @@
--- Kept on ASSUME deliberately (IMPLICIT-PROPS-DESIGN.md §11.1, R0: ASSUME is deprecated): an #EVAL stuck on an assumed term, and the exit code it produces, is the thing under test.
 -- `l4 run` EXITS 1 ON THIS FILE, BY DESIGN. Every #EVAL below names an assumed
 -- term, so evaluation gets Stuck rather than producing a value, and a module
 -- that cannot evaluate should not report success (ruled by Meng 2026-08-01; see
@@ -8,10 +7,12 @@
 -- The golden suite is unaffected: it evaluates in-process and compares output,
 -- and never inspects a process exit code.
 
-ASSUME foo IS A FUNCTION FROM NUMBER TO BOOLEAN
+§ `Assumed terms`
+    GIVEN foo IS A FUNCTION FROM NUMBER TO BOOLEAN
+          bar IS A  BOOLEAN
+
 #EVAL foo 2
 
-ASSUME bar IS A  BOOLEAN
 baz b MEANS IF b THEN 2 ELSE 3
 #EVAL baz bar
 #EVAL IF bar THEN 2 ELSE 3
