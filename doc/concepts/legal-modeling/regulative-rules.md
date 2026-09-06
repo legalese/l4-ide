@@ -241,12 +241,12 @@ LEST `penalty clause`                          -- alternative obligation (repara
 
 | Modal   | HENCE fires when                        | LEST fires when                        | HENCE default | LEST default |
 | ------- | --------------------------------------- | -------------------------------------- | ------------- | ------------ |
-| `DO`    | action is taken                         | deadline passes                        | _(required)_  | _(required)_ |
+| `DO`    | action is taken                         | deadline passes                        | `FULFILLED`   | `BREACH`     |
 | `MUST`  | action is taken                         | deadline passes without action         | `FULFILLED`   | `BREACH`     |
 | `MAY`   | action is taken                         | deadline passes (permission unused)    | `FULFILLED`   | `FULFILLED`  |
 | `SHANT` | deadline passes (prohibition respected) | action is taken (prohibition violated) | `FULFILLED`   | `BREACH`     |
 
-If you omit `HENCE` or `LEST`, the default above is supplied. `DO` is the bare form: it neither requires nor forbids the action, and both branches must be given explicitly.
+If you omit `HENCE` or `LEST`, the default above is supplied. `DO` is the bare form, with no modal word; on the current release it behaves exactly as `MUST` does — the same defaults, and the same outcomes when the action is taken and when the deadline passes.
 
 ---
 
@@ -533,7 +533,7 @@ When a deadline failure has a remedy ("pay within 30 or pay extra within 60"), e
 | MUST      | Obligation                              | `PARTY x MUST action`                               |
 | MAY       | Permission                              | `PARTY x MAY action`                                |
 | SHANT     | Prohibition (polarity flips!)           | `PARTY x SHANT action`                              |
-| DO        | Bare action (no defaults)               | `PARTY x DO action`                                 |
+| DO        | Bare form; behaves as MUST              | `PARTY x DO action`                                 |
 | WITHIN    | Relative deadline                       | `WITHIN duration`                                   |
 | HENCE     | Desirable-outcome branch                | `HENCE nextRule`                                    |
 | LEST      | Undesirable-outcome branch              | `LEST consequence` (terminal or another obligation) |
