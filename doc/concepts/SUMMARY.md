@@ -12,6 +12,7 @@
 ## Legal Modeling
 
 - [Regulative Rules](legal-modeling/regulative-rules.md)
+- [The Regulative Layer, Whole](legal-modeling/regulative-layer-whole.md)
 - [Constitutive vs Regulative Rules](legal-modeling/constitutive-vs-regulative.md)
 - [Default Reasoning and Exceptions](legal-modeling/default-reasoning.md)
 - [Five Kinds of No Answer](legal-modeling/non-answers.md)

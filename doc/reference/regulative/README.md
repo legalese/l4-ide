@@ -8,13 +8,15 @@ Regulative keywords express legal obligations, permissions, prohibitions, and th
 
 ### Deontic Modalities
 
-| Keyword           | Meaning                   |
-| ----------------- | ------------------------- |
-| [MUST](MUST.md)   | Obligation (required)     |
-| [MAY](MAY.md)     | Permission (allowed)      |
-| [SHANT](SHANT.md) | Prohibition (forbidden)   |
-| MUST NOT          | Synonym for SHANT         |
-| DO                | Possibility (optionality) |
+| Keyword           | Meaning                    |
+| ----------------- | -------------------------- |
+| [MUST](MUST.md)   | Obligation (required)      |
+| [MAY](MAY.md)     | Permission (allowed)       |
+| [SHANT](SHANT.md) | Prohibition (forbidden)    |
+| MUST NOT          | Synonym for SHANT          |
+| DO                | Bare form; behaves as MUST |
+
+`DO` is the bare form, with no modal word. Measured on the current release, it behaves exactly as `MUST` does: the same defaults when `HENCE` or `LEST` is omitted (`FULFILLED` and `BREACH`), and the same outcomes when the action is taken and when the deadline passes.
 
 **Types:** **[DEONTIC](DEONTIC.md)** - the regulative rule type; **[EVENT](EVENT.md)** - the event type consumed by traces
 
@@ -109,7 +111,7 @@ The meaning of "success" depends on the deontic modal:
 
 | Modal   | HENCE triggers when...                  | Default if omitted |
 | ------- | --------------------------------------- | ------------------ |
-| `DO`    | action is taken                         | _(required)_       |
+| `DO`    | action is taken                         | `FULFILLED`        |
 | `MUST`  | action is taken                         | `FULFILLED`        |
 | `MAY`   | action is taken                         | `FULFILLED`        |
 | `SHANT` | deadline passes (prohibition respected) | `FULFILLED`        |
@@ -156,7 +158,7 @@ The meaning of "failure" depends on the deontic modal:
 
 | Modal   | LEST triggers when...                      | Default if omitted |
 | ------- | ------------------------------------------ | ------------------ |
-| `DO`    | deadline passes                            | _(required)_       |
+| `DO`    | deadline passes                            | `BREACH`           |
 | `MUST`  | deadline passes without action             | `BREACH`           |
 | `MAY`   | deadline passes (permission not exercised) | `FULFILLED`        |
 | `SHANT` | action is taken (prohibition violated)     | `BREACH`           |

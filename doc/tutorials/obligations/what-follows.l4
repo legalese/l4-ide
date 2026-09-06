@@ -1,0 +1,214 @@
+-- Companion file for the tutorial "What Follows".
+--
+-- The same tenancy as "One Obligation": Ms Ng lets a flat to Alice. This
+-- file is about what happens AFTER an obligation is met or missed:
+--
+--   a receipt follows a payment                 (HENCE)
+--   a late fee follows a missed payment         (LEST, as a second chance)
+--   a guarantor pays when the tenant does not   (LEST, then ROR)
+--
+-- Every example on the tutorial page that runs today also lives here, in
+-- the order the page presents them. Run it with:
+--     l4 run what-follows.l4
+
+
+-- ====================================================================
+-- Who can act, and what can be done.
+-- ====================================================================
+
+DECLARE Actor IS ONE OF Alice, `Ms Ng`, `Mr Lim`
+
+DECLARE Action IS ONE OF
+    Pay       HAS payer  IS AN Actor
+                  payee  IS AN Actor
+                  amount IS A NUMBER
+    Receipt   HAS issuer IS AN Actor
+                  to     IS AN Actor
+                  amount IS A NUMBER
+
+
+-- ====================================================================
+-- Step 1. A receipt follows the payment.
+-- ====================================================================
+
+GIVETH A DEONTIC Actor Action
+`rent, then receipt` MEANS
+    PARTY  Alice
+    MUST   EXACTLY (Pay Alice `Ms Ng` 1500)
+    WITHIN 7
+    HENCE  PARTY  `Ms Ng`
+           MUST   EXACTLY (Receipt `Ms Ng` Alice 1500)
+           WITHIN 5
+           HENCE  FULFILLED
+           LEST   BREACH BY `Ms Ng` BECAUSE "no receipt was issued"
+    LEST   BREACH BY Alice BECAUSE "the rent was not paid by the seventh day"
+
+-- Alice pays on day 6; Ms Ng issues the receipt on day 11, five days later.
+#TRACE `rent, then receipt` AT 0 WITH
+    PARTY Alice   DOES Pay Alice `Ms Ng` 1500     AT 6
+    PARTY `Ms Ng` DOES Receipt `Ms Ng` Alice 1500 AT 11
+
+-- The receipt comes on day 12: one day too late.
+#TRACE `rent, then receipt` AT 0 WITH
+    PARTY Alice   DOES Pay Alice `Ms Ng` 1500     AT 6
+    PARTY `Ms Ng` DOES Receipt `Ms Ng` Alice 1500 AT 12
+
+-- Alice has paid; the receipt is now what is owed.
+#TRACE `rent, then receipt` AT 0 WITH
+    PARTY Alice DOES Pay Alice `Ms Ng` 1500 AT 6
+
+-- Alice never pays: the receipt never becomes due.
+#TRACE `rent, then receipt` AT 0 WITH
+    (`WAIT UNTIL` 8)
+
+
+-- ====================================================================
+-- Step 2. A second chance follows a missed payment.
+-- ====================================================================
+
+GIVETH A DEONTIC Actor Action
+`rent, with a late fee` MEANS
+    PARTY  Alice
+    MUST   EXACTLY (Pay Alice `Ms Ng` 1500)
+    WITHIN 7
+    HENCE  FULFILLED
+    LEST   PARTY  Alice
+           MUST   EXACTLY (Pay Alice `Ms Ng` 1550)
+           WITHIN 14
+           HENCE  FULFILLED
+           LEST   BREACH BY Alice BECAUSE "the rent and the late fee were not paid"
+
+-- Alice misses day 7, then pays 1550 on day 15.
+#TRACE `rent, with a late fee` AT 0 WITH
+    (`WAIT UNTIL` 8)
+    PARTY Alice DOES Pay Alice `Ms Ng` 1550 AT 15
+
+-- Day 8 has come with no payment: the second chance is now what is owed.
+#TRACE `rent, with a late fee` AT 0 WITH
+    (`WAIT UNTIL` 8)
+
+-- Alice pays the plain rent on day 15, without the fee.
+#TRACE `rent, with a late fee` AT 0 WITH
+    (`WAIT UNTIL` 8)
+    PARTY Alice DOES Pay Alice `Ms Ng` 1500 AT 15
+
+-- Nobody does anything for a month.
+#TRACE `rent, with a late fee` AT 0 WITH
+    (`WAIT UNTIL` 8)
+    (`WAIT UNTIL` 40)
+
+
+-- ====================================================================
+-- Step 3. Paying any amount, and handing it on.
+-- ====================================================================
+
+GIVEN who    IS AN Actor
+      amount IS A NUMBER
+GIVETH A DEONTIC Actor Action
+`a receipt to` who amount MEANS
+    PARTY  `Ms Ng`
+    MUST   EXACTLY (Receipt `Ms Ng` who amount)
+    WITHIN 5
+    HENCE  FULFILLED
+    LEST   BREACH BY `Ms Ng` BECAUSE "no receipt was issued"
+
+GIVETH A DEONTIC Actor Action
+`rent, receipt for the amount paid` MEANS
+    PARTY  Alice
+    MUST   Pay Alice `Ms Ng` amount PROVIDED amount AT LEAST 1500
+    WITHIN 7
+    HENCE  `a receipt to` Alice amount
+    LEST   BREACH BY Alice BECAUSE "the rent was not paid by the seventh day"
+
+-- Alice pays 1600 (rent plus something towards the deposit); the receipt is for 1600.
+#TRACE `rent, receipt for the amount paid` AT 0 WITH
+    PARTY Alice   DOES Pay Alice `Ms Ng` 1600     AT 6
+    PARTY `Ms Ng` DOES Receipt `Ms Ng` Alice 1600 AT 9
+
+-- Stop after the payment: the receipt is owed, written with the rule's own input names.
+#TRACE `rent, receipt for the amount paid` AT 0 WITH
+    PARTY Alice DOES Pay Alice `Ms Ng` 1600 AT 6
+
+-- A receipt for the wrong amount is not the receipt that is owed.
+#TRACE `rent, receipt for the amount paid` AT 0 WITH
+    PARTY Alice   DOES Pay Alice `Ms Ng` 1600     AT 6
+    PARTY `Ms Ng` DOES Receipt `Ms Ng` Alice 1500 AT 9
+    (`WAIT UNTIL` 12)
+
+-- A payment under the rent does not count; the clock keeps running.
+#TRACE `rent, receipt for the amount paid` AT 0 WITH
+    PARTY Alice DOES Pay Alice `Ms Ng` 1000 AT 3
+
+
+-- ====================================================================
+-- Step 4. A guarantor. Simple guarantee: Mr Lim pays only if Alice does not.
+-- ====================================================================
+
+GIVETH A DEONTIC Actor Action
+`rent, guaranteed by Mr Lim` MEANS
+    PARTY  Alice
+    MUST   EXACTLY (Pay Alice `Ms Ng` 1500)
+    WITHIN 7
+    HENCE  FULFILLED
+    LEST   PARTY  `Mr Lim`
+           MUST   EXACTLY (Pay `Mr Lim` `Ms Ng` 1500)
+           WITHIN 14
+           HENCE  FULFILLED
+           LEST   BREACH BY `Mr Lim` BECAUSE "the guarantor did not pay the rent"
+
+-- Alice pays: Mr Lim is never called on.
+#TRACE `rent, guaranteed by Mr Lim` AT 0 WITH
+    PARTY Alice DOES Pay Alice `Ms Ng` 1500 AT 5
+
+-- Alice misses day 7; Mr Lim pays on day 15.
+#TRACE `rent, guaranteed by Mr Lim` AT 0 WITH
+    (`WAIT UNTIL` 8)
+    PARTY `Mr Lim` DOES Pay `Mr Lim` `Ms Ng` 1500 AT 15
+
+-- Mr Lim pays on day 3, before Alice has missed anything: it does not count.
+#TRACE `rent, guaranteed by Mr Lim` AT 0 WITH
+    PARTY `Mr Lim` DOES Pay `Mr Lim` `Ms Ng` 1500 AT 3
+
+-- The first thing to happen after day 7 is Mr Lim's payment, on day 20.
+#TRACE `rent, guaranteed by Mr Lim` AT 0 WITH
+    PARTY `Mr Lim` DOES Pay `Mr Lim` `Ms Ng` 1500 AT 20
+
+-- Neither of them pays.
+#TRACE `rent, guaranteed by Mr Lim` AT 0 WITH
+    (`WAIT UNTIL` 8)
+    (`WAIT UNTIL` 30)
+
+
+-- ====================================================================
+-- Step 5. The same guarantee, but Ms Ng may go to Mr Lim first.
+-- ====================================================================
+
+GIVETH A DEONTIC Actor Action
+`rent, Alice or Mr Lim` MEANS
+    (PARTY  Alice
+     MUST   EXACTLY (Pay Alice `Ms Ng` 1500)
+     WITHIN 7
+     HENCE  FULFILLED
+     LEST   BREACH BY Alice BECAUSE "the rent was not paid by the seventh day")
+    ROR
+    (PARTY  `Mr Lim`
+     MUST   EXACTLY (Pay `Mr Lim` `Ms Ng` 1500)
+     WITHIN 7
+     HENCE  FULFILLED
+     LEST   BREACH BY `Mr Lim` BECAUSE "the guarantor did not pay the rent")
+
+-- Mr Lim pays on day 3: that settles it.
+#TRACE `rent, Alice or Mr Lim` AT 0 WITH
+    PARTY `Mr Lim` DOES Pay `Mr Lim` `Ms Ng` 1500 AT 3
+
+-- Alice pays on day 5: that settles it too.
+#TRACE `rent, Alice or Mr Lim` AT 0 WITH
+    PARTY Alice DOES Pay Alice `Ms Ng` 1500 AT 5
+
+-- Nobody has paid yet.
+#TRACE `rent, Alice or Mr Lim` AT 0 WITH
+    (`WAIT UNTIL` 3)
+
+-- Neither pays by day 7.
+#TRACE `rent, Alice or Mr Lim` AT 0 WITH
+    (`WAIT UNTIL` 8)
