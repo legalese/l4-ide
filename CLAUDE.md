@@ -16,7 +16,11 @@ otherwise route around the rule; delete them once the rule is obviously self-jus
 - **`legalese/l4-ide`** is the fork where **PRs are raised and merged**.
 - **`main`** is the GitHub default branch and is the stable/releasable line.
 - **`unstable`** is a long-lived integration branch. **Feature branches PR into `unstable`, not
-  `main`.** Releases are a `unstable` → `main` PR plus a tag.
+  `main`.** ~~Releases are a `unstable` → `main` PR plus a tag.~~ **Corrected 2026-09-06 (ruling D9,
+  `specs/todo/RELEASE-MODEL-SPEC.md`): that sentence was drifted in both halves.** `unstable`
+  reaches `main` through a wave of human-reviewable **topic PRs**, not one merge PR (D9.1) — and the
+  merge is **not** the release: the release is a manual `workflow_dispatch` of `main-tag.yml`, which
+  mints its own tag from `github.run_number`. **A hand-pushed tag runs nothing.**
 
 ### 1.1 GitHub issue auto-close never fires here — close by hand
 

@@ -627,6 +627,17 @@ note: this expands `TYPICALLY` from a literal annotation into a defaulted expres
 change in its own right; `doc/reference/types/TYPICALLY.md` says so when R8 lands. Detail:
 `PROPS-REDTEAM-2026-09-03.md` §2.5.
 
+**EXTENDED 2026-09-06 to `DECLARE` record fields (D7.3, upstream #645).** R8 as written governs
+`GIVEN` binders and `TYPICALLY.md:69-72` carves record fields out. D7.3 rules that a `MAYBE`-typed
+field may be declared `field IS A MAYBE T TYPICALLY NOTHING`, and only then may a construction
+site omit it — same principle, one declaration, the default living where the name is declared.
+Ruled 2026-09-06, **not built**, and **blocked on R8's own named-site half**. The governing text for
+that ruling is `TYPICALLY-DEFAULTS-SPEC.md:420-428` and the record is
+`SURFACE-SUGAR-CLUSTER-2026-09.md` §D7.3, which also rules the source/boundary asymmetry R8 does not
+reach: the JSON and service boundary keeps defaulting an absent `MAYBE` field to `NOTHING`
+(`Machine.hs:2282`, `Backend/Jl4.hs:436-441`, `JsonSchema.hs:264`), and `TYPICALLY NOTHING` does not
+gate it.
+
 ### 11.6 R4 — The section binder is the indented `GIVEN` on the line after the heading. RULED 2026-09-04.
 
 **Ruling (Meng, 2026-09-04: "next-line-after-section, indented, to be the convention; having a

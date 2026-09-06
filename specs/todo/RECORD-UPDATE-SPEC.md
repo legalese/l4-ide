@@ -1330,13 +1330,37 @@ Deliberately staged so the risky thing is provable before anything irreversible 
 
 | #   | step                                                                              | why here                                                                 |
 | --- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| 0   | The §8.1 readability experiment on `bna.l4`                                       | cheapest possible falsification of R1; do it first                       |
+| 0   | ~~The §8.1 readability experiment on `bna.l4`~~ **WAIVED 2026-09-06**             | see the note below; R1 stands unfalsified and step 1 may start           |
 | 1   | Lexer: reserve `BUT`; parser: the `BUT WITH` alternative beside `namedApp`        | R2/R3 — the discriminator, before any semantics                          |
 | 2   | `Update` AST node + the 19 forced `Expr` arms; real `inferExpr` case + R4's gates | `-Werror` turns each consumer into a read; 17 of the arms are one-liners |
 | 3   | `elaborateUpdates` + the newtype'd second `CheckResult` projection                | R3.1 — late, so the printer and LSP keep the written form                |
 | 4   | `Update` arm in `subjectOfActionExpr` (§5.7)                                      | runs during checking, so late elaboration does not cover it              |
 | 5   | R3.1's obligations 1–3: head `LET`-binding, field-list checks, order slot         | correctness, not polish — see R3.1's obligations                         |
 | 6   | R6 bracketing rule; R5 parenthesised head                                         | both attach to the new production only                                   |
+
+**Step 0 was WAIVED by Meng, 2026-09-06** (rulings-bench card `D7-small-language-cluster`,
+sub-item D7.2, marked accept). His words, verbatim:
+
+> Let's waive the D7.2 experiment. I'm all out of round tuits.
+
+**What that does and does not settle.** The experiment was §8.1's cheapest falsification of **R1**;
+waiving it means R1 **stands unfalsified**, not that it was confirmed — nobody read the two versions
+side by side. Step 1 may therefore start, which is what the waiver is for: #438 was blocked behind
+an experiment that had been prepared and not run since 2026-08-24. The materials stay in
+`RECORD-UPDATE-EXPERIMENT.md` for anyone who later wants the evidence; its §7 records the waiver
+rather than a verdict.
+
+**One thing the waiver does not reach, and it is a mark only Meng can make.** R2 reversed the
+spelling Meng himself filed on #438 — bare `WITH` became `BUT WITH` (`4193c42c`, 2026-08-19) — and
+that reversal was conceded to a model judge and has **never been marked by him**. Measured
+2026-09-06: `grep -c 'marked accept' specs/todo/RECORD-UPDATE-SPEC.md` → **0**, against 6 in
+`IMPLICIT-PROPS-DESIGN.md`. So `BUT WITH` is ratified-by-silence, not ratified. Before step 1
+reserves the keyword, that is worth one sentence from him. (Reserving `BUT` breaks **0** of 907
+`.l4` files; the 5 grep hits are inside backticked section headings, which are opaque to keywords.)
+
+**Also owed before step 2, and not done here:** §3's consumer census is stale — 18 `AppNamed`
+consumers when written, **21** now, including the new `dischargeModule` pass, whose order against
+`elaborateUpdates` is unruled.
 
 **No step for the evaluator, and no step for any backend.** That is R3.1's dividend: elaboration
 happens before the checked module is returned, so `EvaluateLazy/Machine.hs`, `Dmn/Lower`, `jl4-mlir`,
