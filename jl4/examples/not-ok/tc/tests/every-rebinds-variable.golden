@@ -1,0 +1,21 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: every-rebinds-variable.l4
+  Hidden: no
+  Range: 13:30-13:31
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The action of this EVERY binds a new name
+
+      `t`
+
+    which is spelled like the quantifier's own variable `t`.
+    An action is a pattern, so this would be a fresh name matching anyone,
+    not a reference to the member. To mean the member, write
+
+      EXACTLY `t`
+
+    in that position; to mean a fresh name, choose a different spelling.

@@ -1,0 +1,39 @@
+IMPORT prelude
+-- EVERY-EACH-QUANTIFIER-SPEC, phase 1 (front end): the barrier form.
+--
+-- Every tenant must sign. A bare HENCE is the barrier: it fires ONCE, when the
+-- last of them has signed (spec §2.2.6, §3.1). LEST fires at the deadline, and
+-- blames exactly the tenants who did not sign (§6.1).
+--
+-- Phase 1 parses, scopes, type-checks and prints this; running it is phase 2,
+-- so the #EVAL below reports that, deliberately.
+
+DECLARE Actor IS ONE OF
+    Landlord HAS name IS A STRING
+    Tenant   HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Sign    HAS signer IS AN Actor
+    Deliver HAS who    IS AN Actor, what IS A STRING
+
+theLandlord MEANS Landlord OF "Ms Ng"
+
+GIVETH A DEONTIC Actor Action
+`the tenancy begins` MEANS
+    PARTY theLandlord MUST Deliver (EXACTLY theLandlord) what WITHIN 5
+
+-- `EVERY Tenant t`: the pattern form (RULED 2026-09-07). `Tenant` is a
+-- constructor of `Actor`, not a type; it selects the cast. `t` is bound to
+-- each member, at type Actor, in the action, the deadline, HENCE and LEST.
+--
+-- `Sign (EXACTLY t)`, not `Sign t`: an action is a pattern, and a bare `t`
+-- there would be a NEW name matching any signer. EXACTLY makes it the member.
+GIVETH A DEONTIC Actor Action
+`all tenants sign` MEANS
+    EVERY Tenant t
+        MUST   Sign (EXACTLY t)
+        WITHIN 14
+        HENCE  `the tenancy begins`
+        LEST   BREACH
+
+#EVAL `all tenants sign`

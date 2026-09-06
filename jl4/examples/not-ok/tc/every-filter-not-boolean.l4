@@ -1,0 +1,11 @@
+-- The WHO clause must be a BOOLEAN.
+
+DECLARE Actor IS ONE OF
+    Tenant HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Sign HAS signer IS AN Actor
+
+GIVETH A DEONTIC Actor Action
+bad MEANS
+    EVERY Tenant t WHO 42 MUST Sign (EXACTLY t) WITHIN 14

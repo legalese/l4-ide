@@ -1,0 +1,13 @@
+-- An action is a pattern: `Sign t` binds a NEW `t` matching any signer, which
+-- would let a stranger's signature discharge tenant t's duty. The checker
+-- refuses the silent shadowing and says to write `Sign (EXACTLY t)`.
+
+DECLARE Actor IS ONE OF
+    Tenant HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Sign HAS signer IS AN Actor
+
+GIVETH A DEONTIC Actor Action
+bad MEANS
+    EVERY Tenant t MUST Sign t WITHIN 14

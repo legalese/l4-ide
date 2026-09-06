@@ -1,0 +1,31 @@
+IMPORT prelude
+-- EVERY-EACH-QUANTIFIER-SPEC, phase 1: the WHO filter (spec §2.1).
+--
+-- The filter is a Boolean expression in which the bound variable is in scope.
+-- (The spec's §2.1 point-free reading, `WHO member_of tenants` with the
+-- variable inserted as the first argument, is not built: write the variable.)
+-- PROVISIONAL R-Q4: `WHO` is the only filter word; `WHERE` keeps its meaning.
+
+DECLARE Actor IS ONE OF
+    Landlord HAS name IS A STRING
+    Tenant   HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Sign HAS signer IS AN Actor
+
+tenants MEANS LIST (Tenant OF "Alice"), (Tenant OF "Bob"), (Tenant OF "Carol")
+
+-- the filter on its own line
+GIVETH A DEONTIC Actor Action
+`the listed tenants sign` MEANS
+    EVERY Tenant t
+        WHO    elem t tenants
+        MUST   Sign (EXACTLY t)
+        WITHIN 14
+        HENCE  FULFILLED
+        LEST   BREACH
+
+-- the filter inline, and the cast narrowed further by a comparison
+GIVETH A DEONTIC Actor Action
+`everyone but Carol signs` MEANS
+    EVERY Tenant t WHO NOT (t EQUALS Tenant OF "Carol") MUST Sign (EXACTLY t) WITHIN 14

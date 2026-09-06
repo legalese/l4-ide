@@ -1,0 +1,12 @@
+-- The cast after EVERY must be a constructor of the PARTY type. `Sign` builds
+-- an Action, so the contract is not a DEONTIC Actor Action.
+
+DECLARE Actor IS ONE OF
+    Tenant HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Sign HAS signer IS AN Actor
+
+GIVETH A DEONTIC Actor Action
+bad MEANS
+    EVERY Sign s MUST Sign (EXACTLY s) WITHIN 14

@@ -1,0 +1,19 @@
+-- EVERY-EACH-QUANTIFIER-SPEC §2.4 (RULED 2026-09-07): `EVERY a` with no cast
+-- is the unfiltered case — every value of the party type. Here the party type
+-- is a plain enumeration, and the variable's type comes from the DEONTIC
+-- signature and from the action it performs.
+
+DECLARE Actor IS ONE OF Alice, Bob, Carol
+
+DECLARE Action IS ONE OF
+    Sign HAS signer IS AN Actor
+
+GIVETH A DEONTIC Actor Action
+`everyone signs` MEANS
+    EVERY a
+        MUST   Sign (EXACTLY a)
+        WITHIN 10
+
+-- no signature: the party type is inferred from the action's signer field
+`everyone signs, inferred` MEANS
+    EVERY a MUST Sign (EXACTLY a) WITHIN 10

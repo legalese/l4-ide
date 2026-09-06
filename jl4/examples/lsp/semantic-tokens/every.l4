@@ -1,0 +1,14 @@
+DECLARE Actor IS ONE OF
+    Tenant HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Sign HAS signer IS AN Actor
+
+GIVETH A DEONTIC Actor Action
+contract MEANS
+    EVERY Tenant t
+        WHO    NOT (t EQUALS Tenant OF "Carol")
+        MUST   Sign (EXACTLY t)
+        WITHIN 14
+        HENCE FOR EACH FULFILLED
+        LEST   BREACH BY t

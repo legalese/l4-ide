@@ -1,0 +1,26 @@
+-- PROVISIONAL R-Q1 / R-Q2: `EACH` is NOT a keyword. It is recognised only as
+-- the second word of `HENCE FOR EACH`, so a program may still use it as a name.
+
+EACH MEANS 3
+
+#EVAL EACH PLUS 1
+
+GIVEN EACH IS A NUMBER
+GIVETH A NUMBER
+twice EACH MEANS EACH TIMES 2
+
+#EVAL twice 4
+
+DECLARE Actor IS ONE OF
+    Tenant HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Sign HAS signer IS AN Actor
+
+-- ... and in the same file, the marker still reads as the fork
+GIVETH A DEONTIC Actor Action
+`sign, and note each signature` MEANS
+    EVERY Tenant t
+        MUST   Sign (EXACTLY t)
+        WITHIN 14
+        HENCE FOR EACH FULFILLED
