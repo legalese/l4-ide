@@ -1,8 +1,44 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
+section-scoping-descendant-rebind.l4:32:8-9:
+  I found a problem while checking the assumption of `y`:
+    ASSUME is an older way of introducing a name, and it is being retired.
+    This one leaves
+    
+      `y`
+    
+    open for somebody outside the file to supply. Say that with a GIVEN
+    indented under the heading of the section whose rules read it:
+    
+      § <heading>
+          GIVEN y IS A NUMBER
+    
+    If it instead marks a case the rules cannot answer, write in its place
+    
+      REFUSE "<the reason>"
+    
+    See doc/reference/types/ASSUME.md for the recipe.
 section-scoping-descendant-rebind.l4:33:1-9:
   NUMBER
+section-scoping-descendant-rebind.l4:37:8-9:
+  I found a problem while checking the assumption of `y`:
+    ASSUME is an older way of introducing a name, and it is being retired.
+    This one leaves
+    
+      `y`
+    
+    open for somebody outside the file to supply. Say that with a GIVEN
+    indented under the heading of the section whose rules read it:
+    
+      § <heading>
+          GIVEN y IS A NUMBER
+    
+    If it instead marks a case the rules cannot answer, write in its place
+    
+      REFUSE "<the reason>"
+    
+    See doc/reference/types/ASSUME.md for the recipe.
 section-scoping-descendant-rebind.l4:45:1-14:
   10
 section-scoping-descendant-rebind.l4:46:1-12:

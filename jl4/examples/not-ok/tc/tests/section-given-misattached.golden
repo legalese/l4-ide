@@ -70,3 +70,27 @@ File: section-given-misattached.l4
 
       § <heading>
           GIVEN `the other rate` IS A <type>
+
+File: section-given-misattached.l4
+  Hidden: no
+  Range: 18:8-18:18
+  Source: check
+  Severity: DiagnosticSeverity_Warning
+  Code: <none>
+  Message:
+    ASSUME is an older way of introducing a name, and it is being retired.
+    This one leaves
+
+      `base fee`
+
+    open for somebody outside the file to supply. Say that with a GIVEN
+    indented under the heading of the section whose rules read it:
+
+      § <heading>
+          GIVEN `base fee` IS A FUNCTION FROM NUMBER TO NUMBER
+
+    If it instead marks a case the rules cannot answer, write in its place
+
+      REFUSE "<the reason>"
+
+    See doc/reference/types/ASSUME.md for the recipe.

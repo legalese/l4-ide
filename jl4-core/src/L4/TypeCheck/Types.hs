@@ -213,6 +213,36 @@ data CheckWarning
     -- ^ A fixity annotation was attached to a definition that is not a plain
     -- binary infix operator (pattern @_ op _@); the annotation is ignored.
     -- Carries the definition's name and the annotation's source range.
+  | DeprecatedAssume Name AssumeRole (Maybe Text)
+    -- ^ An author-written @ASSUME@. The keyword is deprecated
+    -- (IMPLICIT-PROPS-DESIGN.md §11.1), and this is the warning that says so
+    -- — a warning, never an error, so nothing that checked before stops
+    -- checking. Carries the declared name (the warning's anchor), the job the
+    -- declaration's shape says it was doing, and, when that shape lets one be
+    -- spelled, the pasteable line that replaces it (@GIVEN age IS A NUMBER@,
+    -- @DECLARE Person@). Emitted once per declaration from
+    -- 'L4.TypeCheck.inferAssume'; the elaborations
+    -- 'L4.Desugar.desugarSectionGivens' prepends for a section @GIVEN@ reach
+    -- the same code and never draw it.
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass NFData
+
+-- | Which of @ASSUME@'s three jobs a declaration was doing, read off its
+-- checked signature alone — no use-site analysis — so 'DeprecatedAssume' can
+-- name the spelling that replaces it. The one job this cannot see is a
+-- term-shaped refusal (@ASSUME `no figure exists before commencement` IS A
+-- NUMBER@), which is why the term-role message names @REFUSE@ as well.
+data AssumeRole
+  = AssumeTypeRole
+    -- ^ @ASSUME T IS A TYPE@ (or @GIVETH A TYPE@ above a bare @ASSUME T@): a
+    -- bodiless @DECLARE T@, the opaque type of §11.1.1.
+  | AssumeAnyTypeRole
+    -- ^ The result type is one of the declaration's own type variables
+    -- (@GIVEN a IS A TYPE@ then @ASSUME gap IS AN a@), or no type was written
+    -- at all: nothing can ever supply a value, so the only replacement is a
+    -- @REFUSE@.
+  | AssumeTermRole
+    -- ^ A value or a function the boundary supplies: a section @GIVEN@.
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
@@ -347,6 +377,7 @@ instance HasSrcRange CheckError where
   -- The clause-head hull anchors the warning; it wins over the enclosing
   -- WhileCheckingDecide context range via @rangeOf e <|> rangeOf ctx@ above.
   rangeOf (CheckWarning (PatternClausesMissing r _ _)) = Just r
+  rangeOf (CheckWarning (DeprecatedAssume n _ _)) = rangeOf n
   rangeOf (SuspiciousBinderPattern b _)     = rangeOf b
   rangeOf (MisattachedSectionGiven n _)     = rangeOf n
   rangeOf (UnreadImplicitSupply _ b)        = rangeOf b

@@ -1,5 +1,44 @@
 Parsing successful
 Typechecking successful
+tbd.l4:5:8-12:
+  I found a problem while checking the assumption of `TBD1`:
+    ASSUME is an older way of introducing a name, and it is being retired.
+    This one gives
+    
+      `TBD1`
+    
+    a type that could be anything, so no value can ever be supplied for it.
+    If it marks a case the rules cannot answer, write in its place
+    
+      REFUSE "<the reason>"
+    
+    See doc/reference/control-flow/REFUSE.md.
+tbd.l4:13:8-12:
+  I found a problem while checking the assumption of `TBD2`:
+    ASSUME is an older way of introducing a name, and it is being retired.
+    This one gives
+    
+      `TBD2`
+    
+    a type that could be anything, so no value can ever be supplied for it.
+    If it marks a case the rules cannot answer, write in its place
+    
+      REFUSE "<the reason>"
+    
+    See doc/reference/control-flow/REFUSE.md.
+tbd.l4:21:8-12:
+  I found a problem while checking the assumption of `TBD3`:
+    ASSUME is an older way of introducing a name, and it is being retired.
+    This one gives
+    
+      `TBD3`
+    
+    a type that could be anything, so no value can ever be supplied for it.
+    If it marks a case the rules cannot answer, write in its place
+    
+      REFUSE "<the reason>"
+    
+    See doc/reference/control-flow/REFUSE.md.
 tbd.l4:26:1-12:
   a
 tbd.l4:27:1-12:

@@ -1,2 +1,74 @@
 Parsing successful
 Typechecking successful
+ditto.l4:2:8-9:
+  I found a problem while checking the assumption of `x`:
+    ASSUME is an older way of introducing a name, and it is being retired.
+    This one leaves
+    
+      `x`
+    
+    open for somebody outside the file to supply. Say that with a GIVEN
+    indented under the heading of the section whose rules read it:
+    
+      § <heading>
+          GIVEN x IS A BOOLEAN
+    
+    If it instead marks a case the rules cannot answer, write in its place
+    
+      REFUSE "<the reason>"
+    
+    See doc/reference/types/ASSUME.md for the recipe.
+ditto.l4:3:8-9:
+  I found a problem while checking the assumption of `y`:
+    ASSUME is an older way of introducing a name, and it is being retired.
+    This one leaves
+    
+      `y`
+    
+    open for somebody outside the file to supply. Say that with a GIVEN
+    indented under the heading of the section whose rules read it:
+    
+      § <heading>
+          GIVEN y IS A BOOLEAN
+    
+    If it instead marks a case the rules cannot answer, write in its place
+    
+      REFUSE "<the reason>"
+    
+    See doc/reference/types/ASSUME.md for the recipe.
+ditto.l4:4:8-9:
+  I found a problem while checking the assumption of `n`:
+    ASSUME is an older way of introducing a name, and it is being retired.
+    This one leaves
+    
+      `n`
+    
+    open for somebody outside the file to supply. Say that with a GIVEN
+    indented under the heading of the section whose rules read it:
+    
+      § <heading>
+          GIVEN n IS A NUMBER
+    
+    If it instead marks a case the rules cannot answer, write in its place
+    
+      REFUSE "<the reason>"
+    
+    See doc/reference/types/ASSUME.md for the recipe.
+ditto.l4:8:8-9:
+  I found a problem while checking the assumption of `m`:
+    ASSUME is an older way of introducing a name, and it is being retired.
+    This one leaves
+    
+      `m`
+    
+    open for somebody outside the file to supply. Say that with a GIVEN
+    indented under the heading of the section whose rules read it:
+    
+      § <heading>
+          GIVEN m IS A NUMBER
+    
+    If it instead marks a case the rules cannot answer, write in its place
+    
+      REFUSE "<the reason>"
+    
+    See doc/reference/types/ASSUME.md for the recipe.

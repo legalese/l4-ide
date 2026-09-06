@@ -17,3 +17,39 @@ opaque-declare.l4:78:1-115:
   TRUE
 opaque-declare.l4:79:1-115:
   FALSE
+opaque-declare.l4:84:8-21:
+  I found a problem while checking the assumption of `some person`:
+    ASSUME is an older way of introducing a name, and it is being retired.
+    This one leaves
+    
+      `some person`
+    
+    open for somebody outside the file to supply. Say that with a GIVEN
+    indented under the heading of the section whose rules read it:
+    
+      § <heading>
+          GIVEN `some person` IS A Person
+    
+    If it instead marks a case the rules cannot answer, write in its place
+    
+      REFUSE "<the reason>"
+    
+    See doc/reference/types/ASSUME.md for the recipe.
+opaque-declare.l4:85:8-23:
+  I found a problem while checking the assumption of `some premises`:
+    ASSUME is an older way of introducing a name, and it is being retired.
+    This one leaves
+    
+      `some premises`
+    
+    open for somebody outside the file to supply. Say that with a GIVEN
+    indented under the heading of the section whose rules read it:
+    
+      § <heading>
+          GIVEN `some premises` IS A Premises
+    
+    If it instead marks a case the rules cannot answer, write in its place
+    
+      REFUSE "<the reason>"
+    
+    See doc/reference/types/ASSUME.md for the recipe.

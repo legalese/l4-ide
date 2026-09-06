@@ -536,6 +536,16 @@ inferDeclare (MkDeclare ann _tysig appForm _t) =
   errorContext (WhileCheckingDeclare (getName appForm)) do
     lookupDeclareCheckedByAnno ann >>= \ d -> pure (d.payload, d.publicNames)
 
+-- | Where an 'Assume' node came from. Only an author-written @ASSUME@ is the
+-- deprecated spelling; the 0-ary @ASSUME@ that 'desugarSectionGivens' prepends
+-- for each section-@GIVEN@ parameter is the checker's own elaboration of the
+-- ruled spelling, and must not be warned about. 'inferSection' tells the two
+-- apart with 'isSectionBinderElaboration', the same name-based test every
+-- other consumer of the elaborations uses.
+data AssumeOrigin
+  = WrittenAssume
+  | SectionGivenElaboration
+
 -- | We allow assumptions for types, but we could potentially be more
 -- sophisticated here.
 --
@@ -554,12 +564,16 @@ inferDeclare (MkDeclare ann _tysig appForm _t) =
 --
 -- which would currently not match the first case.
 --
-inferAssume :: Assume Name -> Check (Assume Resolved, [CheckInfo])
-inferAssume (MkAssume ann _tysig appForm (Just (Type _tann)) _mTypically) = do
+inferAssume :: AssumeOrigin -> Assume Name -> Check (Assume Resolved, [CheckInfo])
+inferAssume origin (MkAssume ann _tysig appForm (Just (Type _tann)) _mTypically) = do
   -- declaration of a type
   errorContext (WhileCheckingAssume (getName appForm)) do
-    lookupAssumeCheckedByAnno ann >>= \ d -> pure (d.payload, d.publicNames)
-inferAssume (MkAssume ann _tysig appForm mt mTypically) = do
+    d <- lookupAssumeCheckedByAnno ann
+    let MkAssume _ _ rappForm _ _ = d.payload
+    warnDeprecatedAssume origin (getName appForm) AssumeTypeRole
+      (Just ("DECLARE " <> prettyLayout rappForm))
+    pure (d.payload, d.publicNames)
+inferAssume origin (MkAssume ann _tysig appForm mt mTypically) = do
   -- declaration of a term
   errorContext (WhileCheckingAssume (getName appForm)) do
     lookupFunTypeSigByAnno ann >>= \ dHead -> do
@@ -574,6 +588,18 @@ inferAssume (MkAssume ann _tysig appForm mt mTypically) = do
 
           rTypically <- checkTypically (getName appForm) dHead.resultType mTypically
 
+          -- The deprecation warning reads the declared type off @rmt@ where
+          -- there is one: for a bare @ASSUME age IS A NUMBER@ the scanned
+          -- signature's result is still a fresh inference variable
+          -- ('scanFunSigAssume' merges the @IS A@ type into the signature
+          -- only when a GIVEN is present), and only the 'expect' above ties
+          -- the two together. The @TYPICALLY@ default, if any, travels onto
+          -- the suggested line: a section @GIVEN@ carries one the same way.
+          let declaredType = fromMaybe dHead.resultType rmt
+              role = assumeRoleOf dHead declaredType
+          warnDeprecatedAssume origin (getName appForm) role
+            (assumeReplacementLine dHead declaredType rTypically role)
+
           -- See Note [Adding type information to all binders]
           assume <-
             MkAssume dHead.anno
@@ -583,6 +609,53 @@ inferAssume (MkAssume ann _tysig appForm mt mTypically) = do
               <*> pure rTypically
               >>= nlgAssume
           pure (assume, [dHead.name])
+
+-- | The deprecation warning for an author-written @ASSUME@ ('DeprecatedAssume');
+-- nothing for the checker's own section-@GIVEN@ elaborations.
+warnDeprecatedAssume :: AssumeOrigin -> Name -> AssumeRole -> Maybe Text -> Check ()
+warnDeprecatedAssume SectionGivenElaboration _ _ _ = pure ()
+warnDeprecatedAssume WrittenAssume n role mReplacement =
+  addWarning (DeprecatedAssume n role mReplacement)
+
+-- | Read the job a term-form @ASSUME@ was doing off its checked signature
+-- (see 'AssumeRole'). The type form, @… IS A TYPE@, never reaches here: it is
+-- the first 'inferAssume' clause. @GIVETH A TYPE@ above a bare @ASSUME T@ does,
+-- and is the same job.
+assumeRoleOf :: FunTypeSig -> Type' Resolved -> AssumeRole
+assumeRoleOf dHead declaredType =
+  case declaredType of
+    Type _                                                 -> AssumeTypeRole
+    InfVar {}                                              -> AssumeAnyTypeRole
+    TyApp _ r [] | getUnique r `elem` ownTypeVariables     -> AssumeAnyTypeRole
+    _                                                      -> AssumeTermRole
+  where
+    ownTypeVariables =
+      [ getUnique n | MkCheckInfo ns KnownTypeVariable <- dHead.arguments, n <- ns ]
+
+-- | The pasteable line 'DeprecatedAssume' offers in place of a term-form
+-- @ASSUME@, when its shape lets one be spelled. A term becomes
+-- @GIVEN name IS A type@ (the article is optional to the parser and is the
+-- spelling every page teaches); a head with inputs (@ASSUME f x IS A BOOLEAN@ under
+-- @GIVEN x IS A BOOLEAN@) becomes a @GIVEN@ of the corresponding function
+-- type. A signature that quantifies its own type variables has no section
+-- @GIVEN@ spelling (the message then shows the shape with a @<type>@ hole),
+-- and the any-type role has no replacement line at all.
+assumeReplacementLine :: FunTypeSig -> Type' Resolved -> Maybe (Expr Resolved) -> AssumeRole -> Maybe Text
+assumeReplacementLine dHead declaredType mTypically = \ case
+  AssumeTypeRole    -> Just ("DECLARE " <> prettyLayout dHead.rappForm)
+  AssumeAnyTypeRole -> Nothing
+  AssumeTermRole
+    | any isTypeVariable dHead.arguments -> Nothing
+    | otherwise ->
+        Just ("GIVEN " <> prettyLayout (getName dHead.rappForm) <> " IS A " <> prettyLayout fullType <> typically)
+  where
+    typically = maybe "" (\ e -> " TYPICALLY " <> prettyLayout e) mTypically
+    isTypeVariable (MkCheckInfo _ KnownTypeVariable) = True
+    isTypeVariable _                                 = False
+    inputTypes = [ ty | MkCheckInfo _ (KnownTerm ty _) <- dHead.arguments ]
+    fullType = case inputTypes of
+      [] -> declaredType
+      _  -> Fun emptyAnno [ MkOptionallyNamedType emptyAnno Nothing ty | ty <- inputTypes ] declaredType
 
 inferDirective :: Directive Name -> Check (Directive Resolved)
 inferDirective (LazyEval ann e) = errorContext (WhileCheckingExpression e) do
@@ -638,8 +711,12 @@ inferSection (MkSection ann mn maka mgiven topdecls) = do
 
   -- Push this section while inferring its bodies so that unqualified references
   -- resolve to the nearest enclosing section (lexical scoping).
+  let elaborated = sectionGivenNames mgiven
+      originOf d
+        | isSectionBinderElaboration elaborated d = SectionGivenElaboration
+        | otherwise                               = WrittenAssume
   (rtopdecls, topDeclExtends) <- withSectionStack mn maka $
-    unzip <$> traverse inferTopDecl topdecls
+    unzip <$> traverse (\ d -> inferTopDecl (originOf d) d) topdecls
 
   rmgiven <- traverse (resolveSectionGiven rtopdecls) mgiven
 
@@ -712,29 +789,31 @@ inferLocalDecl (LocalDecide ann decide) = do
   (rdecide, extends) <- softprune $ inferDecide decide
   pure (LocalDecide ann rdecide, extends)
 inferLocalDecl (LocalAssume ann assume) = do
-  (rassume, extends) <- softprune $ inferAssume assume
+  (rassume, extends) <- softprune $ inferAssume WrittenAssume assume
   pure (LocalAssume ann rassume, extends)
 
-inferTopDecl :: TopDecl Name -> Check (TopDecl Resolved, [CheckInfo])
-inferTopDecl (Declare ann declare) = do
+-- | The 'AssumeOrigin' is read only by the 'Assume' case; 'inferSection'
+-- computes it per declaration.
+inferTopDecl :: AssumeOrigin -> TopDecl Name -> Check (TopDecl Resolved, [CheckInfo])
+inferTopDecl _ (Declare ann declare) = do
   (rdeclare, extends) <- prune $ inferDeclare declare
   pure (Declare ann rdeclare, extends)
-inferTopDecl (Decide ann decide) = do
+inferTopDecl _ (Decide ann decide) = do
   (rdecide, extends) <- prune $ inferDecide decide
   pure (Decide ann rdecide, extends)
-inferTopDecl (Assume ann assume) = do
-  (rassume, extends) <- prune $ inferAssume assume
+inferTopDecl origin (Assume ann assume) = do
+  (rassume, extends) <- prune $ inferAssume origin assume
   pure (Assume ann rassume, extends)
-inferTopDecl (Directive ann directive) = do
+inferTopDecl _ (Directive ann directive) = do
   rdirective <- inferDirective directive
   pure (Directive ann rdirective, [])
-inferTopDecl (Import ann import_) = do
+inferTopDecl _ (Import ann import_) = do
   rimport_ <- inferImport import_
   pure (Import ann rimport_, [])
-inferTopDecl (Section ann sec) = do
+inferTopDecl _ (Section ann sec) = do
   (sec', extends) <- inferSection sec
   pure (Section ann sec', extends)
-inferTopDecl (Timezone ann tzExpr) = errorContext (WhileCheckingExpression tzExpr) do
+inferTopDecl _ (Timezone ann tzExpr) = errorContext (WhileCheckingExpression tzExpr) do
   -- Both the 'errorContext' and the 'prune' are load-bearing (mirrors LazyEval):
   -- 'prune' collapses ambiguous candidates into an 'AmbiguousTermError' diagnostic
   -- (instead of crashing in 'runCheckUnique'), and the context supplies the
@@ -5601,6 +5680,50 @@ prettyCheckWarning = \ case
     , ""
     , "where a and b are the GIVEN inputs."
     ]
+  DeprecatedAssume n role mReplacement ->
+    "ASSUME is an older way of introducing a name, and it is being retired."
+    : case role of
+      AssumeTermRole ->
+        [ "This one leaves"
+        , ""
+        , "  " <> quotedName n
+        , ""
+        , "open for somebody outside the file to supply. Say that with a GIVEN"
+        , "indented under the heading of the section whose rules read it:"
+        , ""
+        , "  § <heading>"
+        , "      " <> fromMaybe ("GIVEN " <> prettyLayout n <> " IS A <type>") mReplacement
+        , ""
+        , "If it instead marks a case the rules cannot answer, write in its place"
+        , ""
+        , "  REFUSE \"<the reason>\""
+        , ""
+        , "See doc/reference/types/ASSUME.md for the recipe."
+        ]
+      AssumeTypeRole ->
+        [ "This one names a kind of thing,"
+        , ""
+        , "  " <> quotedName n
+        , ""
+        , "without saying what it is made of. Write that as a DECLARE with nothing"
+        , "after the name:"
+        , ""
+        , "  " <> fromMaybe ("DECLARE " <> prettyLayout n) mReplacement
+        , ""
+        , "See doc/reference/types/DECLARE.md, under opaque types."
+        ]
+      AssumeAnyTypeRole ->
+        [ "This one gives"
+        , ""
+        , "  " <> quotedName n
+        , ""
+        , "a type that could be anything, so no value can ever be supplied for it."
+        , "If it marks a case the rules cannot answer, write in its place"
+        , ""
+        , "  REFUSE \"<the reason>\""
+        , ""
+        , "See doc/reference/control-flow/REFUSE.md."
+        ]
 
 -- | Render a synthesized missing branch as valid, pasteable L4 (the
 -- pattern rendering itself is 'prettyMissingPattern').

@@ -1,5 +1,54 @@
 Parsing successful
 Typechecking successful
+signatures.l4:13:8-9:
+  I found a problem while checking the assumption of `f`:
+    ASSUME is an older way of introducing a name, and it is being retired.
+    This one leaves
+    
+      `f`
+    
+    open for somebody outside the file to supply. Say that with a GIVEN
+    indented under the heading of the section whose rules read it:
+    
+      § <heading>
+          GIVEN f IS A FUNCTION FROM BOOLEAN TO BOOLEAN
+    
+    If it instead marks a case the rules cannot answer, write in its place
+    
+      REFUSE "<the reason>"
+    
+    See doc/reference/types/ASSUME.md for the recipe.
+signatures.l4:16:8-9:
+  I found a problem while checking the assumption of `T`:
+    ASSUME is an older way of introducing a name, and it is being retired.
+    This one names a kind of thing,
+    
+      `T`
+    
+    without saying what it is made of. Write that as a DECLARE with nothing
+    after the name:
+    
+      DECLARE T x
+    
+    See doc/reference/types/DECLARE.md, under opaque types.
+signatures.l4:20:8-9:
+  I found a problem while checking the assumption of `h`:
+    ASSUME is an older way of introducing a name, and it is being retired.
+    This one leaves
+    
+      `h`
+    
+    open for somebody outside the file to supply. Say that with a GIVEN
+    indented under the heading of the section whose rules read it:
+    
+      § <heading>
+          GIVEN h IS A FUNCTION FROM BOOLEAN TO NUMBER
+    
+    If it instead marks a case the rules cannot answer, write in its place
+    
+      REFUSE "<the reason>"
+    
+    See doc/reference/types/ASSUME.md for the recipe.
 signatures.l4:22:1-9:
   FUNCTION FROM BOOLEAN TO BOOLEAN
 signatures.l4:23:1-9:

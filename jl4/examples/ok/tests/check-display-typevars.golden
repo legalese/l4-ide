@@ -1,5 +1,18 @@
 Parsing successful
 Typechecking successful
+check-display-typevars.l4:8:8-14:
+  I found a problem while checking the assumption of `bottom`:
+    ASSUME is an older way of introducing a name, and it is being retired.
+    This one gives
+    
+      `bottom`
+    
+    a type that could be anything, so no value can ever be supplied for it.
+    If it marks a case the rules cannot answer, write in its place
+    
+      REFUSE "<the reason>"
+    
+    See doc/reference/control-flow/REFUSE.md.
 check-display-typevars.l4:10:1-14:
   a
 check-display-typevars.l4:11:1-23:

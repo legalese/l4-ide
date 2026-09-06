@@ -1,2 +1,56 @@
 Parsing successful
 Typechecking successful
+assume-as-given.l4:6:8-19:
+  I found a problem while checking the assumption of `temperature`:
+    ASSUME is an older way of introducing a name, and it is being retired.
+    This one leaves
+    
+      `temperature`
+    
+    open for somebody outside the file to supply. Say that with a GIVEN
+    indented under the heading of the section whose rules read it:
+    
+      § <heading>
+          GIVEN temperature IS A NUMBER
+    
+    If it instead marks a case the rules cannot answer, write in its place
+    
+      REFUSE "<the reason>"
+    
+    See doc/reference/types/ASSUME.md for the recipe.
+assume-as-given.l4:7:8-16:
+  I found a problem while checking the assumption of `humidity`:
+    ASSUME is an older way of introducing a name, and it is being retired.
+    This one leaves
+    
+      `humidity`
+    
+    open for somebody outside the file to supply. Say that with a GIVEN
+    indented under the heading of the section whose rules read it:
+    
+      § <heading>
+          GIVEN humidity IS A NUMBER
+    
+    If it instead marks a case the rules cannot answer, write in its place
+    
+      REFUSE "<the reason>"
+    
+    See doc/reference/types/ASSUME.md for the recipe.
+assume-as-given.l4:10:8-23:
+  I found a problem while checking the assumption of `is authorized`:
+    ASSUME is an older way of introducing a name, and it is being retired.
+    This one leaves
+    
+      `is authorized`
+    
+    open for somebody outside the file to supply. Say that with a GIVEN
+    indented under the heading of the section whose rules read it:
+    
+      § <heading>
+          GIVEN `is authorized` IS A FUNCTION FROM NUMBER TO BOOLEAN
+    
+    If it instead marks a case the rules cannot answer, write in its place
+    
+      REFUSE "<the reason>"
+    
+    See doc/reference/types/ASSUME.md for the recipe.

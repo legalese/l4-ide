@@ -27,6 +27,7 @@ If you already know what error you are looking at, use the table of contents bel
 - [Compiler Warnings](#compiler-warnings)
   - [Non-exhaustive pattern match](#non-exhaustive-pattern-match)
   - [Redundant pattern match branch](#redundant-pattern-match-branch)
+  - [ASSUME is being retired](#assume-is-being-retired)
 - [Runtime Errors](#runtime-errors)
   - [Circular definition](#circular-definition)
   - [Non-exhaustive patterns at runtime](#non-exhaustive-patterns-at-runtime)
@@ -430,6 +431,58 @@ OTHERWISE "unknown"
 **What went wrong:** A WHEN branch can never be reached because earlier branches (or an earlier OTHERWISE) already cover every value it could match.
 
 **How to fix it:** Delete the unreachable branch, or reorder branches if a more specific pattern was accidentally placed after a more general one.
+
+---
+
+### ASSUME is being retired
+
+**Warning message:**
+
+```
+ASSUME is an older way of introducing a name, and it is being retired.
+This one leaves
+
+  `age`
+
+open for somebody outside the file to supply. Say that with a GIVEN
+indented under the heading of the section whose rules read it:
+
+  § <heading>
+      GIVEN age IS A NUMBER
+
+If it instead marks a case the rules cannot answer, write in its place
+
+  REFUSE "<the reason>"
+
+See doc/reference/types/ASSUME.md for the recipe.
+```
+
+`l4 check` and `l4 run` print it under a `Severity: DiagnosticSeverity_Warning` header and still exit 0. In the editor it is a warning, not an error, and the `ASSUME` line is marked as deprecated (most editors strike it through).
+
+**What you wrote:**
+
+```l4
+ASSUME age IS A NUMBER
+
+DECIDE `is adult` IF age >= 18
+```
+
+**What went wrong:** Nothing is broken. The file still checks, runs and exports exactly as it did, and it will until the keyword is removed. `ASSUME` was one keyword doing three unrelated jobs, and each job now has a spelling of its own ([ASSUME](../types/ASSUME.md) has the table). The warning reads the shape of the declaration to tell which job this one was doing, and names that spelling:
+
+- _A fact to be supplied for each case_ (`ASSUME age IS A NUMBER`, or a rule defined elsewhere, `ASSUME rate IS A FUNCTION FROM NUMBER TO NUMBER`): a [section `GIVEN`](../syntax/section-given.md), indented under the heading of the section whose rules read it. The suggested `GIVEN` line is pasteable as written; it carries a `TYPICALLY` default across, and spells the function type out when the `ASSUME` wrote its inputs on the head (`GIVEN n IS A NUMBER` above `ASSUME `is large` n IS A BOOLEAN` becomes `GIVEN `is large` IS A FUNCTION FROM NUMBER TO BOOLEAN`).
+- _A kind of thing with no stated parts_ (`ASSUME Person IS A TYPE`): a bodiless [`DECLARE Person`](../types/DECLARE.md#opaque-types). That message ends "See doc/reference/types/DECLARE.md, under opaque types."
+- _A name that could be of any type_ (`GIVEN a IS A TYPE` followed by `ASSUME gap IS AN a`, or an `ASSUME` with no type at all): no value can ever be supplied for it, so that message offers [`REFUSE`](../control-flow/REFUSE.md) alone and ends "See doc/reference/control-flow/REFUSE.md."
+
+**How to fix it:** Move the declaration under the heading of the section whose rules read it, and indent it past the `§`:
+
+```l4
+§ `Adults`
+    GIVEN age IS A NUMBER
+
+DECIDE `is adult` IF age >= 18
+```
+
+The warning is given once per `ASSUME`, on the declared name. A `GIVEN` under a section heading never draws it, although the checker treats the two alike.
 
 ---
 

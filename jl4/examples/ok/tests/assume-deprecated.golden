@@ -1,83 +1,92 @@
 Parsing successful
 Typechecking successful
-Evaluation successful
-misc.l4:54:1-14:
-  Suc OF (Suc OF (Suc OF Zero))
-misc.l4:55:1-15:
-  Suc OF (Suc OF (Suc OF Zero))
-misc.l4:56:1-15:
-  Suc OF (Suc OF (Suc OF (Suc OF (Suc OF (Suc OF Zero)))))
-misc.l4:67:1-43:
-  LIST 1, 2, 3, 4, 5, 6
-misc.l4:83:8-14:
-  I found a problem while checking the assumption of `coerce`:
+assume-deprecated.l4:11:8-11:
+  I found a problem while checking the assumption of `age`:
     ASSUME is an older way of introducing a name, and it is being retired.
     This one leaves
     
-      `coerce`
+      `age`
     
     open for somebody outside the file to supply. Say that with a GIVEN
     indented under the heading of the section whose rules read it:
     
       § <heading>
-          GIVEN coerce IS A FUNCTION FROM NUMBER TO BOOLEAN
+          GIVEN age IS A NUMBER
     
     If it instead marks a case the rules cannot answer, write in its place
     
       REFUSE "<the reason>"
     
     See doc/reference/types/ASSUME.md for the recipe.
-misc.l4:84:8-14:
-  I found a problem while checking the assumption of `coerce`:
+assume-deprecated.l4:14:8-16:
+  I found a problem while checking the assumption of `tax on`:
     ASSUME is an older way of introducing a name, and it is being retired.
     This one leaves
     
-      `coerce`
+      `tax on`
     
     open for somebody outside the file to supply. Say that with a GIVEN
     indented under the heading of the section whose rules read it:
     
       § <heading>
-          GIVEN coerce IS A FUNCTION FROM BOOLEAN TO NUMBER
+          GIVEN `tax on` IS A FUNCTION FROM NUMBER TO NUMBER
     
     If it instead marks a case the rules cannot answer, write in its place
     
       REFUSE "<the reason>"
     
     See doc/reference/types/ASSUME.md for the recipe.
-misc.l4:85:8-14:
-  I found a problem while checking the assumption of `coerce`:
+assume-deprecated.l4:19:8-18:
+  I found a problem while checking the assumption of `is large`:
     ASSUME is an older way of introducing a name, and it is being retired.
     This one leaves
     
-      `coerce`
+      `is large`
     
     open for somebody outside the file to supply. Say that with a GIVEN
     indented under the heading of the section whose rules read it:
     
       § <heading>
-          GIVEN coerce IS A FUNCTION FROM NUMBER TO STRING
+          GIVEN `is large` IS A FUNCTION FROM NUMBER TO BOOLEAN
     
     If it instead marks a case the rules cannot answer, write in its place
     
       REFUSE "<the reason>"
     
     See doc/reference/types/ASSUME.md for the recipe.
-misc.l4:86:8-14:
-  I found a problem while checking the assumption of `coerce`:
+assume-deprecated.l4:22:8-14:
+  I found a problem while checking the assumption of `Person`:
     ASSUME is an older way of introducing a name, and it is being retired.
-    This one leaves
+    This one names a kind of thing,
     
-      `coerce`
+      `Person`
     
-    open for somebody outside the file to supply. Say that with a GIVEN
-    indented under the heading of the section whose rules read it:
+    without saying what it is made of. Write that as a DECLARE with nothing
+    after the name:
     
-      § <heading>
-          GIVEN coerce IS A FUNCTION FROM STRING TO NUMBER
+      DECLARE Person
     
-    If it instead marks a case the rules cannot answer, write in its place
+    See doc/reference/types/DECLARE.md, under opaque types.
+assume-deprecated.l4:27:8-11:
+  I found a problem while checking the assumption of `gap`:
+    ASSUME is an older way of introducing a name, and it is being retired.
+    This one gives
+    
+      `gap`
+    
+    a type that could be anything, so no value can ever be supplied for it.
+    If it marks a case the rules cannot answer, write in its place
     
       REFUSE "<the reason>"
     
-    See doc/reference/types/ASSUME.md for the recipe.
+    See doc/reference/control-flow/REFUSE.md.
+assume-deprecated.l4:31:1-18:
+  BOOLEAN
+assume-deprecated.l4:32:1-16:
+  FUNCTION FROM NUMBER TO NUMBER
+assume-deprecated.l4:33:1-18:
+  FUNCTION FROM NUMBER TO BOOLEAN
+assume-deprecated.l4:34:1-11:
+  a
+assume-deprecated.l4:41:1-21:
+  BOOLEAN

@@ -1,6 +1,24 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
+regcf.l4:143:8-84:
+  I found a problem while checking the assumption of `no Regulation Crowdfunding figure exists before commencement on 2016-05-16`:
+    ASSUME is an older way of introducing a name, and it is being retired.
+    This one leaves
+    
+      `no Regulation Crowdfunding figure exists before commencement on 2016-05-16`
+    
+    open for somebody outside the file to supply. Say that with a GIVEN
+    indented under the heading of the section whose rules read it:
+    
+      § <heading>
+          GIVEN `no Regulation Crowdfunding figure exists before commencement on 2016-05-16` IS A NUMBER
+    
+    If it instead marks a case the rules cannot answer, write in its place
+    
+      REFUSE "<the reason>"
+    
+    See doc/reference/types/ASSUME.md for the recipe.
 regcf.l4:1000:1-50:
   assertion satisfied
 regcf.l4:1001:1-52:

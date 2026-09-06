@@ -1,2 +1,56 @@
 Parsing successful
 Typechecking successful
+tdnr.l4:3:8-11:
+  I found a problem while checking the assumption of `foo`:
+    ASSUME is an older way of introducing a name, and it is being retired.
+    This one leaves
+    
+      `foo`
+    
+    open for somebody outside the file to supply. Say that with a GIVEN
+    indented under the heading of the section whose rules read it:
+    
+      § <heading>
+          GIVEN foo IS A NUMBER
+    
+    If it instead marks a case the rules cannot answer, write in its place
+    
+      REFUSE "<the reason>"
+    
+    See doc/reference/types/ASSUME.md for the recipe.
+tdnr.l4:4:8-11:
+  I found a problem while checking the assumption of `foo`:
+    ASSUME is an older way of introducing a name, and it is being retired.
+    This one leaves
+    
+      `foo`
+    
+    open for somebody outside the file to supply. Say that with a GIVEN
+    indented under the heading of the section whose rules read it:
+    
+      § <heading>
+          GIVEN foo IS A BOOLEAN
+    
+    If it instead marks a case the rules cannot answer, write in its place
+    
+      REFUSE "<the reason>"
+    
+    See doc/reference/types/ASSUME.md for the recipe.
+tdnr.l4:5:8-11:
+  I found a problem while checking the assumption of `foo`:
+    ASSUME is an older way of introducing a name, and it is being retired.
+    This one leaves
+    
+      `foo`
+    
+    open for somebody outside the file to supply. Say that with a GIVEN
+    indented under the heading of the section whose rules read it:
+    
+      § <heading>
+          GIVEN foo IS A STRING
+    
+    If it instead marks a case the rules cannot answer, write in its place
+    
+      REFUSE "<the reason>"
+    
+    See doc/reference/types/ASSUME.md for the recipe.

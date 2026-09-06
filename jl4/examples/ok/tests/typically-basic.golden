@@ -1,5 +1,41 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
+typically-basic.l4:31:8-20:
+  I found a problem while checking the assumption of `jurisdiction`:
+    ASSUME is an older way of introducing a name, and it is being retired.
+    This one leaves
+    
+      `jurisdiction`
+    
+    open for somebody outside the file to supply. Say that with a GIVEN
+    indented under the heading of the section whose rules read it:
+    
+      § <heading>
+          GIVEN jurisdiction IS A STRING TYPICALLY "SG"
+    
+    If it instead marks a case the rules cannot answer, write in its place
+    
+      REFUSE "<the reason>"
+    
+    See doc/reference/types/ASSUME.md for the recipe.
+typically-basic.l4:32:8-29:
+  I found a problem while checking the assumption of `person has capacity`:
+    ASSUME is an older way of introducing a name, and it is being retired.
+    This one leaves
+    
+      `person has capacity`
+    
+    open for somebody outside the file to supply. Say that with a GIVEN
+    indented under the heading of the section whose rules read it:
+    
+      § <heading>
+          GIVEN `person has capacity` IS A BOOLEAN TYPICALLY TRUE
+    
+    If it instead marks a case the rules cannot answer, write in its place
+    
+      REFUSE "<the reason>"
+    
+    See doc/reference/types/ASSUME.md for the recipe.
 typically-basic.l4:66:1-28:
   TRUE

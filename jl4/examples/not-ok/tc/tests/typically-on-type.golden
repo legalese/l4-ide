@@ -13,6 +13,25 @@ File: typically-on-type.l4
 
 File: typically-on-type.l4
   Hidden: no
+  Range: 6:8-6:19
+  Source: check
+  Severity: DiagnosticSeverity_Warning
+  Code: <none>
+  Message:
+    ASSUME is an older way of introducing a name, and it is being retired.
+    This one names a kind of thing,
+
+      `some type`
+
+    without saying what it is made of. Write that as a DECLARE with nothing
+    after the name:
+
+      DECLARE `some type`
+
+    See doc/reference/types/DECLARE.md, under opaque types.
+
+File: typically-on-type.l4
+  Hidden: no
   Range: 11:8-11:24
   Source: check
   Severity: DiagnosticSeverity_Error

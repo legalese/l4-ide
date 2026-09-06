@@ -1,2 +1,20 @@
 Parsing successful
 Typechecking successful
+daydate.l4:104:8-50:
+  I found a problem while checking the assumption of `YMD refused an out-of-range month or day`:
+    ASSUME is an older way of introducing a name, and it is being retired.
+    This one leaves
+    
+      `YMD refused an out-of-range month or day`
+    
+    open for somebody outside the file to supply. Say that with a GIVEN
+    indented under the heading of the section whose rules read it:
+    
+      § <heading>
+          GIVEN `YMD refused an out-of-range month or day` IS A DATE
+    
+    If it instead marks a case the rules cannot answer, write in its place
+    
+      REFUSE "<the reason>"
+    
+    See doc/reference/types/ASSUME.md for the recipe.
