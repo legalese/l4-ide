@@ -391,36 +391,68 @@ EVERY d
 | `EVERY`    | Barrier/Join      | Collects all completions, fires HENCE **once** when all done |
 | `EACH`     | Fork/Distributive | Fires HENCE **for each** completion independently            |
 
-> **Proposed vocabulary — Meng, 2026-09-06, not yet ruled.** _"The EVERY vs EACH semantics may not
-> stand up to scrutiny from a noob persona — we may prefer to say 'jointly' vs 'severally' for the
-> barrier join vs the distributive semantics."_ The mapping is to the classical contract-law
-> distinction, not to Pattern C's hybrid: a **joint** obligation is one promise by several promisors
-> together, discharged only when all perform, with one breach — the barrier, one `HENCE`, one
-> `LEST`; **several** obligations are separate promises, each independently enforceable with its own
-> breach — the fork, and §6.3's indexed blame is several liability's per-obligor breach. A bare
-> `EVERY p MUST X` with no continuation is a `RAND` chain over the inhabitants under either name
-> (`RAND` is "parallel AND — all must be fulfilled", `doc/reference/regulative/README.md`).
+> **Proposed vocabulary — Meng, 2026-09-06, not yet ruled; researched the same night and the
+> research recommends against.** _"The EVERY vs EACH semantics may not stand up to scrutiny from a
+> noob persona — we may prefer to say 'jointly' vs 'severally' for the barrier join vs the
+> distributive semantics."_ The first reading of this (recorded here for an hour, and wrong) mapped
+> the pair onto the classical joint-vs-several obligation distinction. The research memo,
+> [`EVERY-EACH-JOINT-SEVERAL-MEMO.md`](EVERY-EACH-JOINT-SEVERAL-MEMO.md), finds the mapping fails on
+> the one axis that touches performance:
 >
-> **The false friend this must avoid.** This spec already uses the words for two _other_ patterns it
-> defers as harder (§2.2 Patterns C and D, and the proposed syntax at §2.4): _"jointly and severally
-> liable"_ — the creditor may pursue any obligor for the whole, a shared-resource semantics — and
-> _"jointly execute"_ — one coordinated act, not several acts joined afterwards. If `JOINTLY` names
-> the barrier, a reader must not import Pattern D's single act; if `SEVERALLY` names the fork, a reader
-> must not import Pattern C's each-for-the-whole. `JOINTLY AND SEVERALLY` therefore stays a distinct,
-> still-deferred construct and is **not** the composition of the two modifiers.
+> - **Common-law _joint_ asserts the opposite of the barrier on discharge.** Restatement (Second)
+>   of Contracts § 293: _"Full or partial performance or other satisfaction of the contractual duty
+>   of a promisor discharges the duty to the obligee of each other promisor of the same performance
+>   to the extent of the amount or value applied."_ Under the barrier, Alice signing does nothing
+>   for Bob, and §6.1 blames every non-completer. A lawyer reading `JOINTLY` expects one obligor to
+>   be able to satisfy the whole — a wrong answer, not an approximation. Release of one joint
+>   obligor discharges all (_Duck v Mayeu_ [1892] 2 QB 511; Restatement § 294(1)(a)); the barrier
+>   has no such operation.
+> - **The sign of _joint_ flips between traditions.** Louisiana Civil Code art. 1788 defines a
+>   joint obligation as one where _"neither is bound for the whole"_ — the inverse of the common-law
+>   sense. The civilian taxonomy itself fits four-for-four (several → fork, LCC art. 1787; joint/
+>   divided → barrier; solidary → Pattern C; indivisible → Pattern D), because it classifies
+>   obligation _structure_ where the common-law pair classifies _remedy and procedure_ — Restatement
+>   § 288 calls the distinction "primarily remedial and procedural". A keyword whose meaning inverts
+>   across the two traditions L4 encodes is not a keyword.
+> - **Drafting practice has retired the words.** Ken Adams: _"ill understood. (At least, I didn't
+>   understand them!)"_ … _"I've now decided that they're more trouble than they're worth."_ His
+>   canonical _several_ example divides the payload ($50 + $50) where the fork replicates it. And
+>   _severally_ fails the first-time reader worse than `EACH`: the numeral sense of _several_ has
+>   dominated since the 1530s, so "severally, every Person must sign" reads as _some_ must sign.
+> - **No formal contract language uses this vocabulary** — searched and not found in Symboleo,
+>   FCL/Regorous, Hvitved's CSL, Accord/Ergo, Lexon. Adopting it would follow no one.
 >
-> **Measured (2026-09-06, `unstable` @ `cd4d4680`):** neither `JOINTLY` nor `SEVERALLY` is a lexer
-> keyword (nor are `EVERY`/`EACH`); the only bare uppercase corpus occurrences are two lines of one
-> `--` comment in `sg-succession/cleanroom-2026-08/guardianship-of-infants-act.l4:1294`, so reserving
-> either breaks nothing; the source texts we encode use the words — 45 files under `jl4/examples` and
-> 20 under `canon` contain _jointly_ or _severally_, many in Reg CF's arithmetic sense ("calculated
-> jointly with that person's spouse"), which the phrasebook must keep apart from the obligation sense.
+> **What the memo proposes instead (§7.2): mark the join at the continuation, not the quantifier.**
+> §3.3 already concedes the distinction is a continuation property — without `HENCE`/`LEST` the two
+> coincide — so encoding it in the quantifier is what manufactures the vocabulary problem:
 >
-> **Sketch, not ruled:** one quantifier, the join made explicit — `EVERY Person p MUST sign JOINTLY
-HENCE …` / `… SEVERALLY HENCE …` — the bare form meaning whichever this spec rules as the default.
-> Whether the two English words survive a lawyer's reading better than `EVERY`/`EACH` survives a
-> beginner's is the question; the argument for them is that the distinction is one lawyers already
-> draw and a first-time reader can be taught in a sentence.
+> ```
+> EVERY Person p MUST sign  HENCE ONCE ALL HAVE  notify        -- barrier
+> EVERY Person p MUST sign  HENCE FOR EACH       notify p      -- fork
+> ```
+>
+> One quantifier word, one new keyword, no glossary, no doctrine imported, and `JOINTLY` /
+> `SEVERALLY` left free for Patterns D and C where they are doctrinally correct. Second best, if
+> single modifiers are wanted: `TOGETHER` / `SEPARATELY`. Memo §7.4 gives the definitional sentence
+> if `JOINTLY`/`SEVERALLY` are adopted regardless; it needs four denials, which is itself the
+> argument.
+>
+> **Two corrections to this spec that hold whichever way the ruling goes:** (1) the barrier/fork pair
+> already has exact established names in the workflow-patterns literature — **WCP-12 "Multiple
+> Instances without Synchronization"** is the fork and **WCP-14** (run-time-known instance count) is
+> precisely this spec's barrier — worth citing in §3.1–3.2 and §14 given the BPMN export; (2) §2.2's
+> heading "Distributive vs Collective" is off in the formal vocabulary — in Norman & Reed and
+> Royakkers & Dignum _both_ constructs are distributive, and a _collective_ obligation is one the
+> group may discharge without every member acting, which L4 does not model. **One open question §13
+> does not list:** what happens to an armed barrier when the inhabitant set changes after arming
+> (WCP-14 vs WCP-15); doctrine's survivorship rule is a real design option not yet ruled on.
+>
+> **Measured (2026-09-06, `unstable` @ `cd4d4680`), still true and still relevant if the words are
+> wanted for Patterns C/D:** neither `JOINTLY` nor `SEVERALLY` is a lexer keyword; the only bare
+> uppercase corpus occurrences are two lines of one `--` comment in
+> `sg-succession/cleanroom-2026-08/guardianship-of-infants-act.l4:1294`; the source texts use the
+> words — 45 files under `jl4/examples`, 20 under `canon` — many in Reg CF's arithmetic sense
+> ("calculated jointly with that person's spouse"), a third sense the phrasebook must keep apart.
 
 **EVERY (barrier):**
 
