@@ -5,6 +5,14 @@
 IMPORT prelude
 IMPORT `jerseyCharities-types`
 
+§ `Charities (Jersey) Law 2014 with Subsidiary Legislation`
+    GIVEN cat IS A FUNCTION FROM A STRING AND A STRING TO A STRING
+          contains IS A FUNCTION FROM A STRING AND A STRING TO A BOOLEAN
+          monthsBetween IS A FUNCTION FROM A Date AND A Date TO A NUMBER
+          daysFromToday IS A FUNCTION FROM A Date TO A NUMBER
+          addDays IS A FUNCTION FROM A Date AND A NUMBER TO A Date
+          addMonths IS A FUNCTION FROM A Date AND A NUMBER TO A Date
+
 -- ======================================================================
 -- MISSING PRELUDE FUNCTIONS AND ASSUMPTIONS
 -- ======================================================================
@@ -17,14 +25,6 @@ length list MEANS
   CONSIDER list
   WHEN EMPTY THEN 0
   WHEN x FOLLOWED BY xs THEN 1 + length xs
-
--- Assume additional required functions
-ASSUME cat IS A FUNCTION FROM A STRING AND A STRING TO A STRING
-ASSUME contains IS A FUNCTION FROM A STRING AND A STRING TO A BOOLEAN
-ASSUME monthsBetween IS A FUNCTION FROM A Date AND A Date TO A NUMBER
-ASSUME daysFromToday IS A FUNCTION FROM A Date TO A NUMBER
-ASSUME addDays IS A FUNCTION FROM A Date AND A NUMBER TO A Date
-ASSUME addMonths IS A FUNCTION FROM A Date AND A NUMBER TO A Date
 
 -- ======================================================================
 -- SECTION A – STRUCTURAL / INTERPRETIVE LAYER

@@ -81,16 +81,24 @@ commencement MEANS Date OF 2000, 4, 1
           `inciting another to commit any such offence` IS A FUNCTION FROM Offence TO BOOLEAN
           `attempting to commit any such offence` IS A FUNCTION FROM Offence TO BOOLEAN
           `aiding, abetting, counselling or procuring the commission of any such offence` IS A FUNCTION FROM Offence TO BOOLEAN
-ASSUME Person IS A TYPE
+          `is an appropriate authority` IS A FUNCTION FROM Person TO BOOLEAN
+          `is an appropriate authority` IS A FUNCTION FROM Authority TO BOOLEAN
+          `forfeiture` IS A FUNCTION FROM Order TO BOOLEAN
+          `confiscation` IS A FUNCTION FROM Order TO BOOLEAN
+          forfeiture IS A FUNCTION FROM Action TO BOOLEAN
+          confiscation IS A FUNCTION FROM Action TO BOOLEAN
+          -- cartesian product of the two lists, using f as the pairing function; this could live in a library
+          combine IS FOR ALL a AND b AND c A FUNCTION FROM (A FUNCTION FROM a AND b TO c) AND A LIST OF a AND A LIST OF b TO A LIST OF c
+          `lifted or` IS FOR ALL a A FUNCTION FROM A LIST OF (FUNCTION FROM a TO BOOLEAN) AND a TO BOOLEAN
+DECLARE Person
 -- for the following section: see notes in the DECIDE below
-ASSUME `is an appropriate authority` IS A FUNCTION FROM Person TO BOOLEAN
 
-ASSUME Action IS A TYPE
-ASSUME ActionTarget IS A TYPE
+DECLARE Action
+DECLARE ActionTarget
 
-ASSUME Offence IS A TYPE
+DECLARE Offence
 
-ASSUME Matter IS A TYPE
+DECLARE Matter
 -- not so clear whether this setup is correct.
 -- this pattern is common in the legislation, but it is not clear how to model it.
 -- where a definition sets up tests, rather than going into the substance of the test in the provisions
@@ -100,11 +108,11 @@ ASSUME Matter IS A TYPE
 -- enforcement  - of - a Singapore confiscation order
 -- satisfaction /    \ a foreign confiscantion order
 
-ASSUME Investigation IS A TYPE
+DECLARE Investigation
 
-ASSUME Proceedings IS A TYPE
+DECLARE Proceedings
 
-ASSUME Organisation IS A TYPE
+DECLARE Organisation
 -- Do I put appropriate authority here too, or define Authority as a Type?
 
 -- If you already some type, such as Organisation
@@ -114,22 +122,19 @@ ASSUME Organisation IS A TYPE
 DECLARE Authority IS ONE OF
   `Person Authority` HAS person IS A Person
   `Organisation Authority` HAS organisation IS AN Organisation
-ASSUME `is an appropriate authority` IS A FUNCTION FROM Authority TO BOOLEAN
 
-ASSUME Order IS A TYPE
-ASSUME OrderType IS A TYPE
+DECLARE Order
+DECLARE OrderType
+
+-- this is very tedious to do: should I be doing it as a WHERE instead?
+-- also, as you can see below, many intra-provision references, how do I model this?
+-- Given the number of condition branches in this particular definition provision, I'm glad for the visualizer.
 
 -- “foreign confiscation order” —
 -- (a)	means an order made by a court or other competent authority of a foreign country, on or after the appointed date for that country, for the recovery, forfeiture or confiscation of —
 -- (i)	any property obtained or received in connection with an offence against the law of that country, or the value of that property; or
 -- (ii)	any property derived or realised, directly or indirectly, from any property mentioned in sub‑paragraph (i), or the value of the derived or realised property; and
 -- (b)	includes an instrumentality forfeiture order;
-ASSUME `forfeiture` IS A FUNCTION FROM Order TO BOOLEAN
-ASSUME `confiscation` IS A FUNCTION FROM Order TO BOOLEAN
--- this is very tedious to do: should I be doing it as a WHERE instead?
--- also, as you can see below, many intra-provision references, how do I model this?
--- Given the number of condition branches in this particular definition provision, I'm glad for the visualizer.
-
 GIVEN o IS A Order
 GIVETH A BOOLEAN
 DECIDE `is a foreign confiscation order` IS
@@ -148,27 +153,27 @@ DECIDE `is a foreign confiscation order` IS
                 OR `derived indirectly` o
         OR `instrumentality forfeiture order` o
 
-ASSUME Country IS A TYPE
-ASSUME Certificate IS A TYPE
+DECLARE Country
+DECLARE Certificate
 
-ASSUME Material IS A TYPE
+DECLARE Material
 
-ASSUME Premises IS A TYPE
-ASSUME CourtOrder IS A TYPE
-ASSUME Company IS A TYPE
+DECLARE Premises
+DECLARE CourtOrder
+DECLARE Company
 
-ASSUME Law IS A TYPE
+DECLARE Law
 
-ASSUME Item IS A TYPE
-ASSUME Client IS A TYPE
-ASSUME Lawyer IS A TYPE
-ASSUME JudicialPerson IS A TYPE
-ASSUME Court IS A TYPE
-ASSUME Property IS A TYPE
+DECLARE Item
+DECLARE Client
+DECLARE Lawyer
+DECLARE JudicialPerson
+DECLARE Court
+DECLARE Property
 
-ASSUME LegalDefinition IS A TYPE
+DECLARE LegalDefinition
 
-ASSUME Reference IS A TYPE
+DECLARE Reference
 
 DECLARE dealing
   HAS action IS A Action
@@ -194,26 +199,6 @@ DECIDE `is ancillary criminal matter` IS
           OR `the obtaining, enforcement or satisfaction of a Singapore confiscation order or foreign confiscation order` acm
 -- how do I capture relationships with 'dealing', 'Singapore offence', 'foreign offence', etc.?
 -}
-
-ASSUME forfeiture IS A FUNCTION FROM Action TO BOOLEAN
-ASSUME confiscation IS A FUNCTION FROM Action TO BOOLEAN
-
--- cartesian product of the two list, using f as the pairing function
--- this can be defined in a library
-GIVEN a IS A TYPE
-      b IS A TYPE
-      c IS A TYPE
-      f IS A FUNCTION FROM a AND b TO c
-      xs IS A LIST OF a
-      ys IS A LIST OF b
-GIVETH A LIST OF c
-ASSUME combine 
-
-GIVEN  a  IS A TYPE
-       xs IS A LIST OF FUNCTION FROM a TO BOOLEAN
-       x  IS AN a
-GIVETH A BOOLEAN
-ASSUME `lifted or`
 
 GIVEN acm IS A Matter
 GIVETH A BOOLEAN

@@ -54,12 +54,13 @@ commencement MEANS Date OF 2000, 4, 1
           `a territory of that country, other than a territory that is itself a prescribed foreign country` IS A FUNCTION FROM Reference TO BOOLEAN
           `a ship or aircraft of, or registered in, that country` IS A FUNCTION FROM Reference TO BOOLEAN
           `the law in force in any part of that country` IS A FUNCTION FROM Reference TO BOOLEAN
-ASSUME Person IS A TYPE
+          `is an appropriate authority` IS A FUNCTION FROM Person TO BOOLEAN
+          `is an appropriate authority` IS A FUNCTION FROM Authority TO BOOLEAN
+DECLARE Person
 -- for the following section: see notes in the DECIDE below
-ASSUME `is an appropriate authority` IS A FUNCTION FROM Person TO BOOLEAN
 
-ASSUME Action IS A TYPE
-ASSUME ActionTarget IS A TYPE
+DECLARE Action
+DECLARE ActionTarget
 
 {-
 ASSUME Offence IS A TYPE
@@ -126,46 +127,45 @@ GIVEN  act  IS AN Action
      `drug dealing offence` act p
   OR `serious offence` act p
 
-ASSUME Matter IS A TYPE
+DECLARE Matter
 -- not so clear whether this setup is correct.
 -- this pattern is common in the legislation, but it is not clear how to model it.
 -- where a definition sets up tests, rather than going into the substance of the test in the provisions
 -- should I remove 'as the case may be'?
 
-ASSUME Investigation IS A TYPE
+DECLARE Investigation
 
-ASSUME Proceedings IS A TYPE
+DECLARE Proceedings
 
 -- see notes on Person and Organisation, especially in relation to appropriate authority
-ASSUME Authority IS A TYPE
-ASSUME `is an appropriate authority` IS A FUNCTION FROM Authority TO BOOLEAN
+DECLARE Authority
 
-ASSUME Organisation IS A TYPE
+DECLARE Organisation
 -- Do I put appropriate authority here too, or define Authority as a Type?
 
-ASSUME Order IS A TYPE
-ASSUME OrderType IS A TYPE
+DECLARE Order
+DECLARE OrderType
 
-ASSUME Country IS A TYPE
-ASSUME Certificate IS A TYPE
+DECLARE Country
+DECLARE Certificate
 
-ASSUME Material IS A TYPE
+DECLARE Material
 
-ASSUME Premises IS A TYPE
-ASSUME CourtOrder IS A TYPE
-ASSUME Company IS A TYPE
+DECLARE Premises
+DECLARE CourtOrder
+DECLARE Company
 
-ASSUME Law IS A TYPE
+DECLARE Law
 
-ASSUME Item IS A TYPE
-ASSUME Client IS A TYPE
-ASSUME Lawyer IS A TYPE
-ASSUME JudicialPerson IS A TYPE
-ASSUME Court IS A TYPE
+DECLARE Item
+DECLARE Client
+DECLARE Lawyer
+DECLARE JudicialPerson
+DECLARE Court
 
-ASSUME LegalDefinition IS A TYPE
+DECLARE LegalDefinition
 
-ASSUME Reference IS A TYPE
+DECLARE Reference
 
 DECLARE dealing
   HAS action IS A Action

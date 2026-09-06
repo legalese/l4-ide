@@ -1,8 +1,8 @@
 
-ASSUME zero IS A NUMBER
 
 § `Section title`
     GIVEN one IS A NUMBER
+          zero IS A NUMBER
 
 § §
     GIVEN two IS A NUMBER
