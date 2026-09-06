@@ -271,11 +271,22 @@ bad MEANS PARTY Bob MUST EXACTLY send Alice Bob WITHIN 10
   `send` is performed by `Alice`, not by `Bob`.
 ```
 
-⚠️ **Gotcha** — the _bare_ applied form does **not** parse as an action (the
-action slot is a pattern):
+⚠️ **Gotcha** — the _bare_ applied form is not read as a rule being used. The
+action slot is a pattern, so `send` is taken for a pattern name that nothing
+defines, and the check fails:
 
 ```l4
 oops MEANS PARTY Alice MUST send Alice Bob WITHIN 10   -- ERROR: use EXACTLY
+```
+
+```
+I could not find a definition for the identifier
+
+  send
+
+which I have inferred to be of type:
+
+  FUNCTION FROM Actor AND Actor TO SendMessage
 ```
 
 **A named cast (some actors).** To allow a _specific subset_ of actors and no

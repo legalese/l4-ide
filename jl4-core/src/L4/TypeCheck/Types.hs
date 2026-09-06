@@ -10,6 +10,7 @@ import Codec.Serialise (Serialise)
 import qualified Optics
 import L4.Annotation (HasSrcRange(..), HasAnno(..), AnnoExtra, AnnoToken, emptyAnno)
 import L4.Lexer (PosToken, FixityDirection)
+import L4.Lint.NotReach (NotReachSite (..))
 import L4.Parser.SrcSpan (SrcRange(..), SrcPos)
 import L4.Syntax
 import L4.TypeCheck.With
@@ -196,6 +197,11 @@ data CheckError =
     -- Severity 'SInfo': a hint, never blocking (legitimate catch-all names
     -- can trip the distance check). Arguments: the binder, the resembled
     -- constructor.
+  | NotReachesConnective NotReachSite
+    -- ^ A written @NOT@ whose operand contains a bare @AND@\/@OR@\/@IMPLIES@
+    -- on the @NOT@'s own line: @NOT a AND b@, or @NOT (a) AND b@. Both read
+    -- as @NOT (a AND b)@, which is silently not what most readers take them
+    -- to say (SET-OPERATORS-SPEC §18.1, R-NOT-1). See 'L4.Lint.NotReach'.
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
@@ -352,6 +358,7 @@ instance HasSrcRange CheckError where
   rangeOf (UnreadImplicitSupply _ b)        = rangeOf b
   rangeOf (AmbiguousImplicitSupply _ r)     = rangeOf r
   rangeOf (RestatedSectionBinder n)         = rangeOf n
+  rangeOf (NotReachesConnective site)       = Just site.range
   rangeOf _                                 = Nothing
 
 -- | A token in a mixfix pattern, representing either a keyword (part of the function name)

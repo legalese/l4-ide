@@ -1,0 +1,243 @@
+-- Companion file for the tutorial "Several Parties".
+--
+-- The same flat, now let to three flatmates: Alice, Bob and Carol share it,
+-- and Ms Ng is still the landlord. One rent of 1500 a month, due by the
+-- seventh day. The lease can arrange that debt in more than one way, and
+-- this file runs the ways that run today:
+--
+--   each owes a share        (RAND: all of these)
+--   any one may pay it all   (ROR: any of these)
+--   one pays, the other repays a share   (ROR, with a follow-on inside)
+--   any amounts, until the rent is reached   (a rule that calls itself)
+--
+-- Every example on the tutorial page that runs today also lives here, in
+-- the order the page presents them. Run it with:
+--     l4 run several-parties.l4
+
+
+-- ====================================================================
+-- Who can act, and what can be done.
+-- ====================================================================
+
+DECLARE Actor IS ONE OF Alice, Bob, Carol, `Ms Ng`
+
+DECLARE Action IS ONE OF
+    Pay       HAS payer  IS AN Actor
+                  payee  IS AN Actor
+                  amount IS A NUMBER
+    Reimburse HAS payer  IS AN Actor
+                  payee  IS AN Actor
+                  amount IS A NUMBER
+    Sign      HAS signer IS AN Actor
+
+
+-- ====================================================================
+-- Step 1. Each owes a share: all of these.
+-- ====================================================================
+
+GIVETH A DEONTIC Actor Action
+`each pays a share` MEANS
+    (PARTY  Alice
+     MUST   EXACTLY (Pay Alice `Ms Ng` 500)
+     WITHIN 7
+     HENCE  FULFILLED
+     LEST   BREACH BY Alice BECAUSE "Alice's share was not paid")
+    RAND
+    (PARTY  Bob
+     MUST   EXACTLY (Pay Bob `Ms Ng` 500)
+     WITHIN 7
+     HENCE  FULFILLED
+     LEST   BREACH BY Bob BECAUSE "Bob's share was not paid")
+    RAND
+    (PARTY  Carol
+     MUST   EXACTLY (Pay Carol `Ms Ng` 500)
+     WITHIN 7
+     HENCE  FULFILLED
+     LEST   BREACH BY Carol BECAUSE "Carol's share was not paid")
+
+-- All three pay: done.
+#TRACE `each pays a share` AT 0 WITH
+    PARTY Alice DOES Pay Alice `Ms Ng` 500 AT 2
+    PARTY Bob   DOES Pay Bob   `Ms Ng` 500 AT 3
+    PARTY Carol DOES Pay Carol `Ms Ng` 500 AT 5
+
+-- Two have paid; Carol's share is still owed.
+#TRACE `each pays a share` AT 0 WITH
+    PARTY Alice DOES Pay Alice `Ms Ng` 500 AT 2
+    PARTY Bob   DOES Pay Bob   `Ms Ng` 500 AT 3
+
+-- Only Alice paid, and day 8 has come.
+#TRACE `each pays a share` AT 0 WITH
+    PARTY Alice DOES Pay Alice `Ms Ng` 500 AT 2
+    (`WAIT UNTIL` 8)
+
+-- Alice pays Bob's share as well as her own: her payments do nothing for Bob.
+#TRACE `each pays a share` AT 0 WITH
+    PARTY Alice DOES Pay Alice `Ms Ng` 500 AT 2
+    PARTY Alice DOES Pay Alice `Ms Ng` 500 AT 3
+    PARTY Carol DOES Pay Carol `Ms Ng` 500 AT 5
+
+
+-- ====================================================================
+-- Step 2. Three signatures, and what cannot yet follow them.
+-- ====================================================================
+
+GIVETH A DEONTIC Actor Action
+`all three sign` MEANS
+    (PARTY Alice MUST Sign Alice WITHIN 14 HENCE FULFILLED LEST BREACH BY Alice)
+    RAND
+    (PARTY Bob   MUST Sign Bob   WITHIN 14 HENCE FULFILLED LEST BREACH BY Bob)
+    RAND
+    (PARTY Carol MUST Sign Carol WITHIN 14 HENCE FULFILLED LEST BREACH BY Carol)
+
+-- Alice and Carol have signed; the lease waits for Bob.
+#TRACE `all three sign` AT 0 WITH
+    PARTY Alice DOES Sign Alice AT 1
+    PARTY Carol DOES Sign Carol AT 2
+
+-- All three have signed.
+#TRACE `all three sign` AT 0 WITH
+    PARTY Alice DOES Sign Alice AT 1
+    PARTY Carol DOES Sign Carol AT 2
+    PARTY Bob   DOES Sign Bob   AT 9
+
+
+-- ====================================================================
+-- Step 3. Any one of them may pay it all: any of these.
+-- ====================================================================
+
+rent MEANS 1500
+
+GIVETH A DEONTIC Actor Action
+`any one pays the rent` MEANS
+    (PARTY  Alice
+     MUST   EXACTLY (Pay Alice `Ms Ng` rent)
+     WITHIN 7
+     HENCE  FULFILLED
+     LEST   BREACH BY Alice BECAUSE "the rent was not paid")
+    ROR
+    (PARTY  Bob
+     MUST   EXACTLY (Pay Bob `Ms Ng` rent)
+     WITHIN 7
+     HENCE  FULFILLED
+     LEST   BREACH BY Bob BECAUSE "the rent was not paid")
+    ROR
+    (PARTY  Carol
+     MUST   EXACTLY (Pay Carol `Ms Ng` rent)
+     WITHIN 7
+     HENCE  FULFILLED
+     LEST   BREACH BY Carol BECAUSE "the rent was not paid")
+
+-- Bob pays the whole rent on day 3: everyone is discharged.
+#TRACE `any one pays the rent` AT 0 WITH
+    PARTY Bob DOES Pay Bob `Ms Ng` 1500 AT 3
+
+-- Bob pays 1000: not the rent, so nothing is discharged.
+#TRACE `any one pays the rent` AT 0 WITH
+    PARTY Bob DOES Pay Bob `Ms Ng` 1000 AT 3
+
+-- Nobody pays by day 7.
+#TRACE `any one pays the rent` AT 0 WITH
+    (`WAIT UNTIL` 8)
+
+
+-- ====================================================================
+-- Step 4. One pays the whole, the other repays a share.
+-- Two flatmates here, to keep the screen readable.
+-- ====================================================================
+
+GIVETH A DEONTIC Actor Action
+`one pays, the other repays` MEANS
+    (PARTY  Alice
+     MUST   EXACTLY (Pay Alice `Ms Ng` 1500)
+     WITHIN 7
+     HENCE  PARTY  Bob
+            MUST   EXACTLY (Reimburse Bob Alice 750)
+            WITHIN 30
+            HENCE  FULFILLED
+            LEST   BREACH BY Bob BECAUSE "Bob did not repay his half"
+     LEST   BREACH BY Alice BECAUSE "the rent was not paid")
+    ROR
+    (PARTY  Bob
+     MUST   EXACTLY (Pay Bob `Ms Ng` 1500)
+     WITHIN 7
+     HENCE  PARTY  Alice
+            MUST   EXACTLY (Reimburse Alice Bob 750)
+            WITHIN 30
+            HENCE  FULFILLED
+            LEST   BREACH BY Alice BECAUSE "Alice did not repay her half"
+     LEST   BREACH BY Bob BECAUSE "the rent was not paid")
+
+-- Bob pays the rent on day 3; Alice repays him on day 20.
+#TRACE `one pays, the other repays` AT 0 WITH
+    PARTY Bob   DOES Pay Bob `Ms Ng` 1500     AT 3
+    PARTY Alice DOES Reimburse Alice Bob 750  AT 20
+
+-- Bob has paid the rent; what is owed now is Alice's half, to Bob.
+#TRACE `one pays, the other repays` AT 0 WITH
+    PARTY Bob DOES Pay Bob `Ms Ng` 1500 AT 3
+
+-- Bob paid on day 3; day 8 has come and Alice has not yet repaid him.
+#TRACE `one pays, the other repays` AT 0 WITH
+    PARTY Bob DOES Pay Bob `Ms Ng` 1500 AT 3
+    (`WAIT UNTIL` 8)
+
+-- Bob pays the rent; then, oddly, Alice pays the rent too.
+#TRACE `one pays, the other repays` AT 0 WITH
+    PARTY Bob   DOES Pay Bob   `Ms Ng` 1500 AT 3
+    PARTY Alice DOES Pay Alice `Ms Ng` 1500 AT 5
+
+
+-- ====================================================================
+-- Step 5. Any amounts, from anyone, until the rent is reached.
+-- ====================================================================
+
+GIVEN balance IS A NUMBER
+GIVETH A DEONTIC Actor Action
+`rent still owed` balance MEANS
+    IF   balance AT MOST 0
+    THEN FULFILLED
+    ELSE (PARTY  Alice
+          MUST   Pay Alice `Ms Ng` amount
+          WITHIN 7
+          HENCE  `rent still owed` (balance MINUS amount)
+          LEST   BREACH BY Alice BECAUSE "the rent was not paid in full")
+         ROR
+         (PARTY  Bob
+          MUST   Pay Bob `Ms Ng` amount
+          WITHIN 7
+          HENCE  `rent still owed` (balance MINUS amount)
+          LEST   BREACH BY Bob BECAUSE "the rent was not paid in full")
+         ROR
+         (PARTY  Carol
+          MUST   Pay Carol `Ms Ng` amount
+          WITHIN 7
+          HENCE  `rent still owed` (balance MINUS amount)
+          LEST   BREACH BY Carol BECAUSE "the rent was not paid in full")
+
+-- Three payments of 500 add up to the rent.
+#TRACE `rent still owed` 1500 AT 0 WITH
+    PARTY Alice DOES Pay Alice `Ms Ng` 500 AT 2
+    PARTY Bob   DOES Pay Bob   `Ms Ng` 500 AT 3
+    PARTY Carol DOES Pay Carol `Ms Ng` 500 AT 5
+
+-- Two unequal payments add up to the rent.
+#TRACE `rent still owed` 1500 AT 0 WITH
+    PARTY Alice DOES Pay Alice `Ms Ng` 1000 AT 2
+    PARTY Carol DOES Pay Carol `Ms Ng` 500  AT 5
+
+-- Stop after one instalment: the balance is not shown, and five sides stand.
+#TRACE `rent still owed` 1500 AT 0 WITH
+    PARTY Alice DOES Pay Alice `Ms Ng` 500 AT 2
+
+-- The first defect: the clock restarts after every payment.
+-- Three payments on days 6, 12 and 18 are all "in time", though the
+-- rent was due by day 7.
+#TRACE `rent still owed` 1500 AT 0 WITH
+    PARTY Alice DOES Pay Alice `Ms Ng` 500 AT 6
+    PARTY Bob   DOES Pay Bob   `Ms Ng` 500 AT 12
+    PARTY Carol DOES Pay Carol `Ms Ng` 500 AT 18
+
+-- The second defect: when nobody pays, one flatmate is blamed.
+#TRACE `rent still owed` 1500 AT 0 WITH
+    (`WAIT UNTIL` 8)

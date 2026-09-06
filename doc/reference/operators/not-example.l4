@@ -37,33 +37,50 @@ hasAccess isAdmin isRestricted MEANS isAdmin OR NOT isRestricted
 
 -- How Far NOT Reaches
 
+-- On one line, NOT reaches forward over everything after it, so
+-- `NOT a AND b` would mean NOT (a AND b) even though it reads like
+-- "not-a, and b". L4 refuses that spelling: the file does not check until
+-- you say which reading you meant. Both of these are refused --
+--
+--     wideByDefault a b MEANS NOT a AND b
+--     looksCareful  a b MEANS NOT (a) AND b   -- the bracket closes around a,
+--                                             -- not around the NOT
+--
+-- and these are the spellings that are accepted.
+
+-- Brackets around the whole group: the WIDE reading, NOT (a AND b).
 GIVEN a IS A BOOLEAN, b IS A BOOLEAN
-
--- NOT reaches forward over the AND, so this is the WIDE reading:
--- it means NOT (a AND b), even though it reads like "not-a, and b".
-wideByDefault a b MEANS NOT a AND b -- NOT-REACH-OK: the wide reading is the point
-
--- Spelling the wide reading out. Same rule as wideByDefault.
 notBoth a b MEANS NOT (a AND b)
 
--- Brackets around the OPERAND do NOT narrow it -- still NOT (a AND b).
-looksCareful a b MEANS NOT (a) AND b -- NOT-REACH-OK: shows the bracket trap
-
--- Brackets around the NOT itself DO narrow it. This is (NOT a) AND b.
+-- Brackets around the NOT itself: the NARROW reading, (NOT a) AND b.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN
 narrowedProperly a b MEANS (NOT a) AND b
 
--- The first three are all the same rule. The fourth is the one you probably
--- meant. With a = FALSE and b = FALSE the first three give TRUE and the
--- fourth gives FALSE; with a = TRUE and b = TRUE all four agree on FALSE.
-#EVAL wideByDefault FALSE FALSE
-#EVAL notBoth FALSE FALSE
-#EVAL looksCareful FALSE FALSE
-#EVAL narrowedProperly FALSE FALSE
+-- Over several lines nothing is refused, and the columns decide. An AND
+-- that starts further right than the NOT is reached over: the wide reading.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN
+swallowed a b MEANS
+    NOT a
+        AND b
 
-#EVAL wideByDefault TRUE TRUE
+-- An AND that starts in the NOT's column, or further left, stops it: the
+-- narrow reading.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN
+stopped a b MEANS
+    NOT a
+    AND b
+
+-- With a = FALSE and b = FALSE the wide reading gives TRUE and the narrow
+-- reading gives FALSE; with a = TRUE and b = TRUE all four agree on FALSE.
+#EVAL notBoth FALSE FALSE
+#EVAL swallowed FALSE FALSE
+#EVAL narrowedProperly FALSE FALSE
+#EVAL stopped FALSE FALSE
+
 #EVAL notBoth TRUE TRUE
-#EVAL looksCareful TRUE TRUE
+#EVAL swallowed TRUE TRUE
 #EVAL narrowedProperly TRUE TRUE
+#EVAL stopped TRUE TRUE
 
 -- NOT with Comparisons
 

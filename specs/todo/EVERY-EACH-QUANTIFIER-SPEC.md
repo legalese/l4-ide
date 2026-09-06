@@ -491,8 +491,8 @@ The semantic difference only manifests when continuations are present.
 
 > **Status (2026-09-06): PROPOSED, NOT BUILT.** This section replaces the three-paragraph
 > "Collective Semantics (Future Work)" stub that stood here until 2026-09-06 (kept verbatim in
-> §2.2.7.1). Nothing below describes the tree; §2.2.7.9 lists what would make it true. Every
-> ruling in §2.2.7.8 is open except the one synonym Meng ruled in passing (§2.2.7.4).
+> §2.2.7.1). Nothing below describes the tree; §2.2.7.9 lists what would make it true. All six
+> rulings in §2.2.7.8 were **RULED 2026-09-06 (marked accept)**; still nothing is built.
 
 ##### 2.2.7.1 What this section said before 2026-09-06
 
@@ -578,9 +578,12 @@ Measure       ::= 'count' | Aggregate 'OF' Binder            -- the Binder is a 
 A quantifier-prefix spelling is sugar for the same thing when there is no per-act continuation:
 
 ```l4
-SOME 2 OF Director d MUST sign WITHIN 30 HENCE `resolution passes`
--- ≡  EVERY Director d MUST sign  ONCE SOME 2 HAVE  WITHIN 30 HENCE `resolution passes`
+SOME 2 OF Director d DO sign WITHIN 30 HENCE `resolution passes`
+-- ≡  EVERY Director d DO sign  ONCE SOME 2 HAVE  WITHIN 30 HENCE `resolution passes`
 ```
+
+`DO`, not `MUST`, in the prefix form — R-T5's style note (Meng, 2026-09-06): no single director owes a
+signature, so the act is stated neutrally and the obligation lives on the join.
 
 **Ruled in passing, Meng, 2026-09-06:** `SOME m OF …` is a synonym for `AT LEAST m OF …`. His note
 on the word: _"some" is properly used in this sense in a sort of archaic sense_ — "some two of
@@ -610,7 +613,8 @@ unspecified.
    line. This is the ought-to-do / ought-to-be split the A&B memo found (its §6.3): an ought-to-be
    continuation is idempotent under parallel composition, which is why the landlord is indifferent
    to how many cheques. Where the modal inside is `MUST` (divided shares, §2.2.7.6 second form) the
-   threshold disappears and blame narrows to the performer.
+   threshold disappears and blame narrows to the performer. In the prefix form of §2.2.7.4 the house
+   style is `DO`, not `MUST` (R-T5's style note, 2026-09-06).
 3. **The deadline attaches to the `ONCE` line.** `WITHIN` after `ONCE` bounds the _state_, not each
    act. This fixes the defect of the only encoding available today — a contract recursing on the
    remaining balance re-arms its `WITHIN` on every payment, so the law's single due date on the
@@ -692,17 +696,66 @@ breach.
   _counterparts_ clause exists precisely to convert it into the barrier, so the law itself
   distinguishes them by needing a clause to move between them.
 
-##### 2.2.7.8 Rulings needed, all open
+##### 2.2.7.8 Rulings: all six RULED 2026-09-06 (marked accept)
 
-| ruling                                                                    | state                                   |
-| ------------------------------------------------------------------------- | --------------------------------------- |
-| R-T1 — `ONCE` (this section) vs `UNTIL` (the old stub) as the keyword     | **open**                                |
-| R-T2 — `WITHIN` attaches to the `ONCE` line (point 3)                     | **open**                                |
-| R-T3 — compound breach carries a set of parties (point 4)                 | **open**                                |
-| R-T4 — measure vocabulary: `sum OF amount`, `count`, `AND` of thresholds  | **open**                                |
-| R-T5 — quantifier-prefix `SOME m OF Cast …` as sugar for `EVERY … ONCE`   | **open**                                |
-| R-T6 — an armed threshold when the cast changes (memo §1.3, survivorship) | **open**                                |
-| `SOME m OF` ≡ `AT LEAST m OF`                                             | **ruled** 2026-09-06 (Meng, in passing) |
+Meng marked all six cards of the "Threshold Joins Bench" (an artifact of 2026-09-06, not in the
+tree; its marks are read back by the general-manager session) **accept**, between 14:21 and 14:24
+UTC. Each accepts the card's recommendation as written. The recommendations were one reader's and
+no adversarial pass ran on them; they are recorded here with what decided them, so that a later
+reader need not open the artifact, and so that the measurements can be re-run.
+
+| ruling                                                                                                                                       | state                                   |
+| -------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| R-T1 — the keyword is `ONCE`, for the barrier and the threshold alike                                                                        | **RULED 2026-09-06**, accept            |
+| R-T2 — `WITHIN` in both positions: on a deonton it bounds the act; after `ONCE` it bounds the state                                          | **RULED 2026-09-06**, accept            |
+| R-T3 — `BY` takes a party or a list of parties; a compound breach collects the set of unfulfilled operands                                   | **RULED 2026-09-06**, accept            |
+| R-T4 — `Aggregate OF Binder` is sugar over a general Boolean condition; `AND` of thresholds is Boolean `AND`                                 | **RULED 2026-09-06**, accept            |
+| R-T5 — the prefix `SOME m OF Cast …` is sugar only without a per-act continuation; the pattern spelling it needs was ruled 2026-09-07 (§2.4) | **RULED 2026-09-06**, accept, with note |
+| R-T6 — the cast is fixed at arming; a change of cast is an explicit event                                                                    | **RULED 2026-09-06**, accept, with note |
+| `SOME m OF` ≡ `AT LEAST m OF`                                                                                                                | ruled 2026-09-06 (Meng, in passing)     |
+
+**What decided each.** Measurements dated 2026-09-06 on `unstable` `cdc11501`.
+
+- **R-T1.** `ONCE`, `UNTIL` and `HAVE` are all absent from the keyword table of
+  `jl4-core/src/L4/Lexer.hs`. The memo's barrier marker already spells `HENCE ONCE ALL HAVE`
+  (`EVERY-EACH-JOINT-SEVERAL-MEMO.md:380-389`), and a threshold is that barrier with another
+  condition, so one word serves both; `HENCE UNTIL ALL HAVE` reads as its own opposite. Corpus
+  `UNTIL` is 16 non-comment lines in 5 files, every one inside the backticked name `` `WAIT UNTIL` ``,
+  which a new keyword would not break. Found on the way and owed elsewhere: the status header of
+  `SUBJECT-TO-NOTWITHSTANDING-SPEC.md` says `UNTIL` "exists as a keyword (`Lexer.hs:330`)"; it does
+  not, and that line is to be corrected in that spec's next change, not this one.
+- **R-T2.** Today's `Deonton` carries one `due :: Maybe (Expr n)` (`jl4-core/src/L4/Syntax.hs:396`),
+  parsed after the action and its `PROVIDED` guard and before `HENCE`/`LEST`. §2.2.7.6's rent needs
+  both a per-act deadline (the receipt within five days) and one deadline on the total, and the law
+  draws exactly that distinction. The grammar cost is the optional `TemporalConstraint` §2.2.7.4
+  already carries.
+- **R-T3.** `Breach Anno (Maybe (Expr n)) (Maybe (Expr n))` (`Syntax.hs:342`) holds one optional
+  party; the compound case at `jl4-core/src/L4/EvaluateLazy/Machine.hs:1698-1730` picks one operand
+  by operator and timestamp under a comment that the assignment "may be wrong if the events are
+  passed out of order wrt time". A set is what a wizard or an export needs to answer "who is in
+  breach". 34 golden files print a breach; those with compound failure will re-bless with the fuller
+  answer when this is built.
+- **R-T4.** The prelude already has `count`, `sum`, `product`, `maximum`, `minimum`, `all`, `any`,
+  `elem` (`jl4-core/libraries/prelude.l4`); `OF`, `AT` and `LEAST` are keywords. The sugar desugars
+  to the prelude call over the projected list of matching performances; the general Boolean form
+  stays writable for what the sugar cannot say; the s 177 quorum is
+  `ONCE count AT LEAST 2 AND sum OF shares AT LEAST 10%` with no special production.
+  `maximum`/`minimum` keep their `@nonexhaustive`.
+- **R-T5.** D7.6 (`SURFACE-SUGAR-CLUSTER-2026-09.md`) declined a standalone `EVERY Person p`
+  desugaring because its per-party `HENCE` would later be re-meant by this spec's barrier; the
+  restriction to no-per-act-continuation removes that hazard here, since a fork needs the `ONCE`
+  form. The variable-position spelling — `EVERY p` (§2.4, §3.1) against `EVERY Person p` (the
+  unmerged upstream draft `970a8705`) — was **ruled 2026-09-07 (§2.4): the pattern form `EVERY Tenant t`
+  is primary and `EVERY t` is the unfiltered case**, so the prefix form is no longer blocked. **Meng's note, verbatim:** _"Suggest we stylistically prefer DO to MUST in this 'not
+  all parties' special case"_ — where no single member of the cast owes the act, the neutral `DO` is
+  the house style; §2.2.7.4's example and §2.2.7.5 point 2 now say so.
+- **R-T6.** The memo's §1.3 table records release-of-one-discharges-all and survivorship, and
+  nothing about what a count threshold does when its population changes; a live cast would silently
+  re-mean a joint obligation as several. Fixed at arming, with a departure or joinder as an explicit
+  event, is the reading under which nothing re-means silently, and a live-membership quorum stays
+  writable as a measure over the ledger's member list. The card declared low confidence and that
+  stands. **Meng's note, verbatim:** _"This is why novations etc are a thing"_ — a change of party is
+  a new agreement, not a silent re-count.
 
 ##### 2.2.7.9 What would make this section true
 
@@ -732,13 +785,16 @@ Note: Since `/=` is symmetric, the argument order doesn't affect the result. The
 
 ```
 QuantifiedDeonton ::=
-    Quantifier Variable [Filter]
+    Quantifier Pattern [Filter]
         DeonticModal Action
         [TemporalConstraint]
         [HenceClause]
         [LestClause]
 
 Quantifier ::= 'EVERY' | 'EACH' | 'ALL' | 'NO'
+
+Pattern ::= Constructor Variable      -- EVERY Tenant t   : the primary form; the constructor selects the cast
+          | Variable                  -- EVERY t          : the unfiltered case; every value of the actor type
 
 Filter ::= 'WHO' Predicate
          | 'WHERE' Predicate
@@ -758,6 +814,21 @@ Continuation ::= Deonton
                | 'FULFILLED'
                | 'BREACH'
 ```
+
+**RULED 2026-09-07 (Meng, in session, on the GM's measured recommendation), verbatim:** _"Ok: the
+pattern form as primary, EVERY Tenant t, with EVERY t as the unfiltered case."_
+
+**What decided it.** Under the value-actor encoding (`doc/concepts/legal-modeling/actors-and-actions.md`)
+`Tenant` is not a type but a **constructor** of `Actor`, so the word before the variable is a
+_pattern_ that selects the cast — exactly as `Pay t theLandlord amount` is a pattern over actions —
+and not a type annotation. The bare `EVERY t` therefore ranges over every value of the actor type,
+landlord included, until a `WHO` filter narrows it. Both spellings fit one production, `Quantifier
+Pattern`, and the variable stays last, as in the unmerged upstream draft `970a8705`. Measured
+2026-09-07 on `unstable`: this document wrote the bare form on 28 code lines (typed from the
+`DEONTIC` signature) and the pattern form on 2 (§2.2.7.6); the upstream draft wrote `EVERY Person p`
+throughout. **The bare-form examples below remain valid as the unfiltered case**; new examples use
+the pattern form where a cast is meant. This ruling unblocks R-T5's prefix sugar (§2.2.7.8).
+Nothing is built.
 
 ## 3. Semantics Overview
 

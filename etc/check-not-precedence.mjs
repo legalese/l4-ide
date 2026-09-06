@@ -21,8 +21,13 @@
 // is swallowed; and a single line ALWAYS swallows, because everything after the
 // `NOT` on its own line is necessarily further right.
 //
-// It is silent: the module typechecks and returns a wrong BOOLEAN. It is not
-// hypothetical. In the sg-succession corpus it fired twice:
+// It WAS silent: the module typechecked and returned a wrong BOOLEAN. Since
+// SET-OPERATORS-SPEC §18.3 (ruling R-NOT-1, step 2) the compiler refuses the
+// same-line form -- `NOT a AND b` and `NOT (a) AND b` are check errors
+// (jl4-core/src/L4/Lint/NotReach.hs), wherever a file is checked. This file
+// is what covers the files that are NOT checked; see "WHAT THIS STILL DOES"
+// below. Before the refusal it was not hypothetical. In the sg-succession
+// corpus it fired twice:
 //
 //   * ISA s 7 rule 1 ("a surviving spouse, no issue and no parent"),
 //     transcribed the obvious way, gave a widow the WHOLE estate where rule 4
@@ -47,6 +52,26 @@
 // This linter therefore flags a `NOT` that is NOT enclosed in a parenthesis
 // group closing before the next connective at its own nesting level. A `NOT`
 // with no following connective is left alone.
+//
+// WHAT THIS STILL DOES, NOW THAT THE COMPILER REFUSES THE SAME-LINE FORM.
+// Measured 2026-09-07 on the tree that shipped the refusal: this sweep covers
+// 911 `.l4` files. 520 of them are type-checked by the golden suite or by
+// `doc/test-docs.sh`, and the compiler's refusal reaches every one of those.
+// Of the other 390, some are checked by other suites (`jl4/tests-cli/fixtures`,
+// `jl4-mlir/test/fixtures`, the exporter example directories), but at least
+// 187 are checked by NOTHING in CI: `jl4/experiments/` (154), `paper/` (16),
+// `p4-design/scratch/` (11) and `jl4/examples/experiments/` (6). A same-line
+// `NOT … AND …` written there is exactly as wrong as it ever was, and only this
+// file sees it -- with no build, in about a second, which is also why it can
+// run in the `corpus-goldens` job that has no Haskell toolchain. So it stays.
+// The two checks overlap on purpose; the overlap is the checked corpus, and
+// the linter's own value is the remainder.
+//
+// It follows that the only legitimate live occurrences of the refused spelling
+// in the repository are the `not-ok/tc/` fixtures that pin the compiler's
+// message, and every one of them carries the NOT-REACH-OK marker below. A page
+// under `doc/` can no longer exhibit the broken form as live code, because
+// `doc/test-docs.sh` type-checks it; the reference page shows it in a comment.
 //
 // It is a LINTER over source text, not a parser, and it deliberately reads ONE
 // LINE AT A TIME. That is not laziness, it is the point: the multi-line cases
@@ -321,15 +346,18 @@ for (const f of findings) {
   );
   console.log(`    ${f.text}`);
   console.log(
-    `    NOT takes the WHOLE following expression, so this reads as NOT ( ... ${f.connective} ... ).`,
+    `    NOT takes the WHOLE following expression, so this reads as NOT ( ... ${f.connective} ... ),`,
   );
   console.log(
-    `    Write (NOT x) ${f.connective} ... if that is what you meant. Parenthesising`,
+    `    and l4 check refuses the spelling. Write NOT ( ... ${f.connective} ... ) if that is what`,
   );
   console.log(
-    `    the OPERAND -- NOT (x) ${f.connective} ... -- does NOT help; the bracket must`,
+    `    you meant, or (NOT x) ${f.connective} ... if only x is negated. Parenthesising the`,
   );
-  console.log(`    close around the NOT itself.`);
+  console.log(
+    `    OPERAND -- NOT (x) ${f.connective} ... -- does NOT help; the bracket must close around`,
+  );
+  console.log(`    the NOT itself.`);
 }
 if (suppressed.length) {
   console.log(

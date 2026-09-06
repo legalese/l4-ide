@@ -1,0 +1,17 @@
+`narrow` with `FALSE` and `FALSE`
+`wide` with `FALSE` and `FALSE`
+`stopped` with `FALSE` and `FALSE`
+`swallowed` with `FALSE` and `FALSE`
+`stoppedLeft` with `FALSE` and `FALSE`
+`lastOnLine` with `TRUE` and `FALSE`
+`groupThenNextLine` with `FALSE` and `FALSE`
+`exception` with `TRUE`, `TRUE` and `FALSE`
+`exception` with `TRUE`, `TRUE` and `TRUE`
+`isNotZero` with 0
+`isNotZero` with 5
+not `narrow` with `FALSE` and `FALSE`
+`wide` with `FALSE` and `FALSE`
+not `stopped` with `FALSE` and `FALSE`
+`swallowed` with `FALSE` and `FALSE`
+not `stoppedLeft` with `FALSE` and `FALSE`
+`lastOnLine` with `TRUE` and `FALSE`

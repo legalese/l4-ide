@@ -1066,7 +1066,7 @@ DECIDE deep IF
 
 #### 3e: XOR (Neither value determines)
 
-**L4:** `DECIDE xor_example IF (a AND NOT b) OR (NOT a AND b)`
+**L4:** `DECIDE xor_example IF (a AND NOT b) OR ((NOT a) AND b)`
 
 **No input:**
 
@@ -1340,7 +1340,7 @@ describe "edge cases" $ do
     (head resp.required).name `shouldBe` "x"
 
   it "XOR gives equal priority to both variables" $ do
-    -- (a AND NOT b) OR (NOT a AND b)
+    -- (a AND NOT b) OR ((NOT a) AND b)
     resp <- partialEval "xor_func" Map.empty
     resp.result `shouldBe` Nothing
     length resp.required `shouldBe` 2
