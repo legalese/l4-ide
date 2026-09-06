@@ -772,6 +772,10 @@ Kept so that no later session re-proposes one without meeting its witness.
    and docs, `doc/reference/types/ASSUME.md` carrying the notice and the recipe (`CLAUDE.md` §6);
    then keyword removal together with the dead `LocalAssume` grammar (`Syntax.hs:454`,
    `Parser.hs:502`; 0 legal-corpus uses, refused by Docassemble).
+   **Status 2026-09-06:** the corpus and docs half is done — ruled by Meng that day and recorded,
+   with the measurements and the keep-list, in `IMPLICIT-PROPS-DESIGN.md` §11.1.2; the warning is
+   being built separately; keyword removal is outstanding and is additionally blocked on the Blawx
+   and relational legs, which read their input predicates from the `ASSUME` node.
 8. **Temporal**, last (§2.11).
 
 **Migration recipe by role** (counts 2026-09-04: 664 `ASSUME` lines in 105 files; legal 54, ok 97,
