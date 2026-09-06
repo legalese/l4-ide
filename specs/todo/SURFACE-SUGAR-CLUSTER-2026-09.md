@@ -96,20 +96,80 @@ as the governing text, not `IMPLICIT-PROPS-DESIGN.md` §11.5 R8, which carves `D
 
 ## D7.5 — DECLINE `GIVEN A Foo` (unnamed arguments). RULED 2026-09-06.
 
-**The ruling.** Declined. #410 is closed — **but not on the reasons the proposal gave**, and the
-closing comment must carry the corrected ones or the first reader who greps will reopen it.
+**The ruling.** Declined. #410 is **to be closed when this file lands** (the GM posts the comment;
+deputies do not — repo `CLAUDE.md` §1.1), and **not on the reasons the proposal gave**: the closing
+comment carries the grounds below, or the first reader who greps will reopen it. Meng's mark,
+verbatim, after the bench card was talked through in session rather than re-marked:
 
-**What decided it, corrected.** Two grounds survive: kosmikus's two-spellings objection, which is
-**his own issue's** and has stood unrebutted for sixteen months; and **constructor shadowing** —
-`GIVEN A Person` binds a term named `Person`, so the body can no longer construct a `Person`.
+> Decline; option 1; but append additional reasoning against it, from the above discussion it is
+> likely to be a bad idea and regretted the moment we implement it.
+
+**What #410 asks.** kosmikus, 2025-05-08: write `GIVEN A Foo` and have `Foo`, of type `Foo`, in
+scope. His own comment six days later argued against it — no syntactic split between type and value
+names, `GIVEN x` already infers, the article is optional after `IS`, so `GIVEN BOOLEAN` and
+`GIVEN A BOOLEAN` would both be legal with different meanings, "I'm afraid this is confusing" — and
+nobody has replied since. The issue is open, labelled `needs discussion`.
+
+**What decided it — three grounds, each re-checkable with the binary.** Probes run 2026-09-06 on
+the installed `l4` with `JL4_LIBRARY_PATH` unset (embedded prelude), against
+`DECLARE Person HAS name IS A STRING, age IS A NUMBER`:
+
+1. **The feature already exists, in a shorter spelling.** `GIVEN Person` — no `IS A` — parses,
+   checks and runs today: it binds a term named `Person` with its type inferred, and
+   `Person's age AT LEAST 18` in the body checks. `GIVEN Person IS A Person` also checks and
+   evaluates. So the article would buy exactly one thing, pinning the type, and `IS A Person`
+   already spells that. #410 asks for a three-word form of something writable in two.
+2. **Constructor shadowing is inherent in the spelling, not incidental.** With any input named
+   `Person` in scope the body cannot construct a `Person`:
+   `Person WITH name IS Person's name, age IS Person's age PLUS 1` fails with _"You are trying to
+   apply Person (predefined) of type Person6 (which is not a function) to (named) arguments"_. The
+   proposal's whole point is that the term is named after its type, so every body that later needs
+   to build its input — or, under #438's `BUT WITH`, copy it — hits this. Enumerations escape it
+   (their constructors are not the type name); record types, which are what legal encodings pass
+   around, do not. No warning fires today when a `GIVEN` binder hides a constructor.
+3. **The demand it would serve cannot be spelled by it.** Measured 2026-09-06 over `jl4`,
+   `jl4-core`, `doc`, `skills` and `legalese/canon` (comments stripped; `GIVEN` blocks including
+   continuation lines): **6,753** typed inputs; **499 in 65 files** name the input after its own
+   type case-insensitively (`GIVEN person IS A Person` — jl4 271, jl4-core 47, doc 25, canon 156);
+   **865 in 192 files** use the initial letter (`GIVEN p IS A Person`); **exactly one** uses the
+   type's own case (`jl4/experiments/safe-post.l4:254`, `GIVEN Company IS A Company`). The corpus
+   wants terseness and spells it lowercase, and lowercase is the one thing `GIVEN A Person` cannot
+   produce without mangling the case of the name. `doc/STYLE.md:139` moreover tells every doc page
+   to name the person (`GIVEN alex IS A Person`), so the audience the English-like reading would
+   help is already routed the other way.
+
+**Why it would be regretted the moment it shipped** (the "additional reasoning" Meng's mark asks
+for, from the 2026-09-06 discussion):
+
+- Shipping it makes the same-name idiom the _taught_ form. Ground 2 then bites at every site whose
+  body later grows a construction or a `BUT WITH`, and the repair at each site is to rename the
+  input — that is, to rewrite it back into today's form.
+- It adds a third spelling of one thing to the cheat sheet (`GIVEN Person`,
+  `GIVEN Person IS A Person`, `GIVEN A Person`), and kosmikus's objection survives in reduced form:
+  two legal spellings one article apart whose difference — pinned versus inferred type — is the
+  same as between `GIVEN x` and `GIVEN x IS A T`. Real, small, and one more thing to teach.
+- The statute-isomorphism argument for it ("a person … the person") has no back half:
+  `THE Person's age` in a body is a parse error today, so the sugar would read like the source on
+  the `GIVEN` line and unlike it everywhere else.
+- Sugar in a corpus is a migration to remove; a decline costs nothing to reverse. Nothing becomes
+  impossible — the workaround is the two-word form that already exists.
+
+**Two alternatives were put and not taken.** A narrow accept (`GIVEN A Foo` desugars to
+`GIVEN Foo IS A Foo`, article required, bare type names only, plus a hides-constructor warning; one
+parser alternative) and a hold gated on a `THE Foo` back-reference landing. If such a back-reference
+ever lands, that is the moment to revisit — not before.
 
 **Adversarially weakened; two stated reasons are measurably false and are struck.** _"Zero
-measurable demand" is wrong by an order of magnitude — parameters named after their own type number
-**259 in 53 l4-ide files** on one filter and 364 in 42 on another, more than the populations the
-proposal compared against, so the comparison inverts. "An ambiguity you cannot lint away" is also
-wrong: `A`/`AN`/`THE` are keyword tokens (`Lexer.hs:270-273`), so with the article required a
-name-clash warning is mechanical and would fire on zero sites today._ **Neither may appear in the
-closing comment.**
+measurable demand" is wrong by an order of magnitude — the refuters counted parameters named after
+their own type at 259 in 53 l4-ide files on one filter and 364 in 42 on another (the GM's wider
+count above, 499 in 65 with canon, supersedes both for the closing comment); that is more than the
+populations the proposal compared against, so the comparison inverts. "An ambiguity you cannot lint
+away" is also wrong: `A`/`AN`/`THE` are keyword tokens (`Lexer.hs:270-273`), so with the article
+required a name-clash warning is mechanical and would fire on one site today._ **Neither may appear
+in the closing comment.**
+
+**Side finding, unfiled.** The shadowing diagnostic leaks an inference gensym (`Person6`) and labels
+the input "(predefined)". Wording only; not this ruling's business.
 
 ---
 
