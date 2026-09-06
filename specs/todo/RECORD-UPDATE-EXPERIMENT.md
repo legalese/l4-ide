@@ -1,5 +1,9 @@
 # Record-Update Readability Experiment — §8.1 / §9 step 0 of `RECORD-UPDATE-SPEC.md`
 
+> **Status (2026-09-06): WAIVED BY MENG, NOT RUN — see §7.** Prepared 2026-08-24 and never run;
+> `RECORD-UPDATE-SPEC.md` §9 step 0 carries the waiver and what it does not settle. The materials
+> below are kept intact so the experiment remains available to anyone who wants the evidence later.
+>
 > **Status (2026-08-24): PREPARED, NOT RUN.** Version A below is extracted verbatim from
 > `jl4/examples/legal/bna/bna.l4` on this branch @ `d55fb196`. Version B is **to be written by
 > hand** and the verdict section is empty. This file is the materials and protocol for the
@@ -341,5 +345,19 @@ trap)._
 
 ## 7. Verdict
 
-_Pending. Record: the judge's four answers, the date, and the §8.1 disposition (R1 stands / R1
-flips)._
+**WAIVED by Meng, 2026-09-06. Not run.** Rulings-bench card `D7-small-language-cluster`, sub-item
+D7.2, marked accept. Verbatim:
+
+> Let's waive the D7.2 experiment. I'm all out of round tuits.
+
+**§8.1 disposition: R1 stands — unfalsified, not confirmed.** No judge read the two versions, so
+nothing here is evidence for R1; what the waiver removes is the block, not the doubt. `#438` may
+start at `RECORD-UPDATE-SPEC.md` §9 step 1.
+
+**A limit of the protocol, recorded because it bears on the waiver's cost.** This experiment could
+not have been blind: Version A is verbatim from `bna.l4` and Version B is hand-written in a syntax
+that does not exist, so any judge can tell which is which. Weigh the forgone result accordingly —
+it was never going to be as strong as §8.1's framing implies.
+
+_If it is ever run: record the judge's four answers, the date, and the disposition, and replace this
+section rather than appending to it._
