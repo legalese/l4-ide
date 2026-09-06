@@ -332,7 +332,12 @@ typecheckWithDependencies lookupModule uri source = do
             , tcdScopeMap = result.scopeMap
             , tcdNlgMap = result.nlgMap
             , tcdDescMap = result.descMap
-            , tcdSuccess = null result.errors
+            -- Success is decided by severity, as the Shake typecheck rule
+            -- decides it: only an SError blocks. Infos (#CHECK) and warnings
+            -- (exhaustiveness, the ASSUME deprecation) leave the module
+            -- successful. Keying this on "no diagnostics at all" made a
+            -- warning-bearing module unsuccessful through this API alone.
+            , tcdSuccess = not (any ((== TypeCheck.SError) . TypeCheck.severity) result.errors)
             , tcdResolvedImports = resolvedImports
             , tcdUri = uri
             , tcdSectionPaths = result.sectionPaths

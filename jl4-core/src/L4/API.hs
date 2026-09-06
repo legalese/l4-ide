@@ -229,8 +229,12 @@ l4Eval source =
         , "diagnostics" .= Vector.fromList (map importErrorToDiagnostic errors)
         ]
     Right result ->
-      -- Only fail on actual errors; SInfo items (e.g. #CHECK type annotations) are informational
-      let actualErrors = filter (\e -> severity e /= SInfo) result.tcdErrors
+      -- Only fail on actual errors: SInfo items (e.g. #CHECK type annotations)
+      -- are informational, and SWarn items (exhaustiveness, the ASSUME
+      -- deprecation) are warnings the checker has already decided do not
+      -- block. Keying this on "not SInfo" made every warning fatal here while
+      -- the LSP, `l4 check` and the service all let the file through.
+      let actualErrors = filter (\e -> severity e == SError) result.tcdErrors
       in if not (null actualErrors)
         then
           -- Return type check errors as diagnostics
@@ -598,7 +602,9 @@ l4VisualizeByName source uriText version functionName simplify =
         [ "error" .= Text.intercalate "; " errors
         ]
     Right result ->
-      if not (null result.tcdErrors)
+      -- Only an SError-severity diagnostic is a type check error; a #CHECK
+      -- info or a warning (exhaustiveness, the ASSUME deprecation) is not.
+      if any ((== SError) . severity) result.tcdErrors
         then
           encodeJson $ Aeson.object
             [ "error" .= ("Type check error" :: Text)
