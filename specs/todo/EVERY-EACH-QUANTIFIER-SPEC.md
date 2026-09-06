@@ -391,6 +391,37 @@ EVERY d
 | `EVERY`    | Barrier/Join      | Collects all completions, fires HENCE **once** when all done |
 | `EACH`     | Fork/Distributive | Fires HENCE **for each** completion independently            |
 
+> **Proposed vocabulary — Meng, 2026-09-06, not yet ruled.** _"The EVERY vs EACH semantics may not
+> stand up to scrutiny from a noob persona — we may prefer to say 'jointly' vs 'severally' for the
+> barrier join vs the distributive semantics."_ The mapping is to the classical contract-law
+> distinction, not to Pattern C's hybrid: a **joint** obligation is one promise by several promisors
+> together, discharged only when all perform, with one breach — the barrier, one `HENCE`, one
+> `LEST`; **several** obligations are separate promises, each independently enforceable with its own
+> breach — the fork, and §6.3's indexed blame is several liability's per-obligor breach. A bare
+> `EVERY p MUST X` with no continuation is a `RAND` chain over the inhabitants under either name
+> (`RAND` is "parallel AND — all must be fulfilled", `doc/reference/regulative/README.md`).
+>
+> **The false friend this must avoid.** This spec already uses the words for two _other_ patterns it
+> defers as harder (§2.2 Patterns C and D, and the proposed syntax at §2.4): _"jointly and severally
+> liable"_ — the creditor may pursue any obligor for the whole, a shared-resource semantics — and
+> _"jointly execute"_ — one coordinated act, not several acts joined afterwards. If `JOINTLY` names
+> the barrier, a reader must not import Pattern D's single act; if `SEVERALLY` names the fork, a reader
+> must not import Pattern C's each-for-the-whole. `JOINTLY AND SEVERALLY` therefore stays a distinct,
+> still-deferred construct and is **not** the composition of the two modifiers.
+>
+> **Measured (2026-09-06, `unstable` @ `cd4d4680`):** neither `JOINTLY` nor `SEVERALLY` is a lexer
+> keyword (nor are `EVERY`/`EACH`); the only bare uppercase corpus occurrences are two lines of one
+> `--` comment in `sg-succession/cleanroom-2026-08/guardianship-of-infants-act.l4:1294`, so reserving
+> either breaks nothing; the source texts we encode use the words — 45 files under `jl4/examples` and
+> 20 under `canon` contain _jointly_ or _severally_, many in Reg CF's arithmetic sense ("calculated
+> jointly with that person's spouse"), which the phrasebook must keep apart from the obligation sense.
+>
+> **Sketch, not ruled:** one quantifier, the join made explicit — `EVERY Person p MUST sign JOINTLY
+HENCE …` / `… SEVERALLY HENCE …` — the bare form meaning whichever this spec rules as the default.
+> Whether the two English words survive a lawyer's reading better than `EVERY`/`EACH` survives a
+> beginner's is the question; the argument for them is that the distinction is one lawyers already
+> draw and a first-time reader can be taught in a sentence.
+
 **EVERY (barrier):**
 
 ```l4
