@@ -2,6 +2,8 @@
 
 How L4 models obligations, permissions, and prohibitions — and how those rules play out against a stream of events.
 
+> **Reading order.** This page is the reference-style account. If you would rather start from one lease and one screen at a time, the tutorial series [One Obligation](../../tutorials/obligations/one-obligation.md) → [What Follows](../../tutorials/obligations/what-follows.md) → [Several Parties](../../tutorials/obligations/several-parties.md) builds the same material up in that order, and [The Regulative Layer, Whole](regulative-layer-whole.md) lays out how the five separate ideas on this page fit together and which are still proposed.
+
 ---
 
 ## What Are Regulative Rules?
@@ -557,6 +559,8 @@ Key conceptual takeaways:
 
 ## Further Reading
 
+- [One Obligation](../../tutorials/obligations/one-obligation.md), [What Follows](../../tutorials/obligations/what-follows.md), [Several Parties](../../tutorials/obligations/several-parties.md), [What Is Coming](../../tutorials/obligations/what-is-coming.md) — The tutorial series: one tenancy, one screen at a time
+- [The Regulative Layer, Whole](regulative-layer-whole.md) — How the five separate ideas on this page fit together, and which are proposed rather than built
 - [Foundation Course Module 6](../../courses/foundation/module-6-regulative.md) — Hands-on tutorial
 - [Regulative Rule Keywords](../../reference/regulative/README.md) — Full keyword reference
 - [DEONTIC](../../reference/regulative/DEONTIC.md) — The regulative type, in detail

@@ -553,3 +553,4 @@ One `ASSUME` does not migrate this way. `ASSUME T IS A TYPE` does not name a fac
 - [Exporting Rules for Deployment](../deploying-rules/exporting-rules-for-deployment.md) — putting these two questions behind a live address
 - [Using the l4 command line](../getting-started/l4-cli.md) — `l4 batch` and the rest of the command line
 - [Encoding Legislation](../getting-started/encoding-legislation.md) — turning a longer provision into rules
+- [One Obligation](../obligations/one-obligation.md) — from facts and definitions to duties: who must do what, by when, and what follows

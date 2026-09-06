@@ -36,6 +36,7 @@ _More topics planned: Layout Sensitivity, Scope_
 Representing legal concepts in code
 
 - **[Regulative Rules](legal-modeling/regulative-rules.md)** - Obligations, permissions, prohibitions
+- **[The Regulative Layer, Whole](legal-modeling/regulative-layer-whole.md)** - The five separate ideas that make up an obligation in L4, told as five questions about one tenancy, and which of them are built and which are still proposed
 - **[Constitutive vs Regulative Rules](legal-modeling/constitutive-vs-regulative.md)** - Definitions vs duties, and why L4 separates them at the type level
 - **[Default Reasoning and Exceptions](legal-modeling/default-reasoning.md)** - Defeasibility, UNLESS, and encoding general-rule-plus-exception structure
 - **[Five Kinds of No Answer](legal-modeling/non-answers.md)** - What a person can mean by "there is no answer": a value that may be absent, a failure with a reason, a fact nobody has supplied, a law not in force, and a model that does not cover the case

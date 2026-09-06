@@ -220,5 +220,7 @@ Advance time in traces without events:
 ## Further Reading
 
 - [Regulative Rules Concept](../../concepts/legal-modeling/regulative-rules.md) — Deep dive into deontic logic
+- [The Regulative Layer, Whole](../../concepts/legal-modeling/regulative-layer-whole.md) — The five separate ideas behind a DEONTIC value, and which are still proposed
+- [One Obligation](../../tutorials/obligations/one-obligation.md) — The tutorial series starts here: write one obligation and play it forward
 - [Foundation Module 5](../../courses/foundation/module-6-regulative.md) — Tutorial on regulative rules
 - [Tom Hvitved's PhD Thesis](https://di.ku.dk/english/research/phd/phd-theses/2011/hvitved12phd.pdf) — Theoretical foundation

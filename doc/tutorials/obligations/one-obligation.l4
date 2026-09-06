@@ -1,0 +1,128 @@
+-- Companion file for the tutorial "One Obligation".
+--
+-- A residential tenancy: Ms Ng lets a flat to Alice. Three rules from the
+-- lease, one of each kind:
+--
+--   the rent is due       -- Alice MUST pay 1500 by the seventh day
+--   the inspection right  -- Ms Ng MAY inspect the flat, on notice, once a month
+--   no subletting         -- Alice SHANT sublet the flat
+--
+-- Every example on the tutorial page that runs today also lives here, in the
+-- order the page presents them. Run it with:
+--     l4 run one-obligation.l4
+
+
+-- ====================================================================
+-- Who can act, and what can be done.
+-- Each act names the person who does it as its first entry: the payer
+-- of a payment, the inspector of an inspection, the tenant who sublets.
+-- ====================================================================
+
+DECLARE Actor IS ONE OF Alice, `Ms Ng`
+
+DECLARE Action IS ONE OF
+    Pay     HAS payer     IS AN Actor
+                payee     IS AN Actor
+                amount    IS A NUMBER
+    Inspect HAS inspector IS AN Actor
+    Sublet  HAS tenant    IS AN Actor
+
+
+-- ====================================================================
+-- Step 3. One obligation, all five parts written out.
+-- ====================================================================
+
+GIVETH A DEONTIC Actor Action
+`the rent is due` MEANS
+    PARTY  Alice
+    MUST   EXACTLY (Pay Alice `Ms Ng` 1500)
+    WITHIN 7
+    HENCE  FULFILLED
+    LEST   BREACH BY Alice BECAUSE "the rent was not paid by the seventh day"
+
+
+-- ====================================================================
+-- Step 4. Three things that can happen.
+-- ====================================================================
+
+-- Alice pays on day 5: done.
+#TRACE `the rent is due` AT 0 WITH
+    PARTY Alice DOES Pay Alice `Ms Ng` 1500 AT 5
+
+-- Alice pays on day 9: too late.
+#TRACE `the rent is due` AT 0 WITH
+    PARTY Alice DOES Pay Alice `Ms Ng` 1500 AT 9
+
+-- Nothing has happened yet: the obligation is still open.
+#TRACE `the rent is due` AT 0 WITH
+
+
+-- ====================================================================
+-- Step 5. The clock.
+-- ====================================================================
+
+-- Exactly on day 7: still in time.
+#TRACE `the rent is due` AT 0 WITH
+    PARTY Alice DOES Pay Alice `Ms Ng` 1500 AT 7
+
+-- Day 8 arrives and nobody has done anything.
+#TRACE `the rent is due` AT 0 WITH
+    (`WAIT UNTIL` 8)
+
+-- Something else happens first: Ms Ng inspects on day 2. Alice's
+-- obligation is untouched, but the clock has moved on.
+#TRACE `the rent is due` AT 0 WITH
+    PARTY `Ms Ng` DOES Inspect `Ms Ng` AT 2
+
+-- The month starts on day 100 instead of day 0: the deadline is day 107.
+#TRACE `the rent is due` AT 100 WITH
+    PARTY Alice DOES Pay Alice `Ms Ng` 1500 AT 106
+
+-- The wrong amount is not the payment the lease asks for.
+#TRACE `the rent is due` AT 0 WITH
+    PARTY Alice DOES Pay Alice `Ms Ng` 1000 AT 5
+
+
+-- ====================================================================
+-- Step 6. May: a right, not a duty.
+-- ====================================================================
+
+GIVETH A DEONTIC Actor Action
+`the inspection right` MEANS
+    PARTY  `Ms Ng`
+    MAY    Inspect `Ms Ng`
+    WITHIN 30
+    HENCE  FULFILLED
+    LEST   FULFILLED
+
+-- Ms Ng inspects on day 12: the right was used.
+#TRACE `the inspection right` AT 0 WITH
+    PARTY `Ms Ng` DOES Inspect `Ms Ng` AT 12
+
+-- Thirty days pass and Ms Ng never comes: nobody is in breach.
+#TRACE `the inspection right` AT 0 WITH
+    (`WAIT UNTIL` 31)
+
+
+-- ====================================================================
+-- Step 7. Shall not: the outcomes swap places.
+-- ====================================================================
+
+GIVETH A DEONTIC Actor Action
+`no subletting` MEANS
+    PARTY  Alice
+    SHANT  Sublet Alice
+    WITHIN 365
+    HENCE  FULFILLED
+    LEST   BREACH BY Alice BECAUSE "the flat was sublet"
+
+-- Alice sublets on day 40: the prohibition is broken.
+#TRACE `no subletting` AT 0 WITH
+    PARTY Alice DOES Sublet Alice AT 40
+
+-- A year passes and Alice never sublets: the prohibition was kept.
+#TRACE `no subletting` AT 0 WITH
+    (`WAIT UNTIL` 366)
+
+-- Nothing has happened yet.
+#TRACE `no subletting` AT 0 WITH

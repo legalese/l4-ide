@@ -1,0 +1,145 @@
+-- Companion file for "The Regulative Layer, Whole".
+--
+-- One tenancy, used to show that the five ideas behind an L4 obligation are
+-- five separate choices. Every example on that page that runs today is here,
+-- in the order the page presents them, together with a few extra runs of the
+-- same rules that the page describes in prose rather than showing. Run it with:
+--     l4 run regulative-layer-whole-example.l4
+
+
+-- ====================================================================
+-- Question 4 first, because every other question uses its answer:
+-- who can act, and what can be done. Each act names its doer first.
+-- ====================================================================
+
+DECLARE Actor IS ONE OF Alice, Bob, `Ms Ng`, `Mr Lim`
+
+DECLARE Action IS ONE OF
+    Pay     HAS payer  IS AN Actor
+                payee  IS AN Actor
+                amount IS A NUMBER
+    Receipt HAS issuer IS AN Actor
+                to     IS AN Actor
+                amount IS A NUMBER
+    Inspect HAS inspector IS AN Actor
+
+
+-- ====================================================================
+-- Question 1. One obligation: five parts, three outcomes.
+-- ====================================================================
+
+GIVETH A DEONTIC Actor Action
+`the rent is due` MEANS
+    PARTY  Alice
+    MUST   EXACTLY (Pay Alice `Ms Ng` 1500)
+    WITHIN 7
+    HENCE  FULFILLED
+    LEST   BREACH BY Alice BECAUSE "the rent was not paid by the seventh day"
+
+#TRACE `the rent is due` AT 0 WITH
+    PARTY Alice DOES Pay Alice `Ms Ng` 1500 AT 5
+
+#TRACE `the rent is due` AT 0 WITH
+    (`WAIT UNTIL` 8)
+
+#TRACE `the rent is due` AT 0 WITH
+    PARTY `Ms Ng` DOES Inspect `Ms Ng` AT 2
+
+
+-- ====================================================================
+-- Question 2. Combining: in sequence (HENCE / LEST) and at once (RAND / ROR).
+-- ====================================================================
+
+-- In sequence: a receipt follows the payment; a guarantor follows a default.
+GIVETH A DEONTIC Actor Action
+`rent, receipt, guarantee` MEANS
+    PARTY  Alice
+    MUST   EXACTLY (Pay Alice `Ms Ng` 1500)
+    WITHIN 7
+    HENCE  PARTY  `Ms Ng`
+           MUST   EXACTLY (Receipt `Ms Ng` Alice 1500)
+           WITHIN 5
+           HENCE  FULFILLED
+           LEST   BREACH BY `Ms Ng` BECAUSE "no receipt was issued"
+    LEST   PARTY  `Mr Lim`
+           MUST   EXACTLY (Pay `Mr Lim` `Ms Ng` 1500)
+           WITHIN 14
+           HENCE  FULFILLED
+           LEST   BREACH BY `Mr Lim` BECAUSE "the guarantor did not pay the rent"
+
+#TRACE `rent, receipt, guarantee` AT 0 WITH
+    PARTY Alice DOES Pay Alice `Ms Ng` 1500 AT 6
+
+#TRACE `rent, receipt, guarantee` AT 0 WITH
+    (`WAIT UNTIL` 8)
+
+-- At once: two flatmates each owe a share (all of these) ...
+GIVETH A DEONTIC Actor Action
+`two shares` MEANS
+    (PARTY Alice MUST EXACTLY (Pay Alice `Ms Ng` 750) WITHIN 7 HENCE FULFILLED LEST BREACH BY Alice)
+    RAND
+    (PARTY Bob   MUST EXACTLY (Pay Bob   `Ms Ng` 750) WITHIN 7 HENCE FULFILLED LEST BREACH BY Bob)
+
+#TRACE `two shares` AT 0 WITH
+    PARTY Alice DOES Pay Alice `Ms Ng` 750 AT 2
+
+-- ... or either of them may pay the whole (any of these).
+GIVETH A DEONTIC Actor Action
+`either pays the whole` MEANS
+    (PARTY Alice MUST EXACTLY (Pay Alice `Ms Ng` 1500) WITHIN 7 HENCE FULFILLED LEST BREACH BY Alice)
+    ROR
+    (PARTY Bob   MUST EXACTLY (Pay Bob   `Ms Ng` 1500) WITHIN 7 HENCE FULFILLED LEST BREACH BY Bob)
+
+#TRACE `either pays the whole` AT 0 WITH
+    PARTY Bob DOES Pay Bob `Ms Ng` 1500 AT 2
+
+#TRACE `either pays the whole` AT 0 WITH
+    (`WAIT UNTIL` 8)
+
+
+-- ====================================================================
+-- Question 3. What happened: a blank filled from the event, tested, handed on.
+-- ====================================================================
+
+GIVEN who    IS AN Actor
+      amount IS A NUMBER
+GIVETH A DEONTIC Actor Action
+`a receipt to` who amount MEANS
+    PARTY  `Ms Ng`
+    MUST   EXACTLY (Receipt `Ms Ng` who amount)
+    WITHIN 5
+    HENCE  FULFILLED
+    LEST   BREACH BY `Ms Ng` BECAUSE "no receipt was issued"
+
+GIVETH A DEONTIC Actor Action
+`rent, any amount over` MEANS
+    PARTY  Alice
+    MUST   Pay Alice `Ms Ng` amount PROVIDED amount AT LEAST 1500
+    WITHIN 7
+    HENCE  `a receipt to` Alice amount
+    LEST   BREACH BY Alice BECAUSE "the rent was not paid by the seventh day"
+
+#TRACE `rent, any amount over` AT 0 WITH
+    PARTY Alice   DOES Pay Alice `Ms Ng` 1600     AT 6
+    PARTY `Ms Ng` DOES Receipt `Ms Ng` Alice 1600 AT 9
+
+
+-- ====================================================================
+-- Question 4. An act with the doer left open, used with EXACTLY.
+-- ====================================================================
+
+GIVEN who    IS AN Actor
+      amount IS A NUMBER
+GIVETH AN Action
+`payment by` who amount MEANS Pay who `Ms Ng` amount
+
+GIVETH A DEONTIC Actor Action
+`rent, by whoever is named` MEANS
+    PARTY  Alice
+    MUST   EXACTLY (`payment by` Alice 1500)
+    WITHIN 7
+    HENCE  FULFILLED
+    LEST   BREACH BY Alice
+
+#TRACE `rent, by whoever is named` AT 0 WITH
+    PARTY Alice DOES Pay Alice `Ms Ng` 1500 AT 3
