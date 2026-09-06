@@ -1350,13 +1350,15 @@ an experiment that had been prepared and not run since 2026-08-24. The materials
 `RECORD-UPDATE-EXPERIMENT.md` for anyone who later wants the evidence; its §7 records the waiver
 rather than a verdict.
 
-**One thing the waiver does not reach, and it is a mark only Meng can make.** R2 reversed the
-spelling Meng himself filed on #438 — bare `WITH` became `BUT WITH` (`4193c42c`, 2026-08-19) — and
-that reversal was conceded to a model judge and has **never been marked by him**. Measured
-2026-09-06: `grep -c 'marked accept' specs/todo/RECORD-UPDATE-SPEC.md` → **0**, against 6 in
-`IMPLICIT-PROPS-DESIGN.md`. So `BUT WITH` is ratified-by-silence, not ratified. Before step 1
-reserves the keyword, that is worth one sentence from him. (Reserving `BUT` breaks **0** of 907
-`.l4` files; the 5 grep hits are inside backticked section headings, which are opaque to keywords.)
+**A mark I listed as owed here, and then withdrew the same day.** An earlier version of this note
+said R2's `BUT WITH` had "never been marked by Meng" — following the adversarial verdict, which had
+counted `(marked accept)` strings and found 0 in this file against 6 in `IMPLICIT-PROPS-DESIGN.md`.
+**That was a house-style difference read as a missing ruling.** `BUT WITH` **is** ruled, by him:
+`:822` records R2 as ruled 2026-08-19, and the commit that wrote it, `4193c42c`, is under his name,
+titled "rule `alice BUT WITH age IS 31`, reversing R2", and carries both halves of the reasoning.
+Meng, 2026-09-06: _"BUT WITH was agreed; I thought it was settled."_ Nothing is owed. (Reserving
+`BUT` breaks **0** of 907 `.l4` files; the 5 grep hits are inside backticked section headings, which
+are opaque to keywords.)
 
 **Also owed before step 2, and not done here:** §3's consumer census is stale — 18 `AppNamed`
 consumers when written, **21** now, including the new `dischargeModule` pass, whose order against

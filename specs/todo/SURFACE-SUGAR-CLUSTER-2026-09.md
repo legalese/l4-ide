@@ -26,6 +26,13 @@
 
 - **D7.2 (#438, record update)** — `RECORD-UPDATE-SPEC.md` §9 step 0 and
   `RECORD-UPDATE-EXPERIMENT.md` §7. Meng waived the experiment; see those two files.
+  **Addendum, 2026-09-06 — a correction to the adversarial verdict, and it removes a mark I had
+  listed as owed.** The refuter reported `BUT WITH` as "never marked by Meng". It was ruled, by him:
+  `RECORD-UPDATE-SPEC.md:822` records R2 as ruled 2026-08-19, and the commit that wrote it,
+  `4193c42c`, is under his name and titled "rule `alice BUT WITH age IS 31`, reversing R2", with
+  both halves of the reasoning in its message. His words, 2026-09-06: _"BUT WITH was agreed; I
+  thought it was settled."_ It was. The refuter had compared two house styles — counting
+  `(marked accept)` strings — and read the absence of one convention as the absence of a ruling.
 - **D7.4 (#909, `CONSIDER` exhaustiveness → error)** — recorded beside the three
   `consider-exhaustiveness-*.md` specs, whose implemented false-positive-freeness result is its
   precondition. See `consider-exhaustiveness-scope-hardening.md`.
@@ -125,8 +132,24 @@ immovable. There is also an unmerged spec draft (`upstream/every`, `970a8705`) t
 `EVERY Person p` with `p` last, so the spec carries two spellings and must rule between them._
 
 **Cross-reference, deliberately not restated here.** The plural-quantifier idiom now has **§2.2.7
-threshold joins** on branch `spec/threshold-join` (PR #352) and the joint/several memo. Read those
-for the semantics; this ruling only says where #484 lives.
+threshold joins** on branch `spec/threshold-join` (PR #352). Read the spec for the semantics; this
+ruling only says where #484 lives.
+
+**Addendum, 2026-09-06 — Meng's own model, and it is the spec's.** _"in my mind it immediately fans
+out via an unfold of RANDs, so to speak, to as many parallel threads as there are inhabitant persons
+in the type."_ That is `EVERY-EACH-QUANTIFIER-SPEC.md`'s CSP fan-out almost verbatim: `EVERY` is the
+**barrier** (interleave, then `HENCE` once), `EACH` is the **fork** (each thread carries its own
+`HENCE`). **The one question the spec leaves open is not the semantics but the vocabulary: which
+English word means which.**
+
+**Addendum, 2026-09-06 — `JOINTLY`/`SEVERALLY` was proposed and the research says no.** Meng
+proposed the pair for barrier/fork, on the ground that a noob persona may not read `EVERY` vs `EACH`
+correctly. A research pass over doctrine, practice, civil law and the formal literature concluded
+**against** it, on the one axis that touches performance — common-law _joint_ asserts the opposite
+of a barrier (Restatement (Second) of Contracts § 293: performance by one promisor discharges the
+duty of the others) — and proposed instead that the join be marked somewhere else. The finding is
+in **`specs/todo/EVERY-EACH-JOINT-SEVERAL-MEMO.md`** (landed in PR #350); it is cited here, not
+restated, and it is the quantifier spec's ruling to make, not this cluster's.
 
 ---
 
