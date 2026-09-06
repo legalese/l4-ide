@@ -505,7 +505,7 @@ I could not continue evaluating, because I needed to know the value of
 but it is an assumed term.
 ```
 
-**What went wrong:** The rule you evaluated reads a name that stands for a fact to be supplied for each case, and nothing supplied it for this run. Two spellings produce that kind of name: a section `GIVEN`, indented under a `§` heading, and a module-level `ASSUME`. Both are blanks in the rule rather than values, and evaluation stops at the blank. A directive that stops this way makes `l4 run` exit non-zero.
+**What went wrong:** The rule you evaluated reads a name that stands for a fact to be supplied for each case, and nothing supplied it for this run. Two spellings produce that kind of name: a section `GIVEN`, indented under a `§` heading, and, in older files, a module-level `ASSUME` (deprecated). Both are blanks in the rule rather than values, and evaluation stops at the blank. A directive that stops this way makes `l4 run` exit non-zero.
 
 **How to fix it:** Decide which of three things you meant.
 
@@ -513,11 +513,9 @@ but it is an assumed term.
 - _The fact is fixed for everyone._ Define it instead of leaving it open — `` `rate` MEANS 0.2 `` — and it stops being a blank.
 - _You only wanted to see the rule's shape._ Use `#CHECK`, which reports the type without evaluating anything, rather than `#EVAL`.
 
-There is no way to fill a blank inside the file today, and `WITH` fails in two different ways depending on where it is written. ``#EVAL `tax on` 100 WITH rate IS 0.2``, with a value before the `WITH`, does not parse: `unexpected WITH`. Where the name takes no inputs of its own, `#EVAL isAdult WITH age IS 25` and `#CHECK isAdult WITH age IS 25` both parse and then report a check error, that `isAdult` is being given named inputs but is not a function.
+- _You want to try the rule on one case, inside the file._ Name the blank with `WITH` at the directive: `#EVAL isAdult WITH age IS 25` supplies a section `GIVEN` called `age` to the rule and to everything it relies on, and `#ASSERT isAdult WITH age IS 25` does the same for a test. This works only for a section `GIVEN`, not for an older `ASSUME` — written against one of those, the same line reports a check error, that `isAdult` is being given named inputs but is not a function, which is a sign the file wants migrating. A value written _before_ the `WITH`, as in ``#EVAL `tax on` 100 WITH rate IS 0.2``, does not parse (`unexpected WITH`): supply every input by name, or none.
 
-_Proposed, not landed (2026-09-04): supplying a value at the directive or the point of use with `WITH`, and the discharge that works out which blanks an entry point reads and asks for exactly those. This lands with the discharge pull request; until then supply values from outside the file (web form, `l4 batch`, application programming interface (API))._
-
-See [The section `GIVEN`](../syntax/section-given.md) and [ASSUME](../types/ASSUME.md).
+See [The section `GIVEN`](../syntax/section-given.md) and [ASSUME (deprecated)](../types/ASSUME.md).
 
 ---
 

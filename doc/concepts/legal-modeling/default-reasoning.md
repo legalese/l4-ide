@@ -21,9 +21,10 @@ Crucially, the legal text keeps the rule and its exceptions **separate**. The ge
 L4 provides `UNLESS` for exactly this structure. Semantically it is just conjunction with a negation — `A UNLESS B` means `A AND NOT B` — but its **precedence** is what makes it an exception operator: it binds looser than both `AND` and `OR`, so it carves its exception out of the _entire_ rule that precedes it.
 
 ```l4
-ASSUME `is a citizen` IS A BOOLEAN
-ASSUME `has resided for 5 years` IS A BOOLEAN
-ASSUME `has been disqualified` IS A BOOLEAN
+§ `Eligibility`
+    GIVEN `is a citizen` IS A BOOLEAN
+          `has resided for 5 years` IS A BOOLEAN
+          `has been disqualified` IS A BOOLEAN
 
 DECIDE `is eligible` IF
       `is a citizen`
