@@ -1,0 +1,52 @@
+IMPORT prelude
+
+DECLARE Actor IS ONE OF
+    Landlord HAS name IS A STRING
+    Tenant   HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Sign    HAS signer IS AN Actor
+    Deliver HAS who    IS AN Actor, what IS A STRING
+    Pay     HAS payer  IS AN Actor, payee IS AN Actor, amount IS A NUMBER
+    Receipt HAS issuer IS AN Actor, to    IS AN Actor, amount IS A NUMBER
+
+theLandlord MEANS Landlord OF "Ms Ng"
+tenants     MEANS LIST (Tenant OF "Alice"), (Tenant OF "Bob"), (Tenant OF "Carol")
+
+GIVETH A DEONTIC Actor Action
+`the tenancy begins` MEANS
+    PARTY theLandlord MUST Deliver (EXACTLY theLandlord) what WITHIN 5
+
+-- everyone, then one thing: HENCE fires once, when the last tenant has signed
+GIVETH A DEONTIC Actor Action
+`all tenants sign` MEANS
+    EVERY Tenant t
+        MUST   Sign (EXACTLY t)
+        WITHIN 14
+        HENCE  `the tenancy begins`
+        LEST   BREACH
+
+-- each with its own: HENCE FOR EACH fires once per tenant who pays
+GIVETH A DEONTIC Actor Action
+`each payment gets a receipt` MEANS
+    EVERY Tenant t
+        MUST   Pay (EXACTLY t) (EXACTLY theLandlord) amount
+        WITHIN 7
+        HENCE FOR EACH
+               (PARTY theLandlord
+                    MUST   Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount)
+                    WITHIN 5)
+        LEST   BREACH BY t
+
+-- only some of them: WHO narrows the cast
+GIVETH A DEONTIC Actor Action
+`the listed tenants sign` MEANS
+    EVERY Tenant t
+        WHO    elem t tenants
+        MUST   Sign (EXACTLY t)
+        WITHIN 14
+
+-- the bare form: every value of the party type, landlord included
+GIVETH A DEONTIC Actor Action
+`everyone signs` MEANS
+    EVERY a MUST Sign (EXACTLY a) WITHIN 14
