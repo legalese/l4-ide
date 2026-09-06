@@ -140,7 +140,7 @@ Boolean operations for conditions and logic.
 - **Keyword:** [NOT](NOT.md)
 - **Type:** `BOOLEAN -> BOOLEAN`
 - **Example:** `NOT TRUE` → `FALSE`
-- **Note:** NOT reaches forward over whatever follows it on the line, so `NOT a AND b` means `NOT (a AND b)`. Write `(NOT a) AND b` for the narrow reading. See [How Far Does NOT Reach?](NOT.md#how-far-does-not-reach)
+- **Note:** NOT reaches forward over whatever follows it on the line, so `NOT a AND b` would mean `NOT (a AND b)` — and L4 refuses that spelling. Write `NOT (a AND b)` for the wide reading or `(NOT a) AND b` for the narrow one. See [How Far Does NOT Reach?](NOT.md#how-far-does-not-reach)
 
 ### Implication
 
@@ -239,19 +239,22 @@ Use parentheses `()` to override precedence.
 
 ### NOT is not on this list
 
-[NOT](NOT.md) is deliberately absent, and it is the one operator you cannot look up here. It does not join two things, and it has no place in the ordering above. Instead it **reaches forward** and takes everything after it, until it meets a word that starts at its own column or further left:
+[NOT](NOT.md) is deliberately absent, and it is the one operator you cannot look up here. It does not join two things, and it has no place in the ordering above. Instead it **reaches forward** and takes everything after it, until it meets a word that starts at its own column or further left. On one line that is everything, so `NOT a AND b` would mean `NOT (a AND b)` — and because most people read it the other way, L4 refuses the spelling and asks for brackets:
 
 ```l4
+-- refused: on one line the NOT would reach over the AND
+--     wide a b MEANS NOT a AND b
+
+-- the wide reading, spelled out: NOT (a AND b)
 GIVEN a IS A BOOLEAN, b IS A BOOLEAN
+wide a b MEANS NOT (a AND b)
 
--- NOT reaches over the AND: this means NOT (a AND b)
-wide a b MEANS NOT a AND b
-
--- Brackets around the NOT itself are what stop it: (NOT a) AND b
+-- brackets around the NOT itself are what stop it: (NOT a) AND b
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN
 narrow a b MEANS (NOT a) AND b
 ```
 
-Bracketing the operand — `NOT (a) AND b` — does **not** narrow it. Read [How Far Does NOT Reach?](NOT.md#how-far-does-not-reach) before writing a rule that puts NOT anywhere but at the end of a line.
+Bracketing the operand — `NOT (a) AND b` — does **not** narrow it, and is refused too. Read [How Far Does NOT Reach?](NOT.md#how-far-does-not-reach) before writing a rule that puts NOT anywhere but at the end of a line.
 
 ### Examples
 

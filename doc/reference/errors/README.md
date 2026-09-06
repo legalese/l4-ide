@@ -19,6 +19,7 @@ If you already know what error you are looking at, use the table of contents bel
   - [Body less indented than definition](#body-less-indented-than-definition)
   - [Multi-line function arguments](#multi-line-function-arguments)
   - [GIVEN at column 1 meant for the section](#given-at-column-1-meant-for-the-section)
+  - [NOT followed by AND, OR or IMPLIES on one line](#not-followed-by-and-or-or-implies-on-one-line)
 - [Type Errors](#type-errors)
   - [Branch type mismatch](#branch-type-mismatch)
   - [Undefined field access](#undefined-field-access)
@@ -299,6 +300,51 @@ DECLARE Applicant
 ```
 
 **Note:** the check fires for a `DECLARE` or an `ASSUME` below the `GIVEN`, not for a `DECIDE`. A decision that ignores one of its own inputs is an ordinary thing to write, and is indistinguishable from a section `GIVEN` that has been pushed back to column 1. So if a rule that should read a section-wide name is asking whoever calls it for an input instead, check the column of its `GIVEN` yourself. See [The section `GIVEN`](../syntax/section-given.md).
+
+---
+
+### NOT followed by AND, OR or IMPLIES on one line
+
+**Error message:**
+
+```
+On one line, NOT reaches to the end of the line, so this reads as
+
+  NOT (`has a permit` AND `paid the fee`)
+
+If that is the meaning, write those brackets in. If only
+
+  `has a permit`
+
+is negated, put the brackets around the NOT and that alone:
+
+  (NOT `has a permit`) AND `paid the fee`
+
+or move the AND to a line of its own, starting in the same
+column as the NOT or further left.
+```
+
+**What you wrote:**
+
+```l4
+GIVEN `has a permit` IS A BOOLEAN
+      `paid the fee` IS A BOOLEAN
+DECIDE `must apply` IF NOT `has a permit` AND `paid the fee`
+```
+
+**What went wrong:** `NOT` has no place in the ranking of the other operators. It reaches forward and takes everything after it on its line, so the rule above would mean "it is not the case that (they have a permit and paid the fee)" — while most people read it as "they have no permit, and they paid the fee". The two disagree whenever the person has no permit. Rather than return the wrong answer silently, L4 stops and asks which you meant. Brackets around the first thing alone, `NOT (`has a permit`) AND …`, do not change this: that bracket closes around `has a permit`, not around the `NOT`, and the spelling is refused too.
+
+**How to fix it:** say which reading you meant.
+
+```l4
+-- the whole of "has a permit and paid the fee" is negated
+DECIDE `must apply` IF NOT (`has a permit` AND `paid the fee`)
+
+-- only "has a permit" is negated
+DECIDE `must apply` IF (NOT `has a permit`) AND `paid the fee`
+```
+
+Or move the `AND` to its own line. Over several lines nothing is refused, and the columns decide: an `AND` that starts in the same column as the `NOT`, or further left, stops the `NOT`; one that starts further right is reached over. `x AND NOT y` on one line is always fine, because the `NOT` is last and there is nothing after it to reach over. Comparisons are not refused either: `NOT n EQUALS 0` has only one sensible reading. See [How Far Does NOT Reach?](../operators/NOT.md#how-far-does-not-reach).
 
 ---
 

@@ -1,0 +1,68 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: not-bracketed-operand.l4
+  Hidden: no
+  Range: 11:24-11:35
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    On one line, NOT reaches to the end of the line, so this reads as
+
+      NOT (a AND b)
+
+    If that is the meaning, write those brackets in. If only
+
+      a
+
+    is negated, put the brackets around the NOT and that alone:
+
+      (NOT a) AND b
+
+    or move the AND to a line of its own, starting in the same
+    column as the NOT or further left.
+
+File: not-bracketed-operand.l4
+  Hidden: no
+  Range: 16:24-16:40
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    On one line, NOT reaches to the end of the line, so this reads as
+
+      NOT ((a OR b) AND b)
+
+    If that is the meaning, write those brackets in. If only
+
+      a OR b
+
+    is negated, put the brackets around the NOT and that alone:
+
+      (NOT (a OR b)) AND b
+
+    or move the AND to a line of its own, starting in the same
+    column as the NOT or further left.
+
+File: not-bracketed-operand.l4
+  Hidden: no
+  Range: 24:22-24:37
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    On one line, NOT reaches to the end of the line, so this reads as
+
+      NOT ((flip OF a) OR b)
+
+    If that is the meaning, write those brackets in. If only
+
+      flip OF a
+
+    is negated, put the brackets around the NOT and that alone:
+
+      (NOT (flip OF a)) OR b
+
+    or move the OR to a line of its own, starting in the same
+    column as the NOT or further left.
