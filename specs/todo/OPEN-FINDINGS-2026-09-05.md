@@ -7,7 +7,7 @@
 > and a **mechanism** you can read, so that acting on it needs no archaeology.
 >
 > **Scope.** Findings only. The rulings themselves are in their own documents:
-> `IMPLICIT-PROPS-DESIGN.md` §11, `SUBJECT-TO-NOTWITHSTANDING-SPEC.md` §11,
+> `IMPLICIT-PROPS-DESIGN.md` §11, `SUBJECT-TO-NOTWITHSTANDING-SPEC.md` §12,
 > `SET-OPERATORS-SPEC.md` §18, `TEMPORAL-RULE-VERSION-DESIGN.md` §1.4.3.
 >
 > **Every finding has a stable id, `OF-n`, and the id is the handle — not its position in this

@@ -487,20 +487,231 @@ EVERY p MUST sign    ≡    EACH p MUST sign    -- when no HENCE/LEST
 
 The semantic difference only manifests when continuations are present.
 
-#### 2.2.7 Collective Semantics (Future Work)
+#### 2.2.7 Threshold joins: `ONCE`, `SOME m OF …`, and measures
 
-Patterns C and D require additional constructs beyond EVERY/EACH:
+> **Status (2026-09-06): PROPOSED, NOT BUILT.** This section replaces the three-paragraph
+> "Collective Semantics (Future Work)" stub that stood here until 2026-09-06 (kept verbatim in
+> §2.2.7.1). Nothing below describes the tree; §2.2.7.9 lists what would make it true. Every
+> ruling in §2.2.7.8 is open except the one synonym Meng ruled in passing (§2.2.7.4).
 
-```l4
--- Pattern C: Joint and Several (proposed future syntax)
-JOINTLY AND SEVERALLY guarantors MUST pay debt
-    UNTIL debt_satisfied
+##### 2.2.7.1 What this section said before 2026-09-06
 
--- Pattern D: Truly Joint (proposed future syntax)
-ALL parties MUST JOINTLY execute closing_documents
+> Patterns C and D require additional constructs beyond EVERY/EACH:
+>
+> ```l4
+> -- Pattern C: Joint and Several (proposed future syntax)
+> JOINTLY AND SEVERALLY guarantors MUST pay debt
+>     UNTIL debt_satisfied
+>
+> -- Pattern D: Truly Joint (proposed future syntax)
+> ALL parties MUST JOINTLY execute closing_documents
+> ```
+>
+> These collective patterns are deferred to a future specification. For now, EVERY/EACH addresses
+> the most common patterns (A and B) which cover the majority of real-world quantified obligations.
+
+The `UNTIL debt_satisfied` in that stub was the right instinct and the rest of this section is what
+it turns into once it is worked through: Pattern C's join is a **threshold over a measure**, not a
+count of performers, and Pattern D is not a threshold at all.
+
+##### 2.2.7.2 Where this came from
+
+Two remarks of Meng's on 2026-09-06, after the joint/several research
+([`EVERY-EACH-JOINT-SEVERAL-MEMO.md`](EVERY-EACH-JOINT-SEVERAL-MEMO.md)) and the Alchourrón–Bulygin
+pass that followed it (a session-scratchpad memo of 2026-09-06, **not in the tree**; every claim
+taken from it below is restated here so this section stands alone):
+
+1. _"Years ago we specified but never implemented some syntax for L4: `M OF N` allowed a '2 of 3'
+   game scoring or '51 of 100' vote counting; perhaps we could excavate this idea and use it for
+   '1 OF N' for joint / existential quantification or 'N OF N' for several / universal
+   quantification."_ — No trace of `M OF N` survives in `legalese/l4-ide` or its archived refs
+   (grepped 2026-09-06); if the old spec exists it is in the natural4 repository.
+2. _"If five people are jointly liable for, say, the rent, what the landlord really cares about is
+   receiving the full amount even if it is written as four separate cheques that add up to the
+   right number. And that's a different modeling problem in the real domain. So not everything
+   boils down to atomic events."_
+
+The two are one observation. In a Petri net an all-join is a single transition with n input places,
+but an m-of-n join **cannot** be drawn that way: it needs a counting place that every performance
+drops a token into, and a join transition with an arc of weight m out of it. The moment the language
+says `2 OF 3` it has stopped counting events and started measuring an accumulator. The rent is the
+same net with a different measure: each cheque raises the marking of a "received" place, and
+discharge is a transition with an arc weighted at the rent. Not everything is a firing; some things
+are markings. Restatement (Second) of Contracts § 293 states the pro-tanto step in words —
+performance by one promisor discharges the others _"to the extent of the amount or value applied"_.
+
+##### 2.2.7.3 The family
+
+One construct with a parameter, whose endpoints are the two folds this spec already has:
+
+| spelling                                        | join condition                  | this spec / doctrine / patterns                                                                                       |
+| ----------------------------------------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `ANY OF` ≡ `SOME 1 OF` ≡ `AT LEAST 1 OF`        | count ≥ 1                       | the `ROR` fold; "one for all"; common-law _joint_ (§ 293); WCP-9 discriminator; **no quantifier today**               |
+| `SOME m OF` ≡ `AT LEAST m OF`                   | count ≥ m                       | k-out-of-n partial join (WCP-30); bank mandates "any two signatories"; jury verdicts; quorum by number                |
+| `ALL OF` ≡ `N OF N`                             | count = cast                    | the `RAND` fold; `EVERY` with one continuation (§3.1); WCP-14                                                         |
+| `ONCE sum OF amount AT LEAST rent`              | a measure over the performances | the rent; Pattern C's primary obligation; § 293's "amount or value applied"                                           |
+| `ONCE count AT LEAST 2 AND shares AT LEAST 10%` | two measures at once            | Singapore Companies Act s 177 quorum ("two or more members holding ≥ 10 %"), `corporate-resolutions/SPEC-NOTES.md:74` |
+
+The measure defaults to a count of performers. `EVERY` and `EACH` are **orthogonal** to this table:
+they say where the continuation attaches (§3.1–3.2), the table says when the join fires. `EACH` with
+a threshold is meaningless (a fork has no join); `EVERY` is `ALL OF` plus one continuation.
+
+##### 2.2.7.4 Syntax
+
+The memo's continuation marker (§7.2 there: `HENCE ONCE ALL HAVE …` / `HENCE FOR EACH …`) already
+puts the join on the continuation. `ONCE` generalises by taking a threshold instead of the word
+`ALL`:
+
+```
+ThresholdJoin ::= QuantifiedDeonton 'ONCE' Threshold [TemporalConstraint] [HenceClause] [LestClause]
+
+Threshold     ::= 'ALL' 'HAVE'
+                | 'ANY' 'HAS'
+                | Count 'OF' Cast 'HAVE'           -- SOME 2 OF Director HAVE
+                | Measure Comparison Expr          -- sum OF amount AT LEAST rent
+                | Threshold 'AND' Threshold        -- the s 177 quorum
+
+Count         ::= 'SOME' Number | 'AT' 'LEAST' Number       -- synonyms, see below
+Measure       ::= 'count' | Aggregate 'OF' Binder            -- the Binder is a name bound in the action pattern
 ```
 
-These collective patterns are deferred to a future specification. For now, EVERY/EACH addresses the most common patterns (A and B) which cover the majority of real-world quantified obligations.
+A quantifier-prefix spelling is sugar for the same thing when there is no per-act continuation:
+
+```l4
+SOME 2 OF Director d MUST sign WITHIN 30 HENCE `resolution passes`
+-- ≡  EVERY Director d MUST sign  ONCE SOME 2 HAVE  WITHIN 30 HENCE `resolution passes`
+```
+
+**Ruled in passing, Meng, 2026-09-06:** `SOME m OF …` is a synonym for `AT LEAST m OF …`. His note
+on the word: _"some" is properly used in this sense in a sort of archaic sense_ — "some two of
+them", where _some_ picks out an unspecified subset of the stated size. One hazard for the
+definitional sentence, recorded because this spec's whole vocabulary debate was about first-time
+readers: the modern collocation _"some 200 people"_ reads as _approximately_, so the page that
+introduces `SOME m OF` must say _at least_ in its first sentence.
+
+Name collisions were checked. `SOME` is not a keyword (`jl4-core/src/L4/Lexer.hs` has `OF`, `AT`,
+`LEAST`, `ALL`; not `SOME`). An earlier proposal spelled an actor-agnostic contract head
+`DEONTIC SOME who` and was **rejected** on arity and event-typing grounds
+(`specs/done/DEONTIC-PARTY-ACTION-AGREEMENT-SPEC.md`, "Do NOT make the contract head
+actor-agnostic"); that was a type, not a quantifier, and the rejection does not reach this use —
+said here so that a later reader who greps for `SOME` does not conclude the quantifier was ruled
+out. `ALL` and `NO` already appear in §2.4's `Quantifier` production with no semantics given
+anywhere in this document; under this section `ALL` is the `N OF N` spelling and `NO` is still
+unspecified.
+
+##### 2.2.7.5 Semantics, in six points
+
+1. **The join is over an accumulator.** Each performance that matches the quantified pattern adds
+   to a per-contract accumulator (a count, or the bound measure); the `ONCE` condition is evaluated
+   against it after every matching event. A `HENCE FOR EACH` continuation still fires per event
+   (fork), independently of the join.
+2. **Acts inside, state outside.** In a threshold obligation the quantified modal is typically
+   `MAY` — no single obligor owes any single act — and the `MUST` lives on the state at the `ONCE`
+   line. This is the ought-to-do / ought-to-be split the A&B memo found (its §6.3): an ought-to-be
+   continuation is idempotent under parallel composition, which is why the landlord is indifferent
+   to how many cheques. Where the modal inside is `MUST` (divided shares, §2.2.7.6 second form) the
+   threshold disappears and blame narrows to the performer.
+3. **The deadline attaches to the `ONCE` line.** `WITHIN` after `ONCE` bounds the _state_, not each
+   act. This fixes the defect of the only encoding available today — a contract recursing on the
+   remaining balance re-arms its `WITHIN` on every payment, so the law's single due date on the
+   total is not expressible without threading the clock by hand (cf. §5.1).
+4. **Blame is a set.** `LEST BREACH BY EVERY t` (joint: the shortfall is everyone's) and
+   `LEST BREACH BY EACH t WHO owes` (divided) both need the compound breach to carry a **set of
+   parties**. Today `RAND`/`ROR` breach carries **one operand** — the machine picks left for `RAND`
+   and right for `ROR` by timestamp tie-break (`jl4-core/src/L4/EvaluateLazy/Machine.hs:1698-1730`,
+   "consistently with CSL"). That is the same gap the six-ways page recorded for the any-join.
+5. **The domain is the cast, filtered.** `EVERY Tenant t` over a constructor with a payload
+   (`Tenant HAS name IS A STRING`) ranges over an open type and needs §2.1's `WHO member_of …`
+   filter, exactly as the existing `EVERY` does. The performer check of the value-actor encoding is
+   silent for computed actors (`doc/concepts/legal-modeling/actors-and-actions.md` §7), so
+   "a tenant may only pay as payer" is a run-time check under this encoding.
+6. **Without a continuation the whole family collapses**, for the reason §3.3 already gives for
+   `EVERY`/`EACH`: obligation distributes over conjunction in any normal deontic logic, so with no
+   `HENCE`/`LEST` and no `ONCE` there is nothing for a join to condition (A&B memo §6.1, Sergot
+   2001). Everything in this section is about continuations.
+
+##### 2.2.7.6 Worked example: the rent
+
+Declarations in the value-actor style the concept page prescribes (actors are constructors of one
+type; actions are records whose first actor field is the performer). **Unrun**, 2026-09-06.
+
+```l4
+DECLARE Actor IS ONE OF
+    Landlord HAS name IS A STRING
+    Tenant   HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Pay     HAS payer  IS AN Actor, payee IS AN Actor, amount IS A NUMBER  -- performer: payer
+    Receipt HAS issuer IS AN Actor, to    IS AN Actor, amount IS A NUMBER  -- performer: issuer
+
+theLandlord MEANS Landlord OF "Ms Ng"
+tenants     MEANS LIST (Tenant OF "Alice"), (Tenant OF "Bob"), (Tenant OF "Carol")
+rent        MEANS 1500
+
+-- joint rent: any tenant may pay any amount; the STATE must reach the rent by the due date
+GIVEN due IS A NUMBER
+GIVETH A DEONTIC Actor Action
+`rent owed jointly` MEANS
+    EVERY Tenant t WHO member_of tenants
+        MAY    Pay t theLandlord amount
+        HENCE FOR EACH                               -- fork: one receipt per cheque
+               PARTY theLandlord MUST Receipt theLandlord t amount WITHIN 5
+    ONCE   sum OF amount AT LEAST rent               -- the join is a measure over the cheques
+    WITHIN due                                       -- one deadline, on the state
+    HENCE  FULFILLED
+    LEST   BREACH BY EVERY Tenant                    -- joint: everyone
+
+-- divided rent: each tenant owes a share; no threshold; blame narrows
+`rent owed severally` MEANS
+    EACH Tenant t WHO member_of tenants
+        MUST   Pay t theLandlord amount PROVIDED amount AT LEAST share t
+        WITHIN due
+        HENCE  PARTY theLandlord MUST Receipt theLandlord t amount WITHIN 5
+        LEST   BREACH BY t
+```
+
+For contrast, the only form that runs today — a contract recursing on the balance, one `ROR`
+alternative per tenant, `amount` bound as a fresh pattern name and related in `PROVIDED` (the idiom
+of `jl4/examples/legal/ceo-performance-award.l4:404-412`) — is on the "Six Ways to Owe One Debt" page of 2026-09-06
+(an artifact, <https://claude.ai/code/artifact/9c4ed1f6-91a4-4991-8381-ffb926cfc831>, **not in the
+tree**) and carries the two defects points 3 and 4 above name: a re-arming deadline and a single-party
+breach.
+
+##### 2.2.7.7 Patterns C and D, restated
+
+- **Pattern C (joint and several)** is `ANY OF` on the primary obligation — any one performance,
+  or under a measure any accumulation, discharges all — with the creditor's election before it and a
+  contribution fork after it. The memo (§7.1, point 5) finds `JOINTLY AND SEVERALLY` doctrinally
+  correct as a name for exactly this composite and for nothing in Patterns A or B; the old stub's
+  spelling is therefore kept as the candidate surface for the composite, with `UNTIL` replaced by
+  `ONCE`.
+- **Pattern D (the joint act)** is **not** a threshold. It is one transition with n input places:
+  there is no per-performer state, no "two of three have signed", and nothing to accumulate. In L4
+  it is a group-valued `PARTY` over a single action, not a quantifier. The six-ways page's note on
+  shapes 2 and 5 records the test: a deed executed by several parties is Pattern D by default, and a
+  _counterparts_ clause exists precisely to convert it into the barrier, so the law itself
+  distinguishes them by needing a clause to move between them.
+
+##### 2.2.7.8 Rulings needed, all open
+
+| ruling                                                                    | state                                   |
+| ------------------------------------------------------------------------- | --------------------------------------- |
+| R-T1 — `ONCE` (this section) vs `UNTIL` (the old stub) as the keyword     | **open**                                |
+| R-T2 — `WITHIN` attaches to the `ONCE` line (point 3)                     | **open**                                |
+| R-T3 — compound breach carries a set of parties (point 4)                 | **open**                                |
+| R-T4 — measure vocabulary: `sum OF amount`, `count`, `AND` of thresholds  | **open**                                |
+| R-T5 — quantifier-prefix `SOME m OF Cast …` as sugar for `EVERY … ONCE`   | **open**                                |
+| R-T6 — an armed threshold when the cast changes (memo §1.3, survivorship) | **open**                                |
+| `SOME m OF` ≡ `AT LEAST m OF`                                             | **ruled** 2026-09-06 (Meng, in passing) |
+
+##### 2.2.7.9 What would make this section true
+
+A parser for the `ONCE` line and the `SOME`/`AT LEAST` count; a desugaring to a residual contract
+carrying the accumulator (the recursion-on-balance form, with the clock threaded so that R-T2
+holds) or to a ledger cell read at the join; a set-valued breach (R-T3); goldens under `ok/` for
+the two rent forms and the s 177 quorum; and a page under `doc/` before the work is closed (repo
+`CLAUDE.md` §6). Until then this section is a design record and the six-ways page is its
+illustration.
 
 ### 2.3 Cross-Party References
 
