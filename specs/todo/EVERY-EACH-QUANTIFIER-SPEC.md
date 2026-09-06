@@ -704,15 +704,15 @@ UTC. Each accepts the card's recommendation as written. The recommendations were
 no adversarial pass ran on them; they are recorded here with what decided them, so that a later
 reader need not open the artifact, and so that the measurements can be re-run.
 
-| ruling                                                                                                                  | state                                   |
-| ----------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
-| R-T1 — the keyword is `ONCE`, for the barrier and the threshold alike                                                   | **RULED 2026-09-06**, accept            |
-| R-T2 — `WITHIN` in both positions: on a deonton it bounds the act; after `ONCE` it bounds the state                     | **RULED 2026-09-06**, accept            |
-| R-T3 — `BY` takes a party or a list of parties; a compound breach collects the set of unfulfilled operands              | **RULED 2026-09-06**, accept            |
-| R-T4 — `Aggregate OF Binder` is sugar over a general Boolean condition; `AND` of thresholds is Boolean `AND`            | **RULED 2026-09-06**, accept            |
-| R-T5 — the prefix `SOME m OF Cast …` is sugar only without a per-act continuation, after the variable spelling is ruled | **RULED 2026-09-06**, accept, with note |
-| R-T6 — the cast is fixed at arming; a change of cast is an explicit event                                               | **RULED 2026-09-06**, accept, with note |
-| `SOME m OF` ≡ `AT LEAST m OF`                                                                                           | ruled 2026-09-06 (Meng, in passing)     |
+| ruling                                                                                                                                       | state                                   |
+| -------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| R-T1 — the keyword is `ONCE`, for the barrier and the threshold alike                                                                        | **RULED 2026-09-06**, accept            |
+| R-T2 — `WITHIN` in both positions: on a deonton it bounds the act; after `ONCE` it bounds the state                                          | **RULED 2026-09-06**, accept            |
+| R-T3 — `BY` takes a party or a list of parties; a compound breach collects the set of unfulfilled operands                                   | **RULED 2026-09-06**, accept            |
+| R-T4 — `Aggregate OF Binder` is sugar over a general Boolean condition; `AND` of thresholds is Boolean `AND`                                 | **RULED 2026-09-06**, accept            |
+| R-T5 — the prefix `SOME m OF Cast …` is sugar only without a per-act continuation; the pattern spelling it needs was ruled 2026-09-07 (§2.4) | **RULED 2026-09-06**, accept, with note |
+| R-T6 — the cast is fixed at arming; a change of cast is an explicit event                                                                    | **RULED 2026-09-06**, accept, with note |
+| `SOME m OF` ≡ `AT LEAST m OF`                                                                                                                | ruled 2026-09-06 (Meng, in passing)     |
 
 **What decided each.** Measurements dated 2026-09-06 on `unstable` `cdc11501`.
 
@@ -745,8 +745,8 @@ reader need not open the artifact, and so that the measurements can be re-run.
   desugaring because its per-party `HENCE` would later be re-meant by this spec's barrier; the
   restriction to no-per-act-continuation removes that hazard here, since a fork needs the `ONCE`
   form. The variable-position spelling — `EVERY p` (§2.4, §3.1) against `EVERY Person p` (the
-  unmerged upstream draft `970a8705`) — is a ruling this spec still owes itself, and the prefix form
-  waits on it. **Meng's note, verbatim:** _"Suggest we stylistically prefer DO to MUST in this 'not
+  unmerged upstream draft `970a8705`) — was **ruled 2026-09-07 (§2.4): the pattern form `EVERY Tenant t`
+  is primary and `EVERY t` is the unfiltered case**, so the prefix form is no longer blocked. **Meng's note, verbatim:** _"Suggest we stylistically prefer DO to MUST in this 'not
   all parties' special case"_ — where no single member of the cast owes the act, the neutral `DO` is
   the house style; §2.2.7.4's example and §2.2.7.5 point 2 now say so.
 - **R-T6.** The memo's §1.3 table records release-of-one-discharges-all and survivorship, and
@@ -785,13 +785,16 @@ Note: Since `/=` is symmetric, the argument order doesn't affect the result. The
 
 ```
 QuantifiedDeonton ::=
-    Quantifier Variable [Filter]
+    Quantifier Pattern [Filter]
         DeonticModal Action
         [TemporalConstraint]
         [HenceClause]
         [LestClause]
 
 Quantifier ::= 'EVERY' | 'EACH' | 'ALL' | 'NO'
+
+Pattern ::= Constructor Variable      -- EVERY Tenant t   : the primary form; the constructor selects the cast
+          | Variable                  -- EVERY t          : the unfiltered case; every value of the actor type
 
 Filter ::= 'WHO' Predicate
          | 'WHERE' Predicate
@@ -811,6 +814,21 @@ Continuation ::= Deonton
                | 'FULFILLED'
                | 'BREACH'
 ```
+
+**RULED 2026-09-07 (Meng, in session, on the GM's measured recommendation), verbatim:** _"Ok: the
+pattern form as primary, EVERY Tenant t, with EVERY t as the unfiltered case."_
+
+**What decided it.** Under the value-actor encoding (`doc/concepts/legal-modeling/actors-and-actions.md`)
+`Tenant` is not a type but a **constructor** of `Actor`, so the word before the variable is a
+_pattern_ that selects the cast — exactly as `Pay t theLandlord amount` is a pattern over actions —
+and not a type annotation. The bare `EVERY t` therefore ranges over every value of the actor type,
+landlord included, until a `WHO` filter narrows it. Both spellings fit one production, `Quantifier
+Pattern`, and the variable stays last, as in the unmerged upstream draft `970a8705`. Measured
+2026-09-07 on `unstable`: this document wrote the bare form on 28 code lines (typed from the
+`DEONTIC` signature) and the pattern form on 2 (§2.2.7.6); the upstream draft wrote `EVERY Person p`
+throughout. **The bare-form examples below remain valid as the unfiltered case**; new examples use
+the pattern form where a cast is meant. This ruling unblocks R-T5's prefix sugar (§2.2.7.8).
+Nothing is built.
 
 ## 3. Semantics Overview
 
