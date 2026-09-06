@@ -65,7 +65,7 @@ notL4 = [i|
 GIVEN a IS A BOOLEAN
       b IS A BOOLEAN
 GIVETH A BOOLEAN
-DECIDE `with not` IF NOT a AND b
+DECIDE `with not` IF (NOT a) AND b
 |]
 
 threeWayAndL4 :: Text
@@ -526,7 +526,7 @@ serviceTests = do
       let r = svcQP c [("a", True)]
       r.determined `shouldBe` Nothing
 
-  describe "NOT a AND b" do
+  describe "(NOT a) AND b" do
     it "undetermined with no bindings" do
       c <- serviceCache "with not" notL4
       let r = svcQP c []

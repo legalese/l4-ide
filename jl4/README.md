@@ -169,7 +169,7 @@ GIVEN x IS A BOOLEAN, y IS A BOOLEAN @ref foo bar baz
 GIVETH A BOOLEAN @ref 1981/61 sec. 2
 DECIDE xor x y IS  @ref SG-c-2025-sghcf-14
      x AND NOT y <<SG-c-2025-sghcf-12>>
-  OR NOT x AND y @nlg Locally overwrite the annotation for %y%
+  OR (NOT x) AND y @nlg Locally overwrite the annotation for %y%
 ```
 
 Citation files can be loaded via the `@ref-src` annotation at any toplevel location of an L4 file.

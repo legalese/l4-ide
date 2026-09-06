@@ -547,7 +547,7 @@ analyseBody labels order body
     -- The gate that keeps "this condition excludes nothing" from crying wolf.
     -- The ladder body is in CONJUNCTIVE normal form, and reaching CNF
     -- MANUFACTURES valid clauses: `x XOR y' written out as
-    -- @(x AND NOT y) OR (NOT x AND y)@ distributes to a conjunction that
+    -- @(x AND NOT y) OR ((NOT x) AND y)@ distributes to a conjunction that
     -- contains @x OR NOT x@. That clause is not in the draftsman's text and
     -- telling him it adds nothing is telling him about our normaliser.
     --

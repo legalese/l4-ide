@@ -651,8 +651,14 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
       parensIfNeeded e1 <+> "IMPLIES" <+> parensIfNeeded e2
     Equals     _ e1 e2 ->
       parensIfNeeded e1 <+> "EQUALS" <+> parensIfNeeded e2
+    -- The operand is bracketed on the same rule as a conjunct: a bare
+    -- connective after NOT on one line -- `NOT a AND b` -- is the spelling
+    -- the checker refuses (SET-OPERATORS-SPEC §18.1), so `Not (And a b)`
+    -- must come back as `NOT (a AND b)` or the printed module no longer
+    -- checks. Comparisons stay bare: `NOT n EQUALS 0` is accepted and
+    -- means what it prints.
     Not        _ e1 ->
-      "NOT" <+> printWithLayout e1
+      "NOT" <+> parensIfOpenTailed e1
     Plus       _ e1 e2 ->
       parensIfNeeded e1 <+> "PLUS" <+> parensIfNeeded e2
     Minus      _ e1 e2 ->
