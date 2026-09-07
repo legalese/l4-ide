@@ -298,6 +298,31 @@ a counterexample. `ASSUME` is not entrenched — B rests on the section binder, 
 successor. The prover itself is purely additive: a new subcommand reading existing syntax, removing
 nothing.
 
+**Measured blast radius, and the file that proves the rule discriminates.**
+`jl4/examples/ok/assert-raises.l4` already contains both kinds of stuck assert, side by side, and
+its golden pins all of them:
+
+| line       | assert                           | why it is stuck                     | under B                           |
+| ---------- | -------------------------------- | ----------------------------------- | --------------------------------- |
+| 7, 8       | `(1 DIVIDED BY 0) EQUALS 1`      | genuine runtime error, no free vars | **`Errored`, exit 1 — unchanged** |
+| 11, 12     | `x EQUALS 1`                     | `x` is the section's `GIVEN` binder | **deferred**                      |
+| 21, 22     | `b`                              | `b` is the section's `GIVEN` binder | **deferred**                      |
+| 15, 25, 26 | short-circuit and ground asserts | not stuck                           | unchanged                         |
+
+That is the syntactic rule doing exactly the work asked of it: division by zero has no free
+variables and stays an error; `x EQUALS 1` has a free variable that is an unsupplied binder and
+becomes an obligation. All four deferred asserts are also **refutable** — `x = 2`, `x = 1`,
+`b = FALSE`, `b = TRUE` — so `l4 prove` replaces four "could not be evaluated" reports with four
+witnesses. Strictly more information than the tree gives today.
+
+The whole measured cost of the change, over `origin/unstable` on 2026-09-07: **one golden**
+(`jl4/examples/ok/tests/assert-raises.golden`, where 4 of 9 entries change and the two
+division-by-zero entries must **not**), **one CLI test** (`expectFail` on `assert-assumed.l4`
+becomes the deferred outcome), and **no corpus file at all** — `assert-raises.golden` is the only
+golden in the tree containing the string "assertion could not be evaluated". Re-blessing that
+golden without reading it would hide the one thing worth checking, which is that lines 7 and 8 did
+not move.
+
 **The safety net is CI, not the exit code.** Since a deferred obligation no longer fails `l4 run`,
 something must ensure it is actually discharged rather than accumulating unseen. That is the same
 "silently missing" problem `etc/check-corpus-goldens.mjs` was written for, and it takes the same
