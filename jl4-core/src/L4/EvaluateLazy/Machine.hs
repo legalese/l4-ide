@@ -937,8 +937,19 @@ forwardExpr env = \ case
     env' <- evalRecLocalDecls env ds
     let combinedEnv = Map.union env' env
     continueExpr combinedEnv e
-  Regulative _ann (MkDeonton _ party action due followup lest) ->
-    continueBackward (ValObligation env (Left party) action (Left due) (fromMaybe fulfilExpr followup) lest)
+  Regulative _ann (MkDeonton _ subject action due _join followup lest) ->
+    case subject of
+      Party _ party ->
+        continueBackward (ValObligation env (Left party) action (Left due) (fromMaybe fulfilExpr followup) lest)
+      Every{} ->
+        -- Phase 1 of EVERY-EACH-QUANTIFIER-SPEC ships the front end only: a
+        -- quantified obligation parses, scopes, type-checks and prints. The
+        -- barrier machine (spec §3.1, §4.3: one sub-obligation per member of
+        -- the cast, HENCE once at the last completion, LEST at the deadline
+        -- with blame = the non-completers) is phase 2. Fail loudly rather than
+        -- run the obligation as if it bound one party.
+        userException $ UserError
+          "EVERY is not yet evaluable: a quantified obligation parses and type-checks, but running it is not implemented (EVERY-EACH-QUANTIFIER-SPEC, phase 2)."
   Event _ann ev ->
     continueExpr env (desugarEvent ev)
   Fetch _ann e -> do

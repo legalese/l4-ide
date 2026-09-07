@@ -1,0 +1,42 @@
+IMPORT prelude
+-- EVERY-EACH-QUANTIFIER-SPEC §2.3 (cross-party references) and §8.1 (nesting).
+--
+-- An EVERY inside the continuation of an EVERY: each partner MAY terminate,
+-- and on each termination (UPON EACH) every OTHER partner must settle with
+-- the one who left, all of them (ONCE ALL HAVE) before the fork's own
+-- continuation counts as done. The outer variable `x` is referenced inside the
+-- inner filter, action and continuation.
+
+DECLARE Actor IS ONE OF
+    Partner HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Terminate HAS who IS AN Actor
+    Settle    HAS who IS AN Actor, with IS AN Actor
+
+chair MEANS Partner OF "Chair"
+
+GIVETH A DEONTIC Actor Action
+`mutual termination` MEANS
+    EVERY Partner x
+        MAY    Terminate (EXACTLY x)
+        WITHIN 365
+        UPON   EACH
+        HENCE  EVERY Partner y
+                   WHO    NOT (y EQUALS x)
+                   MUST   Settle (EXACTLY y) (EXACTLY x)
+                   WITHIN 30
+                   ONCE   ALL HAVE
+                   HENCE  FULFILLED
+                   LEST   BREACH BY y
+
+-- an EVERY inside the continuation of a plain PARTY obligation
+GIVETH A DEONTIC Actor Action
+`after the chair gives notice` MEANS
+    PARTY chair
+        MUST   Terminate (EXACTLY chair)
+        WITHIN 10
+        HENCE  EVERY Partner p
+                   WHO    NOT (p EQUALS chair)
+                   MUST   Settle (EXACTLY p) (EXACTLY chair)
+                   WITHIN 30

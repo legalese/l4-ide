@@ -1,0 +1,28 @@
+-- `EACH` is NOT a keyword (R-Q2: EACH is not a quantifier). It is recognised
+-- only as the second word of the fork's join line `UPON EACH` (R-Q1, RULED
+-- 2026-09-07), so a program may still use it as a name.
+
+EACH MEANS 3
+
+#EVAL EACH PLUS 1
+
+GIVEN EACH IS A NUMBER
+GIVETH A NUMBER
+twice EACH MEANS EACH TIMES 2
+
+#EVAL twice 4
+
+DECLARE Actor IS ONE OF
+    Tenant HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Sign HAS signer IS AN Actor
+
+-- ... and in the same file, the join line still reads as the fork
+GIVETH A DEONTIC Actor Action
+`sign, and note each signature` MEANS
+    EVERY Tenant t
+        MUST   Sign (EXACTLY t)
+        WITHIN 14
+        UPON   EACH
+        HENCE  FULFILLED

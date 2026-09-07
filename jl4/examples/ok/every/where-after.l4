@@ -1,0 +1,14 @@
+-- PROVISIONAL R-Q4: `WHO` is the filter word and `WHERE` is not overloaded, so
+-- a WHERE block after a quantified obligation still means local definitions.
+
+DECLARE Actor IS ONE OF
+    Tenant HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Sign HAS signer IS AN Actor
+
+GIVETH A DEONTIC Actor Action
+`sign by the due date` MEANS
+    EVERY Tenant t MUST Sign (EXACTLY t) WITHIN due
+    WHERE
+        due MEANS 14

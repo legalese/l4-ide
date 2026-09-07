@@ -241,6 +241,16 @@ data TKeywords
   | TKMean
   | TKUnless
   | TKTypically
+  | TKEvery      -- ^ @EVERY@: the quantified deonton head (EVERY-EACH-QUANTIFIER-SPEC §2.4)
+  | TKWho        -- ^ @WHO@: the quantifier filter (spec §2.1)
+  | TKOnce       -- ^ @ONCE@: the barrier\/threshold join, @ONCE ALL HAVE@ (spec §2.2.7.4, R-T1)
+  | TKHave       -- ^ @HAVE@: @ONCE ALL HAVE@ (spec §2.2.7.4)
+  | TKSome       -- ^ @SOME@: @SOME m OF@ (spec §2.2.7.4, R-T5); lexed now, parsed in phase 3
+  | TKUpon       -- ^ @UPON@: the fork join, @UPON EACH@ (R-Q1 RULED 2026-09-07, spec §2.4\/§2.5).
+                 --   This is the JOIN-line position only. @UPON \<event\>@ as a /rule head/ —
+                 --   'specs\/todo\/UPON-EXTERNAL-EVENTS-SPEC.md', status OPEN — is a different
+                 --   construct in a different position and is still unbuilt; reserving the word
+                 --   here does not build it, and the two are distinguished by position.
   deriving stock (Eq, Generic, Ord, Show)
   deriving anyclass (ToExpr, NFData)
 
@@ -333,6 +343,12 @@ keywords = Map.fromList
   , ("MEAN"       , TKMean       )
   , ("UNLESS"     , TKUnless     )
   , ("TYPICALLY"  , TKTypically  )
+  , ("EVERY"      , TKEvery      )
+  , ("WHO"        , TKWho        )
+  , ("ONCE"       , TKOnce       )
+  , ("HAVE"       , TKHave       )
+  , ("SOME"       , TKSome       )
+  , ("UPON"       , TKUpon       )
   ]
 
 data TOperators

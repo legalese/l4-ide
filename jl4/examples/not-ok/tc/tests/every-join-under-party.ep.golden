@@ -1,0 +1,14 @@
+-- A join line says when a GROUP's continuation fires; a single PARTY has no
+-- group. R-Q1. Both spellings are refused here; this file uses the barrier.
+
+DECLARE Actor IS ONE OF
+    Tenant HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Sign HAS signer IS AN Actor
+
+alice MEANS Tenant OF "Alice"
+
+GIVETH A DEONTIC Actor Action
+bad MEANS
+    PARTY alice MUST Sign (EXACTLY alice) WITHIN 14 ONCE ALL HAVE HENCE FULFILLED

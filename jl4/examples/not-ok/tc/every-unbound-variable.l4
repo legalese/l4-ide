@@ -1,0 +1,11 @@
+-- The EVERY variable is `t`; the action refers to `u`, which nothing binds.
+
+DECLARE Actor IS ONE OF
+    Tenant HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Sign HAS signer IS AN Actor
+
+GIVETH A DEONTIC Actor Action
+bad MEANS
+    EVERY Tenant t MUST Sign (EXACTLY u) WITHIN 14

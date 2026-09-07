@@ -2500,17 +2500,125 @@ refuse = attachAnno $
 optionalWithHole :: HasSrcRange a => AnnoParser a -> AnnoParser (Maybe a)
 optionalWithHole p = Just <$> p <|> annoHole (pure Nothing)
 
+-- | A deonton: @PARTY p@ or @EVERY [Cast] v [WHO f]@, then the modal and
+-- action, then the optional @WITHIN@ \/ @ONCE …@ \/ @HENCE@ \/ @LEST@ clauses.
+--
+-- The column of the head keyword (@PARTY@ or @EVERY@) is the layout threshold
+-- for every body that follows, exactly as before the quantified form existed.
+-- One hole per field, in field order ('L4.Syntax.Deonton').
 obligation :: Parser (Deonton Name)
 obligation = do
   current <- Lexer.indentLevel
   attachAnno $
     MkDeonton emptyAnno
-      <$  annoLexeme (spacedKeyword_ TKParty)
-      <*> annoHole (indentedExpr current)
+      <$> annoHole (subject current)
       <*> annoHole (must current)
       <*> optionalWithHole (deadline current)
+      <*> optionalWithHole (joinLine current)
       <*> optionalWithHole (hence current)
       <*> optionalWithHole (lest current)
+
+-- | The subject of a deonton (EVERY-EACH-QUANTIFIER-SPEC §2.4, RULED 2026-09-07):
+--
+-- > PARTY e
+-- > EVERY v            [WHO filter]     -- every value of the party type
+-- > EVERY Cast v       [WHO filter]     -- every value built by the constructor Cast
+--
+-- After @EVERY@ come one or two names; with two, the first is the cast and the
+-- second the variable (the variable is always last). Both are plain names
+-- (backticked names included), not expressions, so @EVERY Tenant t MUST …@
+-- cannot be misread as the application @Tenant t@. The filter word is @WHO@
+-- only: @WHERE@ stays the local-definition keyword ('L4.Parser.whereBlock') and
+-- is not overloaded here (R-Q4, RULED 2026-09-07).
+--
+-- Holes, in order: cast (empty when absent), variable, filter (empty when
+-- absent) — matching the 'Every' constructor's fields positionally.
+subject :: Pos -> Parser (Subject Name)
+subject current =
+      attachAnno
+        ( Party emptyAnno
+            <$  annoLexeme (spacedKeyword_ TKParty)
+            <*> annoHole (indentedExpr current)
+        )
+  <|> attachAnno
+        ( (\ n1 mn2 filt -> case mn2 of
+              Nothing -> Every emptyAnno Nothing n1 filt
+              Just n2 -> Every emptyAnno (Just n1) n2 filt)
+            <$  annoLexeme (spacedKeyword_ TKEvery)
+            <*> indented' (annoHole name) current
+            <*> optionalWithHole (indented' (annoHole name) current)
+            <*> optionalWithHole (annoLexeme (spacedKeyword_ TKWho) *> annoHole (indentedExpr current))
+        )
+
+-- | The join line of a quantified obligation (EVERY-EACH-QUANTIFIER-SPEC
+-- §2.2.7.4 and §2.4, R-Q1 RULED 2026-09-07):
+--
+-- > ONCE ALL HAVE [WITHIN d]     -- the barrier (level-triggered)
+-- > UPON EACH     [WITHIN d]     -- the fork    (edge-triggered)
+--
+-- Two alternatives rather than two thresholds, because the fork is not a
+-- threshold: see 'L4.Syntax.Join'. @UPON@ is a keyword here; @EACH@ is NOT,
+-- and is matched as the identifier token spelled @EACH@ — the device
+-- 'timezone'' uses for @TIMEZONE@ — so a program may still name a value
+-- @EACH@.
+--
+-- Layout: EVERY word of the join line — the head keyword, the marker words,
+-- and the @WITHIN@ body — must sit strictly right of the deonton's head
+-- keyword column.
+--
+-- The join line is the ONLY clause whose keyword is itself column-checked, and
+-- it has to be. @WITHIN@, @HENCE@ and @LEST@ each guard their body expression
+-- with 'indentedExpr', so a dedented one of those still fails on its body; a
+-- bare @ONCE ALL HAVE@ or @UPON EACH@ has no body, so without this guard it
+-- had NO positional constraint at all and was silently absorbed by whatever
+-- deonton was open — measured 2026-09-07: a fork written at the OUTER rule's
+-- clause column attached to a nested @EVERY@ inside the outer's @HENCE@,
+-- checked clean, and exactprinted identically, so nothing in the toolchain
+-- showed the author that the fork had bound to the wrong rule.
+-- Barrier-versus-fork is exactly the distinction 'ContinuationWithoutJoin'
+-- refuses to guess at, so deciding it by invisible layout was the worst
+-- available default.
+--
+-- Phase 3 adds the count and measure thresholds (@SOME 2 OF … HAVE@,
+-- @sum OF amount AT LEAST rent@) as further 'Threshold' alternatives, all of
+-- them under @ONCE@.
+joinLine :: Pos -> AnnoParser (Join Name)
+joinLine current = annoHole $
+      attachAnno
+        ( JoinOnce emptyAnno
+            <$  indented' (annoLexeme (spacedKeyword_ TKOnce)) current
+            <*> annoHole (joinThreshold current)
+            <*> optionalWithHole (deadline current)
+        )
+  <|> attachAnno
+        ( JoinUpon emptyAnno
+            <$> annoHole (uponEach current)
+            <*> optionalWithHole (deadline current)
+        )
+
+-- | @ONCE@'s threshold. Phase 1 has only the barrier; the count and measure
+-- forms of spec §2.2.7.4 become further alternatives here.
+joinThreshold :: Pos -> Parser (Threshold Name)
+joinThreshold current =
+  attachAnno
+    ( AllHave emptyAnno
+        <$  indented' (annoLexeme (spacedKeyword_ TKAll)) current
+        <*  indented' (annoLexeme (spacedKeyword_ TKHave)) current
+    )
+
+-- | The fork's words, @UPON EACH@ (R-Q1 RULED 2026-09-07). The printer's twin
+-- is 'L4.Print.uponEachWords', which the diagnostics read; changing the
+-- spelling is those two definitions and the goldens that quote them.
+--
+-- @UPON@ in THIS position is the join line. @UPON <event>@ as a /rule head/ —
+-- @specs\/todo\/UPON-EXTERNAL-EVENTS-SPEC.md@, status OPEN — is a different
+-- construct in a different position, and is not built; the two never compete,
+-- because a rule head cannot appear after an act.
+uponEach :: Pos -> Parser UponEach
+uponEach current = attachAnno $
+  MkUponEach emptyAnno
+    <$  indented' (annoLexeme (spacedKeyword_ TKUpon)) current
+    <*  indented' (annoLexeme (spacedToken_ (TIdentifiers (TIdentifier "EACH")))) current
 
 must :: Pos -> Parser (RAction Name)
 must current = attachAnno $

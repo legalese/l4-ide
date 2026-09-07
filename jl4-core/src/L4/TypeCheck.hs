@@ -1849,19 +1849,115 @@ checkMultiWayIf ann es e t = do
   pure (MultiWayIf ann es' e')
 
 checkDeonton
-  :: Anno -> Expr Name -> RAction Name
-  -> Maybe (Expr Name) -> Maybe (Expr Name) -> Maybe (Expr Name)
+  :: Anno -> Subject Name -> RAction Name
+  -> Maybe (Expr Name) -> Maybe (Join Name) -> Maybe (Expr Name) -> Maybe (Expr Name)
   -> Type' Resolved -> Type' Resolved -> Check (Deonton Resolved)
-checkDeonton ann party action due hence lest partyT actionT = do
-  partyR <- checkExpr ExpectRegulativePartyContext party partyT
+checkDeonton ann subject action due mjoin hence lest partyT actionT =
+  case subject of
+    Party sann party -> do
+      partyR <- checkExpr ExpectRegulativePartyContext party partyT
+      -- A join says when a cast's continuation fires; one PARTY is not a cast.
+      forM_ mjoin (addError . JoinWithoutEvery)
+      joinR <- traverse checkJoin mjoin
+      (actionR, dueR, henceR, lestR) <-
+        checkDeontonBody (Just partyR) partyT actionT action due hence lest
+      pure (MkDeonton ann (Party sann partyR) actionR dueR joinR henceR lestR)
+    Every sann mCast v mFilter -> do
+      -- EVERY-EACH-QUANTIFIER-SPEC §2.1/§2.4: the bound variable has the
+      -- contract's party type (from @GIVETH DEONTIC Party Action@, or inferred
+      -- from the action and the events) and scopes over the WHO filter, the
+      -- action, the ACT's deadline, HENCE and LEST. The cast, when given, is a
+      -- constructor of that party type (value-actor encoding: @Tenant@ is a
+      -- constructor of @Actor@, not a type).
+      mCastR <- traverse (checkQuantifierCast partyT) mCast
+      -- R-Q1 (RULED 2026-09-07): under a quantifier the join line is
+      -- mandatory whenever there is a continuation. No default: a barrier
+      -- default would silently reverse today's single-party @MAY … HENCE@.
+      case (mjoin, hence <|> lest) of
+        (Nothing, Just k) -> addError (ContinuationWithoutJoin k)
+        _                 -> pure ()
+      -- DELIBERATELY outside the 'extendKnown' below: a join line's WITHIN
+      -- bounds the WHOLE group (R-T2), so it must not depend on which member
+      -- you are looking at — @ONCE ALL HAVE WITHIN graceOf t@ would be a
+      -- different deadline per member, which is not a deadline on the whole.
+      -- Keeping @v@ out of scope rejects it. Measured limit (2026-09-07): the
+      -- rejection arrives as the generic "could not find a definition for t",
+      -- which then prints the type it inferred for @t@ — poor wording for a
+      -- deliberate restriction. Stated on doc/reference/regulative/EVERY.md;
+      -- a dedicated diagnostic is not built.
+      joinR <- traverse checkJoin mjoin
+      rv <- def v
+      rv' <- setAnnResolvedTypeOfResolved partyT (Just Local) rv
+      extendKnown (makeKnown rv (KnownTerm partyT Local)) do
+        filterR <- traverse (\e -> checkExpr ExpectQuantifierFilterContext e boolean) mFilter
+        -- The performer/actor agreement check ('checkRegulativeActorAgreement')
+        -- is silent for a computed party (actors-and-actions.md §7); a bound
+        -- variable is one, so it is not run here. Phase 2 checks agreement at
+        -- run time, per member.
+        (actionR, dueR, henceR, lestR) <-
+          checkDeontonBody Nothing partyT actionT action due hence lest
+        -- An action is a pattern, so @MUST Sign t@ would bind a NEW @t@ over
+        -- any signer rather than refer to the member. Refuse the silent
+        -- shadowing and say how to spell the reference (@Sign (EXACTLY t)@).
+        forM_ (patternBinders actionR.action) \ b ->
+          when (rawName (getName b) == rawName v) $
+            addError (QuantifierVariableRebound b rv')
+        pure (MkDeonton ann (Every sann mCastR rv' filterR) actionR dueR joinR henceR lestR)
+
+-- | The @ONCE@ line: its threshold carries no expression in phase 1; its
+-- @WITHIN@ bounds the joined state and is a NUMBER like the act's (R-T2).
+checkJoin :: Join Name -> Check (Join Resolved)
+checkJoin = \ case
+  JoinOnce jann th mdue -> do
+    let thR = case th of AllHave a -> AllHave a
+    JoinOnce jann thR <$> checkJoinDeadline mdue
+  JoinUpon jann ue mdue ->
+    JoinUpon jann ue <$> checkJoinDeadline mdue
+  where
+    checkJoinDeadline =
+      traverse (\e -> checkExpr ExpectJoinDeadlineContext e number)
+
+-- | The part of a deonton after its subject: the action (with its PROVIDED
+-- guard), the deadline, and the two continuations. Shared by both subjects.
+checkDeontonBody
+  :: Maybe (Expr Resolved) -> Type' Resolved -> Type' Resolved
+  -> RAction Name -> Maybe (Expr Name) -> Maybe (Expr Name) -> Maybe (Expr Name)
+  -> Check (RAction Resolved, Maybe (Expr Resolved), Maybe (Expr Resolved), Maybe (Expr Resolved))
+checkDeontonBody mPartyR partyT actionT action due hence lest = do
   (actionR, boundByPattern) <- checkAction action actionT
   checkPartyActionAgreement partyT actionT
-  checkRegulativeActorAgreement partyT partyR (actionExprOfPattern actionR.action)
+  forM_ mPartyR \partyR ->
+    checkRegulativeActorAgreement partyT partyR (actionExprOfPattern actionR.action)
   let rTy = contract partyT actionT
   dueR <- traverse (\e -> checkExpr ExpectRegulativeDeadlineContext e number) due
   henceR <- traverse (\e -> extendKnownMany boundByPattern $ checkExpr ExpectRegulativeFollowupContext e rTy) hence
   lestR <- traverse (\e -> checkExpr ExpectRegulativeFollowupContext e rTy) lest
-  pure (MkDeonton ann partyR actionR dueR henceR lestR)
+  pure (actionR, dueR, henceR, lestR)
+
+-- | The variables an action pattern binds (its 'PatVar's), in source order.
+patternBinders :: Pattern Resolved -> [Resolved]
+patternBinders = \ case
+  PatVar _ b       -> [b]
+  PatApp _ _ ps    -> concatMap patternBinders ps
+  PatCons _ p1 p2  -> patternBinders p1 <> patternBinders p2
+  PatExpr _ _      -> []
+  PatLit _ _       -> []
+
+-- | The cast of an @EVERY Cast v@: a data constructor whose result type is the
+-- party type. A constructor with a payload (@Tenant HAS name IS A STRING@) has
+-- a function type; only its result must agree, since the quantifier ranges
+-- over the values it builds, not over its fields.
+checkQuantifierCast :: Type' Resolved -> Name -> Check Resolved
+checkQuantifierCast partyT c = do
+  (rc, ct) <- resolveConstructor c
+  t <- instantiate ct
+  expect ExpectQuantifierCastContext partyT (resultType t)
+  setAnnResolvedTypeOfResolved t (Just Constructor) rc
+  where
+    resultType = \ case
+      Forall _ _ t' -> resultType t'
+      Fun _ _ t'    -> resultType t'
+      t'            -> t'
 
 checkAction :: RAction Name -> Type' Resolved -> Check (RAction Resolved, [CheckInfo])
 checkAction MkAction {anno, modal, action, provided = mprovided} actionT = do
@@ -3045,10 +3141,10 @@ inferExpr' g =
       v <- fresh (NormalName "multiwayif")
       re <- checkMultiWayIf ann es e v
       pure (re, v)
-    Regulative ann (MkDeonton ann'' e1 e2 me3 me4 me5) -> do
+    Regulative ann (MkDeonton ann'' subj e2 me3 mj me4 me5) -> do
       party <- fresh (NormalName "party")
       action <- fresh (NormalName "action")
-      ob <- checkDeonton ann'' e1 e2 me3 me4 me5 party action
+      ob <- checkDeonton ann'' subj e2 me3 mj me4 me5 party action
       pure (Regulative ann ob, contract party action)
     Consider ann e branches -> do
       v <- fresh (NormalName "consider")
@@ -5255,8 +5351,14 @@ setInertContext = go True  -- True = we're at top level or direct boolean operan
 
     goNamed ctx' (MkNamedExpr ann n e) = MkNamedExpr ann n (go False ctx' e)
     goGuarded ctx' (MkGuardedExpr ann c f) = MkGuardedExpr ann (go True ctx' c) (go False ctx' f)
-    goObl ctx' (MkDeonton ann party action due hence lest) =
-      MkDeonton ann (go False ctx' party) (goRAction ctx' action) (fmap (go False ctx') due) (fmap (go False ctx') hence) (fmap (go False ctx') lest)
+    goObl ctx' (MkDeonton ann subj action due mjoin hence lest) =
+      MkDeonton ann (goSubject ctx' subj) (goRAction ctx' action) (fmap (go False ctx') due) (fmap (goJoin ctx') mjoin) (fmap (go False ctx') hence) (fmap (go False ctx') lest)
+    goJoin ctx' = \ case
+      JoinOnce ann th due -> JoinOnce ann th (fmap (go False ctx') due)
+      JoinUpon ann ue due -> JoinUpon ann ue (fmap (go False ctx') due)
+    goSubject ctx' = \ case
+      Party ann party -> Party ann (go False ctx' party)
+      Every ann mCast v mFilter -> Every ann mCast v (fmap (go True ctx') mFilter)
     goRAction ctx' (MkAction ann modal pat provided) =
       MkAction ann modal pat (fmap (go False ctx') provided)
     goBranch ctx' (MkBranch ann lhs e) = MkBranch ann lhs (go False ctx' e)
@@ -5384,6 +5486,14 @@ prettyCheckErrorContext (WhileCheckingAssume n ctx)      e =
 prettyCheckErrorContext (WhileCheckingExpression _e ctx) e = prettyCheckErrorContext ctx e
 prettyCheckErrorContext (WhileCheckingPattern _p ctx)    e = prettyCheckErrorContext ctx e
 prettyCheckErrorContext (WhileCheckingType _t ctx)       e = prettyCheckErrorContext ctx e
+
+-- | The fork's words as the diagnostics spell them; reads the printer's
+-- 'L4.Print.uponEachWords'. A re-spelling therefore changes that one definition,
+-- its parser twin 'L4.Parser.uponEach', the goldens that quote this message —
+-- and the hand-counted padding in 'prettyCheckError' below, which aligns the two
+-- alternatives' trailing comments and is sized for a nine-character fork.
+forkWordsText :: Text
+forkWordsText = Text.strip (prettyLayout (MkUponEach emptyAnno))
 
 prettyCheckError :: CheckError -> [Text]
 prettyCheckError (SuspiciousBinderPattern binder ctor)     =
@@ -5686,6 +5796,39 @@ prettyCheckError (ExportAssumeNameClash fnName paramName) =
       <> " with the same name as an ASSUME it reads."
   , "Both would be one input field, so a request could not supply them separately."
   , "Rename the input or the ASSUME."
+  ]
+prettyCheckError (QuantifierVariableRebound b q) =
+  [ "The action of this EVERY binds a new name"
+  , ""
+  , "  " <> quotedName (getName b)
+  , ""
+  , "which is spelled like the quantifier's own variable " <> quotedName (getName q) <> "."
+  , "An action is a pattern, so this would be a fresh name matching anyone,"
+  , "not a reference to the member. To mean the member, write"
+  , ""
+  , "  EXACTLY " <> quotedName (getName q)
+  , ""
+  , "in that position; to mean a fresh name, choose a different spelling."
+  ]
+prettyCheckError (JoinWithoutEvery _) =
+  [ "A join line needs an EVERY."
+  , ""
+  , "A join line says when the continuation of a group's obligation fires —"
+  , "ONCE ALL HAVE, when the last of them has acted, or " <> forkWordsText <> ", once per"
+  , "member. This rule binds a single PARTY, so there is no group: drop the"
+  , "join line, or quantify the subject with EVERY."
+  ]
+prettyCheckError (ContinuationWithoutJoin _) =
+  [ "An EVERY with a HENCE or LEST needs a join line saying when it fires."
+  , ""
+  , "Write one of"
+  , ""
+  , "  ONCE ALL HAVE    -- once, when the last of them has acted (the barrier)"
+  , "  " <> forkWordsText <> "        -- once per member who acts (the fork)"
+  , ""
+  , "on its own line between the act's WITHIN and the HENCE or LEST, indented"
+  , "past the EVERY. There is no default: the two readings differ, and guessing"
+  , "one would silently change the rule."
   ]
 prettyCheckError (RegulativeActorMismatch party performer actionName) =
   [ "An actor may only perform its own actions."
@@ -6048,6 +6191,15 @@ prettyTypeMismatch ExpectRefuseMessageContext expected given =
   standardTypeMismatch [ "The message of a REFUSE is expected to be a string literal, of type" ] expected given
 prettyTypeMismatch ExpectRecordCellContext expected given =
   standardTypeMismatch [ "The cell of a RECORD/COMMIT/ATTEST is expected to be of type" ] expected given
+prettyTypeMismatch ExpectQuantifierCastContext expected given =
+  standardTypeMismatch
+    [ "The cast of an EVERY must be a constructor of the party type."
+    , "This rule's party type is"
+    ] expected given
+prettyTypeMismatch ExpectQuantifierFilterContext expected given =
+  standardTypeMismatch [ "The WHO clause of an EVERY is expected to be of type" ] expected given
+prettyTypeMismatch ExpectJoinDeadlineContext expected given =
+  standardTypeMismatch [ "The WITHIN on a join line (the deadline on the whole) is expected to be of type" ] expected given
 
 -- | Best effort, only small numbers will occur"
 prettyOrdinal :: Int -> Text

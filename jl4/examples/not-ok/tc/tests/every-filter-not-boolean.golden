@@ -1,0 +1,17 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: every-filter-not-boolean.l4
+  Hidden: no
+  Range: 11:24-11:26
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The WHO clause of an EVERY is expected to be of type
+
+      BOOLEAN
+
+    but is here of type
+
+      NUMBER

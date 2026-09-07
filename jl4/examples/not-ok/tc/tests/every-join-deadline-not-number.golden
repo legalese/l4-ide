@@ -1,0 +1,17 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: every-join-deadline-not-number.l4
+  Hidden: no
+  Range: 12:63-12:69
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The WITHIN on a join line (the deadline on the whole) is expected to be of type
+
+      NUMBER
+
+    but is here of type
+
+      STRING

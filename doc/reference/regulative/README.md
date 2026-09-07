@@ -25,6 +25,7 @@ Regulative keywords express legal obligations, permissions, prohibitions, and th
 | Keyword               | Purpose                           |
 | --------------------- | --------------------------------- |
 | [PARTY](PARTY.md)     | Who has the obligation/permission |
+| [EVERY](EVERY.md)     | Every member of a group has it    |
 | WITHIN                | Temporal deadline (relative)      |
 | HENCE                 | Consequence on fulfillment        |
 | LEST                  | Consequence on breach             |
@@ -471,6 +472,7 @@ saleContract MEANS
 ## Related Pages
 
 - **[PARTY](PARTY.md)** - Party declarations
+- **[EVERY](EVERY.md)** - One obligation for every member of a group (front end only; evaluation is proposed, not landed)
 - **[MUST](MUST.md)** - Obligations
 - **[MAY](MAY.md)** - Permissions
 - **[SHANT](SHANT.md)** - Prohibitions (also written MUST NOT)

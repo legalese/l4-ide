@@ -222,16 +222,33 @@ instance Linearize (Expr Resolved) where
     MultiWayIf _ conds o -> hcat $
       foldMap (\(MkGuardedExpr _ c f) -> ["if", lin c, "then", lin f]) conds
       <> ["otherwise", lin o ]
-    Regulative _ (MkDeonton _ party (MkAction _ modal rule mprovided) mdeadline mfollowup mlest) -> hcat $
-      [ text "party"
-      , lin party
-      , text (deonticModalText modal)
-      , lin rule
-      ]
+    Regulative _ (MkDeonton _ subj (MkAction _ modal rule mprovided) mdeadline mjoin mfollowup mlest) -> hcat $
+      linSubject subj
+      <> [ text (deonticModalText modal)
+         , lin rule
+         ]
       <> maybe [] (\ provided -> [ text "provided that", lin provided ]) mprovided
       <> maybe [] (\ deadline -> [ text "within", lin deadline ]) mdeadline
+      <> maybe [] linJoin mjoin
       <> maybe [] (\ followup -> [ text "hence",  lin followup ]) mfollowup
       <> maybe [] (\ lest -> [ text "lest",  lin lest ]) mlest
+      where
+        linJoin j = case j of
+          -- follows 'L4.Print' (uponEachWords); R-Q1 RULED 2026-09-07
+          JoinOnce _ th mdue ->
+            [ text "once" ]
+            <> (case th of AllHave _ -> [ text "all", text "have" ])
+            <> linJoinDue mdue
+          JoinUpon _ _ mdue -> [ text "upon", text "each" ] <> linJoinDue mdue
+        linJoinDue = maybe [] (\ d -> [ text "within", lin d ])
+        linSubject = \ case
+          Party _ party -> [ text "party", lin party ]
+          Every _ mCast v mFilter ->
+            [ text "every" ]
+            -- Resolved can't use 'lin', as it doesn't have an 'Anno'
+            <> maybe [] (\ c -> [ linearize c ]) mCast
+            <> [ linearize v ]
+            <> maybe [] (\ f -> [ text "who", lin f ]) mFilter
     Consider _ e br -> hcat
       [ text "consider"
       , text "the"

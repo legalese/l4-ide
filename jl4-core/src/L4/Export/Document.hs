@@ -1091,9 +1091,13 @@ patternText = \case
 -- ----------------------------------------------------------------------------
 
 deonticClause :: Deonton Resolved -> Clause
-deonticClause (MkDeonton _ party (MkAction _ modal actPat mprov) mdue mhence mlest) =
+deonticClause (MkDeonton _ subj (MkAction _ modal actPat mprov) mdue _join mhence mlest) =
+  -- The @ONCE …@ join line is not rendered by this export in phase 1 of
+  -- EVERY-EACH-QUANTIFIER-SPEC: 'CDeontic' has no slot for it, and the
+  -- barrier/fork distinction is a run-time property that phase 2 builds. The
+  -- limit is stated on the doc page for EVERY.
   CDeontic
-    (inlineProse party)
+    (subjectProse subj)
     (modalWord modal)
     (patternText actPat)
     (dueText mdue)
@@ -1115,6 +1119,17 @@ deonticClause (MkDeonton _ party (MkAction _ modal actPat mprov) mdue mhence mle
     Refuse _ msg ->
       CLeaf ("the model refuses to answer: “" <> inlineProse msg <> "”")
     _ -> toClause e
+
+-- | The subject of a deontic clause as prose: the party, or the quantifier
+-- read aloud (@every Tenant t who …@).
+subjectProse :: Subject Resolved -> Text
+subjectProse = \case
+  Party _ party -> inlineProse party
+  Every _ mCast v mFilter ->
+    "every "
+      <> maybe "" (\c -> nameToText (getActual c) <> " ") mCast
+      <> nameToText (getActual v)
+      <> maybe "" (\f -> " who " <> inlineProse f) mFilter
 
 modalWord :: DeonticModal -> Text
 modalWord = \case

@@ -257,8 +257,8 @@ The rent, in the proposed form, shows all three at once — a group, a receipt p
 -- PROPOSED, NOT LANDED (2026-09-06). Does not run.
 EVERY Flatmate f
     MAY    Pay f `Ms Ng` amount
-    HENCE FOR EACH
-           PARTY `Ms Ng` MUST Receipt `Ms Ng` f amount WITHIN 5
+    UPON   EACH
+    HENCE  PARTY `Ms Ng` MUST Receipt `Ms Ng` f amount WITHIN 5
 ONCE   sum OF amount AT LEAST 1500
 WITHIN 7
 HENCE  FULFILLED

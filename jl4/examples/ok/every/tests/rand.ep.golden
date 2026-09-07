@@ -1,0 +1,26 @@
+IMPORT prelude
+-- EVERY-EACH-QUANTIFIER-SPEC §8.3: a quantified obligation as an operand of
+-- RAND / ROR, beside a plain PARTY obligation. Parenthesised, as the corpus
+-- writes compound obligations.
+
+DECLARE Actor IS ONE OF
+    Landlord HAS name IS A STRING
+    Tenant   HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Sign    HAS signer IS AN Actor
+    Deliver HAS who    IS AN Actor, what IS A STRING
+
+theLandlord MEANS Landlord OF "Ms Ng"
+
+GIVETH A DEONTIC Actor Action
+`sign and deliver` MEANS
+    (EVERY Tenant t MUST Sign (EXACTLY t) WITHIN 14 ONCE ALL HAVE HENCE FULFILLED LEST BREACH)
+    RAND
+    (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) what WITHIN 14 HENCE FULFILLED LEST BREACH)
+
+GIVETH A DEONTIC Actor Action
+`either way` MEANS
+    (EVERY Tenant t MUST Sign (EXACTLY t) WITHIN 14)
+    ROR
+    (EVERY Tenant t WHO t EQUALS Tenant OF "Alice" MUST Sign (EXACTLY t) WITHIN 7)

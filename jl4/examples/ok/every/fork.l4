@@ -1,0 +1,36 @@
+IMPORT prelude
+-- EVERY-EACH-QUANTIFIER-SPEC, phase 1: the fork form.
+--
+-- `UPON EACH` is the fork: the continuation fires once PER tenant who
+-- pays, independently, rather than once when all have (spec §2.2.6, §3.2).
+-- The join is a line of its own between the act's WITHIN and the HENCE
+-- (R-Q1, RULED 2026-09-07). The fork's words were ruled `UPON EACH` the same
+-- day: a barrier is level-triggered and fires once, a fork is edge-triggered and
+-- fires per completion, so the trigger lives in the keyword rather than in a
+-- threshold. `ONCE EACH HAS` no longer parses.
+--
+-- `amount`, bound by the action pattern, and `t`, bound by EVERY, are both in
+-- scope in the continuation and in LEST. The inner obligation is parenthesised,
+-- as the corpus writes every nested obligation: it has no closing token, so its
+-- own optional HENCE/LEST would otherwise swallow the outer LEST.
+
+DECLARE Actor IS ONE OF
+    Landlord HAS name IS A STRING
+    Tenant   HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Pay     HAS payer  IS AN Actor, payee IS AN Actor, amount IS A NUMBER
+    Receipt HAS issuer IS AN Actor, to    IS AN Actor, amount IS A NUMBER
+
+theLandlord MEANS Landlord OF "Ms Ng"
+
+GIVETH A DEONTIC Actor Action
+`each payment gets a receipt` MEANS
+    EVERY Tenant t
+        MUST   Pay (EXACTLY t) (EXACTLY theLandlord) amount
+        WITHIN 7
+        UPON   EACH
+        HENCE  (PARTY theLandlord
+                    MUST   Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount)
+                    WITHIN 5)
+        LEST   BREACH BY t
