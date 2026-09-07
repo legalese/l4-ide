@@ -45,6 +45,7 @@ Phase: Lexer
 15:39-47 SemanticTokenTypes_Variable
 15:48-50 SemanticTokenTypes_Keyword
 15:51-58 SemanticTokenTypes_Variable
+16:1-135 SemanticTokenTypes_Comment
 
 Phase: Parse
 1:1-2 SemanticTokenTypes_Operator
@@ -93,6 +94,7 @@ Phase: Parse
 15:39-47 SemanticTokenTypes_Type
 15:48-50 SemanticTokenTypes_Keyword
 15:51-58 SemanticTokenTypes_Type
+16:1-135 SemanticTokenTypes_Comment
 
 Phase: Check
 1:1-2 SemanticTokenTypes_Operator
@@ -141,4 +143,5 @@ Phase: Check
 15:39-47 SemanticTokenTypes_Type
 15:48-50 SemanticTokenTypes_Keyword
 15:51-58 SemanticTokenTypes_Type
+16:1-135 SemanticTokenTypes_Comment
 

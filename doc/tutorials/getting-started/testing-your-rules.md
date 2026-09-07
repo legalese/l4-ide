@@ -137,16 +137,17 @@ Result:
 
 ### What an error looks like
 
-An assertion whose expression _stops and says why_ — a division by zero, a `CONSIDER` with no matching branch, a name that is only `ASSUME`d — is neither satisfied nor failed: L4 could not decide it either way. `#ASSERT P` and `#ASSERT NOT P` then both report the same thing, with the reason:
+An assertion whose expression _stops and says why_ — a division by zero, a `CONSIDER` with no matching branch, a fact named under a section heading that nothing has supplied — is neither satisfied nor failed: L4 could not decide it either way. `#ASSERT P` and `#ASSERT NOT P` then both report the same thing, with the reason:
 
 ```l4
-ASSUME x IS A NUMBER
+§ `A fact nobody has supplied`
+    GIVEN x IS A NUMBER
 
 #ASSERT x EQUALS 1
 ```
 
 ```
-Evaluation[1] @ stuck-assert.l4:3:1-19
+Evaluation[1] @ stuck-assert.l4:4:1-19
 
 Result:
   assertion could not be evaluated:
@@ -157,7 +158,7 @@ Result:
 
 This is a breakdown, not a verdict: `l4 run` exits non-zero, and with `--json` — the machine-readable output, written in JavaScript Object Notation (JSON) — the result keeps `"kind": "assertion"` with `"value": null` and the reason under `"error"`.
 
-The same holds for a bare `ASSUME`d yes-or-no name asserted directly. `#ASSERT NOT b` has to know the value of `b`, and stops; `#ASSERT b` gets as far as `b` itself without stopping — but that is no verdict either, so it reports the same way rather than as `assertion failed`.
+The same holds for a bare yes-or-no fact, left open the same way, asserted directly. `#ASSERT NOT b` has to know the value of `b`, and stops; `#ASSERT b` gets as far as `b` itself without stopping — but that is no verdict either, so it reports the same way rather than as `assertion failed`. (Older files leave such a fact open with `ASSUME b IS A BOOLEAN`; the report reads the same.)
 
 ### What a refusal looks like
 

@@ -1,31 +1,32 @@
--- Test file for implicit ASSUME extraction in jl4-service
+-- Test file for open-fact extraction in jl4-service.
 --
--- This file tests the "dynamic mode" where undeclared variables with
--- type-inferred types are automatically exposed as API parameters.
+-- This file was written for a "dynamic mode" in which UNDECLARED names with
+-- inferred types were exposed as API parameters. That case no longer exists
+-- here: every name below is declared (`temperature` and `humidity` once for
+-- the section, `threshold` and `approved` as rule inputs), `l4 check` reports
+-- nothing, and the schema of each export lists exactly the declared inputs it
+-- reads. The two section-level facts were module-level ASSUMEs until
+-- 2026-09-06; they are promoted to API parameters the same way.
 --
 -- Expected behavior:
--- - IDE shows red error for undeclared `temperature` and `approved`
--- - jl4-service still generates valid function schema
--- - Schema includes all three parameter types:
---   1. GIVEN parameters (threshold)
---   2. Explicit ASSUME parameters (humidity)
---   3. Implicit ASSUME parameters (temperature, approved)
+-- - jl4-service generates a valid function schema for each export
+-- - Schema includes both parameter kinds:
+--   1. rule GIVEN parameters (threshold, approved)
+--   2. section GIVEN parameters (humidity, temperature)
 
 DECLARE Rating IS ONE OF Hot, Warm, Cool, Cold
 
--- Explicit ASSUME - should appear in schema
-ASSUME humidity IS A NUMBER
-ASSUME temperature IS A NUMBER
+§ `Climate`
+    GIVEN humidity IS A NUMBER
+          temperature IS A NUMBER
 
--- Test 1: Implicit NUMBER from arithmetic context
--- `temperature` is undeclared but inferred as NUMBER from `temperature > threshold`
+-- Test 1: a section-level NUMBER read next to a rule input
 GIVEN threshold IS A NUMBER
 
 @export default Check if temperature exceeds threshold
 DECIDE `exceeds threshold` threshold IF temperature > threshold
 
--- Test 2: Implicit BOOLEAN from boolean context
--- `approved` is undeclared but inferred as BOOLEAN from `AND approved`
+-- Test 2: a rule-input BOOLEAN read beside the section-level NUMBER
 @export Check if warm and approved
 GIVEN approved IS A BOOLEAN
 DECIDE `is warm and approved` IF
@@ -33,8 +34,8 @@ DECIDE `is warm and approved` IF
   AND temperature < 30
   AND approved
 
--- Test 3: Mix of explicit ASSUME, implicit ASSUME, and GIVEN
--- Should have: threshold (GIVEN), humidity (explicit ASSUME), temperature (implicit)
+-- Test 3: a rule input plus both section-level facts
+-- Should have: threshold (rule GIVEN), humidity and temperature (section GIVEN)
 @export Comfort check with humidity
 GIVEN threshold IS A NUMBER
 DECIDE `is comfortable` threshold IF

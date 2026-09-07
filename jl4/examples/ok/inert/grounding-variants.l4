@@ -10,29 +10,19 @@
 -- PERMISSION, `holds` (closed world) for discharging an OBLIGATION. Flip the radio
 -- between these two and watch each one become dangerous in turn.
 --
--- Nothing here evaluates: every atom is an uninterpreted ASSUME or a GIVEN parameter,
--- which is exactly what we want — a screenful of genuinely UNANSWERED atoms is the
--- input the grounding knob exists to interpret.
+-- Nothing here evaluates: every atom is a GIVEN parameter of the decision that reads
+-- it, which is exactly what we want — a screenful of genuinely UNANSWERED atoms is the
+-- input the grounding knob exists to interpret. (The first nine were module-level
+-- ASSUMEs until 2026-09-06; as rule inputs the ladder's box labels are byte-identical,
+-- measured through jl4-lsp, whereas a section GIVEN would prefix each with its heading.)
 
 IMPORT prelude
 
--- Atoms nobody has answered.
+-- Atoms nobody has answered: each decision below declares its own as GIVEN inputs.
 --
--- Deliberately NOT under a `§` section: a name declared inside one is reported to the
--- visualizer fully qualified ("… (qualified at section X)"), which lands verbatim in the
--- box label and makes every leaf unreadably wide.
-
-ASSUME `a prohibition notice is in force` IS A BOOLEAN
-ASSUME `the visitor holds a valid pass`   IS A BOOLEAN
-ASSUME `the site is a restricted area`    IS A BOOLEAN
-
-ASSUME `the return was filed`             IS A BOOLEAN
-ASSUME `the levy was paid`                IS A BOOLEAN
-ASSUME `an extension was granted`         IS A BOOLEAN
-
-ASSUME `the premises are residential`     IS A BOOLEAN
-ASSUME `smoke alarms are fitted`          IS A BOOLEAN
-ASSUME `the escape route is clear`        IS A BOOLEAN
+-- Deliberately NOT under a `§` section: a name declared for a section is reported to
+-- the visualizer qualified by the heading (`Atoms.\`a prohibition notice is in force\``,
+-- measured 2026-09-07), which lands verbatim in the box label and widens every leaf.
 
 
 -- == 1. A PERMISSION — whose two atoms want OPPOSITE readings ==
@@ -50,6 +40,10 @@ ASSUME `the escape route is clear`        IS A BOOLEAN
 -- That is why NEGATION-AS-FAILURE-SPEC.md puts `holds`/`presumed` at the USE SITE: the
 -- drafter chooses per atom, and this knob can only ever supply a house default for the
 -- atoms nobody chose for.
+GIVEN `a prohibition notice is in force` IS A BOOLEAN
+      `the visitor holds a valid pass`   IS A BOOLEAN
+      `the site is a restricted area`    IS A BOOLEAN   -- declared, never read: an atom the picture can show unanswered
+GIVETH A BOOLEAN
 DECIDE `may enter the site` IF
         NOT `a prohibition notice is in force`
     AND     `the visitor holds a valid pass`
@@ -60,6 +54,10 @@ DECIDE `may enter the site` IF
 -- Exactly inverted. An unproven filing is NOT a filing: nobody discharges a duty by
 -- failing to mention it. Open world here manufactures compliance out of silence, which
 -- is the single most expensive mistake this picture can make.
+GIVEN `the return was filed`             IS A BOOLEAN
+      `the levy was paid`                IS A BOOLEAN
+      `an extension was granted`         IS A BOOLEAN
+GIVETH A BOOLEAN
 DECIDE `has discharged the reporting duty` IF
             `the return was filed`
         AND `the levy was paid`
@@ -73,6 +71,10 @@ DECIDE `has discharged the reporting duty` IF
 -- out-of-scope and the note says N/A "on this reading" — never as a plain finding.
 -- Open world puts the case in scope and then decides the requirement, which is how a
 -- single knob can walk you from "we don't know" to "in breach" with no new facts.
+GIVEN `the premises are residential`     IS A BOOLEAN
+      `smoke alarms are fitted`          IS A BOOLEAN
+      `the escape route is clear`        IS A BOOLEAN
+GIVETH A BOOLEAN
 DECIDE `rule 7 is satisfied` IF
     `the premises are residential`
         IMPLIES

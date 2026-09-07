@@ -38,19 +38,20 @@ DECLARE Person HAS
   age IS A NUMBER
 ```
 
-### In Assumptions
+### In a section GIVEN
 
 ```l4
-ASSUME x IS A NUMBER
-ASSUME f IS A FUNCTION FROM NUMBER TO NUMBER
+§ `Facts about the case`
+    GIVEN x IS A NUMBER
+          f IS A FUNCTION FROM NUMBER TO NUMBER
 ```
 
-A rule is told some facts about the case in front of it (its **"inputs"**).
-`ASSUME` is deprecated as the way to declare one (ruled 2026-09-04) and still
-works: a fact supplied afresh for each case is now written with the same
-`IS A Type` spelling in a
-[`GIVEN` under its section's heading](../syntax/section-given.md) — a
-**"section `GIVEN`"**.
+A rule is told some facts about the case in front of it (its **"inputs"**). A
+fact supplied afresh for each case is declared once, with this same `IS A Type`
+spelling, in a [`GIVEN` under its section's heading](../syntax/section-given.md)
+— a **"section `GIVEN`"**. Older files declare the same facts with `ASSUME` at
+the left margin; that keyword is deprecated (ruled 2026-09-04) and still works.
+See [ASSUME (deprecated)](ASSUME.md).
 
 ### In Definitions
 
@@ -121,12 +122,13 @@ person1 MEANS Person OF 20, "John"  -- Explicit form using OF
 person2 MEANS Person 21, "Jill"     -- Short form
 ```
 
-### Within ASSUME
+### Within a section GIVEN
 
 ```l4
 DECLARE Container a HAS value IS A a
 
-ASSUME box IS A Container OF NUMBER
+§ `Boxes`
+    GIVEN box IS A Container OF NUMBER
 ```
 
 ## WITH
@@ -160,8 +162,8 @@ Both a type constructor and literal syntax.
 ### As Type
 
 ```l4
-ASSUME numbers IS A LIST OF NUMBER
-ASSUME names IS A LIST OF STRING
+GIVEN numbers IS A LIST OF NUMBER
+      names IS A LIST OF STRING
 ```
 
 ### As Literal
@@ -187,11 +189,9 @@ FUNCTION FROM Type1 AND Type2 TO ResultType
 ### Examples
 
 ```l4
--- One input
-ASSUME f IS A FUNCTION FROM NUMBER TO NUMBER
-
--- Several inputs (joined with AND)
-ASSUME g IS A FUNCTION FROM NUMBER AND STRING TO BOOLEAN
+§ `Rules assumed to exist`
+    GIVEN f IS A FUNCTION FROM NUMBER TO NUMBER              -- one input
+          g IS A FUNCTION FROM NUMBER AND STRING TO BOOLEAN  -- several inputs (joined with AND)
 ```
 
 [Types: Functions](../types/function-type-example.l4)

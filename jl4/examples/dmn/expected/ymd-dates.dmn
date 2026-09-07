@@ -3,9 +3,6 @@
   <inputData id="input_the_application_date" name="the_application_date" label="the application date">
     <variable id="input_the_application_date_var" name="the_application_date" label="the application date" typeRef="date"/>
   </inputData>
-  <inputData id="input_no_fee_is_prescribed_before_commencement_on_1983_01_01" name="no_fee_is_prescribed_before_commencement_on_1983_01_01" label="no fee is prescribed before commencement on 1983-01-01">
-    <variable id="input_no_fee_is_prescribed_before_commencement_on_1983_01_01_var" name="no_fee_is_prescribed_before_commencement_on_1983_01_01" label="no fee is prescribed before commencement on 1983-01-01" typeRef="number"/>
-  </inputData>
   <inputData id="input_rules_effective_date" name="RULES_EFFECTIVE_DATE" label="RULES EFFECTIVE DATE">
     <variable id="input_rules_effective_date_var" name="RULES_EFFECTIVE_DATE" label="RULES EFFECTIVE DATE" typeRef="date"/>
   </inputData>
@@ -86,10 +83,17 @@
       </rule>
     </decisionTable>
   </decision>
+  <decision id="decision_no_fee_is_prescribed_before_commencement_on_1983_01_01" name="no_fee_is_prescribed_before_commencement_on_1983_01_01" label="no fee is prescribed before commencement on 1983-01-01">
+    <description>REFUSE: no fee is prescribed before commencement on 1983-01-01</description>
+    <variable id="decision_no_fee_is_prescribed_before_commencement_on_1983_01_01_var" name="no_fee_is_prescribed_before_commencement_on_1983_01_01" label="no fee is prescribed before commencement on 1983-01-01" typeRef="number"/>
+    <literalExpression id="decision_no_fee_is_prescribed_before_commencement_on_1983_01_01_literal">
+      <text>null</text>
+    </literalExpression>
+  </decision>
   <decision id="decision_the_filing_fee" name="the_filing_fee" label="the filing fee">
     <variable id="decision_the_filing_fee_var" name="the_filing_fee" label="the filing fee" typeRef="number"/>
     <informationRequirement id="decision_the_filing_fee_ir1">
-      <requiredInput href="#input_no_fee_is_prescribed_before_commencement_on_1983_01_01"/>
+      <requiredDecision href="#decision_no_fee_is_prescribed_before_commencement_on_1983_01_01"/>
     </informationRequirement>
     <informationRequirement id="decision_the_filing_fee_ir2">
       <requiredInput href="#input_rules_effective_date"/>
@@ -135,7 +139,7 @@
           <text>no_fee_is_prescribed_before_commencement_on_1983_01_01</text>
         </outputEntry>
         <annotationEntry>
-          <text>no fee is prescribed before commencement on 1983-01-01</text>
+          <text>no fee is prescribed before commencement on 1983-01-01 (main.l4:87:1-89:68)</text>
         </annotationEntry>
       </rule>
     </decisionTable>
@@ -156,70 +160,70 @@
     <encapsulatedDecision href="#decision_commencement"/>
     <encapsulatedDecision href="#decision_the_appointed_day"/>
     <encapsulatedDecision href="#decision_the_transition_day"/>
+    <encapsulatedDecision href="#decision_no_fee_is_prescribed_before_commencement_on_1983_01_01"/>
     <encapsulatedDecision href="#decision_the_filing_fee"/>
     <inputData href="#input_the_application_date"/>
-    <inputData href="#input_no_fee_is_prescribed_before_commencement_on_1983_01_01"/>
     <inputData href="#input_rules_effective_date"/>
   </decisionService>
   <dmndi:DMNDI>
     <dmndi:DMNDiagram id="definitions_ymd_date_literals_diagram" name="YMD date literals">
       <dmndi:DMNShape id="input_the_application_date_shape" dmnElementRef="input_the_application_date">
-        <dc:Bounds x="60" y="380" width="180" height="80"/>
-      </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_no_fee_is_prescribed_before_commencement_on_1983_01_01_shape" dmnElementRef="input_no_fee_is_prescribed_before_commencement_on_1983_01_01">
-        <dc:Bounds x="280" y="380" width="180" height="80"/>
+        <dc:Bounds x="60" y="540" width="180" height="80"/>
       </dmndi:DMNShape>
       <dmndi:DMNShape id="input_rules_effective_date_shape" dmnElementRef="input_rules_effective_date">
-        <dc:Bounds x="500" y="380" width="180" height="80"/>
+        <dc:Bounds x="280" y="540" width="180" height="80"/>
       </dmndi:DMNShape>
       <dmndi:DMNShape id="decision_commencement_shape" dmnElementRef="decision_commencement">
-        <dc:Bounds x="60" y="220" width="180" height="80"/>
+        <dc:Bounds x="60" y="380" width="180" height="80"/>
       </dmndi:DMNShape>
       <dmndi:DMNShape id="decision_the_appointed_day_shape" dmnElementRef="decision_the_appointed_day">
-        <dc:Bounds x="280" y="220" width="180" height="80"/>
+        <dc:Bounds x="280" y="380" width="180" height="80"/>
       </dmndi:DMNShape>
       <dmndi:DMNShape id="decision_the_transition_day_shape" dmnElementRef="decision_the_transition_day">
-        <dc:Bounds x="500" y="220" width="180" height="80"/>
+        <dc:Bounds x="500" y="380" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_the_filing_fee_shape" dmnElementRef="decision_the_filing_fee">
-        <dc:Bounds x="720" y="220" width="180" height="80"/>
+      <dmndi:DMNShape id="decision_no_fee_is_prescribed_before_commencement_on_1983_01_01_shape" dmnElementRef="decision_no_fee_is_prescribed_before_commencement_on_1983_01_01">
+        <dc:Bounds x="720" y="380" width="180" height="80"/>
       </dmndi:DMNShape>
       <dmndi:DMNShape id="decision_the_regime_that_applies_shape" dmnElementRef="decision_the_regime_that_applies">
-        <dc:Bounds x="60" y="60" width="180" height="80"/>
+        <dc:Bounds x="60" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_the_filing_fee_shape" dmnElementRef="decision_the_filing_fee">
+        <dc:Bounds x="280" y="220" width="180" height="80"/>
       </dmndi:DMNShape>
       <dmndi:DMNShape id="decision_the_fee_with_surcharge_shape" dmnElementRef="decision_the_fee_with_surcharge">
-        <dc:Bounds x="280" y="60" width="180" height="80"/>
+        <dc:Bounds x="60" y="60" width="180" height="80"/>
       </dmndi:DMNShape>
       <dmndi:DMNShape id="service_ymd_date_literals_shape" dmnElementRef="service_ymd_date_literals">
-        <dc:Bounds x="40" y="40" width="880" height="280"/>
+        <dc:Bounds x="40" y="40" width="880" height="440"/>
       </dmndi:DMNShape>
       <dmndi:DMNEdge id="decision_the_regime_that_applies_ir1_edge" dmnElementRef="decision_the_regime_that_applies_ir1">
-        <di:waypoint x="150" y="220"/>
-        <di:waypoint x="150" y="140"/>
+        <di:waypoint x="150" y="380"/>
+        <di:waypoint x="150" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_regime_that_applies_ir2_edge" dmnElementRef="decision_the_regime_that_applies_ir2">
-        <di:waypoint x="370" y="220"/>
-        <di:waypoint x="150" y="140"/>
+        <di:waypoint x="370" y="380"/>
+        <di:waypoint x="150" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_regime_that_applies_ir3_edge" dmnElementRef="decision_the_regime_that_applies_ir3">
-        <di:waypoint x="590" y="220"/>
-        <di:waypoint x="150" y="140"/>
+        <di:waypoint x="590" y="380"/>
+        <di:waypoint x="150" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_regime_that_applies_ir4_edge" dmnElementRef="decision_the_regime_that_applies_ir4">
-        <di:waypoint x="150" y="380"/>
-        <di:waypoint x="150" y="140"/>
+        <di:waypoint x="150" y="540"/>
+        <di:waypoint x="150" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_filing_fee_ir1_edge" dmnElementRef="decision_the_filing_fee_ir1">
-        <di:waypoint x="370" y="380"/>
-        <di:waypoint x="810" y="300"/>
+        <di:waypoint x="810" y="380"/>
+        <di:waypoint x="370" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_filing_fee_ir2_edge" dmnElementRef="decision_the_filing_fee_ir2">
-        <di:waypoint x="590" y="380"/>
-        <di:waypoint x="810" y="300"/>
+        <di:waypoint x="370" y="540"/>
+        <di:waypoint x="370" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_fee_with_surcharge_ir1_edge" dmnElementRef="decision_the_fee_with_surcharge_ir1">
-        <di:waypoint x="810" y="220"/>
-        <di:waypoint x="370" y="140"/>
+        <di:waypoint x="370" y="220"/>
+        <di:waypoint x="150" y="140"/>
       </dmndi:DMNEdge>
     </dmndi:DMNDiagram>
   </dmndi:DMNDI>

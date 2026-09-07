@@ -150,9 +150,10 @@ DECIDE person IS
 **Type Inference:** JSONDECODE uses bidirectional type checking. The expected type guides parsing:
 
 ```l4
--- Type annotation guides decoding
-ASSUME result IS A EITHER STRING Person
-DECIDE result IS JSONDECODE jsonString
+-- The declared output type guides decoding
+GIVEN jsonString IS A STRING
+GIVETH AN EITHER STRING Person
+result jsonString MEANS JSONDECODE jsonString
 ```
 
 ---

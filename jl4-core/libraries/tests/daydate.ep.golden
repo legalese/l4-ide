@@ -89,8 +89,8 @@ GIVETH A DATE
 --   * unlike `Date d m y`, YMD rejects out-of-range components instead of
 --     rolling them: `YMD 2026 28 7` (a transposition) and `YMD 2023 2 29`
 --     (no such leap day) stop evaluation loudly, where `Date` rolls forward
---     silently. "Rejects" is ordinary English here, NOT the `REFUSE` keyword;
---     the note below says why this site is deliberately not a refusal.
+--     silently. Since 2026-09-06 that stop is a `REFUSE`; the note below
+--     says why, and what the designed shape is.
 --
 -- The check is a component round-trip: build the candidate with `Date`,
 -- then require its year, month and day to equal the arguments. Any rolled
@@ -100,29 +100,33 @@ GIVETH A DATE
 -- The pair is deliberate: YMD is the STRICT constructor for literals;
 -- `Date d m y` is unchanged as the LENIENT, rolling constructor, which date
 -- arithmetic relies on (`Date 1 (month PLUS 6) year` is idiomatic). The
--- rejected case is a deliberate ASSUME bottom: evaluation that reaches it
--- stops with "... is an assumed term", naming the binding below.
+-- rejected case is a deliberate REFUSE: evaluation that reaches it stops
+-- with the reason below, and no rule can turn it back into a date. Until
+-- 2026-09-06 it was an `ASSUME … IS A DATE` bottom, which displayed as its
+-- own name and only stopped evaluation when forced.
 --
--- STILL AN ASSUME, DELIBERATELY, AND NOT A `REFUSE`. The `REFUSE` keyword is
--- in the language (R7, ruled 2026-09-04; shipped on `unstable` in PR #334 —
--- `Lexer.hs` has the token and `prelude.l4:767` defines TBD over it). The Reg
--- CF corpus's commencement floor has a ruled destination and HAS NOT REACHED
--- IT: `regcf.l4:143` is still an ASSUME as of 2026-09-05, and its migration is
--- pending on `props/assume-sweep`. Note the destination is NOT `REFUSE`
--- either — R7's taxonomy split makes "the law is not in force" a gate, and
--- R7.1 (`IMPLICIT-PROPS-DESIGN.md` §11.9.2, ruled 2026-09-05) puts that gate
--- on the rule-version axis; R7 says the arm stays a refusal only until the
--- gate exists, and it does not exist yet.
---
--- This site is not that case either way. The taxonomy of
+-- A `REFUSE`, DELIBERATELY, AND AS A STOPGAP. The taxonomy of
 -- PROPS-REDTEAM-2026-09-03 §2.8 classifies an out-of-range YMD as INVALID
 -- INPUT (the EITHER row), not as the model declining to answer. Its designed
 -- shape is therefore a change to this constructor's RETURN TYPE, which every
 -- date-arithmetic call site in the corpus goes through — a different and much
 -- larger change than swapping the bottom, and one that belongs in its own
--- branch. The binding below keeps the ordinary word "refused" in its name;
+-- branch. Until that lands, `REFUSE` is the one construct that keeps the
+-- constructor loud without making its sentinel suppliable: the section-GIVEN
+-- spelling of the old ASSUME would have been an input, and discharge would
+-- have threaded it into every reader of `YMD`. Recorded in
+-- IMPLICIT-PROPS-DESIGN.md §11.1.2 and doc/reference/control-flow/REFUSE.md.
+--
+-- Not to be confused with the Reg CF corpus's commencement floor
+-- (`regcf.l4:143`), which is still an ASSUME as of 2026-09-07 for a different
+-- reason — a refusal reachable from a tier-2 BKM un-BKMs it in the DMN
+-- exporter (§11.1.2) — and whose own designed destination is a gate on the
+-- rule-version axis (R7.1, §11.9.2), not a refusal, once that gate exists.
+-- The definition below keeps the ordinary word "refused" in its name;
 -- renaming it would move goldens in other files and buys nothing.
-ASSUME `YMD refused an out-of-range month or day` IS A DATE
+GIVETH A DATE
+`YMD refused an out-of-range month or day` MEANS
+    REFUSE "YMD refused an out-of-range month or day"
 
 GIVEN year  IS A NUMBER
       month IS A NUMBER

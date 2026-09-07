@@ -3,6 +3,92 @@
 
 IMPORT prelude -- provides "all"
 
+§ `Charities (Jersey) Law 2014`
+    GIVEN `charitable purpose` IS A FUNCTION FROM Purpose TO BOOLEAN
+          `ancillary or incidental to charitable purpose` IS A FUNCTION FROM Purpose TO BOOLEAN
+          `provides public benefit in Jersey or elsewhere` IS A FUNCTION FROM Entity TO BOOLEAN
+          `is a Jersey entity` IS A FUNCTION FROM Entity TO BOOLEAN
+          `carries out substantial activity in Jersey` IS A FUNCTION FROM Entity TO BOOLEAN
+          `has a principal address in Jersey` IS A FUNCTION FROM Entity TO BOOLEAN
+          constitution IS A FUNCTION FROM Entity TO Constitution
+          `is a written document` IS A FUNCTION FROM Constitution TO BOOLEAN
+          name IS A FUNCTION FROM Entity TO Name
+          `is undesirable` IS A FUNCTION FROM Name TO BOOLEAN
+          `same as another charity` IS A FUNCTION FROM Name TO BOOLEAN
+          `too similar to another charity` IS A FUNCTION FROM Name TO BOOLEAN
+          `misleading` IS A FUNCTION FROM Name TO BOOLEAN
+          `implies false connection` IS A FUNCTION FROM Name TO BOOLEAN
+          `offensive` IS A FUNCTION FROM Name TO BOOLEAN
+          `is governor of` IS A FUNCTION FROM Person AND Entity TO BOOLEAN
+          `directed by Minister` IS A FUNCTION FROM Entity TO BOOLEAN
+          `directed by States Assembly member` IS A FUNCTION FROM Entity TO BOOLEAN
+          `directed by equivalent in another jurisdiction` IS A FUNCTION FROM Entity TO BOOLEAN
+          `is registered` IS A FUNCTION FROM Entity TO BOOLEAN
+          `is deregistered` IS A FUNCTION FROM Entity TO BOOLEAN
+          `registration date` IS A FUNCTION FROM Entity TO Date
+          `deregistration date` IS A FUNCTION FROM Entity TO Date
+          `registration section` IS A FUNCTION FROM Entity TO RegisterSection
+          `applied for registration` IS A FUNCTION FROM Entity TO BOOLEAN
+          `applied for deregistration` IS A FUNCTION FROM Entity TO BOOLEAN
+          `registration refused` IS A FUNCTION FROM Entity TO BOOLEAN
+          `applied to change name` IS A FUNCTION FROM Entity TO BOOLEAN
+          `name change refused` IS A FUNCTION FROM Entity TO BOOLEAN
+          `meets funding condition` IS A FUNCTION FROM Entity TO BOOLEAN
+          `refrains from soliciting donations` IS A FUNCTION FROM Entity TO BOOLEAN
+          `requested restricted section` IS A FUNCTION FROM Entity TO BOOLEAN
+          `acts with due diligence` IS A FUNCTION FROM Person AND Entity TO BOOLEAN
+          `acts as prudent person` IS A FUNCTION FROM Person AND Entity TO BOOLEAN
+          `acts to best ability` IS A FUNCTION FROM Person AND Entity TO BOOLEAN
+          `observes good faith` IS A FUNCTION FROM Person AND Entity TO BOOLEAN
+          `ensures consistency with purposes` IS A FUNCTION FROM Person AND Entity TO BOOLEAN
+          `ensures compliance with law` IS A FUNCTION FROM Person AND Entity TO BOOLEAN
+          `reportable matter exists` IS A FUNCTION FROM Person TO BOOLEAN
+          `reported to charity` IS A FUNCTION FROM Person AND Entity TO BOOLEAN
+          `reported to Commissioner` IS A FUNCTION FROM Person TO BOOLEAN
+          `declared no reportable matters` IS A FUNCTION FROM Person AND Entity TO BOOLEAN
+          `is fit and proper person` IS A FUNCTION FROM Person TO BOOLEAN
+          `provides annual return` IS A FUNCTION FROM Entity TO BOOLEAN
+          `reports changes` IS A FUNCTION FROM Entity TO BOOLEAN
+          `applies property per purposes` IS A FUNCTION FROM Entity TO BOOLEAN
+          `applies property per statement` IS A FUNCTION FROM Entity TO BOOLEAN
+          `amended to non-charitable purpose` IS A FUNCTION FROM Entity TO BOOLEAN
+          `changed name without permission` IS A FUNCTION FROM Entity TO BOOLEAN
+          `uses other than registered name` IS A FUNCTION FROM Entity TO BOOLEAN
+          `amended purposes without approval` IS A FUNCTION FROM Entity TO BOOLEAN
+          `amended statement without approval` IS A FUNCTION FROM Entity TO BOOLEAN
+          `required steps notice served` IS A FUNCTION FROM Entity TO BOOLEAN
+          `notice served on governor` IS A FUNCTION FROM Person TO BOOLEAN
+          `complied with notice` IS A FUNCTION FROM Entity TO BOOLEAN
+          `disqualification order exists` IS A FUNCTION FROM Person TO BOOLEAN
+          `refers to as charity` IS A FUNCTION FROM Entity AND Entity TO BOOLEAN
+          `refers to as Jersey charity` IS A FUNCTION FROM Entity AND Entity TO BOOLEAN
+          `refers to as registered` IS A FUNCTION FROM Entity AND Entity TO BOOLEAN
+          `knows not registered` IS A FUNCTION FROM Entity AND Entity TO BOOLEAN
+          `intends to mislead` IS A FUNCTION FROM Entity AND Entity TO BOOLEAN
+          `intends to gain advantage` IS A FUNCTION FROM Entity AND Entity TO BOOLEAN
+          `misconduct` IS A FUNCTION FROM Entity TO BOOLEAN
+          `governor misconduct` IS A FUNCTION FROM Entity TO BOOLEAN
+          `governor reportable matter` IS A FUNCTION FROM Entity TO BOOLEAN
+          `misled Commissioner` IS A FUNCTION FROM Entity TO BOOLEAN
+          `no longer exists` IS A FUNCTION FROM Entity TO BOOLEAN
+          `governor of registered charity` IS A FUNCTION FROM Entity TO BOOLEAN
+          `wholly managed in Jersey` IS A FUNCTION FROM Entity TO BOOLEAN
+          `excepted foreign charity` IS A FUNCTION FROM Entity TO BOOLEAN
+          `established under UK law` IS A FUNCTION FROM Entity TO BOOLEAN
+          `established under prescribed law` IS A FUNCTION FROM Entity TO BOOLEAN
+          `entitled to use charity term` IS A FUNCTION FROM Entity TO BOOLEAN
+          `managed from establishment jurisdiction` IS A FUNCTION FROM Entity TO BOOLEAN
+          `may appeal to tribunal` IS A FUNCTION FROM Entity AND Decision TO BOOLEAN
+          `may appeal to court` IS A FUNCTION FROM Entity AND Decision TO BOOLEAN
+          `is required steps notice` IS A FUNCTION FROM Decision TO BOOLEAN
+          `is deregistration decision` IS A FUNCTION FROM Decision TO BOOLEAN
+          `is registration refusal` IS A FUNCTION FROM Decision TO BOOLEAN
+          `is name change refusal` IS A FUNCTION FROM Decision TO BOOLEAN
+          `organized religious charity` IS A FUNCTION FROM Entity TO BOOLEAN
+          `acquired before deregistration` IS A FUNCTION FROM Property TO BOOLEAN
+          `preserved charitable purposes` IS A FUNCTION FROM Entity TO Purpose
+          `preserved public benefit statement` IS A FUNCTION FROM Entity TO Statement
+
 -- would likely be interested in Parts 3 and 4. Specifically, sections 5, 6, 7, 8, 11, 12, 13, 15, 16, 17
 
 -- Basic types
@@ -12,7 +98,7 @@ DECLARE Entity
     HAS name IS A STRING
         purposes IS A LIST OF Purpose
 
-ASSUME Constitution IS A TYPE
+DECLARE Constitution
 -- ASSUME Person IS A TYPE
 -- upgraded to something with more deets
 DECLARE Person
@@ -21,14 +107,14 @@ DECLARE Person
 
 `Billy` MEANS Person WITH name IS "William", address IS "home"
 
-ASSUME Property IS A TYPE
-ASSUME Name IS A TYPE
-ASSUME Decision IS A TYPE
-ASSUME Notice IS A TYPE
-ASSUME Statement IS A TYPE
-ASSUME Return IS A TYPE
-ASSUME Section IS A TYPE
-ASSUME Information IS A TYPE
+DECLARE Property
+DECLARE Name
+DECLARE Decision
+DECLARE Notice
+DECLARE Statement
+DECLARE Return
+DECLARE Section
+DECLARE Information
 
 -- do we have extension support? https://github.com/legalese/l4-ide/issues/238
 -- until we do, let's just manually reproduce, i think that should work
@@ -59,112 +145,6 @@ commencement    MEANS Date OF 1983, 1, 1
 -- Place structure
 DECLARE Place
   HAS `English name` IS A STRING
-
--- Functions and predicates
-ASSUME `charitable purpose` IS A FUNCTION FROM Purpose TO BOOLEAN
-ASSUME `ancillary or incidental to charitable purpose` IS A FUNCTION FROM Purpose TO BOOLEAN
-ASSUME `provides public benefit in Jersey or elsewhere` IS A FUNCTION FROM Entity TO BOOLEAN
-ASSUME `is a Jersey entity` IS A FUNCTION FROM Entity TO BOOLEAN
-ASSUME `carries out substantial activity in Jersey` IS A FUNCTION FROM Entity TO BOOLEAN
-ASSUME `has a principal address in Jersey` IS A FUNCTION FROM Entity TO BOOLEAN
-ASSUME constitution IS A FUNCTION FROM Entity TO Constitution
-ASSUME `is a written document` IS A FUNCTION FROM Constitution TO BOOLEAN
-ASSUME name IS A FUNCTION FROM Entity TO Name
-ASSUME `is undesirable` IS A FUNCTION FROM Name TO BOOLEAN
-ASSUME `same as another charity` IS A FUNCTION FROM Name TO BOOLEAN
-ASSUME `too similar to another charity` IS A FUNCTION FROM Name TO BOOLEAN
-ASSUME `misleading` IS A FUNCTION FROM Name TO BOOLEAN
-ASSUME `implies false connection` IS A FUNCTION FROM Name TO BOOLEAN
-ASSUME `offensive` IS A FUNCTION FROM Name TO BOOLEAN
-ASSUME `is governor of` IS A FUNCTION FROM Person AND Entity TO BOOLEAN
-ASSUME `directed by Minister` IS A FUNCTION FROM Entity TO BOOLEAN
-ASSUME `directed by States Assembly member` IS A FUNCTION FROM Entity TO BOOLEAN
-ASSUME `directed by equivalent in another jurisdiction` IS A FUNCTION FROM Entity TO BOOLEAN
-
--- Registration related functions
-ASSUME `is registered` IS A FUNCTION FROM Entity TO BOOLEAN
-ASSUME `is deregistered` IS A FUNCTION FROM Entity TO BOOLEAN
-ASSUME `registration date` IS A FUNCTION FROM Entity TO Date
-ASSUME `deregistration date` IS A FUNCTION FROM Entity TO Date
-ASSUME `registration section` IS A FUNCTION FROM Entity TO RegisterSection
-ASSUME `applied for registration` IS A FUNCTION FROM Entity TO BOOLEAN
-ASSUME `applied for deregistration` IS A FUNCTION FROM Entity TO BOOLEAN
-ASSUME `registration refused` IS A FUNCTION FROM Entity TO BOOLEAN
-ASSUME `applied to change name` IS A FUNCTION FROM Entity TO BOOLEAN
-ASSUME `name change refused` IS A FUNCTION FROM Entity TO BOOLEAN
-
--- Restricted section functions
-ASSUME `meets funding condition` IS A FUNCTION FROM Entity TO BOOLEAN
-ASSUME `refrains from soliciting donations` IS A FUNCTION FROM Entity TO BOOLEAN
-ASSUME `requested restricted section` IS A FUNCTION FROM Entity TO BOOLEAN
-
--- Governor conduct functions
-ASSUME `acts with due diligence` IS A FUNCTION FROM Person AND Entity TO BOOLEAN
-ASSUME `acts as prudent person` IS A FUNCTION FROM Person AND Entity TO BOOLEAN
-ASSUME `acts to best ability` IS A FUNCTION FROM Person AND Entity TO BOOLEAN
-ASSUME `observes good faith` IS A FUNCTION FROM Person AND Entity TO BOOLEAN
-ASSUME `ensures consistency with purposes` IS A FUNCTION FROM Person AND Entity TO BOOLEAN
-ASSUME `ensures compliance with law` IS A FUNCTION FROM Person AND Entity TO BOOLEAN
-ASSUME `reportable matter exists` IS A FUNCTION FROM Person TO BOOLEAN
-ASSUME `reported to charity` IS A FUNCTION FROM Person AND Entity TO BOOLEAN
-ASSUME `reported to Commissioner` IS A FUNCTION FROM Person TO BOOLEAN
-ASSUME `declared no reportable matters` IS A FUNCTION FROM Person AND Entity TO BOOLEAN
-ASSUME `is fit and proper person` IS A FUNCTION FROM Person TO BOOLEAN
-
--- Charity compliance functions
-ASSUME `provides annual return` IS A FUNCTION FROM Entity TO BOOLEAN
-ASSUME `reports changes` IS A FUNCTION FROM Entity TO BOOLEAN
-ASSUME `applies property per purposes` IS A FUNCTION FROM Entity TO BOOLEAN
-ASSUME `applies property per statement` IS A FUNCTION FROM Entity TO BOOLEAN
-ASSUME `amended to non-charitable purpose` IS A FUNCTION FROM Entity TO BOOLEAN
-ASSUME `changed name without permission` IS A FUNCTION FROM Entity TO BOOLEAN
-ASSUME `uses other than registered name` IS A FUNCTION FROM Entity TO BOOLEAN
-ASSUME `amended purposes without approval` IS A FUNCTION FROM Entity TO BOOLEAN
-ASSUME `amended statement without approval` IS A FUNCTION FROM Entity TO BOOLEAN
-
--- Notices and orders
-ASSUME `required steps notice served` IS A FUNCTION FROM Entity TO BOOLEAN
-ASSUME `notice served on governor` IS A FUNCTION FROM Person TO BOOLEAN
-ASSUME `complied with notice` IS A FUNCTION FROM Entity TO BOOLEAN
-ASSUME `disqualification order exists` IS A FUNCTION FROM Person TO BOOLEAN
-
--- Term usage
-ASSUME `refers to as charity` IS A FUNCTION FROM Entity AND Entity TO BOOLEAN
-ASSUME `refers to as Jersey charity` IS A FUNCTION FROM Entity AND Entity TO BOOLEAN
-ASSUME `refers to as registered` IS A FUNCTION FROM Entity AND Entity TO BOOLEAN
-ASSUME `knows not registered` IS A FUNCTION FROM Entity AND Entity TO BOOLEAN
-ASSUME `intends to mislead` IS A FUNCTION FROM Entity AND Entity TO BOOLEAN
-ASSUME `intends to gain advantage` IS A FUNCTION FROM Entity AND Entity TO BOOLEAN
-ASSUME `misconduct` IS A FUNCTION FROM Entity TO BOOLEAN
-ASSUME `governor misconduct` IS A FUNCTION FROM Entity TO BOOLEAN
-ASSUME `governor reportable matter` IS A FUNCTION FROM Entity TO BOOLEAN
-ASSUME `misled Commissioner` IS A FUNCTION FROM Entity TO BOOLEAN
-ASSUME `no longer exists` IS A FUNCTION FROM Entity TO BOOLEAN
-ASSUME `governor of registered charity` IS A FUNCTION FROM Entity TO BOOLEAN
-
--- Excepted foreign charity functions
-ASSUME `wholly managed in Jersey` IS A FUNCTION FROM Entity TO BOOLEAN
-ASSUME `excepted foreign charity` IS A FUNCTION FROM Entity TO BOOLEAN
-ASSUME `established under UK law` IS A FUNCTION FROM Entity TO BOOLEAN
-ASSUME `established under prescribed law` IS A FUNCTION FROM Entity TO BOOLEAN
-ASSUME `entitled to use charity term` IS A FUNCTION FROM Entity TO BOOLEAN
-ASSUME `managed from establishment jurisdiction` IS A FUNCTION FROM Entity TO BOOLEAN
-
--- Appeal functions
-ASSUME `may appeal to tribunal` IS A FUNCTION FROM Entity AND Decision TO BOOLEAN
-ASSUME `may appeal to court` IS A FUNCTION FROM Entity AND Decision TO BOOLEAN
-ASSUME `is required steps notice` IS A FUNCTION FROM Decision TO BOOLEAN
-ASSUME `is deregistration decision` IS A FUNCTION FROM Decision TO BOOLEAN
-ASSUME `is registration refusal` IS A FUNCTION FROM Decision TO BOOLEAN
-ASSUME `is name change refusal` IS A FUNCTION FROM Decision TO BOOLEAN
-
--- Special charity types
-ASSUME `organized religious charity` IS A FUNCTION FROM Entity TO BOOLEAN
-
--- Property functions
-ASSUME `acquired before deregistration` IS A FUNCTION FROM Property TO BOOLEAN
-ASSUME `preserved charitable purposes` IS A FUNCTION FROM Entity TO Purpose
-ASSUME `preserved public benefit statement` IS A FUNCTION FROM Entity TO Statement
 
 -- British Overseas Territories
 `British Overseas Territories` MEANS

@@ -1484,8 +1484,8 @@ jobs:
       #
       # What these add that the reg-cf steps above cannot: the SAME model
       # answering DIFFERENTLY for different rule dates, driven only by half-open
-      # date intervals on a UNIQUE decision table. Ten rule dates x six
-      # decisions = 60, and seven of the ten exist purely to pin the
+      # date intervals on a UNIQUE decision table. Eleven rule dates x seven
+      # decisions = 77, and seven of the eleven exist purely to pin the
       # closed-low/open-high convention: a day-of/day-before pair on EACH of the
       # table's three seams, plus a date well before commencement. Straddling
       # only the newest seam (which an earlier version did) would have let an
@@ -1496,6 +1496,13 @@ jobs:
       # <decision> before and emits as a <businessKnowledgeModel> now. A BKM is
       # INVOKED, not evaluated, so it no longer appears in either engine's
       # decision tally -- seven decisions per case became six.
+      #
+      # AND SIX BECAME SEVEN AGAIN on 2026-09-06, for an unrelated reason. The
+      # corpus ASSUME migration turned this exhibit's pre-commencement sentinel
+      # into a REFUSE-backed definition, so it stopped being an opaque input and
+      # became a decision the engines evaluate: eleven cases x seven = 77, and
+      # KIE's service-output tally moved with it (55/55). Both counts below are
+      # LOCALLY MEASURED on 2026-09-07, KIE on JDK 17 and Camunda on JDK 21.
       #
       # What that costs, stated plainly: nothing here value-checks
       # `the_rules_in_force_include`'s own result any more. Its correctness now
@@ -1514,19 +1521,22 @@ jobs:
           ./etc/kie-dmn-check/run.sh \
             jl4/examples/dmn/expected/gst-rate.dmn \
             --cases jl4/examples/dmn/gst-rate.cases.json | tee kie-gst.log
-          grep -q 'KIE 8.44.0.Final VERDICT: .*0 error(s), 0 warning(s), 66/66 decision(s) SUCCEEDED, 66/66 value(s) as expected' kie-gst.log
+          grep -q 'KIE 8.44.0.Final VERDICT: .*0 error(s), 0 warning(s), 77/77 decision(s) SUCCEEDED, 77/77 value(s) as expected' kie-gst.log
 
           ./etc/camunda-dmn-check/run.sh \
             jl4/examples/dmn/expected/gst-rate.dmn \
             --cases jl4/examples/dmn/gst-rate.cases.json | tee camunda-gst.log
-          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT: .*1 parsed, 0 error(s), 66/66 decision(s) evaluated, 66/66 value(s) as expected' camunda-gst.log
+          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT: .*1 parsed, 0 error(s), 77/77 decision(s) evaluated, 77/77 value(s) as expected' camunda-gst.log
 
       # The DATE-LITERAL leg (spec §15.4.1). Not redundant with the step above:
       # gst-rate.l4 spells every date `Date d m y`, so nothing there would
       # notice `YMD y m d` regressing back to raw L4 -- which is what it used to
-      # emit, for the constructor daydate.l4 RECOMMENDS. NINE cases x six
-      # decisions = 54, and the counts are pinned to the LOCALLY MEASURED
-      # verdict lines (2026-08-02; case I and the recount 2026-09-05).
+      # emit, for the constructor daydate.l4 RECOMMENDS. NINE cases x seven
+      # decisions = 63, and the counts are pinned to the LOCALLY MEASURED
+      # verdict lines (2026-08-02; case I and the recount 2026-09-05; the
+      # seventh decision on 2026-09-07, when the ASSUME migration made this
+      # exhibit's sentinel a REFUSE-backed definition -- the same +1 per case as
+      # the step above. KIE's service-output tally is unchanged at 18/18).
       #
       # Case I is ruling D1's: the first case here that asks a pre-commencement
       # rule date WITHOUT handing the model a floor value. F, G and H already
@@ -1554,12 +1564,12 @@ jobs:
           ./etc/kie-dmn-check/run.sh \
             jl4/examples/dmn/expected/ymd-dates.dmn \
             --cases jl4/examples/dmn/ymd-dates.cases.json | tee kie-ymd.log
-          grep -q 'KIE 8.44.0.Final VERDICT: 1 file(s), 9 case(s), 0 error(s), 0 warning(s), 54/54 decision(s) SUCCEEDED, 54/54 value(s) as expected, 18/18 service output value(s) as expected' kie-ymd.log
+          grep -q 'KIE 8.44.0.Final VERDICT: 1 file(s), 9 case(s), 0 error(s), 0 warning(s), 63/63 decision(s) SUCCEEDED, 63/63 value(s) as expected, 18/18 service output value(s) as expected' kie-ymd.log
 
           ./etc/camunda-dmn-check/run.sh \
             jl4/examples/dmn/expected/ymd-dates.dmn \
             --cases jl4/examples/dmn/ymd-dates.cases.json | tee camunda-ymd.log
-          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT: 1 file(s), 9 case(s), 1 parsed, 0 error(s), 54/54 decision(s) evaluated, 54/54 value(s) as expected' camunda-ymd.log
+          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT: 1 file(s), 9 case(s), 1 parsed, 0 error(s), 63/63 decision(s) evaluated, 63/63 value(s) as expected' camunda-ymd.log
 
       # THE REFUSAL leg (ruling D1, 2026-09-05; IMPLICIT-PROPS-DESIGN §11.9.1).
       #

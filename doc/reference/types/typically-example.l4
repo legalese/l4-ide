@@ -7,9 +7,6 @@ DECLARE Person HAS
   is_under_duress IS A BOOLEAN TYPICALLY FALSE
   jurisdiction IS A STRING TYPICALLY "Singapore"
 
--- An assumed name, with a default
-ASSUME `applicable law` IS A STRING TYPICALLY "Singapore"
-
 -- A rule's own inputs, with defaults
 GIVEN
   age IS A NUMBER TYPICALLY 18

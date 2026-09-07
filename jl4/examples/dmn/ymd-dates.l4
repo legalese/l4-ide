@@ -81,9 +81,12 @@ GIVETH A STRING
            OTHERWISE "pre-commencement"
 
 -- Before commencement there is no fee to answer for, so a rule date earlier
--- than 1983-01-01 is a curated refusal rather than an answer. Same device, and
--- the same reasoning, as `gst-rate.l4`'s and the Reg CF corpus's ASSUME floor.
-ASSUME `no fee is prescribed before commencement on 1983-01-01` IS A NUMBER
+-- than 1983-01-01 is a curated refusal rather than an answer. Same device as
+-- `gst-rate.l4`'s floor and the Reg CF corpus's: one named REFUSE, lowered to
+-- FEEL `null` (ruling D1; `refuse.l4` is the exhibit).
+GIVETH A NUMBER
+`no fee is prescribed before commencement on 1983-01-01` MEANS
+    REFUSE "no fee is prescribed before commencement on 1983-01-01"
 
 GIVETH A NUMBER
 `the filing fee` MEANS

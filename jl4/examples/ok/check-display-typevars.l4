@@ -3,9 +3,11 @@
 -- in any scope, and different after every edit. The display form is `a`, `b`,
 -- … by order of first appearance, the same rendering hover uses.
 
+-- `bottom` is a polymorphic refusal, so it has type `a` for any `a` and no
+-- directive here ever forces it.
 GIVEN a IS A TYPE
 GIVETH a
-ASSUME bottom
+bottom MEANS REFUSE "bottom: no value of any type"
 
 #CHECK bottom
 #CHECK GIVEN x YIELD x

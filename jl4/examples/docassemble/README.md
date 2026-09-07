@@ -104,10 +104,12 @@ recognise the same program.
   method name, so it must sanitise to `alternative_` or the interview
   silently returns a wrong verdict) plus a computed (`MEANS`) field, which
   survives by inlining its desugar-synthesized selector (R2 repairs golden).
-- `assume-via-fn.l4` — an `ASSUME` referenced only through an inlined
-  parameterized `DECIDE`; its question block must still be emitted (R3
-  repair golden). No `#EVAL`: `ASSUME` is uninterpreted, so the round-trip
-  expectations for this one example are hand-computed in the fixture table.
+- `assume-via-fn.l4` — a section-level open fact (a module-level `ASSUME`
+  until 2026-09-06; the exporter treats both alike) referenced only through
+  an inlined parameterized `DECIDE`; its question block must still be emitted
+  (R3 repair golden). No `#EVAL`: the fact is never supplied, so the
+  round-trip expectations for this one example are hand-computed in the
+  fixture table.
 - `expected/*.yml` (+ `*.fidelity.txt` sidecars) — committed golden output,
   pinned byte-exact by the `l4 docassemble` cases in `jl4/tests-cli/Main.hs`.
 - `not-ok/` — fixtures the backend must REFUSE, each with a named diagnostic:

@@ -9,7 +9,7 @@
 
 - [Types](types/README.md)
   - [A / AN](types/A-AN.md)
-  - [ASSUME](types/ASSUME.md)
+  - [ASSUME (deprecated)](types/ASSUME.md)
   - [DECLARE](types/DECLARE.md)
   - [Type Keywords](types/keywords.md)
   - [FOR ALL (Polymorphism)](types/for-all.md)

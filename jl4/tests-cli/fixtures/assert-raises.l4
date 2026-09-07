@@ -1,4 +1,6 @@
 -- Typechecks cleanly; every #ASSERT here RAISES instead of deciding.
-ASSUME x IS A NUMBER
+§ `Assert raises`
+    GIVEN x IS A NUMBER
+
 #ASSERT (1 DIVIDED BY 0) EQUALS 1
 #ASSERT NOT (x EQUALS 1)

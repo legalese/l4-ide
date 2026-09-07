@@ -25,7 +25,9 @@ GIVETH A DATE
 GIVETH A DATE
 `GST commenced` MEANS Date 1 4 1994
 
-ASSUME `no GST rate exists before commencement` IS A NUMBER
+GIVETH A NUMBER
+`no GST rate exists before commencement` MEANS
+    REFUSE "no GST rate exists before commencement"
 
 GIVEN change IS A DATE
 GIVETH A BOOLEAN

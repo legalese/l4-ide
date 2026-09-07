@@ -1,3 +1,4 @@
+-- Kept on ASSUME deliberately (IMPLICIT-PROPS-DESIGN.md §11.1, R0: ASSUME is deprecated): the three ASSUME signature spellings (GIVEN … ASSUME f x; GIVEN x IS A TYPE … ASSUME T x; GIVEN … GIVETH … ASSUME h) are the subject, and none has a section-GIVEN form.
 
 § `Signatures`
     GIVEN g IS A T OF NUMBER

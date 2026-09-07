@@ -7,10 +7,12 @@
 -- The golden suite is unaffected: it evaluates in-process and compares output,
 -- and never inspects a process exit code.
 
-ASSUME foo IS A FUNCTION FROM NUMBER TO BOOLEAN
+§ `Assumed terms`
+    GIVEN foo IS A FUNCTION FROM NUMBER TO BOOLEAN
+          bar IS A  BOOLEAN
+
 #EVAL foo 2
 
-ASSUME bar IS A  BOOLEAN
 baz b MEANS IF b THEN 2 ELSE 3
 #EVAL baz bar
 #EVAL IF bar THEN 2 ELSE 3
