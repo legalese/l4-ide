@@ -1,4 +1,5 @@
--- The WITHIN after ONCE is a deadline on the whole, a NUMBER like the act's.
+-- The WITHIN on a join line is a deadline on the whole, a NUMBER like the
+-- act's. True of both spellings; this file uses the barrier.
 
 DECLARE Actor IS ONE OF
     Tenant HAS name IS A STRING

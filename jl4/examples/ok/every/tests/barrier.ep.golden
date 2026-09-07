@@ -5,7 +5,7 @@ IMPORT prelude
 -- 2026-09-07): HENCE fires ONCE, when the last of them has signed (spec
 -- §2.2.6, §3.1). LEST fires at the deadline, and blames exactly the tenants
 -- who did not sign (§6.1). The ONCE line is mandatory whenever an EVERY has a
--- HENCE or a LEST; see not-ok/tc/every-continuation-without-once.l4.
+-- HENCE or a LEST; see not-ok/tc/every-continuation-without-join.l4.
 --
 -- Phase 1 parses, scopes, type-checks and prints this; running it is phase 2,
 -- so the #EVAL below reports that, deliberately.

@@ -1,5 +1,5 @@
--- An ONCE line says when a GROUP's continuation fires; a single PARTY has no
--- group. R-Q1.
+-- A join line says when a GROUP's continuation fires; a single PARTY has no
+-- group. R-Q1. Both spellings are refused here; this file uses the barrier.
 
 DECLARE Actor IS ONE OF
     Tenant HAS name IS A STRING

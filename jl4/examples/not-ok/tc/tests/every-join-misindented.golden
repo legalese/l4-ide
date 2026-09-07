@@ -1,14 +1,14 @@
 Parsing successful
 Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
-File: every-once-misindented.l4
+File: every-join-misindented.l4
   Hidden: no
-  Range: 29:9-29:13
+  Range: 34:9-34:13
   Source: parser
   Severity: DiagnosticSeverity_Error
   Code: <none>
   Message:
        |
-    29 |         ONCE   EACH HAS
+    34 |         UPON   EACH
        |         ^^^^
-    unexpected ONCE
+    unexpected UPON
     expecting %, &&, *, +, -, .., ..., /, ;, <, <=, =, =>, >, >=, ABOVE, AND, AT, BELOW, DIVIDED, EQUALS, FOLLOWED, GREATER, HENCE, IMPLIES, LESS, LEST, MINUS, MODULO, OR, PLUS, RAND, ROR, TIMES, UNLESS, WHERE, end of input, space token, or ||

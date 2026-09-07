@@ -1,6 +1,6 @@
 -- `EACH` is NOT a keyword (R-Q2: EACH is not a quantifier). It is recognised
--- only as the first word of the fork's join line `ONCE EACH HAS` (words
--- provisional, R-Q1), so a program may still use it as a name.
+-- only as the second word of the fork's join line `UPON EACH` (R-Q1, RULED
+-- 2026-09-07), so a program may still use it as a name.
 
 EACH MEANS 3
 
@@ -24,5 +24,5 @@ GIVETH A DEONTIC Actor Action
     EVERY Tenant t
         MUST   Sign (EXACTLY t)
         WITHIN 14
-        ONCE   EACH HAS
+        UPON   EACH
         HENCE  FULFILLED

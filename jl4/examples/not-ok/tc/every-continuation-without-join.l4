@@ -1,7 +1,8 @@
--- R-Q1 (RULED 2026-09-07): under an EVERY the ONCE line is mandatory whenever
+-- R-Q1 (RULED 2026-09-07): under an EVERY the join line is mandatory whenever
 -- there is a HENCE or a LEST. There is no default, because the barrier and the
 -- fork readings differ, and a barrier default would silently reverse what a
--- single party's MAY … HENCE means today. The message names both spellings.
+-- single party's MAY … HENCE means today. The message names both spellings,
+-- ONCE ALL HAVE and UPON EACH.
 
 DECLARE Actor IS ONE OF
     Tenant HAS name IS A STRING

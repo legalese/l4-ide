@@ -1,16 +1,16 @@
 Parsing successful
 Typechecking successful
 Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
-File: every-once-under-party.l4
+File: every-join-under-party.l4
   Hidden: no
   Range: 14:53-14:66
   Source: check
   Severity: DiagnosticSeverity_Error
   Code: <none>
   Message:
-    An ONCE line needs an EVERY.
+    A join line needs an EVERY.
 
-    ONCE says when the continuation of a group's obligation fires — once all
-    of them have acted, or once each of them has. This rule binds a single
-    PARTY, so there is no group: drop the ONCE line, or quantify the subject
-    with EVERY.
+    A join line says when the continuation of a group's obligation fires —
+    ONCE ALL HAVE, when the last of them has acted, or UPON EACH, once per
+    member. This rule binds a single PARTY, so there is no group: drop the
+    join line, or quantify the subject with EVERY.

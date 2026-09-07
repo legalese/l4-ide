@@ -1,6 +1,6 @@
 -- The join line is column-checked, every word of it (L4.Parser.joinLine).
 --
--- Here the author writes `ONCE EACH HAS` at the OUTER rule's clause column,
+-- Here the author writes `UPON EACH` at the OUTER rule's clause column,
 -- meaning it for the outer EVERY -- but a nested EVERY is still open inside the
 -- outer's HENCE, and the nested one's clauses live further right. Before the
 -- guard (measured 2026-09-07) this parsed clean, attached the fork to the INNER
@@ -8,8 +8,13 @@
 -- that barrier-versus-fork had been decided by invisible layout -- the one
 -- distinction `ContinuationWithoutJoin` refuses to guess at.
 --
--- A join line dedented to or past the EVERY's own column instead reports
--- "incorrect indentation (got N, should be greater than M)".
+-- The message you get depends on WHICH word is misplaced, which is worth
+-- knowing before you debug one. A misplaced HEAD keyword (ONCE or UPON), as
+-- here, falls out of the join slot without consuming anything, so the leftover
+-- keyword is reported by the expression follow-set: a long "expecting %, &&, *,
+-- ..." list that never says "indentation". Only a misplaced SECOND word (ALL,
+-- HAVE, EACH) reports "incorrect indentation (got N, should be greater than M)",
+-- because by then the join is committed. Measured 2026-09-07.
 
 DECLARE Actor IS ONE OF
     Tenant HAS name IS A STRING
@@ -26,4 +31,4 @@ GIVETH A DEONTIC Actor Action
         HENCE  EVERY Tenant y
                    MUST   Sign (EXACTLY y)
                    WITHIN 2
-        ONCE   EACH HAS
+        UPON   EACH

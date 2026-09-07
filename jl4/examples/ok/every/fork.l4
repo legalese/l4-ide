@@ -1,11 +1,13 @@
 IMPORT prelude
 -- EVERY-EACH-QUANTIFIER-SPEC, phase 1: the fork form.
 --
--- `ONCE EACH HAS` is the fork: the continuation fires once PER tenant who
+-- `UPON EACH` is the fork: the continuation fires once PER tenant who
 -- pays, independently, rather than once when all have (spec §2.2.6, §3.2).
 -- The join is a line of its own between the act's WITHIN and the HENCE
--- (R-Q1, RULED 2026-09-07). The fork's WORDS are provisional: `ONCE EACH HAS`,
--- `AS EACH HAS`, `EACH TIME ONE HAS` and `UPON EACH` are on Meng's bench.
+-- (R-Q1, RULED 2026-09-07). The fork's words were ruled `UPON EACH` the same
+-- day: a barrier is level-triggered and fires once, a fork is edge-triggered and
+-- fires per completion, so the trigger lives in the keyword rather than in a
+-- threshold. `ONCE EACH HAS` no longer parses.
 --
 -- `amount`, bound by the action pattern, and `t`, bound by EVERY, are both in
 -- scope in the continuation and in LEST. The inner obligation is parenthesised,
@@ -27,7 +29,7 @@ GIVETH A DEONTIC Actor Action
     EVERY Tenant t
         MUST   Pay (EXACTLY t) (EXACTLY theLandlord) amount
         WITHIN 7
-        ONCE   EACH HAS
+        UPON   EACH
         HENCE  (PARTY theLandlord
                     MUST   Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount)
                     WITHIN 5)
