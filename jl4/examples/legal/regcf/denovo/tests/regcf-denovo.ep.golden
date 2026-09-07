@@ -206,9 +206,12 @@ GIVETH A DATE
 `the 2022 inflation adjustment` MEANS YMD 2022 9 20
 
 -- Below this date the module has no text to encode from. Reaching this
--- binding stops evaluation loudly and names itself, which is the whole point:
--- a curated refusal beats a silently wrong number.
-ASSUME `no encoding of Part 227 exists for rule dates before 2022-09-20` IS A NUMBER
+-- definition stops evaluation loudly with the reason below, which is the
+-- whole point: a curated refusal beats a silently wrong number. It is a
+-- REFUSE, not an input: nothing can supply it and it is in no schema.
+GIVETH A NUMBER
+`no encoding of Part 227 exists for rule dates before 2022-09-20` MEANS
+    REFUSE "no encoding of Part 227 exists for rule dates before 2022-09-20"
 
 @ref eCFR versioner diff of 2023-02-28 against 2023-03-02; 86 FR 3590/3591/3592 sunset
 GIVETH A DATE

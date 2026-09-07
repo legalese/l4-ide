@@ -1,13 +1,11 @@
 § `Ditto highlighting`
-
-
-ASSUME x IS A BOOLEAN
-^      y ^  ^ ^
-^      n ^  ^ NUMBER
+    GIVEN x IS A BOOLEAN
+          y ^  ^ ^
+          n ^  ^ NUMBER
 
 -- we can even have whitespace and comments in between
 
-^      m ^  ^ ^
+          m ^  ^ ^
 
 test MEANS
   IF n AT LEAST m

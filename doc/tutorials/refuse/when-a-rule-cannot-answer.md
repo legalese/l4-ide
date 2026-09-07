@@ -505,3 +505,4 @@ It can be written once instead, in a form that works wherever it is used, whatev
 - [Five Kinds of No Answer](../../concepts/legal-modeling/non-answers.md) — the same sorting problem taken further, as a piece of critical thinking
 - [What a Section Needs to Know](../section-given/what-a-section-needs-to-know.md) — naming the facts a whole run of rules needs, once, under the heading
 - [Encoding Legislation](../getting-started/encoding-legislation.md) — turning statutory text into rules
+- [One Obligation](../obligations/one-obligation.md) — the other half of a contract: who must do what, by when, and what follows

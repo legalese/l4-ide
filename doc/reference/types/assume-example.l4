@@ -1,4 +1,7 @@
--- ASSUME keyword examples
+-- Kept on ASSUME deliberately (IMPLICIT-PROPS-DESIGN.md §11.1, R0: ASSUME is deprecated): this is the deprecation page's own example of what the keyword did.
+-- ASSUME keyword examples. ASSUME is DEPRECATED (IMPLICIT-PROPS-DESIGN.md
+-- §11.1, ruled 2026-09-04); this file is kept so the deprecation page can
+-- show what the keyword did. The migrated form is at the end of the file.
 
 -- Assuming plain facts
 

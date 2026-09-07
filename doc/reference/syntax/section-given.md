@@ -110,7 +110,8 @@ column rule and L4 accepts it, but it is not the house style:
 A section `GIVEN` may bind the same name **more than once, at different types**.
 Each occurrence then resolves to whichever of them its context demands — the
 same type-directed name resolution that several module-level `ASSUME`s of one
-name already get (`jl4/examples/ok/tdnr.l4`).
+name used to get (`jl4/examples/ok/tdnr.l4` was written that way, and now
+carries the section `GIVEN` spelling of the same three declarations).
 
 ```l4
 § `Fees`
@@ -176,9 +177,9 @@ cannot introduce the hazard.
 
 ## What a section `GIVEN` does in this release
 
-**In this release a section `GIVEN` behaves as an assumed term, exactly like
-`ASSUME`.** A rule that reads one cannot be run to an answer until the name is
-supplied; `#EVAL` on such a rule reports
+**A section `GIVEN` that nothing supplies behaves as an assumed term, exactly
+as an older `ASSUME` did.** A rule that reads one cannot be run to an answer
+until the name is supplied; `#EVAL` on such a rule reports
 
 ```
 I could not continue evaluating, because I needed to know the value of
@@ -186,13 +187,14 @@ I could not continue evaluating, because I needed to know the value of
 but it is an assumed term.
 ```
 
-_Proposed, not landed (2026-09-04): supplying a section `GIVEN` at the point of
-use, and the discharge that works out which names an entry point reads and asks
-for exactly those. Both land with the discharge pull request; until then values
-arrive from outside the file (web form, `l4 batch`, application programming
-interface)._
+**Supplying one inside the file works, by name, with `WITH`** (landed with the
+discharge change, 2026-09-05): ``#EVAL `the fee` WITH `applicable rate` IS 0.2``
+supplies the name to the rule and to everything it relies on, and `#ASSERT`
+takes the same form. This is the one thing an `ASSUME` never had; against an
+`ASSUME`d name the same line is a check error. A value written _before_ the
+`WITH` does not parse: supply every input by name, or none.
 
-What does work today:
+What else works:
 
 - **The list of facts a published rule asks for.** A name that an `@export`ed
   rule reads — directly or through anything it relies on — becomes a required
@@ -217,8 +219,31 @@ model treats as opaque, declared for the section on the same visibility rules
 as any other section `GIVEN`, exactly as `ASSUME a IS A TYPE` does at module
 level; prefer `DECLARE` for that.
 
-Whether a section `GIVEN` crosses an `IMPORT` is whatever `ASSUME` does today,
-which this release does not change and does not assert.
+A section `GIVEN` does **not** reach across an `IMPORT`, and neither does
+`ASSUME`. Suppose module `B` imports module `A`, `A` declares a section `GIVEN`
+called `gst rate`, and one of `A`'s own definitions reads it. A function in `B`
+marked `@export` that calls that definition cannot be given a value for
+`gst rate`. Two things go wrong, and the quiet one comes first:
+
+- `l4 batch B.l4 --inputs row.json --validate-only` answers
+  `{"errors":[],"status":"valid"}`. The list of inputs an exported function
+  needs is collected from `B` alone; it does not follow the `IMPORT` into `A`,
+  so it never learns that `gst rate` is wanted.
+- Running the same row then stops with _"I could not continue evaluating,
+  because I needed to know the value of `gst rate` but it is an assumed term."_
+  Adding `"gst rate"` to the input row does **not** help: the value is accepted
+  into the row and then ignored, because the way `l4 batch` supplies a value is
+  by rewriting the module it was given, and it cannot rewrite a module it only
+  imports.
+
+Measured 2026-09-05. Until this is repaired, read `--validate-only` as saying
+nothing at all about a module that reads a name declared in one it imports. The
+repair is ruled and not yet built, and the first part of it is a **refusal** —
+`l4 check` rejecting this shape rather than accepting it quietly — not a wider
+search. Recorded as a defect in
+`specs/todo/OPEN-FINDINGS-2026-09-05.md` as **OF-7** (and listed in
+`specs/todo/PROPS-REDTEAM-2026-09-03.md` §7); the ordering of the repair is ruled in
+`specs/todo/IMPLICIT-PROPS-DESIGN.md` §11.19.
 
 ## Example
 
@@ -226,7 +251,7 @@ which this release does not change and does not assert.
 
 ## See also
 
-- [`ASSUME`](../types/ASSUME.md) — the same idea for a single name, at module level
+- [`ASSUME` (deprecated)](../types/ASSUME.md) — the older spelling of the same idea, at module level, and where each of its jobs went
 - [`GIVEN`](../functions/GIVEN.md) — the inputs of one rule
 - [Section markers (§)](README.md#section-markers-)
 - [Sections](sections.md) — the full visibility rule for nested and sibling sections, qualified names, and the ambiguity error

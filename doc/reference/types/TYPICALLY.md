@@ -24,10 +24,11 @@ names listed after `GIVEN`). `TYPICALLY` may appear on:
    rule's inputs
 3. **A `GIVEN` under a section heading** (a **"section `GIVEN`"**) — default
    values for a name declared once for every rule in the section
-4. **ASSUME declarations** — default values for assumed names.
-   `ASSUME` is deprecated for this job (ruled 2026-09-04) and still works;
-   a fact supplied for each case belongs under its section's heading instead.
-   See [the section `GIVEN`](../syntax/section-given.md).
+4. **`ASSUME` declarations, in older files** — default values for assumed
+   names. `ASSUME` is deprecated (ruled 2026-09-04) and still works; a fact
+   supplied for each case belongs under its section's heading instead. See
+   [the section `GIVEN`](../syntax/section-given.md) and
+   [ASSUME (deprecated)](ASSUME.md).
 
 ## Purpose
 
@@ -140,15 +141,18 @@ Every rule in Part 3 reads those two names without re-declaring them. A
 published rule that reads them asks for both, and carries `"Singapore"` and
 `TRUE` as their JSON Schema defaults.
 
-### In ASSUME (a name declared at the top of the file)
+### In older files: `ASSUME`
 
 ```l4
 ASSUME `applicable law` IS A STRING TYPICALLY "Singapore"
 ASSUME `person has capacity` IS A BOOLEAN TYPICALLY TRUE
 ```
 
-`ASSUME` is deprecated (ruled 2026-09-04) and still works; the two spellings
-carry the default in the same way.
+`ASSUME` is deprecated (ruled 2026-09-04) and still works. On an `ASSUME` the
+default stays metadata, as everywhere outside a section `GIVEN`; moving the
+declaration under its section's heading, as the previous example does, is what
+makes the default take effect for a rule given no value. The companion file no
+longer carries this spelling.
 
 ## Behavior
 

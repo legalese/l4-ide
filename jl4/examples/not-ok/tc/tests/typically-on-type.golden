@@ -3,7 +3,7 @@ Typechecking successful
 Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
 File: typically-on-type.l4
   Hidden: no
-  Range: 6:8-6:19
+  Range: 8:11-8:22
   Source: check
   Severity: DiagnosticSeverity_Error
   Code: <none>
@@ -13,28 +13,7 @@ File: typically-on-type.l4
 
 File: typically-on-type.l4
   Hidden: no
-  Range: 6:8-6:19
-  Source: check
-  Severity: DiagnosticSeverity_Warning
-  Code: <none>
-  Message:
-    ASSUME is an older way of introducing a name, and it is being retired.
-    Nothing is broken: the file still checks, runs and exports as before.
-    This one names a kind of thing
-
-      `some type`
-
-    without saying what it is made of. Write that as a DECLARE with no
-    parts listed:
-
-      DECLARE `some type`
-
-    The manual explains the move: doc/reference/types/DECLARE.md,
-    under Opaque Types (a type that is named but not described).
-
-File: typically-on-type.l4
-  Hidden: no
-  Range: 11:8-11:24
+  Range: 13:8-13:24
   Source: check
   Severity: DiagnosticSeverity_Error
   Code: <none>

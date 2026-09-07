@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://legalese.com/l4/single-instruction-demo/gate-state.schema.json",
+  "title": "Gate state",
+  "description": "The state of one human gate (HG1 or HG2) on a corpus row. Ruled 2026-09-06 by rulings-bench card D10-corpus-selection; recorded in SPEC.md §7.3.2. A waived HG1 is an ORDINARY outcome, not a degraded one, so 'waived' and 'not-sought' must be distinguishable from 'pending' in the artifact rather than inferred from a row that never advanced.",
+  "type": "object",
+  "required": ["gate", "review"],
+  "additionalProperties": false,
+  "properties": {
+    "gate": {
+      "type": "string",
+      "enum": ["HG1", "HG2"],
+      "description": "Which gate. HG1 is the domain-expert review of the inert-style L4; HG2 is Meng's go on anything outward-facing."
+    },
+    "review": {
+      "type": "string",
+      "enum": ["pending", "granted", "waived", "not-sought", "withheld"],
+      "description": "pending = sought and not yet answered, and the only state that may ever block. granted = a reviewer signed off. waived = deliberately released without review; per SPEC.md §7.3.1 this is expected for HG1 and is not a defect. not-sought = the row never asked. withheld = a reviewer looked and declined."
+    },
+    "by": {
+      "type": "string",
+      "description": "Who granted, waived or withheld. Required in practice for granted/waived/withheld; not schema-enforced because historical rows predate the field."
+    },
+    "at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the state was last set."
+    },
+    "note": {
+      "type": "string",
+      "description": "Free text. For a waiver, why it was waived rather than sought."
+    }
+  }
+}

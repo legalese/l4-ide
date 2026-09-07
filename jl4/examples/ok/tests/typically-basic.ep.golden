@@ -1,3 +1,4 @@
+-- Kept on ASSUME deliberately (IMPLICIT-PROPS-DESIGN.md §11.1, R0: ASSUME is deprecated): jl4-service/test/QueryPlanSpec.hs pins the ladder atomIds of `may purchase alcohol` captured from a live jl4-lsp (and a TS fixture in another repo pins the same ids); moving these declarations moves them.
 -- Test file for the TYPICALLY keyword: metadata-only default values.
 -- TYPICALLY stores a default on DECLARE fields, GIVEN parameters and
 -- ASSUME declarations; the value is type-checked against the annotated

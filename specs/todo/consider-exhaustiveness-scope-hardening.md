@@ -2,6 +2,48 @@
 
 ## Status: IMPLEMENTED (via entityInfo-sourcing, not the split-field design below)
 
+> ## D7.4 — `PatternMatchesMissing` is promoted to a check ERROR. RULED 2026-09-06, ACCEPT-SUBJECT-TO-SCAN.
+>
+> Rulings-bench card `D7-small-language-cluster`, sub-item D7.4 (upstream #909), marked **accept**
+> by Meng 2026-09-06. **The false-positive-freeness result this document carries is its
+> precondition** — promoting a warning that can fire wrongly would break correct programs — which is
+> why the ruling is recorded here rather than in a new file. Recorded also on
+> `consider-exhaustiveness-builtin-containers.md` and `-imported-enums.md`.
+>
+> **The ruling.** Take the issue's **Option B**: `PatternMatchesMissing` becomes a `CheckError`.
+> **Subject to** the hosted-deployment scan the issue itself demands — the gate is #909's own and
+> cannot be discharged from the tree, because nothing in this repository can see what is deployed.
+>
+> **Migration, measured 2026-09-06: 13 files move from `ok/` to `not-ok/tc/`, and 52 goldens
+> change.** Canon is unaffected (0). **The issue body's "grep-verified, only `empty.l4`" line is
+> wrong and must be corrected to 13 files in the same edit** — a migration budgeted at one file and
+> costing thirteen is how a promotion lands half-done.
+>
+> **Adversarially weakened, and the amendments it forces are part of the ruling.** _This reverses a
+> reasoned position the shipped manual took eleven days after the issue was filed —
+> `doc/concepts/type-system/exhaustiveness.md:117-124`, "Why Warnings, Not Errors … This is a
+> deliberate choice", with two stated reasons (incremental encoding; legacy encodings must keep
+> compiling). Option B is also not a zero-logic change: `viableCandidate` (`Types.hs:289-292`)
+> reopens the `1685b48a` regression unless exhaustiveness runs after resolution or is exempted
+> there. A second constructor (`PatternClausesMissing`) and the DMN L1 channel ride along._
+>
+> **So the build owes, and none of it is done:** promote **both** constructors; exempt them in
+> `viableCandidate` or reorder; re-rule `DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §2.4's L1 channel and
+> both sibling exhaustiveness specs; and **rewrite `exhaustiveness.md`'s "Why Warnings, Not Errors"
+> plus the four other pages that teach it**, in the shipping PR, per `CLAUDE.md` §6. A promotion
+> that leaves the manual arguing against it is two documents disagreeing in public.
+>
+> **The alternative that was never weighed, recorded so it is not re-proposed as new.** Blocking
+> warnings at the `jl4-service` deploy surface only (`Compiler.hs:155-160`) — the one place the
+> fall-through is genuinely silent — needs no language change, no corpus migration and no manual
+> reversal. It was not chosen; it was also not considered when the issue was written.
+>
+> **What already agrees with the promotion:** two surfaces treat the warning as fatal today
+> (`API.hs:232-233`, WASM `QueryPlanWasm.hs:42`), so promotion makes the surfaces consistent rather
+> than stricter; the `@nonexhaustive` opt-out exists, is exercised, and covers `WHERE`-locals — and
+> its own fixture still says "fails to typecheck" (`nonexhaustive-decorator.l4:4-5`), wording
+> written under a fatal regime and true again once this lands.
+
 Branch `mengwong/consider-exhaustiveness`. Two adversarial workflows (a design
 red-team and a whole-family sweep) converged on a fix that is **smaller and more
 complete** than the split-field proposal drafted further down this document. The

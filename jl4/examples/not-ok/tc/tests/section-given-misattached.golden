@@ -3,7 +3,7 @@ Typechecking successful
 Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
 File: section-given-misattached.l4
   Hidden: no
-  Range: 12:7-12:17
+  Range: 13:7-13:17
   Source: check
   Severity: DiagnosticSeverity_Error
   Code: <none>
@@ -17,7 +17,7 @@ File: section-given-misattached.l4
 
 File: section-given-misattached.l4
   Hidden: no
-  Range: 12:7-12:17
+  Range: 13:7-13:17
   Source: check
   Severity: DiagnosticSeverity_Error
   Code: <none>
@@ -38,7 +38,7 @@ File: section-given-misattached.l4
 
 File: section-given-misattached.l4
   Hidden: no
-  Range: 13:9-13:14
+  Range: 14:9-14:14
   Source: check
   Severity: DiagnosticSeverity_Error
   Code: <none>
@@ -48,11 +48,11 @@ File: section-given-misattached.l4
     However, this name `the rate` appears in the definition
     and the corresponding name in the type signature is
 
-      `the rate` (at section-given-misattached.l4:12:7-17)
+      `the rate` (at section-given-misattached.l4:13:7-17)
 
 File: section-given-misattached.l4
   Hidden: no
-  Range: 17:7-17:23
+  Range: 18:7-18:23
   Source: check
   Severity: DiagnosticSeverity_Error
   Code: <none>
@@ -73,7 +73,7 @@ File: section-given-misattached.l4
 
 File: section-given-misattached.l4
   Hidden: no
-  Range: 18:8-18:18
+  Range: 19:8-19:18
   Source: check
   Severity: DiagnosticSeverity_Warning
   Code: <none>

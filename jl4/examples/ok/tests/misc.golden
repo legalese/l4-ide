@@ -1,87 +1,11 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
-misc.l4:54:1-14:
+misc.l4:58:1-14:
   Suc OF (Suc OF (Suc OF Zero))
-misc.l4:55:1-15:
+misc.l4:59:1-15:
   Suc OF (Suc OF (Suc OF Zero))
-misc.l4:56:1-15:
+misc.l4:60:1-15:
   Suc OF (Suc OF (Suc OF (Suc OF (Suc OF (Suc OF Zero)))))
-misc.l4:67:1-43:
+misc.l4:71:1-43:
   LIST 1, 2, 3, 4, 5, 6
-misc.l4:83:8-14:
-  I found a problem while checking the assumption of `coerce`:
-    ASSUME is an older way of introducing a name, and it is being retired.
-    Nothing is broken: the file still checks, runs and exports as before.
-    This one leaves
-    
-      `coerce`
-    
-    open for somebody outside the file to supply. Say that
-    with a GIVEN indented under the heading of the section whose rules
-    read it (add a § heading if the file has none):
-    
-      § <heading>
-          GIVEN coerce IS A FUNCTION FROM NUMBER TO BOOLEAN
-    
-    (If this ASSUME instead marked a case the rules cannot answer, that is
-    REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
-    
-    The manual explains the move: doc/reference/types/ASSUME.md.
-misc.l4:84:8-14:
-  I found a problem while checking the assumption of `coerce`:
-    ASSUME is an older way of introducing a name, and it is being retired.
-    Nothing is broken: the file still checks, runs and exports as before.
-    This one leaves
-    
-      `coerce`
-    
-    open for somebody outside the file to supply. Say that
-    with a GIVEN indented under the heading of the section whose rules
-    read it (add a § heading if the file has none):
-    
-      § <heading>
-          GIVEN coerce IS A FUNCTION FROM BOOLEAN TO NUMBER
-    
-    (If this ASSUME instead marked a case the rules cannot answer, that is
-    REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
-    
-    The manual explains the move: doc/reference/types/ASSUME.md.
-misc.l4:85:8-14:
-  I found a problem while checking the assumption of `coerce`:
-    ASSUME is an older way of introducing a name, and it is being retired.
-    Nothing is broken: the file still checks, runs and exports as before.
-    This one leaves
-    
-      `coerce`
-    
-    open for somebody outside the file to supply. Say that
-    with a GIVEN indented under the heading of the section whose rules
-    read it (add a § heading if the file has none):
-    
-      § <heading>
-          GIVEN coerce IS A FUNCTION FROM NUMBER TO STRING
-    
-    (If this ASSUME instead marked a case the rules cannot answer, that is
-    REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
-    
-    The manual explains the move: doc/reference/types/ASSUME.md.
-misc.l4:86:8-14:
-  I found a problem while checking the assumption of `coerce`:
-    ASSUME is an older way of introducing a name, and it is being retired.
-    Nothing is broken: the file still checks, runs and exports as before.
-    This one leaves
-    
-      `coerce`
-    
-    open for somebody outside the file to supply. Say that
-    with a GIVEN indented under the heading of the section whose rules
-    read it (add a § heading if the file has none):
-    
-      § <heading>
-          GIVEN coerce IS A FUNCTION FROM STRING TO NUMBER
-    
-    (If this ASSUME instead marked a case the rules cannot answer, that is
-    REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
-    
-    The manual explains the move: doc/reference/types/ASSUME.md.

@@ -105,6 +105,13 @@ This is the answer to the closure-opacity problem: with closures you must trace 
 
 ### 4.3 Discover purity; don't annotate it
 
+> **WITHDRAWN 2026-09-05 — see R14 (§11.18).** Nothing below was ever built, and the badge it
+> proposes would be uninformative: 95 of the 745 `.l4` files under `jl4/` and `jl4-core/` carry a
+> module-level `ASSUME` at all, so "very pure" would be true of roughly seven files in eight.
+> The read-set that §4.3 wanted as its mechanism is separately real and shipped (PR #328); what is
+> withdrawn is the classification painted on top of it. Retained unedited below because §8 Q8 and
+> §9 cite it.
+
 Because `props` is available everywhere by default, the interesting analysis is the inverse: **statically determine which functions actually use it.**
 
 - Analyze each function and the **transitive closure of its callees** for any reference to a `props` component.
@@ -146,6 +153,13 @@ Extend the same inference to `props`: a reference to `props's jurisdiction` (or 
 The intent is that **the developer never has to write the `props` requirements by hand** — the compiler infers them. Annotation is a smell we are explicitly trying to avoid.
 
 ### 5.3 Computed fields compose with `props`
+
+> **DISCHARGED 2026-09-05 — see R13 (§11.17).** This section turns out to describe the tree
+> rather than propose anything: a computed field reading a section binder type-checks, exports,
+> and evaluates today (probe measured 2026-09-05, answer 109), because
+> `jl4-core/src/L4/TypeCheck.hs:195-199` orders the two desugars so they do not interfere and
+> `jl4-core/src/L4/Export.hs:353-356` walks a computed field's selector `DECIDE` like any other
+> callee. Nothing is owed on it. Read the present tense below as reporting, not promising.
 
 L4 already supports **computed fields** — properties defined entirely in terms of other attributes of the object (methods-as-fields). These compose cleanly with `props`: a derived property like `eligibility` can be computed from `age` and `jurisdiction` without explicit drilling, and the compiler tracks the dependency automatically. Whether a given field is a plain stored value or a computed one is "further magic" the inference layer resolves; the consuming rule shouldn't have to care.
 
@@ -202,7 +216,7 @@ Minimize the surface of the breaking change: existing explicit `GIVEN` threading
 5. **Interaction with `WHERE` closures.** How does the new `props` model relate to the existing `WHERE`-block environment access? Subsume it, coexist, or reframe `WHERE` in terms of `props`?
 6. **Regulative rules.** How does implicit `props` interact with `PARTY`/`MUST`/`HENCE`/`LEST` and with `#TRACE` temporal testing? Does the environment flow through state transitions, and how is it shown in `#TRACE` output?
 7. **Teaching story.** How do we _teach_ `props`? The mental model ("everything the caller knows is passed on, unless you deliberately use `local`") needs a crisp, honest framing that doesn't read as "we brought back globals."
-8. **Purity classification surface.** How is "very pure" exposed — diagnostic, hover, badge in the visualizer, attribute in generated artifacts?
+8. ~~**Purity classification surface.** How is "very pure" exposed — diagnostic, hover, badge in the visualizer, attribute in generated artifacts?~~ **WITHDRAWN 2026-09-05, see R14 (§11.18)** — it asks where to paint a classification that was never built and would not inform; §4.3, which it depends on, is withdrawn with it.
 9. **Error messages.** When a function references a `props` field not available in scope, the diagnostic must stay intelligible across a large call graph. What does a good error look like?
 
 ---
@@ -453,15 +467,25 @@ establishment is withdrawn there (visibility already ships; `§` placement is a 
 §5.1's structural subtyping is found unnecessary. R0–R12 are all recorded below, each with the mark Meng gave it on 2026-09-04. The red team's
 rulings are closed; what remains is implementation in the order of `PROPS-REDTEAM-2026-09-03.md` §6.
 
+**Added 2026-09-05, from a second rulings sheet Meng marked that day.** Four further rulings sit
+below and are **not** part of the 2026-09-04 red team: **R7 is amended** by §11.9.1 (the DMN image
+of a refusal), §11.9.2 (`<outputValues>` widened by `null`) and §11.9.3 (which also carries D6's
+pre-commencement-gate ruling and why its DMN half was not taken), and **R13** and **R14**
+are added by §11.17 and §11.18 (§5.3 discharged, §4.3 and §8 Q8 withdrawn), and §11.19 rules the
+ORDER in which the cross-`IMPORT` hole is repaired — the refusal before the closure — while the
+defect record itself lives at `OPEN-FINDINGS-2026-09-05.md` **OF-7**, because it spans `Export.hs`,
+`Batch.hs` and `Print.hs` and needs an id that does not move when this section list grows. **Every one of the four authorises work that has not been done**;
+each says so in its own status line and names what would make it true.
+
 ### 11.1 R0 — `ASSUME` is deprecated. RULED 2026-09-04.
 
 **Ruling (Meng, 2026-09-04): `ASSUME` is deprecated.** Its three jobs go to three destinations:
 
-| job                                | destination                                                                 | status                    |
-| ---------------------------------- | --------------------------------------------------------------------------- | ------------------------- |
-| suppliable term (the ~550 uses)    | a section-level `GIVEN` discharged by the compiler into ordinary parameters | mechanism pending (R1–R5) |
-| uninterpreted type (`… IS A TYPE`) | a bodiless `DECLARE T`, an opaque nominal type (§11.1.1)                    | built 2026-09-05          |
-| refusal / typed bottom             | `REFUSE "…"`, uncatchable, boundary-only, in no schema                      | spec pending (R7)         |
+| job                                | destination                                                                 | status                                                    |
+| ---------------------------------- | --------------------------------------------------------------------------- | --------------------------------------------------------- |
+| suppliable term (the ~550 uses)    | a section-level `GIVEN` discharged by the compiler into ordinary parameters | built (#333, #344); corpus rewritten 2026-09-06 (§11.1.2) |
+| uninterpreted type (`… IS A TYPE`) | a bodiless `DECLARE T`, an opaque nominal type (§11.1.1)                    | built 2026-09-05 (#335); corpus rewritten 2026-09-06      |
+| refusal / typed bottom             | `REFUSE "…"`, uncatchable, boundary-only, in no schema                      | built (#334; DMN image #339); corpus rewritten 2026-09-06 |
 
 **What decided it.** Not the design argument but the defect list. Of the eight proposal-independent
 bugs found by the 2026-09-03/04 red teams (`PROPS-REDTEAM-2026-09-03.md` §7), five are
@@ -547,21 +571,236 @@ which is both a bug fix and step one of discharge; (2) the mechanism rulings R1�
 (3) discharge; (4) `REFUSE` and the empty-`DECLARE` migration of the type role, so that no refusal
 and no sort is ever suppliable; (5) a deprecation warning in `l4 check` with a code action that
 rewrites a term `ASSUME` to the ruled spelling — the warning does not land before the code action
-can; (6) corpus and docs migration, `doc/reference/types/ASSUME.md` carrying the notice and the
-recipe (CLAUDE.md §6); (7) keyword removal, together with the dead `LocalAssume` grammar.
+can (ruled 2026-09-06, being built separately, §11.1.2); (6) corpus and docs migration,
+`doc/reference/types/ASSUME.md` carrying the notice and the recipe (CLAUDE.md §6) — **done
+2026-09-06, §11.1.2**, except the Blawx- and relational-shaped fixtures that wait on those legs;
+(7) keyword removal, together with the dead `LocalAssume` grammar — outstanding, and now also
+blocked on the Blawx and relational legs reading the section binder (§11.1.2, finding).
 
 **What this does not decide.** Nothing of the red team's remains open; R1–R12 are ruled in
 §11.2–§11.13 below. Still owed from the riders: the pre-commencement gate design and the
 CORPUS-TRACK §8 amendment (§11.9). Consistent with §10.7 above and the handoff's §7 ("`ASSUME` is not simply
 to be deleted"): the refusal and type roles get their own constructs _before_ the keyword goes.
 
-#### 11.1.2 The deprecation warning, and the code action that stops offering `ASSUME`. BUILT 2026-09-06.
+#### 11.1.2 The corpus is rewritten, and a checker warning is ruled. RULED 2026-09-06.
+
+**Ruling (Meng, 2026-09-06), verbatim: "Yes the checker should have an ASSUME deprecation
+warning but we should also just rewrite all our code to the new system using REFUSE and section
+givens etc."**
+
+Two halves. **The warning half is ruled and is being built in a separate PR** by another deputy;
+as of this writing `l4 check` reports nothing for an `ASSUME`, and the keep-list below is exactly
+the set of files that PR will re-golden when the warning lands. **The rewrite half is this PR**,
+and this section records what it did.
+
+**Measured, before and after** (comment-stripped `^\s*ASSUME\b` over `jl4`, `jl4-core` and
+`doc`, on `unstable` at `cdc11501`):
+
+| tree              | before        | after                                                                                                                                                                                                                                                   |
+| ----------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `jl4/experiments` | 214 in 12     | 17 in 3: 14 inside `{- -}` blocks in `macma2.l4` (commented-out code), 1 bodied `ASSUME Person IS A TYPE / HAS ATTRIBUTE …` in `britishcitizen.l4`, a file that does not parse at HEAD, and 2 polymorphic placeholders in `macma3.l4` (the limit below) |
+| everything else   | 127 in 48     | 70 in 15: 69 in 14 files kept deliberately (below), and 1 in `regcf.l4` blocked by the DMN finding below                                                                                                                                                |
+| total             | **341 in 60** | **87 in 18**                                                                                                                                                                                                                                            |
+
+The 254 migrated lines, by role: **87 type** (86 as `ASSUME T IS A TYPE` → `DECLARE T`, in place;
+one, `not-ok/tc/typically-on-type.l4`'s `IS A TYPE TYPICALLY 42`, as a section `GIVEN … IS A TYPE`,
+the one spelling that reproduces its error), **115 function** and **41 term** (→ a section `GIVEN` under the declaring section's own heading, or
+under a synthesised title heading where the file had none or where every heading was `§§`-deep),
+and **11 refusal** (→ one named definition per refusal whose body is `REFUSE "…"`, readers
+unchanged): the encoding floor in `regcf-denovo.l4`, the DMN exhibits `gst-rate.l4` and
+`ymd-dates.l4` and the five `dmn/not-ok/dated-chain-*.l4`, `daydate.l4`'s out-of-range `YMD`,
+the polymorphic `TBD` in `experiments/thailand-cosmetics/prelude.l4`, and
+`ok/check-display-typevars.l4`'s polymorphic `bottom`. **`regcf.l4`'s two refusals did not move**,
+for the finding below. One of them was found already mis-migrated: the second curated bottom,
+"the COVID-19 temporary rules … are not modelled here" (§10.6(d)), had been swept into a
+**section `GIVEN`** on 2026-09-05 (#337), which made a refusal a suppliable input in the schema
+and an `<inputData>` in the DMN model — the one thing R7 says a refusal must never be. The
+sweep's refusal detector keyed on the words "no …" and "refused"; that name has neither. The
+detector is left as it is, because a detector that recognises refusals by their wording will
+always have a hole — the recipe is to read each site (§2.8's field test: could a person supply
+this value?) — and the site itself is left as the sweep left it, with the floor, until the DMN
+question is answered.
+
+**The mechanism.** `etc/migrate-assume.mjs` gained `--types` (the type role, in place),
+`--hoist-root` (a declaration above the first heading goes onto the first heading's `GIVEN` when
+that heading is `§`-deep, and under a synthesised title `§` when every heading is deeper), a
+prologue fix (the synthesised heading follows the file's `IMPORT`s; before the fix it went above
+them and every prelude name became "could not find a definition"), and a gate on its refusal
+detector (a function-typed name is a predicate, not a bottom: `registration refused`,
+`is name change refusal` and three more in `jerseyCharities.l4` were being refused as refusals).
+Its `overload` guard is **deleted**: the collapse it protected against was fixed by §11.15, whose
+regression test and corpus witness are both on `unstable`, so `ok/tdnr.l4` (`foo` at three types)
+and `ok/misc.l4` (`coerce` at four) — the two files §11.14 named as that repair's acceptance test
+— now carry the section-`GIVEN` spelling, one parameter per type, and the `prettyLayout
+round-trip` block is green on both. The two `ditto` fixtures (`ok/ditto.l4`,
+`lsp/semantic-tokens/ditto.l4`) were rewritten by hand onto the `GIVEN`'s continuation lines,
+which `^` copies positionally exactly as it copied the `ASSUME` line.
+
+**Answer-preservation.** The script's `--verify` oracle (`l4 run --json`, HEAD against
+worktree) over every rewritten `.l4` file on the final tree, 59 files: **54 identical, 0
+reordered, 5 different**. The five: `not-ok/tc/parse-error2.l4` and `parse-error3.l4`, kept
+files whose one-line keep comment moved the line number quoted inside their pre-existing parse
+error; and `seatbelt.l4`, `purchase.l4` and `macma3.l4`, which fail to check at HEAD and whose
+only differences are the line numbers quoted inside their pre-existing errors' caret excerpts
+and, in `macma3.l4`, two "multiple definitions" diagnostics for `forfeiture`/`confiscation` that
+disappear because both declaration pairs now sit in the heading's `GIVEN` above the use site —
+exactly the declaration-order sensitivity §11.15's retracted attribution names, so a spurious
+diagnostic gone, not a meaning changed. Every one of the 154 files in `jl4/experiments` keeps its
+HEAD `l4 check` exit code (127 clean and 27 failing, before and after, per file), and every one
+but `macma3.l4` keeps its diagnostics. Every goldened file's `.golden` was read: outside the
+refusal sites the changes are the moved declaration in the exactprint, and line-number shifts
+from a one-line keep comment. The refusal sites change what the reader is told, which is the
+point: `ymd-constructor.l4` prints `The model refuses to answer: YMD refused an out-of-range
+month or day` where it printed the bottom's own name as data (§2.8 predicted exactly that
+display), and `regcf-denovo.schema.golden` loses the floor from the published inputs and from
+`required` (`REFUSE.md` predicted exactly that removal).
+
+**The DMN leg, measured on both engines** (KIE 8.44.0.Final, Camunda 8.7.6, locally, 2026-09-06).
+Each floor leaves the `<inputData>` and becomes a `<decision>` whose literal is `null` and whose
+`<description>` carries the reason (D1), so the engine harness no longer hands the floor in as
+`-1`: `gst-rate.cases.json` 66/66 → **77/77** (eleven cases, seven decisions), `ymd-dates.cases.json`
+**63/63**, 0 errors and 0 warnings on both engines, with every refusing decision's `null` licensed
+by an explicit null in `expect` and the pre-commencement cases (F/J, F/G/H) re-pinned to `null`
+on the rate, the fee and everything downstream — which is what L4 says a reached refusal does,
+not what an engine said. `ymd-dates.l4`'s "nothing Blocking" test now excludes `D-REFUSE`, whose
+Blocking on a strict consumer and a DRG root is D1's own calibration. The Reg CF corpus leg is
+unchanged, because `regcf.l4` is unchanged.
+
+**Finding: a refusal reachable from a tier-2 BKM un-BKMs it, and that blocks the Reg CF corpus's
+own refusals.** Measured 2026-09-06 with this tree's binary on four variants of `regcf.l4`
+(HEAD; HEAD with only the commencement floor spelled `REFUSE`; the same plus the COVID site
+spelled `REFUSE`; each against HEAD's and the migrated `daydate.l4`, which made no difference):
+
+| variant                               | BKMs | decisions | inputData | tally                           |
+| ------------------------------------- | ---- | --------- | --------- | ------------------------------- |
+| HEAD (floor an `ASSUME` bottom)       | 10   | 70        | 29        | 21 lossy, 133 advisory          |
+| floor `REFUSE`, COVID a section GIVEN | 5    | 76        | 58        | 31 blocking, 44 lossy, 133 adv. |
+| floor and COVID both `REFUSE`         | 5    | 77        | 56        | 31 blocking, 45 lossy, 134 adv. |
+
+The five BKMs that vanish are exactly the decisions that can reach the floor — `investment
+limit`, `financial statements required`, `offering is within the offering limit`, `investor is
+within the investment limit`, `the transaction qualifies for the section 4(a)(6) exemption` —
+and they reappear as parameterised decisions. §11.9.1 rules that a refusing decide is not
+`DMN-SAFE` and does not un-lift, and `L4.Dmn.Lower` applies the same rule to BKM eligibility
+(the "safety-refused tier-2 residue", `Lower.hs:5350`, `:6059`), so each demoted decision needs
+its own `<inputData>` for `investor`, `offering`, `issuer`, `filing`, `arrangement` and `amount
+to be sold in this transaction`: hence `investor_2` … `investor_6`, twenty-nine new inputs, and
+`D-SCOPE`/`D-RENAME` notes on all of them. D1 was measured on `refuse.l4`, which has no BKM, so
+this shape was never exercised. Three exporter tests written against the BKM shape fail on it
+(§15.8's `financial statements required` BKM, the §15.12 `D-SVCEMPTY` claim, and R13's
+"empties Blocking"), and the 23-case engine pins would all have to be re-derived against a model
+with twice the inputs. That is an exporter ruling — should a refusing BKM stay a BKM, with the
+refusal reaching it as a knowledge requirement? — and not a corpus rewrite, so `regcf.l4` is
+byte-identical to HEAD in this PR and its two sites are the ones the DMN half of item 6 still
+owes.
+
+**Kept on `ASSUME`, deliberately — 14 files, each with a one-line comment saying so** (and,
+separately, `regcf.l4`'s floor, blocked as above, and `macma3.l4`'s two polymorphic placeholders,
+blocked by the limit recorded under "Refuted, and what changed"). The list was 27 files at the
+first pass; the refuters below cut it to 14. Their
+purpose is to exercise the deprecated keyword's own syntax, diagnostics or tooling, or they declare
+something no `ASSUME`-free spelling can: the deprecation page's own example
+(`doc/reference/types/assume-example.l4`); the semantic-token fixture; the two parse-error
+fixtures and the misattached-`GIVEN` fixture (`not-ok/tc/parse-error2.l4`, `parse-error3.l4`,
+`section-given-misattached.l4` — a `GIVEN` spelling reports a _different_ error, measured);
+`ok/signatures.l4` and `ok/tbd.l4` (the signature spellings, and the polymorphic ones have no
+section-`GIVEN` image, below); `ok/typically-basic.l4` (`jl4-service/test/QueryPlanSpec.hs`
+pins ladder atom ids captured from it, and a TypeScript fixture in another repository pins the
+same ids); and the **relational and Blawx trees** — `relational/assumed.l4`,
+`not-ok/assumed-signatures.l4`, `not-ok/local-assume.l4`, `blawx/alcohol.l4`, `antisocial.l4`,
+`not-ok/arity-two.l4` — whose input predicates are signature-style `ASSUME`s (next finding).
+
+**Refuted, and what changed (2026-09-07).** Per the standing authorisation (BRIEF §14), seven
+agents were run against this branch before it was reported: five Sonnet differentials, one per
+tree, comparing `l4 run` (and `l4 check`) on every file — importers included — between
+`cdc11501` and this head, and two independent Opus refuters each trying to produce a working
+`ASSUME`-free rewrite of every kept file. The differentials: **933 files, 0 unexpected
+differences** — libraries plus their 112 importers 128/0, `legal` 26/0, `ok`+`not-ok`+`lsp`
+375/0, `experiments`+`dmn`+`docassemble`+`relational`+`blawx`+fixtures+`doc` 376/1, the keep-list
+28/0 — the one being `macma3.l4`, where this PR's first rewrite of two polymorphic placeholders
+(`combine`, `lifted or`) as `FOR ALL`-typed section-`GIVEN` parameters had replaced two
+diagnostics with two different ones. Measured on the repair: **an explicit `FOR ALL` type on an
+assumed term is not instantiated at a use site in either spelling** (`GIVEN pick IS FOR ALL a A
+FUNCTION FROM a AND a TO a` and `ASSUME pick IS FOR ALL …` both report "You are giving 2 inputs
+to pick … but it is not a function"); only the signature form (`GIVEN a IS A TYPE … GIVETH … ASSUME
+f`) generalises, and that form has no section-`GIVEN` image. The two placeholders are back in that
+form, `ASSUME.md` no longer claims the `FOR ALL` carry, and `ok/tbd.l4`'s keep reason is this
+limit. The same differential found `ok/ymd-constructor.l4`'s own comment still describing the
+pre-`REFUSE` "assumed term" stop; corrected.
+
+The keep-list refuters produced working rewrites — same `l4 run`/`l4 check` output modulo
+positions, and the same tool output where a tool is the fixture's subject — for **thirteen** of
+the 27 files, each re-measured here before it moved: `blawx/not-ok/zero-arity.l4` (the same three
+arity-0 rejections from `l4 blawx`), `docassemble/assume-via-fn.l4` (YAML and fidelity byte-identical
+to the shipped golden), `not-ok/tc/typically-on-type.l4` (`GIVEN … IS A TYPE TYPICALLY 42` under a
+heading reports the identical error — the stated reason had considered only `DECLARE`),
+`ok/assumes.l4`, `relational/assumed-nullary.l4` (a nullary section `GIVEN` lowers to the identical
+`RInput`), `tests-cli/fixtures/assert-assumed.l4`, `batch-assume-direct.l4`, `batch-assume-helper.l4`
+(byte-identical NDJSON, including `Missing required field: 'x'`), `implicit-assume-test.l4` (whose
+header claimed an implicit-extraction case that no longer existed: every name was declared),
+`ok/assume-as-given.l4` (identical required-input sets on all four exports),
+`ok/section-scoping-descendant-rebind.l4` (byte-identical, and by construction: the section
+binder's elaboration _is_ the fully annotated 0-ary `ASSUME` the regression is about),
+`tests-cli/fixtures/export-blocking-only.l4` (two rule `GIVEN`s with **distinct** names — `p q` and
+`r s` — keep the report at `2 blocking` with no advisory; and the stated cause was wrong twice
+over: the note a heading adds is `D-SVCEMPTY`, not `D-FLAVOR-NOSERVICE`, and it is caused by the
+`§` heading alone, `ASSUME`s or not), and `ok/inert/grounding-variants.l4` (each decision now
+declares its atoms as its own rule `GIVEN`s; measured through `jl4-lsp`'s decision-graph command,
+all 42 box labels are byte-identical to HEAD, whereas a section `GIVEN` prefixes each with its
+heading — the comment's quoted "(qualified at section X)" rendering was stale, `Print.hs` retired
+it for the dotted form). Where the two refuters disagreed, measurement decided: `parse-error2.l4`
+stays because the `GIVEN` spelling's error reads `unexpected GIVEN`, not the fixture's error;
+`typically-basic.l4` stays for the atom-id pin above, which neither refuter could see.
+
+**What survives is structural, not lexical** (the refuters' summary, confirmed): a section
+`GIVEN` desugars to the very `ASSUME` node every tool reads, so no fixture of the form "how tool
+X treats an `ASSUME`" keeps the keyword on its own account. The four things with no
+`ASSUME`-free spelling are the signature form `GIVEN p IS A T / ASSUME f p IS A U` (a parse error
+under a heading; the function-typed section `GIVEN` is refused on the export path), the
+`GIVETH`-headed polymorphic form, the `WHERE`-local form, and the `§` heading a section `GIVEN`
+drags in (which the DMN exporter and the ladder visualizer both react to).
+
+**Finding: the Blawx bridge and the relational middle end are built on the `ASSUME` node, and that
+blocks sequencing item 7.** `L4.Relational.Lower` lowers a top-level `ASSUME` to an `RInput`
+predicate and `L4.Blawx.Lower` hangs it off a category; the same predicate as a section `GIVEN`
+is function-typed, and `L4.Export.validateExportInputs` rejects a function-typed input on an
+`@export`ed decision, so a Blawx seed in the section-`GIVEN` spelling has no export root and no
+Blawx image at all (the seeds' own headers record the measurement). Removing the keyword
+therefore costs those two legs their input predicates until they read the section binder. The
+Blawx tutorial and `ASSUME.md` now say so; an earlier sentence in the tutorial claiming "the
+exporter treats a section `GIVEN` exactly as it treats an `ASSUME` term" was false for Blawx (a
+nullary section `GIVEN` is the arity-0 shape `not-ok/zero-arity.l4` pins as refused) and is
+corrected.
+
+**Docs.** `doc/reference/types/ASSUME.md` is the deprecation page: what the keyword did, the three
+destinations with a before/after each, the function-typed limit above, and the recipe. Every
+other page that taught `ASSUME` as the way to supply a fact now teaches the section `GIVEN`
+(`keywords.md`, `TYPICALLY.md`, `DECLARE.md`, `A-AN.md`, `default-reasoning.md`,
+`testing-your-rules.md`, `http-json.md`, the section-`GIVEN` tutorial's migration example, the
+errors page); `REFUSE.md`'s limits no longer say the corpus refusals are unmigrated, and the
+`daydate` pages say `YMD` refuses. Two stale "proposed, not landed" notes about supplying a
+section `GIVEN` with `WITH` — in `errors/README.md` and `section-given.md` — were replaced with
+what the discharge PR made true (probed: `#EVAL isAdult WITH age IS 25` answers; the same line
+against an `ASSUME` is a check error).
+
+**`legalese/canon` is untouched** and holds exactly one `ASSUME`,
+`subjects/sg/child-support/encodings/legalese/sg-csp.l4:79`, refusal-role ("no Baby Bonus Cash
+Gift rate is encoded for a birth before 2015-01-01"); it is the GM's to queue.
+
+**What this does not decide.** Whether `daydate.l4`'s out-of-range `YMD` should answer `EITHER`
+(the taxonomy row §2.8 puts it in) rather than refuse: that is a change to the library's
+interface, which every date in the corpus relies on, and `REFUSE` is the one construct that keeps
+the constructor loud without making its sentinel suppliable; recorded as a limit in `REFUSE.md`.
+And sequencing item 7, keyword removal, which now waits on the two legs above as well as on the
+warning.
+
+#### 11.1.3 The deprecation warning, and the code action that stops offering `ASSUME`. BUILT 2026-09-06.
 
 **Ruling (Meng, 2026-09-06), verbatim: "Yes the checker should have an ASSUME deprecation warning
 but we should also just rewrite all our code to the new system using REFUSE and section givens
 etc."** This addendum is the warning half — sequencing item 5 — together with the repointing of
-the one code action that §11.14 Finding 2 tied to it. The rewrite half is the sibling branch
-`props/assume-rewrite`, which records its own sweep here when it lands.
+the one code action that §11.14 Finding 2 tied to it. The rewrite half landed first and is
+§11.1.2 above, which records its own sweep; this section is the warning it ruled.
 
 **What the warning is.** `DeprecatedAssume` in `CheckWarning`
 (`jl4-core/src/L4/TypeCheck/Types.hs`), emitted once per author-written `ASSUME` from
@@ -738,10 +977,23 @@ root (§11.4). Per-call variation is written, `callee WITH person IS person's gu
 **What decided it.** The argument recorded at `PROPS-REDTEAM-2026-09-03.md` §2.3: a name
 coincidence would become a binding; `R(f)` would stop being the callee's; one program would have two
 readings; every tradition that had dynamic parameter binding gave it up (Common Lisp's `special`
-declaration is exactly the section-`GIVEN`/function-`GIVEN` line). Measured cost zero: across 607
-files there are 235 term-role `ASSUME` names and 2,311 function `GIVEN` names and no file where the
-two sets overlap. Restatement as an error rather than a warning was part of the recommendation Meng
-accepted; it is the one sub-point he did not separately voice.
+declaration is exactly the section-`GIVEN`/function-`GIVEN` line). Measured cost zero **as of
+2026-09-04**: across 607 files there were 235 term-role `ASSUME` names and 2,311 function `GIVEN`
+names and no file where the two sets overlapped. Those counts are pre-sweep and are now stale —
+2026-09-05, post-#337: 644 files, 101 term-role `ASSUME` lines. Restatement as an error rather than
+a warning was part of the recommendation Meng accepted; it is the one sub-point he did not
+separately voice.
+
+**The cost is still zero, but not for the reason above, and it was not zero in between.** That count
+measured a proxy — whether any file spells a name as both a term-role `ASSUME` and a function
+`GIVEN` — rather than the check as built. The first implementation keyed on the raw name
+**module-wide** and rejected `doc/tutorials/section-given/what-a-section-needs-to-know.l4`, a
+before-and-after tutorial whose "before" section deliberately repeats a name that a **different,
+later** section declares as a section `GIVEN`; `doc/test-docs.sh` went red on a correct file (#344).
+Scoped to the binders _visible_ at the declaration — its own section and its ancestors — the check
+now fires on **zero** files across `jl4/examples/ok`, `jl4/examples/legal`, `jl4-core/libraries` and
+`doc`, measured 2026-09-05 post-sweep. Note for anyone re-deriving this: the column-1 reading is a
+false lead. A column-1 `GIVEN` is never read as a section binder, so R4 was never in play.
 
 ### 11.4 R3 — Distinct binders per section; one binder per name per root. RULED 2026-09-04.
 
@@ -781,6 +1033,17 @@ evaluator discards) and a reference page saying defaults do not change evaluatio
 note: this expands `TYPICALLY` from a literal annotation into a defaulted expression, a language
 change in its own right; `doc/reference/types/TYPICALLY.md` says so when R8 lands. Detail:
 `PROPS-REDTEAM-2026-09-03.md` §2.5.
+
+**EXTENDED 2026-09-06 to `DECLARE` record fields (D7.3, upstream #645).** R8 as written governs
+`GIVEN` binders and `TYPICALLY.md:69-72` carves record fields out. D7.3 rules that a `MAYBE`-typed
+field may be declared `field IS A MAYBE T TYPICALLY NOTHING`, and only then may a construction
+site omit it — same principle, one declaration, the default living where the name is declared.
+Ruled 2026-09-06, **not built**, and **blocked on R8's own named-site half**. The governing text for
+that ruling is `TYPICALLY-DEFAULTS-SPEC.md:420-428` and the record is
+`SURFACE-SUGAR-CLUSTER-2026-09.md` §D7.3, which also rules the source/boundary asymmetry R8 does not
+reach: the JSON and service boundary keeps defaulting an absent `MAYBE` field to `NOTHING`
+(`Machine.hs:2282`, `Backend/Jl4.hs:436-441`, `JsonSchema.hs:264`), and `TYPICALLY NOTHING` does not
+gate it.
 
 ### 11.6 R4 — The section binder is the indented `GIVEN` on the line after the heading. RULED 2026-09-04.
 
@@ -1050,6 +1313,16 @@ at export time, on both engines. Meng saw both sides and kept the row. Should th
 revisited, the change is one arm of `datedTable`'s `ruleSpecs` and its goldens, and it would be an
 amendment to §11.9.1 rather than a second image alongside it.
 
+**One distinction D6 draws that the recount does not, folded in from the rulings branch 2026-09-05.**
+These ten are not one population, and the migration must classify per site rather than sweep. Some
+say _the law was not in force_ — `regcf.l4:143`, `dmn/gst-rate.l4:65`, `dmn/ymd-dates.l4:86`, the
+five fixtures — and belong in the gate row. Two say _this encoding does not carry that period_:
+`regcf-denovo.l4:211` ("no encoding of Part 227 exists for rule dates before 2022-09-20") and
+canon's `sg-csp.l4:79`, whose own comment at `:70-78` says the encoding lacks the earlier rates.
+Those are the `REFUSE` row of R7's taxonomy, not the gate row, even though both are guarded on a
+date — and canon's is guarded on the **child's date of birth**, not on `RULES EFFECTIVE DATE`, so no
+rule-version axis can answer it at all.
+
 ### 11.10 R10 — Backends. RULED 2026-09-04 (marked accept).
 
 The transitive read-set pass lands first; the schema is keyed by (name, tier) with `x-l4-tier`;
@@ -1089,13 +1362,28 @@ succeeds to `e WITH \`RULES EFFECTIVE DATE\` IS d` once sharing is measured.
 no existing program changes meaning (`LET` appears 127 times in the examples and libraries and 7 in
 canon); no demand (`LET` has zero uses in the 26 legal files against 125 `WHERE` blocks, and the
 corpus's only hypothetical, `EVAL UNDER RULES EFFECTIVE AT`, has nineteen uses all at the outermost
-position of a directive, measured 2026-09-04). The cost, terseness when several calls share one
+position of a directive **or export body**, measured 2026-09-03 over `jl4/examples/legal/**`).
+
+**Corrected 2026-09-05.** The sentence above dropped the "or export body" qualifier its own source
+carries (`PROPS-REDTEAM-2026-09-03.md` §2.11: "all 19 legal-corpus uses … sit at the outermost
+position of a directive **or export body**, zero inside a rule, quantifier or lambda"), was undated
+in one place and misdated in another, and did not say what it was counting over. The count itself
+was and is right: re-measured 2026-09-05, `grep -rn 'EVAL UNDER RULES EFFECTIVE AT' --include='*.l4'
+jl4/examples/legal/` returns **19** — 17 in `regcf.l4`, 1 in `regcf-wizard.l4`, 1 in
+`regcf-denovo.l4`. Do not read this correction as saying the nineteen was overstated; it was not.
+**What R9 schedules is separately re-ruled**: `TEMPORAL-RULE-VERSION-DESIGN.md` §1.4.3 (2026-09-05)
+rules sub-question (c) that the fold of `EVAL UNDER RULES EFFECTIVE AT` into `WITH` **is not a
+rename** — it re-schedules on the 21 interval-builtin sites that rebind the axis per iterated day,
+and it cannot be defined without also defining `WITH` discharge to snapshot and to report its own
+unfrozen arms. The cost, terseness when several calls share one
 override, is met by a helper. Detail: `PROPS-REDTEAM-2026-09-03.md` §2.6.
 
 ### 11.14 Sequencing item 6 — the corpus and docs migration: what it swept, and the two things it found
 
 **Status 2026-09-05: built on branch `props/assume-sweep`, rebased onto `props/opaque-declare`
-(PR #335), NOT merged.** Everything below describes that branch, not `unstable`. The migration is
+(PR #335), NOT merged.** _Update 2026-09-06: merged as PR #337 (`b4fc3913`); the trees it held
+back, the type and refusal roles, and the `overload` guard's lifting all landed with §11.1.2._
+Everything below describes that branch as it was. The migration is
 driven by `etc/migrate-assume.mjs`, which is committed with it: the script is idempotent and never
 writes without `--write`, so the tree it produces is re-derivable — re-running it over the swept
 trees is a no-op, and that is the intended way to review the mechanical half of the diff.
@@ -1504,9 +1792,25 @@ contribution, so `h MEANS alpha PLUS (g WITH beta IS 100)` no longer carries
 schema is keyed off the discharged AST and would otherwise list it as required.
 Edges are per call site, not per callee: a definition called once with a `WITH`
 and once positionally in the same body still contributes its full read-set
-through the second call. Measured cost on `legal/regcf/regcf.l4` (86 directives):
-0.70 s, against 0.73 s undischarged — none. Ported from the review branch's
-`69cbbef6`, whose own measurement was 0.77 s.
+through the second call.
+
+**Cost, corrected 2026-09-05.** An earlier version of this section said "0.70 s
+against 0.73 s undischarged — none", and cited the review branch's 0.77 s as
+agreeing. Both figures were real and neither was comparable: they were taken
+_before_ the `ASSUME` sweep gave `legal/regcf/regcf.l4` a section `GIVEN` at line
+468, when `dischargeModule` was the identity on that file and genuinely free.
+Re-measured post-sweep, five interleaved pairs on one machine under one load:
+**baseline median 0.77 s against 1.19 s, so ~1.6x, +0.44 s.** Corpus-wide it is
+invisible — all 344 files under `jl4/examples/ok`, `jl4/examples/legal` and
+`jl4-core/libraries`, alternating runs, 86 s/88 s baseline against 87 s/88 s —
+because only a file that carries a section `GIVEN` and has a large call graph
+pays; the rest hit `dischargeModule`'s empty-binder early exit. **Not isolated:**
+whether the 1.6x is this fixpoint or discharge as a whole is unmeasured.
+
+The rule this cost us, worth more than the number: **a performance figure without
+the corpus it was taken on is not a figure.** Two true measurements disagreed for
+a week's worth of confusion in one evening because neither said which corpus it
+ran on.
 
 **The `TYPICALLY` call-graph edge is gone.** `readSets` used to add each binder's
 default as an edge keyed by the binder's own `Unique`. A default is literal-only
@@ -1539,10 +1843,43 @@ evaluation.
 
 What the importer still cannot do is `WITH`-supply that binder:
 `CheckEnv.sectionBinderNames` is per module, so the name is not suppliable across
-the boundary and the imported module's own `TYPICALLY` (or "assumed term")
-applies. That is the remaining half of §2.2's "discharge happens at the module
+the boundary ~~and the imported module's own `TYPICALLY` (or "assumed term")
+applies~~. That is the remaining half of §2.2's "discharge happens at the module
 boundary", and it is deferred. `ok/section-given-import-def.l4` and
 `ok/section-given-import-call.l4` pin both the fix and the limit.
+
+**Corrected 2026-09-05 — the conclusion holds, the message does not.** The
+struck clause is a reasonable inference and it is kept, because the cost of
+deleting it is that nobody learns the search term is wrong. **Predicted:** the
+imported module's own `TYPICALLY`, or failing that "… is an assumed term".
+**Measured:** neither. That binder carries no `TYPICALLY`, and the observable on
+the corpus's own witness is a **`CONSIDER` exhaustiveness failure** — the
+binder's value flows into `regcf-wizard.l4:345`'s three-arm `CONSIDER` and
+matches no arm:
+
+```
+The value
+  `the COVID-19 temporary rules, Rule 201(z) and (bb), are not modelled here`
+reached a CONSIDER that has no branch for it.
+```
+
+**How it was produced**, on `origin/unstable` `063ddd34` with that tree's own
+binary — the arm needs a rule date inside the COVID window _and_ an aggregate
+above tier 1 and at most 250,000 (`regcf.l4:510-513`), so both have to be forced:
+
+```
+l4 batch regcf-wizard.l4 -e 'raise check' -i plan.json   --fixed-now 2021-06-01T00:00:00Z          # aggregate 200000
+```
+
+**Severity is unchanged and "loud, not silent" stands** — `"status":"error"`, no
+wrong answer. What changes is what a reader greps for: **anyone searching logs
+for `assumed term` to find this class will miss every instance.**
+
+**And the same row passes `--validate-only`.** `{"status":"valid","errors":[]}`,
+because the export schema demands only the export's own record parameter
+(`plan`) and never the imported binder — a green validate in front of a red run,
+on the wizard. That half is recorded as `OPEN-FINDINGS-2026-09-05.md` **OF-7**,
+which owns the defect; this section owns the ruling and the limit.
 
 #### Deferred, each with why
 
@@ -1590,3 +1927,83 @@ boundary", and it is deferred. `ok/section-given-import-def.l4` and
   `` `is a British citizen (variant)` `` to a higher-order rule and lost both its
   `#EVAL`s without it. `ok/section-given-reader-as-value.l4` pins both spellings.
   `ImplicitReaderUsedAsValue` and its corpus file are gone with it.
+
+---
+
+### 11.17 R13 — §5.3 is discharged: computed fields already compose. RULED 2026-09-05.
+
+**Ruling (Meng, 2026-09-05, mark `accept` on rulings-bench card `D5-computed-fields-purity`,
+option A′).** §5.3, "computed fields compose with `props`", is **discharged**: it is a description
+of the tree, not a proposal. Nothing is owed on it, and §5.3 above is retensed to say so.
+
+**What decided it.** A probe, and two code facts.
+
+- Probe `scratchpad/consult/adv-d5/cf1.l4`, re-run 2026-09-05 on the `l4-base2` binary: a
+  `DECLARE Sale` whose `gst` field is `` MEANS `net` * `gst rate` `` — a computed field reading a
+  section binder declared two declarations away — exports, demands `gst rate` in its schema, and
+  `l4 batch cf1.l4 -i '{"x":{"net":100},"gst rate":0.09}'` answers **109**. Omit `gst rate` from
+  the row and it answers `Missing required field 'gst rate' in JSON object`. The composition works
+  and the schema knows about it.
+- `jl4-core/src/L4/TypeCheck.hs:195-199` runs the two desugars in a stated order —
+  `desugarSectionGivens (desugarComputedFields program)` — with the comment explaining why they do
+  not interfere: computed-field desugaring only inserts `DECIDE`s after a `DECLARE`, and section
+  binders are elaborated last so each `ASSUME` sits at its section's head.
+- `jl4-core/src/L4/Export.hs:353-356` says in its own Haddock that a computed `MEANS` record field
+  desugars to a top-level selector `DECIDE` and "must be walked like any other callee", which is
+  why the read-set finds it.
+
+**Blast radius: zero.** No file changes and no program re-means. The card counted computed fields
+two ways — **89 indented-`MEANS` sites in 20 files** on its own heuristic, 50 in 12 on the prior
+analysis's narrower one, and **0 in `/Users/mengwong/src/legalese/canon`** under both. Neither
+count was re-measured here and neither is load-bearing: the ruling is that nothing is owed, and
+that holds at any of these figures. Four of the card's 20 are libraries — `prelude.l4`,
+`math.l4`, `excel-date.l4`, `negation-as-failure.l4` — which 159 and 65 files import, so the
+exposure is wider than a file list suggests even though the count of changes is nil.
+
+---
+
+### 11.18 R14 — §4.3 and §8 Q8 are withdrawn: "very pure" is not built and would not inform. RULED 2026-09-05.
+
+**Ruling (Meng, 2026-09-05, same card, option A′).** §4.3 ("Discover purity; don't annotate it" —
+mark a subtree "very pure" when it never touches the environment) and §8 open question 8 ("Purity
+classification surface" — how is "very pure" exposed) are **withdrawn**. §4.3 and §8 Q8 above are
+retensed to say so.
+
+**What decided it.** Two measurements, both taken 2026-09-05.
+
+- **Nothing was ever built.**
+  `grep -rniE 'very pure|veryPure|isPure|purity' --include='*.hs' --include='*.ts' --include='*.svelte' .`
+  over the tree returns **nothing**. §4.3 has been a proposal for its whole life, and §8 Q8 asks
+  how to surface a classification that does not exist.
+- **The badge would be uninformative.** `grep -rlE '^[[:space:]]*ASSUME ' --include='*.l4' jl4 jl4-core`
+  returns **95** files, against **745** `.l4` files under those two trees. So a "very pure" badge
+  would be true of roughly seven files in eight, which is not a distinction a reader can act on.
+  (The card gave this as "95 of 615"; the numerator reproduces exactly, the denominator does not —
+  745 is what `find jl4 jl4-core -name '*.l4'` counts on this tree today. The ratio is more lopsided
+  than the card's, not less.)
+
+**What this does not withdraw.** The read-set itself, which R0/R10/R11 build and which PR #328
+already landed, is the mechanism §4.3 wanted; what is withdrawn is the badge on top of it and the
+question of where to paint it. If purity is ever wanted as an artifact attribute, it is a fresh
+proposal against a read-set that by then exists, not a resumption of this one.
+
+---
+
+### 11.19 The cross-`IMPORT` hole. RULING here; the defect record is OF-7.
+
+**Ruling (with R13/R14, card `D5-computed-fields-purity`, option A′).** The measurement pass that
+discharged §5.3 turned up a hole, and it is **filed as a defect rather than silently absorbed**.
+What is ruled here is the **ordering, not a preference: the first required move is the REFUSAL, not
+the closure.** `l4 check`/`l4 batch` must refuse an export whose read-set crosses an `IMPORT` before
+the closure is allowed to find one — because closing the collector over imports on its own converts
+a false green into a **demanded-then-silently-ignored** parameter, which is worse than the state it
+replaces.
+
+**Ruled 2026-09-05; not built.**
+
+**The defect record — mechanism, probe, both halves, exposure — is
+[`OPEN-FINDINGS-2026-09-05.md` OF-7](./OPEN-FINDINGS-2026-09-05.md), not this section.** It was
+moved there 2026-09-05 because a defect that spans `Export.hs`, `Batch.hs` and `Print.hs` was never
+a props-spec section, and because `OF-7` is a stable id while a §11 number is not: three branches
+appended to §11 on one day and collided. **Cite `OF-7` for the defect and §11.19 for the ruling.**
+Also recorded in `PROPS-REDTEAM-2026-09-03.md` §7.

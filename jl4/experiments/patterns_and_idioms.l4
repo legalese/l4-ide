@@ -4,16 +4,16 @@
 
 IMPORT prelude
 
+§ `L4 Patterns and Idioms Reference`
+    GIVEN cat IS A FUNCTION FROM A STRING AND A STRING TO A STRING
+          contains IS A FUNCTION FROM A STRING AND A STRING TO A BOOLEAN
+          monthsBetween IS A FUNCTION FROM A Date AND A Date TO A NUMBER
+          addDays IS A FUNCTION FROM A Date AND A NUMBER TO A Date
+          addMonths IS A FUNCTION FROM A Date AND A NUMBER TO A Date
+
 -- ======================================================================
 -- SECTION 1: REQUIRED FUNCTION ASSUMPTIONS
 -- ======================================================================
-
--- Essential functions not in prelude that we need for examples
-ASSUME cat IS A FUNCTION FROM A STRING AND A STRING TO A STRING
-ASSUME contains IS A FUNCTION FROM A STRING AND A STRING TO A BOOLEAN
-ASSUME monthsBetween IS A FUNCTION FROM A Date AND A Date TO A NUMBER
-ASSUME addDays IS A FUNCTION FROM A Date AND A NUMBER TO A Date
-ASSUME addMonths IS A FUNCTION FROM A Date AND A NUMBER TO A Date
 
 -- ======================================================================
 -- SECTION 2: MISSING PRELUDE FUNCTIONS
@@ -526,7 +526,7 @@ DECIDE complexAction IS PayMoney step1 step2
 -- ✅ FIX: Don't redefine prelude functions (elem, MAYBE, etc.)
 
 -- When you see: "could not find definition for [function]"
--- ✅ FIX: Add ASSUME statement, define it yourself, or use prelude version
+-- ✅ FIX: Declare it as a section GIVEN under the heading (an input supplied per case), define it yourself, or use the prelude version
 
 -- When you see: "unexpected LIST expecting &&, *, +, -, /, ;"
 -- ✅ FIX: Add parentheses around LIST in constructors

@@ -2,26 +2,26 @@ Parsing successful
 Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
 File: parse-error3.l4
   Hidden: no
-  Range: 5:1-5:7
+  Range: 6:1-6:7
   Source: parser
   Severity: DiagnosticSeverity_Error
   Code: <none>
   Message:
       |
-    5 | ASSUME one IS A NUMBER
+    6 | ASSUME one IS A NUMBER
       | ^^^^^^
     unexpected ASSUME
     expecting FUNCTION, LIST, TYPE, identifier, or space token
 
 File: parse-error3.l4
   Hidden: no
-  Range: 7:1-7:1
+  Range: 8:1-8:1
   Source: parser
   Severity: DiagnosticSeverity_Error
   Code: <none>
   Message:
       |
-    7 | 
+    8 | 
       | ^
     unexpected end of input
     expecting FUNCTION, LIST, TYPE, identifier, or space token

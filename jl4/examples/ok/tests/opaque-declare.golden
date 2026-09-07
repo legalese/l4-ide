@@ -1,57 +1,19 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
-opaque-declare.l4:71:1-21:
+opaque-declare.l4:78:1-21:
   FUNCTION FROM Person TO BOOLEAN
-opaque-declare.l4:72:1-25:
+opaque-declare.l4:79:1-25:
   FUNCTION FROM Applicant TO BOOLEAN
-opaque-declare.l4:73:1-24:
+opaque-declare.l4:80:1-24:
   FUNCTION FROM Candidate TO BOOLEAN
-opaque-declare.l4:74:1-20:
+opaque-declare.l4:81:1-20:
   FUNCTION FROM Bag OF NUMBER AND Pair OF STRING TO BOOLEAN
-opaque-declare.l4:75:1-21:
+opaque-declare.l4:82:1-21:
   FUNCTION FROM Application TO BOOLEAN
-opaque-declare.l4:76:1-20:
+opaque-declare.l4:83:1-20:
   FUNCTION FROM Officer TO BOOLEAN
-opaque-declare.l4:78:1-115:
+opaque-declare.l4:85:1-115:
   TRUE
-opaque-declare.l4:79:1-115:
+opaque-declare.l4:86:1-115:
   FALSE
-opaque-declare.l4:84:8-21:
-  I found a problem while checking the assumption of `some person`:
-    ASSUME is an older way of introducing a name, and it is being retired.
-    Nothing is broken: the file still checks, runs and exports as before.
-    This one leaves
-    
-      `some person`
-    
-    open for somebody outside the file to supply. Say that
-    with a GIVEN indented under the heading of the section whose rules
-    read it (add a § heading if the file has none):
-    
-      § <heading>
-          GIVEN `some person` IS A Person
-    
-    (If this ASSUME instead marked a case the rules cannot answer, that is
-    REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
-    
-    The manual explains the move: doc/reference/types/ASSUME.md.
-opaque-declare.l4:85:8-23:
-  I found a problem while checking the assumption of `some premises`:
-    ASSUME is an older way of introducing a name, and it is being retired.
-    Nothing is broken: the file still checks, runs and exports as before.
-    This one leaves
-    
-      `some premises`
-    
-    open for somebody outside the file to supply. Say that
-    with a GIVEN indented under the heading of the section whose rules
-    read it (add a § heading if the file has none):
-    
-      § <heading>
-          GIVEN `some premises` IS A Premises
-    
-    (If this ASSUME instead marked a case the rules cannot answer, that is
-    REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
-    
-    The manual explains the move: doc/reference/types/ASSUME.md.

@@ -1,3 +1,4 @@
+-- Kept on ASSUME deliberately (IMPLICIT-PROPS-DESIGN.md §11.1, R0: ASSUME is deprecated): the Blawx leg lowers signature-style ASSUME input predicates; their section-GIVEN image is function-typed and refused on the export path (see header).
 § `Imaginary Alcohol Act`
 
 -- The second P4b `ASSUME` seed, and the one that shows where Blawx's ontology

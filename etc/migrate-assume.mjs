@@ -25,6 +25,23 @@
 //                  comment run that titles it) and is named from that opening
 //                  comment when it reads as a title, else from the file stem.
 //                  Without this flag such files are reported and left alone.
+//   --types        rewrite the TYPE role too: `ASSUME T IS A TYPE` (nullary or
+//                  parameterised, no TYPICALLY, no body) becomes the bodiless
+//                  `DECLARE T`, in place — the ruled opaque spelling of
+//                  IMPLICIT-PROPS-DESIGN.md §11.1.1, which parses on this tree
+//                  since legalese/l4-ide#335 (`ok/opaque-declare.l4` is the
+//                  witness). A bodied type ASSUME (`… IS A TYPE` / `HAS …`) is
+//                  reported and left: it is not the opaque shape.
+//   --hoist-root   an ASSUME before the FIRST heading of a file that has
+//                  headings is hoisted: onto the first heading's GIVEN when that
+//                  heading is depth 1 (a name declared on `§ A` is visible from
+//                  a sibling `§ B` whenever B declares none of its own, so this
+//                  is a visibility no-op unless the name is declared twice);
+//                  under a synthesised depth-1 title heading when every heading
+//                  in the file is deeper (`§§`+), so the root becomes the title
+//                  section and the existing headings its children. Verify with
+//                  `--verify` either way. Without the flag such sites are
+//                  reported as `root` and left.
 //   --json         machine-readable report on stdout
 //
 // What it rewrites — the term role, in either of its spellings:
@@ -56,8 +73,9 @@
 //
 //   type role       ASSUME T IS A TYPE           — an opaque sort; its ruled
 //                                                   spelling is a bodiless
-//                                                   DECLARE T (§11.1), migrated
-//                                                   separately
+//                                                   DECLARE T (§11.1.1). Rewritten
+//                                                   in place under --types; left
+//                                                   and reported without it
 //   app-form        GIVEN p IS A Person           — a signature-style ASSUME.
 //                   ASSUME f p IS A BOOLEAN        Measured 2026-09-05: read by
 //                                                   an @export, its function-typed
@@ -68,23 +86,40 @@
 //                                                   relational exhibits keep it
 //   refusal role    ASSUME `no X exists before …`  — a deliberate typed bottom.
 //                                                   Its ruled spelling is REFUSE
-//                                                   (R7); the DMN exhibits wait for
-//                                                   REFUSE's DMN image, and
-//                                                   daydate.l4's YMD is invalid
-//                                                   input, not a refusal
+//                                                   (R7): one named definition
+//                                                   per refusal, readers unchanged.
+//                                                   Not scripted — the reason
+//                                                   string is authored — so it is
+//                                                   reported for a hand rewrite.
+//                                                   Most corpus sites moved
+//                                                   2026-09-06 (IMPLICIT-PROPS-
+//                                                   DESIGN.md §11.1.2); regcf.l4's
+//                                                   wait on a DMN exporter limit
+//                                                   recorded there.
+//                                                   Only a NULLARY term qualifies:
+//                                                   a function whose name merely
+//                                                   contains "refused" is a
+//                                                   predicate, not a bottom
 //   local ASSUME    … WHERE ASSUME x IS A T        — the dead LocalAssume grammar;
 //                                                   left for keyword removal
 //   ditto           ASSUME x IS A BOOLEAN          — a `^` copies the declaration
 //                   ^      y ^  ^ ^                  above it, so moving the
 //                                                   declaration changes what is
 //                                                   copied
-//   overload        ASSUME foo IS A NUMBER         — type-directed name resolution.
-//                   ASSUME foo IS A BOOLEAN          A section GIVEN cannot yet
-//                                                   carry one name at two types:
-//                                                   resolveSectionGiven pairs each
-//                                                   parameter with its elaboration
-//                                                   by raw name, so all of them
-//                                                   collapse onto the first type
+//   (overload)      ASSUME foo IS A NUMBER         — type-directed name resolution.
+//                   ASSUME foo IS A BOOLEAN          NO LONGER REFUSED. The guard
+//                                                   was lifted 2026-09-06: the
+//                                                   collapse it protected against
+//                                                   (IMPLICIT-PROPS-DESIGN.md
+//                                                   §11.14 Finding 1) was fixed by
+//                                                   §11.15, whose regression test
+//                                                   `jl4-core/test/SectionGivenTdnrSpec.hs`
+//                                                   and corpus witness
+//                                                   `ok/section-given-tdnr.l4` are
+//                                                   both on this tree. One name at
+//                                                   several types goes into ONE
+//                                                   section GIVEN, one parameter
+//                                                   per type, in source order
 //   keep            a file whose SUBJECT is the keyword — one named for it, or
 //                   one whose own comment says the ASSUME spelling is the thing
 //                   under test. Migrating it would delete the exhibit
@@ -116,12 +151,21 @@ import { execFileSync } from "node:child_process";
 // ---------------------------------------------------------------------------
 
 const argv = process.argv.slice(2);
-const opts = { write: false, addHeading: false, json: false, verify: null };
+const opts = {
+  write: false,
+  addHeading: false,
+  hoistRoot: false,
+  types: false,
+  json: false,
+  verify: null,
+};
 const inputs = [];
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i];
   if (a === "--write") opts.write = true;
   else if (a === "--add-heading") opts.addHeading = true;
+  else if (a === "--hoist-root") opts.hoistRoot = true;
+  else if (a === "--types") opts.types = true;
   else if (a === "--json") opts.json = true;
   else if (a === "--verify") opts.verify = argv[++i];
   else if (a === "-h" || a === "--help") {
@@ -138,7 +182,7 @@ for (let i = 0; i < argv.length; i++) {
 }
 if (inputs.length === 0) {
   console.error(
-    "usage: node etc/migrate-assume.mjs [--write] [--add-heading] [--json] [--verify <l4>] <file-or-dir>...",
+    "usage: node etc/migrate-assume.mjs [--write] [--add-heading] [--hoist-root] [--types] [--json] [--verify <l4>] <file-or-dir>...",
   );
   process.exit(2);
 }
@@ -287,39 +331,50 @@ function classifyType(type) {
   return "term";
 }
 
-// Files that must keep their `ASSUME`s because their subject IS the keyword.
-// Rewriting these would delete the exhibit the page or the test exists to show.
+// Files that must keep their `ASSUME`s because their subject IS the keyword,
+// or because no ASSUME-free spelling exists for what they declare. The list is
+// explicit, one entry per file, after two independent Opus refuters
+// (2026-09-07) produced working rewrites for thirteen files an earlier version
+// of this list had kept on a name pattern; what remains is what neither could
+// rewrite (IMPLICIT-PROPS-DESIGN.md §11.1.2). Each file carries the reason on
+// its first line (last line for the semantic-token fixture).
 const KEEP = [
-  // A file NAMED for the keyword exists to exercise the keyword. That covers
-  // `doc/reference/types/assume-example.l4` (the worked example on the page that
-  // documents ASSUME), `ok/assumes.l4`, `ok/assume-as-given.l4` (the fixture for
-  // jl4-service's ASSUME-to-API-parameter promotion), `lsp/semantic-tokens/assume.l4`,
-  // `relational/assumed*.l4`, `relational/not-ok/local-assume.l4` (the dead
-  // LocalAssume grammar), `docassemble/assume-via-fn.l4` and
-  // `implicit-assume-test.l4`. They migrate when the keyword goes, not before.
   [
-    /(^|\/)[^/]*assume[^/]*\.l4$/i,
-    "the file is named for the keyword: it exists to exercise ASSUME's own behaviour, so rewriting it would delete the exhibit",
+    /(^|\/)doc\/reference\/types\/assume-example\.l4$/,
+    "the deprecation page's own example of what the keyword did",
   ],
   [
-    /(^|\/)jl4\/examples\/not-ok\/tc\/parse-error[23]\.l4$/,
-    "a deliberate parse-error exhibit whose error is anchored on the ASSUME line itself; migrating it would change what the file exhibits",
+    /(^|\/)jl4\/examples\/lsp\/semantic-tokens\/assume\.l4$/,
+    "the semantic-token fixture for the keyword",
+  ],
+  // The relational middle end lowers a SIGNATURE-style ASSUME (`GIVEN p …` /
+  // `ASSUME f p IS A T`) to an input predicate; that spelling has no section
+  // GIVEN form (the signature form is a parse error under a heading, and the
+  // function-typed section GIVEN is refused on the export path). A NULLARY
+  // fact lowers identically from either spelling and migrates.
+  [
+    /(^|\/)jl4\/examples\/relational\/(assumed|not-ok\/assumed-signatures)\.l4$/,
+    "the relational middle end's lowering of signature-style ASSUME input predicates is the exhibit; that spelling has no section-GIVEN form",
   ],
   [
-    /(^|\/)jl4\/examples\/blawx\/not-ok\/zero-arity\.l4$/,
-    "the subjectless-input rejection fixture: its own comment names 'a nullary top-level ASSUME' as the shape under test",
+    /(^|\/)jl4\/examples\/relational\/not-ok\/local-assume\.l4$/,
+    "the dead LocalAssume grammar is the shape under test; a WHERE block cannot hold a § heading",
   ],
   [
-    /(^|\/)jl4\/examples\/ok\/inert\/grounding-variants\.l4$/,
-    "the file says in its own comment that it is deliberately NOT under a section, because the visualizer reports a name declared in one fully qualified and the box labels become unreadably wide",
+    /(^|\/)jl4\/examples\/blawx\/(alcohol|antisocial|not-ok\/arity-two)\.l4$/,
+    "a Blawx seed: its input predicates are signature-style ASSUMEs; the section-GIVEN image is function-typed and refused on the export path (measured 2026-09-06 and 2026-09-07)",
   ],
   [
-    /(^|\/)jl4\/examples\/ok\/section-scoping-descendant-rebind\.l4$/,
-    "the regression is about a fully annotated ASSUME's inference-variable type falling into its own type group; the ASSUME spelling is the thing under test",
+    /(^|\/)jl4\/examples\/ok\/(signatures|tbd)\.l4$/,
+    "the ASSUME signature spellings are the subject, and the polymorphic ones (GIVEN a IS A TYPE … GIVETH a … ASSUME f) have no section-GIVEN image: an explicit FOR ALL type is not instantiated at a use site",
   ],
   [
     /(^|\/)jl4\/examples\/ok\/typically-basic\.l4$/,
-    "covers TYPICALLY on all three surfaces it can appear on, one of which is an ASSUME declaration; migrating drops that third of the coverage while the keyword still exists",
+    "jl4-service/test/QueryPlanSpec.hs pins ladder atomIds captured from this file; moving the declarations moves them",
+  ],
+  [
+    /(^|\/)jl4\/examples\/not-ok\/tc\/(section-given-misattached|parse-error[23])\.l4$/,
+    "a diagnostic fixture whose error is reported on the ASSUME declaration itself (a GIVEN spelling reports a different error)",
   ],
 ];
 
@@ -402,21 +457,46 @@ function titleFor(file, lines, mask) {
  * as though the marker introduced it.
  */
 function prologueEnd(lines, mask) {
+  // The prologue is the run of blank lines, comments (line or block),
+  // file-level annotations and IMPORTs before the first thing the file says.
+  // A heading may not precede an IMPORT, so when the prologue holds one the
+  // heading goes after the LAST of them. Measured 2026-09-06: the earlier
+  // version stopped at the first comment run, and on
+  // `jl4/experiments/jerseyCharities.l4` (title comment, `@ref`, blank,
+  // `IMPORT prelude`) and `patterns_and_idioms.l4` (three-line title comment,
+  // blank, `IMPORT prelude`) it put the `§` above the IMPORT — 12 errors
+  // became 26 and 0 became 9, all of them "could not find a definition" for
+  // prelude names.
   let at = 0;
-  const skipBlanks = () => {
-    while (at < lines.length && RE_BLANK.test(lines[at])) at++;
-  };
-  skipBlanks();
-  while (at < lines.length && (RE_IMPORT.test(lines[at]) || mask[at])) {
-    at++;
-    skipBlanks();
-  }
-  if (at < lines.length && RE_LINE_COMMENT.test(lines[at]) && !mask[at]) {
-    while (at < lines.length && RE_LINE_COMMENT.test(lines[at]) && !mask[at])
+  let lastImport = -1;
+  while (at < lines.length) {
+    const l = lines[at];
+    if (
+      RE_BLANK.test(l) ||
+      mask[at] ||
+      RE_LINE_COMMENT.test(l) ||
+      RE_ANNOT.test(l)
+    ) {
       at++;
-    skipBlanks();
+      continue;
+    }
+    if (RE_IMPORT.test(l)) {
+      lastImport = at;
+      at++;
+      continue;
+    }
+    break;
   }
-  return at;
+  const skipBlanks = (i) => {
+    while (i < lines.length && RE_BLANK.test(lines[i])) i++;
+    return i;
+  };
+  if (lastImport >= 0) return skipBlanks(lastImport + 1);
+  // No IMPORT: after the opening comment run that titles the file (and any
+  // annotation riding with it), but not past a comment that introduces the
+  // first declaration — the scan above stops at the first code line, so the
+  // whole leading comment/annotation run is the prologue.
+  return skipBlanks(0) < lines.length ? at : at;
 }
 
 // ---------------------------------------------------------------------------
@@ -545,68 +625,38 @@ function migrateFile(file, text) {
 
   // 3. classify and target
 
-  // Type-directed name resolution: the same name ASSUMEd more than once, at a
-  // different type each time. A section GIVEN cannot yet carry that shape.
-  // Measured 2026-09-05: `resolveSectionGiven` (jl4-core/src/L4/TypeCheck.hs:641)
-  // pairs each GivenSig parameter with its desugared 0-ary ASSUME elaboration by
-  // raw name alone — `List.lookup (rawName nm) elaborations` — so when a name
-  // repeats, every occurrence finds the FIRST elaboration and inherits its type
-  // and its resolved binder. The rewritten file still `l4 check`s clean and
-  // evaluates identically, because the elaborations themselves stay distinct and
-  // they are what runs; only the checked module's GivenSig node is wrong. But
-  // `prettyLayout` prints exactly that node, so `l4 batch` and the REPL re-emit
-  // `GIVEN foo IS NUMBER` three times over and the re-emitted module no longer
-  // type-checks. `ok/tdnr.l4` (foo at NUMBER/BOOLEAN/STRING) and `ok/misc.l4`
-  // (coerce at four function types) were the only two files in the authored
-  // corpus to reach it, and both failed the `prettyLayout round-trip` block.
-  // Compare names the way the CHECKER does, not the way they are spelled: a
-  // backticked name and a bare one denote the same identifier. Measured on
-  // `jl4/experiments/macma3.l4`, which ASSUMEs `` `forfeiture` `` at
-  // `FROM Order TO BOOLEAN` (line 94) and `forfeiture` at
-  // `FROM Action TO BOOLEAN` (line 188), and likewise `confiscation` — the
-  // checker reports "multiple definitions for the identifier" for both, so they
-  // are one name, and a guard keyed on the raw spelling let both through.
+  // Type-directed name resolution — one name ASSUMEd at several types — is NOT
+  // a refusal any more. The guard that stood here until 2026-09-06 protected
+  // against `resolveSectionGiven` pairing every repetition of a name with the
+  // FIRST elaboration (IMPLICIT-PROPS-DESIGN.md §11.14, Finding 1); that was
+  // fixed by consuming the elaboration list one-to-one (§11.15), and both the
+  // regression test (`jl4-core/test/SectionGivenTdnrSpec.hs`) and the corpus
+  // witness (`ok/section-given-tdnr.l4`) are on this tree. Repeated names go
+  // into one section GIVEN as one parameter per type, in source order, which
+  // is exactly the shape that witness carries. `ok/tdnr.l4` and `ok/misc.l4`,
+  // the marker files §11.14 named as the repair's acceptance test, migrate
+  // with everything else.
   //
-  // THIS GUARD IS MEANT TO BE DELETED. It exists only because the compiler
-  // cannot yet carry an overloaded section binder; when that is repaired the
-  // whole block goes and `ok/tdnr.l4` and `ok/misc.l4` migrate. Those two files
-  // are that repair's acceptance test and are left un-migrated as its marker —
-  // see IMPLICIT-PROPS-DESIGN.md §11.14, Finding 1, which records what "done"
-  // looks like. The repair had NOT landed on `unstable` as of 2026-09-05: check
-  // the tree rather than deleting this on the strength of a comment.
-  //
-  // Note `macma3.l4` is cited above ONLY as evidence that a backticked and a
-  // bare name are one identifier. Its two vanishing "multiple definitions"
-  // diagnostics are a SEPARATE, still-unowned declaration-order sensitivity in
-  // TDNR candidate resolution that predates section binders; an earlier version
-  // of §11.14 blamed them on the collapse and that attribution was retracted.
-  const overloadKey = (n) => n.replace(/^`|`$/g, "");
-  const overloaded = new Set();
-  {
-    const seen = new Set();
-    for (const d of decls) {
-      if (!d.head) continue;
-      const k = overloadKey(d.head.name);
-      if (seen.has(k)) overloaded.add(k);
-      seen.add(k);
-    }
-  }
+  // What the lifted guard does NOT cover, and still bites: a name overloaded
+  // ACROSS sections. The script places each ASSUME under its own heading, so
+  // `foo` at type T in § A and `foo` at type U in § B become two section
+  // binders, and a reader that reaches both gets "which foo?" where module-level
+  // TDNR resolved by type. `jl4/experiments/macma2.l4` and `macma3.l4` have
+  // that shape; they are hoisted by hand onto the common heading.
 
   const fileHasHeading = headings.length > 0;
+  const minLevel = fileHasHeading
+    ? Math.min(...headings.map((h) => h.level))
+    : 1;
   const plan = [];
+  const typeRewrites = [];
+  let needSyntheticForRoot = false;
   for (const d of decls) {
     const name = d.head ? d.head.name : "?";
     const refuse = (role, reason) =>
       report.refused.push({ name, line: d.i + 1, role, reason });
     if (!d.head) {
       refuse("unparsed", "could not parse the ASSUME head");
-      continue;
-    }
-    if (overloaded.has(overloadKey(d.head.name))) {
-      refuse(
-        "overload",
-        "the name is ASSUMEd more than once in this file, at a different type each time (type-directed name resolution); a section GIVEN collapses every occurrence onto the first parameter's type — see resolveSectionGiven, jl4-core/src/L4/TypeCheck.hs:641",
-      );
       continue;
     }
     if (dittoFollows(d.end)) {
@@ -636,16 +686,48 @@ function migrateFile(file, text) {
     }
     const kind = classifyType(d.head.type);
     if (kind === "type") {
-      refuse(
-        "type",
-        "uninterpreted type; its ruled spelling is a bodiless DECLARE (§11.1), migrated separately",
-      );
+      if (!opts.types) {
+        refuse(
+          "type",
+          "uninterpreted type; its ruled spelling is a bodiless DECLARE (§11.1.1) — run with --types",
+        );
+        continue;
+      }
+      if (d.head.typically !== null) {
+        refuse(
+          "type-typically",
+          "a TYPICALLY on a type ASSUME: an error the opaque DECLARE spelling has no analogue for (not-ok/tc/typically-on-type.l4 pins it)",
+        );
+        continue;
+      }
+      if (d.end !== d.i || d.sig) {
+        refuse(
+          "type-bodied",
+          "a type ASSUME with a body or a signature above it: not the bare opaque shape, so not rewritten mechanically",
+        );
+        continue;
+      }
+      const flat = d.head.type.replace(/\s+/g, " ").trim();
+      if (!/^(A |AN )?TYPE$/.test(flat)) {
+        refuse(
+          "type-bodied",
+          "a type ASSUME whose head carries more than `IS A TYPE`; not rewritten mechanically",
+        );
+        continue;
+      }
+      typeRewrites.push(d);
+      report.rewritten.push({
+        name: d.head.name,
+        line: d.i + 1,
+        role: "type",
+        heading: "(in place: DECLARE)",
+      });
       continue;
     }
     // The name decides that a site is refusal-role; the path only supplies a
     // better reason for that site staying. A path must never classify, or every
     // ordinary ASSUME in `jl4/examples/dmn/` would be mistaken for a refusal.
-    if (REFUSAL_NAME.test(d.head.name)) {
+    if (kind === "term" && !d.head.args && REFUSAL_NAME.test(d.head.name)) {
       const sited = REFUSAL_PATHS.find(([re]) => re.test(rel));
       refuse(
         "refusal",
@@ -669,13 +751,16 @@ function migrateFile(file, text) {
     for (const hh of headings) if (hh.line < d.i) h = hh;
     if (!h) {
       if (fileHasHeading) {
-        refuse(
-          "root",
-          "sits before the first heading of a file that has headings; the root section cannot carry a binder — hoist by hand",
-        );
-        continue;
-      }
-      if (!opts.addHeading) {
+        if (!opts.hoistRoot) {
+          refuse(
+            "root",
+            "sits before the first heading of a file that has headings; the root section cannot carry a binder — run with --hoist-root, or hoist by hand",
+          );
+          continue;
+        }
+        if (minLevel === 1) h = headings[0];
+        else needSyntheticForRoot = true;
+      } else if (!opts.addHeading) {
         refuse("no-heading", "file has no § heading (run with --add-heading)");
         continue;
       }
@@ -683,11 +768,11 @@ function migrateFile(file, text) {
     plan.push({ d, h, role: kind === "function" ? "function" : "term" });
   }
 
-  if (plan.length === 0) return report;
+  if (plan.length === 0 && typeRewrites.length === 0) return report;
 
   // 4. synthesise a heading if needed, after the file's prologue
   let syntheticHeading = null;
-  if (!fileHasHeading) {
+  if (plan.length > 0 && (!fileHasHeading || needSyntheticForRoot)) {
     const at = prologueEnd(lines, mask);
     syntheticHeading = {
       insertBefore: at,
@@ -742,6 +827,17 @@ function migrateFile(file, text) {
       role: p.role,
       heading: p.h ? p.h.text.trim() : syntheticHeading.text,
     });
+  }
+
+  // 6a. the type role, in place: `ASSUME T x IS A TYPE  -- c` → `DECLARE T x  -- c`
+  for (const d of typeRewrites) {
+    const m = lines[d.i].match(RE_ASSUME);
+    const headText = [d.head.name, d.head.args].filter(Boolean).join(" ");
+    lines[d.i] =
+      m[1] +
+      "DECLARE " +
+      headText +
+      (d.trailingComment ? "  " + d.trailingComment : "");
   }
 
   // 6. apply: delete declaration lines (bottom-up), then insert GIVEN blocks (bottom-up)

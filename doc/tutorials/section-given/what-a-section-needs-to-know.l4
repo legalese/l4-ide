@@ -20,7 +20,6 @@
 -- Run it with:
 --     l4 run what-a-section-needs-to-know.l4
 
-
 -- ====================================================================
 -- Recap. Two small rules of the ordinary kind: each is told its inputs
 -- and gives one output. The GIVEN is at column 1, so `a` and `b` belong
@@ -39,7 +38,6 @@ GIVETH A NUMBER
 
 #EVAL `the greater of` 40000 20000
 
-
 -- ====================================================================
 -- The three dollar figures Rule 100(a)(2) turns on. The regulation
 -- settles all three for everybody, so all three are written with MEANS
@@ -54,7 +52,6 @@ GIVETH A NUMBER
 
 GIVETH A NUMBER
 `the minimum permitted investment` MEANS 2500
-
 
 -- ====================================================================
 -- Concept 1, before. Rule 100(a)(2) as almost everyone encodes it the
@@ -90,7 +87,6 @@ GIVETH A NUMBER
              ((`the larger measure (first draft)` `annual income` `net worth`) TIMES 0.05)
              `the minimum permitted investment`
 
-
 -- ====================================================================
 -- Concept 1, after, and concept 2. The same two facts, declared once
 -- under the heading. The GIVEN starts past the § of the heading, which
@@ -118,7 +114,6 @@ GIVETH A NUMBER
     IF `both measures reach the cut point`
     THEN `the lesser of` (`the larger measure` TIMES 0.10) `the per-investor ceiling`
     ELSE `the greater of` (`the larger measure` TIMES 0.05) `the minimum permitted investment`
-
 
 -- ====================================================================
 -- A second question, about entirely different facts, under its own
@@ -148,7 +143,6 @@ GIVETH A BOOLEAN
 `the company may use the crowdfunding exemption` MEANS
     NOT `the company is excluded by Rule 100(b)`
 
-
 -- ====================================================================
 -- Concept 3, the statute's own letter form. Sections 1 and 6 of the
 -- Bribery Act 2010 each open by introducing "a person ('P')", and the P
@@ -175,7 +169,6 @@ GIVETH A BOOLEAN
 GIVETH A BOOLEAN
 `F is a foreign public official` MEANS f's `is a foreign public official`
 
-
 -- ====================================================================
 -- Concept 3, the same word for two things. Two sections may each name a
 -- fact `the fee`, and they are two different facts, each read by its own
@@ -196,29 +189,21 @@ GIVETH A NUMBER
 GIVETH A NUMBER
 `the renewal fee payable` MEANS `the fee`
 
-
 -- ====================================================================
--- Migrating an ASSUME: the before, and the after. The fact keeps its
--- name; only the keyword and the indent change. Both still work; the
--- second one has a stated home. The rule names differ only so that both
--- versions can live in this one file.
+-- Migrating an ASSUME. Older files wrote this fact as
+--     ASSUME `the funding portal is registered` IS A BOOLEAN
+-- at the left margin. Below is the migrated form: the fact keeps its
+-- name; only the keyword and the indent change, and the fact now has a
+-- stated home. (The un-migrated spelling is shown on the tutorial page
+-- and not here: every file under doc/ is written in the current form.)
 -- ====================================================================
 
-§ `Intermediaries, before migration`
-
-ASSUME `the funding portal is registered` IS A BOOLEAN
-
-GIVETH A BOOLEAN
-`the intermediary requirement is met (before)` MEANS
-    `the funding portal is registered`
-
-§ `Intermediaries, after migration`
+§ `Intermediaries`
     GIVEN `the funding portal is registered` IS A BOOLEAN
 
 GIVETH A BOOLEAN
-`the intermediary requirement is met (after)` MEANS
+`the intermediary requirement is met` MEANS
     `the funding portal is registered`
-
 
 -- ====================================================================
 -- #CHECK reports what kind of answer a rule gives. It needs no facts at

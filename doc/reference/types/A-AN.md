@@ -16,7 +16,6 @@ Used in type annotations to improve readability.
 ```l4
 GIVEN name IS A Type
 GIVEN name IS AN Type
-ASSUME name IS A Type
 
 § `A section`
     GIVEN name IS A Type
@@ -40,11 +39,12 @@ GIVEN obj IS AN Object
           account IS AN Account
 ```
 
-A rule is told some facts about the case in front of it (its **"inputs"**).
-`ASSUME` is deprecated as the way to declare one (ruled 2026-09-04) and still
-works; a fact supplied afresh for each case now goes in a
+A rule is told some facts about the case in front of it (its **"inputs"**). A
+fact supplied afresh for each case goes in a
 [`GIVEN` under its section's heading](../syntax/section-given.md) — a
-**"section `GIVEN`"** — where the articles read exactly the same way.
+**"section `GIVEN`"** — where the articles read exactly the same way. Older
+files spell the same declaration `ASSUME name IS A Type`; that keyword is
+deprecated (ruled 2026-09-04) and still works.
 
 ### Rules
 

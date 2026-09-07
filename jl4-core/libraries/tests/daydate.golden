@@ -1,21 +1,2 @@
 Parsing successful
 Typechecking successful
-daydate.l4:104:8-50:
-  I found a problem while checking the assumption of `YMD refused an out-of-range month or day`:
-    ASSUME is an older way of introducing a name, and it is being retired.
-    Nothing is broken: the file still checks, runs and exports as before.
-    This one leaves
-    
-      `YMD refused an out-of-range month or day`
-    
-    open for somebody outside the file to supply. Say that
-    with a GIVEN indented under the heading of the section whose rules
-    read it (add a § heading if the file has none):
-    
-      § <heading>
-          GIVEN `YMD refused an out-of-range month or day` IS A DATE
-    
-    (If this ASSUME instead marked a case the rules cannot answer, that is
-    REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
-    
-    The manual explains the move: doc/reference/types/ASSUME.md.

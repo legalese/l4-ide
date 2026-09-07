@@ -33,12 +33,13 @@ GIVETH A BOOLEAN
 DECIDE `was granted` app IF app's outcome EQUALS granted
 
 § `Where the values come from`
+    GIVEN `the applicant` IS AN Applicant
+          `the premises` IS A Premises
 
 -- No expression in this file can produce an `Applicant`: an opaque type has no
--- constructors. A value arrives from outside — an ASSUME here, a JSON input at
--- a service boundary in production.
-ASSUME `the applicant` IS AN Applicant
-ASSUME `the premises` IS A Premises
+-- constructors. A value arrives from outside — the section GIVEN above names
+-- the two this file reads, and a JSON input supplies them at a service
+-- boundary in production.
 
 #EVAL `was granted` (Application WITH applicant IS `the applicant`,
                                  premises  IS `the premises`,

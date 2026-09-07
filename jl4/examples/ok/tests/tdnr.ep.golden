@@ -1,8 +1,7 @@
 § `Type-directed name resolution`
-
-ASSUME foo IS A NUMBER
-ASSUME foo IS A BOOLEAN
-ASSUME foo IS A STRING
+    GIVEN foo IS A NUMBER
+          foo IS A BOOLEAN
+          foo IS A STRING
 
 DECIDE bar
   IS foo + 2

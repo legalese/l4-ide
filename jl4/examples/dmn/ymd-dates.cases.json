@@ -38,7 +38,7 @@
     "ACTIVATION CONTRACT: every expected value below was derived from the L4",
     "SOURCE, not from a DMN engine's own output -- a pin regenerated from the",
     "thing it pins is vacuous. Measured 2026-08-02 with the built `l4` binary",
-    "on eight copies of ymd-dates.l4 whose two ASSUMEs were replaced by the",
+    "on eight copies of ymd-dates.l4 whose two open facts (then ASSUMEs) were replaced by the",
     "case's own values, each carrying",
     "`#EVAL \\`EVAL UNDER RULES EFFECTIVE AT\\` (YMD y m d) <decision>` for all",
     "six decisions. L4 answered `DATE OF 1, 1, 1983` / `DATE OF 29, 2, 2024` /",
@@ -46,164 +46,254 @@
     "same argument-order check from the evaluator's side.",
     "",
     "WHAT THEY DO NOT COVER, so a green run is not read as more than it is:",
-    "the floor row's answer is an ASSUME bottom, which L4 refuses to evaluate.",
-    "Here it is an ordinary DMN input, and -1 is a sentinel chosen because no",
-    "real fee could be negative, so a floor-row hit is unmistakable in the",
-    "harness output (same device as gst-rate.cases.json).",
+    "the floor row's answer is a REFUSE (since 2026-09-06; an ASSUME bottom before",
+    "that, handed in as the sentinel -1). A refusal lowers to FEEL `null` (ruling",
+    "D1), so the floor decision answers null in EVERY case and every case licenses",
+    "that with an explicit null in `expect`; a floor-row hit shows as null",
+    "propagating through the surcharge, not as -1 (same device as",
+    "gst-rate.cases.json).",
     "",
-    "CASE I IS THE ONE THAT ACTUALLY TESTS THE PRE-COMMENCEMENT REGION, added",
-    "2026-09-05 under ruling D1. F, G and H already ask a rule date below",
-    "commencement -- but they HAND THE MODEL the floor value as -1 and expect -1",
-    "back, so they enter the region and never reach the bottom the floor arm names.",
-    "I supplies the floor as an explicit JSON null instead: nothing is invented, the",
-    "floor row answers null, and FEEL propagates it through the surcharge. That is",
-    "what the model will do of its own accord once the floor migrates from an ASSUME",
-    "input to a REFUSE decision, so this case's ANSWERS do not move under that",
-    "migration -- only the name moves, from `context` to `expect`."
+    "CASES F, G, H AND I ALL REACH THE FLOOR. Until 2026-09-06 F, G and H handed",
+    "the model the floor as -1 and expected -1 back, so they entered the region and",
+    "never reached the bottom the floor arm names; I (added 2026-09-05, ruling D1)",
+    "supplied it as an explicit null and predicted, correctly, that its answers",
+    "would not move under the migration. With the floor a REFUSE decision, all four",
+    "answer null on the fee and the surcharge, and nothing is supplied for the",
+    "floor at all -- it is no longer an input."
   ],
   "cases": [
     {
       "name": "A. on the transition day (both axes)",
       "context": {
-        "the_application_date": { "$date": "2026-01-01" },
-        "RULES_EFFECTIVE_DATE": { "$date": "2026-01-01" },
-        "no_fee_is_prescribed_before_commencement_on_1983_01_01": -1
+        "the_application_date": {
+          "$date": "2026-01-01"
+        },
+        "RULES_EFFECTIVE_DATE": {
+          "$date": "2026-01-01"
+        }
       },
       "expect": {
-        "commencement": { "$date": "1983-01-01" },
-        "the_appointed_day": { "$date": "2024-02-29" },
-        "the_transition_day": { "$date": "2026-01-01" },
+        "commencement": {
+          "$date": "1983-01-01"
+        },
+        "the_appointed_day": {
+          "$date": "2024-02-29"
+        },
+        "the_transition_day": {
+          "$date": "2026-01-01"
+        },
         "the_regime_that_applies": "transitional",
         "the_filing_fee": 1000,
-        "the_fee_with_surcharge": 2000
+        "the_fee_with_surcharge": 2000,
+        "no_fee_is_prescribed_before_commencement_on_1983_01_01": null
       }
     },
     {
       "name": "B. the day before the transition day",
       "context": {
-        "the_application_date": { "$date": "2025-12-31" },
-        "RULES_EFFECTIVE_DATE": { "$date": "2025-12-31" },
-        "no_fee_is_prescribed_before_commencement_on_1983_01_01": -1
+        "the_application_date": {
+          "$date": "2025-12-31"
+        },
+        "RULES_EFFECTIVE_DATE": {
+          "$date": "2025-12-31"
+        }
       },
       "expect": {
-        "commencement": { "$date": "1983-01-01" },
-        "the_appointed_day": { "$date": "2024-02-29" },
-        "the_transition_day": { "$date": "2026-01-01" },
+        "commencement": {
+          "$date": "1983-01-01"
+        },
+        "the_appointed_day": {
+          "$date": "2024-02-29"
+        },
+        "the_transition_day": {
+          "$date": "2026-01-01"
+        },
         "the_regime_that_applies": "appointed",
         "the_filing_fee": 250,
-        "the_fee_with_surcharge": 500
+        "the_fee_with_surcharge": 500,
+        "no_fee_is_prescribed_before_commencement_on_1983_01_01": null
       }
     },
     {
       "name": "C. on the appointed day, which is a leap day",
       "context": {
-        "the_application_date": { "$date": "2024-02-29" },
-        "RULES_EFFECTIVE_DATE": { "$date": "2024-02-29" },
-        "no_fee_is_prescribed_before_commencement_on_1983_01_01": -1
+        "the_application_date": {
+          "$date": "2024-02-29"
+        },
+        "RULES_EFFECTIVE_DATE": {
+          "$date": "2024-02-29"
+        }
       },
       "expect": {
-        "commencement": { "$date": "1983-01-01" },
-        "the_appointed_day": { "$date": "2024-02-29" },
-        "the_transition_day": { "$date": "2026-01-01" },
+        "commencement": {
+          "$date": "1983-01-01"
+        },
+        "the_appointed_day": {
+          "$date": "2024-02-29"
+        },
+        "the_transition_day": {
+          "$date": "2026-01-01"
+        },
         "the_regime_that_applies": "appointed",
         "the_filing_fee": 250,
-        "the_fee_with_surcharge": 500
+        "the_fee_with_surcharge": 500,
+        "no_fee_is_prescribed_before_commencement_on_1983_01_01": null
       }
     },
     {
       "name": "D. the day before the appointed day",
       "context": {
-        "the_application_date": { "$date": "2024-02-28" },
-        "RULES_EFFECTIVE_DATE": { "$date": "2024-02-28" },
-        "no_fee_is_prescribed_before_commencement_on_1983_01_01": -1
+        "the_application_date": {
+          "$date": "2024-02-28"
+        },
+        "RULES_EFFECTIVE_DATE": {
+          "$date": "2024-02-28"
+        }
       },
       "expect": {
-        "commencement": { "$date": "1983-01-01" },
-        "the_appointed_day": { "$date": "2024-02-29" },
-        "the_transition_day": { "$date": "2026-01-01" },
+        "commencement": {
+          "$date": "1983-01-01"
+        },
+        "the_appointed_day": {
+          "$date": "2024-02-29"
+        },
+        "the_transition_day": {
+          "$date": "2026-01-01"
+        },
         "the_regime_that_applies": "original",
         "the_filing_fee": 250,
-        "the_fee_with_surcharge": 500
+        "the_fee_with_surcharge": 500,
+        "no_fee_is_prescribed_before_commencement_on_1983_01_01": null
       }
     },
     {
       "name": "E. on commencement",
       "context": {
-        "the_application_date": { "$date": "1983-01-01" },
-        "RULES_EFFECTIVE_DATE": { "$date": "1983-01-01" },
-        "no_fee_is_prescribed_before_commencement_on_1983_01_01": -1
+        "the_application_date": {
+          "$date": "1983-01-01"
+        },
+        "RULES_EFFECTIVE_DATE": {
+          "$date": "1983-01-01"
+        }
       },
       "expect": {
-        "commencement": { "$date": "1983-01-01" },
-        "the_appointed_day": { "$date": "2024-02-29" },
-        "the_transition_day": { "$date": "2026-01-01" },
+        "commencement": {
+          "$date": "1983-01-01"
+        },
+        "the_appointed_day": {
+          "$date": "2024-02-29"
+        },
+        "the_transition_day": {
+          "$date": "2026-01-01"
+        },
         "the_regime_that_applies": "original",
         "the_filing_fee": 250,
-        "the_fee_with_surcharge": 500
+        "the_fee_with_surcharge": 500,
+        "no_fee_is_prescribed_before_commencement_on_1983_01_01": null
       }
     },
     {
       "name": "F. the day before commencement (both floor rows)",
       "context": {
-        "the_application_date": { "$date": "1982-12-31" },
-        "RULES_EFFECTIVE_DATE": { "$date": "1982-12-31" },
-        "no_fee_is_prescribed_before_commencement_on_1983_01_01": -1
+        "the_application_date": {
+          "$date": "1982-12-31"
+        },
+        "RULES_EFFECTIVE_DATE": {
+          "$date": "1982-12-31"
+        }
       },
       "expect": {
-        "commencement": { "$date": "1983-01-01" },
-        "the_appointed_day": { "$date": "2024-02-29" },
-        "the_transition_day": { "$date": "2026-01-01" },
+        "commencement": {
+          "$date": "1983-01-01"
+        },
+        "the_appointed_day": {
+          "$date": "2024-02-29"
+        },
+        "the_transition_day": {
+          "$date": "2026-01-01"
+        },
         "the_regime_that_applies": "pre-commencement",
-        "the_filing_fee": -1,
-        "the_fee_with_surcharge": -2
+        "the_filing_fee": null,
+        "the_fee_with_surcharge": null,
+        "no_fee_is_prescribed_before_commencement_on_1983_01_01": null
       }
     },
     {
       "name": "G. long before commencement",
       "context": {
-        "the_application_date": { "$date": "1900-01-01" },
-        "RULES_EFFECTIVE_DATE": { "$date": "1900-01-01" },
-        "no_fee_is_prescribed_before_commencement_on_1983_01_01": -1
+        "the_application_date": {
+          "$date": "1900-01-01"
+        },
+        "RULES_EFFECTIVE_DATE": {
+          "$date": "1900-01-01"
+        }
       },
       "expect": {
-        "commencement": { "$date": "1983-01-01" },
-        "the_appointed_day": { "$date": "2024-02-29" },
-        "the_transition_day": { "$date": "2026-01-01" },
+        "commencement": {
+          "$date": "1983-01-01"
+        },
+        "the_appointed_day": {
+          "$date": "2024-02-29"
+        },
+        "the_transition_day": {
+          "$date": "2026-01-01"
+        },
         "the_regime_that_applies": "pre-commencement",
-        "the_filing_fee": -1,
-        "the_fee_with_surcharge": -2
+        "the_filing_fee": null,
+        "the_fee_with_surcharge": null,
+        "no_fee_is_prescribed_before_commencement_on_1983_01_01": null
       }
     },
     {
       "name": "H. the two date axes pulled apart",
       "context": {
-        "the_application_date": { "$date": "2024-06-15" },
-        "RULES_EFFECTIVE_DATE": { "$date": "1982-12-31" },
-        "no_fee_is_prescribed_before_commencement_on_1983_01_01": -1
+        "the_application_date": {
+          "$date": "2024-06-15"
+        },
+        "RULES_EFFECTIVE_DATE": {
+          "$date": "1982-12-31"
+        }
       },
       "expect": {
-        "commencement": { "$date": "1983-01-01" },
-        "the_appointed_day": { "$date": "2024-02-29" },
-        "the_transition_day": { "$date": "2026-01-01" },
+        "commencement": {
+          "$date": "1983-01-01"
+        },
+        "the_appointed_day": {
+          "$date": "2024-02-29"
+        },
+        "the_transition_day": {
+          "$date": "2026-01-01"
+        },
         "the_regime_that_applies": "appointed",
-        "the_filing_fee": -1,
-        "the_fee_with_surcharge": -2
+        "the_filing_fee": null,
+        "the_fee_with_surcharge": null,
+        "no_fee_is_prescribed_before_commencement_on_1983_01_01": null
       }
     },
     {
       "name": "I. THE FLOOR ITSELF -- pre-commencement, and the floor is NOT supplied",
       "context": {
-        "the_application_date": { "$date": "1982-12-31" },
-        "RULES_EFFECTIVE_DATE": { "$date": "1982-12-31" },
-        "no_fee_is_prescribed_before_commencement_on_1983_01_01": null
+        "the_application_date": {
+          "$date": "1982-12-31"
+        },
+        "RULES_EFFECTIVE_DATE": {
+          "$date": "1982-12-31"
+        }
       },
       "expect": {
-        "commencement": { "$date": "1983-01-01" },
-        "the_appointed_day": { "$date": "2024-02-29" },
-        "the_transition_day": { "$date": "2026-01-01" },
+        "commencement": {
+          "$date": "1983-01-01"
+        },
+        "the_appointed_day": {
+          "$date": "2024-02-29"
+        },
+        "the_transition_day": {
+          "$date": "2026-01-01"
+        },
         "the_regime_that_applies": "pre-commencement",
         "the_filing_fee": null,
-        "the_fee_with_surcharge": null
+        "the_fee_with_surcharge": null,
+        "no_fee_is_prescribed_before_commencement_on_1983_01_01": null
       }
     }
   ]

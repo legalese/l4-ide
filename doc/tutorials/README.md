@@ -18,6 +18,17 @@ New to L4? Start here:
 
 See also: [Common Patterns](../reference/patterns/common-patterns.md) - a quick reference of frequently used L4 patterns.
 
+## Obligations
+
+Who must do what, by when, and what follows — one tenancy, carried through four pages:
+
+- **[One Obligation](obligations/one-obligation.md)** - Who, what, by when, then what: write one obligation, play it forward, and read the three things the screen can say
+- **[What Follows](obligations/what-follows.md)** - A receipt follows a payment, a late fee follows a missed one, a guarantor pays when the tenant does not: `HENCE`, `LEST`, and the two kinds of guarantee
+- **[Several Parties](obligations/several-parties.md)** - Three flatmates and one rent: all of these, any of these, one pays and the other repays, and paying in instalments — with the two honest defects of the last
+- **[What Is Coming](obligations/what-is-coming.md)** - The pieces that are designed but not built: everyone-then-one-thing, each-with-its-own, and "enough of them"
+
+**Prerequisites:** Your First L4 File. See [The Regulative Layer, Whole](../concepts/legal-modeling/regulative-layer-whole.md) for how the pieces fit together.
+
 ## Natural Language Functions
 
 Write functions that read like legal prose:

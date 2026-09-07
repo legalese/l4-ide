@@ -1,32 +1,60 @@
-# ASSUME
+# ASSUME (deprecated)
 
-Declares a name and the kind of thing it stands for, without giving it a value:
-something the rules can talk about before anyone has said what it is.
+`ASSUME` declared a name and the kind of thing it stands for, without giving it
+a value: something the rules could talk about before anyone had said what it
+was. **It is deprecated.** L4 still accepts it, and every file written with it
+still reads, checks, runs and publishes exactly as before; this page is kept so
+that a reader of older code knows what the keyword did and what to write
+instead.
+
+- **Ruled 2026-09-04** (`specs/todo/IMPLICIT-PROPS-DESIGN.md` §11.1): one
+  keyword was carrying three unrelated jobs, and each job now has a construct of
+  its own.
+- **The repository's own L4 was rewritten on 2026-09-06**: every `ASSUME` in
+  the examples, the libraries and this documentation moved to the constructs
+  below, except for the handful of files whose whole purpose is to test the
+  deprecated keyword itself (each says so in a comment on its first line) and
+  the Reg CF corpus's own refusal, which waits on a Decision Model and
+  Notation (DMN) exporter limit recorded under
+  [`REFUSE`](../control-flow/REFUSE.md#limits-as-they-stand-today).
+- **The checker warns, since 2026-09-07.** Every author-written `ASSUME`
+  draws a warning — never an error, so nothing that checked before stops
+  checking — that reads the shape of the declaration and names the construct to
+  use instead. See
+  [ASSUME is being retired](../errors/README.md#assume-is-being-retired) for the
+  text and the shapes it tells apart.
+
+## What it did
 
 A rule is told some facts about the case in front of it (its **"inputs"**) and
-works out one answer from them. An `ASSUME`d name is one of those facts, left
-open at the top of the file for somebody outside the file to supply.
+works out one answer from them. An `ASSUME`d name was one of those facts, left
+open at the top of the file for somebody outside the file to supply:
 
-**`ASSUME` is deprecated (ruled 2026-09-04), and it still works.**
-L4 still accepts it, it still runs and it still exports exactly as it always
-has, and nothing already written stops working. Since 2026-09-07 the checker
-says so: every `ASSUME` draws a warning, never an error, that reads the shape
-of the declaration and names the spelling to use instead — see
-[ASSUME is being retired](../errors/README.md#assume-is-being-retired) for the
-text and the three shapes it tells apart. New rules should use the constructs
-in the table below, because one keyword was carrying four unrelated jobs.
+```l4
+ASSUME `applicant age` IS A NUMBER          -- a fact, to be supplied per case
+ASSUME Applicant IS A TYPE                  -- a kind of thing, never described
+ASSUME `no figure exists before 2016` IS A NUMBER   -- a case the model declines
+```
 
-| The job the `ASSUME` was doing                                    | Where that job goes                                                                                                                                                                                                                                             |
-| ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| a fact supplied afresh for each case (the applicant's age)        | a [`GIVEN` under the section heading](../syntax/section-given.md) whose rules read it — a **"section `GIVEN`"**                                                                                                                                                 |
-| a kind of thing the model treats as opaque (`ASSUME T IS A TYPE`) | [`DECLARE T`](DECLARE.md#opaque-types) — a name with no stated contents                                                                                                                                                                                         |
-| a case the encoding deliberately does not cover                   | [`REFUSE "..."`](../control-flow/REFUSE.md)                                                                                                                                                                                                                     |
-| a rule defined elsewhere (`… IS A FUNCTION FROM …`)               | a section `GIVEN` of function type, as the warning suggests; note that `@export` refuses a function-typed input spelled `… IS A FUNCTION FROM …` but not one spelled with its inputs on the head (`ASSUME f p IS A BOOLEAN`), see "Function-typed inputs" below |
+Those three lines look alike and mean three different things, which is the
+whole reason for the deprecation: a reader could not tell from the keyword
+whether the author meant "ask for this", "this is a kind of thing", or "there is
+no answer here".
 
-## Migrating a term `ASSUME`
+## Where each job goes now
+
+| The job the `ASSUME` was doing                                    | Where that job goes                                                                                                                                                    |
+| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| a fact supplied afresh for each case (the applicant's age)        | a [`GIVEN` under the section heading](../syntax/section-given.md) whose rules read it — a **"section `GIVEN`"**                                                        |
+| a rule defined elsewhere (`… IS A FUNCTION FROM …`)               | the same section `GIVEN`, with the same function type — but read "Function-typed inputs" below first, because for an `@export`ed rule the move can cost you the export |
+| a kind of thing the model treats as opaque (`ASSUME T IS A TYPE`) | [`DECLARE T`](DECLARE.md#opaque-types) — a name with no stated contents                                                                                                |
+| a case the encoding deliberately does not cover                   | one named definition whose body is [`REFUSE "..."`](../control-flow/REFUSE.md)                                                                                         |
+
+### 1. A fact supplied per case: the section `GIVEN`
 
 Move the declaration under the heading of the section whose rules read it, and
-indent it past the `§`:
+indent it past the `§`. The name, the type and every rule that reads the name
+are unchanged.
 
 Before:
 
@@ -34,6 +62,9 @@ Before:
 § `1. Issuer eligibility`
 
 ASSUME issuer IS AN IssuerProfile
+
+GIVETH A BOOLEAN
+`is disqualified` MEANS issuer's `has a disqualifying event`
 ```
 
 After:
@@ -41,68 +72,156 @@ After:
 ```l4
 § `1. Issuer eligibility`
     GIVEN issuer IS AN IssuerProfile
+
+GIVETH A BOOLEAN
+`is disqualified` MEANS issuer's `has a disqualifying event`
 ```
 
-Behaviour is identical in this release: both behave as assumed terms, and both
-appear as inputs of any `@export`ed rule that reads them. The indentation is what
-makes a GIVEN the section's rather than one rule's — a `GIVEN` at column 1 lists
-the inputs of the declaration below it, as it has always done. See
-[the section `GIVEN`](../syntax/section-given.md) for the column rule and the
-check error that reports a mis-indented one. A runnable version of the section
-form is at the end of [assume-example.l4](assume-example.l4).
-
-> `ASSUME` is for a fact the boundary supplies — it becomes a required input of the published rule. If what you mean is that the model declines to answer, that is a refusal, and it is spelled [`REFUSE`](../control-flow/REFUSE.md). A refusal is not an input anyone can supply, and no rule can convert it into an answer.
-
-## Syntax
+The indentation is what makes a `GIVEN` the section's rather than one rule's: a
+`GIVEN` at column 1 lists the inputs of the declaration below it, as it always
+has. Both spellings behave as an open fact until something supplies it, and
+both appear as inputs of any `@export`ed rule that reads them. What the section
+`GIVEN` adds is that the fact has a stated home, and that a value can now be
+supplied inside the file with `WITH`:
 
 ```l4
-ASSUME name IS A Type
-ASSUME name IS A FUNCTION FROM Type1 TO Type2
+#EVAL `is disqualified` WITH issuer IS `Alex's company`
 ```
 
-## Examples
+That last line is the one thing an `ASSUME` never had. Written against an
+`ASSUME`d name it is a check error ("You are giving named inputs to … but it
+is not a function"), because an `ASSUME` was never an input of anything in
+particular. See [What a Section Needs to Know](../../tutorials/section-given/what-a-section-needs-to-know.md)
+for the tutorial, and [the section `GIVEN`](../syntax/section-given.md) for the
+column rule, the scoping rules and the check error that reports a mis-indented
+one.
 
-**Example file:** [assume-example.l4](assume-example.l4)
+The migration is mechanical for this job, and the repository ships the script
+that did it: `node etc/migrate-assume.mjs --write <files>` rewrites every term
+`ASSUME` under its own heading (`--add-heading` synthesises one for a file with
+none, `--hoist-root` places declarations that sat above the first heading, and
+`--types` handles the next job too). It reports, by name and line, every
+`ASSUME` it will not touch and why.
 
-### Assuming a plain fact
+### 2. A kind of thing: `DECLARE T`
+
+`ASSUME TypeName IS A TYPE` named a type without describing it. A bodiless
+`DECLARE` says the same thing:
+
+Before:
 
 ```l4
--- Assume a boolean input
-ASSUME isEmployed IS A BOOLEAN
-
--- Assume a numeric value
-ASSUME income IS A NUMBER
-
--- Assume a string
-ASSUME applicantName IS A STRING
+ASSUME Applicant IS A TYPE
 ```
 
-### Assuming a rule defined elsewhere
+After:
 
 ```l4
--- Assume a rule defined elsewhere
-ASSUME calculateTax IS A FUNCTION FROM NUMBER TO NUMBER
-
--- A rule with several inputs (joined with AND)
-ASSUME addNumbers IS A FUNCTION FROM NUMBER AND NUMBER TO NUMBER
+DECLARE Applicant
 ```
 
-### Reading assumed names in a decision
+The two produce the same entity in the type checker, so a file can be migrated
+one line at a time and nothing downstream changes. See
+[opaque types](DECLARE.md#opaque-types).
+
+### 3. A case the model does not cover: `REFUSE`
+
+Some `ASSUME`s were never facts anyone could supply. They were placed where a
+rule had nothing to say — a figure for a year before the regulation existed —
+so that evaluation would stop there rather than invent a number. That is a
+**refusal**, and it is spelled `REFUSE`, as one named definition per refusal so
+that every arm reaching it reads as a citation:
+
+Before:
 
 ```l4
-ASSUME age IS A NUMBER
-ASSUME income IS A NUMBER
+ASSUME `no Regulation Crowdfunding figure exists before commencement on 2016-05-16` IS A NUMBER
 
-DECIDE isEligible IS
-  age >= 18 AND income > 50000
+GIVETH A NUMBER
+`offering maximum` MEANS
+    BRANCH IF `the rules in force include` `the 2021 amendments` THEN 5000000
+           OTHERWISE `no Regulation Crowdfunding figure exists before commencement on 2016-05-16`
 ```
 
-## Behavior
+After:
 
-- An assumed name says what kind of thing it is, but carries no value.
-- L4 accepts a rule that reads one, and that rule can be quoted, published and
-  reasoned about — but it cannot be run to an answer until the value is
-  supplied.
+```l4
+GIVETH A NUMBER
+`no Regulation Crowdfunding figure exists before commencement on 2016-05-16` MEANS
+    REFUSE "no Regulation Crowdfunding figure exists before commencement on 2016-05-16"
+
+GIVETH A NUMBER
+`offering maximum` MEANS
+    BRANCH IF `the rules in force include` `the 2021 amendments` THEN 5000000
+           OTHERWISE `no Regulation Crowdfunding figure exists before commencement on 2016-05-16`
+```
+
+The rules that reach it do not change. What changes is what the reader and the
+tools are told: a refusal is not an input, so it leaves the published list of
+facts, and it stops evaluation with the author's reason rather than with "it is
+an assumed term". (The example is drawn from the Reg CF corpus, whose own floor
+still carries the older spelling for the exporter reason on the `REFUSE` page.) The field test for which of the two you are looking at, in an
+older file: _could a person supply this value?_ If yes, it was a fact, and it
+becomes a section `GIVEN`. If nobody could, it was a refusal. See
+[When a Rule Cannot Answer](../../tutorials/refuse/when-a-rule-cannot-answer.md)
+and [`REFUSE`](../control-flow/REFUSE.md).
+
+## Function-typed inputs
+
+`ASSUME f IS A FUNCTION FROM NUMBER TO BOOLEAN` declared a rule defined
+elsewhere. The section `GIVEN` accepts the same type, and a rule that reads
+such a name type-checks and runs exactly as it did:
+
+```l4
+§ `Helpers assumed to exist`
+    GIVEN cat IS A FUNCTION FROM A STRING AND A STRING TO A STRING
+          coerce IS A FUNCTION FROM A NUMBER TO A BOOLEAN
+          coerce IS A FUNCTION FROM A BOOLEAN TO A NUMBER
+```
+
+One name may be declared at several types, as the second and third lines show;
+each use resolves to whichever type its context needs.
+
+**A rule that works for any kind of thing** (what programming language theory
+calls **polymorphic**) has no section `GIVEN` form. Writing its type with
+`FOR ALL` is accepted, but a use of the name is then rejected as "not a
+function" — and the same is true of `ASSUME f IS FOR ALL …`, so this is not a
+loss the migration causes. The one spelling that works is the older signature
+form, a `GIVEN a IS A TYPE` and a `GIVETH` heading an `ASSUME f` with no type
+of its own; `jl4/examples/ok/tbd.l4` keeps it for that reason. Write the rule
+out instead of assuming it wherever you can.
+
+**The limit is at the export boundary.** A published rule cannot accept an
+input that is itself a rule, because a rule cannot be sent as JavaScript Object
+Notation (JSON), which is what a request carries. L4 reports
+`Function type inputs are not supported for @export` for an `@export`ed rule
+that reads a function-typed input.
+
+**And that makes this one migration you should measure before you make it.** The
+refusal keys on how the type is _spelled_, not on the keyword — so the two
+spellings are not interchangeable here, and moving between them can change
+whether a rule exports at all. Measured 2026-09-07: `ASSUME \`is eligible\` p IS A
+BOOLEAN`puts the input on the head, is not a function type, and an`@export`ed
+rule that reads it **checks clean**; the section `GIVEN`the warning offers for
+it,`GIVEN \`is eligible\` IS A FUNCTION FROM Person TO BOOLEAN`, **is refused**.
+There are 34 such sites in the corpus, across five files in the Blawx and
+relational examples, and they keep the older spelling until that gate is ruled
+on. Two exporters
+are built on that older shape and still read it: the Blawx bridge and the
+relational middle end lower a predicate written as
+`GIVEN p IS A Person`/`ASSUME `is authorised` p IS A BOOLEAN` to an input
+predicate, and have no image yet for the section-`GIVEN`spelling of the same
+predicate. The shipped Blawx seeds therefore keep that`ASSUME` form, and say
+so in their headers; see [L4 to Blawx](../../tutorials/blawx/l4-to-blawx.md).
+
+## Reading older code
+
+Everything below still holds for an `ASSUME` you meet in a file that has not
+been migrated.
+
+- An assumed name says what kind of thing it is, but carries no value. L4
+  accepts a rule that reads one, and that rule can be quoted, published and
+  reasoned about, but it cannot be run to an answer until the value is supplied.
 - `#EVAL` on such a rule stops at the name and says so:
 
   ```
@@ -111,115 +230,34 @@ DECIDE isEligible IS
   but it is an assumed term.
   ```
 
-## How a value reaches an assumed name
+  A section `GIVEN` that nothing has supplied reports in exactly the same
+  words, so meeting them is not a sign that a `GIVEN` was treated as something
+  else.
 
-Nothing inside the file supplies one. The value comes from the boundary — the
-place that asked the question:
+- Nothing inside the file supplies an `ASSUME`. The value comes from the
+  boundary: `l4 batch rules.l4 --inputs cases.json`, a request to `jl4-service`,
+  or the generated web form. When a module-level `ASSUME` is read by an
+  `@export`ed rule it becomes an input of the published rule and must be
+  supplied with the request; `ASSUME`s that no published rule reads stay
+  module-level assumptions.
+- `TYPICALLY` on an `ASSUME` records a default and applies it nowhere; on a
+  section `GIVEN` a default is what a rule given no value works out. See
+  [`TYPICALLY`](TYPICALLY.md).
 
-- `l4 batch rules.l4 --inputs cases.json` runs the file once for each case in
-  that JavaScript Object Notation (JSON) file;
-- a request to `jl4-service` carries the values as request inputs;
-- the generated web form asks the person for exactly the names the exported rule
-  reads.
-
-Neither `#CHECK ... WITH ...` nor `#EVAL ... WITH ...` binds an assumed value
-today, and the failure takes more than one shape. Where the name takes no
-inputs of its own, both `#CHECK isAdult WITH age IS 25` and `#EVAL isAdult WITH
-age IS 25` report the same check error: `You are giving named inputs to isAdult …
-but it is not a function, so it takes none.` Where a value is written before
-the `WITH`, as in
-``#EVAL `tax on` 100 WITH rate IS 0.2``, the file does not parse at all:
-`unexpected WITH`.
-
-_Proposed, not landed (2026-09-04): supplying an ASSUMEd value inside the file,
-as `#EVAL isAdult WITH age IS 25` where `age` is assumed. This lands with the
-discharge pull request; until then supply values from outside the file (web
-form, `l4 batch`, application programming interface)._
-
-## ASSUME and `@export`
-
-When a module-level ASSUME is read by an `@export`-decorated DECIDE, it becomes
-an input of the published rule and must be supplied with the request (alongside
-the rule's own `GIVEN` inputs). ASSUMEs that no published rule reads stay
-module-level assumptions and are unaffected. A section `GIVEN` is promoted the
-same way.
-
-```l4
-ASSUME age IS A NUMBER         -- becomes an input of `isAdult`
-ASSUME unused IS A BOOLEAN     -- stays assumed (no @export reads it)
-
-@export Check if the subject is an adult
-DECIDE isAdult IS age >= 18
-```
-
-### Function-typed inputs are not supported for `@export`
-
-A published rule cannot accept an input that is itself a rule, whether it is
-declared as a `GIVEN` input or as an ASSUME the rule reads:
-
-```l4
--- ✘ Rejected when the file is checked, and again at deploy time
-ASSUME predicate IS A FUNCTION FROM NUMBER TO BOOLEAN
-@export Apply the predicate
-DECIDE `applies` IF predicate OF 42
-```
-
-A rule cannot be sent as JSON, which is what both request styles carry —
-Representational State Transfer (REST) and the Model Context Protocol (MCP) —
-and a function-typed ASSUME stays uninterpreted when the rule is run, so any
-request would come back with an "assumed term" error rather than an answer. L4
-reports `Function type inputs are not supported for @export`, and the service
-refuses to deploy such bundles.
-
-## Testing in the file: make the input a rule `GIVEN`
-
-To exercise a rule inside the file, give the rule the input as its own
-`GIVEN`; `WITH` then supplies it by name, and this does work today:
-
-```l4
-GIVEN age IS A NUMBER
-DECIDE isAdult IF age >= 18
-
-#EVAL isAdult WITH age IS 25     -- TRUE
-#ASSERT isAdult WITH age IS 25
-```
-
-## A name for a whole section
-
-For a name that is an input to every rule in a section rather than to one
-definition, a `GIVEN` indented under the section's heading declares it once for
-that section. It resolves, runs and exports exactly as a same-section
-`ASSUME` term does. See [the section `GIVEN`](../syntax/section-given.md).
-
-## Assuming a type: use `DECLARE` instead
-
-`ASSUME TypeName IS A TYPE` declares a type rather than a value — a type that
-is named but not described:
-
-```l4
-ASSUME Person IS A TYPE       -- works, but no longer the preferred spelling
-```
-
-A bodiless `DECLARE` says the same thing, and is now the spelling to reach for:
-
-```l4
-DECLARE Person
-```
-
-The two produce the same entity in the type checker, so a file can be migrated
-one line at a time and nothing downstream changes. `DECLARE` is preferred
-because it puts every type declaration under one keyword, and leaves `ASSUME`
-for what its name suggests — assuming a _value_ you have not defined. See
-[opaque types](DECLARE.md#opaque-types).
+**Example file:** [assume-example.l4](assume-example.l4) — the deprecated forms
+above, kept runnable, with the migrated section `GIVEN` at the end of the file
+for comparison.
 
 ## Related Keywords
 
-- **[GIVEN](../functions/GIVEN.md)** - List a rule's own inputs (a "rule `GIVEN`")
-- **[The section `GIVEN`](../syntax/section-given.md)** - Declare a name once for
-  a whole section: where a term `ASSUME` goes now
-- **[DECIDE](../functions/DECIDE.md)** - Define a value or rule with a body
-- **[TYPE-KEYWORDS](keywords.md)** - Type syntax (IS, FUNCTION, and the rest)
+- **[The section `GIVEN`](../syntax/section-given.md)** — where a term `ASSUME`
+  goes now
+- **[GIVEN](../functions/GIVEN.md)** — a rule's own inputs (a "rule `GIVEN`")
+- **[DECLARE](DECLARE.md)** — records, enumerations and, with no body, opaque
+  types
+- **[REFUSE](../control-flow/REFUSE.md)** — a case the encoding declines
+- **[TYPE-KEYWORDS](keywords.md)** — type syntax (IS, FUNCTION, and the rest)
 
 ## See Also
 
-- **[Types Reference](../types/README.md)** - Type syntax
+- **[Types Reference](../types/README.md)** — type syntax

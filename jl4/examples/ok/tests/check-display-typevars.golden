@@ -1,26 +1,12 @@
 Parsing successful
 Typechecking successful
-check-display-typevars.l4:8:8-14:
-  I found a problem while checking the assumption of `bottom`:
-    ASSUME is an older way of introducing a name, and it is being retired.
-    Nothing is broken: the file still checks, runs and exports as before.
-    This one gives
-    
-      `bottom`
-    
-    a type that could be anything, so no value can ever be supplied for it.
-    If it marks a case the rules cannot answer, write in its place
-    
-      REFUSE "<the reason>"
-    
-    The manual explains the move: doc/reference/control-flow/REFUSE.md.
-check-display-typevars.l4:10:1-14:
+check-display-typevars.l4:12:1-14:
   a
-check-display-typevars.l4:11:1-23:
+check-display-typevars.l4:13:1-23:
   FUNCTION FROM a TO a
-check-display-typevars.l4:12:1-26:
+check-display-typevars.l4:14:1-26:
   FUNCTION FROM a AND b TO a
-check-display-typevars.l4:13:1-27:
+check-display-typevars.l4:15:1-27:
   LIST OF a
-check-display-typevars.l4:14:1-32:
+check-display-typevars.l4:16:1-32:
   FUNCTION FROM a TO NUMBER

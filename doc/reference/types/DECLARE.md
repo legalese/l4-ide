@@ -125,12 +125,14 @@ DECLARE Bag x
 #### Where the values come from
 
 An opaque type has no constructors, so no expression in your file can produce
-one. Values arrive from outside: an `ASSUME` while you are drafting, or a JSON
+one. Values arrive from outside: a fact declared in a
+[section `GIVEN`](../syntax/section-given.md) while you are drafting, or a JSON
 input at a service boundary once the rules are deployed. A rule that never
 looks inside an opaque value still evaluates normally.
 
 ```l4
-ASSUME `the applicant` IS AN Applicant
+§ `Where the values come from`
+    GIVEN `the applicant` IS AN Applicant
 ```
 
 #### Limits
@@ -163,10 +165,9 @@ ASSUME `the applicant` IS AN Applicant
 
 `ASSUME TypeName IS A TYPE` declares the same thing and still works. The two
 produce the same entity in the type checker, so you can migrate a file one
-line at a time. `DECLARE` is now the preferred spelling: it puts type
-declarations under one keyword, and it keeps `ASSUME` for what its name
-suggests — assuming a _value_ you have not defined. See
-[ASSUME](ASSUME.md).
+line at a time. `DECLARE` is the spelling to use: it puts type declarations
+under one keyword, and `ASSUME` is deprecated in every one of its jobs. See
+[ASSUME (deprecated)](ASSUME.md).
 
 ## Examples
 

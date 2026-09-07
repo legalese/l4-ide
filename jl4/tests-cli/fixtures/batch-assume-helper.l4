@@ -1,5 +1,5 @@
-§ `Helper reads an ASSUME`
-ASSUME x IS A NUMBER
+§ `Helper reads a section GIVEN`
+    GIVEN x IS A NUMBER
 g MEANS x PLUS 1
 
 @export f adds y to the helper's value

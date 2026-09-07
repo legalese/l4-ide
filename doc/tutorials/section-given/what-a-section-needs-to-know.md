@@ -507,26 +507,30 @@ Do not instead lean on the allowance mentioned in Step 3, where a rule under no 
 
 Older L4 files name their per-case facts with `ASSUME`, at the left margin, anywhere in the file. **Those files still work**: `ASSUME` reads, checks, publishes and runs exactly as it always has. Since 2026-09-07 the checker reports a warning on each one — never an error — naming the spelling to use instead; see [ASSUME is being retired](../../reference/errors/README.md#assume-is-being-retired). It is deprecated for this job as of 2026-09-04, because the one keyword was doing several unrelated jobs at once and a reader could not tell from the keyword which was meant. To move one, put it under the heading of the section whose rules use it, indent it past the `§`, and change the word. Nothing else changes — not the fact's name, not the rule's name, not a line of any rule that uses it:
 
+Before:
+
 ```l4
-§ `Intermediaries, before migration`
+§ `Intermediaries`
 
 ASSUME `the funding portal is registered` IS A BOOLEAN
 
 GIVETH A BOOLEAN
-`the intermediary requirement is met (before)` MEANS
+`the intermediary requirement is met` MEANS
     `the funding portal is registered`
 ```
 
+After:
+
 ```l4
-§ `Intermediaries, after migration`
+§ `Intermediaries`
     GIVEN `the funding portal is registered` IS A BOOLEAN
 
 GIVETH A BOOLEAN
-`the intermediary requirement is met (after)` MEANS
+`the intermediary requirement is met` MEANS
     `the funding portal is registered`
 ```
 
-(The two rule names differ only because the companion file keeps both versions side by side, and one file cannot have two rules of the same name. In a real migration you edit the `ASSUME` line in place and leave every other line alone.)
+(The companion file carries only the migrated form — every file in this documentation is written in the current spelling — so the "before" above is shown here and nowhere else. In a real migration you edit the `ASSUME` line in place and leave every other line alone.)
 
 Behaviour in this release is identical: both wait to be supplied, and both appear in the published list of facts of any `@export`ed question that reaches them. What you gain is that the fact has a stated home, visible at a glance to a reader and to every tool that reads the file. There is no hurry; migrate when you are in the file for other reasons.
 
@@ -553,3 +557,4 @@ One `ASSUME` does not migrate this way. `ASSUME T IS A TYPE` does not name a fac
 - [Exporting Rules for Deployment](../deploying-rules/exporting-rules-for-deployment.md) — putting these two questions behind a live address
 - [Using the l4 command line](../getting-started/l4-cli.md) — `l4 batch` and the rest of the command line
 - [Encoding Legislation](../getting-started/encoding-legislation.md) — turning a longer provision into rules
+- [One Obligation](../obligations/one-obligation.md) — from facts and definitions to duties: who must do what, by when, and what follows

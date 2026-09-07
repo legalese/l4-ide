@@ -1,5 +1,5 @@
-§ `Export reads an ASSUME directly`
-ASSUME x IS A NUMBER
+§ `Export reads a section GIVEN directly`
+    GIVEN x IS A NUMBER
 
 @export f adds y to the assumed x
 GIVEN y IS A NUMBER
