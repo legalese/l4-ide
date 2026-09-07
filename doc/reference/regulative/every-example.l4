@@ -28,13 +28,13 @@ GIVETH A DEONTIC Actor Action
         HENCE  `the tenancy begins`
         LEST   BREACH
 
--- each with its own: ONCE EACH HAS, then HENCE fires once per tenant who pays
+-- each with its own: UPON EACH, then HENCE fires once per tenant who pays
 GIVETH A DEONTIC Actor Action
 `each payment gets a receipt` MEANS
     EVERY Tenant t
         MUST   Pay (EXACTLY t) (EXACTLY theLandlord) amount
         WITHIN 7
-        ONCE   EACH HAS
+        UPON   EACH
         HENCE  (PARTY theLandlord
                     MUST   Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount)
                     WITHIN 5)

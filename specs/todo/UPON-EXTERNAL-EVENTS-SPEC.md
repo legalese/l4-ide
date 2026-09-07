@@ -1,7 +1,28 @@
-> **Status (audited 2026-07-03):** OPEN — `UPON` and the `Environment` party are unimplemented; only the underlying deontic + trace-`Event` machinery exists.
+> **Status (audited 2026-07-03; amended 2026-09-07):** OPEN — the **rule head** `UPON <event>` and the `Environment` party are unimplemented; only the underlying deontic + trace-`Event` machinery exists.
 >
-> - No `UPON` keyword (absent from `jl4-core/src/L4/Lexer.hs`); no `Environment` built-in party; no desugaring. Parser accepts only `PARTY <expr> MUST/MAY/SHANT …` (`Parser.hs:1769-1794`).
-> - `UPON`/`EVERY` occur only in non-golden aspirational examples (`jl4/experiments/purchase.l4:92`, `deontic-may.l4:16`). Related-but-distinct: trace `MkEvent{party,action,timestamp}` (`Syntax.hs:172-179`) already models observed party actions.
+> - No `Environment` built-in party and no desugaring. The rule head this spec proposes is not parsed.
+> - `UPON`/`EVERY` occur only in non-golden aspirational examples (`jl4/experiments/purchase.l4:94`, `deontic-may.l4:16`). Related-but-distinct: trace `MkEvent{party,action,timestamp}` (`Syntax.hs:172-179`) already models observed party actions.
+>
+> **The word `UPON` is now taken, in a different position (2026-09-07).** `EVERY-EACH-QUANTIFIER-SPEC.md`
+> §2.4/§2.5 R-Q1 ruled the fork of a quantified obligation's join line to be `UPON EACH`, and that is
+> built on branch `every/build-1` (unmerged as of 2026-09-07): `UPON` is a keyword (`TKUpon` in `jl4-core/src/L4/Lexer.hs`) and is
+> parsed by `L4.Parser.uponEach`, in the join position only — after the act, before `HENCE`.
+>
+> **This does not build, block or prejudge the rule head.** The two are distinguished by position: a
+> rule head cannot appear after an act, so `UPON EACH` and `UPON <event>` never compete for the same
+> token sequence. What changes for whoever implements this spec is only that the keyword already
+> exists and need not be added, and that `EACH` immediately after `UPON` is spoken for. If an event is
+> ever named `EACH`, it will need backticks. The `EVERY` in those two experiment files is the
+> quantifier's own keyword and is unrelated to this spec.
+>
+> **Two things the implementer should know, both measured 2026-09-07.** First, `L4.Parser.uponEach`
+> does not backtrack: once `UPON` is consumed in join-eligible position the parse is committed, which
+> is what makes its errors pointed — and it also means a rule head cannot later be added _at that
+> position_ even with backtracking. Position is load-bearing, not incidental. Second, the separation
+> is clean in the grammar but leaks in the diagnostics: a rule head written indented under an open
+> deonton reports `expecting EACH`, which is confusing, and the compiler's advice on a
+> column-1 rule head is to indent it — which lands the author exactly there. Whoever builds the rule
+> head should fix that message in the same change.
 
 # Specification: UPON and External Event Modeling in L4
 
