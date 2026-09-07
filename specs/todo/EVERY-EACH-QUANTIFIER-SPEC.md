@@ -14,7 +14,8 @@
 >   `BarrierObligation` runtime exists. The syntax appears only in non-compiling sketches under
 >   `jl4/experiments/` (`regulative-powers.l4:4`, `deontic-may.l4:99-101`, `jerseyAlcohol.l4:42`).
 > - **Rulings so far:** R-T1–R-T6 (§2.2.7.8, 2026-09-06); the pattern spelling (§2.4, 2026-09-07);
->   **R-Q1–R-Q7 (§2.5, 2026-09-07)**. Under R-Q1 there is one quantifier word, `EVERY`, and a
+>   **R-Q1–R-Q7 (§2.5, 2026-09-07)**; **R-Q7A–R-Q7C, the anchor's spelling (§5.1.1, 2026-09-07;
+>   ruled, not built)**. Under R-Q1 there is one quantifier word, `EVERY`, and a
 >   mandatory join line under it whenever a continuation follows: `ONCE ALL HAVE` (barrier) or
 >   `UPON EACH` (fork). The fork's words were RULED on 2026-09-07 and are no longer provisional;
 >   `ONCE EACH HAS` does not parse. `EACH` is not a keyword and not a quantifier. The file keeps its
@@ -979,12 +980,18 @@ DeonticModal ::= ('MUST' ['NOT'] | 'MAY' | 'SHANT' | 'DO') ['DO']
 
 Action ::= Pattern ['PROVIDED' Expr]  -- the PROVIDED guard, measured working under EVERY 2026-09-07
 
-TemporalConstraint ::= 'WITHIN' Duration ['OF' Anchor]   -- 'OF' Anchor: the named anchor of R-Q7 (§5.1); unbuilt
+TemporalConstraint ::= 'WITHIN' Duration ['OF' Anchor]   -- 'OF' Anchor: the named anchor of R-Q7 (§5.1).
+                                      -- The connective is 'OF' and only 'OF' (R-Q7A, §5.1.1). Unbuilt.
                      | 'BEFORE' Deadline                  -- documented as planned, unbuilt (doc/reference/regulative/README.md:102)
                      | 'BY' Deadline                      -- unruled and unbuilt; TKBy serves FOLLOWED BY, DIVIDED BY, BREACH BY
 
-Anchor ::= `the join's firing` | `the missed deadline` | `the arming` | Event
-                                      -- R-Q7: the four anchors the machine must expose; their spellings are not ruled
+Anchor ::= 'THE' ('JOIN' | 'DEADLINE' | 'ARMING')   -- R-Q7B: the three lifecycle positions. THE is already
+                                      -- a keyword (Lexer.hs:273); JOIN, DEADLINE and ARMING are matched by
+                                      -- SPELLING and not reserved, exactly as EACH is in UPON EACH.
+         | Event                      -- R-Q7: any recorded event, which the drafter has already named
+         | Expr                       -- R-Q7C: anything of type DATE. The slot is a three-way union the
+                                      -- checker discriminates; no new keyword. Spellings RULED 2026-09-07
+                                      -- (R-Q7A/B/C, §5.1.1); unbuilt.
 
 HenceClause ::= 'HENCE' Continuation
 
@@ -1241,8 +1248,17 @@ branch was in the merge queue at the time):
   event after the deadline) and a `WITHIN 13` workaround built on it. When R-Q7's `LEST` default is
   built (§5.2) that page changes and the trace goldens re-bless.
 - In this document: extend §3–§9 to `SHANT` (R-Q3); define the release / substitute / join events
-  (R-Q6, §13.4); rule the anchor spellings (R-Q7). The fork's words (R-Q1) were ruled 2026-09-07 and
-  are recorded above.
+  (R-Q6, §13.4). The fork's words (R-Q1) were ruled 2026-09-07 and are recorded above; **the anchor
+  spellings (R-Q7) were ruled the same day and are recorded at §5.1.1** — `OF` alone as the connective,
+  `OF THE JOIN`/`OF THE DEADLINE`/`OF THE ARMING` for the lifecycle positions, and a date-valued
+  expression admitted in the slot. Ruled, not built.
+- Opened by those rulings, and owed to nobody yet: **the `AFTER` window** (§5.1.2, sketched on Meng's
+  request and not ruled — it owes the early-act semantics, the empty-window check, and its meaning
+  under `LEST`); **an anchor picked by an expression** rather than named, which R-Q7B's note flags as
+  the natural place for that pressure to arrive; and **a date library** with plain days, business
+  days, officially recognised holidays, widely observed non-holidays, and weeks free of public
+  holidays in a named jurisdiction (R-Q7C's note). The last is a library, not a language change:
+  §5.1.1 measures that `WITHIN 5 days` already parses and checks once `days` is defined.
 
 ## 3. Semantics Overview
 
@@ -1517,6 +1533,169 @@ t=25: Party C signs  ← barrier achieved, t_last = 25
 t=25: HENCE spawns with reference time = 25
       escrow_agent's deadline = 25 + 5 = 30
 ```
+
+#### 5.1.1 The anchor's spelling — RULED 2026-09-07 (R-Q7A, R-Q7B, R-Q7C)
+
+§5.1 above ruled the anchor's **mechanism** and its **defaults** and left its **spelling** open.
+Three cards — the Anchor Bench, an artifact of 2026-09-07, **not in the tree**
+(<https://claude.ai/code/artifact/0e3b1279-79c2-4616-ada7-bad7473e9630>) — closed it. All three were
+marked **accept**, on the recommended option in each case, between 03:37 and 03:41 UTC on
+7 September 2026. Meng's notes are quoted verbatim, and each one opens a follow-up rather than
+qualifying the ruling; the follow-ups are listed at the end of this section and in §2.5's owed list. **None of this
+is built**: the grammar in §2.4 carries it, and no parser production exists.
+
+**R-Q7A — the connective is `OF`, and only `OF`.** Not `AFTER`, and not the two as synonyms. `OF` is
+already a keyword (`Lexer.hs:268`, `TKOf`), so the slot reserves no new word, and it is the form
+`doc/reference/regulative/README.md:82-95` already documents. This is a grammar addition either way:
+measured 2026-09-07 on a binary built from this branch, `WITHIN 5 OF notice` is a **parse error at
+the `OF`**, because `WITHIN` takes exactly one expression (`Parser.hs:2534-2536`) and `OF` is not an
+operator inside one.
+
+> _"Forecasting the future here: a triggerable interval may not activate immediately upon the
+> previous event; for instance, we might say: 'after the current order is delivered, the customer may
+> place a new order AFTER a three-business-day cooling-off period, WITHIN 30 days starting at the end
+> of the cooling-off-period.' So we might want to reserve AFTER for that sort of construct. Shall we
+> try to sketch a design for that now?"_
+
+So `AFTER` is **held, not rejected**: it is spoken for by a different construct — the
+earliest-permitted edge of a window — sketched at §5.1.2, which answers the question in that note.
+
+**R-Q7B — the three lifecycle anchors are `OF THE JOIN`, `OF THE DEADLINE`, `OF THE ARMING`.** Three
+of the four anchors §5.1 requires are positions in the obligation's own life, not values a drafter
+can point at; the fourth, a recorded event, already has a name the drafter chose. `THE` is already a
+keyword (`Lexer.hs:273`, `TKThe`), and `JOIN`, `DEADLINE` and `ARMING` are matched by **spelling**
+rather than reserved — the same move `UPON EACH` makes for `EACH`, ruled the same morning (R-Q1,
+§2.5). So the whole of R-Q7B costs zero new reserved words. Measured 2026-09-07: none of the three
+nouns appears as an identifier anywhere in the goldened corpus.
+
+Why each is wanted. **The join's firing** is the `HENCE` default, so naming it is only ever emphasis.
+**The missed deadline** is the `LEST` default, but a drafter may want it under `HENCE` — _the cure
+period runs from the date performance fell due, not from the day the last party finally signed_.
+**The arming time** is reachable no other way: it is when the obligation was entered, which is what
+_within 30 days of this agreement_ means. The machine already computes all three (§5.1's
+`Machine.hs` citations for the firing; the deonton's entry for the arming; R-Q5 for the missed
+deadline), so this is a naming question and not a semantics question.
+
+> _"Using 'the X' suggests that a drafter may want to reach for 'some other X' resolved using some
+> expression, but let's not get too anxious; go with this for now, and just note a possibility that
+> this would be the natural place for someone to want to add sophistication that we might not be able
+> to support just yet."_
+
+Noted, and it is a real forward pressure: `THE` is a definite article, and a definite article invites
+an indefinite sibling. The shapes it would open — `OF SOME …`, `OF THE JOIN OF <rule>`, an anchor
+picked by an expression rather than named — are **not designed and not ruled**, and nothing here
+forecloses them. The one thing this ruling should not do is make them harder to add later, which is
+why the three nouns are matched by spelling in one position rather than reserved globally.
+
+**R-Q7C — the slot admits a date-valued expression.** `WITHIN 5 OF closingDate` is the way to write
+an absolute deadline, and `WITHIN 0 OF (YMD 2026 6 30)` is _by 30 June_. This closes a hole §5.1
+opened when it struck the `BY date` escape hatch: the strike was right on the law of it — R-T2 ruled
+nothing about `BY`, and `TKBy` already serves `FOLLOWED BY`, `DIVIDED BY` and `BREACH BY`, so a
+deadline `BY` would be a fourth meaning for that word — but it left _this must happen by 30 June_
+with no ruled spelling at all. The cost is that the slot becomes a three-way union the checker
+discriminates: a lifecycle anchor, a recorded event, or a `DATE`.
+
+> _"we need to beef up our date libraries to better support things that people will want to put in
+> this slot -- plain days; business days; holidays officially recognized; including non-holidays of
+> widespread observance; weeks not containing public holidays in x jurisdiction; and so on."_
+
+That is a **library** requirement, not a language one, and it is now on §2.5's owed list. The reason
+it lands here rather than in the grammar is the one measurement that retired what had been a fourth
+card: **unit words need no ruling and no grammar change**. Measured 2026-09-07 on a binary built from
+this branch, `WITHIN 5 days` **parses**; it fails only the check, with _could not find a definition
+for the identifier_, because `days` names nothing. Add one line of ordinary L4 —
+`GIVEN n IS A NUMBER GIVETH A NUMBER DECIDE n days IS n` — and the same file reports **Check
+succeeded**. So `days`, `` `business days` ``, `` `weeks not containing a public holiday in
+Singapore` `` are all already expressible through mixfix and backticked names; what is missing is a
+calendar for them to consult, which is a library to write and not a keyword to reserve. The corpus
+already writes `` WITHIN `five business days` `` 11 times, which is exactly this move made by hand.
+
+**What these three do not settle.** The `AFTER` window (§5.1.2, sketched and not ruled); an anchor
+picked by an expression rather than named (R-Q7B's note); the date library (R-Q7C's note); and
+whether an anchored `WITHIN` under `LEST` may name `THE JOIN` at all, which is a well-formedness
+question — under `LEST` the join did not fire.
+
+#### 5.1.2 `AFTER`: the window's opening edge — PROPOSED 2026-09-07, not ruled
+
+This section answers the question in R-Q7A's note ("Shall we try to sketch a design for that now?").
+It is a sketch. Nothing here is ruled, and nothing here is built.
+
+**The gap.** `WITHIN d` gives a window one edge, the closing one; the opening edge is the anchor
+itself, so an obligation is performable from the instant it arms. Meng's cooling-off example is the
+counter-case, and it is ordinary: _the customer may place a new order after a three-business-day
+cooling-off period, within 30 days_. Nothing in the language today can say when a window **opens**.
+
+**We have already written this construct, twice.** `jl4/experiments/purchase.l4:152-168` — an
+aspirational sketch that has never parsed — writes four nested continuations in exactly this shape,
+and it is worth reading because it disagrees with the note above on the one point that matters:
+
+```
+PARTY   seller
+MAY     `water plant`
+AFTER   5 days
+BEFORE  8 days
+```
+
+That is a window of `[a+5, a+8]`: **two offsets from one anchor**. Meng's sentence is a window of
+`[a+3, a+33]`: **an offset, then a length measured from where the offset ends**. Both readings are
+attested in real drafting, and the grammar in §2.4 already carries the other half of the first one —
+`'BEFORE' Deadline`, documented as planned and unbuilt (`doc/reference/regulative/README.md:102`).
+
+**The proposal: keep both readings, and let the closing word say which.** They are not ambiguous
+together, because the second word differs:
+
+```
+AFTER  3 OF `delivery`   BEFORE 30      -- window [delivery+3, delivery+30]: two offsets, one anchor
+AFTER  3 OF `delivery`   WITHIN 30      -- window [delivery+3, delivery+33]: AFTER re-anchors, WITHIN measures
+```
+
+The reason to carry both is that they match different source texts. A statute that says _not earlier
+than 3 and not later than 30 days after delivery_ hands the drafter two offsets, and `BEFORE` takes
+them as written. A contract that says _a 3-day cooling-off period, then 30 days to order_ hands the
+drafter an offset and a length, and `WITHIN` takes those as written. Making a drafter do the
+arithmetic to reach the other spelling is exactly the kind of silent transcription error this
+language exists to remove.
+
+Read `AFTER d OF a` as **re-anchoring**: it moves the reference time to `a + d`, and everything
+downstream measures from the moved anchor. That makes `WITHIN` mean what it already means and needs
+no second rule; `BEFORE` is then the one that reaches back past the move, to the original anchor.
+`AFTER` composes with R-Q7B's lifecycle anchors and R-Q7C's dates for free —
+`AFTER 30 OF THE ARMING`, `AFTER 3 OF closingDate` — and with the join line, since a fork's
+continuation has an anchor like any other (`UPON EACH` … `HENCE … AFTER 3 …`).
+
+**`AFTER` alone is well-formed** — a permission that opens and never closes is an ordinary legal
+object (a right that vests and does not expire). `BEFORE` alone is today's `WITHIN` with a different
+name, and should probably be refused rather than admitted as a synonym.
+
+**The question a sketch cannot answer: what does an early act do?** Three readings, and they are not
+interchangeable:
+
+1. **Nullity.** The act does not count as performance. The obligation stays live, its clock
+   untouched, and the party may act again inside the window.
+2. **Breach.** Acting early violates the clause, the way acting late does.
+3. **Not enabled.** The action is not offered at all — the machine has no transition for it.
+
+For a `MAY`, (1) is the natural reading and (3) is how a wizard would render it. For a `MUST`, (1) is
+harsh but is what a cooling-off period means, and (2) is what a source that says _shall not … before_
+means — but a drafter with that source should be writing a `SHANT`, not an early `MUST`. The
+recommendation is **(1), with a diagnostic**: a silent nullity is how a party loses a deadline it
+believed it had met. This is the same territory as R-Q3's deferred bounded-deontics discussion, and
+it should be ruled with that, not before it.
+
+**Cost, measured 2026-09-07 on this branch.** `AFTER` and `BEFORE` are **not** keywords
+(`jl4-core/src/L4/Lexer.hs`; the keyword table is an exact, case-sensitive `Map.lookup` on the raw
+identifier text at `identifierOrKeyword`, `Lexer.hs:670-675` **on this branch** — the status header's
+`:654-659` is that function's place on `unstable`, before this branch's keywords shifted it). Reserving `AFTER` touches six lines of `.l4` in the whole
+tree: four are `purchase.l4`'s aspirational `AFTER n days` above, in `jl4/experiments/`, which is
+**in no goldened glob** and already fails to parse for unrelated reasons; the other two are inside
+backticked section names in `housing-act-ground-5F.l4:605,:726`, and a backticked name never consults
+the keyword table. Zero goldened corpus files, zero canon files, zero `doc/` files — the same shape
+`UPON` measured at before it was taken.
+
+**What this sketch owes before it could be ruled**: the early-act semantics above; whether `BEFORE`'s
+offset is checked against `AFTER`'s at compile time (`AFTER 30 BEFORE 5` is an empty window and
+should be an error, not a rule that can never fire); and what the pair means under `LEST`, where the
+anchor is a missed deadline rather than a performance.
 
 ### 5.2 LEST Reference Time
 
