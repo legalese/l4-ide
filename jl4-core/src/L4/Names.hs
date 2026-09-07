@@ -1,5 +1,6 @@
 module L4.Names where
 
+import L4.Annotation (Anno_ (..), AnnoElement_ (..))
 import L4.Syntax
 
 class HasName a where
@@ -34,21 +35,44 @@ sectionGivenNames (Just (MkGivenSig _ otns)) =
   [ rawName (getName otn) | otn <- otns ]
 
 -- | Is this top-level declaration the /elaboration/ of one of the section-binder
--- names @ns@?
+-- parameters named in @ns@ — the 0-ary @ASSUME@ that
+-- 'L4.Desugar.elaborateSectionBinder' prepends for it?
 --
--- See the invariant documented in "L4.Desugar": in a desugared module every
--- section-@GIVEN@ parameter has exactly one 0-ary @ASSUME@ of the same name at
--- the head of that section's declaration list. Recognition is by name within
--- the declaring section, not by position — 'L4.Export.rewriteModuleAssumes'
+-- Two tests, both required. The name: a section-@GIVEN@ parameter has exactly
+-- one 0-ary @ASSUME@ of the same name at the head of that section's
+-- declaration list, and recognition is by name within the declaring section
+-- rather than by position, because 'L4.Export.rewriteModuleAssumes'
 -- substitutes a @DECIDE@ in place, so the prefix does not stay homogeneous.
+-- And the identity: the elaboration is built from a single range-hinted hole
+-- and carries no concrete tokens ('isSynthesisedAnno'), whereas anything the
+-- author wrote carries at least the keyword that introduced it.
 --
--- A section that also spells out an @ASSUME@ of a name its own @GIVEN@ binds is
--- already a duplicate definition, so the name-based test has no reachable
--- false positive.
+-- The name alone is NOT enough. An earlier version of this comment claimed
+-- that an author-written @ASSUME@ of a name its own section's @GIVEN@ binds
+-- "is already a duplicate definition, so the name-based test has no reachable
+-- false positive". Measured 2026-09-07 by seven independent refuters: false.
+-- L4 resolves names by type, so @GIVEN x IS A NUMBER@ on the heading and
+-- @ASSUME x IS A STRING@ in the body coexist in a file that checks clean, and
+-- even at the same type nothing is reported until a use is ambiguous. The
+-- name-only test took the author's @ASSUME@ for the checker's own, which
+-- silenced its deprecation warning, dropped it from the re-printed module and
+-- from rendered documents. @ok/assume-beside-section-given.l4@ pins the
+-- repair.
 isSectionBinderElaboration :: HasName n => [RawName] -> TopDecl n -> Bool
 isSectionBinderElaboration ns = \ case
-  Assume _ (MkAssume _ _ (MkAppForm _ n [] _) _ _) -> rawName (getName n) `elem` ns
-  _                                                -> False
+  Assume _ (MkAssume ann _ (MkAppForm _ n [] _) _ _) ->
+    rawName (getName n) `elem` ns && isSynthesisedAnno ann
+  _ -> False
+
+-- | Did the checker synthesise this node, rather than the author write it?
+-- Every parsed node carries at least one cluster of concrete tokens (the
+-- keyword that introduced it); a node the compiler built for itself carries
+-- holes only.
+isSynthesisedAnno :: Anno_ t e -> Bool
+isSynthesisedAnno ann = not (any isCsn ann.payload)
+  where
+    isCsn AnnoCsn {}  = True
+    isCsn AnnoHole {} = False
 
 -- | Keep only those section-@GIVEN@ parameters whose names are in @keep@;
 -- 'Nothing' when nothing survives. Used to hold a section's @GIVEN@ and its

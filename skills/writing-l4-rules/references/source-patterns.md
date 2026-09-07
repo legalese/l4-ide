@@ -46,8 +46,8 @@ most needed. If you add an entry to an area file, add its line here in the same 
   [Entry 11.8](source-patterns/11-when-the-encoding-cannot-answer.md#e11-8) measures both halves.
   `TBD`, from the prelude, is the refusal that means "not written yet".
 - **`ASSUME` is deprecated for declaring inputs, and still works.** It parses, type-checks and
-  exports exactly as before, and emits no warning. Write new inputs as a record parameter or a
-  section `GIVEN`; see
+  exports exactly as before, and since 2026-09-07 draws a deprecation warning naming the
+  spelling to use instead. Write new inputs as a record parameter or a section `GIVEN`; see
   [entry 11.7](source-patterns/11-when-the-encoding-cannot-answer.md#e11-7) for migrating an old one.
 
 **Proposed, not landed (2026-09-04). Do not write these.**

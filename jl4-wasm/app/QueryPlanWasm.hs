@@ -20,6 +20,8 @@ import qualified Data.Text.Lazy.Encoding as LazyText
 import Data.Text.Encoding (encodeUtf8)
 
 import L4.API.VirtualFS (checkWithImports, emptyVFS, TypeCheckWithDepsResult(..))
+import L4.TypeCheck (severity)
+import L4.TypeCheck.Types (Severity (..))
 import qualified L4.Viz.Ladder as Ladder
 import qualified L4.Viz.VizExpr as VizExpr
 import qualified L4.Decision.BooleanDecisionQuery as BDQ
@@ -39,7 +41,9 @@ l4QueryPlan source uriText functionName bindingsJson =
     Left errors ->
       encodeJson $ Aeson.object ["error" Aeson..= Text.intercalate "; " errors]
     Right result ->
-      if not (null result.tcdErrors)
+      -- Only an SError-severity diagnostic is a type check error; a #CHECK
+      -- info or a warning (exhaustiveness, the ASSUME deprecation) is not.
+      if any ((== SError) . severity) result.tcdErrors
         then encodeJson $ Aeson.object ["error" Aeson..= ("Type check error" :: Text.Text)]
         else
           case Ladder.visualizeByNameWithState result.tcdUri uriText 1 result.tcdModule result.tcdSubstitution True functionName of

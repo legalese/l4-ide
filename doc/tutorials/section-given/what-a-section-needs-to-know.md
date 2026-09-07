@@ -505,7 +505,7 @@ Do not instead lean on the allowance mentioned in Step 3, where a rule under no 
 
 ## Migrating a File That Uses `ASSUME`
 
-Older L4 files name their per-case facts with `ASSUME`, at the left margin, anywhere in the file. **Those files still work**: `ASSUME` reads, checks, publishes and runs exactly as it always has, and no warning is reported for it. It is deprecated for this job as of 2026-09-04, because the one keyword was doing three unrelated jobs at once and a reader could not tell from the keyword which was meant. To move one, put it under the heading of the section whose rules use it, indent it past the `§`, and change the word. Nothing else changes — not the fact's name, not the rule's name, not a line of any rule that uses it:
+Older L4 files name their per-case facts with `ASSUME`, at the left margin, anywhere in the file. **Those files still work**: `ASSUME` reads, checks, publishes and runs exactly as it always has. Since 2026-09-07 the checker reports a warning on each one — never an error — naming the spelling to use instead; see [ASSUME is being retired](../../reference/errors/README.md#assume-is-being-retired). It is deprecated for this job as of 2026-09-04, because the one keyword was doing several unrelated jobs at once and a reader could not tell from the keyword which was meant. To move one, put it under the heading of the section whose rules use it, indent it past the `§`, and change the word. Nothing else changes — not the fact's name, not the rule's name, not a line of any rule that uses it:
 
 Before:
 
