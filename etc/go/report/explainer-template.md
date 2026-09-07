@@ -32,7 +32,7 @@ and draws nothing._
 | ------------ | ------------------------------------------------------------------------------------------ |
 | subject      | {{run.subject}} — {{run.citation}}                                                         |
 | run id       | `{{run.id}}`                                                                               |
-| milestone    | {{run.milestone_upper}}                                                                    |
+| encoding     | {{run.encoding}}                                                                           |
 | repo HEAD    | `{{run.repo_head}}` ({{run.tree_state}})                                                   |
 | clock        | `{{run.fixed_now}}`                                                                        |
 | journal      | `{{run.journal_path}}` — {{run.record_count}} records read here, chain {{run.chain_state}} |

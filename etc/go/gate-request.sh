@@ -80,7 +80,7 @@ this worktree, then hand back the signature file:
 
 That writes $PAYLOAD.sig. Then re-run with:
 
-  etc/go/go.sh run --milestone g1 --subject <subject> --run-id <id>
+  etc/go/go.sh run --subject <subject> --encoding <encoding> --run-id <id>
 
 go.sh looks for \$RUN/$GATE.payload.txt.sig and verifies it against
 specs/todo/single-instruction-demo/gate-allowed-signers.

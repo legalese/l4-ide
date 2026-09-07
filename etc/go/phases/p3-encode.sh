@@ -23,11 +23,33 @@
 # "the real stage needs: the l4 skill's inert-style guidance as the prompt
 # substrate; JL4_LIBRARY_PATH pinned; and its green gate must parse the run log
 # for `assertion failed` rather than trust exit 0 (§3.2)." The first is the
-# skill's G2 section. The second the driver does (go.sh exports it). The third
+# skill's deposit runbook. The second the driver does (go.sh exports it). The third
 # belongs to P6, not here: this stage runs `l4 check`, whose exit code IS
 # load-bearing — only a typecheck error produces exit 1, which is exactly what
 # is being asked. `l4 run`'s exit code is the one that lies, and p6-tests.sh
 # reads results[] instead for precisely that reason.
+
+# THE MODULE SET IS THE DRIVER'S, and this stage was the one that did not ask.
+#
+# `GO_MODULES` is what the driver resolved for THIS RUN; `GO_S_ENCODING_MODULES`
+# is what the SIDECAR declares for the resolved encoding, and on the
+# `--encoding undeclared` path those differ: the driver deliberately empties
+# `GO_MODULES` because there is no additional encoding to iterate, while
+# `subject.mjs`, called with no `--encoding`, still exports the COMMITTED
+# encoding's modules. Reading the sidecar name directly, this stage typechecked
+# all seven of `sg-succession`'s committed modules and wrote `PASS` with an
+# oracle reading "the deposit is L4 the toolchain accepts" — for a deposit that
+# does not exist. Its own `plan` row said `undeclared` at the same time.
+#
+# Its four sibling measurement stages (p3-check, p6-tests, p8-verify, p7-dmn)
+# all carried this fallback already; p3-encode was the only one that did not,
+# which is why the empty set reached `l4 check` instead of `go_skip`. The
+# fallback exists so that a DIRECT invocation outside the driver resolves the
+# same set a run would — measuring anything else would make the receipt claim
+# something the stage did not do.
+if [[ -z "${GO_MODULES+x}" ]]; then
+  GO_MODULES="${GO_S_ENCODING_MODULES:-${GO_S_ENCODING:-}${GO_S_WIZARD:+ $GO_S_WIZARD}}"
+fi
 
 if [[ "${1:-}" == "--inputs" ]]; then
   # THE PINNED CLOCK IS A VERDICT INPUT, so it is a digest contributor.
@@ -39,18 +61,27 @@ if [[ "${1:-}" == "--inputs" ]]; then
   # run's answer about a different point in legal time. Declared per stage
   # rather than folded centrally like the l4 binary's sha, because only the
   # stages that actually pass --fixed-now should re-run when it moves.
-  printf '%s\n' ${GO_S_ENCODING_MODULES:-} "${BASH_SOURCE[0]}" "text:fixed_now=${GO_FIXED_NOW:-unset}"
+  printf '%s\n' ${GO_MODULES:-} "${BASH_SOURCE[0]}" "text:fixed_now=${GO_FIXED_NOW:-unset}"
   exit 0
 fi
 
 source "$(dirname "${BASH_SOURCE[0]}")/../lib/phase-prelude.sh"
 
-if [[ -z "${GO_S_ENCODING_MODULES:-}" ]]; then
-  go_skip "the '$GO_S_ID' sidecar declares no denovo.modules, so this subject has nowhere to deposit a de novo encoding. Add it to $GO_S_DIR/subject.json; the paths' existence is optional, because writing the L4 is agent work owned by the G2 section of .claude/skills/running-the-l4-pipeline/SKILL.md and by the writing-l4-rules skill."
+if [[ -z "${GO_MODULES:-}" ]]; then
+  # NAME A KEY THE SCHEMA ACCEPTS. `denovo.modules` stopped existing at R2/R3,
+  # and there are three encoding cases — a diagnostic that names the wrong one
+  # sends the reader to edit the committed encoding when what they need is to
+  # create an `encodings` entry.
+  case "${GO_S_ENCODING_ID:-primary}" in
+    primary) _KEY="encoding.modules" ;;
+    undeclared) _KEY="encodings.<id>.modules (none is declared yet)" ;;
+    *) _KEY="encodings.${GO_S_ENCODING_ID}.modules" ;;
+  esac
+  go_skip "the '$GO_S_ID' sidecar declares no $_KEY, so this subject has nowhere to deposit a de novo encoding. Add it to $GO_S_DIR/subject.json; the paths' existence is optional, because writing the L4 is agent work owned by the deposit runbook in .claude/skills/running-the-l4-pipeline/SKILL.md and by the writing-l4-rules skill."
 fi
 
 declare -a MODULES=()
-read -ra MODULES <<<"$GO_S_ENCODING_MODULES"
+read -ra MODULES <<<"$GO_MODULES"
 
 declare -a MISSING=()
 for m in "${MODULES[@]}"; do [[ -f "$m" ]] || MISSING+=("$m"); done
@@ -85,7 +116,7 @@ go_receipt --status PASS \
   --oracle-cmd "$ORACLE_CMD" \
   --oracle-exit 0 \
   --oracle-class structural \
-  --oracle-because "typechecking is the compiler's own verdict on the module, and for 'l4 check' the exit code is the oracle: only a typecheck error produces exit 1. It proves the deposit is L4 the toolchain accepts. It proves NOTHING about fidelity to the source, about house style, or about whether the encoding answers anything — no #ASSERT is run here (that is P6) and no house-style check is applied here (that is p3-check, which runs over this same deposit in this same milestone)." \
+  --oracle-because "typechecking is the compiler's own verdict on the module, and for 'l4 check' the exit code is the oracle: only a typecheck error produces exit 1. It proves the deposit is L4 the toolchain accepts. It proves NOTHING about fidelity to the source, about house style, or about whether the encoding answers anything — no #ASSERT is run here (that is P6) and no house-style check is applied here (that is p3-check, which runs over this same deposit in this same run)." \
   --artifact "$LOG" "${METRICS[@]}" \
   --note "P3's actual deliverable — 'isomorphic: a domain expert can review it against $GO_S_CITATION section by section' — is unverified by this stage and is HG1's subject (SPEC.md §7.3). A module that typechecks and says something else entirely reaches this same PASS" \
-  --note "the two mechanisable P3 house rules (BRANCH over ELSE IF, an @ref on every dated arm) are p3-check's half of this phase: it runs over the same resolved module set at this milestone, so read its receipt beside this one"
+  --note "the two mechanisable P3 house rules (BRANCH over ELSE IF, an @ref on every dated arm) are p3-check's half of this phase: it runs over this run's same resolved module set, so read its receipt beside this one"

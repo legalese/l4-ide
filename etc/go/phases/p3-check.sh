@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# P3-check — the mechanisable P3 house rules, over the milestone's module set.
+# P3-check — the mechanisable P3 house rules, over the run's module set.
 #
 # These are P3 HOUSE RULES, not corpus facts, so the same checks apply to
 # whichever module set the driver resolved (2026-08-09): the committed

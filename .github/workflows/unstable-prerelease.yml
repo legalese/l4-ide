@@ -778,7 +778,7 @@ jobs:
 #   * `linux-x64` and `win32-x64` as binaries anyone has actually USED. Both
 #     were smoke-tested by their own build jobs and by nothing since. Only
 #     `darwin-arm64` has been taken the whole way: downloaded from the release,
-#     checksum-matched, and driven through `etc/go/go.sh run --milestone g1
+#     checksum-matched, and driven through `etc/go/go.sh run --encoding primary
 #     --subject regcf --through p3-check` to `p0-preflight: PASS`, with `l4
 #     check` exiting 0 on both corpus files and `JL4_LIBRARY_PATH` unset. That
 #     path is the entire reason this workflow exists, so it is worth someone

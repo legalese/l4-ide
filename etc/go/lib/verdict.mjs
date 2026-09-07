@@ -121,15 +121,15 @@ export function checkReceipt(r, ctx = {}) {
   // replayed PASS is that earlier row, which `go.sh verify` re-checks.
   //
   // The alternative — demoting a replayed PASS to UNVERIFIED — was tried and is
-  // wrong: it makes the milestone verdict change when you run the same
-  // milestone twice, which destroys the idempotence property that makes
+  // wrong: it makes the run verdict change when you run the same selection
+  // twice, which destroys the idempotence property that makes
   // resumability meaningful.
   const replayed = !!(r.replayed_from && String(r.replayed_from).trim());
 
   if (r.status === "PASS" && replayed) {
     // `!r.replayed_from` inside a branch guarded by `replayed` is ALWAYS false,
     // so this rule never fired: a replayed PASS naming zero artifacts was
-    // accepted, and `verify` called the milestone COMPLETE. Its live cause is a
+    // accepted, and `verify` called the run COMPLETE. Its live cause is a
     // cross-run borrow whose file copies all failed silently — `cp … 2>/dev/null
     // &&` — which produced exactly that receipt.
     //
@@ -181,20 +181,26 @@ export function checkReceipt(r, ctx = {}) {
 }
 
 /**
- * The milestone rule.
+ * The run rule.
  *
- * G1 is *completeness of accounting, not greenness* — which is what SPEC.md §6
- * actually asks for ("DMN may still be non-executable at G1 only if the report
- * says so in Blocking terms"). A milestone is COMPLETE when every declared leg
- * has a receipt, nothing is BROKEN, every non-PASS receipt carries a reason,
- * and every gate is either signed or explicitly waived on the record.
+ * A run is *complete in its accounting, not green* — which is what SPEC.md §6
+ * actually asks for of the G1 capability ("DMN may still be non-executable at
+ * G1 only if the report says so in Blocking terms"). A run is COMPLETE when
+ * every declared leg has a receipt, nothing is BROKEN, every non-PASS receipt
+ * carries a reason, and every gate is either signed or explicitly waived on the
+ * record.
+ *
+ * It judges a RUN and not a milestone: G0-G4 describe what this tooling can do,
+ * in the order it was built, and a body of law does not pass through them
+ * (R9, §3.9). The rule itself is unchanged — only the thing it is a rule about
+ * was ever misnamed.
  */
-export function milestoneVerdict({ declared, receipts, gates }) {
+export function runVerdict({ declared, receipts, gates }) {
   const byStage = new Map();
   for (const r of receipts) byStage.set(r.stage, r);
 
-  // A milestone that declares nothing is not a completed milestone, it is an
-  // unstarted one. Without this, an EMPTY journal satisfies every clause of the
+  // A run that declares nothing is not a completed run, it is an unstarted
+  // one. Without this, an EMPTY journal satisfies every clause of the
   // rule below vacuously and reports COMPLETE — the exact vacuous-pass failure
   // this lattice exists to refuse everywhere else.
   if (!declared.length)

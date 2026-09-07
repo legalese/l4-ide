@@ -14,7 +14,7 @@
 //        [--oracle-because TEXT] [--artifact PATH]... [--inputs-digest D] \
 //        [--replayed-from HASH] [--replayed-from-run RUNID]
 //        [--metric key=value]...
-//   node etc/go/lib/receipt.mjs run-begin  --run DIR --run-id ID --milestone M --subject S ...
+//   node etc/go/lib/receipt.mjs run-begin  --run DIR --run-id ID --encoding E --subject S ...
 //   node etc/go/lib/receipt.mjs run-end    --run DIR --verdict V
 //   node etc/go/lib/receipt.mjs gate       --run DIR --gate HG1 --state satisfied|waived|refused \
 //        [--namespace NS] [--payload-digest D] [--corpus-digest D] \
@@ -135,7 +135,12 @@ switch (kind) {
     append(journal, {
       kind: "run_begin",
       run_id: args.run_id,
-      milestone: args.milestone,
+      // WHICH ENCODING THIS RUN IS ABOUT — `primary`, a declared id, or
+      // `undeclared`. It replaced `milestone` at journal schema 5 (R9, §3.9):
+      // a run is about one subject and one encoding of it, and a capability
+      // label named neither. `g2` in particular named an ordinal, which stops
+      // identifying anything once a subject declares two additional encodings.
+      encoding: args.encoding,
       subject: args.subject,
       repo_head: args.repo_head ?? null,
       tree_state: args.tree_state ?? null,

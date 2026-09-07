@@ -8,9 +8,9 @@
 # "cooperate with the standards", an unlisted LegalDocML leg is worth surfacing.
 #
 # It is declared EXTRA rather than a P7 leg, which has a structural consequence:
-# it is not in G1's declared stage list contributing to the milestone rule the
+# it is not in the primary declared stage list contributing to the run rule the
 # way the mandated legs are, and its oracle is well-formedness, which
-# etc/go/lib/verdict.mjs bars from PASS. So this leg cannot raise the milestone
+# etc/go/lib/verdict.mjs bars from PASS. So this leg cannot raise the run
 # verdict no matter what it reports.
 
 if [[ "${1:-}" == "--inputs" ]]; then

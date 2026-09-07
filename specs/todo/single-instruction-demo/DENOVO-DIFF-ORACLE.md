@@ -19,9 +19,9 @@ measurements below this header predate the wiring and are kept as written. Where
 disagrees with the tree, the tree wins.
 
 What that means for SPEC.md §6's milestone list: G2's acceptance is "the §8 diff oracle", and a
-`go.sh run --milestone g2` now runs it wherever the sidecar declares a surface map. The pipeline
+A deposit-path `go.sh run` now runs it wherever the sidecar declares a surface map. The pipeline
 still WRITES no de novo encoding — producing the deposits remains agent work by design — so a
-subject with no deposits still yields a `SKIPPED` comparator receipt, on the record.
+subject with no deposits still yields a`SKIPPED` comparator receipt, on the record.
 
 ---
 

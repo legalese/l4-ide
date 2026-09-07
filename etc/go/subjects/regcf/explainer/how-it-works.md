@@ -53,7 +53,7 @@ receipt as it goes. The reasons matter more than the names:
 - **The gate** is where a human either signs off on the judgements a machine
   cannot make, or explicitly waives that requirement with a stated reason. There
   are two, and only one of them can be waived:
-  [HG1 is the only waivable gate. HG2 guards anything outward-facing](src:etc/go/go.sh#L29 "verbatim").
+  [HG1 is the only waivable gate. HG2 guards anything outward-facing](src:etc/go/go.sh#L38 "verbatim").
   The header of this page tells you what happened to the first. A waiver is not
   an absence; it is a verdict with somebody's reason attached.
 - **Tests** run the rules against cases with known answers —

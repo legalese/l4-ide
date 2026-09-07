@@ -54,9 +54,9 @@ fi
 # The one question this leg's shape turns on, and it is now asked of the
 # DECLARATION rather than of a label. That re-keying is the substantive part of
 # the R2/R3 change here. `GO_MODULES_ORIGIN=denovo` said which PASS a run was,
-# and the leg then had to KNOW, as an unwritten fact about the milestone, that a
+# and the leg then had to KNOW, as an unwritten fact about the run, that a
 # second pass happens to have nothing committed to diff against — so the
-# milestone and the oracle were welded together in a reader's head, and a third
+# stage set and the oracle were welded together in a reader's head, and a third
 # encoding would have had nowhere to sit. The sidecar states the fact outright,
 # so the leg reads it: no golden, no differential oracle, whoever the run is
 # about.

@@ -8,8 +8,8 @@
 # The R4 fork-space agreement/divergence sweep (rung 2) and an external model
 # checker (rung 3) are still unbuilt, and the note on the receipt says so.
 #
-# DECLARED AT BOTH MILESTONES since 2026-08-09 (D3): `go.sh` names p8-verify
-# in G1_STAGES (after p6-tests) and G2_STAGES, HG1-gated at both — SPEC.md
+# DECLARED ON BOTH PATHS since 2026-08-09 (D3): `go.sh` names p8-verify
+# in PRIMARY_STAGES (after p6-tests) and DEPOSIT_STAGES, HG1-gated in both — SPEC.md
 # §7.3 blocks P6 onward, and this stage publishes analysis OF the encoding
 # under review. It verifies whichever module set the driver resolved
 # (GO_MODULES: the committed corpus at g1, the de novo deposit at g2); the

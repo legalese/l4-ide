@@ -1,6 +1,6 @@
 # Status Vocabulary Reference
 
-Eight statuses, five oracle classes, four milestone verdicts, and the rules that stop any of them from being nicer than the evidence behind it.
+Eight statuses, five oracle classes, four run verdicts, and the rules that stop any of them from being nicer than the evidence behind it.
 
 **Canonical references:**
 
@@ -16,7 +16,7 @@ Eight statuses, five oracle classes, four milestone verdicts, and the rules that
 - [The eight statuses](#the-eight-statuses)
 - [The five oracle classes](#the-five-oracle-classes)
 - [The rules a receipt must satisfy](#the-rules-a-receipt-must-satisfy)
-- [The four milestone verdicts](#the-four-milestone-verdicts)
+- [The four run verdicts](#the-four-run-verdicts)
 - [Four things people mis-label](#four-things-people-mis-label)
 - [What a replayed receipt means](#what-a-replayed-receipt-means)
 
@@ -83,14 +83,14 @@ If a leg's only available oracle is weak, the honest status is `UNVERIFIED` with
 
 1. **`PASS` requires an oracle** that records a command, returned exit 0, and declares a sufficient class.
 2. **`PASS` requires at least one artifact on disk**, with its sha256 recorded. A status may not point at nothing.
-3. **Every non-`PASS` status requires a reason**, because the report has to print something and the milestone rule requires it.
+3. **Every non-`PASS` status requires a reason**, because the report has to print something and the run rule requires it.
 4. **`NOT-EXECUTABLE`, `NOT-REGENERATED` and `NOT-BUILT` require a `blocker`** naming the specific missing thing — not "unsupported", but which file does not exist, which ruling is open, which command has no implementation.
 5. **Every artifact carries a sha256.** An unhashed file cannot be re-checked later, so it cannot support a status.
 6. **A weak oracle class caps at `UNVERIFIED`.**
 
 ---
 
-## The four milestone verdicts
+## The four run verdicts
 
 | verdict      | exit | condition                                                                                                                                                                         |
 | ------------ | ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -99,7 +99,7 @@ If a leg's only available oracle is weak, the honest status is `UNVERIFIED` with
 | `GATE`       | 3    | a human gate was not satisfied                                                                                                                                                    |
 | `BROKEN`     | 4    | a harness defect                                                                                                                                                                  |
 
-`COMPLETE` is **completeness of accounting, not greenness.** That reading is not a convenience: SPEC.md §6 defines G1 as permitting a non-executable DMN _only if the report says so in Blocking terms_, which is a rule about what the report contains, not about what colour the legs are. A milestone where nine of thirteen legs are honestly non-green and every one of them is explained is a successful milestone. A milestone where one leg is silently missing is not, even if the other twelve are green.
+`COMPLETE` is **completeness of accounting, not greenness.** That reading is not a convenience: SPEC.md §6 defines G1 as permitting a non-executable DMN _only if the report says so in Blocking terms_, which is a rule about what the report contains, not about what colour the legs are. A run where nine of thirteen legs are honestly non-green and every one of them is explained is a successful run. A run where one leg is silently missing is not, even if the other twelve are green.
 
 `BROKEN` outranks `GATE`, which outranks `INCOMPLETE`. A defective harness is not a gate problem and should not be reported as one.
 
@@ -123,7 +123,7 @@ A resumed run does not re-execute a stage whose declared inputs digest to the sa
 
 Three properties follow, and all three matter:
 
-- **The verdict is stable under replay.** Running the same milestone twice produces the same milestone verdict. Demoting a replayed `PASS` was tried and rejected: it makes the verdict depend on how many times you ran it, which destroys the only reason resumability is worth having.
+- **The verdict is stable under replay.** Running the same selection twice produces the same run verdict. Demoting a replayed `PASS` was tried and rejected: it makes the verdict depend on how many times you ran it, which destroys the only reason resumability is worth having.
 - **A replayed `PASS` needs no oracle of its own.** Its evidence is the earlier row, in the same hash-chained journal, which `go.sh verify` re-checks.
 - **The artifact hashes are copied, not recomputed.** Re-hashing would launder a file that changed after the original receipt was written; copying means `go.sh verify` still compares the original sha256 against what is on disk now and reports `CHANGED`.
 

@@ -7,7 +7,7 @@
 # means fetching the subject's source text, which is an outward network act this
 # orchestrator does not perform — its one and only outward request is the
 # loopback jl4-service deployment in p7-mcp.sh (ORCHESTRATOR.md §6.4). Fetching
-# is therefore agent-side work owned by the G2 section of
+# is therefore agent-side work owned by the deposit runbook in
 # .claude/skills/running-the-l4-pipeline/SKILL.md, including the archive-fallback
 # route the BNA smoke run needed when legislation.gov.uk answered an AWS WAF
 # challenge (SMOKE-REPORT.md §2, p1-ingest) — which the schema records as

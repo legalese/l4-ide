@@ -192,7 +192,7 @@ const gateStates = [...new Map(gateRecs.map((g) => [g.gate, g])).values()].map(
 );
 // The RECORDED verdict is the only verdict this document will print.
 //
-// It used to fall back to `milestoneVerdict(...)` when no `run_end` existed
+// It used to fall back to `runVerdict(...)` when no `run_end` existed
 // yet, and that produced a FALSE STATEMENT in the copy that carries a hash:
 // `p9-explain` renders inside its own stage, before its own `stage_end` and
 // before `run_end`, so the recomputation saw a declared stage with no receipt
@@ -567,7 +567,7 @@ function ladderSubsection() {
     return absent(
       "A ladder diagram draws one decision's Boolean structure: an AND is a series circuit, an OR a parallel one, and each leaf is a field name carrying the regulation's own words.",
       declared.includes("p7-ladder")
-        ? "`p7-ladder` is declared at this milestone and produced no receipt, so no figure is attested."
+        ? "`p7-ladder` is declared for this run and produced no receipt, so no figure is attested."
         : "`p7-ladder` is not declared for this subject, so no figure is attested.",
     );
   const why = ladderWhy();
@@ -660,7 +660,7 @@ function ltsSubsection() {
       absent(
         "The state-graph leg emits one graph per regulative rule.",
         declared.includes("p7-lts")
-          ? "`p7-lts` is declared at this milestone and produced no receipt."
+          ? "`p7-lts` is declared for this run and produced no receipt."
           : "`p7-lts` is not declared for this subject.",
       ),
     ].join("\n");
@@ -751,7 +751,7 @@ function bpmnSubsection() {
       absent(
         "The BPMN leg emits one process per regulative rule.",
         declared.includes("p7-bpmn")
-          ? "`p7-bpmn` is declared at this milestone and produced no receipt."
+          ? "`p7-bpmn` is declared for this run and produced no receipt."
           : "`p7-bpmn` is not declared for this subject.",
       ),
     ].join("\n");
@@ -881,7 +881,7 @@ function dmnSubsection() {
       absent(
         "The DMN leg emits the whole corpus as a decision requirements graph.",
         declared.includes("p7-dmn")
-          ? "`p7-dmn` is declared at this milestone and produced no receipt."
+          ? "`p7-dmn` is declared for this run and produced no receipt."
           : "`p7-dmn` is not declared for this subject.",
       ),
     ].join("\n");
@@ -1043,7 +1043,7 @@ function sweepSection() {
     narrative +
     absent(
       "This pipeline has a stage that searches for external modification — court decisions, agency interpretive guidance, rules in flight — and records what it searched, not only what it found.",
-      "`p2-sweep` is not declared at this milestone. Nothing was searched, so nothing may be reported as searched, and this document makes no claim that the encoding is current with respect to courts, C&DIs, no-action letters, or rules in flight. (At `g2` the stage validates a deposited register — but note that validating a register is not performing a sweep: no procedure enumerates the searches that should have run.)",
+      "`p2-sweep` is not declared for this run. Nothing was searched, so nothing may be reported as searched, and this document makes no claim that the encoding is current with respect to courts, C&DIs, no-action letters, or rules in flight. (On the deposit path the stage validates a deposited register — but note that validating a register is not performing a sweep: no procedure enumerates the searches that should have run.)",
     )
   );
 }
@@ -1312,7 +1312,7 @@ function provenanceSection() {
     `etc/go/go.sh verify --run-id ${begin.run_id} --gates`,
     "```",
     "",
-    "The first re-renders this page — both carriers — from the journal, the narrative and the artifacts; the second re-reads the journal, re-hashes every artifact a receipt names, and recomputes the milestone verdict. Neither runs a build, calls a model, or makes a network request.",
+    "The first re-renders this page — both carriers — from the journal, the narrative and the artifacts; the second re-reads the journal, re-hashes every artifact a receipt names, and recomputes the run verdict. Neither runs a build, calls a model, or makes a network request.",
   ].join("\n");
 }
 
@@ -1363,13 +1363,14 @@ const p9r = byStage.get("p9-report");
 const reportPointer = p9r
   ? `[\`report.md\`](report.md) — the audit account of this same run; \`p9-report\` reported **${p9r.status}**`
   : declared.includes("p9-report")
-    ? "`report.md` — `p9-report` is declared at this milestone and left no receipt, so no audit report is accounted for"
+    ? "`report.md` — `p9-report` is declared for this run and left no receipt, so no audit report is accounted for"
     : "`report.md` — `p9-report` is not declared for this run, so there is no audit account to link to";
 
 const values = {
   "explainer.title": manifest.title,
   "run.id": begin.run_id ?? "(none)",
-  "run.milestone_upper": (begin.milestone ?? "?").toUpperCase(),
+  "run.encoding":
+    begin.encoding ?? (begin.milestone ? `legacy:${begin.milestone}` : "?"),
   "run.subject": begin.subject ?? "(none)",
   "run.subject_display": desc.display_name,
   "run.citation": desc.citation,

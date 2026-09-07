@@ -80,7 +80,7 @@ flowchart LR
   HG2 --> P10[P10 publish\nlegalese/canon]
 ```
 
-Two facts make this more than a diagram. First, **it runs**: the replay milestone is measured, and the flagship corpus executes — **1,340/1,340** expected values across **20** dated test cases, answered identically by two independent DMN engines. Second, **every stage writes receipts**: statuses come from scripts with exit codes, a report is generated from the journal (never typed), and each projection ships with a _fidelity report_ that declares what the target notation could not carry. We would rather say “lossy, and here is exactly what was lost” than pretend.
+Two facts make this more than a diagram. First, **it runs**: the replay path is measured, and the flagship corpus executes — **1,340/1,340** expected values across **20** dated test cases, answered identically by two independent DMN engines. Second, **every stage writes receipts**: statuses come from scripts with exit codes, a report is generated from the journal (never typed), and each projection ships with a _fidelity report_ that declares what the target notation could not carry. We would rather say “lossy, and here is exactly what was lost” than pretend.
 
 The pipeline’s output lands in [**legalese/canon**](https://github.com/legalese/canon) — a public corpus where each subject carries its encoding, tests, projections, registers, conversion report, and the gate signatures. Yours will be the signature that upgrades a subject from `adversarially-reviewed` to `reviewed`.
 
@@ -307,8 +307,8 @@ If you would rather see the machinery than talk to it, the driver is usable dire
 ```bash
 # $L4 is already set, from whichever of the two routes above you took;
 # go.sh refuses outright if it does not point at something executable
-etc/go/go.sh plan --milestone g1
-etc/go/go.sh run  --milestone g1 --subject regcf
+etc/go/go.sh plan --subject regcf --encoding primary
+etc/go/go.sh run  --subject regcf --encoding primary
 ```
 
 ### If your machine is not set up for Haskell — four routes
@@ -326,7 +326,7 @@ Only route two above needs GHC, and on Windows a native GHC install is the least
 
 > **Where you run it is free. Where you sign is not.** Running the pipeline on a cloud sandbox, a colleague's laptop or a build server changes nothing about the result — the run is reproducible and its journal says what happened. **Signing is a different act.** The private half of the key in § 4 is what binds _your name_ to a digest, and `gate-request.sh` is explicit that the signature is made “out of band, with a key that never enters the worktree”. So generate it on a machine you control, keep it there, and sign there: the gate prints a short payload file, and you can carry that to the key rather than the key to the payload. A signing key sitting in a disposable sandbox would still verify — it would simply stop meaning the thing the gate exists to mean.
 
-**Which of this was measured, and on what.** On `darwin-arm64`, on **5 August 2026**, against release `unstable-20260805-c873bb5`: the archive's checksum matched the published `SHA256SUMS`; the extracted `l4` evaluated a file importing a bundled library from an unrelated working directory with `JL4_LIBRARY_PATH` unset; `go.sh` refused a bogus `$L4` by name; and `L4=<extracted>/l4 etc/go/go.sh run --milestone g1 --subject regcf --through p3-check` reached `p0-preflight: PASS` with `l4 check` exiting 0 on both corpus files. The `linux-x64` and `win32-x64` archives were smoke-tested on their own build runners, and _not_ by anyone running a `go` on that platform.
+**Which of this was measured, and on what.** On `darwin-arm64`, on **5 August 2026**, against release `unstable-20260805-c873bb5`: the archive's checksum matched the published `SHA256SUMS`; the extracted `l4` evaluated a file importing a bundled library from an unrelated working directory with `JL4_LIBRARY_PATH` unset; `go.sh` refused a bogus `$L4` by name; and `L4=<extracted>/l4 etc/go/go.sh run --subject regcf --encoding primary --through p3-check` reached `p0-preflight: PASS` with `l4 check` exiting 0 on both corpus files. The `linux-x64` and `win32-x64` archives were smoke-tested on their own build runners, and _not_ by anyone running a `go` on that platform.
 
 ### Where you come in, and how to get past yourself
 
@@ -335,7 +335,7 @@ The run will stop at **HG1** and ask for your signature, because everything from
 But while you are still finding your feet, stopping at a gate every time is friction with no review value, so the gate is _waivable_ — on the record, never silently:
 
 ```bash
-etc/go/go.sh run --milestone g1 --subject regcf \
+etc/go/go.sh run --subject regcf --encoding primary \
   --waive HG1="learning the pipeline; not a review of the encoding"
 ```
 

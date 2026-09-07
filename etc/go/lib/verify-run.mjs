@@ -14,7 +14,7 @@
 import { existsSync, statSync } from "node:fs";
 import { isAbsolute, resolve } from "node:path";
 import { sha256File, verify } from "./ledger.mjs";
-import { milestoneVerdict } from "./verdict.mjs";
+import { runVerdict } from "./verdict.mjs";
 
 const args = process.argv.slice(2);
 const rundir = args.find((a) => !a.startsWith("--"));
@@ -96,12 +96,12 @@ for (const r of stageEnds) {
   }
 }
 
-// --- 2. the milestone verdict, recomputed --------------------------------------
+// --- 2. the run verdict, recomputed --------------------------------------------
 const declared = begin?.declared_stages ?? [];
 const gateStates = [...new Map(gates.map((g) => [g.gate, g])).values()].map(
   (g) => ({ gate: g.gate, state: g.state, reason: g.reason }),
 );
-const verdict = milestoneVerdict({
+const verdict = runVerdict({
   declared,
   receipts: stageEnds,
   gates: gateStates,
@@ -161,7 +161,7 @@ if (wantGates) {
         detail: `${g.gate} is recorded satisfied with no signature file named`,
       });
   }
-  // A gate needs a record only if this milestone actually declares one of the
+  // A gate needs a record only if this run actually declares one of the
   // stages it gates. HG2 gates p10-publish, which is not a G1 stage, so its
   // absence from a G1 journal is correct and must not be reported as a finding.
   for (const [gname, gatedStages] of Object.entries(GATED_BY)) {
@@ -177,7 +177,12 @@ if (wantGates) {
 const out = {
   rundir,
   run_id: begin?.run_id ?? null,
-  milestone: begin?.milestone ?? null,
+  // WHAT THE RUN WAS ABOUT. Schema 5 records the encoding; a schema-4 journal
+  // records only a capability label, and `g2` named an ordinal from which the
+  // encoding CANNOT be recovered — so it is reported as what it is rather than
+  // translated into an id nobody wrote down.
+  encoding:
+    begin?.encoding ?? (begin?.milestone ? `legacy:${begin.milestone}` : null),
   subject: begin?.subject ?? null,
   chain_ok: chain.ok,
   chain_problems: chain.problems,
@@ -200,7 +205,7 @@ if (asJson) {
   process.stdout.write(JSON.stringify(out, null, 2) + "\n");
 } else {
   process.stdout.write(
-    `run ${out.run_id ?? "(no run_begin)"} — ${out.milestone ?? "?"}/${out.subject ?? "?"}\n`,
+    `run ${out.run_id ?? "(no run_begin)"} — ${out.subject ?? "?"}/${out.encoding ?? "?"}\n`,
   );
   process.stdout.write(
     `  journal chain: ${chain.ok ? "verifies" : "BROKEN"} (${records.length} records)\n`,
