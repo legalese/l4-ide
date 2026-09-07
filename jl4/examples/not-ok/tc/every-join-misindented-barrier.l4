@@ -1,0 +1,37 @@
+-- The barrier's half of the layout guard. Sibling of
+-- every-join-misindented.l4, which pins the same defect for the fork.
+--
+-- BOTH join spellings are bodiless -- `ONCE ALL HAVE` and `UPON EACH` each
+-- carry no expression of their own -- so neither has a body whose indentation
+-- would catch a misplaced line. That is why every WORD of a join line is
+-- column-checked (L4.Parser.joinLine), and why both spellings need a fixture:
+-- the guard is per-alternative, and a refactor could easily restore one and
+-- lose the other.
+--
+-- Here the author writes `ONCE ALL HAVE` at the OUTER rule's clause column,
+-- meaning it for the outer EVERY -- but a nested EVERY is still open inside the
+-- outer's HENCE, and the nested one's clauses live further right. Without the
+-- guard this parsed clean, attached the BARRIER to the inner rule, and
+-- exactprinted byte-for-byte, so nothing showed the author that the join had
+-- bound to the wrong rule.
+--
+-- As in the fork's fixture, a misplaced HEAD keyword is reported by the
+-- expression follow-set rather than as an indentation error; only a misplaced
+-- second word (ALL, HAVE, EACH) says "incorrect indentation".
+
+DECLARE Actor IS ONE OF
+    Tenant HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Sign HAS signer IS AN Actor
+
+GIVETH A DEONTIC Actor Action
+`bad` MEANS
+    EVERY Tenant x
+        MUST   Sign (EXACTLY x)
+        WITHIN 1
+        UPON   EACH
+        HENCE  EVERY Tenant y
+                   MUST   Sign (EXACTLY y)
+                   WITHIN 2
+        ONCE   ALL HAVE
