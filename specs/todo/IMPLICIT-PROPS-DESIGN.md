@@ -923,7 +923,10 @@ checker, 333 warnings; the six files with a parse error never reach it.
   destination for a head-form function `ASSUME` has no spelling `@export` accepts, and
   `doc/reference/types/ASSUME.md`'s "refuses it either way" was false (corrected). **Needs a ruling**
   before the sibling rewrite touches those five files: widen the gate to the head form (consistent,
-  and breaks those files' exports), or accept function-typed section `GIVEN`s that only helpers read.
+  and breaks those files' exports), or accept function-typed section `GIVEN`s that only helpers read. **RULED 2026-09-07 (R-X4,
+  §11.20): neither, because the premise was false — the head form does not export either.** It
+  passes `l4 check` and then fails every batch row, so the gate is inconsistent rather than
+  protective. It is re-keyed on the AppForm's arity, refusing both spellings at check time.
 - **`l4 batch` re-prints a TDNR section `GIVEN` wrongly.** `Export.rewriteModuleAssumes` keeps the
   surviving binders by raw name (`filterGivenSigTo`), so dropping one of two same-named
   elaborations keeps both `GivenSig` parameters and the reprint declares the name three times. Same
@@ -1014,6 +1017,15 @@ inputs. As definitions the pattern runs today on the FIX D branch exactly as int
 `ASSUME` in each section it checks identically; the shipped binary gets it wrong only through the
 defect FIX D repairs. Preconditions: FIX D and the §3.3.4 drift, both on
 `fix/section-scoping-ambiguity`. Detail: `PROPS-REDTEAM-2026-09-03.md` §2.1, §2.2.
+
+**The per-root check is NOT BUILT — measured 2026-09-07, and R-X2 (§11.20) rules it built as one
+job with the call-site type check.** `TypeCheck.hs:236-244` wires exactly two whole-module implicit
+checks, both keyed to supply sites; nothing scans a root's read-set. Witness on the shipped fixture
+`ok/section-given-bridge.l4` plus two lines, `` `both` MEANS foo PLUS g `` and
+``#EVAL `both` WITH foo IS 1``: under section 1 the answer is **991** (1 + 99×10 — the supply
+reached one `foo`, the other fell to its default); the identical lines under section 2 give **11**.
+`l4 check` succeeds both times. `ambiguousFor` (`Discharge.hs:476-479`) cannot see the case because
+it requires the resolved `Unique` to be absent from the read-set, and here it is present.
 
 ### 11.5 R8 — `TYPICALLY` has one behaviour, filled in once at the root. RULED 2026-09-04.
 
@@ -1641,7 +1653,9 @@ recorded under "deferred" below.
 argument that is not one of the callee's declared parameters when the name is
 one the module's section `GIVEN`s bind (a new `CheckEnv.sectionBinderNames`,
 filled from `L4.Desugar.collectSectionBinderNames` before desugaring), checks it
-against the binder's declared type, and records it with a negative index
+against **the type the name resolves to in the caller's scope** — not the binder's declared
+type, which this sentence claimed until 2026-09-07 and which was never true; see R-X2 in §11.20 —
+and records it with a negative index
 (`implicitSupplyIndex`, documented on `AppNamed` in `L4.Syntax`).
 `inferAppNamed` accepts such a site on a callee with no function type at all,
 which is the common case: before discharge a 0-ary rule is not a function, and
@@ -1780,6 +1794,12 @@ the spelling case can only fire where the `Unique` case failed, and such a suppl
 is an error today, so it can turn an error into a working program and can never
 change an answer a working program already gives. Two same-spelled binders in one
 read-set is `AmbiguousImplicitSupply`, a new error, rather than a guess.
+**Refuted 2026-09-07 (R-X2, §11.20).** The argument is sound about answers a working
+program already gives and silent about whether the program it turns the error into
+is well-typed. It is not: the value is typed against the caller's resolution of the
+name and delivered by spelling to a binder whose `typ` is never consulted, so
+`l4 check` passes a `STRING` into a `GIVEN rate IS A NUMBER` and `l4 run` returns it
+from a rule declared `GIVETH A NUMBER`. smucclaw/l4-ide#956.
 `ok/section-given-bridge.l4` and `not-ok/tc/section-given-ambiguous-supply.l4`.
 
 **A reader passed as a value was a check error.** See the deferrals below; it is
@@ -2007,3 +2027,51 @@ moved there 2026-09-05 because a defect that spans `Export.hs`, `Batch.hs` and `
 a props-spec section, and because `OF-7` is a stable id while a §11 number is not: three branches
 appended to §11 on one day and collided. **Cite `OF-7` for the defect and §11.19 for the ruling.**
 Also recorded in `PROPS-REDTEAM-2026-09-03.md` §7.
+
+**R-X3, 2026-09-07 (§11.20): the closure is the END STATE, and this section's ordering stands.**
+Meng accepted "make the import transparent — the caller's value reaches the binder" on the
+post-review bench. That is the closure this ruling already permits as the second move; the refusal
+remains the first, for the reason given above and now measured twice more (the review's finding 4,
+and the GM's own three-shape re-run, in which every shape returned `{"errors":[],"status":"valid"}`
+for a row missing the imported binder). One thing the re-run did NOT confirm: the review's headline
+that a `TYPICALLY` makes the failure a silent wrong answer. The GM's shapes failed loudly, two
+different ways. The schema half is certain; the silent half is unestablished.
+
+### 11.20 R-X1–R-X6 — the post-review bench. RULED 2026-09-07.
+
+Six cards, "What the Review Left Open" (an artifact, **not in the tree**,
+<https://claude.ai/code/artifact/1fdea3d4-eec3-4c06-a53c-25e3f4f9d35e>, db collection
+`fix-rulings`), put to Meng after the adversarial review of `unstable` `caf6e656` (workflow
+`wf_1f3eeb1e-5ca`: 56 agents, eight dimensions, two refuters per material finding; 23 survived, 1
+killed, 9 unverified). Marked 06:34–06:39 UTC. Notes verbatim. **Cite R-Xn, not the section number.**
+R-X5 and R-X6 concern the regulative window and are recorded in
+`EVERY-EACH-QUANTIFIER-SPEC.md` §5.1.2.
+
+| id   | question                              | mark       | ruling                                                                                                                                                                        |
+| ---- | ------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| R-X1 | does wave 3 (`unstable`→`main`) wait? | **accept** | Waits for R-X2 and R-X3 to be built. A release decision; also in the GM register and told to the merge manager.                                                               |
+| R-X2 | how the `WITH` type check is fixed    | **accept** | Option c: check the supply against the **binder's** declared type AND build R3's per-root check (§11.4). One job, one confusion.                                              |
+| R-X3 | cross-`IMPORT`: silent or loud?       | **accept** | Option b, the closure, as END STATE. §11.19's ordering stands: refusal first. See the note under §11.19.                                                                      |
+| R-X4 | the `@export` gate, reframed          | **accept** | Option a: gate on **arity**; both spellings refused at check time. _"let's come back to this and backlog B for future work."_ — B is the predicate-as-row export, backlogged. |
+
+**What decided each.**
+
+- **R-X1.** The top finding is `l4 check` certifying a wrong-typed program (#956). Silent, not loud,
+  which is the difference from known-defect releases shipped before.
+- **R-X2.** The card first recommended option a alone; the GM moved it to c after measuring the
+  991/11 swing on `ok/section-given-bridge.l4` (§11.4 note). The row reading, discussed the same day:
+  `Discharge` already elaborates the read-set into a trailing record of parameters, closed and
+  computed bottom-up, so this is the missing **type** of that record, not a new mechanism. R3's
+  hybrid — child shadows ancestor, siblings must be distinct per root — is the row's well-formedness
+  condition. **Not built.**
+- **R-X3.** See §11.19. The card omitted §11.19 because it was written before that section was
+  re-read; recorded here so the omission is not repeated.
+- **R-X4.** Measured by the GM on `blawx/antisocial.l4`: `Check succeeded`, then `--validate-only`
+  demands eleven fields including `'is authorised'` and `'conduct'` — predicates over a `Person` —
+  and a full row dies inside `antisocial.l4.batch1.l4` with "multiple definitions for the identifier
+  effect … of type Consequence / FUNCTION FROM InputArgs TO Consequence". Cause:
+  `checkAssumeFunctionInputs` (`Export.hs:672-679`) binds `MkAppForm _ paramName _ _` and tests the
+  declared `ty`, discarding the argument list. Three shipped files, 18 `@export`ed rules, none
+  invocable. §11.1.2's reason for keeping six files on `ASSUME` was true only of `l4 check`.
+  **Backlogged (Meng's note):** teach the export path to take a predicate as an enumerated row of
+  values. **Not built.**

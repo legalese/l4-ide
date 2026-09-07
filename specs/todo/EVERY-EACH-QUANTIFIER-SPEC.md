@@ -6,7 +6,7 @@
 > Where a claim below is false on that branch, the entry says which tree it describes.
 >
 > - On `unstable`: `EVERY`, `EACH`, `NO`, `ONCE`, `HAVE`, `WHO`, `WHOSE` and `SOME` are not lexer keywords (the keyword
->   table in `jl4-core/src/L4/Lexer.hs`; `identifierOrKeyword` at `Lexer.hs:654-659` is an exact map
+>   table in `jl4-core/src/L4/Lexer.hs`; `identifierOrKeyword` at `Lexer.hs:670-675` (since #360; `:654-659` before it) is an exact map
 >   lookup, so there are no soft keywords). `ALL` is `TKAll` (`Lexer.hs:317`), consumed by `FOR ALL`
 >   (`Parser.hs:1244-1245`) and `RECALL ALL` (`Parser.hs:2375`).
 > - `obligation` takes exactly one party expression after `PARTY` (`Parser.hs:2503-2513`); `HENCE` and
@@ -15,7 +15,8 @@
 >   `jl4/experiments/` (`regulative-powers.l4:4`, `deontic-may.l4:99-101`, `jerseyAlcohol.l4:42`).
 > - **Rulings so far:** R-T1–R-T6 (§2.2.7.8, 2026-09-06); the pattern spelling (§2.4, 2026-09-07);
 >   **R-Q1–R-Q7 (§2.5, 2026-09-07)**; **R-Q7A–R-Q7C, the anchor's spelling (§5.1.1, 2026-09-07;
->   ruled, not built)**. Under R-Q1 there is one quantifier word, `EVERY`, and a
+>   ruled, not built)**; **R-X5 (the window's edges, modified) and R-X6 (the early act, ruled),
+>   §5.1.2, 2026-09-07, not built**. Under R-Q1 there is one quantifier word, `EVERY`, and a
 >   mandatory join line under it whenever a continuation follows: `ONCE ALL HAVE` (barrier) or
 >   `UPON EACH` (fork). The fork's words were RULED on 2026-09-07 and are no longer provisional;
 >   `ONCE EACH HAS` does not parse. `EACH` is not a keyword and not a quantifier. The file keeps its
@@ -982,10 +983,11 @@ Action ::= Pattern ['PROVIDED' Expr]  -- the PROVIDED guard, measured working un
 
 TemporalConstraint ::= 'WITHIN' Duration ['OF' Anchor]   -- 'OF' Anchor: the named anchor of R-Q7 (§5.1).
                                       -- The connective is 'OF' and only 'OF' (R-Q7A, §5.1.1). Unbuilt.
-                     | 'BEFORE' Deadline                  -- documented as planned, unbuilt (doc/reference/regulative/README.md:102)
+                     | 'BEFORE' Expr                      -- R-X5: an absolute DATE, the closing edge; 'BEFORE' Duration is refused. Unbuilt
+                     | 'AFTER' (Duration ['OF' Anchor] | Expr)   -- R-X5: the opening edge, duration or DATE; never re-anchors. Unbuilt
                      | 'BY' Deadline                      -- unruled and unbuilt; TKBy serves FOLLOWED BY, DIVIDED BY, BREACH BY
 
-Anchor ::= 'THE' ('JOIN' | 'DEADLINE' | 'ARMING')   -- R-Q7B: the three lifecycle positions. THE is already
+Anchor ::= 'THE' ('JOIN' | 'DEADLINE' | 'ARMING' | 'OPENING')   -- 'OPENING' proposed by R-X5 (§5.1.2), residue   -- R-Q7B: the three lifecycle positions. THE is already
                                       -- a keyword (Lexer.hs:273); JOIN, DEADLINE and ARMING are matched by
                                       -- SPELLING and not reserved, exactly as EACH is in UPON EACH.
          | Event                      -- R-Q7: any recorded event, which the drafter has already named
@@ -1242,11 +1244,10 @@ branch was in the merge queue at the time):
   "Six Ways to Owe One Debt" page (an artifact, §2.2.7.6) describes the same pair.
 - The build's `doc/` page for the quantifier owes the `RAND`/`ROR` worked example of §8.3 (R-Q2,
   Meng's note).
-- `doc/reference/regulative/README.md:104` promises `BEFORE` as supporting **absolute deadlines**,
-  while `jl4/experiments/purchase.l4:97` writes `BEFORE 30 days` as a duration from the anchor and
-  says so in an inline comment. Two readings of one unbuilt keyword, and R-Q7C has just given
-  absolute deadlines a spelling that needs no keyword at all. §5.1.2 lays out the three ways out and
-  picks none of them; the page is owed a correction whichever wins.
+- `doc/reference/regulative/README.md:104` promises `BEFORE` for absolute deadlines. **R-X5
+  (2026-09-07, §5.1.2) keeps that reading**, so the page becomes true when `BEFORE` is built rather
+  than needing correction; `jl4/experiments/purchase.l4`'s seven `BEFORE n days` lines migrate to
+  `WITHIN`.
 - **The BPMN export cannot tell a barrier from a fork, and its fidelity report does not say so.**
   Measured 2026-09-07 by the GM on a binary built from `every/build-1`: one rule exported twice,
   once with `ONCE ALL HAVE` and once with `UPON EACH`, gives **byte-identical** BPMN XML and a
@@ -1633,10 +1634,11 @@ picked by an expression rather than named (R-Q7B's note); the date library (R-Q7
 whether an anchored `WITHIN` under `LEST` may name `THE JOIN` at all, which is a well-formedness
 question — under `LEST` the join did not fire.
 
-#### 5.1.2 `AFTER`: the window's opening edge — PROPOSED 2026-09-07, not ruled
+#### 5.1.2 `AFTER` and `BEFORE`: the window's two edges — MODIFIED 2026-09-07 (R-X5); the early act RULED (R-X6); not built
 
 This section answers the question in R-Q7A's note ("Shall we try to sketch a design for that now?").
-It is a sketch. Nothing here is ruled, and nothing here is built.
+R-X6 is ruled and R-X5 is a design Meng modified and asked to have worked through; both are
+recorded below. **Nothing here is built.**
 
 **The gap.** `WITHIN d` gives a window one edge, the closing one; the opening edge is the anchor
 itself, so an obligation is performable from the instant it arms. Meng's cooling-off example is the
@@ -1657,61 +1659,66 @@ BEFORE  8 days
 
 That is a window of `[a+5, a+8]`: **two offsets from one anchor**. Meng's sentence is a window of
 `[a+3, a+33]`: **an offset, then a length measured from where the offset ends**. Both readings are
-attested in real drafting, and the grammar in §2.4 already carries the other half of the first one —
-`'BEFORE' Deadline`, documented as planned and unbuilt (`doc/reference/regulative/README.md:102`).
+attested in real drafting. Until 2026-09-07 this section proposed telling them apart by the closing
+word; R-X5 replaced that, below.
 
-**The proposal: keep both readings, and let the closing word say which.** They are not ambiguous
-together, because the second word differs:
+**Meng's modify (R-X5, 2026-09-07), verbatim:** _"yikes. BEFORE more naturally mates with an
+absolute date, and WITHIN more naturally mates with a duration. can you think about this
+possibility?"_ Worked through here; it is better than the sketch it replaces, and the sketch's
+re-anchoring `AFTER` is withdrawn.
+
+**The design is type-directed, not keyword-directed.** Each edge word says which edge; the
+argument's type says how the edge is computed.
+
+| edge    | duration form          | absolute form   |
+| ------- | ---------------------- | --------------- |
+| opening | `AFTER d [OF anchor]`  | `AFTER <date>`  |
+| closing | `WITHIN d [OF anchor]` | `BEFORE <date>` |
+
+`WITHIN <date>` and `BEFORE <duration>` are check errors, each naming the other word. English
+already draws the line here — _within 30 days_, _before 30 June_, never _within 30 June_ — and so
+does the corpus: measured 2026-09-07, every `WITHIN` argument in the tree is a number or a backticked
+duration, none date-shaped. `AFTER` needs no second word because _after 5 days_ and _after 1 January_
+both read.
+
+**`AFTER` does not re-anchor.** Both edges measure from the same anchor, so the statutory two-offset
+window is the default and is written as the statute says it:
 
 ```
-AFTER  3 OF `delivery`   BEFORE 30      -- window [delivery+3, delivery+30]: two offsets, one anchor
-AFTER  3 OF `delivery`   WITHIN 30      -- window [delivery+3, delivery+33]: AFTER re-anchors, WITHIN measures
+AFTER  3 OF `delivery`
+WITHIN 30                          -- window [delivery+3, delivery+30]
 ```
 
-The reason to carry both is that they match different source texts. A statute that says _not earlier
-than 3 and not later than 30 days after delivery_ hands the drafter two offsets, and `BEFORE` takes
-them as written. A contract that says _a 3-day cooling-off period, then 30 days to order_ hands the
-drafter an offset and a length, and `WITHIN` takes those as written. Making a drafter do the
-arithmetic to reach the other spelling is exactly the kind of silent transcription error this
-language exists to remove.
+The re-anchored window — Meng's cooling-off sentence, `[delivery+3, delivery+33]` — uses the
+mechanism R-Q7 built for naming anchors, with one more lifecycle position joining R-Q7B's three,
+**`THE OPENING`** (the instant the window opened):
 
-Read `AFTER d OF a` as **re-anchoring**: it moves the reference time to `a + d`, and everything
-downstream measures from the moved anchor. That makes `WITHIN` mean what it already means and needs
-no second rule; `BEFORE` is then the one that reaches back past the move, to the original anchor.
-`AFTER` composes with R-Q7B's lifecycle anchors and R-Q7C's dates for free —
-`AFTER 30 OF THE ARMING`, `AFTER 3 OF closingDate` — and with the join line, since a fork's
-continuation has an anchor like any other (`UPON EACH` … `HENCE … AFTER 3 …`).
+```
+AFTER  3 OF `delivery`
+WITHIN 30 OF THE OPENING           -- window [delivery+3, delivery+33]
+```
+
+No arithmetic and no overloaded keyword; the two readings are told apart by an anchor, which is what
+anchors are for. Mixed edges compose: `AFTER 3 OF delivery BEFORE (YMD 2026 12 31)` opens
+relative and closes absolute, a real contract shape.
+
+**What this does to earlier rulings and files.** `doc/reference/regulative/README.md:104`, which
+promises `BEFORE` for absolute deadlines, becomes **true when built** instead of corrected.
+`jl4/experiments/purchase.l4` migrates by one word per line — its `BEFORE n days` at `:97`, `:101`,
+`:134`, `:153`, `:159`, `:164`, `:169` become `WITHIN n days` — with meaning preserved, because its
+`AFTER` never re-anchored either. R-Q7C stands (a date as an **anchor**, `WITHIN 5 OF closingDate`,
+is still needed) but its awkward idiom for the degenerate case, `WITHIN 0 OF (YMD …)`, is no longer
+the natural spelling; `BEFORE (YMD …)` is.
+
+**Residue, not ruled:** whether `THE OPENING` is wanted, or the re-anchored form is rare enough to
+write out by hand.
 
 **`AFTER` alone is well-formed** — a permission that opens and never closes is an ordinary legal
 object (a right that vests and does not expire).
 
-**`BEFORE` alone is the problem, and it has to be settled first.** Our tree already carries two
-incompatible readings of that word, neither of them built:
-
-- `doc/reference/regulative/README.md:104` says BEFORE is "planned, not yet implemented — will
-  support **absolute deadlines**", i.e. `BEFORE <a date>`.
-- `jl4/experiments/purchase.l4:97` writes `BEFORE 30 days` and explains itself in an inline comment
-  — _"relative temporal referent: when the UPON first starts to be true"_ — i.e. a **duration from
-  the anchor**, which is what `WITHIN` already means. It does so again at `:102`, and again in each
-  of the four nested blocks at `:152-168`.
-
-So the sketch above cannot simply help itself to `BEFORE` as the window's closing offset: that is
-purchase.l4's reading, and it contradicts the manual's. Worse, R-Q7C has just removed the manual's
-reason for the word — an absolute deadline now has a ruled spelling, `WITHIN 0 OF (YMD 2026 6 30)`,
-and needs no keyword of its own. Three ways out, and this document does not pick one:
-
-1. **Give `BEFORE` purchase.l4's meaning** — a duration from the anchor, so `AFTER 3 BEFORE 30` is
-   the two-offset window and `BEFORE 30` alone is a synonym for `WITHIN 30`. The manual's sentence
-   changes rather than becomes true, and the language gains a synonym pair, which it has admitted
-   once already (`DO` beside `MUST`, R-Q2).
-2. **Give `BEFORE` the manual's meaning** and find another closing word for the window. Then
-   `BEFORE` and R-Q7C's date slot say the same thing two ways, which is the cost the other direction.
-3. **Refuse `BEFORE` entirely** and let the window be `AFTER d1 WITHIN d2` only, re-anchored. One
-   spelling, no synonym, and the drafter does the arithmetic in the two-offset case — which is the
-   transcription error this section opened by objecting to.
-
-Whichever wins, `doc/reference/regulative/README.md:104` is owed a correction: it promises a feature
-under a meaning that at least one of our own sketches does not use.
+**The `BEFORE` conflict this section carried until 2026-09-07 is closed by R-X5.** The manual's
+reading (absolute date) wins; purchase.l4's reading (a duration) was `WITHIN`'s job all along, and
+that file's lines migrate as above.
 
 **The question a sketch cannot answer: what does an early act do?** Three readings, and they are not
 interchangeable:
@@ -1723,15 +1730,19 @@ interchangeable:
 
 For a `MAY`, (1) is the natural reading and (3) is how a wizard would render it. For a `MUST`, (1) is
 harsh but is what a cooling-off period means, and (2) is what a source that says _shall not … before_
-means — but a drafter with that source should be writing a `SHANT`, not an early `MUST`. The
-recommendation is **(1), with a diagnostic**: a silent nullity is how a party loses a deadline it
-believed it had met. This is the same territory as R-Q3's deferred bounded-deontics discussion, and
-it should be ruled with that, not before it.
+means — but a drafter with that source should be writing a `SHANT`, not an early `MUST`.
+
+**RULED 2026-09-07 (R-X6, Meng: accept): (1), nullity, with a diagnostic.** The act does not
+count as performance; the obligation stays live with its clock untouched; the party may act again
+once the window opens; and the machine reports that the act fell outside the window rather than
+swallowing it. A silent nullity is how a party loses a deadline it believed it had met. The card
+offered "defer to the bounded-deontics discussion" as a legitimate mark and it was not taken.
+**Not built.**
 
 **Cost, measured 2026-09-07 on this branch.** `AFTER` and `BEFORE` are **not** keywords
 (`jl4-core/src/L4/Lexer.hs`; the keyword table is an exact, case-sensitive `Map.lookup` on the raw
-identifier text at `identifierOrKeyword`, `Lexer.hs:670-675` **on this branch** — the status header's
-`:654-659` is that function's place on `unstable`, before this branch's keywords shifted it). Reserving `AFTER` touches six lines of `.l4` in the whole
+identifier text at `identifierOrKeyword`, `Lexer.hs:670-675` on `unstable` since #360 landed).
+Reserving `AFTER` touches six lines of `.l4` in the whole
 tree: four are `purchase.l4`'s aspirational `AFTER n days` above, in `jl4/experiments/`, which is
 **in no goldened glob** and already fails to parse for unrelated reasons; the other two are inside
 backticked section names in `housing-act-ground-5F.l4:605,:726`, and a backticked name never consults
