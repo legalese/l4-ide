@@ -15,7 +15,7 @@ theLandlord MEANS Landlord OF "Ms Ng"
 
 GIVETH A DEONTIC Actor Action
 `sign and deliver` MEANS
-    (EVERY Tenant t MUST Sign (EXACTLY t) WITHIN 14 HENCE FULFILLED LEST BREACH)
+    (EVERY Tenant t MUST Sign (EXACTLY t) WITHIN 14 ONCE ALL HAVE HENCE FULFILLED LEST BREACH)
     RAND
     (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) what WITHIN 14 HENCE FULFILLED LEST BREACH)
 

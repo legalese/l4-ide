@@ -1,9 +1,11 @@
 IMPORT prelude
 -- EVERY-EACH-QUANTIFIER-SPEC, phase 1 (front end): the barrier form.
 --
--- Every tenant must sign. A bare HENCE is the barrier: it fires ONCE, when the
--- last of them has signed (spec §2.2.6, §3.1). LEST fires at the deadline, and
--- blames exactly the tenants who did not sign (§6.1).
+-- Every tenant must sign. `ONCE ALL HAVE` is the barrier (R-Q1, RULED
+-- 2026-09-07): HENCE fires ONCE, when the last of them has signed (spec
+-- §2.2.6, §3.1). LEST fires at the deadline, and blames exactly the tenants
+-- who did not sign (§6.1). The ONCE line is mandatory whenever an EVERY has a
+-- HENCE or a LEST; see not-ok/tc/every-continuation-without-once.l4.
 --
 -- Phase 1 parses, scopes, type-checks and prints this; running it is phase 2,
 -- so the #EVAL below reports that, deliberately.
@@ -33,6 +35,7 @@ GIVETH A DEONTIC Actor Action
     EVERY Tenant t
         MUST   Sign (EXACTLY t)
         WITHIN 14
+        ONCE   ALL HAVE
         HENCE  `the tenancy begins`
         LEST   BREACH
 

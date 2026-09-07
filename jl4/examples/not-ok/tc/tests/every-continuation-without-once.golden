@@ -1,0 +1,38 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: every-continuation-without-once.l4
+  Hidden: no
+  Range: 14:58-14:67
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    An EVERY with a HENCE or LEST needs an ONCE line saying when it fires.
+
+    Write one of
+
+      ONCE ALL HAVE    -- once, when the last of them has acted (the barrier)
+      ONCE EACH HAS    -- once per member who acts (the fork)
+
+    on its own line between the act's WITHIN and the HENCE or LEST, indented
+    past the EVERY. There is no default: the two readings differ, and guessing
+    one would silently change the rule.
+
+File: every-continuation-without-once.l4
+  Hidden: no
+  Range: 21:16-21:27
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    An EVERY with a HENCE or LEST needs an ONCE line saying when it fires.
+
+    Write one of
+
+      ONCE ALL HAVE    -- once, when the last of them has acted (the barrier)
+      ONCE EACH HAS    -- once per member who acts (the fork)
+
+    on its own line between the act's WITHIN and the HENCE or LEST, indented
+    past the EVERY. There is no default: the two readings differ, and guessing
+    one would silently change the rule.

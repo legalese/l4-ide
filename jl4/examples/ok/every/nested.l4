@@ -2,9 +2,10 @@ IMPORT prelude
 -- EVERY-EACH-QUANTIFIER-SPEC §2.3 (cross-party references) and §8.1 (nesting).
 --
 -- An EVERY inside the continuation of an EVERY: each partner MAY terminate,
--- and on each termination (FOR EACH) every OTHER partner must settle with the
--- one who left. The outer variable `x` is referenced inside the inner filter,
--- action and continuation.
+-- and on each termination (ONCE EACH HAS) every OTHER partner must settle with
+-- the one who left, all of them (ONCE ALL HAVE) before the fork's own
+-- continuation counts as done. The outer variable `x` is referenced inside the
+-- inner filter, action and continuation.
 
 DECLARE Actor IS ONE OF
     Partner HAS name IS A STRING
@@ -20,11 +21,12 @@ GIVETH A DEONTIC Actor Action
     EVERY Partner x
         MAY    Terminate (EXACTLY x)
         WITHIN 365
-        HENCE FOR EACH
-               EVERY Partner y
+        ONCE   EACH HAS
+        HENCE  EVERY Partner y
                    WHO    NOT (y EQUALS x)
                    MUST   Settle (EXACTLY y) (EXACTLY x)
                    WITHIN 30
+                   ONCE   ALL HAVE
                    HENCE  FULFILLED
                    LEST   BREACH BY y
 

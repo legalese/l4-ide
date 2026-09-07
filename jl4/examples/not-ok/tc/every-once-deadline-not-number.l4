@@ -1,0 +1,11 @@
+-- The WITHIN after ONCE is a deadline on the whole, a NUMBER like the act's.
+
+DECLARE Actor IS ONE OF
+    Tenant HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Sign HAS signer IS AN Actor
+
+GIVETH A DEONTIC Actor Action
+bad MEANS
+    EVERY Tenant t MUST Sign (EXACTLY t) ONCE ALL HAVE WITHIN "soon" HENCE FULFILLED

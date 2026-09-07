@@ -22,6 +22,7 @@ GIVETH A DEONTIC Actor Action
         WHO    elem t tenants
         MUST   Sign (EXACTLY t)
         WITHIN 14
+        ONCE   ALL HAVE
         HENCE  FULFILLED
         LEST   BREACH
 

@@ -10,5 +10,6 @@ contract MEANS
         WHO    NOT (t EQUALS Tenant OF "Carol")
         MUST   Sign (EXACTLY t)
         WITHIN 14
-        HENCE FOR EACH FULFILLED
+        ONCE   EACH HAS WITHIN 30
+        HENCE  FULFILLED
         LEST   BREACH BY t

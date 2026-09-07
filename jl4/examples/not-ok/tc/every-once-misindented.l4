@@ -1,0 +1,29 @@
+-- The join line is column-checked, every word of it (L4.Parser.joinLine).
+--
+-- Here the author writes `ONCE EACH HAS` at the OUTER rule's clause column,
+-- meaning it for the outer EVERY -- but a nested EVERY is still open inside the
+-- outer's HENCE, and the nested one's clauses live further right. Before the
+-- guard (measured 2026-09-07) this parsed clean, attached the fork to the INNER
+-- rule, and exactprinted byte-for-byte identically, so nothing showed the author
+-- that barrier-versus-fork had been decided by invisible layout -- the one
+-- distinction `ContinuationWithoutJoin` refuses to guess at.
+--
+-- A join line dedented to or past the EVERY's own column instead reports
+-- "incorrect indentation (got N, should be greater than M)".
+
+DECLARE Actor IS ONE OF
+    Tenant HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Sign HAS signer IS AN Actor
+
+GIVETH A DEONTIC Actor Action
+`bad` MEANS
+    EVERY Tenant x
+        MUST   Sign (EXACTLY x)
+        WITHIN 1
+        ONCE   ALL HAVE
+        HENCE  EVERY Tenant y
+                   MUST   Sign (EXACTLY y)
+                   WITHIN 2
+        ONCE   EACH HAS

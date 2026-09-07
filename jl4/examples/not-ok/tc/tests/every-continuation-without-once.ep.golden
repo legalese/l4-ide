@@ -1,0 +1,21 @@
+-- R-Q1 (RULED 2026-09-07): under an EVERY the ONCE line is mandatory whenever
+-- there is a HENCE or a LEST. There is no default, because the barrier and the
+-- fork readings differ, and a barrier default would silently reverse what a
+-- single party's MAY … HENCE means today. The message names both spellings.
+
+DECLARE Actor IS ONE OF
+    Tenant HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Sign HAS signer IS AN Actor
+
+GIVETH A DEONTIC Actor Action
+`bare hence` MEANS
+    EVERY Tenant t MUST Sign (EXACTLY t) WITHIN 14 HENCE FULFILLED
+
+GIVETH A DEONTIC Actor Action
+`bare lest` MEANS
+    EVERY Tenant t
+        MUST   Sign (EXACTLY t)
+        WITHIN 14
+        LEST   BREACH BY t
