@@ -17,26 +17,45 @@ GIVETH A DEONTIC Actor Action
 `the tenancy begins` MEANS
     PARTY theLandlord MUST Deliver (EXACTLY theLandlord) what WITHIN 5
 
--- everyone, then one thing: HENCE fires once, when the last tenant has signed
+-- everyone, then one thing: ONCE ALL HAVE, then HENCE fires once, when the
+-- last tenant has signed
 GIVETH A DEONTIC Actor Action
 `all tenants sign` MEANS
     EVERY Tenant t
         MUST   Sign (EXACTLY t)
         WITHIN 14
+        ONCE   ALL HAVE
         HENCE  `the tenancy begins`
         LEST   BREACH
 
--- each with its own: HENCE FOR EACH fires once per tenant who pays
+-- each with its own: ONCE EACH HAS, then HENCE fires once per tenant who pays
 GIVETH A DEONTIC Actor Action
 `each payment gets a receipt` MEANS
     EVERY Tenant t
         MUST   Pay (EXACTLY t) (EXACTLY theLandlord) amount
         WITHIN 7
-        HENCE FOR EACH
-               (PARTY theLandlord
+        ONCE   EACH HAS
+        HENCE  (PARTY theLandlord
                     MUST   Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount)
                     WITHIN 5)
         LEST   BREACH BY t
+
+-- a deadline on the whole: each signature within 14, all of them within 30
+GIVETH A DEONTIC Actor Action
+`sign, and be done by day 30` MEANS
+    EVERY Tenant t
+        MUST   Sign (EXACTLY t)
+        WITHIN 14
+        ONCE   ALL HAVE WITHIN 30
+        HENCE  FULFILLED
+        LEST   BREACH
+
+-- composed with RAND: the tenants' signatures AND the landlord's delivery
+GIVETH A DEONTIC Actor Action
+`sign and deliver` MEANS
+    (EVERY Tenant t MUST Sign (EXACTLY t) WITHIN 14 ONCE ALL HAVE HENCE FULFILLED LEST BREACH)
+    RAND
+    (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) what WITHIN 14 HENCE FULFILLED LEST BREACH)
 
 -- only some of them: WHO narrows the cast
 GIVETH A DEONTIC Actor Action
