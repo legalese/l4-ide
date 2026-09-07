@@ -237,6 +237,24 @@ under it publishes ten scopes. Weigh that against writing the input as an
 ordinary rule `GIVEN` on each rule, which is what a Catala deliverable wants
 today.
 
+**One condition on that, and it is all-or-nothing.** An `@export`ed rule is
+published as a Catala _scope_, and Catala allows a scope to be called only from
+inside another scope. So if an `@export`ed rule is called by one that is **not**
+exported, the call comes out inside a plain top-level definition:
+
+```
+declaration the_middle content decimal
+  depends on the_n content decimal
+  equals ((output of TheBase with { -- the_n: the_n }).the_base + 1.0)
+```
+
+and Catala rejects the file — _"Scope calls are not allowed outside of a scope"_.
+`l4 catala` does not notice: it exits 0 and writes the output, so the failure
+finds you when you run `catala typecheck`, not when you export. If you are here
+because of a section `GIVEN` this costs you little, since every rule that reads
+the binder has to be exported anyway; if you are applying `@export` to an
+ordinary helper, it is the whole story. Measured 2026-09-07.
+
 The restriction is ours, not Catala's, and it is ruled to go away:
 `specs/todo/IMPLICIT-PROPS-DESIGN.md` §11.10 (ruling **R10**, ruled 2026-09-04)
 moves the backends onto the rewritten module, where the name is an ordinary input

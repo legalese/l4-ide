@@ -1376,6 +1376,37 @@ Catala is correct: the binder becomes an `input` on every scope and the caller t
 unusable under Catala — it costs one published scope per rule that reads the binder, where the
 author wanted a helper. R10 buys back the helpers, not the ability to compile at all.
 
+The `ofek` session then took that further than this probe could, and the result is worth recording
+with its provenance, because the two halves were measured on different machines. It ran
+`catala typecheck` on the emitted module (successful — the hatch is not merely well-formed text, it
+passes the next tool), and then marked all 28 definitions taking a `GIVEN` in the real module:
+**43 scopes emitted, `catala typecheck` successful, and the six worked cases return the same six
+figures as the shipped single-`@export` build, digit for digit.** That turns "one scope per reader"
+from a three-declaration probe into a whole-module measurement, and it retracted a claim on that
+side — the row's fork register had carried F13 as "`@export` is not composable", now restated
+(canon `64f6c02` on `mengwong/drafts`). No `catala` toolchain exists on this machine, so every
+`catala`-side result in this paragraph is theirs; everything above it is reproduced here.
+
+**The hatch has an all-or-nothing condition, and `l4 catala` does not check it.** An `@export`ed
+rule is published as a Catala _scope_, and Catala allows a scope call only from inside another
+scope. One non-exported rule anywhere in the chain lowers to a toplevel definition, and the scope
+call lands inside it. Reproduced here on their eleven-line witness — an exported `the base`, a plain
+`the middle` that calls it, an exported `the pay` that calls `the middle`:
+
+```
+declaration the_middle content decimal
+  depends on the_n content decimal
+  equals ((output of TheBase with { -- the_n: the_n }).the_base + 1.0)
+```
+
+`l4 catala` **exits 0 and writes that file**; Catala then rejects it with _"Scope calls are not
+allowed outside of a scope"_ (their run). For a section `GIVEN` the condition is close to free,
+since every reader of the binder has to be exported anyway; for anyone applying the hatch to an
+ordinary helper it is the whole story, and nothing on the L4 side says so. **This is the upstream
+candidate, and it is the silence rather than the composition** — the machinery to refuse is already
+there and well-aimed at the adjacent case; it simply does not ask whether an exported helper has a
+non-exported caller.
+
 **Why this is recorded here rather than left in the backlog.** The cost is now being paid by an
 encoding outside `l4-ide`. The Israeli teachers' pay row in `legalese/canon`
 (`subjects/il/ofek-hadash-2008`, `NOTES.md` §11, commit `d082a4e` on `mengwong/drafts`) declined the
@@ -1395,10 +1426,11 @@ Four things follow, and no more than four:
   delegating rule still reads the `ASSUME`, so under Catala every such rule would have to be
   `@export`. Entry 11.9 now says so.
 - **The twin's unit is rules-exercised, not sections**, which the same row measured: 263 `#ASSERT`s
-  across nine modules, of which its note counts 254 as handing a case in explicitly, and five call
-  sites in two other modules for the three rules under one `§§` heading. Entry 11.9's "one extra
-  delegating rule per section is a much smaller price" is true for the statute shape it was written
-  against and false for an arithmetic cascade; it now says which shape it means.
+  across its nine modules — 254 of them in the eight hand-written ones, the ninth being generated —
+  each handing a case in explicitly and so each needing its own twin, alongside five call sites in
+  two other modules for the three rules under one `§§` heading. Entry 11.9's "one extra delegating
+  rule per section is a much smaller price" is true for the statute shape it was written against and
+  false for an arithmetic cascade; it now says which shape it means.
 - **A user-facing page said this worked.** `doc/reference/syntax/section-given.md` listed "every
   export backend … treats a section `GIVEN` as it treats an `ASSUME` term" under _What else works_.
   That sentence is true of the mechanism and misleading about the result, because for Catala

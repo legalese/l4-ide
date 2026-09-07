@@ -654,9 +654,10 @@ section is a much smaller price.
 holds when a Part has one operative test. It inverts on an arithmetic cascade, where every rule
 under the heading is separately asserted and some are called from other modules. Measured on the
 Israeli teachers' pay row in `legalese/canon` (`subjects/il/ofek-hadash-2008`, its `NOTES.md`
-§ 11, 2026-09-07): 263 `#ASSERT`s across nine modules, of which that note counts 254 as handing a
-case in explicitly, and five call sites in two other modules for the three rules under a single
-`§§` heading (`ofek-pay.l4:64,82,94,107`, `ofek-placement.l4:60`). Each of those needs its own
+§ 11, 2026-09-07): 263 `#ASSERT`s across its nine modules — 254 of them in the eight hand-written
+ones, the ninth being generated — each handing a case in explicitly, and five call sites in two
+other modules for the three rules under a single `§§` heading (`ofek-pay.l4:64,82,94,107`,
+`ofek-placement.l4:60`). Each of those needs its own
 twin, and then the twins — not the section rules — are what the row actually tests. That row kept
 its repeated rule `GIVEN`s, and was right to. Weigh the identical lines you would delete against the
 twins you would add before you choose.
