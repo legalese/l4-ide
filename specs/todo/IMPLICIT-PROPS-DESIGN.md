@@ -1405,7 +1405,10 @@ since every reader of the binder has to be exported anyway; for anyone applying 
 ordinary helper it is the whole story, and nothing on the L4 side says so. **This is the upstream
 candidate, and it is the silence rather than the composition** — the machinery to refuse is already
 there and well-aimed at the adjacent case; it simply does not ask whether an exported helper has a
-non-exported caller.
+non-exported caller. **Filed upstream as smucclaw/l4-ide#958**, with the eleven-line witness and a
+suggested fix (walk each exported definition's callers, and `bad` a non-exported one in the same
+voice as the `ASSUME` refusal). R10 does not close it: R10 removes the section-`GIVEN` refusal, and
+this one is about `@export` composition and stays reachable.
 
 **Why this is recorded here rather than left in the backlog.** The cost is now being paid by an
 encoding outside `l4-ide`. The Israeli teachers' pay row in `legalese/canon`
