@@ -1242,6 +1242,11 @@ branch was in the merge queue at the time):
   "Six Ways to Owe One Debt" page (an artifact, §2.2.7.6) describes the same pair.
 - The build's `doc/` page for the quantifier owes the `RAND`/`ROR` worked example of §8.3 (R-Q2,
   Meng's note).
+- `doc/reference/regulative/README.md:104` promises `BEFORE` as supporting **absolute deadlines**,
+  while `jl4/experiments/purchase.l4:97` writes `BEFORE 30 days` as a duration from the anchor and
+  says so in an inline comment. Two readings of one unbuilt keyword, and R-Q7C has just given
+  absolute deadlines a spelling that needs no keyword at all. §5.1.2 lays out the three ways out and
+  picks none of them; the page is owed a correction whichever wins.
 - **The BPMN export cannot tell a barrier from a fork, and its fidelity report does not say so.**
   Measured 2026-09-07 by the GM on a binary built from `every/build-1`: one rule exported twice,
   once with `ONCE ALL HAVE` and once with `UPON EACH`, gives **byte-identical** BPMN XML and a
@@ -1638,9 +1643,10 @@ itself, so an obligation is performable from the instant it arms. Meng's cooling
 counter-case, and it is ordinary: _the customer may place a new order after a three-business-day
 cooling-off period, within 30 days_. Nothing in the language today can say when a window **opens**.
 
-**We have already written this construct, twice.** `jl4/experiments/purchase.l4:152-168` — an
-aspirational sketch that has never parsed — writes four nested continuations in exactly this shape,
-and it is worth reading because it disagrees with the note above on the one point that matters:
+**We have already written this construct.** `jl4/experiments/purchase.l4` — an aspirational sketch
+that has never parsed — uses it throughout: a bare `BEFORE 30 days` at `:97` and `:102`, and the
+full two-edged form in four nested continuations at `:152-168`. It is worth reading because it
+disagrees with the note above on the one point that matters:
 
 ```
 PARTY   seller
@@ -1677,8 +1683,35 @@ no second rule; `BEFORE` is then the one that reaches back past the move, to the
 continuation has an anchor like any other (`UPON EACH` … `HENCE … AFTER 3 …`).
 
 **`AFTER` alone is well-formed** — a permission that opens and never closes is an ordinary legal
-object (a right that vests and does not expire). `BEFORE` alone is today's `WITHIN` with a different
-name, and should probably be refused rather than admitted as a synonym.
+object (a right that vests and does not expire).
+
+**`BEFORE` alone is the problem, and it has to be settled first.** Our tree already carries two
+incompatible readings of that word, neither of them built:
+
+- `doc/reference/regulative/README.md:104` says BEFORE is "planned, not yet implemented — will
+  support **absolute deadlines**", i.e. `BEFORE <a date>`.
+- `jl4/experiments/purchase.l4:97` writes `BEFORE 30 days` and explains itself in an inline comment
+  — _"relative temporal referent: when the UPON first starts to be true"_ — i.e. a **duration from
+  the anchor**, which is what `WITHIN` already means. It does so again at `:102`, and again in each
+  of the four nested blocks at `:152-168`.
+
+So the sketch above cannot simply help itself to `BEFORE` as the window's closing offset: that is
+purchase.l4's reading, and it contradicts the manual's. Worse, R-Q7C has just removed the manual's
+reason for the word — an absolute deadline now has a ruled spelling, `WITHIN 0 OF (YMD 2026 6 30)`,
+and needs no keyword of its own. Three ways out, and this document does not pick one:
+
+1. **Give `BEFORE` purchase.l4's meaning** — a duration from the anchor, so `AFTER 3 BEFORE 30` is
+   the two-offset window and `BEFORE 30` alone is a synonym for `WITHIN 30`. The manual's sentence
+   changes rather than becomes true, and the language gains a synonym pair, which it has admitted
+   once already (`DO` beside `MUST`, R-Q2).
+2. **Give `BEFORE` the manual's meaning** and find another closing word for the window. Then
+   `BEFORE` and R-Q7C's date slot say the same thing two ways, which is the cost the other direction.
+3. **Refuse `BEFORE` entirely** and let the window be `AFTER d1 WITHIN d2` only, re-anchored. One
+   spelling, no synonym, and the drafter does the arithmetic in the two-offset case — which is the
+   transcription error this section opened by objecting to.
+
+Whichever wins, `doc/reference/regulative/README.md:104` is owed a correction: it promises a feature
+under a meaning that at least one of our own sketches does not use.
 
 **The question a sketch cannot answer: what does an early act do?** Three readings, and they are not
 interchangeable:
