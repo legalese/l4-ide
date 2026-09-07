@@ -1344,6 +1344,68 @@ parameters; OpenFisca puts scalar implicits in `parameters(period)` and refuses 
 `imaginary-alcohol-act.l4` migrates as fourteen scalar section `GIVEN`s. Detail:
 `PROPS-REDTEAM-2026-09-03.md` §2.10.
 
+#### R10's cost, measured outside this tree — 2026-09-07
+
+R10 is ruled and unbuilt, so the backends still lower the module the author wrote (the _Deferred_
+list under §11.16 says why that was the right sequencing). For Catala that is not degraded fidelity
+but a **refusal**: a section `GIVEN` read by anything other than the exported decision itself does
+not compile at all.
+
+The mechanism, verified on `unstable` `30bbc026`. The parser elaborates a section `GIVEN` into a
+0-ary `ASSUME` at the head of its section (`jl4-core/src/L4/Names.hs:61-65`); `collectAssumes` picks
+that up like any other (`jl4-core/src/L4/Catala/Lower.hs:2116-2126`); and `assumeRef` rejects a read
+wherever `cxAssumeOK` is `False` (`:1677-1683`), which is everywhere except inside an exported
+decision's scope — `True` at `:1088`, `False` at `:387` for the toplevel and `:1208` for a helper.
+`scopeCall` refuses the same thing one call deeper (`:1689-1691`).
+
+Reproduced here on a three-declaration probe — a section `GIVEN`, a plain helper that reads it, an
+`@export` decision that calls the helper — run on the `l4` built at `9d6536a9` with its embedded
+prelude:
+
+```
+l4 catala: cannot compile these decisions to Catala:
+  - in `the rank of the teacher`: ASSUMEd input `the teacher` is only readable inside an
+    @export decision's scope (where it becomes a scope `input`); pass it to this helper as
+    a parameter instead (pay.l4:10:5-18)
+```
+
+Exit 1, and no output file is written. **The refusal has an escape hatch, which is worth stating
+because it changes what R10 is worth.** Marking the helper `@export` too lifts it, and the emitted
+Catala is correct: the binder becomes an `input` on every scope and the caller threads it
+(`output of TheRankOfTheTeacher with { -- the_teacher: the_teacher }`). So the construct is not
+unusable under Catala — it costs one published scope per rule that reads the binder, where the
+author wanted a helper. R10 buys back the helpers, not the ability to compile at all.
+
+**Why this is recorded here rather than left in the backlog.** The cost is now being paid by an
+encoding outside `l4-ide`. The Israeli teachers' pay row in `legalese/canon`
+(`subjects/il/ofek-hadash-2008`, `NOTES.md` §11, commit `d082a4e` on `mengwong/drafts`) declined the
+section `GIVEN` for exactly this reason: its ninth module _is_ the Catala deliverable, and the `§`
+heading where the repetition is worst carries ten identical `GIVEN`s. Its note calls the construct
+"unusable" there; the probe above says the sharper thing, that it is usable at the price of
+publishing ten scopes where the author wanted ten helpers — which for that row is the same decision
+and a better reason for it.
+
+Four things follow, and no more than four:
+
+- **Catala's failure mode is refusal, not lost fidelity** — recoverable, but only by exporting
+  every reader. Whether the other five backends degrade or refuse on the same shape is unmeasured;
+  this note claims no ordering among them.
+- **The phrasebook's remedy does not reach this case.** `writing-l4-rules` entry 11.9 answers the
+  arity-zero problem with a `GIVEN`-parameterised twin per section rule — but the section's own
+  delegating rule still reads the `ASSUME`, so under Catala every such rule would have to be
+  `@export`. Entry 11.9 now says so.
+- **The twin's unit is rules-exercised, not sections**, which the same row measured: 263 `#ASSERT`s
+  across nine modules, of which its note counts 254 as handing a case in explicitly, and five call
+  sites in two other modules for the three rules under one `§§` heading. Entry 11.9's "one extra
+  delegating rule per section is a much smaller price" is true for the statute shape it was written
+  against and false for an arithmetic cascade; it now says which shape it means.
+- **A user-facing page said this worked.** `doc/reference/syntax/section-given.md` listed "every
+  export backend … treats a section `GIVEN` as it treats an `ASSUME` term" under _What else works_.
+  That sentence is true of the mechanism and misleading about the result, because for Catala
+  treating it as an `ASSUME` term **is** the refusal. Corrected in the same change, with the
+  diagnostic on the page — §6 of `CLAUDE.md` asks a page to state its limits, and a limit filed
+  under what works is worse than one left out.
+
 ### 11.11 R11 — `@reads`. RULED 2026-09-04 (marked accept).
 
 A function may annotate an implicit it reads, `@reads interp — …`, or override the section's
@@ -1910,7 +1972,12 @@ which owns the defect; this section owns the ruling and the limit.
   another (measured 2026-09-05), no library declares one, and the sweep's own
   measurement is that none of its 46 headingless `ASSUME` files is imported
   either. If it is ever reached the failure is loud — a length mismatch naming
-  the callee — not a wrong value.
+  the callee — not a wrong value. **Reachable outside this tree, 2026-09-07:** the
+  `legalese/canon` row `subjects/il/ofek-hadash-2008` would have had a declaring
+  module imported by two others had it adopted the construct, and declined it for
+  the Catala reason in §11.10. The measurement above is scoped to this tree and
+  stands; what has changed is that the class is no longer hypothetical. If we want
+  it exercised, it wants a compiler test, not a corpus row.
 - **The backends still see the undischarged module.** R10 (§11.10) moves DMN,
   Catala, Docassemble, OpenFisca, Blawx and MLIR onto the discharged AST, keys
   the export schema by (name, tier), makes defaulted implicits optional and adds

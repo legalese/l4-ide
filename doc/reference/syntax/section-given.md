@@ -207,11 +207,40 @@ What else works:
 - **Every export backend** — Decision Model and Notation (DMN), Business Process
   Model and Notation (BPMN), docassemble, Catala, OpenFisca, Blawx and the
   Multi-Level Intermediate Representation (MLIR) — treats a section `GIVEN` as
-  it treats an `ASSUME` term.
+  it treats an `ASSUME` term. For Catala, that sameness is a limit and not a
+  convenience; the next paragraph says what it costs.
 - **Diagnostics and hover**, which point at the `GIVEN` line under the heading
   (a "defined at" note names that line, and hovering the name shows the kind
   of thing it stands for). Go-to-definition and find-references have not been
   exercised on a section `GIVEN` in this release.
+
+**What Catala makes of one, measured 2026-09-07.** The backends compile the
+module as you wrote it, not the rewritten one in which the section's `GIVEN` has
+become an ordinary input of every rule beneath the heading. So `l4 catala` meets
+a section `GIVEN` as an `ASSUME` term — and it will only read an `ASSUME` term
+inside a rule marked `@export`. A plain helper that reads one is refused, the
+command exits 1, and no file is written:
+
+```
+l4 catala: cannot compile these decisions to Catala:
+  - in `the rank of the teacher`: ASSUMEd input `the teacher` is only readable
+    inside an @export decision's scope (where it becomes a scope `input`); pass
+    it to this helper as a parameter instead (pay.l4:10:5-18)
+```
+
+Marking that helper `@export` as well does lift the refusal, and what comes out
+is right: the name becomes an `input` on every scope, and a caller threads its
+own copy through (`output of TheRankOfTheTeacher with { -- the_teacher: the_teacher }`).
+The price is that every rule which reads the section `GIVEN` has to be published
+as its own Catala scope rather than kept as a helper — a heading with ten rules
+under it publishes ten scopes. Weigh that against writing the input as an
+ordinary rule `GIVEN` on each rule, which is what a Catala deliverable wants
+today.
+
+The restriction is ours, not Catala's, and it is ruled to go away:
+`specs/todo/IMPLICIT-PROPS-DESIGN.md` §11.10 (ruling **R10**, ruled 2026-09-04)
+moves the backends onto the rewritten module, where the name is an ordinary input
+and nothing needs refusing. It is not yet built.
 
 A name with no kind of thing after it (`GIVEN a`) is accepted and behaves as
 `ASSUME a` does. A name declared `IS A TYPE` stands for a kind of thing the

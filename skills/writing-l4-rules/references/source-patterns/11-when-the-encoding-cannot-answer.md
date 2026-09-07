@@ -645,14 +645,53 @@ worth having, and when supply lands the second becomes callable as it stands.
 **Not** a `#EVAL` or `#ASSERT` on the section-`GIVEN` rule. Exit 1, and on a page under `doc/` it
 fails the docs harness.
 
-**Not** a section `GIVEN` abandoned for a rule `GIVEN` because you could not test it. The repetition
-the section `GIVEN` removes is real — 62 identical lines in one corpus file ([entry 1.2](01-definitions-and-scope.md#e1-2)) — and one
-extra delegating rule per section is a much smaller price.
+**Not** a section `GIVEN` abandoned for a rule `GIVEN` because you could not test it, in a Part with
+one operative test. The repetition the section `GIVEN` removes is real — 62 identical lines in one
+corpus file ([entry 1.2](01-definitions-and-scope.md#e1-2)) — and one extra delegating rule per
+section is a much smaller price.
+
+**But count the twins first, because the unit is rules-exercised, not sections.** The trade above
+holds when a Part has one operative test. It inverts on an arithmetic cascade, where every rule
+under the heading is separately asserted and some are called from other modules. Measured on the
+Israeli teachers' pay row in `legalese/canon` (`subjects/il/ofek-hadash-2008`, its `NOTES.md`
+§ 11, 2026-09-07): 263 `#ASSERT`s across nine modules, of which that note counts 254 as handing a
+case in explicitly, and five call sites in two other modules for the three rules under a single
+`§§` heading (`ofek-pay.l4:64,82,94,107`, `ofek-placement.l4:60`). Each of those needs its own
+twin, and then the twins — not the section rules — are what the row actually tests. That row kept
+its repeated rule `GIVEN`s, and was right to. Weigh the identical lines you would delete against the
+twins you would add before you choose.
 
 **Not** `#CHECK … WITH x IS v`. `WITH` at a directive names a **rule's own** inputs, so it works on
 the delegating rule's `GIVEN`-parameterised twin and not on the section `GIVEN`; naming a section
 `GIVEN` there is a check error, not a parse error.
 [Entry 1.5](01-definitions-and-scope.md#e1-5) has the detail.
+
+**Not, yet, in a module whose deliverable is a Catala export.** `l4 catala` refuses a section
+`GIVEN` read by anything other than the exported decision itself, so the delegating twin does not
+rescue you there unless every delegating rule is `@export`. The parser elaborates a section `GIVEN`
+into a 0-ary `ASSUME` at the head of its section (`jl4-core/src/L4/Names.hs:61-65`), and the
+backends lower the module the author wrote rather than the discharged one — so the Catala lowerer
+meets an `ASSUME` and refuses it wherever `cxAssumeOK` is false, which is everywhere but the
+exported decision's own lowering (`jl4-core/src/L4/Catala/Lower.hs:1677-1683`, set true only at
+`:1088`; `:1689-1691` refuses a call into such a scope). Line references on `unstable` `30bbc026`.
+The refusal reads:
+
+```
+l4 catala: cannot compile these decisions to Catala:
+  - in `the rank of the teacher`: ASSUMEd input `the teacher` is only readable inside an
+    @export decision's scope (where it becomes a scope `input`); pass it to this helper as
+    a parameter instead
+```
+
+Marking the helper `@export` too does lift it, and the Catala that comes out is correct — the binder
+becomes an `input` on every scope and the caller threads it. The price is one published scope per
+rule that reads the binder, where you wanted a helper. So this is a cost, not a wall; on a heading
+with ten rules under it, it is a large one.
+
+That is ruled, not accidental: `specs/todo/IMPLICIT-PROPS-DESIGN.md` § 11.10 (**R10**, ruled
+2026-09-04) moves the backends onto the discharged AST, where the binder is an ordinary parameter
+and the refusal cannot arise. It is not yet built. Until it is, a module you will export to Catala
+is one to write with rule `GIVEN`s.
 
 **Reading the run.** `l4 run` prints everything **twice**: once as a diagnostic block, and again as
 an `Evaluation[n]` block with its `Result:` and `Trace:`. A file with ninety directives produces
