@@ -86,7 +86,27 @@ For set difference, legal English says _less_: "all employees LESS those on prob
 #EVAL setSize (`all employees` WITHOUT `on probation`)    -- 3
 ```
 
-The word operators have no precedence, so parenthesize compounds: `A UNION (B INTERSECT C)`.
+The word operators carry declared fixities too — `UNION` and `WITHOUT` at `@infixl 6`, `INTERSECT` at `@infixl 7`, mirroring `PLUS`/`TIMES` — so unparenthesized compounds group the way set theory expects: intersection binds tighter than union.
+
+```l4
+p1 MEANS setFromList (LIST 1, 2)
+p2 MEANS setFromList (LIST 2, 3)
+p3 MEANS setFromList (LIST 3)
+
+#EVAL setSize (p1 UNION p2 INTERSECT p3)   -- 3: groups as p1 UNION (p2 INTERSECT p3) = {1,2,3}
+-- had it grouped the other way, (p1 UNION p2) INTERSECT p3 = {3}, this would read 1
+```
+
+## Word operators beside AND and OR
+
+A word operator's whole call is one term as far as `AND`/`OR` are concerned. Write it unparenthesized on either side of a keyword operator and the call binds tighter — the same grouping ordinary function application has always had:
+
+```l4
+#EVAL "carol" `is in` `new yorkers` OR "carol" `is in` `on probation`   -- TRUE: the second call is
+#EVAL "alice" `is in` `new yorkers` OR "alice" `is in` `on probation`   -- TRUE: the first call is
+```
+
+This is what keeps a distributed predicate like "resides in NY or NJ" free of a thicket of parentheses, and it composes with everything above: a `UNION`/`INTERSECT` chain, once written, is itself one term and can sit beside `AND`/`OR` the same way. See the [syntax reference](../../reference/syntax/README.md) for the full grouping rule, including how it applies to operators you declare yourself.
 
 ## PLUS and MINUS: precedence for free
 

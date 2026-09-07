@@ -41,6 +41,22 @@ b1 MEANS setFromList (LIST 2, 3, 4)
 -- chains need no parentheses, but beware: not a group!
 #EVAL setToList (a1 PLUS b1 MINUS b1)                      -- LIST 1, not a1
 
+§§ `UNION and INTERSECT carry their own precedence too`
+
+c1 MEANS setFromList (LIST 3, 4, 5)
+
+-- INTERSECT binds tighter than UNION (mirrors TIMES over PLUS), so this
+-- groups as a1 UNION (b1 INTERSECT c1) = {1,2,3} UNION {3,4} = {1,2,3,4}
+#EVAL setSize (a1 UNION b1 INTERSECT c1)                   -- 4
+-- had it grouped left-to-right instead, (a1 UNION b1) INTERSECT c1 = {3,4}
+
+§§ `A word-operator call is one term beside AND and OR`
+
+-- each `is in` call is a complete term; write it unparenthesized next to
+-- OR and it binds tighter, same as ordinary function application
+#EVAL "wally" `is in` `all employees` OR "wally" `is in` `on probation`   -- TRUE
+#EVAL "erin"  `is in` `all employees` OR "erin"  `is in` `on probation`  -- FALSE
+
 §§ `Equality is extensional — via set equals`
 
 #EVAL (setFromList (LIST 2, 1, 1)) `set equals` (setFromList (LIST 1, 2))   -- TRUE
