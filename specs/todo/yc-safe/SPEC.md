@@ -64,24 +64,26 @@ the right tool"]** — the pipeline is not run; its registers are reused.
 Fetched 2026-09-04 from `https://www.ycombinator.com/documents` (asset paths under
 `/assets/ycdc/`), sha256 recorded in the source bundle **[M: `curl` + `shasum -a 256`]**:
 
-| form              | file                                               |    size | note                                                            |
-| ----------------- | -------------------------------------------------- | ------: | --------------------------------------------------------------- | --------- | ----------------- |
-| US, valuation cap | `Postmoney Safe - Valuation Cap Only - FINAL.docx` |  55,762 | the baseline; "Version 1.2" per footer                          |
-| US, discount      | `Postmoney Safe - Discount Only - FINAL.docx`      |  47,628 |                                                                 |
-| US, MFN           | `Postmoney Safe - MFN Only - FINAL.docx`           |  49,313 |                                                                 |
-| SG, valuation cap | `… (Singapore) FINAL.docx`                         |  57,988 | "Singapore Version 1.x" footer                                  |
-| CA, valuation cap | `… (Canada) FINAL.docx`                            |  73,714 |                                                                 |
-| KY, valuation cap | `… (Cayman) FINAL.docx`                            |  56,260 |                                                                 |
-| side letters ×4   | `Pro Rata Side Letter[ (SG                         |      CA | KY)].docx`                                                      | ~23–25 KB | US footer © 2018 |
-| User Guide        | `SAFE User Guide.pdf`                              | 685,212 | 33 pp.; Appendix II = worked examples; Appendix III = changelog |
+| form              | file                                                    |          size | header stamp / note                                             |
+| ----------------- | ------------------------------------------------------- | ------------: | --------------------------------------------------------------- |
+| US, valuation cap | `Postmoney Safe - Valuation Cap Only - FINAL.docx`      |        55,762 | the baseline; "Version 1.2"                                     |
+| US, discount      | `Postmoney Safe - Discount Only - FINAL.docx`           |        47,628 | "Version 1.2"                                                   |
+| US, MFN           | `Postmoney Safe - MFN Only - FINAL.docx`                |        49,313 | "Version 1.3" — no changelog entry describes a 1.3              |
+| SG, valuation cap | `… (Singapore) FINAL.docx`                              |        57,988 | "Singapore Version 1.2"                                         |
+| CA, valuation cap | `… (Canada) FINAL.docx`                                 |        73,714 | "Canada Version 1.2"                                            |
+| KY, valuation cap | `… (Cayman) FINAL.docx`                                 |        56,260 | "Cayman Version 1.2"                                            |
+| side letters ×4   | `Pro Rata Side Letter[ (Singapore/Canada/Cayman)].docx` | 22,921–25,053 | US "Version 1.0", © 2018; the other three unstamped, © 2021   |
+| User Guide        | `SAFE User Guide.pdf`                                   |       685,212 | 33 pp.; Appendix II = worked examples; Appendix III = changelog |
 
-**Licence [M: `unzip -p … word/footer*.xml`]:** every form's footer reads "© 2023 Y
+**Licence [M: `unzip -p … word/footer*.xml`]:** every SAFE's footer reads "© 2023 Y
 Combinator Management, LLC. This form is made available under a Creative Commons
 Attribution-NoDerivatives 4.0 License (International) … You may modify this form so you can
 use it in transactions, but please do not publicly disseminate a modified version of the
 form without asking us first." Appendix III (v1.0 note) states the purpose: that republished
 copies be "the actual safe documents, rather than modified versions that might confuse
-people into thinking that they are viewing or using the 'standard' versions."
+people into thinking that they are viewing or using the 'standard' versions." The four Pro Rata
+Side Letters carry that same licence sentence word for word, dated © 2018 (US) and © 2021
+(the three others).
 
 Consequences, recorded as **R9** in §11: the source `.docx` and its verbatim Markdown
 extraction may be deposited with attribution; the generator's output for a transaction is
