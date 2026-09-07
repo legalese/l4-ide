@@ -21,6 +21,13 @@ otherwise route around the rule; delete them once the rule is obviously self-jus
   reaches `main` through a wave of human-reviewable **topic PRs**, not one merge PR (D9.1) — and the
   merge is **not** the release: the release is a manual `workflow_dispatch` of `main-tag.yml`, which
   mints its own tag from `github.run_number`. **A hand-pushed tag runs nothing.**
+- **There are TWO release tracks, cut from different refs (D9.3), and "cut a release" is ambiguous
+  between them.** The **VS Code extension** (with `jl4-service` and the LSP binaries) comes from
+  `main` via `main-tag.yml` — 49 of them, latest `l4-ide-build-90`, 2026-08-07. Standalone **`l4` /
+  `jl4-lsp` prereleases** come from `unstable` via the shelf at `legalese/prereleases`, tagged
+  `unstable-<date>-<shortsha>`; its own description says "Not the stable line." Say which track you
+  mean. **The consequence that catches people: the shelf ships off `unstable`, so anything merged
+  there can reach users at the next cut — "not released yet" is not a defence for a known defect.**
 
 ### 1.1 GitHub issue auto-close never fires here — close by hand
 
