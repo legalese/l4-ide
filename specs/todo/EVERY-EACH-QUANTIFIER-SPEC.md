@@ -1101,14 +1101,16 @@ HENCE` fires when the permission is exercised (`Machine.hs:1669-1671`), so a dra
   later re-spelling is those two plus the goldens that quote the message — which is the "relatively
   low engineering cost" the ruling relies on.
 
-  **One reading the GM should confirm.** §2.4's conditional note wrote the fork as
-  `'UPON' 'EACH' [HenceClause] [LestClause]`, omitting the `[TemporalConstraint]` that the `ONCE`
-  branch carries. That omission is read here as brevity, not as a decision, because §2.5's own
-  candidate-4 text says "the structure is unchanged" and because dropping it would have removed a
-  capability that already worked (`ONCE EACH HAS WITHIN 30` parsed and checked). So the fork
-  **keeps** its optional `WITHIN`, and `UPON EACH WITHIN 30` is legal: each continuation fires on
-  its own member's act, and the whole is bounded by day thirty. If that reading is wrong the fix is
-  one alternative in `L4.Parser.joinLine` and one field.
+  **The fork keeps its optional `WITHIN` — CONFIRMED 2026-09-07 (GM).** §2.4's conditional note
+  wrote the fork as `'UPON' 'EACH' [HenceClause] [LestClause]`, omitting the `[TemporalConstraint]`
+  that the `ONCE` branch carries. That omission is brevity, not a decision, and the build was right
+  to keep the constraint: §2.5's own candidate-4 text says "the structure is unchanged"; dropping it
+  would have removed a capability that already worked (`ONCE EACH HAS WITHIN 30` parsed and
+  checked); and removing a working capability as a side effect of a spelling ruling is exactly the
+  kind of silent narrowing this document exists to prevent. Both of the build's refuters reached the
+  same reading independently. So `UPON EACH WITHIN 30` is legal: each continuation fires on its own
+  member's act, and the whole is bounded by day thirty. Were this ever reversed, the fix is one
+  alternative in `L4.Parser.joinLine` and one field.
 
 - **R-Q2.** `ALL` already has two jobs (`Parser.hs:1244-1245`, `:2375`) and R-T1's `ONCE ALL HAVE`
   gives it a third inside the join. Nothing in §3–§9 ever gave a bare `ALL Pattern` a meaning distinct
