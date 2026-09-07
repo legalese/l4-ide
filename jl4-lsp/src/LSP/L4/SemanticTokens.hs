@@ -70,6 +70,14 @@ identIsTypeVar t = case posTokenCategory t.payload of
   CIdentifier -> Just SemanticTokenTypes_TypeParameter
   _ -> Nothing
 
+-- | @EACH@ in the fork's join line (@ONCE EACH HAS@) is lexed as an identifier
+-- (it is deliberately not a keyword, so programs may still name a value
+-- @EACH@), but at that position it is a marker word and highlights as one.
+identIsKeyword :: PosToken -> Maybe SemanticTokenTypes
+identIsKeyword t = case posTokenCategory t.payload of
+  CIdentifier -> Just SemanticTokenTypes_Keyword
+  _ -> Nothing
+
 identIsCon :: PosToken -> Maybe SemanticTokenTypes
 identIsCon t = case posTokenCategory t.payload of
   CIdentifier -> Just SemanticTokenTypes_Class
@@ -202,8 +210,11 @@ instance ToSemTokens Context PosToken (Expr Name) where
 instance ToSemTokens Context PosToken (GuardedExpr Name) where
 instance ToSemTokens Context PosToken (Deonton Name) where
 instance ToSemTokens Context PosToken (Subject Name) where
--- ForEach has no children; its FOR EACH tokens live in its own Anno
-instance ToSemTokens Context PosToken ForEach where
+instance ToSemTokens Context PosToken (Join Name) where
+-- A threshold's words live in its own Anno; EACH there is an identifier token
+-- shown as the keyword it acts as.
+instance ToSemTokens Context PosToken (Threshold Name) where
+  toSemTokens th = withTokenType identIsKeyword $ genericToSemTokens th
 -- DeonticModal has no tokens to highlight
 instance ToSemTokens Context PosToken DeonticModal where
   toSemTokens _ = pure []
@@ -322,8 +333,11 @@ instance ToSemTokens () PosToken (AppForm Resolved) where
 
 instance ToSemTokens () PosToken (Deonton Resolved) where
 instance ToSemTokens () PosToken (Subject Resolved) where
--- ForEach has no children; its FOR EACH tokens live in its own Anno
-instance ToSemTokens () PosToken ForEach where
+instance ToSemTokens () PosToken (Join Resolved) where
+-- A threshold's words live in its own Anno; EACH there is an identifier token
+-- shown as the keyword it acts as.
+instance ToSemTokens () PosToken (Threshold Resolved) where
+  toSemTokens th = withTokenType identIsKeyword $ genericToSemTokens th
 -- DeonticModal has no tokens to highlight
 instance ToSemTokens () PosToken DeonticModal where
   toSemTokens _ = pure []

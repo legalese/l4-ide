@@ -129,16 +129,21 @@ carameliseEvent = \ case
 
 carameliseDeonton :: HasName n => Deonton n -> Deonton n
 carameliseDeonton = \ case
-  MkDeonton { anno, subject, action, due, forEach, hence, lest} ->
+  MkDeonton { anno, subject, action, due, join = mjoin, hence, lest} ->
     MkDeonton
       { anno
       , subject = carameliseSubject subject
       , action = carameliseRAction action
       , due = fmap carameliseExpr due
-      , forEach
+      , join = fmap carameliseJoin mjoin
       , hence = fmap carameliseExpr hence
       , lest = fmap carameliseExpr lest
       }
+
+carameliseJoin :: HasName n => Join n -> Join n
+carameliseJoin = \ case
+  MkJoin { anno, threshold, due } ->
+    MkJoin { anno, threshold, due = fmap carameliseExpr due }
 
 carameliseSubject :: HasName n => Subject n -> Subject n
 carameliseSubject = \ case

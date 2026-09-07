@@ -714,7 +714,7 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
         [ "BRANCH" ]
         <> map (\(MkGuardedExpr _ a b) -> "IF" <+> printWithLayout a <+> "THEN" <+> printWithLayout b) conds
         <> [ "OTHERWISE" <+> printWithLayout o ]
-    Regulative _ (MkDeonton _ s a t fe f l) -> prettyObligation (printWithLayout s) a t fe f l
+    Regulative _ (MkDeonton _ s a t j f l) -> prettyObligation (printWithLayout s) a t j f l
     -- One branch per line, aligned, and WITHOUT the comma separator.
     -- 'L4.Parser.consider' reads the branch list with `lsepBy`, i.e.
     -- `manyLines` over comma-separated groups: continuation lines must start at
@@ -893,8 +893,8 @@ parensIfOpenTailed e
       _             -> False
 
 prettyObligation
-  :: (LayoutPrinter a, LayoutPrinter t,  LayoutPrinter f, LayoutPrinter l)
-  => Doc ann -> a ->  Maybe t -> Maybe ForEach -> Maybe f -> Maybe l -> Doc ann
+  :: (LayoutPrinter a, LayoutPrinter t, LayoutPrinter j, LayoutPrinter f, LayoutPrinter l)
+  => Doc ann -> a ->  Maybe t -> Maybe j -> Maybe f -> Maybe l -> Doc ann
 -- | @group (hang 2 …)@: an obligation prints on ONE line whenever it can.
 --
 -- Two constraints meet here. (1) 'L4.Parser.obligation' takes the PARTY
@@ -910,20 +910,35 @@ prettyObligation
 -- fits, so the obligation collapses to a single well-formed line. When an
 -- operand contains a hard break of its own (a nested CONSIDER, say) flattening
 -- fails and 'hang' satisfies (1) by indenting relative to PARTY.
-prettyObligation subjectDoc a t fe f l =
+prettyObligation subjectDoc a t j f l =
   Prettyprinter.group $ hang 2 $ vsep $
     [ subjectDoc
     , printWithLayout a
     ]
     <> mprint "WITHIN" t
-    <> mprint henceKeyword f
+    <> foldMap (\ x -> [printWithLayout x]) j   -- the ONCE line prints its own keyword
+    <> mprint "HENCE" f
     <> mprint "LEST" l
-  where
-    -- @HENCE FOR EACH@ marks a forking continuation (PROVISIONAL R-Q1,
-    -- EVERY-EACH-QUANTIFIER-SPEC §2.2.6); the marker has no payload of its own.
-    henceKeyword = case fe of
-      Nothing -> "HENCE"
-      Just _  -> "HENCE FOR EACH"
+
+-- | A run-time obligation carries no join line (phase 1: an EVERY never
+-- reaches the machine); this pins the printer's type for that call site.
+noJoin :: Maybe (Join Resolved)
+noJoin = Nothing
+
+-- | @ONCE ALL HAVE [WITHIN d]@ / @ONCE EACH HAS [WITHIN d]@.
+instance LayoutPrinterWithName n => LayoutPrinter (Join n) where
+  printWithLayout (MkJoin _ th due) =
+    hsep $ [ "ONCE", printWithLayout th ] <> mprint "WITHIN" due
+
+instance LayoutPrinter (Threshold n) where
+  printWithLayout = \ case
+    AllHave _ -> "ALL HAVE"
+    EachHas _ -> forkWords
+
+-- | The fork's words, in ONE place on the printer side (the parser's twin is
+-- 'L4.Parser.forkWords'; the diagnostics read this one). PROVISIONAL R-Q1.
+forkWords :: Doc ann
+forkWords = "EACH HAS"
 
 -- | The subject of a deonton: @PARTY p@, or @EVERY [Cast] v [WHO filter]@
 -- (EVERY-EACH-QUANTIFIER-SPEC §2.4). The filter is bracketed like a WITHIN/
@@ -1077,9 +1092,9 @@ instance LayoutPrinter a => LayoutPrinter (Lazy.Value a) where
       ]
     Lazy.ValObligation _env p a t f l -> case t of
       -- A run-time obligation always binds one party (phase 1: an EVERY
-      -- never reaches the machine), so no FOR EACH marker is printed.
-      Left te -> prettyObligation ("PARTY" <+> printWithLayout p) a te Nothing (Just f) l
-      Right tv -> prettyObligation ("PARTY" <+> printWithLayout p) a (Just tv) Nothing (Just f) l
+      -- never reaches the machine), so there is no ONCE line to print.
+      Left te -> prettyObligation ("PARTY" <+> printWithLayout p) a te noJoin (Just f) l
+      Right tv -> prettyObligation ("PARTY" <+> printWithLayout p) a (Just tv) noJoin (Just f) l
     Lazy.ValROp _env op l r -> hsep
       [ printWithLayout l
       , case op of ValROr -> "OR"; ValRAnd -> "AND"

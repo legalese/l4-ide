@@ -670,7 +670,7 @@ fanLabel mGuard = TransitionLabel
 
 -- | Extract an obligation as a state transition
 extractDeonton :: Maybe StateId -> Deonton Resolved -> ExtractM ()
-extractDeonton mFromState MkDeonton{..} = do
+extractDeonton mFromState MkDeonton{subject, action, due, hence, lest} = do
   -- Create or get the source state
   fromState <- case mFromState of
     Just sid -> pure sid
@@ -871,7 +871,7 @@ classifyTarget self = \case
 
 -- | Generate a descriptive name for an obligation (for intermediate states)
 describeDeonton :: Deonton Resolved -> Text
-describeDeonton MkDeonton{..} =
+describeDeonton MkDeonton{subject, action} =
   let partyT = subjectText subject
       modalT = case action.modal of
         DMust    -> "must"
@@ -887,7 +887,7 @@ describeDeonton MkDeonton{..} =
 -- EVERY-EACH-QUANTIFIER-SPEC does not fan the cast out into per-member
 -- transitions here (the cast is only known at run time, once evaluated — R-T6),
 -- so the state graph, and the BPMN lowered from it, show a single task for the
--- whole cast. The @HENCE FOR EACH@ fork marker is likewise not drawn.
+-- whole cast. The @ONCE …@ join line is likewise not drawn.
 subjectText :: Subject Resolved -> Text
 subjectText = \case
   Party _ p -> prettyLayout p

@@ -222,18 +222,23 @@ instance Linearize (Expr Resolved) where
     MultiWayIf _ conds o -> hcat $
       foldMap (\(MkGuardedExpr _ c f) -> ["if", lin c, "then", lin f]) conds
       <> ["otherwise", lin o ]
-    Regulative _ (MkDeonton _ subj (MkAction _ modal rule mprovided) mdeadline mForEach mfollowup mlest) -> hcat $
+    Regulative _ (MkDeonton _ subj (MkAction _ modal rule mprovided) mdeadline mjoin mfollowup mlest) -> hcat $
       linSubject subj
       <> [ text (deonticModalText modal)
          , lin rule
          ]
       <> maybe [] (\ provided -> [ text "provided that", lin provided ]) mprovided
       <> maybe [] (\ deadline -> [ text "within", lin deadline ]) mdeadline
-      <> maybe [] (\ followup -> [ text "hence" ] <> forEachWords <> [ lin followup ]) mfollowup
+      <> maybe [] linJoin mjoin
+      <> maybe [] (\ followup -> [ text "hence",  lin followup ]) mfollowup
       <> maybe [] (\ lest -> [ text "lest",  lin lest ]) mlest
       where
-        -- "hence, for each," — the fork marker (PROVISIONAL R-Q1).
-        forEachWords = maybe [] (const [ text "for", text "each" ]) mForEach
+        linJoin (MkJoin _ th mdue) =
+          [ text "once" ]
+          <> (case th of
+                AllHave _ -> [ text "all", text "have" ]
+                EachHas _ -> [ text "each", text "has" ])   -- follows 'L4.Print.forkWords'
+          <> maybe [] (\ d -> [ text "within", lin d ]) mdue
         linSubject = \ case
           Party _ party -> [ text "party", lin party ]
           Every _ mCast v mFilter ->

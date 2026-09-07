@@ -552,13 +552,17 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Expr n) where
     Inert ann txt ctx -> pure $ Inert ann txt ctx
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Deonton n) where
-  addNlg (MkDeonton ann' subj event deadline forEach followup lest) = do
+  addNlg (MkDeonton ann' subj event deadline mjoin followup lest) = do
     subj' <- addNlg subj
     event' <- addNlg event
     deadline' <- traverse addNlg deadline
+    join' <- traverse addNlg mjoin
     followup' <- traverse addNlg followup
     lest' <- traverse addNlg lest
-    pure $  MkDeonton ann' subj' event' deadline' forEach followup' lest'
+    pure $  MkDeonton ann' subj' event' deadline' join' followup' lest'
+
+instance (HasSrcRange n, HasNlg n) => HasNlg (Join n) where
+  addNlg (MkJoin ann th due) = MkJoin ann th <$> traverse addNlg due
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Subject n) where
   addNlg = \ case
@@ -829,14 +833,17 @@ instance HasDesc (NamedExpr n) where
   addDesc (MkNamedExpr ann n e) = MkNamedExpr ann n <$> addDesc e
 
 instance HasDesc (Deonton n) where
-  addDesc (MkDeonton ann subj act due forEach hence lest) =
+  addDesc (MkDeonton ann subj act due mjoin hence lest) =
     MkDeonton ann
       <$> addDesc subj
       <*> addDesc act
       <*> traverse addDesc due
-      <*> pure forEach
+      <*> traverse addDesc mjoin
       <*> traverse addDesc hence
       <*> traverse addDesc lest
+
+instance HasDesc (Join n) where
+  addDesc (MkJoin ann th due) = MkJoin ann th <$> traverse addDesc due
 
 instance HasDesc (Subject n) where
   addDesc = \ case
@@ -1491,14 +1498,18 @@ instance (HasSrcRange n, HasRef n) => HasRef (Expr n) where
       pure $ f ann' e1' e2'
 
 instance (HasSrcRange n, HasRef n) => HasRef (Deonton n) where
-  addRef (MkDeonton ann subj event deadline forEach followup lest) = do
+  addRef (MkDeonton ann subj event deadline mjoin followup lest) = do
     -- 'Deonton' has no 'HasSrcRange' handle of its own here; attach via children.
     subj' <- addRef subj
     event' <- addRef event
     deadline' <- traverse addRef deadline
+    join' <- traverse addRef mjoin
     followup' <- traverse addRef followup
     lest' <- traverse addRef lest
-    pure $ MkDeonton ann subj' event' deadline' forEach followup' lest'
+    pure $ MkDeonton ann subj' event' deadline' join' followup' lest'
+
+instance (HasSrcRange n, HasRef n) => HasRef (Join n) where
+  addRef (MkJoin ann th due) = MkJoin ann th <$> traverse addRef due
 
 instance (HasSrcRange n, HasRef n) => HasRef (Subject n) where
   addRef = \ case

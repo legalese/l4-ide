@@ -1091,9 +1091,9 @@ patternText = \case
 -- ----------------------------------------------------------------------------
 
 deonticClause :: Deonton Resolved -> Clause
-deonticClause (MkDeonton _ subj (MkAction _ modal actPat mprov) mdue _forEach mhence mlest) =
-  -- The @HENCE FOR EACH@ fork marker is not rendered by this export in phase 1
-  -- of EVERY-EACH-QUANTIFIER-SPEC: 'CDeontic' has no slot for it, and the
+deonticClause (MkDeonton _ subj (MkAction _ modal actPat mprov) mdue _join mhence mlest) =
+  -- The @ONCE …@ join line is not rendered by this export in phase 1 of
+  -- EVERY-EACH-QUANTIFIER-SPEC: 'CDeontic' has no slot for it, and the
   -- barrier/fork distinction is a run-time property that phase 2 builds. The
   -- limit is stated on the doc page for EVERY.
   CDeontic

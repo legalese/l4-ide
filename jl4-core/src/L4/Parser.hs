@@ -2501,22 +2501,21 @@ optionalWithHole :: HasSrcRange a => AnnoParser a -> AnnoParser (Maybe a)
 optionalWithHole p = Just <$> p <|> annoHole (pure Nothing)
 
 -- | A deonton: @PARTY p@ or @EVERY [Cast] v [WHO f]@, then the modal and
--- action, then the optional @WITHIN@ \/ @HENCE [FOR EACH]@ \/ @LEST@ clauses.
+-- action, then the optional @WITHIN@ \/ @ONCE …@ \/ @HENCE@ \/ @LEST@ clauses.
 --
 -- The column of the head keyword (@PARTY@ or @EVERY@) is the layout threshold
 -- for every body that follows, exactly as before the quantified form existed.
--- 'henceClause' contributes TWO holes (the @FOR EACH@ marker and the
--- continuation) so that the 'Deonton' field order and the hole order agree
--- whether or not a @HENCE@ is present.
+-- One hole per field, in field order ('L4.Syntax.Deonton').
 obligation :: Parser (Deonton Name)
 obligation = do
   current <- Lexer.indentLevel
   attachAnno $
-    (\ subj act dl (fe, h) l -> MkDeonton emptyAnno subj act dl fe h l)
+    MkDeonton emptyAnno
       <$> annoHole (subject current)
       <*> annoHole (must current)
       <*> optionalWithHole (deadline current)
-      <*> henceClause current
+      <*> optionalWithHole (joinLine current)
+      <*> optionalWithHole (hence current)
       <*> optionalWithHole (lest current)
 
 -- | The subject of a deonton (EVERY-EACH-QUANTIFIER-SPEC §2.4, RULED 2026-09-07):
@@ -2551,33 +2550,60 @@ subject current =
             <*> optionalWithHole (annoLexeme (spacedKeyword_ TKWho) *> annoHole (indentedExpr current))
         )
 
--- | @HENCE [FOR EACH] continuation@, or nothing.
+-- | The join line of a quantified obligation (EVERY-EACH-QUANTIFIER-SPEC
+-- §2.2.7.4, R-Q1 RULED 2026-09-07):
 --
--- @FOR EACH@ marks the continuation as a fork — it fires once per completed
--- member of an @EVERY@ — where a bare @HENCE@ is the barrier, firing once when
--- the last member has completed (PROVISIONAL R-Q1, spec §2.2.6). @FOR@ is the
--- existing keyword ('TKFor', shared with @FOR ALL@); @EACH@ is deliberately NOT
--- a keyword and is matched as the identifier token spelled @EACH@ — the same
--- device 'timezone'' uses for @TIMEZONE@ — so a program may still name a value
--- @EACH@ (PROVISIONAL R-Q2: no second quantifier word in phase 1).
+-- > ONCE ALL HAVE [WITHIN d]     -- barrier
+-- > ONCE EACH HAS [WITHIN d]     -- fork (words PROVISIONAL, see 'forkWords')
 --
--- Always contributes exactly two holes: the marker's and the continuation's.
-henceClause :: Pos -> AnnoParser (Maybe ForEach, Maybe (Expr Name))
-henceClause current = wrapAnnoParser $
-      unwrapAnnoParser
-        ( annoLexeme (spacedKeyword_ TKHence)
-            *> ((,) <$> optionalWithHole forEachMarker
-                    <*> (Just <$> annoHole (indentedExpr current)))
+-- Layout: EVERY word of the join line — @ONCE@, the threshold's words, and the
+-- @WITHIN@ body — must sit strictly right of the head keyword's column, like
+-- the deonton's other bodies.
+--
+-- The join line is the ONLY clause whose keyword is itself column-checked, and
+-- it has to be. @WITHIN@, @HENCE@ and @LEST@ each guard their body expression
+-- with 'indentedExpr', so a dedented one of those still fails on its body; a
+-- bare @ONCE ALL HAVE@ has no body, so without this guard it had NO positional
+-- constraint at all and was silently absorbed by whatever deonton was open —
+-- measured 2026-09-07: an @ONCE EACH HAS@ written at the OUTER rule's clause
+-- column attached to a nested @EVERY@ inside the outer's @HENCE@, checked
+-- clean, and exactprinted identically, so nothing in the toolchain showed the
+-- author that the fork had bound to the wrong rule. Barrier-versus-fork is
+-- exactly the distinction 'ContinuationWithoutJoin' refuses to guess at, so
+-- deciding it by invisible layout was the worst available default.
+--
+-- Phase 3 adds the count and measure thresholds (@SOME 2 OF … HAVE@,
+-- @sum OF amount AT LEAST rent@) as further 'Threshold' alternatives here.
+joinLine :: Pos -> AnnoParser (Join Name)
+joinLine current = annoHole $ attachAnno $
+  MkJoin emptyAnno
+    <$  indented' (annoLexeme (spacedKeyword_ TKOnce)) current
+    <*> annoHole (joinThreshold current)
+    <*> optionalWithHole (deadline current)
+
+joinThreshold :: Pos -> Parser (Threshold Name)
+joinThreshold current =
+      attachAnno
+        ( AllHave emptyAnno
+            <$  indented' (annoLexeme (spacedKeyword_ TKAll)) current
+            <*  indented' (annoLexeme (spacedKeyword_ TKHave)) current
         )
-  <|> pure (WithAnno [mkHoleWithSrcRangeHint Nothing, mkHoleWithSrcRangeHint Nothing] (Nothing, Nothing))
-  where
-    -- NB: the plain @HENCE body@ form (one hole) survives as 'hence' for the
-    -- RECORD/COMMIT/ATTEST continuation slot, which has no FOR EACH.
-    forEachMarker :: AnnoParser ForEach
-    forEachMarker = annoHole $ attachAnno $
-      MkForEach emptyAnno
-        <$  annoLexeme (spacedKeyword_ TKFor)
-        <*  annoLexeme (spacedToken_ (TIdentifiers (TIdentifier "EACH")))
+  <|> attachAnno (EachHas emptyAnno <$ forkWords current)
+
+-- | The fork's words, in ONE place on the parser side (the printer's twin is
+-- 'L4.Print.forkWords'). PROVISIONAL R-Q1 (2026-09-07): Meng has
+-- @ONCE EACH HAS@, @AS EACH HAS@, @EACH TIME ONE HAS@ and @UPON EACH@ on the
+-- bench; whichever wins changes this definition and its twin, nothing else.
+--
+-- @EACH@ is deliberately NOT a keyword: it is matched as the identifier token
+-- spelled @EACH@ — the device 'timezone'' uses for @TIMEZONE@ — so a program
+-- may still name a value @EACH@ (measured: zero bare uses in the corpus, so
+-- either choice is free; this one keeps the option open).
+forkWords :: Pos -> AnnoParser ()
+forkWords current =
+  ()
+    <$  indented' (annoLexeme (spacedToken_ (TIdentifiers (TIdentifier "EACH")))) current
+    <*  indented' (annoLexeme (spacedKeyword_ TKHas)) current
 
 must :: Pos -> Parser (RAction Name)
 must current = attachAnno $
@@ -2602,8 +2628,6 @@ deadline :: Pos -> AnnoParser (Expr Name)
 deadline current =
   annoLexeme (spacedKeyword_ TKWithin) *> annoHole (indentedExpr current)
 
--- | @HENCE body@, one hole. Used by the RECORD/COMMIT/ATTEST continuation
--- slot ('recordOrCommitExpr'); a deonton's HENCE goes through 'henceClause'.
 hence :: Pos -> AnnoParser (Expr Name)
 hence current =
   annoLexeme (spacedKeyword_ TKHence) *> annoHole (indentedExpr current)

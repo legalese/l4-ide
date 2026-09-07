@@ -167,11 +167,16 @@ data CheckError =
     -- An action is a pattern, so that @t@ would be a NEW binder matching any
     -- signer — silently discharging tenant @t@'s duty by a stranger's act.
     -- Arguments: the pattern's binder, the quantifier's binder.
-  | ForEachWithoutEvery ForEach
-    -- ^ @HENCE FOR EACH@ under a @PARTY@ subject. The fork marker says the
-    -- continuation fires once per member of a cast, and a single party is
-    -- not a cast. Carries the marker for its source range.
-    -- PROVISIONAL R-Q1 (EVERY-EACH-QUANTIFIER-SPEC).
+  | JoinWithoutEvery (Join Name)
+    -- ^ An @ONCE …@ join line under a @PARTY@ subject. The join says when a
+    -- cast's continuation fires, and a single party is not a cast. Carries
+    -- the join for its source range. (EVERY-EACH-QUANTIFIER-SPEC R-Q1.)
+  | ContinuationWithoutJoin (Expr Name)
+    -- ^ A @HENCE@ or @LEST@ directly under an @EVERY@ with no @ONCE@ line.
+    -- The join is mandatory there (R-Q1, RULED 2026-09-07): a default would
+    -- silently decide barrier-or-fork, and the barrier reading reverses what a
+    -- single-party @MAY … HENCE@ means today. Carries the first continuation
+    -- present, for its source range.
   | RegulativeActorMismatch Resolved Resolved Resolved
     -- ^ A regulative @PARTY p MUST a@ (or a @PARTY p DOES a@ event) binds a
     -- party to an action belonging to a different actor. In a value-actor
@@ -287,6 +292,7 @@ data ExpectationContext =
   | ExpectRecordCellContext -- cell (path) argument of RECORD/COMMIT/ATTEST
   | ExpectQuantifierCastContext -- the constructor after EVERY must build values of the party type
   | ExpectQuantifierFilterContext -- the WHO clause of an EVERY is a predicate on the bound variable
+  | ExpectJoinDeadlineContext -- the WITHIN after ONCE bounds the joined state
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
@@ -360,7 +366,8 @@ instance HasSrcRange CheckError where
   rangeOf (InconsistentNameInAppForm n _)   = rangeOf n
   rangeOf (CheckInfo _ mr)                  = mr
   rangeOf (RegulativeActorMismatch p _ _)   = rangeOf p
-  rangeOf (ForEachWithoutEvery fe)          = rangeOf fe
+  rangeOf (JoinWithoutEvery j)              = rangeOf j
+  rangeOf (ContinuationWithoutJoin e)       = rangeOf e
   rangeOf (QuantifierVariableRebound b _)   = rangeOf b
   rangeOf (FixityAnnotationMalformed mr _)  = mr
   rangeOf (FixityReassociationClash mr _ _) = mr

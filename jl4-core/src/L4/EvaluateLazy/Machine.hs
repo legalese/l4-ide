@@ -937,7 +937,7 @@ forwardExpr env = \ case
     env' <- evalRecLocalDecls env ds
     let combinedEnv = Map.union env' env
     continueExpr combinedEnv e
-  Regulative _ann (MkDeonton _ subject action due _forEach followup lest) ->
+  Regulative _ann (MkDeonton _ subject action due _join followup lest) ->
     case subject of
       Party _ party ->
         continueBackward (ValObligation env (Left party) action (Left due) (fromMaybe fulfilExpr followup) lest)
