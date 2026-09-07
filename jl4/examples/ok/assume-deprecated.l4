@@ -1,0 +1,41 @@
+-- Every spelling of ASSUME the checker still accepts, one per role the
+-- deprecation warning can tell apart. Each ASSUME below draws the warning; the
+-- section GIVEN at the end does not, although the checker meets it through the
+-- very same ASSUME node (the elaboration `desugarSectionGivens` prepends).
+--
+-- The file type-checks: the warning is never an error, so ASSUME keeps
+-- working while it is being retired (IMPLICIT-PROPS-DESIGN.md §11.1).
+
+-- A fact left open for the boundary to supply: the warning offers a section
+-- GIVEN, spelled out with the name and the type.
+ASSUME age IS A NUMBER
+
+-- A rule defined elsewhere: still a section GIVEN, of function type.
+ASSUME `tax on` IS A FUNCTION FROM NUMBER TO NUMBER
+
+-- The same job with an input written on the head: the warning spells the
+-- function type out from the head's inputs.
+GIVEN n IS A NUMBER
+ASSUME `is large` n IS A BOOLEAN
+
+-- A kind of thing with no stated parts: the warning offers a bodiless DECLARE.
+ASSUME Person IS A TYPE
+
+-- A name that could be of any type, so nothing can ever supply a value for
+-- it: the warning offers REFUSE.
+GIVEN a IS A TYPE
+ASSUME gap IS AN a
+
+DECIDE `is adult` IF age >= 18
+
+#CHECK `is adult`
+#CHECK `tax on`
+#CHECK `is large`
+#CHECK gap
+
+§ `Told the new way`
+    GIVEN income IS A NUMBER
+
+DECIDE `is well off` IF income > 100000
+
+#CHECK `is well off`

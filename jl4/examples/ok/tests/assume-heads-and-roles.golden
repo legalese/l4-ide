@@ -1,0 +1,179 @@
+Parsing successful
+Typechecking successful
+assume-heads-and-roles.l4:23:10-16:
+  I found a problem while checking the assumption of `plus`:
+    ASSUME is an older way of introducing a name, and it is being retired.
+    Nothing is broken: the file still checks, runs and exports as before.
+    This one leaves
+    
+      `plus`
+    
+    open for somebody outside the file to supply. Say that
+    with a GIVEN indented under the heading of the section whose rules
+    read it (add a § heading if the file has none):
+    
+      § <heading>
+          GIVEN plus IS A FUNCTION FROM NUMBER AND NUMBER TO NUMBER
+    
+    (If this ASSUME instead marked a case the rules cannot answer, that is
+    REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
+    
+    The manual explains the move: doc/reference/types/ASSUME.md.
+assume-heads-and-roles.l4:27:8-16:
+  I found a problem while checking the assumption of `identity`:
+    ASSUME is an older way of introducing a name, and it is being retired.
+    Nothing is broken: the file still checks, runs and exports as before.
+    This one leaves
+    
+      `identity`
+    
+    open for somebody outside the file to supply. Say that
+    with a GIVEN indented under the heading of the section whose rules
+    read it (add a § heading if the file has none):
+    
+      § <heading>
+          GIVEN identity IS A <type>
+    
+    (If this ASSUME instead marked a case the rules cannot answer, that is
+    REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
+    
+    The manual explains the move: doc/reference/types/ASSUME.md.
+assume-heads-and-roles.l4:30:8-11:
+  I found a problem while checking the assumption of `age`:
+    ASSUME is an older way of introducing a name, and it is being retired.
+    Nothing is broken: the file still checks, runs and exports as before.
+    This one leaves
+    
+      `age`
+    
+    open for somebody outside the file to supply. Say that
+    with a GIVEN indented under the heading of the section whose rules
+    read it (add a § heading if the file has none):
+    
+      § <heading>
+          GIVEN age IS A NUMBER
+    
+    (If this ASSUME instead marked a case the rules cannot answer, that is
+    REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
+    
+    The manual explains the move: doc/reference/types/ASSUME.md.
+assume-heads-and-roles.l4:32:8-12:
+  I found a problem while checking the assumption of `pick`:
+    ASSUME is an older way of introducing a name, and it is being retired.
+    Nothing is broken: the file still checks, runs and exports as before.
+    This one leaves
+    
+      `pick`
+    
+    open for somebody outside the file to supply. Say that
+    with a GIVEN indented under the heading of the section whose rules
+    read it (add a § heading if the file has none):
+    
+      § <heading>
+          GIVEN pick IS FOR ALL v FUNCTION FROM v TO v
+    
+    (If this ASSUME instead marked a case the rules cannot answer, that is
+    REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
+    
+    The manual explains the move: doc/reference/types/ASSUME.md.
+assume-heads-and-roles.l4:35:8-18:
+  I found a problem while checking the assumption of `is large`:
+    ASSUME is an older way of introducing a name, and it is being retired.
+    Nothing is broken: the file still checks, runs and exports as before.
+    This one leaves
+    
+      `is large`
+    
+    open for somebody outside the file to supply. Say that
+    with a GIVEN indented under the heading of the section whose rules
+    read it (add a § heading if the file has none):
+    
+      § <heading>
+          GIVEN `is large` IS A <type>
+    
+    (If this ASSUME instead marked a case the rules cannot answer, that is
+    REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
+    
+    The manual explains the move: doc/reference/types/ASSUME.md.
+assume-heads-and-roles.l4:37:8-9:
+  I found a problem while checking the assumption of `w`:
+    ASSUME is an older way of introducing a name, and it is being retired.
+    Nothing is broken: the file still checks, runs and exports as before.
+    This one leaves
+    
+      `w`
+    
+    with no type written. Say what kind of thing it is,
+    with a GIVEN indented under the heading of the section whose rules
+    read it (add a § heading if the file has none):
+    
+      § <heading>
+          GIVEN w IS A <type>
+    
+    (If this ASSUME instead marked a case the rules cannot answer, that is
+    REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
+    
+    The manual explains the move: doc/reference/types/ASSUME.md.
+assume-heads-and-roles.l4:39:8-12:
+  I found a problem while checking the assumption of `rate`:
+    ASSUME is an older way of introducing a name, and it is being retired.
+    Nothing is broken: the file still checks, runs and exports as before.
+    This one leaves
+    
+      `rate`
+    
+    open for somebody outside the file to supply. Say that
+    with a GIVEN indented under the heading of the section whose rules
+    read it (add a § heading if the file has none):
+    
+      § <heading>
+          GIVEN rate IS A NUMBER
+    
+    The ASSUME also names it `interest rate`.
+    A GIVEN cannot carry an AKA, so write `rate` wherever the other
+    name was used.
+    
+    (If this ASSUME instead marked a case the rules cannot answer, that is
+    REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
+    
+    The manual explains the move: doc/reference/types/ASSUME.md.
+assume-heads-and-roles.l4:42:8-20:
+  I found a problem while checking the assumption of `filing fee`:
+    ASSUME is an older way of introducing a name, and it is being retired.
+    Nothing is broken: the file still checks, runs and exports as before.
+    This one leaves
+    
+      `filing fee`
+    
+    open for somebody outside the file to supply. Say that
+    with a GIVEN indented under the heading of the section whose rules
+    read it (add a § heading if the file has none):
+    
+      § <heading>
+          GIVEN `filing fee` IS A NUMBER TYPICALLY 100
+    
+    Keep any @desc or @ref written above it: they go above the GIVEN line
+    the same way.
+    
+    (If this ASSUME instead marked a case the rules cannot answer, that is
+    REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
+    
+    The manual explains the move: doc/reference/types/ASSUME.md.
+assume-heads-and-roles.l4:50:1-14:
+  FUNCTION FROM NUMBER AND NUMBER TO NUMBER
+assume-heads-and-roles.l4:51:1-16:
+  FUNCTION FROM a TO a
+assume-heads-and-roles.l4:52:1-11:
+  NUMBER
+assume-heads-and-roles.l4:53:1-12:
+  FOR ALL v FUNCTION FROM v TO v
+assume-heads-and-roles.l4:54:1-18:
+  FUNCTION FROM a TO BOOLEAN
+assume-heads-and-roles.l4:55:1-9:
+  NUMBER
+assume-heads-and-roles.l4:56:1-23:
+  NUMBER
+assume-heads-and-roles.l4:57:1-20:
+  NUMBER
+assume-heads-and-roles.l4:58:1-11:
+  NUMBER

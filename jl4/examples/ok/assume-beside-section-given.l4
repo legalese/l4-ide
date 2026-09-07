@@ -1,0 +1,25 @@
+-- An author-written ASSUME that shares a name with its own section's GIVEN.
+-- L4 resolves names by type, so the two bindings coexist and the file checks
+-- clean: `label` reads the STRING one, `doubled` the NUMBER one.
+--
+-- The checker tells the section GIVEN's own elaboration (a 0-ary ASSUME it
+-- prepends for `income`) apart from this ASSUME by identity — the elaboration
+-- carries no tokens — and not by name alone. Measured 2026-09-07 before that
+-- repair (IMPLICIT-PROPS-DESIGN.md §11.1.2): the name-only test took this
+-- ASSUME for the checker's own, so it drew no deprecation warning and was
+-- dropped from the re-printed module. Exactly one warning is expected here,
+-- on line 13, and `l4 batch`'s re-print must keep the declaration.
+
+§ `Rates`
+    GIVEN income IS A NUMBER
+
+ASSUME income IS A STRING
+
+GIVETH A STRING
+DECIDE `label` IS income
+
+GIVETH A NUMBER
+DECIDE `doubled` IS income TIMES 2
+
+#CHECK `label`
+#CHECK `doubled`

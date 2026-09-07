@@ -1,0 +1,21 @@
+-- An ASSUME inside a WHERE. There is no section for it to move to, so the
+-- warning offers the rule's own GIVEN instead of a section GIVEN, and a
+-- WHERE-local type ASSUME is sent to the top of the file, since a WHERE
+-- cannot hold a DECLARE. Pinned after the 2026-09-07 refuters showed the
+-- section-GIVEN advice hoisting a local binding to module scope
+-- (IMPLICIT-PROPS-DESIGN.md §11.1.2).
+
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `above the threshold` IF n AT LEAST threshold
+  WHERE
+    ASSUME threshold IS A NUMBER
+
+GIVETH A BOOLEAN
+DECIDE `has a widget` IS `some widget is present`
+  WHERE
+    ASSUME Widget IS A TYPE
+    ASSUME `some widget is present` IS A BOOLEAN
+
+#CHECK `above the threshold`
+#CHECK `has a widget`

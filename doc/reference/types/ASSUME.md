@@ -17,8 +17,12 @@ instead.
   the Reg CF corpus's own refusal, which waits on a Decision Model and
   Notation (DMN) exporter limit recorded under
   [`REFUSE`](../control-flow/REFUSE.md#limits-as-they-stand-today).
-- **A warning from the checker is ruled, and is being built in a separate
-  change.** Today `l4 check` reports nothing for an `ASSUME`.
+- **The checker warns, since 2026-09-07.** Every author-written `ASSUME`
+  draws a warning — never an error, so nothing that checked before stops
+  checking — that reads the shape of the declaration and names the construct to
+  use instead. See
+  [ASSUME is being retired](../errors/README.md#assume-is-being-retired) for the
+  text and the shapes it tells apart.
 
 ## What it did
 
@@ -39,12 +43,12 @@ no answer here".
 
 ## Where each job goes now
 
-| The job the `ASSUME` was doing                                    | Where that job goes                                                                                             |
-| ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| a fact supplied afresh for each case (the applicant's age)        | a [`GIVEN` under the section heading](../syntax/section-given.md) whose rules read it — a **"section `GIVEN`"** |
-| a rule defined elsewhere (`… IS A FUNCTION FROM …`)               | the same section `GIVEN`, with the same function type — see the limit under "Function-typed inputs" below       |
-| a kind of thing the model treats as opaque (`ASSUME T IS A TYPE`) | [`DECLARE T`](DECLARE.md#opaque-types) — a name with no stated contents                                         |
-| a case the encoding deliberately does not cover                   | one named definition whose body is [`REFUSE "..."`](../control-flow/REFUSE.md)                                  |
+| The job the `ASSUME` was doing                                    | Where that job goes                                                                                                                                                    |
+| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| a fact supplied afresh for each case (the applicant's age)        | a [`GIVEN` under the section heading](../syntax/section-given.md) whose rules read it — a **"section `GIVEN`"**                                                        |
+| a rule defined elsewhere (`… IS A FUNCTION FROM …`)               | the same section `GIVEN`, with the same function type — but read "Function-typed inputs" below first, because for an `@export`ed rule the move can cost you the export |
+| a kind of thing the model treats as opaque (`ASSUME T IS A TYPE`) | [`DECLARE T`](DECLARE.md#opaque-types) — a name with no stated contents                                                                                                |
+| a case the encoding deliberately does not cover                   | one named definition whose body is [`REFUSE "..."`](../control-flow/REFUSE.md)                                                                                         |
 
 ### 1. A fact supplied per case: the section `GIVEN`
 
@@ -191,12 +195,23 @@ out instead of assuming it wherever you can.
 input that is itself a rule, because a rule cannot be sent as JavaScript Object
 Notation (JSON), which is what a request carries. L4 reports
 `Function type inputs are not supported for @export` for an `@export`ed rule
-that reads a function-typed input, whichever keyword declared it. Two exporters
+that reads a function-typed input.
+
+**And that makes this one migration you should measure before you make it.** The
+refusal keys on how the type is _spelled_, not on the keyword — so the two
+spellings are not interchangeable here, and moving between them can change
+whether a rule exports at all. Measured 2026-09-07: `ASSUME \`is eligible\` p IS A
+BOOLEAN`puts the input on the head, is not a function type, and an`@export`ed
+rule that reads it **checks clean**; the section `GIVEN`the warning offers for
+it,`GIVEN \`is eligible\` IS A FUNCTION FROM Person TO BOOLEAN`, **is refused**.
+There are 34 such sites in the corpus, across five files in the Blawx and
+relational examples, and they keep the older spelling until that gate is ruled
+on. Two exporters
 are built on that older shape and still read it: the Blawx bridge and the
 relational middle end lower a predicate written as
-`GIVEN p IS A Person` / `ASSUME `is authorised` p IS A BOOLEAN` to an input
-predicate, and have no image yet for the section-`GIVEN` spelling of the same
-predicate. The shipped Blawx seeds therefore keep that `ASSUME` form, and say
+`GIVEN p IS A Person`/`ASSUME `is authorised` p IS A BOOLEAN` to an input
+predicate, and have no image yet for the section-`GIVEN`spelling of the same
+predicate. The shipped Blawx seeds therefore keep that`ASSUME` form, and say
 so in their headers; see [L4 to Blawx](../../tutorials/blawx/l4-to-blawx.md).
 
 ## Reading older code
