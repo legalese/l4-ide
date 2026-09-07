@@ -233,12 +233,14 @@ instance Linearize (Expr Resolved) where
       <> maybe [] (\ followup -> [ text "hence",  lin followup ]) mfollowup
       <> maybe [] (\ lest -> [ text "lest",  lin lest ]) mlest
       where
-        linJoin (MkJoin _ th mdue) =
-          [ text "once" ]
-          <> (case th of
-                AllHave _ -> [ text "all", text "have" ]
-                EachHas _ -> [ text "each", text "has" ])   -- follows 'L4.Print.forkWords'
-          <> maybe [] (\ d -> [ text "within", lin d ]) mdue
+        linJoin j = case j of
+          -- follows 'L4.Print' (uponEachWords); R-Q1 RULED 2026-09-07
+          JoinOnce _ th mdue ->
+            [ text "once" ]
+            <> (case th of AllHave _ -> [ text "all", text "have" ])
+            <> linJoinDue mdue
+          JoinUpon _ _ mdue -> [ text "upon", text "each" ] <> linJoinDue mdue
+        linJoinDue = maybe [] (\ d -> [ text "within", lin d ])
         linSubject = \ case
           Party _ party -> [ text "party", lin party ]
           Every _ mCast v mFilter ->

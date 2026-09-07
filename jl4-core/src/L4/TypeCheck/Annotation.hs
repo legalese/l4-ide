@@ -147,7 +147,10 @@ nlgExpr = \ case
       rule' <- nlgPattern rule
       provided' <- traverse nlgExpr provided
       deadline' <- traverse nlgExpr deadline
-      join' <- traverse (\ (MkJoin jann th d) -> MkJoin jann th <$> traverse nlgExpr d) mjoin
+      let nlgJoin = \ case
+            JoinOnce jann th d -> JoinOnce jann th <$> traverse nlgExpr d
+            JoinUpon jann ue d -> JoinUpon jann ue <$> traverse nlgExpr d
+      join' <- traverse nlgJoin mjoin
       followup' <- traverse nlgExpr followup
       lest' <- traverse nlgExpr lest
       pure $ Regulative ann (MkDeonton ann'' subj' (MkAction ann' modal rule' provided') deadline' join' followup' lest')

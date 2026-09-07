@@ -916,7 +916,7 @@ prettyObligation subjectDoc a t j f l =
     , printWithLayout a
     ]
     <> mprint "WITHIN" t
-    <> foldMap (\ x -> [printWithLayout x]) j   -- the ONCE line prints its own keyword
+    <> foldMap (\ x -> [printWithLayout x]) j   -- the join line prints its own keyword
     <> mprint "HENCE" f
     <> mprint "LEST" l
 
@@ -925,20 +925,27 @@ prettyObligation subjectDoc a t j f l =
 noJoin :: Maybe (Join Resolved)
 noJoin = Nothing
 
--- | @ONCE ALL HAVE [WITHIN d]@ / @ONCE EACH HAS [WITHIN d]@.
+-- | @ONCE ALL HAVE [WITHIN d]@ (the barrier) / @UPON EACH [WITHIN d]@ (the
+-- fork). R-Q1 RULED 2026-09-07.
 instance LayoutPrinterWithName n => LayoutPrinter (Join n) where
-  printWithLayout (MkJoin _ th due) =
-    hsep $ [ "ONCE", printWithLayout th ] <> mprint "WITHIN" due
+  printWithLayout = \ case
+    JoinOnce _ th due  -> hsep $ [ "ONCE", printWithLayout th ] <> mprint "WITHIN" due
+    JoinUpon _ ue due  -> hsep $ [ printWithLayout ue ] <> mprint "WITHIN" due
 
 instance LayoutPrinter (Threshold n) where
   printWithLayout = \ case
     AllHave _ -> "ALL HAVE"
-    EachHas _ -> forkWords
+
+instance LayoutPrinter UponEach where
+  printWithLayout (MkUponEach _) = uponEachWords
 
 -- | The fork's words, in ONE place on the printer side (the parser's twin is
--- 'L4.Parser.forkWords'; the diagnostics read this one). PROVISIONAL R-Q1.
-forkWords :: Doc ann
-forkWords = "EACH HAS"
+-- 'L4.Parser.uponEach'; the diagnostics read this one, via
+-- 'L4.TypeCheck.forkWordsText'). R-Q1 RULED 2026-09-07 in favour of
+-- @UPON EACH@, with Meng's note that changing it later is cheap: this
+-- definition, its parser twin, and the goldens that quote the diagnostic.
+uponEachWords :: Doc ann
+uponEachWords = "UPON EACH"
 
 -- | The subject of a deonton: @PARTY p@, or @EVERY [Cast] v [WHO filter]@
 -- (EVERY-EACH-QUANTIFIER-SPEC §2.4). The filter is bracketed like a WITHIN/
@@ -1092,7 +1099,7 @@ instance LayoutPrinter a => LayoutPrinter (Lazy.Value a) where
       ]
     Lazy.ValObligation _env p a t f l -> case t of
       -- A run-time obligation always binds one party (phase 1: an EVERY
-      -- never reaches the machine), so there is no ONCE line to print.
+      -- never reaches the machine), so there is no join line to print.
       Left te -> prettyObligation ("PARTY" <+> printWithLayout p) a te noJoin (Just f) l
       Right tv -> prettyObligation ("PARTY" <+> printWithLayout p) a (Just tv) noJoin (Just f) l
     Lazy.ValROp _env op l r -> hsep

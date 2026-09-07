@@ -70,7 +70,7 @@ identIsTypeVar t = case posTokenCategory t.payload of
   CIdentifier -> Just SemanticTokenTypes_TypeParameter
   _ -> Nothing
 
--- | @EACH@ in the fork's join line (@ONCE EACH HAS@) is lexed as an identifier
+-- | @EACH@ in the fork's join line (@UPON EACH@) is lexed as an identifier
 -- (it is deliberately not a keyword, so programs may still name a value
 -- @EACH@), but at that position it is a marker word and highlights as one.
 identIsKeyword :: PosToken -> Maybe SemanticTokenTypes
@@ -211,10 +211,12 @@ instance ToSemTokens Context PosToken (GuardedExpr Name) where
 instance ToSemTokens Context PosToken (Deonton Name) where
 instance ToSemTokens Context PosToken (Subject Name) where
 instance ToSemTokens Context PosToken (Join Name) where
--- A threshold's words live in its own Anno; EACH there is an identifier token
--- shown as the keyword it acts as.
 instance ToSemTokens Context PosToken (Threshold Name) where
-  toSemTokens th = withTokenType identIsKeyword $ genericToSemTokens th
+-- The marker's two words live in its own Anno, so this override cannot reach
+-- the join deadline's identifiers: EACH is an identifier token shown as the
+-- keyword it acts as.
+instance ToSemTokens Context PosToken UponEach where
+  toSemTokens ue = withTokenType identIsKeyword $ genericToSemTokens ue
 -- DeonticModal has no tokens to highlight
 instance ToSemTokens Context PosToken DeonticModal where
   toSemTokens _ = pure []
@@ -334,10 +336,10 @@ instance ToSemTokens () PosToken (AppForm Resolved) where
 instance ToSemTokens () PosToken (Deonton Resolved) where
 instance ToSemTokens () PosToken (Subject Resolved) where
 instance ToSemTokens () PosToken (Join Resolved) where
--- A threshold's words live in its own Anno; EACH there is an identifier token
--- shown as the keyword it acts as.
 instance ToSemTokens () PosToken (Threshold Resolved) where
-  toSemTokens th = withTokenType identIsKeyword $ genericToSemTokens th
+-- See the Name-phase instance above: EACH is an identifier shown as a keyword.
+instance ToSemTokens () PosToken UponEach where
+  toSemTokens ue = withTokenType identIsKeyword $ genericToSemTokens ue
 -- DeonticModal has no tokens to highlight
 instance ToSemTokens () PosToken DeonticModal where
   toSemTokens _ = pure []

@@ -142,8 +142,8 @@ carameliseDeonton = \ case
 
 carameliseJoin :: HasName n => Join n -> Join n
 carameliseJoin = \ case
-  MkJoin { anno, threshold, due } ->
-    MkJoin { anno, threshold, due = fmap carameliseExpr due }
+  JoinOnce anno th due -> JoinOnce anno th (fmap carameliseExpr due)
+  JoinUpon anno ue due -> JoinUpon anno ue (fmap carameliseExpr due)
 
 carameliseSubject :: HasName n => Subject n -> Subject n
 carameliseSubject = \ case

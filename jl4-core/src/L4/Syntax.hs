@@ -455,45 +455,61 @@ data Subject n
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
 -- | The join line of a quantified obligation (EVERY-EACH-QUANTIFIER-SPEC
--- §2.2.7.4; R-Q1 RULED 2026-09-07, R-T1/R-T2 RULED 2026-09-06): when the
--- continuation fires.
+-- §2.2.7.4 and §2.4; R-Q1 RULED 2026-09-07, R-T1\/R-T2 RULED 2026-09-06): when
+-- the continuation fires.
 --
 -- > ONCE ALL HAVE [WITHIN d]    -- the barrier: HENCE once, at the last completion
--- > ONCE EACH HAS [WITHIN d]    -- the fork: HENCE once per completion (spelling PROVISIONAL)
+-- > UPON EACH     [WITHIN d]    -- the fork:   HENCE once per completion
+--
+-- The two are separate constructors rather than two 'Threshold's because they
+-- are triggered differently: every @ONCE@ threshold is LEVEL-triggered and
+-- fires once when the threshold is met, while the fork is EDGE-triggered and
+-- fires per completion. Phase 3's count and measure thresholds
+-- (@ONCE SOME 2 OF … HAVE@, @ONCE sum OF amount AT LEAST rent@) and their
+-- conjunctions are all level-triggered, so they join 'Threshold'; the fork
+-- never could. R-Q1 (Meng, 2026-09-07): /"Let's rule fork words in favour of
+-- UPON EACH. We can always change our minds about this in future at relatively
+-- low engineering cost."/
 --
 -- A bare @HENCE@ or @LEST@ directly under an @EVERY@ is a check error naming
 -- both spellings ('L4.TypeCheck.checkDeonton'): a barrier default would
 -- silently reverse what a single-party @MAY … HENCE@ means today. The
--- @WITHIN@ after @ONCE@ bounds the /state/ — one deadline on the whole —
+-- @WITHIN@ on either form bounds the /state/ — one deadline on the whole —
 -- where the deonton's own @WITHIN@ bounds each act (R-T2).
---
--- The join is its own node, not a marker on the @HENCE@, so that the count
--- and measure thresholds of spec §2.2.7 (phase 3) hang off it without moving.
-data Join n = MkJoin
-  { anno :: Anno
-  , threshold :: Threshold n
-  , due :: Maybe (Expr n)
-  }
+data Join n
+  = JoinOnce Anno (Threshold n) (Maybe (Expr n))
+    -- ^ @ONCE Threshold [WITHIN d]@ — level-triggered.
+  | JoinUpon Anno UponEach (Maybe (Expr n))
+    -- ^ @UPON EACH [WITHIN d]@ — edge-triggered. The words live in their own
+    -- node so the LSP can highlight @EACH@ (an identifier token, not a
+    -- keyword) as the marker word it is, without that override reaching the
+    -- deadline expression's own identifiers.
   deriving stock (GHC.Generic, Eq, Ord, Show, Functor, Foldable, Traversable)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
--- | What the join waits for (spec §2.2.7.3). Phase 1 carries the two ends of
--- the family; the count and measure forms — @SOME 2 OF … HAVE@,
+-- | The @UPON EACH@ marker. It carries no payload: its 'Anno' holds the two
+-- source tokens, which is what lets the derived exactprint and semantic-token
+-- instances place them without a hand-written arm.
+--
+-- @EACH@ is deliberately NOT a keyword (R-Q1): it is matched as the identifier
+-- token spelled @EACH@, so a program may still name a value @EACH@.
+data UponEach = MkUponEach Anno
+  deriving stock (GHC.Generic, Eq, Ord, Show)
+  deriving anyclass (SOP.Generic, ToExpr, NFData)
+
+-- | What an @ONCE@ join waits for (spec §2.2.7.3). Phase 1 carries only the
+-- barrier; the count and measure forms — @SOME 2 OF … HAVE@,
 -- @sum OF amount AT LEAST rent@, @Threshold AND Threshold@ — are phase 3 and
 -- become further constructors carrying their expressions, which is why the
--- type is parameterised although neither phase-1 constructor mentions @n@.
+-- type is parameterised although the phase-1 constructor does not mention @n@.
+--
+-- The fork is NOT here: it is 'JoinUpon'. See 'Join'.
 --
 -- Each constructor's 'Anno' holds its own words, so the derived exactprint and
 -- semantic-token instances need no hand-written arm.
 data Threshold n
   = AllHave Anno
     -- ^ @ALL HAVE@ — count = cast: the barrier.
-  | EachHas Anno
-    -- ^ @EACH HAS@ — no join at all: one continuation per performance, the
-    -- bound variable in it being the performer (the fork). The WORDS are
-    -- PROVISIONAL (R-Q1, 2026-09-07: candidates @ONCE EACH HAS@,
-    -- @AS EACH HAS@, @EACH TIME ONE HAS@, @UPON EACH@); they live in exactly
-    -- two places, 'L4.Parser.forkWords' and 'L4.Print.forkWords'.
   deriving stock (GHC.Generic, Eq, Ord, Show, Functor, Foldable, Traversable)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
@@ -832,6 +848,8 @@ deriving via L4Syntax (Subject n)
   instance HasAnno (Subject n)
 deriving via L4Syntax (Join n)
   instance HasAnno (Join n)
+deriving via L4Syntax UponEach
+  instance HasAnno UponEach
 deriving via L4Syntax (Threshold n)
   instance HasAnno (Threshold n)
 deriving via L4Syntax (RAction n)
@@ -880,6 +898,7 @@ deriving anyclass instance ToConcreteNodes PosToken (GuardedExpr Name)
 deriving anyclass instance ToConcreteNodes PosToken (Deonton Name)
 deriving anyclass instance ToConcreteNodes PosToken (Subject Name)
 deriving anyclass instance ToConcreteNodes PosToken (Join Name)
+deriving anyclass instance ToConcreteNodes PosToken UponEach
 deriving anyclass instance ToConcreteNodes PosToken (Threshold Name)
 -- DeonticModal has no source tokens, so return empty list
 instance ToConcreteNodes PosToken DeonticModal where
@@ -1140,6 +1159,7 @@ deriving anyclass instance HasSrcRange (GuardedExpr a)
 deriving anyclass instance HasSrcRange (Deonton a)
 deriving anyclass instance HasSrcRange (Subject a)
 deriving anyclass instance HasSrcRange (Join a)
+deriving anyclass instance HasSrcRange UponEach
 deriving anyclass instance HasSrcRange (Threshold a)
 deriving anyclass instance HasSrcRange (LocalDecl a)
 deriving anyclass instance HasSrcRange (NamedExpr a)
@@ -1221,6 +1241,7 @@ deriving anyclass instance Serialise n => Serialise (GuardedExpr n)
 deriving anyclass instance Serialise n => Serialise (Deonton n)
 deriving anyclass instance Serialise n => Serialise (Subject n)
 deriving anyclass instance Serialise n => Serialise (Join n)
+deriving anyclass instance Serialise UponEach
 deriving anyclass instance Serialise n => Serialise (Threshold n)
 deriving anyclass instance Serialise DeonticModal
 deriving anyclass instance Serialise n => Serialise (RAction n)

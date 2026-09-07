@@ -292,7 +292,7 @@ data ExpectationContext =
   | ExpectRecordCellContext -- cell (path) argument of RECORD/COMMIT/ATTEST
   | ExpectQuantifierCastContext -- the constructor after EVERY must build values of the party type
   | ExpectQuantifierFilterContext -- the WHO clause of an EVERY is a predicate on the bound variable
-  | ExpectJoinDeadlineContext -- the WITHIN after ONCE bounds the joined state
+  | ExpectJoinDeadlineContext -- a join line's WITHIN bounds the joined state
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 

@@ -562,7 +562,9 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Deonton n) where
     pure $  MkDeonton ann' subj' event' deadline' join' followup' lest'
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Join n) where
-  addNlg (MkJoin ann th due) = MkJoin ann th <$> traverse addNlg due
+  addNlg = \ case
+    JoinOnce ann th due -> JoinOnce ann th <$> traverse addNlg due
+    JoinUpon ann ue due -> JoinUpon ann ue <$> traverse addNlg due
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Subject n) where
   addNlg = \ case
@@ -843,7 +845,9 @@ instance HasDesc (Deonton n) where
       <*> traverse addDesc lest
 
 instance HasDesc (Join n) where
-  addDesc (MkJoin ann th due) = MkJoin ann th <$> traverse addDesc due
+  addDesc = \ case
+    JoinOnce ann th due -> JoinOnce ann th <$> traverse addDesc due
+    JoinUpon ann ue due -> JoinUpon ann ue <$> traverse addDesc due
 
 instance HasDesc (Subject n) where
   addDesc = \ case
@@ -1509,7 +1513,9 @@ instance (HasSrcRange n, HasRef n) => HasRef (Deonton n) where
     pure $ MkDeonton ann subj' event' deadline' join' followup' lest'
 
 instance (HasSrcRange n, HasRef n) => HasRef (Join n) where
-  addRef (MkJoin ann th due) = MkJoin ann th <$> traverse addRef due
+  addRef = \ case
+    JoinOnce ann th due -> JoinOnce ann th <$> traverse addRef due
+    JoinUpon ann ue due -> JoinUpon ann ue <$> traverse addRef due
 
 instance (HasSrcRange n, HasRef n) => HasRef (Subject n) where
   addRef = \ case

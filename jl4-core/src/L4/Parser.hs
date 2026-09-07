@@ -2529,7 +2529,7 @@ obligation = do
 -- (backticked names included), not expressions, so @EVERY Tenant t MUST …@
 -- cannot be misread as the application @Tenant t@. The filter word is @WHO@
 -- only: @WHERE@ stays the local-definition keyword ('L4.Parser.whereBlock') and
--- is not overloaded here (PROVISIONAL R-Q4).
+-- is not overloaded here (R-Q4, RULED 2026-09-07).
 --
 -- Holes, in order: cast (empty when absent), variable, filter (empty when
 -- absent) — matching the 'Every' constructor's fields positionally.
@@ -2551,59 +2551,74 @@ subject current =
         )
 
 -- | The join line of a quantified obligation (EVERY-EACH-QUANTIFIER-SPEC
--- §2.2.7.4, R-Q1 RULED 2026-09-07):
+-- §2.2.7.4 and §2.4, R-Q1 RULED 2026-09-07):
 --
--- > ONCE ALL HAVE [WITHIN d]     -- barrier
--- > ONCE EACH HAS [WITHIN d]     -- fork (words PROVISIONAL, see 'forkWords')
+-- > ONCE ALL HAVE [WITHIN d]     -- the barrier (level-triggered)
+-- > UPON EACH     [WITHIN d]     -- the fork    (edge-triggered)
 --
--- Layout: EVERY word of the join line — @ONCE@, the threshold's words, and the
--- @WITHIN@ body — must sit strictly right of the head keyword's column, like
--- the deonton's other bodies.
+-- Two alternatives rather than two thresholds, because the fork is not a
+-- threshold: see 'L4.Syntax.Join'. @UPON@ is a keyword here; @EACH@ is NOT,
+-- and is matched as the identifier token spelled @EACH@ — the device
+-- 'timezone'' uses for @TIMEZONE@ — so a program may still name a value
+-- @EACH@.
+--
+-- Layout: EVERY word of the join line — the head keyword, the marker words,
+-- and the @WITHIN@ body — must sit strictly right of the deonton's head
+-- keyword column.
 --
 -- The join line is the ONLY clause whose keyword is itself column-checked, and
 -- it has to be. @WITHIN@, @HENCE@ and @LEST@ each guard their body expression
 -- with 'indentedExpr', so a dedented one of those still fails on its body; a
--- bare @ONCE ALL HAVE@ has no body, so without this guard it had NO positional
--- constraint at all and was silently absorbed by whatever deonton was open —
--- measured 2026-09-07: an @ONCE EACH HAS@ written at the OUTER rule's clause
--- column attached to a nested @EVERY@ inside the outer's @HENCE@, checked
--- clean, and exactprinted identically, so nothing in the toolchain showed the
--- author that the fork had bound to the wrong rule. Barrier-versus-fork is
--- exactly the distinction 'ContinuationWithoutJoin' refuses to guess at, so
--- deciding it by invisible layout was the worst available default.
+-- bare @ONCE ALL HAVE@ or @UPON EACH@ has no body, so without this guard it
+-- had NO positional constraint at all and was silently absorbed by whatever
+-- deonton was open — measured 2026-09-07: a fork written at the OUTER rule's
+-- clause column attached to a nested @EVERY@ inside the outer's @HENCE@,
+-- checked clean, and exactprinted identically, so nothing in the toolchain
+-- showed the author that the fork had bound to the wrong rule.
+-- Barrier-versus-fork is exactly the distinction 'ContinuationWithoutJoin'
+-- refuses to guess at, so deciding it by invisible layout was the worst
+-- available default.
 --
 -- Phase 3 adds the count and measure thresholds (@SOME 2 OF … HAVE@,
--- @sum OF amount AT LEAST rent@) as further 'Threshold' alternatives here.
+-- @sum OF amount AT LEAST rent@) as further 'Threshold' alternatives, all of
+-- them under @ONCE@.
 joinLine :: Pos -> AnnoParser (Join Name)
-joinLine current = annoHole $ attachAnno $
-  MkJoin emptyAnno
-    <$  indented' (annoLexeme (spacedKeyword_ TKOnce)) current
-    <*> annoHole (joinThreshold current)
-    <*> optionalWithHole (deadline current)
+joinLine current = annoHole $
+      attachAnno
+        ( JoinOnce emptyAnno
+            <$  indented' (annoLexeme (spacedKeyword_ TKOnce)) current
+            <*> annoHole (joinThreshold current)
+            <*> optionalWithHole (deadline current)
+        )
+  <|> attachAnno
+        ( JoinUpon emptyAnno
+            <$> annoHole (uponEach current)
+            <*> optionalWithHole (deadline current)
+        )
 
+-- | @ONCE@'s threshold. Phase 1 has only the barrier; the count and measure
+-- forms of spec §2.2.7.4 become further alternatives here.
 joinThreshold :: Pos -> Parser (Threshold Name)
 joinThreshold current =
-      attachAnno
-        ( AllHave emptyAnno
-            <$  indented' (annoLexeme (spacedKeyword_ TKAll)) current
-            <*  indented' (annoLexeme (spacedKeyword_ TKHave)) current
-        )
-  <|> attachAnno (EachHas emptyAnno <$ forkWords current)
+  attachAnno
+    ( AllHave emptyAnno
+        <$  indented' (annoLexeme (spacedKeyword_ TKAll)) current
+        <*  indented' (annoLexeme (spacedKeyword_ TKHave)) current
+    )
 
--- | The fork's words, in ONE place on the parser side (the printer's twin is
--- 'L4.Print.forkWords'). PROVISIONAL R-Q1 (2026-09-07): Meng has
--- @ONCE EACH HAS@, @AS EACH HAS@, @EACH TIME ONE HAS@ and @UPON EACH@ on the
--- bench; whichever wins changes this definition and its twin, nothing else.
+-- | The fork's words, @UPON EACH@ (R-Q1 RULED 2026-09-07). The printer's twin
+-- is 'L4.Print.uponEachWords', which the diagnostics read; changing the
+-- spelling is those two definitions and the goldens that quote them.
 --
--- @EACH@ is deliberately NOT a keyword: it is matched as the identifier token
--- spelled @EACH@ — the device 'timezone'' uses for @TIMEZONE@ — so a program
--- may still name a value @EACH@ (measured: zero bare uses in the corpus, so
--- either choice is free; this one keeps the option open).
-forkWords :: Pos -> AnnoParser ()
-forkWords current =
-  ()
-    <$  indented' (annoLexeme (spacedToken_ (TIdentifiers (TIdentifier "EACH")))) current
-    <*  indented' (annoLexeme (spacedKeyword_ TKHas)) current
+-- @UPON@ in THIS position is the join line. @UPON <event>@ as a /rule head/ —
+-- @specs\/todo\/UPON-EXTERNAL-EVENTS-SPEC.md@, status OPEN — is a different
+-- construct in a different position, and is not built; the two never compete,
+-- because a rule head cannot appear after an act.
+uponEach :: Pos -> Parser UponEach
+uponEach current = attachAnno $
+  MkUponEach emptyAnno
+    <$  indented' (annoLexeme (spacedKeyword_ TKUpon)) current
+    <*  indented' (annoLexeme (spacedToken_ (TIdentifiers (TIdentifier "EACH")))) current
 
 must :: Pos -> Parser (RAction Name)
 must current = attachAnno $

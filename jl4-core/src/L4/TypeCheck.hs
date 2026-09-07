@@ -1744,7 +1744,7 @@ checkDeonton ann subject action due mjoin hence lest partyT actionT =
       case (mjoin, hence <|> lest) of
         (Nothing, Just k) -> addError (ContinuationWithoutJoin k)
         _                 -> pure ()
-      -- DELIBERATELY outside the 'extendKnown' below: the WITHIN after ONCE
+      -- DELIBERATELY outside the 'extendKnown' below: a join line's WITHIN
       -- bounds the WHOLE group (R-T2), so it must not depend on which member
       -- you are looking at — @ONCE ALL HAVE WITHIN graceOf t@ would be a
       -- different deadline per member, which is not a deadline on the whole.
@@ -1775,12 +1775,15 @@ checkDeonton ann subject action due mjoin hence lest partyT actionT =
 -- | The @ONCE@ line: its threshold carries no expression in phase 1; its
 -- @WITHIN@ bounds the joined state and is a NUMBER like the act's (R-T2).
 checkJoin :: Join Name -> Check (Join Resolved)
-checkJoin (MkJoin jann th mdue) = do
-  let thR = case th of
-        AllHave a -> AllHave a
-        EachHas a -> EachHas a
-  dueR <- traverse (\e -> checkExpr ExpectJoinDeadlineContext e number) mdue
-  pure (MkJoin jann thR dueR)
+checkJoin = \ case
+  JoinOnce jann th mdue -> do
+    let thR = case th of AllHave a -> AllHave a
+    JoinOnce jann thR <$> checkJoinDeadline mdue
+  JoinUpon jann ue mdue ->
+    JoinUpon jann ue <$> checkJoinDeadline mdue
+  where
+    checkJoinDeadline =
+      traverse (\e -> checkExpr ExpectJoinDeadlineContext e number)
 
 -- | The part of a deonton after its subject: the action (with its PROVIDED
 -- guard), the deadline, and the two continuations. Shared by both subjects.
@@ -5218,7 +5221,9 @@ setInertContext = go True  -- True = we're at top level or direct boolean operan
     goGuarded ctx' (MkGuardedExpr ann c f) = MkGuardedExpr ann (go True ctx' c) (go False ctx' f)
     goObl ctx' (MkDeonton ann subj action due mjoin hence lest) =
       MkDeonton ann (goSubject ctx' subj) (goRAction ctx' action) (fmap (go False ctx') due) (fmap (goJoin ctx') mjoin) (fmap (go False ctx') hence) (fmap (go False ctx') lest)
-    goJoin ctx' (MkJoin ann th due) = MkJoin ann th (fmap (go False ctx') due)
+    goJoin ctx' = \ case
+      JoinOnce ann th due -> JoinOnce ann th (fmap (go False ctx') due)
+      JoinUpon ann ue due -> JoinUpon ann ue (fmap (go False ctx') due)
     goSubject ctx' = \ case
       Party ann party -> Party ann (go False ctx' party)
       Every ann mCast v mFilter -> Every ann mCast v (fmap (go True ctx') mFilter)
@@ -5350,9 +5355,13 @@ prettyCheckErrorContext (WhileCheckingExpression _e ctx) e = prettyCheckErrorCon
 prettyCheckErrorContext (WhileCheckingPattern _p ctx)    e = prettyCheckErrorContext ctx e
 prettyCheckErrorContext (WhileCheckingType _t ctx)       e = prettyCheckErrorContext ctx e
 
--- | The fork's words as the diagnostics spell them; follows 'L4.Print.forkWords'.
+-- | The fork's words as the diagnostics spell them; reads the printer's
+-- 'L4.Print.uponEachWords'. A re-spelling therefore changes that one definition,
+-- its parser twin 'L4.Parser.uponEach', the goldens that quote this message —
+-- and the hand-counted padding in 'prettyCheckError' below, which aligns the two
+-- alternatives' trailing comments and is sized for a nine-character fork.
 forkWordsText :: Text
-forkWordsText = Text.strip (prettyLayout (EachHas emptyAnno :: Threshold Resolved))
+forkWordsText = Text.strip (prettyLayout (MkUponEach emptyAnno))
 
 prettyCheckError :: CheckError -> [Text]
 prettyCheckError (SuspiciousBinderPattern binder ctor)     =
@@ -5670,20 +5679,20 @@ prettyCheckError (QuantifierVariableRebound b q) =
   , "in that position; to mean a fresh name, choose a different spelling."
   ]
 prettyCheckError (JoinWithoutEvery _) =
-  [ "An ONCE line needs an EVERY."
+  [ "A join line needs an EVERY."
   , ""
-  , "ONCE says when the continuation of a group's obligation fires — once all"
-  , "of them have acted, or once each of them has. This rule binds a single"
-  , "PARTY, so there is no group: drop the ONCE line, or quantify the subject"
-  , "with EVERY."
+  , "A join line says when the continuation of a group's obligation fires —"
+  , "ONCE ALL HAVE, when the last of them has acted, or " <> forkWordsText <> ", once per"
+  , "member. This rule binds a single PARTY, so there is no group: drop the"
+  , "join line, or quantify the subject with EVERY."
   ]
 prettyCheckError (ContinuationWithoutJoin _) =
-  [ "An EVERY with a HENCE or LEST needs an ONCE line saying when it fires."
+  [ "An EVERY with a HENCE or LEST needs a join line saying when it fires."
   , ""
   , "Write one of"
   , ""
   , "  ONCE ALL HAVE    -- once, when the last of them has acted (the barrier)"
-  , "  ONCE " <> forkWordsText <> "    -- once per member who acts (the fork)"
+  , "  " <> forkWordsText <> "        -- once per member who acts (the fork)"
   , ""
   , "on its own line between the act's WITHIN and the HENCE or LEST, indented"
   , "past the EVERY. There is no default: the two readings differ, and guessing"
@@ -5985,7 +5994,7 @@ prettyTypeMismatch ExpectQuantifierCastContext expected given =
 prettyTypeMismatch ExpectQuantifierFilterContext expected given =
   standardTypeMismatch [ "The WHO clause of an EVERY is expected to be of type" ] expected given
 prettyTypeMismatch ExpectJoinDeadlineContext expected given =
-  standardTypeMismatch [ "The WITHIN after ONCE (the deadline on the whole) is expected to be of type" ] expected given
+  standardTypeMismatch [ "The WITHIN on a join line (the deadline on the whole) is expected to be of type" ] expected given
 
 -- | Best effort, only small numbers will occur"
 prettyOrdinal :: Int -> Text
