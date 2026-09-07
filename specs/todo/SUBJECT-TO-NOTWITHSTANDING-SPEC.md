@@ -891,10 +891,31 @@ the drafting connective ("_subject to_ section 6"), and the two are not lexicall
 predicate sense frequently cites a section too ("subject to a disqualification as specified in
 section 227.503(a)").
 
-This is the survey's first finding and it is about syntax, not semantics: **`APPLIES` and
-`SUBJECT TO` are homonyms of high-frequency corpus vocabulary**, and both senses already appear
-inside identifier text that the parser sees. Compare the known mixfix/identifier collision traps
-(smucclaw/l4-ide#944, #948). Any keyword design under §8 item 2 has to survive this.
+This is the survey's first finding: **`APPLIES` and `SUBJECT TO` are homonyms of high-frequency
+corpus vocabulary.** Be precise about what that does and does not threaten.
+
+It is **not** a lexer hazard. Every one of the 130 identifiers is backtick-quoted, and `quoted`
+(`jl4-core/src/L4/Lexer.hs:496-499`) consumes everything between backticks as a single `TQuoted`
+token — "printable char except backticks" — so a reserved `APPLIES` would not collide with
+`` `the guardian may apply to the court under section 7(4)` `` any more than the existing `IF` and
+`AND` collide with `` `is adult` ``. A sweep for unquoted `appl*` in both corpora finds it only
+inside string literals, `@desc`/`@export` prose and comments, which are equally opaque. (An
+earlier draft of this section asserted that "both senses appear inside identifier text that the
+parser sees"; that inferred a hazard from a frequency count without reading the lexer, and it is
+withdrawn.)
+
+What the homonymy does threaten is narrower, and worth naming exactly:
+
+- **Unquoted mixfix patterns.** A user-defined mixfix that wants the bare word — the corpus does
+  not currently have one, but nothing prevents it — would collide, in the manner of
+  smucclaw/l4-ide#944 and #948.
+- **The prose round-trip.** NLG emits sentences containing "applies" in all four senses; a keyword
+  spelled the same way widens the gap between generated prose and source, which the
+  legislative-prose work is trying to close.
+- **Human ambiguity, which the count does measure.** A reader meeting `APPLIES` in a file where
+  47% of nearby `appl*` vocabulary means "petition the court" or "appropriate the funds" has to
+  disambiguate every time. That is a readability cost, not a parsing one — but readability is the
+  whole point of an isomorphic surface syntax.
 
 ### 10.3 Encoders already hand-roll the projections of §9.5
 
