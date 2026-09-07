@@ -207,17 +207,93 @@ What else works:
 - **Every export backend** — Decision Model and Notation (DMN), Business Process
   Model and Notation (BPMN), docassemble, Catala, OpenFisca, Blawx and the
   Multi-Level Intermediate Representation (MLIR) — treats a section `GIVEN` as
-  it treats an `ASSUME` term.
+  it treats an `ASSUME` term. For Catala, that sameness is a limit and not a
+  convenience; the next paragraph says what it costs.
 - **Diagnostics and hover**, which point at the `GIVEN` line under the heading
   (a "defined at" note names that line, and hovering the name shows the kind
   of thing it stands for). Go-to-definition and find-references have not been
   exercised on a section `GIVEN` in this release.
+
+**What Catala makes of one, measured 2026-09-07.** The backends compile the
+module as you wrote it, not the rewritten one in which the section's `GIVEN` has
+become an ordinary input of every rule beneath the heading. So `l4 catala` meets
+a section `GIVEN` as an `ASSUME` term — and it will only read an `ASSUME` term
+inside a rule marked `@export`. A plain helper that reads one is refused, the
+command exits 1, and no file is written:
+
+```
+l4 catala: cannot compile these decisions to Catala:
+  - in `the rank of the teacher`: ASSUMEd input `the teacher` is only readable
+    inside an @export decision's scope (where it becomes a scope `input`); pass
+    it to this helper as a parameter instead (pay.l4:10:5-18)
+```
+
+Marking that helper `@export` as well does lift the refusal, and what comes out
+is right: the name becomes an `input` on every scope, and a caller threads its
+own copy through (`output of TheRankOfTheTeacher with { -- the_teacher: the_teacher }`).
+The price is that every rule which reads the section `GIVEN` has to be published
+as its own Catala scope rather than kept as a helper — a heading with ten rules
+under it publishes ten scopes. Weigh that against writing the input as an
+ordinary rule `GIVEN` on each rule, which is what a Catala deliverable wants
+today.
+
+**One condition on that, and it is all-or-nothing.** An `@export`ed rule is
+published as a Catala _scope_, and Catala allows a scope to be called only from
+inside another scope. So if an `@export`ed rule is called by one that is **not**
+exported, the call comes out inside a plain top-level definition:
+
+```
+declaration the_middle content decimal
+  depends on the_n content decimal
+  equals ((output of TheBase with { -- the_n: the_n }).the_base + 1.0)
+```
+
+and Catala rejects the file — _"Scope calls are not allowed outside of a scope"_.
+`l4 catala` does not notice: it exits 0 and writes the output, so the failure
+finds you when you run `catala typecheck`, not when you export.
+
+**It is the rule in the middle, not the number of exports.** Remove that
+un-exported rule — export it too, or fold its body into its caller — and the same
+module with the same two `@export`s typechecks. A module may export as many rules
+as it likes; what it may not do is route a call between two of them through one
+that is not exported. If you are here because of a section `GIVEN` the condition
+costs you little, since every rule that reads the binder has to be exported
+anyway; if you are applying `@export` to an ordinary helper, it is the whole
+story. Measured 2026-09-07 on `catala` 1.2.1; reported upstream as
+[smucclaw/l4-ide#958](https://github.com/smucclaw/l4-ide/issues/958).
+
+The restriction is ours, not Catala's, and it is ruled to go away:
+`specs/todo/IMPLICIT-PROPS-DESIGN.md` §11.10 (ruling **R10**, ruled 2026-09-04)
+moves the backends onto the rewritten module, where the name is an ordinary input
+and nothing needs refusing. It is not yet built.
 
 A name with no kind of thing after it (`GIVEN a`) is accepted and behaves as
 `ASSUME a` does. A name declared `IS A TYPE` stands for a kind of thing the
 model treats as opaque, declared for the section on the same visibility rules
 as any other section `GIVEN`, exactly as `ASSUME a IS A TYPE` does at module
 level; prefer `DECLARE` for that.
+
+### Which shape of encoding this is for
+
+A section `GIVEN` is at its best in an encoding that lives in **one file**: a
+statute, or a Part of one, where the rules that share an input are written
+together under the heading that introduces it.
+
+It is worth saying plainly that this is the opposite of where the temptation is
+strongest. The repetition a section `GIVEN` removes grows with the size of the
+encoding — and a large encoding is exactly the one likely to have been split
+into a domain module, several subject modules and a file of test cases. Both of
+the limits below then bite at once: a rule in another module cannot be given the
+binder by name, and the Catala route out of the export refusal needs the whole
+call chain exported, which a chain that spans modules cannot be. Neither is
+about how many rules share the input; both are about where the callers live.
+
+So: count the callers before hoisting a repeated `GIVEN` under a heading, not
+the repetitions. If every caller is in the same file, this construct is for you.
+If the assertions live in a case file that imports the rules, they will not
+reach, and the repeated rule `GIVEN` is still the right encoding today.
+
+### Across an `IMPORT`
 
 A section `GIVEN` does **not** reach across an `IMPORT`, and neither does
 `ASSUME`. Suppose module `B` imports module `A`, `A` declares a section `GIVEN`

@@ -357,10 +357,12 @@ Two house-style spellings, in this order of preference:
    The indentation is the whole difference: a `GIVEN` at column 1 is the
    signature of the declaration below it, as always.
 
-   Nothing inside the file supplies a section `GIVEN` in this release (`WITH`
-   at a call site is proposed, not landed, 2026-09-04): an `#EVAL` or `#ASSERT`
-   that reaches one stops and makes `l4 run` exit 1. To exercise such a rule,
-   follow entry 11.9 of the phrasebook,
+   A section `GIVEN` **is** supplied from inside the file, by name, with `WITH`
+   (landed with the discharge change, 2026-09-05):
+   ``#EVAL `the fee` WITH `applicable rate` IS 0.2``, the same at `#ASSERT`, and
+   the same at an ordinary call site inside another rule. An `#EVAL` or
+   `#ASSERT` that reaches one and does **not** supply it still stops and makes
+   `l4 run` exit 1. Entry 11.9 of the phrasebook has both routes and the traps,
    [references/source-patterns/11-when-the-encoding-cannot-answer.md](references/source-patterns/11-when-the-encoding-cannot-answer.md#e11-9).
 
 **`ASSUME` is deprecated for declaring inputs (ruled 2026-09-04), and it is
