@@ -1689,9 +1689,11 @@ AFTER  3 OF `delivery`
 WITHIN 30                          -- window [delivery+3, delivery+30]
 ```
 
-The re-anchored window — Meng's cooling-off sentence, `[delivery+3, delivery+33]` — uses the
-mechanism R-Q7 built for naming anchors, with one more lifecycle position joining R-Q7B's three,
-**`THE OPENING`** (the instant the window opened):
+The re-anchored window — Meng's cooling-off sentence, `[delivery+3, delivery+33]` — was proposed
+here to use the mechanism R-Q7 built for naming anchors, with one more lifecycle position joining
+R-Q7B's three, **`THE OPENING`** (the instant the window opened). **That proposal was DECLINED on
+2026-09-08; see §5.1.3. The block below is the rejected spelling, kept because §5.1.3 argues from
+it.**
 
 ```
 AFTER  3 OF `delivery`
@@ -1710,8 +1712,8 @@ promises `BEFORE` for absolute deadlines, becomes **true when built** instead of
 is still needed) but its awkward idiom for the degenerate case, `WITHIN 0 OF (YMD …)`, is no longer
 the natural spelling; `BEFORE (YMD …)` is.
 
-**Residue, not ruled:** whether `THE OPENING` is wanted, or the re-anchored form is rare enough to
-write out by hand.
+**Residue, now ruled:** whether `THE OPENING` is wanted, or the re-anchored form is rare enough to
+write out by hand. Declined, and replaced with a direction — **§5.1.3**.
 
 **`AFTER` alone is well-formed** — a permission that opens and never closes is an ordinary legal
 object (a right that vests and does not expire).
@@ -1753,6 +1755,59 @@ the keyword table. Zero goldened corpus files, zero canon files, zero `doc/` fil
 offset is checked against `AFTER`'s at compile time (`AFTER 30 BEFORE 5` is an empty window and
 should be an error, not a rule that can never fire); and what the pair means under `LEST`, where the
 anchor is a missed deadline rather than a performance.
+
+#### 5.1.3 `THE OPENING` declined; the anchor slot becomes an expression over the trace. RULED 2026-09-08 (W3)
+
+**The mark.** Bench card `W3`, collection `wave-rulings`, marked `a` — _decline on measurement_ —
+2026-09-07T22:37Z.
+
+**The measurement it was declined on**, taken 2026-09-08 against `unstable` `6e9b57bb`:
+
+| count | what                                                                  |
+| ----- | --------------------------------------------------------------------- |
+| 3     | lifecycle anchors ruled by R-Q7B                                      |
+| 0     | corpus rules encoding a re-anchored window                            |
+| 2     | corpus files mentioning cooling-off — both source text, not encodings |
+| 2     | existing `WITHIN … OF` uses, both date arithmetic                     |
+
+So §5.1.2's `WITHIN 30 OF THE OPENING` is **not** the ruled spelling, and the re-anchored window has
+no spelling today. Write it out by hand until an encoding needs one. Same shape as the M3 decline:
+the anchors cost no keywords, so the objection was never lexical — a fourth anchor names a moment
+the other three do not, and would need its own answer for a window that never opens.
+
+**The note replaced the question rather than answering it.** Meng's mark carried this, verbatim:
+
+> "Suggest we facilitate event resolution relative to the trace, allowing arbitrary date/time
+> expressions both absolute and relative to trace events and to other join/fork/etc time points in
+> the deontics. This generalizes expressiveness. Please consult the CSP and LTS literature generally
+> to see if there is anything we can borrow. We may have an agent persona defined which has the
+> right priming and can assist with this."
+
+**The direction, as this spec reads it: stop enumerating named anchors.** The anchor slot becomes an
+**expression over time points in the trace** — absolute dates, trace events, and the lifecycle points
+of _other_ rules. R-Q7B's three named anchors and R-Q7C's date-valued expression both become special
+cases of one slot rather than two mechanisms sitting beside each other.
+
+That subsumes three things this document has been carrying separately:
+
+- **R-Q7A's held `AFTER`** — held, not rejected, for a window's opening edge (§5.1.1).
+- **The open item "an anchor picked by an EXPRESSION rather than named"**, whose objection was that
+  `THE` invites an indefinite sibling. Under a general slot the definite article stops carrying the
+  grammar.
+- **`THE OPENING` itself**, which needs no keyword once the opening edge is a time point the trace
+  already knows.
+
+**What is ruled here is the direction. None of it is ruled in detail, and one thing is now harder.**
+The question that killed the simple `THE OPENING` — what a reference means when the referenced event
+never occurs — does not go away under a general scheme; it gets worse, because an arbitrary
+expression can name an event that no execution reaches, and the answer has to hold for every such
+expression rather than for one keyword. Re-entrancy is the second: when a rule fires more than once,
+_which_ occurrence does a reference to its join denote?
+
+**Prior art commissioned 2026-09-08**, per the note's last two sentences: CSP and timed CSP, labelled
+transition systems and their timed variants, timed automata (clocks, resets, guards), event
+structures and causal models, MTL and TPTL — the freeze quantifier in particular — Allen's interval
+algebra, and timed process calculi. This section carries the findings before anything is spelled.
 
 ### 5.2 LEST Reference Time
 
