@@ -320,7 +320,7 @@ academic-industrial complex is the CFO who offshored the factory — except the 
 population's ability to understand its own law, and the low-cost overseas supplier it got outsourced
 to owes the West nothing.
 
-### 4.9 The second enclosure: who is *allowed* to fill the gap
+### 4.9 The second enclosure: who is _allowed_ to fill the gap
 
 Everything above concerns the enclosure of the **corpus**. There is a second enclosure on the
 **supply** side, and it cuts the other way: unauthorised-practice law makes it an offence for

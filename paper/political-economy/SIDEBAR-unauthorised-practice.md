@@ -31,15 +31,15 @@ that prohibits "applying law to another person's facts" — the American formula
 instead is an enumerated list, in **s 33**, of acts an "unauthorised person" (defined in s 32(2):
 not on the roll with a practising certificate) may not do:
 
-| Provision      | Prohibited act                                                                                                                       | Paid?                                       |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------- |
-| s 33(1)(a)     | acts as an advocate or solicitor **or an agent for any party to proceedings**; sues out process; conducts an action; drafts court documents | **irrelevant — no fee element**             |
-| s 33(1)(b)     | holds out as qualified                                                                                                                 | irrelevant                                  |
-| s 33(2)(a)     | draws or prepares any document or instrument relating to movable/immovable property, or to any legal proceeding                        | **reverse burden** — see below              |
-| s 33(2)(b)     | takes instructions for, or prepares, probate / letters of administration papers                                                        | reverse burden                              |
-| s 33(2)(d)     | sends a letter threatening legal proceedings on a claimant's behalf                                                                    | reverse burden                              |
-| s 33(2)(e)     | negotiates or settles a personal-injury or death claim                                                                                 | reverse burden                              |
-| s 33(3)        | for reward, offers to place a solicitor's services at another's disposal                                                               | **fee is an element**                       |
+| Provision  | Prohibited act                                                                                                                              | Paid?                           |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
+| s 33(1)(a) | acts as an advocate or solicitor **or an agent for any party to proceedings**; sues out process; conducts an action; drafts court documents | **irrelevant — no fee element** |
+| s 33(1)(b) | holds out as qualified                                                                                                                      | irrelevant                      |
+| s 33(2)(a) | draws or prepares any document or instrument relating to movable/immovable property, or to any legal proceeding                             | **reverse burden** — see below  |
+| s 33(2)(b) | takes instructions for, or prepares, probate / letters of administration papers                                                             | reverse burden                  |
+| s 33(2)(d) | sends a letter threatening legal proceedings on a claimant's behalf                                                                         | reverse burden                  |
+| s 33(2)(e) | negotiates or settles a personal-injury or death claim                                                                                      | reverse burden                  |
+| s 33(3)    | for reward, offers to place a solicitor's services at another's disposal                                                                    | **fee is an element**           |
 
 Three things about that table are worth more than the table.
 
@@ -71,8 +71,7 @@ executable paperwork"), and it repays a slow read. Verbatim:
 > property or to any legal proceeding**;
 > **(b)** takes instructions for or draws or prepares any **papers** on which to found or oppose a
 > grant of probate or letters of administration;
-> **(c)** _[Deleted by Act 8 of 2011]_
-> **(d)** on behalf of a claimant … writes, publishes or sends a **letter or notice** threatening
+> **(c)** _[Deleted by Act 8 of 2011]_ > **(d)** on behalf of a claimant … writes, publishes or sends a **letter or notice** threatening
 > legal proceedings other than a letter or notice that the matter will be handed to a solicitor …;
 > or
 > **(e)** solicits the right to negotiate, or negotiates in any way for the settlement of, or
@@ -85,14 +84,14 @@ Five observations, in rough order of how much they matter to a software system.
 
 **(i) "directly or indirectly" appears here and nowhere else in s 33.** s 33(1) has no such words.
 The phrase is the classic reach-through, aimed at the unlicensed operator who has someone else hold
-the pen. Whether it reaches a *tool* — as opposed to a person acting through another person — is
+the pen. Whether it reaches a _tool_ — as opposed to a person acting through another person — is
 the central undecided question for document automation, and nothing in the Act answers it.
 
 **(ii) The scope of (a) is enormous on its face.** "Any document or instrument relating to any
 movable or immovable property or to any legal proceeding" — read literally, almost every commercial
 agreement relates to movable property: a sale of goods, an equipment lease, a charge, an assignment,
 a licence. On its face (a) reserves **general contract drafting**. Compare the English "reserved
-instrument activities", which are tied narrowly to dispositions and registration of *land*. Singapore
+instrument activities", which are tied narrowly to dispositions and registration of _land_. Singapore
 did not draft a narrow reservation and then widen it; it drafted a wide one and has been carving
 exemptions out of it one profession at a time (see (v)).
 
@@ -114,7 +113,7 @@ business model, a company, and an address.**
 
 **(v) Three exemptions in s 34(1) bite specifically on (a), and one of them is the interesting one.**
 
-- **s 34(1)(k): "any person merely employed to engross any instrument or proceeding."** To *engross*
+- **s 34(1)(k): "any person merely employed to engross any instrument or proceeding."** To _engross_
   is to produce the final fair copy. This is the closest thing in the Act to a document-assembly
   carve-out, and it is drawn along exactly the line computational law cares about: it protects the
   party that **renders** without **choosing**. A template filler is an engrosser; a system that
@@ -159,21 +158,21 @@ So: advice on legal rights and obligations **is** named, as an example, inside t
 intuitive statement is not wrong; it is imprecise in two places that happen to be the two places a
 software system lives.
 
-- The first test turns on **"exclusive"**. It is not "an act lawyers do", it is an act *customarily
-  within their exclusive function*. That word is the whole question for computational law, and it
+- The first test turns on **"exclusive"**. It is not "an act lawyers do", it is an act _customarily
+  within their exclusive function_. That word is the whole question for computational law, and it
   is a moving one: whatever a $9 app does at population scale for a decade stops being exclusive to
   anybody, and the test is expressly historical/traditional — it reads the past, so it cannot help
   but ratify the present once the present has lasted.
 - The second test turns on **"by reason of his being an advocate and solicitor"**. A software
-  vendor is not engaged *qua* lawyer. On its face the second test does not reach a product at all;
+  vendor is not engaged _qua_ lawyer. On its face the second test does not reach a product at all;
   it reaches a person trading on professional standing. _Turner_ itself was two New York attorneys
-  in a Singapore arbitration — the paradigm of being hired *because* you are a lawyer.
+  in a Singapore arbitration — the paradigm of being hired _because_ you are a lawyer.
 
 **Neither test was written with a machine in the room**, and the seam between them is exactly where
 an L4-style system sits: doing an act that was once exclusive, for a principal who is not engaging
 a professional.
 
-## 3. Why this is *this paper's* problem
+## 3. Why this is _this paper's_ problem
 
 §3's spectrum of gap-fillers has five rows. **Every row below the sovereign is unlicensed.** The
 open-civic corpus, the free high-accuracy advice service, the state-sponsored adversary running the
@@ -182,26 +181,26 @@ the ones the paper hopes will win.
 
 Now apply the prohibition down the column, and note that **it does not bind uniformly:**
 
-| Filler                                | Bound by UPL in practice?                                                                              |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| Sovereign rules-as-code               | no — s 34(1)(a), (d) exempt the AG and public officers drawing instruments in the course of duty       |
-| Domestic startup / civic project      | **yes, maximally** — incorporated, named, bank-accounted, reachable, and s 33(6)–(8) reach the company, its directors and every partner of a firm |
-| Big tech                              | partly — deep pockets, lobbying, and the option to geofence a feature                                  |
-| Anonymous offshore "free" service     | **no** — no forum, no assets, no directors to charge                                                    |
-| State-sponsored adversary             | **no, by construction**                                                                                 |
+| Filler                            | Bound by UPL in practice?                                                                                                                         |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sovereign rules-as-code           | no — s 34(1)(a), (d) exempt the AG and public officers drawing instruments in the course of duty                                                  |
+| Domestic startup / civic project  | **yes, maximally** — incorporated, named, bank-accounted, reachable, and s 33(6)–(8) reach the company, its directors and every partner of a firm |
+| Big tech                          | partly — deep pockets, lobbying, and the option to geofence a feature                                                                             |
+| Anonymous offshore "free" service | **no** — no forum, no assets, no directors to charge                                                                                              |
+| State-sponsored adversary         | **no, by construction**                                                                                                                           |
 
 This is the sting, and it is a claim the paper can make that nobody in the access-to-justice
 literature is making: **an unauthorised-practice regime is a filter that selects out precisely the
 gap-fillers who can be held to account, and leaves untouched the ones who cannot.** It does not
 reduce the number of people getting machine-mediated legal answers. It reduces the number of
-*jurisdictionally reachable* people supplying them. Under-provision (§1) creates the vacuum; UPL
+_jurisdictionally reachable_ people supplying them. Under-provision (§1) creates the vacuum; UPL
 then disqualifies the accountable candidates for filling it. §4.8 says enclosure manufactures its
 own liberators; this says the second enclosure **disarms the defenders**.
 
 ## 4. Protectionism or consumer protection? — put the judicial rationale on the record first
 
 The honest version of this argument has to quote what the courts actually say the provisions are
-*for*, because they say it plainly and it is a mix.
+_for_, because they say it plainly and it is a mix.
 
 _Turner_ at [34], as quoted in _Choo Cheng Tong_ at [6]: the primary object is to **"protect the
 public from claims to legal services by unauthorised persons"**, ensuring that members of the
@@ -226,7 +225,7 @@ Read that ordering carefully, because it is doing the work:
   It is calibrated to the boundary of the profession.
 
 So the fair answer to "protectionism or consumer protection?" is **both, and the case law does not
-hide it.** The paper's contribution is not to pick a side but to observe the *incidence*: a rule
+hide it.** The paper's contribution is not to pick a side but to observe the _incidence_: a rule
 justified by recourse is being applied to a class of supplier for whom the recourse rationale is
 strongest (the reachable domestic vendor) and is unenforceable against the class for whom it is
 weakest (the anonymous offshore one).
@@ -244,12 +243,12 @@ fight entry.
 
 Practising certificates have **none of those three properties**. They are not capped in number, not
 transferable, and have no resale value. Singapore admits everyone who qualifies; there is no
-*numerus clausus* to abolish. So there is no capitalised rent and no incumbent whose net worth
-collapses when the rule changes — which, incidentally, is why this reform is *politically easier*
+_numerus clausus_ to abolish. So there is no capitalised rent and no incumbent whose net worth
+collapses when the rule changes — which, incidentally, is why this reform is _politically easier_
 than the medallion fight, not harder. Nobody is holding a million-dollar asset that goes to zero.
 
 The rent here, to the extent there is one, is **scope rent** — it accrues to the profession as a
-whole through the *size of the reserved zone*, not to individuals through a tradeable licence. Which
+whole through the _size of the reserved zone_, not to individuals through a tradeable licence. Which
 means the reform lever is not "raise the cap". It is **"shrink or map the zone"**, and there are two
 existing instruments for that:
 
@@ -275,16 +274,16 @@ instrument for permitting this already exists and has apparently never been used
 
 The received story is "LegalZoom beat UPL." The record is mixed, and **the mechanisms by which it
 prevailed are the whole point** — because only one of the four is a court holding about what
-computational document assembly *is*.
+computational document assembly _is_.
 
-| Year | Forum | Outcome |
-| ---- | ----- | ------- |
-| 1999 | Texas — _UPL Committee v Parsons Technology_ (Quicken Family Lawyer) | **Lost.** District court enjoined sale of the software statewide as the practice of law under Tex. Gov't Code § 81.101. |
-| 1999 | Texas legislature | **Reversed by statute within months.** H.B. 1507, 76th Leg., effective immediately: the practice of law "does not include the design, creation, publication, distribution, display, or sale … [of] computer software, or similar products if the products clearly and conspicuously state that the products are not a substitute for the advice of an attorney." Fifth Circuit then **vacated the injunction and remanded** "in light of the amended statute": 179 F.3d 956 (5th Cir. 1999). |
-| 2011 | Missouri — _Janson v LegalZoom_, 802 F. Supp. 2d 1053 (W.D. Mo.) | **Lost**, and settled. Summary judgment for LegalZoom only on patent and trademark applications; denied in all other respects. |
-| 2014 | South Carolina — _Medlock v LegalZoom_ | **Won cleanly**, on the merits. |
-| 2015 | North Carolina — consent judgment, 22 Oct 2015 | **Won by antitrust leverage.** |
-| 2016 | North Carolina legislature — H.B. 436 / S.L. 2016-60 | **Codified.** |
+| Year | Forum                                                                | Outcome                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ---- | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1999 | Texas — _UPL Committee v Parsons Technology_ (Quicken Family Lawyer) | **Lost.** District court enjoined sale of the software statewide as the practice of law under Tex. Gov't Code § 81.101.                                                                                                                                                                                                                                                                                                                                                                      |
+| 1999 | Texas legislature                                                    | **Reversed by statute within months.** H.B. 1507, 76th Leg., effective immediately: the practice of law "does not include the design, creation, publication, distribution, display, or sale … [of] computer software, or similar products if the products clearly and conspicuously state that the products are not a substitute for the advice of an attorney." Fifth Circuit then **vacated the injunction and remanded** "in light of the amended statute": 179 F.3d 956 (5th Cir. 1999). |
+| 2011 | Missouri — _Janson v LegalZoom_, 802 F. Supp. 2d 1053 (W.D. Mo.)     | **Lost**, and settled. Summary judgment for LegalZoom only on patent and trademark applications; denied in all other respects.                                                                                                                                                                                                                                                                                                                                                               |
+| 2014 | South Carolina — _Medlock v LegalZoom_                               | **Won cleanly**, on the merits.                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| 2015 | North Carolina — consent judgment, 22 Oct 2015                       | **Won by antitrust leverage.**                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| 2016 | North Carolina legislature — H.B. 436 / S.L. 2016-60                 | **Codified.**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 
 Four things in that table are worth more than the table.
 
@@ -304,10 +303,10 @@ reasoning from first principles about what the machine does. **Renders, does not
 jurisdictions, two centuries apart in drafting, converging on the same seam is the strongest
 available evidence that the seam is real and not merely convenient.
 
-**(iii) South Carolina's *second* reason is §1 of this paper.** The report relied on an affidavit
+**(iii) South Carolina's _second_ reason is §1 of this paper.** The report relied on an affidavit
 that of the 20 practice areas LegalZoom covered, **19 had the same basic services available free via
-self-help portals run by South Carolina government agencies.** The defence to UPL was that *the
-sovereign was already provisioning it.* Which is the paper's thesis stated as a rule of decision:
+self-help portals run by South Carolina government agencies.** The defence to UPL was that _the
+sovereign was already provisioning it._ Which is the paper's thesis stated as a rule of decision:
 **where the state fills the gap, the gap-filler is lawful; the enclosure bites hardest precisely
 where the state has under-provisioned.**
 
@@ -335,29 +334,29 @@ that may appear in the completed document."** Read that as an engineer: it is a 
 requirement over a template's branching space**, written in lawyerly prose. For a combinatorial
 template a human cannot actually complete it — the reachable-document set is exponential in the
 number of branch points. Enumerating the reachable outputs of a rule set is precisely what a formal
-encoding *can* do. **The statute has already imposed an obligation that is only tractable with
+encoding _can_ do. **The statute has already imposed an obligation that is only tractable with
 formal methods, and does not know it.** That is the single best available bridge from this paper's
 regulatory argument to the constructive half in §5.
 
 ## 5b. The indirection argument — why it fails, and what its failure reveals
 
-The engineer's instinct on being shown s 33(2) is Wheeler's theorem: *all problems in computer
-science can be solved by another level of indirection.* Interpose layers. The startup sells a
+The engineer's instinct on being shown s 33(2) is Wheeler's theorem: _all problems in computer
+science can be solved by another level of indirection._ Interpose layers. The startup sells a
 package; the package fills a template with the customer's own name and address; an agent inside the
 package reads the template and selects a configuration reflecting the facts; the customer signs. No
 human at the vendor ever touched this customer's facts.
 
 **It does not work, and s 33(2) is the one subsection drafted against it.** "Directly or
 **indirectly**" appears there and nowhere else in s 33. The 1966 drafter was solving for the layman
-who hires a clerk, but the words are act-based, and indirection defeats a *person*-based test, not
-an *act*-based one. Walk the stack:
+who hires a clerk, but the words are act-based, and indirection defeats a _person_-based test, not
+an _act_-based one. Walk the stack:
 
-| Layer | Status |
-| ----- | ------ |
-| The company sells software | s 33(6) makes a body corporate's act an offence; **s 33(7) makes the director, officer or employee who did the act personally liable** to the s 33(5) punishments. The corporate layer doubles exposure rather than absorbing it. |
-| The package fills in name and address | **Safe on all three authorities.** s 34(1)(k) "merely employed to engross"; _Medlock_'s "records the customer's original information **verbatim**". Rendering. |
-| The agent selects a configuration reflecting the facts | **This is the _Janson_ employee, automated.** LegalZoom lost Missouri because staff reviewed answers for completeness and inconsistency; that turned a product into a service. Choosing. |
-| The customer signs | Irrelevant to the offence, which is complete on the preparing. |
+| Layer                                                  | Status                                                                                                                                                                                                                            |
+| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The company sells software                             | s 33(6) makes a body corporate's act an offence; **s 33(7) makes the director, officer or employee who did the act personally liable** to the s 33(5) punishments. The corporate layer doubles exposure rather than absorbing it. |
+| The package fills in name and address                  | **Safe on all three authorities.** s 34(1)(k) "merely employed to engross"; _Medlock_'s "records the customer's original information **verbatim**". Rendering.                                                                    |
+| The agent selects a configuration reflecting the facts | **This is the _Janson_ employee, automated.** LegalZoom lost Missouri because staff reviewed answers for completeness and inconsistency; that turned a product into a service. Choosing.                                          |
+| The customer signs                                     | Irrelevant to the offence, which is complete on the preparing.                                                                                                                                                                    |
 
 **But the reductio holds, and it is the more valuable half.** Nothing in the statutory text
 distinguishes an L4-based product from Word running vanilla Copilot. Both are a corporate person,
@@ -375,7 +374,7 @@ things is true:
 Route 2 does not rescue the consumer-protection story either, because applied honestly **it inverts
 with respect to the stated rationale.** Vanilla Copilot will confabulate a clause and cannot say
 why; a purpose-built formal system emits a checkable trace. A rule that exempts the unverifiable
-tool because it was not *trying* to do law, and catches the verifiable one because it was, sorts by
+tool because it was not _trying_ to do law, and catches the verifiable one because it was, sorts by
 intent when the rationale on the record is recourse. That is the sharpest single argument in this
 sidebar and it belongs in the paper's body.
 
@@ -400,15 +399,15 @@ decomposition** (Collins, 1975) from real-closed fields up to algorithms, via sy
 automated induction and nonlinear decision procedures. A decomposition partitions a function's input
 space into **finitely many symbolic regions**, each carrying three things:
 
-- **constraints over the inputs** characterising when execution enters that region — *when does this
-  clause fire*;
+- **constraints over the inputs** characterising when execution enters that region — _when does this
+  clause fire_;
 - an **invariant result** describing the output for every input satisfying those constraints —
-  *what document you get*;
-- **sample points** witnessing satisfiability — *a concrete specimen the reviewer can read*.
+  _what document you get_;
+- **sample points** witnessing satisfiability — _a concrete specimen the reviewer can read_.
 
 Which is precisely a **reviewable artefact of human size**. A lawyer cannot review 2⁴⁰ documents.
-A lawyer can review forty regions, each stated as "*if these facts, then this text, and here is an
-example*" — and can sign off that the enumeration is exhaustive, because the decomposition is a
+A lawyer can review forty regions, each stated as "_if these facts, then this text, and here is an
+example_" — and can sign off that the enumeration is exhaustive, because the decomposition is a
 proof that it is, not a sampling of it.
 
 So the constructive position, which is the one to argue:
@@ -422,8 +421,8 @@ So the constructive position, which is the one to argue:
 Two things follow for the paper.
 
 **(a) It reframes the ask.** Do not argue "we are not preparing the document" — that is §5b, correct
-and self-defeating. Argue instead: *we are the class of person who should be exempted under LPA
-s 34(2), and the decomposition is the evidence that exempting us is safe.* That is an argument
+and self-defeating. Argue instead: _we are the class of person who should be exempted under LPA
+s 34(2), and the decomposition is the evidence that exempting us is safe._ That is an argument
 addressed to a **supervising sovereign**, which is the only regulatory shape _NC Dental_ leaves
 standing, and it uses a power Singapore already holds.
 
@@ -445,17 +444,17 @@ relation and work with the finitely many classes.** The umbrella is **abstract i
 (Cousot & Cousot, 1977) — a sound quotient of a concrete domain into a finite abstract one. Nearly
 the whole toolbox is an instance:
 
-| Instance                              | The equivalence relation                                                         |
-| ------------------------------------- | -------------------------------------------------------------------------------- |
-| **Myhill–Nerode**                     | right-congruence on strings; **number of classes = states in the minimal DFA**    |
-| Predicate abstraction / CEGAR         | agreement on a finite predicate set; refinement **splits** a class when too coarse |
-| Symbolic execution                    | the path condition — Imandra's route in                                           |
-| Cylindrical algebraic decomposition   | cells on which every polynomial has constant sign (Collins, 1975)                 |
-| Bisimulation quotient                 | no observation distinguishes the states                                           |
-| Symmetry reduction                    | orbits under a group action                                                       |
-| Equivalence partitioning (Myers, 1979)| the testing textbook's name for the same move                                     |
+| Instance                               | The equivalence relation                                                           |
+| -------------------------------------- | ---------------------------------------------------------------------------------- |
+| **Myhill–Nerode**                      | right-congruence on strings; **number of classes = states in the minimal DFA**     |
+| Predicate abstraction / CEGAR          | agreement on a finite predicate set; refinement **splits** a class when too coarse |
+| Symbolic execution                     | the path condition — Imandra's route in                                            |
+| Cylindrical algebraic decomposition    | cells on which every polynomial has constant sign (Collins, 1975)                  |
+| Bisimulation quotient                  | no observation distinguishes the states                                            |
+| Symmetry reduction                     | orbits under a group action                                                        |
+| Equivalence partitioning (Myers, 1979) | the testing textbook's name for the same move                                      |
 
-**Myhill–Nerode is the one to put on a slide**, because it says the quotient *is* the minimal
+**Myhill–Nerode is the one to put on a slide**, because it says the quotient _is_ the minimal
 automaton. So "decompose the contract into regions" and "minimise the contract's automaton" are the
 same act — and the contract-as-automaton framing (Flood & Goodenough, _Contract as Automaton_, OFR
 WP 15-04, 2015) is already in the deck to hang it on.
@@ -482,7 +481,7 @@ encoding can produce exactly the same finite region count and be unreviewable.
 ### Two corollaries
 
 **(i) The class count is the review budget.** Forty regions is a morning's work; forty thousand has
-moved the problem rather than solved it. So *how the rule is drafted* determines whether it is
+moved the problem rather than solved it. So _how the rule is drafted_ determines whether it is
 reviewable at all — which is a much stronger argument for rules-as-code than the usual one. Not
 "code is precise", but **"a rule drafted this way decomposes small enough that a human can check all
 of it."**
@@ -499,7 +498,7 @@ are the same test.
 
 Quotienting does **not** beat NP-completeness in the complexity-theoretic sense. It shrinks real
 instances, often enormously, but the worst case stands — CAD is doubly exponential in the number of
-variables. The thing that changes the complexity *class* is the **language restriction**: no
+variables. The thing that changes the complexity _class_ is the **language restriction**: no
 unbounded loops moves you from undecidable to decidable. Keep the two claims apart, or a reviewer
 will separate them for you. It is also the tidiest defence of L4's design: the restriction that
 looks like a limitation is precisely what makes the region map available.
@@ -517,7 +516,7 @@ Do not ship the argument without this, or it reads as a lobbying document.
   that a service right 99.5% of the time becomes load-bearing and the danger lives in the 0.5% that
   nobody can check. An offence that does **not** wait for demonstrable harm is the natural
   regulatory response to a harm that is undetectable in the individual case. The paper cannot argue
-  that undetectable population-scale error is the threat *and* that harm-independent regulation is
+  that undetectable population-scale error is the threat _and_ that harm-independent regulation is
   illegitimate. Pick one, or distinguish carefully.
 - **"Exclusive" may be doing honest work.** The first Turner test asks what is customarily within
   the exclusive function of the profession. If a task genuinely requires professional judgment under
