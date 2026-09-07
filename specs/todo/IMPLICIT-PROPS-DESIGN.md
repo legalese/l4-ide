@@ -1384,8 +1384,19 @@ passes the next tool), and then marked all 28 definitions taking a `GIVEN` in th
 figures as the shipped single-`@export` build, digit for digit.** That turns "one scope per reader"
 from a three-declaration probe into a whole-module measurement, and it retracted a claim on that
 side — the row's fork register had carried F13 as "`@export` is not composable", now restated
-(canon `64f6c02` on `mengwong/drafts`). No `catala` toolchain exists on this machine, so every
-`catala`-side result in this paragraph is theirs; everything above it is reproduced here.
+(canon `64f6c02` on `mengwong/drafts`). The 28-export whole-module run is theirs; everything else
+in this section has been reproduced here.
+
+> **Correction, 2026-09-07.** An earlier revision of this section said "no `catala` toolchain exists
+> on this machine". That was false, and it was written into three places before anyone checked it.
+> `catala` and `clerk` 1.2.1 are installed here, in a **named opam switch** — `~/.opam/catala/bin`
+> — so a bare `which catala` fails and looking in `~/.opam/default/bin` finds nothing. The slip
+> underneath was inferring a separate machine from a separate session: the session that measured the
+> Catala side is a peer on this same host. Anyone repeating this work: put
+> `~/.opam/catala/bin` on `PATH`, and note that `catala typecheck` run outside a project directory
+> fails with _"The standard library module Stdlib_en could not be found"_, which reads like a broken
+> install and is not — run `clerk start` in a scratch directory first, as `etc/validate-catala.mjs`
+> does.
 
 **The hatch has an all-or-nothing condition, and `l4 catala` does not check it.** An `@export`ed
 rule is published as a Catala _scope_, and Catala allows a scope call only from inside another
@@ -1399,16 +1410,16 @@ declaration the_middle content decimal
   equals ((output of TheBase with { -- the_n: the_n }).the_base + 1.0)
 ```
 
-`l4 catala` **exits 0 and writes that file**; Catala then rejects it with _"Scope calls are not
-allowed outside of a scope"_ at `chain.catala_en:23.11-55`, exit 123, on `catala` 1.2.1 —
-originally their run, and now measured in the issue thread itself
-([#958 comment](https://github.com/smucclaw/l4-ide/issues/958#issuecomment-5571825701)), so both
-halves are on one machine's record even though they are still not on this one's.
+`l4 catala` **exits 0 and writes that file**; `catala typecheck` then rejects it with _"Scope calls
+are not allowed outside of a scope"_ at `chain.catala_en:23.11-55`, exit 123, on `catala` 1.2.1.
+Measured here, and independently in the issue thread
+([#958 comment](https://github.com/smucclaw/l4-ide/issues/958#issuecomment-5571825701)).
 
 **The control is what pins the diagnosis, and it is worth stating because the obvious reading is
 wrong.** Delete the middle definition and point the second export at the first directly, leaving
-_both_ `@export`s in place: `Typechecking successful!`, exit 0. So the fault is not "two exports in
-one module" — it is the non-exported definition routed between them. A module may export as many
+_both_ `@export`s in place: `l4 catala` exit 0, `catala typecheck` exit 0, `Typechecking
+successful!` — run here on a two-definition module. So the fault is not "two exports in one module"
+— it is the non-exported definition routed between them. A module may export as many
 rules as it likes. That distinction is exactly what the missing check would encode, and it is what
 the current failure gives the reader no way to reach.
 
