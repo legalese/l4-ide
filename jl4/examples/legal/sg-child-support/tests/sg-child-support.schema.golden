@@ -1,0 +1,47 @@
+{
+    "$defs": {
+        "ChildFacts": {
+            "properties": {
+                "birth order": {
+                    "type": "number"
+                },
+                "co-matching already received": {
+                    "type": "number"
+                },
+                "date of birth": {
+                    "format": "date",
+                    "type": "string"
+                },
+                "is a Singapore citizen": {
+                    "type": "boolean"
+                }
+            },
+            "required": [
+                "date of birth",
+                "is a Singapore citizen",
+                "birth order",
+                "co-matching already received"
+            ],
+            "type": "object"
+        }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "What a Singapore Citizen child receives in government child-support money, line by line, under the rules in force on a chosen date. Use a rule date before 2027-04-01 for the Baby Bonus Scheme and Large Families Scheme as they stand today, and on or after it for the SG Child Support Package announced at the 2026 National Day Rally. The announced Package is policy, not law: no Bill has been introduced.",
+    "properties": {
+        "facts": {
+            "$ref": "#/$defs/ChildFacts",
+            "description": "The child's date of birth, citizenship, birth order among the mother's living children, and how much CDA co-matching the family has already received."
+        },
+        "rule date": {
+            "description": "Apply the rules as they stood, or are announced to stand, on this date. ISO 8601, e.g. 2027-04-01.",
+            "format": "date",
+            "type": "string"
+        }
+    },
+    "required": [
+        "rule date",
+        "facts"
+    ],
+    "title": "child support under the rules effective on",
+    "type": "object"
+}

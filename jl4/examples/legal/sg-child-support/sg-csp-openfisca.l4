@@ -1,0 +1,170 @@
+IMPORT prelude
+IMPORT daydate
+IMPORT `sg-child-support-domain`
+IMPORT `sg-csp`
+
+§ `The SG Child Support Package, shaped for OpenFisca`
+
+-- WHY THIS MODULE EXISTS.
+--
+-- sg-csp.l4 is written to be READ AGAINST THE SOURCE: dates are dates, the
+-- rule-version axis is explicit, and local bindings name the intermediate
+-- quantities a reader needs. That shape is right for review and wrong for
+-- `l4 openfisca`, whose v1 lowering supports neither the date builtins
+-- (`YMD`, `DATE_YEAR`) nor `WHERE`/`LET` bindings, and which expects the
+-- OpenFisca formula shape: an entity and a period in, one number out.
+--
+-- So this module is a PROJECTION, not a second encoding. It restates the
+-- Package's money lines in the subset the exporter accepts, and then
+-- ASSERTS ITSELF EQUAL to sg-csp.l4 over a spread of cohorts. If the two
+-- ever disagree the assertions fail here, which is the only thing that
+-- stops a projection quietly becoming a fork.
+--
+-- What an agency gets out of it: a runnable OpenFisca module. Agencies that
+-- already microsimulate a tax-benefit system in OpenFisca can drop these
+-- variables into an existing population model and price the scheme against
+-- their own microdata, rather than against the flat per-cohort arithmetic a
+-- spreadsheet allows.
+
+§§ `The OpenFisca entity and period`
+
+-- Year-granular ON PURPOSE. Child Credits and the PSEA top-up band on the
+-- calendar year the child turns n, so a year is their natural grain. The
+-- Baby Gift and the CDA lines band on an exact date, and that is carried by
+-- a BOOLEAN the caller sets rather than by a date the exporter cannot read.
+DECLARE Person
+    HAS `birth year`                            IS A NUMBER
+        `born on or after the Package commences` IS A BOOLEAN
+        `born on or after the Cash Gift enhancement` IS A BOOLEAN
+        `has a Child Development Account`       IS A BOOLEAN
+        `birth order`                           IS A NUMBER
+        `is a Singapore citizen`                IS A BOOLEAN
+
+DECLARE Period HAS year IS A NUMBER
+
+@export Total Child Credits a Singapore Citizen child receives under the SG Child Support Package, at $2,000 a year for the years the child turns 1 to 16, counted from 2026 onwards.
+GIVEN p      IS A Person @desc The child, with birth year, birth order and citizenship.
+      period IS A Period @desc The simulation period.
+GIVETH A NUMBER
+`child credits` p period MEANS
+    BRANCH IF NOT p's `is a Singapore citizen` THEN 0
+           IF p's `birth year` PLUS 16 LESS THAN 2026 THEN 0
+           IF p's `birth year` PLUS 1 AT LEAST 2026 THEN 32000
+           OTHERWISE 2000 TIMES (p's `birth year` PLUS 16 MINUS 2025)
+
+@export The $10,000 Post-Secondary Education Account top-up, paid in the year a Singapore Citizen child turns 17, for children turning 17 from 2026 onwards.
+GIVEN p      IS A Person @desc The child, with birth year and citizenship.
+      period IS A Period @desc The simulation period.
+GIVETH A NUMBER
+`psea top up` p period MEANS
+    IF       p's `is a Singapore citizen`
+         AND p's `birth year` PLUS 17 AT LEAST 2026
+    THEN 10000
+    ELSE 0
+
+@export The Baby Gift line of the SG Child Support Package: $10,000 for a child born on or after 1 April 2027, and for a child still being paid the Baby Bonus Cash Gift on 31 March 2027 the greater of what they have been paid and $10,000. Zero for a cohort the Gift never reaches.
+GIVEN p      IS A Person @desc The child. Set the two commencement booleans from the date of birth.
+      period IS A Period @desc The simulation period.
+GIVETH A NUMBER
+`baby gift` p period MEANS
+    BRANCH IF NOT p's `is a Singapore citizen` THEN 0
+           IF p's `born on or after the Package commences` THEN 10000
+           IF p's `born on or after the Cash Gift enhancement` THEN 10000
+           OTHERWISE 0
+
+@export The Child Development Account First Step Grant under the SG Child Support Package: $5,000 for a Singapore Citizen child born on or after 1 April 2027, and nothing for an existing child, whose grant was paid at birth under whatever scheme then applied.
+GIVEN p      IS A Person @desc The child.
+      period IS A Period @desc The simulation period.
+GIVETH A NUMBER
+`cda first step grant` p period MEANS
+    IF       p's `is a Singapore citizen`
+         AND p's `born on or after the Package commences`
+    THEN 5000
+    ELSE 0
+
+@export The Child Development Account co-matching CAP from 1 October 2027, when every cap becomes $5,000. A cap, not a payment: the Government matches only what the family saves, so an agency pricing this line must apply its own take-up assumption.
+GIVEN p      IS A Person @desc The child. `has a Child Development Account` is false for a child born before 1 January 2015, whose account has closed.
+      period IS A Period @desc The simulation period.
+GIVETH A NUMBER
+`cda co matching cap` p period MEANS
+    IF       p's `is a Singapore citizen`
+         AND p's `has a Child Development Account`
+    THEN 5000
+    ELSE 0
+
+@export default The five lines of the SG Child Support Package added together, for one Singapore Citizen child, birth to 17. The co-matching line is a cap; at full take-up this is the "up to $62,000" of the announcement.
+GIVEN p      IS A Person @desc The child.
+      period IS A Period @desc The simulation period.
+GIVETH A NUMBER
+`package total` p period MEANS
+         (`baby gift` OF p, period)
+    PLUS (`child credits` OF p, period)
+    PLUS (`cda first step grant` OF p, period)
+    PLUS (`cda co matching cap` OF p, period)
+    PLUS (`psea top up` OF p, period)
+
+§§ `The projection asserts itself equal to the encoding it projects`
+
+-- Each pair below is the SAME child, described twice: once as sg-csp.l4's
+-- `Child` and once as this module's `Person`. The assertion is that the two
+-- descriptions produce the same money. Nothing else keeps a projection
+-- honest; a projection that is never compared is a fork nobody declared.
+
+GIVETH A Period
+`any year` MEANS Period WITH year IS 2028
+
+GIVEN `birth year` IS A NUMBER, `birth order` IS A NUMBER,
+      `after commencement` IS A BOOLEAN, `after enhancement` IS A BOOLEAN, `has CDA` IS A BOOLEAN
+GIVETH A Person
+`person born` `birth year` `order` `birth order` `flags` `after commencement` `after enhancement` `has CDA` MEANS
+    Person WITH
+        `birth year` IS `birth year`
+        `born on or after the Package commences` IS `after commencement`
+        `born on or after the Cash Gift enhancement` IS `after enhancement`
+        `has a Child Development Account` IS `has CDA`
+        `birth order` IS `birth order`
+        `is a Singapore citizen` IS TRUE
+
+GIVEN `birth year` IS A NUMBER, `birth order` IS A NUMBER
+GIVETH A Child
+`child born` `birth year` `order` `birth order` MEANS
+    Child WITH
+        `name` IS "cross-check"
+        `date of birth` IS YMD `birth year` 6 15
+        `is a Singapore citizen` IS TRUE
+        `birth order` IS `birth order`
+        `parents lawfully married` IS TRUE
+
+GIVEN child IS A Child
+GIVETH A NUMBER
+`encoded lines for` child MEANS
+    `EVAL UNDER RULES EFFECTIVE AT` (YMD 2027 10 1) (`the five Package lines for` child)
+
+-- 2028: a full post-commencement cohort. The headline $62,000.
+#ASSERT (`package total` OF (`person born` 2028 `order` 1 `flags` TRUE TRUE TRUE), `any year`) EQUALS 62000
+#ASSERT (`package total` OF (`person born` 2028 `order` 1 `flags` TRUE TRUE TRUE), `any year`) EQUALS `encoded lines for` (`child born` 2028 `order` 1)
+
+-- 2026: born before commencement, so no First Step Grant on the Package line.
+#ASSERT (`package total` OF (`person born` 2026 `order` 3 `flags` FALSE TRUE TRUE), `any year`) EQUALS `encoded lines for` (`child born` 2026 `order` 3)
+
+-- 2020: before the Cash Gift enhancement, so the Gift line is a dash.
+#ASSERT (`package total` OF (`person born` 2020 `order` 1 `flags` FALSE FALSE TRUE), `any year`) EQUALS `encoded lines for` (`child born` 2020 `order` 1)
+
+-- 2012: the account closed at 12, so no co-matching line either.
+#ASSERT (`package total` OF (`person born` 2012 `order` 1 `flags` FALSE FALSE FALSE), `any year`) EQUALS `encoded lines for` (`child born` 2012 `order` 1)
+
+-- 2009: the PSEA top-up and nothing else.
+#ASSERT (`package total` OF (`person born` 2009 `order` 1 `flags` FALSE FALSE FALSE), `any year`) EQUALS 10000
+#ASSERT (`package total` OF (`person born` 2009 `order` 1 `flags` FALSE FALSE FALSE), `any year`) EQUALS `encoded lines for` (`child born` 2009 `order` 1)
+
+-- A non-citizen child is outside every line.
+`a non-citizen child` MEANS
+    Person WITH
+        `birth year` IS 2028
+        `born on or after the Package commences` IS TRUE
+        `born on or after the Cash Gift enhancement` IS TRUE
+        `has a Child Development Account` IS TRUE
+        `birth order` IS 1
+        `is a Singapore citizen` IS FALSE
+
+#ASSERT (`package total` OF `a non-citizen child`, `any year`) EQUALS 0

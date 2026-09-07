@@ -1,0 +1,3074 @@
+{
+  "generated_by": "app/build-scenarios.mjs",
+  "encoding": "jl4/examples/legal/sg-child-support",
+  "rule_dates": {
+    "package_settled": "2027-10-01",
+    "act_today": "2026-01-01",
+    "announced_leave": "2027-04-01"
+  },
+  "comparison_floor": "2015-01-01",
+  "counts": {
+    "children": 88,
+    "windows": 20,
+    "leave": 108,
+    "values": 1388
+  },
+  "children": [
+    {
+      "dob": {
+        "y": 2009,
+        "m": 6,
+        "d": 15
+      },
+      "order": 1,
+      "note": null,
+      "lines": 10000,
+      "gift": 0,
+      "credits": 0,
+      "fsg": 0,
+      "cap": 0,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": null
+    },
+    {
+      "dob": {
+        "y": 2009,
+        "m": 6,
+        "d": 15
+      },
+      "order": 2,
+      "note": null,
+      "lines": 10000,
+      "gift": 0,
+      "credits": 0,
+      "fsg": 0,
+      "cap": 0,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": null
+    },
+    {
+      "dob": {
+        "y": 2009,
+        "m": 6,
+        "d": 15
+      },
+      "order": 3,
+      "note": null,
+      "lines": 10000,
+      "gift": 0,
+      "credits": 0,
+      "fsg": 0,
+      "cap": 0,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": null
+    },
+    {
+      "dob": {
+        "y": 2009,
+        "m": 6,
+        "d": 15
+      },
+      "order": 5,
+      "note": null,
+      "lines": 10000,
+      "gift": 0,
+      "credits": 0,
+      "fsg": 0,
+      "cap": 0,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": null
+    },
+    {
+      "dob": {
+        "y": 2010,
+        "m": 6,
+        "d": 15
+      },
+      "order": 1,
+      "note": null,
+      "lines": 12000,
+      "gift": 0,
+      "credits": 2000,
+      "fsg": 0,
+      "cap": 0,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": null
+    },
+    {
+      "dob": {
+        "y": 2010,
+        "m": 6,
+        "d": 15
+      },
+      "order": 2,
+      "note": null,
+      "lines": 12000,
+      "gift": 0,
+      "credits": 2000,
+      "fsg": 0,
+      "cap": 0,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": null
+    },
+    {
+      "dob": {
+        "y": 2010,
+        "m": 6,
+        "d": 15
+      },
+      "order": 3,
+      "note": null,
+      "lines": 12000,
+      "gift": 0,
+      "credits": 2000,
+      "fsg": 0,
+      "cap": 0,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": null
+    },
+    {
+      "dob": {
+        "y": 2010,
+        "m": 6,
+        "d": 15
+      },
+      "order": 5,
+      "note": null,
+      "lines": 12000,
+      "gift": 0,
+      "credits": 2000,
+      "fsg": 0,
+      "cap": 0,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": null
+    },
+    {
+      "dob": {
+        "y": 2011,
+        "m": 6,
+        "d": 15
+      },
+      "order": 1,
+      "note": null,
+      "lines": 14000,
+      "gift": 0,
+      "credits": 4000,
+      "fsg": 0,
+      "cap": 0,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": null
+    },
+    {
+      "dob": {
+        "y": 2011,
+        "m": 6,
+        "d": 15
+      },
+      "order": 2,
+      "note": null,
+      "lines": 14000,
+      "gift": 0,
+      "credits": 4000,
+      "fsg": 0,
+      "cap": 0,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": null
+    },
+    {
+      "dob": {
+        "y": 2011,
+        "m": 6,
+        "d": 15
+      },
+      "order": 3,
+      "note": null,
+      "lines": 14000,
+      "gift": 0,
+      "credits": 4000,
+      "fsg": 0,
+      "cap": 0,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": null
+    },
+    {
+      "dob": {
+        "y": 2011,
+        "m": 6,
+        "d": 15
+      },
+      "order": 5,
+      "note": null,
+      "lines": 14000,
+      "gift": 0,
+      "credits": 4000,
+      "fsg": 0,
+      "cap": 0,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": null
+    },
+    {
+      "dob": {
+        "y": 2012,
+        "m": 6,
+        "d": 15
+      },
+      "order": 1,
+      "note": null,
+      "lines": 16000,
+      "gift": 0,
+      "credits": 6000,
+      "fsg": 0,
+      "cap": 0,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": null
+    },
+    {
+      "dob": {
+        "y": 2012,
+        "m": 6,
+        "d": 15
+      },
+      "order": 2,
+      "note": null,
+      "lines": 16000,
+      "gift": 0,
+      "credits": 6000,
+      "fsg": 0,
+      "cap": 0,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": null
+    },
+    {
+      "dob": {
+        "y": 2012,
+        "m": 6,
+        "d": 15
+      },
+      "order": 3,
+      "note": null,
+      "lines": 16000,
+      "gift": 0,
+      "credits": 6000,
+      "fsg": 0,
+      "cap": 0,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": null
+    },
+    {
+      "dob": {
+        "y": 2012,
+        "m": 6,
+        "d": 15
+      },
+      "order": 5,
+      "note": null,
+      "lines": 16000,
+      "gift": 0,
+      "credits": 6000,
+      "fsg": 0,
+      "cap": 0,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": null
+    },
+    {
+      "dob": {
+        "y": 2013,
+        "m": 6,
+        "d": 15
+      },
+      "order": 1,
+      "note": null,
+      "lines": 18000,
+      "gift": 0,
+      "credits": 8000,
+      "fsg": 0,
+      "cap": 0,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": null
+    },
+    {
+      "dob": {
+        "y": 2013,
+        "m": 6,
+        "d": 15
+      },
+      "order": 2,
+      "note": null,
+      "lines": 18000,
+      "gift": 0,
+      "credits": 8000,
+      "fsg": 0,
+      "cap": 0,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": null
+    },
+    {
+      "dob": {
+        "y": 2013,
+        "m": 6,
+        "d": 15
+      },
+      "order": 3,
+      "note": null,
+      "lines": 18000,
+      "gift": 0,
+      "credits": 8000,
+      "fsg": 0,
+      "cap": 0,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": null
+    },
+    {
+      "dob": {
+        "y": 2013,
+        "m": 6,
+        "d": 15
+      },
+      "order": 5,
+      "note": null,
+      "lines": 18000,
+      "gift": 0,
+      "credits": 8000,
+      "fsg": 0,
+      "cap": 0,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": null
+    },
+    {
+      "dob": {
+        "y": 2014,
+        "m": 6,
+        "d": 15
+      },
+      "order": 1,
+      "note": null,
+      "lines": 20000,
+      "gift": 0,
+      "credits": 10000,
+      "fsg": 0,
+      "cap": 0,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": null
+    },
+    {
+      "dob": {
+        "y": 2014,
+        "m": 6,
+        "d": 15
+      },
+      "order": 2,
+      "note": null,
+      "lines": 20000,
+      "gift": 0,
+      "credits": 10000,
+      "fsg": 0,
+      "cap": 0,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": null
+    },
+    {
+      "dob": {
+        "y": 2014,
+        "m": 6,
+        "d": 15
+      },
+      "order": 3,
+      "note": null,
+      "lines": 20000,
+      "gift": 0,
+      "credits": 10000,
+      "fsg": 0,
+      "cap": 0,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": null
+    },
+    {
+      "dob": {
+        "y": 2014,
+        "m": 6,
+        "d": 15
+      },
+      "order": 5,
+      "note": null,
+      "lines": 20000,
+      "gift": 0,
+      "credits": 10000,
+      "fsg": 0,
+      "cap": 0,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": null
+    },
+    {
+      "dob": {
+        "y": 2015,
+        "m": 6,
+        "d": 15
+      },
+      "order": 1,
+      "note": null,
+      "lines": 27000,
+      "gift": 0,
+      "credits": 12000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": 0,
+        "cap": 1000,
+        "total": 23000
+      }
+    },
+    {
+      "dob": {
+        "y": 2015,
+        "m": 6,
+        "d": 15
+      },
+      "order": 2,
+      "note": null,
+      "lines": 27000,
+      "gift": 0,
+      "credits": 12000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": 0,
+        "cap": -2000,
+        "total": 20000
+      }
+    },
+    {
+      "dob": {
+        "y": 2015,
+        "m": 6,
+        "d": 15
+      },
+      "order": 3,
+      "note": null,
+      "lines": 27000,
+      "gift": 0,
+      "credits": 12000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": 0,
+        "cap": -4000,
+        "total": 18000
+      }
+    },
+    {
+      "dob": {
+        "y": 2015,
+        "m": 6,
+        "d": 15
+      },
+      "order": 5,
+      "note": null,
+      "lines": 27000,
+      "gift": 0,
+      "credits": 12000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": 0,
+        "cap": -10000,
+        "total": 12000
+      }
+    },
+    {
+      "dob": {
+        "y": 2016,
+        "m": 6,
+        "d": 15
+      },
+      "order": 1,
+      "note": null,
+      "lines": 29000,
+      "gift": 0,
+      "credits": 14000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": 0,
+        "cap": 1000,
+        "total": 25000
+      }
+    },
+    {
+      "dob": {
+        "y": 2016,
+        "m": 6,
+        "d": 15
+      },
+      "order": 2,
+      "note": null,
+      "lines": 29000,
+      "gift": 0,
+      "credits": 14000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": 0,
+        "cap": -2000,
+        "total": 22000
+      }
+    },
+    {
+      "dob": {
+        "y": 2016,
+        "m": 6,
+        "d": 15
+      },
+      "order": 3,
+      "note": null,
+      "lines": 29000,
+      "gift": 0,
+      "credits": 14000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": 0,
+        "cap": -4000,
+        "total": 20000
+      }
+    },
+    {
+      "dob": {
+        "y": 2016,
+        "m": 6,
+        "d": 15
+      },
+      "order": 5,
+      "note": null,
+      "lines": 29000,
+      "gift": 0,
+      "credits": 14000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": 0,
+        "cap": -10000,
+        "total": 14000
+      }
+    },
+    {
+      "dob": {
+        "y": 2017,
+        "m": 6,
+        "d": 15
+      },
+      "order": 1,
+      "note": null,
+      "lines": 31000,
+      "gift": 0,
+      "credits": 16000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": 0,
+        "cap": 1000,
+        "total": 27000
+      }
+    },
+    {
+      "dob": {
+        "y": 2017,
+        "m": 6,
+        "d": 15
+      },
+      "order": 2,
+      "note": null,
+      "lines": 31000,
+      "gift": 0,
+      "credits": 16000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": 0,
+        "cap": -2000,
+        "total": 24000
+      }
+    },
+    {
+      "dob": {
+        "y": 2017,
+        "m": 6,
+        "d": 15
+      },
+      "order": 3,
+      "note": null,
+      "lines": 31000,
+      "gift": 0,
+      "credits": 16000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": 0,
+        "cap": -4000,
+        "total": 22000
+      }
+    },
+    {
+      "dob": {
+        "y": 2017,
+        "m": 6,
+        "d": 15
+      },
+      "order": 5,
+      "note": null,
+      "lines": 31000,
+      "gift": 0,
+      "credits": 16000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": 0,
+        "cap": -10000,
+        "total": 16000
+      }
+    },
+    {
+      "dob": {
+        "y": 2018,
+        "m": 6,
+        "d": 15
+      },
+      "order": 1,
+      "note": null,
+      "lines": 33000,
+      "gift": 0,
+      "credits": 18000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": 0,
+        "cap": 1000,
+        "total": 29000
+      }
+    },
+    {
+      "dob": {
+        "y": 2018,
+        "m": 6,
+        "d": 15
+      },
+      "order": 2,
+      "note": null,
+      "lines": 33000,
+      "gift": 0,
+      "credits": 18000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": 0,
+        "cap": -2000,
+        "total": 26000
+      }
+    },
+    {
+      "dob": {
+        "y": 2018,
+        "m": 6,
+        "d": 15
+      },
+      "order": 3,
+      "note": null,
+      "lines": 33000,
+      "gift": 0,
+      "credits": 18000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": 0,
+        "cap": -4000,
+        "total": 24000
+      }
+    },
+    {
+      "dob": {
+        "y": 2018,
+        "m": 6,
+        "d": 15
+      },
+      "order": 5,
+      "note": null,
+      "lines": 33000,
+      "gift": 0,
+      "credits": 18000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": 0,
+        "cap": -10000,
+        "total": 18000
+      }
+    },
+    {
+      "dob": {
+        "y": 2019,
+        "m": 6,
+        "d": 15
+      },
+      "order": 1,
+      "note": null,
+      "lines": 35000,
+      "gift": 0,
+      "credits": 20000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": 0,
+        "cap": 1000,
+        "total": 31000
+      }
+    },
+    {
+      "dob": {
+        "y": 2019,
+        "m": 6,
+        "d": 15
+      },
+      "order": 2,
+      "note": null,
+      "lines": 35000,
+      "gift": 0,
+      "credits": 20000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": 0,
+        "cap": -2000,
+        "total": 28000
+      }
+    },
+    {
+      "dob": {
+        "y": 2019,
+        "m": 6,
+        "d": 15
+      },
+      "order": 3,
+      "note": null,
+      "lines": 35000,
+      "gift": 0,
+      "credits": 20000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": 0,
+        "cap": -4000,
+        "total": 26000
+      }
+    },
+    {
+      "dob": {
+        "y": 2019,
+        "m": 6,
+        "d": 15
+      },
+      "order": 5,
+      "note": null,
+      "lines": 35000,
+      "gift": 0,
+      "credits": 20000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": 0,
+        "cap": -10000,
+        "total": 20000
+      }
+    },
+    {
+      "dob": {
+        "y": 2020,
+        "m": 6,
+        "d": 15
+      },
+      "order": 1,
+      "note": null,
+      "lines": 37000,
+      "gift": 0,
+      "credits": 22000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": 0,
+        "cap": 1000,
+        "total": 33000
+      }
+    },
+    {
+      "dob": {
+        "y": 2020,
+        "m": 6,
+        "d": 15
+      },
+      "order": 2,
+      "note": null,
+      "lines": 37000,
+      "gift": 0,
+      "credits": 22000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": 0,
+        "cap": -2000,
+        "total": 30000
+      }
+    },
+    {
+      "dob": {
+        "y": 2020,
+        "m": 6,
+        "d": 15
+      },
+      "order": 3,
+      "note": null,
+      "lines": 37000,
+      "gift": 0,
+      "credits": 22000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": 0,
+        "cap": -4000,
+        "total": 28000
+      }
+    },
+    {
+      "dob": {
+        "y": 2020,
+        "m": 6,
+        "d": 15
+      },
+      "order": 5,
+      "note": null,
+      "lines": 37000,
+      "gift": 0,
+      "credits": 22000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": 0,
+        "cap": -10000,
+        "total": 22000
+      }
+    },
+    {
+      "dob": {
+        "y": 2021,
+        "m": 6,
+        "d": 15
+      },
+      "order": 1,
+      "note": null,
+      "lines": 39000,
+      "gift": 0,
+      "credits": 24000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": 0,
+        "cap": 1000,
+        "total": 35000
+      }
+    },
+    {
+      "dob": {
+        "y": 2021,
+        "m": 6,
+        "d": 15
+      },
+      "order": 2,
+      "note": null,
+      "lines": 39000,
+      "gift": 0,
+      "credits": 24000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": 0,
+        "cap": -2000,
+        "total": 32000
+      }
+    },
+    {
+      "dob": {
+        "y": 2021,
+        "m": 6,
+        "d": 15
+      },
+      "order": 3,
+      "note": null,
+      "lines": 39000,
+      "gift": 0,
+      "credits": 24000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": 0,
+        "cap": -4000,
+        "total": 30000
+      }
+    },
+    {
+      "dob": {
+        "y": 2021,
+        "m": 6,
+        "d": 15
+      },
+      "order": 5,
+      "note": null,
+      "lines": 39000,
+      "gift": 0,
+      "credits": 24000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": 0,
+        "cap": -10000,
+        "total": 24000
+      }
+    },
+    {
+      "dob": {
+        "y": 2022,
+        "m": 6,
+        "d": 15
+      },
+      "order": 1,
+      "note": null,
+      "lines": 41000,
+      "gift": 0,
+      "credits": 26000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": 0,
+        "cap": 1000,
+        "total": 37000
+      }
+    },
+    {
+      "dob": {
+        "y": 2022,
+        "m": 6,
+        "d": 15
+      },
+      "order": 2,
+      "note": null,
+      "lines": 41000,
+      "gift": 0,
+      "credits": 26000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": 0,
+        "cap": -2000,
+        "total": 34000
+      }
+    },
+    {
+      "dob": {
+        "y": 2022,
+        "m": 6,
+        "d": 15
+      },
+      "order": 3,
+      "note": null,
+      "lines": 41000,
+      "gift": 0,
+      "credits": 26000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": 0,
+        "cap": -4000,
+        "total": 32000
+      }
+    },
+    {
+      "dob": {
+        "y": 2022,
+        "m": 6,
+        "d": 15
+      },
+      "order": 5,
+      "note": null,
+      "lines": 41000,
+      "gift": 0,
+      "credits": 26000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": 0,
+        "cap": -10000,
+        "total": 26000
+      }
+    },
+    {
+      "dob": {
+        "y": 2023,
+        "m": 6,
+        "d": 15
+      },
+      "order": 1,
+      "note": null,
+      "lines": 53000,
+      "gift": 10000,
+      "credits": 28000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": -1000,
+        "cap": 1000,
+        "total": 38000
+      }
+    },
+    {
+      "dob": {
+        "y": 2023,
+        "m": 6,
+        "d": 15
+      },
+      "order": 2,
+      "note": null,
+      "lines": 53000,
+      "gift": 10000,
+      "credits": 28000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": -1000,
+        "cap": -2000,
+        "total": 35000
+      }
+    },
+    {
+      "dob": {
+        "y": 2023,
+        "m": 6,
+        "d": 15
+      },
+      "order": 3,
+      "note": null,
+      "lines": 53600,
+      "gift": 10600,
+      "credits": 28000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": -2400,
+        "cap": -4000,
+        "total": 31600
+      }
+    },
+    {
+      "dob": {
+        "y": 2023,
+        "m": 6,
+        "d": 15
+      },
+      "order": 5,
+      "note": null,
+      "lines": 53600,
+      "gift": 10600,
+      "credits": 28000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": -2400,
+        "cap": -10000,
+        "total": 25600
+      }
+    },
+    {
+      "dob": {
+        "y": 2024,
+        "m": 6,
+        "d": 15
+      },
+      "order": 1,
+      "note": null,
+      "lines": 55000,
+      "gift": 10000,
+      "credits": 30000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": -1000,
+        "cap": 1000,
+        "total": 40000
+      }
+    },
+    {
+      "dob": {
+        "y": 2024,
+        "m": 6,
+        "d": 15
+      },
+      "order": 2,
+      "note": null,
+      "lines": 55000,
+      "gift": 10000,
+      "credits": 30000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": -1000,
+        "cap": -2000,
+        "total": 37000
+      }
+    },
+    {
+      "dob": {
+        "y": 2024,
+        "m": 6,
+        "d": 15
+      },
+      "order": 3,
+      "note": null,
+      "lines": 55000,
+      "gift": 10000,
+      "credits": 30000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": -3000,
+        "cap": -4000,
+        "total": 33000
+      }
+    },
+    {
+      "dob": {
+        "y": 2024,
+        "m": 6,
+        "d": 15
+      },
+      "order": 5,
+      "note": null,
+      "lines": 55000,
+      "gift": 10000,
+      "credits": 30000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": -3000,
+        "cap": -10000,
+        "total": 27000
+      }
+    },
+    {
+      "dob": {
+        "y": 2025,
+        "m": 6,
+        "d": 15
+      },
+      "order": 1,
+      "note": null,
+      "lines": 57000,
+      "gift": 10000,
+      "credits": 32000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": -1000,
+        "cap": 1000,
+        "total": 42000
+      }
+    },
+    {
+      "dob": {
+        "y": 2025,
+        "m": 6,
+        "d": 15
+      },
+      "order": 2,
+      "note": null,
+      "lines": 57000,
+      "gift": 10000,
+      "credits": 32000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": -1000,
+        "cap": -2000,
+        "total": 39000
+      }
+    },
+    {
+      "dob": {
+        "y": 2025,
+        "m": 6,
+        "d": 15
+      },
+      "order": 3,
+      "note": null,
+      "lines": 57000,
+      "gift": 10000,
+      "credits": 32000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 5000,
+      "lflc": 1000,
+      "delta": {
+        "cash": -3000,
+        "cap": -4000,
+        "total": 30000
+      }
+    },
+    {
+      "dob": {
+        "y": 2025,
+        "m": 6,
+        "d": 15
+      },
+      "order": 5,
+      "note": null,
+      "lines": 57000,
+      "gift": 10000,
+      "credits": 32000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 5000,
+      "lflc": 1000,
+      "delta": {
+        "cash": -3000,
+        "cap": -10000,
+        "total": 24000
+      }
+    },
+    {
+      "dob": {
+        "y": 2026,
+        "m": 6,
+        "d": 15
+      },
+      "order": 1,
+      "note": null,
+      "lines": 57000,
+      "gift": 10000,
+      "credits": 32000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": -1000,
+        "cap": 1000,
+        "total": 42000
+      }
+    },
+    {
+      "dob": {
+        "y": 2026,
+        "m": 6,
+        "d": 15
+      },
+      "order": 2,
+      "note": null,
+      "lines": 57000,
+      "gift": 10000,
+      "credits": 32000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": -1000,
+        "cap": -2000,
+        "total": 39000
+      }
+    },
+    {
+      "dob": {
+        "y": 2026,
+        "m": 6,
+        "d": 15
+      },
+      "order": 3,
+      "note": null,
+      "lines": 57000,
+      "gift": 10000,
+      "credits": 32000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 5000,
+      "lflc": 0,
+      "delta": {
+        "cash": -3000,
+        "cap": -4000,
+        "total": 29000
+      }
+    },
+    {
+      "dob": {
+        "y": 2026,
+        "m": 6,
+        "d": 15
+      },
+      "order": 5,
+      "note": null,
+      "lines": 57000,
+      "gift": 10000,
+      "credits": 32000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 5000,
+      "lflc": 0,
+      "delta": {
+        "cash": -3000,
+        "cap": -10000,
+        "total": 23000
+      }
+    },
+    {
+      "dob": {
+        "y": 2027,
+        "m": 6,
+        "d": 15
+      },
+      "order": 1,
+      "note": null,
+      "lines": 62000,
+      "gift": 10000,
+      "credits": 32000,
+      "fsg": 5000,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": -1000,
+        "cap": 1000,
+        "total": 42000
+      }
+    },
+    {
+      "dob": {
+        "y": 2027,
+        "m": 6,
+        "d": 15
+      },
+      "order": 2,
+      "note": null,
+      "lines": 62000,
+      "gift": 10000,
+      "credits": 32000,
+      "fsg": 5000,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": -1000,
+        "cap": -2000,
+        "total": 39000
+      }
+    },
+    {
+      "dob": {
+        "y": 2027,
+        "m": 6,
+        "d": 15
+      },
+      "order": 3,
+      "note": null,
+      "lines": 62000,
+      "gift": 10000,
+      "credits": 32000,
+      "fsg": 5000,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 5000,
+      "lflc": 0,
+      "delta": {
+        "cash": -3000,
+        "cap": -4000,
+        "total": 24000
+      }
+    },
+    {
+      "dob": {
+        "y": 2027,
+        "m": 6,
+        "d": 15
+      },
+      "order": 5,
+      "note": null,
+      "lines": 62000,
+      "gift": 10000,
+      "credits": 32000,
+      "fsg": 5000,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 5000,
+      "lflc": 0,
+      "delta": {
+        "cash": -3000,
+        "cap": -10000,
+        "total": 18000
+      }
+    },
+    {
+      "dob": {
+        "y": 2028,
+        "m": 6,
+        "d": 15
+      },
+      "order": 1,
+      "note": null,
+      "lines": 62000,
+      "gift": 10000,
+      "credits": 32000,
+      "fsg": 5000,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": -1000,
+        "cap": 1000,
+        "total": 42000
+      }
+    },
+    {
+      "dob": {
+        "y": 2028,
+        "m": 6,
+        "d": 15
+      },
+      "order": 2,
+      "note": null,
+      "lines": 62000,
+      "gift": 10000,
+      "credits": 32000,
+      "fsg": 5000,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": -1000,
+        "cap": -2000,
+        "total": 39000
+      }
+    },
+    {
+      "dob": {
+        "y": 2028,
+        "m": 6,
+        "d": 15
+      },
+      "order": 3,
+      "note": null,
+      "lines": 62000,
+      "gift": 10000,
+      "credits": 32000,
+      "fsg": 5000,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 5000,
+      "lflc": 0,
+      "delta": {
+        "cash": -3000,
+        "cap": -4000,
+        "total": 24000
+      }
+    },
+    {
+      "dob": {
+        "y": 2028,
+        "m": 6,
+        "d": 15
+      },
+      "order": 5,
+      "note": null,
+      "lines": 62000,
+      "gift": 10000,
+      "credits": 32000,
+      "fsg": 5000,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 5000,
+      "lflc": 0,
+      "delta": {
+        "cash": -3000,
+        "cap": -10000,
+        "total": 18000
+      }
+    },
+    {
+      "dob": {
+        "y": 2023,
+        "m": 2,
+        "d": 13
+      },
+      "order": 1,
+      "note": "the last day before the Budget 2023 Cash Gift enhancement",
+      "lines": 43000,
+      "gift": 0,
+      "credits": 28000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": 0,
+        "cap": 1000,
+        "total": 39000
+      }
+    },
+    {
+      "dob": {
+        "y": 2023,
+        "m": 2,
+        "d": 14
+      },
+      "order": 1,
+      "note": "the first day of it",
+      "lines": 53000,
+      "gift": 10000,
+      "credits": 28000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": -1000,
+        "cap": 1000,
+        "total": 38000
+      }
+    },
+    {
+      "dob": {
+        "y": 2023,
+        "m": 2,
+        "d": 13
+      },
+      "order": 3,
+      "note": "the same day, third child",
+      "lines": 43000,
+      "gift": 0,
+      "credits": 28000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": 0,
+        "cap": -4000,
+        "total": 34000
+      }
+    },
+    {
+      "dob": {
+        "y": 2023,
+        "m": 2,
+        "d": 14
+      },
+      "order": 3,
+      "note": "the same day, third child",
+      "lines": 54000,
+      "gift": 11000,
+      "credits": 28000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": -2000,
+        "cap": -4000,
+        "total": 32000
+      }
+    },
+    {
+      "dob": {
+        "y": 2027,
+        "m": 3,
+        "d": 31
+      },
+      "order": 1,
+      "note": "the last day before the Package commences",
+      "lines": 57000,
+      "gift": 10000,
+      "credits": 32000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": -1000,
+        "cap": 1000,
+        "total": 42000
+      }
+    },
+    {
+      "dob": {
+        "y": 2027,
+        "m": 4,
+        "d": 1
+      },
+      "order": 1,
+      "note": "the first day of the Package",
+      "lines": 62000,
+      "gift": 10000,
+      "credits": 32000,
+      "fsg": 5000,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 0,
+      "lflc": 0,
+      "delta": {
+        "cash": -1000,
+        "cap": 1000,
+        "total": 42000
+      }
+    },
+    {
+      "dob": {
+        "y": 2027,
+        "m": 3,
+        "d": 31
+      },
+      "order": 3,
+      "note": "the same day, third child",
+      "lines": 57000,
+      "gift": 10000,
+      "credits": 32000,
+      "fsg": 0,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 5000,
+      "lflc": 0,
+      "delta": {
+        "cash": -3000,
+        "cap": -4000,
+        "total": 29000
+      }
+    },
+    {
+      "dob": {
+        "y": 2027,
+        "m": 4,
+        "d": 1
+      },
+      "order": 3,
+      "note": "the same day, third child",
+      "lines": 62000,
+      "gift": 10000,
+      "credits": 32000,
+      "fsg": 5000,
+      "cap": 5000,
+      "psea": 10000,
+      "lfmg": 5000,
+      "lflc": 0,
+      "delta": {
+        "cash": -3000,
+        "cap": -4000,
+        "total": 24000
+      }
+    }
+  ],
+  "windows": [
+    {
+      "dob": {
+        "y": 2026,
+        "m": 6,
+        "d": 15
+      },
+      "order": 1,
+      "got": 0,
+      "before": 4000,
+      "after": 5000,
+      "lapsing": 0
+    },
+    {
+      "dob": {
+        "y": 2026,
+        "m": 6,
+        "d": 15
+      },
+      "order": 1,
+      "got": 3000,
+      "before": 4000,
+      "after": 5000,
+      "lapsing": 0
+    },
+    {
+      "dob": {
+        "y": 2026,
+        "m": 6,
+        "d": 15
+      },
+      "order": 1,
+      "got": 5000,
+      "before": 4000,
+      "after": 5000,
+      "lapsing": 0
+    },
+    {
+      "dob": {
+        "y": 2026,
+        "m": 6,
+        "d": 15
+      },
+      "order": 1,
+      "got": 8000,
+      "before": 4000,
+      "after": 5000,
+      "lapsing": 0
+    },
+    {
+      "dob": {
+        "y": 2026,
+        "m": 6,
+        "d": 15
+      },
+      "order": 1,
+      "got": 12000,
+      "before": 4000,
+      "after": 5000,
+      "lapsing": 0
+    },
+    {
+      "dob": {
+        "y": 2026,
+        "m": 6,
+        "d": 15
+      },
+      "order": 2,
+      "got": 0,
+      "before": 7000,
+      "after": 5000,
+      "lapsing": 2000
+    },
+    {
+      "dob": {
+        "y": 2026,
+        "m": 6,
+        "d": 15
+      },
+      "order": 2,
+      "got": 3000,
+      "before": 7000,
+      "after": 5000,
+      "lapsing": 2000
+    },
+    {
+      "dob": {
+        "y": 2026,
+        "m": 6,
+        "d": 15
+      },
+      "order": 2,
+      "got": 5000,
+      "before": 7000,
+      "after": 5000,
+      "lapsing": 2000
+    },
+    {
+      "dob": {
+        "y": 2026,
+        "m": 6,
+        "d": 15
+      },
+      "order": 2,
+      "got": 8000,
+      "before": 7000,
+      "after": 5000,
+      "lapsing": 0
+    },
+    {
+      "dob": {
+        "y": 2026,
+        "m": 6,
+        "d": 15
+      },
+      "order": 2,
+      "got": 12000,
+      "before": 7000,
+      "after": 5000,
+      "lapsing": 0
+    },
+    {
+      "dob": {
+        "y": 2026,
+        "m": 6,
+        "d": 15
+      },
+      "order": 3,
+      "got": 0,
+      "before": 9000,
+      "after": 5000,
+      "lapsing": 4000
+    },
+    {
+      "dob": {
+        "y": 2026,
+        "m": 6,
+        "d": 15
+      },
+      "order": 3,
+      "got": 3000,
+      "before": 9000,
+      "after": 5000,
+      "lapsing": 4000
+    },
+    {
+      "dob": {
+        "y": 2026,
+        "m": 6,
+        "d": 15
+      },
+      "order": 3,
+      "got": 5000,
+      "before": 9000,
+      "after": 5000,
+      "lapsing": 4000
+    },
+    {
+      "dob": {
+        "y": 2026,
+        "m": 6,
+        "d": 15
+      },
+      "order": 3,
+      "got": 8000,
+      "before": 9000,
+      "after": 5000,
+      "lapsing": 1000
+    },
+    {
+      "dob": {
+        "y": 2026,
+        "m": 6,
+        "d": 15
+      },
+      "order": 3,
+      "got": 12000,
+      "before": 9000,
+      "after": 5000,
+      "lapsing": 0
+    },
+    {
+      "dob": {
+        "y": 2026,
+        "m": 6,
+        "d": 15
+      },
+      "order": 5,
+      "got": 0,
+      "before": 15000,
+      "after": 5000,
+      "lapsing": 10000
+    },
+    {
+      "dob": {
+        "y": 2026,
+        "m": 6,
+        "d": 15
+      },
+      "order": 5,
+      "got": 3000,
+      "before": 15000,
+      "after": 5000,
+      "lapsing": 10000
+    },
+    {
+      "dob": {
+        "y": 2026,
+        "m": 6,
+        "d": 15
+      },
+      "order": 5,
+      "got": 5000,
+      "before": 15000,
+      "after": 5000,
+      "lapsing": 10000
+    },
+    {
+      "dob": {
+        "y": 2026,
+        "m": 6,
+        "d": 15
+      },
+      "order": 5,
+      "got": 8000,
+      "before": 15000,
+      "after": 5000,
+      "lapsing": 7000
+    },
+    {
+      "dob": {
+        "y": 2026,
+        "m": 6,
+        "d": 15
+      },
+      "order": 5,
+      "got": 12000,
+      "before": 15000,
+      "after": 5000,
+      "lapsing": 3000
+    }
+  ],
+  "leave": [
+    {
+      "kids": 1,
+      "months": 2,
+      "rate": 200,
+      "actDays": 0,
+      "announcedDays": 0,
+      "actCost": 0,
+      "announcedCost": 0
+    },
+    {
+      "kids": 1,
+      "months": 2,
+      "rate": 400,
+      "actDays": 0,
+      "announcedDays": 0,
+      "actCost": 0,
+      "announcedCost": 0
+    },
+    {
+      "kids": 1,
+      "months": 2,
+      "rate": 500,
+      "actDays": 0,
+      "announcedDays": 0,
+      "actCost": 0,
+      "announcedCost": 0
+    },
+    {
+      "kids": 1,
+      "months": 2,
+      "rate": 600,
+      "actDays": 0,
+      "announcedDays": 0,
+      "actCost": 0,
+      "announcedCost": 0
+    },
+    {
+      "kids": 1,
+      "months": 2,
+      "rate": 800,
+      "actDays": 0,
+      "announcedDays": 0,
+      "actCost": 0,
+      "announcedCost": 0
+    },
+    {
+      "kids": 1,
+      "months": 2,
+      "rate": 1200,
+      "actDays": 0,
+      "announcedDays": 0,
+      "actCost": 0,
+      "announcedCost": 0
+    },
+    {
+      "kids": 1,
+      "months": 3,
+      "rate": 200,
+      "actDays": 2,
+      "announcedDays": 2,
+      "actCost": 400,
+      "announcedCost": 0
+    },
+    {
+      "kids": 1,
+      "months": 3,
+      "rate": 400,
+      "actDays": 2,
+      "announcedDays": 2,
+      "actCost": 800,
+      "announcedCost": 0
+    },
+    {
+      "kids": 1,
+      "months": 3,
+      "rate": 500,
+      "actDays": 2,
+      "announcedDays": 2,
+      "actCost": 1000,
+      "announcedCost": 0
+    },
+    {
+      "kids": 1,
+      "months": 3,
+      "rate": 600,
+      "actDays": 2,
+      "announcedDays": 2,
+      "actCost": 1200,
+      "announcedCost": 200
+    },
+    {
+      "kids": 1,
+      "months": 3,
+      "rate": 800,
+      "actDays": 2,
+      "announcedDays": 2,
+      "actCost": 1600,
+      "announcedCost": 600
+    },
+    {
+      "kids": 1,
+      "months": 3,
+      "rate": 1200,
+      "actDays": 2,
+      "announcedDays": 2,
+      "actCost": 2400,
+      "announcedCost": 1400
+    },
+    {
+      "kids": 1,
+      "months": 6,
+      "rate": 200,
+      "actDays": 3,
+      "announcedDays": 4,
+      "actCost": 600,
+      "announcedCost": 0
+    },
+    {
+      "kids": 1,
+      "months": 6,
+      "rate": 400,
+      "actDays": 3,
+      "announcedDays": 4,
+      "actCost": 1200,
+      "announcedCost": 0
+    },
+    {
+      "kids": 1,
+      "months": 6,
+      "rate": 500,
+      "actDays": 3,
+      "announcedDays": 4,
+      "actCost": 1500,
+      "announcedCost": 0
+    },
+    {
+      "kids": 1,
+      "months": 6,
+      "rate": 600,
+      "actDays": 3,
+      "announcedDays": 4,
+      "actCost": 1800,
+      "announcedCost": 400
+    },
+    {
+      "kids": 1,
+      "months": 6,
+      "rate": 800,
+      "actDays": 3,
+      "announcedDays": 4,
+      "actCost": 2400,
+      "announcedCost": 1200
+    },
+    {
+      "kids": 1,
+      "months": 6,
+      "rate": 1200,
+      "actDays": 3,
+      "announcedDays": 4,
+      "actCost": 3600,
+      "announcedCost": 2800
+    },
+    {
+      "kids": 1,
+      "months": 8,
+      "rate": 200,
+      "actDays": 4,
+      "announcedDays": 5,
+      "actCost": 600,
+      "announcedCost": 0
+    },
+    {
+      "kids": 1,
+      "months": 8,
+      "rate": 400,
+      "actDays": 4,
+      "announcedDays": 5,
+      "actCost": 1200,
+      "announcedCost": 0
+    },
+    {
+      "kids": 1,
+      "months": 8,
+      "rate": 500,
+      "actDays": 4,
+      "announcedDays": 5,
+      "actCost": 1500,
+      "announcedCost": 0
+    },
+    {
+      "kids": 1,
+      "months": 8,
+      "rate": 600,
+      "actDays": 4,
+      "announcedDays": 5,
+      "actCost": 1800,
+      "announcedCost": 500
+    },
+    {
+      "kids": 1,
+      "months": 8,
+      "rate": 800,
+      "actDays": 4,
+      "announcedDays": 5,
+      "actCost": 2400,
+      "announcedCost": 1500
+    },
+    {
+      "kids": 1,
+      "months": 8,
+      "rate": 1200,
+      "actDays": 4,
+      "announcedDays": 5,
+      "actCost": 3600,
+      "announcedCost": 3500
+    },
+    {
+      "kids": 1,
+      "months": 10,
+      "rate": 200,
+      "actDays": 5,
+      "announcedDays": 6,
+      "actCost": 600,
+      "announcedCost": 0
+    },
+    {
+      "kids": 1,
+      "months": 10,
+      "rate": 400,
+      "actDays": 5,
+      "announcedDays": 6,
+      "actCost": 1200,
+      "announcedCost": 0
+    },
+    {
+      "kids": 1,
+      "months": 10,
+      "rate": 500,
+      "actDays": 5,
+      "announcedDays": 6,
+      "actCost": 1500,
+      "announcedCost": 0
+    },
+    {
+      "kids": 1,
+      "months": 10,
+      "rate": 600,
+      "actDays": 5,
+      "announcedDays": 6,
+      "actCost": 1800,
+      "announcedCost": 600
+    },
+    {
+      "kids": 1,
+      "months": 10,
+      "rate": 800,
+      "actDays": 5,
+      "announcedDays": 6,
+      "actCost": 2400,
+      "announcedCost": 1800
+    },
+    {
+      "kids": 1,
+      "months": 10,
+      "rate": 1200,
+      "actDays": 5,
+      "announcedDays": 6,
+      "actCost": 3600,
+      "announcedCost": 4200
+    },
+    {
+      "kids": 1,
+      "months": 12,
+      "rate": 200,
+      "actDays": 6,
+      "announcedDays": 8,
+      "actCost": 600,
+      "announcedCost": 0
+    },
+    {
+      "kids": 1,
+      "months": 12,
+      "rate": 400,
+      "actDays": 6,
+      "announcedDays": 8,
+      "actCost": 1200,
+      "announcedCost": 0
+    },
+    {
+      "kids": 1,
+      "months": 12,
+      "rate": 500,
+      "actDays": 6,
+      "announcedDays": 8,
+      "actCost": 1500,
+      "announcedCost": 0
+    },
+    {
+      "kids": 1,
+      "months": 12,
+      "rate": 600,
+      "actDays": 6,
+      "announcedDays": 8,
+      "actCost": 1800,
+      "announcedCost": 800
+    },
+    {
+      "kids": 1,
+      "months": 12,
+      "rate": 800,
+      "actDays": 6,
+      "announcedDays": 8,
+      "actCost": 2400,
+      "announcedCost": 2400
+    },
+    {
+      "kids": 1,
+      "months": 12,
+      "rate": 1200,
+      "actDays": 6,
+      "announcedDays": 8,
+      "actCost": 3600,
+      "announcedCost": 5600
+    },
+    {
+      "kids": 2,
+      "months": 2,
+      "rate": 200,
+      "actDays": 0,
+      "announcedDays": 0,
+      "actCost": 0,
+      "announcedCost": 0
+    },
+    {
+      "kids": 2,
+      "months": 2,
+      "rate": 400,
+      "actDays": 0,
+      "announcedDays": 0,
+      "actCost": 0,
+      "announcedCost": 0
+    },
+    {
+      "kids": 2,
+      "months": 2,
+      "rate": 500,
+      "actDays": 0,
+      "announcedDays": 0,
+      "actCost": 0,
+      "announcedCost": 0
+    },
+    {
+      "kids": 2,
+      "months": 2,
+      "rate": 600,
+      "actDays": 0,
+      "announcedDays": 0,
+      "actCost": 0,
+      "announcedCost": 0
+    },
+    {
+      "kids": 2,
+      "months": 2,
+      "rate": 800,
+      "actDays": 0,
+      "announcedDays": 0,
+      "actCost": 0,
+      "announcedCost": 0
+    },
+    {
+      "kids": 2,
+      "months": 2,
+      "rate": 1200,
+      "actDays": 0,
+      "announcedDays": 0,
+      "actCost": 0,
+      "announcedCost": 0
+    },
+    {
+      "kids": 2,
+      "months": 3,
+      "rate": 200,
+      "actDays": 2,
+      "announcedDays": 3,
+      "actCost": 400,
+      "announcedCost": 0
+    },
+    {
+      "kids": 2,
+      "months": 3,
+      "rate": 400,
+      "actDays": 2,
+      "announcedDays": 3,
+      "actCost": 800,
+      "announcedCost": 0
+    },
+    {
+      "kids": 2,
+      "months": 3,
+      "rate": 500,
+      "actDays": 2,
+      "announcedDays": 3,
+      "actCost": 1000,
+      "announcedCost": 0
+    },
+    {
+      "kids": 2,
+      "months": 3,
+      "rate": 600,
+      "actDays": 2,
+      "announcedDays": 3,
+      "actCost": 1200,
+      "announcedCost": 300
+    },
+    {
+      "kids": 2,
+      "months": 3,
+      "rate": 800,
+      "actDays": 2,
+      "announcedDays": 3,
+      "actCost": 1600,
+      "announcedCost": 900
+    },
+    {
+      "kids": 2,
+      "months": 3,
+      "rate": 1200,
+      "actDays": 2,
+      "announcedDays": 3,
+      "actCost": 2400,
+      "announcedCost": 2100
+    },
+    {
+      "kids": 2,
+      "months": 6,
+      "rate": 200,
+      "actDays": 3,
+      "announcedDays": 5,
+      "actCost": 600,
+      "announcedCost": 0
+    },
+    {
+      "kids": 2,
+      "months": 6,
+      "rate": 400,
+      "actDays": 3,
+      "announcedDays": 5,
+      "actCost": 1200,
+      "announcedCost": 0
+    },
+    {
+      "kids": 2,
+      "months": 6,
+      "rate": 500,
+      "actDays": 3,
+      "announcedDays": 5,
+      "actCost": 1500,
+      "announcedCost": 0
+    },
+    {
+      "kids": 2,
+      "months": 6,
+      "rate": 600,
+      "actDays": 3,
+      "announcedDays": 5,
+      "actCost": 1800,
+      "announcedCost": 500
+    },
+    {
+      "kids": 2,
+      "months": 6,
+      "rate": 800,
+      "actDays": 3,
+      "announcedDays": 5,
+      "actCost": 2400,
+      "announcedCost": 1500
+    },
+    {
+      "kids": 2,
+      "months": 6,
+      "rate": 1200,
+      "actDays": 3,
+      "announcedDays": 5,
+      "actCost": 3600,
+      "announcedCost": 3500
+    },
+    {
+      "kids": 2,
+      "months": 8,
+      "rate": 200,
+      "actDays": 4,
+      "announcedDays": 6,
+      "actCost": 600,
+      "announcedCost": 0
+    },
+    {
+      "kids": 2,
+      "months": 8,
+      "rate": 400,
+      "actDays": 4,
+      "announcedDays": 6,
+      "actCost": 1200,
+      "announcedCost": 0
+    },
+    {
+      "kids": 2,
+      "months": 8,
+      "rate": 500,
+      "actDays": 4,
+      "announcedDays": 6,
+      "actCost": 1500,
+      "announcedCost": 0
+    },
+    {
+      "kids": 2,
+      "months": 8,
+      "rate": 600,
+      "actDays": 4,
+      "announcedDays": 6,
+      "actCost": 1800,
+      "announcedCost": 600
+    },
+    {
+      "kids": 2,
+      "months": 8,
+      "rate": 800,
+      "actDays": 4,
+      "announcedDays": 6,
+      "actCost": 2400,
+      "announcedCost": 1800
+    },
+    {
+      "kids": 2,
+      "months": 8,
+      "rate": 1200,
+      "actDays": 4,
+      "announcedDays": 6,
+      "actCost": 3600,
+      "announcedCost": 4200
+    },
+    {
+      "kids": 2,
+      "months": 10,
+      "rate": 200,
+      "actDays": 5,
+      "announcedDays": 8,
+      "actCost": 600,
+      "announcedCost": 0
+    },
+    {
+      "kids": 2,
+      "months": 10,
+      "rate": 400,
+      "actDays": 5,
+      "announcedDays": 8,
+      "actCost": 1200,
+      "announcedCost": 0
+    },
+    {
+      "kids": 2,
+      "months": 10,
+      "rate": 500,
+      "actDays": 5,
+      "announcedDays": 8,
+      "actCost": 1500,
+      "announcedCost": 0
+    },
+    {
+      "kids": 2,
+      "months": 10,
+      "rate": 600,
+      "actDays": 5,
+      "announcedDays": 8,
+      "actCost": 1800,
+      "announcedCost": 800
+    },
+    {
+      "kids": 2,
+      "months": 10,
+      "rate": 800,
+      "actDays": 5,
+      "announcedDays": 8,
+      "actCost": 2400,
+      "announcedCost": 2400
+    },
+    {
+      "kids": 2,
+      "months": 10,
+      "rate": 1200,
+      "actDays": 5,
+      "announcedDays": 8,
+      "actCost": 3600,
+      "announcedCost": 5600
+    },
+    {
+      "kids": 2,
+      "months": 12,
+      "rate": 200,
+      "actDays": 6,
+      "announcedDays": 10,
+      "actCost": 600,
+      "announcedCost": 0
+    },
+    {
+      "kids": 2,
+      "months": 12,
+      "rate": 400,
+      "actDays": 6,
+      "announcedDays": 10,
+      "actCost": 1200,
+      "announcedCost": 0
+    },
+    {
+      "kids": 2,
+      "months": 12,
+      "rate": 500,
+      "actDays": 6,
+      "announcedDays": 10,
+      "actCost": 1500,
+      "announcedCost": 0
+    },
+    {
+      "kids": 2,
+      "months": 12,
+      "rate": 600,
+      "actDays": 6,
+      "announcedDays": 10,
+      "actCost": 1800,
+      "announcedCost": 1000
+    },
+    {
+      "kids": 2,
+      "months": 12,
+      "rate": 800,
+      "actDays": 6,
+      "announcedDays": 10,
+      "actCost": 2400,
+      "announcedCost": 3000
+    },
+    {
+      "kids": 2,
+      "months": 12,
+      "rate": 1200,
+      "actDays": 6,
+      "announcedDays": 10,
+      "actCost": 3600,
+      "announcedCost": 7000
+    },
+    {
+      "kids": 3,
+      "months": 2,
+      "rate": 200,
+      "actDays": 0,
+      "announcedDays": 0,
+      "actCost": 0,
+      "announcedCost": 0
+    },
+    {
+      "kids": 3,
+      "months": 2,
+      "rate": 400,
+      "actDays": 0,
+      "announcedDays": 0,
+      "actCost": 0,
+      "announcedCost": 0
+    },
+    {
+      "kids": 3,
+      "months": 2,
+      "rate": 500,
+      "actDays": 0,
+      "announcedDays": 0,
+      "actCost": 0,
+      "announcedCost": 0
+    },
+    {
+      "kids": 3,
+      "months": 2,
+      "rate": 600,
+      "actDays": 0,
+      "announcedDays": 0,
+      "actCost": 0,
+      "announcedCost": 0
+    },
+    {
+      "kids": 3,
+      "months": 2,
+      "rate": 800,
+      "actDays": 0,
+      "announcedDays": 0,
+      "actCost": 0,
+      "announcedCost": 0
+    },
+    {
+      "kids": 3,
+      "months": 2,
+      "rate": 1200,
+      "actDays": 0,
+      "announcedDays": 0,
+      "actCost": 0,
+      "announcedCost": 0
+    },
+    {
+      "kids": 3,
+      "months": 3,
+      "rate": 200,
+      "actDays": 2,
+      "announcedDays": 4,
+      "actCost": 400,
+      "announcedCost": 0
+    },
+    {
+      "kids": 3,
+      "months": 3,
+      "rate": 400,
+      "actDays": 2,
+      "announcedDays": 4,
+      "actCost": 800,
+      "announcedCost": 0
+    },
+    {
+      "kids": 3,
+      "months": 3,
+      "rate": 500,
+      "actDays": 2,
+      "announcedDays": 4,
+      "actCost": 1000,
+      "announcedCost": 0
+    },
+    {
+      "kids": 3,
+      "months": 3,
+      "rate": 600,
+      "actDays": 2,
+      "announcedDays": 4,
+      "actCost": 1200,
+      "announcedCost": 400
+    },
+    {
+      "kids": 3,
+      "months": 3,
+      "rate": 800,
+      "actDays": 2,
+      "announcedDays": 4,
+      "actCost": 1600,
+      "announcedCost": 1200
+    },
+    {
+      "kids": 3,
+      "months": 3,
+      "rate": 1200,
+      "actDays": 2,
+      "announcedDays": 4,
+      "actCost": 2400,
+      "announcedCost": 2800
+    },
+    {
+      "kids": 3,
+      "months": 6,
+      "rate": 200,
+      "actDays": 3,
+      "announcedDays": 6,
+      "actCost": 600,
+      "announcedCost": 0
+    },
+    {
+      "kids": 3,
+      "months": 6,
+      "rate": 400,
+      "actDays": 3,
+      "announcedDays": 6,
+      "actCost": 1200,
+      "announcedCost": 0
+    },
+    {
+      "kids": 3,
+      "months": 6,
+      "rate": 500,
+      "actDays": 3,
+      "announcedDays": 6,
+      "actCost": 1500,
+      "announcedCost": 0
+    },
+    {
+      "kids": 3,
+      "months": 6,
+      "rate": 600,
+      "actDays": 3,
+      "announcedDays": 6,
+      "actCost": 1800,
+      "announcedCost": 600
+    },
+    {
+      "kids": 3,
+      "months": 6,
+      "rate": 800,
+      "actDays": 3,
+      "announcedDays": 6,
+      "actCost": 2400,
+      "announcedCost": 1800
+    },
+    {
+      "kids": 3,
+      "months": 6,
+      "rate": 1200,
+      "actDays": 3,
+      "announcedDays": 6,
+      "actCost": 3600,
+      "announcedCost": 4200
+    },
+    {
+      "kids": 3,
+      "months": 8,
+      "rate": 200,
+      "actDays": 4,
+      "announcedDays": 8,
+      "actCost": 600,
+      "announcedCost": 0
+    },
+    {
+      "kids": 3,
+      "months": 8,
+      "rate": 400,
+      "actDays": 4,
+      "announcedDays": 8,
+      "actCost": 1200,
+      "announcedCost": 0
+    },
+    {
+      "kids": 3,
+      "months": 8,
+      "rate": 500,
+      "actDays": 4,
+      "announcedDays": 8,
+      "actCost": 1500,
+      "announcedCost": 0
+    },
+    {
+      "kids": 3,
+      "months": 8,
+      "rate": 600,
+      "actDays": 4,
+      "announcedDays": 8,
+      "actCost": 1800,
+      "announcedCost": 800
+    },
+    {
+      "kids": 3,
+      "months": 8,
+      "rate": 800,
+      "actDays": 4,
+      "announcedDays": 8,
+      "actCost": 2400,
+      "announcedCost": 2400
+    },
+    {
+      "kids": 3,
+      "months": 8,
+      "rate": 1200,
+      "actDays": 4,
+      "announcedDays": 8,
+      "actCost": 3600,
+      "announcedCost": 5600
+    },
+    {
+      "kids": 3,
+      "months": 10,
+      "rate": 200,
+      "actDays": 5,
+      "announcedDays": 10,
+      "actCost": 600,
+      "announcedCost": 0
+    },
+    {
+      "kids": 3,
+      "months": 10,
+      "rate": 400,
+      "actDays": 5,
+      "announcedDays": 10,
+      "actCost": 1200,
+      "announcedCost": 0
+    },
+    {
+      "kids": 3,
+      "months": 10,
+      "rate": 500,
+      "actDays": 5,
+      "announcedDays": 10,
+      "actCost": 1500,
+      "announcedCost": 0
+    },
+    {
+      "kids": 3,
+      "months": 10,
+      "rate": 600,
+      "actDays": 5,
+      "announcedDays": 10,
+      "actCost": 1800,
+      "announcedCost": 1000
+    },
+    {
+      "kids": 3,
+      "months": 10,
+      "rate": 800,
+      "actDays": 5,
+      "announcedDays": 10,
+      "actCost": 2400,
+      "announcedCost": 3000
+    },
+    {
+      "kids": 3,
+      "months": 10,
+      "rate": 1200,
+      "actDays": 5,
+      "announcedDays": 10,
+      "actCost": 3600,
+      "announcedCost": 7000
+    },
+    {
+      "kids": 3,
+      "months": 12,
+      "rate": 200,
+      "actDays": 6,
+      "announcedDays": 12,
+      "actCost": 600,
+      "announcedCost": 0
+    },
+    {
+      "kids": 3,
+      "months": 12,
+      "rate": 400,
+      "actDays": 6,
+      "announcedDays": 12,
+      "actCost": 1200,
+      "announcedCost": 0
+    },
+    {
+      "kids": 3,
+      "months": 12,
+      "rate": 500,
+      "actDays": 6,
+      "announcedDays": 12,
+      "actCost": 1500,
+      "announcedCost": 0
+    },
+    {
+      "kids": 3,
+      "months": 12,
+      "rate": 600,
+      "actDays": 6,
+      "announcedDays": 12,
+      "actCost": 1800,
+      "announcedCost": 1200
+    },
+    {
+      "kids": 3,
+      "months": 12,
+      "rate": 800,
+      "actDays": 6,
+      "announcedDays": 12,
+      "actCost": 2400,
+      "announcedCost": 3600
+    },
+    {
+      "kids": 3,
+      "months": 12,
+      "rate": 1200,
+      "actDays": 6,
+      "announcedDays": 12,
+      "actCost": 3600,
+      "announcedCost": 8400
+    }
+  ]
+}

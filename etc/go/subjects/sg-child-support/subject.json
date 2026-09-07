@@ -1,0 +1,79 @@
+{
+  "_comment": [
+    "The sg-child-support subject sidecar. ONE subject, TWO regimes, because they",
+    "are two halves of one announcement and they share their nouns: the same child's",
+    "date of birth decides a Baby Gift cohort in sg-csp.l4 and a qualifying-child age",
+    "band in sg-childcare-leave.l4. Splitting them would duplicate the family.",
+    "",
+    "WHAT MAKES THIS SUBJECT UNUSUAL, and what a reader should know before trusting",
+    "any figure it produces: its primary source is an ANNOUNCEMENT, not an enactment.",
+    "The SG Child Support Package was announced at the National Day Rally on",
+    "23 August 2026 and is to be implemented from 1 April 2027. No Bill has been",
+    "introduced and the Child Development Co-Savings Act 2001 is unamended. So the",
+    "rule-version axis here does not carry two versions of one statute; it carries",
+    "the scheme as administered TODAY against the scheme as ANNOUNCED, and the",
+    "encoding says so at every dated figure. See NOTES.md.",
+    "",
+    "'checks.min_dated_arms' is 0 ON PURPOSE, and this is NOT the same claim",
+    "sg-succession's 0 makes. That corpus has no rule-version axis at all. This one",
+    "has a thoroughly dated axis, but it reaches it through a named predicate --",
+    "`the rules in force include` <a named DATE constant> -- rather than through a",
+    "line that compares `RULES EFFECTIVE DATE` against a Date LITERAL, which is the",
+    "shape p3-check's temporal-closure sub-check matches. The count that check would",
+    "report is therefore an artefact of the indirection and not a measure of the",
+    "temporal structure. A 0 floor makes the sub-check report NOT CHECKED rather",
+    "than vacuously green over an empty matched set. Raising the floor would require",
+    "inlining date literals at every call site purely to be counted, which is a worse",
+    "encoding; the honest move is the 0 and this paragraph.",
+    "",
+    "'checks.min_assertions' is 79 = the assertions_total that `l4 run --json` reports across the module set, MEASURED 2026-08-25 via etc/go/lib/assert-report.mjs: 71 in sg-child-support-cases.l4 and 8 in sg-csp-openfisca.l4. The four rule modules carry none, by design, because a rule module that asserts about itself is not independent evidence. The floor exists because 'no failed assertion' is satisfied vacuously by an empty results[].",
+    "reports across the module set, MEASURED 2026-08-25 via etc/go/lib/assert-report.mjs.",
+    "All 71 are in sg-child-support-cases.l4; the four rule modules carry none, by",
+    "design, because a rule module that asserts about itself is not independent",
+    "evidence. The floor exists because 'no failed assertion' is satisfied vacuously",
+    "by an empty results[].",
+    "",
+    "'comparison' declares the fork register only, and deliberately declares NEITHER",
+    "'modules' NOR 'surface_map'. SPEC.md section 8's diff oracle compares an",
+    "additional encoding against the committed one; there is no prior encoding of",
+    "this subject anywhere, so there is nothing to diff. The registers are genuine",
+    "P1/P2/P4 deposits regardless, so a deposit-path run validates them and p8-diff",
+    "reports SKIPPED with a named reason.",
+    "",
+    "'p7-wizard' is NOT declared. The leg renders a dedicated wizard module and this subject has none: its question-asking surface is the four @export functions in sg-child-support.l4, which the p7-mcp leg covers. Declaring the leg without the module makes subject.mjs refuse the sidecar, which is the check working.",
+    "",
+    "sg-csp-openfisca.l4 is a PROJECTION of sg-csp.l4 into the subset `l4 openfisca` v1 accepts -- no date builtins, no WHERE/LET, entity-and-period formulas. It is in the module list because its eight assertions are the only thing keeping the projection from drifting into a second, undeclared encoding: each one asserts the projection equal to sg-csp.l4 for one cohort band. Its emitted artifact is projections/openfisca/sg_child_support.py."
+  ],
+  "id": "sg-child-support",
+  "display_name": "Singapore child support \u2014 the SG Child Support Package and childcare leave",
+  "citation": "SG Child Support Package and childcare leave (National Day Rally 2026); Child Development Co-Savings Act 2001",
+  "source_url": "https://www.pmo.gov.sg/newsroom/ndr2026/",
+  "encoding": {
+    "state": "written",
+    "main": "jl4/examples/legal/sg-child-support/sg-child-support.l4",
+    "modules": [
+      "jl4/examples/legal/sg-child-support/sg-child-support-domain.l4",
+      "jl4/examples/legal/sg-child-support/sg-csp.l4",
+      "jl4/examples/legal/sg-child-support/sg-childcare-leave.l4",
+      "jl4/examples/legal/sg-child-support/sg-csp-openfisca.l4",
+      "jl4/examples/legal/sg-child-support/sg-child-support.l4",
+      "jl4/examples/legal/sg-child-support/sg-child-support-cases.l4"
+    ]
+  },
+  "checks": {
+    "min_dated_arms": 0,
+    "min_assertions": 79
+  },
+  "legs": {
+    "p7-lts": {},
+    "p7-mcp": {},
+    "p7-akn": {}
+  },
+  "natlang_sources": {
+    "bundle": "jl4/examples/legal/sg-child-support/registers/source-bundle.json",
+    "register": "jl4/examples/legal/sg-child-support/registers/external-modifications.json"
+  },
+  "comparison": {
+    "fork_register": "jl4/examples/legal/sg-child-support/registers/fork-register.json"
+  }
+}

@@ -1,0 +1,267 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>SG Child Support Package — what the encoding answers</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root{--ink:#16181d;--dim:#5b616e;--line:#dfe2e8;--bg:#fbfbfc;--card:#fff;
+        --up:#0a6b3d;--down:#a3231f;--flat:#5b616e;--accent:#1f4b8f;--warn:#8a5a00}
+  @media (prefers-color-scheme:dark){:root{--ink:#e8eaee;--dim:#9aa1ad;--line:#2b2f38;
+        --bg:#14161a;--card:#1b1e24;--up:#4ec98a;--down:#ff7b74;--flat:#9aa1ad;--accent:#7fa8e8;--warn:#e0a83c}}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  main{max-width:1040px;margin:0 auto;padding:2rem 1.25rem 5rem}
+  h1{font-size:1.6rem;margin:0 0 .35rem;letter-spacing:-.01em}
+  h2{font-size:1.12rem;margin:2.6rem 0 .5rem;letter-spacing:-.01em}
+  h3{font-size:.98rem;margin:1.4rem 0 .4rem}
+  p{margin:.5rem 0}
+  .sub{color:var(--dim);margin:0 0 1.2rem}
+  .note{color:var(--dim);font-size:.87rem}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:1rem 1.1rem;margin:.8rem 0}
+  .banner{border-left:3px solid var(--warn);background:var(--card);border-radius:0 8px 8px 0;
+          padding:.85rem 1rem;margin:1rem 0}
+  table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+  .scroll{overflow-x:auto}
+  th,td{padding:.34rem .5rem;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+  th:first-child,td:first-child{text-align:left}
+  thead th{font-size:.76rem;text-transform:uppercase;letter-spacing:.05em;color:var(--dim);font-weight:600}
+  tbody tr:hover{background:color-mix(in srgb,var(--accent) 7%,transparent)}
+  .up{color:var(--up)} .down{color:var(--down)} .flat{color:var(--flat)}
+  .controls{display:flex;flex-wrap:wrap;gap:1rem;align-items:flex-end;margin:.6rem 0 1rem}
+  label{display:block;font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;color:var(--dim);margin-bottom:.2rem}
+  select,input{font:inherit;padding:.32rem .5rem;border:1px solid var(--line);border-radius:6px;
+               background:var(--card);color:var(--ink);min-width:7rem}
+  .big{font-size:1.5rem;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+  .kv{display:grid;grid-template-columns:1fr auto;gap:.15rem 1rem;font-variant-numeric:tabular-nums}
+  .kv .lbl{color:var(--dim)}
+  .kv .tot{border-top:1px solid var(--line);margin-top:.35rem;padding-top:.35rem;font-weight:600}
+  code{font:13px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;background:color-mix(in srgb,var(--ink) 7%,transparent);
+       padding:.08em .35em;border-radius:4px}
+  .foot{margin-top:3rem;padding-top:1rem;border-top:1px solid var(--line);color:var(--dim);font-size:.85rem}
+</style>
+<main>
+<h1>SG Child Support Package</h1>
+<p class="sub">Every figure on this page was computed by an executable L4 encoding of the scheme
+and the schemes it replaces. Nothing here is worked out in JavaScript.</p>
+
+<div class="banner">
+  <strong>This is an announcement, not law.</strong>
+  The Package was announced at the National Day Rally on 23 August 2026 and is to be implemented
+  from 1 April 2027. No Bill has been introduced and the Child Development Co-Savings Act 2001 is
+  unamended. Every figure dated on or after 1 April 2027 states a policy intention.
+  <span class="note">Not legal advice.</span>
+</div>
+
+<h2>1 — What one child gets</h2>
+<p>The Package is stated as “up to $62,000 for every Singapore Citizen child”. That figure is
+reached by exactly one cohort. Pick a child and the encoding says what they actually get.</p>
+<div class="controls">
+  <div><label for="y">Born in</label><select id="y"></select></div>
+  <div><label for="o">Birth order</label><select id="o">
+    <option value="1">1st child</option><option value="2">2nd child</option>
+    <option value="3">3rd child</option><option value="5">5th child</option></select></div>
+</div>
+<div class="card">
+  <div class="kv" id="breakdown"></div>
+</div>
+<div class="card" id="deltacard">
+  <h3 style="margin-top:0">Against the schemes being replaced</h3>
+  <div class="kv" id="delta"></div>
+</div>
+
+<h2>2 — The cohort table</h2>
+<p>The five Package lines, by year of birth. Support is flat across birth orders in every cohort
+but one — which is the scheme doing what it says.</p>
+<div class="scroll"><table id="cohort"></table></div>
+
+<h2>3 — The line that goes down</h2>
+<p>The $10,000 Baby Gift replaces a Baby Bonus Cash Gift of $11,000, or $13,000 for a third or
+subsequent child. It is a floor, so nothing is recovered — but the instalments stop, and the
+cash line falls for every child born from the Budget 2023 enhancement onward.</p>
+<div class="scroll"><table id="cashline"></table></div>
+
+<h2>4 — A deadline worth acting on</h2>
+<p>Government co-matching into a Child Development Account is capped by birth order today:
+$4,000, $7,000, $9,000 and $15,000. On <strong>1 October 2027</strong> every cap becomes $5,000.
+Headroom not used by 30 September 2027 is gone.</p>
+<div class="controls">
+  <div><label for="wo">Birth order</label><select id="wo">
+    <option value="1">1st child</option><option value="2">2nd child</option>
+    <option value="3">3rd child</option><option value="5">5th child</option></select></div>
+  <div><label for="wg">Co-matched so far</label><select id="wg"></select></div>
+</div>
+<div class="card"><div id="window"></div></div>
+<p class="note">Two readings of “all caps adjust to $5,000” survive the announcement, and this page
+shows the one the encoding takes: the $5,000 is a lifetime total. On the rival reading it is fresh
+headroom and every child gets a further $5,000. Both execute in the encoding; fork F1 records why.</p>
+
+<h2>5 — Childcare leave, and who pays for it</h2>
+<p>Today the Act gives 2 to 6 days, graduated by months served, and caps the combined entitlement
+at six days however many children you have. The announced scheme gives 8, 10 or 12 days by number
+of children aged 12 and below. The Government says it will cover the cost “up to the reimbursement
+limit” — reported unchanged at $500 a day.</p>
+<div class="controls">
+  <div><label for="lk">Children aged 12 and below</label><select id="lk">
+    <option value="1">1</option><option value="2">2</option><option value="3">3</option></select></div>
+  <div><label for="lm">Months served this year</label><select id="lm"></select></div>
+</div>
+<div class="scroll"><table id="leave"></table></div>
+<p class="note">Above a gross daily rate of about $800 with one child — about $667 with three — the
+employer’s bill <em>rises</em>, because the day count roughly doubles while the reimbursement
+limit does not move.</p>
+
+<h2>6 — What it costs the budget</h2>
+<p>Per-child entitlements come from the encoding. The population figures are yours to set: this is
+the multiplication an agency would run, and the reason a scheme like this is worth encoding at all.</p>
+<div class="controls">
+  <div><label for="bbirths">Citizen births a year</label><input id="bbirths" type="number" value="28000" min="0" step="500"></div>
+  <div><label for="bmatch">Take-up of CDA co-matching</label><select id="bmatch">
+    <option value="1">100% save to the cap</option><option value="0.7" selected>70%</option>
+    <option value="0.5">50%</option><option value="0">nobody saves</option></select></div>
+</div>
+<div class="card"><div id="budget"></div></div>
+<p class="note">A steady-state annual cost, not a cash-flow forecast: it prices one birth cohort's
+whole entitlement from birth to 17, which in steady state is what the scheme costs each year once
+every cohort is in the system. Disbursements are spread over eighteen years and the transition
+years cost more, because existing cohorts are being brought in at once.</p>
+
+<div class="foot">
+  <p><strong>Provenance.</strong> Built from
+  <code>jl4/examples/legal/sg-child-support</code> by <code>app/build-scenarios.mjs</code>, which
+  writes one <code>#EVAL</code> per question into a generated L4 module, runs <code>l4 run
+  --json</code>, and records what the encoding answered. <span id="prov"></span></p>
+  <p>Sources: the National Day Rally 2026 speech; life.gov.sg; population.gov.sg;
+  madeforfamilies.gov.sg; and the Child Development Co-Savings Act 2001, which is the instrument
+  any of this would have to amend. Interpretive choices are recorded in the encoding's fork
+  register. <strong>Not legal advice.</strong></p>
+</div>
+</main>
+<script id="outcomes" type="application/json">/*__OUTCOMES__*/</script>
+<script>
+const D = JSON.parse(document.getElementById("outcomes").textContent);
+const $ = (id) => document.getElementById(id);
+const m = (n) => (n === null || n === undefined) ? "—" : "$" + Math.round(n).toLocaleString();
+const sgn = (n) => n === null || n === undefined ? "—" : (n > 0 ? "+" : n < 0 ? "−" : "") + "$" + Math.abs(Math.round(n)).toLocaleString();
+const cls = (n) => n === null || n === undefined ? "flat" : n > 0 ? "up" : n < 0 ? "down" : "flat";
+const grid = D.children.filter(c => c.dob.d === 15);
+const YEARS = [...new Set(grid.map(c => c.dob.y))].sort();
+const find = (y, o) => grid.find(c => c.dob.y === y && c.order === o);
+
+// --- 1. one child ----------------------------------------------------------
+YEARS.forEach(y => $("y").add(new Option(y, y)));
+$("y").value = 2028;
+function renderChild() {
+  const c = find(+$("y").value, +$("o").value); if (!c) return;
+  const rows = [["Baby Gift (cash)", c.gift], ["Child Credits", c.credits],
+    ["CDA First Step Grant", c.fsg], ["CDA co-matching (cap)", c.cap],
+    ["PSEA top-up at 17", c.psea]];
+  const extra = [["Large Family MediSave Grant", c.lfmg], ["Large Family LifeSG Credits", c.lflc]]
+    .filter(([, v]) => v > 0);
+  $("breakdown").innerHTML =
+    rows.map(([k, v]) => `<div class="lbl">${k}</div><div>${m(v)}</div>`).join("") +
+    `<div class="lbl tot">The five Package lines</div><div class="tot">${m(c.lines)}</div>` +
+    extra.map(([k, v]) => `<div class="lbl">${k} <span class="note">(outside the $62,000)</span></div><div>${m(v)}</div>`).join("");
+  const d = c.delta;
+  $("delta").innerHTML = d
+    ? [["Cash line", d.cash], ["CDA co-matching cap", d.cap], ["Maximum lifetime support", d.total]]
+        .map(([k, v]) => `<div class="lbl">${k}</div><div class="${cls(v)}">${sgn(v)}</div>`).join("")
+    : `<div class="lbl" style="grid-column:1/3">The encoding <strong>refuses</strong> this comparison.
+       It holds Baby Bonus rates only from ${D.comparison_floor}; for an earlier birth it stops rather
+       than quote a rate nobody measured.</div>`;
+}
+["y", "o"].forEach(id => $(id).addEventListener("input", renderChild));
+
+// --- 2. cohort table -------------------------------------------------------
+$("cohort").innerHTML =
+  `<thead><tr><th>Born</th><th>1st</th><th>2nd</th><th>3rd</th><th>5th</th><th>Reached by</th></tr></thead><tbody>` +
+  YEARS.map(y => {
+    const v = [1, 2, 3, 5].map(o => find(y, o));
+    const same = v.every(c => c && c.lines === v[0].lines);
+    const why = y <= 2009 ? "PSEA top-up only" : y <= 2014 ? "Credits + PSEA"
+      : y <= 2022 ? "Credits + CDA cap + PSEA" : y <= 2026 ? "Gift top-up + Credits + cap + PSEA"
+        : "the full Package";
+    return `<tr><td>${y}</td>` + v.map(c => `<td>${m(c && c.lines)}</td>`).join("") +
+      `<td class="note" style="text-align:left">${why}${same ? "" : " — <em>see note</em>"}</td></tr>`;
+  }).join("") + `</tbody>`;
+
+// --- 3. the cash line ------------------------------------------------------
+const cashYears = YEARS.filter(y => find(y, 1) && find(y, 1).delta);
+$("cashline").innerHTML =
+  `<thead><tr><th>Born</th><th>1st child</th><th>2nd</th><th>3rd</th><th>5th</th></tr></thead><tbody>` +
+  cashYears.map(y => `<tr><td>${y}</td>` + [1, 2, 3, 5].map(o => {
+    const c = find(y, o); const v = c && c.delta ? c.delta.cash : null;
+    return `<td class="${cls(v)}">${sgn(v)}</td>`;
+  }).join("") + `</tr>`).join("") + `</tbody>`;
+
+// --- 4. the co-matching window ---------------------------------------------
+const GOTS = [...new Set(D.windows.map(w => w.got))].sort((a, b) => a - b);
+GOTS.forEach(g => $("wg").add(new Option(m(g), g)));
+function renderWindow() {
+  const w = D.windows.find(x => x.order === +$("wo").value && x.got === +$("wg").value); if (!w) return;
+  const act = w.lapsing > 0;
+  $("window").innerHTML =
+    `<p class="big ${act ? "down" : "flat"}">${act ? m(w.lapsing) + " lapses on 30 September 2027" : "Nothing lapses"}</p>` +
+    `<div class="kv">
+       <div class="lbl">Cap until 30 September 2027</div><div>${m(w.before)}</div>
+       <div class="lbl">Cap from 1 October 2027</div><div>${m(w.after)}</div>
+       <div class="lbl">Already co-matched</div><div>${m(w.got)}</div>
+     </div>` +
+    (act ? `<p class="note">To keep it, the family must save ${m(w.before - w.got)} into the CDA before that date.</p>`
+      : (w.after > w.before ? `<p class="note">This birth order gains: the cap rises from ${m(w.before)} to ${m(w.after)}.</p>`
+        : `<p class="note">Already at or above the new cap; nothing further is available either way.</p>`));
+}
+["wo", "wg"].forEach(id => $(id).addEventListener("input", renderWindow));
+
+// --- 5. leave --------------------------------------------------------------
+const MONTHS = [...new Set(D.leave.map(v => v.months))].sort((a, b) => a - b);
+MONTHS.forEach(x => $("lm").add(new Option(x + " months", x)));
+$("lm").value = 12;
+function renderLeave() {
+  const rows = D.leave.filter(v => v.kids === +$("lk").value && v.months === +$("lm").value)
+    .sort((a, b) => a.rate - b.rate);
+  if (!rows.length) return;
+  $("leave").innerHTML =
+    `<thead><tr><th>Gross daily rate</th><th>Days today</th><th>Days announced</th>
+     <th>Employer pays today</th><th>Employer pays announced</th><th>Change</th></tr></thead><tbody>` +
+    rows.map(v => {
+      const ch = v.announcedCost - v.actCost;
+      return `<tr><td>${m(v.rate)}</td><td>${v.actDays}</td><td>${v.announcedDays}</td>
+        <td>${m(v.actCost)}</td><td>${m(v.announcedCost)}</td>
+        <td class="${ch > 0 ? "down" : ch < 0 ? "up" : "flat"}">${sgn(ch)}</td></tr>`;
+    }).join("") + `</tbody>`;
+}
+["lk", "lm"].forEach(id => $(id).addEventListener("input", renderLeave));
+
+// --- 6. budget -------------------------------------------------------------
+function renderBudget() {
+  const births = Math.max(0, +$("bbirths").value || 0);
+  const takeup = +$("bmatch").value;
+  const c = find(2028, 1);           // a full post-commencement cohort
+  const payments = c.gift + c.credits + c.fsg + c.psea;
+  const matching = c.cap * takeup;
+  const per = payments + matching;
+  const rows = [
+    ["Baby Gift", c.gift], ["Child Credits (16 x $2,000)", c.credits],
+    ["CDA First Step Grant", c.fsg], ["PSEA top-up", c.psea],
+    [`CDA co-matching at ${Math.round(takeup * 100)}% take-up`, matching],
+  ];
+  $("budget").innerHTML =
+    `<p class="big">${m(per * births)} <span class="note" style="font-size:.85rem;font-weight:400">
+      per birth cohort, birth to 17</span></p>
+     <div class="kv">` +
+    rows.map(([k, v]) => `<div class="lbl">${k} x ${births.toLocaleString()}</div><div>${m(v * births)}</div>`).join("") +
+    `<div class="lbl tot">Per child</div><div class="tot">${m(per)}</div></div>
+     <p class="note">Committed the year a cohort is born, and paid out across the eighteen years
+     that follow. The co-matching line is the only one that depends on behaviour: it is a cap, and
+     an agency's own take-up data replaces the slider.</p>`;
+}
+["bbirths", "bmatch"].forEach(id => $(id).addEventListener("input", renderBudget));
+
+$("prov").textContent =
+  `This build: ${D.counts.values.toLocaleString()} values over ${D.counts.children} children, ` +
+  `${D.counts.windows} co-matching windows and ${D.counts.leave} leave scenarios. ` +
+  `Money is read at rule date ${D.rule_dates.package_settled}; leave today at ` +
+  `${D.rule_dates.act_today} and as announced at ${D.rule_dates.announced_leave}.`;
+
+renderChild(); renderWindow(); renderLeave(); renderBudget();
+</script>
