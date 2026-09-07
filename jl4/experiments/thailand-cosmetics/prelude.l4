@@ -658,11 +658,12 @@ GIVETH A LIST OF a
 nub list MEANS
   nubBy (GIVEN x, y YIELD x EQUALS y) list
 
--- polymorphic placeholder
+-- polymorphic placeholder: a rule that has not been written yet. Reaching it
+-- REFUSES, as the shipped prelude's TBD does.
 GIVEN
   a IS A TYPE
 GIVETH AN a
-ASSUME TBD
+TBD MEANS REFUSE "TBD: this rule has not been written yet"
 
 -- Comparison of nullable numbers
 GIVEN a IS A MAYBE NUMBER

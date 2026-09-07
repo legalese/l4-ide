@@ -2527,8 +2527,15 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
               , "-"
               ]
           _ -> expectationFailure "the input-date chain did not become a table"
-        -- The whole point of the exhibit: nothing in it is Blocking any more.
-        [n | n <- (dmnReport drg).notes, n.severity == Blocking] `shouldBe` []
+        -- The whole point of the exhibit: nothing in it is Blocking any more --
+        -- nothing, that is, about DATES. The pre-commencement floor became a
+        -- REFUSE on 2026-09-06, and D1's calibration makes `the filing fee` and
+        -- `the fee with surcharge` Blocking under D-REFUSE (a strict consumer,
+        -- and a DRG root, cannot fence the null); that is designed, measured in
+        -- `refuse.l4`, and not what this exhibit is about, so it is excluded by
+        -- code rather than by widening the claim.
+        [n | n <- (dmnReport drg).notes, n.severity == Blocking, n.code /= "D-REFUSE"] `shouldBe` []
+        map (.code) [n | n <- (dmnReport drg).notes, n.severity == Blocking] `shouldSatisfy` all (== "D-REFUSE")
 
     it "refuses duplicate dates by the same predicate (R10)" $ do
       drg <- notOkDrg "dated-chain-duplicate-date.l4"

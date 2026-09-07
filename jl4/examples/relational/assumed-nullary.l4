@@ -1,7 +1,8 @@
--- The nullary ASSUME: an input predicate with NO subject.
+-- The nullary input: an input predicate with NO subject.
 --
--- `ASSUME p IS A BOOLEAN` is a proposition, not a property of anything. It
--- lowers, and the golden says so: `input …/0 : (goal)`, called as a bare atom
+-- A section `GIVEN p IS A BOOLEAN` (a top-level `ASSUME p IS A BOOLEAN` until
+-- 2026-09-06; the two lower identically) is a proposition, not a property of
+-- anything. It lowers, and the golden says so: `input …/0 : (goal)`, called as a bare atom
 -- with no arguments. That is an ordinary — if unusual — Horn-clause program,
 -- and a swipl, ASP or Logical English leg has a perfectly good image for it.
 --
@@ -21,12 +22,11 @@
 -- about, and answering it in advance is not a lossless carry — it is a
 -- different program.
 --
--- No #EVAL / #ASSERT: ASSUME is uninterpreted (see ./assumed.l4).
+-- No #EVAL / #ASSERT: the inputs are never supplied (see ./assumed.l4).
 
-@desc the notice was served on the recipient
-ASSUME `the notice was served` IS A BOOLEAN
-
-ASSUME `days allowed` IS A NUMBER TYPICALLY 28
+§ `Appeals`
+    GIVEN `the notice was served` IS A BOOLEAN @desc the notice was served on the recipient
+          `days allowed` IS A NUMBER TYPICALLY 28
 
 @export whether the recipient is in time to appeal
 GIVEN n IS A NUMBER

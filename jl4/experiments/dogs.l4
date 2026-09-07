@@ -69,9 +69,9 @@ DECLARE Victim IS ONE OF VictimP HAS p IS A  Person
 #CHECK VictimA OF (Animal WITH name IS "Spot", dangerous IS FALSE)
 
 § `application-specific input environment`
-ASSUME attacks IS A BOOLEAN
-^      chases  IS A BOOLEAN
-^      `causes injury to`  IS A FUNCTION FROM Victim TO BOOLEAN
+    GIVEN attacks IS A BOOLEAN
+          chases  IS A BOOLEAN
+          `causes injury to`  IS A FUNCTION FROM Victim TO BOOLEAN
 
 @ref Dog Act 058 of 1976 (WA)
 @ref url https://www.legislation.wa.gov.au/legislation/statutes.nsf/law_a230.html

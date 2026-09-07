@@ -13,3 +13,4 @@ ASSUME `is authorised`  IS A FUNCTION FROM Person TO BOOLEAN
 ASSUME Receiver IS A TYPE
 ASSUME `is an individual aged 16 or over` IS A FUNCTION FROM Receiver TO BOOLEAN
 ASSUME `is a body` IS A FUNCTION FROM Receiver TO BOOLEAN
+-- Kept on ASSUME deliberately (IMPLICIT-PROPS-DESIGN.md §11.1, R0: ASSUME is deprecated): the semantic-token fixture for the keyword.

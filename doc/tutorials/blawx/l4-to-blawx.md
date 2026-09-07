@@ -246,12 +246,16 @@ a record-spelling twin (`antisocial-twin.l4`) that emits **byte-identical**
 s(CASP) apart from the provenance header naming the source file — the two
 idioms are the same program to Blawx.
 
-`ASSUME` is deprecated as the way to declare an input (ruled 2026-09-04) and
-still works, so those seeds and every file like them keep exporting unchanged.
-For a new encoding, write the record spelling the twin uses, or declare the
-fact as a [section `GIVEN`, under the heading of the section](../../reference/syntax/section-given.md)
-that reads it; the exporter treats a section `GIVEN` exactly as it treats an
-`ASSUME` term.
+`ASSUME` is deprecated (ruled 2026-09-04) and still works, so those seeds and
+every file like them keep exporting unchanged, and the seeds are deliberately
+kept in that form: the Blawx bridge and the relational middle end it is built
+on read an input predicate from the `ASSUME` declaration, and they have no
+image yet for the same predicate written as a
+[section `GIVEN`](../../reference/syntax/section-given.md) — that spelling is
+function-typed, and a function-typed input is rejected on the export path. For
+a new encoding, write the record spelling the twin uses. See
+[ASSUME (deprecated)](../../reference/types/ASSUME.md) for where the keyword's
+other jobs went.
 
 **What does not map, refuses loudly — with one exception that warns.** The
 regulative layer (obligations, parties, deadlines), temporal

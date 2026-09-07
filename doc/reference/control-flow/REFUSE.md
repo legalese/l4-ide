@@ -27,7 +27,7 @@ that mattered:
   cannot tell it from a real one.
 - **`NOTHING`** can be handled: a `CONSIDER` downstream turns "we decline" into "use the default",
   which is exactly the laundering the refusal was meant to prevent.
-- **`ASSUME`** says "this is an unknown FACT". So it becomes a required input: it appears in the
+- **`ASSUME`** (deprecated; in older files) says "this is an unknown FACT". So it becomes a required input: it appears in the
   export schema, and a caller of the Reg CF money decisions was asked to supply a value for
   _"no Regulation Crowdfunding figure exists before commencement on 2016-05-16"_. Nobody can supply
   that. It is not a fact.
@@ -162,16 +162,17 @@ directive exists to test.
 | an execution trace    | `↯ refused: <reason>` — a first-class event, distinct from a crash. Both renders say so: `l4 trace` text, and the `--format dot` node label                                                  |
 | the export schema     | nothing. A refusal is not an input, so it is not a parameter                                                                                                                                 |
 
-That last row is the one to watch when the corpus moves. In `jl4/examples/legal/regcf/denovo/`,
-the encoding floor is still an `ASSUME`, so it still appears in the exported JSON schema as
+That last row is what the corpus migration of 2026-09-06 made visible. Until then the encoding
+floor in `jl4/examples/legal/regcf/denovo/` was an `ASSUME`, so it appeared in the exported JSON
+schema as
 
 ```json
 "no encoding of Part 227 exists for rule dates before 2022-09-20": { "type": "number" }
 ```
 
-and in that function's `required` list — a caller of the money decisions is being asked to supply
-the encoding floor. Written as a `REFUSE` it leaves the schema entirely. **That migration is
-written but not landed**: see the DMN limit below, which is what holds it.
+and in that function's `required` list — a caller of the money decisions was being asked to supply
+the encoding floor. Written as a `REFUSE`, which it now is, it leaves the schema entirely; the
+schema golden beside that file records the removal.
 
 ## Limits, as they stand today
 
@@ -227,16 +228,33 @@ us or from a wrong answer.
   read-set. It is not here yet.
 - **`TBD` is not distinguished from a hand-written refusal.** It reports as an ordinary refusal
   whose reason begins `TBD:`. Warning separately on placeholders needs `Ref(f)` first.
-- **Not every curated refusal in the corpus has been migrated**, and each exception says why at its
-  own site. `jl4-core/libraries/daydate.l4`'s out-of-range `YMD` is invalid INPUT rather than a
-  refusal — the fix is that constructor's return type, not a change of bottom. `jl4/examples/legal/
-regcf/regcf.l4`, `jl4/examples/dmn/gst-rate.l4` and `ymd-dates.l4` still spell their
-  pre-commencement floor as an `ASSUME` the engine harness supplies as `-1`; the DMN image they
-  were waiting for now exists, and moving them is a separate change. The worked example of what
-  they will become is `jl4/examples/dmn/refuse.l4`.
+- **Most curated refusals in the corpus are now a `REFUSE`** (2026-09-06): the encoding floor in
+  `jl4/examples/legal/regcf/denovo/`, the DMN exhibits `jl4/examples/dmn/gst-rate.l4` and
+  `ymd-dates.l4`, and `jl4-core/libraries/daydate.l4`'s out-of-range `YMD`. That last one
+  deserves a note. An out-of-range `YMD 2026 28 7` is invalid _input_ rather than a case the law
+  does not cover, and the principled fix would be a constructor that answers `EITHER` a reason
+  or a date. That is a change to the library's interface, which every date in the corpus relies
+  on; until it is made, `REFUSE` is the one construct that keeps the constructor loud without
+  turning its sentinel into something a caller could supply.
+- **The Reg CF corpus's own two refusals have NOT moved**, and the reason is a DMN limit this
+  page did not know until it was measured (2026-09-06). `jl4/examples/legal/regcf/regcf.l4`'s
+  commencement floor is read by five decisions the exporter emits as business knowledge models
+  (`investment limit`, `financial statements required`, `offering is within the offering limit`,
+  `investor is within the investment limit`, `the transaction qualifies for the section 4(a)(6)
+exemption`). A decision that can refuse is not `DMN-SAFE`, and a BKM that is not safe is
+  emitted as an ordinary parameterised decision instead — so with the floor spelled `REFUSE`, and
+  nothing else changed, the corpus model goes from 10 BKMs to 5, from 70 decisions to 76, and
+  from 29 inputs to 58, because each demoted decision now needs its own copy of `investor`,
+  `offering` and the rest (`investor_2` … `investor_6`, reported as `D-SCOPE` and `D-RENAME`),
+  with 31 Blocking `D-REFUSE` notes. The engine cases and three exporter tests are written
+  against the BKM shape. Whether a refusing BKM should stay a BKM is an exporter design
+  question, not a corpus one; until it is answered, the floor stays an `ASSUME` bottom and the
+  second refusal, "the COVID-19 temporary rules … are not modelled here", stays the section
+  `GIVEN` the 2026-09-05 sweep left it as — a suppliable input, which a refusal should never be.
+  `jl4/examples/dmn/refuse.l4` remains the worked example of the DMN image.
 
 ## Related
 
-- **[ASSUME](../types/ASSUME.md)** — for a fact the boundary supplies, which a refusal is not
+- **[ASSUME (deprecated)](../types/ASSUME.md)** — what the older keyword did, and where each of its jobs went
 - **[IF](IF.md)** / **[CONSIDER](CONSIDER.md)** — the arms that reach a refusal
 - **[Errors and Troubleshooting](../errors/README.md)**

@@ -3,7 +3,7 @@ Typechecking successful
 Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
 File: typically-on-type.l4
   Hidden: no
-  Range: 6:8-6:19
+  Range: 8:11-8:22
   Source: check
   Severity: DiagnosticSeverity_Error
   Code: <none>
@@ -13,7 +13,7 @@ File: typically-on-type.l4
 
 File: typically-on-type.l4
   Hidden: no
-  Range: 11:8-11:24
+  Range: 13:8-13:24
   Source: check
   Severity: DiagnosticSeverity_Error
   Code: <none>

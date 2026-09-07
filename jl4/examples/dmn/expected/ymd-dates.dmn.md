@@ -10,6 +10,8 @@
 
 <!-- OMITTED: `the regime that applies` — a cell outside dmnmd's grammar. Located, with its code, in the fidelity report. -->
 
+<!-- OMITTED: `no fee is prescribed before commencement on 1983-01-01` — this decision REFUSES, and dmnmd has no way to say `declined` (REFUSE: no fee is prescribed before commencement on 1983-01-01). Located, with its code, in the fidelity report. -->
+
 <!-- OMITTED: `the filing fee` — a cell outside dmnmd's grammar. Located, with its code, in the fidelity report. -->
 
 <!-- OMITTED: `the fee with surcharge` — a formula (the_filing_fee * 2), and dmnmd has no boxed-expression form. Located, with its code, in the fidelity report. -->

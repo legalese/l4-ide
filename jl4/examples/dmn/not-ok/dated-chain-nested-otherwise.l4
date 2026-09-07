@@ -27,7 +27,9 @@ TIMEZONE IS "Asia/Singapore"
 GIVETH A DATE
 `the 2024 rate change` MEANS Date 1 1 2024
 
-ASSUME `no GST rate exists before commencement` IS A NUMBER
+GIVETH A NUMBER
+`no GST rate exists before commencement` MEANS
+    REFUSE "no GST rate exists before commencement"
 
 GIVETH A NUMBER
 `GST rate percent` MEANS

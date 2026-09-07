@@ -1,3 +1,4 @@
+-- Kept on ASSUME deliberately (IMPLICIT-PROPS-DESIGN.md §11.1, R0: ASSUME is deprecated): the misattached-GIVEN check is tested on a DECLARE and on an ASSUME by name.
 -- The dedent hazard of R4. A section binder that a paste or a hand-edit pushes
 -- back to column 1 stops being the section's and becomes the signature of the
 -- declaration below it. Where that declaration makes no use of the name at all,

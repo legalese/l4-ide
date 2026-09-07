@@ -1,3 +1,4 @@
+-- Kept on ASSUME deliberately (IMPLICIT-PROPS-DESIGN.md §11.1, R0: ASSUME is deprecated): the parse errors are anchored on the ASSUME lines themselves.
 § `Some Assumptions`
 
 -- While there are three errors we only report one.

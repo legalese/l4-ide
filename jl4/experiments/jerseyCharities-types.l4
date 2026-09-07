@@ -1,5 +1,8 @@
 IMPORT prelude
 
+§ `JerseyCharities types`
+    GIVEN lastFinancialRecord IS A FUNCTION FROM RegisterEntry TO FinancialYearRecord
+
 -- ======================================================================
 -- SECTION A – STRUCTURAL / INTERPRETIVE LAYER
 -- ======================================================================
@@ -38,8 +41,6 @@ DECLARE RegisterEntry
         fundingCondition IS A BOOLEAN
         retrospectiveDeregistration IS A BOOLEAN
         deregistrationReason IS A MAYBE STRING
-
-ASSUME lastFinancialRecord IS A FUNCTION FROM RegisterEntry TO FinancialYearRecord
 
 -- Record of a financial year's data
 DECLARE FinancialYearRecord
@@ -122,14 +123,12 @@ DECLARE Notice IS ONE OF
   annualReturn
   application    HAS submission IS A Submission
 
-
 DECLARE RequiredStepsNotice HAS noticeId IS A STRING
                                 issueDate IS A Date
                                 steps IS A LIST OF STRING
                                 deadline IS A Date
                                 reasonCodes IS A LIST OF STRING
                                 complianceStatus IS A ComplianceStatus
-
 
 DECLARE DeregistrationNotice HAS noticeId IS A STRING
                                  date IS A Date

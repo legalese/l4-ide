@@ -86,10 +86,10 @@ TIMEZONE IS "Etc/UTC"
 -- expected: the refusal, by name — day 32 rolls in Date; YMD refuses it
 #EVAL YMD 2026 1 32
 
--- Forcing a refused date through arithmetic is LOUD: the machine stops with
--- "I could not continue evaluating, because I needed to know the value of
--- `YMD refused an out-of-range month or day` but it is an assumed term."
--- expected: that error
+-- Forcing a refused date through arithmetic is LOUD: since 2026-09-06 the
+-- refusal is a REFUSE, so the directive reports "The model refuses to answer:
+-- YMD refused an out-of-range month or day" (before that, the ASSUME bottom
+-- stopped evaluation with "... but it is an assumed term").  expected: that
 #EVAL DATE_SERIAL (YMD 2023 2 29)
 
 

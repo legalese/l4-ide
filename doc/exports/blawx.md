@@ -134,7 +134,7 @@ a fixture under `jl4/examples/blawx/not-ok/`:
   this is refused rather than emitted, because the emitted version runs and quietly answers
   differently. Say the rule once per slot (which needs no identity at all), or compare an enum- or
   number-valued field of the two records. This does **not** apply to a category you introduced with
-  `ASSUME T IS A TYPE`: it has no fields to compare structurally, its values are plain atoms on
+  a bodiless `DECLARE T` (or the older `ASSUME T IS A TYPE`): it has no fields to compare structurally, its values are plain atoms on
   both sides, and `EQUALS` on two of them still compiles. It **does** apply to a record type you
   reached through `IMPORT`: the imported sort arrives with a printed name and no identity behind
   it, so the compiler cannot tell whether it is a record, and it refuses with a message that says

@@ -209,7 +209,11 @@ nothing consumes it at all.
 Before that ruling this exhibit could not exist. The exporter wrote the L4 text
 `REFUSE "…"` into a `<literalExpression>`, and KIE 8.44.0.Final failed to compile the
 **whole file** (`ERROR [ERR_COMPILING_FEEL] … syntax error`, verdict `FAILED`), which is
-why every legal-corpus refusal site is still spelled `ASSUME`.
+why every legal-corpus refusal site was still spelled `ASSUME`. On 2026-09-06 the two dated
+exhibits beside this file (`gst-rate.l4`, `ymd-dates.l4`) and `legal/regcf/denovo/` moved to
+`REFUSE` on the strength of it; `legal/regcf/regcf.l4`'s floor did not, because a refusal
+reachable from a tier-2 businessKnowledgeModel un-BKMs it (measured: 5 BKMs become decisions,
+29 inputs become 58) — see `doc/reference/control-flow/REFUSE.md`, limits.
 
 The module holds one of each **position** a refusal can occupy, because each is a
 different code path: a whole body (a boxed `null`), the floor arm of a law-time chain, an
