@@ -250,10 +250,17 @@ declaration the_middle content decimal
 
 and Catala rejects the file — _"Scope calls are not allowed outside of a scope"_.
 `l4 catala` does not notice: it exits 0 and writes the output, so the failure
-finds you when you run `catala typecheck`, not when you export. If you are here
-because of a section `GIVEN` this costs you little, since every rule that reads
-the binder has to be exported anyway; if you are applying `@export` to an
-ordinary helper, it is the whole story. Measured 2026-09-07.
+finds you when you run `catala typecheck`, not when you export.
+
+**It is the rule in the middle, not the number of exports.** Remove that
+un-exported rule — export it too, or fold its body into its caller — and the same
+module with the same two `@export`s typechecks. A module may export as many rules
+as it likes; what it may not do is route a call between two of them through one
+that is not exported. If you are here because of a section `GIVEN` the condition
+costs you little, since every rule that reads the binder has to be exported
+anyway; if you are applying `@export` to an ordinary helper, it is the whole
+story. Measured 2026-09-07 on `catala` 1.2.1; reported upstream as
+[smucclaw/l4-ide#958](https://github.com/smucclaw/l4-ide/issues/958).
 
 The restriction is ours, not Catala's, and it is ruled to go away:
 `specs/todo/IMPLICIT-PROPS-DESIGN.md` §11.10 (ruling **R10**, ruled 2026-09-04)

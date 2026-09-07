@@ -1400,12 +1400,29 @@ declaration the_middle content decimal
 ```
 
 `l4 catala` **exits 0 and writes that file**; Catala then rejects it with _"Scope calls are not
-allowed outside of a scope"_ (their run). For a section `GIVEN` the condition is close to free,
+allowed outside of a scope"_ at `chain.catala_en:23.11-55`, exit 123, on `catala` 1.2.1 —
+originally their run, and now measured in the issue thread itself
+([#958 comment](https://github.com/smucclaw/l4-ide/issues/958#issuecomment-5571825701)), so both
+halves are on one machine's record even though they are still not on this one's.
+
+**The control is what pins the diagnosis, and it is worth stating because the obvious reading is
+wrong.** Delete the middle definition and point the second export at the first directly, leaving
+_both_ `@export`s in place: `Typechecking successful!`, exit 0. So the fault is not "two exports in
+one module" — it is the non-exported definition routed between them. A module may export as many
+rules as it likes. That distinction is exactly what the missing check would encode, and it is what
+the current failure gives the reader no way to reach.
+
+For a section `GIVEN` the condition is close to free,
 since every reader of the binder has to be exported anyway; for anyone applying the hatch to an
 ordinary helper it is the whole story, and nothing on the L4 side says so. **This is the upstream
 candidate, and it is the silence rather than the composition** — the machinery to refuse is already
 there and well-aimed at the adjacent case; it simply does not ask whether an exported helper has a
-non-exported caller. **Filed upstream as smucclaw/l4-ide#958**, with the eleven-line witness and a
+non-exported caller. The cost of the silence is not only the invalid file: that encoding's fork
+register carried "`@export` is not composable" — false, and derived from exactly this failure — and
+was believed for three days before the control retracted it (canon `64f6c02`). A diagnostic naming
+the non-exported caller would have prevented the wrong lesson as well as the bad output, which is
+the stronger argument for making it a refusal rather than a warning. **Filed upstream as
+smucclaw/l4-ide#958**, with the eleven-line witness and a
 suggested fix (walk each exported definition's callers, and `bad` a non-exported one in the same
 voice as the `ASSUME` refusal). R10 does not close it: R10 removes the section-`GIVEN` refusal, and
 this one is about `@export` composition and stays reachable.
