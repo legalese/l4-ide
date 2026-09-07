@@ -214,6 +214,15 @@ Verified 2026-09-07 against the compiler at the head of this branch.
 - Evaluation. A `#TRACE` or `#EVAL` of a rule containing `EVERY` stops with `EVERY is not yet evaluable`. The barrier and fork semantics, the blame set on failure, the deadline on the whole, and the clock for continuations (`HENCE` starts at the join's firing) are the next phase of the design.
 - The prose export (`l4 render`) writes the subject as "every Tenant t who …" and drops the join line — except when the `EVERY` is an operand of `RAND` or `ROR`, where the whole rule falls back to the layout printer and the join line is re-emitted verbatim into the prose.
 - The WASM export refuses a rule containing `EVERY` rather than compile it wrongly.
+- **The BPMN export draws a barrier and a fork identically, and its fidelity report does not say so.**
+  Measured 2026-09-07: the same rule with `ONCE ALL HAVE` and with `UPON EACH` produces
+  **byte-identical** BPMN, and a **byte-identical** fidelity report — which lists the deontic
+  modality, the bearer-versus-performer gap and the missing deadline units, and never mentions the
+  join at all. The quantifier goes the same way: the whole family draws as one task, and the only
+  trace of `EVERY` in the output is the lane's label. A fidelity report exists to say what the
+  notation could not carry, so this is the one export gap you cannot discover from the export.
+  Until it is fixed, do not read a BPMN diagram of a quantified rule as evidence of which join it
+  has; read the `.l4`.
 
 **Sharp edges, all measured 2026-09-07.** Each of these is a case where the compiler does something defensible but says it badly, or accepts something it arguably should not. They are listed so you recognise them rather than debug them.
 

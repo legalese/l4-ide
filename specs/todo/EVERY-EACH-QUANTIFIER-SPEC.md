@@ -1242,6 +1242,17 @@ branch was in the merge queue at the time):
   "Six Ways to Owe One Debt" page (an artifact, §2.2.7.6) describes the same pair.
 - The build's `doc/` page for the quantifier owes the `RAND`/`ROR` worked example of §8.3 (R-Q2,
   Meng's note).
+- **The BPMN export cannot tell a barrier from a fork, and its fidelity report does not say so.**
+  Measured 2026-09-07 by the GM on a binary built from `every/build-1`: one rule exported twice,
+  once with `ONCE ALL HAVE` and once with `UPON EACH`, gives **byte-identical** BPMN XML and a
+  **byte-identical** fidelity report. The report names the deontic modality (F1), the
+  bearer-versus-performer gap (F2), the missing deadline unit and the absent as-of date (F5), and
+  never mentions the join or the quantifier; the only trace of `EVERY` anywhere in the output is a
+  lane label. This is introduced by this branch — `unstable` has no quantifier to lose — and it is
+  the one export gap a reader cannot discover from the export, because the artifact whose job is to
+  list the losses is silent about it. Recorded on `doc/reference/regulative/EVERY.md` as well.
+  Not yet located: the collapse may be in the state graph the exporter reads or in
+  `L4.Bpmn.Lower`; whoever fixes it should measure which before writing a finding.
 - `doc/reference/regulative/README.md:82-95` documents `WITHIN 5 days OF notice` as an anchored form.
   **Probed 2026-09-07:** it is a parse error (`unexpected OF` at the `OF`) on the installed binary of
   27 August and on the 4 September probe binary, with or without `days`. The page is owed a correction
