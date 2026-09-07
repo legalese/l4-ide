@@ -273,6 +273,28 @@ model treats as opaque, declared for the section on the same visibility rules
 as any other section `GIVEN`, exactly as `ASSUME a IS A TYPE` does at module
 level; prefer `DECLARE` for that.
 
+### Which shape of encoding this is for
+
+A section `GIVEN` is at its best in an encoding that lives in **one file**: a
+statute, or a Part of one, where the rules that share an input are written
+together under the heading that introduces it.
+
+It is worth saying plainly that this is the opposite of where the temptation is
+strongest. The repetition a section `GIVEN` removes grows with the size of the
+encoding — and a large encoding is exactly the one likely to have been split
+into a domain module, several subject modules and a file of test cases. Both of
+the limits below then bite at once: a rule in another module cannot be given the
+binder by name, and the Catala route out of the export refusal needs the whole
+call chain exported, which a chain that spans modules cannot be. Neither is
+about how many rules share the input; both are about where the callers live.
+
+So: count the callers before hoisting a repeated `GIVEN` under a heading, not
+the repetitions. If every caller is in the same file, this construct is for you.
+If the assertions live in a case file that imports the rules, they will not
+reach, and the repeated rule `GIVEN` is still the right encoding today.
+
+### Across an `IMPORT`
+
 A section `GIVEN` does **not** reach across an `IMPORT`, and neither does
 `ASSUME`. Suppose module `B` imports module `A`, `A` declares a section `GIVEN`
 called `gst rate`, and one of `A`'s own definitions reads it. A function in `B`

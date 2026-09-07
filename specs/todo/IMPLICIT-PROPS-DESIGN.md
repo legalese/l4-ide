@@ -2141,6 +2141,20 @@ proposal against a read-set that by then exists, not a resumption of this one.
 
 ### 11.19 The cross-`IMPORT` hole. RULING here; the defect record is OF-7.
 
+> **What the unbuilt state surfaces as today, measured 2026-09-07.** A caller in another module that
+> supplies the binder by name gets `IllegalAppNamed` — _"You are giving named inputs to … but it is
+> not a function, so it takes none."_ **That is not this ruling being implemented, and an
+> implementer should not mistake it for one.** The error constructor predates the whole programme
+> (`294867c7`, 2025-03-17, PR #221); what routes to it is props-era. `inferAppNamed`
+> (`TypeCheck.hs:3343-3358`) lets a 0-ary definition take named arguments only when every name
+> passes `isSectionBinderSupply`, and that predicate asks `sectionBinderNames` — **this module's**
+> binders. Across an `IMPORT` the callee's binder is not in the caller's set, the guard fails, and
+> control falls through to the pre-existing message.
+>
+> So the diagnostic is not merely unhelpful, it is wrong about the cause: the callee _is_ a function
+> of that binder in its own module, and the caller simply cannot name it. The refusal this section
+> rules has to say that, which the existing message cannot be made to do — it is a different error.
+
 **Ruling (with R13/R14, card `D5-computed-fields-purity`, option A′).** The measurement pass that
 discharged §5.3 turned up a hole, and it is **filed as a defect rather than silently absorbed**.
 What is ruled here is the **ordering, not a preference: the first required move is the REFUSAL, not
