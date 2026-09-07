@@ -30,7 +30,7 @@
 # green run is a gate that has quietly become its mechanisable half.
 
 if [[ "${1:-}" == "--inputs" ]]; then
-  printf '%s\n' "${GO_S_DENOVO_BUNDLE:-}" "${GO_S_DENOVO_REGISTER:-}" "${GO_S_DENOVO_FORKS:-}" \
+  printf '%s\n' "${GO_S_NATLANG_BUNDLE:-}" "${GO_S_NATLANG_REGISTER:-}" "${GO_S_COMPARISON_FORKS:-}" \
     "${BASH_SOURCE[0]}" "$GO_ROOT/etc/go/lib/deposit-prelude.sh" \
     "$GO_ROOT/etc/go/lib/register-validate.mjs" \
     "$GO_ROOT/specs/todo/single-instruction-demo/schemas/source-bundle.schema.json" \

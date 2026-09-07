@@ -129,7 +129,8 @@ function refuseUnknown(id) {
       `  module of the encoding, in dependency order, main among them; optional wizard\n` +
       `  naming which of them is the wizard), checks, and a 'legs'\n` +
       `  object declaring exactly the projection legs the subject supports, each with its\n` +
-      `  committed golden/cases paths, repo-root-relative, plus an optional 'denovo' object\n` +
+      `  committed golden/cases paths, repo-root-relative, plus optional 'natlang_sources',\n` +
+      `  'comparison' and 'encodings' objects\n` +
       `  declaring where the G2 deposits live — bundle, register, fork_register, modules,\n` +
       `  surface_map, plus per-deposit 'checks' floors and per-leg 'legs' declarations —\n` +
       `  whose paths' existence on disk is optional because producing them is agent work),\n` +
@@ -167,7 +168,21 @@ function mustBeDir(where, rel) {
   return abs;
 }
 
-export function loadSubject(id) {
+/**
+ * Resolve a subject, optionally SELECTING one of its encodings.
+ *
+ * `selectedEncoding` defaults to "primary" — the committed encoding declared
+ * under `encoding`. Naming an id from `encodings` makes the run about THAT
+ * encoding: its modules and floors arrive under the ordinary `GO_S_ENCODING_*`
+ * and `GO_S_MIN_*` names, so nothing downstream has to know which was chosen.
+ *
+ * That is the whole of R3 in one parameter. Which encoding a run is about is a
+ * RUN PARAMETER; it was previously a schema key named after an ordinal
+ * (`denovo`) and a capability label (`--milestone g2`), both of which made a
+ * subject's position in its own history something you declare rather than
+ * something you ask.
+ */
+export function loadSubject(id, selectedEncoding = "primary") {
   if (!/^[a-z0-9][a-z0-9-]*$/.test(id)) refuseUnknown(id);
   const dir = resolve(SUBJECTS_DIR, id);
   const descPath = resolve(dir, "subject.json");
@@ -189,7 +204,9 @@ export function loadSubject(id) {
     "encoding",
     "checks",
     "legs",
-    "denovo",
+    "natlang_sources",
+    "comparison",
+    "encodings",
     "explainer",
   ]);
   for (const k of ["id", "display_name", "citation", "source_url"]) {
@@ -281,7 +298,7 @@ export function loadSubject(id) {
   //
   // `encoding.modules` declares the whole set, IN DEPENDENCY ORDER (an ontology
   // module before the statute modules that IMPORT it), and is validated exactly
-  // the way `denovo.modules` is below — with one deliberate difference: a
+  // the way `encodings.<id>.modules` is below — with one deliberate difference: a
   // corpus module must EXIST. A de novo module is an agent deposit whose
   // absence is a stage's SKIPPED story; a corpus module is committed, so a
   // missing one is a misconfiguration and says so, naming the path.
@@ -312,7 +329,7 @@ export function loadSubject(id) {
       if (typeof m !== "string" || !m)
         die(`encoding.modules: every entry must be a non-empty string`);
       // The env transport is space-separated (GO_S_ENCODING_MODULES, exactly as
-      // GO_S_DENOVO_MODULES and GO_S_LEGS). A path with whitespace would split
+      // an additional encoding's modules and GO_S_LEGS). A path with whitespace would split
       // silently into two nonexistent paths, so it is refused here rather than
       // mis-read there.
       if (/\s/.test(m))
@@ -411,160 +428,229 @@ export function loadSubject(id) {
       `legs['p7-wizard'] is declared but corpus.wizard is not: the wizard leg renders the wizard module, so a subject with no wizard module omits the leg`,
     );
 
-  // --- the de novo deposit declaration (G2) ---------------------------------
+  // --- what the subject is made of, named by WHAT IT IS ---------------------
   //
-  // The G2 stages do not WRITE their deliverables: fetching a statute and
-  // encoding it are agent acts, and the orchestrator makes no outward network
-  // request and calls no model. What the stages own is the other half — given a
-  // deposit, say whether it is well formed, and say so with an exit code.
+  // R2/R3. This used to be one `denovo` object, and `denovo` is an ORDINAL —
+  // "the second pass" — so it named a position in the subject's history rather
+  // than a thing. Worse, it bundled SIX keys covering FOUR different kinds of
+  // thing: the fetched legal text, the case-law sweep, a second encoding of the
+  // law, and the declaration that pairs two encodings for comparison. Renaming
+  // it wholesale would have moved the category error under a better word, which
+  // is why §3.2 deferred the rename until the split was possible.
   //
-  // So a subject declares WHERE its de novo deposits live, and the paths'
-  // EXISTENCE is deliberately optional (the `x` kind, as for legs['p7-dmn'].
-  // cases): a deposit the agent has not produced yet is a missing prerequisite
-  // the stage reports as SKIPPED with a named reason, not a configuration
-  // error. Omitting the `denovo` section entirely is also legal, and means the
-  // subject has no de novo path declared at all — which the stages likewise
-  // report rather than assume.
-  const dn = desc.denovo;
-  const denovo = {
-    GO_S_DENOVO_BUNDLE: "",
-    GO_S_DENOVO_REGISTER: "",
-    GO_S_DENOVO_FORKS: "",
-    GO_S_DENOVO_MODULES: "",
-    GO_S_DENOVO_MIN_DATED_ARMS: "",
-    GO_S_DENOVO_MIN_ASSERTIONS: "",
-    GO_S_DENOVO_SURFACE_MAP: "",
-    GO_S_DENOVO_DMN_CASES: "",
+  // It is possible now, so the four kinds get four homes:
+  //
+  //   natlang_sources  the fetched legal text, and the sweep's findings —
+  //                    NATURAL language, as against the formal language it is
+  //                    encoded into. Subject-level: the law is the law, however
+  //                    many times it has been encoded.
+  //   comparison       the fork register and the surface map — the declarations
+  //                    that exist only to relate two encodings to each other.
+  //   encodings        ADDITIONAL encodings of the same law, keyed by an
+  //                    author-chosen id. `encoding` (singular) remains the
+  //                    primary, committed one.
+  //
+  // AN ID, NOT AN ORDINAL. `encodings["cleanroom-2026-08"]` names the OCCASION,
+  // which is a fact about the job; "de novo" named the POSITION, which is a
+  // query over history. And the property "de novo" was really reaching for —
+  // produced WITHOUT reading a prior encoding — is now derivable rather than
+  // declared: it is readset.independence(), which asks whether the producer's
+  // read-set contained an `encode` artifact for this subject. §3.3 asked for
+  // the pipeline to "stop needing either word"; R4 is what made that reachable.
+  //
+  // The deposits' EXISTENCE stays deliberately optional (the `x` kind): a
+  // deposit the agent has not produced yet is a missing prerequisite the stage
+  // reports as SKIPPED with a named reason, not a configuration error.
+  const nls = desc.natlang_sources;
+  const cmp = desc.comparison;
+  const encs = desc.encodings;
+  const extra = {
+    GO_S_NATLANG_BUNDLE: "",
+    GO_S_NATLANG_REGISTER: "",
+    GO_S_COMPARISON_FORKS: "",
+    GO_S_COMPARISON_SURFACE_MAP: "",
   };
-  if (dn !== undefined) {
-    if (typeof dn !== "object" || dn === null || Array.isArray(dn))
-      die(`subject.json: 'denovo' must be an object`);
-    checkKeys("denovo", dn, [
-      "bundle",
-      "register",
-      "fork_register",
-      "modules",
-      "checks",
-      "surface_map",
-      "legs",
-    ]);
-    const declared = {
-      bundle: "GO_S_DENOVO_BUNDLE",
-      register: "GO_S_DENOVO_REGISTER",
-      fork_register: "GO_S_DENOVO_FORKS",
-    };
-    for (const [key, envName] of Object.entries(declared)) {
-      if (dn[key] === undefined) continue;
-      if (typeof dn[key] !== "string" || !dn[key])
-        die(`denovo.${key} must be a non-empty string`);
-      denovo[envName] = resolve(REPO, dn[key]); // existence is the stage's story
-    }
-    if (dn.modules !== undefined) {
-      if (!Array.isArray(dn.modules) || dn.modules.length === 0)
-        die(`denovo.modules must be a non-empty array of module paths`);
-      const abs = [];
-      for (const m of dn.modules) {
-        if (typeof m !== "string" || !m)
-          die(`denovo.modules: every entry must be a non-empty string`);
-        // The env transport is space-separated, matching GO_S_LEGS. A path with
-        // whitespace would split silently into two nonexistent paths, so it is
-        // refused here rather than mis-read there.
-        if (/\s/.test(m))
-          die(
-            `denovo.modules['${m}']: a module path may not contain whitespace`,
-          );
-        const a = resolve(REPO, m);
-        // SPEC.md §8: the de novo run re-derives the subject WITHOUT reading the
-        // existing corpus, and the diff oracle compares the two. A `denovo`
-        // module that IS a corpus module makes that comparison an identity and
-        // the G2 milestone a restatement of G1. Tested against the WHOLE corpus
-        // module set, not against main/wizard: with an ontology module and three
-        // statute modules, a collision with any of the others is the same defect
-        // and would otherwise make the acceptance diff a partial identity with
-        // no error anywhere.
-        if (encodingModuleSet.has(a))
-          die(
-            `denovo.modules['${m}'] is also a corpus module. G2 re-derives the subject from source without reading the committed encoding (SPEC.md §8), so a de novo module that is the replay corpus makes the acceptance diff an identity`,
-          );
-        abs.push(a);
-      }
-      denovo.GO_S_DENOVO_MODULES = abs.join(" ");
-    }
-    // Floors are PER-ORIGIN (D2). `checks` measures the committed corpus and
-    // `denovo.checks` measures the deposit; a stage running over the de novo
-    // module set reads the de novo floor and never the corpus one — a corpus
-    // floor over a deposit would fail a healthy deposit for not being the
-    // corpus, and a deposit floor over the corpus would let the corpus shrink
-    // unnoticed. Same two keys, same shape, deliberately: the floor's meaning
-    // ("the measured population, pinned so a vacuous pass is impossible") does
-    // not change with the origin, only the population does. Both keys are
-    // optional here because a subject may declare modules before anyone has
-    // measured them; the stages say on the receipt when a floor is undeclared.
-    if (dn.checks !== undefined) {
-      if (
-        typeof dn.checks !== "object" ||
-        dn.checks === null ||
-        Array.isArray(dn.checks)
-      )
-        die(`subject.json: 'denovo.checks' must be an object`);
-      checkKeys("denovo.checks", dn.checks, [
-        "min_dated_arms",
-        "min_assertions",
-      ]);
-      const dnEnv = {
-        min_dated_arms: "GO_S_DENOVO_MIN_DATED_ARMS",
-        min_assertions: "GO_S_DENOVO_MIN_ASSERTIONS",
-      };
-      for (const [key, envName] of Object.entries(dnEnv)) {
-        if (dn.checks[key] === undefined) continue;
-        if (!Number.isInteger(dn.checks[key]) || dn.checks[key] < 0)
-          die(`denovo.checks.${key}: must be a non-negative integer`);
-        denovo[envName] = String(dn.checks[key]);
-      }
-    }
-    // The surface map is SPEC.md §8's pairing declaration — the one deposit
-    // that names BOTH encodings, so the one file p8-diff (the one stage
-    // licensed to read both) takes its module paths from. Existence is the
-    // stage's story, like every other deposit.
-    if (dn.surface_map !== undefined) {
-      if (typeof dn.surface_map !== "string" || !dn.surface_map)
-        die(`denovo.surface_map must be a non-empty string`);
-      denovo.GO_S_DENOVO_SURFACE_MAP = resolve(REPO, dn.surface_map);
-    }
-    // Per-leg de novo declarations. NOT a reuse of LEG_KEYS: that table makes
-    // `golden`/`fidelity_golden` required, and no de novo golden exists — a
-    // deposit has nothing committed to diff against, which is exactly why the
-    // g2 projection leg runs emit-only. So the closed set of declarable de novo
-    // leg keys is its own (small) table, extended only when a g2 leg learns to
-    // read a new one.
-    const DENOVO_LEG_KEYS = { "p7-dmn": { cases: "x" } };
-    const DENOVO_LEG_ENV = { "p7-dmn": { cases: "GO_S_DENOVO_DMN_CASES" } };
-    if (dn.legs !== undefined) {
-      if (
-        typeof dn.legs !== "object" ||
-        dn.legs === null ||
-        Array.isArray(dn.legs)
-      )
-        die(`subject.json: 'denovo.legs' must be an object`);
-      checkKeys("denovo.legs", dn.legs, LEG_ORDER);
-      for (const [leg, entry] of Object.entries(dn.legs)) {
-        if (typeof entry !== "object" || entry === null || Array.isArray(entry))
-          die(`denovo.legs['${leg}'] must be an object`);
-        checkKeys(
-          `denovo.legs['${leg}']`,
-          entry,
-          Object.keys(DENOVO_LEG_KEYS[leg] ?? {}),
-        );
-        for (const key of Object.keys(DENOVO_LEG_KEYS[leg] ?? {})) {
-          if (entry[key] === undefined) continue;
-          if (typeof entry[key] !== "string" || !entry[key])
-            die(`denovo.legs['${leg}'].${key} must be a non-empty string`);
-          denovo[DENOVO_LEG_ENV[leg][key]] = resolve(REPO, entry[key]);
-        }
-      }
+
+  if (nls !== undefined) {
+    if (typeof nls !== "object" || nls === null || Array.isArray(nls))
+      die(`subject.json: 'natlang_sources' must be an object`);
+    checkKeys("natlang_sources", nls, ["bundle", "register"]);
+    for (const [key, envName] of Object.entries({
+      bundle: "GO_S_NATLANG_BUNDLE",
+      register: "GO_S_NATLANG_REGISTER",
+    })) {
+      if (nls[key] === undefined) continue;
+      if (typeof nls[key] !== "string" || !nls[key])
+        die(`natlang_sources.${key} must be a non-empty string`);
+      extra[envName] = resolve(REPO, nls[key]);
     }
   }
 
+  if (cmp !== undefined) {
+    if (typeof cmp !== "object" || cmp === null || Array.isArray(cmp))
+      die(`subject.json: 'comparison' must be an object`);
+    checkKeys("comparison", cmp, ["fork_register", "surface_map"]);
+    for (const [key, envName] of Object.entries({
+      fork_register: "GO_S_COMPARISON_FORKS",
+      surface_map: "GO_S_COMPARISON_SURFACE_MAP",
+    })) {
+      if (cmp[key] === undefined) continue;
+      if (typeof cmp[key] !== "string" || !cmp[key])
+        die(`comparison.${key} must be a non-empty string`);
+      extra[envName] = resolve(REPO, cmp[key]);
+    }
+  }
+
+  // Additional encodings. Validated wholesale — every declared one, not only
+  // the selected one — because a typo in an encoding nobody selected today is
+  // still a defect, and a schema that only checks the path being walked lets
+  // the other paths rot unobserved.
+  //
+  // NOT a reuse of LEG_KEYS: that table makes `golden`/`fidelity_golden`
+  // required, and an additional encoding HAS no golden — nothing committed to
+  // diff it against, which is exactly why its projection legs run emit-only.
+  const ALT_LEG_KEYS = { "p7-dmn": { cases: "x" } };
+  const ALT_LEG_ENV = { "p7-dmn": { cases: "GO_S_ENCODING_DMN_CASES" } };
+  const altEncodings = {};
+  if (encs !== undefined) {
+    if (typeof encs !== "object" || encs === null || Array.isArray(encs))
+      die(`subject.json: 'encodings' must be an object keyed by encoding id`);
+    for (const [encId, e] of Object.entries(encs)) {
+      // The id is a name, and it must not be able to masquerade as the primary
+      // or as an ordinal. `primary` is reserved because that is what the
+      // selector calls the committed encoding.
+      if (!/^[a-z0-9][a-z0-9._-]*$/.test(encId))
+        die(
+          `encodings['${encId}']: an encoding id must match [a-z0-9][a-z0-9._-]* — it names an occasion, not a sentence`,
+        );
+      if (encId === "primary")
+        die(
+          `encodings['primary']: 'primary' names the committed encoding declared under 'encoding', and may not be redeclared`,
+        );
+      if (typeof e !== "object" || e === null || Array.isArray(e))
+        die(`encodings['${encId}'] must be an object`);
+      checkKeys(`encodings['${encId}']`, e, ["modules", "checks", "legs"]);
+
+      const out = {
+        GO_S_ENCODING_MODULES: "",
+        GO_S_MIN_DATED_ARMS: "",
+        GO_S_MIN_ASSERTIONS: "",
+        GO_S_ENCODING_DMN_CASES: "",
+      };
+      // REQUIRED, unlike every other key here. An encoding with no modules is
+      // not an under-specified encoding, it is not an encoding — and the old
+      // schema allowed exactly that, because `denovo` was a grab-bag in which
+      // `modules` was one optional member among six unrelated ones.
+      if (e.modules === undefined)
+        die(
+          `encodings['${encId}'].modules is required: an encoding is its modules`,
+        );
+      {
+        if (!Array.isArray(e.modules) || e.modules.length === 0)
+          die(`encodings['${encId}'].modules must be a non-empty array`);
+        const abs = [];
+        for (const m of e.modules) {
+          if (typeof m !== "string" || !m)
+            die(
+              `encodings['${encId}'].modules: every entry must be a non-empty string`,
+            );
+          // The env transport is space-separated, matching GO_S_LEGS. A path
+          // with whitespace would split silently into two nonexistent paths.
+          if (/\s/.test(m))
+            die(
+              `encodings['${encId}'].modules['${m}']: a module path may not contain whitespace`,
+            );
+          // An additional encoding that IS the committed one makes the
+          // acceptance diff an identity — the comparison would compare a thing
+          // with itself and report agreement, which is the most confident way
+          // to learn nothing.
+          if (encodingModules.includes(resolve(REPO, m)))
+            die(
+              `encodings['${encId}'].modules['${m}'] is also a committed encoding module. The acceptance diff (SPEC.md §8) compares an additional encoding AGAINST the committed one, so an additional module that IS the committed one makes that comparison an identity`,
+            );
+          abs.push(resolve(REPO, m));
+        }
+        out.GO_S_ENCODING_MODULES = abs.join(" ");
+      }
+      // Floors measure THE ENCODING THEY BELONG TO. A committed floor applied to
+      // a fresh deposit would fail a healthy deposit for not being the committed
+      // one; a deposit floor applied to the committed encoding would let the
+      // committed one shrink unnoticed. Same two keys, same shape, deliberately:
+      // the floor's meaning does not change with the encoding, only the
+      // population does. Which is why they now live WITH their encoding instead
+      // of in a parallel `denovo.checks` — the pairing is structural, not a
+      // convention a reader has to hold in their head.
+      if (e.checks !== undefined) {
+        if (
+          typeof e.checks !== "object" ||
+          e.checks === null ||
+          Array.isArray(e.checks)
+        )
+          die(`encodings['${encId}'].checks must be an object`);
+        checkKeys(`encodings['${encId}'].checks`, e.checks, [
+          "min_dated_arms",
+          "min_assertions",
+        ]);
+        for (const [key, envName] of Object.entries({
+          min_dated_arms: "GO_S_MIN_DATED_ARMS",
+          min_assertions: "GO_S_MIN_ASSERTIONS",
+        })) {
+          if (e.checks[key] === undefined) continue;
+          if (!Number.isInteger(e.checks[key]) || e.checks[key] < 0)
+            die(
+              `encodings['${encId}'].checks.${key}: must be a non-negative integer`,
+            );
+          out[envName] = String(e.checks[key]);
+        }
+      }
+      if (e.legs !== undefined) {
+        if (
+          typeof e.legs !== "object" ||
+          e.legs === null ||
+          Array.isArray(e.legs)
+        )
+          die(`encodings['${encId}'].legs must be an object`);
+        checkKeys(`encodings['${encId}'].legs`, e.legs, LEG_ORDER);
+        for (const [leg, entry] of Object.entries(e.legs)) {
+          if (
+            typeof entry !== "object" ||
+            entry === null ||
+            Array.isArray(entry)
+          )
+            die(`encodings['${encId}'].legs['${leg}'] must be an object`);
+          checkKeys(
+            `encodings['${encId}'].legs['${leg}']`,
+            entry,
+            Object.keys(ALT_LEG_KEYS[leg] ?? {}),
+          );
+          for (const key of Object.keys(ALT_LEG_KEYS[leg] ?? {})) {
+            if (entry[key] === undefined) continue;
+            if (typeof entry[key] !== "string" || !entry[key])
+              die(
+                `encodings['${encId}'].legs['${leg}'].${key} must be a non-empty string`,
+              );
+            out[ALT_LEG_ENV[leg][key]] = resolve(REPO, entry[key]);
+          }
+        }
+      }
+      altEncodings[encId] = out;
+    }
+  }
+
+  // THE SELECTION. A run is ABOUT one encoding, and which one is a run
+  // parameter — never a schema key, and never a capability label. The selected
+  // encoding populates the ordinary `GO_S_ENCODING_*` and `GO_S_MIN_*`
+  // variables, so no phase script branches on an "origin" sentinel: it reads
+  // the encoding it was given. That is what deletes p3-check's, p6-tests's and
+  // p7-dmn's `GO_MODULES_ORIGIN` arms rather than renaming them.
+  if (selectedEncoding !== "primary" && !(selectedEncoding in altEncodings))
+    die(
+      `--encoding '${selectedEncoding}': subject '${id}' declares no such encoding. Declared: ${
+        Object.keys(altEncodings).join(", ") || "(none besides the primary)"
+      }`,
+    );
+  const selected =
+    selectedEncoding === "primary" ? null : altEncodings[selectedEncoding];
   // --- the explainer narrative (P9's reader-facing sibling) -----------------
   //
   // EXPLAINER-REPORT-SPEC.md E1-a: EXPLICIT DECLARATION, not directory
@@ -604,7 +690,7 @@ export function loadSubject(id) {
       GO_S_ENCODING: encodingMain,
       GO_S_WIZARD: encodingWizard,
       // The whole encoding, space-separated, in declared (dependency) order —
-      // same transport as GO_S_DENOVO_MODULES and GO_S_LEGS. GO_S_ENCODING and
+      // same transport as GO_S_LEGS. GO_S_ENCODING and
       // GO_S_WIZARD stay exactly what they were, the entry module and the
       // wizard role pointer, so the single-module legs read the same value they
       // always did.
@@ -620,8 +706,19 @@ export function loadSubject(id) {
       GO_S_MIN_ASSERTIONS: String(desc.checks.min_assertions),
       GO_S_EXPLAINER_DIR: explainerDir,
       GO_S_LEGS: legs.join(" "),
-      ...denovo,
+      ...extra,
       ...env,
+      // THE SELECTION WINS, LAST. Spread after the committed defaults so a run
+      // about an additional encoding sees that encoding's modules and floors
+      // under the ORDINARY names — which is what lets every phase script drop
+      // its "origin" branch and simply read the encoding it was handed.
+      //
+      // A key the selected encoding does not declare lands as "", exactly as an
+      // undeclared committed floor would: the stage then reports the floor
+      // UNDECLARED rather than silently inheriting the committed one, which
+      // would fail a healthy deposit for not being the committed encoding.
+      ...(selected ?? {}),
+      GO_S_ENCODING_ID: selectedEncoding,
     },
   };
 }
@@ -630,8 +727,22 @@ export function loadSubject(id) {
 const sq = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const [, , idOrFlag, sub] = process.argv;
-  if (!idOrFlag) die("usage: subject.mjs <id> [bpmn-rules] | --list | --ci");
+  // `--encoding <id>` is pulled out before the positional split, so it may sit
+  // anywhere on the line. It selects WHICH encoding the caller is asking about;
+  // omitted, the answer is about the committed one.
+  const rawArgs = process.argv.slice(2);
+  let wantEncoding = "primary";
+  const encIdx = rawArgs.indexOf("--encoding");
+  if (encIdx >= 0) {
+    if (!rawArgs[encIdx + 1]) die("--encoding needs an encoding id");
+    wantEncoding = rawArgs[encIdx + 1];
+    rawArgs.splice(encIdx, 2);
+  }
+  const [idOrFlag, sub] = rawArgs;
+  if (!idOrFlag)
+    die(
+      "usage: subject.mjs <id> [bpmn-rules] [--encoding <enc-id>] | --list | --ci",
+    );
   if (idOrFlag === "--list") {
     process.stdout.write(listSubjects().join("\n") + "\n");
     process.exit(0);
@@ -645,6 +756,16 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   // under a name only one subject will ever match. Paths are relative because
   // that is what a `paths:` filter and a repo-root `run:` step both want; the
   // GO_S_* env transport stays absolute and unchanged.
+  // `--encodings`: the ids of a subject's ADDITIONAL encodings, one per line.
+  // The driver needs this to translate the legacy `--milestone g2` into a
+  // selection, and to REFUSE when the translation is ambiguous. It is a listing
+  // and not a selection, so it deliberately does not take --encoding.
+  if (sub === "--encodings" || sub === "encodings") {
+    const { desc } = loadSubject(idOrFlag);
+    for (const k of Object.keys(desc.encodings ?? {}))
+      process.stdout.write(k + "\n");
+    process.exit(0);
+  }
   if (idOrFlag === "--ci") {
     const out = listSubjects().map((id) => {
       const { desc } = loadSubject(id);
@@ -666,7 +787,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     process.stdout.write(JSON.stringify(out, null, 2) + "\n");
     process.exit(0);
   }
-  const { desc, env } = loadSubject(idOrFlag);
+  const { desc, env } = loadSubject(idOrFlag, wantEncoding);
   if (sub === "bpmn-rules") {
     const rules = desc.legs["p7-bpmn"]?.rules ?? {};
     for (const [rule, stem] of Object.entries(rules))

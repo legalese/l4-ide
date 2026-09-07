@@ -182,6 +182,7 @@ NEW_FORCE=0
 declare -a STORE_ARGS=()
 STAGE_ONLY=""
 WANT_JSON=0
+ENCODING_ID=""
 
 # `store` owns its own flag vocabulary (--keep-days, --dry-run, --allow-waived,
 # --subject, --stage), so the driver hands it every argument verbatim rather
@@ -220,6 +221,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --fixed-now)
       L4_GO_FIXED_NOW="$2"
+      shift 2
+      ;;
+    --encoding)
+      ENCODING_ID="$2"
       shift 2
       ;;
     --stage)
@@ -326,7 +331,48 @@ fi
 # an unknown subject exits 2 listing the available sidecars and the recipe for
 # adding one. The eval is safe because subject.mjs single-quotes every value.
 if [[ -n "$SUBJECT" ]]; then
-  SUBJECT_ENV="$(node "$LIB/subject.mjs" "$SUBJECT")" || exit 2
+  # WHICH ENCODING THIS RUN IS ABOUT.
+  #
+  # `--encoding <id>` names it outright. `--milestone g2` is accepted as the
+  # legacy spelling and TRANSLATED, because g2 never meant a capability to the
+  # subject — it meant "the run about the additional encoding". The translation
+  # refuses when it is ambiguous rather than picking, which is the whole reason
+  # an id beats an ordinal: with two additional encodings declared, "the second
+  # pass" names nothing, and the error says so and lists them.
+  _ENC="${ENCODING_ID:-}"
+  _NO_ADDITIONAL_ENCODING=0
+  _ENC_UNDECLARED=0
+  if [[ -z "$_ENC" && "$MILESTONE" == "g2" ]]; then
+    mapfile -t _DECLARED < <(node "$LIB/subject.mjs" "$SUBJECT" --encodings 2>/dev/null || true)
+    case "${#_DECLARED[@]}" in
+      0)
+        # NOT an error. A subject that has not yet declared an additional
+        # encoding is exactly the subject a g2 PLAN is most useful for: it
+        # forecasts what would have to be deposited. So the module set is
+        # empty — there is no additional encoding to iterate — and the deposit
+        # stages report SKIPPED naming what is missing, which is what they did
+        # before this ruling and what R12's "unwritten" case depends on.
+        _ENC=""
+        _NO_ADDITIONAL_ENCODING=1
+        # The run is about an additional encoding that DOES NOT EXIST YET, and
+        # the stages must say so. Leaving GO_S_ENCODING_ID at "primary" made
+        # every skip reason tell the reader to add modules to the COMMITTED
+        # encoding — advice that is wrong in the only case that ever fires, and
+        # the same defect as the plan showing the committed modules as a deposit.
+        _ENC_UNDECLARED=1
+        ;;
+      1) _ENC="${_DECLARED[0]}" ;;
+      *)
+        echo "go.sh: '$SUBJECT' declares ${#_DECLARED[@]} additional encodings, so --milestone g2 is" >&2
+        echo "       ambiguous — an ordinal cannot name one of several. Use --encoding <id>:" >&2
+        printf '         %s\n' "${_DECLARED[@]}" >&2
+        exit 2
+        ;;
+    esac
+  fi
+  _ENC_ARGS=()
+  [[ -n "$_ENC" ]] && _ENC_ARGS=(--encoding "$_ENC")
+  SUBJECT_ENV="$(node "$LIB/subject.mjs" "$SUBJECT" "${_ENC_ARGS[@]}")" || exit 2
   eval "$SUBJECT_ENV"
   export "${!GO_S_@}"
 fi
@@ -348,7 +394,7 @@ if [[ $_NEEDS_SUBJECT -eq 1 ]]; then
   # would leave a granted HG1 open across an edit to the other three, and a gate
   # that does not re-open over the thing it gates is not a gate over that thing
   # (the same lesson the narrative deposit taught below, at a different scale).
-  # Split the same way the g2 branch splits GO_S_DENOVO_MODULES.
+  # Split the same way the g2 branch splits GO_S_ENCODING_MODULES.
   declare -a GO_ENCODING_FILES=()
   read -ra _CORPUS_MODULES <<<"${GO_S_ENCODING_MODULES:-$GO_S_ENCODING}"
   GO_ENCODING_FILES+=("${_CORPUS_MODULES[@]}")
@@ -364,16 +410,16 @@ if [[ $_NEEDS_SUBJECT -eq 1 ]]; then
     # The surface map is in the set for the same reason the narrative deposit is
     # in g1's: HG1 covers the pairing declaration too, and a map edited after a
     # waiver would otherwise ride the old grant into p8-diff.
-    for _p in "${GO_S_DENOVO_BUNDLE:-}" "${GO_S_DENOVO_REGISTER:-}" "${GO_S_DENOVO_FORKS:-}" "${GO_S_DENOVO_SURFACE_MAP:-}"; do
+    for _p in "${GO_S_NATLANG_BUNDLE:-}" "${GO_S_NATLANG_REGISTER:-}" "${GO_S_COMPARISON_FORKS:-}" "${GO_S_COMPARISON_SURFACE_MAP:-}"; do
       [[ -n "$_p" ]] && GO_ENCODING_FILES+=("$_p")
     done
-    if [[ -n "${GO_S_DENOVO_MODULES:-}" ]]; then
-      read -ra _mods <<<"$GO_S_DENOVO_MODULES"
+    if [[ -n "${GO_S_ENCODING_MODULES:-}" ]]; then
+      read -ra _mods <<<"$GO_S_ENCODING_MODULES"
       GO_ENCODING_FILES+=("${_mods[@]}")
     fi
-    # A subject with no `denovo` section at all still needs a digest to bind a
+    # A subject with no additional encoding declared still needs a digest to bind a
     # gate to; `text:` entries are literal digest contributors (digestSet).
-    [[ ${#GO_ENCODING_FILES[@]} -eq 0 ]] && GO_ENCODING_FILES=("text:g2-no-denovo-declared=$GO_S_ID")
+    [[ ${#GO_ENCODING_FILES[@]} -eq 0 ]] && GO_ENCODING_FILES=("text:no-additional-encoding-declared=$GO_S_ID")
   else
     # THE NARRATIVE DEPOSIT IS PART OF WHAT HG1 IS BEING ASKED ABOUT.
     #
@@ -401,27 +447,39 @@ if [[ $_NEEDS_SUBJECT -eq 1 ]]; then
   # p3-check, p6-tests and p8-verify iterate one module list, resolved here: at
   # g1 the committed corpus (corpus.modules — every module of the encoding, which
   # defaults to corpus.main plus the optional corpus.wizard when the sidecar
-  # declares no set), at g2 the subject's declared de novo deposit
-  # (denovo.modules — possibly empty, which those stages report as SKIPPED under
-  # the deposit contract). GO_MODULES_ORIGIN
-  # says which, so a stage selects the matching per-origin floor and never reads
-  # a corpus floor over a deposit, or a deposit floor over the corpus.
+  # THE SELECTED ENCODING IS THE MODULE SET. There is no longer an "origin"
+  # sentinel, and deleting it is R2/R3's point rather than a tidy-up: `denovo`
+  # named an ORDINAL ("the second pass") and `corpus|denovo` made a subject's
+  # position in its own history something the driver declared. subject.mjs now
+  # resolves the SELECTED encoding into the ordinary GO_S_ENCODING_MODULES and
+  # GO_S_MIN_* names, so a stage reads the encoding it was handed and no stage
+  # branches on which one it is. That is what let p3-check, p6-tests and p7-dmn
+  # DELETE their per-origin arms instead of renaming them.
+  #
+  # Floors still travel with their encoding, and that property is now
+  # structural: `encodings.<id>.checks` sits inside the encoding it measures,
+  # so a committed floor cannot be applied to a deposit (which would fail a
+  # healthy deposit for not being the committed encoding) and a deposit floor
+  # cannot be applied to the committed one (which would let it shrink
+  # unnoticed). It used to be a convention the reader had to hold in their head.
   #
   # Exported EXPLICITLY: the `export "${!GO_S_@}"` glob above covers only the
   # sidecar-derived names, and the `--inputs` answers are produced by subshells
   # the dispatch loop spawns, which inherit only exported env.
-  if [[ "$MILESTONE" == "g2" ]]; then
-    GO_MODULES="${GO_S_DENOVO_MODULES:-}"
-    GO_MODULES_ORIGIN="denovo"
-  else
-    # Symmetrical with the g2 line above: one space-separated list, already
-    # resolved and validated by subject.mjs. The `:-` arm is the pre-2026-08-18
-    # shape, kept so a sidecar resolved by an older subject.mjs — or a hand-set
-    # environment — still names a module set rather than none.
-    GO_MODULES="${GO_S_ENCODING_MODULES:-$GO_S_ENCODING${GO_S_WIZARD:+ $GO_S_WIZARD}}"
-    GO_MODULES_ORIGIN="corpus"
-  fi
-  export GO_MODULES GO_MODULES_ORIGIN
+  GO_MODULES="${GO_S_ENCODING_MODULES:-$GO_S_ENCODING${GO_S_WIZARD:+ $GO_S_WIZARD}}"
+  # An asked-for additional encoding that the subject has not declared leaves
+  # the module set EMPTY rather than falling back to the committed one. Falling
+  # back would silently run the deposit stages over the COMMITTED encoding and
+  # report them green — a run that measured the wrong thing and said so
+  # confidently, which is worse than the SKIP the stages give when they find
+  # nothing declared.
+  [[ "${_NO_ADDITIONAL_ENCODING:-0}" == "1" ]] && GO_MODULES=""
+  # `undeclared` is a THIRD value beside `primary` and a real id, because there
+  # are genuinely three cases and collapsing any two of them makes a stage give
+  # advice about the wrong key.
+  [[ "${_ENC_UNDECLARED:-0}" == "1" ]] && GO_S_ENCODING_ID="undeclared"
+  export GO_S_ENCODING_ID
+  export GO_MODULES
 
   # Assemble the declared stage list and the HG1 set from the sidecar's legs.
   # p8-verify sits directly after p6-tests (D3, 2026-08-09) and is HG1-gated on
@@ -487,17 +545,40 @@ stages_for() {
 # what runs cannot tell you what is missing. Every row says which of the two it
 # is, and the deposit rows say whether the deposit is there.
 cmd_plan_g2() {
-  local b r f m
-  b="${GO_S_DENOVO_BUNDLE:-}"
-  r="${GO_S_DENOVO_REGISTER:-}"
-  f="${GO_S_DENOVO_FORKS:-}"
-  m="${GO_S_DENOVO_MODULES:-}"
+  local b r f m enc key
+  b="${GO_S_NATLANG_BUNDLE:-}"
+  r="${GO_S_NATLANG_REGISTER:-}"
+  f="${GO_S_COMPARISON_FORKS:-}"
+  enc="${GO_S_ENCODING_ID:-primary}"
+  # THE DEPOSIT MODULE SET IS THE SELECTED ADDITIONAL ENCODING'S, and there is
+  # none when nothing was selected. Reading GO_S_ENCODING_MODULES unconditionally
+  # showed the COMMITTED encoding here — `sg-succession`, which declares no
+  # additional encoding, reported "7 declared module(s)" for a deposit it does
+  # not have. A plan that confidently describes the wrong artifact is worse than
+  # one that says `undeclared`, which is what the deposit contract asks for.
+  case "$enc" in
+    primary | undeclared)
+      m=""
+      key="encodings.<id>"
+      ;;
+    *)
+      m="${GO_S_ENCODING_MODULES:-}"
+      key="encodings.$enc"
+      ;;
+  esac
 
-  echo "milestone g2, subject $SUBJECT — SPEC.md §4's de novo stage order, in order:"
+  if [[ "$enc" == "primary" || "$enc" == "undeclared" ]]; then
+    echo "milestone g2, subject $SUBJECT — the deposit stage order, in order."
+    echo "This subject declares NO additional encoding, so every deposit below reads"
+    echo "'undeclared': the plan is a forecast of what would have to be declared under"
+    echo "'encodings' and deposited, not an account of anything that exists."
+  else
+    echo "milestone g2, subject $SUBJECT, encoding '$enc' — the deposit stage order, in order:"
+  fi
   echo
   printf '  %-14s %-9s %-11s %s\n' STAGE GATE DEPOSIT "WHAT IT CHECKS / WHY NOT"
-  printf '  %-14s %-9s %-11s %s\n' "p1-ingest" "-" "$(deposit_state "$b")" "${b:-(no denovo.bundle in subject.json)}"
-  printf '  %-14s %-9s %-11s %s\n' "p2-sweep" "-" "$(deposit_state "$r")" "${r:-(no denovo.register in subject.json)}"
+  printf '  %-14s %-9s %-11s %s\n' "p1-ingest" "-" "$(deposit_state "$b")" "${b:-(no natlang_sources.bundle in subject.json)}"
+  printf '  %-14s %-9s %-11s %s\n' "p2-sweep" "-" "$(deposit_state "$r")" "${r:-(no natlang_sources.register in subject.json)}"
 
   local mstate="undeclared" mn=0
   if [[ -n "$m" ]]; then
@@ -508,15 +589,15 @@ cmd_plan_g2() {
     local x
     for x in "${mm[@]}"; do [[ -f "$x" ]] || mstate=absent; done
   fi
-  printf '  %-14s %-9s %-11s %s\n' "p3-encode" "-" "$mstate" "$([[ $mn -gt 0 ]] && echo "$mn declared module(s); l4 check each" || echo "(no denovo.modules in subject.json)")"
-  printf '  %-14s %-9s %-11s %s\n' "p3-check" "-" "$mstate" "the P3 house rules over the SAME deposit: BRANCH over ELSE IF, @ref per dated arm, per-origin floors (denovo.checks)"
-  printf '  %-14s %-9s %-11s %s\n' "p4-forks" "-" "$(deposit_state "$f")" "${f:-(no denovo.fork_register in subject.json)}"
+  printf '  %-14s %-9s %-11s %s\n' "p3-encode" "-" "$mstate" "$([[ $mn -gt 0 ]] && echo "$mn declared module(s); l4 check each" || echo "(no $key.modules in subject.json)")"
+  printf '  %-14s %-9s %-11s %s\n' "p3-check" "-" "$mstate" "the P3 house rules over the SAME deposit: BRANCH over ELSE IF, @ref per dated arm, and the floors that travel with this encoding ($key.checks)"
+  printf '  %-14s %-9s %-11s %s\n' "p4-forks" "-" "$(deposit_state "$f")" "${f:-(no comparison.fork_register in subject.json)}"
 
   local n=0 s
   for s in "$b" "$r" "$f"; do [[ -n "$s" && -f "$s" ]] && n=$((n + 1)); done
   printf '  %-14s %-9s %-11s %s\n' "p5-gate" "-" "$n of 3" "the cross-file joins; needs all three deposits, else SKIPPED"
   echo "  ---- HG1 ------- Meng's go on the encoding; blocks P6 onward (SPEC.md §7.3)"
-  printf '  %-14s %-9s %-11s %s\n' "p6-tests" "HG1" "$mstate" "the deposit's own #ASSERT directives, via l4 run --json results[]; floor = denovo.checks.min_assertions"
+  printf '  %-14s %-9s %-11s %s\n' "p6-tests" "HG1" "$mstate" "the deposit's own #ASSERT directives, via l4 run --json results[]; floor = $key.checks.min_assertions"
   # Every p7 leg the sidecar declares, with a PRECISE reason per leg: a plan
   # that lists only what runs cannot tell a reader what is missing, and a
   # generic reason ("compares against committed goldens") was true of some
@@ -526,16 +607,16 @@ cmd_plan_g2() {
   for leg in "${P7_LEG_ORDER[@]}"; do
     [[ " $GO_S_LEGS " == *" $leg "* ]] || continue
     if [[ "$leg" == "p7-dmn" ]]; then
-      printf '  %-14s %-9s %-11s %s\n' "p7-dmn" "HG1" "$mstate" "emit-only over the deposit: l4 export + dmn-moddle gate + engine-load probes; no golden exists, so no diff. Cases via denovo.legs['p7-dmn'].cases when declared"
+      printf '  %-14s %-9s %-11s %s\n' "p7-dmn" "HG1" "$mstate" "emit-only over the deposit: l4 export + dmn-moddle gate + engine-load probes; no golden exists, so no diff. Cases via encodings.<id>.legs['p7-dmn'].cases when declared"
       continue
     fi
     case "$leg" in
-      p7-dmn-md) legwhy="golden-differential only, and no de novo dmn-md golden exists; re-pointing it emit-only is unbuilt" ;;
+      p7-dmn-md) legwhy="golden-differential only, and this encoding declares no dmn-md golden; re-pointing it emit-only is unbuilt" ;;
       p7-bpmn) legwhy="needs an expected_dir + rules map for the deposit; the sidecar declares neither, and the leg's soundness gate reads committed goldens" ;;
-      p7-ladder) legwhy="needs a de novo demo entry + figures dir (no denovo demo/*.ts exists); the committed ones render the replay corpus" ;;
+      p7-ladder) legwhy="needs its own demo entry + figures dir, and none is declared for this encoding; the committed ones render the committed encoding" ;;
       p7-lts) legwhy="its oracle cross-checks digraph count against the BPMN discovery call over the committed corpus; re-pointing both halves is unbuilt" ;;
       p7-mcp) legwhy="needs a loopback JL4_GO_SERVICE_URL deployment of the DEPOSIT (it carries @exports); the leg today zips the committed corpus pair" ;;
-      p7-tnr) legwhy="the sidecar declares no denovo.legs['p7-tnr'].golden — a de novo .nlg.golden is on disk but undeclared, and an undeclared golden gates nothing" ;;
+      p7-tnr) legwhy="the sidecar declares no legs['p7-tnr'].golden for this encoding — a .nlg.golden is on disk but undeclared, and an undeclared golden gates nothing" ;;
       p7-wizard) legwhy="its well-formedness checks read the committed wizard module; the deposit declares no wizard split" ;;
       p7-akn) legwhy="re-pointing its shallow well-formedness pass at the deposit is unbuilt" ;;
       *) legwhy="re-pointing this leg at the deposit is unbuilt" ;;
@@ -543,11 +624,11 @@ cmd_plan_g2() {
     printf '  %-14s %-9s %-11s %s\n' "$leg" "NOT WIRED" "-" "$legwhy"
   done
   printf '  %-14s %-9s %-11s %s\n' "p8-verify" "HG1" "$mstate" "l4 verify over the de novo module set; five control fixtures license the oracle"
-  local sm="${GO_S_DENOVO_SURFACE_MAP:-}" smwhat
+  local sm="${GO_S_COMPARISON_SURFACE_MAP:-}" smwhat
   if [[ -n "$sm" ]]; then
     smwhat="SPEC.md §8's diff oracle over $sm"
   else
-    smwhat="(no denovo.surface_map in subject.json)"
+    smwhat="(no comparison.surface_map in subject.json)"
   fi
   printf '  %-14s %-9s %-11s %s\n' "p8-diff" "HG1" "$(deposit_state "$sm")" "$smwhat"
   printf '  %-14s %-9s %-11s %s\n' "p9-report" "HG1" "-" "reads journal.ndjson and nothing else"

@@ -1,6 +1,6 @@
 # The pipeline as an artifact graph: phases, witnesses, and what the labels are for
 
-_Status: **rulings recorded; nine of thirteen implemented.** Written 2026-08-20 on branch
+_Status: **rulings recorded; eleven of thirteen implemented.** Written 2026-08-20 on branch
 `mengwong/sg-succession`, out of the conversation that added the pipeline's second subject
 (`sg-succession`) and found that several of its central nouns name the wrong things._
 
@@ -13,7 +13,8 @@ ledger, and `go.sh store`), and **R4** (`etc/go/lib/readset.mjs` and `go.sh read
 is recorded on every `stage_end`, and journal schema 4 enforces that it re-folds to its own digest).
 **R5** (`store diff` labels each divergence by phase class, and refuses to call an encode
 divergence a fork without evidence the sources matched) and **R13** (`go.sh subject-report`).
-What remains a decision rather than a description is the vocabulary: **R2**, **R3** and **R9**.
+**R2** and **R3** (the `denovo` split, and `--encoding <id>` in place of an origin sentinel).
+What remains a decision rather than a description is **R9** alone.
 What would make those present tense is named per ruling in §3._
 
 _Why this document exists at all: the rulings below were reached in conversation and existed
@@ -55,8 +56,8 @@ something the graph answers.
 | ruling | status                     | one line                                                                                                |
 | ------ | -------------------------- | ------------------------------------------------------------------------------------------------------- |
 | R1     | **ANSWERED · IMPLEMENTED** | the subject's L4 is `encoding`, not `corpus`, §3.1                                                      |
-| R2     | **ANSWERED**               | the fetched legal text is `natlang_sources`; `denovo` is deferred, not half-renamed, §3.2               |
-| R3     | **ANSWERED**               | phase identity is intrinsic; ordinals are extrinsic and are not schema keys, §3.3                       |
+| R2     | **ANSWERED · IMPLEMENTED** | the fetched legal text is `natlang_sources`; `denovo` is SPLIT, not renamed, §3.2                       |
+| R3     | **ANSWERED · IMPLEMENTED** | phase identity is intrinsic; ordinals are extrinsic and are not schema keys, §3.3                       |
 | R4     | **ANSWERED · IMPLEMENTED** | blindness is a recorded read-set, not a flag; freshness is derived from it, §3.4                        |
 | R5     | **ANSWERED · IMPLEMENTED** | a diff means a different thing per phase, and an encoding diff is a fork only if upstream matched, §3.5 |
 | R6     | **ANSWERED · IMPLEMENTED** | artifacts are witnesses: they accumulate and are compared, not clobbered, §3.6                          |
@@ -80,7 +81,7 @@ prior encoding.
 `encoding.main` / `.wizard` / `.modules`; `GO_S_ENCODING*`; `GO_ENCODING_FILES`. Verified as a
 pure rename: `go.sh plan` byte-identical for both subjects including the gate digest.
 
-### 3.2 R2 — the fetched legal text is `natlang_sources` — ANSWERED, deferred
+### 3.2 R2 — the fetched legal text is `natlang_sources` — ANSWERED, IMPLEMENTED 2026-08-24
 
 Named for the axis that matters: **natural language** versus the formal language it is encoded
 into. `sources` alone was rejected because jl4-service's deploy API already uses `sources` for the
@@ -95,7 +96,72 @@ spans both.
 bundles the sources together with modules, checks and a surface map. Renaming it wholesale would
 move the category error under a better word. Splitting it needs §3.6's store first.
 
-### 3.3 R3 — phase identity is intrinsic — ANSWERED
+**Implemented 2026-08-24, as a SPLIT rather than a rename** — which is what the paragraph above
+deferred until R6 existed, and R6 shipped on 2026-08-21.
+
+`denovo` bundled six keys across four unrelated kinds of thing. Each now sits under what it _is_:
+
+| was                    | is now                     | because it is                         |
+| ---------------------- | -------------------------- | ------------------------------------- |
+| `denovo.bundle`        | `natlang_sources.bundle`   | the fetched legal text                |
+| `denovo.register`      | `natlang_sources.register` | the case-law sweep's findings         |
+| `denovo.fork_register` | `comparison.fork_register` | a declaration relating two encodings  |
+| `denovo.surface_map`   | `comparison.surface_map`   | ditto                                 |
+| `denovo.modules`       | `encodings.<id>.modules`   | a second **encoding** of the same law |
+| `denovo.checks`        | `encodings.<id>.checks`    | floors measuring **that** encoding    |
+
+**The floors' pairing became structural rather than a convention.** `checks` used to sit in a
+parallel object, and the rule "a stage running over the deposit reads the deposit floor" was
+something the reader had to hold in their head. Now the floors are _inside_ the encoding they
+measure, so a committed floor cannot be applied to a deposit and a deposit floor cannot be applied
+to the committed one.
+
+**`GO_MODULES_ORIGIN=corpus|denovo` is gone entirely** rather than half-renamed, which is what
+§3.10 required of a pair. `subject.mjs` takes `--encoding <id>` and resolves the SELECTED encoding
+into the ordinary `GO_S_ENCODING_MODULES` and `GO_S_MIN_*` names, so a stage reads the encoding it
+was handed and never asks which one it is. That is what let `p3-check`, `p6-tests`, `p7-dmn` and
+`p8-verify` **delete** their per-origin arms rather than rename them.
+
+`p7-dmn`'s arm survives, and its re-keying is the most instructive part of the change: the leg
+runs emit-only for a deposit because there is no golden to diff against. The true question was
+never "which pass is this" but **"is there a golden?"** — which the sidecar answers directly. Keyed
+on the declaration, a future additional encoding that acquired a golden would be diffed without
+anybody editing the script.
+
+**An id names an occasion, not a position.** `encodings["cleanroom-2026-08"]` is a fact about the
+job; "de novo" was a fact about the job's place in a sequence. `primary` is reserved for the
+committed encoding, and the legacy `--milestone g2` is TRANSLATED into a selection — refusing when
+a subject declares more than one, because an ordinal cannot name one of several. That refusal is
+the clearest statement of why the rename happened.
+
+**And the word "de novo" is no longer needed for the thing it was reaching for.** §3.3 asked for
+the pipeline to _"stop needing either word"_, and R4 is what made that reachable: "produced without
+reading a prior encoding" is `readset.independence()`, a question asked of the graph rather than a
+property declared in a sidecar. That closure was not available when this ruling was written.
+
+**Three defects the build found**, each recorded because each is the same shape — a diagnostic that
+survives a rename and starts pointing at nothing:
+
+- `--milestone g2` on a subject declaring no additional encoding showed the **committed** encoding's
+  seven modules as the deposit set. A plan that confidently describes the wrong artifact is worse
+  than one that says `undeclared`.
+- The same case made every skip reason say `encoding.modules`, telling the reader to edit the
+  committed encoding when what they need is to create an `encodings` entry. There are **three**
+  cases — `primary`, a real id, and `undeclared` — and collapsing any two gives advice about the
+  wrong key.
+- Two selftest assertions on the old `module_origin` metric survived green because their guard was
+  never satisfied: latent tests asserting a fact that had stopped being true.
+
+**Deliberately NOT renamed, with reasons** (the §3.10 discipline):
+
+- `etc/go/lib/denovo-diff.mjs` and its `denovo-diff.{json,md}` outputs. R5 already re-reads it as
+  the general `encode`-phase comparator; the name is a module filename, not a schema key, a
+  stage-set name or a config value, and its outputs are named inside committed receipts.
+- The corpus directory `jl4/examples/legal/<id>/denovo/` and the module `regcf-denovo.l4`. Renaming
+  the module means regenerating its four goldens, which needs a build — a separate change, and one
+  this ruling does not require.
+
+### 3.3 R3 — phase identity is intrinsic — ANSWERED, IMPLEMENTED 2026-08-24
 
 Phases are named by what they do: `source` (agentic download), `research` (agentic case-law
 sweep), `encode` (agentic encoding), then the projections. Ordinals — first, second, "de novo",

@@ -37,9 +37,9 @@ GO_REGISTER_VALIDATE="$GO_ROOT/etc/go/lib/register-validate.mjs"
 # `kind`, so one string names the format, the validator and the file.
 go_deposit_path() {
   case "$1" in
-    source-bundle) printf '%s' "${GO_S_DENOVO_BUNDLE:-}" ;;
-    external-modifications) printf '%s' "${GO_S_DENOVO_REGISTER:-}" ;;
-    fork-register) printf '%s' "${GO_S_DENOVO_FORKS:-}" ;;
+    source-bundle) printf '%s' "${GO_S_NATLANG_BUNDLE:-}" ;;
+    external-modifications) printf '%s' "${GO_S_NATLANG_REGISTER:-}" ;;
+    fork-register) printf '%s' "${GO_S_COMPARISON_FORKS:-}" ;;
     *)
       echo "go_deposit_path: unknown schema '$1'" >&2
       return 2

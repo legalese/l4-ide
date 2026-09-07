@@ -32,7 +32,7 @@
 # which is `witnesses` here.
 
 if [[ "${1:-}" == "--inputs" ]]; then
-  printf '%s\n' "${GO_S_DENOVO_FORKS:-}" "${GO_S_DENOVO_REGISTER:-}" "${GO_S_DENOVO_BUNDLE:-}" \
+  printf '%s\n' "${GO_S_COMPARISON_FORKS:-}" "${GO_S_NATLANG_REGISTER:-}" "${GO_S_NATLANG_BUNDLE:-}" \
     "${BASH_SOURCE[0]}" "$GO_ROOT/etc/go/lib/deposit-prelude.sh" \
     "$GO_ROOT/etc/go/lib/register-validate.mjs" \
     "$GO_ROOT/specs/todo/single-instruction-demo/schemas/fork-register.schema.json"

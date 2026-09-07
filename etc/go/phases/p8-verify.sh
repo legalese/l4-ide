@@ -46,16 +46,18 @@
 # its own without inlining callees, and it is sound but not complete. Silence is
 # not a consistency proof.
 
-# The milestone-scoped module set, resolved by the driver as GO_MODULES with
-# GO_MODULES_ORIGIN=corpus|denovo. When invoked directly without one — the
-# documented direct-invocation route — the committed corpus set is the default,
+# The module set of the encoding this run is about, resolved by the driver as
+# GO_MODULES. There is no longer an "origin" sentinel beside it: subject.mjs
+# resolves the SELECTED encoding into the ordinary GO_S_ENCODING_* names, so
+# this stage reads the encoding it was handed and never asks which one it is
+# (R2/R3). When invoked directly — the documented direct-invocation route — the
+# committed encoding is the default,
 # preserving the pre-2026-08-09 contract. Kept byte-for-byte in step with the
 # driver's own derivation (go.sh, the g1 arm): a fallback that resolved a
 # NARROWER set than a run does would make a direct invocation measure something
 # other than what the receipt claims.
 if [[ -z "${GO_MODULES+x}" ]]; then
   GO_MODULES="${GO_S_ENCODING_MODULES:-${GO_S_ENCODING:-}${GO_S_WIZARD:+ $GO_S_WIZARD}}"
-  GO_MODULES_ORIGIN="corpus"
 fi
 
 if [[ "${1:-}" == "--inputs" ]]; then
@@ -86,7 +88,18 @@ source "$(dirname "${BASH_SOURCE[0]}")/../lib/phase-prelude.sh"
 declare -a MODULES=()
 read -ra MODULES <<<"${GO_MODULES:-}"
 if [[ ${#MODULES[@]} -eq 0 ]]; then
-  go_skip "the '$GO_S_ID' sidecar declares no module set for this milestone's origin (${GO_MODULES_ORIGIN:-corpus}: denovo.modules), so there is nothing to verify. Add it to $GO_S_DIR/subject.json; writing the module is agent work."
+  # The key NAMED is the one that actually exists in the sidecar: `encoding` for
+  # the committed encoding, `encodings.<id>.modules` for an additional one. The
+  # old message said `denovo.modules`, which is now a key the schema refuses —
+  # a diagnostic that sends the reader to a nonexistent key is worse than none.
+  case "${GO_S_ENCODING_ID:-primary}" in
+    primary) _MODULES_KEY="encoding.modules" ;;
+    # No additional encoding is DECLARED at all, so there is no id to name —
+    # the reader has to create the entry, not fill one in.
+    undeclared) _MODULES_KEY="encodings.<id>.modules (none is declared yet)" ;;
+    *) _MODULES_KEY="encodings.${GO_S_ENCODING_ID}.modules" ;;
+  esac
+  go_skip "the '$GO_S_ID' sidecar declares no module set for the encoding this run is about (${GO_S_ENCODING_ID:-primary}: $_MODULES_KEY), so there is nothing to verify. Add it to $GO_S_DIR/subject.json; writing the module is agent work."
 fi
 declare -a MISSING_MODULES=()
 for m in "${MODULES[@]}"; do [[ -f "$m" ]] || MISSING_MODULES+=("$m"); done
@@ -168,7 +181,7 @@ fi
 
 # --- the module set ----------------------------------------------------------
 
-declare -a METRICS=(--metric "module_origin=${GO_MODULES_ORIGIN:-corpus}")
+declare -a METRICS=(--metric "encoding_id=${GO_S_ENCODING_ID:-primary}")
 TOTAL_FINDINGS=0
 TOTAL_DECISIONS=0
 TOTAL_ANALYSED=0
@@ -178,7 +191,7 @@ TOTAL_NESTED=0
 
 {
   echo
-  echo "MODULE SET (${GO_MODULES_ORIGIN:-corpus}):"
+  echo "MODULE SET (${GO_S_ENCODING_ID:-primary}):"
 } >>"$LOG"
 
 for SRC in "${MODULES[@]}"; do
@@ -243,7 +256,7 @@ RUNG_NOTE="Rung 1 of 3. R5 (2026-08-02) ordered the P8 ladder as ROBDD first, th
 
 if [[ $TOTAL_FINDINGS -gt 0 ]]; then
   go_receipt --status DEGRADED \
-    --reason "the verifier ran over ${#MODULES[@]} ${GO_MODULES_ORIGIN:-corpus}-origin module(s) and reported $TOTAL_FINDINGS propositional finding(s) across $TOTAL_ANALYSED analysed decision(s). Each finding names its decision, its site in the ladder, the atoms involved and what is wrong with it; see the .verify.txt artifacts. All ${#CONTROLS[@]} controls reproduced, so the checker was working when it said so — these are findings about the encoding, not about the harness." \
+    --reason "the verifier ran over ${#MODULES[@]} module(s) of the ${GO_S_ENCODING_ID:-primary} encoding and reported $TOTAL_FINDINGS propositional finding(s) across $TOTAL_ANALYSED analysed decision(s). Each finding names its decision, its site in the ladder, the atoms involved and what is wrong with it; see the .verify.txt artifacts. All ${#CONTROLS[@]} controls reproduced, so the checker was working when it said so — these are findings about the encoding, not about the harness." \
     "${ARTS[@]}" "${METRICS[@]}" \
     --note "$BOUND_NOTE" \
     --note "$RUNG_NOTE"
