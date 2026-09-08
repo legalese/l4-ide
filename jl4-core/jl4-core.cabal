@@ -231,6 +231,7 @@ test-suite jl4-core-test
     DirectiveAmbiguitySpec
     ResolutionCascadeSpec
     RefAnnotationSpec
+    NlgPercentSpec
     TracePostprocessSpec
     EdgeCrashSpec
     PrintRoundtripSpec

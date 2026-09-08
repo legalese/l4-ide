@@ -1,0 +1,38 @@
+-- Literal percent signs in `@nlg` prose.
+--
+-- Inside an `@nlg` annotation, `%` delimits a natural-language reference, so
+-- `%amount%` renders that parameter. The delimiters are tight: `% word %` is
+-- prose, not a reference.
+--
+-- Without that tightness the `%` of a written-out percentage pairs with the `%`
+-- opening the next real reference, capturing the word between them as an
+-- identifier and demoting the intended reference to plain text.
+-- Regression test for smucclaw/l4-ide#957.
+
+-- One word between the two percent signs, not in scope. This used to report
+-- "could not find a definition for the identifier `with`".
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+@nlg 5% with %amount%
+DECIDE `over threshold` IF amount > 100
+
+#CHECK `over threshold` WITH amount IS 200
+
+-- The same shape, but the captured word is a parameter in scope. This used to
+-- typecheck clean and quietly render `rate` where the author wrote a percent sign,
+-- with the intended `%amount%` reduced to literal text.
+GIVEN rate IS A NUMBER
+      amount IS A NUMBER
+GIVETH A NUMBER
+@nlg a 5% rate %amount%
+DECIDE `scaled amount` IS amount TIMES rate
+
+#EVAL `scaled amount` 2 50
+
+-- References themselves are unaffected: tight, and still resolved.
+GIVEN amount IS A NUMBER
+GIVETH A NUMBER
+@nlg %amount% doubled
+DECIDE doubled IS amount TIMES 2
+
+#EVAL doubled 21
