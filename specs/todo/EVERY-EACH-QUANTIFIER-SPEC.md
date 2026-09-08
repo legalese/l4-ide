@@ -11,8 +11,9 @@
 > BUILT on `lang/every-in` (branched from `lang/every-runtime`), MERGED to `unstable` 2026-09-08 as PR #374 (merge `28c48e3f`):
 > see **§11.0.2**, with `jl4/examples/ok/every/run-in.l4` as its witness and §2.4's grammar
 > updated. `IN` is the spelling to reach for. The older inferred spelling of §11.0 —
-> `WHO elem t xs` — still runs unchanged for a rule that writes no `IN`, and whether it should be
-> deprecated is **open**, §13.5.
+> `WHO elem t xs` — is **DEPRECATED** as of 2026-09-08 (§13.5). It still runs unchanged for a rule
+> that writes no `IN`, and nothing warns you, but the corpus and the documentation have been
+> migrated off it and removal is not scheduled.
 >
 > The pre-#360 bullets below are **kept as the record of the tree the design was written against**;
 > the first two are now false of `unstable` and say so.
@@ -125,6 +126,13 @@ written where it is used, as in any other L4 expression; nothing is inserted for
 
 For set membership, apply the prelude's `elem` (`jl4-core/libraries/prelude.l4:465`) to the variable
 (this document's `member_of` is `elem` under an illustrative name):
+
+> **Read the example below for what a `WHO` condition is, NOT for how to give a rule its group.**
+> It is kept in the `elem` spelling because `elem`-as-a-condition is its subject. Since 2026-09-08
+> the group is written on its own clause — `EVERY p IN signatories` (§11.0.2) — and a bare
+> `WHO elem p signatories` with no `IN` is the **deprecated** inferred roll of §13.5. The two are
+> not in competition: `IN` says which list the group is drawn FROM, and a `WHO` condition, `elem`
+> or otherwise, narrows what was drawn.
 
 ```l4
 GIVEN signatories IS A LIST OF Person
@@ -343,13 +351,13 @@ document against nine `WHO` spellings, and R-Q1 retired `EACH` as a quantifier w
 tenant may sublet" is admitted, as sugar and not as a third prohibition mechanism:
 
 ```l4
-NO Tenant t WHO elem t tenants MAY sublet WITHIN term
+NO Tenant t IN tenants MAY sublet WITHIN term
     UPON  EACH                                -- the fork join, fixed by the sugar (R-Q1, RULED 2026-09-07)
     LEST  BREACH BY t                             -- the violator; the others are untouched
     HENCE `the term ended without a sublet`       -- SHANT's HENCE: the prohibition held
 
 -- exactly:
-EVERY Tenant t WHO elem t tenants SHANT sublet WITHIN term
+EVERY Tenant t IN tenants SHANT sublet WITHIN term
     UPON  EACH
     LEST  BREACH BY t
     HENCE `the term ended without a sublet`
@@ -499,7 +507,10 @@ EVERY d
 #### 2.2.6 EVERY vs EACH: Barrier vs Fork Semantics
 
 > **SUPERSEDED 2026-09-07 by R-Q1 (§2.5).** The two-word scheme this section describes — `EVERY` for
-> the barrier, `EACH` for the fork — is no longer the design. There is **one quantifier word,
+> the barrier, `EACH` for the fork — is no longer the design. (Its code blocks are kept verbatim as
+> the record of what was superseded, so they also still write the roll in the pre-2026-09-08
+> `WHO elem d board` spelling, deprecated by §13.5. Do not copy the spelling out of a superseded
+> block; the current one is `IN board`.) There is **one quantifier word,
 > `EVERY`**, and the join is written on a **mandatory `ONCE` line** between the quantified act and its
 > continuation:
 >
@@ -829,7 +840,7 @@ rent        MEANS 1500
 GIVEN due IS A NUMBER
 GIVETH A DEONTIC Actor Action
 `rent owed jointly` MEANS
-    EVERY Tenant t WHO elem t tenants
+    EVERY Tenant t IN tenants
         MAY    Pay t theLandlord amount
         UPON   EACH                              -- fork: one receipt per cheque (R-Q1, RULED 2026-09-07)
         HENCE  PARTY theLandlord MUST Receipt theLandlord t amount WITHIN 5
@@ -840,7 +851,7 @@ GIVETH A DEONTIC Actor Action
 
 -- divided rent: each tenant owes a share; no threshold; blame narrows
 `rent owed severally` MEANS
-    EVERY Tenant t WHO elem t tenants
+    EVERY Tenant t IN tenants
         MUST   Pay t theLandlord amount PROVIDED amount AT LEAST share t
         WITHIN due
         UPON   EACH                              -- fork
@@ -849,9 +860,10 @@ GIVETH A DEONTIC Actor Action
 ```
 
 (Respelled 2026-09-07 under R-Q1 and R-Q4: `HENCE FOR EACH` → `UPON EACH … HENCE`, `EACH Tenant t`
-→ `EVERY Tenant t … UPON EACH`, `WHO member_of tenants` → `WHO elem t tenants`. The two join lines
-of the joint form are the two layers R-T2 and R-Q5 distinguish: the inner one is the act layer, the
-outer one the state.)
+→ `EVERY Tenant t … UPON EACH`, `WHO member_of tenants` → `WHO elem t tenants`. Respelled again
+2026-09-09 under §13.5, which deprecated that last step's output: `WHO elem t tenants` →
+`IN tenants`. The two join lines of the joint form are the two layers R-T2 and R-Q5 distinguish: the
+inner one is the act layer, the outer one the state.)
 
 For contrast, the only form that runs today — a contract recursing on the balance, one `ROR`
 alternative per tenant, `amount` bound as a fresh pattern name and related in `PROVIDED` (the idiom
@@ -2046,7 +2058,7 @@ shapes, in the value-actor style of §2.2.7.6, with the breach naming under R-T3
 ```l4
 -- (1) a quantified obligation as one operand of RAND: the board signs AND the secretary files
 `board signs and secretary files` MEANS
-    (EVERY Director d WHO elem d board MUST sign WITHIN 30
+    (EVERY Director d IN board MUST sign WITHIN 30
         ONCE ALL HAVE
         HENCE FULFILLED
         LEST  BREACH)                     -- blame = the non-signers (§6.1), a set under R-T3
@@ -2059,7 +2071,7 @@ shapes, in the value-actor style of §2.2.7.6, with the breach naming under R-T3
 
 -- (2) a quantified obligation as one operand of ROR: unanimous written consent OR a chair's decision
 `consent or decision` MEANS
-    (EVERY Director d WHO elem d board DO consent WITHIN 14
+    (EVERY Director d IN board DO consent WITHIN 14
         ONCE ALL HAVE
         HENCE `resolution passes`)
     ROR
@@ -2070,7 +2082,7 @@ shapes, in the value-actor style of §2.2.7.6, with the breach naming under R-T3
 
 -- (3) a barrier whose HENCE is itself a RAND: after the last signature, two things follow in parallel
 `sign then close` MEANS
-    EVERY Director d WHO elem d board MUST sign WITHIN 30
+    EVERY Director d IN board MUST sign WITHIN 30
         ONCE  ALL HAVE
         HENCE (PARTY escrow    MUST `release funds`       WITHIN 5
                RAND
@@ -2207,8 +2219,12 @@ and not a new front-end rule.
    this document or in `doc/` uses.
 2. **Discover the cast from the event stream.** Fatal for the barrier: "all who acted have acted"
    is vacuously true, so `ONCE ALL HAVE` would fire on the first event.
-3. **The roll.** Every runnable example already writes it — §2.1's `WHO elem p signatories`,
+3. **The roll.** Every runnable example already wrote it — §2.1's `WHO elem p signatories`,
    §2.2.7.6's `WHO elem t tenants`, and the corpus's `jl4/examples/ok/every/who-filter.l4`.
+   (Past tense as of 2026-09-09: §11.0.2 gave the roll its own `IN` clause, §13.5 deprecated this
+   inferred spelling, and §2.2.7.6 and `who-filter.l4` have both been migrated. The argument below
+   is the one that was made against the tree as it stood, and it is what `IN` was ruled from; §2.1's
+   example is still in this spelling, deliberately, for the reason its own note gives.)
    Measured on the corpus at
    `6e9b57bb`: of the nine `ok/every/*.l4` front-end examples, exactly one rule
    (`who-filter.l4`'s first) carries the conjunct, which is why the new run-time examples are new
@@ -2649,7 +2665,7 @@ explicit **edit** event applied to the running barrier — a **release**, a **su
 the accumulator**, and leaves the deadline where it was:
 
 ```l4
-EVERY Director d WHO elem d board MUST sign WITHIN 30 days
+EVERY Director d IN board MUST sign WITHIN 30 days
     ONCE ALL HAVE
     HENCE `resolution passes`
     LEST  BREACH
@@ -2695,7 +2711,7 @@ R-T6's own low confidence carries over to the survivorship half. The memo's rele
 all gap (`:99`) stays open: at the `ANY OF` end it needs a discharge operation the language does not
 have.
 
-### 13.5 Should the INFERRED roll be deprecated? — OPEN, put to Meng 2026-09-08
+### 13.5 The inferred roll is DEPRECATED — RULED 2026-09-08 (Meng); migrated 2026-09-09
 
 §11.0.2 built `IN` and left the older spelling running: with no `IN` clause, the machine still
 reads the roll out of the first `elem v xs` conjunct of the `WHO` filter (§11.0). The build did not
@@ -2752,10 +2768,91 @@ which is a ruling and not an implementation choice.
   resolving to a top-level binding of the same name — is untouched by this question. It is a
   scoping matter shared with the join line, and it survives whichever way this is ruled.
 
-**No recommendation is recorded here on purpose.** This is a question about what a drafter must
-write, which §11.0.2 gives as the reason the build stopped short of it; the measurements above are
-the whole of what the build knows, and they are here so the ruling can be made without redoing
-them.
+**No recommendation was recorded above, on purpose.** This is a question about what a drafter must
+write, which §11.0.2 gives as the reason the build stopped short of it; the measurements are the
+whole of what the build knew, and they were left as the whole of it so that the ruling could be made
+without redoing them.
+
+**RULED 2026-09-08.** Meng's mark, on the two halves put separately:
+
+> _"1. Deprecate for inconsistency and redundancy."_
+
+and, on the shape of the follow-through:
+
+> _"reword the deprecation. no real code uses that style. just mechanically rewrite existing code
+> that matches the deprecated style. don't think we really need a warning but your call if you want
+> it."_
+
+**What was ruled, and what "deprecated" means here.** The inferred roll is deprecated. It is not
+removed: `EVERY Tenant t WHO elem t tenants` still runs, still means what it meant, and existing
+code outside this repository keeps working. What changes is that it is no longer one of two ways to
+say the same thing — it is the older way, the documentation says so on every page that mentions it,
+and the corpus no longer teaches it except where a test needs it.
+
+**The warning is DECLINED — my call, taken under the discretion Meng's mark gave.** The reason is
+the measurement above and not a preference: the inference lives in the EVALUATOR
+(`L4.EvaluateLazy.Machine.quantifierRoll`), and `L4.EvaluateLazy.Machine` imports `L4.TypeCheck`
+rather than the other way round, so a check-time warning means either moving that function across a
+module boundary or keeping two copies of one recognition rule in two phases — the arrangement that
+drifts. Against that cost, after the migration below, a warning would fire on **six** sites in this
+repository, **five of which are the tests that exist to keep the inference honest**: it would be a
+diagnostic whose main effect is to annotate its own witnesses.
+
+**State the cost of declining, because it is real.** A deprecation with no warning is enforced by
+documentation alone. A drafter who writes `WHO elem t tenants` today gets no signal of any kind —
+not a warning, not a note, nothing in the trace. The only thing that tells them is a page they have
+to be reading already. If the deprecation is ever to become a removal, a warning has to come first,
+and this ruling does not schedule one.
+
+**What was migrated (2026-09-09).** Eleven conjuncts across four corpus files —
+`ok/every/run-modals.l4` (7), `run-barrier.l4` (2), `run-fork.l4` (1), `who-filter.l4` (1) — by the
+mechanical rule above. Verified semantics-preserving rather than assumed: each file was run before
+and after and the outputs compared, and all four are identical modulo the file name, the line ranges
+shifted by the removed `WHO` line, and the rule's own text where a residual obligation echoes it.
+Goldens regenerated, read, and checked for absolute paths.
+
+**What was kept, and why each one is not an oversight.**
+
+- **`ok/every/run-roll.l4`, all five.** That file is the witness for the inference itself. One of
+  the five — `circular`, `WHO elem t (LIST t, alice)` — witnesses a RUN-time refusal that has no
+  `IN` counterpart at all, because an `IN` roll that mentions the member is caught at CHECK time
+  (§11.0.2). Rewriting it would delete the only test of that path.
+- **`doc/reference/regulative/every-example.l4`, one.** The labelled specimen, shown beside its `IN`
+  equivalent, so a reader who meets the older spelling in existing material can recognise it. It is
+  now labelled **deprecated** rather than "still runs".
+- **`ok/every/run-in.l4`, two.** These are NOT this pattern, and a grep for `elem` reports them as
+  though they were. Both already carry an `IN` roll; their `elem` is a deliberate narrowing
+  condition, and the file exists to prove that `IN` wins over `elem` and that `elem` goes on
+  narrowing. Rewriting them would destroy both witnesses. Noted here because the same grep will
+  mislead the next person.
+
+**This document's own examples are handled too**, as this section said they would be if the answer
+was yes — but split, because they are not all the same kind of example. **Eight blocks were
+rewritten** to `IN`, in §2.2.3 (the `NO` sugar, both halves), §2.2.7.6 (the joint and several rent),
+§8.3 (all three `RAND`/`ROR` shapes) and §13.4 (the survivorship example): in every one of them the
+roll is incidental and the block is illustrating something else. **Three sites were marked instead
+of rewritten**, each with a note saying why: §2.1, whose subject IS `elem`-as-a-condition and which
+now carries a note distinguishing the `IN` clause from a `WHO elem` narrowing; §2.2.6, whose code
+blocks are kept verbatim as the record of a design that was superseded, with a line added to its
+banner telling the reader not to copy the spelling out of it; and §11.0's own argument, whose
+measurement is dated and true of the tree it was taken against, now marked past-tense. The blocks
+that DESCRIBE the inference — §11.0, §11.0.1, §11.0.2, and this section — keep `elem`, because that
+is their subject.
+
+**Two user-facing messages were reworded** (`Machine.hs`). `rollCallRefusal`, which a run emits when
+an `EVERY` has no roll at all, offered the `elem` spelling as a working alternative; it now names it
+as the older one. `circularRollRefusal`, which can only be reached from the inferred spelling, told
+the reader to write `WHO elem t tenants`; it now tells them to write `IN tenants`, which fixes the
+circularity and migrates them in one step. Neither is a warning: they fire only where the run was
+already refusing.
+
+**What is NOT ruled.** Removal. There is no date, no deprecation window and no removal commit
+planned, and this section should not be read as promising one. What has changed is which spelling
+the language teaches.
+
+**What this still does not touch.** The shadowing hole of §11.0.2 — an identifier spelled like the
+member resolving to a top-level binding of the same name — is untouched, as this section said it
+would be. It is a scoping matter shared with the join line and survives the ruling.
 
 ### 13.6 `WHOSE`, and the R-Q4 problem it does not escape — OPEN, raised by Meng 2026-09-08
 
