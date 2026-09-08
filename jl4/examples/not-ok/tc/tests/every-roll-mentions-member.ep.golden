@@ -1,0 +1,28 @@
+-- EVERY-EACH-QUANTIFIER-SPEC §11.0.2: the IN roll is read ONCE, for the whole
+-- group, before there is any member to speak of, so it may not mention the
+-- member it is drawing. The member variable is deliberately out of scope
+-- there, exactly as it is out of scope in a join line's WITHIN, so this is a
+-- check-time error and not a run-time refusal.
+--
+-- Measured limit, 2026-09-08: the rejection arrives as the generic "could not
+-- find a definition", the same wording the join line's restriction gets. A
+-- dedicated diagnostic is not built.
+--
+-- The older inferred spelling cannot be caught here — the WHO condition does
+-- bind the member, legitimately, for its other conjuncts — so there the same
+-- mistake is a run-time refusal instead. Its witness is
+-- jl4/examples/ok/every/run-roll.l4's `circular`.
+
+DECLARE Actor IS ONE OF
+    Tenant HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Sign HAS signer IS AN Actor
+
+GIVEN p IS AN Actor
+GIVETH A LIST OF Actor
+peersOf MEANS LIST p
+
+GIVETH A DEONTIC Actor Action
+`roll mentions the member` MEANS
+    EVERY Tenant t IN (peersOf t) MUST Sign (EXACTLY t) WITHIN 14

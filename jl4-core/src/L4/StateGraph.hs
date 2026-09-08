@@ -891,10 +891,11 @@ describeDeonton MkDeonton{subject, action} =
 subjectText :: Subject Resolved -> Text
 subjectText = \case
   Party _ p -> prettyLayout p
-  Every _ mCast v mFilter -> Text.unwords $
+  Every _ mCast v mRoll mFilter -> Text.unwords $
     [ "EVERY" ]
     <> maybe [] (\c -> [prettyLayout c]) mCast
     <> [ prettyLayout v ]
+    <> maybe [] (\r -> [ "IN", prettyLayout r ]) mRoll
     <> maybe [] (\f -> [ "WHO", prettyLayout f ]) mFilter
 
 -- | Pretty-print a pattern to text

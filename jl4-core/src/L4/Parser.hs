@@ -2500,7 +2500,7 @@ refuse = attachAnno $
 optionalWithHole :: HasSrcRange a => AnnoParser a -> AnnoParser (Maybe a)
 optionalWithHole p = Just <$> p <|> annoHole (pure Nothing)
 
--- | A deonton: @PARTY p@ or @EVERY [Cast] v [WHO f]@, then the modal and
+-- | A deonton: @PARTY p@ or @EVERY [Cast] v [IN roll] [WHO f]@, then the modal and
 -- action, then the optional @WITHIN@ \/ @ONCE …@ \/ @HENCE@ \/ @LEST@ clauses.
 --
 -- The column of the head keyword (@PARTY@ or @EVERY@) is the layout threshold
@@ -2518,11 +2518,12 @@ obligation = do
       <*> optionalWithHole (hence current)
       <*> optionalWithHole (lest current)
 
--- | The subject of a deonton (EVERY-EACH-QUANTIFIER-SPEC §2.4, RULED 2026-09-07):
+-- | The subject of a deonton (EVERY-EACH-QUANTIFIER-SPEC §2.4, RULED 2026-09-07;
+-- the @IN@ roll RULED and built 2026-09-08, §11.0.2):
 --
 -- > PARTY e
--- > EVERY v            [WHO filter]     -- every value of the party type
--- > EVERY Cast v       [WHO filter]     -- every value built by the constructor Cast
+-- > EVERY v            [IN roll] [WHO filter]  -- every value of the party type
+-- > EVERY Cast v       [IN roll] [WHO filter]  -- every value built by the constructor Cast
 --
 -- After @EVERY@ come one or two names; with two, the first is the cast and the
 -- second the variable (the variable is always last). Both are plain names
@@ -2531,8 +2532,18 @@ obligation = do
 -- only: @WHERE@ stays the local-definition keyword ('L4.Parser.whereBlock') and
 -- is not overloaded here (R-Q4, RULED 2026-09-07).
 --
--- Holes, in order: cast (empty when absent), variable, filter (empty when
--- absent) — matching the 'Every' constructor's fields positionally.
+-- @IN@ comes before @WHO@, in reading order — /every tenant t in tenants who is
+-- not carol/. It needs no new keyword: @TKIn@ already exists for @LET … IN@,
+-- and one name cannot be mistaken for it, since 'name' never matches a keyword
+-- token. The roll expression is open-tailed, but every word that can follow it
+-- (@WHO@, @MUST@, @MAY@, @SHANT@, @DO@) is a keyword, so it cannot swallow
+-- them; the PRINTER is where the open tail has to be handled ('L4.Print').
+--
+-- Holes, in order: cast (empty when absent), variable, roll (empty when
+-- absent), filter (empty when absent) — matching the 'Every' constructor's
+-- fields positionally. Exactprint and semantic tokens are DERIVED by zipping
+-- holes against fields ('L4.Syntax'), so this order is load-bearing and a
+-- mismatch would not fail to compile.
 subject :: Pos -> Parser (Subject Name)
 subject current =
       attachAnno
@@ -2541,12 +2552,13 @@ subject current =
             <*> annoHole (indentedExpr current)
         )
   <|> attachAnno
-        ( (\ n1 mn2 filt -> case mn2 of
-              Nothing -> Every emptyAnno Nothing n1 filt
-              Just n2 -> Every emptyAnno (Just n1) n2 filt)
+        ( (\ n1 mn2 roll filt -> case mn2 of
+              Nothing -> Every emptyAnno Nothing n1 roll filt
+              Just n2 -> Every emptyAnno (Just n1) n2 roll filt)
             <$  annoLexeme (spacedKeyword_ TKEvery)
             <*> indented' (annoHole name) current
             <*> optionalWithHole (indented' (annoHole name) current)
+            <*> optionalWithHole (annoLexeme (spacedKeyword_ TKIn) *> annoHole (indentedExpr current))
             <*> optionalWithHole (annoLexeme (spacedKeyword_ TKWho) *> annoHole (indentedExpr current))
         )
 

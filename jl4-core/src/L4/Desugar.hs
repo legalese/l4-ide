@@ -149,7 +149,8 @@ carameliseJoin = \ case
 carameliseSubject :: HasName n => Subject n -> Subject n
 carameliseSubject = \ case
   Party ann party -> Party ann (carameliseExpr party)
-  Every ann mCast v mFilter -> Every ann mCast v (fmap carameliseExpr mFilter)
+  Every ann mCast v mRoll mFilter ->
+    Every ann mCast v (fmap carameliseExpr mRoll) (fmap carameliseExpr mFilter)
 
 carameliseRAction :: HasName n => RAction n -> RAction n
 carameliseRAction = \ case

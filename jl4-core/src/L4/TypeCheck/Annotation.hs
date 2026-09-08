@@ -143,7 +143,8 @@ nlgExpr = \ case
     Regulative ann (MkDeonton ann'' subj (MkAction ann' modal rule provided) deadline mjoin followup lest) -> do
       subj' <- case subj of
         Party sann party -> Party sann <$> nlgExpr party
-        Every sann mCast v mFilter -> Every sann mCast v <$> traverse nlgExpr mFilter
+        Every sann mCast v mRoll mFilter ->
+          Every sann mCast v <$> traverse nlgExpr mRoll <*> traverse nlgExpr mFilter
       rule' <- nlgPattern rule
       provided' <- traverse nlgExpr provided
       deadline' <- traverse nlgExpr deadline

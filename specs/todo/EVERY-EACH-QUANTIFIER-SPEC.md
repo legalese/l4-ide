@@ -7,6 +7,13 @@
 > §11.0.1 for exactly what was built and what was not, and §11.0 for the roll-call rule that made
 > it possible. The four witnesses are `jl4/examples/ok/every/run-{barrier,fork,roll,modals}.l4`.
 >
+> **THE ROLL IS NOW SAYABLE OUTRIGHT.** `EVERY Cast v IN xs` was RULED by Meng on 2026-09-08 and is
+> BUILT on `lang/every-in` (branched from `lang/every-runtime`, unmerged at the time of writing):
+> see **§11.0.2**, with `jl4/examples/ok/every/run-in.l4` as its witness and §2.4's grammar
+> updated. `IN` is the spelling to reach for. The older inferred spelling of §11.0 —
+> `WHO elem t xs` — still runs unchanged for a rule that writes no `IN`, and whether it should be
+> deprecated is **open**, §13.5.
+>
 > The pre-#360 bullets below are **kept as the record of the tree the design was written against**;
 > the first two are now false of `unstable` and say so.
 >
@@ -29,9 +36,11 @@
 > - **Rulings so far:** R-T1–R-T6 (§2.2.7.8, 2026-09-06); the pattern spelling (§2.4, 2026-09-07);
 >   **R-Q1–R-Q7 (§2.5, 2026-09-07)**; **R-Q7A–R-Q7C, the anchor's spelling (§5.1.1, 2026-09-07;
 >   ruled, not built)**; **R-X5 (the window's edges, modified) and R-X6 (the early act, ruled),
->   §5.1.2, 2026-09-07, not built**; and two on 2026-09-08 — **W3, `THE OPENING` declined and
+>   §5.1.2, 2026-09-07, not built**; and three on 2026-09-08 — **W3, `THE OPENING` declined and
 >   the anchor slot ruled to become a trace expression (§5.1.3, direction only, not built)**, and
->   **the roll call, how a run gets its cast (§11.0, ANSWERED and BUILT)**. Under R-Q1 there is
+>   **the roll call, how a run gets its cast (§11.0, ANSWERED and BUILT)**, and
+>   **the roll said outright, `EVERY Cast v IN xs` (§11.0.2, RULED by Meng and BUILT)**.
+>   Under R-Q1 there is
 >   one quantifier word, `EVERY`, and a
 >   mandatory join line under it whenever a continuation follows: `ONCE ALL HAVE` (barrier) or
 >   `UPON EACH` (fork). The fork's words were RULED on 2026-09-07 and are no longer provisional;
@@ -750,8 +759,11 @@ definitional sentence, recorded because this spec's whole vocabulary debate was 
 readers: the modern collocation _"some 200 people"_ reads as _approximately_, so the page that
 introduces `SOME m OF` must say _at least_ in its first sentence.
 
-Name collisions were checked. `SOME` is not a keyword (`jl4-core/src/L4/Lexer.hs` has `OF`, `AT`,
-`LEAST`, `ALL`; not `SOME`). An earlier proposal spelled an actor-agnostic contract head
+Name collisions were checked. `SOME` was not a keyword when this was written. **STALE since #360
+(2026-09-07):** it is one now — `TKSome` at `jl4-core/src/L4/Lexer.hs:248`, in the keyword table at
+`:350` — lexed but never parsed, since §2.2.7.4's count join is still unbuilt. The status header
+already flags this; corrected here too, because this is the section that owns the claim.
+An earlier proposal spelled an actor-agnostic contract head
 `DEONTIC SOME who` and was **rejected** on arity and event-typing grounds
 (`specs/done/DEONTIC-PARTY-ACTION-AGREEMENT-SPEC.md`, "Do NOT make the contract head
 actor-agnostic"); that was a type, not a quantifier, and the rejection does not reach this use —
@@ -954,7 +966,9 @@ R-Q4 and the variable is now written out.
 
 ```
 QuantifiedDeonton ::=
-    Quantifier Pattern [Filter]
+    Quantifier Pattern [Roll] [Filter]
+                                      -- Roll RULED and BUILT 2026-09-08 (§11.0.2); it precedes the
+                                      -- Filter, in reading order
         DeonticModal Action
         [TemporalConstraint]
         [Join]                        -- REQUIRED whenever a HenceClause or LestClause follows
@@ -987,7 +1001,16 @@ NoProhibition ::= 'NO' Pattern [Filter] 'MAY' Action [TemporalConstraint] [Join]
 Pattern ::= Constructor Variable      -- EVERY Tenant t   : the primary form; the constructor selects the cast
           | Variable                  -- EVERY t          : the unfiltered case; every value of the actor type
 
+Roll ::= 'IN' Expr                    -- RULED and BUILT 2026-09-08 (§11.0.2): the LIST the group is
+                                      -- drawn from, of the party type. Read ONCE for the whole group,
+                                      -- with the bound variable OUT of scope, so it may not mention a
+                                      -- member. Optional: with no IN, the roll is read out of an
+                                      -- `elem v xs` conjunct of the Filter instead (§11.0), and where
+                                      -- both are written the IN clause is the roll and the conjunct
+                                      -- goes on narrowing like any other condition.
+
 Filter ::= 'WHO' Expr                 -- R-Q4: a Boolean expression in which the bound variable is free;
+
                                       -- WHERE is not a filter word (it opens a where-block, Parser.hs:1334-1338).
                                       -- 'WHOSE' Expr is PROPOSED, not ruled (§2.5, R-Q4)
 
@@ -1045,7 +1068,9 @@ Pattern`, and the variable stays last, as in the unmerged upstream draft `970a87
 `DEONTIC` signature) and the pattern form on 2 (§2.2.7.6); the upstream draft wrote `EVERY Person p`
 throughout. **The bare-form examples below remain valid as the unfiltered case**; new examples use
 the pattern form where a cast is meant. This ruling unblocks R-T5's prefix sugar (§2.2.7.8).
-Nothing is built.
+Nothing was built when this paragraph was written; the pattern form and the `Roll` line above it
+have both since been built (#360 on 2026-09-07, §11.0.2 on 2026-09-08). R-T5's prefix sugar is
+still unbuilt.
 
 ### 2.5 Rulings R-Q1–R-Q7 (2026-09-07)
 
@@ -1469,6 +1494,7 @@ The party type `P` is determined by the deontic context (`GIVETH DEONTIC P A`):
         pending   = parties \ completed
 
         status =
+
             if completed == parties
             then Achieved (max { t' | (p, _, t') ∈ completions })
             else if t > δ
@@ -1476,6 +1502,7 @@ The party type `P` is determined by the deontic context (`GIVETH DEONTIC P A`):
             else Pending
 
     in case status of
+
         Achieved t_ach -> (Success, spawn(h, t_ach))
         Failed t_f blame -> (Breach t_f blame, spawn(l, t_f))
         Pending -> (Pending, [])
@@ -2209,6 +2236,16 @@ being read out of the filter. That question was **not** ruled here, because R-Q4
 only filter word and a cast-source keyword is a new production, not an implementation choice. It is
 put to Meng as an open question, not decided by the build.
 
+> **ANSWERED 2026-09-08, see §11.0.2.** Meng ruled the syntax in: `EVERY Cast v IN xs` is built,
+> and `IN` is the spelling to reach for. This section is NOT retracted — the inference it describes
+> still runs, unchanged, for a rule that writes no `IN`. Of the three costs listed in the bullets
+> ABOVE this note, `IN` avoids the first two and NOT the third: it is matched by keyword rather
+> than by spelling, so no user-defined `elem` can capture it, and it needs no `AND` chain to be
+> found in — but **a roll with repeats still produces repeated members**, because that is a
+> property of the list, not of how the list was named. (Separately, `IN` also moves §11.0.1's
+> circular-roll refusal from run time to check time.) Whether the inferred form should be
+> deprecated is a further question, still open — §13.5.
+
 ### 11.0.1 What phase 2 built, and what it did not — 2026-09-08
 
 **Built**, on `lang/every-runtime`, witnessed by `jl4/examples/ok/every/run-{barrier,fork,roll,modals}.l4`:
@@ -2310,6 +2347,147 @@ predates every line of this branch. It blocks any RUN of §2.2.7.6's own rent ex
 shape `fork.l4` writes (`Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount)`) — `fork.l4`
 itself carries no directive at `6e9b57bb`, so it was never red, which is how the defect survived.
 Witness: `jl4/examples/ok/regulative-exactly-later-argument.l4`.
+
+### 11.0.2 The roll, said outright: `EVERY Cast v IN xs` — RULED 2026-09-08 (Meng), BUILT
+
+**The ruling.** Meng, 2026-09-08, in session: _build `EVERY X x IN xs` syntax, and revise the
+documentation accordingly._ §11.0 put exactly this to review as the one thing it declined to
+settle — "a cast-source keyword is a new production, not an implementation choice" — and named
+Meng as the person to settle it. It is now a production, built on `lang/every-in`, with
+`jl4/examples/ok/every/run-in.l4` as its witness.
+
+**The grammar.** §2.4 writes the same production, in its own vocabulary
+(`QuantifiedDeonton ::= Quantifier Pattern [Roll] [Filter]`); the shape is:
+
+```
+Roll ::= 'IN' Expr                    -- a LIST of the party type: the group is drawn from it
+```
+
+placed between the `Pattern` and the `Filter`.
+
+`IN` sits before `WHO`, in reading order — _every tenant t in tenants who is not carol_. It costs
+no new keyword: `TKIn` has existed since `LET … IN` (`jl4-core/src/L4/Lexer.hs:239,341`
+@ `03af495f`), and one name cannot be mistaken for it, because `name` (`Parser.hs:364-365`) never
+matches a keyword token. Measured 2026-09-08: `LET … IN` is the only other `TKIn` consumer in the
+tree (`Parser.hs:594`, `Parser.hs:612`), so there was no ambiguity to resolve.
+
+Four questions §11.0 did not answer, each with the measurement that settled it.
+
+**Q1 — does `IN` REPLACE the inferred roll, COEXIST with it, or supersede it on a deprecation
+path? RULED: coexist, with `IN` winning wherever both are written.** Two things decided it.
+
+- **Measured on the base tree `03af495f`, comment lines excluded:** 19 roll-supplying
+  `WHO … elem v xs` conjuncts across 7 files (`ok/every/run-modals.l4` 7, `run-roll.l4` 5,
+  `run-barrier.l4` 2, `doc/reference/regulative/every-run-example.l4` 2, `run-fork.l4` 1,
+  `who-filter.l4` 1, `doc/reference/regulative/every-example.l4` 1). Two of the seven files are the
+  pages a reader is pointed at. Not all 19 sit in rules a run would notice: `who-filter.l4` and
+  `every-example.l4` carry no directive at all, and `run-roll.l4`'s `circular` already refuses — so
+  the honest form of the claim is that replacing the inference would rewrite 19 conjuncts, change
+  the answer of 15, and change `circular`'s answer in KIND rather than in substance — its refusal
+  would move from run time to check time (§13.5 says the same, and says why that matters).
+
+- **The deeper reason, and it is not migration cost.** `elem v xs` is a perfectly good FILTER in
+  its own right — it was one before it was ever a roll. Reading a roll out of it _when no roll was
+  written_ therefore takes nothing away from anybody and adds no second meaning to the conjunct;
+  the two readings agree on every program that has only one of them.
+
+**What is NOT ruled here, and is Meng's:** whether the inferred form should be deprecated —
+warned on at check time, and eventually removed. That changes what a user must write, so the build
+did not decide it. Recorded as an open question in §13.5.
+
+**Q2 — a rule that writes `IN xs` AND carries an `elem v ys` conjunct. RULED: `IN` is the roll; the
+conjunct keeps its ordinary job.** No new rule was needed and none was added: the conjunct is
+evaluated per candidate exactly like every other part of the filter, so the cast is _the members of
+`xs` that satisfy the whole filter, in `xs`'s order_. Where `xs` and `ys` are the same list the
+conjunct is a redundancy every member passes; that is harmless and draws no diagnostic. Two
+witnesses in `run-in.l4`:
+
+- case 6, `IN (LIST alice)` beside `WHO elem t tenants`, **discriminates**: if the conjunct were
+  still taken as the roll this would want three signatures, and Alice's alone completes the
+  barrier. Measured by building the counterfactual, 2026-09-08.
+- case 7, `IN tenants` beside `WHO elem t (LIST alice, bob)` — the roll is three, the conjunct
+  narrows to two, and two signatures complete it. **This one does not discriminate**, and is kept
+  as the readable illustration of the rule rather than as evidence for it: either reading produces
+  the cast `{alice, bob}`. Said plainly because an earlier draft of this section claimed both cases
+  discriminated, and the adversarial pass showed only case 6 does.
+
+Note what this makes explicit: the same net behaviour was already reachable under §11.0 by writing
+two `elem` conjuncts, where the leftmost silently became the roll and the rest silently narrowed
+(§11.0's main text: "takes the FIRST conjunct of the form `elem v xs`"). `IN` does not change that
+answer; it stops it being silent.
+
+**Q3 — does the refusal now point at the new syntax? RULED: yes, and it does.**
+`rollCallRefusal` (`jl4-core/src/L4/EvaluateLazy/Machine.hs:1985` @ this branch) names
+`EVERY Tenant t IN tenants MUST ...` first and mentions the `elem` spelling second, as still
+working. Golden: `jl4/examples/ok/every/tests/run-roll.golden:5`.
+
+**Q4 — does `EACH` take `IN`, and do §2.2.7's threshold joins? RULED: `EACH` does not; the built
+joins get it for free; the unbuilt ones inherit a question §2.2.7 has never answered.**
+
+- **`EACH` takes no `IN`, and the reason is that there is no `EACH` to take it.** R-Q1 (§2.5,
+  2026-09-07) retired `EACH` as a quantifier. Re-measured 2026-09-08: the only `EACH` anywhere in
+  the compiler is the fork's join word, matched by SPELLING as an ordinary identifier at
+  `jl4-core/src/L4/Parser.hs:2633` @ this branch (`:2621` @ `03af495f`) — there is no `TKEach` —
+  and a join word names _when the continuation fires_, not _who is in the group_. A join has no cast of its own to draw.
+
+- **`ONCE ALL HAVE` and `UPON EACH` get the roll whatever its spelling, and needed no work.** The
+  roll is drawn BEFORE the join is inspected: `startRollCall` (`Machine.hs:2021`) runs to
+  completion and only then does `assembleQuantified` (`Machine.hs:2058`) look at
+  `ctx.deonton.join`. Witnessed under both: `run-in.l4` cases 1–7, 9, 10 (barrier) and case 8
+  (fork).
+
+- **A consequence for phase 3, stated and deliberately NOT ruled.** §2.2.7.4 writes both the
+  grammar's `Count 'OF' Cast 'HAVE'` — a cast INSIDE the threshold — and the prefix sugar
+  `SOME 2 OF Director d DO sign …` (§2.2.7.8's R-T5 row names that sugar but writes no example of
+  it). Neither says where its list comes from, and neither is built
+  (`Threshold` has one constructor, `AllHave`, `jl4-core/src/L4/Syntax.hs:521`; `SOME` is lexed
+  and never parsed, `Lexer.hs:248,350`). With `IN` in the language the natural reading is that the
+  threshold's `Cast` NARROWS the roll rather than supplying a second one, and that the prefix sugar
+  grows an `IN` slot — `SOME 2 OF Director d IN board DO sign …`. That is a reading offered to
+  whoever builds §2.2.7.4, not a ruling: nothing was measured against it, because there is nothing
+  to measure.
+
+**One thing the explicit spelling buys that §11.0 could not have.** The `IN` roll is type-checked
+with the member variable **out of scope** — `checkDeonton` checks it beside the join line's
+`WITHIN`, before `extendKnown` opens the member's scope (`jl4-core/src/L4/TypeCheck.hs:1914`, with
+`extendKnown` at `:1917`, @ this branch), against `LIST OF partyT` under a new
+`ExpectQuantifierRollContext`. The language rule this makes uniform is worth stating in one
+line: **what is read once for the whole group — the
+join's deadline, and now the roll — cannot mention a member; what is read per member — the filter,
+the action, the act's `WITHIN`, and a fork's continuations — can.**
+
+So `EVERY Tenant t IN (peersOf t)` is a CHECK-time error, where §11.0's `WHO elem t (peersOf t)`
+is a run-time refusal (`circularRollRefusal`). The inferred form cannot be given the same treatment
+and this is not an oversight: the filter genuinely does bind the member, legitimately, for every
+other conjunct, so the variable cannot be taken out of scope there. Witnesses:
+`jl4/examples/not-ok/tc/every-roll-mentions-member.l4` (check time) beside `run-roll.l4`'s
+`circular` (run time).
+
+**Three limits carried in deliberately, all measured 2026-09-08.**
+
+- The circularity rejection arrives as the generic _"I could not find a definition for the
+  identifier t"_, the same poor wording the join line's identical restriction has had since
+  2026-09-07 (the note is in the code, `jl4-core/src/L4/TypeCheck.hs:1896-1911`, and on
+  `doc/reference/regulative/EVERY.md` for readers). A dedicated diagnostic is not built, and the
+  two positions should get one together rather than separately.
+- **The rejection depends on the member's name being UNBOUND, not on its being the member**, which
+  is weaker than "the roll cannot mention the member" sounds. Measured 2026-09-08: with a top-level
+  `t MEANS carol` in the module, `EVERY Tenant t IN (peersOf t) WHO NOT (t EQUALS carol)`
+  type-checks and runs — the `t` in the roll silently means the top-level one and the `t` in the
+  filter means the member. One identifier, one line, two meanings. This is ordinary lexical scoping
+  and it is **inherited, not introduced**: the join line's `ONCE ALL HAVE WITHIN t` has exactly the
+  same hole, and re-measured against the base binary at `03af495f` it behaves identically there.
+  Closing it would mean ruling that an identifier merely SPELLED like the member is an error in
+  these positions whatever else is in scope — a language change that would have to cover the join
+  line too, and so not one this build made. Recorded rather than fixed; the doc page says it in the
+  reader's terms.
+- Adding a field to `Subject` changes the CBOR wire format (`Syntax.hs:1253`,
+  `Serialise n => Serialise (Subject n)`). The boundary is not the repo's edge: `jl4-service`
+  persists whole modules to disk inside this tree (`jl4-service/src/BundleStore.hs:80`,
+  `SerializedBundle` carrying a `Module Resolved`, written by `saveBundleCbor` at `:197`). Nothing
+  breaks, because `loadBundleCbor` at `:215` uses `deserialiseOrFail` (`:225`) and recompiles on
+  failure — but an existing deployment's `bundle.cbor` cache goes stale on this change and is rebuilt, logging
+  `"Corrupt bundle.cbor, will recompile"` against the deployment id (`BundleStore.hs:227-228`).
 
 ### 11.1 Runtime State
 
@@ -2517,6 +2695,68 @@ R-T6's own low confidence carries over to the survivorship half. The memo's rele
 all gap (`:99`) stays open: at the `ANY OF` end it needs a discharge operation the language does not
 have.
 
+### 13.5 Should the INFERRED roll be deprecated? — OPEN, put to Meng 2026-09-08
+
+§11.0.2 built `IN` and left the older spelling running: with no `IN` clause, the machine still
+reads the roll out of the first `elem v xs` conjunct of the `WHO` filter (§11.0). The build did not
+touch that, on the ground that removing it — or warning on it — changes **what a user must write**,
+which is a ruling and not an implementation choice.
+
+**The question.** Should a rule that relies on the inferred roll get a check-time warning naming
+`IN`, and should the inference eventually be removed?
+
+**What is measured, so that the question can be answered without re-deriving it.**
+
+- **What it would cost, measured on `lang/every-in` itself and not on the tree §11.0.2 was written
+  against.** After this branch's own migration there are **17 conjuncts across 6 files** still
+  relying on the inference: `ok/every/run-modals.l4` 7, `run-roll.l4` 5, `run-barrier.l4` 2,
+  `run-fork.l4` 1, `who-filter.l4` 1, `doc/reference/regulative/every-example.l4` 1. (At the base
+  `03af495f` it was 19 across 7; this branch migrated `every-run-example.l4` outright and left
+  `every-example.l4` one deliberate specimen.) Among the `doc/` example files only
+  `every-example.l4` still relies on the inference, and it does so deliberately, as the specimen
+  shown beside its `IN` equivalent. The older spelling is still _discussed_ on three `doc/` pages,
+  which is intended: it is what a reader will meet in existing material.
+- **Most of the rewrite is mechanical; one case is not.** `WHO elem t xs` becomes `IN xs`, and
+  `WHO elem t xs AND p` becomes `IN xs WHO p`. The exception is `run-roll.l4`'s `circular`
+  (`WHO elem t (LIST t, alice)`), which exists to witness the RUN-TIME refusal: rewriting it to
+  `IN` moves the diagnostic to check time (§11.0.2) and destroys the witness. A deprecation would
+  have to keep one un-migrated file, or accept losing that witness.
+- **What deprecating it would buy.** Three sharp edges `IN` does not have. Two are §11.0's own
+  costs: the roll is found by the SPELLING `elem`, so a user-defined two-argument `elem` is taken
+  for it; and only an `AND` chain is walked, so `OR` and `NOT` refuse. The third is §11.0.1's: a
+  circular roll is a run-time refusal rather than a check-time error, because the filter must bind
+  the member for its other conjuncts. As long as the inference lives, so do all three. And note
+  what deprecation would NOT buy: §11.0's _third_ cost — a roll with repeats producing repeated
+  members — belongs to the list rather than to the spelling, so `IN` has it too.
+- **What it would cost to build the warning.** Not free, and the reason is worth knowing before
+  ruling: the inference lives in the EVALUATOR (`L4.EvaluateLazy.Machine.quantifierRoll`), not in
+  the checker, so a check-time warning means teaching `checkDeonton` to recognise the same
+  `elem v xs` shape. It is NOT a retyping job — `checkDeonton` has `rv :: Resolved` and
+  `filterR :: Expr Resolved` in scope at `TypeCheck.hs:1914-1917`, which are exactly
+  `quantifierRoll`'s argument types (`Machine.hs:1957`), so the call would compile as written. The
+  obstacle is the module direction: `L4.EvaluateLazy.Machine` imports `L4.TypeCheck` and not the
+  other way round, so sharing the function means MOVING it, and duplicating it instead leaves two
+  copies of one rule in two phases — the arrangement that drifts. If the answer is yes, move the
+  recognition into the checker and have the evaluator read what the checker recorded.
+- **This document's own examples are NOT in the count above, and there are more of them than there
+  are corpus rules.** Measured 2026-09-08: about ten code blocks in this specification still write
+  `EVERY … WHO elem …` — §2.1's headline example, §2.2.3, §2.2.6, §2.2.7.6's rent, §8.3 and §12 —
+  all of them unmarked, while the status header now says `IN` is the spelling to reach for. They
+  were left alone deliberately: each illustrates a DIFFERENT ruling, and rewriting them in the same
+  change that introduced `IN` would have churned sections this work did not review. If the answer
+  to this section's question is yes, they are part of the job; if it is no, they should still be
+  marked, because a reader learns the spelling from the examples and not from the header.
+- **What NOT deprecating it costs.** Two spellings for one idea, indefinitely, in a language whose
+  pitch is that there is one obvious way to write a rule.
+- **What it would NOT touch.** The shadowing hole of §11.0.2 — an identifier spelled like the member
+  resolving to a top-level binding of the same name — is untouched by this question. It is a
+  scoping matter shared with the join line, and it survives whichever way this is ruled.
+
+**No recommendation is recorded here on purpose.** This is a question about what a drafter must
+write, which §11.0.2 gives as the reason the build stopped short of it; the measurements above are
+the whole of what the build knows, and they are here so the ruling can be made without redoing
+them.
+
 ## 14. Related Work
 
 - **Hvitved's CSL**: Trace-based contract semantics, blame assignment
@@ -2527,14 +2767,16 @@ have.
 
 ## 15. Appendix: Formal Grammar
 
-Brought into line with §2.4 on 2026-09-07 (R-Q1–R-Q4 and R-Q7, §2.5). Until then this appendix still
-carried a `variable 'IN' set_expr` head that §2.4 had already replaced with the pattern form, four
-quantifier words, a `WHERE` filter, and a `predicate` sub-grammar that only the withdrawn insertion
-rule needed.
+Brought into line with §2.4 on 2026-09-07 (R-Q1–R-Q4 and R-Q7, §2.5), and again on 2026-09-08 for
+the `roll` (§11.0.2). Until 2026-09-07 this appendix carried a `variable 'IN' set_expr` head that
+§2.4 had already replaced with the pattern form, four quantifier words, a `WHERE` filter, and a
+`predicate` sub-grammar that only the withdrawn insertion rule needed. `IN` is back as of
+2026-09-08, but as a separate optional clause AFTER the pattern rather than as the head of it — the
+pattern form is unchanged, and the roll is a `LIST`, not a `SET`.
 
 ```ebnf
 quantified_deonton ::=
-    quantifier pattern [filter]
+    quantifier pattern [roll] [filter]
     deontic_modal action_expr
     [temporal_constraint]
     [join]                          (* required whenever a continuation follows; R-Q1 *)
@@ -2554,6 +2796,13 @@ no_prohibition ::= 'NO' pattern [filter] 'MAY' action_expr [temporal_constraint]
                                        UPON EACH; R-Q3, §2.2.3 *)
 
 pattern ::= constructor variable | variable
+
+roll ::= 'IN' list_expr             (* the LIST the group is drawn from, of the party type. RULED and
+                                       BUILT 2026-09-08 (§11.0.2). Read ONCE for the whole group, with
+                                       the bound variable OUT of scope, so it may not name a member.
+                                       Optional: with no roll, one is read out of an `elem v xs`
+                                       conjunct of the filter instead (§11.0); with both, the roll is
+                                       the IN clause and the conjunct merely narrows. *)
 
 filter ::= 'WHO' boolean_expr       (* the bound variable is free in boolean_expr; R-Q4 *)
                                     (* 'WHOSE' boolean_expr: proposed, not ruled; §2.5 R-Q4 *)

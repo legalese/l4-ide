@@ -1,8 +1,8 @@
 IMPORT prelude
 -- The shapes EVERY can take. Most of the rules below name no group — no
--- `WHO elem t tenants` — so they show the syntax without being runnable:
--- running a quantified rule needs a list to draw the group from, and says so
--- when there is none. See "Where the group comes from" on EVERY.md, and
+-- `IN tenants` — so they show the syntax without being runnable: running a
+-- quantified rule needs a list to draw the group from, and says so when there
+-- is none. See "Where the group comes from" on EVERY.md, and
 -- every-run-example.l4 for the same rules with a group and a trace.
 
 DECLARE Actor IS ONE OF
@@ -62,11 +62,20 @@ GIVETH A DEONTIC Actor Action
     RAND
     (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) what WITHIN 14 HENCE FULFILLED LEST BREACH)
 
--- only some of them: WHO narrows the cast
+-- where the group comes from: IN names the roll, and WHO narrows it
 GIVETH A DEONTIC Actor Action
 `the listed tenants sign` MEANS
+    EVERY Tenant t IN tenants
+        WHO    NOT (t EQUALS (Tenant OF "Carol"))
+        MUST   Sign (EXACTLY t)
+        WITHIN 14
+
+-- the older spelling of the same thing: the roll read out of the WHO
+-- condition. Still runs; `IN` is the one to write now.
+GIVETH A DEONTIC Actor Action
+`the listed tenants sign, the old way` MEANS
     EVERY Tenant t
-        WHO    elem t tenants
+        WHO    elem t tenants AND NOT (t EQUALS (Tenant OF "Carol"))
         MUST   Sign (EXACTLY t)
         WITHIN 14
 

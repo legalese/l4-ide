@@ -1,0 +1,34 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: every-roll-not-list.l4
+  Hidden: no
+  Range: 13:23-13:25
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The IN clause of an EVERY is the list the group is drawn from, so it is
+    expected to be of type
+
+      LIST OF Actor
+
+    but is here of type
+
+      NUMBER
+
+File: every-roll-not-list.l4
+  Hidden: no
+  Range: 17:23-17:37
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The IN clause of an EVERY is the list the group is drawn from, so it is
+    expected to be of type
+
+      LIST OF Actor
+
+    but is here of type
+
+      LIST OF STRING

@@ -956,17 +956,20 @@ instance LayoutPrinter UponEach where
 uponEachWords :: Doc ann
 uponEachWords = "UPON EACH"
 
--- | The subject of a deonton: @PARTY p@, or @EVERY [Cast] v [WHO filter]@
--- (EVERY-EACH-QUANTIFIER-SPEC §2.4). The filter is bracketed like a WITHIN/
--- HENCE/LEST body: an open-tailed predicate (@member_of tenants@) would
--- otherwise swallow the modal that follows it.
+-- | The subject of a deonton: @PARTY p@, or
+-- @EVERY [Cast] v [IN roll] [WHO filter]@ (EVERY-EACH-QUANTIFIER-SPEC §2.4;
+-- the @IN@ roll §11.0.2, 2026-09-08). The roll and the filter are both
+-- bracketed like a WITHIN\/HENCE\/LEST body: an open-tailed expression
+-- (@tenantsOf building@, @member_of tenants@) would otherwise swallow the
+-- @WHO@ or the modal that follows it.
 instance LayoutPrinterWithName n => LayoutPrinter (Subject n) where
   printWithLayout = \ case
     Party _ p -> "PARTY" <+> printWithLayout p
-    Every _ mCast v mFilter -> hsep $
+    Every _ mCast v mRoll mFilter -> hsep $
       [ "EVERY" ]
       <> foldMap (\ c -> [printWithLayout c]) mCast
       <> [ printWithLayout v ]
+      <> foldMap (\ r -> [ "IN", parensIfNeeded r ]) mRoll
       <> foldMap (\ f -> [ "WHO", parensIfNeeded f ]) mFilter
 
 -- | @WITHIN@/@HENCE@/@LEST@ bodies are bracketed via 'parensIfNeeded'.

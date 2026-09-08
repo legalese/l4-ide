@@ -1,15 +1,15 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
-run-roll.l4:35:1-36:35:
-  EVERY has nothing to draw its cast from. Running a quantified obligation needs a list of the parties it ranges over, because a party type is normally open: `Tenant HAS name IS A STRING` has infinitely many values. Name the list in the WHO condition, as `EVERY Tenant t WHO elem t tenants MUST ...`, with `tenants` a LIST of the party type. (EVERY-EACH-QUANTIFIER-SPEC section 2.2.7.5 point 5; doc/reference/regulative/EVERY.md.)
-run-roll.l4:50:1-51:35:
+run-roll.l4:44:1-45:35:
+  EVERY has nothing to draw its cast from. Running a quantified obligation needs a list of the parties it ranges over, because a party type is normally open: `Tenant HAS name IS A STRING` has infinitely many values. Name the list with IN, as `EVERY Tenant t IN tenants MUST ...`, with `tenants` a LIST of the party type. (An `elem` condition still works - `EVERY Tenant t WHO elem t tenants` - but IN says it outright and is checked earlier.) (EVERY-EACH-QUANTIFIER-SPEC sections 11.0.2 and 2.2.7.5 point 5; doc/reference/regulative/EVERY.md.)
+run-roll.l4:59:1-60:35:
   FULFILLED
-run-roll.l4:65:1-67:47:
+run-roll.l4:74:1-76:47:
   FULFILLED
-run-roll.l4:82:1-84:35:
+run-roll.l4:91:1-93:35:
   FULFILLED
-run-roll.l4:97:1-98:35:
+run-roll.l4:106:1-107:35:
   EVERY's roll cannot mention the member it is drawing. The list after `elem` is read once, before there is any member to speak of, so it may not depend on one: write `WHO elem t tenants`, not `WHO elem t (peersOf t)`. To narrow the group by something about each member, put that in a further condition - `WHO elem t tenants AND isAdult t`.
-run-roll.l4:112:1-113:35:
+run-roll.l4:121:1-122:35:
   FULFILLED

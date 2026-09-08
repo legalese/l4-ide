@@ -1,0 +1,25 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+run-in.l4:44:1-47:35:
+  FULFILLED
+run-in.l4:61:1-62:35:
+  PARTY Tenant OF "Bob" MUST Sign (EXACTLY t) WITHIN 13 HENCE `the join` LEST `the join fails` AND PARTY Tenant OF "Carol" MUST Sign (EXACTLY t) WITHIN 13 HENCE `the join` LEST `the join fails`
+run-in.l4:76:1-78:35:
+  FULFILLED
+run-in.l4:91:1-92:35:
+  FULFILLED
+run-in.l4:105:1-107:47:
+  FULFILLED
+run-in.l4:123:1-124:35:
+  FULFILLED
+run-in.l4:138:1-140:35:
+  FULFILLED
+run-in.l4:168:1-172:56:
+  FULFILLED AND PARTY Landlord OF "Ms Ng" MUST Receipt (EXACTLY theLandlord) (EXACTLY t) WITHIN 3 HENCE FULFILLED AND PARTY Landlord OF "Ms Ng" MUST Receipt (EXACTLY theLandlord) (EXACTLY t) WITHIN 4 HENCE FULFILLED
+run-in.l4:191:1-193:35:
+  FULFILLED
+run-in.l4:206:1-207:35:
+  FULFILLED
+run-in.l4:215:1-91:
+  EVERY Tenant t IN tenants WHO (NOT t EQUALS carol) MUST Sign (EXACTLY t) WITHIN 14

@@ -1886,7 +1886,7 @@ checkDeonton ann subject action due mjoin hence lest partyT actionT =
       (actionR, dueR, henceR, lestR) <-
         checkDeontonBody (Just partyR) partyT actionT action due hence lest
       pure (MkDeonton ann (Party sann partyR) actionR dueR joinR henceR lestR)
-    Every sann mCast v mFilter -> do
+    Every sann mCast v mRoll mFilter -> do
       -- EVERY-EACH-QUANTIFIER-SPEC §2.1/§2.4: the bound variable has the
       -- contract's party type (from @GIVETH DEONTIC Party Action@, or inferred
       -- from the action and the events) and scopes over the WHO filter, the
@@ -1900,16 +1900,42 @@ checkDeonton ann subject action due mjoin hence lest partyT actionT =
       case (mjoin, hence <|> lest) of
         (Nothing, Just k) -> addError (ContinuationWithoutJoin k)
         _                 -> pure ()
-      -- DELIBERATELY outside the 'extendKnown' below: a join line's WITHIN
-      -- bounds the WHOLE group (R-T2), so it must not depend on which member
-      -- you are looking at — @ONCE ALL HAVE WITHIN graceOf t@ would be a
-      -- different deadline per member, which is not a deadline on the whole.
-      -- Keeping @v@ out of scope rejects it. Measured limit (2026-09-07): the
-      -- rejection arrives as the generic "could not find a definition for t",
-      -- which then prints the type it inferred for @t@ — poor wording for a
-      -- deliberate restriction. Stated on doc/reference/regulative/EVERY.md;
-      -- a dedicated diagnostic is not built.
+      -- BOTH of the next two are DELIBERATELY outside the 'extendKnown' below,
+      -- for the same reason: they are read ONCE FOR THE WHOLE GROUP, before
+      -- there is any member to speak of, so neither may depend on one.
+      --
+      --   * a join line's WITHIN bounds the WHOLE group (R-T2) —
+      --     @ONCE ALL HAVE WITHIN graceOf t@ would be a different deadline per
+      --     member, which is not a deadline on the whole;
+      --   * the IN roll is the list the group is DRAWN FROM (§11.0.2), so
+      --     @EVERY Tenant t IN (peersOf t)@ would have to know its own answer.
+      --
+      -- Keeping @v@ out of scope rejects both. Under the older inferred form
+      -- the same circularity CANNOT be caught here, because the filter does
+      -- bind @v@ (legitimately, for every other conjunct), so it stays a
+      -- run-time refusal there ('L4.EvaluateLazy.Machine.circularRollRefusal').
+      -- Writing the roll after IN is therefore the spelling that gets the
+      -- earlier, cheaper diagnostic.
+      --
+      -- TWO measured limits, both shared by the roll and the join line, both
+      -- stated on doc/reference/regulative/EVERY.md and in spec §11.0.2:
+      --
+      --   * the rejection arrives as the generic "could not find a definition
+      --     for t", which then prints the type it inferred for @t@ — poor
+      --     wording for a deliberate restriction (2026-09-07, and unchanged
+      --     for the roll on 2026-09-08). A dedicated diagnostic is not built,
+      --     and the two positions should get one together.
+      --   * it rejects an UNBOUND name, not "the member". A top-level
+      --     @t MEANS carol@ in the same module makes @IN (peersOf t)@ resolve
+      --     @t@ to that binding and check clean — one spelling, two meanings.
+      --     This is ordinary lexical scoping; @ONCE ALL HAVE WITHIN t@ has the
+      --     same hole and had it before the roll existed (measured against the
+      --     03af495f binary, 2026-09-08). Closing it needs a rule that a name
+      --     merely SPELLED like the member is an error here whatever else is
+      --     in scope, which is a language change covering both positions.
+
       joinR <- traverse checkJoin mjoin
+      mRollR <- traverse (\e -> checkExpr ExpectQuantifierRollContext e (list partyT)) mRoll
       rv <- def v
       rv' <- setAnnResolvedTypeOfResolved partyT (Just Local) rv
       extendKnown (makeKnown rv (KnownTerm partyT Local)) do
@@ -1930,7 +1956,7 @@ checkDeonton ann subject action due mjoin hence lest partyT actionT =
         forM_ (patternBinders actionR.action) \ b ->
           when (rawName (getName b) == rawName v) $
             addError (QuantifierVariableRebound b rv')
-        pure (MkDeonton ann (Every sann mCastR rv' filterR) actionR dueR joinR henceR lestR)
+        pure (MkDeonton ann (Every sann mCastR rv' mRollR filterR) actionR dueR joinR henceR lestR)
 
 -- | The @ONCE@ line: its threshold carries no expression in phase 1; its
 -- @WITHIN@ bounds the joined state and is a NUMBER like the act's (R-T2).
@@ -5470,7 +5496,10 @@ setInertContext = go True  -- True = we're at top level or direct boolean operan
       JoinUpon ann ue due -> JoinUpon ann ue (fmap (go False ctx') due)
     goSubject ctx' = \ case
       Party ann party -> Party ann (go False ctx' party)
-      Every ann mCast v mFilter -> Every ann mCast v (fmap (go True ctx') mFilter)
+      -- The filter is a BOOLEAN context ('go True'); the roll is a LIST, so it
+      -- is not one.
+      Every ann mCast v mRoll mFilter ->
+        Every ann mCast v (fmap (go False ctx') mRoll) (fmap (go True ctx') mFilter)
     goRAction ctx' (MkAction ann modal pat provided) =
       MkAction ann modal pat (fmap (go False ctx') provided)
     goBranch ctx' (MkBranch ann lhs e) = MkBranch ann lhs (go False ctx' e)
@@ -6368,6 +6397,11 @@ prettyTypeMismatch ExpectQuantifierCastContext expected given =
     ] expected given
 prettyTypeMismatch ExpectQuantifierFilterContext expected given =
   standardTypeMismatch [ "The WHO clause of an EVERY is expected to be of type" ] expected given
+prettyTypeMismatch ExpectQuantifierRollContext expected given =
+  standardTypeMismatch
+    [ "The IN clause of an EVERY is the list the group is drawn from, so it is"
+    , "expected to be of type"
+    ] expected given
 prettyTypeMismatch ExpectJoinDeadlineContext expected given =
   standardTypeMismatch [ "The WITHIN on a join line (the deadline on the whole) is expected to be of type" ] expected given
 

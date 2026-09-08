@@ -1126,10 +1126,11 @@ deonticClause (MkDeonton _ subj (MkAction _ modal actPat mprov) mdue _join mhenc
 subjectProse :: Subject Resolved -> Text
 subjectProse = \case
   Party _ party -> inlineProse party
-  Every _ mCast v mFilter ->
+  Every _ mCast v mRoll mFilter ->
     "every "
       <> maybe "" (\c -> nameToText (getActual c) <> " ") mCast
       <> nameToText (getActual v)
+      <> maybe "" (\r -> " in " <> inlineProse r) mRoll
       <> maybe "" (\f -> " who " <> inlineProse f) mFilter
 
 modalWord :: DeonticModal -> Text
