@@ -248,9 +248,15 @@ exemption`). A decision that can refuse is not `DMN-SAFE`, and a BKM that is not
   `offering` and the rest (`investor_2` … `investor_6`, reported as `D-SCOPE` and `D-RENAME`),
   with 31 Blocking `D-REFUSE` notes. The engine cases and three exporter tests are written
   against the BKM shape. Whether a refusing BKM should stay a BKM is an exporter design
-  question, not a corpus one; until it is answered, the floor stays an `ASSUME` bottom and the
-  second refusal, "the COVID-19 temporary rules … are not modelled here", stays the section
-  `GIVEN` the 2026-09-05 sweep left it as — a suppliable input, which a refusal should never be.
+  question, not a corpus one; until it is answered, the floor stays an `ASSUME` bottom — and so,
+  since 2026-09-08, does the second refusal, "the COVID-19 temporary rules … are not modelled
+  here". That one had been left as the section `GIVEN` the 2026-09-05 sweep turned it into, on
+  the reasoning that it is "a suppliable input, which a refusal should never be" — correct
+  reasoning, and it has now been acted on. The sweep's classifier keyed on the NAME
+  (`etc/migrate-assume.mjs`, `REFUSAL_NAME`), which matched the commencement floor and missed
+  this one; the refusal built for `IMPLICIT-PROPS-DESIGN.md` §11.19 found it, because a
+  suppliable input in an imported module is exactly what that refuses. Both markers are now
+  `ASSUME` bottoms, and both migrate to `REFUSE` together when the DMN image lands.
   `jl4/examples/dmn/refuse.l4` remains the worked example of the DMN image.
 
 ## Related

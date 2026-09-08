@@ -1,0 +1,29 @@
+Parsing successful
+Typechecking successful
+Info | [Import Resolution] Resolving import: implicit-rate-lib from binder-refused.l4Debug | [Import Resolution] Checking VFS URIs: project:/implicit-rate-lib.l4, implicit-rate-lib.l4, implicit-rate-lib.l4Debug | [Import Resolution] VFS MISS: project:/implicit-rate-lib.l4Debug | [Import Resolution] VFS MISS: implicit-rate-lib.l4Debug | [Import Resolution] VFS MISS: implicit-rate-lib.l4Info | [Import Resolution] Found on filesystem: $JL4_EXAMPLES/not-ok/import/implicit-rate-lib.l4Info | [Import Resolution] Resolving import: implicit-rate-lib from binder-refused.l4Debug | [Import Resolution] Checking VFS URIs: project:/implicit-rate-lib.l4, implicit-rate-lib.l4, implicit-rate-lib.l4Debug | [Import Resolution] VFS MISS: project:/implicit-rate-lib.l4Debug | [Import Resolution] VFS MISS: implicit-rate-lib.l4Debug | [Import Resolution] VFS MISS: implicit-rate-lib.l4Info | [Import Resolution] Found on filesystem: $JL4_EXAMPLES/not-ok/import/implicit-rate-lib.l4Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: binder-refused.l4
+  Hidden: no
+  Range: 16:1-16:19
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    This @export
+
+      `straight cost of`
+
+    reaches
+
+      `Rates.the rate`
+
+    which is in an imported module and involves a section input -- it either is
+    one, or it reads one.
+
+    Section inputs do not cross an IMPORT: such an input would not appear in this
+    export's schema, a value sent under its name would be accepted and then
+    ignored, and there is no way to deliver one to the imported module at all. So
+    a request that validates here can still fail when it runs, which is why this
+    is refused rather than answered.
+
+    Give the imported rule an ordinary GIVEN parameter instead of a section
+    GIVEN, or move what this export needs into this module.

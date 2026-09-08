@@ -1,0 +1,31 @@
+-- IMPLICIT-PROPS-DESIGN.md §11.19, defect OF-7: an @export whose read-set
+-- crosses an IMPORT is refused.
+--
+-- `implicit-rate-lib` declares a section GIVEN `the rate` and a rule that reads
+-- it. This module imports that rule and exports something that calls it.
+-- Discharge does not cross an IMPORT, so all three of these are true at once
+-- and none of them is visible to the writer:
+--
+--   * `the rate` appears in no schema this export publishes, so
+--     `l4 batch --validate-only` answers {"errors":[],"status":"valid"} for a
+--     row that provably cannot evaluate;
+--   * a value sent under that name is accepted into the row and then dropped,
+--     because nothing binds it; and
+--   * `l4 batch` could not deliver it even if the schema demanded it: it
+--     supplies a binder by rewriting this module's own source, and the IMPORT
+--     is re-emitted verbatim, so the imported module is re-resolved from disk
+--     untouched.
+--
+-- The refusal comes BEFORE closing the read-set collector over imports, which
+-- is the ruled end state (R-X3). Closing it first would turn a false green into
+-- a parameter demanded and then silently ignored, which is worse.
+--
+-- Calling an imported reader WITHOUT exporting it is fine and stays fine:
+-- `ok/section-given-import-call.l4` pins that.
+
+IMPORT `implicit-rate-lib`
+
+@export What this amount comes to at the imported rate.
+GIVEN amount IS A NUMBER
+GIVETH A NUMBER
+`cost of` amount MEANS `scaled by the rate` amount

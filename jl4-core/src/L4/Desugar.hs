@@ -16,6 +16,7 @@ module L4.Desugar (
   desugarSectionGivens,
   detectMisattachedSectionGivens,
   collectSectionBinderNames,
+  collectSectionBinderDecls,
   detectRestatedSectionBinders,
   ) where
 
@@ -626,6 +627,45 @@ collectSectionBinderNames (MkModule _ _ sect) = goSection sect
   goTopDecl = \ case
     Section _ s -> goSection s
     _           -> Set.empty
+
+-- | Every section binder in the module, by spelling, with the heading path it
+-- is declared at and the type it was declared with.
+--
+-- The same walk as 'collectSectionBinderNames', on the same /parsed/ module and
+-- for a related reason: 'L4.TypeCheck.implicitSupply' has to check a @WITH@
+-- supply against the binder's declared type, and by the time the elaboration's
+-- own body is inferred it is too late for a supply site in an earlier section.
+-- Reading the type off the parse is order-independent, because every @DECLARE@
+-- in the module is already in scope before any body is checked
+-- ('L4.TypeCheck.withScanTypeAndSigEnvironment' scans declarations first).
+--
+-- Entries stay in declaration order, so two same-spelled binders are offered to
+-- the reader in the order the file declares them.
+collectSectionBinderDecls :: Module Name -> Map RawName [SectionBinderDecl]
+collectSectionBinderDecls (MkModule _ _ sect) = goSection [] sect
+ where
+  goSection :: [NonEmpty Text] -> Section Name -> Map RawName [SectionBinderDecl]
+  goSection path (MkSection _ mname maka mgiven decls) =
+    let path' = path <> sectionPathStep mname maka
+    in Map.unionsWith (<>)
+         ( Map.fromListWith (flip (<>))
+             [ ( rawName (getName otn)
+               , [MkSectionBinderDecl path' (getName otn) mty]
+               )
+             | otn@(MkOptionallyTypedName _ _ mty _) <- sectionGivenParams mgiven
+             ]
+         : [ goSection path' s | Section _ s <- decls ]
+         )
+
+-- | The one heading level a section contributes to a section path, spelled as
+-- 'L4.TypeCheck.withSectionStack' spells it. An anonymous section contributes
+-- nothing, which is likewise what 'withSectionStack' does with one.
+sectionPathStep :: Maybe Name -> Maybe (Aka Name) -> [NonEmpty Text]
+sectionPathStep Nothing     _    = []
+sectionPathStep (Just name) maka =
+  [rawNameToText <$> (rawName name :| maybe [] akaRawNames maka)]
+ where
+  akaRawNames (MkAka _ ns) = fmap rawName ns
 
 -- | One section-binder parameter, as the 0-ary @ASSUME@ that stands for it.
 --

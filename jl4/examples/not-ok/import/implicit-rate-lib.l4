@@ -1,0 +1,15 @@
+-- The library half of the cross-IMPORT refusal fixture, which is
+-- `export-refused.l4` beside it. This file typechecks and evaluates perfectly
+-- well; it exists only to be imported.
+--
+-- It is deliberately outside every golden glob. Imports resolve
+-- importer-relative, so the two files have to share a directory, and only one
+-- of them is meant to fail -- hence `not-ok/import/*-refused.l4` in
+-- jl4/tests/Main.hs rather than a whole-directory glob.
+
+§ `Rates`
+    GIVEN `the rate` IS A NUMBER TYPICALLY 0.05
+
+GIVEN amount IS A NUMBER
+GIVETH A NUMBER
+`scaled by the rate` amount MEANS amount TIMES `the rate`

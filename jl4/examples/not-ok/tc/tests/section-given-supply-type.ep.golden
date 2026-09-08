@@ -1,0 +1,27 @@
+-- R-X2, upstream smucclaw/l4-ide#956: a WITH supply is checked against the type
+-- the BINDER was declared with, not against whatever the caller's own scope
+-- binds that spelling to.
+--
+-- `bad` has a WHERE local also called `rate`, and a local shadows a section
+-- GIVEN absolutely. So the expression on the right of IS is a piece of text.
+-- The name on the LEFT of IS is not the local, though: it is the input of the
+-- rule being called, which the heading declares as a number, and that is what
+-- the value has to fit.
+--
+-- Before this was checked the file passed `l4 check` clean and died in `l4 run`
+-- as "Internal error ... running bin op with invalid operation / value
+-- combination": a type error escaping the type checker as a bug report.
+-- Confirmed 2026-09-08 against two independently built binaries at 6e9b57bb.
+--
+-- The remedy is to supply a number. See doc/reference/syntax/section-given.md.
+
+§ `Rates`
+    GIVEN rate IS A NUMBER TYPICALLY 0.05
+
+GIVETH A NUMBER
+scaled MEANS 100 TIMES rate
+
+GIVETH A NUMBER
+bad MEANS scaled WITH rate IS rate
+    WHERE
+        rate MEANS "5 percent"

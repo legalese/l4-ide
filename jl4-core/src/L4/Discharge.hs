@@ -60,6 +60,8 @@ module L4.Discharge
   , implicitSupplySites
   , unreadImplicitSupplies
   , ambiguousImplicitSupplies
+  , ambiguousRootBinders
+  , implicitReaders
   ) where
 
 import Base
@@ -68,8 +70,9 @@ import qualified Base.Map as Map
 import qualified Base.Text as Text
 import qualified Data.Set as Set
 import L4.Annotation (emptyAnno)
-import L4.Export (collectReferencedUniques, decideBodiesFromModule)
+import L4.Export (collectExportedDecides, collectReferencedUniques, decideBodiesFromModule, transitiveReferencedUniquesWith)
 import L4.Syntax
+import L4.TypeCheck.Types (typeKey)
 import qualified Optics
 
 -- | A section binder, as the checker left it on the section's own 'GivenSig'.
@@ -141,42 +144,14 @@ readSets mod' binders
 
   -- Per definition: the binders its body names, and the definitions it calls
   -- together with what each call supplies by name.
-  direct = Map.map directReads bodies
-  edges  = Map.map callEdges bodies
-
-  directReads body =
-    [ b | u <- Set.toList (collectReferencedUniques body), Just b <- [Map.lookup u binders] ]
-
-  -- One edge per CALL SITE, because what a site supplies is the site's own:
-  -- a definition called once with @WITH beta IS …@ and once positionally in
-  -- the same body contributes its full read-set through the second call.
-  -- 'collectReferencedUniques' cannot be used for this half; it merges the
-  -- sites of one callee, and the merged edge would re-add what a @WITH@ took
-  -- off.
-  callEdges body =
-    [ (getUnique g, [ r | (i, MkNamedExpr _ r _) <- zip order nes, i < 0 ])
-    | AppNamed _ g nes (Just order) <- subExprs body
-    , Map.member (getUnique g) bodies
-    ]
-    <> [ (getUnique h, [])
-       | e <- subExprs body
-       , h <- case e of
-           App _ h _  -> [h]
-           Var _ h    -> [h]
-           Proj _ _ f -> [f]
-           _          -> []
-       , Map.member (getUnique h) bodies
-       ]
+  direct = Map.map (directBinderReads binders) bodies
+  edges  = Map.map (bodyCallEdges bodies) bodies
 
   step current =
     Map.mapWithKey
       (\ u own ->
          canonicalise
-           (own <> concat
-              [ [ b | b <- reached, not (any (\ r -> suppliesBinder reached r b) supplied) ]
-              | (g, supplied) <- Map.findWithDefault [] u edges
-              , let reached = Map.findWithDefault [] g current
-              ]))
+           (own <> reachedThrough current (Map.findWithDefault [] u edges)))
       current
 
   iterateToFixpoint :: Int -> (Map.Map Unique [Binder] -> Map.Map Unique [Binder]) -> Map.Map Unique [Binder] -> Map.Map Unique [Binder]
@@ -194,11 +169,58 @@ readSets mod' binders
   nonEmptyRead [] = Nothing
   nonEmptyRead bs = Just bs
 
-  -- Declaration order, once each.
-  canonicalise bs =
-    Map.elems (Map.fromList [ (b.position, b) | b <- bs ])
+  canonicalise = canonicaliseBinders
 
-  subExprs = Optics.toListOf (Optics.cosmosOf (Optics.gplate @(Expr Resolved)))
+-- | The binders a body names directly.
+directBinderReads :: Map.Map Unique Binder -> Expr Resolved -> [Binder]
+directBinderReads binders body =
+  [ b | u <- Set.toList (collectReferencedUniques body), Just b <- [Map.lookup u binders] ]
+
+-- | One edge per CALL SITE, because what a site supplies is the site's own:
+-- a definition called once with @WITH beta IS …@ and once positionally in
+-- the same body contributes its full read-set through the second call.
+-- 'collectReferencedUniques' cannot be used for this half; it merges the
+-- sites of one callee, and the merged edge would re-add what a @WITH@ took
+-- off.
+--
+-- Edges to definitions outside @bodies@ are dropped: they have no read-set to
+-- contribute here. Across an @IMPORT@ that is not the same as "contributes
+-- nothing" — see 'L4.Export.validateExportImplicitImports', which is what
+-- refuses that case rather than answering it.
+bodyCallEdges
+  :: Map.Map Unique (Expr Resolved) -> Expr Resolved -> [(Unique, [Resolved])]
+bodyCallEdges bodies body =
+  [ (getUnique g, [ r | (i, MkNamedExpr _ r _) <- zip order nes, i < 0 ])
+  | AppNamed _ g nes (Just order) <- subExprsOf body
+  , Map.member (getUnique g) bodies
+  ]
+  <> [ (getUnique h, [])
+     | e <- subExprsOf body
+     , h <- case e of
+         App _ h _  -> [h]
+         Var _ h    -> [h]
+         Proj _ _ f -> [f]
+         _          -> []
+     , Map.member (getUnique h) bodies
+     ]
+
+-- | What a body picks up through its call edges: each callee's read-set, less
+-- whatever that call site supplies (§2.2's subtraction rule).
+reachedThrough :: Map.Map Unique [Binder] -> [(Unique, [Resolved])] -> [Binder]
+reachedThrough current es =
+  concat
+    [ [ b | b <- reached, not (any (\ r -> suppliesBinder reached r b) supplied) ]
+    | (g, supplied) <- es
+    , let reached = Map.findWithDefault [] g current
+    ]
+
+-- | Declaration order, once each.
+canonicaliseBinders :: [Binder] -> [Binder]
+canonicaliseBinders bs =
+  Map.elems (Map.fromList [ (b.position, b) | b <- bs ])
+
+subExprsOf :: Expr Resolved -> [Expr Resolved]
+subExprsOf = Optics.toListOf (Optics.cosmosOf (Optics.gplate @(Expr Resolved)))
 
 -- | Discharge a checked module.
 --
@@ -469,6 +491,140 @@ ambiguousImplicitSupplies mod'
   binders = sectionBinders mod'
   rs      = readSets mod' binders
   readSetOf n = fromMaybe [] (Map.lookup (getUnique n) rs)
+
+-- | R3's per-root check: the two shapes in which one name ends up standing for
+-- two section binders at the point where binders are actually filled in.
+--
+-- R3 enforces one binder per name PER ROOT, not per module — two sibling
+-- sections may each declare @foo@, and each is read by its own subtree. A ROOT
+-- is where the values arrive: an @\@export@, whose read-set is published as a
+-- request schema, and a @WITH@, where a writer names one. The two go wrong
+-- differently, so they are tested differently:
+--
+-- * __An @\@export@__ whose read-set holds two same-spelled, same-typed binders
+--   cannot publish a schema at all — the row would need one key twice.
+--   Unconditional: nothing has to be supplied for this to be broken.
+--
+-- * __A @WITH@ supply__ whose callee reads two same-spelled, same-typed binders
+--   reaches exactly one of them, and the other falls back to its own default.
+--   This is §11.4's measured witness: @ok\/section-given-bridge.l4@ plus
+--   @`both` MEANS foo PLUS g@ and @#EVAL `both` WITH foo IS 1@ answers __991__
+--   (1 + 99×10 — the supply reached one @foo@, the other took its default),
+--   and @l4 check@ used to accept it.
+--
+-- __Why a supply and not merely a directive.__ An earlier build tested every
+-- directive's read-set, on the reading that a directive is a root. Two
+-- independent adversarial passes broke that on 2026-09-08: with no @WITH@ there
+-- is no supply channel at all, every binder takes its own @TYPICALLY@ default
+-- and the answer is total and deterministic, so there is nothing to be
+-- ambiguous between — and the rule refused the very sibling-section drafting R3
+-- exists to permit, turning @ok\/section-given-fruit.l4@,
+-- @doc\/reference\/syntax\/sections-example.l4@ and the section-@GIVEN@ tutorial
+-- red with one added @#ASSERT@ apiece, with no way out, since a directive
+-- cannot be rewritten to reach fewer binders. It also refused
+-- @#EVAL g WITH foo IS foo@ — the bridge its own message tells the writer to
+-- write.
+--
+-- __Why this does not overlap 'ambiguousImplicitSupplies'.__ That check fires
+-- when the supplied name's 'Unique' matches NO binder the callee reads; this
+-- one requires that it matches ONE and that a second is spelled alike. The two
+-- conditions are disjoint, so a site is reported at most once.
+--
+-- Returns @(callee-or-export, binders)@ with the binders in declaration order,
+-- one entry per same-spelled group. The first component is what the diagnostic
+-- points at and names.
+ambiguousRootBinders :: Module Resolved -> [(Resolved, [Resolved])]
+ambiguousRootBinders mod'
+  | Map.null binders = []
+  | otherwise        = exportGroups <> supplyGroups
+ where
+  binders = sectionBinders mod'
+  rs      = readSets mod' binders
+
+  readSetOf n = Map.findWithDefault [] (getUnique n) rs
+
+  exportGroups =
+    [ (n, map (.resolved) alike)
+    | MkDecide _ _ (MkAppForm _ n _ _) _ <- collectExportedDecides mod'
+    , alike <- sameSpelledGroups (readSetOf n)
+    ]
+
+  supplyGroups =
+    [ (n, map (.resolved) alike)
+    | (n, r) <- implicitSupplySites mod'
+    , let reached = readSetOf n
+    , getUnique r `elem` map (getUnique . (.resolved)) reached
+    , alike <- sameSpelledGroups reached
+    , spellingOf r `elem` map (spellingOf . (.resolved)) alike
+    ]
+
+-- | The read-set entries that share an unqualified spelling AND a type, in
+-- declaration order, for each such pair that two or more of them share.
+--
+-- __The type is half the key, and leaving it out was a real defect.__ L4 lets
+-- one heading bind a name several times at several types and resolves each use
+-- by its context — the idiom @ok\/section-given-tdnr.l4@ and @ok\/misc.l4@ exist
+-- to pin, and which @doc\/reference\/syntax\/section-given.md@ documents under
+-- "One name, several types". Grouping on spelling alone called that an
+-- ambiguity: two adversarial passes on 2026-09-08 each turned both fixtures red
+-- by adding a single directive, and the diagnostic offered the reader two
+-- candidates printed under identical section-qualified spellings, with three
+-- remedies none of which applies. Two binders of one name at DIFFERENT types
+-- are not two answers to one question; they are two questions.
+--
+-- 'typeKey' is the annotation-insensitive skeleton the resolver already uses to
+-- decide which candidates count as "the same type", so this check and
+-- overload resolution cannot drift apart on what sameness means. An untyped
+-- binder groups with other untyped ones.
+sameSpelledGroups :: [Binder] -> [[Binder]]
+sameSpelledGroups bs =
+  [ alike
+  | alike@(_ : _ : _) <-
+      Map.elems (Map.fromListWith (flip (<>))
+        [ ((spellingOf b.resolved, fmap typeKey b.typ), [b]) | b <- bs ])
+  ]
+
+-- | The definitions an IMPORTER must treat as carrying implicit inputs: the
+-- ones it can neither supply nor see in a schema, because discharge stops at
+-- the module boundary.
+--
+-- Three sources, and the second and third were each a measured hole before they
+-- were added (adversarial pass, 2026-09-08):
+--
+-- * every definition with a non-empty read-set;
+-- * every section binder itself — the elaboration is a 0-ary @ASSUME@, never a
+--   'readSets' key, so an @\@export@ in the importer that names the imported
+--   BINDER directly went unrefused and, with a @TYPICALLY@ on it, answered a
+--   wrong number with @"status":"success"@;
+-- * every definition that reaches an ALREADY-imported reader. Without this a
+--   module in the middle of a chain — @A@ imports @B@ imports @C@, only @C@
+--   declares a binder — contributes nothing, because its own 'sectionBinders'
+--   is empty and its 'readSets' is therefore @Map.empty@; @A@'s export then
+--   validated a row it could not evaluate, one hop further out than the defect
+--   this refusal was built for.
+--
+-- The third is the only part that costs anything, so it is skipped entirely
+-- when @imported@ is empty — which is every module whose imports are the
+-- stdlib.
+implicitReaders :: Set Unique -> Module Resolved -> Set Unique
+implicitReaders imported mod' =
+  imported
+    <> Map.keysSet binders
+    <> Map.keysSet rs
+    <> reachers
+ where
+  binders = sectionBinders mod'
+  rs      = readSets mod' binders
+  bodies  = decideBodiesFromModule mod'
+
+  reachers
+    | Set.null imported = Set.empty
+    | otherwise =
+        Set.fromList
+          [ u
+          | (u, body) <- Map.toList bodies
+          , not (Set.disjoint (transitiveReferencedUniquesWith bodies body) imported)
+          ]
 
 -- | No 'Unique' match, and two or more binders in the read-set spelled alike.
 ambiguousFor :: [Binder] -> Resolved -> Bool

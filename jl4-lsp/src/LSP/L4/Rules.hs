@@ -138,6 +138,11 @@ data TypeCheckResult = TypeCheckResult
     -- including those reached through its imports. Propagated to importers by
     -- 'unionCheckStates' so an imported name can be named under its defining
     -- section. See 'L4.TypeCheck.Types.SectionPaths'.
+  , implicitReaders :: Set Unique
+    -- ^ Definitions with a non-empty read-set, this module's and its
+    -- dependencies'. Propagated to importers by 'unionCheckEnv' so that an
+    -- @\@export@ reaching one can be refused. See
+    -- 'L4.TypeCheck.Types.CheckResult.implicitReaders'.
   }
   deriving stock (Generic)
 
@@ -158,6 +163,7 @@ instance NFData TypeCheckResult where
     `seq` rnf dependencies
     `seq` rnf mixfixRegistry
     `seq` rnf sectionPaths
+    `seq` rnf implicitReaders
 
 type instance RuleResult EvaluateLazy = [EvaluateLazy.EvalDirectiveResult]
 data EvaluateLazy = EvaluateLazy
@@ -710,7 +716,7 @@ jl4Rules evalConfig rootDirectory recorder = do
         -- applied when the TypeCheckResult is built below), as
         -- 'unionImportedCheckEnv' requires.
         unionCheckEnv cEnv tcRes =
-          TypeCheck.unionImportedCheckEnv cEnv tcRes.environment tcRes.entityInfo tcRes.mixfixRegistry
+          TypeCheck.unionImportedCheckEnv cEnv tcRes.environment tcRes.entityInfo tcRes.mixfixRegistry tcRes.implicitReaders
         -- NOTE: we don't want to leak the inference variables from the substitution
         initCheckState = set #substitution Map.empty $ foldl' unionCheckStates TypeCheck.initialCheckState dependencies
         initCheckEnv = foldl' unionCheckEnv (TypeCheck.initialCheckEnv uri) dependencies
@@ -737,6 +743,7 @@ jl4Rules evalConfig rootDirectory recorder = do
         , dependencies = dependencies <> foldMap (.dependencies) dependencies
         , mixfixRegistry = result.mixfixRegistry
         , sectionPaths = result.sectionPaths
+        , implicitReaders = result.implicitReaders
         }
       )
 

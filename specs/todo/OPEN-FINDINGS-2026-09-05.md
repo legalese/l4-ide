@@ -360,9 +360,22 @@ applies depends on the base that work is cut from.
 
 ## OF-7 — the read-set does not cross an `IMPORT`, and neither does the supply path
 
-**Severity: a false green, then a loud failure. Ruled, not built. The ORDERING is ruled in
+**Severity: a false green, then a loud failure. The ORDERING is ruled in
 `IMPLICIT-PROPS-DESIGN.md` §11.19 — the refusal first, the closure second — and this is the record
 that ruling points at.** Also listed in `PROPS-REDTEAM-2026-09-03.md` §7.
+
+> **STATUS 2026-09-08: the REFUSAL is BUILT; the closure is not, and remains the ruled end state
+> (R-X3).** `Export.validateExportImplicitImports` refuses an `@export` whose closure reaches a
+> definition in an imported module with a non-empty read-set, as a new check error
+> `ImplicitCrossesImport`. The one fact that had to cross the boundary to make that possible is a
+> `Set Unique` of readers (`CheckResult.implicitReaders` → `CheckEnv.importedImplicitReaders`); no
+> dependency AST is needed, because a refusal needs to know _that_ a callee has implicits, never
+> _which_. Fixture `not-ok/import/export-refused.l4`. Full record, including the one corpus file it
+> refused and why that file's encoding was wrong: `IMPLICIT-PROPS-DESIGN.md` §11.19 and §11.22.
+>
+> **Two corrections to the text below, made where it is wrong rather than appended:** the `Export.hs`
+> line numbers had moved (they are re-cited against `6e9b57bb` below), and `regcf-wizard.l4` carries
+> **six** `@export`s, not eight.
 
 **The hole, measured 2026-09-05** (probe `scratchpad/consult/adv-d5/cf5.l4` + `lib_c.l4`, run on
 `l4-base2`). `lib_c.l4` declares a section `GIVEN rate3 IS A NUMBER TYPICALLY 0.05` and a helper
@@ -380,11 +393,14 @@ evaluate, and a value supplied under that name is **accepted into the row and ig
 **Both halves must be named, or the next person fixes the half that makes it worse.**
 
 1. **The read-set collector does not follow `IMPORT`.** Its three sites are per-module by type
-   signature: `assumesFromModule :: Module Resolved -> …` (`Export.hs:300`),
-   `decideBodiesFromModule :: Module Resolved -> …` (`Export.hs:377`, the call graph's edge table),
-   and `rewriteModuleAssumes :: … -> Module Resolved -> Module Resolved` (`Export.hs:441`). The
+   signature: `assumesFromModule :: Module Resolved -> …` (`Export.hs:302` @ `6e9b57bb`),
+   `decideBodiesFromModule :: Module Resolved -> …` (`Export.hs:380` @ `6e9b57bb`, the call graph's
+   edge table), and `rewriteModuleAssumes :: … -> Module Resolved -> Module Resolved`
+   (`Export.hs:451` @ `6e9b57bb`). The
    card's prior analysis said the fix is "confined to one module: `Export.hs` is the only place the
    closure is computed"; it is one of four sites, and the fourth is not in `Export.hs` at all.
+   (Line numbers re-measured 2026-09-08; the three cited here were `:300`, `:377` and `:441`, all
+   drifted. This is why a bare `Foo.hs:1234` is worth nothing without its ref.)
 2. **The supply path cannot deliver across an `IMPORT` even if the collector did.** `l4 batch`
    supplies a read binder by **rewriting the module's source**: it drops the binder's declaration
    and redefines it over the decoded row in a generated wrapper (`jl4/app/L4/Cli/Batch.hs:221-236`,
@@ -411,8 +427,11 @@ an imported module today.**) ~~Section `GIVEN` exists in only 7 files on `b2a3fa
 them is imported.~~ **THAT BOUND HAS EXPIRED, and the exposure is no longer zero.** Re-measured on
 `origin/unstable` **`063ddd34`**: **93 files carry a section binder** (140 sites), and **one of them
 is imported** — `jl4/examples/legal/regcf/regcf.l4`, which acquired a section `GIVEN` at `:468` in
-the sweep and is imported by `jl4/examples/legal/regcf/regcf-wizard.l4`, a file carrying **eight**
-`@export`s.
+the sweep and is imported by `jl4/examples/legal/regcf/regcf-wizard.l4`, a file carrying ~~eight~~
+**six** `@export`s (`grep -c '^@export'`, re-counted 2026-09-08). **Of those six, exactly one —
+`raise check` — was refused when the check was built, which is this defect's own probe.** The sweep's
+conversion of that binder is now understood to have been a mis-classification of a refusal-role
+`ASSUME`, and is reverted; see `IMPLICIT-PROPS-DESIGN.md` §11.22.
 
 **This is NOT new, and the crash half is already fixed. Corrected before it was written up as a
 find.** `IMPLICIT-PROPS-DESIGN.md` §11.16 ("Crossing an `IMPORT` was reachable and crashed; it is
@@ -563,7 +582,7 @@ Filed by whoever holds GitHub write authority; **nothing here has been posted**.
 | OF-5       | New issue: a `WHERE` local silently shadows a section `GIVEN`; ask for a warning, not an error.                                                                                                     |
 | OF-4       | No issue yet — measure first. An issue asserting a behaviour nobody has run would be the thing this file exists to prevent.                                                                         |
 | OF-6       | **#948: neither close nor re-open on today's evidence.** Comment the branch split if anything at all.                                                                                               |
-| OF-7       | Nothing yet — the ruling (refusal first) is not built, and an issue before the branch exists would only restate `IMPLICIT-PROPS-DESIGN.md` §11.19.                                                  |
+| OF-7       | The refusal is BUILT 2026-09-08 (`ImplicitCrossesImport`); the closure is the ruled end state and is not. See `IMPLICIT-PROPS-DESIGN.md` §11.19 and §11.22.                                         |
 | OF-8       | Nothing — a toolchain decision, not a defect; it wants a PR, not an issue.                                                                                                                          |
 | OF-11      | Nothing — a wording change plus a grep, not an issue.                                                                                                                                               |
 | OF-12      | Nothing until it is costed; an issue asking for an unscoped tool is not a request anyone can act on.                                                                                                |

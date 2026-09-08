@@ -1,5 +1,9 @@
 module L4.Names where
 
+import Control.DeepSeq (NFData)
+import Data.List.NonEmpty (NonEmpty)
+import Data.Text (Text)
+import GHC.Generics (Generic)
 import L4.Annotation (Anno_ (..), AnnoElement_ (..))
 import L4.Syntax
 
@@ -33,6 +37,34 @@ sectionGivenNames :: HasName n => Maybe (GivenSig n) -> [RawName]
 sectionGivenNames Nothing = []
 sectionGivenNames (Just (MkGivenSig _ otns)) =
   [ rawName (getName otn) | otn <- otns ]
+
+-- | One section binder, as the parsed module declares it.
+--
+-- Collected by 'L4.Desugar.collectSectionBinderDecls' and carried on
+-- 'L4.TypeCheck.Types.CheckEnv' so that a @WITH@ site can be checked against
+-- the type the BINDER was declared with rather than against whatever the
+-- caller's scope happens to bind that spelling to (R-X2,
+-- smucclaw\/l4-ide#956).
+data SectionBinderDecl =
+  MkSectionBinderDecl
+    { sectionPath  :: ![NonEmpty Text]
+    -- ^ The heading path this binder is declared at, spelled exactly the way
+    -- 'L4.TypeCheck.withSectionStack' spells the reader-side
+    -- @CheckEnv.sectionStack@ — outermost first, each level being the
+    -- section's name followed by its @AKA@ aliases — so that
+    -- 'L4.TypeCheck.Types.sectionProximity' can compare the two directly.
+    -- Empty for a binder on an anonymous heading, which is what
+    -- 'withSectionStack' does with one too.
+    , binderName   :: !Name
+    -- ^ The @GIVEN@-line occurrence, which is what a diagnostic should point at.
+    , declaredType :: !(Maybe (Type' Name))
+    -- ^ Unresolved, and deliberately so: this is read off the module before
+    -- desugaring, and 'L4.TypeCheck.inferType' turns it into a
+    -- @Type' Resolved@ at the point of use. See 'L4.TypeCheck.binderTypeFor'
+    -- for why the resolved type cannot simply be looked up in the environment.
+    }
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass (NFData)
 
 -- | Is this top-level declaration the /elaboration/ of one of the section-binder
 -- parameters named in @ns@ — the 0-ary @ASSUME@ that

@@ -89,6 +89,13 @@ main = do
   -- (empty.l4 used to live here while warnings still failed typecheck; now
   -- that only SError blocks 'SuccessfulTypeCheck', it lives in ok/.)
   exportPlacementFiles <- sort <$> globDir1 (compile "not-ok/export-*.l4") examplesRoot
+  -- A cross-IMPORT refusal takes two files: the module that declares the
+  -- section binder, and the importer whose @export reaches it. Imports resolve
+  -- importer-relative, so the two have to share a directory -- and only the
+  -- importer is meant to fail. Hence a glob that picks the importer out by
+  -- name rather than one that takes the whole directory. The library beside it
+  -- is deliberately in no glob at all.
+  importRefusalFiles <- sort <$> globDir1 (compile "not-ok/import/*-refused.l4") examplesRoot
   hspec do
     describe "corpus sanity (every glob matched something)" $ do
       let corpusNonEmpty nm xs = it (nm <> " corpus is non-empty") $ xs `shouldSatisfy` (not . null)
@@ -100,6 +107,7 @@ main = do
       corpusNonEmpty "semantic-tokens" semanticTokenFiles
       corpusNonEmpty "hover"           hoverFiles
       corpusNonEmpty "export-placement" exportPlacementFiles
+      corpusNonEmpty "import-refusal"   importRefusalFiles
     describe "ok files" $ tests evalConfig (True, True) (okFiles <> legalFiles <> librariesFiles) examplesRoot
     -- Invariant: exactprint is the identity on the source for every parseable
     -- corpus file. This is the single guard against the whole class of
@@ -124,6 +132,8 @@ main = do
         it (makeRelative examplesRoot inputFile) $
           jl4PrettyLayoutRoundTrip evalConfig inputFile
     describe "tc fails" $ tests evalConfig (False, True) tcFailsFiles examplesRoot
+    describe "import refusal (@export whose read-set crosses an IMPORT)" $
+      tests evalConfig (False, True) importRefusalFiles examplesRoot
     describe "nlg fails" $ tests evalConfig (True, False) nlgFailsFiles examplesRoot
     describe "export placement (typechecks; no default export)" $
       tests evalConfig (True, True) exportPlacementFiles examplesRoot
@@ -142,7 +152,7 @@ main = do
         let goldenDir = takeDirectory inputFile </> "tests"
         describe testCase $ do
           it "parses and checks" $
-            l4Golden evalConfig tcOk goldenDir inputFile
+            l4Golden evalConfig tcOk root goldenDir inputFile
           it "exactprints" $
             jl4ExactPrintGolden evalConfig goldenDir inputFile
           it "natural language annotations" $
@@ -150,11 +160,11 @@ main = do
           it "json schema" $
             jl4JsonSchemaGolden evalConfig goldenDir inputFile
 
-l4Golden :: JL4Lazy.EvalConfig -> Bool -> String -> String -> IO (Golden String)
-l4Golden evalConfig isOk dir inputFile = do
+l4Golden :: JL4Lazy.EvalConfig -> Bool -> String -> String -> String -> IO (Golden String)
+l4Golden evalConfig isOk examplesRoot dir inputFile = do
   (output, _) <- capture (checkFile evalConfig isOk inputFile)
-  scrubLibPath <- mkLibraryPathScrubber
-  let normalize = scrubLibPath . normalizeWhitespaceString . stripAnsiCodesString
+  scrubPaths <- mkPathScrubber examplesRoot
+  let normalize = scrubPaths . normalizeWhitespaceString . stripAnsiCodesString
   pure
     Golden
       { output = normalize output
@@ -166,20 +176,35 @@ l4Golden evalConfig isOk dir inputFile = do
       , failFirstTime = True
       }
 
--- | Build a scrubber that replaces the (absolute, machine-specific)
--- @JL4_LIBRARY_PATH@ prefix with a stable @$JL4_LIBRARY_PATH@ token, so goldens
--- that capture import-resolution logs like @Found on filesystem: <abspath>@ are
--- portable across machines and CI. In jl4-test @JL4_LIBRARY_PATH@ is always set
--- (see 'main'), so a library import is always resolved from the filesystem at
--- that path; the only environment-dependent part of the log is the prefix.
--- No-op when the variable is unset or empty.
-mkLibraryPathScrubber :: IO (String -> String)
-mkLibraryPathScrubber = do
+-- | Build a scrubber that replaces the two absolute, machine-specific path
+-- prefixes that reach golden output with stable tokens, so goldens capturing
+-- import-resolution logs like @Found on filesystem: <abspath>@ are portable
+-- across machines and CI.
+--
+-- There are TWO such prefixes and scrubbing only one is not enough:
+--
+--   * @JL4_LIBRARY_PATH@ -> @$JL4_LIBRARY_PATH@, for an import resolved out of
+--     the stdlib. In jl4-test the variable is always set (see 'main').
+--   * the examples root -> @$JL4_EXAMPLES@, for an import resolved
+--     /importer-relative/ — one corpus file importing its neighbour. Nothing
+--     scrubbed this until 2026-09-08, when the first goldens to capture such a
+--     resolution (@not-ok/import/**@) were committed with a developer\'s own
+--     worktree path baked in. They passed on that machine, deterministically,
+--     and failed in CI, whose checkout lives at @/__w/l4-ide/l4-ide@ — a green
+--     local run is structurally unable to catch this, so the scrub belongs
+--     here rather than in a reviewer\'s eye.
+--
+-- Each replacement is a no-op when its prefix is empty.
+mkPathScrubber :: String -> IO (String -> String)
+mkPathScrubber examplesRoot = do
   mp <- lookupEnv "JL4_LIBRARY_PATH"
-  pure $ case mp of
-    Just p | not (null p) ->
-      Text.unpack . Text.replace (Text.pack p) "$JL4_LIBRARY_PATH" . Text.pack
-    _ -> id
+  let sub prefix token
+        | null prefix = id
+        | otherwise = Text.unpack . Text.replace (Text.pack prefix) token . Text.pack
+      libScrub = case mp of
+        Just p | not (null p) -> sub p "$JL4_LIBRARY_PATH"
+        _ -> id
+  pure (sub examplesRoot "$JL4_EXAMPLES" . libScrub)
 
 jl4ExactPrintGolden :: JL4Lazy.EvalConfig -> String -> String -> IO (Golden Text)
 jl4ExactPrintGolden evalConfig dir inputFile = do

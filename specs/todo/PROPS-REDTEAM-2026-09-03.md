@@ -836,10 +836,18 @@ ignored (measured 2026-09-05, `scratchpad/consult/adv-d5/cf5.l4` on the `l4-base
 
 Closing the collector alone turns a false green into a demanded-then-silently-ignored parameter, so
 **the refusal is the first required move**: `l4 check`/`l4 batch` refuse an export whose read-set
-crosses an `IMPORT`, before the closure is allowed to find one. Zero corpus files are exposed today
+crosses an `IMPORT`, before the closure is allowed to find one. ~~Zero corpus files are exposed today
 (every one of the 25 imported modules has `ASSUME` = 0 apart from `regcf.l4`'s two refusal-role
 lines; the 7 files with a section `GIVEN` are all fixtures and none is imported), which is why this
-is a defect on a schedule rather than a stop-work.
+is a defect on a schedule rather than a stop-work.~~
+
+**THAT EXPOSURE COUNT EXPIRED WITH THE SWEEP, and the refusal is BUILT — 2026-09-08.** The sweep gave
+`regcf.l4` a section `GIVEN` and `regcf-wizard.l4` imports it, so one shipped file was exposed when
+the check was written, and one of its six `@export`s (`raise check`) was refused. That binder turned
+out to be a refusal-role `ASSUME` the sweep mis-classified, and is restored. Implementation,
+measurements and the three sources the refusal needs:
+`IMPLICIT-PROPS-DESIGN.md` §11.19 and §11.22; defect record `OPEN-FINDINGS-2026-09-05.md` OF-7. The
+`Export.hs` line numbers above are stale — re-cited against `6e9b57bb` in OF-7.
 
 **Findings from 2026-09-05 that are NOT props defects, and live in their own file.**
 `specs/todo/OPEN-FINDINGS-2026-09-05.md` collects twelve open items (`OF-1` … `OF-12`) found while the 2026-09-05 rulings
