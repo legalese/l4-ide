@@ -3150,7 +3150,16 @@ drafter will not recognise their program in it; and the corrected totality rule 
 this unreadable set, since the intersection over constructors **is** the set of names declared on
 every arm.
 
-#### What is NOT ruled here, and is Meng's
+#### What is NOT ruled here, and is Meng's — RULED later the same day, see `SUM-TYPE-FIELDS-SPEC.md`
+
+> **2026-09-09, after this subsection was written.** Meng was shown the two hazards and ruled:
+> _"let's take the best of both worlds from Haskell and OCaml."_ That ruling is written out as
+> `SUM-TYPE-FIELDS-SPEC.md` §3 — one total selector per shared field (S1), no projection without
+> narrowing (S2), narrowing as a check-time fact (S3). It answers item 3 below outright and gives
+> items 1 and 2 their mechanism; what remains `WHOSE`-specific is recorded in that file's §3 S5.
+> The list below is kept as the record of what was open when the separability question was
+> answered. Note also that file's §0 on the word "cast": this document uses it for the ensemble,
+> and the constructor in `EVERY Tenant t` is properly the **narrowing constructor**.
 
 None of the following is settled, because each changes what a drafter must write (assignment §7):
 
