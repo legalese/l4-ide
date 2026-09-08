@@ -161,6 +161,18 @@ Worth setting beside [docassemble](docassemble.md), which consumes `TYPICALLY` a
 prefill. The same L4 annotation is honoured by one interaction backend and deliberately dropped by
 the other, and both are right for what they are for.
 
+**A file that compiles here may still refuse to be published as a web API, and `l4 check` will say
+so.** An `ASSUME`d predicate — `GIVEN p IS A Person` above ``ASSUME `is authorised` p IS A
+BOOLEAN`` — is a rule with an input of its own, and someone has to answer it. Blawx has a place to
+put that question: the predicate becomes an `#abducible` the interview asks about. A web request
+does not, because it carries JavaScript Object Notation (**"JSON"**), which sends values and not
+rules. So since 2026-09-08 an `@export`ed rule that reads one is refused at check time, while
+`l4 blawx` compiles the same file unchanged. If you run `l4 check` on one of the shipped seeds and
+see a page of `… is assumed and takes 1 input of its own`, nothing is wrong: that file is a Blawx
+encoding, not a web API. To publish it as an API, write its inputs as record fields — every shipped
+seed has a record-spelled twin that emits byte-identical s(CASP). See
+[ASSUME (deprecated)](../reference/types/ASSUME.md#function-typed-inputs).
+
 ## Before you deploy on a stock Blawx instance
 
 Two limits our encodings hit on an unmodified Blawx, both reported upstream. Neither is a defect in

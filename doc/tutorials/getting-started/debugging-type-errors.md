@@ -263,6 +263,38 @@ File:     err-export.l4
 
 Fix by removing the `@export` (keep the higher-order function internal) or by restructuring the exported rule to take plain data — for example, an enum value selecting among known predicates.
 
+### The same mistake, spelled another way
+
+The rule being refused is "an input must be a value, not a rule", and it does not care whether the rule was written as a function type. An `ASSUME` that takes inputs of its own is a rule too, even though its declared type is `BOOLEAN`:
+
+```l4
+-- ❌ Wrong: the exported rule reads an assumed rule of one input
+ASSUME Person IS A TYPE
+
+GIVEN p IS A Person
+ASSUME `is eligible` p IS A BOOLEAN
+
+@export Whether the person may apply
+GIVEN who IS A Person
+GIVETH A BOOLEAN
+DECIDE `may apply` IF `is eligible` who
+```
+
+```
+File:     err-export-assume.l4
+  Range:    7:8-7:17
+  Source:   check
+  Severity: DiagnosticSeverity_Error
+  Message:
+    The @export rule `may apply` reads `is eligible`, which is assumed and takes 1 input of its own.
+    A published rule's inputs travel as JSON, which can carry a value but not a rule, so an assumed rule with inputs of its own can never be supplied — every request would stop on it.
+    Give `is eligible` a definition (DECIDE or MEANS), or take what it is asked about as an ordinary input of `may apply`, or remove the @export.
+```
+
+Hiding the assumed rule behind a helper does not help — the check follows every rule the exported one reaches, which is exactly the set a request would have to fill in. An assumed name that takes **no** inputs is a value, and stays perfectly publishable: `ASSUME age IS A NUMBER` is an input the request supplies.
+
+Before 2026-09-08 this spelling passed `l4 check` and then failed on every request, so a file could look publishable and not be. Both spellings are refused now, at check time. See [ASSUME (deprecated)](../../reference/types/ASSUME.md#function-typed-inputs).
+
 ---
 
 ## A Debugging Routine

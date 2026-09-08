@@ -5790,6 +5790,22 @@ prettyCheckError (ExportFunctionTypeInput _fnName paramName) =
       <> quotedName (getActual paramName)
       <> " has a function type."
   ]
+prettyCheckError (ExportAssumeArityInput fnName paramName arity) =
+  [ "The @export rule " <> quotedName (getActual fnName)
+      <> " reads " <> quotedName (getActual paramName)
+      <> ", which is assumed and takes " <> inputCount <> " of its own."
+  , "A published rule's inputs travel as JSON, which can carry a value but not a\
+    \ rule, so an assumed rule with inputs of its own can never be supplied — every\
+    \ request would stop on it."
+  , "Give " <> quotedName (getActual paramName)
+      <> " a definition (DECIDE or MEANS), or take what it is asked about as an\
+         \ ordinary input of " <> quotedName (getActual fnName)
+      <> ", or remove the @export."
+  ]
+ where
+  inputCount
+    | arity == 1 = "1 input"
+    | otherwise  = Text.pack (show arity) <> " inputs"
 prettyCheckError (ExportAssumeNameClash fnName paramName) =
   [ "The @export function " <> quotedName (getActual fnName)
       <> " has a GIVEN input " <> quotedName (getActual paramName)

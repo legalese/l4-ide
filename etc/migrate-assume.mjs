@@ -77,13 +77,16 @@
 //                                                   in place under --types; left
 //                                                   and reported without it
 //   app-form        GIVEN p IS A Person           — a signature-style ASSUME.
-//                   ASSUME f p IS A BOOLEAN        Measured 2026-09-05: read by
-//                                                   an @export, its function-typed
-//                                                   section-GIVEN image is rejected
-//                                                   by the export path ("Function
-//                                                   type inputs are not supported
-//                                                   for @export"), so the Blawx and
-//                                                   relational exhibits keep it
+//                   ASSUME f p IS A BOOLEAN        Left alone because the shape
+//                                                   ITSELF is the exhibit, not
+//                                                   because the destination is
+//                                                   worse: since R-X4 (built
+//                                                   2026-09-08) an @export that
+//                                                   reads either spelling is
+//                                                   refused, so the move is a
+//                                                   no-op for publishability and
+//                                                   the Blawx and relational
+//                                                   exhibits keep the ASSUME
 //   refusal role    ASSUME `no X exists before …`  — a deliberate typed bottom.
 //                                                   Its ruled spelling is REFUSE
 //                                                   (R7): one named definition
@@ -349,9 +352,11 @@ const KEEP = [
   ],
   // The relational middle end lowers a SIGNATURE-style ASSUME (`GIVEN p …` /
   // `ASSUME f p IS A T`) to an input predicate; that spelling has no section
-  // GIVEN form (the signature form is a parse error under a heading, and the
-  // function-typed section GIVEN is refused on the export path). A NULLARY
-  // fact lowers identically from either spelling and migrates.
+  // GIVEN form (the signature form is a parse error under a heading). Since
+  // R-X4 (built 2026-09-08) both spellings are equally refused on the export
+  // path, so THAT is no longer half of the reason — the reason is that the
+  // exhibit is the ASSUME. A NULLARY fact lowers identically from either
+  // spelling and migrates.
   [
     /(^|\/)jl4\/examples\/relational\/(assumed|not-ok\/assumed-signatures)\.l4$/,
     "the relational middle end's lowering of signature-style ASSUME input predicates is the exhibit; that spelling has no section-GIVEN form",
@@ -362,7 +367,7 @@ const KEEP = [
   ],
   [
     /(^|\/)jl4\/examples\/blawx\/(alcohol|antisocial|not-ok\/arity-two)\.l4$/,
-    "a Blawx seed: its input predicates are signature-style ASSUMEs; the section-GIVEN image is function-typed and refused on the export path (measured 2026-09-06 and 2026-09-07)",
+    "a Blawx seed: its input predicates are signature-style ASSUMEs, and that shape is the exhibit. Since R-X4 (built 2026-09-08) an @export reading EITHER spelling is refused, so migrating would not restore the export either; `l4 blawx` compiles these files regardless (specs/todo/IMPLICIT-PROPS-DESIGN.md §11.21)",
   ],
   [
     /(^|\/)jl4\/examples\/ok\/(signatures|tbd)\.l4$/,
@@ -680,7 +685,7 @@ function migrateFile(file, text) {
     if (d.sig || d.head.args) {
       refuse(
         "app-form",
-        "signature-style ASSUME (GIVEN … ASSUME f x …): its function-typed section-GIVEN image is rejected on the export path (measured 2026-09-05, l4 blawx)",
+        "signature-style ASSUME (GIVEN … ASSUME f x …): this tool has no rewrite for the app form. Since R-X4 (built 2026-09-08) an @export reading either spelling is refused, so leaving it here neither costs nor saves an export — the rewrite is simply not implemented",
       );
       continue;
     }

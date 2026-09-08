@@ -233,29 +233,32 @@ matched the L4 evaluator on every tier-1 query
 Two details deserve a word:
 
 **`ASSUME` inputs.** A module whose inputs are top-level `ASSUME`d
-predicates (rather than record fields) exports too —
+predicates (rather than record fields) compiles to Blawx too —
 [`antisocial.l4`](../../../jl4/examples/blawx/antisocial.l4) is the shipped
 example, encoding s. 43 of the United Kingdom's Anti-social Behaviour, Crime and
-Policing Act 2014 with nine `ASSUME`d predicates over five `ASSUME`d types.
-Note the spelling: `ASSUME `is authorised` p IS A BOOLEAN` (a declared
-parameter), not `ASSUME `is authorised` IS A FUNCTION FROM Person TO
-BOOLEAN` — function-typed `ASSUME`s are rejected on the export path because
-they cannot cross the web-app boundary, which carries data as JavaScript
-Object Notation (**"JSON"**). Each shipped `ASSUME` seed has
-a record-spelling twin (`antisocial-twin.l4`) that emits **byte-identical**
-s(CASP) apart from the provenance header naming the source file — the two
-idioms are the same program to Blawx.
+Policing Act 2014 with nine `ASSUME`d predicates over five `ASSUME`d types. Each
+shipped `ASSUME` seed has a record-spelling twin (`antisocial-twin.l4`) that
+emits **byte-identical** s(CASP) apart from the provenance header naming the
+source file — the two idioms are the same program to Blawx.
 
-`ASSUME` is deprecated (ruled 2026-09-04) and still works, so those seeds and
-every file like them keep exporting unchanged, and the seeds are deliberately
-kept in that form: the Blawx bridge and the relational middle end it is built
-on read an input predicate from the `ASSUME` declaration, and they have no
-image yet for the same predicate written as a
-[section `GIVEN`](../../reference/syntax/section-given.md) — that spelling is
-function-typed, and a function-typed input is rejected on the export path. For
-a new encoding, write the record spelling the twin uses. See
-[ASSUME (deprecated)](../../reference/types/ASSUME.md) for where the keyword's
-other jobs went.
+**These seeds compile to Blawx and cannot be published as a web API, and that is
+on purpose.** An `ASSUME`d predicate is a rule with an input of its own — "is
+this person authorised?" — and the answer is something a person supplies. Blawx
+has a place to put that: the predicate becomes an `#abducible` the interview
+asks about. A web request does not: it carries JavaScript Object Notation
+(**"JSON"**), which can send a value but not a rule. So since 2026-09-08 `l4
+check` refuses to publish a rule that reads one, in either spelling, while `l4
+blawx` still compiles it. Running `l4 check` on one of these seeds will tell you
+so, at length, and nothing is wrong with the file.
+
+`ASSUME` is deprecated (ruled 2026-09-04) and still works, and the seeds are
+deliberately kept in that form: the Blawx bridge and the relational middle end it
+is built on read an input predicate from the `ASSUME` declaration, and they have
+no image yet for the same predicate written as a
+[section `GIVEN`](../../reference/syntax/section-given.md). For a new encoding
+that has to be published as a web API, write the record spelling the twin uses.
+See [ASSUME (deprecated)](../../reference/types/ASSUME.md) for where the
+keyword's other jobs went.
 
 **What does not map, refuses loudly — with one exception that warns.** The
 regulative layer (obligations, parties, deadlines), temporal

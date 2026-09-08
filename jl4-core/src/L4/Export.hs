@@ -668,16 +668,87 @@ checkGivenFunctionInputs synonyms fnName (MkTypeSig _ (MkGivenSig _ names) _) =
   , isFunctionTypeExpanded synonyms ty
   ]
 
+-- | The gate on an @\@export@ed rule's assumed inputs, keyed on the assumed
+-- name's ARITY rather than on how its type happens to be spelled.
+--
+-- An assumed name of arity zero is a /value/ the request supplies. An assumed
+-- name of arity one or more is a /rule/, and a JSON request has no way to send
+-- one, so an export that reads it can never be invoked. L4 spells that same
+-- rule two ways, and until R-X4 they were gated differently:
+--
+-- > ASSUME `is authorised` IS A FUNCTION FROM Person TO BOOLEAN   -- arrow form
+-- >
+-- > GIVEN p IS A Person                                           -- app form
+-- > ASSUME `is authorised` p IS A BOOLEAN
+--
+-- The arrow form was refused because its declared type is a 'Fun'. The app
+-- form's declared type is @BOOLEAN@ — the inputs are on the head, where the
+-- type test could not see them — so it passed @l4 check@ and then failed every
+-- @l4 batch@ row on a stuck assumed term, which is worse than the refusal it
+-- dodged: the module looks deployable and is not. Both are refused here.
+--
+-- Ruled R-X4, 2026-09-07 (@specs\/todo\/IMPLICIT-PROPS-DESIGN.md@ §11.20).
+-- Teaching the export path to /accept/ an assumed predicate, as an enumerated
+-- row of values, is backlogged as B in that ruling; until it lands, an
+-- @\@export@ over an assumed predicate is refused rather than mis-served.
+--
+-- Note what this deliberately does NOT change: 'assumesFromModule', which
+-- builds the published parameter list, still filters on the declared type
+-- alone, so an app-form @ASSUME@ still contributes a (wrongly typed) field to
+-- a schema. That collector is exactly what backlog B rewrites, and a module
+-- that reaches it now has to pass this gate first.
 checkAssumeFunctionInputs
   :: Map.Map Unique (Type' Resolved)
   -> [Assume Resolved]
   -> Resolved
   -> [CheckErrorWithContext]
 checkAssumeFunctionInputs synonyms readAssumes fnName =
-  [ mkExportFunErr fnName paramName
-  | MkAssume _ _ (MkAppForm _ paramName _ _) (Just ty) _mTypically <- readAssumes
-  , isFunctionTypeExpanded synonyms ty
+  [ err
+  | MkAssume _ tySig (MkAppForm _ paramName args _) mty _mTypically <- readAssumes
+  , Just err <- [refusal paramName args (mty <|> extractReturnType tySig)]
   ]
+ where
+  -- An assumed name's result type has TWO spellings and the gate must read
+  -- both. @ASSUME f x IS A BOOLEAN@ puts it after @IS A@; @GIVETH A FUNCTION
+  -- FROM NUMBER TO NUMBER@ above a bare @ASSUME f@ puts it in the signature and
+  -- leaves the @IS A@ slot empty. Reading only the first missed the second
+  -- entirely: @jl4/examples/ok/{signatures,tbd}.l4@ are written that way, they
+  -- reach the runtime as assumed terms exactly like every other assumed rule,
+  -- and an @\@export@ over one used to check clean. Found by an adversarial
+  -- refuter on the first build of this gate; see §11.21's "found by review".
+  refusal paramName args mty
+    -- Inputs on the head: the app form is authoritative and the declared type
+    -- is only the result, so this is the case the type test misses.
+    | not (null args) =
+        Just (mkExportArityErr fnName paramName (assumedArity synonyms args mty))
+    -- Inputs in the type. 'isFunctionTypeExpanded' and not an arrow-spine
+    -- count, because @MAYBE OF FUNCTION FROM A TO B@ has no spine and is just
+    -- as unsendable.
+    | Just ty <- mty, isFunctionTypeExpanded synonyms ty =
+        Just (mkExportFunErr fnName paramName)
+    | otherwise = Nothing
+
+-- | How many inputs an assumed name really takes: the arguments written on its
+-- app form, plus the arrow spine of its result type.
+--
+-- Both sources are real and they compose — @ASSUME f x IS A FUNCTION FROM B TO
+-- BOOLEAN@ is a rule of two inputs — and 'L4.Relational.Lower.assumeDef'
+-- flattens them in this same order. The caller resolves the result type from
+-- either spelling (@IS A …@ or a @GIVETH@) before handing it here. Only the
+-- count is computed here; whether to refuse is 'checkAssumeFunctionInputs''
+-- decision, which is why a wrapped function (@MAYBE OF FUNCTION …@) contributes
+-- nothing to the spine and is nevertheless refused there.
+assumedArity :: Map.Map Unique (Type' Resolved) -> [a] -> Maybe (Type' Resolved) -> Int
+assumedArity synonyms args mty = length args + maybe 0 (spine Set.empty) mty
+ where
+  spine visited = \case
+    Fun _ opts result -> length opts + spine visited result
+    Forall _ _ inner  -> spine visited inner
+    TyApp _ synName _
+      | u <- getUnique synName
+      , Just expanded <- Map.lookup u synonyms
+      , not (Set.member u visited) -> spine (Set.insert u visited) expanded
+    _ -> 0
 
 -- | A GIVEN parameter and a read ASSUME that share a name would collapse
 -- into one input field of the export's schema (the GIVEN shadows the
@@ -705,5 +776,16 @@ mkExportFunErr :: Resolved -> Resolved -> CheckErrorWithContext
 mkExportFunErr fnName paramName =
   MkCheckErrorWithContext
     { kind    = ExportFunctionTypeInput fnName paramName
+    , context = WhileCheckingDecide (getActual fnName) None
+    }
+
+-- | Anchored on the @\@export@ed decision, not on the @ASSUME@, matching
+-- 'mkExportFunErr': one assumed rule may be read by several exports, and the
+-- edit the message asks for (define it, take its subject as an input, or drop
+-- the @\@export@) is made at each export in turn.
+mkExportArityErr :: Resolved -> Resolved -> Int -> CheckErrorWithContext
+mkExportArityErr fnName paramName arity =
+  MkCheckErrorWithContext
+    { kind    = ExportAssumeArityInput fnName paramName arity
     , context = WhileCheckingDecide (getActual fnName) None
     }

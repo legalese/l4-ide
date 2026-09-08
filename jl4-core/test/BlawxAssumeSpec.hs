@@ -35,16 +35,33 @@ import L4.TypeCheck.Types (Severity (..))
 --
 -- Type-check errors are surfaced as a 'Left' rather than ignored: a module that
 -- L4 rejects would otherwise be asserted on anyway, and the assertion would be
--- pinning the exporter's treatment of a broken module. That matters more than
--- usual here — the @ASSUME@ corpus shape is exactly where
--- @L4.Export.validateExportInputs@ fires (a function-typed @ASSUME@ referenced
--- by an @\@export@ is a type error), and a spec that swallowed it would claim
--- support for a spelling no user can compile.
+-- pinning the exporter's treatment of a broken module.
+--
+-- __The one diagnostic this steps over, and why it is not "swallowing".__
+-- Since R-X4 (2026-09-07) @L4.Export.validateExportInputs@ refuses an
+-- @\@export@ whose read-set contains an assumed /rule/, in either spelling —
+-- @ASSUME f p IS A BOOLEAN@ as well as @ASSUME f IS A FUNCTION FROM …@ — because
+-- a JSON request carries values and not rules. That is a statement about the web
+-- API, and this leg does not serve one: an assumed predicate is what becomes an
+-- @#abducible@ the Blawx interview asks the user about, which is the very thing
+-- the modules below exist to pin. 'TC.isExportPublicationRefusal' names exactly
+-- those two, @l4 blawx@ steps over the same pair at 'L4.Cli.Blawx.loadBlawxDoc',
+-- and every other 'SError' still fails the spec. An earlier version of this
+-- comment warned that swallowing the error would "claim support for a spelling
+-- no user can compile"; that warning stands for every other diagnostic, and the
+-- honest statement of this one is @specs\/todo\/IMPLICIT-PROPS-DESIGN.md@ §11.21:
+-- these modules compile to Blawx and cannot be published as a web API until
+-- backlog B lands.
 blawxYaml :: Text -> Either Text Text
 blawxYaml src = case checkWithImports emptyVFS src of
   Left errs -> Left ("parse/import: " <> Text.unlines errs)
   Right r
-    | errs@(_ : _) <- filter ((== SError) . TC.severity) r.tcdErrors ->
+    | errs@(_ : _) <-
+        [ e
+        | e <- r.tcdErrors
+        , TC.severity e == SError
+        , not (TC.isExportPublicationRefusal e.kind)
+        ] ->
         Left ("typecheck: " <> Text.unlines (concatMap TC.prettyCheckErrorWithContext errs))
     | otherwise -> case lowerModule defaultLowerOptions r.tcdEntityInfo r.tcdModule of
         Left es -> Left ("lowering: " <> Text.unlines (map renderLowerError es))

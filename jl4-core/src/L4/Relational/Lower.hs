@@ -691,19 +691,32 @@ assumeAnnos outer (MkAssume aAnno _ (MkAppForm afAnno hd _ _) _ _) =
 -- same 'AssumeDef', and a mixture (app-form binders plus an arrow result) is
 -- flattened in that order.
 --
--- __Spelling (2) is the one an @\@export@ed module can use__, and that is worth
--- knowing before writing a corpus: @L4.Export.validateExportInputs@ makes a
--- /function-typed/ @ASSUME@ referenced by an @\@export@ed @DECIDE@ a type
--- error (@ExportFunctionTypeInput@ — a function cannot cross the web app's
--- JSON boundary), and the relational lowering is export-rooted, so a module
--- written entirely in spelling (1) has no root to lower from. Spelling (2)'s
--- declared type is @BOOLEAN@, not an arrow, so it passes.
+-- __Neither spelling can be published as a web API, and both lower here.__ That
+-- was not always so, and the older reading is the one to unlearn: spelling (2)
+-- used to slip past @L4.Export.validateExportInputs@ because its declared type
+-- is @BOOLEAN@ rather than an arrow, so it passed @l4 check@ and then failed
+-- every @l4 batch@ row on a stuck assumed term. Since R-X4 (2026-09-07, built
+-- 2026-09-08) that gate is keyed on the assumed name's ARITY and refuses both —
+-- spelling (1) as @ExportFunctionTypeInput@, spelling (2) as
+-- @ExportAssumeArityInput@.
 --
--- The 'LEHigherOrder' refusal below is deliberately the complement of
+-- This lowering is unaffected, on purpose. It is export-rooted only in the sense
+-- that @\@export@ marks which definitions to lower; it emits a logic program,
+-- where an assumed predicate is an ordinary input — the Blawx leg turns it into
+-- an @#abducible@ the interview asks a person about — and a refusal about what
+-- JSON can carry says nothing about that. @L4.Cli.Blawx.loadBlawxDoc@ and the
+-- two golden harnesses step over exactly those two diagnostics, by name, via
+-- @L4.TypeCheck.Types.isExportPublicationRefusal@; every other @SError@ still
+-- stops them. See @specs\/todo\/IMPLICIT-PROPS-DESIGN.md@ §11.21.
+--
+-- The 'LEHigherOrder' refusal below __used__ to be the exact complement of
 -- @L4.Export.assumesFromModule@\'s filter, which __drops__ function-typed
 -- @ASSUME@s: an @ASSUME@ of a function is a /predicate/ here and a
--- non-representable form field there. A reader who finds only one of the two
--- will otherwise conclude the other is a bug.
+-- non-representable form field there. They are no longer complements — the
+-- validator is arity-keyed and that collector is still type-keyed — and closing
+-- the gap is backlog B of R-X4 (teach the export path to take a predicate as an
+-- enumerated row of values). A reader who finds only one of the three will
+-- otherwise conclude the others are bugs.
 assumeDef :: SortEnv -> EntityInfo -> Anno -> Assume Resolved -> AssumeDef
 assumeDef se ei outer a@(MkAssume _ (MkTypeSig _ (MkGivenSig _ givens) _) (MkAppForm _ res args _) mty mDefault) =
   MkAssumeDef

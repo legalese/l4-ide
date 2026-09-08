@@ -25,6 +25,7 @@ If you already know what error you are looking at, use the table of contents bel
   - [Undefined field access](#undefined-field-access)
   - [Wrong number of inputs](#wrong-number-of-inputs)
   - [APPEND vs append](#append-vs-append)
+  - [An @export input that is a rule, not a value](#an-export-input-that-is-a-rule-not-a-value)
 - [Compiler Warnings](#compiler-warnings)
   - [Non-exhaustive pattern match](#non-exhaustive-pattern-match)
   - [Redundant pattern match branch](#redundant-pattern-match-branch)
@@ -439,6 +440,57 @@ CONCAT "hello", " world"
 
 ---
 
+### An @export input that is a rule, not a value
+
+**Error message:** `Function type inputs are not supported for @export.` — or, for the other
+spelling, `The @export rule … reads …, which is assumed and takes 1 input of its own.`
+
+**What you wrote:** A published rule that depends on a rule somebody else is expected to supply.
+
+```l4
+ASSUME Person IS A TYPE
+
+GIVEN p IS A Person
+ASSUME `is eligible` p IS A BOOLEAN
+
+@export Whether the person may apply
+GIVEN who IS A Person
+GIVETH A BOOLEAN
+DECIDE `may apply` IF `is eligible` who
+```
+
+**What went wrong:** `@export` publishes a rule as a web endpoint, and a request reaches it as
+JavaScript Object Notation (**"JSON"**). JSON carries **values** — a number, a date, a yes or no, a
+record of those. It cannot carry a rule. So an input that is itself a rule can never be supplied,
+and every request would stop on it.
+
+Three ways of writing the same mistake, all refused:
+
+| what you wrote                                                      | how many inputs it takes |
+| ------------------------------------------------------------------- | ------------------------ |
+| `GIVEN p IS A Person` above ``ASSUME `is eligible` p IS A BOOLEAN`` | 1                        |
+| ``ASSUME `is eligible` IS A FUNCTION FROM Person TO BOOLEAN``       | 1                        |
+| ``GIVEN `is eligible` IS A FUNCTION FROM Person TO BOOLEAN``        | 1                        |
+
+An assumed name that takes **no** inputs is a value, and stays publishable: `ASSUME age IS A NUMBER`
+is exactly the sort of thing a request supplies.
+
+The check follows every rule the published one reaches, so moving the assumed rule behind a helper
+does not silence it — that set is precisely what a request would have to fill in.
+
+**How to fix it:** any of three moves, and the message names all three.
+
+1. **Give the rule a definition** — `DECIDE` or `MEANS` — so nothing outside has to supply it.
+2. **Take what it is asked about as an ordinary input.** If `` `is eligible` `` is really a fact
+   about the person, make it a field of the person's record and let the request send that.
+3. **Remove the `@export`.** The rule still checks, runs and compiles; it is simply not published.
+
+Compiling to [Blawx](../../exports/blawx.md) is the one place this shape is fine as written, because
+a Blawx interview asks a person for the answer instead of receiving it in a request. `l4 blawx` will
+still compile such a file even though `l4 check` refuses to publish it.
+
+---
+
 ## Compiler Warnings
 
 Warnings do not stop compilation, but they flag code that is likely to fail at runtime or that contains dead branches.
@@ -516,7 +568,7 @@ DECIDE `is adult` IF age >= 18
 
 **What went wrong:** Nothing is broken. The file still checks, runs and exports exactly as it did, and it will until the keyword is removed. `ASSUME` was one keyword doing four unrelated jobs, three of which the warning can tell apart from the shape of the declaration alone ([ASSUME](../types/ASSUME.md) has the table). The warning reads that shape and names the spelling that replaces it:
 
-- _A fact to be supplied for each case_ (`ASSUME age IS A NUMBER`, or a rule defined elsewhere, `ASSUME rate IS A FUNCTION FROM NUMBER TO NUMBER`): a [section `GIVEN`](../syntax/section-given.md), indented under the heading of the section whose rules read it. The suggested `GIVEN` line is pasteable as written; it carries a `TYPICALLY` default across, and spells the function type out when the `ASSUME` wrote its inputs on the head (`GIVEN n IS A NUMBER` above ``ASSUME `is large` n IS A BOOLEAN`` becomes ``GIVEN `is large` IS A FUNCTION FROM NUMBER TO BOOLEAN``). Where the type cannot be written down at the destination — it names a type variable the `ASSUME` declared for itself with `GIVEN a IS A TYPE`, or an input was written without a type — the line shows a `<type>` hole for you to fill in. An `ASSUME` inside a `WHERE` has no section to move to, so the message offers the rule's own `GIVEN` instead; an `AKA` on the `ASSUME` is named, since a `GIVEN` cannot carry one; and a `@desc` or `@ref` above it is mentioned, since it moves with it.
+- _A fact to be supplied for each case_ (`ASSUME age IS A NUMBER`, or a rule defined elsewhere, `ASSUME rate IS A FUNCTION FROM NUMBER TO NUMBER`): a [section `GIVEN`](../syntax/section-given.md), indented under the heading of the section whose rules read it. The suggested `GIVEN` line is pasteable as written; it carries a `TYPICALLY` default across, and spells the function type out when the `ASSUME` wrote its inputs on the head (`GIVEN n IS A NUMBER` above ``ASSUME `is large` n IS A BOOLEAN`` becomes ``GIVEN `is large` IS A FUNCTION FROM NUMBER TO BOOLEAN``). That rewrite is safe to take: since 2026-09-08 a published rule refuses to read an assumed rule in _either_ spelling ([the entry above](#an-export-input-that-is-a-rule-not-a-value)), so moving between them cannot cost you an export. Where the type cannot be written down at the destination — it names a type variable the `ASSUME` declared for itself with `GIVEN a IS A TYPE`, or an input was written without a type — the line shows a `<type>` hole for you to fill in. An `ASSUME` inside a `WHERE` has no section to move to, so the message offers the rule's own `GIVEN` instead; an `AKA` on the `ASSUME` is named, since a `GIVEN` cannot carry one; and a `@desc` or `@ref` above it is mentioned, since it moves with it.
 - _A kind of thing with no stated parts_ (`ASSUME Person IS A TYPE`): a [`DECLARE Person`](../types/DECLARE.md#opaque-types) with nothing after the name — what the DECLARE page calls an **"opaque type"**, a type that is named but not described. That message ends "The manual explains the move: doc/reference/types/DECLARE.md, under Opaque Types".
 - _A name that could be of any type_ (`GIVEN a IS A TYPE` followed by `ASSUME gap IS AN a`, with no inputs): no value can ever be supplied for it, so that message offers [`REFUSE`](../control-flow/REFUSE.md) alone and ends "The manual explains the move: doc/reference/control-flow/REFUSE.md." An `ASSUME` with no type written at all (`ASSUME w`) is a different case: the message asks you to write the type in, on a `GIVEN` line with a `<type>` hole.
 

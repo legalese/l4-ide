@@ -927,6 +927,9 @@ checker, 333 warnings; the six files with a parse error never reach it.
   §11.20): neither, because the premise was false — the head form does not export either.** It
   passes `l4 check` and then fails every batch row, so the gate is inconsistent rather than
   protective. It is re-keyed on the AppForm's arity, refusing both spellings at check time.
+  **BUILT 2026-09-08 (§11.21), and that is what makes the sibling rewrite of those five files safe:**
+  neither destination exports, so the migration no longer trades a clean file for a broken one — it
+  moves a file that was already refused. The count was five files, not the three §11.20 estimated.
 - **`l4 batch` re-prints a TDNR section `GIVEN` wrongly.** `Export.rewriteModuleAssumes` keeps the
   surviving binders by raw name (`filterGivenSigTo`), so dropping one of two same-named
   elaborations keeps both `GivenSig` parameters and the reprint declares the name three times. Same
@@ -2293,4 +2296,223 @@ R-X5 and R-X6 concern the regulative window and are recorded in
   declared `ty`, discarding the argument list. Three shipped files, 18 `@export`ed rules, none
   invocable. §11.1.2's reason for keeping six files on `ASSUME` was true only of `l4 check`.
   **Backlogged (Meng's note):** teach the export path to take a predicate as an enumerated row of
-  values. **Not built.**
+  values. **BUILT 2026-09-08 — see §11.21**, which also records the count the estimate missed (five
+  files, not three) and the second meaning of `@export` the build ran into.
+
+### 11.21 R-X4 as built — the arity gate, and the second meaning of `@export` it exposed. BUILT 2026-09-08.
+
+Branch `props/rx4-export-arity`, cut from `unstable` at `6e9b57bb`. Cite **R-X4** for the ruling
+(§11.20) and **this section** for what the build found.
+
+#### What shipped
+
+- **The gate is keyed on the assumed name's arity.** `checkAssumeFunctionInputs`
+  (`jl4-core/src/L4/Export.hs`) no longer discards the app form's argument list. An `ASSUME` read by
+  an `@export`ed `DECIDE` is refused when it has arguments on its head, when its declared type
+  contains a function, or both. The type half is unchanged and still uses
+  `isFunctionTypeExpanded` — not an arrow-spine count — because `MAYBE OF FUNCTION FROM A TO B` has
+  no spine and is just as unsendable.
+- **A second constructor, not a widened one.** `ExportAssumeArityInput Resolved Resolved Int`
+  (`jl4-core/src/L4/TypeCheck/Types.hs`). Reusing `ExportFunctionTypeInput` would have printed
+  "has a function type" for an `ASSUME` whose declared type is literally `BOOLEAN` — false, and the
+  kind of false that sends a reader to fix the wrong thing. The `Int` is the assumed rule's **total**
+  arity: app-form arguments plus the arrow spine of the declared type, added, because
+  `ASSUME f x IS A FUNCTION FROM B TO BOOLEAN` really is a rule of two inputs and
+  `L4.Relational.Lower.assumeDef` already flattens them in that order.
+- **The message names the rule, the export, the count, and three ways out** — define it, take its
+  subject as an ordinary input, or drop the `@export`. `l4 check` on
+  `jl4/examples/blawx/not-ok/arity-two.l4`:
+
+  > The @export rule `qualifies` reads `severity exceeds`, which is assumed and takes 2 inputs of
+  > its own. / A published rule's inputs travel as JSON, which can carry a value but not a rule, so
+  > an assumed rule with inputs of its own can never be supplied — every request would stop on it. /
+  > Give `severity exceeds` a definition (DECIDE or MEANS), or take what it is asked about as an
+  > ordinary input of `qualifies`, or remove the @export.
+
+- **Nine cases in `jl4-core/test/ExportValidationSpec.hs`**, including the two that keep the gate
+  honest in the other direction: a nullary `ASSUME` is a value and still passes, and an app-form
+  `ASSUME` no export reads still passes. One asserts the arrow spelling is **not** reclassified — a
+  widened gate and a re-labelled one are different changes and the suite can now tell them apart.
+
+#### Measured
+
+`l4 check`, binary built on this branch, `JL4_LIBRARY_PATH` pinned to this tree. Errors are the new
+refusal; every one of these files exited clean before.
+
+| file                                                   | refusals | was |
+| ------------------------------------------------------ | -------- | --- |
+| `jl4/examples/blawx/antisocial.l4`                     | 21       | 0   |
+| `jl4/examples/blawx/alcohol.l4`                        | 14       | 0   |
+| `jl4/examples/relational/assumed.l4`                   | 6        | 0   |
+| `jl4/examples/relational/not-ok/assumed-signatures.l4` | 3        | 0   |
+| `jl4/examples/blawx/not-ok/arity-two.l4`               | 2        | 0   |
+
+Five files, not the three §11.20 estimated; the two extra are the `not-ok` fixtures, whose subject is
+a _lowering_ refusal reached only after a clean type-check. Three further probes under
+`p4-design/scratch/` are also refused; nothing in CI reads them
+(`.github/workflows/pr-checks.yml:271-275 @ 6e9b57bb` says so in the author's own words).
+
+**Not one of the five is inside a corpus golden glob** (`jl4/tests/Main.hs:79-92 @ 6e9b57bb`;
+`etc/check-corpus-goldens.mjs:32-47 @ 6e9b57bb`). Their coverage is bespoke: the relational Debug
+goldens, the committed `.blawx`/`.pl` pairs, and ~11 assertions in `jl4/tests-cli/Main.hs`.
+
+#### What the build found: `@export` carries two meanings, and R-X4 splits them
+
+To `l4 batch`, `l4 export` and `jl4-service`, `@export` means **publish this over JSON**. To the
+relational middle end and the Blawx bridge it means only **root the lowering here** —
+`L4.Relational.Lower.lowerModule` returns `LENoExport` for a module with no `@export` at all
+(`jl4-core/src/L4/Relational/Lower.hs:2589-2606 @ 6e9b57bb`).
+
+Those two readings were compatible only because the gate could not see the app form. Once it can,
+they are not, and the collision is total rather than partial:
+
+- An `@export`ed decision may not **read** an assumed rule — the read-set is transitive, so hiding it
+  behind a helper does not help.
+- It may not **take** one as a `GIVEN` either, in either spelling: `checkGivenFunctionInputs` already
+  refuses the function-typed parameter.
+- So **an assumed-predicate module cannot be exported at all**, and being unexportable it has no
+  root, and having no root it cannot be lowered. The `ASSUME` → `RInput` widening, the `#abducible`
+  interview inputs, and every fixture that pins them would have become unreachable from any
+  compilable module — not by anything R-X4 ruled, but by a marker the two legs happen to share.
+
+**Resolution as built, and it is a judgement call, not a ruling.** The two legs part company at
+exactly the two diagnostics that are _about_ JSON. `isExportPublicationRefusal`
+(`jl4-core/src/L4/TypeCheck/Types.hs`) names `ExportFunctionTypeInput` and `ExportAssumeArityInput`
+and nothing else; `L4.Cli.Blawx.loadBlawxDoc` reads `Rules.TypeCheck` instead of
+`Rules.SuccessfulTypeCheck` and re-imposes the same "no `SError`" bar **minus those two**;
+`jl4/tests/RelationalExport.hs` and `jl4-core/test/BlawxAssumeSpec.hs` do the same in-process. Every
+other error still stops all three.
+
+The justification is not convenience. An assumed predicate is a perfectly good input to a logic
+program — it is precisely what the Blawx leg turns into an `#abducible` the interview asks a person
+about — and it is not a thing a JSON request can carry. Backlog B of R-X4 ("teach the export path to
+take a predicate as an enumerated row of values") is the JSON side learning what the ASP side
+already does; until it lands, the legs disagree, and the disagreement is now written down instead of
+being an accident of which diagnostic the gate could see.
+
+**What it does NOT do.** `l4 check`, `l4 batch`, `l4 export` and `jl4-service` all refuse, unchanged
+and at check time, which is what R-X4 ruled. There is no way to publish one of these modules. A user
+who runs `l4 check` on a Blawx seed is told plainly that it cannot be published, and a user who runs
+`l4 blawx` on it still gets a `.blawx` file.
+
+**Evidence that it is behaviour-preserving for the legs:** all eight committed Blawx goldens
+(`antisocial`, `alcohol` and their record-spelled twins × `.blawx`/`.pl`) are **byte-identical** to
+freshly generated output on this branch, and `jl4-core-test` is 536 examples, 0 failures — including
+all twelve `BlawxAssumeSpec` cases that a plain refusal would have taken down.
+
+**If Meng would rather not split them**, the alternative is one line: delete
+`isExportPublicationRefusal` and its three call sites. The cost, measured rather than estimated, is
+five corpus files, eight committed goldens, twelve `BlawxAssumeSpec` cases, two `RelationalExport`
+goldens and ~11 `tests-cli` assertions, and the `ASSUME` → `RInput` widening becomes dead code until
+backlog B. That is the trade, stated so it can be reversed on sight.
+
+#### Found by review, and repaired
+
+Two adversarial refuters were run against the first green build, with distinct lenses — one on the
+gate's scope (does it refuse exactly the right set?), one on the step-over (does it leak into any
+path that publishes?). Between them, 938 `.l4` files were swept and roughly forty hand-written
+probes run. Three findings were repaired here; the rest are recorded below rather than absorbed.
+
+- **The result type has two spellings and the gate read only one. REPAIRED.** An assumed rule can
+  put its type after `IS A` — `ASSUME f x IS A BOOLEAN` — or in a `GIVETH` above a bare `ASSUME f`.
+  The first build read only the `IS A` slot, so `GIVETH A FUNCTION FROM NUMBER TO NUMBER` above
+  `ASSUME f`, with no term `GIVEN` to backfill the app form, was **not refused**: `l4 check` exited
+  0, `l4 run` died on "it is an assumed term", and `l4 batch` reported "multiple definitions for the
+  identifier f". That is precisely the false green R-X4 exists to close, surviving inside the fix
+  for it. The same hole undercounted the arity of `GIVEN x IS A NUMBER` / `GIVETH A FUNCTION FROM
+NUMBER TO NUMBER` / `ASSUME f x` as 1 instead of 2. `checkAssumeFunctionInputs` now resolves the
+  result type as `mty <|> extractReturnType tySig`. Two cases pin it, and they pin the
+  classification as well as the count: the `GIVETH`-only form is the arrow form written the other
+  way round, so it is refused as `ExportFunctionTypeInput`, while the mixed form counts 2. The exposure was not
+  hypothetical: `jl4/examples/ok/signatures.l4:20-21` and `jl4/examples/ok/tbd.l4:4-6` are written
+  that way, and §11.1.2 names the `GIVETH`-headed form as one of the four shapes with no
+  `ASSUME`-free spelling.
+- **`jl4-service` logged the wrong cause. REPAIRED.** The deploy was refused either way — the new
+  diagnostic falls into `blockingErrs` — but its `exportFnTypeErrs` comprehension matched
+  `ExportFunctionTypeInput` alone, so an arity refusal was logged as "module has type errors".
+  Both constructors now have their own text, and the log line no longer says "FUNCTION-typed".
+- **`l4 blawx` printed 22 KB of error-severity diagnostics and exited 0. REPAIRED.** A wall of red
+  followed by success reads as a command that failed and lied. It now says, once, how many
+  diagnostics it stepped over, why they do not apply to Blawx, and that `l4 check` will report the
+  same ones and exit 1.
+
+- **The CLI test harness deadlocked on the new stderr volume. REPAIRED.**
+  `runL4In` (`jl4/tests-cli/Main.hs`) read stdout to EOF with the strict
+  `BS.hGetContents` and only then read stderr. A child that writes more to stderr
+  than the pipe buffer holds — about 16 KB on macOS — blocks on that write, never
+  closes stdout, and the parent never returns. `l4 blawx` on `antisocial.l4` now
+  emits about 22 KB of diagnostics on a run that exits 0, and it hung the whole
+  suite: no output, no failure, nothing to point at, twice, until the process was
+  killed by hand. The harness now drains stderr on a forked thread. **This is a
+  latent trap independent of R-X4** — any future command verbose enough on stderr
+  would have sprung it — and it is worth knowing that the symptom is a suite that
+  never finishes rather than one that goes red.
+
+#### Found by review, NOT repaired — each with its witness
+
+- **A `WHERE`-local `ASSUME` is invisible to the gate, in both spellings.** `allAssumesFromModule`
+  (`jl4-core/src/L4/Export.hs`) walks `Section` declarations only, and a `WHERE`-local `ASSUME`
+  lives inside a body expression. An `@export` over one checks clean and dies at every request on
+  the assumed term. **Pre-existing, not a regression**: the arrow half behaved this way before R-X4
+  and the app-form half was never refused at all. Fixing it means walking body expressions in the
+  collector, which changes what `assumesFromModule` reports to the schema as well — that is backlog
+  B's territory, not this branch's. Witness: `jl4/examples/ok/assume-in-where.l4` is the construct;
+  the refuter's probes are `w02.l4`/`w03.l4`.
+- **A module that IMPORTs a refused one is not itself blocked.** `l4 check` on the importer exits 1
+  (it inherits the diagnostic) while `l4 batch` and `l4 export` on the same file exit 0, because
+  `success = null errors` is computed per module (`jl4-lsp/src/LSP/L4/Rules.hs:718-730 @ 6e9b57bb`).
+  Nothing refused is actually published — a wrapper that re-exports the refused decision fails at
+  `l4 batch` — but it fails with the old stuck-term message, which is the failure mode R-X4 replaces,
+  surviving one `IMPORT` hop. Same family as §11.19/OF-7, one hop further out. **Pre-existing
+  dependency model; newly reachable for eight files.**
+- **The refusal never reaches the VS Code deploy sidebar.** `l4/getExportedFunctions`
+  (`jl4-lsp/app/LSP/L4/Handlers.hs:848 @ 6e9b57bb`) is served from a plain `TypeCheck` with no
+  `.success` check, so a module with 21 red squiggles still lists five deployable exports; pressing
+  Deploy is refused server-side. **Pre-existing code, newly reachable** — and worth saying out loud,
+  because R-X4's stated point is to refuse at check time rather than at the first request, and the
+  IDE is the one surface where a user starts a request and is not told.
+- **`l4 format` and `l4 ast` proceed on any module that parses**, refused or not. Pre-existing, and
+  neither publishes nor serves — but it makes "`l4 blawx` is the only verb that proceeds" false as a
+  sentence, so it is written down rather than repeated. Every verb that publishes or serves was
+  enumerated and exits 1: bare `FILE`, `run`, `check`, `trace`, `state-graph`, `nlg`, `verify`,
+  `batch`, `batch --validate-only`, `render`, `export --to dmn`, `export --to bpmn`, `openfisca`,
+  `catala`, `docassemble`, and the separate `jl4-schema` binary.
+- **`l4 blawx --roundtrip` steps over the refusal and `l4 blawx --import` does not**
+  (`recordOracles` keeps `SuccessfulTypeCheck`, deliberately — it evaluates). Unreachable today:
+  `L4.Blawx.Lift` never emits an `ASSUME`, so no lifted module can carry one. Nothing pins that.
+- **`isFunctionTypeExpanded` is exponential in a diamond of type synonyms.** Its `visited` set stops
+  cycles but not re-visits along sibling type arguments, so 26 nested `DECLARE Sᵢ IS A Pair OF
+Sᵢ₋₁, Sᵢ₋₁` make `l4 check` take 9 s and 28 make it take 30 s. **Pre-existing and untouched** —
+  `checkGivenFunctionInputs` blows up identically at the base commit — and R-X4 in fact _reduces_
+  exposure, because the `not (null args)` guard short-circuits before the call. Self-recursive
+  synonyms do not hang: the type checker rejects them first.
+- **The read-set is syntactic, so a dead branch counts.** ``IF FALSE THEN `rate for` m ELSE 0``
+  is refused although no request could reach the assumed rule. Conservative over-approximation,
+  identical to the gate it replaces; the message's "every request would stop on it" is literally
+  false for that file. Accepted rather than repaired: a reachability-aware read-set is a different
+  and much larger change.
+
+#### Deliberately not changed
+
+- **`assumesFromModule`** (`jl4-core/src/L4/Export.hs:302-317 @ 6e9b57bb`) still filters on the
+  declared type alone, so an app-form `ASSUME` still contributes a wrongly-typed field to a schema.
+  That collector is exactly what backlog B rewrites, and a module now has to pass the gate before it
+  reaches the collector. Making it _drop_ app-form assumes instead would be worse, not better: it
+  converts a loud refusal into the demanded-then-silently-ignored parameter §11.19 rules against.
+- **`jl4-service/src/Compiler.hs`** is untouched. Its `exportFnTypeErrs` branch still keys on
+  `ExportFunctionTypeInput` only; the new constructor falls into `blockingErrs`, which renders the
+  full message and rejects the deploy. Correct outcome, generic log line — worth tightening, not
+  worth a coupling now.
+- **`p4-design/widening-plan.md`** is a design record, not a spec, so its narrative is left standing
+  — but two of its instructions were actively misleading and carry dated corrections in place. `:341-343
+@ 6e9b57bb` told a future reader to keep `validateExportInputs` and `assumesFromModule` symmetric
+  as complements; after R-X4 the validator counts inputs and the collector reads the declared type,
+  so restoring that symmetry would undo this change. `§9.1 @ 6e9b57bb` prescribed the app form as
+  the spelling that "therefore passes", which is exactly what R-X4 refuses. Both now point here.
+
+#### Owed
+
+- Backlog B — the predicate-as-row export. Until it lands, the five files above are compilable to
+  Blawx and not publishable as a web API, and every one of them says so in its own header.
+- The split above wants Meng's yes or no. It is recorded here rather than in a PR description
+  because a PR description is not where a decision lives.
