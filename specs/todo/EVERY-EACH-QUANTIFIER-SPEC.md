@@ -2957,10 +2957,44 @@ from it is the observation that `WHOSE` need not wait on R5's top-level answer t
 only to be **complete** — which is a change to R-Q4's recorded sequencing and should be ruled as
 such.
 
-The measurement a ruling would need, and which nothing has yet run: **how many names in the corpus
-are both a record field and a top-level definition.** If the answer is zero, R5's rank can be
-extended to top-level names with a collision error and the silence closes. If it is not zero, the
-extension is a breaking change and the count says how breaking.
+#### The measurement — RUN 2026-09-09, and it does not say what was hoped
+
+Across `jl4/examples/**` and `jl4-core/libraries/*`: **1146 distinct field names, 3462 top-level
+names, 30 that are both.** Cross-file overlap only bites under `IMPORT`, so the number that counts
+is **same-file collisions: 5** — four in `jl4/examples/legal/regcf/regcf-wizard.l4`, one in
+`jl4/examples/blawx/imported/beard_tax.l4`.
+
+**They are real, and they are deliberate.** `regcf-wizard.l4:597-602` is the purest form — a record
+construction in which the field and the value share a spelling:
+
+```l4
+`what you must still line up`  IS  `what you must still line up`
+`after you raise you must`     IS  `after you raise you must`
+`law as in force`              IS  `law as in force`
+```
+
+Left of `IS` is a **field** (`:167`, `:168`, `:170`); right of it is a **top-level `MEANS`**
+(`:363`, `:373`, `:393`). `beard_tax.l4` is the same idiom from the other side:
+`DECIDE facial_hair_length_mm x IF isJust (x's facial_hair_length_mm)` (`:63-64`) — a derived
+function named after the field it derives from, disambiguated by `x's`.
+
+**So the hoped-for answer — zero, therefore extend R5's rank to top-level names with a collision
+error — is not available.** That extension would refuse five sites of an idiom that says something
+a drafter should be able to say: _this field is that concept_. Worse, under a rank in which opened
+fields shadow top-level names, `` `law as in force` IS `law as in force` `` stops being a definition
+and becomes a **self-reference**, silently.
+
+**What the measurement does support**, and it is the better rule anyway: **an opened field must not
+shadow a top-level name, and a collision is an error only at an AMBIGUOUS READ — never at the
+declaration.** That is already R5's own shape for two opened records ("an error at the read naming
+both records"), extended to the top-level case rather than to the declaration site. `r's f` remains
+the escape hatch, and all five sites already use the explicit form where it matters.
+
+Method and its limits, so the count can be re-derived or disputed: field names were taken from
+lines matching `<name> IS A|AN|THE|ONE OF|LIST` indented under a `DECLARE`, top-level names from
+column-zero `<name> MEANS` and `DECIDE <name>`. Backtick identifiers are handled; `GIVETH`-only
+definitions and fields introduced by other spellings are not counted, so **5 is a floor, not a
+ceiling**.
 
 #### A synthesis, proposed 2026-09-08 (GM), not ruled: `WHOSE` is not sugar, it is R5 opening the member
 
