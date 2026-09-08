@@ -1684,6 +1684,7 @@ lowerApp ctx e ref args
         \does not read module-level inputs, or supply the value as an ordinary GIVEN parameter"
     | otherwise =
         "pass it to this helper as a parameter instead"
+
   -- Recognisers key on the /bare/ name, and on both spellings of it: a
   -- section-qualified reference carries its section path
   -- ("Prelude.Numeric Aggregates.sum"), and an @AKA@\'d definition answers to
@@ -1950,7 +1951,6 @@ fnRef1 ctx = \case
   -- argument is not a one-argument definition, which it plainly is.
   fe@(App _ r []) | Just sg <- Map.lookup (getUnique r) ctx.cxScopes
                   , [(_, True)] <- sg.ssParams
-                  , null sg.ssAssumes
                   , not ctx.cxInScope ->
     vErr (rangeOf fe) (outsideScopeMsg (canonText r))
   App _ r [] | Just sg <- Map.lookup (getUnique r) ctx.cxScopes
