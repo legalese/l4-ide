@@ -2937,6 +2937,67 @@ are both a record field and a top-level definition.** If the answer is zero, R5'
 extended to top-level names with a collision error and the silence closes. If it is not zero, the
 extension is a breaking change and the count says how breaking.
 
+#### A synthesis, proposed 2026-09-08 (GM), not ruled: `WHOSE` is not sugar, it is R5 opening the member
+
+Meng asked for a Hegelian reading, and suggested field-opening as the route. It is, and the reason
+is that **thesis and antithesis share a false premise**.
+
+- **Thesis** (pre-R-Q4): the filter holds a point-free predicate and the member is _supplied_ to it.
+  Terse, English-shaped, and dead — because supplying means **applying**, and connectives are
+  applicable too.
+- **Antithesis** (R-Q4, current): the filter holds a Boolean expression and the member is _named_ in
+  it. Composes with anything, and costs the drafter a repeated `t` in every conjunct — the
+  "pronoun awaiting a complement" awkwardness that started this.
+
+Both assume the member reaches the filter by **application** — the only question being who applies
+it. R5 offers a third relation: the member reaches the filter by **scope**.
+
+**So read `WHOSE` not as sugar over `t's`, but as the keyword that OPENS the member's fields over
+the filter** — exactly what R5 already rules for a record-typed `GIVEN`, function or section, here
+extended to the binder a quantifier introduces. Then:
+
+```l4
+EVERY Tenant t WHOSE monthly_rent AT LEAST 1000 AND standing EQUALS "current"
+```
+
+is not a rewrite of anything. `monthly_rent` and `standing` are **opened fields resolving under
+R5's existing rank**; `AND` is just `AND`. Nothing is inserted, so the failure that killed the
+thesis has nothing to attach to — and nothing is repeated, so the antithesis's cost is paid off.
+The antithesis is preserved rather than discarded: `WHO t's monthly_rent …` stays available and
+stays the answer wherever explicitness is wanted, and `r's f` is always available under R5 anyway.
+
+**What this buys beyond the dilemma.**
+
+- **The layout-conjoined form becomes optional style, not load-bearing.** Under opening, one
+  constraint per line is a formatting choice a drafter may make for readability; it is no longer
+  the only thing standing between `y` and the wrong namespace. That is worth having either way, but
+  it should be chosen as style rather than adopted as a disambiguator.
+- **The totality rule arrives from the other direction, and arrives better.** Opening can only put
+  in scope the fields that exist on every constructor the member could still be. With a cast, that
+  is the cast's arm. Without one, on a sum type whose field names are flat, it is the empty set —
+  so `EVERY t WHOSE monthly_rent …` opens nothing and fails **at check time, naming the missing
+  cast**, instead of reaching a run-time _"reached a CONSIDER that has no branch for it"_ that
+  names neither the field nor the cast.
+
+**What must be true for this to work, stated so it can be refuted rather than assumed.**
+
+1. **R5 must extend from a record-typed binder to a CONSTRUCTOR's fields under a cast.** Its text
+   (§11.7) says "the fields of a record-typed `GIVEN`, function or section"; a sum type narrowed by
+   a cast is not that, and the extension is real work, not a reading.
+2. **The quantifier's member must count as a binder the function "sees".** R5's rank is
+   `WHERE`/`LET` locals, the function's own `GIVEN`, fields opened from it, section `GIVEN`s, fields
+   opened from those, selectors. A quantifier member is none of those, so it needs a rank position
+   of its own — innermost, since it is bound closest to the filter.
+3. **It does NOT close the top-level collision.** An opened field against a top-level `MEANS` of the
+   same name is still unresolved, because R5's rank has no entry for top-level names. The synthesis
+   does not answer that — it **relocates it to R5, where it belongs**, and where the machinery to
+   answer it (a rank plus a collision error) already exists. The measurement named above is what R5
+   would need.
+
+So the synthesis is not that the problem vanishes. It is that **the `WHOSE`-specific dilemma
+dissolves into an already-ruled mechanism**, leaving exactly one question, in the document that owns
+it, with the shape of its answer already ruled.
+
 **No recommendation is recorded here on purpose**, and unlike §13.5 the reason is not only that this
 changes what a drafter must write. It is that the question is **upstream of the quantifier**: it is
 about how L4 resolves an unqualified name in the presence of records, it is already ruled in another
