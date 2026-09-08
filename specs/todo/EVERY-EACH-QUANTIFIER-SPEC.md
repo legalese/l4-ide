@@ -2,13 +2,13 @@
 > the **FRONT END IS MERGED** — `every/build-1` landed on `unstable` as PR #360 (merge `734b8015`,
 > 2026-09-07), so the lexer, parser, name resolution, type checker, printers, NLG, document export
 > and state graph all carry `EVERY` and the join line on `unstable` today. **EVALUATION IS BUILT**
-> on `lang/every-runtime` (2026-09-08, unmerged at the time of writing): §3.1's barrier, §3.2's
+> on `lang/every-runtime`, MERGED to `unstable` 2026-09-08 as PR #370 (merge `6247ba69`): §3.1's barrier, §3.2's
 > fork, §3.3's distributive form, all four modals, R-T2's join deadline and nesting all run; see
 > §11.0.1 for exactly what was built and what was not, and §11.0 for the roll-call rule that made
 > it possible. The four witnesses are `jl4/examples/ok/every/run-{barrier,fork,roll,modals}.l4`.
 >
 > **THE ROLL IS NOW SAYABLE OUTRIGHT.** `EVERY Cast v IN xs` was RULED by Meng on 2026-09-08 and is
-> BUILT on `lang/every-in` (branched from `lang/every-runtime`, unmerged at the time of writing):
+> BUILT on `lang/every-in` (branched from `lang/every-runtime`), MERGED to `unstable` 2026-09-08 as PR #374 (merge `28c48e3f`):
 > see **§11.0.2**, with `jl4/examples/ok/every/run-in.l4` as its witness and §2.4's grammar
 > updated. `IN` is the spelling to reach for. The older inferred spelling of §11.0 —
 > `WHO elem t xs` — still runs unchanged for a rule that writes no `IN`, and whether it should be
