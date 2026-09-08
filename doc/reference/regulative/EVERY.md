@@ -2,7 +2,7 @@
 
 Binds an obligation, permission or prohibition to **every member of a group at once**, instead of to one named party. `EVERY Tenant t MUST sign` reads "every tenant, call them t, must sign": one obligation per tenant, all live at the same time, and one place to say what happens when they have acted.
 
-**Status (2026-09-08): `EVERY` runs, and the group is written with `IN`.** A rule written with `EVERY` is parsed, its names and types are checked, it is printed back, it appears in the state graph, and — new on this date — it can be **run** against a stream of events with `#TRACE`, exactly as a `PARTY` rule can. The barrier fires once at the last act, the fork fires once per act, and a failure produces a breach. Also new on this date: `IN` says which group the rule is about — `EVERY Tenant t IN tenants` — replacing an older spelling that had to smuggle the same list into the `WHO` condition. The older spelling still works and nothing already written needs changing.
+**Status (2026-09-08): `EVERY` runs, and the group is written with `IN`.** A rule written with `EVERY` is parsed, its names and types are checked, it is printed back, it appears in the state graph, and — new on this date — it can be **run** against a stream of events with `#TRACE`, exactly as a `PARTY` rule can. The barrier fires once at the last act, the fork fires once per act, and a failure produces a breach. Also new on this date: `IN` says which group the rule is about — `EVERY Tenant t IN tenants` — replacing an older spelling that had to smuggle the same list into the `WHO` condition. **That older spelling is deprecated** as of the same date: it still runs, nothing already written stops working, and nothing warns you — but `IN` is the one to write, and everything we ship has been moved across. See [The older spelling, now deprecated](#the-older-spelling-now-deprecated-a-roll-read-out-of-the-who-condition) for the two-line rewrite.
 
 Two things about running it are worth knowing before you write one, and both have sections of their own below: the group has to be given as a **list**, which is what `IN` is for — `EVERY Tenant t IN tenants` ([Where the group comes from](#where-the-group-comes-from-the-roll)) — and a few parts of the design are still not built
 ([What runs today, and what does not](#what-runs-today-and-what-does-not)). The design, its rulings and the parts still open are in `specs/todo/EVERY-EACH-QUANTIFIER-SPEC.md`.
@@ -29,7 +29,7 @@ The join line is optional in the grammar and **required whenever the rule has a 
 
 Everything after the first line is the same as after [PARTY](PARTY.md): the same modals, the same `WITHIN`, `HENCE`, `LEST` and `PROVIDED`. The one new thing is the **join line**, `ONCE ALL HAVE` or `UPON EACH`.
 
-`IN` comes before `WHO`, in the order you would say them: _every tenant t in tenants who is not Carol_. A rule you intend to **run** has to be given the group as a list somewhere, and `IN` is where to give it; see [Where the group comes from](#where-the-group-comes-from-the-roll), which also covers the older spelling that put the same list inside the `WHO` condition.
+`IN` comes before `WHO`, in the order you would say them: _every tenant t in tenants who is not Carol_. A rule you intend to **run** has to be given the group as a list somewhere, and `IN` is where to give it; see [Where the group comes from](#where-the-group-comes-from-the-roll), which also covers the older, now deprecated spelling that put the same list inside the `WHO` condition.
 
 Write each clause indented past the `EVERY`, as the examples below do. What the compiler actually enforces is narrower than that convention: for `WITHIN`, `HENCE` and `LEST` it is the clause's **body** that must sit past the `EVERY`, not the keyword. The join line is the exception, because a bare `ONCE ALL HAVE` or `UPON EACH` has no body to check and a misplaced one would otherwise attach silently to a different rule — so its head keyword and its marker words are themselves column-checked. Its `WITHIN` keyword is not; only that `WITHIN`'s body is, like every other clause.
 
@@ -169,22 +169,44 @@ Four details worth knowing:
 
 - **A name listed twice is counted twice.** A roll of `LIST alice, alice, bob` produces three obligations, two of them Alice's. Under a barrier one signature from Alice settles both and nothing worse happens than the group not being the size it looks. Under a fork it is worse: the continuation fires once per copy, so a single payment earns two receipts. Keep the roll free of repeats.
 
-### The older spelling: a roll read out of the WHO condition
+### The older spelling, now deprecated: a roll read out of the WHO condition
 
 Before `IN` existed, the roll had to be smuggled into the `WHO` condition using `elem`, which asks "is this one of those?":
 
 ```l4
 EVERY Tenant t
-    WHO elem t tenants          -- the older spelling: still works, still means the same thing
+    WHO elem t tenants          -- the older spelling: DEPRECATED, still runs
 ```
 
-**This still runs, and nothing you have already written needs changing.** When a rule writes no `IN`, the machine looks through the `WHO` condition for a condition of the form `elem t <some list>` and takes that list as the roll. You will meet this spelling in older examples; [every-example.l4](every-example.l4) shows one beside its `IN` equivalent, and `jl4/examples/ok/every/run-roll.l4` in the corpus is the file devoted to it (its first rule is the deliberate exception, with no roll at all — that is the one that shows the refusal).
+**This spelling is deprecated.** That was decided on 8 September 2026, for a plain reason: it and `IN` say the same thing two different ways, and a language whose whole pitch is that there is one obvious way to write a rule should not carry two.
 
-Prefer `IN` in anything new. Saying the roll outright is clearer to read, and it also avoids three rough edges that the older spelling cannot avoid:
+Deprecated here means something narrow and worth stating exactly, because the word gets used loosely:
+
+- **It still runs.** Nothing you have already written has stopped working, and nothing in this release makes it stop. When a rule writes no `IN`, the machine still looks through the `WHO` condition for a condition of the form `elem t <some list>` and takes that list as the roll.
+- **Nothing warns you.** There is no message, no note in the trace, no mark in the editor. If you write the old spelling today, the only thing that will tell you is this page. That is a deliberate choice and its cost is on us, not on you: the recognition lives in the part of the compiler that _runs_ a rule rather than the part that _checks_ it, and moving it would have cost more than the warning was worth while the corpus was being migrated anyway.
+- **Removal is not scheduled.** No date has been set and no removal is planned. If one is ever proposed, a warning would have to come first.
+- **What has actually changed is what the language teaches.** Every example we ship writes `IN`, this page recommends `IN`, and the one place the compiler used to offer `elem` as an alternative now names it as the older spelling.
+
+**How to move existing rules across.** The rewrite is mechanical, and there are only two shapes:
+
+| what you have                   | what to write           |
+| ------------------------------- | ----------------------- |
+| `WHO elem t tenants`            | `IN tenants`            |
+| `WHO elem t tenants AND <rest>` | `IN tenants WHO <rest>` |
+
+Read that second row as splitting one condition into its two jobs. `elem t tenants` was never really a condition — it was the roll wearing a condition's clothes — and `<rest>` is the actual narrowing. `IN` takes the first job, `WHO` keeps the second.
+
+There is **one shape that does not rewrite**, and it is a good thing rather than a bad one: `WHO elem t (peersOf t)`, a roll that asks the list to know its own answer. Under the old spelling that is refused when the rule is _run_; under `IN` the same mistake is caught when the rule is _checked_, which is earlier and better, but it is a different moment, so a rule that used to fail late will now fail early. If you were relying on it reaching run time — and the only reason to be is that you are testing the refusal itself — that is the one case to look at by hand.
+
+**Why it is deprecated, and not merely out of fashion.** Three rough edges belong to the older spelling and not to `IN`:
 
 - **It is found by the word `elem`, not by meaning.** A two-argument function of your own called `elem` would be taken for it. In practice `elem` is the one from the standard library, which is why examples using this spelling start `IMPORT prelude`.
 - **It has to sit in a plain chain of `AND`s.** `WHO elem t tenants AND …` works, at any depth of `AND`. `WHO elem t tenants OR elem t others` does not, and neither does `WHO NOT (elem t tenants)`: the first offers two lists and the second names who is _out_ rather than who is in, and the search simply does not look inside an `OR` or a `NOT`. What you get in both cases is the same message as for no roll at all — "EVERY has nothing to draw its cast from" — which is accurate but does not point at the `OR`. If you want the members of two lists, join the lists first: `IN (append tenants others)`.
-- **A circular roll is caught later.** `WHO elem t (peersOf t)` is only refused when the rule is run, not when it is checked, because the member genuinely is in scope inside a `WHO` condition — that is what a condition is for. `IN` has no such difficulty and the same mistake is caught at check time.
+- **A circular roll is caught later**, as described just above.
+
+One thing deprecating it does **not** fix, so that you do not expect it to: a roll with a name in it twice still produces that member twice. That belongs to the list, not to the spelling, and `IN` has it too.
+
+**Where you will still meet it.** In existing material, which is the point of keeping it alive. Inside this repository it survives in exactly two places, both on purpose: [every-example.l4](every-example.l4) shows one labelled specimen beside its `IN` equivalent, so that you can recognise the shape; and `jl4/examples/ok/every/run-roll.l4` in the corpus is the file devoted to the older spelling, because a feature that still runs still needs tests. Everything else has been migrated.
 
 **If you write both**, the `IN` list is the roll and the `elem` condition goes on doing what any other condition does: narrowing. So
 
@@ -193,7 +215,7 @@ EVERY Tenant t IN tenants
     WHO elem t (LIST alice, bob)
 ```
 
-draws the three from `tenants`, then keeps the two the condition allows. Nothing is ambiguous and nothing is silently dropped. Worked examples of both spellings side by side are in `jl4/examples/ok/every/run-in.l4`.
+draws the three from `tenants`, then keeps the two the condition allows. Nothing is ambiguous and nothing is silently dropped — and note that this is **not** the deprecated spelling, because the roll is written outright. An `elem` condition beside an `IN` roll is an ordinary condition, and there is nothing wrong with it. Worked examples of both spellings side by side are in `jl4/examples/ok/every/run-in.l4`.
 
 ## The action: write EXACTLY to mean the member
 
@@ -349,7 +371,7 @@ Verified 2026-09-08 against the compiler at the head of this branch.
 
 **Does not run, and says so:**
 
-- A rule with no roll (above) refuses, naming what to write. The message names `IN` first, and says the older `WHO elem` spelling still works.
+- A rule with no roll (above) refuses, naming what to write. The message names `IN`, and mentions the older `WHO elem` spelling only to say that it is the deprecated one.
 
 - The prose export (`l4 render`) writes the subject as "every Tenant t in tenants who …" and drops the join line
   — except when the `EVERY` is an operand of `RAND` or `ROR`, where the whole rule falls back to the layout printer and the join line is re-emitted verbatim into the prose.
@@ -361,7 +383,7 @@ Verified 2026-09-08 against the compiler at the head of this branch.
 - **A residual barrier loses its join.** If the events run out mid-way, what comes back is the outstanding members' obligations, with their deadlines correctly counted down. Their `HENCE` and `LEST` print as `` `the join` `` and `` `the join fails` `` — the machine's own markers for "report back to the group", not anything you wrote. What the residual does not carry is the join line, so feeding it more events would run the members and not the join. Run the whole stream at once.
 - **A join line's `WITHIN` bounds each act; only a barrier also checks it on the whole.** Written alone, on either kind of join line, it is each member's deadline — otherwise nothing would ever expire. Written alongside an act `WITHIN`, the act's is each member's deadline, and a barrier additionally fails if the last act lands after the join's; a fork has no join to check, so there the act's is the only one enforced. Write the tighter of the two on the act.
 - **When two members act at the very same instant, the continuation can see one of their acts.** The join's time is right either way, but the stream handed to the continuation is the one belonging to whichever of the two the roll named first, so an event stamped exactly at the join may still reach it. It only bites if the continuation's action could be matched by a member's own act at that instant. A prohibition (`SHANT`) barrier ties by construction and is not affected, because every member finishes on the same event.
-- **The type checker is looser than the run time in two places**, and both refuse rather than answer: a barrier continuation that names the member, and a roll — in the older `WHO elem` spelling only — that names the member. Both are described above. An `IN` roll that names the member is caught earlier, at check time.
+- **The type checker is looser than the run time in two places**, and both refuse rather than answer: a barrier continuation that names the member, and a roll — in the older, deprecated `WHO elem` spelling only — that names the member. Both are described above. An `IN` roll that names the member is caught earlier, at check time, which is one of the reasons the older spelling is the deprecated one.
 
 - **Nothing checks that the action names the member.** `MUST Sign (EXACTLY t)` ties the act to the member; `MUST Sign someoneElse` does not, and is accepted. What the run does check is that the **event's** party is the member. Write `EXACTLY t`.
 - **The count and measure joins are not built at all** — `ONCE SOME 2 OF … HAVE`, `ONCE sum OF amount AT LEAST rent`. Only `ONCE ALL HAVE` and `UPON EACH` parse.

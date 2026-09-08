@@ -239,7 +239,7 @@ _When the same obligation falls on everyone in a group, what can be said about t
 
 _Status (2026-09-08): the first two pieces below — the barrier and the fork — are **built**, and their reference page is [EVERY](../../reference/regulative/EVERY.md). The third, "enough of them", is **proposed, not landed**; its spellings are the design document's current ones. The design is `specs/todo/EVERY-EACH-QUANTIFIER-SPEC.md`. [What Is Coming](../../tutorials/obligations/what-is-coming.md) gives each piece a page's worth of explanation._
 
-_Settled on 7 September 2026, built on 8 September 2026: there is one quantifier word, `EVERY`, and a line of its own — `ONCE ALL HAVE` or `UPON EACH` — saying when the follow-on fires. The word after `EVERY` names the kind of party and narrows the group, as `Flatmate` does in the table. Which people are in the group is given as a list, after `IN` — `EVERY Flatmate f IN flatmates` — ruled and built on 8 September 2026. (Before that the same list went inside the `WHO` condition, as `WHO elem f flatmates`; that spelling still runs.)_
+_Settled on 7 September 2026, built on 8 September 2026: there is one quantifier word, `EVERY`, and a line of its own — `ONCE ALL HAVE` or `UPON EACH` — saying when the follow-on fires. The word after `EVERY` names the kind of party and narrows the group, as `Flatmate` does in the table. Which people are in the group is given as a list, after `IN` — `EVERY Flatmate f IN flatmates` — ruled and built on 8 September 2026. (Before that the same list went inside the `WHO` condition, as `WHO elem f flatmates`; that spelling is deprecated as of the same day, and still runs.)_
 
 Three pieces, each answering a question the others do not:
 
