@@ -341,6 +341,10 @@ whitespace. A multi-line `@ref` is therefore safe.
 - `L4.Export` — untouched. §2's `ASSUME` handling is deliberately the complement of
   `assumesFromModule`'s function-typed filter; add a cross-reference comment at both sites so the
   next reader does not "fix" one to match the other.
+  **Superseded 2026-09-08.** R-X4 re-keyed `validateExportInputs` on the assumed name's arity, so it
+  and `assumesFromModule` are no longer complements: the validator counts inputs, the collector
+  reads the declared type. Closing that gap is backlog B of R-X4. Do not restore the symmetry this
+  bullet asks for — see `specs/todo/IMPLICIT-PROPS-DESIGN.md` §11.21.
 
 ---
 
@@ -576,6 +580,14 @@ shows the form is long-standing L4, not an invention.
 Both spellings are admitted by the middle end (§9.2), so nothing has to move if the export rule is
 later relaxed. Whether it should be — an `ASSUME`d predicate is a perfectly good logic-program
 input and a nonsensical form field — is a question for the coordinator, not for this PR.
+
+**Answered 2026-09-07, built 2026-09-08 (R-X4).** The question was put and the coordinator ruled the
+other way: the gate was widened, not relaxed. It is now keyed on the assumed name's arity, so the
+re-spelling this section prescribes no longer passes either — `ASSUME `is authorised` p IS A
+BOOLEAN` read by an `@export` is refused as `ExportAssumeArityInput`. The half of the sentence that
+survives is the one about the logic program: `l4 blawx` and the relational goldens step over exactly
+those two diagnostics, so the seeds still compile. Everything in §9.1 above about the arrow form
+being _uniquely_ refused is spent. See `specs/todo/IMPLICIT-PROPS-DESIGN.md` §11.21.
 
 ### 9.2 Two `ASSUME` spellings, not one
 

@@ -962,22 +962,28 @@ sentence above is too short to carry:
 
 - **A _local_ `ASSUME` stays out** (`local ASSUME`): it is scoped to one definition, so there is
   no module-level name to declare and nothing for an interview to abduce.
-- **Spelling matters, for a reason outside this leg.** The arrow form (an `ASSUME` whose declared
-  type is a `FUNCTION FROM … TO …`) lowers correctly, but a module that `@export`s a `DECIDE`
-  referencing it does not type-check at all: `L4.Export.validateExportInputs` raises
-  `ExportFunctionTypeInput`, because `@export` appends referenced `ASSUME`s to the web app's
-  parameter list and a function cannot cross a JSON boundary. Lowering is export-rooted, so such
-  a module has no root. A corpus for this leg must therefore use the binder form instead, whose
-  declared type is `BOOLEAN`:
+- **Spelling mattered, for a reason outside this leg, and since 2026-09-08 it does not.** Both forms
+  are admitted by this lowering. What differed was the export path: the arrow form (an `ASSUME`
+  whose declared type is a `FUNCTION FROM … TO …`) made a module that `@export`s a `DECIDE`
+  referencing it fail to type-check (`ExportFunctionTypeInput`), while the binder form below slipped
+  past, because `@export` appends referenced `ASSUME`s to the web app's parameter list and the check
+  only looked at the declared type. **R-X4 re-keyed that gate on the assumed name's arity
+  (`specs/todo/IMPLICIT-PROPS-DESIGN.md` §11.20, built §11.21), so both forms are now refused for
+  publication:**
 
   ```
   GIVEN p IS A Person
   ASSUME `is authorised` p IS A BOOLEAN
   ```
 
-  Both forms are admitted by the lowering, so nothing moves if that export rule is later
-  relaxed. This is why `jl4/examples/legal/anti-social.l4` — written entirely in the arrow form
-  — cannot be used as a Blawx seed as written.
+  **That does not stop this leg**, and the corpus does not move. `L4.Cli.Blawx.loadBlawxDoc` and the
+  two golden harnesses step over exactly those two diagnostics, by name
+  (`L4.TypeCheck.Types.isExportPublicationRefusal`), because they are statements about what a JSON
+  request can carry and this leg emits a logic program in which an assumed predicate is an ordinary
+  `#abducible` input. Every other `SError` still stops them. The corpus keeps the binder form
+  because it is the exhibit, not because the arrow form costs an export — neither exports.
+  `jl4/examples/legal/anti-social.l4`, written entirely in the arrow form, has no `@export` at all
+  and so still has no root; that is a corpus gap, unchanged by R-X4.
 
 ## 7. Architecture
 

@@ -379,12 +379,23 @@ or a module-level `ASSUME` — is promoted to a parameter of that function
 and must be supplied by the caller. Names that no exported function reads stay
 internal.
 
-**Function-typed inputs are not allowed for `@export`.** Neither a `GIVEN`
-parameter nor a referenced `ASSUME` may have a `FUNCTION FROM … TO …` type
-on an exported function: GIVENs can't be passed over JSON, and function-typed
-ASSUMEs stay uninterpreted at runtime (any call fails with a stuck
-"assumed term" error). The typechecker and `jl4-service` deploy both reject
-such bundles with `Function type inputs are not supported for @export`.
+**An `@export`ed rule's inputs must be values, never rules.** A request arrives
+as JSON, which carries a value and cannot carry a rule, so neither a `GIVEN`
+parameter nor an `ASSUME` the export reaches may be one. Two spellings, both
+refused at check time since 2026-09-08 (R-X4):
+
+- a `FUNCTION FROM … TO …` type, on a `GIVEN` or an `ASSUME` —
+  `Function type inputs are not supported for @export`;
+- an `ASSUME` that takes inputs on its head, ``ASSUME `is eligible` p IS A BOOLEAN``,
+  whose declared type is `BOOLEAN` — `The @export rule … reads …,
+which is assumed and takes 1 input of its own`. This one used to pass
+  `l4 check` and then fail on every request.
+
+An `ASSUME` of **no** inputs is a value and stays publishable. The check follows
+every rule the export reaches, so hiding one behind a helper does not help. The
+typechecker and the `jl4-service` deploy both reject such bundles; `l4 blawx` is
+the exception and compiles them, because a Blawx interview asks a person for the
+answer rather than receiving it in a request.
 
 ### `@desc` — document parameters
 

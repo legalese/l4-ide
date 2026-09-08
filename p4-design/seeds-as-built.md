@@ -229,6 +229,10 @@ Three deviations from `legal/anti-social.l4`, all forced and all documented in t
    lowering is export-rooted, so that spelling never reaches the middle end. The seed uses
    `GIVEN p IS A Person` + `ASSUME `is authorised` p IS A BOOLEAN`, whose declared type is `BOOLEAN`.
    The original's own comment (`:30-33`) records the same wall from the other side.
+   **Half of this is spent as of 2026-09-08 (R-X4, `specs/todo/IMPLICIT-PROPS-DESIGN.md` §11.21):**
+   the gate is now keyed on the assumed name's arity, so the seed's spelling is refused for
+   publication too. The seed does not move — `l4 blawx` and the relational goldens step over that
+   one refusal by name — but "whose declared type is `BOOLEAN`" is no longer why it works.
 2. **Two TYPE renames**, forced by a hard Blawx error — see §5.1. `Conduct` → `Behaviour`,
    `Effect` → `Consequence`. The **accessors keep the Act's words** (`conduct`, `effect`), because
    that is where they read as the statute and because a value attribute's synthesised NLG is

@@ -43,12 +43,12 @@ no answer here".
 
 ## Where each job goes now
 
-| The job the `ASSUME` was doing                                    | Where that job goes                                                                                                                                                    |
-| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| a fact supplied afresh for each case (the applicant's age)        | a [`GIVEN` under the section heading](../syntax/section-given.md) whose rules read it — a **"section `GIVEN`"**                                                        |
-| a rule defined elsewhere (`… IS A FUNCTION FROM …`)               | the same section `GIVEN`, with the same function type — but read "Function-typed inputs" below first, because for an `@export`ed rule the move can cost you the export |
-| a kind of thing the model treats as opaque (`ASSUME T IS A TYPE`) | [`DECLARE T`](DECLARE.md#opaque-types) — a name with no stated contents                                                                                                |
-| a case the encoding deliberately does not cover                   | one named definition whose body is [`REFUSE "..."`](../control-flow/REFUSE.md)                                                                                         |
+| The job the `ASSUME` was doing                                    | Where that job goes                                                                                                                                                          |
+| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| a fact supplied afresh for each case (the applicant's age)        | a [`GIVEN` under the section heading](../syntax/section-given.md) whose rules read it — a **"section `GIVEN`"**                                                              |
+| a rule defined elsewhere (`… IS A FUNCTION FROM …`)               | the same section `GIVEN`, with the same function type — the move is safe either way, but read "Function-typed inputs" below for what an `@export`ed rule may not read at all |
+| a kind of thing the model treats as opaque (`ASSUME T IS A TYPE`) | [`DECLARE T`](DECLARE.md#opaque-types) — a name with no stated contents                                                                                                      |
+| a case the encoding deliberately does not cover                   | one named definition whose body is [`REFUSE "..."`](../control-flow/REFUSE.md)                                                                                               |
 
 ### 1. A fact supplied per case: the section `GIVEN`
 
@@ -193,26 +193,50 @@ out instead of assuming it wherever you can.
 
 **The limit is at the export boundary.** A published rule cannot accept an
 input that is itself a rule, because a rule cannot be sent as JavaScript Object
-Notation (JSON), which is what a request carries. L4 reports
-`Function type inputs are not supported for @export` for an `@export`ed rule
-that reads a function-typed input.
+Notation (JSON), which is what a request carries. A request carries **values** —
+a number, a date, a yes or no, a record of those — and a rule is not a value.
 
-**And that makes this one migration you should measure before you make it.** The
-refusal keys on how the type is _spelled_, not on the keyword — so the two
-spellings are not interchangeable here, and moving between them can change
-whether a rule exports at all. Measured 2026-09-07: `ASSUME \`is eligible\` p IS A
-BOOLEAN`puts the input on the head, is not a function type, and an`@export`ed
-rule that reads it **checks clean**; the section `GIVEN`the warning offers for
-it,`GIVEN \`is eligible\` IS A FUNCTION FROM Person TO BOOLEAN`, **is refused**.
-There are 34 such sites in the corpus, across five files in the Blawx and
-relational examples, and they keep the older spelling until that gate is ruled
-on. Two exporters
-are built on that older shape and still read it: the Blawx bridge and the
-relational middle end lower a predicate written as
-`GIVEN p IS A Person`/`ASSUME `is authorised` p IS A BOOLEAN` to an input
-predicate, and have no image yet for the section-`GIVEN`spelling of the same
-predicate. The shipped Blawx seeds therefore keep that`ASSUME` form, and say
-so in their headers; see [L4 to Blawx](../../tutorials/blawx/l4-to-blawx.md).
+That limit does not care how you spelled the rule. An assumed name that takes no
+inputs of its own is a value, and a request can supply it. An assumed name that
+takes one or more inputs is a rule, and a request cannot. Both of these declare
+the same one-input rule, and since 2026-09-08 L4 refuses an `@export`ed rule that
+reads either of them:
+
+```
+GIVEN p IS A Person
+ASSUME `is eligible` p IS A BOOLEAN
+
+ASSUME `is eligible` IS A FUNCTION FROM Person TO BOOLEAN
+```
+
+The message names the rule, the published rule that reads it, how many inputs it
+takes, and what you can do about it:
+
+```
+The @export rule `may apply` reads `is eligible`, which is assumed and takes 1
+input of its own.
+A published rule's inputs travel as JSON, which can carry a value but not a
+rule, so an assumed rule with inputs of its own can never be supplied — every
+request would stop on it.
+Give `is eligible` a definition (DECIDE or MEANS), or take what it is asked
+about as an ordinary input of `may apply`, or remove the @export.
+```
+
+**Which means moving between the two spellings is safe.** It used to matter a
+great deal — until 2026-09-08 the head-form spelling slipped past the check and
+then failed on every request, so a file could look publishable and not be. Both
+are refused now, at check time, so migrating one to the other cannot change
+whether a rule exports.
+
+**Two exporters still read the older shape, and still work.** The Blawx bridge
+and the relational middle end turn a predicate written as
+`GIVEN p IS A Person` / ``ASSUME `is authorised` p IS A BOOLEAN`` into an input
+predicate — something a person answers in an interview rather than something a
+request sends. They are not publishing a web API, so the refusal above does not
+apply to them, and `l4 blawx` still compiles those files. What you cannot do is
+publish one of them as a web API. The shipped Blawx seeds keep the `ASSUME`
+form for that reason and say so in their headers; see
+[L4 to Blawx](../../tutorials/blawx/l4-to-blawx.md).
 
 ## Reading older code
 

@@ -475,9 +475,12 @@ evaluate as assumed terms and both export as parameters. The migration buys scop
 eye, not new behaviour — so do it when you are editing the section anyway, and do not sweep a corpus
 for it.
 
-**Not** a migration that expects `@export` to start working. A **function-typed** input is rejected
-for `@export` whichever way it is declared: `Function type inputs are not supported for @export`.
-Moving it to a section `GIVEN` does not change that.
+**Not** a migration that expects `@export` to start working. An input that is itself a **rule** is
+rejected for `@export` however it is declared — as a `FUNCTION FROM … TO …` type
+(`Function type inputs are not supported for @export`) or with its inputs on the head
+(``ASSUME `is eligible` p IS A BOOLEAN``, refused since 2026-09-08 with `… is assumed and takes 1
+input of its own`). Moving it to a section `GIVEN` does not change that — but neither does leaving
+it where it is, which is why the migration is safe to make.
 
 **Not** a claim that `ASSUME` has stopped working. It parses, checks and exports as before, and no
 deprecation warning is emitted.
