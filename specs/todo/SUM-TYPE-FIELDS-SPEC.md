@@ -40,6 +40,13 @@ _type-cast_ sense of the word, and that second sense is the one that matters to 
 Where an earlier document says "the cast narrows the roll", read "the narrowing constructor narrows
 the roll".
 
+**This binds the documentation this work ships.** `doc/reference/regulative/EVERY.md:345` already
+says _"the cast must be a constructor of that type"_ — the forbidden sense, predating this file. New
+text must not extend it: write "the narrowing constructor", or name the thing directly
+(_"`EVERY Tenant t` tells the checker `t` is a `Tenant`"_). Repairing the pre-existing sentence is a
+separate, optional cleanup — a drafter-facing rename of a word in shipped docs, not part of this
+ruling.
+
 ## 1. Two hazards on a sum type, measured 2026-09-09
 
 All probes run against a binary built from `lang/whose-opening` @ `a619afa6`, `JL4_LIBRARY_PATH`
@@ -157,7 +164,30 @@ draft of this rule misread what a `WHEN` pattern binds:
   `WHEN`s did not consume — and a trailing catch-all `WHEN other THEN …` gives its binder the same
   residual (**RULED 2026-09-09**, Meng). The shipped `jl4-core/libraries/actus-core.l4:297-311`
   depends on this: `OTHERWISE ccy's isoCode` after ten `WHEN`s cover every arm but the one
-  declaring `isoCode`;
+  declaring `isoCode`.
+
+  **A `WHEN` arm consumes its constructor ONLY IF its sub-patterns are irrefutable** — every one a
+  plain variable. An arm whose sub-pattern is a literal, an `EXACTLY`, or a nested constructor
+  (`WHEN Tenant 1500`, `WHEN Tenant (EXACTLY threshold)`, `WHEN Tenant (Some n)`;
+  `Syntax.hs:567-573`) matches only _some_ values of that constructor, so the constructor **stays in
+  the residual**. Without this the residual is unsound and S2's guarantee fails: measured
+  2026-09-09, `CONSIDER a WHEN Tenant 1500 THEN 1 OTHERWISE a's deposit` (with `deposit` on
+  `Landlord` only) would compute `missing = ∅`, raise nothing, and still die at run time on
+  `Tenant OF 1600`. The checker already draws this distinction for exhaustiveness — it refuses to
+  reason over opaque arms precisely so "a partial literal match [is not] certified exhaustive"
+  (`TypeCheck.hs:2313-2320`, `patternHasOpaque` `:2962-2968`) — and the residual must reuse that
+  predicate rather than `hintSuspiciousBinders`' head-only heuristic (`:2889-2896`), which is a
+  hint's approximation and not sound for this purpose.
+
+  **An unknown constructor set is "every constructor", never the empty set.** If the scrutinee's
+  type is still an inference variable after `applySubst`, or its head is not a key of
+  `constructorsInScopeFromEntityInfo` (a type synonym head is not), the candidate set is **empty** —
+  and an empty narrowing would make `missing` empty too, silently certifying every projection in
+  that body. Record no narrowing in that case, and have S2 intersect any recorded narrowing with the
+  selector's own domain before subtracting, so a stale or empty entry can never certify a
+  projection. This is the same failure shape as the residual above: a narrowing that is wrong in the
+  permissive direction is invisible;
+
 - a base that is **not a bare binder** — `p's birthPlace's val`, `(f a)'s x`, an `IF` or `CONSIDER`
   result — could still be **every** constructor, always; the only repair is to name it
   (`CONSIDER p's birthPlace WHEN Just place THEN …`). Exception: a base that is syntactically a
@@ -316,7 +346,21 @@ This is where the work is expected to land; the implementer re-checks each ancho
   annotations on one field an error? Open; the plan's default is keep.
 - **A syntactically identical non-binder base inside a branch that matched it** —
   `CONSIDER f a WHEN Tenant t THEN (f a)'s rent`. Treated as un-narrowed (§3 S3), since narrowing it
-  needs expression identity. Open, and much harder; the repair is to name the value.
+  needs expression identity. Open, and much harder; the repair is to name the value. Measured shape
+  that checks and runs **today** and that S2 will refuse:
+  `CONSIDER w's inner WHEN Tenant t THEN (w's inner)'s monthly_rent`.
+- **An alias of a narrowed binder.** `WHEN Tenant t THEN b's monthly_rent WHERE b MEANS a`
+  evaluates today; after S3 the alias `b` carries no narrowing and S2 fires. Neither shape is in the
+  corpus, so neither changes the gate counts, but both are (B) genuine-with-a-ruling rather than (A)
+  S3 gaps, and the gate reader must file them that way. Propagating a narrowing through a `LET`/
+  `WHERE` alias is the obvious extension and is not ruled.
+- **Whether narrowing the SCRUTINEE inside a `WHEN` branch is wanted at all.** As built it is flow
+  typing, which neither tradition in §2 has in that form. It is not free-standing: Meng's
+  `OTHERWISE` ruling already narrows the scrutinee (that is what `actus-core.l4:311` needs), so the
+  `WHEN` case is its counterpart and is implemented on that basis. The alternative — S3 is a no-op
+  at `CONSIDER`, and a drafter reads the payload through the pattern binders only
+  (`THEN t`, `WHEN Tenant name rent THEN rent`) — would make S2 markedly more restrictive. Confirm
+  or overturn; the implementation notes which was chosen.
 - **A partial projection that returns `MAYBE`** (`a's? monthly_rent`, or similar). Would give a
   drafter an explicit escape from S2 without a pattern. Not proposed; recorded so the door is known.
 - **Per-constructor fields that _share a name on purpose with different meanings_.** S1 merges
