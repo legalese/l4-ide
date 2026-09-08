@@ -1,0 +1,6 @@
+executing contract `unrolled` at 0 with the following events:  party `alice` did `Sign` with `alice` at 1
+executing contract `tenants only` at 0 with the following events:  party `alice` did `Sign` with `alice` at 1
+executing contract `everyone listed` at 0 with the following events:  party `alice` did `Sign` with `alice` at 1 party `theLandlord` did `Sign` with `theLandlord` at 2
+executing contract `all but carol` at 0 with the following events:  party `alice` did `Sign` with `alice` at 1 party `bob` did `Sign` with `bob` at 2
+executing contract `circular` at 0 with the following events:  party `alice` did `Sign` with `alice` at 1
+executing contract `nobody` at 0 with the following events:  party `alice` did `Sign` with `alice` at 1

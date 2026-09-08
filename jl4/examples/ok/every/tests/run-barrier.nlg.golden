@@ -1,0 +1,7 @@
+executing contract `the tenancy` at 0 with the following events:  party `alice` did `Sign` with `alice` at 1 party `bob` did `Sign` with `bob` at 2 party `carol` did `Sign` with `carol` at 9 party `theLandlord` did `Deliver` with `theLandlord` at 13
+executing contract `the tenancy` at 0 with the following events:  party `alice` did `Sign` with `alice` at 1 party `bob` did `Sign` with `bob` at 2 party `carol` did `Sign` with `carol` at 9 party `theLandlord` did `Deliver` with `theLandlord` at 15
+executing contract `the tenancy` at 0 with the following events:  party `theLandlord` did `Deliver` with `theLandlord` at 3 party `alice` did `Sign` with `alice` at 4 party `bob` did `Sign` with `bob` at 5 party `carol` did `Sign` with `carol` at 9
+executing contract `the tenancy` at 0 with the following events:  party `alice` did `Sign` with `alice` at 1 party `bob` did `Sign` with `bob` at 2 party `theLandlord` did `Deliver` with `theLandlord` at 20
+executing contract `the tenancy` at 0 with the following events:  party `alice` did `Sign` with `alice` at 1
+`the tenancy`
+executing contract `whose tenancy` at 0 with the following events:  party `alice` did `Sign` with `alice` at 1

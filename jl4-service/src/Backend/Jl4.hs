@@ -1108,6 +1108,11 @@ valueToFnLiteral ei = \case
       [ (opStr, FnArray [leftLit, rightLit])
       ]
 
+  -- An armed-but-unrun EVERY: the cast has not been drawn yet, so there are no
+  -- member obligations to serialize. Report the source form.
+  Eval.ValQuantified _env deonton ->
+    pure $ FnObject [("EVERY", FnLitString (prettyLayout deonton))]
+
   Eval.ValEnvironment{} -> throwError $ InterpreterError "#EVAL produced environment."
   Eval.ValUnappliedConstructor name ->
     pure $ FnLitString $ prettyLayout name

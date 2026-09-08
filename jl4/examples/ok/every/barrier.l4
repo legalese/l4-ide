@@ -7,8 +7,9 @@ IMPORT prelude
 -- who did not sign (§6.1). The ONCE line is mandatory whenever an EVERY has a
 -- HENCE or a LEST; see not-ok/tc/every-continuation-without-join.l4.
 --
--- Phase 1 parses, scopes, type-checks and prints this; running it is phase 2,
--- so the #EVAL below reports that, deliberately.
+-- This file is the FRONT END's witness: it shows the shape. The #EVAL at the
+-- foot has no event stream, so what it prints is the rule itself, unarmed and
+-- with its cast not yet drawn. Running one against events is run-barrier.l4.
 
 DECLARE Actor IS ONE OF
     Landlord HAS name IS A STRING

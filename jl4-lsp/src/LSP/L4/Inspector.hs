@@ -208,6 +208,7 @@ valueToJson = \case
   Val.ValEnvironment{} -> Aeson.String "<environment>"
   Val.ValObligation{} -> Aeson.String "<obligation>"
   Val.ValROp{} -> Aeson.String "<deferred-op>"
+  Val.ValQuantified{} -> Aeson.String "<quantified-obligation>"
   Val.ValBreached{} -> Aeson.object ["$type" .= ("Breach" :: Text)]
 
 consToList :: Val.NF -> Val.NF -> [Aeson.Value]

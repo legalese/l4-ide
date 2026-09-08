@@ -1,0 +1,12 @@
+executing contract `each approves` at 0 with the following events:  party `a` did `Approve` with `a` at 1 party `b` did `Approve` with `b` at 2
+executing contract `each approves` at 0 with the following events:  party `a` did `Approve` with `a` at 1 party `b` did `Approve` with `b` at 20
+executing contract `the resolution` at 0 with the following events:  party `a` did `Approve` with `a` at 1 party `b` did `Approve` with `b` at 2
+executing contract `the resolution` at 0 with the following events:  party `a` did `Approve` with `a` at 1 party `theChair` did `Approve` with `theChair` at 40
+executing contract `no subletting` at 0 with the following events:  party `theChair` did `Approve` with `theChair` at 40
+executing contract `no subletting` at 0 with the following events:  party `b` did `Sublet` with `b` at 3 party `theChair` did `Approve` with `theChair` at 40
+executing contract `quorum by ten` at 0 with the following events:  party `a` did `Approve` with `a` at 1 party `b` did `Approve` with `b` at 2
+executing contract `quorum by ten` at 0 with the following events:  party `a` did `Approve` with `a` at 1 party `b` did `Approve` with `b` at 20
+executing contract `approve, or else` at 0 with the following events:  party `a` did `Approve` with `a` at 1 party `b` did `Approve` with `b` at 2
+executing contract `approve, or else` at 0 with the following events:  party `a` did `Approve` with `a` at 1 party `theChair` did `Approve` with `theChair` at 500
+executing contract `then all confirm` at 0 with the following events:  party `a` did `Approve` with `a` at 1 party `b` did `Approve` with `b` at 2 party `a` did `Sublet` with `a` at 3 party `b` did `Sublet` with `b` at 4
+executing contract `then all confirm` at 0 with the following events:  party `a` did `Approve` with `a` at 1 party `b` did `Approve` with `b` at 2 party `a` did `Sublet` with `a` at 3 party `b` did `Sublet` with `b` at 9

@@ -554,6 +554,8 @@ nfFromTrace m = \ case
     MkNF (ValBreached (ExplicitBreach (fmap rec mParty) (fmap rec mReason)))
   ValROp env op l r ->
     MkNF (ValROp env op (fmap (fmap rec) l) (fmap (fmap rec) r))
+  ValQuantified env d ->
+    MkNF (ValQuantified env d)
   where
     rec :: Reference -> NF
     rec r = rec' r.address

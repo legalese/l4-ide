@@ -59,6 +59,20 @@ data Value a =
   | ValClosure (GivenSig Resolved) (Expr Resolved) Environment
   | ValObligation Environment (Either RExpr (Value a)) (RAction Resolved) (Either (Maybe RExpr) (Value a)) RExpr (Maybe RExpr)
   | ValROp Environment RBinOp (Either RExpr (Value a)) (Either RExpr (Value a))
+  | ValQuantified Environment (Deonton Resolved)
+    -- ^ An ARMED but not yet run quantified obligation: @EVERY [Cast] v [WHO …]
+    -- … [ONCE ALL HAVE | UPON EACH] …@ (EVERY-EACH-QUANTIFIER-SPEC §2.4).
+    --
+    -- Unlike 'ValObligation', which already knows its one party, a quantified
+    -- obligation does not know its cast until it is applied to a time and an
+    -- event stream: the roll (§2.2.7.5 point 5, the list the @WHO@ filter
+    -- tests membership in) is read at that point — once, for the whole family
+    -- (R-Q6\/R-T6, "the cast is evaluated once at arming"). Until then this
+    -- value carries the whole 'Deonton' unchanged, so a residual prints back
+    -- as the source form.
+    --
+    -- The 'Subject' inside is always an 'Every'; a 'Party' deonton becomes a
+    -- 'ValObligation' directly.
   | ValNullaryBuiltinFun NullaryBuiltinFun
   | ValUnaryBuiltinFun UnaryBuiltinFun
   | ValBinaryBuiltinFun BinOp
@@ -180,6 +194,7 @@ instance NFData a => NFData (Value a) where
   rnf (ValEnvironment env)        = env `seq` ()
   rnf (ValBreached ev)            = rnf ev `seq` ()
   rnf (ValObligation env p a t f l) = env `seq` p `deepseq` a `deepseq` t `deepseq` f `deepseq` l `deepseq` ()
+  rnf (ValQuantified env d)       = env `seq` d `deepseq` ()
 
 type MaybeEvaluated = MaybeEvaluated' RExpr
 

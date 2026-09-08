@@ -1,5 +1,5 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
-barrier.l4:42:1-25:
-  EVERY is not yet evaluable: a quantified obligation parses and type-checks, but running it is not implemented (EVERY-EACH-QUANTIFIER-SPEC, phase 2).
+barrier.l4:43:1-25:
+  EVERY Tenant t MUST Sign (EXACTLY t) WITHIN 14 ONCE ALL HAVE HENCE `the tenancy begins` LEST BREACH

@@ -1,0 +1,11 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+run-fork.l4:39:1-43:58:
+  FULFILLED
+run-fork.l4:47:1-50:58:
+  PARTY Landlord OF "Ms Ng" MUST Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount) WITHIN 2 HENCE FULFILLED AND FULFILLED
+run-fork.l4:53:1-56:59:
+  DEONTIC BREACHED:
+    BREACH
+    BY Tenant OF "Bob"

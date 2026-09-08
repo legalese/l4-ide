@@ -1,0 +1,123 @@
+IMPORT prelude
+-- EVERY-EACH-QUANTIFIER-SPEC, phase 2: the other modals, the plain
+-- distributive form, and the deadline on the join line.
+--
+-- A quantified rule with no join line has no continuation either (the checker
+-- refuses one without a join), so barrier and fork coincide and what is left
+-- is the plain distributive obligation: one obligation per member, all live at
+-- once (spec §3.3).
+
+DECLARE Actor IS ONE OF
+    Chair    HAS name IS A STRING
+    Director HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Approve HAS who IS AN Actor
+    Sublet  HAS who IS AN Actor
+
+theChair MEANS Chair OF "Ms Ng"
+a MEANS Director OF "A"
+b MEANS Director OF "B"
+board MEANS LIST a, b
+
+-- 1. No join line: each director owes an approval by day 10, on their own.
+GIVETH A DEONTIC Actor Action
+`each approves` MEANS
+    EVERY Director d WHO elem d board MUST Approve (EXACTLY d) WITHIN 10
+
+#TRACE `each approves` AT 0 WITH
+  PARTY a DOES Approve a AT 1
+  PARTY b DOES Approve b AT 2
+
+#TRACE `each approves` AT 0 WITH
+  PARTY a DOES Approve a AT 1
+  PARTY b DOES Approve b AT 20
+
+-- 2. MAY under a barrier. This is the constitutive pattern of spec §2.2.1
+--    Pattern B: no director OWES an approval, so nothing is breached when one
+--    withholds it — the resolution simply does not pass. Read the second trace
+--    carefully: it comes back FULFILLED because nothing was owed, and the
+--    HENCE did not fire. A drafter who needs to SEE that the resolution failed
+--    writes a LEST on the join.
+GIVETH A DEONTIC Actor Action
+`the resolution` MEANS
+    EVERY Director d WHO elem d board MAY Approve (EXACTLY d) WITHIN 30
+        ONCE ALL HAVE HENCE FULFILLED
+
+#TRACE `the resolution` AT 0 WITH
+  PARTY a DOES Approve a AT 1
+  PARTY b DOES Approve b AT 2
+
+#TRACE `the resolution` AT 0 WITH
+  PARTY a DOES Approve a AT 1
+  PARTY theChair DOES Approve theChair AT 40
+
+-- 3. SHANT under a barrier. A prohibition is kept by NOT acting, so the
+--    barrier is achieved when the deadline passes with nobody having sublet.
+GIVETH A DEONTIC Actor Action
+`no subletting` MEANS
+    EVERY Director d WHO elem d board SHANT Sublet (EXACTLY d) WITHIN 30
+        ONCE ALL HAVE HENCE FULFILLED LEST BREACH
+
+#TRACE `no subletting` AT 0 WITH
+  PARTY theChair DOES Approve theChair AT 40
+
+#TRACE `no subletting` AT 0 WITH
+  PARTY b DOES Sublet b AT 3
+  PARTY theChair DOES Approve theChair AT 40
+
+-- 4. WITHIN in both positions (R-T2). On the act it bounds each approval; on
+--    the ONCE line it bounds the whole, so approvals inside their own 30 days
+--    still miss if the LAST of them lands after day 10.
+GIVETH A DEONTIC Actor Action
+`quorum by ten` MEANS
+    EVERY Director d WHO elem d board MUST Approve (EXACTLY d) WITHIN 30
+        ONCE ALL HAVE WITHIN 10 HENCE FULFILLED
+
+#TRACE `quorum by ten` AT 0 WITH
+  PARTY a DOES Approve a AT 1
+  PARTY b DOES Approve b AT 2
+
+#TRACE `quorum by ten` AT 0 WITH
+  PARTY a DOES Approve a AT 1
+  PARTY b DOES Approve b AT 20
+
+-- 5. A deadline written ONLY on the join line, under a FORK. It has to bound
+--    each act, or nothing would ever expire and the rule could never fail.
+GIVETH A DEONTIC Actor Action
+`approve, or else` MEANS
+    EVERY Director d WHO elem d board MUST Approve (EXACTLY d)
+        UPON EACH WITHIN 10
+        HENCE FULFILLED
+        LEST  BREACH BY d
+
+#TRACE `approve, or else` AT 0 WITH
+  PARTY a DOES Approve a AT 1
+  PARTY b DOES Approve b AT 2
+
+#TRACE `approve, or else` AT 0 WITH
+  PARTY a DOES Approve a AT 1
+  PARTY theChair DOES Approve theChair AT 500
+
+-- 6. Nesting: a barrier whose HENCE is itself a quantified obligation. The
+--    inner rule is armed at the outer join, so its five days run from there.
+GIVETH A DEONTIC Actor Action
+`then all confirm` MEANS
+    EVERY Director d WHO elem d board MUST Approve (EXACTLY d) WITHIN 10
+        ONCE ALL HAVE
+        HENCE (EVERY Director e
+                   WHO    elem e board
+                   MUST   Sublet (EXACTLY e)
+                   WITHIN 5)
+
+#TRACE `then all confirm` AT 0 WITH
+  PARTY a DOES Approve a AT 1
+  PARTY b DOES Approve b AT 2
+  PARTY a DOES Sublet a AT 3
+  PARTY b DOES Sublet b AT 4
+
+#TRACE `then all confirm` AT 0 WITH
+  PARTY a DOES Approve a AT 1
+  PARTY b DOES Approve b AT 2
+  PARTY a DOES Sublet a AT 3
+  PARTY b DOES Sublet b AT 9

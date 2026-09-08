@@ -1,0 +1,56 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+run-modals.l4:28:1-30:30:
+  FULFILLED
+run-modals.l4:32:1-34:31:
+  DEONTIC BREACHED:
+    party
+      Director OF "B"
+    who did action
+      Approve OF (Director OF "B")
+    at
+      20
+    surpassed the deadline of party
+      Director OF "B"
+    who had to do obligatory action
+      MUST Approve (EXACTLY d)
+    before their deadline, which was at
+      10
+run-modals.l4:47:1-49:30:
+  FULFILLED
+run-modals.l4:51:1-53:45:
+  FULFILLED
+run-modals.l4:62:1-63:45:
+  FULFILLED
+run-modals.l4:65:1-67:45:
+  DEONTIC BREACHED:
+    BREACH
+run-modals.l4:77:1-79:30:
+  FULFILLED
+run-modals.l4:81:1-83:31:
+  DEONTIC BREACHED:
+    BREACH
+    BECAUSE "every member acted, but the last of them acted after the ONCE line's WITHIN deadline"
+run-modals.l4:94:1-96:30:
+  FULFILLED
+run-modals.l4:98:1-100:46:
+  DEONTIC BREACHED:
+    BREACH
+    BY Director OF "B"
+run-modals.l4:113:1-117:29:
+  FULFILLED
+run-modals.l4:119:1-123:29:
+  DEONTIC BREACHED:
+    party
+      Director OF "B"
+    who did action
+      Sublet OF (Director OF "B")
+    at
+      9
+    surpassed the deadline of party
+      Director OF "B"
+    who had to do obligatory action
+      MUST Sublet (EXACTLY e)
+    before their deadline, which was at
+      7
