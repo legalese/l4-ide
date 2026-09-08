@@ -1892,8 +1892,12 @@ checkDeonton ann subject action due mjoin hence lest partyT actionT =
         filterR <- traverse (\e -> checkExpr ExpectQuantifierFilterContext e boolean) mFilter
         -- The performer/actor agreement check ('checkRegulativeActorAgreement')
         -- is silent for a computed party (actors-and-actions.md §7); a bound
-        -- variable is one, so it is not run here. Phase 2 checks agreement at
-        -- run time, per member.
+        -- variable is one, so it is not run here. Nor is it run at run time:
+        -- the machine checks that the EVENT's party is the member
+        -- ('Contract8'), which is a different question from whether the
+        -- ACTION's own actor field names the performer. Writing
+        -- @MUST Sign (EXACTLY t)@ is what ties the two together, and nothing
+        -- enforces it — stated on doc/reference/regulative/EVERY.md.
         (actionR, dueR, henceR, lestR) <-
           checkDeontonBody Nothing partyT actionT action due hence lest
         -- An action is a pattern, so @MUST Sign t@ would bind a NEW @t@ over

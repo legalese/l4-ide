@@ -72,6 +72,7 @@ instance ToJSON a => ToJSON (Value a) where
   toJSON (ValClosure{})           = toJSON ("<function>" :: Text)
   toJSON (ValObligation{})        = toJSON ("<obligation>" :: Text)
   toJSON (ValROp{})               = toJSON ("<deferred-op>" :: Text)
+  toJSON (ValQuantified{})        = toJSON ("<quantified-obligation>" :: Text)
   toJSON (ValNullaryBuiltinFun{}) = toJSON ("<builtin>" :: Text)
   toJSON (ValUnaryBuiltinFun{})   = toJSON ("<builtin>" :: Text)
   toJSON (ValBinaryBuiltinFun{})  = toJSON ("<builtin>" :: Text)

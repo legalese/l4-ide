@@ -1,22 +1,38 @@
-> **Status (re-audited 2026-09-07 on `unstable` `5dc0ca19`; first audited 2026-07-03):** OPEN
-> upstream — on `unstable`, nothing quantified is built and regulative rules bind a single `PARTY`
-> only. The bullets below describe that tree. **On branch `every/build-1` the FRONT END is built**
-> (2026-09-07, unmerged): the lexer, parser, name resolution, type checker, printers, NLG, document
-> export and state graph all carry `EVERY` and the join line; evaluation is not built and says so.
-> Where a claim below is false on that branch, the entry says which tree it describes.
+> **Status (re-audited 2026-09-08 on `lang/every-runtime`, cut from `unstable` `6e9b57bb`):**
+> the **FRONT END IS MERGED** — `every/build-1` landed on `unstable` as PR #360 (merge `734b8015`,
+> 2026-09-07), so the lexer, parser, name resolution, type checker, printers, NLG, document export
+> and state graph all carry `EVERY` and the join line on `unstable` today. **EVALUATION IS BUILT**
+> on `lang/every-runtime` (2026-09-08, unmerged at the time of writing): §3.1's barrier, §3.2's
+> fork, §3.3's distributive form, all four modals, R-T2's join deadline and nesting all run; see
+> §11.0.1 for exactly what was built and what was not, and §11.0 for the roll-call rule that made
+> it possible. The four witnesses are `jl4/examples/ok/every/run-{barrier,fork,roll,modals}.l4`.
 >
-> - On `unstable`: `EVERY`, `EACH`, `NO`, `ONCE`, `HAVE`, `WHO`, `WHOSE` and `SOME` are not lexer keywords (the keyword
+> The pre-#360 bullets below are **kept as the record of the tree the design was written against**;
+> the first two are now false of `unstable` and say so.
+>
+> - **FALSE since #360 (2026-09-07).** `EVERY`, `WHO`, `ONCE`, `HAVE`, `SOME`, `ALL` and `UPON`
+>   are lexer keywords on `unstable` — `SOME` included (`Lexer.hs:350`), even though §2.2.7.4's
+>   count join is not built. `EACH` is matched by spelling and is still not a keyword; `NO` and
+>   `WHOSE` are still not keywords. The bullet as written described `unstable` before the merge:
+>   `EVERY`, `EACH`, `NO`, `ONCE`, `HAVE`, `WHO`, `WHOSE` and `SOME` are not lexer keywords (the keyword
 >   table in `jl4-core/src/L4/Lexer.hs`; `identifierOrKeyword` at `Lexer.hs:670-675` (since #360; `:654-659` before it) is an exact map
 >   lookup, so there are no soft keywords). `ALL` is `TKAll` (`Lexer.hs:317`), consumed by `FOR ALL`
 >   (`Parser.hs:1244-1245`) and `RECALL ALL` (`Parser.hs:2375`).
-> - `obligation` takes exactly one party expression after `PARTY` (`Parser.hs:2503-2513`); `HENCE` and
+> - **FALSE since #360, and its last sentence false since 2026-09-08.** The bullet as written:
+>   `obligation` takes exactly one party expression after `PARTY` (`Parser.hs:2503-2513`); `HENCE` and
 >   `LEST` are parsed there and nowhere else (`Parser.hs:2538-2544`). No barrier, fork, filter or
 >   `BarrierObligation` runtime exists. The syntax appears only in non-compiling sketches under
 >   `jl4/experiments/` (`regulative-powers.l4:4`, `deontic-may.l4:99-101`, `jerseyAlcohol.l4:42`).
+>   — There is now a filter and a barrier/fork runtime (§11.0.1); it is not shaped like §4.1's
+>   `BarrierObligation`, and §11.1's `BarrierRuntime` record is still a design sketch, not a type in
+>   the tree.
 > - **Rulings so far:** R-T1–R-T6 (§2.2.7.8, 2026-09-06); the pattern spelling (§2.4, 2026-09-07);
 >   **R-Q1–R-Q7 (§2.5, 2026-09-07)**; **R-Q7A–R-Q7C, the anchor's spelling (§5.1.1, 2026-09-07;
 >   ruled, not built)**; **R-X5 (the window's edges, modified) and R-X6 (the early act, ruled),
->   §5.1.2, 2026-09-07, not built**. Under R-Q1 there is one quantifier word, `EVERY`, and a
+>   §5.1.2, 2026-09-07, not built**; and two on 2026-09-08 — **W3, `THE OPENING` declined and
+>   the anchor slot ruled to become a trace expression (§5.1.3, direction only, not built)**, and
+>   **the roll call, how a run gets its cast (§11.0, ANSWERED and BUILT)**. Under R-Q1 there is
+>   one quantifier word, `EVERY`, and a
 >   mandatory join line under it whenever a continuation follows: `ONCE ALL HAVE` (barrier) or
 >   `UPON EACH` (fork). The fork's words were RULED on 2026-09-07 and are no longer provisional;
 >   `ONCE EACH HAS` does not parse. `EACH` is not a keyword and not a quantifier. The file keeps its
@@ -770,7 +786,8 @@ document until 2026-09-07, when both were ruled out of it: `ALL` is not a quanti
    "consistently with CSL"). That is the same gap the six-ways page recorded for the any-join.
 5. **The domain is the cast, filtered.** `EVERY Tenant t` over a constructor with a payload
    (`Tenant HAS name IS A STRING`) ranges over an open type and needs §2.1's `WHO member_of …`
-   filter, exactly as the existing `EVERY` does. The performer check of the value-actor encoding is
+   filter, exactly as the existing `EVERY` does. **This point is the one the run time turned into
+   a rule: see §11.0, the roll call (ANSWERED 2026-09-08).** The performer check of the value-actor encoding is
    silent for computed actors (`doc/concepts/legal-modeling/actors-and-actions.md` §7), so
    "a tenant may only pay as payer" is a run-time check under this encoding.
 6. **Without a continuation the whole family collapses**, for the reason §3.3 already gives for
@@ -1287,6 +1304,9 @@ branch was in the merge queue at the time):
 > `EVERY`. In the workflow-patterns catalogue it is **WCP-14**, multiple instances with
 > synchronisation (the joint/several memo's §7.5 asked for the citation here).
 
+**BUILT 2026-09-08** on `lang/every-runtime`; witness `jl4/examples/ok/every/run-barrier.l4`.
+What the build does NOT do is §6.1's blame set — see §11.0.1.
+
 `EVERY` with a `ONCE ALL HAVE` join has **barrier semantics**:
 
 - **HENCE fires** when ALL parties complete (join point)
@@ -1313,6 +1333,8 @@ EVERY p MUST X ONCE ALL HAVE HENCE shared_h LEST shared_l
 > word. In the workflow-patterns catalogue it is **WCP-12**, multiple instances without
 > synchronisation.
 
+**BUILT 2026-09-08** on `lang/every-runtime`; witness `jl4/examples/ok/every/run-fork.l4`.
+
 `EVERY` with a fork join has **fork semantics**:
 
 - **HENCE fires** independently for each party that completes
@@ -1332,6 +1354,11 @@ EVERY p MUST X UPON EACH HENCE h(p) LEST l(p)
 | **Counting**  | No shared counter; each completion is independent |
 
 ### 3.3 Without HENCE/LEST: Both Equivalent
+
+**BUILT 2026-09-08** on `lang/every-runtime`; witness `jl4/examples/ok/every/run-modals.l4`. The
+desugaring below is what the build does, literally: the members become a right-nested `RAND` fold
+over the cast, because `RAND` already gives every operand the whole event stream, which is the
+interleaving this section means.
 
 When there is no continuation there is no join to write, and the barrier and the fork coincide: a
 quantified obligation with no `ONCE` line is the plain distributive obligation. Unchanged in
@@ -1425,6 +1452,11 @@ data BarrierStatus
 ```
 
 ### 4.2 Denotational Semantics
+
+> **`parties = { p | p ∈ P, pred(p) }` below is not constructible, and §11.0 (2026-09-08) says
+> what the run time does instead.** `P` is normally an open type, so the comprehension has no
+> finite extension; the machine reads the cast off the filter's `elem` conjunct — the roll — and
+> refuses when there is none.
 
 The party type `P` is determined by the deontic context (`GIVETH DEONTIC P A`):
 
@@ -2117,7 +2149,176 @@ At contract analysis time, check for:
 
 ## 11. Implementation Notes
 
+### 11.0 The roll call: where the cast comes from — ANSWERED 2026-09-08
+
+**The question §4.2 left open.** The denotational semantics reads
+`parties = { p | p ∈ P, pred(p) }` — a comprehension over the party type. That set is not
+constructible: under the value-actor encoding a cast constructor with a payload
+(`Tenant HAS name IS A STRING`) has **one constructor and infinitely many values**, and §2.2.7.5
+point 5 says so in terms ("ranges over an open type and needs §2.1's `WHO member_of …` filter"). No
+section of this document said how a machine gets from that filter to a list, and until 2026-09-08
+nothing had to: the front end never asked.
+
+**The ruling, and it is the only reading the language supports today.** The cast is drawn from the
+**roll**: the list an `elem v xs` conjunct of the `WHO` filter names. At arming the machine reads
+the filter left to right through `AND`, takes the first conjunct of the form `elem v xs` with `v`
+the bound variable, evaluates `xs` to a `LIST`, and that list is the roll. Each entry is then
+narrowed twice more — by the cast constructor when one is written (`EVERY Tenant t` drops a
+landlord on the roll), and by the whole filter. What survives, in roll order, is the cast, fixed
+from then on (R-Q6, R-T6). **A quantified obligation with no such conjunct refuses to run**, with a
+message naming the spelling to add; it still parses and type-checks, so this is a run-time refusal
+and not a new front-end rule.
+
+**What decided it.** Three candidates were worked through against the tree on 2026-09-08.
+
+1. **Enumerate the party type's constructors.** Measured: the evaluator can do this — `entityInfo`
+   is in `EvalState` and `Machine.hs` already scans it for constructors at `:2375-2394`
+   @ `6e9b57bb` (`:2649-2660` is a keyed lookup, not a scan, and does not support the point).
+   But enumerating _constructors_ is not enumerating _inhabitants_, and
+   the corpus's own casts are payload-carrying: it answers `{Tenant}`, not `{Alice, Bob, Carol}`.
+   It would work only for a party type all of whose constructors are nullary, which no example in
+   this document or in `doc/` uses.
+2. **Discover the cast from the event stream.** Fatal for the barrier: "all who acted have acted"
+   is vacuously true, so `ONCE ALL HAVE` would fire on the first event.
+3. **The roll.** Every runnable example already writes it — §2.1's `WHO elem p signatories`,
+   §2.2.7.6's `WHO elem t tenants`, and the corpus's `jl4/examples/ok/every/who-filter.l4`.
+   Measured on the corpus at
+   `6e9b57bb`: of the nine `ok/every/*.l4` front-end examples, exactly one rule
+   (`who-filter.l4`'s first) carries the conjunct, which is why the new run-time examples are new
+   files rather than `#TRACE` lines added to the old ones.
+
+**The cost, stated plainly.** Three edges, all measured 2026-09-08 and all on the doc page:
+
+- The conjunct is recognised by **spelling** — the function must be called `elem` — which is the
+  device the parser already uses for `EACH` in `UPON EACH` and for `TIMEZONE`. A user-defined
+  two-argument `elem` shadowing the prelude's would be taken as the roll.
+- Only an `AND` chain is walked. `WHO elem t xs OR elem t ys` and `WHO NOT (elem t xs)` both
+  refuse: the first has two candidate rolls and the second names who is out. Refusing is the right
+  answer for the second and a real limit for the first; `append` is the workaround.
+- A roll with **repeats** produces repeated members. `LIST alice, alice, bob` is a cast of three.
+  Under a BARRIER one signature from Alice discharges both of her obligations, so nothing goes
+  wrong beyond the group not being the size it looks. Under a FORK it is worse: the continuation
+  fires once per copy, so one act earns two receipts (measured 2026-09-08). No de-duplication is
+  done, because `EQUALS` on a party is a structural comparison the machine would have to run
+  pairwise, and nothing in this document asks for it.
+
+**What review should reconsider, and what it should not.** The refusal is not a placeholder: it is
+the same move R-Q1 makes for a bare continuation and `CONSIDER` makes for a missing branch. What is
+open is whether the roll deserves its own **syntax** — `EVERY Tenant t IN tenants` — instead of
+being read out of the filter. That question was **not** ruled here, because R-Q4 fixed `WHO` as the
+only filter word and a cast-source keyword is a new production, not an implementation choice. It is
+put to Meng as an open question, not decided by the build.
+
+### 11.0.1 What phase 2 built, and what it did not — 2026-09-08
+
+**Built**, on `lang/every-runtime`, witnessed by `jl4/examples/ok/every/run-{barrier,fork,roll,modals}.l4`:
+
+- the roll call (§11.0), fixed at arming (R-Q6/R-T6);
+- the plain distributive form with no join line (§3.3), as the `RAND` fold this document always
+  said it was — the members run over the same event stream, which is what `RAND` already means;
+- the **fork** (§3.2, `UPON EACH`): each member carries its own copy of the continuation with the
+  member variable bound, so `LEST BREACH BY t` names the member;
+- the **barrier** (§3.1, `ONCE ALL HAVE`): `HENCE` once, anchored at the last completion and
+  handed the event stream that followed it, which is R-Q7's "unanchored, `HENCE` counts from the
+  join's firing" and §3.4's `t_last`;
+- the join line's own `WITHIN` (R-T2): written alone, on either kind of join line, it bounds each
+  act, because otherwise no member would ever expire; written alongside an act `WITHIN`, a barrier
+  additionally checks it on the whole;
+- all four modals under a join, including `SHANT` achieving at the deadline (§3.4's "success time
+  by modal"). `MAY` is the one worth spelling out: a member who never exercises the permission has
+  breached nothing, so under a barrier with **no** `LEST` the join simply never fires and the run
+  reports `FULFILLED` — the same word a completed barrier gives. With a `LEST` on the join, that
+  member's lapse does make the group fail. §2.2.1's Pattern B is the case this is right for, and
+  the doc page says in terms that `FULFILLED` is not evidence the `HENCE` fired.
+- nesting: a quantified obligation inside another's `HENCE`, armed at the outer join.
+
+**Not built, and each one is a place a run gives a coarser answer than this document specifies:**
+
+- **§6.1's blame set.** A failed barrier names ONE non-completer — the first in roll order —
+  because `ReasonForBreach` carries one party. This is R-T3 (§2.2.7.5 point 4), unbuilt, exactly as
+  that point predicted. Measured 2026-09-08: reversing the roll reverses which member is named,
+  so the choice is deterministic and it is roll order.
+- **§5.2's deadline anchor.** A `LEST` continuation is anchored at the revealing event's stamp, not
+  at the missed deadline. §5.2 records that changing this changes the **single-party** path and
+  every trace golden that prints a reparation deadline; the build deliberately made `EVERY` match
+  the single-party path rather than diverge from it, so that §5.2 remains one change to make in one
+  place. It is still owed.
+- **The residual of an unfinished barrier** is the outstanding members' obligations — with their
+  deadlines correctly decremented, and carrying the machine's two sentinels in their `HENCE` and
+  `LEST` slots (they print as `` `the join` `` and `` `the join fails` ``) — but WITHOUT the join
+  line. Feeding that residual more events would run the members and not the join. Nothing in
+  `l4 run` does that (a residual is the final answer), but a service that resumed a contract would
+  need §11.1's `BarrierRuntime` to be a real value.
+- **The performer/actor agreement check per member.** `TypeCheck.checkDeonton` said phase 2 would
+  check it at run time. It does not: the machine checks that the EVENT's party is the member, which
+  is a different question from whether the ACTION's own actor field names the performer. That
+  comment is corrected in the same change.
+- **§13.2's partial-completion visibility**, and the count and measure joins of §2.2.7.4.
+
+**Two run-time REFUSALS this build had to add, neither of which the design anticipated.** Both are
+cases the front end accepts and the run cannot answer; both are named rather than crashed on, and
+both have a corpus witness.
+
+- **A barrier's `HENCE` or `LEST` may not name the member.** §3.1 writes them `shared_h` and
+  `shared_l`, and that is exactly the point: `ONCE ALL HAVE` fires once, after everybody has acted,
+  so there is no member for the variable to denote. The type checker binds the variable throughout
+  the rule (`TypeCheck.checkDeonton`), which is right for the fork — where each member carries its
+  own copy — and wrong here. **This is arguably a front-end bug and the refusal is the run time
+  compensating for it**: the better fix is for `checkDeonton` to drop the variable from scope in
+  `HENCE`/`LEST` under a `JoinOnce`, which is a change to merged front-end behaviour and is left to
+  review. Witness: `run-barrier.l4`'s `whose tenancy`.
+- **The roll may not mention the member.** `WHO elem t (peersOf t)` type-checks and cannot be
+  evaluated: the roll is read once, before there is any member. Witness: `run-roll.l4`'s
+  `circular`.
+
+**What the adversarial pass of 2026-09-08 changed, and it changed real answers.** Recorded so a
+later reader knows these were found by attack, not by design:
+
+- The barrier used to run a failing member's obligation **twice** — once to learn it had failed,
+  once again with the `LEST` attached, to get the anchor and residual stream the `LEST` needed.
+  Measured: two ledger writes where a single-party control produced one, and — where a member's
+  `WITHIN` was itself a ledger read — a verdict of `FULFILLED` where the control said `BREACH`,
+  because the second pass recomputed a later deadline. Fixed by a **second sentinel**: a barrier
+  member's `LEST` slot holds a marker that reports the machine's own anchor and residual stream
+  back to the barrier, which then runs the real `LEST` once. Nothing is applied twice.
+- A fork's `WITHIN` on the join line was **read for no join at all**: `joinStateDue` matched only
+  `JoinOnce`, so `UPON EACH WITHIN 10` with no act deadline left every member with no deadline and
+  the rule could never fail. Fixed; the act deadline still wins when both are written, and the
+  fork's own `WITHIN` is still not separately enforced in that case (a fork has no join event to
+  check it against), which is the residue of R-T2 under a fork.
+- The residual of an unfinished barrier reported each member's ORIGINAL deadline, not the
+  decremented one — thirteen days out on a fourteen-day obligation with thirteen days elapsed —
+  because the frame kept the pre-scan obligation rather than the residual the scan produced.
+
+**One imprecision left in, deliberately, because fixing it needs machinery this build does not
+have.** When two or more members complete at the **same instant**, the join's firing time is right
+but the event stream handed to the continuation is the one belonging to whichever of them the roll
+named first. So an event stamped exactly at the join can still reach the continuation — including a
+tied member's own act, which then does double duty. Computing the correct stream (the shortest
+suffix, or the whole stream trimmed to events strictly after the join) needs a trimming walk with
+its own frames. A `SHANT` barrier ties by construction, but harmlessly: every member completes at
+the same revealing event and their residual streams are identical.
+
+**A defect found on the way, and fixed here because the fork's own example needs it.** `EXACTLY e`
+in the **second or later** argument of an action pattern raised `is not in scope` at run time.
+`PatApp0` handed the ambient environment to the first sub-pattern and `PatApp1` then handed each
+later sub-pattern the environment the PREVIOUS sub-pattern had produced — its bindings, not the
+scope it was written in. The sibling `FOLLOWED BY` frames (`PatCons0`/`PatCons1`) always carried
+the ambient environment separately. Nothing about it is quantifier-specific: reproduced with a
+plain `PARTY alice MUST Pay payer (EXACTLY theLandlord)` on the 2026-08-27 installed binary, which
+predates every line of this branch. It blocks any RUN of §2.2.7.6's own rent example, and of the
+shape `fork.l4` writes (`Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount)`) — `fork.l4`
+itself carries no directive at `6e9b57bb`, so it was never red, which is how the defect survived.
+Witness: `jl4/examples/ok/regulative-exactly-later-argument.l4`.
+
 ### 11.1 Runtime State
+
+> **Still a sketch, 2026-09-08.** No such type exists; grep for `BarrierRuntime` finds nothing in
+> `.hs`. The build carries the barrier's state in an evaluator FRAME
+> (`L4.EvaluateLazy.ContractFrame.BarrierStepFrame`) rather than in a value, which is why an
+> unfinished barrier's residual loses its join line (§11.0.1): a frame does not survive the answer
+> being returned. A resumable contract — a service that stores a running barrier and feeds it more
+> events later — is what would need this record to become real.
 
 ```haskell
 data BarrierRuntime = BarrierRuntime

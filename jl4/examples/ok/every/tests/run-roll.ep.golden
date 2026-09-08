@@ -1,0 +1,113 @@
+IMPORT prelude
+-- EVERY-EACH-QUANTIFIER-SPEC, phase 2: WHERE THE CAST COMES FROM.
+--
+-- A party type is normally open. `Tenant HAS name IS A STRING` has one
+-- constructor and infinitely many values, so "every tenant" is not something
+-- the machine can count out. The spec says so itself (§2.2.7.5 point 5: the
+-- pattern form "ranges over an open type and needs §2.1's `WHO member_of …`
+-- filter"), and every runnable example in it draws its cast from a list.
+--
+-- So the cast is drawn from the ROLL: the list an `elem <variable> <list>`
+-- condition inside `WHO` names. The rest of the `WHO` condition then narrows
+-- it, and the cast word narrows it again. Without such a condition there is
+-- nothing to call the roll from, and running the rule refuses and says so.
+
+DECLARE Actor IS ONE OF
+    Landlord HAS name IS A STRING
+    Tenant   HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Sign HAS signer IS AN Actor
+
+theLandlord MEANS Landlord OF "Ms Ng"
+alice       MEANS Tenant OF "Alice"
+bob         MEANS Tenant OF "Bob"
+carol       MEANS Tenant OF "Carol"
+tenants     MEANS LIST alice, bob, carol
+noOne       MEANS EMPTY
+
+-- 1. No roll: nothing says who the tenants are, so running this refuses,
+--    naming what to write instead.
+GIVETH A DEONTIC Actor Action
+`unrolled` MEANS
+    EVERY Tenant t MUST Sign (EXACTLY t) WITHIN 14
+
+#TRACE `unrolled` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+
+-- 2. The cast word narrows the roll. The roll here holds a landlord as well,
+--    and `Tenant` leaves him out: only Alice is bound, and only she signs.
+GIVETH A DEONTIC Actor Action
+`tenants only` MEANS
+    EVERY Tenant t
+        WHO    elem t (LIST alice, theLandlord)
+        MUST   Sign (EXACTLY t)
+        WITHIN 14
+        ONCE   ALL HAVE
+        HENCE  FULFILLED
+        LEST   BREACH
+
+#TRACE `tenants only` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+
+-- 3. No cast word at all: every entry of the roll is bound, landlord included,
+--    so this one needs both signatures.
+GIVETH A DEONTIC Actor Action
+`everyone listed` MEANS
+    EVERY x
+        WHO    elem x (LIST alice, theLandlord)
+        MUST   Sign (EXACTLY x)
+        WITHIN 14
+        ONCE   ALL HAVE
+        HENCE  FULFILLED
+        LEST   BREACH
+
+#TRACE `everyone listed` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+  PARTY theLandlord DOES Sign theLandlord AT 2
+
+-- 4. A further condition beside the membership one. The roll is the three
+--    tenants; the second half of the condition drops Carol, so two signatures
+--    are enough.
+GIVETH A DEONTIC Actor Action
+`all but carol` MEANS
+    EVERY Tenant t
+        WHO    elem t tenants AND NOT (t EQUALS carol)
+        MUST   Sign (EXACTLY t)
+        WITHIN 14
+        ONCE   ALL HAVE
+        HENCE  FULFILLED
+        LEST   BREACH
+
+#TRACE `all but carol` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+  PARTY bob   DOES Sign bob   AT 2
+
+-- 5. The roll may not mention the member it is drawing. The list is read
+--    once, before there is anybody to be a member, so a roll that depended on
+--    one would have to know its own answer. Refused by name; without the check
+--    it reached the evaluator as an unbound name.
+GIVETH A DEONTIC Actor Action
+`circular` MEANS
+    EVERY Tenant t
+        WHO    elem t (LIST t, alice)
+        MUST   Sign (EXACTLY t)
+        WITHIN 14
+
+#TRACE `circular` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+
+-- 6. An empty cast. Nobody is bound, so a barrier's "all of them have acted"
+--    holds from the start and the HENCE fires at once.
+GIVETH A DEONTIC Actor Action
+`nobody` MEANS
+    EVERY Tenant t
+        WHO    elem t noOne
+        MUST   Sign (EXACTLY t)
+        WITHIN 14
+        ONCE   ALL HAVE
+        HENCE  FULFILLED
+        LEST   BREACH
+
+#TRACE `nobody` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1

@@ -1,0 +1,78 @@
+IMPORT prelude
+-- Running a rule that uses EVERY. The companion to every-example.l4, which
+-- shows the shapes; this one shows the shapes working.
+--
+-- Every rule here names its group with `WHO elem t tenants` — the roll. That
+-- is what makes it runnable: see "Where the group comes from" on EVERY.md.
+
+DECLARE Actor IS ONE OF
+    Landlord HAS name IS A STRING
+    Tenant   HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Sign    HAS signer IS AN Actor
+    Deliver HAS who    IS AN Actor
+    Pay     HAS payer  IS AN Actor, payee IS AN Actor, amount IS A NUMBER
+    Receipt HAS issuer IS AN Actor, to    IS AN Actor, amount IS A NUMBER
+
+theLandlord MEANS Landlord OF "Ms Ng"
+alice       MEANS Tenant OF "Alice"
+bob         MEANS Tenant OF "Bob"
+carol       MEANS Tenant OF "Carol"
+tenants     MEANS LIST alice, bob, carol
+
+-- THE BARRIER. Every tenant signs; when the last of them has, the landlord
+-- owes a delivery, and his five days run from that moment.
+GIVETH A DEONTIC Actor Action
+`the tenancy` MEANS
+    EVERY Tenant t
+        WHO    elem t tenants
+        MUST   Sign (EXACTLY t)
+        WITHIN 14
+        ONCE   ALL HAVE
+        HENCE  (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5)
+        LEST   BREACH
+
+-- Alice on day 1, Bob on day 2, Carol on day 9: the group is complete on day
+-- 9, so the delivery is due on day 14, and a delivery on day 13 is in time.
+#TRACE `the tenancy` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+  PARTY bob   DOES Sign bob   AT 2
+  PARTY carol DOES Sign carol AT 9
+  PARTY theLandlord DOES Deliver theLandlord AT 13
+
+-- Carol never signs, so the group's obligation fails and the LEST fires.
+#TRACE `the tenancy` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+  PARTY bob   DOES Sign bob   AT 2
+  PARTY theLandlord DOES Deliver theLandlord AT 20
+
+-- THE FORK. Each tenant who pays earns a receipt of their own, within five
+-- days of their own payment.
+GIVETH A DEONTIC Actor Action
+`receipts` MEANS
+    EVERY Tenant t
+        WHO    elem t tenants
+        MUST   Pay (EXACTLY t) (EXACTLY theLandlord) amount
+        WITHIN 7
+        UPON   EACH
+        HENCE  (PARTY theLandlord
+                    MUST   Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount)
+                    WITHIN 5)
+        LEST   BREACH BY t
+
+#TRACE `receipts` AT 0 WITH
+  PARTY alice DOES Pay alice theLandlord 100 AT 1
+  PARTY theLandlord DOES Receipt theLandlord alice 100 AT 2
+  PARTY bob   DOES Pay bob   theLandlord 200 AT 3
+  PARTY theLandlord DOES Receipt theLandlord bob 200 AT 4
+  PARTY carol DOES Pay carol theLandlord 300 AT 5
+  PARTY theLandlord DOES Receipt theLandlord carol 300 AT 6
+
+-- Bob does not pay: his branch fails, and the breach names him.
+#TRACE `receipts` AT 0 WITH
+  PARTY alice DOES Pay alice theLandlord 100 AT 1
+  PARTY theLandlord DOES Receipt theLandlord alice 100 AT 2
+  PARTY carol DOES Pay carol theLandlord 300 AT 5
+  PARTY theLandlord DOES Receipt theLandlord carol 300 AT 6
+  PARTY theLandlord DOES Receipt theLandlord bob 200 AT 20

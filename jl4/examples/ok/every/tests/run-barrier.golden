@@ -1,0 +1,30 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+run-barrier.l4:43:1-47:51:
+  FULFILLED
+run-barrier.l4:52:1-56:51:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Deliver OF (Landlord OF "Ms Ng")
+    at
+      15
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Deliver (EXACTLY theLandlord)
+    before their deadline, which was at
+      14
+run-barrier.l4:61:1-65:35:
+  PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5 HENCE FULFILLED
+run-barrier.l4:68:1-71:51:
+  DEONTIC BREACHED:
+    BREACH
+run-barrier.l4:80:1-81:35:
+  PARTY Tenant OF "Bob" MUST Sign (EXACTLY t) WITHIN 13 HENCE `the join` LEST `the join fails` AND PARTY Tenant OF "Carol" MUST Sign (EXACTLY t) WITHIN 13 HENCE `the join` LEST `the join fails`
+run-barrier.l4:85:1-20:
+  EVERY Tenant t WHO (elem OF t, tenants) MUST Sign (EXACTLY t) WITHIN 14 ONCE ALL HAVE HENCE (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5) LEST BREACH
+run-barrier.l4:102:1-103:35:
+  A barrier's HENCE and LEST belong to the join, not to any one member, so they cannot name `t`: `ONCE ALL HAVE` fires once, after everybody has acted, and there is no member for the name to stand for. Either write the continuation without it, or use the fork, `UPON EACH`, which fires once per member and does bind the member inside it.

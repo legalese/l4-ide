@@ -1,0 +1,56 @@
+IMPORT prelude
+-- EVERY-EACH-QUANTIFIER-SPEC, phase 2 (the run time): the FORK.
+--
+-- `UPON EACH` fires its HENCE once per member who acts, independently, with
+-- the member variable bound to that member (spec §3.2). Three tenants who pay
+-- earn three receipts, not one; and a LEST written under a fork blames the
+-- member it belongs to, not the group.
+
+DECLARE Actor IS ONE OF
+    Landlord HAS name IS A STRING
+    Tenant   HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Pay     HAS payer  IS AN Actor, payee IS AN Actor, amount IS A NUMBER
+    Receipt HAS issuer IS AN Actor, to    IS AN Actor, amount IS A NUMBER
+
+theLandlord MEANS Landlord OF "Ms Ng"
+alice       MEANS Tenant OF "Alice"
+bob         MEANS Tenant OF "Bob"
+
+-- The roll deliberately includes the landlord, so that the cast word `Tenant`
+-- is doing visible work: it narrows the roll to the two tenants.
+everyone MEANS LIST alice, bob, theLandlord
+
+GIVETH A DEONTIC Actor Action
+`receipts` MEANS
+    EVERY Tenant t
+        WHO    elem t everyone
+        MUST   Pay (EXACTLY t) (EXACTLY theLandlord) amount
+        WITHIN 7
+        UPON   EACH
+        HENCE  (PARTY theLandlord
+                    MUST   Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount)
+                    WITHIN 5)
+        LEST   BREACH BY t
+
+-- Both tenants pay and both are receipted. `amount`, bound by the action
+-- pattern, reaches the receipt: a receipt for the wrong sum would not match.
+#TRACE `receipts` AT 0 WITH
+  PARTY alice DOES Pay alice theLandlord 100 AT 1
+  PARTY theLandlord DOES Receipt theLandlord alice 100 AT 2
+  PARTY bob   DOES Pay bob   theLandlord 200 AT 3
+  PARTY theLandlord DOES Receipt theLandlord bob 200 AT 4
+
+-- Alice pays and is not receipted. Her fork is still open while Bob's has
+-- closed, which is what "independently" means.
+#TRACE `receipts` AT 0 WITH
+  PARTY alice DOES Pay alice theLandlord 100 AT 1
+  PARTY bob   DOES Pay bob   theLandlord 200 AT 3
+  PARTY theLandlord DOES Receipt theLandlord bob 200 AT 4
+
+-- Bob never pays. His LEST fires and names him: `t` is bound to the member.
+#TRACE `receipts` AT 0 WITH
+  PARTY alice DOES Pay alice theLandlord 100 AT 1
+  PARTY theLandlord DOES Receipt theLandlord alice 100 AT 2
+  PARTY theLandlord DOES Receipt theLandlord bob 200 AT 20

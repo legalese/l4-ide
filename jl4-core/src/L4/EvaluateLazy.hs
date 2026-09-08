@@ -595,6 +595,9 @@ nfAux d (ValROp env op l r) = do
   l' <- traverseAndNF d l
   r' <- traverseAndNF d r
   pure (MkNF (ValROp env op l' r'))
+-- An armed-but-unrun EVERY holds only syntax and its arming environment, so
+-- there is nothing under it to force to normal form.
+nfAux _ (ValQuantified env d) = pure (MkNF (ValQuantified env d))
 
 traverseAndNF :: Int -> Either a WHNF -> Eval (Either a (Value NF))
 traverseAndNF d = traverse (traverse (evalAndNF d))

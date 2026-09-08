@@ -714,7 +714,7 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
         [ "BRANCH" ]
         <> map (\(MkGuardedExpr _ a b) -> "IF" <+> printWithLayout a <+> "THEN" <+> printWithLayout b) conds
         <> [ "OTHERWISE" <+> printWithLayout o ]
-    Regulative _ (MkDeonton _ s a t j f l) -> prettyObligation (printWithLayout s) a t j f l
+    Regulative _ d -> printWithLayout d
     -- One branch per line, aligned, and WITHOUT the comma separator.
     -- 'L4.Parser.consider' reads the branch list with `lsepBy`, i.e.
     -- `manyLines` over comma-separated groups: continuation lines must start at
@@ -925,6 +925,15 @@ prettyObligation subjectDoc a t j f l =
 noJoin :: Maybe (Join Resolved)
 noJoin = Nothing
 
+-- | @PARTY p MUST … WITHIN … ONCE ALL HAVE HENCE … LEST …@ — the source form
+-- of a deonton, shared by the 'Regulative' expression printer and by the
+-- run-time value of an armed-but-unrun @EVERY@ ('L4.Evaluate.ValueLazy.ValQuantified'),
+-- so a quantified residual prints back in the source form. Not byte-for-byte
+-- what the drafter wrote — this is the layout printer, not the exact printer,
+-- so @WHO elem t tenants@ comes back as @WHO (elem OF t, tenants)@.
+instance LayoutPrinterWithName n => LayoutPrinter (Deonton n) where
+  printWithLayout (MkDeonton _ s a t j f l) = prettyObligation (printWithLayout s) a t j f l
+
 -- | @ONCE ALL HAVE [WITHIN d]@ (the barrier) / @UPON EACH [WITHIN d]@ (the
 -- fork). R-Q1 RULED 2026-09-07.
 instance LayoutPrinterWithName n => LayoutPrinter (Join n) where
@@ -1107,6 +1116,9 @@ instance LayoutPrinter a => LayoutPrinter (Lazy.Value a) where
       , case op of ValROr -> "OR"; ValRAnd -> "AND"
       , printWithLayout r
       ]
+    -- An armed-but-unrun EVERY prints back as the source form: it has not met
+    -- an event stream yet, so its cast has not been drawn (see 'ValQuantified').
+    Lazy.ValQuantified _env d -> printWithLayout d
   parensIfNeeded :: Lazy.Value a -> Doc ann
   parensIfNeeded v = case v of
     Lazy.ValNumber{}               -> printWithLayout v

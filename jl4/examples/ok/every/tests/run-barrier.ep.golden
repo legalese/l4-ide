@@ -1,0 +1,103 @@
+IMPORT prelude
+-- EVERY-EACH-QUANTIFIER-SPEC, phase 2 (the run time): the BARRIER.
+--
+-- `ONCE ALL HAVE` fires its HENCE exactly once, when the LAST member of the
+-- cast has acted (spec §3.1, §3.4). Two things follow, and the traces below
+-- pin both:
+--
+--   * the HENCE is anchored at that last completion, not at arming, so its own
+--     WITHIN counts from there (R-Q7, §5.1);
+--   * the HENCE sees only the events that came AFTER that completion, so an
+--     act that predates the join cannot discharge it.
+--
+-- The cast is drawn from the ROLL — the list the WHO condition tests
+-- membership in — read once, when the contract meets its event stream (R-Q6,
+-- R-T6: "the cast is evaluated once at arming"). See run-roll.l4.
+
+DECLARE Actor IS ONE OF
+    Landlord HAS name IS A STRING
+    Tenant   HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Sign    HAS signer IS AN Actor
+    Deliver HAS who    IS AN Actor
+
+theLandlord MEANS Landlord OF "Ms Ng"
+alice       MEANS Tenant OF "Alice"
+bob         MEANS Tenant OF "Bob"
+carol       MEANS Tenant OF "Carol"
+tenants     MEANS LIST alice, bob, carol
+
+GIVETH A DEONTIC Actor Action
+`the tenancy` MEANS
+    EVERY Tenant t
+        WHO    elem t tenants
+        MUST   Sign (EXACTLY t)
+        WITHIN 14
+        ONCE   ALL HAVE
+        HENCE  (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5)
+        LEST   BREACH
+
+-- All three sign; the third signature at day 9 is the join. The landlord's
+-- five days run from day 9, so a delivery at day 13 is timely.
+#TRACE `the tenancy` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+  PARTY bob   DOES Sign bob   AT 2
+  PARTY carol DOES Sign carol AT 9
+  PARTY theLandlord DOES Deliver theLandlord AT 13
+
+-- The same signatures, and a delivery at day 15. The deadline the breach
+-- reports is 14 = 9 + 5, which is what shows the HENCE was anchored at the
+-- JOIN and not at arming (where it would have been 5).
+#TRACE `the tenancy` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+  PARTY bob   DOES Sign bob   AT 2
+  PARTY carol DOES Sign carol AT 9
+  PARTY theLandlord DOES Deliver theLandlord AT 15
+
+-- The landlord delivers at day 3, BEFORE the barrier fires at day 9. That
+-- delivery does not count: the obligation it would discharge did not exist
+-- yet, so what is left over is the landlord's obligation, still outstanding.
+#TRACE `the tenancy` AT 0 WITH
+  PARTY theLandlord DOES Deliver theLandlord AT 3
+  PARTY alice DOES Sign alice AT 4
+  PARTY bob   DOES Sign bob   AT 5
+  PARTY carol DOES Sign carol AT 9
+
+-- Carol never signs. The barrier cannot be achieved, so the LEST fires.
+#TRACE `the tenancy` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+  PARTY bob   DOES Sign bob   AT 2
+  PARTY theLandlord DOES Deliver theLandlord AT 20
+
+-- The events run out with two tenants still to sign. The barrier has neither
+-- fired nor failed, so what comes back is the outstanding member obligations,
+-- with their deadlines decremented by the time that has passed. Their HENCE
+-- and LEST print as `the join` and `the join fails`: those are the machine's
+-- own markers for "report back to the barrier", not anything the drafter
+-- wrote. Phase-2 limit: the residual does not carry the JOIN LINE, so feeding
+-- it more events would run the members and not the join.
+#TRACE `the tenancy` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+
+-- Without an event stream at all, a quantified obligation prints back as
+-- itself: it has not been armed, so its cast has not been drawn.
+#EVAL `the tenancy`
+
+-- A barrier's HENCE and LEST belong to the JOIN, not to any member, so they
+-- cannot name one: `ONCE ALL HAVE` fires once, after everybody has acted, and
+-- there is nobody for `t` to stand for. The type checker binds `t` throughout
+-- the rule -- right for a fork, where each member carries its own copy of the
+-- continuation -- so this is refused when the rule is run, by name.
+GIVETH A DEONTIC Actor Action
+`whose tenancy` MEANS
+    EVERY Tenant t
+        WHO    elem t tenants
+        MUST   Sign (EXACTLY t)
+        WITHIN 14
+        ONCE   ALL HAVE
+        HENCE  FULFILLED
+        LEST   BREACH BY t
+
+#TRACE `whose tenancy` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1

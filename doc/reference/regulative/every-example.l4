@@ -1,4 +1,9 @@
 IMPORT prelude
+-- The shapes EVERY can take. Most of the rules below name no group — no
+-- `WHO elem t tenants` — so they show the syntax without being runnable:
+-- running a quantified rule needs a list to draw the group from, and says so
+-- when there is none. See "Where the group comes from" on EVERY.md, and
+-- every-run-example.l4 for the same rules with a group and a trace.
 
 DECLARE Actor IS ONE OF
     Landlord HAS name IS A STRING

@@ -235,23 +235,23 @@ One more thing the cast settles. A cast is a type, and no cast is a special case
 
 ## Question 5. What about a group?
 
-_When the same obligation falls on everyone in a group, what can be said about the group?_ This is the question the four above cannot answer, and it is the proposed part of the layer.
+_When the same obligation falls on everyone in a group, what can be said about the group?_ This is the question the four above cannot answer. Two of its three pieces landed on 8 September 2026; the third is still a design.
 
-_Proposed, not landed (2026-09-06): everything in this section. The design is `specs/todo/EVERY-EACH-QUANTIFIER-SPEC.md`; its section on "enough of them" was added on 2026-09-06. Nothing here runs, and the spellings are the design document's current ones. [What Is Coming](../../tutorials/obligations/what-is-coming.md) gives each piece a page's worth of explanation._
+_Status (2026-09-08): the first two pieces below — the barrier and the fork — are **built**, and their reference page is [EVERY](../../reference/regulative/EVERY.md). The third, "enough of them", is **proposed, not landed**; its spellings are the design document's current ones. The design is `specs/todo/EVERY-EACH-QUANTIFIER-SPEC.md`. [What Is Coming](../../tutorials/obligations/what-is-coming.md) gives each piece a page's worth of explanation._
 
-_Settled on 7 September 2026: the word after `EVERY` or `EACH` names the kind of party and picks out the group, as `Flatmate` does in the table; `EVERY f` with no kind word means every party there is._
+_Settled on 7 September 2026, built on 8 September 2026: there is one quantifier word, `EVERY`, and a line of its own — `ONCE ALL HAVE` or `UPON EACH` — saying when the follow-on fires. The word after `EVERY` names the kind of party and narrows the group, as `Flatmate` does in the table. Which people are in the group is given as a list, in the `WHO` condition._
 
 Three pieces, each answering a question the others do not:
 
-| Piece                    | Question                                              | Proposed spelling                                                     |
-| ------------------------ | ----------------------------------------------------- | --------------------------------------------------------------------- |
-| everyone, then one thing | after all of them have acted, what follows — once?    | `EVERY Flatmate f MUST … HENCE …` (a **"barrier"**)                   |
-| each with its own        | after each of them acts, what follows — for that one? | `EACH Flatmate f MUST … HENCE …` (a **"fork"**)                       |
-| enough of them           | when has enough happened for the follow-on to fire?   | `ONCE sum OF amount AT LEAST rent`, `SOME 2 OF …` (a **"threshold"**) |
+| Piece                    | Question                                              | Spelling                                                              | State    |
+| ------------------------ | ----------------------------------------------------- | --------------------------------------------------------------------- | -------- |
+| everyone, then one thing | after all of them have acted, what follows — once?    | `EVERY Flatmate f … ONCE ALL HAVE HENCE …` (a **"barrier"**)          | built    |
+| each with its own        | after each of them acts, what follows — for that one? | `EVERY Flatmate f … UPON EACH HENCE …` (a **"fork"**)                 | built    |
+| enough of them           | when has enough happened for the follow-on to fire?   | `ONCE sum OF amount AT LEAST rent`, `SOME 2 OF …` (a **"threshold"**) | proposed |
 
 The first two differ only in where the follow-on attaches, and without a follow-on they are the same thing. The third is independent of both: it says _when_ the follow-on fires — a count of the group, or a total — and the design notes that its two ends are things you already have: "once any one has" is `ROR`, "once all have" is `RAND` with a single follow-on. `SOME m OF` means _at least_ m; that is the one ruling in this part of the design that has been given.
 
-The rent, in the proposed form, shows all three at once — a group, a receipt per payment, and a deadline on the total with a breach that names everyone. The `MAY` inside has no bad outcome of its own; the `WITHIN`, `HENCE` and `LEST` at the end belong to the `ONCE` line:
+The rent, in the proposed form, shows all three at once — and because its third piece is not built, the whole block below is not runnable — a group, a receipt per payment, and a deadline on the total with a breach that names everyone. The `MAY` inside has no bad outcome of its own; the `WITHIN`, `HENCE` and `LEST` at the end belong to the `ONCE` line:
 
 ```l4
 -- PROPOSED, NOT LANDED (2026-09-06). Does not run.
@@ -287,13 +287,14 @@ One place where two questions meet deserves to be named, because it is where rea
 
 ## Built, and proposed
 
-| Built, in the current release                                                                                         | Proposed, not landed (2026-09-06)                                                             |
+| Built, in the current release                                                                                         | Proposed, not landed (2026-09-08)                                                             |
 | --------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| the five-part obligation; `MUST`, `MAY`, `SHANT`, `DO`; `WITHIN`; `FULFILLED`, `BREACH BY … BECAUSE …`                | `EVERY` / `EACH` for a group                                                                  |
-| chains through `HENCE` and `LEST`; a rule that gives an obligation, including one that uses itself                    | `ONCE` with a count or a total; `SOME m OF` ≡ `AT LEAST m OF`                                 |
-| `RAND`, `ROR`, and how they group without brackets                                                                    | a follow-on attached to a `RAND` or `ROR` as a whole                                          |
-| `#TRACE`, `AT`, `DOES`, `WAIT UNTIL`; the inclusive deadline; the clock rules for `HENCE` and `LEST`                  | a breach that names every party who failed                                                    |
+| the five-part obligation; `MUST`, `MAY`, `SHANT`, `DO`; `WITHIN`; `FULFILLED`, `BREACH BY … BECAUSE …`                | `ONCE` with a count or a total; `SOME m OF` ≡ `AT LEAST m OF`                                 |
+| chains through `HENCE` and `LEST`; a rule that gives an obligation, including one that uses itself                    | a follow-on attached to a `RAND` or `ROR` as a whole                                          |
+| `RAND`, `ROR`, and how they group without brackets                                                                    | a breach that names every party who failed                                                    |
+| `#TRACE`, `AT`, `DOES`, `WAIT UNTIL`; the inclusive deadline; the clock rules for `HENCE` and `LEST`                  | a `LEST` clock counted from the missed deadline rather than from the event that revealed it   |
 | `EXACTLY` around the whole act; a shape with a blank; `PROVIDED`; handing a blank to a rule                           | `EXACTLY` around a named figure (today, only around the whole act)                            |
+| `EVERY` for a group, with `ONCE ALL HAVE` (barrier) or `UPON EACH` (fork), the group given as a list in `WHO`         |                                                                                               |
 | the cast as a fixed list; the performer convention and check; one act in both directions; open-doer acts; procurement | an obligation that says whom it is owed to (the layer has a party and an act, but no obligee) |
 
 The last row of the right-hand column is one the design documents record as the next axis after this one, and it is not on this page: an L4 obligation says who is bound and to do what, but not to whom it is owed, so "payment to any one of several creditors discharges the debt" cannot yet be written at all.

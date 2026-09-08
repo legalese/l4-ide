@@ -1,0 +1,15 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+regulative-exactly-later-argument.l4:40:1-41:35:
+  FULFILLED
+regulative-exactly-later-argument.l4:47:1-48:46:
+  FULFILLED
+regulative-exactly-later-argument.l4:54:1-55:46:
+  FULFILLED
+regulative-exactly-later-argument.l4:62:1-63:46:
+  FULFILLED
+regulative-exactly-later-argument.l4:71:1-72:55:
+  FULFILLED
+regulative-exactly-later-argument.l4:76:1-77:40:
+  PARTY Tenant OF "Alice" MUST Pay (EXACTLY alice) (EXACTLY theLandlord) WITHIN 6 HENCE FULFILLED

@@ -1,0 +1,6 @@
+executing contract `waves` at 0 with the following events:  party `alice` did `Wave` with `alice` at 1
+executing contract `pays someone` at 0 with the following events:  party `alice` did `Pay` with `alice` and `theLandlord` at 1
+executing contract `pays the landlord` at 0 with the following events:  party `alice` did `Pay` with `alice` and `theLandlord` at 1
+executing contract `alice pays the landlord` at 0 with the following events:  party `alice` did `Pay` with `alice` and `theLandlord` at 1
+executing contract `notes the landlord` at 0 with the following events:  party `alice` did `Note` with `alice`, `theLandlord` and hello at 1
+executing contract `alice pays the landlord` at 0 with the following events:  party `alice` did `Pay` with `alice` and `alice` at 1
