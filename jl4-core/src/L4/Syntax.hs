@@ -448,9 +448,12 @@ data Subject n
     --
     -- The bare form @EVERY v@ ranges over every value of the party type.
     --
-    -- Phase 1 (front end): parsed, scoped, typed, printed. Evaluation is
-    -- phase 2 (barrier: @HENCE@ fires once at the last completion; @LEST@ at
-    -- the deadline with blame = the set of non-completers, spec §3.1/§6.1).
+    -- Evaluation (phase 2, built 2026-09-08) draws the cast from the ROLL —
+    -- the list an @elem v xs@ conjunct of the filter names — because a party
+    -- type is normally open (spec §2.2.7.5 point 5). See
+    -- 'L4.EvaluateLazy.Machine.startRollCall'. Blame on a failed barrier is
+    -- ONE non-completer, not spec §6.1's set: 'ReasonForBreach' carries one
+    -- party and R-T3's set is not built.
   deriving stock (GHC.Generic, Eq, Ord, Show, Functor, Foldable, Traversable)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 

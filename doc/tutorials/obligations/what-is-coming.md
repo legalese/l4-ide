@@ -1,12 +1,12 @@
 # What Is Coming
 
-The pieces of the regulative layer that are designed but not built: everyone-then-one-thing, each-with-its-own, and "enough of them".
+The three pieces of the regulative layer that close the gap this tutorial ended on. **Two of them landed on 8 September 2026 and run today**; the third, "enough of them", is still a design.
 
 **Prerequisites:** [Several Parties](several-parties.md), and in particular its last column — the things the six arrangements of one debt cannot yet say.
 
-**There is no companion file for this page.** Nothing on it runs. Every piece of L4 below is written as a design document spells it, and is marked so. If you type any of it into a file today, L4 will not accept it.
+**Two of the three pieces below now run**, and each block says which it is. The two that run — everyone-then-one-thing and each-with-its-own — have a reference page of their own, [EVERY](../../reference/regulative/EVERY.md), and a companion file you can run, [every-run-example.l4](../../reference/regulative/every-run-example.l4). Read this page for how the three pieces fit together and why they are three; read that page for how to write one. The third piece is still written as the design document spells it, and is marked so.
 
-_Proposed, not landed (2026-09-06): everything on this page. The design lives in the specification `specs/todo/EVERY-EACH-QUANTIFIER-SPEC.md` — its section 2.2.6 for the first two pieces, and its section 2.2.7, added on 2026-09-06, for the third. The spellings below are that document's current spellings, and the document itself says its naming is not settled. Read this page for the shape of what is coming, not for spellings to learn._
+_Status (2026-09-08): pieces 1 and 2 are **built**; piece 3, "enough of them", is **proposed, not landed**. The design lives in the specification `specs/todo/EVERY-EACH-QUANTIFIER-SPEC.md` — its section 2.2.6 for the first two pieces, and its section 2.2.7 for the third. The spellings for pieces 1 and 2 were ruled on 7 September 2026 and are the ones the compiler accepts; piece 3's are still the design document's, and it says its naming is not settled._
 
 ---
 
@@ -20,7 +20,7 @@ _Proposed, not landed (2026-09-06): everything on this page. The design lives in
 
 All three have the same cause. Today, the things you can combine are obligations you have written out by hand, one per person, and the only place a follow-on can go is inside one of them. There is no way to say "these people, as a group", and so no way to hang anything on the group.
 
-Three proposed pieces close that gap. They are separate pieces — each one answers a different question, and you would choose them independently — and the clearest way to see them is as three questions.
+Three pieces close that gap, two of them built. They are separate pieces — each one answers a different question, and you would choose them independently — and the clearest way to see them is as three questions.
 
 ---
 
@@ -31,15 +31,19 @@ Three proposed pieces close that gap. They are separate pieces — each one answ
 Three flatmates must sign, and when the last of them has, the tenancy begins. In [Several Parties](several-parties.md) that was three obligations joined by `RAND` and nowhere to write "then the tenancy begins". The proposal is a way to write an obligation _for everyone in a group_ at once, and to attach a single follow-on to the group:
 
 ```l4
--- PROPOSED, NOT LANDED (2026-09-06). Does not run.
+-- BUILT (2026-09-08). This runs.
 EVERY Flatmate f
-    MUST   Sign f
+    WHO    elem f flatmates         -- the group, given as a list
+    MUST   Sign (EXACTLY f)
     WITHIN 14
+    ONCE   ALL HAVE                 -- the line that says when the follow-on fires
     HENCE  `the tenancy begins`     -- fires once, when the last of them has signed
     LEST   `the lease falls through`
 ```
 
-Read `EVERY Flatmate f` as "for every flatmate, call them f": one obligation per flatmate, all live at once, exactly as the `RAND` was — and then one `HENCE` for the whole. The specification calls this shape a **"barrier"**: nothing follows until everyone has crossed it, and then one thing follows. Each flatmate who does not sign is in breach on their own account.
+Three things in that block were not in the first draft of this page, and all three were ruled on 7 September 2026. `WHO elem f flatmates` names the group as a list, which is what makes the rule runnable at all — see [Where the group comes from](../../reference/regulative/EVERY.md#where-the-group-comes-from-the-roll). `ONCE ALL HAVE` is a line of its own saying when the follow-on fires, and it is required whenever there is one. And `EXACTLY f` is how you say "this flatmate" inside the action; a bare `f` there would match anybody's signature.
+
+Read `EVERY Flatmate f` as "for every flatmate, call them f": one obligation per flatmate, all live at once, exactly as the `RAND` was — and then one `HENCE` for the whole. This shape is called a **"barrier"**: nothing follows until everyone has crossed it, and then one thing follows. If somebody does not sign, the `LEST` fires once for the group — and here is the third gap this page opened with, still open: the breach names one of the flatmates who failed, not all of them.
 
 ---
 
@@ -47,22 +51,26 @@ Read `EVERY Flatmate f` as "for every flatmate, call them f": one obligation per
 
 **The question: after each of them acts, what happens — for that one?**
 
-A different sentence, and a different shape. Each flatmate who pays a share is to be given a receipt — three payments, three receipts, each following its own payment and not waiting for the others. Nothing here happens once for the group; everything happens once per person. The specification spells that with a second word:
+A different sentence, and a different shape. Each flatmate who pays a share is to be given a receipt — three payments, three receipts, each following its own payment and not waiting for the others. Nothing here happens once for the group; everything happens once per person. The quantifier is the same word; what changes is the join line, `UPON EACH` in place of `ONCE ALL HAVE`:
 
 ```l4
--- PROPOSED, NOT LANDED (2026-09-06). Does not run.
-EACH Flatmate f
-    MUST   EXACTLY (Pay f `Ms Ng` 500)
+-- BUILT (2026-09-08). This runs.
+EVERY Flatmate f
+    WHO    elem f flatmates
+    MUST   Pay (EXACTLY f) (EXACTLY theLandlord) amount
     WITHIN 7
-    HENCE  `a receipt to` f 500     -- fires for each flatmate who pays
+    UPON   EACH                     -- the fork: once per flatmate who pays
+    HENCE  (PARTY theLandlord
+                MUST   Receipt (EXACTLY theLandlord) (EXACTLY f) (EXACTLY amount)
+                WITHIN 5)
     LEST   BREACH BY f
 ```
 
-The specification calls this shape a **"fork"**: the group splits into its members, and each member carries its own follow-on. Without a `HENCE` or `LEST` the two shapes are the same thing — one obligation per person — and the difference between them is only where the follow-on attaches. That is why the two words are proposed as a pair.
+This shape is called a **"fork"**: the group splits into its members, and each member carries its own follow-on, with `f` standing for that member inside it. Without a `HENCE` or `LEST` the two shapes are the same thing — one obligation per person — and the difference between them is only where the follow-on attaches. That is why the join line, and not the quantifier, is where the difference is written.
 
-_A note on the words, because it is the part most likely to change. The specification's own discussion records that `EVERY` and `EACH` may not survive contact with a first-time reader, and it records a proposal to call the two shapes "jointly" and "severally" instead — The research done that night recommends against it, and no ruling has yet been made. Those words carry a settled legal meaning, about who may be sued and whether one person's payment discharges the rest, which is not this distinction — and on the point of discharge it is the opposite: a joint promisor's payment discharges the others, where under everyone-then-one-thing nobody's act does anything for anyone else. The alternative the research preferred was to mark the shape on a line of its own, so that `EVERY` serves for both. **That is what was ruled, on 2026-09-07:** a line of its own says when the follow-on fires — `ONCE ALL HAVE` for everyone-then-one-thing, `UPON EACH` for each-with-its-own — and it is required whenever there is a follow-on at all, because the two readings differ and the language declines to guess. The two shapes were never in doubt; only the words were._
+_A note on the words, kept because it records how they were settled. The specification's own discussion records that `EVERY` and `EACH` may not survive contact with a first-time reader, and it records a proposal to call the two shapes "jointly" and "severally" instead — The research done that night recommends against it, and no ruling has yet been made. Those words carry a settled legal meaning, about who may be sued and whether one person's payment discharges the rest, which is not this distinction — and on the point of discharge it is the opposite: a joint promisor's payment discharges the others, where under everyone-then-one-thing nobody's act does anything for anyone else. The alternative the research preferred was to mark the shape on a line of its own, so that `EVERY` serves for both. **That is what was ruled, on 2026-09-07:** a line of its own says when the follow-on fires — `ONCE ALL HAVE` for everyone-then-one-thing, `UPON EACH` for each-with-its-own — and it is required whenever there is a follow-on at all, because the two readings differ and the language declines to guess. The two shapes were never in doubt; only the words were._
 
-_One thing about the words is settled (7 September 2026). The word after `EVERY` or `EACH` names the kind of party, as `Flatmate` does above, and it is that word which picks out the group; `EVERY f` with no kind word means every party there is. Whether the two words themselves stay `EVERY` and `EACH` is the part still open._
+_And the words themselves are settled (7 September 2026), and built (8 September 2026). There is one quantifier word, `EVERY`; `EACH` appears only inside `UPON EACH` and is not a keyword at all. The word after `EVERY` names the kind of party, as `Flatmate` does above, and it narrows the group; `EVERY f` with no kind word takes the whole roll._
 
 ---
 
@@ -106,16 +114,19 @@ And all three sit beside `RAND` and `ROR` rather than replacing them. `RAND` and
 
 ---
 
-## What Would Make This Page True
+## What Would Make The Rest Of This Page True
 
-The specification lists it plainly, and this page repeats it so that a reader can check the state of things without opening the design document: a way for L4 to read the `ONCE` line and the count; a way to run it, which is either a rule that uses itself with the clock carried through properly or a running total kept where the group is counted; a breach that carries a set of people rather than one; test files for the rent by total and by share and for the quorum; and a page under this documentation before the work is closed. Six rulings on the design are open, and one — that `SOME m OF` means at least — has been given.
+Pieces 1 and 2 landed on 8 September 2026, and what remains is piece 3, "enough of them". The specification lists what it needs, and this page repeats it so that a reader can check the state of things without opening the design document: a way for L4 to read a `ONCE` line that carries a count or a total rather than the word `ALL`; a way to run it, which is a running total kept where the group is counted; a breach that carries a set of people rather than one; and test files for the rent by total and by share and for the quorum.
 
-When those land, this page is deleted and the material moves into [Several Parties](several-parties.md), where the gaps it fills were shown. Until then, the honest encoding of a shared debt is the one on that page, with its two defects named.
+One of those — **a breach that names everyone who failed** — is still missing for pieces 1 and 2 as well. A group obligation that fails today names one member, the first on the roll, not all of the members who did not act. So the third of the three gaps this page opened with is the one still open, and it is open for all three pieces.
+
+When piece 3 lands, this page is deleted and the material moves into [Several Parties](several-parties.md), where the gaps it fills were shown.
 
 ---
 
 ## Next Steps
 
+- [EVERY](../../reference/regulative/EVERY.md) — the reference page for the two pieces that now run, with worked traces
 - [Several Parties](several-parties.md) — the arrangements that run today, and the defects these pieces would fix
 - [The Regulative Layer, Whole](../../concepts/legal-modeling/regulative-layer-whole.md) — all five ideas of the regulative layer in one place, with the same built/proposed line drawn through them
 - `specs/todo/EVERY-EACH-QUANTIFIER-SPEC.md` — the design itself, for a reader who wants the rulings and the reasoning (it is written for maintainers, not for this page's reader)

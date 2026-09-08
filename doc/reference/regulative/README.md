@@ -472,7 +472,7 @@ saleContract MEANS
 ## Related Pages
 
 - **[PARTY](PARTY.md)** - Party declarations
-- **[EVERY](EVERY.md)** - One obligation for every member of a group (front end only; evaluation is proposed, not landed)
+- **[EVERY](EVERY.md)** - One obligation for every member of a group; the group is given as a list in the `WHO` condition
 - **[MUST](MUST.md)** - Obligations
 - **[MAY](MAY.md)** - Permissions
 - **[SHANT](SHANT.md)** - Prohibitions (also written MUST NOT)

@@ -1092,10 +1092,11 @@ patternText = \case
 
 deonticClause :: Deonton Resolved -> Clause
 deonticClause (MkDeonton _ subj (MkAction _ modal actPat mprov) mdue _join mhence mlest) =
-  -- The @ONCE …@ join line is not rendered by this export in phase 1 of
-  -- EVERY-EACH-QUANTIFIER-SPEC: 'CDeontic' has no slot for it, and the
-  -- barrier/fork distinction is a run-time property that phase 2 builds. The
-  -- limit is stated on the doc page for EVERY.
+  -- The @ONCE …@ join line is not rendered by this export: 'CDeontic' has no
+  -- slot for it. That was written when the barrier/fork distinction had no
+  -- run-time meaning at all; it now has one (phase 2, 2026-09-08), so the
+  -- exported prose is missing a distinction the language draws. The limit is
+  -- stated on the doc page for EVERY.
   CDeontic
     (subjectProse subj)
     (modalWord modal)
