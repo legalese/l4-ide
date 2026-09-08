@@ -1,0 +1,17 @@
+-- The same refusal as `export-refused.l4`, one hop further out: this module
+-- imports `implicit-rate-wrapper`, which imports `implicit-rate-lib`, and only
+-- the last of the three declares a section GIVEN.
+--
+-- An adversarial pass found this a false green on 2026-09-08, and a silent one:
+-- `l4 batch --validate-only` said valid, the run said "status":"success", and
+-- the answer was the library's own TYPICALLY with the supplied value accepted
+-- into the row and dropped. The middle module contributes to what its importers
+-- learn only because a definition that REACHES an imported reader is now itself
+-- counted as one.
+
+IMPORT `implicit-rate-wrapper`
+
+@export What this amount comes to at a rate two modules away.
+GIVEN amount IS A NUMBER
+GIVETH A NUMBER
+`chained cost of` amount MEANS `wrapped cost of` amount

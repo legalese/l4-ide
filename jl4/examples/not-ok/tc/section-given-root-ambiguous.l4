@@ -1,0 +1,28 @@
+-- R3's per-root check (IMPLICIT-PROPS-DESIGN.md §11.4). One binder per name PER
+-- ROOT: two sibling sections may each declare `foo`, and each is read by its own
+-- subtree, but a single directive or @export that reaches both ends up with two
+-- inputs spelled `foo` and no way to say which one a value is for.
+--
+-- `both` reads section 1's `foo` directly and section 2's through `g`. The
+-- measured swing this catches: with these two lines under section 1 the answer
+-- is 991 -- the supply reached one `foo`, and the other fell back to its own
+-- default of 99 -- while under section 2 the identical lines give 11. `l4 check`
+-- used to succeed both times.
+--
+-- The remedy is R3's three. Bridging at the call is the one that keeps both
+-- sections: `foo PLUS (g WITH foo IS foo)` takes section 2's binder off this
+-- root's read-set by the §2.2 subtraction and leaves one.
+
+§ `1`
+    GIVEN foo IS A NUMBER TYPICALLY 4
+
+GIVETH A NUMBER
+`both` MEANS foo PLUS g
+
+#EVAL `both` WITH foo IS 1
+
+§ `2`
+    GIVEN foo IS A NUMBER TYPICALLY 99
+
+GIVETH A NUMBER
+g MEANS foo TIMES 10

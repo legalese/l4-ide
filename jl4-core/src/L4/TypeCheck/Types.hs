@@ -16,6 +16,7 @@ import L4.Syntax
 import L4.TypeCheck.With
 import qualified L4.Utils.IntervalMap as IV
 import L4.Mixfix (MixfixInfo(..))
+import L4.Names (SectionBinderDecl)
 import qualified Base.Set as Set
 
 import Control.Applicative
@@ -147,9 +148,28 @@ data CheckError =
     -- same-spelled binders, and its own 'Unique' matched none of them, so there
     -- is no way to tell which was meant. Arguments: the callee, the supplied
     -- name. See 'L4.Discharge.ambiguousImplicitSupplies'.
+  | AmbiguousRootBinders Resolved Name [Resolved]
+    -- ^ A root — a directive, or an @\@export@ed definition — whose read-set
+    -- holds two or more same-spelled section binders (R3). Whatever a supply
+    -- at this root named, only one of them could receive it and the other
+    -- would silently fall to its default, so the answer depends on which
+    -- binder the resolver happened to pick. Arguments: the root (the
+    -- exported definition's name, or the head of the directive's expression),
+    -- the spelling they share, and the binders themselves, in declaration order
+    -- and re-spelled under their declaring sections ('sectionQualifiedWith').
+    -- See 'L4.Discharge.ambiguousRootBinders'.
   | RestatedSectionBinder Name
     -- ^ A function's own @GIVEN@ restates a name a section-level @GIVEN@
     -- already binds (R2). Carries the parameter name.
+  | ImplicitCrossesImport Resolved Name
+    -- ^ An @\@export@ed definition reaches a definition in an IMPORTED module
+    -- that takes section binders as implicit inputs. Arguments: the exported
+    -- definition's name, and the imported definition. Discharge does not cross
+    -- @IMPORT@, so the imported binder appears in no schema, cannot be
+    -- supplied at the boundary, and cannot be reached by @l4 batch@'s source
+    -- rewrite — the export would validate a row it provably cannot evaluate.
+    -- Ruled in @IMPLICIT-PROPS-DESIGN.md@ §11.19; the defect record is OF-7.
+    -- See 'L4.Export.validateExportImplicitImports'.
   | SuppliedComputedField Name
     -- ^ Tried to supply a computed field in a record constructor (field name)
   | ExportFunctionTypeInput Resolved Resolved
@@ -479,6 +499,8 @@ instance HasSrcRange CheckError where
   rangeOf (MisattachedSectionGiven n _)     = rangeOf n
   rangeOf (UnreadImplicitSupply _ b)        = rangeOf b
   rangeOf (AmbiguousImplicitSupply _ r)     = rangeOf r
+  rangeOf (AmbiguousRootBinders r _ _)      = rangeOf r
+  rangeOf (ImplicitCrossesImport r _)       = rangeOf r
   rangeOf (RestatedSectionBinder n)         = rangeOf n
   rangeOf (NotReachesConnective site)       = Just site.range
   rangeOf _                                 = Nothing
@@ -665,6 +687,25 @@ data CheckEnv =
     -- Deliberately NOT unioned across imports ('unionImportedCheckEnv' resets
     -- it): discharge does not cross @IMPORT@, so an imported module's binder is
     -- not suppliable here.
+    , sectionBinderDecls   :: !(Map RawName [SectionBinderDecl])
+    -- ^ The same binders as 'sectionBinderNames', keyed the same way, but
+    -- carrying the heading path and the declared type of each
+    -- ('L4.Desugar.collectSectionBinderDecls'). This is what lets
+    -- 'L4.TypeCheck.implicitSupply' check a @WITH@ supply against the type the
+    -- BINDER was declared with instead of against the caller's resolution of
+    -- the spelling (R-X2, smucclaw\/l4-ide#956).
+    --
+    -- Reset across imports for the same reason 'sectionBinderNames' is.
+    , importedImplicitReaders :: !(Set Unique)
+    -- ^ Definitions in IMPORTED modules whose read-set is non-empty: they take
+    -- section binders as parameters once their own module is discharged, and
+    -- discharge does not cross @IMPORT@, so this module can neither supply
+    -- them nor see them in an export schema.
+    --
+    -- Unlike every other section-binder field this one IS carried across the
+    -- boundary — it is the only thing an importer can know about a dependency's
+    -- implicits, and 'L4.Export.validateExportImplicitImports' refuses an
+    -- @\@export@ that reaches one (§11.19, defect OF-7).
     , inNonexhaustiveDecide      :: !Bool
     -- ^ Are we checking the body of a definition its author decorated
     -- @\@nonexhaustive@ (deliberately not defined for all inputs)? If so, the
@@ -714,8 +755,8 @@ data CheckEnv =
 -- 'RawName' and unioning it across modules could conflate same-named
 -- record types; the cost is error-message quality only (see the notes in
 -- the exhaustiveness design doc).
-unionImportedCheckEnv :: CheckEnv -> Environment -> EntityInfo -> MixfixRegistry -> CheckEnv
-unionImportedCheckEnv accEnv depEnvironment depEntityInfo depMixfixRegistry =
+unionImportedCheckEnv :: CheckEnv -> Environment -> EntityInfo -> MixfixRegistry -> Set Unique -> CheckEnv
+unionImportedCheckEnv accEnv depEnvironment depEntityInfo depMixfixRegistry depImplicitReaders =
   MkCheckEnv
     { moduleUri = accEnv.moduleUri
     , environment = Map.unionWith List.union accEnv.environment depEnvironment
@@ -728,6 +769,9 @@ unionImportedCheckEnv accEnv depEnvironment depEntityInfo depMixfixRegistry =
     , computedFields = Map.empty
     , cyclicSynonyms = mempty
     , sectionBinderNames = mempty
+    , sectionBinderDecls = mempty
+    , importedImplicitReaders =
+        Set.union accEnv.importedImplicitReaders depImplicitReaders
     , inNonexhaustiveDecide = False
     , errorContext = None
     , sectionStack = []
@@ -788,6 +832,13 @@ data CheckResult =
     , descMap        :: !DescMap
     , mixfixRegistry :: !MixfixRegistry
     -- ^ Registry of mixfix functions from this module (to be propagated to importers)
+    , implicitReaders :: !(Set Unique)
+    -- ^ Definitions with a non-empty read-set: this module's own, plus those
+    -- it inherited from its dependencies, so a chain of imports carries them
+    -- all the way out. An importer merges this into
+    -- 'CheckEnv.importedImplicitReaders' and refuses an @\@export@ that
+    -- reaches one (§11.19). Carried across the import boundary for that reason
+    -- alone; nothing else reads it.
     , sectionPaths   :: !SectionPaths
     -- ^ Where every binding this module can see was defined, section-wise: its
     -- own bindings and, transitively, those of everything it imports. Carried
@@ -914,7 +965,17 @@ ambiguousType n xs = do
 sectionQualified :: Resolved -> Check Resolved
 sectionQualified r = do
   paths <- use #sectionPaths
-  pure case (r, Map.lookup (getUnique r) paths) of
+  pure (sectionQualifiedWith paths r)
+
+-- | 'sectionQualified' against an already-read 'SectionPaths'.
+--
+-- The whole-module implicit checks ('L4.TypeCheck.doCheckProgramWithDependencies')
+-- run outside 'Check', on the finished module, and need the same spelling; the
+-- two must not drift, so there is one body and 'sectionQualified' is the
+-- 'Check'-flavoured wrapper around it.
+sectionQualifiedWith :: SectionPaths -> Resolved -> Resolved
+sectionQualifiedWith paths r =
+  case (r, Map.lookup (getUnique r) paths) of
     (Ref n u o, Just secs)
       | NormalName t <- rawName n
       , Just qual <- nonEmpty ((\(h :| _) -> h) <$> secs)
@@ -1170,7 +1231,7 @@ data TypeKey
   | TyKFun [TypeKey] TypeKey
   | TyKForall Int TypeKey
   | TyKInfVar Int
-  deriving stock (Eq, Show)
+  deriving stock (Eq, Ord, Show)
 
 typeKey :: Type' Resolved -> TypeKey
 typeKey = \ case
@@ -1949,6 +2010,8 @@ extendEnv cis env =
     , computedFields = e.computedFields
     , cyclicSynonyms = e.cyclicSynonyms
     , sectionBinderNames = e.sectionBinderNames
+    , sectionBinderDecls = e.sectionBinderDecls
+    , importedImplicitReaders = e.importedImplicitReaders
     , inNonexhaustiveDecide = e.inNonexhaustiveDecide
     , sectionStack = e.sectionStack
     , localBindings = e.localBindings

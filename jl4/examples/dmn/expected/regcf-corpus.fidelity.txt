@@ -89,223 +89,223 @@ fidelity report — DMN 1.3 (XML), camunda flavor
   [D-LITERALEXPR] advisory — bkm_investor_is_within_the_investment_limit  (main.l4:462:9-465:44)
       `investor is within the investment limit` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_the_rule_date_is_inside_the_covid_19_temporary_rules_window  (main.l4:490:9-491:55)
+  [D-LITERALEXPR] advisory — decision_the_rule_date_is_inside_the_covid_19_temporary_rules_window  (main.l4:499:9-500:55)
       `the rule date is inside the COVID-19 temporary rules window` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_financial_statement_requirement_is_satisfied  (main.l4:533:9-534:74)
+  [D-LITERALEXPR] advisory — decision_financial_statement_requirement_is_satisfied  (main.l4:542:9-543:74)
       `financial statement requirement is satisfied` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_disclosure_requirements_are_met  (main.l4:550:9-552:111)
+  [D-LITERALEXPR] advisory — decision_disclosure_requirements_are_met  (main.l4:559:9-561:111)
       `disclosure requirements are met` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_a_3_conducted_through_a_single_complying_intermediary  (main.l4:569:9-571:127)
+  [D-LITERALEXPR] advisory — decision_a_3_conducted_through_a_single_complying_intermediary  (main.l4:578:9-580:127)
       `(a)(3) — conducted through a single complying intermediary` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_the_21_day_public_availability_period_has_run  (main.l4:577:9-578:77)
+  [D-LITERALEXPR] advisory — decision_the_21_day_public_availability_period_has_run  (main.l4:586:9-587:77)
       `the 21-day public availability period has run` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_the_intermediary_has_discharged_its_investor_facing_duties  (main.l4:584:9-585:175)
+  [D-LITERALEXPR] advisory — decision_the_intermediary_has_discharged_its_investor_facing_duties  (main.l4:593:9-594:175)
       `the intermediary has discharged its investor-facing duties` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_intermediary_obligations_are_met  (main.l4:591:9-593:81)
+  [D-LITERALEXPR] advisory — decision_intermediary_obligations_are_met  (main.l4:600:9-602:81)
       `intermediary obligations are met` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_notice_complies_with_rule_204_b  (main.l4:613:9-617:87)
+  [D-LITERALEXPR] advisory — decision_notice_complies_with_rule_204_b  (main.l4:622:9-626:87)
       `notice complies with Rule 204(b)` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_definition_terms_of_the_offering  (main.l4:622:9-623:13)
+  [D-LITERALEXPR] advisory — decision_definition_terms_of_the_offering  (main.l4:631:9-632:13)
       `definition — terms of the offering` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_b_1_became_an_exchange_act_reporting_company  (main.l4:662:9-125)
+  [D-LITERALEXPR] advisory — decision_b_1_became_an_exchange_act_reporting_company  (main.l4:671:9-125)
       `(b)(1) — became an Exchange Act reporting company` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_b_2_one_annual_report_filed_and_fewer_than_300_holders_of_record  (main.l4:668:9-669:77)
+  [D-LITERALEXPR] advisory — decision_b_2_one_annual_report_filed_and_fewer_than_300_holders_of_record  (main.l4:677:9-678:77)
       `(b)(2) — one annual report filed and fewer than 300 holders of record` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_b_3_three_annual_reports_filed_and_total_assets_not_exceeding_10_000_000  (main.l4:675:9-676:65)
+  [D-LITERALEXPR] advisory — decision_b_3_three_annual_reports_filed_and_total_assets_not_exceeding_10_000_000  (main.l4:684:9-685:65)
       `(b)(3) — three annual reports filed and total assets not exceeding $10,000,000` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_b_4_all_securities_repurchased  (main.l4:682:9-133)
+  [D-LITERALEXPR] advisory — decision_b_4_all_securities_repurchased  (main.l4:691:9-133)
       `(b)(4) — all securities repurchased` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_b_5_liquidated_or_dissolved  (main.l4:688:9-110)
+  [D-LITERALEXPR] advisory — decision_b_5_liquidated_or_dissolved  (main.l4:697:9-110)
       `(b)(5) — liquidated or dissolved` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_ongoing_reporting_obligation_may_terminate  (main.l4:694:9-699:50)
+  [D-LITERALEXPR] advisory — decision_ongoing_reporting_obligation_may_terminate  (main.l4:703:9-708:50)
       `ongoing reporting obligation may terminate` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-VERDICT] lossy — decision_ongoing_reporting_obligation  (main.l4:711:5-716:84)
+  [D-VERDICT] lossy — decision_ongoing_reporting_obligation  (main.l4:720:5-725:84)
       `ongoing reporting obligation` has a deontic body; it is lowered to a VERDICT decision table over its guards, each rule's output a string naming the arm. The obligation semantics (PARTY/MUST/WITHIN/HENCE/LEST) are the BPMN exporter's job (`l4 export --to=bpmn`): WITHIN deadlines are the exported deadline decisions, the HENCE loop is the BPMN loop-back edge, and a BPMN gateway consumes this verdict to choose the process path
       lost: the obligation as a state: PARTY/WITHIN/HENCE/LEST do not survive into this artifact; the verdict names the arm, the BPMN projection carries the lifecycle
-  [D-LITERALEXPR] advisory — decision_the_first_anniversary_of_the_issuance  (main.l4:781:5-97)
+  [D-LITERALEXPR] advisory — decision_the_first_anniversary_of_the_issuance  (main.l4:790:5-97)
       `the first anniversary of the issuance` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_days_until_the_first_anniversary_of_the_issuance  (main.l4:798:5-799:72)
+  [D-LITERALEXPR] advisory — decision_days_until_the_first_anniversary_of_the_issuance  (main.l4:807:5-808:72)
       `days until the first anniversary of the issuance` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_transfer_is_within_the_one_year_restricted_period  (main.l4:805:5-97)
+  [D-LITERALEXPR] advisory — decision_transfer_is_within_the_one_year_restricted_period  (main.l4:814:5-97)
       `transfer is within the one-year restricted period` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_a_4_a_family_or_trust_transferee_or_a_death_or_divorce_circumstance  (main.l4:827:9-835:104)
+  [D-LITERALEXPR] advisory — decision_a_4_a_family_or_trust_transferee_or_a_death_or_divorce_circumstance  (main.l4:836:9-844:104)
       `(a)(4) — a family or trust transferee, or a death-or-divorce circumstance` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_transfer_falls_within_an_exception_in_rule_501_a  (main.l4:841:9-845:103)
+  [D-LITERALEXPR] advisory — decision_transfer_falls_within_an_exception_in_rule_501_a  (main.l4:850:9-854:103)
       `transfer falls within an exception in Rule 501(a)` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_transfer_is_permitted  (main.l4:851:8-852:68)
+  [D-LITERALEXPR] advisory — decision_transfer_is_permitted  (main.l4:860:8-861:68)
       `transfer is permitted` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — bkm_the_transaction_qualifies_for_the_section_4_a_6_exemption  (main.l4:880:9-885:58)
+  [D-LITERALEXPR] advisory — bkm_the_transaction_qualifies_for_the_section_4_a_6_exemption  (main.l4:889:9-894:58)
       `the transaction qualifies for the section 4(a)(6) exemption` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_a_clean_issuer  (main.l4:891:24-898:168)
+  [D-LITERALEXPR] advisory — decision_a_clean_issuer  (main.l4:900:24-907:168)
       `a clean issuer` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_a_delinquent_issuer  (main.l4:911:29-918:168)
+  [D-LITERALEXPR] advisory — decision_a_delinquent_issuer  (main.l4:920:29-927:168)
       `a delinquent issuer` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — bkm_an_offering_of  (main.l4:933:66-937:111)
+  [D-LITERALEXPR] advisory — bkm_an_offering_of  (main.l4:942:66-946:111)
       `an offering of` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — bkm_an_investor_with  (main.l4:944:66-949:147)
+  [D-LITERALEXPR] advisory — bkm_an_investor_with  (main.l4:953:66-958:147)
       `an investor with` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — bkm_an_arrangement_with  (main.l4:954:63-960:135)
+  [D-LITERALEXPR] advisory — bkm_an_arrangement_with  (main.l4:963:63-969:135)
       `an arrangement with` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_certified  (main.l4:1063:19-115)
+  [D-LITERALEXPR] advisory — decision_certified  (main.l4:1072:19-115)
       `certified` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_reviewed  (main.l4:1066:18-85)
+  [D-LITERALEXPR] advisory — decision_reviewed  (main.l4:1075:18-85)
       `reviewed` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_audited  (main.l4:1069:17-83)
+  [D-LITERALEXPR] advisory — decision_audited  (main.l4:1078:17-83)
       `audited` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_a_conforming_filing  (main.l4:1276:29-1279:176)
+  [D-LITERALEXPR] advisory — decision_a_conforming_filing  (main.l4:1285:29-1288:176)
       `a conforming filing` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_the_base_case_qualifies  (main.l4:1286:5-1288:59)
+  [D-LITERALEXPR] advisory — decision_the_base_case_qualifies  (main.l4:1295:5-1297:59)
       `the base case qualifies` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_the_delinquent_issuer_case_qualifies  (main.l4:1293:5-1295:59)
+  [D-LITERALEXPR] advisory — decision_the_delinquent_issuer_case_qualifies  (main.l4:1302:5-1304:59)
       `the delinquent-issuer case qualifies` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_the_over_limit_investor_case_qualifies  (main.l4:1299:5-1301:59)
+  [D-LITERALEXPR] advisory — decision_the_over_limit_investor_case_qualifies  (main.l4:1308:5-1310:59)
       `the over-limit-investor case qualifies` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_the_short_availability_case_qualifies  (main.l4:1305:5-1307:59)
+  [D-LITERALEXPR] advisory — decision_the_short_availability_case_qualifies  (main.l4:1314:5-1316:59)
       `the short-availability case qualifies` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_the_under_assured_financials_case_qualifies  (main.l4:1312:5-1314:59)
+  [D-LITERALEXPR] advisory — decision_the_under_assured_financials_case_qualifies  (main.l4:1321:5-1323:59)
       `the under-assured-financials case qualifies` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_w_offering  (main.l4:1334:20-52)
+  [D-LITERALEXPR] advisory — decision_w_offering  (main.l4:1343:20-52)
       `W offering` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_i_3_investor  (main.l4:1365:22-62)
+  [D-LITERALEXPR] advisory — decision_i_3_investor  (main.l4:1374:22-62)
       `I-3 investor` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_i_4_investor  (main.l4:1380:22-64)
+  [D-LITERALEXPR] advisory — decision_i_4_investor  (main.l4:1389:22-64)
       `I-4 investor` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_a_investor  (main.l4:1399:20-66)
+  [D-LITERALEXPR] advisory — decision_a_investor  (main.l4:1408:20-66)
       `A investor` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_f_offering  (main.l4:1412:20-50)
+  [D-LITERALEXPR] advisory — decision_f_offering  (main.l4:1421:20-50)
       `F offering` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-REGULATIVE] lossy — advertising restriction  (main.l4:640:1-645:66)
+  [D-REGULATIVE] lossy — advertising restriction  (main.l4:649:1-654:66)
       `advertising restriction` has a regulative body and no callers, so it is not emitted as a decision: DMN models decisions; lifecycle is BPMN's and CMMN's job, and a <decision> whose logic is raw deontic L4 misdescribes both
       lost: the obligation's lifecycle: route this rule to the BPMN exporter instead
-  [D-REGULATIVE] lossy — resale restriction  (main.l4:855:1-861:76)
+  [D-REGULATIVE] lossy — resale restriction  (main.l4:864:1-870:76)
       `resale restriction` has a regulative body and no callers, so it is not emitted as a decision: DMN models decisions; lifecycle is BPMN's and CMMN's job, and a <decision> whose logic is raw deontic L4 misdescribes both
       lost: the obligation's lifecycle: route this rule to the BPMN exporter instead
-  [D-FIXTURE] advisory — a foreign issuer  (main.l4:900:1-907:168)
+  [D-FIXTURE] advisory — a foreign issuer  (main.l4:909:1-916:168)
       `a foreign issuer` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
       lost: nothing about the rule set: the decision exists to exercise it, not to state it
-  [D-FIXTURE] advisory — a blank-check issuer  (main.l4:920:1-927:167)
+  [D-FIXTURE] advisory — a blank-check issuer  (main.l4:929:1-936:167)
       `a blank-check issuer` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
       lost: nothing about the rule set: the decision exists to exercise it, not to state it
-  [D-FIXTURE] advisory — a reporting status with  (main.l4:962:1-972:112)
+  [D-FIXTURE] advisory — a reporting status with  (main.l4:971:1-981:112)
       `a reporting status with` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
       lost: nothing about the rule set: the decision exists to exercise it, not to state it
-  [D-FIXTURE] advisory — the fixture issuance date  (main.l4:980:1-47)
+  [D-FIXTURE] advisory — the fixture issuance date  (main.l4:989:1-47)
       `the fixture issuance date` is referenced only from test scaffolding (the fixture-side transitive closure), so it is not emitted; pass --include-tests to emit it
       lost: nothing about the rule set: the decision exists to exercise it, not to state it
-  [D-FIXTURE] advisory — a transfer at  (main.l4:982:1-996:111)
+  [D-FIXTURE] advisory — a transfer at  (main.l4:991:1-1005:111)
       `a transfer at` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
       lost: nothing about the rule set: the decision exists to exercise it, not to state it
-  [D-FIXTURE] advisory — a conforming notice  (main.l4:1102:1-1107:167)
+  [D-FIXTURE] advisory — a conforming notice  (main.l4:1111:1-1116:167)
       `a conforming notice` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
       lost: nothing about the rule set: the decision exists to exercise it, not to state it
-  [D-FIXTURE] advisory — an overreaching notice  (main.l4:1109:1-1114:166)
+  [D-FIXTURE] advisory — an overreaching notice  (main.l4:1118:1-1123:166)
       `an overreaching notice` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
       lost: nothing about the rule set: the decision exists to exercise it, not to state it
-  [D-FIXTURE] advisory — a notice with no platform link  (main.l4:1116:1-1121:167)
+  [D-FIXTURE] advisory — a notice with no platform link  (main.l4:1125:1-1130:167)
       `a notice with no platform link` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
       lost: nothing about the rule set: the decision exists to exercise it, not to state it
-  [D-FIXTURE] advisory — a transfer from  (main.l4:1182:1-1196:111)
+  [D-FIXTURE] advisory — a transfer from  (main.l4:1191:1-1205:111)
       `a transfer from` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
       lost: nothing about the rule set: the decision exists to exercise it, not to state it
-  [D-FIXTURE] advisory — a transfer under limb (4) at  (main.l4:1225:1-1244:115)
+  [D-FIXTURE] advisory — a transfer under limb (4) at  (main.l4:1234:1-1253:115)
       `a transfer under limb (4) at` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
       lost: nothing about the rule set: the decision exists to exercise it, not to state it
-  [D-RULEDATE-UNBOUND] lossy — W within the limit in 2016  (main.l4:1336:1-1337:107)
+  [D-RULEDATE-UNBOUND] lossy — W within the limit in 2016  (main.l4:1345:1-1346:107)
       `W within the limit in 2016` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`); a DMN DRG has one global rule-date input and no scoped rebinding, so no faithful <decision> exists and it is not emitted
       lost: the pinned-regime scenario: evaluate it in L4, or vary RULES_EFFECTIVE_DATE across engine invocations
-  [D-RULEDATE-UNBOUND] lossy — W within the limit in 2021 January  (main.l4:1339:1-1340:107)
+  [D-RULEDATE-UNBOUND] lossy — W within the limit in 2021 January  (main.l4:1348:1-1349:107)
       `W within the limit in 2021 January` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`); a DMN DRG has one global rule-date input and no scoped rebinding, so no faithful <decision> exists and it is not emitted
       lost: the pinned-regime scenario: evaluate it in L4, or vary RULES_EFFECTIVE_DATE across engine invocations
-  [D-RULEDATE-UNBOUND] lossy — W within the limit in 2021 June  (main.l4:1342:1-1343:107)
+  [D-RULEDATE-UNBOUND] lossy — W within the limit in 2021 June  (main.l4:1351:1-1352:107)
       `W within the limit in 2021 June` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`); a DMN DRG has one global rule-date input and no scoped rebinding, so no faithful <decision> exists and it is not emitted
       lost: the pinned-regime scenario: evaluate it in L4, or vary RULES_EFFECTIVE_DATE across engine invocations
-  [D-RULEDATE-UNBOUND] lossy — the cut point the day before the 2017 adjustment  (main.l4:1350:1-1351:85)
+  [D-RULEDATE-UNBOUND] lossy — the cut point the day before the 2017 adjustment  (main.l4:1359:1-1360:85)
       `the cut point the day before the 2017 adjustment` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`); a DMN DRG has one global rule-date input and no scoped rebinding, so no faithful <decision> exists and it is not emitted
       lost: the pinned-regime scenario: evaluate it in L4, or vary RULES_EFFECTIVE_DATE across engine invocations
-  [D-RULEDATE-UNBOUND] lossy — the cut point on the day of the 2017 adjustment  (main.l4:1353:1-1354:85)
+  [D-RULEDATE-UNBOUND] lossy — the cut point on the day of the 2017 adjustment  (main.l4:1362:1-1363:85)
       `the cut point on the day of the 2017 adjustment` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`); a DMN DRG has one global rule-date input and no scoped rebinding, so no faithful <decision> exists and it is not emitted
       lost: the pinned-regime scenario: evaluate it in L4, or vary RULES_EFFECTIVE_DATE across engine invocations
-  [D-RULEDATE-UNBOUND] lossy — I-3 limit under the 2022 rules  (main.l4:1367:1-1368:88)
+  [D-RULEDATE-UNBOUND] lossy — I-3 limit under the 2022 rules  (main.l4:1376:1-1377:88)
       `I-3 limit under the 2022 rules` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`); a DMN DRG has one global rule-date input and no scoped rebinding, so no faithful <decision> exists and it is not emitted
       lost: the pinned-regime scenario: evaluate it in L4, or vary RULES_EFFECTIVE_DATE across engine invocations
-  [D-RULEDATE-UNBOUND] lossy — I-3 limit under the 2023 rules  (main.l4:1370:1-1371:88)
+  [D-RULEDATE-UNBOUND] lossy — I-3 limit under the 2023 rules  (main.l4:1379:1-1380:88)
       `I-3 limit under the 2023 rules` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`); a DMN DRG has one global rule-date input and no scoped rebinding, so no faithful <decision> exists and it is not emitted
       lost: the pinned-regime scenario: evaluate it in L4, or vary RULES_EFFECTIVE_DATE across engine invocations
-  [D-RULEDATE-UNBOUND] lossy — I-4 limit under the 2022 rules  (main.l4:1382:1-1383:88)
+  [D-RULEDATE-UNBOUND] lossy — I-4 limit under the 2022 rules  (main.l4:1391:1-1392:88)
       `I-4 limit under the 2022 rules` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`); a DMN DRG has one global rule-date input and no scoped rebinding, so no faithful <decision> exists and it is not emitted
       lost: the pinned-regime scenario: evaluate it in L4, or vary RULES_EFFECTIVE_DATE across engine invocations
-  [D-RULEDATE-UNBOUND] lossy — the percentage case under the 2019 rules  (main.l4:1390:1-1391:115)
+  [D-RULEDATE-UNBOUND] lossy — the percentage case under the 2019 rules  (main.l4:1399:1-1400:115)
       `the percentage case under the 2019 rules` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`); a DMN DRG has one global rule-date input and no scoped rebinding, so no faithful <decision> exists and it is not emitted
       lost: the pinned-regime scenario: evaluate it in L4, or vary RULES_EFFECTIVE_DATE across engine invocations
-  [D-RULEDATE-UNBOUND] lossy — A is within the limit under the 2021 rules  (main.l4:1401:1-1402:111)
+  [D-RULEDATE-UNBOUND] lossy — A is within the limit under the 2021 rules  (main.l4:1410:1-1411:111)
       `A is within the limit under the 2021 rules` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`); a DMN DRG has one global rule-date input and no scoped rebinding, so no faithful <decision> exists and it is not emitted
       lost: the pinned-regime scenario: evaluate it in L4, or vary RULES_EFFECTIVE_DATE across engine invocations
-  [D-RULEDATE-UNBOUND] lossy — A is within the limit under the 2019 rules  (main.l4:1404:1-1405:111)
+  [D-RULEDATE-UNBOUND] lossy — A is within the limit under the 2019 rules  (main.l4:1413:1-1414:111)
       `A is within the limit under the 2019 rules` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`); a DMN DRG has one global rule-date input and no scoped rebinding, so no faithful <decision> exists and it is not emitted
       lost: the pinned-regime scenario: evaluate it in L4, or vary RULES_EFFECTIVE_DATE across engine invocations
-  [D-RULEDATE-UNBOUND] lossy — F requirement under the 2019 rules  (main.l4:1414:1-1415:99)
+  [D-RULEDATE-UNBOUND] lossy — F requirement under the 2019 rules  (main.l4:1423:1-1424:99)
       `F requirement under the 2019 rules` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`); a DMN DRG has one global rule-date input and no scoped rebinding, so no faithful <decision> exists and it is not emitted
       lost: the pinned-regime scenario: evaluate it in L4, or vary RULES_EFFECTIVE_DATE across engine invocations
-  [D-RULEDATE-UNBOUND] lossy — F requirement under the 2023 rules  (main.l4:1417:1-1418:99)
+  [D-RULEDATE-UNBOUND] lossy — F requirement under the 2023 rules  (main.l4:1426:1-1427:99)
       `F requirement under the 2023 rules` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`); a DMN DRG has one global rule-date input and no scoped rebinding, so no faithful <decision> exists and it is not emitted
       lost: the pinned-regime scenario: evaluate it in L4, or vary RULES_EFFECTIVE_DATE across engine invocations
-  [D-RULEDATE-UNBOUND] lossy — a small offering inside the COVID window  (main.l4:1428:1-1429:120)
+  [D-RULEDATE-UNBOUND] lossy — a small offering inside the COVID window  (main.l4:1437:1-1438:120)
       `a small offering inside the COVID window` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`); a DMN DRG has one global rule-date input and no scoped rebinding, so no faithful <decision> exists and it is not emitted
       lost: the pinned-regime scenario: evaluate it in L4, or vary RULES_EFFECTIVE_DATE across engine invocations
-  [D-RULEDATE-UNBOUND] lossy — a large offering inside the COVID window  (main.l4:1431:1-1432:99)
+  [D-RULEDATE-UNBOUND] lossy — a large offering inside the COVID window  (main.l4:1440:1-1441:99)
       `a large offering inside the COVID window` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`); a DMN DRG has one global rule-date input and no scoped rebinding, so no faithful <decision> exists and it is not emitted
       lost: the pinned-regime scenario: evaluate it in L4, or vary RULES_EFFECTIVE_DATE across engine invocations
   [D-INERT] advisory — decision_business_days_to_file_a_progress_update  (main.l4:242:1-243:50)
       `business days to file a progress update` is kept, but its body forces no reference and no input — an inert prose carrier (typically statutory text plus a constant)
       lost: nothing: the note exists so a reader can tell a constant stub from a live rule
-  [D-INERT] advisory — decision_definition_terms_of_the_offering  (main.l4:620:1-623:13)
+  [D-INERT] advisory — decision_definition_terms_of_the_offering  (main.l4:629:1-632:13)
       `definition — terms of the offering` is kept, but its body forces no reference and no input — an inert prose carrier (typically statutory text plus a constant)
       lost: nothing: the note exists so a reader can tell a constant stub from a live rule
-  [D-INERT] advisory — decision_certified  (main.l4:1062:1-1063:115)
+  [D-INERT] advisory — decision_certified  (main.l4:1071:1-1072:115)
       `certified` is kept, but its body forces no reference and no input — an inert prose carrier (typically statutory text plus a constant)
       lost: nothing: the note exists so a reader can tell a constant stub from a live rule
-  [D-INERT] advisory — decision_audited  (main.l4:1068:1-1069:83)
+  [D-INERT] advisory — decision_audited  (main.l4:1077:1-1078:83)
       `audited` is kept, but its body forces no reference and no input — an inert prose carrier (typically statutory text plus a constant)
       lost: nothing: the note exists so a reader can tell a constant stub from a live rule
   [D-PARAM-AS-INPUT] advisory — input_arrangement
@@ -338,8 +338,8 @@ fidelity report — DMN 1.3 (XML), camunda flavor
   [D-PARAM-AS-INPUT] advisory — input_supplied
       the GIVEN parameter `supplied` of `financial statement requirement is satisfied` became the model input `input_supplied`; the decision can no longer be applied to different subjects within this model, and the argument expressions at its call sites are discarded — each call site now reads the one global value
       lost: per-call-site argument binding: L4 applied this decision to an expression; the DMN model reads one global value
-  [D-PARTIAL] lossy — decision_ongoing_reporting_obligation  (main.l4:707:1-716:84)
-      `ongoing reporting obligation` could not be certified total (TERMINATES at main.l4:707:1-716:84: self-recursion could not be certified structurally terminating (no parameter position decreases through a FOLLOWED BY pattern on every recursive call)), so it is not un-lifted. Its deontic body is lowered to a verdict decision table (see D-VERDICT), which always answers one row, and no raw-L4 call site of it remains in the artifact; what could not be certified is the L4 source itself — the HENCE self-recursion may not terminate — and the artifact does not carry that recursion
+  [D-PARTIAL] lossy — decision_ongoing_reporting_obligation  (main.l4:716:1-725:84)
+      `ongoing reporting obligation` could not be certified total (TERMINATES at main.l4:716:1-725:84: self-recursion could not be certified structurally terminating (no parameter position decreases through a FOLLOWED BY pattern on every recursive call)), so it is not un-lifted. Its deontic body is lowered to a verdict decision table (see D-VERDICT), which always answers one row, and no raw-L4 call site of it remains in the artifact; what could not be certified is the L4 source itself — the HENCE self-recursion may not terminate — and the artifact does not carry that recursion
       lost: the certainty that the SOURCE obligation spine terminates: the verdict table answers regardless, and the L4 recursion it summarises is what could not be certified
   [D-BKM] advisory — bkm_the_rules_in_force_include
       `the rules in force include` is emitted as a businessKnowledgeModel (tier 2): it is applied to distinct argument expressions by `offering maximum in a 12-month period`, `income or net worth cut point`, `minimum permitted investment`, `maximum amount sold to any one investor in a 12-month period`, `tier 1 ceiling`, `tier 2 ceiling`, `first-time issuer review ceiling`, `the applicable measure of annual income or net worth`, `the accredited-investor carve-out applies to`. Saturated call sites render as FEEL named-argument invocations with a knowledgeRequirement edge on each caller; 1 module-level free reference(s) of its body (`RULES_EFFECTIVE_DATE`) are λ-lifted into extra formal parameters, supplied at every call site as `name: name` — a BKM body may read nothing beyond its parameters (measured on both engines, §6.2)
@@ -455,9 +455,9 @@ fidelity report — DMN 1.3 (XML), camunda flavor
   [D-COMPUTEDOUTPUT] advisory — decision_the_applicable_measure_of_annual_income_or_net_worth  (main.l4:409:22-98)
       the output entry `no_Regulation_Crowdfunding_figure_exists_before_commencement_on_2016_05_16` is an expression, not a constant; DMN 8.2.9 permits that, but every published decision-table analysis defines an output entry as a constant
       lost: gap and overlap analysis of this table: DMN renders it, DMN's checkers do not check it
-  [D-UNDECOMPOSABLE] advisory — decision_ongoing_reporting_obligation  (main.l4:711:10-61)
+  [D-UNDECOMPOSABLE] advisory — decision_ongoing_reporting_obligation  (main.l4:720:10-61)
       the guard ``ongoing reporting obligation may terminate` OF status` has no constant endpoint, so it became its own boolean column rather than an input expression tested by a unary test
       lost: interval gap and overlap analysis over this condition
-  [D-ORDERDEPENDENT] advisory — decision_ongoing_reporting_obligation  (main.l4:711:10-61)
+  [D-ORDERDEPENDENT] advisory — decision_ongoing_reporting_obligation  (main.l4:720:10-61)
       hit policy First is order-dependent: DMN 8.2.10 says of such tables that "the table is hard to validate manually and therefore has to be used with care"
       lost: order-free reading; a rule cannot be checked without the rules above it

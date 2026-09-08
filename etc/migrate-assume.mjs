@@ -409,6 +409,17 @@ const CARRIED_ANNOTATIONS = new Set(["desc", "nlg", "ref"]);
 // (`YMD refused an out-of-range month or day`). Those two shapes cover every
 // refusal-role site measured 2026-09-05; nothing else in the corpus is named
 // that way, so the test does not over-reach.
+//
+// CORRECTED 2026-09-08: they did NOT cover every site. `regcf.l4`'s
+// `the COVID-19 temporary rules, Rule 201(z) and (bb), are not modelled here`
+// is refusal-role by the same test its sibling passes -- nothing ever routes a
+// value through it -- and this regex misses it, because it is named for what is
+// unmodelled rather than for what is absent. It was migrated by mistake, and
+// commit 978d9f83's own message ("keeps its one refusal-role ASSUME") is
+// therefore wrong about its own diff. Restored with IMPLICIT-PROPS-DESIGN.md
+// §11.22. A NAME cannot decide this: "is an input" is the test, and only a
+// reader can apply it. Treat this regex as a first pass whose output a human
+// must check, not as a classifier.
 const REFUSAL_NAME = /^`?(no\b|.*\brefus)/i;
 const DMN_REASON =
   "refusal role, and DMN holds it: `L4.Dmn.Lower` writes a refusal into a FEEL literal " +

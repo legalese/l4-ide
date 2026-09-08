@@ -1,0 +1,13 @@
+-- The middle of a three-module chain, for `chain-refused.l4`. Like
+-- `implicit-rate-lib.l4` this typechecks fine and is in no golden glob.
+--
+-- It declares no section GIVEN of its own. That is the point: a module in the
+-- middle of a chain has an empty read-set, so it used to contribute nothing to
+-- what its importers were told, and the refusal missed anything one hop further
+-- out.
+
+IMPORT `implicit-rate-lib`
+
+GIVEN amount IS A NUMBER
+GIVETH A NUMBER
+`wrapped cost of` amount MEANS `scaled by the rate` amount

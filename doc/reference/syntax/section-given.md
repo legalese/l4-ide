@@ -128,6 +128,9 @@ GIVETH A STRING
 This is a drafting idiom to reach for sparingly: a reader who cannot see the
 types cannot see which of them a rule means, and a use site whose context settles
 nothing is a "multiple definitions" error naming both candidates. It is
+deliberately _not_ what [One name, one value](#one-name-one-value) refuses —
+that section is about two facts of one name at the **same** kind of thing, where
+no context can tell them apart. It is
 supported because the `ASSUME`s a section `GIVEN` replaces support it, and a
 migration that lost it would silently change which programs compile.
 
@@ -139,6 +142,71 @@ the printer took the hand-written `ASSUME` for the section's own and dropped
 it, so `l4 batch` and the REPL rebuilt a module that had lost it; it now tells
 the two apart and keeps it. Write the second binding as another `GIVEN`
 parameter on the heading anyway — that is what the warning asks for.
+
+## One name, one value
+
+Two sibling headings may each declare the same name, and that is the point of
+"for the purposes of sections 1 and 2 … , and of sections 3 and 4 … " drafting:
+each heading's rules read their own. Reading both is fine — each takes its own
+`TYPICALLY` value, and the answer is settled.
+
+What is refused is **saying which** when there are two to choose from. If a
+`WITH` supplies a name and the rule it is calling needs two facts of that name,
+only one of them can receive the value and the other quietly falls back to its
+default:
+
+```
+Working out
+
+  `both`
+
+needs more than one section input spelled
+
+  `foo`
+
+and there is no way to say which of them a value is for -- whichever one you
+supplied, the other would fall back to its own default.
+
+The inputs are:
+  `1`.foo (defined at fruit.l4:17:11-14)
+  `2`.foo (defined at fruit.l4:25:11-14)
+
+Hoist them to a common section heading if they are one thing, rename one of
+them, or bridge at the call so that only one of them reaches here:
+
+  <the rule that reads the other one> WITH foo IS foo
+```
+
+Each candidate is named under the heading that declares it, so you can see at a
+glance that they are two different facts rather than one written twice.
+
+There are three ways out, and which is right depends on what you meant:
+
+- **They are the same fact.** Move the `GIVEN` up to a heading that encloses
+  both, and there is only one of them.
+- **They are different facts.** Rename one. Two things that behave differently
+  should not read alike.
+- **They are different facts and both names are the ones the law uses.** Bridge
+  at the call: write `… (g WITH foo IS foo)` where the rule reaches across.
+  The name on the left of `IS` is the called rule's fact and the expression on
+  the right is yours, so the call hands your `foo` over as its `foo`, and only
+  one of the two is left to reach further.
+
+The reason this matters is a measured one. A rule reading one section's `foo`
+directly and another section's through a helper answered **991** when a `WITH`
+supplied `foo` — the value reached one of them and the other fell back to its
+own `TYPICALLY` default of 99 — and `l4 check` accepted it.
+
+**A published rule is held to more.** A rule marked `@export` is refused if its
+facts include two of one name whether or not anything supplies them, because
+those facts are published as the list of things a request must send, and a
+request cannot carry one name twice. Nothing else is refused for merely reading
+two: this is about naming a value, and about publishing.
+
+**Two facts of one name at different kinds of thing are not this.** Those are
+the deliberate idiom above — [One name, several types](#one-name-several-types) —
+and each use settles which it means by its context. Only same-name, same-kind
+facts are refused.
 
 ## The dedent hazard
 
@@ -193,6 +261,62 @@ supplies the name to the rule and to everything it relies on, and `#ASSERT`
 takes the same form. This is the one thing an `ASSUME` never had; against an
 `ASSUME`d name the same line is a check error. A value written _before_ the
 `WITH` does not parse: supply every input by name, or none.
+
+**The value you supply is checked against the kind of thing the `GIVEN` line
+says it is** — not against whatever that name happens to mean where you are
+writing. That matters because a name can mean something else there. A `WHERE`
+line, for instance, hides a section `GIVEN` completely:
+
+```l4
+§ `Rates`
+    GIVEN rate IS A NUMBER TYPICALLY 0.05
+
+GIVETH A NUMBER
+scaled MEANS 100 TIMES rate
+
+GIVETH A NUMBER
+bad MEANS scaled WITH rate IS rate
+    WHERE
+        rate MEANS "5 percent"
+```
+
+The name on the left of `IS` is the **called rule's** input, and the heading
+declares it a number. The expression on the right is read where you wrote it, so
+it is the `WHERE` line's piece of text. That is a check error, and the message
+names the `GIVEN` line the value has to fit:
+
+```
+The input
+
+  rate (defined at fees.l4:2:11-15)
+
+of function
+
+  scaled (defined at fees.l4:5:1-7)
+
+is expected to be of type
+
+  NUMBER
+
+but is here of type
+
+  STRING
+```
+
+Until 2026-09-08 the value was checked against the `WHERE` line instead. The file
+passed `l4 check` clean and then stopped at run time with _"Internal error …
+running bin op with invalid operation / value combination"_ — a type error
+escaping the type checker dressed as a request to report a bug. Reported upstream
+as [smucclaw/l4-ide#956](https://github.com/smucclaw/l4-ide/issues/956).
+
+**One case is not checked, and it is worth knowing which.** If **two** headings
+declare the same name, the value is checked the older way, against what the name
+means where you wrote it. Which of the two a value actually reaches is decided
+by what the called rule reads, and that is not known until the whole file has
+been read — too late for this check. So with two same-named facts of different
+kinds, a value of the wrong kind can still get through to run time. Prefer one
+name per fact where you can; where you cannot, the safe habit is to supply a
+value whose kind is unmistakable rather than another name.
 
 What else works:
 
@@ -313,30 +437,87 @@ reach, and the repeated rule `GIVEN` is still the right encoding today.
 
 ### Across an `IMPORT`
 
-A section `GIVEN` does **not** reach across an `IMPORT`, and neither does
-`ASSUME`. Suppose module `B` imports module `A`, `A` declares a section `GIVEN`
-called `gst rate`, and one of `A`'s own definitions reads it. A function in `B`
-marked `@export` that calls that definition cannot be given a value for
-`gst rate`. Two things go wrong, and the quiet one comes first:
+A **value** for a section `GIVEN` does not reach across an `IMPORT`, and the
+same is true of `ASSUME`. The **name** does: `IMPORT` brings it in like any
+other, and a rule that merely reads it answers with the imported file's own
+`TYPICALLY` value. It is the supplying that stops at the boundary.
 
-- `l4 batch B.l4 --inputs row.json --validate-only` answers
-  `{"errors":[],"status":"valid"}`. The list of inputs an exported function
-  needs is collected from `B` alone; it does not follow the `IMPORT` into `A`,
-  so it never learns that `gst rate` is wanted.
-- Running the same row then stops with _"I could not continue evaluating,
+Suppose module `B` imports module `A`, `A` declares a section `GIVEN` called
+`gst rate`, and one of `A`'s own rules reads it.
+
+**Calling that rule from `B` is fine.** `A`'s rule takes its own `TYPICALLY`
+value, or stops as an assumed term if it has none, exactly as it would inside
+`A`. Nothing is lost and nothing is quiet. Writing `WITH gst rate IS …` in `B`
+is refused, because the name is not one `B` may supply.
+
+**Publishing a rule in `B` that reaches it is refused.** A rule marked `@export`
+is a rule other software sends facts to, and `gst rate` is a fact that cannot
+get there. So `l4 check` — and `l4 batch`, which runs the same check first —
+rejects the module and says why. "Reaches" is meant broadly, and each of these
+counts: calling `A`'s rule directly, calling something in `B` that calls it,
+naming `gst rate` itself in the exported rule, and calling a rule in a **third**
+module `C` that imports `A` — a fact two `IMPORT`s away is no more suppliable
+than one.
+
+```
+This @export
+
+  `cost of`
+
+reaches
+
+  `Rates.scaled by the rate`
+
+which is in an imported module and involves a section input -- it either is
+one, or it reads one.
+
+Section inputs do not cross an IMPORT: such an input would not appear in this
+export's schema, a value sent under its name would be accepted and then
+ignored, and there is no way to deliver one to the imported module at all. So
+a request that validates here can still fail when it runs, which is why this
+is refused rather than answered.
+
+Give the imported rule an ordinary GIVEN parameter instead of a section GIVEN,
+or move what this export needs into this module.
+```
+
+**Why a refusal and not a quiet answer.** Before 2026-09-08 this shape was
+accepted, and it went wrong in the worst order — the reassuring step came first:
+
+- `l4 batch B.l4 --inputs row.json --validate-only` answered
+  `{"errors":[],"status":"valid"}`. The list of facts an exported rule asks for
+  is collected from `B` alone; it does not follow the `IMPORT` into `A`, so it
+  never learned that `gst rate` was wanted.
+- Running the very same row then stopped with _"I could not continue evaluating,
   because I needed to know the value of `gst rate` but it is an assumed term."_
-  Adding `"gst rate"` to the input row does **not** help: the value is accepted
-  into the row and then ignored, because the way `l4 batch` supplies a value is
-  by rewriting the module it was given, and it cannot rewrite a module it only
-  imports.
+  Adding `"gst rate"` to the row did **not** help: the value was accepted into
+  the row and then ignored, because the way `l4 batch` supplies a value is by
+  rewriting the module it was handed, and it cannot rewrite a module that module
+  merely imports.
 
-Measured 2026-09-05. Until this is repaired, read `--validate-only` as saying
-nothing at all about a module that reads a name declared in one it imports. The
-repair is ruled and not yet built, and the first part of it is a **refusal** —
-`l4 check` rejecting this shape rather than accepting it quietly — not a wider
-search. Recorded as a defect in
-`specs/todo/OPEN-FINDINGS-2026-09-05.md` as **OF-7** (and listed in
-`specs/todo/PROPS-REDTEAM-2026-09-03.md` §7); the ordering of the repair is ruled in
+So the answer to _"is this request valid?"_ was yes for a request that could
+never be answered. That is why the first repair is the refusal rather than a
+wider search: teaching the collector to follow the `IMPORT` on its own would
+have turned a false yes into a fact demanded of the sender and then silently
+dropped, which is worse. Following the `IMPORT` **and** delivering the value is
+the ruled end state and is separate, later work.
+
+**The two ways out**, in the order to try them:
+
+- Give the imported rule an ordinary rule `GIVEN` for that fact instead of a
+  section `GIVEN`, and let its callers pass it. Ordinary inputs cross an
+  `IMPORT` perfectly well, and this is the encoding the "count the callers"
+  advice above points at.
+- Or move what the export needs into the exporting module, so nothing has to
+  cross.
+
+The refusal is deliberately limited to `@export`. An ordinary call of an
+imported rule that reads a section `GIVEN` is untouched, which is what
+`jl4/examples/ok/section-given-import-call.l4` pins.
+
+Recorded as a defect in `specs/todo/OPEN-FINDINGS-2026-09-05.md` as **OF-7**
+(and listed in `specs/todo/PROPS-REDTEAM-2026-09-03.md` §7); the ordering of the
+repair — refusal first, wider search second — is ruled in
 `specs/todo/IMPLICIT-PROPS-DESIGN.md` §11.19.
 
 ## Example

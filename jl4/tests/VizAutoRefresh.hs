@@ -155,6 +155,7 @@ partialTypeCheckResult r =
     , dependencies = unused "dependencies"
     , mixfixRegistry = unused "mixfixRegistry"
     , sectionPaths = unused "sectionPaths"
+    , implicitReaders = unused "implicitReaders"
     }
   where
     unused field =

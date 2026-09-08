@@ -44,6 +44,15 @@ const ROOTS = [
     recursive: false,
     only: (n) => n.startsWith("export-"),
   },
+  {
+    // Only the importer is globbed; the library it imports has to sit beside it
+    // (imports resolve importer-relative) and is deliberately in no glob, so it
+    // ships no goldens. See jl4/tests/Main.hs's "import refusal" describe.
+    label: "import-refusal",
+    dir: join(examples, "not-ok", "import"),
+    recursive: false,
+    only: (n) => n.endsWith("-refused.l4"),
+  },
 ];
 const SUFFIXES = ["golden", "ep.golden", "nlg.golden", "schema.golden"];
 

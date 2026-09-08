@@ -1,0 +1,25 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: section-given-supply-type.l4
+  Hidden: no
+  Range: 25:31-25:35
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The input
+
+      rate (defined at section-given-supply-type.l4:19:11-15)
+
+    of function
+
+      scaled (defined at section-given-supply-type.l4:22:1-7)
+
+    is expected to be of type
+
+      NUMBER
+
+    but is here of type
+
+      STRING

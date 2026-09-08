@@ -89,6 +89,13 @@ main = do
   -- (empty.l4 used to live here while warnings still failed typecheck; now
   -- that only SError blocks 'SuccessfulTypeCheck', it lives in ok/.)
   exportPlacementFiles <- sort <$> globDir1 (compile "not-ok/export-*.l4") examplesRoot
+  -- A cross-IMPORT refusal takes two files: the module that declares the
+  -- section binder, and the importer whose @export reaches it. Imports resolve
+  -- importer-relative, so the two have to share a directory -- and only the
+  -- importer is meant to fail. Hence a glob that picks the importer out by
+  -- name rather than one that takes the whole directory. The library beside it
+  -- is deliberately in no glob at all.
+  importRefusalFiles <- sort <$> globDir1 (compile "not-ok/import/*-refused.l4") examplesRoot
   hspec do
     describe "corpus sanity (every glob matched something)" $ do
       let corpusNonEmpty nm xs = it (nm <> " corpus is non-empty") $ xs `shouldSatisfy` (not . null)
@@ -100,6 +107,7 @@ main = do
       corpusNonEmpty "semantic-tokens" semanticTokenFiles
       corpusNonEmpty "hover"           hoverFiles
       corpusNonEmpty "export-placement" exportPlacementFiles
+      corpusNonEmpty "import-refusal"   importRefusalFiles
     describe "ok files" $ tests evalConfig (True, True) (okFiles <> legalFiles <> librariesFiles) examplesRoot
     -- Invariant: exactprint is the identity on the source for every parseable
     -- corpus file. This is the single guard against the whole class of
@@ -124,6 +132,8 @@ main = do
         it (makeRelative examplesRoot inputFile) $
           jl4PrettyLayoutRoundTrip evalConfig inputFile
     describe "tc fails" $ tests evalConfig (False, True) tcFailsFiles examplesRoot
+    describe "import refusal (@export whose read-set crosses an IMPORT)" $
+      tests evalConfig (False, True) importRefusalFiles examplesRoot
     describe "nlg fails" $ tests evalConfig (True, False) nlgFailsFiles examplesRoot
     describe "export placement (typechecks; no default export)" $
       tests evalConfig (True, True) exportPlacementFiles examplesRoot

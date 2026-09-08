@@ -279,6 +279,9 @@ data TypeCheckWithDepsResult = TypeCheckWithDepsResult
   , tcdSectionPaths :: SectionPaths
     -- ^ Where each visible binding was defined, section-wise, including those
     -- reached through imports. See 'L4.TypeCheck.Types.SectionPaths'.
+  , tcdImplicitReaders :: Set Unique
+    -- ^ Definitions with a non-empty read-set, this module's and its imports'.
+    -- See 'L4.TypeCheck.Types.CheckResult.implicitReaders'.
   }
   deriving stock (Generic)
 
@@ -341,6 +344,7 @@ typecheckWithDependencies lookupModule uri source = do
             , tcdResolvedImports = resolvedImports
             , tcdUri = uri
             , tcdSectionPaths = result.sectionPaths
+            , tcdImplicitReaders = result.implicitReaders
             }
 
 -- ----------------------------------------------------------------------------
@@ -402,7 +406,7 @@ combineResolvedImports uri imports =
              , TypeCheck.sectionPaths = Map.union accState.sectionPaths r.sectionPaths
              , TypeCheck.deferredChoices = 0
              }
-         , TypeCheck.unionImportedCheckEnv accEnv r.environment resolvedEntityInfo r.mixfixRegistry
+         , TypeCheck.unionImportedCheckEnv accEnv r.environment resolvedEntityInfo r.mixfixRegistry r.implicitReaders
          )
 
 -- | Update a module's import declarations with resolved URIs.

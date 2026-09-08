@@ -397,6 +397,19 @@ typechecker and the `jl4-service` deploy both reject such bundles; `l4 blawx` is
 the exception and compiles them, because a Blawx interview asks a person for the
 answer rather than receiving it in a request.
 
+**Only within one module, and reaching outside it is refused (2026-09-08).** An
+`@export` that reaches a rule in an `IMPORT`ed module which reads a section
+`GIVEN` of its own is a check error, because that fact can appear in no schema
+and cannot be delivered across the boundary. Keep an `@export` and everything
+its facts come from in one file, or give the imported rule an ordinary `GIVEN`
+parameter and pass it. Calling such a rule _without_ exporting is fine.
+
+**A `WITH` is type-checked against the `GIVEN` line, not against the name where
+you wrote it**, so `WITH rate IS "5 percent"` against `GIVEN rate IS A NUMBER`
+is a check error even when something else called `rate` is in scope where you
+are. And a `WITH` whose callee needs two facts of that one name is refused, since
+only one of them could receive the value.
+
 ### `@desc` — document parameters
 
 Put an inline `@desc` on **every** `GIVEN` parameter an API caller has to supply. These descriptions flow into the OpenAPI parameter docs and the MCP tool's `inputSchema`, and they are what LLMs read when deciding **how to construct a valid call**.

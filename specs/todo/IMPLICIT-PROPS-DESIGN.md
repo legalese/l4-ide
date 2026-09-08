@@ -1021,14 +1021,59 @@ inputs. As definitions the pattern runs today on the FIX D branch exactly as int
 defect FIX D repairs. Preconditions: FIX D and the §3.3.4 drift, both on
 `fix/section-scoping-ambiguity`. Detail: `PROPS-REDTEAM-2026-09-03.md` §2.1, §2.2.
 
-**The per-root check is NOT BUILT — measured 2026-09-07, and R-X2 (§11.20) rules it built as one
-job with the call-site type check.** `TypeCheck.hs:236-244` wires exactly two whole-module implicit
-checks, both keyed to supply sites; nothing scans a root's read-set. Witness on the shipped fixture
+**The per-root check was NOT BUILT until 2026-09-08 — measured 2026-09-07, and R-X2 (§11.20) ruled it
+built as one job with the call-site type check.** `TypeCheck.hs:236-244` wired exactly two whole-module
+implicit checks, both keyed to supply sites; nothing scanned a root's read-set. Witness on the shipped fixture
 `ok/section-given-bridge.l4` plus two lines, `` `both` MEANS foo PLUS g `` and
 ``#EVAL `both` WITH foo IS 1``: under section 1 the answer is **991** (1 + 99×10 — the supply
 reached one `foo`, the other fell to its default); the identical lines under section 2 give **11**.
-`l4 check` succeeds both times. `ambiguousFor` (`Discharge.hs:476-479`) cannot see the case because
+`l4 check` succeeds both times. `ambiguousFor` (`Discharge.hs:476-479` @ `6e9b57bb`) could not see the case because
 it requires the resolved `Unique` to be absent from the read-set, and here it is present.
+
+**BUILT 2026-09-08, together with R-X2's call-site type check, as R-X2 required — one job, one
+confusion.** `Discharge.ambiguousRootBinders` enumerates the roots (`Export.collectExportedDecides`
+for the `@export`s, a section walk for the directives), and reports every group of two or more
+same-spelled binders in a root's read-set as the new check error `AmbiguousRootBinders`. Each
+candidate is named under its declaring section, via `sectionQualifiedWith` — the pure half of
+`sectionQualified`, factored out in this change precisely so the whole-module checks (which run
+outside `Check`) and the ambiguity diagnostics cannot drift to two spellings. Wired beside the other
+two whole-module implicit checks in `TypeCheck.hs`. Fixture:
+`not-ok/tc/section-given-root-ambiguous.l4`. Page: `doc/reference/syntax/section-given.md`, "One
+name per thing you run".
+
+**What building it settled that the ruling did not say: R3 has TWO shapes, and only one of them is
+about a root's read-set as such.** The section is written as "a directive or export whose read-set
+holds two binders of one name", and the first implementation took that literally: it tested every
+directive's read-set, unsubtracted, and every export's. Both halves of that were wrong, and both were
+found by adversarial passes on 2026-09-08 rather than by the corpus, which stayed green throughout.
+
+- **A directive with no `WITH` has nothing to be ambiguous between.** There is no supply channel;
+  every binder it reaches takes its own `TYPICALLY` default and the answer is total and
+  deterministic. Testing it refused the very sibling-section drafting R3 exists to permit —
+  `ok/section-given-fruit.l4`, `doc/reference/syntax/sections-example.l4` and the section-`GIVEN`
+  tutorial each went red on one added `#ASSERT`, with **no way out**, because a directive cannot be
+  rewritten to reach fewer binders. It also refused `#EVAL g WITH foo IS foo` — the bridge the
+  error's own message tells the writer to write.
+- **Grouping on spelling alone conflates R3 with the TDNR overload.** `ok/section-given-tdnr.l4` and
+  `ok/misc.l4` — the two files §11.16 left un-migrated _as this repair's acceptance test_ — each went
+  red on one added directive, and the diagnostic offered two candidates printed under **identical**
+  section-qualified spellings with three remedies none of which applies. Two binders of one name at
+  different types are not two answers to one question; they are two questions. The check now keys on
+  `(spelling, typeKey)`, `typeKey` being the annotation-insensitive skeleton overload resolution
+  already uses, so the two cannot drift on what "the same type" means.
+
+**As built, therefore:**
+
+| shape           | test                                                                                                                   | why                                                                                 |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `@export`       | its read-set holds two same-spelled, same-typed binders — unconditional                                                | the read-set is published as a request schema, and a row cannot carry one key twice |
+| a `WITH` supply | the callee's read-set holds two same-spelled, same-typed binders, and the supplied name's `Unique` matches one of them | the value reaches exactly one; the other falls back to its default. This is the 991 |
+
+The supply test's second clause keeps it disjoint from `ambiguousImplicitSupplies`, which fires when
+the supplied `Unique` matches **none**. A site is reported at most once.
+
+**The witness still fires**, which is the point: `#EVAL `both` WITH foo IS 1` supplies, and `both`'s
+read-set holds both `foo`s. `not-ok/tc/section-given-root-ambiguous.l4` pins it.
 
 ### 11.5 R8 — `TYPICALLY` has one behaviour, filled in once at the root. RULED 2026-09-04.
 
@@ -1594,6 +1639,15 @@ unfrozen arms. The cost, terseness when several calls share one
 override, is met by a helper. Detail: `PROPS-REDTEAM-2026-09-03.md` §2.6.
 
 ### 11.14 Sequencing item 6 — the corpus and docs migration: what it swept, and the two things it found
+
+> **A third thing, found later. 2026-09-08: the sweep converted one line it should not have.** > `legal/regcf/regcf.l4`'s `the COVID-19 temporary rules, Rule 201(z) and (bb), are not modelled here`
+> is a **refusal-role** `ASSUME` — a deliberate bottom, of the kind §11.1.2 kept six files on, and of
+> exactly the kind the same file documents two hundred lines earlier for its sibling marker. `978d9f83`
+> made it a section `GIVEN` along with the other 45 sites, which put a marker that no input is ever
+> routed through into the discharge population, and therefore into a read-set that crosses an
+> `IMPORT`. It surfaced only when §11.19's refusal was built and named it. Reverted; the reasoning is
+> in §11.22. **The lesson for any future sweep: "is an `ASSUME`" is not the test — "is an input" is,
+> and the two are distinguishable only by reading what the name is for.**
 
 **Status 2026-09-05: built on branch `props/assume-sweep`, rebased onto `props/opaque-declare`
 (PR #335), NOT merged.** _Update 2026-09-06: merged as PR #337 (`b4fc3913`); the trees it held
@@ -2219,11 +2273,16 @@ proposal against a read-set that by then exists, not a resumption of this one.
 
 ### 11.19 The cross-`IMPORT` hole. RULING here; the defect record is OF-7.
 
-> **What the unbuilt state surfaces as today, measured 2026-09-07.** A caller in another module that
+> **What the unbuilt state surfaced as, measured 2026-09-07.** A caller in another module that
 > supplies the binder by name gets `IllegalAppNamed` — _"You are giving named inputs to … but it is
 > not a function, so it takes none."_ **That is not this ruling being implemented, and an
 > implementer should not mistake it for one.** The error constructor predates the whole programme
-> (`294867c7`, 2025-03-17, PR #221); what routes to it is props-era. `inferAppNamed`
+> (`73947f0a`, 2025-01-09, Andres Loeh, "Add type- and scope-checking"); what routes to it is
+> props-era. **Attribution corrected 2026-09-08:** this paragraph and the commit message of
+> `b177feba` both said `294867c7`, 2025-03-17, PR #221. `git show 294867c7 | grep -c IllegalAppNamed`
+> is **0** — that commit is the CLI-to-language-server refactor, and it moved `TypeCheck/Types.hs` to
+> its current path, which is how a `git log -1 -- <path>` reading picks it up. The claim it supports
+> survives and widens: 20 months before this programme, not 18. `inferAppNamed`
 > (`TypeCheck.hs:3343-3358`) lets a 0-ary definition take named arguments only when every name
 > passes `isSectionBinderSupply`, and that predicate asks `sectionBinderNames` — **this module's**
 > binders. Across an `IMPORT` the callee's binder is not in the caller's set, the guard fails, and
@@ -2241,7 +2300,62 @@ the closure is allowed to find one — because closing the collector over import
 a false green into a **demanded-then-silently-ignored** parameter, which is worse than the state it
 replaces.
 
-**Ruled 2026-09-05; not built.**
+**Ruled 2026-09-05. The REFUSAL — the first move — is BUILT 2026-09-08. The closure, the second
+move, is not, and remains R-X3's ruled end state.**
+
+`Export.validateExportImplicitImports` refuses an `@export` whose transitive closure reaches a
+definition in an imported module with a non-empty read-set, as the new check error
+`ImplicitCrossesImport`. It is a **new, distinct** constructor with its own message, not a reroute of
+`IllegalAppNamed`, for exactly the reason the blockquote above gives.
+
+**How an importer can see a dependency's implicits at all**, which this section had not settled:
+nothing already crossing the boundary carries them. `EntityInfo` holds the type a callee was
+_checked_ with, and discharge appends its trailing parameters afterwards, so the type never records
+them; `sectionBinderNames` is reset at the boundary by design. So this change adds the one fact that
+has to cross — `CheckResult.implicitReaders`, merged by `unionImportedCheckEnv` into
+`CheckEnv.importedImplicitReaders`. That is a `Set Unique`, not an AST: the importer learns _that_ a
+callee has implicits, never _which_, which is all a refusal needs. Both merge sites
+(`LSP.L4.Rules`, `L4.Import.Resolution`) were updated, as that function's own haddock demands.
+
+**It took three sources, not one, and the second and third were each a measured hole.** The first
+build used only `Map.keysSet (readSets …)`, and an adversarial pass broke it twice on 2026-09-08:
+
+1. every definition with a non-empty read-set — the obvious one;
+2. **every section binder itself.** The elaboration is a 0-ary `ASSUME`, and `readSets`' keys come
+   from `decideBodiesFromModule`, which matches only `DECIDE`. So an `@export` in the importer that
+   named the imported **binder** directly went unrefused — and because the probe's binder carried a
+   `TYPICALLY`, it answered a wrong number with `"status":"success"`. Fixture
+   `not-ok/import/binder-refused.l4`;
+3. **every definition that reaches an already-imported reader.** A module in the middle of a chain
+   (`A` imports `B` imports `C`, only `C` declares a binder) has no binders of its own, so its
+   `sectionBinders` is empty, so `readSets` returns `Map.empty` and it contributed nothing. `A`'s
+   export then validated a row it could not evaluate — **one hop further out than the defect this
+   refusal was built for, and silent rather than loud.** Fixture
+   `not-ok/import/chain-refused.l4` with `implicit-rate-wrapper.l4`.
+
+**That third probe settles a question this section left open.** Its closing note said the review's
+headline — that a `TYPICALLY` makes the failure a silent wrong answer — was "unestablished". It is
+established now: `l4 batch` answered `"status":"success"` with the library's own default while the
+value supplied under that name was accepted into the row and dropped. Established on the tree
+_with the fix in place_, before source 3 was added.
+
+**Gated on `@export`, deliberately.** An ordinary cross-`IMPORT` call of a reader works — §11.16's
+`matchGivens'` fix made it work, and `ok/section-given-import-call.l4` pins it. It is the export
+_boundary_, where a row of JSON meets a schema, that has no way to represent the input. A refusal
+that fired on any cross-`IMPORT` call would turn that shipped fixture red; that was checked before a
+line was written.
+
+**Corpus fallout, measured 2026-09-08.** Exactly one shipped file:
+`jl4/examples/legal/regcf/regcf-wizard.l4` (6 `@export`s, not the 8 OF-7 records), one export
+(`raise check`). Repair and its reasoning in §11.22. All 458 files under `ok/`, `legal/`,
+`jl4-core/libraries` and `doc/` were then re-swept: zero errors, zero firings.
+
+Fixtures: `not-ok/import/{export,binder,chain}-refused.l4` with their libraries
+`implicit-rate-lib.l4` and `implicit-rate-wrapper.l4` — a new corpus family, because a cross-`IMPORT`
+refusal needs files sharing a directory (imports resolve importer-relative) of which only some may
+fail, which no existing glob can express. Page:
+`doc/reference/syntax/section-given.md`, "Across an `IMPORT`", which described the unrepaired state
+in the present tense and now describes the refusal.
 
 **The defect record — mechanism, probe, both halves, exposure — is
 [`OPEN-FINDINGS-2026-09-05.md` OF-7](./OPEN-FINDINGS-2026-09-05.md), not this section.** It was
@@ -2285,9 +2399,12 @@ R-X5 and R-X6 concern the regulative window and are recorded in
   `Discharge` already elaborates the read-set into a trailing record of parameters, closed and
   computed bottom-up, so this is the missing **type** of that record, not a new mechanism. R3's
   hybrid — child shadows ancestor, siblings must be distinct per root — is the row's well-formedness
-  condition. **Not built.**
+  condition. **BUILT 2026-09-08**, both halves in one change as the ruling required: §11.4 for the
+  per-root check, §11.22 for the call-site type check.
 - **R-X3.** See §11.19. The card omitted §11.19 because it was written before that section was
-  re-read; recorded here so the omission is not repeated.
+  re-read; recorded here so the omission is not repeated. **The refusal is BUILT 2026-09-08; the
+  closure — the accepted end state — is not.** The ordering held: nothing about the collector
+  changed.
 - **R-X4.** Measured by the GM on `blawx/antisocial.l4`: `Check succeeded`, then `--validate-only`
   demands eleven fields including `'is authorised'` and `'conduct'` — predicates over a `Person` —
   and a full row dies inside `antisocial.l4.batch1.l4` with "multiple definitions for the identifier
@@ -2516,3 +2633,188 @@ Sᵢ₋₁, Sᵢ₋₁` make `l4 check` take 9 s and 28 make it take 30 s. **Pre
   Blawx and not publishable as a web API, and every one of them says so in its own header.
 - The split above wants Meng's yes or no. It is recorded here rather than in a PR description
   because a PR description is not where a decision lives.
+
+### 11.22 R-X2's call-site type check, as built — 2026-09-08
+
+R-X2 ruled two things built as one job. The per-root half is recorded in §11.4 and the cross-`IMPORT`
+refusal (R-X3's first move) in §11.19; this section is the other half — the call-site type check, and
+what building all three changed about the design as ruled. Ref for every line number here:
+`6e9b57bb`.
+
+#### What it does
+
+`L4.TypeCheck.implicitSupply` used to check the supplied value against `resolveTerm`'s answer, and
+`resolveTerm` answers **in the caller's scope**. Where two sibling sections each declare `rate`, the
+caller's is the one it finds; the value is then delivered by unqualified spelling
+(`Discharge.suppliesBinder`) to the callee's, whose declared type nothing ever consulted. It now
+resolves the supplied name to **the binder the callee reads** and checks against that binder's
+declared type.
+
+**WHICH binder: only ever the module's ONE binder of that spelling**, and nothing at all the moment
+two share it. The binder that actually receives the value is decided by `Discharge.suppliesBinder`,
+which matches the spelling against the **callee's read-set** — a whole-module fact that does not
+exist while a body is being checked. With one binder of that spelling in the module the read-set can
+hold no other, so the two questions cannot disagree. With two, they can.
+
+**The first build guessed, and the guess was wrong.** It ranked the same-spelled candidates by
+`sectionProximity` from the callee's own section. An adversarial pass broke it in one probe on
+2026-09-08: a callee under one heading that reads a binder declared under **another** — transitively,
+through a helper — takes its value from the read-set's binder, while proximity picks its own
+section's. The checker then validated against a type nothing would receive, **rejecting a program
+that worked and accepting one that crashed**. That is #956 moved, not fixed, and it is why the rule
+is now the conservative one.
+
+**A second defect from the same pass, fixed rather than stood down from.** The binder's declared type
+was `inferType`d in the **supply site's** scope. A type name can be declared per section, so a
+`GIVEN r IS A Rate` under one heading and a `DECLARE Rate` under another are two different types, and
+the caller's `Rate` was silently used. It is now resolved under the binder's own section path
+(`local (\ e -> e { sectionStack = d.sectionPath })`).
+
+**So the two-binder case is a known, documented gap**, not a claim of coverage: a value of the wrong
+type can still reach a binder when two headings declare that name. Closing it needs the read-set at
+check time, which is the closure R-X3 rules as the second move. `doc/reference/syntax/section-given.md`
+tells the reader so, in the reader's terms.
+
+**Why the declared type is read off the PARSE and not out of the environment**, which is the one
+non-obvious part. `Desugar.elaborateSectionBinder` gives the binder a 0-ary `ASSUME` with an empty
+`GivenSig`, and `mergeResultTypeInto` drops the declared type for exactly that shape — so the entity
+the module-wide signature scan installs carries an **inference variable** until that `ASSUME`'s own
+body is inferred, in declaration order. A supply site in an EARLIER section would therefore not check
+against a type at all: it would unify against an unsolved variable, silently, and poison the binder's
+type for the rest of the module. `Desugar.collectSectionBinderDecls` reads the parsed module, which
+is order-independent, and `inferType` resolves the type at the supply site; every `DECLARE` it can
+mention is already in scope, because `withScanTypeAndSigEnvironment` scans declarations before any
+signature or body.
+
+#### Measured, before and after
+
+The witness as shipped is a **`WHERE` local shadowing a single section binder**,
+`not-ok/tc/section-given-supply-type.l4`:
+
+```l4
+§ `Rates`
+    GIVEN rate IS A NUMBER TYPICALLY 0.05
+GIVETH A NUMBER
+scaled MEANS 100 TIMES rate
+GIVETH A NUMBER
+bad MEANS scaled WITH rate IS rate
+    WHERE
+        rate MEANS "5 percent"
+```
+
+The name left of `IS` is the callee's input, declared `A NUMBER` on the heading. The expression right
+of it is read where it was written, and a local shadows a section binder absolutely, so it is a
+`STRING`.
+
+|            | before                                                                                                         | after                                                                                            |
+| ---------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `l4 check` | clean                                                                                                          | a type error at the expression, naming the `GIVEN` line it must fit and the callee that reads it |
+| `l4 run`   | **"Internal error … running bin op with invalid operation / value combination. Please report this as a bug."** | not reached; refused                                                                             |
+
+"Before" was measured on **two independently built binaries at `6e9b57bb`** — the `props-rx4` and
+`every-runtime` worktrees — because one stale binary is not a control.
+
+**A second, softer effect, recorded because it is not a refusal.** Where the fix applies, the
+corrected **expected** type also steers the type-directed resolution of the expression right of `IS`,
+so a probe that had been delivering a string to a number resolved the right value and answered
+correctly. A silent wrong answer becoming a right one, not a green build becoming red. The same
+mechanism has a shadow side inside the documented two-binder gap: an adversarial pass showed a bridge
+there can go **vacuous**, the right-hand name resolving to the callee's own binder so the writer's
+value is discarded with no diagnostic. Not fixed here; it needs the read-set.
+
+#### Two things the build changed about the design as ruled
+
+**1. The supplied name resolves to the binder, not to the caller's scope — and that was not
+optional.** An earlier version kept `resolveTerm` and substituted only the type. It refused the wrong
+program, but with the **wrong diagnostic**: `resolveTerm` forks over the candidates and lets the
+branch that succeeds downstream win, and with the expected type pinned, _both_ branches failed
+identically, so the fork surfaced `AmbiguousTermError` — "there are multiple definitions for the
+identifier `rate`" — for what is a plain type mismatch. Resolving the name to the binder directly
+removes the fork, and gives the message in the table above.
+
+It is also what `Discharge.suppliesBinder`'s own comment had been compensating for since the review:
+_"the name to the LEFT of `IS` is one of `g`'s implicit inputs, but `L4.TypeCheck.implicitSupply`
+resolved it in the CALLER's scope to get its type — so when two sibling sections both declare `foo`,
+its `Unique` is the caller's and never matches the callee's."_ In the singleton case it now matches.
+**The spelling fallback is not dead** — it still carries every two-binder case, which is exactly the
+gap above — but it is no longer what the common case depends on.
+
+**2. R3 turned out to have two shapes, not one.** See §11.4: an `@export`'s read-set is tested
+unconditionally, a `WITH` supply's callee is tested when the supplied name matches one of two
+same-spelled binders, and a bare directive is not tested at all. Named here because the halves were
+built together and a reader of one will look for the other.
+
+**3. The refusal needed three sources of `implicitReaders`, not one.** See §11.19. Two of the three
+were holes an adversarial pass measured after the first build passed its own gate.
+
+#### The corpus repair the refusal forced, and what it says about the sweep
+
+The refusal fires on exactly **one** shipped file, measured 2026-09-08: `legal/regcf/regcf-wizard.l4`,
+export `raise check`, reaching `regcf.l4`'s `financial statements required`. That is OF-7's own
+measured probe, so the check found the thing it was built to find.
+
+`regcf.l4`'s binder is **refusal-role**, and the file says so about its sibling two hundred lines
+earlier:
+
+> `ASSUME` makes this a deliberate bottom: an arm that reaches it stops evaluation with
+> "… is an assumed term", naming this binding. … This is not the deprecated module-parameter `ASSUME`
+> style: no input is ever routed through it.
+
+`the COVID-19 temporary rules, Rule 201(z) and (bb), are not modelled here` was written that way —
+introduced as an `ASSUME` in `30ae2bde` (2026-07-29) — and the sweep, `978d9f83`
+("migrate legal/ ASSUME to section GIVEN, 46 sites, 6 files"), converted it along with the rest. That
+was a **mis-classification**: a deliberate bottom is not an implicit input, and turning it into a
+section `GIVEN` is what put it in the discharge population and therefore in a read-set that crosses
+an `IMPORT`. §11.1.2 had already kept six files on `ASSUME` for this very role; this line should have
+been the seventh.
+
+So the repair is to restore it, not to weaken the refusal. Recorded here because it is the first
+thing the sweep is known to have got wrong, and §11.14's account of what the sweep swept did not have
+it.
+
+**What the repair does NOT fix, stated plainly.** With the marker back to an `ASSUME`,
+`regcf-wizard.l4`'s `--validate-only` false green returns: the wizard's schema still never mentions
+the marker, and a run still stops loudly. That is the older, out-of-scope hole — a term-role `ASSUME`
+reached across an `IMPORT` — which OF-7's census already lists separately (`daydate`, the vendored
+`thailand-cosmetics/prelude`) and which §11.16 classifies as loud, not silent. The refusal built here
+covers section binders, which is what §11.19 rules. Extending it to imported `ASSUME`s is a separate
+change with its own measurement, and it is **not** made here.
+
+#### Not done
+
+- **The two-binder type gap.** Where two headings declare one name, a `WITH` supply is still checked
+  the old way. Sound closure needs the read-set at check time, which is R-X3's second move. Stated
+  to the reader on `doc/reference/syntax/section-given.md`, not only here.
+- **A vacuous bridge is silent.** Inside that same gap, a `g WITH foo IS foo` whose right-hand `foo`
+  resolves to the callee's own binder discards the writer's value with no diagnostic. Measured
+  2026-09-08; not fixed.
+- **A top-level callee.** Where the callee is defined outside every section it has no recorded
+  section path; the singleton rule still applies to it, but nothing about a multi-binder module does.
+- The refusal names **one** imported reader per export, the first by `Unique` order. A chain is
+  reached through that one, and naming every link would report a single mistake three or four times.
+- One mistake in a shared definition is reported once per root that reaches it, so an `@export` plus
+  three directives over one bad definition is four errors. Measured; judged acceptable against the
+  alternative of guessing which root the author meant.
+- `Discharge` now walks `sectionBinders` and `readSets` three times per module (two supply checks and
+  the per-root check) rather than twice, plus a per-definition closure when — and only when — the
+  module imports a reader. All of it is behind the empty-binder and empty-import early exits, so a
+  module with neither pays nothing. Not otherwise measured.
+- The closure over imports — R-X3's accepted end state — is untouched, which is the ordering §11.19
+  rules.
+
+#### What the adversarial pass cost, and why it is recorded
+
+Three refuters with distinct lenses were run against the first build, after it had already passed
+`cabal build all`, a 3030-example golden suite and a hand-written probe for each of the three
+rulings. Between them they produced **nine real defects**, four of them regressions that turned
+working programs red or accepted crashing ones, and two of them silent false greens in the very
+refusal being landed. The corpus caught **none** of them: all 458 files stayed green through every
+one, because the shapes involved — a callee reading a binder from off its own ancestry, a directive
+over two sibling sections, an export naming an imported binder, a three-module chain — are each one
+line away from a shipped file and in no shipped file.
+
+That is the entry worth keeping. **A green corpus is not evidence that a whole-module check is
+right**, because a corpus is a sample of what has been written, and a new check is a claim about
+what could be. The measurement that mattered every time was a probe built to break the claim, and
+the cheapest way to get those was to ask for them adversarially rather than to write them while
+believing the code.

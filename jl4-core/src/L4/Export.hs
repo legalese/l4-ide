@@ -25,6 +25,8 @@ module L4.Export (
   extractImplicitAssumeParams,
   hasTypeInferenceVars,
   validateExportInputs,
+  validateExportImplicitImports,
+  collectExportedDecides,
   isExportedDecide,
   isNonexhaustiveDecide,
 ) where
@@ -605,6 +607,60 @@ validateExportInputs mod' =
   let synonyms = collectTypeSynonyms mod'
       assumes  = allAssumesFromModule mod'
   in concatMap (checkOneExport mod' synonyms assumes) (collectExportedDecides mod')
+
+-- | Refuse an @\@export@ whose read-set crosses an @IMPORT@.
+--
+-- @importedReaders@ is 'L4.TypeCheck.Types.CheckEnv.importedImplicitReaders':
+-- the definitions in imported modules that take section binders as parameters
+-- once their own module is discharged. If an export reaches one, three things
+-- are true at once and none of them is visible to the writer:
+--
+-- * the export's JSON schema does not list the imported binder, because the
+--   schema is built from the read-set of THIS module (@assumesReadBy@), and
+--   'L4.Discharge' does not cross @IMPORT@ — so
+--   @l4 batch --validate-only@ answers @{"errors":[],"status":"valid"}@ for a
+--   row that provably cannot evaluate;
+-- * a value supplied under that name is accepted into the row and silently
+--   dropped, because nothing binds it; and
+-- * @l4 batch@ could not deliver it even if the schema demanded it, since it
+--   supplies a binder by rewriting the module's own source and 'L4.Print'
+--   re-emits the @IMPORT@ verbatim, so the imported module is re-resolved from
+--   disk untouched.
+--
+-- __Why this refusal comes BEFORE closing the collector over imports.__ Ruled
+-- in @IMPLICIT-PROPS-DESIGN.md@ §11.19: closing the collector on its own turns
+-- a false green into a demanded-then-silently-ignored parameter, which is worse
+-- than the state it replaces. The closure is the ruled END state (R-X3); this
+-- is the first move, and it can be deleted when the second lands.
+--
+-- Gated on @\@export@ deliberately. An ordinary cross-@IMPORT@ call of a reader
+-- works — the evaluator binds the callee's own parameters and the imported
+-- module's @TYPICALLY@ (or its \"assumed term\") applies, which is what
+-- @ok\/section-given-import-call.l4@ pins. It is the export BOUNDARY, where a
+-- row of JSON is checked against a schema, that has no way to represent the
+-- input.
+--
+-- One error per export: the first imported reader it reaches. The rest of the
+-- chain is reached through that one, and naming all of them would report a
+-- single mistake three or four times.
+validateExportImplicitImports
+  :: Set.Set Unique -> EntityInfo -> Module Resolved -> [CheckErrorWithContext]
+validateExportImplicitImports importedReaders entityInfo mod'
+  | Set.null importedReaders = []
+  | otherwise =
+      [ MkCheckErrorWithContext
+          { kind    = ImplicitCrossesImport fnName importedName
+          , context = WhileCheckingDecide (getActual fnName) None
+          }
+      | MkDecide _ _ (MkAppForm _ fnName _ _) body <- collectExportedDecides mod'
+      , u <- take 1 (Set.toList
+                       (Set.intersection
+                          (transitiveReferencedUniquesWith bodies body)
+                          importedReaders))
+      , Just (importedName, _) <- [Map.lookup u entityInfo]
+      ]
+ where
+  bodies = decideBodiesFromModule mod'
 
 -- | Collect every DECIDE whose description carries the @export flag.
 collectExportedDecides :: Module Resolved -> [Decide Resolved]

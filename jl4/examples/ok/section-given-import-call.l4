@@ -9,9 +9,17 @@
 -- Without that, this file used to stop with
 -- "Internal error: given signatures' values' lengths do not match".
 --
--- What this does NOT give you: supplying `the rate` from here. The name is not
--- in scope across the IMPORT, so the imported file's own TYPICALLY is what
--- applies -- 0.05, hence 5 rather than anything this file could choose.
+-- What this does NOT give you: supplying `the rate` from here. The name itself
+-- IS in scope -- `IMPORT` brings it in like any other, and a rule here that
+-- merely READS it answers 0.05 (measured 2026-09-08; an earlier version of this
+-- comment said the name was out of scope, which is wrong). What does not cross
+-- is the SUPPLY: `CheckEnv.sectionBinderNames` is reset at the import boundary,
+-- so a `WITH` naming it is refused, and the imported file's own TYPICALLY is
+-- what applies -- 0.05, hence 5 rather than anything this file could choose.
+--
+-- Nor may a rule here be `@export`ed if it reaches a rule that reads it: that
+-- is the §11.19 refusal, pinned by `not-ok/import/export-refused.l4`. This file
+-- has no `@export`, which is exactly why it stays legal.
 
 IMPORT `section-given-import-def`
 

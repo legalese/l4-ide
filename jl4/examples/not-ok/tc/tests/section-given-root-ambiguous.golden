@@ -1,0 +1,29 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: section-given-root-ambiguous.l4
+  Hidden: no
+  Range: 22:7-22:13
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    Working out
+
+      `both`
+
+    needs more than one section input spelled
+
+      `foo`
+
+    and there is no way to say which of them a value is for -- whichever one you
+    supplied, the other would fall back to its own default.
+
+    The inputs are:
+      `1`.foo (defined at section-given-root-ambiguous.l4:17:11-14)
+      `2`.foo (defined at section-given-root-ambiguous.l4:25:11-14)
+
+    Hoist them to a common section heading if they are one thing, rename one of
+    them, or bridge at the call so that only one of them reaches here:
+
+      <the rule that reads the other one> WITH foo IS foo

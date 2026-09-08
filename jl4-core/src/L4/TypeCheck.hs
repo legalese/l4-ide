@@ -117,7 +117,7 @@ import qualified Base.Set as Set
 import Data.Function (on)
 import Control.Exception (assert)
 import Text.Read (readMaybe)
-import L4.Desugar (collectSectionBinderNames, desugarComputedFields, desugarSectionGivens, detectComputedFieldCycles, detectMisattachedSectionGivens, detectRestatedSectionBinders, detectTypeSynonymCycles, extractComputedFieldNames)
+import L4.Desugar (collectSectionBinderDecls, collectSectionBinderNames, desugarComputedFields, desugarSectionGivens, detectComputedFieldCycles, detectMisattachedSectionGivens, detectRestatedSectionBinders, detectTypeSynonymCycles, extractComputedFieldNames)
 import L4.Lint.NotReach (NotReachSite (..), detectSameLineNotReach)
 
 mkInitialCheckState :: Substitution -> CheckState
@@ -148,6 +148,8 @@ mkInitialCheckEnv moduleUri environment entityInfo =
     , computedFields = Map.empty
     , cyclicSynonyms = Set.empty
     , sectionBinderNames = Set.empty
+    , sectionBinderDecls = Map.empty
+    , importedImplicitReaders = Set.empty
     , inNonexhaustiveDecide = False
     , moduleUri
     , sectionStack = []
@@ -213,6 +215,7 @@ doCheckProgramWithDependencies checkState checkEnv program =
         { computedFields = extractComputedFieldNames program
         , cyclicSynonyms = Set.fromList (rawName <$> concat synonymCycles)
         , sectionBinderNames = collectSectionBinderNames program
+        , sectionBinderDecls = collectSectionBinderDecls program
         }
   in -- Section binders are elaborated LAST, so that the ASSUME each one becomes
      -- sits at the very head of its section's declaration list. Computed-field
@@ -231,9 +234,18 @@ doCheckProgramWithDependencies checkState checkEnv program =
                 -- Combine mixfix registry from imports with this module's local definitions
                 -- so importing modules can use mixfix functions defined here
                 combinedMixfixRegistry = unionMixfixRegistry localMixfixRegistry env.mixfixRegistry
-                exportErrs = Export.validateExportInputs rprog
-                -- Both need the whole checked module: a read-set is not a fact
-                -- about one body ('L4.Discharge').
+                exportErrs =
+                  Export.validateExportInputs rprog
+                  ++
+                  -- §11.19 / OF-7: the refusal comes BEFORE the closure. An
+                  -- export that reaches an imported reader validates rows it
+                  -- cannot evaluate; closing the collector over imports without
+                  -- refusing first would only turn that into a parameter
+                  -- demanded and then silently dropped.
+                  Export.validateExportImplicitImports
+                    checkEnv.importedImplicitReaders checkEnv.entityInfo rprog
+                -- All three need the whole checked module: a read-set is not a
+                -- fact about one body ('L4.Discharge').
                 implicitErrs =
                   [ MkCheckErrorWithContext (UnreadImplicitSupply callee binder) None
                   | (callee, binder) <- Discharge.unreadImplicitSupplies rprog
@@ -242,8 +254,20 @@ doCheckProgramWithDependencies checkState checkEnv program =
                   [ MkCheckErrorWithContext (AmbiguousImplicitSupply callee binder) None
                   | (callee, binder) <- Discharge.ambiguousImplicitSupplies rprog
                   ]
+                  ++
+                  -- R3's per-root check. The binders are re-spelled under their
+                  -- declaring sections, because two candidates offered to the
+                  -- reader under one spelling are no help at all.
+                  [ MkCheckErrorWithContext
+                      (AmbiguousRootBinders root (getName b0)
+                         (map (sectionQualifiedWith s'.sectionPaths) bs))
+                      None
+                  | (root, bs@(b0 : _)) <- Discharge.ambiguousRootBinders rprog
+                  ]
             in MkCheckResult
               { program = rprog
+              , implicitReaders =
+                  Discharge.implicitReaders checkEnv.importedImplicitReaders rprog
               , errors = suppressResolutionCascade (substErrs ++ moreErrs ++ exportErrs ++ implicitErrs)
               , substitution = s'.substitution
               , environment = env.environment
@@ -338,8 +362,8 @@ withExtraMixfix mixfixAdds =
     -- positional match: 'mixfixRegistry' is a duplicated field name, so a
     -- record update here would be ambiguous under DuplicateRecordFields
     updateMixfix :: MixfixRegistry -> CheckEnv -> CheckEnv
-    updateMixfix adds (MkCheckEnv a b c d e f g reg cf cs sb ne h i lb) =
-      MkCheckEnv a b c d e f g (unionMixfixRegistry adds reg) cf cs sb ne h i lb
+    updateMixfix adds (MkCheckEnv a b c d e f g reg cf cs sb sd ir ne h i lb) =
+      MkCheckEnv a b c d e f g (unionMixfixRegistry adds reg) cf cs sb sd ir ne h i lb
 
 dedupCheckInfos :: [CheckInfo] -> [CheckInfo]
 dedupCheckInfos = go Set.empty []
@@ -3378,10 +3402,94 @@ isSectionBinderSupply n = do
 -- until 'L4.Discharge' computes the read-set.
 implicitSupply :: Resolved -> NamedExpr Name -> Check (Int, NamedExpr Resolved)
 implicitSupply callee (MkNamedExpr ann n e) = do
-  (rn, pt) <- resolveTerm n
+  mBinder <- sectionBinderFor n
+  (rn, pt) <- maybe (resolveTerm n) pure mBinder
   t <- instantiate pt
   re <- checkExpr (ExpectNamedArgContext callee rn) e t
   pure (implicitSupplyIndex, MkNamedExpr ann rn re)
+
+-- | The type the section binder this supply is FOR was declared with.
+--
+-- R-X2 (smucclaw\/l4-ide#956). 'implicitSupply' used to check the value against
+-- @resolveTerm@'s answer, and @resolveTerm@ answers in the CALLER's scope: with
+-- two sibling sections each declaring @rate@, the caller's is the one it finds,
+-- and the value is then delivered by unqualified spelling
+-- ('L4.Discharge.suppliesBinder') to the callee's, whose declared type nothing
+-- ever consulted. Measured on this tree before the fix: a @STRING@ supplied to
+-- a @GIVEN rate IS A NUMBER@ passed @l4 check@ clean and died in @l4 run@ as an
+-- @Internal error ... running bin op with invalid operation \/ value
+-- combination@ — a type error escaping the type checker as a bug report.
+--
+-- __WHICH binder: only ever the module's ONE binder of that spelling__, and
+-- 'Nothing' the moment there are two. That restriction is not caution, it is
+-- the only sound rule available here. The binder that actually receives the
+-- value is decided by 'L4.Discharge.suppliesBinder', which matches the spelling
+-- against the CALLEE's READ-SET — a whole-module fact that does not exist yet
+-- while this body is being checked. With one binder of the spelling in the
+-- module, the read-set can hold no other, so the two questions cannot disagree.
+--
+-- An earlier version of this function guessed at the read-set by ranking the
+-- candidates by 'sectionProximity' from the callee's own section. An
+-- adversarial pass broke it in one probe on 2026-09-08: a callee under one
+-- heading that reads a binder declared under ANOTHER — transitively, through a
+-- helper — takes the value from the read-set's binder, while proximity picks
+-- its own section's. The checker then validated against a type nothing would
+-- receive, rejecting a program that worked and accepting one that crashed. It
+-- is #956 moved, not fixed.
+--
+-- So 'Nothing' — leaving today's behaviour in place — in three cases: the
+-- spelling names no section binder in this module; two or more binders share
+-- the spelling (which includes the TDNR overload of @ok\/section-given-tdnr.l4@
+-- and @ok\/misc.l4@, where 'resolveTerm''s type-directed answer is the right
+-- one anyway); or the binder was declared without a type. **The two-binder case
+-- is therefore a KNOWN, DOCUMENTED gap**: the type check does not reach it, and
+-- closing it needs the read-set at check time, which is R-X3's closure work.
+--
+-- __Why the declared type is read off the PARSE and not the environment.__
+-- 'L4.Desugar.elaborateSectionBinder' gives the binder a 0-ary @ASSUME@ with an
+-- empty 'GivenSig', and 'mergeResultTypeInto' drops the declared type for
+-- exactly that shape, so the entity the module-wide signature scan installs
+-- carries an inference variable until that @ASSUME@'s own body is inferred, in
+-- declaration order. A supply site in an EARLIER section would therefore
+-- unify against — and poison — an unsolved variable instead of checking against
+-- a type. 'L4.Desugar.collectSectionBinderDecls' reads the parse, which is
+-- order-independent; 'inferType' resolves it here, and every @DECLARE@ it can
+-- mention is already in scope ('withScanTypeAndSigEnvironment' scans
+-- declarations before any signature or body).
+sectionBinderFor :: Name -> Check (Maybe (Resolved, Type' Resolved))
+sectionBinderFor n = do
+  decls <- asks (.sectionBinderDecls)
+  case Map.findWithDefault [] (rawName n) decls of
+    [d] -> binderEntity d
+    _   -> pure Nothing
+ where
+  -- The binder as the environment knows it, paired with its declared type.
+  --
+  -- Matched by the source range of the @GIVEN@-line occurrence: the elaboration
+  -- reuses that very 'Name' as its 'AppForm' head
+  -- ('L4.Desugar.elaborateSectionBinder'), and a 'SrcRange' carries its module,
+  -- so the range is an identity rather than a heuristic. 'Nothing' if the binder
+  -- was declared without a type, or if the range fails to single out one
+  -- entity — both leave 'resolveTerm' in charge.
+  binderEntity d =
+    case d.declaredType of
+      Nothing -> pure Nothing
+      Just ty -> do
+        -- In the BINDER's section, not the supply site's. A type name can be
+        -- declared per section, so @GIVEN r IS A Rate@ under one heading and a
+        -- @DECLARE Rate@ under another are two different types, and resolving
+        -- the binder's own type in the caller's scope silently picks the
+        -- caller's @Rate@. Found by an adversarial pass, 2026-09-08.
+        rt <- local (\ e -> e { sectionStack = d.sectionPath }) (inferType ty)
+        cands <- lookupRawNameInEnvironment (rawName n)
+        case [ (u, o, tk)
+             | (u, o, KnownTerm _ tk) <- cands
+             , rangeOf o == rangeOf d.binderName
+             ] of
+          [(u, o, tk)] -> do
+            n' <- setAnnResolvedType rt (Just tk) n
+            pure (Just (Ref n' u o, rt))
+          _ -> pure Nothing
 
 supplyAppNamed :: Resolved -> [(Int, OptionallyNamedType Resolved)] -> [NamedExpr Name] -> Check [(Int, NamedExpr Resolved)]
 supplyAppNamed _r []   [] = pure []
@@ -5535,6 +5643,48 @@ prettyCheckError (AmbiguousImplicitSupply callee binder)   =
   , ""
   , "Rename one of them, or hoist them to a common section heading if they are"
   , "one thing."
+  ]
+prettyCheckError (AmbiguousRootBinders root spelling binders) =
+  [ "Working out"
+  , ""
+  , "  " <> quotedName (getName root)
+  , ""
+  , "needs more than one section input spelled"
+  , ""
+  , "  " <> quotedName spelling
+  , ""
+  , "and there is no way to say which of them a value is for -- whichever one you"
+  , "supplied, the other would fall back to its own default."
+  , ""
+  , "The inputs are:"
+  ] ++ map (\ b -> "  " <> prettyResolvedWithRange b) binders ++
+  [ ""
+  , "Hoist them to a common section heading if they are one thing, rename one of"
+  , "them, or bridge at the call so that only one of them reaches here:"
+  , ""
+  , "  <the rule that reads the other one> WITH " <> prettyLayout spelling
+      <> " IS " <> prettyLayout spelling
+  ]
+prettyCheckError (ImplicitCrossesImport fnName importedName) =
+  [ "This @export"
+  , ""
+  , "  " <> quotedName (getName fnName)
+  , ""
+  , "reaches"
+  , ""
+  , "  " <> quotedName importedName
+  , ""
+  , "which is in an imported module and involves a section input -- it either is"
+  , "one, or it reads one."
+  , ""
+  , "Section inputs do not cross an IMPORT: such an input would not appear in this"
+  , "export's schema, a value sent under its name would be accepted and then"
+  , "ignored, and there is no way to deliver one to the imported module at all. So"
+  , "a request that validates here can still fail when it runs, which is why this"
+  , "is refused rather than answered."
+  , ""
+  , "Give the imported rule an ordinary GIVEN parameter instead of a section"
+  , "GIVEN, or move what this export needs into this module."
   ]
 prettyCheckError (RestatedSectionBinder n)                 =
   [ "A section GIVEN already binds"

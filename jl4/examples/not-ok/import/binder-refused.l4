@@ -1,0 +1,16 @@
+-- The same refusal as `export-refused.l4`, reached the other way: this @export
+-- names the imported section GIVEN itself rather than a rule that reads it.
+--
+-- Worth its own fixture because the two go through different machinery. A rule
+-- with a non-empty read-set is a DECIDE; the section GIVEN is elaborated to a
+-- 0-ary ASSUME, which is never a read-set key, so an earlier build of the
+-- refusal did not see this shape at all -- and because `the rate` carries a
+-- TYPICALLY, that build answered a wrong number with "status":"success" rather
+-- than failing. Found by an adversarial pass, 2026-09-08.
+
+IMPORT `implicit-rate-lib`
+
+@export What this amount comes to at the imported rate, named directly.
+GIVEN amount IS A NUMBER
+GIVETH A NUMBER
+`straight cost of` amount MEANS amount TIMES `the rate`
