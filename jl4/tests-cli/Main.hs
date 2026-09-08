@@ -10,6 +10,8 @@
 -- against small wording changes; this suite checks *structure* instead.
 module Main where
 
+import Control.Concurrent (forkIO)
+import Control.Concurrent.MVar (newEmptyMVar, putMVar, takeMVar)
 import Control.Monad (unless, when)
 import Data.List (findIndex, isInfixOf, isPrefixOf, sort)
 import Data.Maybe (fromMaybe)
@@ -156,8 +158,18 @@ runL4In mCwd mEnv bin args = do
   hClose hin
   hSetBinaryMode hout True
   hSetBinaryMode herr True
+  -- Drain the two pipes CONCURRENTLY. 'BS.hGetContents' is strict, so reading
+  -- stdout to EOF and only then reading stderr deadlocks the moment the child
+  -- writes more to stderr than the pipe buffer holds (~16 KB on macOS): the
+  -- child blocks on the stderr write, so it never closes stdout, so the parent
+  -- never returns. That is not hypothetical — `l4 blawx` on a seed whose
+  -- assumed predicates are refused for publication emits ~22 KB of diagnostics
+  -- on a run that exits 0, and it hung this suite until it was killed, with no
+  -- output and no failure to point at.
+  serrVar <- newEmptyMVar
+  _ <- forkIO (BS.hGetContents herr >>= putMVar serrVar)
   soutBytes <- BS.hGetContents hout
-  serrBytes <- BS.hGetContents herr
+  serrBytes <- takeMVar serrVar
   code <- waitForProcess ph
   pure Output
     { outExit   = code

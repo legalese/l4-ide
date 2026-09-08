@@ -2436,6 +2436,18 @@ NUMBER TO NUMBER` / `ASSUME f x` as 1 instead of 2. `checkAssumeFunctionInputs` 
   diagnostics it stepped over, why they do not apply to Blawx, and that `l4 check` will report the
   same ones and exit 1.
 
+- **The CLI test harness deadlocked on the new stderr volume. REPAIRED.**
+  `runL4In` (`jl4/tests-cli/Main.hs`) read stdout to EOF with the strict
+  `BS.hGetContents` and only then read stderr. A child that writes more to stderr
+  than the pipe buffer holds — about 16 KB on macOS — blocks on that write, never
+  closes stdout, and the parent never returns. `l4 blawx` on `antisocial.l4` now
+  emits about 22 KB of diagnostics on a run that exits 0, and it hung the whole
+  suite: no output, no failure, nothing to point at, twice, until the process was
+  killed by hand. The harness now drains stderr on a forked thread. **This is a
+  latent trap independent of R-X4** — any future command verbose enough on stderr
+  would have sprung it — and it is worth knowing that the symptom is a suite that
+  never finishes rather than one that goes red.
+
 #### Found by review, NOT repaired — each with its witness
 
 - **A `WHERE`-local `ASSUME` is invisible to the gate, in both spellings.** `allAssumesFromModule`
