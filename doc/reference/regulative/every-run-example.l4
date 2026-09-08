@@ -2,8 +2,10 @@ IMPORT prelude
 -- Running a rule that uses EVERY. The companion to every-example.l4, which
 -- shows the shapes; this one shows the shapes working.
 --
--- Every rule here names its group with `WHO elem t tenants` — the roll. That
--- is what makes it runnable: see "Where the group comes from" on EVERY.md.
+-- Every rule here names its group with `IN tenants` — the roll. That is what
+-- makes it runnable: see "Where the group comes from" on EVERY.md. (An older
+-- spelling put the same list in the WHO condition, as `WHO elem t tenants`.
+-- It still works; `IN` is the one to write now.)
 
 DECLARE Actor IS ONE OF
     Landlord HAS name IS A STRING
@@ -25,8 +27,7 @@ tenants     MEANS LIST alice, bob, carol
 -- owes a delivery, and his five days run from that moment.
 GIVETH A DEONTIC Actor Action
 `the tenancy` MEANS
-    EVERY Tenant t
-        WHO    elem t tenants
+    EVERY Tenant t IN tenants
         MUST   Sign (EXACTLY t)
         WITHIN 14
         ONCE   ALL HAVE
@@ -51,8 +52,7 @@ GIVETH A DEONTIC Actor Action
 -- days of their own payment.
 GIVETH A DEONTIC Actor Action
 `receipts` MEANS
-    EVERY Tenant t
-        WHO    elem t tenants
+    EVERY Tenant t IN tenants
         MUST   Pay (EXACTLY t) (EXACTLY theLandlord) amount
         WITHIN 7
         UPON   EACH

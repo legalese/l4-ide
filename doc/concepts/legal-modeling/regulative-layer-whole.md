@@ -239,7 +239,7 @@ _When the same obligation falls on everyone in a group, what can be said about t
 
 _Status (2026-09-08): the first two pieces below — the barrier and the fork — are **built**, and their reference page is [EVERY](../../reference/regulative/EVERY.md). The third, "enough of them", is **proposed, not landed**; its spellings are the design document's current ones. The design is `specs/todo/EVERY-EACH-QUANTIFIER-SPEC.md`. [What Is Coming](../../tutorials/obligations/what-is-coming.md) gives each piece a page's worth of explanation._
 
-_Settled on 7 September 2026, built on 8 September 2026: there is one quantifier word, `EVERY`, and a line of its own — `ONCE ALL HAVE` or `UPON EACH` — saying when the follow-on fires. The word after `EVERY` names the kind of party and narrows the group, as `Flatmate` does in the table. Which people are in the group is given as a list, in the `WHO` condition._
+_Settled on 7 September 2026, built on 8 September 2026: there is one quantifier word, `EVERY`, and a line of its own — `ONCE ALL HAVE` or `UPON EACH` — saying when the follow-on fires. The word after `EVERY` names the kind of party and narrows the group, as `Flatmate` does in the table. Which people are in the group is given as a list, after `IN` — `EVERY Flatmate f IN flatmates` — ruled and built on 8 September 2026. (Before that the same list went inside the `WHO` condition, as `WHO elem f flatmates`; that spelling still runs.)_
 
 Three pieces, each answering a question the others do not:
 
@@ -294,7 +294,7 @@ One place where two questions meet deserves to be named, because it is where rea
 | `RAND`, `ROR`, and how they group without brackets                                                                    | a breach that names every party who failed                                                    |
 | `#TRACE`, `AT`, `DOES`, `WAIT UNTIL`; the inclusive deadline; the clock rules for `HENCE` and `LEST`                  | a `LEST` clock counted from the missed deadline rather than from the event that revealed it   |
 | `EXACTLY` around the whole act; a shape with a blank; `PROVIDED`; handing a blank to a rule                           | `EXACTLY` around a named figure (today, only around the whole act)                            |
-| `EVERY` for a group, with `ONCE ALL HAVE` (barrier) or `UPON EACH` (fork), the group given as a list in `WHO`         |                                                                                               |
+| `EVERY` for a group, with `ONCE ALL HAVE` (barrier) or `UPON EACH` (fork), the group given as a list after `IN`       |                                                                                               |
 | the cast as a fixed list; the performer convention and check; one act in both directions; open-doer acts; procurement | an obligation that says whom it is owed to (the layer has a party and an act, but no obligee) |
 
 The last row of the right-hand column is one the design documents record as the next axis after this one, and it is not on this page: an L4 obligation says who is bound and to do what, but not to whom it is owed, so "payment to any one of several creditors discharges the debt" cannot yet be written at all.

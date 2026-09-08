@@ -1,0 +1,215 @@
+IMPORT prelude
+-- EVERY-EACH-QUANTIFIER-SPEC §11.0.2: SAYING THE ROLL OUTRIGHT.
+--
+-- A party type is normally open. `Tenant HAS name IS A STRING` has one
+-- constructor and infinitely many values, so "every tenant" is not something
+-- the machine can count out: a quantified rule has to be told which list of
+-- people it ranges over. That list is the ROLL.
+--
+-- `IN tenants` says it outright. The older spelling reads the roll out of an
+-- `elem t tenants` condition inside `WHO` (§11.0), and still works — see
+-- `run-roll.l4`, which is that form's witness. When a rule writes both, `IN`
+-- is the roll and the `elem` condition goes on doing what any other condition
+-- does: narrowing.
+--
+-- Three things narrow the group, in this order: the roll supplies it, the cast
+-- word (`Tenant`) drops entries the constructor did not build, and the whole
+-- `WHO` condition drops the rest.
+
+DECLARE Actor IS ONE OF
+    Landlord HAS name IS A STRING
+    Tenant   HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Sign    HAS signer IS AN Actor
+    Receipt HAS issuer IS AN Actor, to IS AN Actor
+
+theLandlord MEANS Landlord OF "Ms Ng"
+alice       MEANS Tenant OF "Alice"
+bob         MEANS Tenant OF "Bob"
+carol       MEANS Tenant OF "Carol"
+tenants     MEANS LIST alice, bob, carol
+
+-- 1. The headline form: a roll and nothing else. All three sign, the barrier
+--    is satisfied, and the HENCE fires.
+GIVETH A DEONTIC Actor Action
+`in alone` MEANS
+    EVERY Tenant t IN tenants
+        MUST   Sign (EXACTLY t)
+        WITHIN 14
+        ONCE   ALL HAVE
+        HENCE  FULFILLED
+        LEST   BREACH
+
+#TRACE `in alone` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+  PARTY bob   DOES Sign bob   AT 2
+  PARTY carol DOES Sign carol AT 3
+
+-- 2. The roll is really the group: only Alice signs, so the barrier does not
+--    fire and what comes back is the two outstanding obligations, their
+--    deadlines counted down from the day that passed.
+GIVETH A DEONTIC Actor Action
+`in incomplete` MEANS
+    EVERY Tenant t IN tenants
+        MUST   Sign (EXACTLY t)
+        WITHIN 14
+        ONCE   ALL HAVE
+        HENCE  FULFILLED
+        LEST   BREACH
+
+#TRACE `in incomplete` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+
+-- 3. A condition beside the roll. The roll is the three tenants; the condition
+--    drops Carol, so two signatures are enough.
+GIVETH A DEONTIC Actor Action
+`in and who` MEANS
+    EVERY Tenant t IN tenants
+        WHO    NOT (t EQUALS carol)
+        MUST   Sign (EXACTLY t)
+        WITHIN 14
+        ONCE   ALL HAVE
+        HENCE  FULFILLED
+        LEST   BREACH
+
+#TRACE `in and who` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+  PARTY bob   DOES Sign bob   AT 2
+
+-- 4. The cast word narrows the roll. This roll holds a landlord as well, and
+--    `Tenant` leaves him out: only Alice is bound, and only she signs.
+GIVETH A DEONTIC Actor Action
+`cast narrows the roll` MEANS
+    EVERY Tenant t IN (LIST alice, theLandlord)
+        MUST   Sign (EXACTLY t)
+        WITHIN 14
+        ONCE   ALL HAVE
+        HENCE  FULFILLED
+        LEST   BREACH
+
+#TRACE `cast narrows the roll` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+
+-- 5. No cast word at all: every entry of the roll is bound, landlord included,
+--    so this one needs both signatures.
+GIVETH A DEONTIC Actor Action
+`bare variable in` MEANS
+    EVERY x IN (LIST alice, theLandlord)
+        MUST   Sign (EXACTLY x)
+        WITHIN 14
+        ONCE   ALL HAVE
+        HENCE  FULFILLED
+        LEST   BREACH
+
+#TRACE `bare variable in` AT 0 WITH
+  PARTY alice       DOES Sign alice       AT 1
+  PARTY theLandlord DOES Sign theLandlord AT 2
+
+-- 6. Both spellings at once. `IN` is the roll — here the single-name list —
+--    and the `elem` condition is read as an ordinary condition, which every
+--    member of that one-name roll passes. If the condition were taken as the
+--    roll instead, this would want three signatures; Alice's alone suffices.
+GIVETH A DEONTIC Actor Action
+`in wins over elem` MEANS
+    EVERY Tenant t IN (LIST alice)
+        WHO    elem t tenants
+        MUST   Sign (EXACTLY t)
+        WITHIN 14
+        ONCE   ALL HAVE
+        HENCE  FULFILLED
+        LEST   BREACH
+
+#TRACE `in wins over elem` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+
+-- 7. And the other way round: the roll is all three, the `elem` condition
+--    narrows it to two, so two signatures are enough.
+GIVETH A DEONTIC Actor Action
+`elem still narrows` MEANS
+    EVERY Tenant t IN tenants
+        WHO    elem t (LIST alice, bob)
+        MUST   Sign (EXACTLY t)
+        WITHIN 14
+        ONCE   ALL HAVE
+        HENCE  FULFILLED
+        LEST   BREACH
+
+#TRACE `elem still narrows` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+  PARTY bob   DOES Sign bob   AT 2
+
+-- 8. The roll under a fork. Each tenant carries their own copy of the
+--    continuation with the member bound, so a receipt is owed once per
+--    signature. Only Alice is receipted here, so what comes back is TWO
+--    outstanding receipts with DIFFERENT deadlines — 3 days left on Bob's,
+--    who signed on day 2, and 4 on Carol's, who signed on day 3. Different
+--    clocks is the visible proof that each member carried its own copy.
+
+--
+--    This case is written this way on purpose. With a bare `HENCE FULFILLED`
+--    and a trace in which everybody acts, a fork and a barrier both answer
+--    FULFILLED, so that shape shows nothing; it takes a continuation that
+--    names the member to see the difference. And a barrier could not be
+--    written here at all: `ONCE ALL HAVE` fires once, for the group, so a
+--    continuation naming `t` is REFUSED when the rule is run (the same
+--    refusal run-barrier.l4's `whose tenancy` witnesses).
+GIVETH A DEONTIC Actor Action
+`fork in` MEANS
+    EVERY Tenant t IN tenants
+        MUST   Sign (EXACTLY t)
+        WITHIN 14
+        UPON   EACH
+        HENCE  (PARTY theLandlord
+                    MUST   Receipt (EXACTLY theLandlord) (EXACTLY t)
+                    WITHIN 5)
+        LEST   BREACH BY t
+
+#TRACE `fork in` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+  PARTY bob   DOES Sign bob   AT 2
+  PARTY carol DOES Sign carol AT 3
+  PARTY theLandlord DOES Receipt theLandlord alice AT 4
+
+-- 9. The roll may be computed. It is an expression like any other, evaluated
+--    once at arming, and it is bracketed here only because an unbracketed
+--    application would be hard for a reader to see the end of.
+GIVEN xs IS A LIST OF Actor
+GIVETH A LIST OF Actor
+`without carol` MEANS
+    filter (GIVEN p YIELD NOT (p EQUALS carol)) xs
+
+GIVETH A DEONTIC Actor Action
+`computed roll` MEANS
+    EVERY Tenant t IN (`without carol` tenants)
+        MUST   Sign (EXACTLY t)
+        WITHIN 14
+        ONCE   ALL HAVE
+        HENCE  FULFILLED
+        LEST   BREACH
+
+#TRACE `computed roll` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+  PARTY bob   DOES Sign bob   AT 2
+
+-- 10. An empty roll. Nobody is bound, so a barrier's "all of them have acted"
+--     holds from the start and the HENCE fires at once.
+GIVETH A DEONTIC Actor Action
+`empty roll` MEANS
+    EVERY Tenant t IN EMPTY
+        MUST   Sign (EXACTLY t)
+        WITHIN 14
+        ONCE   ALL HAVE
+        HENCE  FULFILLED
+        LEST   BREACH
+
+#TRACE `empty roll` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+
+-- 11. How the machine reads the rule back. Written into the directive itself
+--     rather than named first, so that the printers see it: the answer below
+--     is the rule re-rendered from what was understood, and the same line is
+--     what the natural-language rendering is built from. A quantified rule
+--     that is never handed a time and a list of events stays unarmed, and an
+--     unarmed rule's answer is itself.
+#EVAL (EVERY Tenant t IN tenants WHO NOT (t EQUALS carol) MUST Sign (EXACTLY t) WITHIN 14)

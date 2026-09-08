@@ -2,18 +2,20 @@
 
 Binds an obligation, permission or prohibition to **every member of a group at once**, instead of to one named party. `EVERY Tenant t MUST sign` reads "every tenant, call them t, must sign": one obligation per tenant, all live at the same time, and one place to say what happens when they have acted.
 
-**Status (2026-09-08): `EVERY` runs.** A rule written with `EVERY` is parsed, its names and types are checked, it is printed back, it appears in the state graph, and — new on this date — it can be **run** against a stream of events with `#TRACE`, exactly as a `PARTY` rule can. The barrier fires once at the last act, the fork fires once per act, and a failure produces a breach.
+**Status (2026-09-08): `EVERY` runs, and the group is written with `IN`.** A rule written with `EVERY` is parsed, its names and types are checked, it is printed back, it appears in the state graph, and — new on this date — it can be **run** against a stream of events with `#TRACE`, exactly as a `PARTY` rule can. The barrier fires once at the last act, the fork fires once per act, and a failure produces a breach. Also new on this date: `IN` says which group the rule is about — `EVERY Tenant t IN tenants` — replacing an older spelling that had to smuggle the same list into the `WHO` condition. The older spelling still works and nothing already written needs changing.
 
-Two things about running it are worth knowing before you write one, and both have sections of their own below: the group has to be given as a **list** ([Where the group comes from](#where-the-group-comes-from-the-roll)), and a few parts of the design are still not built ([What runs today, and what does not](#what-runs-today-and-what-does-not)). The design, its rulings and the parts still open are in `specs/todo/EVERY-EACH-QUANTIFIER-SPEC.md`.
+Two things about running it are worth knowing before you write one, and both have sections of their own below: the group has to be given as a **list**, which is what `IN` is for — `EVERY Tenant t IN tenants` ([Where the group comes from](#where-the-group-comes-from-the-roll)) — and a few parts of the design are still not built
+([What runs today, and what does not](#what-runs-today-and-what-does-not)). The design, its rulings and the parts still open are in `specs/todo/EVERY-EACH-QUANTIFIER-SPEC.md`.
 
 ## Syntax
 
 ```l4
 EVERY Cast v                   -- every value built by the constructor Cast
 EVERY v                        -- every value of the party type
+EVERY Cast v IN list           -- only those on the list (see "Where the group comes from")
 EVERY Cast v WHO condition     -- only those for which the condition holds
 
-EVERY Cast v [WHO condition]
+EVERY Cast v [IN list] [WHO condition]
     MUST/MAY/SHANT/DO action
     [WITHIN deadline]              -- bounds each act
     [ONCE ALL HAVE [WITHIN deadline]]   -- the barrier: once, when ALL of them have acted
@@ -26,6 +28,8 @@ EVERY Cast v [WHO condition]
 The join line is optional in the grammar and **required whenever the rule has a `HENCE` or a `LEST`** — that is a check, not a parse rule, so the error you get names both spellings.
 
 Everything after the first line is the same as after [PARTY](PARTY.md): the same modals, the same `WITHIN`, `HENCE`, `LEST` and `PROVIDED`. The one new thing is the **join line**, `ONCE ALL HAVE` or `UPON EACH`.
+
+`IN` comes before `WHO`, in the order you would say them: _every tenant t in tenants who is not Carol_. A rule you intend to **run** has to be given the group as a list somewhere, and `IN` is where to give it; see [Where the group comes from](#where-the-group-comes-from-the-roll), which also covers the older spelling that put the same list inside the `WHO` condition.
 
 Write each clause indented past the `EVERY`, as the examples below do. What the compiler actually enforces is narrower than that convention: for `WITHIN`, `HENCE` and `LEST` it is the clause's **body** that must sit past the `EVERY`, not the keyword. The join line is the exception, because a bare `ONCE ALL HAVE` or `UPON EACH` has no body to check and a misplaced one would otherwise attach silently to a different rule — so its head keyword and its marker words are themselves column-checked. Its `WITHIN` keyword is not; only that `WITHIN`'s body is, like every other clause.
 
@@ -64,7 +68,9 @@ With those declarations:
 - The variable is always last. `EVERY t Tenant` is a mistake, and it is reported as one: `t` would be read as the cast, and there is no constructor called `t`.
 - Because the variable is last, **a single name after `EVERY` is always the variable, never a cast.** `EVERY Tenant` — the variable forgotten — is accepted, and it does not mean what it looks like: `Tenant` becomes the bound variable and the rule ranges over every value of the party type, landlords included. The shadowing is partial: inside the rule a bare `Tenant` is the member, while `Tenant OF "Alice"` still resolves to the constructor, so the mistake can go unnoticed for a long time. Write `EVERY Tenant t`. This is a known sharp edge, not a designed behaviour.
 
-The variable has the party type, the one named in the rule's `GIVETH A DEONTIC Actor Action`, and it is in scope in the `WHO` condition, the action, the act's `WITHIN`, and — under a fork — the `HENCE` and the `LEST`. Under a barrier the continuation belongs to the join rather than to any member, so naming the variable there is refused when the rule is run; see [the join line](#the-join-line-once-or-once-per-member). It is **not** in scope in the `WITHIN` on a join line, whether that line is `ONCE ALL HAVE` or `UPON EACH`: that deadline bounds the whole group, so it may not depend on which member you are looking at. Naming the variable there is rejected, but with a poorly worded message — see the limits below.
+The variable has the party type, the one named in the rule's `GIVETH A DEONTIC Actor Action`, and it is in scope in the `WHO` condition, the action, the act's `WITHIN`, and — under a fork — the `HENCE` and the `LEST`. Under a barrier the continuation belongs to the join rather than to any member, so naming the variable there is refused when the rule is run; see [the join line](#the-join-line-once-or-once-per-member).
+
+There are two places it is **not** in scope, and they are the same kind of place: what is read **once, for the whole group**, before there is any member to speak of. Those are the `IN` list — see [Where the group comes from](#where-the-group-comes-from-the-roll) — and the `WITHIN` on a join line, whether that line is `ONCE ALL HAVE` or `UPON EACH`. Neither may depend on which member you are looking at: a group's list cannot be worked out from a member of it, and a deadline on the whole group is not a deadline if it is different for each person. Naming the variable in either is rejected, but with a poorly worded message, and with one sharp edge if some _other_ thing in your file happens to have the same name — both described in the roll section.
 
 ## WHO: only some of them
 
@@ -76,14 +82,16 @@ IMPORT prelude
 tenants MEANS LIST (Tenant OF "Alice"), (Tenant OF "Bob"), (Tenant OF "Carol")
 
 GIVETH A DEONTIC Actor Action
-`the listed tenants sign` MEANS
-    EVERY Tenant t
-        WHO    elem t tenants
+`the tenants who are not Carol sign` MEANS
+    EVERY Tenant t IN tenants
+        WHO    NOT (t EQUALS (Tenant OF "Carol"))
         MUST   Sign (EXACTLY t)
         WITHIN 14
 ```
 
-The condition names the variable itself (`elem t tenants`, "t is one of the tenants"). `elem` comes from the prelude, hence the `IMPORT`. A condition that is not a `BOOLEAN` is a type error.
+The condition names the variable itself — `t` is in scope inside `WHO`, which is the whole point of it. A condition that is not a `BOOLEAN` is a type error.
+
+`IN tenants`, on the first line, is doing something different: it says where the group comes from in the first place, and `WHO` then narrows what it produced. The next section but one is about that.
 
 `WHO` is the only filter word. `WHERE` after a rule keeps its usual meaning, a block of local definitions, so this still works and means what it always meant:
 
@@ -95,7 +103,7 @@ GIVETH A DEONTIC Actor Action
         due MEANS 14
 ```
 
-The `WHO` condition has a second job, and it is the one that decides whether your rule can be **run** at all. That is the next section.
+There is one more thing to say about `WHO` before leaving it: in rules written before `IN` existed, the `WHO` condition also carried the list the group is drawn from, and you will still meet those. That is the next section.
 
 ## Where the group comes from: the roll
 
@@ -103,7 +111,7 @@ Read this before writing a rule you intend to run.
 
 `EVERY Tenant t` says the rule is about tenants. It does not say **which** tenants, and the computer has no way to work that out on its own. `Tenant HAS name IS A STRING` says a tenant is anything with a name, and there is no end to the names one could write down — `Tenant OF "Alice"`, `Tenant OF "Alice "`, `Tenant OF "Aloysius"`, forever. There is no list of all tenants to go through, so there is no way to know when "all of them have signed".
 
-So you have to hand the rule a list. The list is called the **"roll"**, in the sense of a roll of members that gets called out at a meeting, and you write it in the `WHO` condition using `elem`, which asks "is this one of those?":
+So you have to hand the rule a list. The list is called the **"roll"**, in the sense of a roll of members that gets called out at a meeting, and you write it with `IN`:
 
 ```l4
 IMPORT prelude
@@ -112,8 +120,7 @@ tenants MEANS LIST (Tenant OF "Alice"), (Tenant OF "Bob"), (Tenant OF "Carol")
 
 GIVETH A DEONTIC Actor Action
 `all tenants sign` MEANS
-    EVERY Tenant t
-        WHO    elem t tenants          -- the roll: these three, and nobody else
+    EVERY Tenant t IN tenants      -- the roll: these three, and nobody else
         MUST   Sign (EXACTLY t)
         WITHIN 14
         ONCE   ALL HAVE
@@ -121,33 +128,72 @@ GIVETH A DEONTIC Actor Action
         LEST   BREACH
 ```
 
-The rest of the `WHO` condition still narrows the group as you would expect, and so does the kind word after `EVERY`. All three work together, in this order:
+Read it aloud and it says what it does: _every tenant t in tenants must sign, within fourteen days; once all of them have, the rule is fulfilled, and otherwise it is breached._
 
-1. the **roll** gives the starting list — everyone `elem` was asked about;
-2. the kind word (`Tenant`) drops anyone not of that kind, so a roll that also names the landlord still produces a group of tenants only;
-3. the rest of the condition drops anyone it says `FALSE` for.
+`IN` may also go on a line of its own, like the other clauses, when the list is long enough that the first line gets crowded:
 
 ```l4
 EVERY Tenant t
-    WHO elem t tenants AND NOT (t EQUALS (Tenant OF "Carol"))
+    IN     tenants
+    WHO    NOT (t EQUALS (Tenant OF "Carol"))
+    MUST   Sign (EXACTLY t)
+    WITHIN 14
+```
+
+The `WHO` condition still narrows the group as you would expect, and so does the kind word after `EVERY`. All three work together, in this order:
+
+1. the **roll** — the list after `IN` — gives the starting list;
+2. the kind word (`Tenant`) drops anyone not of that kind, so a roll that also names the landlord still produces a group of tenants only;
+3. the `WHO` condition drops anyone it says `FALSE` for.
+
+```l4
+EVERY Tenant t IN tenants
+    WHO NOT (t EQUALS (Tenant OF "Carol"))
 ```
 
 reads the roll of three, keeps the tenants, and drops Carol: a group of two.
 
 **Without a roll, a rule with `EVERY` will not run.** It still parses and type-checks — writing one is not an error — but running it stops with a message that says what to add:
 
-> EVERY has nothing to draw its cast from. Running a quantified obligation needs a list of the parties it ranges over, because a party type is normally open… Name the list in the WHO condition, as `EVERY Tenant t WHO elem t tenants MUST ...`, with `tenants` a LIST of the party type.
+> EVERY has nothing to draw its cast from. Running a quantified obligation needs a list of the parties it ranges over, because a party type is normally open… Name the list with IN, as `EVERY Tenant t IN tenants MUST ...`, with `tenants` a LIST of the party type.
 
 This is the same habit the language has elsewhere: where two readings are possible and neither is obviously right, it declines to guess and tells you which words to write.
 
-Six details worth knowing:
+Four details worth knowing:
 
 - **The roll is read once**, when the rule meets its event stream, and the group is fixed from then on. Somebody who joins the list later does not join a group that is already running, and somebody who leaves it is still counted and still blamed. That is deliberate: a group that quietly changed size would quietly change what the rule means. (The design calls this "the cast is evaluated once at arming"; changing a running group is meant to need an explicit act, which is not built.)
 - **An empty roll means an empty group**, and an empty group has nothing outstanding. A barrier over nobody is achieved immediately and its `HENCE` fires at once, because "all of them have acted" is true when there are none of them. If that is not what you want, guard the rule with an `IF`. One trap follows from it: an empty group whose `HENCE` leads back to the same rule never consumes an event, so it goes round forever and the run ends with a recursion-depth message rather than an answer.
-- **The roll cannot mention the member.** `WHO elem t (peersOf t)` asks the list to know its own answer, and running it refuses and says so. To narrow the group by something about each member, put that in a further condition: `WHO elem t tenants AND isAdult t`.
-- **The word must be `elem`.** The rule is recognised by that spelling — it is how the roll is found — so a two-argument function of your own called `elem` would be taken for it. In practice `elem` is the one from the standard library, which is why every example here starts `IMPORT prelude`.
-- **The roll has to be found in a plain chain of `AND`s.** `WHO elem t tenants AND …` works, at any depth of `AND`. `WHO elem t tenants OR elem t others` does not, and neither does `WHO NOT (elem t tenants)`: the first has two possible rolls and the second names who is _out_ rather than who is in. Both refuse rather than guess. If you want the members of two lists, join the lists first: `WHO elem t (append tenants others)`.
+- **The roll cannot mention the member.** `EVERY Tenant t IN (peersOf t)` asks the list to know its own answer: the list is read once, before there is anybody to be a member, so there is no `t` for it to mean yet. The checker rejects it, and — because the member's name is simply not in scope there — the message you get is the general one, _"I could not find a definition for the identifier t"_. That wording is poorer than the mistake deserves and we know it; the same is true of a join line's `WITHIN`, for the same reason, and the two are meant to get a better message together. To narrow the group by something about each member, put that in the `WHO` condition, where the member **is** in scope: `EVERY Tenant t IN tenants WHO isAdult t`.
+
+  **One sharp edge in that, worth knowing.** What the checker actually rejects is a name it cannot find. If your file happens to define something _else_ called `t` at the top level, then the `t` inside `IN` quietly means **that** one, and nothing is reported — so the same letter would mean the top-level thing in the roll and the member everywhere else. This is the ordinary rule that an inner name only hides an outer one where the inner name is in scope, and the join line's deadline has the same edge. The way to stay clear of it is the way you would anyway: give the member a name nothing else in the file uses.
+
 - **A name listed twice is counted twice.** A roll of `LIST alice, alice, bob` produces three obligations, two of them Alice's. Under a barrier one signature from Alice settles both and nothing worse happens than the group not being the size it looks. Under a fork it is worse: the continuation fires once per copy, so a single payment earns two receipts. Keep the roll free of repeats.
+
+### The older spelling: a roll read out of the WHO condition
+
+Before `IN` existed, the roll had to be smuggled into the `WHO` condition using `elem`, which asks "is this one of those?":
+
+```l4
+EVERY Tenant t
+    WHO elem t tenants          -- the older spelling: still works, still means the same thing
+```
+
+**This still runs, and nothing you have already written needs changing.** When a rule writes no `IN`, the machine looks through the `WHO` condition for a condition of the form `elem t <some list>` and takes that list as the roll. You will meet this spelling in older examples; [every-example.l4](every-example.l4) shows one beside its `IN` equivalent, and `jl4/examples/ok/every/run-roll.l4` in the corpus is the file devoted to it (its first rule is the deliberate exception, with no roll at all — that is the one that shows the refusal).
+
+Prefer `IN` in anything new. Saying the roll outright is clearer to read, and it also avoids three rough edges that the older spelling cannot avoid:
+
+- **It is found by the word `elem`, not by meaning.** A two-argument function of your own called `elem` would be taken for it. In practice `elem` is the one from the standard library, which is why examples using this spelling start `IMPORT prelude`.
+- **It has to sit in a plain chain of `AND`s.** `WHO elem t tenants AND …` works, at any depth of `AND`. `WHO elem t tenants OR elem t others` does not, and neither does `WHO NOT (elem t tenants)`: the first offers two lists and the second names who is _out_ rather than who is in, and the search simply does not look inside an `OR` or a `NOT`. What you get in both cases is the same message as for no roll at all — "EVERY has nothing to draw its cast from" — which is accurate but does not point at the `OR`. If you want the members of two lists, join the lists first: `IN (append tenants others)`.
+- **A circular roll is caught later.** `WHO elem t (peersOf t)` is only refused when the rule is run, not when it is checked, because the member genuinely is in scope inside a `WHO` condition — that is what a condition is for. `IN` has no such difficulty and the same mistake is caught at check time.
+
+**If you write both**, the `IN` list is the roll and the `elem` condition goes on doing what any other condition does: narrowing. So
+
+```l4
+EVERY Tenant t IN tenants
+    WHO elem t (LIST alice, bob)
+```
+
+draws the three from `tenants`, then keeps the two the condition allows. Nothing is ambiguous and nothing is silently dropped. Worked examples of both spellings side by side are in `jl4/examples/ok/every/run-in.l4`.
 
 ## The action: write EXACTLY to mean the member
 
@@ -164,7 +210,8 @@ Other arguments of the action may still be patterns. `MUST Pay (EXACTLY t) (EXAC
 
 ## The join line: once, or once per member
 
-This is the part `PARTY` cannot say, and the reason `EVERY` exists. (The rules in this section leave out the `WHO elem …` line, to keep the join in view; add one before running them, as [every-run-example.l4](every-run-example.l4) does.) Under an `EVERY`, a `HENCE` or a `LEST` needs a line saying **when it fires**, and there are two answers. They use different keywords because they are triggered differently: a barrier waits for a condition to become true and then fires once, while a fork fires on each completion as it happens.
+This is the part `PARTY` cannot say, and the reason `EVERY` exists. (The rules in this section leave out the `IN …` list, to keep the join in view; add one before running them, as [every-run-example.l4](every-run-example.l4) does.)
+Under an `EVERY`, a `HENCE` or a `LEST` needs a line saying **when it fires**, and there are two answers. They use different keywords because they are triggered differently: a barrier waits for a condition to become true and then fires once, while a fork fires on each completion as it happens.
 
 **`ONCE ALL HAVE`** is the **barrier**. The `HENCE` fires **once**, when the last member has acted. Three tenants must sign; the tenancy begins when the third signature arrives, not three times.
 
@@ -279,7 +326,7 @@ A rule with `EVERY` is run the same way a `PARTY` rule is: `#TRACE` it against a
 
 **When the stream runs out** with the group's work unfinished, what comes back is the work that is left: the obligations of the members who have not yet acted. Nothing is breached — the deadline has not been reached, only the list of events has.
 
-Worked traces for all of this are in the corpus: `jl4/examples/ok/every/run-barrier.l4`, `run-fork.l4`, `run-roll.l4` and `run-modals.l4`.
+Worked traces for all of this are in the corpus: `jl4/examples/ok/every/run-in.l4` (the `IN` roll, eleven worked cases), `run-barrier.l4`, `run-fork.l4`, `run-roll.l4` (the older `WHO elem` spelling) and `run-modals.l4`.
 
 ### What each modal means under a join
 
@@ -302,8 +349,10 @@ Verified 2026-09-08 against the compiler at the head of this branch.
 
 **Does not run, and says so:**
 
-- A rule with no roll (above) refuses, naming what to write.
-- The prose export (`l4 render`) writes the subject as "every Tenant t who …" and drops the join line — except when the `EVERY` is an operand of `RAND` or `ROR`, where the whole rule falls back to the layout printer and the join line is re-emitted verbatim into the prose.
+- A rule with no roll (above) refuses, naming what to write. The message names `IN` first, and says the older `WHO elem` spelling still works.
+
+- The prose export (`l4 render`) writes the subject as "every Tenant t in tenants who …" and drops the join line
+  — except when the `EVERY` is an operand of `RAND` or `ROR`, where the whole rule falls back to the layout printer and the join line is re-emitted verbatim into the prose.
 
 **Runs, but not yet as the design says.** These are the places where a run gives an answer and the answer is coarser than the design calls for. Most are a detail of the verdict rather than the verdict itself; the one exception is the same-instant case, marked below, which can make an act count twice.
 
@@ -312,7 +361,8 @@ Verified 2026-09-08 against the compiler at the head of this branch.
 - **A residual barrier loses its join.** If the events run out mid-way, what comes back is the outstanding members' obligations, with their deadlines correctly counted down. Their `HENCE` and `LEST` print as `` `the join` `` and `` `the join fails` `` — the machine's own markers for "report back to the group", not anything you wrote. What the residual does not carry is the join line, so feeding it more events would run the members and not the join. Run the whole stream at once.
 - **A join line's `WITHIN` bounds each act; only a barrier also checks it on the whole.** Written alone, on either kind of join line, it is each member's deadline — otherwise nothing would ever expire. Written alongside an act `WITHIN`, the act's is each member's deadline, and a barrier additionally fails if the last act lands after the join's; a fork has no join to check, so there the act's is the only one enforced. Write the tighter of the two on the act.
 - **When two members act at the very same instant, the continuation can see one of their acts.** The join's time is right either way, but the stream handed to the continuation is the one belonging to whichever of the two the roll named first, so an event stamped exactly at the join may still reach it. It only bites if the continuation's action could be matched by a member's own act at that instant. A prohibition (`SHANT`) barrier ties by construction and is not affected, because every member finishes on the same event.
-- **The type checker is looser than the run time in two places**, and both refuse rather than answer: a barrier continuation that names the member, and a roll that names the member. Both are described above.
+- **The type checker is looser than the run time in two places**, and both refuse rather than answer: a barrier continuation that names the member, and a roll — in the older `WHO elem` spelling only — that names the member. Both are described above. An `IN` roll that names the member is caught earlier, at check time.
+
 - **Nothing checks that the action names the member.** `MUST Sign (EXACTLY t)` ties the act to the member; `MUST Sign someoneElse` does not, and is accepted. What the run does check is that the **event's** party is the member. Write `EXACTLY t`.
 - **The count and measure joins are not built at all** — `ONCE SOME 2 OF … HAVE`, `ONCE sum OF amount AT LEAST rent`. Only `ONCE ALL HAVE` and `UPON EACH` parse.
 - The WASM export refuses a rule containing `EVERY` rather than compile it wrongly.

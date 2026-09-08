@@ -190,14 +190,15 @@ data RBinOp2 = MkRBinOp2
   deriving stock Show
 
 -- | What the roll call and the barrier both carry from step to step: the
--- quantified obligation itself, its three destructured pieces (the bound
--- variable, the optional cast constructor, the optional @WHO@ filter), the
--- environment the obligation was armed in, and the two arguments every
--- contract is applied to.
+-- quantified obligation itself, its four destructured pieces (the bound
+-- variable, the optional cast constructor, the optional @IN@ roll, the
+-- optional @WHO@ filter), the environment the obligation was armed in, and
+-- the two arguments every contract is applied to.
 data QuantCtx = MkQuantCtx
   { deonton :: Deonton Resolved
   , var     :: Resolved            -- ^ the member variable, bound per member
   , cast    :: Maybe Resolved      -- ^ @EVERY Tenant t@: the constructor, if given
+  , roll    :: Maybe RExpr         -- ^ @IN tenants@: the roll, if written outright
   , filt    :: Maybe RExpr         -- ^ the @WHO@ expression, if given
   , env     :: Environment         -- ^ the arming environment
   , time    :: Reference           -- ^ the arming time

@@ -436,21 +436,29 @@ data Deonton n
 data Subject n
   = Party Anno (Expr n)
     -- ^ @PARTY e@: one party, an expression of the contract's party type.
-  | Every Anno (Maybe n) n (Maybe (Expr n))
-    -- ^ @EVERY [Cast] v [WHO filter]@: one obligation per inhabitant of the
-    -- party type, narrowed to those built by the constructor @Cast@ when it is
+  | Every Anno (Maybe n) n (Maybe (Expr n)) (Maybe (Expr n))
+    -- ^ @EVERY [Cast] v [IN roll] [WHO filter]@: one obligation per member of
+    -- the cast, narrowed to those built by the constructor @Cast@ when it is
     -- given (@EVERY Tenant t@ — 'Tenant' is a /constructor/ of the party type
     -- under the value-actor encoding, not a type) and to those satisfying
-    -- @filter@ when it is given. The variable @v@ is bound, at the party type,
-    -- in the filter, the action, the act's @WITHIN@, @HENCE@ and @LEST@ — but
-    -- NOT in the @WITHIN@ after @ONCE@, which bounds the whole group and so
-    -- may not depend on a member (see 'L4.TypeCheck.checkDeonton').
+    -- @filter@ when it is given.
+    --
+    -- The fields, in source and hole order: the cast, the variable, the @IN@
+    -- ROLL, the @WHO@ filter.
+    --
+    -- The variable @v@ is bound, at the party type, in the filter, the action,
+    -- the act's @WITHIN@, @HENCE@ and @LEST@ — but NOT in the @IN@ roll, and
+    -- NOT in the @WITHIN@ after @ONCE@. Both of those are read once for the
+    -- WHOLE group, before there is any member to speak of, so neither may
+    -- depend on one (see 'L4.TypeCheck.checkDeonton').
     --
     -- The bare form @EVERY v@ ranges over every value of the party type.
     --
-    -- Evaluation (phase 2, built 2026-09-08) draws the cast from the ROLL —
-    -- the list an @elem v xs@ conjunct of the filter names — because a party
-    -- type is normally open (spec §2.2.7.5 point 5). See
+    -- Evaluation (phase 2, built 2026-09-08) needs a ROLL — a list to draw the
+    -- cast from — because a party type is normally open (spec §2.2.7.5 point
+    -- 5). @IN xs@ says it outright (spec §11.0.2, built 2026-09-08); with no
+    -- @IN@, the machine falls back to reading it out of an @elem v xs@
+    -- conjunct of the filter (spec §11.0). See
     -- 'L4.EvaluateLazy.Machine.startRollCall'. Blame on a failed barrier is
     -- ONE non-completer, not spec §6.1's set: 'ReasonForBreach' carries one
     -- party and R-T3's set is not built.

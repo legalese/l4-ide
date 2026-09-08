@@ -569,8 +569,8 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Join n) where
 instance (HasSrcRange n, HasNlg n) => HasNlg (Subject n) where
   addNlg = \ case
     Party ann party -> Party ann <$> addNlg party
-    Every ann mCast v mFilter ->
-      Every ann <$> traverse addNlg mCast <*> addNlg v <*> traverse addNlg mFilter
+    Every ann mCast v mRoll mFilter ->
+      Every ann <$> traverse addNlg mCast <*> addNlg v <*> traverse addNlg mRoll <*> traverse addNlg mFilter
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (RAction n) where
   addNlg (MkAction ann modal rule provided) = do
@@ -853,7 +853,8 @@ instance HasDesc (Subject n) where
   addDesc = \ case
     Party ann party -> Party ann <$> addDesc party
     -- The cast and the bound variable are names, which carry no @desc.
-    Every ann mCast v mFilter -> Every ann mCast v <$> traverse addDesc mFilter
+    Every ann mCast v mRoll mFilter ->
+      Every ann mCast v <$> traverse addDesc mRoll <*> traverse addDesc mFilter
 
 instance HasDesc (RAction n) where
   addDesc (MkAction ann modal act provided) =
@@ -1520,8 +1521,8 @@ instance (HasSrcRange n, HasRef n) => HasRef (Join n) where
 instance (HasSrcRange n, HasRef n) => HasRef (Subject n) where
   addRef = \ case
     Party ann party -> Party ann <$> addRef party
-    Every ann mCast v mFilter ->
-      Every ann <$> traverse addRef mCast <*> addRef v <*> traverse addRef mFilter
+    Every ann mCast v mRoll mFilter ->
+      Every ann <$> traverse addRef mCast <*> addRef v <*> traverse addRef mRoll <*> traverse addRef mFilter
 
 instance (HasSrcRange n, HasRef n) => HasRef (RAction n) where
   addRef (MkAction ann modal rule provided) = do

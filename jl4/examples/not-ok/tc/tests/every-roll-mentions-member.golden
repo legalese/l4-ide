@@ -1,0 +1,17 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: every-roll-mentions-member.l4
+  Hidden: no
+  Range: 28:32-28:33
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    I could not find a definition for the identifier
+
+      t
+
+    which I have inferred to be of type: 
+
+      Actor

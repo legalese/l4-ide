@@ -1,0 +1,17 @@
+-- EVERY-EACH-QUANTIFIER-SPEC §11.0.2: the IN clause is the LIST the group is
+-- drawn from, so it must be a list, and a list of the party type. A number is
+-- neither; a list of strings is a list of the wrong thing.
+
+DECLARE Actor IS ONE OF
+    Tenant HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Sign HAS signer IS AN Actor
+
+GIVETH A DEONTIC Actor Action
+`roll is a number` MEANS
+    EVERY Tenant t IN 42 MUST Sign (EXACTLY t) WITHIN 14
+
+GIVETH A DEONTIC Actor Action
+`roll is a list of the wrong thing` MEANS
+    EVERY Tenant t IN (LIST "Alice") MUST Sign (EXACTLY t) WITHIN 14

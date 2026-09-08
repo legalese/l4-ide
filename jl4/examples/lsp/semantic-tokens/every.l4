@@ -13,3 +13,15 @@ contract MEANS
         UPON   EACH WITHIN 30
         HENCE  FULFILLED
         LEST   BREACH BY t
+
+tenants MEANS LIST (Tenant OF "Alice"), (Tenant OF "Bob")
+
+GIVETH A DEONTIC Actor Action
+`with a roll` MEANS
+    EVERY Tenant t IN tenants
+        WHO    NOT (t EQUALS Tenant OF "Carol")
+        MUST   Sign (EXACTLY t)
+        WITHIN 14
+        UPON   EACH WITHIN 30
+        HENCE  FULFILLED
+        LEST   BREACH BY t

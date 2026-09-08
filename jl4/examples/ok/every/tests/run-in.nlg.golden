@@ -1,0 +1,11 @@
+executing contract `in alone` at 0 with the following events:  party `alice` did `Sign` with `alice` at 1 party `bob` did `Sign` with `bob` at 2 party `carol` did `Sign` with `carol` at 3
+executing contract `in incomplete` at 0 with the following events:  party `alice` did `Sign` with `alice` at 1
+executing contract `in and who` at 0 with the following events:  party `alice` did `Sign` with `alice` at 1 party `bob` did `Sign` with `bob` at 2
+executing contract `cast narrows the roll` at 0 with the following events:  party `alice` did `Sign` with `alice` at 1
+executing contract `bare variable in` at 0 with the following events:  party `alice` did `Sign` with `alice` at 1 party `theLandlord` did `Sign` with `theLandlord` at 2
+executing contract `in wins over elem` at 0 with the following events:  party `alice` did `Sign` with `alice` at 1
+executing contract `elem still narrows` at 0 with the following events:  party `alice` did `Sign` with `alice` at 1 party `bob` did `Sign` with `bob` at 2
+executing contract `fork in` at 0 with the following events:  party `alice` did `Sign` with `alice` at 1 party `bob` did `Sign` with `bob` at 2 party `carol` did `Sign` with `carol` at 3 party `theLandlord` did `Receipt` with `theLandlord` and `alice` at 4
+executing contract `computed roll` at 0 with the following events:  party `alice` did `Sign` with `alice` at 1 party `bob` did `Sign` with `bob` at 2
+executing contract `empty roll` at 0 with the following events:  party `alice` did `Sign` with `alice` at 1
+every `Tenant` `t` in `tenants` who not `t` is equal to `carol` must `Sign` has is exactly `t` within 14

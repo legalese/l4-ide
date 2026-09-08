@@ -243,11 +243,12 @@ instance Linearize (Expr Resolved) where
         linJoinDue = maybe [] (\ d -> [ text "within", lin d ])
         linSubject = \ case
           Party _ party -> [ text "party", lin party ]
-          Every _ mCast v mFilter ->
+          Every _ mCast v mRoll mFilter ->
             [ text "every" ]
             -- Resolved can't use 'lin', as it doesn't have an 'Anno'
             <> maybe [] (\ c -> [ linearize c ]) mCast
             <> [ linearize v ]
+            <> maybe [] (\ r -> [ text "in", lin r ]) mRoll
             <> maybe [] (\ f -> [ text "who", lin f ]) mFilter
     Consider _ e br -> hcat
       [ text "consider"

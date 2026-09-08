@@ -32,8 +32,7 @@ Three flatmates must sign, and when the last of them has, the tenancy begins. In
 
 ```l4
 -- BUILT (2026-09-08). This runs.
-EVERY Flatmate f
-    WHO    elem f flatmates         -- the group, given as a list
+EVERY Flatmate f IN flatmates       -- the group, given as a list
     MUST   Sign (EXACTLY f)
     WITHIN 14
     ONCE   ALL HAVE                 -- the line that says when the follow-on fires
@@ -41,7 +40,9 @@ EVERY Flatmate f
     LEST   `the lease falls through`
 ```
 
-Three things in that block were not in the first draft of this page, and all three were ruled on 7 September 2026. `WHO elem f flatmates` names the group as a list, which is what makes the rule runnable at all — see [Where the group comes from](../../reference/regulative/EVERY.md#where-the-group-comes-from-the-roll). `ONCE ALL HAVE` is a line of its own saying when the follow-on fires, and it is required whenever there is one. And `EXACTLY f` is how you say "this flatmate" inside the action; a bare `f` there would match anybody's signature.
+Three things in that block were not in the first draft of this page. `IN flatmates` names the group as a list, which is what makes the rule runnable at all — see [Where the group comes from](../../reference/regulative/EVERY.md#where-the-group-comes-from-the-roll). `ONCE ALL HAVE` is a line of its own saying when the follow-on fires, and it is required whenever there is one; it was ruled on 7 September 2026. And `EXACTLY f` is how you say "this flatmate" inside the action; a bare `f` there would match anybody's signature.
+
+(`IN` was ruled a day later, on 8 September 2026. Examples written before that put the same list inside the `WHO` condition, as `WHO elem f flatmates`; you will still meet that spelling, and it still runs.)
 
 Read `EVERY Flatmate f` as "for every flatmate, call them f": one obligation per flatmate, all live at once, exactly as the `RAND` was — and then one `HENCE` for the whole. This shape is called a **"barrier"**: nothing follows until everyone has crossed it, and then one thing follows. If somebody does not sign, the `LEST` fires once for the group — and here is the third gap this page opened with, still open: the breach names one of the flatmates who failed, not all of them.
 
@@ -55,8 +56,7 @@ A different sentence, and a different shape. Each flatmate who pays a share is t
 
 ```l4
 -- BUILT (2026-09-08). This runs.
-EVERY Flatmate f
-    WHO    elem f flatmates
+EVERY Flatmate f IN flatmates
     MUST   Pay (EXACTLY f) (EXACTLY theLandlord) amount
     WITHIN 7
     UPON   EACH                     -- the fork: once per flatmate who pays
@@ -70,7 +70,7 @@ This shape is called a **"fork"**: the group splits into its members, and each m
 
 _A note on the words, kept because it records how they were settled. The specification's own discussion records that `EVERY` and `EACH` may not survive contact with a first-time reader, and it records a proposal to call the two shapes "jointly" and "severally" instead — The research done that night recommends against it, and no ruling has yet been made. Those words carry a settled legal meaning, about who may be sued and whether one person's payment discharges the rest, which is not this distinction — and on the point of discharge it is the opposite: a joint promisor's payment discharges the others, where under everyone-then-one-thing nobody's act does anything for anyone else. The alternative the research preferred was to mark the shape on a line of its own, so that `EVERY` serves for both. **That is what was ruled, on 2026-09-07:** a line of its own says when the follow-on fires — `ONCE ALL HAVE` for everyone-then-one-thing, `UPON EACH` for each-with-its-own — and it is required whenever there is a follow-on at all, because the two readings differ and the language declines to guess. The two shapes were never in doubt; only the words were._
 
-_And the words themselves are settled (7 September 2026), and built (8 September 2026). There is one quantifier word, `EVERY`; `EACH` appears only inside `UPON EACH` and is not a keyword at all. The word after `EVERY` names the kind of party, as `Flatmate` does above, and it narrows the group; `EVERY f` with no kind word takes the whole roll._
+_And the words themselves are settled (7 September 2026), and built (8 September 2026). There is one quantifier word, `EVERY`; `EACH` appears only inside `UPON EACH` and is not a keyword at all. The word after `EVERY` names the kind of party, as `Flatmate` does above, and it narrows the group; `EVERY f` with no kind word takes the whole roll. Which people are on that roll is said with `IN`, ruled on 8 September 2026 and built the same day._
 
 ---
 

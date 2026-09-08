@@ -1939,13 +1939,21 @@ maybeEvaluate env = either (continueExpr env) continueBackward
 -- move the language makes for a non-exhaustive @CONSIDER@ or a continuation
 -- with no join line: decline to guess.
 
--- | Where the cast comes from: the first @elem v xs@ conjunct of the @WHO@
--- filter, read left to right through @AND@. Returns @xs@.
+-- | The FALLBACK for a quantifier that names no roll outright: the first
+-- @elem v xs@ conjunct of the @WHO@ filter, read left to right through @AND@.
+-- Returns @xs@.
+--
+-- Consulted only when there is no @IN@ clause (§11.0.2, 2026-09-08). @IN@ is
+-- the spelling to reach for; this one is kept because it is what the corpus
+-- and the published examples were written against, and because an
+-- @elem v xs@ conjunct is a perfectly good FILTER in its own right, so
+-- reading a roll out of it costs nothing when no roll was written.
 --
 -- Matched by SPELLING — the function must be called @elem@ — which is the
 -- device the parser already uses for @EACH@ in @UPON EACH@ and for @TIMEZONE@.
 -- A user-defined two-argument @elem@ that shadows the prelude's would be taken
--- as the roll; that sharp edge is stated on doc\/reference\/regulative\/EVERY.md.
+-- as the roll; that sharp edge is stated on doc\/reference\/regulative\/EVERY.md,
+-- and is one of the reasons @IN@ exists.
 quantifierRoll :: Resolved -> Expr Resolved -> Maybe (Expr Resolved)
 quantifierRoll v = go
   where
@@ -1979,14 +1987,19 @@ rollCallRefusal = Text.unwords
   [ "EVERY has nothing to draw its cast from. Running a quantified obligation"
   , "needs a list of the parties it ranges over, because a party type is"
   , "normally open: `Tenant HAS name IS A STRING` has infinitely many values."
-  , "Name the list in the WHO condition, as"
-  , "`EVERY Tenant t WHO elem t tenants MUST ...`,"
+  , "Name the list with IN, as `EVERY Tenant t IN tenants MUST ...`,"
   , "with `tenants` a LIST of the party type."
-  , "(EVERY-EACH-QUANTIFIER-SPEC section 2.2.7.5 point 5;"
+  , "(An `elem` condition still works - `EVERY Tenant t WHO elem t tenants` -"
+  , "but IN says it outright and is checked earlier.)"
+  , "(EVERY-EACH-QUANTIFIER-SPEC sections 11.0.2 and 2.2.7.5 point 5;"
   , "doc/reference/regulative/EVERY.md.)"
   ]
 
--- | What the machine says when the roll would have to know its own answer.
+-- | What the machine says when an INFERRED roll would have to know its own
+-- answer. An @IN@ roll cannot get here: it is checked with the member out of
+-- scope ('L4.TypeCheck.checkDeonton'), so the circular case is a check-time
+-- error there. The filter genuinely does bind the member, so the same trick is
+-- not available for the inferred form.
 circularRollRefusal :: Text
 circularRollRefusal = Text.unwords
   [ "EVERY's roll cannot mention the member it is drawing. The list after"
@@ -1998,19 +2011,28 @@ circularRollRefusal = Text.unwords
   ]
 
 -- | Arm a quantified obligation: start the roll call.
+--
+-- The roll comes from the @IN@ clause when one is written (§11.0.2), and
+-- otherwise from an @elem@ conjunct of the @WHO@ filter ('quantifierRoll',
+-- §11.0). When BOTH are present the @IN@ clause wins and the @elem@ conjunct
+-- keeps its ordinary job of narrowing: it is still evaluated per candidate,
+-- like every other part of the filter, so the cast is the members of the @IN@
+-- list that satisfy the whole filter, in the @IN@ list's order.
 startRollCall :: Environment -> Deonton Resolved -> Reference -> Reference -> Machine Config
 startRollCall env deonton time events =
   case deonton.subject of
     Party{} -> internalException $ RuntimeTypeError
       "a PARTY obligation reached the quantifier's roll call"
-    Every _ cast var filt -> do
-      let ctx = MkQuantCtx {deonton, var, cast, filt, env, time, events}
-      case filt >>= quantifierRoll var of
+    Every _ cast var roll filt -> do
+      let ctx = MkQuantCtx {deonton, var, cast, roll, filt, env, time, events}
+      case maybe (filt >>= quantifierRoll var) Just roll of
         Nothing -> userException (UserError rollCallRefusal)
         -- The roll is read BEFORE any member exists, so it cannot depend on
-        -- one. @WHO elem t (peersOf t)@ type-checks (the variable is in scope
-        -- throughout the filter) and would otherwise reach the evaluator as an
-        -- unbound name, i.e. as "please report this as a bug".
+        -- one. An IN roll is rejected for that at CHECK time; an inferred one
+        -- cannot be — @WHO elem t (peersOf t)@ type-checks, because the
+        -- variable is in scope throughout the filter — and would otherwise
+        -- reach the evaluator as an unbound name, i.e. as "please report this
+        -- as a bug".
         Just rollExpr
           | any (sameResolved var) rollExpr -> userException (UserError circularRollRefusal)
           | otherwise -> do

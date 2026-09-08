@@ -7,10 +7,19 @@ IMPORT prelude
 -- pattern form "ranges over an open type and needs §2.1's `WHO member_of …`
 -- filter"), and every runnable example in it draws its cast from a list.
 --
--- So the cast is drawn from the ROLL: the list an `elem <variable> <list>`
--- condition inside `WHO` names. The rest of the `WHO` condition then narrows
--- it, and the cast word narrows it again. Without such a condition there is
--- nothing to call the roll from, and running the rule refuses and says so.
+-- So the cast is drawn from the ROLL. THIS FILE IS THE OLDER SPELLING of it:
+-- the list an `elem <variable> <list>` condition inside `WHO` names. The rest
+-- of the `WHO` condition then narrows it, and the cast word narrows it again.
+-- Without such a condition there is nothing to call the roll from, and running
+-- the rule refuses and says so.
+--
+-- Since 2026-09-08 the roll can be said outright instead — `EVERY Tenant t IN
+-- tenants` — and that is the spelling to reach for; see run-in.l4, and
+-- EVERY-EACH-QUANTIFIER-SPEC section 11.0.2. This file is kept in the older
+-- form deliberately, as the witness that it still works. Note in particular
+-- that its `circular` case below could NOT simply be rewritten with `IN`: the
+-- explicit form catches that mistake at check time, so the run-time refusal
+-- this file witnesses would have nowhere left to be seen.
 
 DECLARE Actor IS ONE OF
     Landlord HAS name IS A STRING
