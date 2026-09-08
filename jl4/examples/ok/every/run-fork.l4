@@ -24,8 +24,7 @@ everyone MEANS LIST alice, bob, theLandlord
 
 GIVETH A DEONTIC Actor Action
 `receipts` MEANS
-    EVERY Tenant t
-        WHO    elem t everyone
+    EVERY Tenant t IN everyone
         MUST   Pay (EXACTLY t) (EXACTLY theLandlord) amount
         WITHIN 7
         UPON   EACH
