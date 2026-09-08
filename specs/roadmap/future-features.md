@@ -106,6 +106,26 @@ None of these gives the Lisp property: the construct's _own syntax tree_ availab
 
 - **Rung 2c — per-party indices in one multi-party contract.** The real lift, and the thing that vindicates "dependent types won't be a walk in the park": the _point_ of actor-indexed actions is the multi-party clause — _Landlord MAY seek possession; Court MUST order possession_ — two parties and two differently-indexed actions in **one** `DEONTIC`. A single `Action` parameter can hold only one index; pin it to `Action Court` and the landlord's `seek` won't fit, widen it to a sum over both and the index is erased again. Threading a _per-party_ index needs either singletons (to bridge the `PARTY Court` _value_ to the `Court` type-index) or genuine dependency. Only this rung truly needs the heavy machinery; everything below it is reachable now or with a small, localized change.
 
+**Interactive explanation surface for the query planner** (backlogged 2026-09-08, prompted by
+[DATALEX-YSCRIPT-RESEARCH.md](../research/DATALEX-YSCRIPT-RESEARCH.md)). AustLII's DataLex
+platform has shipped, for two decades, a `Why?`/`How?`/`What if?`/`Forget` explanation apparatus
+over its `yscript` rule language — a fully-worked answer to "how do you show a non-lawyer end
+user that the system's conclusion follows from the rules and their own answers". `jl4-query-plan`'s
+ROBDD substrate already has the structural ingredients for the same thing, just not exposed as an
+interactive surface:
+
+- `Why?` ≈ `inputRefsClosureByUnique`'s dependency closure (`QueryPlan.hs:38-84`), read the other
+  way: which higher-level atom needs this one.
+- `How?` ≈ the sequence of `restrict` calls that collapsed the ROBDD to a terminal — the generator
+  loop already makes these calls, it just doesn't retain them.
+- `What if?` ≈ `restrict` on a hypothetical value without committing it.
+- `Forget` ≈ un-restricting one atom and re-planning over the rest.
+
+None of the four needs new substrate; what's missing is threading per-step provenance from the
+planner through to the wizard UI instead of discarding it after each "what's next" call. See
+[Query Planning](../../doc/reference/query-planning/README.md#interactive-explanation-surface-backlog)
+for the doc-side writeup. Not scheduled.
+
 ---
 
 ## Recently Implemented

@@ -86,6 +86,39 @@ are expected to resolve.
 > per-atom defaults that the policy will read, but no consumer reads them for
 > ordering yet.
 
+### Interactive explanation surface (backlog)
+
+The planner's internals already carry the structural ingredients for the kind of live,
+per-question explanation AustLII's DataLex platform has shipped for two decades over its
+`yscript` rule language: `Why?` (why is this question being asked), `How?` (which facts and
+rules produced a conclusion), `What if?` (try a hypothetical without committing), and `Forget`
+(retract an answer and re-ask whatever depended on it). See
+[DATALEX-YSCRIPT-RESEARCH.md](../../../specs/research/DATALEX-YSCRIPT-RESEARCH.md) §C-D for the
+worked examples and the stratum-by-stratum mapping.
+
+Concretely, against this repo's own types (`jl4-query-plan/src/L4/Decision/QueryPlan.hs`):
+
+- **`Why?`** is `inputRefsClosureByUnique`'s dependency closure (`QueryPlan.hs:38-84`) read the
+  other way — which higher-level atom needs this one — already computed to drive ranking, not
+  yet exposed as an answer to a user's question.
+- **`How?`** is the sequence of `restrict` calls that collapses the ROBDD to a terminal (the
+  generator loop's step 3 below, "show the result with the trace of why") — the trace exists
+  implicitly as the steps the wizard already took; nothing currently retains or replays it as an
+  explanation.
+- **`What if?`** is `restrict` applied to a hypothetical value without committing it to the
+  session's answer set — the operation already exists; only the "don't commit" wrapper is
+  missing.
+- **`Forget`** is un-restricting one atom and re-running the planner over the remaining
+  answers — again an operation the substrate supports, not one the wizard surface exposes.
+
+None of this needs a new subsystem: the gap is that the planner is consumed today as a one-shot
+"what's the next question" oracle, and the intermediate structure (which atoms were fixed, in
+what order, and why each one mattered) is discarded rather than retained and surfaced. Turning it
+into a real explanation surface means threading per-step provenance from the query-plan response
+through to the wizard UI. Backlogged 2026-09-08; see
+[Future Features](../../../specs/roadmap/future-features.md) ("Interactive explanation surface for
+the query planner") for the tracked entry. Not scheduled.
+
 ## How the web-app generator uses it
 
 The [web form generator](../../courses/advanced/module-a4-production.md#web-form-generation)

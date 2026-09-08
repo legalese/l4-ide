@@ -293,6 +293,12 @@ committed. Noted for whoever picks this up:
   full "Coding in yscript" and "DataLex Developer's Manual" PDFs (both 403'd this session; try a
   real browser session or an institutional proxy) before designing L4's own explanation UI further
   would be cheap due-diligence against reinventing a decades-old wheel.
+- **Update, same day:** this observation turned out to have a concrete, already-built landing
+  spot. `jl4-query-plan`'s ROBDD substrate (`doc/reference/query-planning/README.md`) already
+  computes the dependency closures and `restrict` sequences that would make `Why?`/`How?`/
+  `What if?`/`Forget` cheap to expose — the gap is only that today's wizard throws that structure
+  away after each "what's next" call. Backlogged in `specs/roadmap/future-features.md`
+  ("Interactive explanation surface for the query planner").
 
 ## G. Sources
 
