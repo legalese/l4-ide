@@ -2759,6 +2759,12 @@ them.
 
 ### 13.6 `WHOSE`, and the R-Q4 problem it does not escape — OPEN, raised by Meng 2026-09-08
 
+> **Meng's mark, 2026-09-08, after the synthesis below was written:** _"Then my layout proposal fades
+> back into existing conjunctive/disjunctive over multiple lines, compatible with inert style. I
+> think this design had legs."_ The layout route is therefore **withdrawn by its proposer**, and the
+> `WHOSE`-as-opening reading is endorsed as a **direction**. It is not thereby built or ruled: the
+> three conditions under "What must be true" are unchanged and none has been discharged.
+
 R-Q4 (§2.5) withdrew the insertion rule: the `WHO` slot no longer holds a point-free predicate with
 the bound variable supplied as its first argument, because that rule could not type §2.1's own
 advertised example — `WHO is_adult AND is_shareholder AND NOT is_conflicted` applies `AND` and `NOT`
@@ -2853,8 +2859,9 @@ capture, which is worse.** That is the objection in its strongest form and it st
   today they can.
 - **Restrict `WHOSE` to a single comparison**, conjunctions falling back to `WHO`. Cheapest and
   safest; buys the least.
-- **Layout-conjoined `WHOSE`, one constraint per line — proposed by Meng 2026-09-08**, and the only
-  route that removes the ambiguity instead of choosing a side of it:
+- \*\*~~Layout-conjoined `WHOSE`, one constraint per line~~ — proposed by Meng 2026-09-08 and
+  WITHDRAWN by him the same day, for two reasons that both turned out to be right. Kept here
+  because the reasoning is what closes the question:
 
   ```l4
   EVERY Tenant t IN arrears
@@ -2874,17 +2881,34 @@ capture, which is worse.** That is the objection in its strongest form and it st
   Each line's remainder (`AT LEAST 1000`) is an ordinary expression in the ordinary namespace; a
   constraint that needs another field says so with `t's`.
 
-  **What it costs, measured.** It is a **new mechanism**: L4's house style is the leading-operator
-  continuation (`a` / `AND b` / `AND c`), the connective always written, and the parser carries
-  real machinery for exactly that (`jl4-core/src/L4/Parser.hs:1446` on indented operators, and
-  `:1506`, "Older thoughts on the operator layout parsing problem"). Operator-free layout
-  conjunction exists nowhere in the language today. That is the whole of the cost, and it is a
-  parser cost rather than a semantic one.
+  **Why it is withdrawn — 1: the synthesis below makes it unnecessary.** Under opening, the field
+  position is not what disambiguates a bare name; R5's rank is. One-constraint-per-line stops being
+  a disambiguator and becomes a formatting choice, which is a much better thing for it to be.
 
-  **The reading it gives up.** `WHOSE` can then never express a disjunction, so
-  "every tenant whose rent is high **or** whose arrears are old" is a `WHO`. That is deliberate —
-  the constraint is what keeps the field position unambiguous — but it should be stated to a
-  drafter rather than discovered.
+  **Why it is withdrawn — 2: L4 already has it, and has had it all along.** The ellipsis operators
+  are asyndetic con/disjunction: **`...` is implicit `AND`, `..` is implicit `OR`**
+  (`skills/writing-l4-rules/references/gotchas.md`, "Asyndetic operators"). They exist precisely so
+  a clause list "should read as a bulleted list rather than a prose 'A and B and C'", and they are
+  not marginal — **591 asyndetic operator lines across the corpus, 405 of them `...`**. So the
+  proposal was not a new mechanism, it was a second spelling of an existing one:
+
+  ```l4
+  EVERY Tenant t IN arrears
+      WHOSE monthly_rent AT LEAST 1000
+        ... standing     EQUALS   "current"
+      MUST …
+  ```
+
+  And because `..` is already there beside `...`, the restriction the proposal needed —
+  _always conjunction, anything else falls back to `WHO`_ — is not needed either. Disjunction comes
+  for free in the same shape.
+
+  **And it is compatible with inert style, which an operator-free form would have fought.** In inert
+  style a string literal in Boolean context carries verbatim statutory prose and evaluates to its
+  context's identity, so the prose _rides between the operands_ — which requires an operand
+  position to ride in. Removing the connective removes the slot. That is the deeper reason the
+  withdrawal is right rather than merely convenient: the house style depends on the very thing the
+  proposal removed.
 
 #### What this turns on — and it is already ruled elsewhere, and already sequenced
 
@@ -2925,11 +2949,12 @@ they differ only in which reading a drafter loses. **That reversal is the angst,
 and it is why this belongs in the spec rather than in a bench card: no mark on a card disposes of
 it, because the choice is not between safe and unsafe but between two silences.
 
-**The layout-conjoined route above is the one exception, and it is an exception by construction.**
-It does not pick a side of the reversal; it removes the question from this construct by making the
-field position syntactic. That does not settle R5 — R5 still has to decide what an opened field does
-against a top-level name, for every other bare name in the language — but it does mean `WHOSE` need
-not wait on that answer, which is a change to R-Q4's recorded sequencing and should be ruled as
+**The layout-conjoined route above would have been the one exception, by construction** — it did not
+pick a side of the reversal, it removed the question from this construct by making the field
+position syntactic. It is withdrawn anyway, because the synthesis below reaches the same place
+without a new mechanism, and because the language already had the layout it asked for. What survives
+from it is the observation that `WHOSE` need not wait on R5's top-level answer to be **useful**,
+only to be **complete** — which is a change to R-Q4's recorded sequencing and should be ruled as
 such.
 
 The measurement a ruling would need, and which nothing has yet run: **how many names in the corpus
