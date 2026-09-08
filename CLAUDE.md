@@ -110,6 +110,12 @@ Warnings are fatal. Note that shadowing is caught via `-Wall` implying `-Wname-s
 a dedicated flag — there is **no** `-Werror=name-shadowing` in this repo, and the only occurrence of
 the string anywhere is `-Wno-name-shadowing` in `jl4-wasm`.
 
+> **That said, GHC prints the string anyway, so do not read its output as contradicting the
+> paragraph above.** A shadowing error arrives as `[-Wname-shadowing, Werror=name-shadowing]` — that
+> is simply how GHC names the promotion from `-Wall` + `-Werror`, not a flag anyone configured.
+> Grepping the error text against this file will otherwise look like it has found a contradiction.
+> (A live example: `to` shadows `Optics.to`, imported unqualified in `jl4/tests/Main.hs`.)
+
 Test suites include `jl4-test` (goldens), `jl4-core-test`, `l4-cli-test`, `jl4-lsp-test`,
 `jl4-service-test`, `jl4-mlir-test`, `jl4-websessions-test`.
 
@@ -242,6 +248,28 @@ is the first thing to distrust here.
 > what makes it read as broken code. `git diff <binary's commit> HEAD -- jl4-core/libraries/` is a
 > cheap check, but **read the diff rather than its exit code**: deleted comment lines are safe, an
 > added annotation is not.
+
+### 3.1.1 A golden that captures an absolute path cannot fail locally
+
+**Before blessing a new golden, grep it for an absolute path.** `grep -c /Users/ <golden>` is the
+whole check.
+
+Some goldens capture import-resolution logs verbatim, and an import resolved _importer-relative_ —
+one corpus file importing its neighbour — logs the absolute path it found. If that path reaches the
+golden, the test passes on the machine that generated it **forever**, and fails in CI **forever**.
+Not through carelessness: the golden and the actual output come from the same filesystem, so on that
+machine they agree _by construction_. Running the suite again, or through
+`etc/verify-branch.sh`, cannot help. A local green is not weak evidence here — it is no evidence.
+
+The harness scrubs two prefixes for exactly this reason (`mkPathScrubber`, `jl4/tests/Main.hs`):
+`JL4_LIBRARY_PATH` → `$JL4_LIBRARY_PATH`, and the examples root → `$JL4_EXAMPLES`. If you add a
+resolution path that is rooted somewhere else again, scrub it there rather than hand-editing the
+golden — a hand-edit relocates the rake instead of removing it.
+
+> **Why.** The three `not-ok/import/**` goldens on PR #369 shipped with a developer's own worktree
+> path baked in. `jl4-test` ran locally twice and passed honestly both times; the merge-queue run
+> failed on all three, its checkout being at `/__w/l4-ide/l4-ide`. Fixed by extending the scrubber
+> (2026-09-08), which had until then covered only the library path.
 
 ### 3.2 There are TWO printers, and they are guarded differently
 
