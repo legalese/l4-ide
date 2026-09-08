@@ -1083,15 +1083,15 @@ has since been built, the entry says so and names the branch (R-Q1 is the one so
 Measurements are dated 2026-09-07 on `unstable` `5dc0ca19` unless stated; every file:line was
 re-opened on that tree when this section was written.
 
-| id   | question, in a phrase                                        | mark, verbatim                                                                                                              | ruling, in a sentence                                                                                                                                                                                                                                                                                                                                     | recorded in                                |
-| ---- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| R-Q1 | the join word: two quantifiers, or one word and a marker?    | **alternative** — _"E but with “ONCE EACH HAS \n HENCE”?"_                                                                  | One quantifier, `EVERY`; under it a continuation requires a join line: `ONCE ALL HAVE` (barrier), `UPON EACH` (fork; **words RULED 2026-09-07**); a bare `HENCE`/`LEST` is a check error. `HENCE FOR EACH` withdrawn.                                                                                                                                     | §2.2.6, §2.2.7.3–.6, §2.4, §3.1–§3.3, §15  |
-| R-Q2 | does a bare `ALL Pattern` mean anything?                     | **accept** — _"How do the quantifies interact with RAND ROR combinators? Docs need to show an example."_                    | Not a quantifier. `ALL` keeps `FOR ALL`, `RECALL ALL`, `ONCE ALL HAVE`, and becomes the `ALL OF` head of the prefix family. `DO` joins `DeonticModal`. The note is a docs requirement: §8.3 gains the example.                                                                                                                                            | §2.2.7.4, §2.4, §8.3, §15                  |
-| R-Q3 | is `NO Tenant t MAY sublet` a form, and of what?             | **accept** — _"The NO P MUST A form feels like it belongs more to the bounded deontics discussion of dominators."_          | Sugar for `EVERY … SHANT` with the fork join; `HENCE` keeps `SHANT`'s meaning; `NO … MUST`/`SHANT`/`MUST NOT` refused with a naming message; the liberty form deferred to the bounded-deontics discussion.                                                                                                                                                | §2.2.3, §2.2.7.4, §2.4, §15, status header |
-| R-Q4 | the filter word, and what the slot holds                     | **accept** — _"Perhaps the WHOSE projection could take advantage of the field-opening logic from the section-givens work."_ | `WHO` only; the slot is a Boolean expression naming the bound variable; §2.1's insertion rule withdrawn. `WHOSE` is **PROPOSED**, sequenced after `IMPLICIT-PROPS-DESIGN.md` §11.7 R5 is built — but see **§13.6**, which measures what R5 does and does not settle for it, and records a layout-conjoined form that would not need to wait on R5 at all. | §2.1, §2.2.3, §2.3, §2.4, §15              |
-| R-Q5 | early failure: `LEST` at detection, or at the deadline?      | **accept** — _"d"_                                                                                                          | No modifier. The failure time is fixed by the layer the `LEST` attaches to — the state's deadline on the `ONCE … WITHIN` line; on the act layer, by the modal. Success time by modal. §13.1 closed.                                                                                                                                                       | §3.4, §5.2, §13.1                          |
-| R-Q6 | does R-T6's fixed cast bind `EVERY`; what on leave/join?     | **accept** — _"d"_                                                                                                          | Cast evaluated once at arming for the whole family; changes only on an explicit **edit** event (release / substitute / join) applied to the running barrier, completions and accumulator preserved. Events proposed, unbuilt.                                                                                                                             | §2.2.7.8 (R-T6 row), §13.4                 |
-| R-Q7 | the continuation clock: `HENCE` from what, `LEST` from what? | **modify** — _"e but with a as default when no OF?"_                                                                        | A drafter may name the anchor (`WITHIN 5 days OF …`); unanchored, `HENCE` counts from the join's firing (today's rule) and `LEST` from the missed deadline (§5.2) — the latter a **change** from today's revealing-event anchor.                                                                                                                          | §2.4, §5.1, §5.2                           |
+| id   | question, in a phrase                                        | mark, verbatim                                                                                                              | ruling, in a sentence                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | recorded in                                |
+| ---- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| R-Q1 | the join word: two quantifiers, or one word and a marker?    | **alternative** — _"E but with “ONCE EACH HAS \n HENCE”?"_                                                                  | One quantifier, `EVERY`; under it a continuation requires a join line: `ONCE ALL HAVE` (barrier), `UPON EACH` (fork; **words RULED 2026-09-07**); a bare `HENCE`/`LEST` is a check error. `HENCE FOR EACH` withdrawn.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | §2.2.6, §2.2.7.3–.6, §2.4, §3.1–§3.3, §15  |
+| R-Q2 | does a bare `ALL Pattern` mean anything?                     | **accept** — _"How do the quantifies interact with RAND ROR combinators? Docs need to show an example."_                    | Not a quantifier. `ALL` keeps `FOR ALL`, `RECALL ALL`, `ONCE ALL HAVE`, and becomes the `ALL OF` head of the prefix family. `DO` joins `DeonticModal`. The note is a docs requirement: §8.3 gains the example.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | §2.2.7.4, §2.4, §8.3, §15                  |
+| R-Q3 | is `NO Tenant t MAY sublet` a form, and of what?             | **accept** — _"The NO P MUST A form feels like it belongs more to the bounded deontics discussion of dominators."_          | Sugar for `EVERY … SHANT` with the fork join; `HENCE` keeps `SHANT`'s meaning; `NO … MUST`/`SHANT`/`MUST NOT` refused with a naming message; the liberty form deferred to the bounded-deontics discussion.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | §2.2.3, §2.2.7.4, §2.4, §15, status header |
+| R-Q4 | the filter word, and what the slot holds                     | **accept** — _"Perhaps the WHOSE projection could take advantage of the field-opening logic from the section-givens work."_ | `WHO` only; the slot is a Boolean expression naming the bound variable; §2.1's insertion rule withdrawn. `WHOSE` is **PROPOSED**, sequenced after `IMPLICIT-PROPS-DESIGN.md` §11.7 R5 is built — but see **§13.6**, which measures what R5 does and does not settle for it. (~~and records a layout-conjoined form that would not need to wait on R5 at all~~ — that form was **withdrawn by its proposer** the day it was raised, §13.6; this cell was stale until 2026-09-09.) **The sequencing is now evidenced but still unruled: §13.6.1 measures `WHOSE` to be SEPARABLE from R5 — it need not wait — which is the change to this cell that §13.6 says "should be ruled as such". Not ruled here; it is Meng's.** | §2.1, §2.2.3, §2.3, §2.4, §15              |
+| R-Q5 | early failure: `LEST` at detection, or at the deadline?      | **accept** — _"d"_                                                                                                          | No modifier. The failure time is fixed by the layer the `LEST` attaches to — the state's deadline on the `ONCE … WITHIN` line; on the act layer, by the modal. Success time by modal. §13.1 closed.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | §3.4, §5.2, §13.1                          |
+| R-Q6 | does R-T6's fixed cast bind `EVERY`; what on leave/join?     | **accept** — _"d"_                                                                                                          | Cast evaluated once at arming for the whole family; changes only on an explicit **edit** event (release / substitute / join) applied to the running barrier, completions and accumulator preserved. Events proposed, unbuilt.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | §2.2.7.8 (R-T6 row), §13.4                 |
+| R-Q7 | the continuation clock: `HENCE` from what, `LEST` from what? | **modify** — _"e but with a as default when no OF?"_                                                                        | A drafter may name the anchor (`WITHIN 5 days OF …`); unanchored, `HENCE` counts from the join's firing (today's rule) and `LEST` from the missed deadline (§5.2) — the latter a **change** from today's revealing-event anchor.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | §2.4, §5.1, §5.2                           |
 
 **What decided each.**
 
@@ -2822,12 +2822,16 @@ consulted.** So:
    for this case, or a catch-all OTHERWISE branch."_ A drafter who wrote neither a `CONSIDER` nor a
    `WHEN` will not recognise their own program in that sentence.
 
-3. **The "same field on two arms, opposite polarity" hazard is already impossible — but by
+3. ~~**The "same field on two arms, opposite polarity" hazard is already impossible — but by
    forbidding the modelling.** Declaring `Landlord HAS amount_due` beside `Tenant HAS amount_due`
    is refused at check time: _"There are multiple definitions for the identifier"_
    (`TypeCheck.hs:5806`). Field names are flat across a sum type's constructors. That forecloses
    the confusion, and it is worth recording that it forecloses it the blunt way; someone will
-   eventually want per-constructor fields that share a name.
+   eventually want per-constructor fields that share a name.~~
+   **RETRACTED 2026-09-09 — the modelling is NOT forbidden, and the mechanism named here is the
+   wrong one. See §13.6.1.** Declaring the same field on two arms type-checks; the quoted message
+   is an error at an ambiguous **read**, never at the declaration. This matters beyond a
+   correction: the totality rule below was derived from the flatness this point asserts.
 
 #### The angst, which is real and is NOT resolved by any of the above
 
@@ -3033,10 +3037,16 @@ stays the answer wherever explicitness is wanted, and `r's f` is always availabl
   it should be chosen as style rather than adopted as a disambiguator.
 - **The totality rule arrives from the other direction, and arrives better.** Opening can only put
   in scope the fields that exist on every constructor the member could still be. With a cast, that
-  is the cast's arm. Without one, on a sum type whose field names are flat, it is the empty set —
-  so `EVERY t WHOSE monthly_rent …` opens nothing and fails **at check time, naming the missing
-  cast**, instead of reaching a run-time _"reached a CONSIDER that has no branch for it"_ that
-  names neither the field nor the cast.
+  is the cast's arm. ~~Without one, on a sum type whose field names are flat, it is the empty set~~
+  — **the struck clause is FALSE and its premise was retracted 2026-09-09; see §13.6.1.** Field
+  names are not flat, so "without a cast" is the **intersection** over the constructors the member
+  could still be, which is not generally empty. The rule itself (_"the fields that exist on every
+  constructor the member could still be"_) is unchanged and correct; only its derivation and the
+  sum-type case were wrong. What the castless case actually does is measured in §13.6.1, and it is
+  worse than this paragraph promises, so the promise below is withdrawn pending a ruling:
+  `EVERY t WHOSE monthly_rent …` fails **at check time, naming the missing cast**, instead of
+  reaching a run-time _"reached a CONSIDER that has no branch for it"_ that names neither the field
+  nor the cast.
 
 **What must be true for this to work, stated so it can be refuted rather than assumed.**
 
@@ -3061,6 +3071,116 @@ it, with the shape of its answer already ruled.
 changes what a drafter must write. It is that the question is **upstream of the quantifier**: it is
 about how L4 resolves an unqualified name in the presence of records, it is already ruled in another
 document as R5, and a filter clause is the wrong place to settle it.
+
+### 13.6.1 Is `WHOSE` separable from R5? — ANSWERED 2026-09-09 (separable), with three corrections to §13.6
+
+§13.6 left three conditions, none discharged, and the GM's assignment named the one that decides the
+size of everything else: **must R5 be BUILT first, or is a scoped opening for the quantifier member
+separable from the general mechanism?**
+
+**Answer: SEPARABLE.** R5 does not have to be built first. Four independent supports, each cited:
+
+1. **The cast's field vector is already computed at the filter-check point, and thrown away.**
+   `checkQuantifierCast` does `(rc, ct) <- resolveConstructor c; t <- instantiate ct`
+   (`TypeCheck.hs:2004-2010`), called from `:1896`. `inferConDecl` builds that constructor type as
+   `fun (typedNameOptionallyNamedType <$> rtns) …` (`:1536`), where each argument carries the
+   selector's own `Resolved` name minted by `inferSelector` (`:1599-1616`), and `instantiate`
+   substitutes only `Forall` variables (`:537-541`), so the **named** argument vector survives.
+2. **The scope hook is one local call.** `extendKnown (makeKnown rv (KnownTerm partyT Local))`
+   (`:1941`) wraps the filter check at `:1942`. The cast (`:1896`) and the roll (`:1938`) are both
+   checked strictly before it, so `partyT` is concrete by then whenever either is written.
+3. **R5's three hardest obligations are vacuous for one record.** The six-level rank
+   (`IMPLICIT-PROPS-DESIGN.md:1133-1136`) has one occupant; the two-opened-records collision error
+   is unreachable; the `WITH` suppliability rule does not apply to a `KnownTerm _ Local`.
+4. **Nothing existing can regress.** `WHOSE` is not a lexer token (`Lexer.hs:244-245, :346-347`) and
+   all 7 corpus occurrences are English prose inside `--` comments (re-measured 2026-09-09). R5, by
+   contrast, changes bare-name resolution inside every function with a record-typed binder.
+
+**Cost, from the tree's own precedent rather than an estimate.** The identical change — one new
+optional keyword-introduced field on `Every` — was made for the `IN` roll one day earlier, commit
+`0548d83b`: 13 compiler files, no lexer change (it reused `TKIn`), no semantic-token change, no MLIR
+change. `WHOSE` adds exactly two lines beyond that shape (a `TKWhose` beside `TKWho`, and one
+`keywords` row).
+
+#### The three corrections, all measured against a binary built from this branch
+
+Probes were run with a binary built from this worktree at `a619afa6`, `JL4_LIBRARY_PATH` pinned to
+this tree's `jl4-core/libraries` (binary and prelude from one tree — see `CLAUDE.md` §3.1).
+
+1. **§13.6 point 3 is FALSE and is retracted above.** Declaring the same field on two arms
+   type-checks. `ok/every/who-filter.l4:10-11` declares `name` on both `Landlord` and `Tenant` and
+   `tests/who-filter.golden` reads `Typechecking successful`; `ok/every/run-in.l4:19-22` is a second
+   witness. The reason: `ensureDistinct NonDistinctSelectors` runs **inside** `inferConDecl`
+   (`TypeCheck.hs:1531`), over one constructor's typed names, so it can never see a sibling arm. And
+   `TypeCheck.hs:5806` is `AmbiguousTermError` — an error at an ambiguous **read**, not a
+   declaration refusal.
+2. **The totality rule's derivation is FALSE and is corrected above.** It does not follow from
+   flatness, because there is no flatness. Restated: the castless case is the **intersection** over
+   the constructors the member could still be, which is not generally empty.
+3. **A correction that must NOT be made.** A draft of this work "corrected" R5's stated elaboration
+   target — `Proj (App r []) field` (`IMPLICIT-PROPS-DESIGN.md:1138`) — to a `Var` base. That is
+   **vacuous and wrong to write down**: `pattern Var ann n = App ann n []` (`Syntax.hs:395-396`) is
+   a bidirectional pattern synonym, so the two spellings are the same node, and the parser produces
+   it for every bare name (`nameAsApp`, `Parser.hs:1981-1986`; and `Parser.hs:2292` says so). **R5's
+   phrasing is correct.** Recorded because the false version was one review pass away from landing.
+
+#### A live defect this work found, which is NOT about `WHOSE`
+
+The corrected totality rule and the read path meet badly, and the meeting is measured, not reasoned:
+**a field declared on two arms at the same type cannot be read at all.**
+
+```
+DECLARE Actor IS ONE OF
+    Landlord HAS name IS A STRING
+    Tenant   HAS name IS A STRING
+…  EVERY a IN everyone WHO a's name EQUALS "alice" …
+```
+
+fails at **check** time with _"There are multiple definitions for the identifier `name` … name … of
+type FUNCTION FROM Actor TO STRING"_ listed twice, plus a cascading second error on `__EQUALS__`.
+`resolveProjectionLabel` applies **no** viability filter
+(`TypeCheck/Types.hs:1387-1389`), so two same-typed selectors share a `typeKey`, survive
+`selectByProximity`, and reach `ambiguousTerm`. **This is true of hand-written `t's f` today** —
+`WHOSE` neither causes it nor worsens it. It has never been seen because no corpus site reads a
+doubly-declared field; `who-filter.l4` and `run-in.l4` are green precisely because they only ever
+declare one.
+
+Two consequences worth carrying: the diagnostic names neither the arms nor the projection, so a
+drafter will not recognise their program in it; and the corrected totality rule would open exactly
+this unreadable set, since the intersection over constructors **is** the set of names declared on
+every arm.
+
+#### What is NOT ruled here, and is Meng's
+
+None of the following is settled, because each changes what a drafter must write (assignment §7):
+
+1. **What `EVERY t WHOSE f` should do on a sum type when `f` is not on every arm** — refuse and name
+   the missing cast, open the intersection, or require a cast outright.
+2. **What it should do for the castless form.** Note this form is live and goldened:
+   `ok/every/run-roll.l4:62-72` is captioned _"No cast word at all"_ and carries a `#TRACE`;
+   `ok/every/bare-variable.l4` is a second. A design that refuses castless `WHOSE` would make it
+   strictly weaker than the `WHO` spelling that works today.
+3. **Whether the doubly-declared-field defect above is fixed first, and how** — a per-arm
+   disambiguation is a language change, not a `WHOSE` change.
+
+#### Method, and what was not checked
+
+Six parallel readers over parser / typecheck-scope / name-resolution / R5-surface / casts /
+evaluation, one synthesis, then three adversarial refuters on distinct lenses. **Two of three
+refuted the synthesis as written** — the `Var`/`App r []` error above, an over-claim that the
+castless form was "unusable" (refuted by `run-roll.l4`), and an over-claim that
+`Desugar.rewriteFieldRefs` is fully shadowing-aware (it drops `LocalAssume`, `Desugar.hs:422`, and
+`branchLhsNames` yields ∅ for every parser-producible pattern, `:435-437`). The separability verdict
+survived all three. One hypothesis raised during this work — that the field/top-level collision might
+already be a loud ambiguity, since `inferSelector` puts fields in the term namespace — was **refuted
+by measurement**: `monthly_rent MEANS 42` beside `DECLARE Party HAS monthly_rent` evaluates a bare
+read to `42`, silently. §13.6's "two silences" framing stands, and its mechanism is now known to be
+type-directed candidate filtering.
+
+Not checked: nothing was built for `WHOSE`; no golden was written or blessed; the DMN/Catala/Blawx/
+docassemble/OpenFisca refusal claims and the `jl4-mlir` cite were verified by reading only; the
+five-collision measurement of §13.6 was spot-checked at `regcf-wizard.l4:597-602` and not
+re-derived; `jl4-test` was not run.
 
 ## 14. Related Work
 
