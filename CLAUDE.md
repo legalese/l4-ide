@@ -110,8 +110,46 @@ Warnings are fatal. Note that shadowing is caught via `-Wall` implying `-Wname-s
 a dedicated flag — there is **no** `-Werror=name-shadowing` in this repo, and the only occurrence of
 the string anywhere is `-Wno-name-shadowing` in `jl4-wasm`.
 
+> **That said, GHC prints the string anyway, so do not read its output as contradicting the
+> paragraph above.** A shadowing error arrives as `[-Wname-shadowing, Werror=name-shadowing]` — that
+> is simply how GHC names the promotion from `-Wall` + `-Werror`, not a flag anyone configured.
+> Grepping the error text against this file will otherwise look like it has found a contradiction.
+> (A live example: `to` shadows `Optics.to`, imported unqualified in `jl4/tests/Main.hs`.)
+
 Test suites include `jl4-test` (goldens), `jl4-core-test`, `l4-cli-test`, `jl4-lsp-test`,
 `jl4-service-test`, `jl4-mlir-test`, `jl4-websessions-test`.
+
+### 3.0 Run the gate with `etc/verify-branch.sh`, not by hand
+
+```
+etc/verify-branch.sh [--quick] [--base <ref>] <ABSOLUTE-worktree-path>
+```
+
+It runs the build, `jl4-test`, `l4-cli-test`, `jl4-core-test`, `check-corpus-goldens`,
+`doc/test-docs.sh` and prettier, pins `JL4_LIBRARY_PATH` for you, and exits non-zero on any failure.
+`--quick` skips `jl4-test`, which is the ~12-minute one.
+
+**The worktree is an argument, not a `cd`, and it must be absolute.** That is the point of the
+script rather than an inconvenience: the working directory of a shell command is not stable between
+invocations in an agent harness, so "remember to `cd` first" is not a control. The tree that was
+actually tested is printed at the top _and_ the bottom of every run, so a truncated log still says
+which one it was.
+
+It also refuses to start when a `cabal` is already running in that worktree (§2.1's phantom
+`.o.tmp`), fails on stray `*.evaldiff.l4` before doing anything (they sit inside the corpus globs),
+runs prettier only over changed files (a whole-repo `--check` in a fresh worktree fails on the
+uninstalled `@repo/prettier-config`, which is an install gap and not a formatting defect), checks
+every commit carries its `Claude-Session:` trailer, and tells you when `L4/Print.hs` is in the diff
+that §3.2.1's evaluation differential is now owed by hand.
+
+**A green run is not a green CI** — the script says so at the end, and lists what it did not run.
+See §3.3.
+
+> **Why.** On 2026-09-08 one session hand-assembled this gate four times and omitted the `cd` in
+> two of them, so the build ran in whichever worktree the shell happened to be in. Both runs went
+> green, and both were green about the wrong tree. One was caught only because the two candidate
+> trees happened to report different example counts — `368` from one and `365` from the other — and
+> had they matched, a branch would have been pushed on a verification of something else entirely.
 
 ### 3.1 Five traps that produce fake failures
 
@@ -210,6 +248,28 @@ is the first thing to distrust here.
 > what makes it read as broken code. `git diff <binary's commit> HEAD -- jl4-core/libraries/` is a
 > cheap check, but **read the diff rather than its exit code**: deleted comment lines are safe, an
 > added annotation is not.
+
+### 3.1.1 A golden that captures an absolute path cannot fail locally
+
+**Before blessing a new golden, grep it for an absolute path.** `grep -c /Users/ <golden>` is the
+whole check.
+
+Some goldens capture import-resolution logs verbatim, and an import resolved _importer-relative_ —
+one corpus file importing its neighbour — logs the absolute path it found. If that path reaches the
+golden, the test passes on the machine that generated it **forever**, and fails in CI **forever**.
+Not through carelessness: the golden and the actual output come from the same filesystem, so on that
+machine they agree _by construction_. Running the suite again, or through
+`etc/verify-branch.sh`, cannot help. A local green is not weak evidence here — it is no evidence.
+
+The harness scrubs two prefixes for exactly this reason (`mkPathScrubber`, `jl4/tests/Main.hs`):
+`JL4_LIBRARY_PATH` → `$JL4_LIBRARY_PATH`, and the examples root → `$JL4_EXAMPLES`. If you add a
+resolution path that is rooted somewhere else again, scrub it there rather than hand-editing the
+golden — a hand-edit relocates the rake instead of removing it.
+
+> **Why.** The three `not-ok/import/**` goldens on PR #369 shipped with a developer's own worktree
+> path baked in. `jl4-test` ran locally twice and passed honestly both times; the merge-queue run
+> failed on all three, its checkout being at `/__w/l4-ide/l4-ide`. Fixed by extending the scrubber
+> (2026-09-08), which had until then covered only the library path.
 
 ### 3.2 There are TWO printers, and they are guarded differently
 
