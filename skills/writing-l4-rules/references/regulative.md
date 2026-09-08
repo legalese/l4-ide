@@ -239,7 +239,7 @@ So `l4 check` passing is **not** evidence that a quantified rule will run. Give 
 The roll may be any expression of type `LIST` of the party type — a literal, a name, a call. Three things about it are worth knowing before you debug them:
 
 - **It is read once**, when the rule meets its event stream, and the group is fixed from then on. Somebody added to the list later does not join a group already running.
-- **It cannot mention the member.** `EVERY Tenant t IN (peersOf t)` asks the list to know its own answer; the member is not in scope there. To narrow by something about each member, use `WHO`, where it is.
+- **It cannot mention the member.** `EVERY Tenant t IN (peersOf t)` asks the list to know its own answer; the member is not in scope there. To narrow by something about each member, use `WHO`, where it is. One sharp edge: what the checker rejects is a name it cannot find, so if the file happens to define something else called `t` at the top level, the `t` inside `IN` quietly means **that** one and nothing is reported. Give the member a name nothing else in the file uses.
 - **A name listed twice is counted twice.** Under a barrier that is harmless; under a fork the continuation fires once per copy, so one payment earns two receipts.
 
 ### 2. The join line is mandatory whenever there is a `HENCE` or a `LEST`
@@ -306,11 +306,11 @@ An `elem` condition **beside** an `IN` roll is an ordinary narrowing condition a
 
 Say these plainly to a user rather than letting them discover them:
 
-- **A failed barrier blames one member, not all of them.** A breach record holds one party, so you get the first non-actor in roll order. If two tenants miss the date, only one is named.
+- **A failed barrier's breach names NOBODY.** A barrier's `LEST` belongs to the join, not to any member, so it may not name `t` — the checker refuses `LEST BREACH BY t` — and a bare `LEST BREACH` yields a bare `BREACH` with no party. A constant works (`LEST BREACH BY theLandlord BECAUSE "…"`) but is a party you chose, not the one who failed. Who is outstanding shows up in the **residual**, not the breach. Use the fork if the failure has to name the member.
 - **The count and measure joins are not built.** `ONCE SOME 2 OF … HAVE` and `ONCE sum OF amount AT LEAST rent` do not parse. Only `ONCE ALL HAVE` and `UPON EACH` do.
 - **`NO Tenant t MAY …`** is designed but not built; write the `SHANT` form.
 - **A residual barrier loses its join line**, so feeding a residual more events runs the members and not the join. Run the whole stream at once.
-- **The WASM export refuses a rule containing `EVERY`**, and the BPMN export draws a barrier and a fork identically without saying so in its fidelity report. Read the `.l4`, not the diagram, to tell which join a rule has.
+- **The BPMN export draws a barrier and a fork identically**, and its fidelity report does not mention the join at all — so the two rules produce byte-identical output. Read the `.l4`, never the diagram, to tell which join a rule has. The reference page reports that the WASM export refuses an `EVERY` rule outright rather than compiling it wrongly; that one is not re-verified here.
 
 Full treatment, including the state-graph behaviour and the measured sharp edges: <https://legalese.com/l4/reference/regulative/EVERY.md>.
 
