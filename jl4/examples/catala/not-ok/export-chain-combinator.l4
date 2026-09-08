@@ -1,0 +1,32 @@
+-- REJECTED (R1, §8.1). The second site of smucclaw/l4-ide#958.
+--
+-- Same defect as `export-chain-broken.l4`, reached by a different route: here
+-- the @export'd `double` is not called directly but handed to `map` as its
+-- function argument, which R5 absorbs into Catala's `map each … among …`. The
+-- absorbed call is still a scope call, and `all doubled` is still a toplevel:
+--
+--   equals (Decimal.sum of (map each item_double among xs
+--             to (output of Double with { -- n: item_double }).double))
+--
+-- Measured on the pristine tree at 6e9b57bb: `l4 catala` exited 0 and printed
+-- nothing, and `catala typecheck` then rejected that line with "Scope calls are
+-- not allowed outside of a scope". The combinator arm carried no context check
+-- at all, so a fix to the direct-call path alone would have left this open.
+--
+-- `l4 check` reports this file as clean.
+
+IMPORT prelude
+
+@export
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`double` n MEANS n TIMES 2
+
+GIVEN xs IS A LIST OF NUMBER
+GIVETH A NUMBER
+`all doubled` xs MEANS sum (map `double` xs)
+
+@export
+GIVEN xs IS A LIST OF NUMBER
+GIVETH A NUMBER
+`total` xs MEANS `all doubled` xs PLUS 1

@@ -507,6 +507,74 @@ spec = do
         ]
       es `shouldSatisfy` mentions "list pattern"
 
+    -- smucclaw/l4-ide#958, both emission sites. R1 puts an @export'd decision in
+    -- a Catala SCOPE and every other reachable decision in a TOPLEVEL, and
+    -- Catala allows `output of S with { … }` only inside a scope. Until these
+    -- refusals, both shapes below lowered clean, `l4 catala` exited 0 in
+    -- silence, and `catala typecheck` rejected the file it had just written with
+    -- "Scope calls are not allowed outside of a scope" (measured on the pristine
+    -- tree at 6e9b57bb against catala 1.2.1, exit 123).
+    it "rejects an @export'd callee called from a non-exported caller (R1, §8.1)" $ do
+      es <- lowerErrs $ Text.unlines
+        [ "@export"
+        , "GIVEN n IS A NUMBER"
+        , "GIVETH A NUMBER"
+        , "`the base` n MEANS n TIMES 2"
+        , ""
+        , "GIVEN n IS A NUMBER"
+        , "GIVETH A NUMBER"
+        , "`the middle` n MEANS `the base` n PLUS 1"
+        , ""
+        , "@export"
+        , "GIVEN n IS A NUMBER"
+        , "GIVETH A NUMBER"
+        , "`the top` n MEANS `the middle` n PLUS 10"
+        ]
+      es `shouldSatisfy` mentions "is @export'd, so it compiles to a Catala scope"
+      es `shouldSatisfy` mentions "Mark this caller @export too"
+
+    -- The combinator arm is a separate site: it had no context check whatsoever,
+    -- so a fix to the direct-call path alone would have left this reachable.
+    it "rejects the same composition reached through a combinator (R5, §8.5)" $ do
+      es <- lowerErrs $ Text.unlines
+        [ "IMPORT prelude"
+        , ""
+        , "@export"
+        , "GIVEN n IS A NUMBER"
+        , "GIVETH A NUMBER"
+        , "`double` n MEANS n TIMES 2"
+        , ""
+        , "GIVEN xs IS A LIST OF NUMBER"
+        , "GIVETH A NUMBER"
+        , "`all doubled` xs MEANS sum (map `double` xs)"
+        , ""
+        , "@export"
+        , "GIVEN xs IS A LIST OF NUMBER"
+        , "GIVETH A NUMBER"
+        , "`total` xs MEANS `all doubled` xs PLUS 1"
+        ]
+      es `shouldSatisfy` mentions "is @export'd, so it compiles to a Catala scope"
+      -- not the generic "must be a literal lambda or a one-argument definition"
+      -- fallthrough, which would tell the author their argument is the wrong
+      -- shape when it is exactly the right shape in the wrong place
+      es `shouldSatisfy` mentions "Mark this caller @export too"
+
+    -- The guard is 'cxInScope', NOT 'cxAssumeOK', and this is why: an R7
+    -- `#[test]` scope IS a Catala scope, so calling an exported decision from
+    -- one is legal and is the entire point of R7. Keying the refusal on
+    -- 'cxAssumeOK' — which is False in a test body — would refuse every test
+    -- scope the emitter produces.
+    it "still emits a test scope's call to an exported decision (R7, §8.7)" $ do
+      m <- lowerOk $ Text.unlines
+        [ "@export"
+        , "GIVEN n IS A NUMBER"
+        , "GIVETH A NUMBER"
+        , "`the base` n MEANS n TIMES 2"
+        , ""
+        , "#EVAL `the base` 21"
+        ]
+      map (.sdName) (scopeDecls m) `shouldSatisfy` elem "Test1"
+
     it "rejects a WHERE binding that takes parameters (§4.2)" $ do
       es <- lowerErrs $ Text.unlines
         [ "@export"

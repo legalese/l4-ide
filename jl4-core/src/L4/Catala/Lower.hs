@@ -224,6 +224,15 @@ data Ctx = Ctx
   , cxHelpers  :: !(Map Unique HelperSig)
   , cxAssumes  :: !(Map Unique AssumeInfo)
   , cxAssumeOK :: !Bool                       -- ^ may this body read an @ASSUME@? (scopes yes)
+  , cxInScope  :: !Bool
+    -- ^ is this expression being emitted /inside a Catala scope body/? Catala
+    -- permits @output of S with { … }@ only there, so a scope call from a
+    -- toplevel @declaration … equals@ is rejected by @catala typecheck@ with
+    -- "Scope calls are not allowed outside of a scope" (measured, catala 1.2.1,
+    -- exit 123). This is deliberately NOT the same question as 'cxAssumeOK': an
+    -- R7 @#[test]@ scope IS a scope (so it may call one) but declares no inputs
+    -- (so it may not read an @ASSUME@). Conflating the two would refuse every
+    -- test scope, which is the whole of R7.
   , cxElided   :: !(Map Unique Text)          -- ^ elided string values → why
   , cxDecides  :: !(Map Unique DecideInfo)
   , cxNonexh   :: !Bool                       -- ^ the enclosing decision carries @\@nonexhaustive@
@@ -385,6 +394,7 @@ buildModule opts mod' efs =
           , cxHelpers  = hsigs
           , cxAssumes  = assumes
           , cxAssumeOK = False
+          , cxInScope  = False
           , cxElided   = elided
           , cxDecides  = decides
           , cxNonexh   = False
@@ -801,8 +811,14 @@ data TestUnit = TestUnit
 -- than failing the emission: a module's testability is not a precondition for
 -- its compilation.
 collectTests :: Ctx -> Map Unique DecideInfo -> Module Resolved -> ([TestUnit], [Text])
-collectTests ctx decides mod' = go (1 :: Int) [ d | Directive _ d <- topDecls mod' ] [] []
+collectTests modCtx decides mod' = go (1 :: Int) [ d | Directive _ d <- topDecls mod' ] [] []
  where
+  -- Everything a directive lowers to is emitted inside a @#[test]@ scope, and
+  -- that is a Catala scope like any other: calling an exported decision from it
+  -- is not merely legal but the entire point of R7. It still declares no
+  -- inputs, so 'cxAssumeOK' stays 'False' — see the note on 'cxInScope'.
+  ctx = modCtx { cxInScope = True }
+
   go _ [] us ns = (reverse us, reverse ns)
   go i (d : ds) us ns = case plan i d of
     Right made     -> go (i + 1) ds (reverse made <> us) ns
@@ -1085,7 +1101,7 @@ lowerExportDi outer assumes assumeUse di ef path =
   -- injective, so the parameters, the ASSUMEd inputs and the output name all go
   -- through 'bindLocal' rather than straight into a map (see its haddock).
   bodyCtx =
-    ( \c -> c { cxAssumeOK = True, cxNonexh = di.diNonexh } )
+    ( \c -> c { cxAssumeOK = True, cxInScope = True, cxNonexh = di.diNonexh } )
     <$> bindParams di.diRange
           outer { cxBound = Map.singleton (catIdent di.diName) di.diName }
           (  [ (getUnique (givenName g), givenText g, givenType g >>= bareTy)
@@ -1205,7 +1221,9 @@ lowerHelper outer di = vIn di.diName $ case di.diGiveth of
       <*> lowerExpr bodyCtx' di.diBody
  where
   bodyCtx =
-    ( \c -> c { cxAssumeOK = False, cxNonexh = di.diNonexh } )
+    -- A non-exported helper compiles to a Catala /toplevel/, not a scope (R1),
+    -- so neither an @ASSUME@ read nor a scope call is legal in its body.
+    ( \c -> c { cxAssumeOK = False, cxInScope = False, cxNonexh = di.diNonexh } )
     <$> bindParams di.diRange
           outer { cxBound = Map.singleton (catIdent di.diName) di.diName }
           (  [ (getUnique (givenName g), givenText g, givenType g >>= bareTy)
@@ -1650,6 +1668,22 @@ lowerApp ctx e ref args
   u   = getUnique ref
   nm  = canonText ref
   bad = vErr (rangeOf e)
+
+  -- Both @ASSUME@ refusals below fire in two different places, and telling the
+  -- author which one they are in is the difference between actionable and
+  -- baffling. 'cxInScope' separates them: a toplevel helper is not a scope at
+  -- all and CAN take the value as a parameter, whereas an R7 @#[test]@ scope is
+  -- a scope but declares no inputs, so there is nowhere for the value to come
+  -- from and no parameter to add. Before this split both cases said "not from a
+  -- toplevel helper", which was simply untrue of a test scope — and it was
+  -- untrue in a committed golden, where a reader would meet it first.
+  noInputsHere
+    | ctx.cxInScope =
+        "this is a `#[test]` scope generated for a #EVAL/#ASSERT directive, and a test scope \
+        \declares no inputs, so there is nowhere for it to read one from — test a decision that \
+        \does not read module-level inputs, or supply the value as an ordinary GIVEN parameter"
+    | otherwise =
+        "pass it to this helper as a parameter instead"
   -- Recognisers key on the /bare/ name, and on both spellings of it: a
   -- section-qualified reference carries its section path
   -- ("Prelude.Numeric Aggregates.sum"), and an @AKA@\'d definition answers to
@@ -1677,7 +1711,7 @@ lowerApp ctx e ref args
   assumeRef ai
     | not ctx.cxAssumeOK =
         bad ("ASSUMEd input `" <> ai.aiL4 <> "` is only readable inside an @export decision's scope "
-             <> "(where it becomes a scope `input`); pass it to this helper as a parameter instead")
+             <> "(where it becomes a scope `input`); " <> noInputsHere)
     | otherwise = case Map.lookup u ctx.cxVars of
         Just v  -> pure (EVar v)
         Nothing -> bad ("ASSUMEd input `" <> ai.aiL4 <> "` is not an input of this scope")
@@ -1686,9 +1720,10 @@ lowerApp ctx e ref args
     | length args /= length sg.ssParams =
         bad ("call to `" <> nm <> "` has " <> tshow (length args) <> " argument(s) but its scope "
              <> "declares " <> tshow (length sg.ssParams))
+    | not ctx.cxInScope = bad (outsideScopeMsg nm)
     | not (null sg.ssAssumes) && not ctx.cxAssumeOK =
         bad ("`" <> nm <> "` reads module-level ASSUMEd inputs, so it can only be called from "
-             <> "another @export decision's scope, not from a toplevel helper")
+             <> "another @export decision's scope; " <> noInputsHere)
     | otherwise =
         (\bound -> EScopeOut sg.ssScope (bound <> [ (a, EVar a) | a <- sg.ssAssumes ]) sg.ssOutput)
         <$> vList [ (,) p <$> lowerExpr ctx a | ((p, keep), a) <- zip sg.ssParams args, keep ]
@@ -1883,11 +1918,41 @@ combinator ctx nm args = case (nm, args) of
                          , CatArm (PCon "Absent" Nothing) d' ])
     <$> lo d <*> lo x
 
+-- | The refusal for a scope call that would land outside any Catala scope.
+--
+-- R1 emits an @\@export@ed decision as a Catala /scope/ and every other reachable
+-- decision as a /toplevel definition/. Catala allows @output of S with { … }@
+-- only inside a scope body, so an un-@\@export@ed caller of an @\@export@ed
+-- callee is a composition that cannot be expressed — @catala typecheck@ rejects
+-- it with "Scope calls are not allowed outside of a scope" (catala 1.2.1, exit
+-- 123). Until this refusal existed, @l4 catala@ emitted that file and exited 0
+-- (smucclaw\/l4-ide#958).
+--
+-- The caller's own name is supplied by the enclosing 'vIn', so the rendered
+-- error reads @in \`the middle\`: \`the base\` is @export'd …@.
+outsideScopeMsg :: Text -> Text
+outsideScopeMsg callee =
+  "`" <> callee <> "` is @export'd, so it compiles to a Catala scope — and Catala allows a scope \
+  \call only from inside another scope. This caller is not @export'd, so it compiles to a toplevel \
+  \definition, and the call would land outside any scope (`catala typecheck` rejects that with \
+  \\"Scope calls are not allowed outside of a scope\"). Mark this caller @export too — every rule \
+  \along the chain has to be exported, not just the one being called — or inline `"
+  <> callee <> "` here (R1, §8.1)."
+
 -- | A named one-argument function, as something a combinator binder can apply.
 fnRef1 :: Ctx -> Expr Resolved -> V (CatExpr -> CatExpr)
 fnRef1 ctx = \case
   App _ r [] | Just hs <- Map.lookup (getUnique r) ctx.cxHelpers, length hs.hsParams == 1 ->
     pure (\a -> ECall hs.hsName [a])
+  -- A combinator's function argument that names an @export'd decision becomes a
+  -- scope call too, so it carries the same restriction as 'scopeCall' — and the
+  -- refusal has to come before the fallthrough, or the caller is told its
+  -- argument is not a one-argument definition, which it plainly is.
+  fe@(App _ r []) | Just sg <- Map.lookup (getUnique r) ctx.cxScopes
+                  , [(_, True)] <- sg.ssParams
+                  , null sg.ssAssumes
+                  , not ctx.cxInScope ->
+    vErr (rangeOf fe) (outsideScopeMsg (canonText r))
   App _ r [] | Just sg <- Map.lookup (getUnique r) ctx.cxScopes
              , [(p, True)] <- sg.ssParams
              , null sg.ssAssumes ->

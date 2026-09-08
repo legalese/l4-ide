@@ -1,0 +1,33 @@
+-- REJECTED (R1, §8.1). The witness for smucclaw/l4-ide#958.
+--
+-- `the base` and `the top` are @export'd, so R1 emits each as a Catala SCOPE.
+-- `the middle` is not, so it is emitted as a toplevel `declaration … equals` —
+-- and its call to `the base` becomes `output of TheBase with { … }`, which
+-- Catala allows only inside a scope body. The emitted module is not valid
+-- Catala: `catala typecheck` rejects it with "Scope calls are not allowed
+-- outside of a scope" (catala 1.2.1, exit 123).
+--
+-- Until the refusal this file pins, `l4 catala` emitted that module, printed
+-- nothing at all on stderr, and exited 0 — the invalid output was discovered
+-- only by running Catala over it by hand.
+--
+-- `l4 check` reports this file as clean; nothing but the Catala lowering
+-- catches it, which is why it is a fixture. The fix an author wants is to mark
+-- `the middle` @export too: the hatch is all-or-nothing along the chain, and
+-- `../export-chain.l4` is the same shape with every rung exported.
+
+§ `Chain`
+
+@export
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`the base` n MEANS n TIMES 2
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`the middle` n MEANS `the base` n PLUS 1
+
+@export
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`the top` n MEANS `the middle` n PLUS 10

@@ -1,0 +1,50 @@
+-- The `@export`-everything hatch, which is what `not-ok/export-chain-broken.l4`
+-- refuses the absence of — and the only file in the Catala corpus that carries a
+-- module-level binder at all.
+--
+-- Two things are exercised here that nothing else in `jl4/examples/catala/` did:
+--
+--   1. A section `GIVEN`. The desugarer elaborates one into a 0-ary `ASSUME` at
+--      the head of its section, which `collectAssumes` picks up like any other,
+--      so `the levy rate` becomes a scope `input` on every scope that reads it —
+--      directly or through a call — and callers thread it through by name
+--      (`output of … with { -- the_levy_rate: the_levy_rate }`).
+--
+--   2. A three-rung call chain in which EVERY rung is `@export`ed. That is the
+--      hatch: an un-exported rung compiles to a Catala toplevel, and a scope
+--      call is not legal there. The cost is one published scope per rule — the
+--      author wanted `the middle` to be a private helper and cannot have one.
+--
+-- The emitted module is checked by `etc/validate-catala.mjs`, so this is not
+-- merely a golden of what we print: `catala typecheck` and `clerk test` agree
+-- that the threading is well-formed and that the numbers match L4's evaluator.
+
+§ `Levy`
+  GIVEN `the levy rate` IS A NUMBER
+
+@export Base charge on a metered quantity, before the levy.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`the base` n MEANS n TIMES 2
+
+@export The base charge with the section's levy applied.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`the middle` n MEANS `the base` n TIMES (1 PLUS `the levy rate`)
+
+@export The levied charge plus a fixed standing amount.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`the top` n MEANS `the middle` n PLUS 10
+
+-- `the base` reads no binder, so R7 can wrap it in a `#[test]` scope and the
+-- emitted block carries a value L4 computed.
+#EVAL `the base` 5
+
+-- `the top` does read one, transitively, and R7 CANNOT test it: a `#[test]`
+-- scope declares no inputs, so it has nowhere to get `the levy rate` from. The
+-- directive is skipped with a note rather than emitted, which is why the
+-- artifact below tests only the first rung. This is a real limit of R7 on
+-- binder-carrying scopes, not a defect in the chain — kept here so the note is
+-- visible in a golden instead of being discovered by the next reader.
+#EVAL `the top` 5

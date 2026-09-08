@@ -4781,6 +4781,17 @@ spec bin = do
       expectGolden bin ["catala", "examples/catala/registry.l4"]
                        "examples/catala/expected/registry.catala_en"
 
+    -- The @export-everything hatch, and the only file in this corpus carrying a
+    -- module-level binder at all: before it, no golden exercised `collectAssumes`,
+    -- `assumeClosure` or the `ssAssumes` threading, so the whole ASSUME path was
+    -- emitted by code that nothing in the tree ran. It pins two things at once —
+    -- that a section GIVEN becomes a scope `input`, and that `assumeClosure`'s
+    -- fixpoint carries it TRANSITIVELY (`the top` never names the binder, reaches
+    -- it only through `the middle`, and must still declare and forward it).
+    it "compiles the @export chain, threading a section GIVEN as a scope input" $
+      expectGolden bin ["catala", "examples/catala/export-chain.l4"]
+                       "examples/catala/expected/export-chain.catala_en"
+
     -- R11's disclosure obligation is the point of these two, not the text: a
     -- narrower emitted record than its L4 source is a shape divergence a
     -- reader must be told about, so it goes in the notes block, not just on
@@ -4894,6 +4905,37 @@ spec bin = do
          ] $ \name ->
       it ("rejects " ++ name ++ " rather than changing its denotation") $
         expectFail bin ["catala", "examples/catala/not-ok/" ++ name ++ ".l4"]
+
+    -- smucclaw/l4-ide#958. R1 emits an @export'd decision as a Catala SCOPE and
+    -- every other reachable decision as a TOPLEVEL, and Catala allows a scope
+    -- call only inside a scope — so a non-exported caller of an exported callee
+    -- cannot be expressed. Until this refusal, `l4 catala` emitted that module,
+    -- printed nothing at all, and exited 0; the invalid output was found only by
+    -- running `catala typecheck` over it by hand, which reports "Scope calls are
+    -- not allowed outside of a scope" (catala 1.2.1, exit 123).
+    --
+    -- Two fixtures because there were two emission sites: the direct call, and
+    -- the combinator argument that R5 absorbs into `map each … among …`. The
+    -- second carried no context check at all, so a fix to the first alone would
+    -- have left it open.
+    --
+    -- The MESSAGE is asserted, not just the exit code. Exit 1 alone would be
+    -- satisfied by a fixture that merely fails to typecheck — the same argument
+    -- `expectVerifyFinding` makes above — and both fixtures typecheck cleanly,
+    -- so a bare `expectFail` here would be a control over nothing.
+    for_ [ ("export-chain-broken",     "the middle",  "the base")
+         , ("export-chain-combinator", "all doubled", "double")
+         ] $ \(name, caller, callee) ->
+      it ("refuses " ++ name ++ ": a scope call would land outside a scope") $ do
+        Output code _ serr <- runL4 bin
+          ["catala", "examples/catala/not-ok/" ++ name ++ ".l4"]
+        code `shouldNotBe` ExitSuccess
+        -- names the caller, the callee, the rule, and the way out
+        serr `shouldSatisfy` (("`" ++ caller ++ "`") `isInfixOf`)
+        serr `shouldSatisfy` ((callee ++ "` is @export'd") `isInfixOf`)
+        serr `shouldSatisfy`
+          ("Catala allows a scope call only from inside another scope" `isInfixOf`)
+        serr `shouldSatisfy` ("Mark this caller @export too" `isInfixOf`)
 
     it "fails on a file that does not typecheck" $
       expectFail bin ["catala", errorFixture]
