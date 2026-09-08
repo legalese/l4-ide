@@ -240,27 +240,40 @@ today.
 **One condition on that, and it is all-or-nothing.** An `@export`ed rule is
 published as a Catala _scope_, and Catala allows a scope to be called only from
 inside another scope. So if an `@export`ed rule is called by one that is **not**
-exported, the call comes out inside a plain top-level definition:
+exported, the call would come out inside a plain top-level definition, which
+Catala rejects. `l4 catala` refuses that up front rather than writing a file the
+next tool will throw out — it exits 1, names the rule and the rule that calls
+it, and tells you what to do:
 
 ```
-declaration the_middle content decimal
-  depends on the_n content decimal
-  equals ((output of TheBase with { -- the_n: the_n }).the_base + 1.0)
+l4 catala: cannot compile these decisions to Catala:
+  - in `the middle`: `Chain.the base` is @export'd, so it compiles to a Catala
+    scope — and Catala allows a scope call only from inside another scope. This
+    caller is not @export'd, so it compiles to a toplevel definition, and the
+    call would land outside any scope (`catala typecheck` rejects that with
+    "Scope calls are not allowed outside of a scope"). Mark this caller @export
+    too — every rule along the chain has to be exported, not just the one being
+    called — or inline `Chain.the base` here (R1, §8.1). (chain.l4:10:22-39)
 ```
-
-and Catala rejects the file — _"Scope calls are not allowed outside of a scope"_.
-`l4 catala` does not notice: it exits 0 and writes the output, so the failure
-finds you when you run `catala typecheck`, not when you export.
 
 **It is the rule in the middle, not the number of exports.** Remove that
 un-exported rule — export it too, or fold its body into its caller — and the same
-module with the same two `@export`s typechecks. A module may export as many rules
-as it likes; what it may not do is route a call between two of them through one
-that is not exported. If you are here because of a section `GIVEN` the condition
-costs you little, since every rule that reads the binder has to be exported
-anyway; if you are applying `@export` to an ordinary helper, it is the whole
-story. Measured 2026-09-07 on `catala` 1.2.1; reported upstream as
-[smucclaw/l4-ide#958](https://github.com/smucclaw/l4-ide/issues/958).
+module with the same two `@export`s compiles and typechecks. A module may export
+as many rules as it likes; what it may not do is route a call between two of them
+through one that is not exported. If you are here because of a section `GIVEN`
+the condition costs you little, since every rule that reads the binder has to be
+exported anyway; if you are applying `@export` to an ordinary helper, it is the
+whole story.
+
+Until 2026-09-08 there was no refusal: `l4 catala` exited 0, printed nothing,
+and wrote a file `catala typecheck` then rejected — so the failure found you one
+tool later, with nothing pointing back at the rule that caused it. If you are
+reading an older note that says the export "is not composable", that is what it
+was describing, and it was too strong: the composition works, provided every rung
+is exported. Reported upstream as
+[smucclaw/l4-ide#958](https://github.com/smucclaw/l4-ide/issues/958); the worked
+example is `jl4/examples/catala/export-chain.l4`, with the two refused shapes
+beside it under `not-ok/`.
 
 The restriction is ours, not Catala's, and it is ruled to go away:
 `specs/todo/IMPLICIT-PROPS-DESIGN.md` §11.10 (ruling **R10**, ruled 2026-09-04)

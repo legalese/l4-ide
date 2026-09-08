@@ -68,12 +68,48 @@ Catala **unchanged**. The same L4 file feeds both bridges with no edits.
 ## What doesn't survive
 
 Catala does not emit a fidelity report. Instead it **refuses**: where emitting something would make
-the Catala assert what the L4 does not, the compiler stops. The examples directory keeps five
+the Catala assert what the L4 does not, the compiler stops. The examples directory keeps seven
 sources specifically to pin those refusals.
 
 The one systematic elision is that a value the rules never actually inspect — a `period` string
 threaded through but never read, say — is dropped rather than modelled, since Catala's type system
 has no place to put it.
+
+### `@export` is all-or-nothing along a chain of calls
+
+This is the limit most likely to surprise you, because it is about how your rules call each other
+rather than about what they say.
+
+A rule you mark `@export` is published as a Catala **scope** — a named, callable unit that Catala's
+own tools (its interpreter, its JSON schema generator, its prover) can see. Every other rule the
+export reaches is emitted as a private **top-level definition**, which those tools cannot see and
+which is not meant to be published.
+
+Catala allows a scope to be called only from inside another scope. So if rule A is exported, rule B
+is not, and B calls A, there is nowhere valid for that call to go — and `l4 catala` refuses:
+
+```
+l4 catala: cannot compile these decisions to Catala:
+  - in `the middle`: `Chain.the base` is @export'd, so it compiles to a Catala scope — and Catala
+    allows a scope call only from inside another scope. This caller is not @export'd, so it
+    compiles to a toplevel definition, and the call would land outside any scope. Mark this caller
+    @export too — every rule along the chain has to be exported, not just the one being called —
+    or inline `Chain.the base` here (R1, §8.1).
+```
+
+Two remedies, and the message names both: mark the calling rule `@export` as well, or fold its body
+into its caller so there is no middle rule left. It is genuinely the rule in the middle and not the
+number of exports — a module may export as many rules as it likes; what it may not do is route a
+call between two exported rules through one that is not.
+
+The cost, when it bites, is that a rule you wanted to keep as a private helper has to be published
+instead. That matters most when a `§` section carries a `GIVEN`, since every rule that reads such a
+name has to be exported anyway — see
+[section GIVEN](../reference/syntax/section-given.md) for that case worked through.
+
+`jl4/examples/catala/export-chain.l4` is the shape done correctly; the two files named
+`export-chain-*` under `jl4/examples/catala/not-ok/` are the two ways of getting it wrong, one of
+them through a rule handed to `map` rather than called directly.
 
 ## Where to look
 

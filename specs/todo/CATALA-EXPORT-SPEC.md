@@ -52,6 +52,20 @@ field-read check did not cover; (h) §6's `SET OF` clause is corrected — it de
 state in the present tense. Five `not-ok` fixtures under `jl4/examples/catala/not-ok/` pin the
 shapes that used to compile to Catala saying something other than what the L4 says.\_
 
+_Composition round, 2026-09-08 (smucclaw#958). What changed: (a) R1's scope/toplevel split has a
+condition nobody had written down — Catala allows a scope call only inside a scope — and the
+emitter did not check it, so a non-exported caller of an `@export`ed callee produced invalid Catala
+at exit 0, silently. It is now a refusal at the call site (§8.1.1), at **two** emission sites, the
+second of which (`fnRef1`, the combinator argument) had no context check at all. (b) The guard is a
+new `cxInScope` flag rather than the existing `cxAssumeOK`, because an R7 `#[test]` scope may call a
+scope but may not read an `ASSUME`; the four-way table is in §8.1.1. (c) Both `ASSUME` refusals said
+"not from a toplevel helper" in a context where the caller is a test scope; corrected. (d) The
+corpus contained **no** file with an `ASSUME` or a section `GIVEN` — so `collectAssumes`,
+`assumeClosure` and the `ssAssumes` threading were untested by anything in the tree;
+`export-chain.l4` and its golden now pin them, validated by the toolchain. (e) R9's harness gains
+`CATALA_CHECK_REQUIRED` and, for the first time, a CI job and a paths filter (§8.9.1) — before this
+round, no filter in `pr-checks.yml` matched the Catala emitter, corpus or harness at all._
+
 **One-line summary.** Just as an `@export`-annotated `DECIDE`/`MEANS` over a subject record is
 exactly an OpenFisca variable, it is exactly a Catala scope; L4's helper functions are exactly
 Catala's toplevel `declaration … depends on … equals` definitions — and because Catala's
@@ -73,19 +87,21 @@ way when P4 needs it.
 
 ## 0. Ruling status
 
-| ruling | state        | detail                                                |
-| ------ | ------------ | ----------------------------------------------------- |
-| R1     | **ANSWERED** | as proposed: scopes for `@export`, toplevels, §8.1    |
-| R2     | **ANSWERED** | as proposed: `decimal`; `money` never inferred, §8.2  |
-| R3     | **ANSWERED** | as proposed: `YMD` native, `Date` emitted, §8.3       |
-| R4     | **ANSWERED** | **REVERSED**: Mode B primary, hardened gate, §8.4     |
-| R5     | **ANSWERED** | as proposed: combinator absorption only, §8.5         |
-| R6     | **ANSWERED** | as proposed: reject recursion, no synthesis, §8.6     |
-| R7     | **ANSWERED** | as proposed: L4 oracle, JSON expected blocks, §8.7    |
-| R8     | **ANSWERED** | as proposed: literate envelope from inert style §8.8  |
-| R9     | **ANSWERED** | as proposed: harness never a build dep, §8.9          |
-| R10    | **ANSWERED** | as proposed: `TYPICALLY` → `context`, §8.10           |
-| R11    | **ANSWERED** | as proposed: opaque strings elided with warning §8.11 |
+| ruling | state        | detail                                                  |
+| ------ | ------------ | ------------------------------------------------------- |
+| R1     | **ANSWERED** | as proposed: scopes for `@export`, toplevels, §8.1      |
+| R1.1   | **ANSWERED** | 2026-09-08: refuse a scope call from a toplevel, §8.1.1 |
+| R2     | **ANSWERED** | as proposed: `decimal`; `money` never inferred, §8.2    |
+| R3     | **ANSWERED** | as proposed: `YMD` native, `Date` emitted, §8.3         |
+| R4     | **ANSWERED** | **REVERSED**: Mode B primary, hardened gate, §8.4       |
+| R5     | **ANSWERED** | as proposed: combinator absorption only, §8.5           |
+| R6     | **ANSWERED** | as proposed: reject recursion, no synthesis, §8.6       |
+| R7     | **ANSWERED** | as proposed: L4 oracle, JSON expected blocks, §8.7      |
+| R8     | **ANSWERED** | as proposed: literate envelope from inert style §8.8    |
+| R9     | **ANSWERED** | as proposed: harness never a build dep, §8.9            |
+| R9.1   | **ANSWERED** | 2026-09-08: `CATALA_CHECK_REQUIRED`, CI filter, §8.9    |
+| R10    | **ANSWERED** | as proposed: `TYPICALLY` → `context`, §8.10             |
+| R11    | **ANSWERED** | as proposed: opaque strings elided with warning §8.11   |
 
 All eleven rulings were **ANSWERED by Meng on 2026-08-16**: R1–R3 and R5–R11 as proposed; R4
 reversed — Mode B (exception-ladder emission) is the primary rendering, with the equivalence gate
@@ -652,6 +668,61 @@ as toplevels would be simpler and more uniform; but it would make the output inv
 scope-keyed Catala tool, forfeiting §1's reason-2. **Not decided.** Whether helpers shared across
 emitted modules deduplicate into a common emitted module.
 
+#### 8.1.1 R1's composition condition is checked — ANSWERED 2026-09-08, built (smucclaw#958)
+
+R1's split has a consequence its 2026-08-16 statement did not draw out, and which the implementation
+did not enforce for three weeks: **Catala allows `output of S with { … }` only inside a scope body.**
+So the scope/toplevel split is not free — an `@export`ed callee may be called from another
+`@export`ed decision, and from an R7 `#[test]` scope, but **not** from a non-exported helper, because
+that helper is a toplevel. The emitted file is not valid Catala.
+
+Measured on `unstable` at `6e9b57bb` (an exported `the base`, a plain `the middle` calling it, an
+exported `the top` calling that):
+
+```
+$ l4 catala chain.l4 > chain.catala_en          # exit 0, nothing on stderr
+$ catala typecheck Chain.catala_en              # exit 123
+  Scope calls are not allowed outside of a scope.
+  21 │   equals ((output of TheBase with { -- n: n }).the_base + 1.0)
+```
+
+**Ruling.** Refuse at the call site. `l4 catala` exits 1 naming the callee, the caller and the
+remedy (mark the caller `@export` too — the condition is all-or-nothing along the chain — or inline
+it). Refusal, not a warning: the alternative is a file that every downstream Catala tool rejects,
+and §6's standing position is that the fragment boundary is a diagnostic, not a silent narrowing.
+
+**Two emission sites.** `scopeCall` (the direct call) and `fnRef1` (a combinator's function
+argument, which R5 absorbs into `map each … among …`). The second had no context check at all, and
+is pinned separately — see `jl4/examples/catala/not-ok/export-chain-{broken,combinator}.l4`.
+
+**The flag is `cxInScope`, not `cxAssumeOK`, and the distinction is load-bearing.** An R7 `#[test]`
+scope is a Catala scope, so it may call one — that is the whole of R7 — but it declares no `input`s,
+so it may not read an `ASSUME`. Those are two questions and the emitter now asks them separately:
+
+| body                    | `cxInScope` | `cxAssumeOK` | may call a scope | may read an `ASSUME` |
+| ----------------------- | ----------- | ------------ | ---------------- | -------------------- |
+| `@export` decision (R1) | yes         | yes          | yes              | yes                  |
+| `#[test]` scope (R7)    | yes         | no           | yes              | no                   |
+| private toplevel (R1)   | no          | no           | no               | no                   |
+
+Keying the new refusal on `cxAssumeOK` would have refused every test scope the emitter produces.
+
+**What review changed.** The split also repaired both `ASSUME` refusals, which ended "not from a
+toplevel helper" even when the caller was a test scope. That wrong wording had reached a committed
+golden.
+
+**Coverage this created.** Before it, **no** `.l4` under `jl4/examples/catala/` contained an
+`ASSUME` or a section `GIVEN` — enumerated, not sampled — so `collectAssumes`, `assumeClosure` and
+the `ssAssumes` threading shipped untested by anything in the tree. `jl4/examples/catala/export-chain.l4`
+now pins the positive case (the `@export`-everything hatch, with the binder threaded transitively
+through a rung that never names it), and the R9 harness validates it with the real toolchain rather
+than merely goldening it.
+
+**Not decided.** R7 cannot test a binder-carrying scope: a `#[test]` scope has no inputs, so a
+`#EVAL` of any rule reading a module-level binder is skipped with a note. `export-chain.l4` carries
+one such directive deliberately, so the note sits in a golden. Whether R7 should grow a way to
+supply those inputs is a separate question this ruling does not answer.
+
 ### 8.2 R2 — `NUMBER` lowers to `decimal`; `integer` only where forced; `money` never inferred
 
 **ANSWERED 2026-08-16 — as proposed.**
@@ -909,6 +980,31 @@ basename of the **file it is in**, but the goldens are named after their L4 sour
 (`flat-tax.catala_en` declares `Module FlatTax`). The harness therefore stages each golden into a
 scratch directory under the name Catala wants — which is also where `clerk start` writes its
 `clerk.toml` and `_build`, so the repo is never written to.
+
+#### 8.9.1 R9's harness gains a way to fail, and a place to run — 2026-09-08
+
+R9 got "never a build dependency" right and left two holes, both found while closing smucclaw#958.
+
+**It could not tell a pass from a no-op.** Every absent-toolchain path printed one line and exited
+0, which is correct on a laptop with no OCaml and indistinguishable from success anywhere else.
+`CATALA_CHECK_REQUIRED=1` now turns those paths into exit 1 — including the "no `.catala_en`
+goldens found" path, which is the same failure wearing a different hat. This is exactly the
+`KIE_CHECK_REQUIRED` / `CAMUNDA_CHECK_REQUIRED` pattern the DMN engine job already uses, and for the
+same stated reason: a harness that skips must not report green.
+
+**It ran nowhere.** `grep -rn catala .github/` returned **nothing** at `6e9b57bb` — the harness had
+never been wired into CI at all, and, worse, **no paths filter in `pr-checks.yml` matched
+`jl4-core/src/L4/Catala/**`, `jl4/examples/catala/**`or`etc/validate-catala.mjs`.** A PR that
+hand-edited a `.catala_en` golden, or added a `.l4` under `jl4/examples/catala/`, therefore
+triggered zero jobs and merged green; the `expectGolden` drift check would then fail on somebody
+else's branch. That is the same failure class as the corpus-goldens job, and the filter is the fix.
+
+A `catala-validate` job now runs `node etc/validate-catala.mjs` under that filter. **State plainly
+what it is worth today:** ubuntu-latest has no OCaml `catala`, so the step prints SKIP and exits 0,
+and a green tick there is _not_ evidence that Catala accepted anything. Only a run with
+`CATALA_CHECK_REQUIRED=1` — a self-hosted runner, or a developer machine — means that. The job
+header says so, so the tick cannot be misread. The paths filter is the half that is load-bearing
+immediately; the job is the seam that makes the rest one env var away.
 
 ### 8.10 R10 — `TYPICALLY` on an exported decision's parameter becomes `context`
 
