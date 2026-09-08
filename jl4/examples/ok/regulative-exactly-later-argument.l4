@@ -1,0 +1,77 @@
+IMPORT prelude
+-- EXACTLY in a LATER argument of an action pattern.
+--
+-- An action is a pattern, and `EXACTLY e` pins an argument to the value of an
+-- expression rather than binding a fresh name to whatever turns up. That
+-- expression has to be read where the pattern was written.
+--
+-- It was not. `PatApp0` handed the ambient environment to the FIRST
+-- sub-pattern and `PatApp1` then handed each later sub-pattern the environment
+-- the PREVIOUS sub-pattern had produced — the bindings it made, not the scope
+-- it was written in. So `EXACTLY <a top-level name>` worked in argument one
+-- and reported `is not in scope` in argument two:
+--
+--     PARTY alice MUST Pay (EXACTLY alice) payee              -- worked
+--     PARTY alice MUST Pay payer (EXACTLY theLandlord)        -- "not in scope"
+--
+-- The sibling `FOLLOWED BY` frames (`PatCons0`/`PatCons1`) always carried the
+-- ambient environment separately; `PatApp1` now does too. Found while building
+-- EVERY evaluation (EVERY-EACH-QUANTIFIER-SPEC phase 2), because the fork
+-- example the spec itself writes — `Receipt (EXACTLY theLandlord) (EXACTLY t)
+-- (EXACTLY amount)` — is exactly this shape. Nothing about it is quantifier-
+-- specific: every rule below binds one PARTY.
+
+DECLARE Actor IS ONE OF
+    Landlord HAS name IS A STRING
+    Tenant   HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Wave HAS who   IS AN Actor
+    Pay  HAS payer IS AN Actor, payee IS AN Actor
+    Note HAS who   IS AN Actor, whom IS AN Actor, what IS A STRING
+
+theLandlord MEANS Landlord OF "Ms Ng"
+alice       MEANS Tenant OF "Alice"
+
+-- one argument
+GIVETH A DEONTIC Actor Action
+`waves` MEANS PARTY alice MUST Wave (EXACTLY alice) WITHIN 7
+
+#TRACE `waves` AT 0 WITH
+  PARTY alice DOES Wave alice AT 1
+
+-- two arguments, EXACTLY in the first
+GIVETH A DEONTIC Actor Action
+`pays someone` MEANS PARTY alice MUST Pay (EXACTLY alice) payee WITHIN 7
+
+#TRACE `pays someone` AT 0 WITH
+  PARTY alice DOES Pay alice theLandlord AT 1
+
+-- two arguments, EXACTLY in the SECOND: this is the case that failed
+GIVETH A DEONTIC Actor Action
+`pays the landlord` MEANS PARTY alice MUST Pay payer (EXACTLY theLandlord) WITHIN 7
+
+#TRACE `pays the landlord` AT 0 WITH
+  PARTY alice DOES Pay alice theLandlord AT 1
+
+-- both pinned
+GIVETH A DEONTIC Actor Action
+`alice pays the landlord` MEANS
+    PARTY alice MUST Pay (EXACTLY alice) (EXACTLY theLandlord) WITHIN 7
+
+#TRACE `alice pays the landlord` AT 0 WITH
+  PARTY alice DOES Pay alice theLandlord AT 1
+
+-- three arguments: the third is reached through two earlier sub-patterns, and
+-- a name bound by an earlier argument is still visible to a later EXACTLY.
+GIVETH A DEONTIC Actor Action
+`notes the landlord` MEANS
+    PARTY alice MUST Note (EXACTLY alice) (EXACTLY theLandlord) what WITHIN 7
+
+#TRACE `notes the landlord` AT 0 WITH
+  PARTY alice DOES Note alice theLandlord "hello" AT 1
+
+-- a pinned argument that does NOT match still refuses, which is the point of
+-- pinning it: the landlord is not Alice's payee here.
+#TRACE `alice pays the landlord` AT 0 WITH
+  PARTY alice DOES Pay alice alice AT 1

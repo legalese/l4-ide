@@ -169,7 +169,16 @@ data Frame =
   | PatLit1 WHNF -- the scrutinee
   | PatLit2
   | PatApp0 Resolved Environment [Pattern Resolved]
-  | PatApp1 [Environment] {- -} [(Reference, Pattern Resolved)]
+  | PatApp1 Environment [Environment] {- -} [(Reference, Pattern Resolved)]
+    -- ^ The FIRST field is the AMBIENT environment the whole pattern is being
+    -- matched in; the second accumulates the binding environments the
+    -- sub-patterns have produced so far. Keeping them apart is load-bearing:
+    -- an @EXACTLY e@ sub-pattern evaluates @e@, and it must do so where the
+    -- pattern was written, not where the previous sub-pattern's bindings
+    -- live. 'PatCons0'\/'PatCons1' already carry the ambient environment this
+    -- way; 'PatApp1' did not, which is why @Pay (EXACTLY t) (EXACTLY theLandlord)@
+    -- reported @theLandlord is not in scope@ while
+    -- @Pay (EXACTLY theLandlord) payee@ worked.
   | EqConstructor1 {- -} Reference [(Reference, Reference)]
   | EqConstructor2 WHNF {- -} [(Reference, Reference)]
   | EqConstructor3 {- -} [(Reference, Reference)]
@@ -937,19 +946,18 @@ forwardExpr env = \ case
     env' <- evalRecLocalDecls env ds
     let combinedEnv = Map.union env' env
     continueExpr combinedEnv e
-  Regulative _ann (MkDeonton _ subject action due _join followup lest) ->
+  Regulative _ann deonton@(MkDeonton _ subject action due _join followup lest) ->
     case subject of
       Party _ party ->
         continueBackward (ValObligation env (Left party) action (Left due) (fromMaybe fulfilExpr followup) lest)
       Every{} ->
-        -- Phase 1 of EVERY-EACH-QUANTIFIER-SPEC ships the front end only: a
-        -- quantified obligation parses, scopes, type-checks and prints. The
-        -- barrier machine (spec §3.1, §4.3: one sub-obligation per member of
-        -- the cast, HENCE once at the last completion, LEST at the deadline
-        -- with blame = the non-completers) is phase 2. Fail loudly rather than
-        -- run the obligation as if it bound one party.
-        userException $ UserError
-          "EVERY is not yet evaluable: a quantified obligation parses and type-checks, but running it is not implemented (EVERY-EACH-QUANTIFIER-SPEC, phase 2)."
+        -- EVERY-EACH-QUANTIFIER-SPEC phase 2. A quantified obligation cannot
+        -- become one obligation here, because it does not yet know its cast:
+        -- the roll is read when the contract meets its event stream, which is
+        -- when it is ARMED (R-Q6/R-T6, "the cast is evaluated once at
+        -- arming"). So evaluation stops at a 'ValQuantified', which prints
+        -- back as the source form and is expanded by the 'App1' frame.
+        continueBackward (ValQuantified env deonton)
   Event _ann ev ->
     continueExpr env (desugarEvent ev)
   Fetch _ann e -> do
@@ -1105,6 +1113,14 @@ backward val = withPoppedFrame $ \ case
             "expected a time stamp, and a list of events but found: " <> foldMap prettyLayout rs'
         pushFrame (ContractFrame (Contract1 ScrutinizeEvents {..}))
         continueRef events
+      ValQuantified env deonton -> do
+        -- EVERY meets its event stream: this is the arming point, so the roll
+        -- call runs here (spec §2.2.7.5 point 5, R-Q6).
+        (time, events) <- case rs of
+          [t, r] -> pure (t, r)
+          rs' -> internalException $ RuntimeTypeError $
+            "expected a time stamp, and a list of events but found: " <> foldMap prettyLayout rs'
+        startRollCall env deonton time events
       ValROp env op rexpr1 rexpr2 -> do
         -- make sure to reassemble the operation after returning
         pushFrame $ ContractFrame $ RBinOp1 MkRBinOp1 {args = rs, ..}
@@ -1235,20 +1251,21 @@ backward val = withPoppedFrame $ \ case
                 case pairs of
                   []             -> continueBackward (ValEnvironment Map.empty)
                   ((r, p) : rps) -> do
-                    pushFrame (PatApp1 [] rps)
+                    pushFrame (PatApp1 env [] rps)
                     continuePattern r env p
             else internalException $ RuntimeTypeError
               "pattern for constructor has the wrong number of arguments"
       _ ->
         patternMatchFailure
-  Just (PatApp1 envs rps) ->
+  Just (PatApp1 ambient envs rps) ->
     case val of
       ValEnvironment env ->
         case rps of
           []              -> continueBackward (ValEnvironment (Map.unions (env : envs)))
           ((r, p) : rps') -> do
-            pushFrame (PatApp1 (env : envs) rps')
-            continuePattern r env p
+            pushFrame (PatApp1 ambient (env : envs) rps')
+            -- 'ambient', NOT 'env': see the note on the 'PatApp1' frame.
+            continuePattern r ambient p
       _ -> internalException $ RuntimeTypeError $
         "expected an environment but found: " <> prettyLayout val <> " when matching constructor"
   Just (PatLit0 env lit) -> do
@@ -1690,6 +1707,85 @@ backwardContractFrame val = \ case
     -- on the deadline-passed / LEST path. Key it exactly as the matched HENCE path
     -- does, so a RECORD in the followup/reparation attributes to the real party.
     continueWithFollowup (Just (partyKeyWHNF val)) env followup events time
+  -- EVERY, the roll call. One cons cell of the roll per step.
+  QuantRoll QuantRollFrame {..} ->
+    case val of
+      ValNil -> assembleQuantified ctx (reverse acc)
+      ValCons hd tl -> do
+        pushCFrame (QuantCast QuantCastFrame {candidate = hd, rest = tl, ..})
+        continueRef hd
+      _ -> internalException $ RuntimeTypeError $
+        "expected a LIST for the cast of EVERY but found: " <> prettyLayout val
+  -- EVERY: the cast test. @EVERY Tenant t@ admits only values built by the
+  -- constructor @Tenant@; @EVERY t@ admits every entry of the roll.
+  QuantCast QuantCastFrame {..} -> do
+    let admitted = case ctx.cast of
+          Nothing -> True
+          Just c  -> case val of
+            ValConstructor n _ -> n `sameResolved` c
+            _                  -> False
+    if not admitted
+      then quantNext QuantRollFrame {..} rest
+      else case ctx.filt of
+        Nothing -> quantNext QuantRollFrame {acc = (candidate, val) : acc, ..} rest
+        Just f  -> do
+          pushCFrame (QuantFilter QuantFilterFrame {candidateV = val, ..})
+          continueExpr (Map.insert (getUnique ctx.var) candidate ctx.env) f
+  -- EVERY: the WHO filter's verdict for one candidate.
+  QuantFilter QuantFilterFrame {..} ->
+    case boolView val of
+      Just True  -> quantNext QuantRollFrame {acc = (candidate, candidateV) : acc, ..} rest
+      Just False -> quantNext QuantRollFrame {..} rest
+      Nothing    -> internalException $ RuntimeTypeError $
+        "expected BOOLEAN from the WHO filter of EVERY but found: " <> prettyLayout val
+  -- EVERY, the barrier: one member's result. NOTE: a barrier member never
+  -- carries the barrier's LEST as an EXPRESSION — it carries a sentinel
+  -- ('failpoint') in that slot instead. That is what keeps the three outcomes
+  -- apart here: the checkpoint sentinel (completed), the failure sentinel
+  -- (definitively did not), and a residual 'ValObligation' (still waiting).
+  -- Hand a member the real LEST and the last two collapse, because a pending
+  -- reparation and a pending member are both 'ValObligation'.
+  Barrier1 BarrierStepFrame {..} ->
+    case val of
+      ValConstructor n [tRef, evRef] | n `sameResolved` checkpoint -> do
+        pushCFrame (Barrier2 BarrierStampFrame {step = BarrierStepFrame {..}, evsRef = evRef})
+        continueRef tRef
+      -- The failure sentinel carries the anchor and the residual stream the
+      -- machine computed for this member's miss, which is exactly what the
+      -- barrier's LEST needs — so it runs ONCE, here, and the member is never
+      -- applied to the stream a second time.
+      ValConstructor n [tRef, evRef] | Just fp <- failpoint, n `sameResolved` fp ->
+        barrierFail ctx tRef evRef
+      -- Still waiting. Keep the RESIDUAL ('val'), not the obligation as it
+      -- stood before the scan ('current'): the residual is the one whose
+      -- deadline has been decremented by the time that has passed.
+      ValObligation{} -> barrierNext BarrierStepFrame {pending = val : pending, ..}
+      ValROp{}        -> barrierNext BarrierStepFrame {pending = val : pending, ..}
+      -- A MAY member whose permission expired under a barrier with no LEST:
+      -- nothing was owed, so nothing is breached, but the join cannot fire.
+      _               -> continueBackward val
+  -- EVERY, the barrier: a completion's timestamp. The LATEST one is the
+  -- join's firing time, and the stream that followed it is what the HENCE
+  -- scrutinizes (spec §3.4, §5.1).
+  Barrier2 BarrierStampFrame {..} -> do
+    stamp <- assertTime val
+    let better = case step.tLast of
+          Just (t, _) | t >= stamp -> step.tLast
+          _                        -> Just (stamp, evsRef)
+    barrierNext step {tLast = better}
+  -- EVERY, the barrier: the WITHIN on the ONCE line (R-T2), which bounds the
+  -- WHOLE (spec §2.2.7.5 point 3) rather than any one act.
+  Barrier3 BarrierStateDueFrame {..} -> do
+    stateDue <- assertTime val
+    pushCFrame (Barrier4 BarrierArmingFrame {..})
+    continueRef ctx.time
+  Barrier4 BarrierArmingFrame {..} -> do
+    armed <- assertTime val
+    if joinTime > armed + stateDue
+      then barrierStateMissed ctx (armed + stateDue)
+      else do
+        tRef <- allocateValue (ValNumber joinTime)
+        fireBarrierHence ctx tRef joinEvents
   RBinOp1 MkRBinOp1 {..}
     -- NOTE: this is weirdly asymmetric because
     -- in case of AND we can never abort earlier but have to instead
@@ -1821,6 +1917,346 @@ backwardContractFrame val = \ case
 
 maybeEvaluate :: Environment -> MaybeEvaluated -> Machine Config
 maybeEvaluate env = either (continueExpr env) continueBackward
+
+-- * EVERY: running a quantified obligation
+--
+-- $every
+--
+-- EVERY-EACH-QUANTIFIER-SPEC phase 2. The shape of the implementation is
+-- forced by one fact about the language: a quantified obligation ranges over
+-- a party type that is usually OPEN. @Tenant HAS name IS A STRING@ has one
+-- constructor and infinitely many values, so "every tenant" is not something
+-- the machine can enumerate. The spec says so itself (§2.2.7.5 point 5: the
+-- pattern form "ranges over an open type and needs §2.1's @WHO member_of …@
+-- filter"), and every runnable example in the spec and on the doc page draws
+-- its cast from a list.
+--
+-- So: the CAST comes from the ROLL, and the roll comes from the filter. A
+-- @WHO@ condition with an @elem <variable> <list>@ conjunct names the list to
+-- draw from; the whole condition then narrows it, and the cast constructor
+-- narrows it again. Without such a conjunct there is nothing to call the roll
+-- from and evaluation refuses, naming the fix ('rollCallRefusal') — the same
+-- move the language makes for a non-exhaustive @CONSIDER@ or a continuation
+-- with no join line: decline to guess.
+
+-- | Where the cast comes from: the first @elem v xs@ conjunct of the @WHO@
+-- filter, read left to right through @AND@. Returns @xs@.
+--
+-- Matched by SPELLING — the function must be called @elem@ — which is the
+-- device the parser already uses for @EACH@ in @UPON EACH@ and for @TIMEZONE@.
+-- A user-defined two-argument @elem@ that shadows the prelude's would be taken
+-- as the roll; that sharp edge is stated on doc\/reference\/regulative\/EVERY.md.
+quantifierRoll :: Resolved -> Expr Resolved -> Maybe (Expr Resolved)
+quantifierRoll v = go
+  where
+    go :: Expr Resolved -> Maybe (Expr Resolved)
+    go = \ case
+      -- The surface 'And' node does not survive type checking: 'inferExpr''
+      -- rewrites @a AND b@ to an application of the overloadable @AND@
+      -- function ('L4.TypeCheck.desugarBinOpToFunction'), so the resolved
+      -- filter of @WHO elem t tenants AND NOT (t EQUALS carol)@ is an 'App'.
+      -- Both shapes are matched: the surface one costs nothing and stops this
+      -- from silently regressing if an unchecked tree ever reaches here.
+      And _ e1 e2 -> either' (go e1) (go e2)
+      App _ f [e1, e2]
+        -- @AND@'s builtin is spelled @__AND__@ internally
+        -- ('L4.TypeCheck.Environment': @"and" `rename` "__AND__"@); matching by
+        -- that name rather than by 'andUnique' also catches the set-valued
+        -- overload, which cannot occur in a BOOLEAN filter but costs nothing.
+        | nameToText (TypeCheck.getName f) == "__AND__" -> either' (go e1) (go e2)
+      App _ f [Var _ x, xs]
+        | nameToText (TypeCheck.getName f) == "elem"
+        , x `sameResolved` v -> Just xs
+      _ -> Nothing
+
+    either' :: Maybe a -> Maybe a -> Maybe a
+    either' (Just r) _ = Just r
+    either' Nothing  r = r
+
+-- | What the machine says when an @EVERY@ has no roll to call.
+rollCallRefusal :: Text
+rollCallRefusal = Text.unwords
+  [ "EVERY has nothing to draw its cast from. Running a quantified obligation"
+  , "needs a list of the parties it ranges over, because a party type is"
+  , "normally open: `Tenant HAS name IS A STRING` has infinitely many values."
+  , "Name the list in the WHO condition, as"
+  , "`EVERY Tenant t WHO elem t tenants MUST ...`,"
+  , "with `tenants` a LIST of the party type."
+  , "(EVERY-EACH-QUANTIFIER-SPEC section 2.2.7.5 point 5;"
+  , "doc/reference/regulative/EVERY.md.)"
+  ]
+
+-- | What the machine says when the roll would have to know its own answer.
+circularRollRefusal :: Text
+circularRollRefusal = Text.unwords
+  [ "EVERY's roll cannot mention the member it is drawing. The list after"
+  , "`elem` is read once, before there is any member to speak of, so it may"
+  , "not depend on one: write `WHO elem t tenants`, not"
+  , "`WHO elem t (peersOf t)`. To narrow the group by something about each"
+  , "member, put that in a further condition -"
+  , "`WHO elem t tenants AND isAdult t`."
+  ]
+
+-- | Arm a quantified obligation: start the roll call.
+startRollCall :: Environment -> Deonton Resolved -> Reference -> Reference -> Machine Config
+startRollCall env deonton time events =
+  case deonton.subject of
+    Party{} -> internalException $ RuntimeTypeError
+      "a PARTY obligation reached the quantifier's roll call"
+    Every _ cast var filt -> do
+      let ctx = MkQuantCtx {deonton, var, cast, filt, env, time, events}
+      case filt >>= quantifierRoll var of
+        Nothing -> userException (UserError rollCallRefusal)
+        -- The roll is read BEFORE any member exists, so it cannot depend on
+        -- one. @WHO elem t (peersOf t)@ type-checks (the variable is in scope
+        -- throughout the filter) and would otherwise reach the evaluator as an
+        -- unbound name, i.e. as "please report this as a bug".
+        Just rollExpr
+          | any (sameResolved var) rollExpr -> userException (UserError circularRollRefusal)
+          | otherwise -> do
+              pushFrame (ContractFrame (QuantRoll QuantRollFrame {ctx, acc = []}))
+              continueExpr env rollExpr
+
+-- | Continue the roll call with the rest of the roll.
+quantNext :: QuantRollFrame -> Reference -> Machine Config
+quantNext frame rest = do
+  pushFrame (ContractFrame (QuantRoll frame))
+  continueRef rest
+
+-- | The roll has been called; build the family. Which family depends on the
+-- join line (spec §2.4, R-Q1):
+--
+--   * no join line at all — and so, the checker having refused a bare
+--     continuation, no HENCE and no LEST: the plain distributive obligation
+--     (§3.3), one per member, interleaved;
+--   * @UPON EACH@ — the fork (§3.2): each member carries its own copy of the
+--     continuation, with the member variable bound to itself;
+--   * @ONCE ALL HAVE@ — the barrier (§3.1): the continuation belongs to the
+--     JOIN, not to any member, and fires once.
+assembleQuantified :: QuantCtx -> [CastMember] -> Machine Config
+assembleQuantified ctx members =
+  case ctx.deonton.join of
+    Nothing                      -> runQuantifiedFold ctx members memberDue
+    Just JoinUpon{}              -> runQuantifiedFold ctx members memberDue
+    Just (JoinOnce _ AllHave{} _)
+      -- A barrier's HENCE and LEST belong to the JOIN, not to a member (spec
+      -- §3.1 writes them @shared_h@ / @shared_l@), so there is no member for
+      -- the variable to denote. The type checker binds it throughout the rule
+      -- — right for a fork, where each member carries its own copy — so this
+      -- is caught here rather than at check time, and named rather than
+      -- crashed on.
+      | any (mentionsVar ctx.var) (catMaybes [ctx.deonton.hence, ctx.deonton.lest])
+      -> userException (UserError (sharedContinuationRefusal ctx.var))
+      | otherwise -> startBarrier ctx members memberDue
+  where
+    -- The act's own WITHIN bounds each performance; the join's bounds the
+    -- whole (R-T2). When only the join carries one it has to bound the acts
+    -- too, or no member would ever expire and the rule could never fail —
+    -- and that holds for a FORK as much as for a barrier, which is why this
+    -- reads 'joinDue' (either join) and not 'joinStateDue' (the ONCE line
+    -- only). When BOTH are present the act's governs each member, and a
+    -- BARRIER additionally checks the state deadline at the join
+    -- ('Barrier3'); a fork has no join event to check, so there the act's
+    -- deadline is the only one enforced — a phase-2 limit, on the doc page
+    -- and in the spec.
+    memberDue = case ctx.deonton.due of
+      Just d  -> Just d
+      Nothing -> joinDue ctx
+
+-- | Does this expression name the quantifier's member variable anywhere?
+mentionsVar :: Resolved -> Expr Resolved -> Bool
+mentionsVar v = any (sameResolved v)
+
+-- | What the machine says when a barrier's shared continuation names a member.
+sharedContinuationRefusal :: Resolved -> Text
+sharedContinuationRefusal v = Text.unwords
+  [ "A barrier's HENCE and LEST belong to the join, not to any one member, so"
+  , "they cannot name"
+  , "`" <> nameToText (TypeCheck.getName v) <> "`:"
+  , "`ONCE ALL HAVE` fires once, after everybody has acted, and there is no"
+  , "member for the name to stand for. Either write the continuation without"
+  , "it, or use the fork, `UPON EACH`, which fires once per member and does"
+  , "bind the member inside it."
+  ]
+
+-- | The @WITHIN@ on EITHER join line, if there is one.
+joinDue :: QuantCtx -> Maybe RExpr
+joinDue ctx = case ctx.deonton.join of
+  Just (JoinOnce _ _ d) -> d
+  Just (JoinUpon _ _ d) -> d
+  Nothing               -> Nothing
+
+-- | The @WITHIN@ on a @ONCE@ line specifically: the deadline on the joined
+-- STATE (R-T2), which only the barrier has an event to check against.
+joinStateDue :: QuantCtx -> Maybe RExpr
+joinStateDue ctx = case ctx.deonton.join of
+  Just (JoinOnce _ _ d) -> d
+  _                     -> Nothing
+
+-- | One member's obligation: the member variable bound to it, the member
+-- itself as the obligation's party (already forced by the roll call, so
+-- 'Contract6' has nothing to evaluate).
+memberObligation :: QuantCtx -> RExpr -> Maybe RExpr -> Maybe RExpr -> CastMember -> WHNF
+memberObligation ctx hence lest mdue (mref, mval) =
+  ValObligation
+    (Map.insert (getUnique ctx.var) mref ctx.env)
+    (Right mval) ctx.deonton.action (Left mdue) hence lest
+
+-- | @A AND B AND C@, right-nested, as the source-level 'RAnd' would build it.
+randFoldWHNF :: Environment -> WHNF -> [WHNF] -> WHNF
+randFoldWHNF _   o []       = o
+randFoldWHNF env o (x : xs) = ValROp env ValRAnd (Right o) (Right (randFoldWHNF env x xs))
+
+-- | The distributive fold: the members run in parallel over the same event
+-- stream, which is what @RAND@ already means (spec §3.3, §3.2). Under a fork
+-- each member carries the continuation, with the member variable bound.
+--
+-- An EMPTY cast is fulfilled: nobody is bound, so nothing is owed. (§10.3
+-- would have this warn; a warning is not built.)
+runQuantifiedFold :: QuantCtx -> [CastMember] -> Maybe RExpr -> Machine Config
+runQuantifiedFold ctx members mdue =
+  case map (memberObligation ctx (fromMaybe fulfilExpr ctx.deonton.hence) ctx.deonton.lest mdue) members of
+    []       -> continueBackward ValFulfilled
+    (o : os) -> do
+      pushFrame (App1 [ctx.time, ctx.events] Nothing)
+      continueBackward (randFoldWHNF ctx.env o os)
+
+-- | One member of a BARRIER. One difference from 'memberObligation': both
+-- continuation slots hold SENTINELS rather than the drafter's expressions —
+-- the checkpoint in the HENCE, and (when the barrier has a LEST) the
+-- failpoint in the LEST. Each reports back to the barrier, carrying the
+-- anchor and the residual stream the machine computed. See the 'Barrier1'
+-- NOTE for why the real LEST is never handed to a member.
+barrierMember
+  :: QuantCtx -> Resolved -> Reference -> Maybe (Resolved, Reference)
+  -> Maybe RExpr -> CastMember -> WHNF
+barrierMember ctx cp cpRef mfail mdue (mref, mval) =
+  ValObligation env' (Right mval) ctx.deonton.action (Left mdue)
+    (Var emptyAnno cp)
+    (fmap (\ (fp, _) -> Var emptyAnno fp) mfail)
+  where
+    env' =
+      Map.insert (getUnique cp) cpRef
+      $ maybe id (\ (fp, fpRef) -> Map.insert (getUnique fp) fpRef) mfail
+      $ Map.insert (getUnique ctx.var) mref ctx.env
+
+-- | Arm the barrier. The checkpoint is a FRESH constructor, minted here and
+-- bound into each member's environment: applied to the @[time, events]@ that
+-- every continuation receives, it yields @ValConstructor cp [time, events]@,
+-- which reports both that the member completed and when.
+--
+-- An empty cast fires the HENCE at once: "all zero of them have acted" is
+-- vacuously true.
+startBarrier :: QuantCtx -> [CastMember] -> Maybe RExpr -> Machine Config
+startBarrier ctx members mdue = do
+  -- Both names are user-visible: a member that has not yet acted when the
+  -- event stream runs out is printed as a residual obligation carrying these
+  -- sentinels in its HENCE and LEST, so they have to read as English there.
+  cp <- def (MkName emptyAnno (NormalName "the join"))
+  cpRef <- allocateValue (ValUnappliedConstructor cp)
+  mfail <- for ctx.deonton.lest \ _ -> do
+    fp <- def (MkName emptyAnno (NormalName "the join fails"))
+    fpRef <- allocateValue (ValUnappliedConstructor fp)
+    pure (fp, fpRef)
+  case map (barrierMember ctx cp cpRef mfail mdue) members of
+    []       -> fireBarrierHence ctx ctx.time ctx.events
+    (o : os) -> barrierRun BarrierStepFrame
+      { ctx, checkpoint = cp, failpoint = fmap fst mfail
+      , current = o, queue = os, tLast = Nothing, pending = [] }
+
+-- | Apply the barrier's current member to the (whole) event stream.
+barrierRun :: BarrierStepFrame -> Machine Config
+barrierRun step = do
+  pushFrame (ContractFrame (Barrier1 step))
+  pushFrame (App1 [step.ctx.time, step.ctx.events] Nothing)
+  continueBackward step.current
+
+-- | Next member, or the verdict.
+barrierNext :: BarrierStepFrame -> Machine Config
+barrierNext step = case step.queue of
+  []       -> barrierFinish step
+  (o : os) -> barrierRun step {current = o, queue = os}
+
+-- | Every member has been run and none failed.
+barrierFinish :: BarrierStepFrame -> Machine Config
+barrierFinish step = case reverse step.pending of
+  -- Some members are still waiting for their event. The barrier has neither
+  -- fired nor failed; what remains to be done is those obligations, as the
+  -- scan left them — deadlines already decremented by the time that passed.
+  -- Their continuation slots still hold the sentinels, which print as
+  -- @`the join`@ and @`the join fails`@. Phase-2 limit: the residual does NOT
+  -- carry the JOIN LINE, so re-applying it to more events would run the
+  -- members and not the join.
+  (o : os) -> continueBackward (randFoldWHNF step.ctx.env o os)
+  [] -> case step.tLast of
+    Nothing       -> fireBarrierHence step.ctx step.ctx.time step.ctx.events
+    Just (t, evs) -> case joinStateDue step.ctx of
+      Nothing  -> do
+        tRef <- allocateValue (ValNumber t)
+        fireBarrierHence step.ctx tRef evs
+      Just due -> do
+        pushFrame (ContractFrame
+          (Barrier3 BarrierStateDueFrame {ctx = step.ctx, joinTime = t, joinEvents = evs}))
+        continueExpr step.ctx.env due
+
+-- | The join fires. The HENCE is anchored at the last completion and sees the
+-- stream that followed it (R-Q7, §5.1: unanchored, a HENCE counts from the
+-- join's firing).
+--
+-- It runs with NO acting party: the join fired, not a person, so a RECORD
+-- inside it goes to the anonymous ledger rather than to whichever member
+-- happened to act last. Set explicitly, so the answer cannot depend on the
+-- order events arrived in.
+fireBarrierHence :: QuantCtx -> Reference -> Reference -> Machine Config
+fireBarrierHence ctx timeRef eventsRef = do
+  mOriginal <- getCurrentParty
+  putCurrentParty Nothing
+  pushFrame (RestoreCurrentParty mOriginal)
+  pushFrame (App1 [timeRef, eventsRef] Nothing)
+  continueExpr ctx.env (fromMaybe fulfilExpr ctx.deonton.hence)
+
+-- | A member did not complete, so the barrier cannot: run the barrier's LEST,
+-- once, with the anchor and the residual stream the FAILING MEMBER'S OWN
+-- expiry produced. Those arrive here through the 'failpoint' sentinel, which
+-- is why the member is never applied to the event stream twice.
+--
+-- The anchor is therefore the machine's usual one for a single-party
+-- obligation — the revealing event's stamp, not the missed deadline. §5.2
+-- rules that this should become the deadline, for the single-party path and
+-- this one together; making only this one diverge would leave the language
+-- with two anchors.
+--
+-- When the barrier has NO LEST this is unreachable: no sentinel is minted, so
+-- a member's own outcome (a 'ValBreached' for a missed @MUST@, a
+-- 'ValFulfilled' for a lapsed @MAY@) is returned as the barrier's, one
+-- non-completer named, first in roll order — spec §6.1 wants the SET, and
+-- 'ReasonForBreach' holds one party (R-T3, unbuilt).
+barrierFail :: QuantCtx -> Reference -> Reference -> Machine Config
+barrierFail ctx timeRef eventsRef = case ctx.deonton.lest of
+  Nothing -> internalException $ RuntimeTypeError
+    "the barrier's LEST sentinel fired for a barrier that has no LEST"
+  Just lestExpr -> do
+    mOriginal <- getCurrentParty
+    putCurrentParty Nothing
+    pushFrame (RestoreCurrentParty mOriginal)
+    pushFrame (App1 [timeRef, eventsRef] Nothing)
+    continueExpr ctx.env lestExpr
+
+-- | Everyone acted, but the last of them acted after the @ONCE … WITHIN@
+-- deadline, which bounds the whole (R-T2).
+barrierStateMissed :: QuantCtx -> Rational -> Machine Config
+barrierStateMissed ctx deadline = case ctx.deonton.lest of
+  Just lestExpr -> do
+    tRef <- allocateValue (ValNumber deadline)
+    mOriginal <- getCurrentParty
+    putCurrentParty Nothing
+    pushFrame (RestoreCurrentParty mOriginal)
+    pushFrame (App1 [tRef, ctx.events] Nothing)
+    continueExpr ctx.env lestExpr
+  Nothing -> do
+    reason <- allocateValue (ValString
+      "every member acted, but the last of them acted after the ONCE line's WITHIN deadline")
+    continueBackward (ValBreached (ExplicitBreach Nothing (Just reason)))
 
 -- | STATE-AS-LEDGER: render a forced party WHNF to the 'Text' key that names its
 -- own ledger. A 'ValString' is its own key; anything else falls back to its
