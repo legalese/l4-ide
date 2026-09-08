@@ -1140,7 +1140,11 @@ every backend consumes. Only binders are suppliable at `WITH`. **Sequencing note
 motivated opening (the alcohol act as one record) was re-cut as fourteen scalars under R10, so
 opening's remaining value is bare field names inside a rule; it is implemented after discharge
 lands, and opt-in `OPENED` stays the fallback if reviewers cannot see binding class. Detail:
-`PROPS-REDTEAM-2026-09-03.md` §2.7.
+`PROPS-REDTEAM-2026-09-03.md` §2.7. **Dependency added 2026-09-09:** "the fields present on every
+constructor" is only a safe set to open once `SUM-TYPE-FIELDS-SPEC.md` S1 is built — today a field
+declared on two arms is two partial selectors and cannot be read at all (that file, §1.2). Build S1
+first. The elaboration target `Proj (App r []) field` stated above is correct as written and was
+re-verified 2026-09-09 (`Var` is a pattern synonym for `App _ _ []`, `Syntax.hs:395-396`).
 
 ### 11.8 R6 — The `MAYBE`/`EITHER` propagation sugar is withdrawn. RULED 2026-09-04 (marked accept).
 
