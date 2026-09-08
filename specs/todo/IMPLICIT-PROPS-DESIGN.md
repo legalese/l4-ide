@@ -1398,6 +1398,11 @@ in this section has been reproduced here.
 > install and is not — run `clerk start` in a scratch directory first, as `etc/validate-catala.mjs`
 > does.
 
+> **CLOSED 2026-09-08 — the check now exists; see §11.10.1 below.** Everything from here to the end
+> of this subsection describes the tree as it stood at `6e9b57bb` and is kept because it is the
+> measurement that motivated the fix. Read the present tense in it as "before 2026-09-08": `l4
+catala` no longer exits 0 on this shape.
+
 **The hatch has an all-or-nothing condition, and `l4 catala` does not check it.** An `@export`ed
 rule is published as a Catala _scope_, and Catala allows a scope call only from inside another
 scope. One non-exported rule anywhere in the chain lowers to a toplevel definition, and the scope
@@ -1468,6 +1473,76 @@ Four things follow, and no more than four:
   treating it as an `ASSUME` term **is** the refusal. Corrected in the same change, with the
   diagnostic on the page — §6 of `CLAUDE.md` asks a page to state its limits, and a limit filed
   under what works is worse than one left out.
+
+#### 11.10.1 smucclaw#958 — ANSWERED 2026-09-08, built. See §8.1 of `CATALA-EXPORT-SPEC.md`.
+
+`l4 catala` now refuses the composition instead of emitting it. The refusal names the callee, the
+caller (via the enclosing `vIn`), and the remedy; exit is 1 and no file is written:
+
+```
+l4 catala: cannot compile these decisions to Catala:
+  - in `the middle`: `Chain.the base` is @export'd, so it compiles to a Catala scope — and Catala
+    allows a scope call only from inside another scope. This caller is not @export'd, so it
+    compiles to a toplevel definition, and the call would land outside any scope (`catala
+    typecheck` rejects that with "Scope calls are not allowed outside of a scope"). Mark this
+    caller @export too — every rule along the chain has to be exported, not just the one being
+    called — or inline `Chain.the base` here (R1, §8.1). (chain.l4:10:22-39)
+```
+
+**What the measurement changed about the diagnosis.** §11.10 above proposed "walk each exported
+definition's callers, and `bad` a non-exported one". The built check is the dual of that and
+strictly cheaper: refuse at the **call site**, where the caller's context is already in hand, rather
+than computing a caller relation. No new traversal, and it cannot miss a call the lowerer reaches.
+
+**Two things the pre-fix note did not know, both found by building it:**
+
+1. **There were two emission sites, not one.** `scopeCall` guarded only `not (null ssAssumes) && not
+cxAssumeOK` — so a callee with _no_ ASSUMEs was never checked at all. The second site is
+   `fnRef1`, the combinator arm where R5 absorbs `map f xs`; it carried **no** context check
+   whatsoever. Measured on the pristine tree at `6e9b57bb`: `l4 catala` exit 0, silent, emitting
+   `(Decimal.sum of (map each item_double among xs to (output of Double with { … }).double))`, which
+   `catala typecheck` rejects at the same error. A fix keyed to the direct-call path alone would
+   have left it reachable. Both are pinned by their own fixture under
+   `jl4/examples/catala/not-ok/`.
+2. **The guard could not be `cxAssumeOK`.** An R7 `#[test]` scope IS a Catala scope — it may call
+   one, and doing so is the whole of R7 — but it declares no inputs, so it may not read an `ASSUME`.
+   `cxAssumeOK` is `False` in a test body, so keying the refusal on it would have refused every test
+   scope the emitter produces. The two questions are now separate flags (`cxInScope`,
+   `cxAssumeOK`), and the four-way table is in the haddock on `cxInScope`.
+
+**What review changed.** The split also repaired both `ASSUME` refusals, which ended "not from a
+toplevel helper" in a context where the caller is a test scope, not a helper. That wrong half had
+reached a committed golden. It now says a test scope declares no inputs, which is the actionable
+fact.
+
+**Coverage the fix had to create before it could be trusted.** No `.l4` under
+`jl4/examples/catala/` contained an `ASSUME` or a section `GIVEN` — zero of twelve, enumerated — so
+while `collectAssumes` and `assumeClosure` do run on every module, nothing in the tree ever ran them
+on a **non-empty** input, and §11.10's whole-module measurement (made outside this repo) was the
+only evidence the `ssAssumes` threading worked at all.
+`jl4/examples/catala/export-chain.l4` is now the positive twin of the refusal fixtures: a section
+`GIVEN` with every rung `@export`ed, pinning that the binder becomes a scope `input` and that
+`assumeClosure`'s fixpoint carries it **transitively** (`the top` never names the binder, reaches it
+only through `the middle`, and must still declare and forward it). Validated by the real toolchain,
+not merely goldened.
+
+**Still open, found while building and deliberately not fixed here.** R7 cannot test a
+binder-carrying scope at all: a `#[test]` scope declares no inputs, so a `#EVAL` of any rule that
+reads a section `GIVEN` is skipped with a note rather than emitted. `export-chain.l4` carries such a
+directive on purpose so the note appears in a committed golden rather than being rediscovered. The
+consequence is that `clerk test` coverage is silently zero on exactly the modules the binder
+machinery exists for — the same _shape_ of defect as #958 (a silence, not a wrong answer), and a
+candidate for its own issue.
+
+**The R9 harness now has a way to fail.** `etc/validate-catala.mjs` skipped and exited 0 whenever
+the toolchain was absent, with no way to distinguish that from a pass, and it ran nowhere in CI —
+`grep -rn catala .github/` returned nothing. It gains `CATALA_CHECK_REQUIRED=1` (the
+`KIE_CHECK_REQUIRED` pattern), and `pr-checks.yml` gains a `catala` paths filter plus a
+`catala-validate` job. The filter is the load-bearing half: a hand-edited `.catala_en` golden or a
+new `.l4` under `jl4/examples/catala/` previously matched **no** filter in that file, so such a PR
+ran no Catala-aware job — only the four unfiltered ones — and merged green. The job itself skips on a hosted runner — ubuntu-latest has no OCaml
+catala and R9 forbids a hard dependency — and its header says so, so a green tick is not misread as
+validation.
 
 ### 11.11 R11 — `@reads`. RULED 2026-09-04 (marked accept).
 

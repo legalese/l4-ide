@@ -32,6 +32,7 @@ jobs:
       docs: ${{ steps.filter.outputs.docs }}
       mlir: ${{ steps.filter.outputs.mlir }}
       dmn: ${{ steps.filter.outputs.dmn }}
+      catala: ${{ steps.filter.outputs.catala }}
       bpmn: ${{ steps.filter.outputs.bpmn }}
       go: ${{ steps.filter.outputs.go }}
     steps:
@@ -220,6 +221,61 @@ jobs:
               - 'jl4/tests-cli/fixtures/dmn-refuse-enum/**'
               # See the note on the haskell filter.
               - '.github/workflows/pr-checks.yml'
+
+            # The Catala emitter, its corpus, and the R9 harness that runs the
+            # real toolchain over the emitted goldens. As with DMN, a change to
+            # the emitter also shows up under 'haskell', but the goldens are
+            # .catala_en and the sources are .l4 — neither matches any other
+            # filter, so a hand-edited golden reaches no job at all without this.
+            catala:
+              - 'jl4-core/src/L4/Catala/**'
+              - 'jl4/examples/catala/**'
+              - 'etc/validate-catala.mjs'
+              # See the note on the haskell filter.
+              - '.github/workflows/pr-checks.yml'
+
+  # ============================================
+  # Catala: the real toolchain over the emitted goldens (R9)
+  # ============================================
+  # `etc/validate-catala.mjs` runs `catala typecheck` + `catala proof` +
+  # `clerk test` over jl4/examples/catala/expected/. Those goldens are pinned
+  # byte-for-byte to the emitter by `expectGolden` in l4-cli-test, so running
+  # Catala over them IS running Catala over emitted output.
+  #
+  # BE HONEST ABOUT WHAT THIS JOB DOES TODAY. Catala is an OCaml toolchain with
+  # no macOS/arm64 binary release and no apt package on ubuntu-latest, and R9 is
+  # explicit that it must never become a build dependency — so on a hosted
+  # runner this step prints one SKIP line and exits 0. It is NOT yet a merge
+  # gate, and nobody should read a green tick here as "Catala accepted the
+  # output"; only a run with CATALA_CHECK_REQUIRED=1 means that.
+  #
+  # It is wired up anyway, for three reasons. The paths filter above is the part
+  # that was actually missing: before it, a hand-edited .catala_en golden or a
+  # new .l4 under jl4/examples/catala/ matched NO filter in this file, so such a
+  # PR ran no Catala-aware job and merged green — the same failure class as the corpus
+  # goldens above. Second, the moment a runner has the toolchain (a self-hosted
+  # box, or an install step added here) this becomes a real gate by setting one
+  # env var. Third, on a developer machine that HAS catala — which is where this
+  # harness is actually run — the command is now discoverable from CI rather
+  # than from a spec footnote.
+  #
+  # Node-only, no npm package, no build: validate-catala.mjs imports node
+  # builtins only.
+  catala-validate:
+    name: Catala Toolchain Validation (skips without catala)
+    needs: changes
+    if: needs.changes.outputs.catala == 'true' || needs.changes.outputs.haskell == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24.x"
+      # No CATALA_CHECK_REQUIRED here, deliberately: setting it would turn every
+      # run on a hosted runner red, since the toolchain genuinely is absent. Set
+      # it on a runner that has catala installed, and the skip becomes exit 1.
+      - name: catala typecheck / proof / clerk test over the emitted goldens
+        run: node etc/validate-catala.mjs
 
   # ============================================
   # BPMN interchange: soundness gate over the emitted fixtures

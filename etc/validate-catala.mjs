@@ -131,14 +131,34 @@ function discover(tool, envVar) {
 const catala = discover("catala", "CATALA_EXE");
 const clerk = discover("clerk", "CLERK_EXE");
 
+// Skipping is right on a laptop that has no OCaml and wrong on a machine that
+// is supposed to be checking this. CATALA_CHECK_REQUIRED=1 turns every skip
+// path into exit 1, exactly as KIE_CHECK_REQUIRED does for the DMN engines --
+// so a runner that is meant to have the toolchain fails loudly instead of
+// printing SKIP and reporting green. Without the knob there is no way to tell a
+// real pass from a harness that did nothing, and "did nothing" is the failure
+// this file exists to prevent.
+const required = process.env.CATALA_CHECK_REQUIRED === "1";
+
 if (!catala || !clerk) {
   const missing = [!catala && "catala", !clerk && "clerk"]
     .filter(Boolean)
     .join(" and ");
+  const where =
+    `${missing} not found on PATH, in CATALA_EXE/CLERK_EXE, or in an ` +
+    `opam switch (tried switch \`${process.env.CATALA_OPAM_SWITCH ?? "catala"}\`)`;
+  if (required) {
+    console.error(
+      `FAIL  CATALA_CHECK_REQUIRED=1 but the toolchain is absent: ${where}. ` +
+        `Install it (recipe in R9 of specs/todo/CATALA-EXPORT-SPEC.md) or unset ` +
+        `CATALA_CHECK_REQUIRED.`,
+    );
+    process.exit(1);
+  }
   console.log(
-    `skipped: no catala toolchain (${missing} not found on PATH, in ` +
-      `CATALA_EXE/CLERK_EXE, or in an opam switch). This validation is ` +
-      `optional by design — see R9 in specs/todo/CATALA-EXPORT-SPEC.md.`,
+    `skipped: no catala toolchain (${where}). This validation is ` +
+      `optional by design — see R9 in specs/todo/CATALA-EXPORT-SPEC.md. ` +
+      `Set CATALA_CHECK_REQUIRED=1 to make this a failure instead.`,
   );
   process.exit(0);
 }
@@ -171,6 +191,16 @@ async function targets() {
 
 const files = await targets();
 if (files.length === 0) {
+  // Also a do-nothing run, and under CATALA_CHECK_REQUIRED it is a failure for
+  // the same reason: a goldens directory that has gone missing or empty must
+  // not read as "everything validated".
+  if (required) {
+    console.error(
+      `FAIL  CATALA_CHECK_REQUIRED=1 but there are no *.catala_en goldens ` +
+        `under ${defaultDir} to validate.`,
+    );
+    process.exit(1);
+  }
   console.log(`skipped: no *.catala_en goldens under ${defaultDir}`);
   process.exit(0);
 }
