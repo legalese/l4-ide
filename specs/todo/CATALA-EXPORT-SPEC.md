@@ -49,7 +49,7 @@ forced it to be partial written down; (d) §8.2's promised per-coercion note is 
 §8.3's day-granular helper for the lenient `Date` is now built and validated; (f) §8.7's promised
 human-format companion block is now emitted; (g) §8.11 gains the whole-value comparison case the
 field-read check did not cover; (h) §6's `SET OF` clause is corrected — it described a planned
-state in the present tense. Five `not-ok` fixtures under `jl4/examples/catala/not-ok/` pin the
+state in the present tense. Seven `not-ok` fixtures under `jl4/examples/catala/not-ok/` pin the
 shapes that used to compile to Catala saying something other than what the L4 says.\_
 
 _Composition round, 2026-09-08 (smucclaw#958). What changed: (a) R1's scope/toplevel split has a
@@ -64,7 +64,8 @@ corpus contained **no** file with an `ASSUME` or a section `GIVEN` — so `colle
 `assumeClosure` and the `ssAssumes` threading were untested by anything in the tree;
 `export-chain.l4` and its golden now pin them, validated by the toolchain. (e) R9's harness gains
 `CATALA_CHECK_REQUIRED` and, for the first time, a CI job and a paths filter (§8.9.1) — before this
-round, no filter in `pr-checks.yml` matched the Catala emitter, corpus or harness at all._
+round no filter in `pr-checks.yml` named Catala at all, and `jl4/examples/catala/**` matched
+nothing whatever._
 
 **One-line summary.** Just as an `@export`-annotated `DECIDE`/`MEANS` over a subject record is
 exactly an OpenFisca variable, it is exactly a Catala scope; L4's helper functions are exactly
@@ -680,11 +681,19 @@ Measured on `unstable` at `6e9b57bb` (an exported `the base`, a plain `the middl
 exported `the top` calling that):
 
 ```
-$ l4 catala chain.l4 > chain.catala_en          # exit 0, nothing on stderr
+$ l4 catala chain.l4 > Chain.catala_en          # exit 0, nothing on stderr
+$ clerk start                                   # catala needs a project root
 $ catala typecheck Chain.catala_en              # exit 123
-  Scope calls are not allowed outside of a scope.
-  21 │   equals ((output of TheBase with { -- n: n }).the_base + 1.0)
+┌─[ERROR]─
+│  Scope calls are not allowed outside of a scope.
+├─➤ Chain.catala_en:21.11-47:
+│ 21 │   equals ((output of TheBase with { -- n: n }).the_base + 1.0)
 ```
+
+(The `clerk start` line is not decoration: a bare `catala typecheck` in a fresh directory fails
+with "The standard library module Stdlib_en could not be found", which reads like a broken install
+and is not. The witness now ships as `jl4/examples/catala/not-ok/export-chain-broken.l4`, so this
+is re-runnable rather than a reconstruction.)
 
 **Ruling.** Refuse at the call site. `l4 catala` exits 1 naming the callee, the caller and the
 remedy (mark the caller `@export` too — the condition is all-or-nothing along the chain — or inline
@@ -699,11 +708,17 @@ is pinned separately — see `jl4/examples/catala/not-ok/export-chain-{broken,co
 scope is a Catala scope, so it may call one — that is the whole of R7 — but it declares no `input`s,
 so it may not read an `ASSUME`. Those are two questions and the emitter now asks them separately:
 
-| body                    | `cxInScope` | `cxAssumeOK` | may call a scope | may read an `ASSUME` |
-| ----------------------- | ----------- | ------------ | ---------------- | -------------------- |
-| `@export` decision (R1) | yes         | yes          | yes              | yes                  |
-| `#[test]` scope (R7)    | yes         | no           | yes              | no                   |
-| private toplevel (R1)   | no          | no           | no               | no                   |
+| body                    | `cxInScope` | `cxAssumeOK` | may call a scope                         | may read an `ASSUME` |
+| ----------------------- | ----------- | ------------ | ---------------------------------------- | -------------------- |
+| `@export` decision (R1) | yes         | yes          | yes                                      | yes                  |
+| `#[test]` scope (R7)    | yes         | no           | yes, unless the callee reads an `ASSUME` | no                   |
+| private toplevel (R1)   | no          | no           | no                                       | no                   |
+
+The qualifier on the middle row is not pedantry: `scopeCall`'s _second_ guard still applies there,
+because a test scope has no `input`s to forward a callee's `ASSUME`s from. The committed golden
+records exactly that case (`expected/export-chain.catala_en`, notes block: "directive 2 did not
+become a Catala `#[test]` scope"), so a table saying an unqualified "yes" would contradict an
+artifact in the same commit. See "Not decided" below.
 
 Keying the new refusal on `cxAssumeOK` would have refused every test scope the emitter produces.
 
@@ -992,12 +1007,20 @@ goldens found" path, which is the same failure wearing a different hat. This is 
 `KIE_CHECK_REQUIRED` / `CAMUNDA_CHECK_REQUIRED` pattern the DMN engine job already uses, and for the
 same stated reason: a harness that skips must not report green.
 
-**It ran nowhere.** `grep -rn catala .github/` returned **nothing** at `6e9b57bb` — the harness had
-never been wired into CI at all, and, worse, **no paths filter in `pr-checks.yml` matched
-`jl4-core/src/L4/Catala/**`, `jl4/examples/catala/**`or`etc/validate-catala.mjs`.** A PR that
-hand-edited a `.catala_en` golden, or added a `.l4` under `jl4/examples/catala/`, therefore
-triggered zero jobs and merged green; the `expectGolden` drift check would then fail on somebody
-else's branch. That is the same failure class as the corpus-goldens job, and the filter is the fix.
+**It ran nowhere.** `grep -rn catala .github/` returned **nothing** at `6e9b57bb`: the harness had
+never been wired into CI, and **no paths filter named Catala at all**.
+
+Be precise about what that did and did not mean, because the first draft of this paragraph
+overclaimed it and an adversarial re-check caught it. Two of the three Catala paths were reached by
+blanket globs: the emitter under `jl4-core/src/L4/Catala/` matched the `haskell` filter's
+`**/*.hs`, and `etc/validate-catala.mjs` matched the `typescript` filter's `**/*.mjs` and `etc/**`.
+Neither of those jobs runs Catala over anything, so the harness still never executed — but the
+files were not invisible. **`jl4/examples/catala/**`is the path that matched nothing at all**, and
+that is the real hole: a PR hand-editing a`.catala_en`golden, or adding a`.l4` under that
+directory, ran **no Catala-aware job** — only the four unfiltered ones (`changes`,
+`corpus-goldens`, `repo-wide`, `nix-check`) — and merged green, with the `expectGolden` drift check
+then failing on somebody else's branch. Same failure class as the corpus-goldens job, and the
+filter is the fix.
 
 A `catala-validate` job now runs `node etc/validate-catala.mjs` under that filter. **State plainly
 what it is worth today:** ubuntu-latest has no OCaml `catala`, so the step prints SKIP and exits 0,

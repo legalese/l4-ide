@@ -1515,10 +1515,11 @@ toplevel helper" in a context where the caller is a test scope, not a helper. Th
 reached a committed golden. It now says a test scope declares no inputs, which is the actionable
 fact.
 
-**Coverage the fix had to create before it could be trusted.** No golden in
-`jl4/examples/catala/` contained an `ASSUME` or a section `GIVEN` — zero, enumerated — so
-`collectAssumes`, `assumeClosure` and the `ssAssumes` threading were emitted by code that nothing in
-the tree ran, and §11.10's whole-module measurement was the only evidence they worked.
+**Coverage the fix had to create before it could be trusted.** No `.l4` under
+`jl4/examples/catala/` contained an `ASSUME` or a section `GIVEN` — zero of twelve, enumerated — so
+while `collectAssumes` and `assumeClosure` do run on every module, nothing in the tree ever ran them
+on a **non-empty** input, and §11.10's whole-module measurement (made outside this repo) was the
+only evidence the `ssAssumes` threading worked at all.
 `jl4/examples/catala/export-chain.l4` is now the positive twin of the refusal fixtures: a section
 `GIVEN` with every rung `@export`ed, pinning that the binder becomes a scope `input` and that
 `assumeClosure`'s fixpoint carries it **transitively** (`the top` never names the binder, reaches it
@@ -1539,7 +1540,7 @@ the toolchain was absent, with no way to distinguish that from a pass, and it ra
 `KIE_CHECK_REQUIRED` pattern), and `pr-checks.yml` gains a `catala` paths filter plus a
 `catala-validate` job. The filter is the load-bearing half: a hand-edited `.catala_en` golden or a
 new `.l4` under `jl4/examples/catala/` previously matched **no** filter in that file, so such a PR
-ran zero jobs and merged green. The job itself skips on a hosted runner — ubuntu-latest has no OCaml
+ran no Catala-aware job — only the four unfiltered ones — and merged green. The job itself skips on a hosted runner — ubuntu-latest has no OCaml
 catala and R9 forbids a hard dependency — and its header says so, so a green tick is not misread as
 validation.
 

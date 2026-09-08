@@ -92,15 +92,22 @@ is not, and B calls A, there is nowhere valid for that call to go — and `l4 ca
 l4 catala: cannot compile these decisions to Catala:
   - in `the middle`: `Chain.the base` is @export'd, so it compiles to a Catala scope — and Catala
     allows a scope call only from inside another scope. This caller is not @export'd, so it
-    compiles to a toplevel definition, and the call would land outside any scope. Mark this caller
-    @export too — every rule along the chain has to be exported, not just the one being called —
-    or inline `Chain.the base` here (R1, §8.1).
+    compiles to a toplevel definition, and the call would land outside any scope (`catala
+    typecheck` rejects that with "Scope calls are not allowed outside of a scope"). Mark this
+    caller @export too — every rule along the chain has to be exported, not just the one being
+    called — or inline `Chain.the base` here (R1, §8.1). (export-chain-broken.l4:28:22-39)
 ```
 
-Two remedies, and the message names both: mark the calling rule `@export` as well, or fold its body
-into its caller so there is no middle rule left. It is genuinely the rule in the middle and not the
-number of exports — a module may export as many rules as it likes; what it may not do is route a
-call between two exported rules through one that is not.
+(That is one long line in a terminal; it is wrapped here to fit the page. The fixture it comes from
+is `jl4/examples/catala/not-ok/export-chain-broken.l4`, so you can reproduce it exactly.)
+
+The message names two remedies: mark the calling rule `@export` as well, or inline the **called**
+rule into it, so there is no scope call left to place. A third works too and the message does not
+mention it — fold the calling rule into _its_ caller, which removes the middle rule entirely.
+
+It is genuinely the rule in the middle and not the number of exports — a module may export as many
+rules as it likes; what it may not do is route a call between two exported rules through one that is
+not.
 
 The cost, when it bites, is that a rule you wanted to keep as a private helper has to be published
 instead. That matters most when a `§` section carries a `GIVEN`, since every rule that reads such a

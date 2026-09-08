@@ -252,7 +252,7 @@ jobs:
   # It is wired up anyway, for three reasons. The paths filter above is the part
   # that was actually missing: before it, a hand-edited .catala_en golden or a
   # new .l4 under jl4/examples/catala/ matched NO filter in this file, so such a
-  # PR ran zero jobs and merged green — the same failure class as the corpus
+  # PR ran no Catala-aware job and merged green — the same failure class as the corpus
   # goldens above. Second, the moment a runner has the toolchain (a self-hosted
   # box, or an install step added here) this becomes a real gate by setting one
   # env var. Third, on a developer machine that HAS catala — which is where this

@@ -253,12 +253,17 @@ l4 catala: cannot compile these decisions to Catala:
     call would land outside any scope (`catala typecheck` rejects that with
     "Scope calls are not allowed outside of a scope"). Mark this caller @export
     too — every rule along the chain has to be exported, not just the one being
-    called — or inline `Chain.the base` here (R1, §8.1). (chain.l4:10:22-39)
+    called — or inline `Chain.the base` here (R1, §8.1).
+    (export-chain-broken.l4:28:22-39)
 ```
 
+(Wrapped here to fit the page; it is one line in a terminal. The fixture is
+`jl4/examples/catala/not-ok/export-chain-broken.l4`, so you can reproduce it.)
+
 **It is the rule in the middle, not the number of exports.** Remove that
-un-exported rule — export it too, or fold its body into its caller — and the same
-module with the same two `@export`s compiles and typechecks. A module may export
+un-exported rule — export it too, inline the rule it calls into it, or fold it
+into its own caller — and the same module with the same two `@export`s compiles
+and typechecks. A module may export
 as many rules as it likes; what it may not do is route a call between two of them
 through one that is not exported. If you are here because of a section `GIVEN`
 the condition costs you little, since every rule that reads the binder has to be
