@@ -137,12 +137,26 @@ processTypecheckedFile logger deployId filepath content moduleContext
   tcResult@Rules.TypeCheckResult{module' = resolvedModule, environment = env, entityInfo = ei, errors = tcErrors}
   evalMap = do
     let exports = enrichReturnTypes ei $ getExportedFunctions resolvedModule
+        -- Both spellings of "this export's input is a rule, not a value", so
+        -- the deploy names the real cause instead of falling through to the
+        -- generic type-error arm below (R-X4, 2026-09-07). Without the second
+        -- pattern the new diagnostic still blocks the deploy, via blockingErrs,
+        -- but is logged as "module has type errors".
         exportFnTypeErrs =
-          [ "Function type inputs are not supported for @export (parameter "
-              <> resolvedText paramName <> " of "
-              <> resolvedText fnName <> ")"
-          | MkCheckErrorWithContext{kind = ExportFunctionTypeInput fnName paramName} <- tcErrors
+          [ msg
+          | MkCheckErrorWithContext{kind} <- tcErrors
+          , Just msg <- [exportInputRefusal kind]
           ]
+        exportInputRefusal = \case
+          ExportFunctionTypeInput fnName paramName -> Just $
+            "Function type inputs are not supported for @export (parameter "
+              <> resolvedText paramName <> " of " <> resolvedText fnName <> ")"
+          ExportAssumeArityInput fnName paramName arity -> Just $
+            "An @export input must be a value, not a rule: "
+              <> resolvedText fnName <> " reads " <> resolvedText paramName
+              <> ", which is assumed and takes " <> Text.pack (show arity)
+              <> " input(s) of its own"
+          _ -> Nothing
         -- Genuine type errors that must block the deploy. We deliberately
         -- tolerate OutOfScopeError: it's repurposed by extractImplicitAssumeParams
         -- to derive implicit ASSUME parameters, so a clean model with implicit
@@ -160,7 +174,7 @@ processTypecheckedFile logger deployId filepath content moduleContext
           ]
     if not (null exportFnTypeErrs)
       then do
-        logWarn logger "Deploy rejected: @export function has FUNCTION-typed input"
+        logWarn logger "Deploy rejected: an @export input is a rule, not a value"
           [ ("deploymentId", toJSON deployId)
           , ("file", toJSON filepath)
           , ("errors", toJSON exportFnTypeErrs)

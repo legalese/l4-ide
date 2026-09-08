@@ -1,4 +1,4 @@
--- Kept on ASSUME deliberately (IMPLICIT-PROPS-DESIGN.md §11.1, R0: ASSUME is deprecated): the Blawx leg lowers signature-style ASSUME input predicates; their section-GIVEN image is function-typed and refused on the export path (see header).
+-- Kept on ASSUME deliberately (IMPLICIT-PROPS-DESIGN.md §11.1, R0: ASSUME is deprecated): the Blawx leg lowers signature-style ASSUME input predicates, and that shape is the exhibit. NOT publishable as a web API since R-X4 (§11.21) — see header.
 § `Imaginary Alcohol Act`
 
 -- The second P4b `ASSUME` seed, and the one that shows where Blawx's ontology
@@ -46,10 +46,14 @@
 -- a person. Nothing else changed.
 --
 -- WHY THE `ASSUME`s READ `GIVEN p IS A Person / ASSUME … p IS A BOOLEAN` rather
--- than `FUNCTION FROM Person TO BOOLEAN`: `L4.Export` refuses a function-typed
--- `ASSUME` on an `@export`ed decision, and lowering is export-rooted, so the
--- arrow spelling never reaches the middle end. `antisocial.l4`'s header records
--- the measurement in full.
+-- than `FUNCTION FROM Person TO BOOLEAN`: history, and only history. `L4.Export`
+-- used to refuse the arrow spelling alone on an `@export`ed decision, so the
+-- arrow spelling never reached the middle end. Since R-X4 (built 2026-09-08) it
+-- refuses BOTH, keyed on arity — `l4 check` on this file reports 14 refusals and
+-- nothing is wrong with it — while `l4 blawx` compiles it unchanged, because a
+-- refusal about what a JSON request can carry says nothing about a logic
+-- program. `antisocial.l4`'s header records the whole measurement; to publish
+-- this subject as a web API, use the record-spelled `alcohol-twin.l4`.
 --
 -- PROVISION (4) IS THE ONE TO READ. Its `NOT ( … AND … AND … )` over three
 -- `ASSUME`d inputs is where R5's epistemics show: an input is not open to

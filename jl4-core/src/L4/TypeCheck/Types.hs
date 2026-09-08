@@ -156,6 +156,18 @@ data CheckError =
     -- ^ An @export-decorated DECIDE has a function-typed input (GIVEN or
     -- referenced ASSUME). Arguments: exported-function name, offending
     -- parameter/assume name.
+  | ExportAssumeArityInput Resolved Resolved Int
+    -- ^ An @export-decorated DECIDE reads a module-level ASSUME whose /app
+    -- form/ carries arguments — @ASSUME \`is authorised\` p IS A BOOLEAN@,
+    -- usually under a @GIVEN p IS A Person@. Its declared type is @BOOLEAN@
+    -- and not an arrow, so 'ExportFunctionTypeInput' cannot see it, but at
+    -- run time it is still a rule of one or more inputs: it cannot be
+    -- supplied over JSON, and every request that reaches it dies on an
+    -- assumed term. Ruled R-X4, 2026-09-07 — the gate is keyed on the
+    -- assumed rule's ARITY, so both spellings of an assumed rule are
+    -- refused, and refused at check time rather than at the first request.
+    -- Arguments: exported-function name, the assumed rule's name, its total
+    -- arity (app-form arguments plus any arrow spine in the declared type).
   | ExportAssumeNameClash Resolved Resolved
     -- ^ An @export-decorated DECIDE has a GIVEN parameter spelled the same
     -- as a module-level ASSUME it (or a helper it reaches) reads. Both
@@ -389,6 +401,35 @@ severity (MkCheckErrorWithContext e _) =
     CheckWarning {}            -> SWarn
     SuspiciousBinderPattern {} -> SInfo
     _                          -> SError
+
+-- | Does this diagnostic refuse an @\@export@ for a reason that belongs to the
+-- __JSON publication boundary alone__?
+--
+-- Both of these say the same thing: a request carries values, and one of this
+-- export's inputs is a /rule/, so no request can ever supply it.
+-- 'ExportFunctionTypeInput' catches the arrow spelling
+-- (@ASSUME f IS A FUNCTION FROM Person TO BOOLEAN@) and
+-- 'ExportAssumeArityInput' the app-form one
+-- (@GIVEN p IS A Person@ / @ASSUME f p IS A BOOLEAN@) — R-X4, 2026-09-07.
+--
+-- __Why anything would want to skip them.__ @\@export@ carries two meanings at
+-- once. To @l4 batch@, @l4 export@ and @jl4-service@ it means "publish this as
+-- a web API", and there the refusal is exactly right. To the relational middle
+-- end and the Blawx bridge it means only "this is the root to lower from", and
+-- those emit a logic program, not a web API: an assumed predicate is a
+-- perfectly good ASP input — it becomes an @#abducible@ the interview asks the
+-- user about — so a refusal about JSON has no bearing on them. Teaching the
+-- JSON side to carry a predicate as an enumerated row of values is backlog B
+-- of the same ruling; until it lands, the two legs part company here.
+--
+-- __This is a permission to lower, never a permission to publish.__ Every path
+-- that serves a request — @l4 check@ included — must keep treating these as
+-- the 'SError's they are. Callers that skip them say so at the call site.
+isExportPublicationRefusal :: CheckError -> Bool
+isExportPublicationRefusal = \ case
+  ExportFunctionTypeInput {}  -> True
+  ExportAssumeArityInput {}   -> True
+  _                           -> False
 
 -- | Is this candidate still viable? Only 'SError'-severity diagnostics fail
 -- a candidate. Warnings and hints attached along the way must NOT influence

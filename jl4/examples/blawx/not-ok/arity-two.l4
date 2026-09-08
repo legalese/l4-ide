@@ -1,4 +1,4 @@
--- Kept on ASSUME deliberately (IMPLICIT-PROPS-DESIGN.md §11.1, R0: ASSUME is deprecated): the arity-two ASSUME input predicate is the rejected shape under test.
+-- Kept on ASSUME deliberately (IMPLICIT-PROPS-DESIGN.md §11.1, R0: ASSUME is deprecated): the arity-two ASSUME input predicate is the rejected shape under test. NOT publishable as a web API since R-X4 (§11.21) — `l4 check` refuses both ASSUMEs; `l4 blawx` still reaches the arity refusal this file exists to pin.
 -- The OTHER half of the refused band, and the fixture that keeps the
 -- diagnostic honest.
 --

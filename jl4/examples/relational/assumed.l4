@@ -1,4 +1,4 @@
--- Kept on ASSUME deliberately (IMPLICIT-PROPS-DESIGN.md §11.1, R0: ASSUME is deprecated): the relational middle end lowers a top-level ASSUME to an input predicate, and this file is that widening's exhibit.
+-- Kept on ASSUME deliberately (IMPLICIT-PROPS-DESIGN.md §11.1, R0: ASSUME is deprecated): the relational middle end lowers a top-level ASSUME to an input predicate, and this file is that widening's exhibit. NOT publishable as a web API since R-X4 (§11.21) — see header.
 -- The ASSUME seed: the second source of an `RInput` predicate.
 --
 -- A top-level ASSUME is a name the module states a signature for and never
@@ -43,18 +43,18 @@
 -- section text falls back `@desc` -> `@ref` -> stub, so the pair pins two of
 -- those three arms in one file.
 --
--- == Why every ASSUME here is written `GIVEN p ... ASSUME f p IS A BOOLEAN`
+-- == This file lowers here and cannot be published as a web API
 --
--- The other spelling, `ASSUME f IS A FUNCTION FROM Person TO BOOLEAN`, lowers
--- identically (the arrow spine is flattened) but cannot appear in a module the
--- relational leg can reach: `L4.Export.validateExportInputs` makes a
--- function-typed ASSUME referenced by an `@export`ed DECIDE a type error
--- (`ExportFunctionTypeInput` — a function cannot cross the web app's JSON
--- boundary), and the lowering is export-rooted, so such a module has no root to
--- lower from. `jl4/examples/legal/anti-social.l4` is written in that spelling
--- and is therefore not exportable as written; re-spelling it is corpus work,
--- not a middle-end change. Both forms are admitted by the lowering, so the day
--- that export rule is relaxed nothing here has to move.
+-- Both spellings — the one below and `ASSUME f IS A FUNCTION FROM Person TO
+-- BOOLEAN` — lower identically (the arrow spine is flattened), and since R-X4
+-- (2026-09-07, built 2026-09-08) an `@export` that reads EITHER is refused:
+-- a request carries values, and an assumed predicate is a rule. So `l4 check`
+-- on this file reports six refusals and nothing is wrong with it. The lowering
+-- is unaffected on purpose — `L4.Cli.Blawx.loadBlawxDoc` and this suite's own
+-- harness step over exactly those two diagnostics by name, via
+-- `L4.TypeCheck.Types.isExportPublicationRefusal`, because an assumed predicate
+-- is an ordinary logic-program input. See IMPLICIT-PROPS-DESIGN.md §11.21; the
+-- app-form spelling stays because it is the exhibit, not because it exports.
 --
 -- There are no #EVAL / #ASSERT directives, and that is not an oversight: ASSUME
 -- is uninterpreted, so `l4 run` cannot anchor an expectation here at all. A

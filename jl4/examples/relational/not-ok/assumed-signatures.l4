@@ -1,4 +1,4 @@
--- Kept on ASSUME deliberately (IMPLICIT-PROPS-DESIGN.md §11.1, R0: ASSUME is deprecated): the ASSUME signatures the relational fragment rejects are the shape under test.
+-- Kept on ASSUME deliberately (IMPLICIT-PROPS-DESIGN.md §11.1, R0: ASSUME is deprecated): the ASSUME signatures the relational fragment rejects are the shape under test. NOT publishable as a web API since R-X4 (§11.21).
 -- Named rejections: the ASSUMEs the M1 fragment does NOT admit as input
 -- predicates, batched so the whole residue of the widening is visible at once.
 --
@@ -20,11 +20,11 @@
 --
 --   * `middle name` is MAYBE-sorted, likewise.
 --
--- All three are written in the `GIVEN x ... ASSUME f x IS A T` spelling rather
--- than as `FUNCTION FROM ... TO ...`, because the latter would be rejected
--- EARLIER, by `L4.Export.validateExportInputs`, as a type error — and a fixture
--- that never reaches the lowering cannot pin the lowering's diagnostics. See
--- the header of ../assumed.l4.
+-- All three are written in the `GIVEN x ... ASSUME f x IS A T` spelling. That
+-- used to be the only spelling that reached the lowering; since R-X4 (built
+-- 2026-09-08) `L4.Export.validateExportInputs` refuses an `@export` that reads
+-- either spelling, and this suite steps over that one refusal by name so the
+-- fixture still pins the lowering's diagnostics. See the header of ../assumed.l4.
 
 ASSUME Person IS A TYPE
 

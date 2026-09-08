@@ -64,6 +64,7 @@ import L4.Blawx.Parse
 import L4.Blawx.Xml (parseXml)
 import L4.Relational.IR (renderLowerError)
 import L4.Relational.Lower (defaultLowerOptions, lowerModule)
+import qualified L4.TypeCheck.Types as TypeCheck
 
 import L4.Cli.Common
 
@@ -166,30 +167,62 @@ exportCmd opts = do
 
 -- | Load and type-check an @.l4@ file, then lower it. Exits on failure; the
 -- export path and the round-trip self-check share it.
+--
+-- __Why this reads 'Rules.TypeCheck' and not 'Rules.SuccessfulTypeCheck'.__
+-- Every other error still stops us — the filter below re-imposes the same
+-- "no 'SError'" bar — but 'TypeCheck.isExportPublicationRefusal' is stepped
+-- over, and only here. Those two diagnostics say a request cannot carry one of
+-- the export's inputs because it is a rule rather than a value (R-X4,
+-- 2026-09-07). That is true of a web API and false of an ASP program: an
+-- assumed predicate is precisely what this leg turns into an @#abducible@ for
+-- the interview to ask about. @\@export@ means "publish over JSON" to
+-- @l4 batch@ and @jl4-service@, and only "root the lowering here" to us, and
+-- those two readings part company at exactly these two diagnostics.
+--
+-- The user is still told: @l4 check@ on the same file refuses it, and the
+-- diagnostics are printed here too. What this buys is that a seed written in
+-- the assumed-predicate style still compiles to Blawx while backlog B — the
+-- JSON side learning to carry a predicate as an enumerated row of values —
+-- is outstanding. See @specs\/todo\/IMPLICIT-PROPS-DESIGN.md@ §11.21.
 loadBlawxDoc :: FilePath -> IO BlawxDoc
 loadBlawxDoc file = do
   evalConfig <- makeEvalConfig (FixedNowOpt Nothing)
   (errs, mTc) <- runOneshot evalConfig file \nfp -> do
     let uri = normalizedFilePathToUri nfp
     _ <- Shake.addVirtualFileFromFS nfp
-    Shake.use Rules.SuccessfulTypeCheck uri
+    Shake.use Rules.TypeCheck uri
+  -- 'Rules.TypeCheck' puts only the SError-severity diagnostics in @errors@
+  -- (Rules.hs partitions on severity before building the result), so this is
+  -- @tc.success@ with the two publication refusals subtracted.
   case mTc of
-    Nothing -> do
+    Just tc
+      | all (TypeCheck.isExportPublicationRefusal . (.kind)) tc.errors -> do
+          -- Surface non-fatal diagnostics, but proceed: a clean type-check is
+          -- the precondition that matters for lowering (`l4 openfisca` posture).
+          putDiagnostics errs
+          -- Without this line the command prints a wall of error-severity
+          -- diagnostics and then exits 0, which reads as a failure that
+          -- somehow succeeded. Say which ones were stepped over and why.
+          case length (filter (TypeCheck.isExportPublicationRefusal . (.kind)) tc.errors) of
+            0 -> pure ()
+            n -> hPutStrLn stderr
+                   ( "l4 blawx: " <> show n <> " diagnostic(s) above refuse this module for \
+                     \publication as a web API, because an @export input must be a value and \
+                     \an assumed rule is not one. That does not apply to Blawx, where such a \
+                     \rule becomes an #abducible the interview asks about, so the export \
+                     \proceeds. `l4 check` will report the same diagnostics and exit 1." )
+          case lowerModule defaultLowerOptions tc.entityInfo tc.module'
+                 >>= lowerBlawx of
+            Left lerrs -> do
+              putDiagnostics
+                ( "l4 blawx: cannot compile these decisions to Blawx:"
+                : map (("  - " <>) . renderLowerError) lerrs
+                )
+              exitFailure
+            Right doc -> pure doc
+    _ -> do
       putDiagnostics errs
       exitFailure
-    Just tc -> do
-      -- Surface non-fatal diagnostics, but proceed: a clean type-check is the
-      -- precondition that matters for lowering (the `l4 openfisca` posture).
-      putDiagnostics errs
-      case lowerModule defaultLowerOptions tc.entityInfo tc.module'
-             >>= lowerBlawx of
-        Left lerrs -> do
-          putDiagnostics
-            ( "l4 blawx: cannot compile these decisions to Blawx:"
-            : map (("  - " <>) . renderLowerError) lerrs
-            )
-          exitFailure
-        Right doc -> pure doc
 
 -- ---------------------------------------------------------------------------
 -- Import (P5)

@@ -1,4 +1,4 @@
--- Kept on ASSUME deliberately (IMPLICIT-PROPS-DESIGN.md §11.1, R0: ASSUME is deprecated): the Blawx leg lowers signature-style ASSUME input predicates; their section-GIVEN image is function-typed and refused on the export path (see header).
+-- Kept on ASSUME deliberately (IMPLICIT-PROPS-DESIGN.md §11.1, R0: ASSUME is deprecated): the Blawx leg lowers signature-style ASSUME input predicates, and that shape is the exhibit. NOT publishable as a web API since R-X4 (§11.21) — see header.
 § `Anti-social Behaviour, Crime and Policing Act 2014 — section 43`
 
 -- The P4b showcase: a module with NO `DECLARE` at all, whose entire ontology
@@ -14,26 +14,37 @@
 -- nine `ASSUME`d predicates become the declared attributes that hang off them,
 -- and the emitted `interview` test abduces every one of them.
 --
--- THE ORIGINAL'S SPELLING CANNOT BE USED, and the reason is not in this leg.
--- `jl4/examples/legal/anti-social.l4` writes every input as
--- `ASSUME `is authorised` IS A FUNCTION FROM Person TO BOOLEAN`. Lowering is
--- export-rooted, and `L4.Export.validateExportInputs` makes it a TYPE ERROR for
--- an `@export`ed decision to reference a function-typed `ASSUME`
--- ("Function type inputs are not supported for @export") because it appends
--- referenced `ASSUME`s to the export's parameter list and a function cannot
--- cross the web app's JSON boundary. So a module in that spelling has no export
--- root and never reaches the middle end at all. The original's own comment at
--- `:30-33` records the same wall from the other side: it says the decision is
--- deliberately NOT `@export`ed.
+-- THIS FILE COMPILES TO BLAWX AND CANNOT BE PUBLISHED AS A WEB API. That is
+-- the settled state as of R-X4 (ruled 2026-09-07, built 2026-09-08;
+-- IMPLICIT-PROPS-DESIGN.md §11.20 and §11.21), and it is worth knowing before
+-- you read the spelling below, because the spelling was chosen for a reason
+-- that no longer holds.
 --
--- The fix is a re-spelling, not a change of meaning: `GIVEN p IS A Person`
--- + `ASSUME `is authorised` p IS A BOOLEAN` declares the same one-place
--- predicate with a non-arrow declared type, and passes. The form is
--- long-standing L4 (`jl4/examples/ok/signatures.l4:9-10`), and the middle end
--- admits BOTH spellings, so nothing here has to move if the export rule is
--- later relaxed. Whether it should be — an `ASSUME`d predicate is a perfectly
--- good logic-program input and a nonsensical web form field — is reported as a
--- question against `L4.Export`, not decided here.
+-- The history, because the file is written around it. The original,
+-- `jl4/examples/legal/anti-social.l4`, writes every input as
+-- `ASSUME `is authorised` IS A FUNCTION FROM Person TO BOOLEAN`, and
+-- `L4.Export.validateExportInputs` made that a TYPE ERROR on an `@export`ed
+-- decision ("Function type inputs are not supported for @export"). Lowering is
+-- export-rooted, so a module in that spelling had no root. The re-spelling here
+-- — `GIVEN p IS A Person` + `ASSUME `is authorised` p IS A BOOLEAN`, the same
+-- one-place predicate with a non-arrow declared type
+-- (`jl4/examples/ok/signatures.l4:9-10`) — passed the check, and then failed
+-- every `l4 batch` row on a stuck assumed term. The question this header used
+-- to report against `L4.Export` — an `ASSUME`d predicate is a perfectly good
+-- logic-program input and a nonsensical web form field — was put to the
+-- coordinator and answered by widening, not relaxing: the gate is now keyed on
+-- the assumed name's ARITY and refuses both spellings at check time.
+--
+-- WHAT THAT MEANS HERE, CONCRETELY. `l4 check` on this file reports 21
+-- refusals and nothing is wrong with it; `l4 blawx` compiles it unchanged, and
+-- the committed goldens are byte-identical across the change. The two legs part
+-- company at exactly those two diagnostics, by name, through
+-- `L4.TypeCheck.Types.isExportPublicationRefusal`: they say a JSON request
+-- cannot carry a rule, and Blawx does not serve JSON requests — an assumed
+-- predicate is what becomes the `#abducible` the interview asks about. To
+-- publish this subject as a web API, use `antisocial-twin.l4`, which is
+-- record-spelled and emits byte-identical s(CASP). Teaching the export path to
+-- take a predicate as an enumerated row of values is backlog B of R-X4.
 --
 -- TWO TYPES ARE RENAMED, and the reason is a hard Blawx error, not taste.
 -- The original has both a TYPE `Conduct` and an accessor `conduct`, and both a

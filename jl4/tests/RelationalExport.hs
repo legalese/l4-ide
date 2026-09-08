@@ -129,6 +129,17 @@ spec examplesRoot = describe "relational export" $ do
 -- that L4 rejects be asserted on anyway — which is how a golden ends up pinning
 -- the exporter's treatment of a failed overload resolution rather than the
 -- behaviour it claims to pin. Warnings and infos are left alone.
+--
+-- __One exception, and it is the leg's whole subject.__
+-- 'TC.isExportPublicationRefusal' is stepped over. Since R-X4 (2026-09-07) an
+-- @\@export@ that reads an assumed /rule/ — @ASSUME f p IS A BOOLEAN@ or its
+-- arrow spelling — is refused, because a JSON request can carry a value and not
+-- a rule. This middle end emits a logic program, where an assumed predicate is
+-- an ordinary input (the Blawx leg makes it an @#abducible@), so that refusal
+-- is not about anything asserted here. @l4 blawx@ steps over the same two
+-- diagnostics and for the same reason; see its 'loadBlawxDoc' and
+-- @specs\/todo\/IMPLICIT-PROPS-DESIGN.md@ §11.21. Every other 'SError' still
+-- aborts, so the guard above keeps doing its job.
 lowered :: FilePath -> FilePath -> IO Text
 lowered examplesRoot srcPath = do
   src <- Text.readFile (examplesRoot </> "relational" </> srcPath)
@@ -138,7 +149,12 @@ lowered examplesRoot srcPath = do
   case checkWithImportsAndUri emptyVFS (Text.pack (takeBaseName srcPath)) src of
     Left errs -> error ("source failed to parse: " <> show errs)
     Right tc
-      | errs@(_ : _) <- filter ((== SError) . TC.severity) tc.tcdErrors ->
+      | errs@(_ : _) <-
+          [ e
+          | e <- tc.tcdErrors
+          , TC.severity e == SError
+          , not (TC.isExportPublicationRefusal e.kind)
+          ] ->
           error
             ( "source failed to typecheck: "
                 <> Text.unpack (Text.unlines (concatMap TC.prettyCheckErrorWithContext errs))
