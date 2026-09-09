@@ -164,6 +164,23 @@ for (const [rel, whom] of [...cited].sort()) {
   carried.push([rel, fs.statSync(abs).size]);
 }
 
+// --- optional: make the bundle openable as a Claude Code project ------------
+// `--project-layout` additionally writes the skill to `.claude/skills/`, so the
+// bundle can be opened as a working directory and the skill auto-loads as a
+// project skill, with every example it cites sitting at the path it names.
+// OFF by default: an installed plugin reads `skills/`, ignores `.claude/`, and
+// the published artifact should not carry the skill twice. This exists so the
+// bundle can be exercised outside an l4-ide checkout before anything is
+// published -- which is the only way to find out whether the skill still works
+// when its examples travel with it.
+if (process.argv.includes("--project-layout")) {
+  copyInto(SKILL_REL, ".claude/skills/writing-l4-rules");
+  if (!quiet)
+    console.log(
+      "project     : also written to .claude/skills/ (--project-layout)",
+    );
+}
+
 // --- totals (needed by both the bundle README and the report) ---------------
 const bytes = carried.reduce((a, [, n]) => a + n, 0);
 const skillBytes = walk(SKILL).reduce((a, f) => a + fs.statSync(f).size, 0);
