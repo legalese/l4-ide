@@ -3127,7 +3127,12 @@ this tree's `jl4-core/libraries` (binary and prelude from one tree — see `CLAU
 #### A live defect this work found, which is NOT about `WHOSE`
 
 The corrected totality rule and the read path meet badly, and the meeting is measured, not reasoned:
-**a field declared on two arms at the same type cannot be read at all.**
+~~**a field declared on two arms at the same type cannot be read at all.**~~ **That was true when
+written and is FALSE since 2026-09-09**, when `SUM-TYPE-FIELDS-SPEC.md` S1 landed on
+`lang/whose-opening`: such a field is now ONE selector, total over the declaring arms, and reads
+fine — `jl4/examples/ok/sum-fields/shared-field.l4` reads exactly this shape on both arms and its
+golden holds the answers. The defect below is therefore **repaired, not merely recorded**; it is kept
+because it is what the repair was derived from, and because the totality rule it forced still stands.
 
 ```
 DECLARE Actor IS ONE OF

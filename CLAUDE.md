@@ -237,17 +237,23 @@ can resolve different prelude versions. Rebuild, or drop the pin.
 > errors. The mismatch was one `@nonexhaustive` annotation the older parser could not read, and
 > nothing in the output said so.
 
-**And editing a library `.l4` does not rebuild the binary that embeds it.** `cabal build jl4:l4`
-answers `Up to date` after a change to `jl4-core/libraries/*.l4`, because the embedded copy is data,
-not a Haskell dependency cabal tracks that way. So the same binary now behaves one way with
-`JL4_LIBRARY_PATH` pinned at the tree and another way with it unset — the _other_ half of the trap
-above, reached from the library side rather than the binary side. If you edit a library and then
-test with the embedded prelude, you are testing the old library.
+**Editing a library `.l4` may not re-embed it — and the accurate account is already written down
+three times, so go there rather than re-deriving it.**
+`jl4-core/src/L4/API/EmbeddedLibraries/TH.hs:39-50` (the primary source, sitting beside the
+`addDependentFile` call it explains), `jl4-core/libraries/README.md`, and
+`specs/todo/LIBRARY-RESOLUTION-SHADOW-SPEC.md` §3.4. In one sentence: the dependency **is**
+registered, but on whatever directory the splice resolved at _build_ time — typically the Cabal
+datadir, not your checkout — so editing your worktree's copy need not invalidate it. While
+developing, pin `JL4_LIBRARY_PATH` at your worktree; it outranks the embed.
 
-> **Why.** 2026-09-09: a corpus rename touched `jl4-core/libraries/actus-core.l4`; every check that
-> pinned `JL4_LIBRARY_PATH` saw the rename and every check that did not would have seen the old
-> field names. It was caught only because the agent noticed `cabal build` claiming `Up to date`
-> after an edit it had just made.
+> **Why this is a pointer and not an explanation.** On 2026-09-09 I wrote an explanation here
+> instead, and got both halves wrong: the cause (I claimed cabal does not track the dependency — it
+> does, `TH.hs:51`) and the consequence (I asserted a library rename was invisible to the embedded
+> copy; measured on the same branch, it was not). Three accurate accounts already existed and I had
+> grepped for none of them. That is the user-level `CLAUDE.md` rules 2 and 3 — re-verify a borrowed
+> claim where you copy it and never sharpen it, and find a document's other copies before correcting
+> it — failing in the file most likely to be believed. A fourth account of a trap is a liability; a
+> pointer to the canonical one is not.
 
 **The same trap arrives from the CORPUS side, and the paragraph above does not cover it**: a binary
 older than the code it reads reports newly-landed **syntax** as broken source. Since #335

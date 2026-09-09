@@ -137,7 +137,7 @@ naming no arm, and hazard 1 is Haskell's run-time throw, minus even the warning.
 
 **The ruling is to take the correct half from each.**
 
-## 3. The rules — RULED 2026-09-09 (Meng), NOT BUILT
+## 3. The rules — RULED 2026-09-09 (Meng); S1 BUILT, S2 and S3 NOT BUILT
 
 **S1 — one selector per shared field (Haskell's half).** When two or more constructors of one sum
 type declare a field with the same name **and the same type**, they denote **one** selector, total

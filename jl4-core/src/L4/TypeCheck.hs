@@ -1704,7 +1704,18 @@ inferConDecls rappForm conDecls = do
       | otherwise = do
           -- DISAGREE: an error at the declaration naming every arm, then
           -- today's per-arm selectors.
-          addError (SharedFieldTypeMismatch occ0.fieldName [ (o.conName, o.fieldName, o.fieldType) | (_, o) <- grp ])
+          --
+          -- Only when the group actually SPANS constructors. SUM-TYPE-FIELDS-SPEC
+          -- §3 S1 scopes this error to "two or more constructors of one sum
+          -- type"; a name repeated INSIDE one constructor is already
+          -- 'ensureDistinct NonDistinctSelectors' above, which says it better —
+          -- the repair there is to drop or rename the duplicate, whereas this
+          -- error would advise giving it the same type on every constructor
+          -- that declares it, which is not a repair for one constructor naming
+          -- a field twice. Raising both made the second contradict the first.
+          let spansConstructors = any (\ ((ai, _), _) -> ai /= fst pos0) grp
+          when spansConstructors $
+            addError (SharedFieldTypeMismatch occ0.fieldName [ (o.conName, o.fieldName, o.fieldType) | (_, o) <- grp ])
           unzip <$> for grp \ (pos, o) -> do
             dn <- def o.fieldName
             ci <- publishSelector dn o
