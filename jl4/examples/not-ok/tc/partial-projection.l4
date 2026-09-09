@@ -88,3 +88,22 @@ GIVETH A NUMBER
     WHEN Landlord d THEN 0
     WHEN Tenant   r THEN 1
     OTHERWISE a's monthly_rent
+
+-- 8. NARROWED TO THE WRONG ARM BY A QUANTIFIER. `EVERY Landlord a` is the
+--    narrowing constructor of §0 — it says the rule ranges over landlords —
+--    and it narrows `a` just as surely as a `WHEN` does, only to an arm that
+--    does not declare the field. Distinct from case 3 because the drafter
+--    wrote no `CONSIDER`: a message about "the branch above" would send them
+--    looking for one. This is the only site in the tree that pins
+--    `NarrowedByCast`, and §4 records that the quantifier-narrowed projection
+--    has no other coverage anywhere.
+DECLARE Action IS ONE OF
+    Sign HAS signer IS AN Actor
+
+GIVEN everyone IS A LIST OF Actor
+GIVETH A DEONTIC Actor Action
+`quantified at the wrong arm` everyone MEANS
+    EVERY Landlord a IN everyone
+        WHO    a's monthly_rent AT LEAST 1000
+        MUST   Sign (EXACTLY a)
+        WITHIN 14

@@ -145,3 +145,25 @@ File: partial-projection.l4
 
     Delete this arm — it is unreachable — or make one of the branches
     above match fewer values, so that something can reach here.
+
+File: partial-projection.l4
+  Hidden: no
+  Range: 107:16-107:41
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    `monthly_rent` is a field of `Tenant` only.
+    But `a` could also be `Landlord`, which has no `monthly_rent`.
+
+    `EVERY Landlord …` narrows it to `Landlord` — and
+    `Landlord` does not declare `monthly_rent`.
+
+    Narrow `a` first:
+
+      EVERY Tenant a …
+      CONSIDER a WHEN Tenant t THEN … a's monthly_rent …
+
+    (or just `THEN t` when the field is the whole payload), or put the read
+    under an `OTHERWISE` after the other arms — or declare `monthly_rent` on
+    `Landlord` too.
