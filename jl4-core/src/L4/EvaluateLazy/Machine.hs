@@ -4009,11 +4009,14 @@ scanAssume (MkAssume _ann _tysig (MkAppForm _ n _ _) _t _mTypically) = pure [n]
 scanDeclare :: Declare Resolved -> Machine [Resolved]
 scanDeclare (MkDeclare _ann _tysig _appFormAka t) = scanTypeDecl t
 
+-- A field two constructors share is ONE selector under one 'Unique'
+-- (see Note [One selector per shared field] in "L4.TypeCheck"), so it gets
+-- ONE cell: dedupe by 'Unique' or 'preAllocate' allocates it once per arm.
 scanTypeDecl :: TypeDecl Resolved -> Machine [Resolved]
 scanTypeDecl (EnumDecl _ann conDecls) =
-  concat <$> traverse scanConDecl conDecls
+  nubOrdOn getUnique . concat <$> traverse scanConDecl conDecls
 scanTypeDecl (RecordDecl _ann mcon tns) =
-  concat <$> traverse (\ c -> scanConDecl (MkConDecl emptyAnno c tns)) (toList mcon)
+  nubOrdOn getUnique . concat <$> traverse (\ c -> scanConDecl (MkConDecl emptyAnno c tns)) (toList mcon)
 scanTypeDecl (SynonymDecl _ann _t) =
   pure []
 scanTypeDecl (OpaqueDecl _ann) =
@@ -4196,39 +4199,76 @@ evalDeclare env (MkDeclare _ann _tysig _appFormAka t) =
 
 evalTypeDecl :: Environment -> TypeDecl Resolved -> Machine ()
 evalTypeDecl env (EnumDecl _ann conDecls) =
-  traverse_ (evalConDecl env) conDecls
+  evalConDecls env conDecls
 evalTypeDecl env (RecordDecl _ann mcon tns) =
-  traverse_ (\ c -> evalConDecl env (MkConDecl emptyAnno c tns)) mcon
+  evalConDecls env [ MkConDecl emptyAnno c tns | c <- toList mcon ]
 evalTypeDecl _env (SynonymDecl _ann _t) =
   pure ()
 evalTypeDecl _env (OpaqueDecl _ann) =
   pure ()
 
-evalConDecl :: Environment -> ConDecl Resolved -> Machine ()
-evalConDecl env (MkConDecl _ann n []) =
-  updateTerm env n (WHNF (ValConstructor n []))
-evalConDecl env (MkConDecl _ann n tns) = do
-  -- constructor
-  updateTerm env n (WHNF (ValUnappliedConstructor n))
-  conRef <- ref (TypeCheck.getName n) n
-  -- selectors (we need to create fresh names for the lambda abstractions so that every binder is unique)
-  traverse_ (\ (i, MkTypedName _ sn _t _ _) -> do
-    arg    <- def (TypeCheck.getName n)
-    argRef <- ref (TypeCheck.getName n) arg
-    args <- traverse (def . TypeCheck.getName) tns
-    body <- ref (TypeCheck.getName sn) (args !! i)
-    let
-      sel =
-        ValClosure
-          (MkGivenSig emptyAnno [MkOptionallyTypedName emptyAnno arg Nothing Nothing])      -- \ x ->
-          (Consider emptyAnno (App emptyAnno argRef [])                             -- case x of
-            [ MkBranch emptyAnno (When emptyAnno (PatApp emptyAnno conRef (PatVar emptyAnno <$> args)))  --   Con y_1 ... y_n ->
-                (App emptyAnno body [])                                             --     y_i
-            ]
-          )
-          emptyEnvironment
-    updateTerm env sn (WHNF sel)
-    ) (zip [0 ..] tns)
+-- | Bind the constructors and the selectors of one type.
+--
+-- The constructors are bound one each. The selectors are bound ONE PER
+-- 'Unique': a field that several constructors declare at one name and one
+-- type is one selector (see Note [One selector per shared field] in
+-- "L4.TypeCheck"), and its closure is a @CONSIDER@ with ONE BRANCH PER
+-- DECLARING CONSTRUCTOR. Each branch carries that constructor's own arity and
+-- that field's own index, because fields are stored positionally
+-- ('ValConstructor' in "L4.Evaluate.ValueLazy") and two arms may place the
+-- same field at different positions:
+--
+-- @
+--   DECLARE Actor IS ONE OF
+--       Landlord HAS addr IS A STRING, name IS A STRING     -- name at 1
+--       Tenant   HAS name IS A STRING, rent IS A NUMBER     -- name at 0
+-- @
+--
+-- 'updateTerm' is an unconditional overwrite of the selector's cell, so this
+-- is the only shape under which every arm's read survives: one closure per
+-- arm, stored one after another, would leave the LAST arm's one-branch
+-- closure standing and every earlier arm's read dying at run time with
+-- \"reached a CONSIDER that has no branch for it\" — silently, since no
+-- golden reads a shared field (SUM-TYPE-FIELDS-SPEC §5 item 2).
+evalConDecls :: Environment -> [ConDecl Resolved] -> Machine ()
+evalConDecls env conDecls = do
+  -- constructors
+  for_ conDecls \ case
+    MkConDecl _ann n []  -> updateTerm env n (WHNF (ValConstructor n []))
+    MkConDecl _ann n _   -> updateTerm env n (WHNF (ValUnappliedConstructor n))
+  -- selectors: every (constructor, field) occurrence, grouped by the
+  -- selector's Unique in first-occurrence order
+  let
+    occurrences =
+      [ (sn, (n, tns, i))
+      | MkConDecl _ann n tns <- conDecls
+      , (i, MkTypedName _ sn _t _ _) <- zip [0 ..] tns
+      ]
+    groups =
+      [ (sn, [ occ | (sn', occ) <- occurrences, getUnique sn' == getUnique sn ])
+      | (sn, _) <- nubOrdOn (getUnique . fst) occurrences
+      ]
+  for_ groups \ (sn, occs) ->
+    case occs of
+      [] -> pure ()
+      (firstCon, _, _) : _ -> do
+        -- we need to create fresh names for the lambda abstractions so that every binder is unique
+        arg    <- def (TypeCheck.getName firstCon)
+        argRef <- ref (TypeCheck.getName firstCon) arg
+        branches <- for occs \ (n, tns, i) -> do
+          conRef <- ref (TypeCheck.getName n) n
+          args <- traverse (def . TypeCheck.getName) tns
+          body <- ref (TypeCheck.getName sn) (args !! i)
+          pure $
+            MkBranch emptyAnno (When emptyAnno (PatApp emptyAnno conRef (PatVar emptyAnno <$> args)))  --   Con y_1 ... y_n ->
+              (App emptyAnno body [])                                                                  --     y_i
+        let
+          sel =
+            ValClosure
+              (MkGivenSig emptyAnno [MkOptionallyTypedName emptyAnno arg Nothing Nothing])  -- \ x ->
+              (Consider emptyAnno (App emptyAnno argRef []) branches)                       -- case x of ...
+              emptyEnvironment
+        updateTerm env sn (WHNF sel)
 
 -----------------------------------------------------------------------------
 -- Premade expressions and values

@@ -1446,11 +1446,12 @@ inferAka r (MkAka ann ns) = do
 
 inferTypeDecl :: AppForm Resolved -> TypeDecl Name -> Check (TypeDecl Resolved, [CheckInfo])
 inferTypeDecl rappForm (EnumDecl ann conDecls) = do
-  let
-    td rcs = EnumDecl ann rcs
   ensureDistinct NonDistinctConstructors (getName <$> conDecls)
-  (rconDecls, extends) <- unzip <$> traverse (inferConDecl rappForm) conDecls
-  pure (td rconDecls, concat extends)
+  -- All the constructors go through ONE call, because a field two of them
+  -- share is one selector, and that can only be seen with every arm in hand.
+  -- See Note [One selector per shared field].
+  (rconDecls, extends) <- inferConDecls rappForm conDecls
+  pure (EnumDecl ann rconDecls, extends)
 inferTypeDecl rappForm (RecordDecl ann _mcon tns) = do
   -- we currently do not allow the user to specify their own constructor name
   -- a record declaration is just a special case of an enum declaration.
@@ -1527,27 +1528,187 @@ inferTypeNameAndSynonym rappForm (Just t) = do
   rt <- inferType t
   pure $ makeKnownMany rs (kt (if quarantined then Nothing else Just rt))
 
+-- | A record declaration is a one-constructor enumeration, so it goes through
+-- 'inferConDecls' as a one-arm group and gets the same selector treatment.
 inferConDecl :: AppForm Resolved -> ConDecl Name -> Check (ConDecl Resolved, [CheckInfo])
-inferConDecl rappForm (MkConDecl ann n tns) = do
-  ensureDistinct NonDistinctSelectors (getName <$> tns)
-  dn <- def n
-  (rtns, extends) <- unzip <$> traverse (inferSelector rappForm) tns
+inferConDecl rappForm conDecl = do
+  (rconDecls, extends) <- inferConDecls rappForm [conDecl]
+  case rconDecls of
+    [rconDecl] -> pure (rconDecl, extends)
+    -- Unreachable invariant: 'inferConDecls' returns exactly one resolved
+    -- constructor per constructor it is given (it is a traversal over them).
+    -- Fail at the site rather than plant a lazy bottom in the AST, as
+    -- 'inferRecordProjection' does for the same reason.
+    _ -> error "internal error in inferConDecls: expected exactly one resolved constructor"
+
+-- Note [One selector per shared field]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- A field that two or more constructors of one type declare with the same
+-- name AND the same type is ONE selector, total over the constructors that
+-- declare it (SUM-TYPE-FIELDS-SPEC §3 S1 — Haskell's rule). Before this,
+-- @Landlord HAS name IS A STRING@ and @Tenant HAS name IS A STRING@ minted two
+-- independent selectors with one spelling and one type, and every read of
+-- @a's name@ was an 'AmbiguousTermError' that named no arm (spec §1.2).
+--
+-- So the constructors of a type are checked TOGETHER, in three steps:
+--
+--   1. per constructor, the things that need no sibling: distinctness of its
+--      own field names, its 'def', and each field's resolved type;
+--   2. the (constructor, field) occurrences are grouped by the field's
+--      spelling, in first-occurrence order. A group whose occurrences agree
+--      on the type ('typeKey' of the resolved field type) mints ONE 'def' for
+--      its first occurrence and a 'defAka' — same 'Unique', the arm's own
+--      name and range — for every later one, and publishes ONE 'CheckInfo'.
+--      A group whose occurrences disagree is 'SharedFieldTypeMismatch' at
+--      the declaration, and then falls back to today's per-arm selectors so
+--      that reads in the same file get today's behaviour rather than a
+--      cascade. "Agree" is by 'typeKey' on the type AS WRITTEN: a synonym is
+--      not expanded here, because in the type-declaration phase the
+--      environment holds a synonym's name but not yet its body (the body is
+--      published by 'inferTypeNameAndSynonym' into 'publicNames', which the
+--      term phase sees and this phase does not — measured 2026-09-09, an
+--      expansion via 'pureExpandSynonym' at this site was a no-op). So
+--      @deposit IS A Money@ beside @deposit IS A NUMBER@ is refused, with
+--      both spellings in the message; the repair is to write them the same;
+--   3. per constructor, its function type is built from ITS OWN field list —
+--      no arm's list is shrunk, because the layout printer re-emits every
+--      arm's @HAS@ list — and the 'CheckInfo's are published in the order
+--      the one-arm code published them: the constructor, then the selectors
+--      this arm is the first to declare.
+--
+-- The evaluator is the other half of the same rule: 'evalConDecls' builds one
+-- closure per selector 'Unique' with one branch per declaring constructor.
+-- The two halves are not separable — with the checker half alone, the last
+-- arm's one-branch closure overwrites the earlier ones and a read on an
+-- earlier arm dies at run time (spec §5 item 2).
+--
+-- 'ensureDistinct NonDistinctSelectors' stays per constructor: one
+-- constructor still may not declare one name twice.
+
+-- | One (constructor, field) occurrence, as 'inferConDecls' step 1 leaves it.
+data FieldOccurrence =
+  MkFieldOccurrence
+    { fieldAnno      :: !Anno
+    , conName        :: !Name
+    , fieldName      :: !Name
+    , fieldType      :: !(Type' Resolved)
+    , fieldKey       :: !TypeKey
+      -- ^ 'typeKey' of 'fieldType'; what the occurrences of one group are
+      -- compared on.
+    , fieldTypically :: !(Maybe (Expr Resolved))
+    }
+
+-- | Type-check the constructors of one type together.
+-- See Note [One selector per shared field].
+inferConDecls :: AppForm Resolved -> [ConDecl Name] -> Check ([ConDecl Resolved], [CheckInfo])
+inferConDecls rappForm conDecls = do
+  -- Step 1.
+  arms <- for conDecls \ (MkConDecl ann n tns) -> do
+    ensureDistinct NonDistinctSelectors (getName <$> tns)
+    dn <- def n
+    fields <- for tns \ (MkTypedName fann fn t mTypically _mMeans) -> do
+      rt <- inferType t
+      rTypically <- checkTypically fn rt mTypically
+      pure MkFieldOccurrence
+        { fieldAnno      = fann
+        , conName        = n
+        , fieldName      = fn
+        , fieldType      = rt
+        , fieldKey       = typeKey rt
+        , fieldTypically = rTypically
+        }
+    pure (ann, dn, fields)
+
+  -- Step 2.
   let
-    conType = forall' (view appFormArgs rappForm) (fun (typedNameOptionallyNamedType <$> rtns) (appFormType rappForm))
-    conInfo = KnownTerm conType Constructor
+    occurrences :: [((Int, Int), FieldOccurrence)]
+    occurrences =
+      [ ((ai, fi), f)
+      | (ai, (_, _, fields)) <- zip [0 ..] arms
+      , (fi, f) <- zip [0 ..] fields
+      ]
+    groups =
+      [ [ o | o@(_, f) <- occurrences, rawName f.fieldName == rn ]
+      | rn <- nubOrd [ rawName f.fieldName | (_, f) <- occurrences ]
+      ]
+  minted <- traverse mintSelectorGroup groups
+  let
+    selectorAt = Map.fromList (concatMap fst minted)
+    infoAt     = Map.fromList (concatMap snd minted)
 
-  -- Data constructors are section-qualifiable too, so that @`Section`.yes@
-  -- names the constructor exactly as @`Section`.someValue@ names a value (#921).
-  -- Aliases only: see 'addQualifiedAliases' for why this must not also record a
-  -- section path for the constructor.
-  conCheckInfo <- addQualifiedAliases (makeKnown dn conInfo)
+  -- Step 3.
+  armsWithInfos <- for (zip [0 ..] arms) \ (ai, (ann, dn, fields)) -> do
+    let
+      rtns =
+        [ MkTypedName f.fieldAnno (selectorAt ! (ai, fi)) f.fieldType f.fieldTypically Nothing
+        | (fi, f) <- zip [0 ..] fields
+        ]
+      conType = forall' (view appFormArgs rappForm) (fun (typedNameOptionallyNamedType <$> rtns) (appFormType rappForm))
+      conInfo = KnownTerm conType Constructor
+      selInfos = mapMaybe (\ fi -> Map.lookup (ai, fi) infoAt) [0 .. length fields - 1]
 
-  condecl <- extendKnownMany (conCheckInfo : concat extends) do
-    -- See Note [Adding type information to all binders]
-    MkConDecl ann
-      <$> resolvedType dn
-      <*> traverse (traverse resolvedType) rtns
-  pure (condecl, conCheckInfo : concat extends)
+    -- Data constructors are section-qualifiable too, so that @`Section`.yes@
+    -- names the constructor exactly as @`Section`.someValue@ names a value (#921).
+    -- Aliases only: see 'addQualifiedAliases' for why this must not also record a
+    -- section path for the constructor.
+    conCheckInfo <- addQualifiedAliases (makeKnown dn conInfo)
+    pure ((ann, dn, rtns), conCheckInfo : selInfos)
+
+  let
+    extends = concatMap snd armsWithInfos
+  rconDecls <- extendKnownMany extends do
+    for armsWithInfos \ ((ann, dn, rtns), _) ->
+      -- See Note [Adding type information to all binders]
+      MkConDecl ann
+        <$> resolvedType dn
+        <*> traverse (traverse resolvedType) rtns
+  pure (rconDecls, extends)
+  where
+    selectorInfo :: Type' Resolved -> CheckEntity
+    selectorInfo rt =
+      KnownTerm (forall' (view appFormArgs rappForm) (fun_ [appFormType rappForm] rt)) Selector
+
+    -- Record @desc annotation for LSP hover. Range-keyed, so every arm of a
+    -- shared field keeps its own text.
+    recordDesc :: Resolved -> FieldOccurrence -> Check ()
+    recordDesc dn o =
+      case o.fieldAnno ^. annDesc of
+        Just desc -> for_ (rangeOf dn) $ \srcRange ->
+          addDescForSrcRange srcRange (getDesc desc)
+        Nothing -> pure ()
+
+    -- Record selectors are section-qualifiable for the same reason constructors
+    -- are (#921): @`Section`.w@ must name the field wherever @w@ would. Aliases
+    -- only, as for constructors (see 'addQualifiedAliases').
+    publishSelector :: Resolved -> FieldOccurrence -> Check CheckInfo
+    publishSelector dn o = do
+      recordDesc dn o
+      addQualifiedAliases (makeKnown dn (selectorInfo o.fieldType))
+
+    -- One group of same-spelled occurrences, in declaration order. Returns the
+    -- selector for each position, and the 'CheckInfo's to publish, keyed by
+    -- the position that owns them.
+    mintSelectorGroup
+      :: [((Int, Int), FieldOccurrence)]
+      -> Check ([((Int, Int), Resolved)], [((Int, Int), CheckInfo)])
+    mintSelectorGroup [] = pure ([], [])
+    mintSelectorGroup grp@((pos0, occ0) : rest)
+      | all (\ (_, o) -> o.fieldKey == occ0.fieldKey) rest = do
+          -- AGREE: one selector, total over these constructors.
+          dn <- def occ0.fieldName
+          dns <- traverse (\ (_, o) -> defAka dn o.fieldName) rest
+          ci <- publishSelector dn occ0
+          for_ (zip dns (snd <$> rest)) \ (d, o) -> recordDesc d o
+          pure (zip (fst <$> grp) (dn : dns), [(pos0, ci)])
+      | otherwise = do
+          -- DISAGREE: an error at the declaration naming every arm, then
+          -- today's per-arm selectors.
+          addError (SharedFieldTypeMismatch occ0.fieldName [ (o.conName, o.fieldName, o.fieldType) | (_, o) <- grp ])
+          unzip <$> for grp \ (pos, o) -> do
+            dn <- def o.fieldName
+            ci <- publishSelector dn o
+            pure ((pos, dn), (pos, ci))
 
 typedNameOptionallyNamedType :: TypedName n -> OptionallyNamedType n
 typedNameOptionallyNamedType (MkTypedName _ n t _ _) = MkOptionallyNamedType emptyAnno (Just n) t
@@ -1595,25 +1756,6 @@ checkTypicallyOpt n mty mTypically =
 rejectTypicallyOnType :: Name -> Maybe (Expr Name) -> Check (Maybe (Expr Resolved))
 rejectTypicallyOnType _ Nothing  = pure Nothing
 rejectTypicallyOnType n (Just _) = Nothing <$ addError (TypicallyOnTypeVariable n)
-
-inferSelector :: AppForm Resolved -> TypedName Name -> Check (TypedName Resolved, [CheckInfo])
-inferSelector rappForm (MkTypedName ann n t mTypically _mMeans) = do
-  rt <- inferType t
-  rTypically <- checkTypically n rt mTypically
-  dn <- def n
-  let selectorInfo = KnownTerm (forall' (view appFormArgs rappForm) (fun_ [appFormType rappForm] rt)) Selector
-  -- Record @desc annotation for LSP hover
-  case ann ^. annDesc of
-    Just desc -> for_ (rangeOf dn) $ \srcRange ->
-      addDescForSrcRange srcRange (getDesc desc)
-    Nothing -> pure ()
-  -- Note: computed fields (MEANS clause) are desugared before type checking,
-  -- so _mExpr is always Nothing here. We pass Nothing in the output.
-  -- Record selectors are section-qualifiable for the same reason constructors
-  -- are (#921): @`Section`.w@ must name the field wherever @w@ would. Aliases
-  -- only, as for constructors (see 'addQualifiedAliases').
-  selCheckInfo <- addQualifiedAliases (makeKnown dn selectorInfo)
-  pure (MkTypedName ann dn rt rTypically Nothing, [selCheckInfo])
 
 -- | Infers / checks a type to be of kind TYPE.
 inferType :: Type' Name -> Check (Type' Resolved)
@@ -5840,6 +5982,18 @@ prettyCheckError (NonDistinctError ndc nns)                  =
   , "But the following names have multiple occurrences:"
   , ""
   ] ++ map prettyNameWithRange (concat nns)
+prettyCheckError (SharedFieldTypeMismatch n occs)           =
+  [ "The field " <> prettyLayout n <> " is declared by more than one constructor of this type,"
+  , "but they do not agree on its type:"
+  , ""
+  ] ++
+  [ "  in " <> prettyLayout con <> ": " <> prettyNameWithRange fn <> " of type " <> prettyLayout t
+  | (con, fn, t) <- occs
+  ] ++
+  [ ""
+  , "A field that several constructors share is one field, and it has one type."
+  , "Give it the same type on every constructor that declares it, or use a different name on each."
+  ]
 prettyCheckError (IncorrectArgsNumberApp r expected given)   =
   [ "The function"
   , ""

@@ -40,6 +40,40 @@ DECLARE Shape IS ONE OF
   Rectangle HAS width IS A NUMBER, height IS A NUMBER
 ```
 
+#### A field on several constructors
+
+When two or more constructors declare a field with the same name **and** the same type, that is one
+field. It can be read with `'s` from a value built by any of those constructors, and like every
+field it is an ordinary function:
+
+```l4
+DECLARE Actor IS ONE OF
+    Landlord HAS addr IS A STRING, name IS A STRING
+    Tenant   HAS name IS A STRING, rent IS A NUMBER
+
+theLandlord MEANS Landlord OF "1 Main St", "Ms Ng"
+alice       MEANS Tenant OF "Alice", 1500
+
+#EVAL theLandlord's name   -- "Ms Ng"
+#EVAL alice's name         -- "Alice"
+```
+
+The field's position does not matter: `name` is the second field of a `Landlord` and the first of a
+`Tenant`.
+
+Two limits:
+
+- The same name at **different** types on two constructors is an error at the declaration, and the
+  message names each constructor and the type it gives the field. Give the field one type, or give
+  it two names. The types have to be written the same way: a synonym (`DECLARE Money IS NUMBER`)
+  and the type it stands for count as different here.
+- A field declared on only **some** constructors is a partial field. Reading it from a value built
+  by a constructor that does not declare it fails when the program runs, not when it is checked.
+  Take the value apart with `CONSIDER` first, or, in a quantified rule, name the constructor
+  (`EVERY Tenant t …`) so the rule ranges only over values that have the field.
+
+**Example file:** [shared-field-example.l4](shared-field-example.l4)
+
 ### Computed Fields (Methods)
 
 Record fields can have a `MEANS` clause that defines a derived value — computed automatically from the record's other fields. These are analogous to **methods**, **calculated properties**, or **derived attributes** in other languages.
