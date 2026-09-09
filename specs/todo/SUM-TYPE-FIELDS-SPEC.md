@@ -726,12 +726,14 @@ This is where the work is expected to land; the implementer re-checks each ancho
    **Corrected:** the grouping cannot live in `inferConDecl` — only `inferTypeDecl`'s `EnumDecl`
    arm (`:1448-1453`) holds all the constructors, and field types must be resolved across arms
    before any selector is minted. Later arms get `defAka` (same `Unique`, their own name and range).
-   **BUILT 2026-09-09** as `inferConDecls` (`TypeCheck.hs:1604-1717`, with Note [One selector per
-   shared field] at `:1544-1587` and `data FieldOccurrence` at `:1590`), which both the `EnumDecl`
+   **BUILT 2026-09-09** as `inferConDecls` (`TypeCheck.hs:1941`, with Note [One selector per
+   shared field] at `:1881` and `data FieldOccurrence` at `:1927` — re-measured 2026-09-10; the
+   anchors first written here were from the S1 tree and the two commits since have moved them, so
+   treat every line number in this §5 as needing a `grep` before it is trusted), which both the `EnumDecl`
    arm (`:1448-1454`) and the `RecordDecl` arm (via `inferConDecl` `:1533`, the one-arm case) go
    through; `inferSelector` is gone. The error is `SharedFieldTypeMismatch Name [(Name, Name, Type'
-Resolved)]` (`TypeCheck/Types.hs:116`, `rangeOf` `:493` anchored on the first occurrence,
-   `prettyCheckError` `TypeCheck.hs:5985`), raised inside the existing `WhileCheckingDeclare`
+Resolved)]` (`TypeCheck/Types.hs:143`, `rangeOf` `:531` anchored on the first occurrence),
+   raised inside the existing `WhileCheckingDeclare`
    context; on disagreement the group falls back to today's per-arm selectors, so a read of the
    disputed field in the same file gets today's ambiguity rather than a cascade. One limit,
    measured while building: "the same type" is `typeKey` on the field type
