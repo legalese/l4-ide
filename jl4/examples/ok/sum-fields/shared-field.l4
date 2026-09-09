@@ -31,6 +31,15 @@ mrNg        MEANS Landlord WITH addr IS "2 High St", name IS "Mr Ng"
 #EVAL name theLandlord
 #EVAL map name (LIST theLandlord, alice, bob, mrNg)
 
+-- and a reader that takes ANY Actor can project it: the selector's type is
+-- FUNCTION FROM Actor TO STRING, not per-arm, so no CONSIDER is needed here.
+GIVEN a IS AN Actor
+GIVETH A STRING
+`who is` a MEANS a's name
+
+#EVAL `who is` theLandlord
+#EVAL `who is` alice
+
 -- the fields each arm keeps to itself are untouched
 #EVAL theLandlord's addr
 #EVAL alice's rent
