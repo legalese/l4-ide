@@ -1,0 +1,25 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+fallthrough.l4:38:1-20:
+  0
+fallthrough.l4:39:1-28:
+  1500
+fallthrough.l4:49:1-33:
+  1500
+fallthrough.l4:60:1-22:
+  0
+fallthrough.l4:61:1-22:
+  1
+fallthrough.l4:62:1-32:
+  900
+fallthrough.l4:73:1-32:
+  1500
+fallthrough.l4:86:1-29:
+  0
+fallthrough.l4:87:1-37:
+  1500
+fallthrough.l4:105:1-28:
+  1500
+fallthrough.l4:106:1-27:
+  4000

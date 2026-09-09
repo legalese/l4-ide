@@ -766,6 +766,16 @@ data NarrowingReason
     -- and no rule had to narrow it (§3 S3's exception). Not in the plan's
     -- enumeration; without it S4 has no sentence for this base shape, and §3.2
     -- requires every raise site to be able to explain itself.
+  | NarrowedByEarlierClauses [Name]
+    -- ^ A later clause of a multi-clause @DECIDE@\/@MEANS@ group: the
+    -- constructors the clauses ABOVE it already match in this column, and
+    -- which therefore cannot reach it under first-match-wins
+    -- (SUM-TYPE-FIELDS-SPEC §5.1). Distinct from 'NarrowedByResidual' because
+    -- the drafter wrote clauses, not @WHEN@ arms, and a diagnostic that talks
+    -- about "the branches above" sends them looking for a @CONSIDER@ they
+    -- never wrote — which is §1.1's own complaint about the run-time error
+    -- this check replaces. The list is never empty: no narrowing is recorded
+    -- when nothing is consumed.
   | NarrowedByResidual [Name] [Pattern Resolved]
     -- ^ An @OTHERWISE@, or a trailing catch-all @WHEN other@: the constructors
     -- the preceding arms CONSUMED, and the arms that matched a constructor but
@@ -996,15 +1006,68 @@ data CheckEnv =
     -- RESET at the import boundary ('unionImportedCheckEnv'), beside
     -- 'localBindings': a narrowing is a fact about a binder inside one body of
     -- THIS module and means nothing across an @IMPORT@.
-    , inSyntheticFallthrough :: !Bool
-    -- ^ Are we inside the body the parser synthesised for clause 2..n of a
-    -- multi-clause @DECIDE@\/@MEANS@ group (@__pm_fallthrough_k@)? If so, S2
-    -- records NOTHING — see Note [S2 has no obligation inside a fall-through].
+    , clauseNarrowings     :: !(Maybe (Map Int [(Resolved, Narrowing)]))
+    -- ^ SUM-TYPE-FIELDS-SPEC §5.1. What each clause of the multi-clause
+    -- @DECIDE@\/@MEANS@ group currently being checked knows about its own
+    -- COLUMN binders, keyed by 0-based clause index: clause @m@'s entry says,
+    -- per column, which constructors can still reach it once clauses
+    -- @0 .. m-1@ have had their turn under first-match-wins.
     --
-    -- Deliberately NOT 'inNonexhaustiveDecide', although @inferDecide@ sets
-    -- both from the same test: that flag is also set by an author's
-    -- @\@nonexhaustive@ decoration, and reusing it would silently extend this
-    -- hole to every decorated definition. Two questions, two flags.
+    -- Set ONLY by @inferDecide@, from the SOURCE clause matrix the parser
+    -- attached to the fused Decide ('Extension.pmMatrix') — the desugared tree
+    -- cannot be read for this, which is what Note [S2 inside a fall-through]
+    -- is about. Read ONLY by @markFallthrough@, which installs entry @k+1@
+    -- over the body of @__pm_fallthrough_k@.
+    --
+    -- @Nothing@ — the enclosing declaration is NOT a fused clause group — is
+    -- not the same as @Just mempty@. It means the group cannot be seen at all,
+    -- which happens for a module that has been through 'L4.Print.prettyLayout'
+    -- and re-parsed (the printer emits the desugared tree and the matrix does
+    -- not survive), and it falls back to 'fallthroughUnanalysed'.
+    --
+    -- A missing key in a @Just@ table is NO narrowing (every constructor still
+    -- possible), never "narrowed to nothing" — the convention of 'narrowings'.
+    --
+    -- Reset by any enclosed non-fall-through 'Decide', so a WHERE helper
+    -- cannot inherit its enclosing group's clause facts; a synthetic
+    -- fall-through deliberately does NOT reset it, because the fall-through
+    -- for clause @k+1@ is nested inside the one for clause @k@ and needs the
+    -- same table.
+    , clauseSuppressColumns :: !(Set Unique)
+    -- ^ The column binders of the group currently being checked for which no
+    -- clause-matrix narrowing could be computed at all — an untyped @GIVEN@
+    -- whose column type is still an inference variable when the table is
+    -- built, an unenumerable column type, or (all columns) a group whose
+    -- matrix does not line up with its appform. These keep the OLD,
+    -- suppress-the-read behaviour rather than being refused for a fact the
+    -- checker merely could not establish.
+    --
+    -- Not itself a suppression: clause 1's body is checked under this and must
+    -- stay checked. It becomes one only where 'fallthroughColumns' copies it.
+    , fallthroughColumns   :: !(Set Unique)
+    -- ^ The binders an un-narrowed partial-projection read may be suppressed
+    -- ON, because they denote a column of an enclosing clause group whose
+    -- possible-set the checker could not compute. Empty means "no suppression
+    -- applies here", which is the case outside a synthesised fall-through and
+    -- also inside one whose columns were all analysable.
+    --
+    -- Written ONLY by @markFallthrough@ (which unions in
+    -- 'clauseSuppressColumns') and by @checkBranch@ (which grows it across a
+    -- catch-all @WHEN b@ arm, since @b@ then denotes the very same value).
+    -- See Note [S2 inside a fall-through].
+    , fallthroughUnanalysed :: !Bool
+    -- ^ Are we inside a synthesised fall-through whose clause group could not
+    -- be seen AT ALL ('clauseNarrowings' @== Nothing@)? Then there are no
+    -- columns to name, and an un-narrowed read on ANY bare binder is
+    -- suppressed — the behaviour the whole fall-through used to have.
+    --
+    -- The one thing that gets here is a module 'L4.Print.prettyLayout' has
+    -- re-emitted and something has re-parsed: @l4 batch@, the REPL, and the
+    -- print round-trip test all do that, the printer emits the DESUGARED tree,
+    -- and 'Extension.pmMatrix' does not survive the trip. The reads in such a
+    -- module were checked against the real clause matrix in the source it was
+    -- printed from; refusing them on the second pass would mean @l4 batch@
+    -- rejecting a file @l4 check@ had just accepted.
     }
   deriving stock (Eq, Generic, Show)
   deriving anyclass (NFData)
@@ -1059,7 +1122,10 @@ unionImportedCheckEnv accEnv depEnvironment depEntityInfo depMixfixRegistry depI
     , sectionStack = []
     , localBindings = Set.empty
     , narrowings = Map.empty
-    , inSyntheticFallthrough = False
+    , clauseNarrowings = Nothing
+    , clauseSuppressColumns = Set.empty
+    , fallthroughColumns = Set.empty
+    , fallthroughUnanalysed = False
     }
 
 newtype SectionNames =
@@ -2319,7 +2385,10 @@ extendEnv cis env =
     , sectionStack = e.sectionStack
     , localBindings = e.localBindings
     , narrowings = e.narrowings
-    , inSyntheticFallthrough = e.inSyntheticFallthrough
+    , clauseNarrowings = e.clauseNarrowings
+    , clauseSuppressColumns = e.clauseSuppressColumns
+    , fallthroughColumns = e.fallthroughColumns
+    , fallthroughUnanalysed = e.fallthroughUnanalysed
     }
     where
       u :: Unique

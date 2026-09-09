@@ -160,7 +160,10 @@ mkInitialCheckEnv moduleUri environment entityInfo =
     , sectionStack = []
     , localBindings = Set.empty
     , narrowings = Map.empty
-    , inSyntheticFallthrough = False
+    , clauseNarrowings = Nothing
+    , clauseSuppressColumns = Set.empty
+    , fallthroughColumns = Set.empty
+    , fallthroughUnanalysed = False
     }
 
 -- | Main entry point for scope- and type-checking.
@@ -369,8 +372,8 @@ withExtraMixfix mixfixAdds =
     -- positional match: 'mixfixRegistry' is a duplicated field name, so a
     -- record update here would be ambiguous under DuplicateRecordFields
     updateMixfix :: MixfixRegistry -> CheckEnv -> CheckEnv
-    updateMixfix adds (MkCheckEnv a b c d e f g reg cf cs sb sd ir ne h i lb nw ft) =
-      MkCheckEnv a b c d e f g (unionMixfixRegistry adds reg) cf cs sb sd ir ne h i lb nw ft
+    updateMixfix adds (MkCheckEnv a b c d e f g reg cf cs sb sd ir ne h i lb nw cn csc fc fu) =
+      MkCheckEnv a b c d e f g (unionMixfixRegistry adds reg) cf cs sb sd ir ne h i lb nw cn csc fc fu
 
 dedupCheckInfos :: [CheckInfo] -> [CheckInfo]
 dedupCheckInfos = go Set.empty []
@@ -963,7 +966,9 @@ inferDecide dec@(MkDecide ann _tysig appForm expr) = do
     -- active. See 'L4.Export.isNonexhaustiveDecide' / 'DescFlags'.
     withNonexhaustiveFlag $ lookupFunTypeSigByAnno ann >>= \ dHead -> do
         decide <- extendKnownMany dHead.arguments $ do
-          rexpr <- checkExpr (ExpectDecideSignatureContext (rangeOf dHead.resultType)) expr dHead.resultType
+          rexpr <-
+            withClauseColumnFacts dHead $
+              checkExpr (ExpectDecideSignatureContext (rangeOf dHead.resultType)) expr dHead.resultType
           -- Clause-matrix exhaustiveness for multi-clause pattern-matching
           -- groups (spec §14.7): runs AFTER the body is checked, so
           -- 'applySubst' can resolve untyped-GIVEN inference variables, and
@@ -996,43 +1001,76 @@ inferDecide dec@(MkDecide ann _tysig appForm expr) = do
               = local (\env -> env { inNonexhaustiveDecide = True })
           | otherwise                  = id
 
-        -- Note [S2 has no obligation inside a fall-through]
+        -- Note [S2 inside a fall-through]
         --
-        -- SUM-TYPE-FIELDS-SPEC §3 S2, a MEASURED and DELIBERATE hole.
-        --
-        -- 'L4.Parser.matchClauses' compiles clauses 2..n of a multi-clause
-        -- group into a LET-bound nullary decide (@__pm_fallthrough_k@) and
-        -- references it from the @OTHERWISE@ of every column. 'checkExpr'
-        -- checks a @LetIn@'s declarations BEFORE its body, so that
-        -- fall-through body is checked entirely OUTSIDE the @OTHERWISE@ whose
-        -- residual is meant to cover it. Without this flag the canonical
-        -- idiom
+        -- SUM-TYPE-FIELDS-SPEC §5.1. 'L4.Parser.matchClauses' compiles clauses
+        -- 2..n of a multi-clause group into a LET-bound nullary decide
+        -- (@__pm_fallthrough_k@) and references it from the @OTHERWISE@ of
+        -- every column. 'checkExpr' checks a @LetIn@'s declarations BEFORE its
+        -- body, so that fall-through body is checked entirely OUTSIDE the
+        -- @OTHERWISE@ whose residual is meant to cover it. Without something
+        -- here the canonical idiom
         --
         -- >  DECIDE f Landlord IS 0
         -- >  DECIDE f a        IS a's monthly_rent
         --
-        -- — total, green, and evaluating correctly today — becomes an S2
-        -- site.
+        -- — total, and evaluating correctly — would be an S2 site.
         --
-        -- The obvious repair is UNSOUND and must not be built: copying the
-        -- residual onto the @__pm_fallthrough_@ binding certifies projections
-        -- under the wrong one, because 'L4.Parser.matchOne' emits the SAME
-        -- reference from the @OTHERWISE@ of EVERY column, at different
-        -- nesting levels with different residuals over different column
-        -- types. One binding, several residuals.
+        -- WHAT THIS USED TO DO, AND WHY IT WAS WRONG. It used to set one
+        -- @Bool@ that silenced 'checkPartialProjection' for the whole
+        -- fall-through body. That accepted three shapes that die at run time
+        -- and that no residual could ever have covered — a bare selector used
+        -- as a value (which has no base at all), a base written as some OTHER
+        -- constructor, and a nested @WHERE@ helper's own parameter — and it
+        -- also left the ONE shape it existed for (an un-narrowed read on the
+        -- group's own column) accepted when the group is genuinely partial.
+        -- One spelling was refused with a good message and the equivalent
+        -- other spelling died at run time.
         --
-        -- So S2 records nothing here. That is permissive — a later clause of
-        -- a multi-clause group carries no S2 guarantee, and a partial
-        -- projection there still dies at run time — and it is stated as a
-        -- limit in the spec rather than papered over. Covering clause
-        -- matrices properly means narrowing at the CLAUSE-MATRIX level
-        -- (per column, per clause, off @dHead.rappForm@), not through the
-        -- desugared @LET@.
+        -- WHAT IT DOES NOW. The residual route really is unsound, for the
+        -- reason recorded before: copying a residual onto the
+        -- @__pm_fallthrough_@ binding would certify projections under the
+        -- wrong one, because 'L4.Parser.matchOne' emits the SAME reference
+        -- from the @OTHERWISE@ of EVERY column, at different nesting levels
+        -- with different residuals over different column types. So the fact is
+        -- computed where it is well defined — the SOURCE clause matrix, per
+        -- column, per clause ('clauseColumnFacts') — and installed here as an
+        -- ordinary 'Narrowing' on the column binders. @__pm_fallthrough_k@'s
+        -- body is exactly clauses @k+1 ..@, so it gets clause @k+1@'s entry;
+        -- the fall-through for @k+1@ nests inside it and intersects a
+        -- strictly tighter one.
+        --
+        -- The suppression survives only where that computation cannot be made
+        -- at all — an untyped @GIVEN@ whose column type is still an inference
+        -- variable, an unenumerable column type, a matrix that does not line
+        -- up with its appform — and even there it is confined to reads whose
+        -- base IS one of those columns ('fallthroughColumns',
+        -- 'isFallthroughColumnRead').
         markFallthrough :: Check a -> Check a
-        markFallthrough
-          | isSyntheticFallthrough
-              = local (\env -> env { inSyntheticFallthrough = True })
-          | otherwise = id
+        markFallthrough act
+          | isSyntheticFallthrough =
+              asks (.clauseNarrowings) >>= \ case
+                -- The enclosing declaration is not a fused clause group, so
+                -- there is no matrix to have read and no columns to name. See
+                -- 'CheckEnv.fallthroughUnanalysed': in practice this is a
+                -- module 'prettyLayout' re-emitted, whose reads were already
+                -- checked against the matrix in the source it came from.
+                Nothing -> local (\ env -> env { fallthroughUnanalysed = True }) act
+                Just tbl -> do
+                  supp <- asks (.clauseSuppressColumns)
+                  let nws = case syntheticFallthroughIndex of
+                        Just k  -> Map.findWithDefault [] (k + 1) tbl
+                        -- Unreachable: 'L4.Parser.fallthroughName' spells @k@
+                        -- with 'show'. If it ever were, no narrowing is
+                        -- installed and the reads are checked at the whole
+                        -- type — restrictive, which is the direction a mistake
+                        -- here must fall.
+                        Nothing -> []
+                  local
+                    (\ env -> env
+                       { fallthroughColumns = Set.union env.fallthroughColumns supp })
+                    (withNarrowings nws act)
+          | otherwise = act
 
     -- The multi-clause pattern-matching desugaring (L4.Parser.matchClauses)
     -- binds the remaining clauses of a group as a LOCAL decide named
@@ -1066,6 +1104,37 @@ inferDecide dec@(MkDecide ann _tysig appForm expr) = do
     isSyntheticFallthrough = case appForm of
       MkAppForm _ (MkName _ (NormalName t)) _ _ -> "__pm_fallthrough_" `Text.isPrefixOf` t
       _ -> False
+
+    -- | The @k@ of @__pm_fallthrough_k@, i.e. the nesting level of this
+    -- synthesised binding. 'L4.Parser.matchClauses' increments @k@ and drops
+    -- exactly one clause in the same recursive step, so @__pm_fallthrough_k@
+    -- binds the clauses at 0-based index @k+1@ and later — which is what makes
+    -- 'clauseNarrowings' addressable from here.
+    syntheticFallthroughIndex :: Maybe Int
+    syntheticFallthroughIndex = case appForm of
+      MkAppForm _ (MkName _ (NormalName t)) _ _ ->
+        readMaybe . Text.unpack =<< Text.stripPrefix "__pm_fallthrough_" t
+      _ -> Nothing
+
+    -- | Record, for the body of THIS declaration, what its clause group knows
+    -- about its own columns — see Note [S2 inside a fall-through] and
+    -- 'clauseColumnFacts'.
+    --
+    -- A synthesised fall-through deliberately does NOT recompute or reset:
+    -- @__pm_fallthrough_(k+1)@ is nested inside @__pm_fallthrough_k@'s body
+    -- and is about the very same columns of the very same group, and the
+    -- fall-through's own appform is nullary so it has nothing of its own to
+    -- record. Every other declaration DOES reset, so a @WHERE@ helper inside a
+    -- clause body cannot inherit its enclosing group's clause facts and
+    -- mis-key them onto its own parameters.
+    withClauseColumnFacts :: FunTypeSig -> Check a -> Check a
+    withClauseColumnFacts dHead act
+      | isSyntheticFallthrough = act
+      | otherwise = do
+          (tbl, supp) <- clauseColumnFacts dec dHead
+          local
+            (\ env -> env { clauseNarrowings = tbl, clauseSuppressColumns = supp })
+            act
 
 -- | Exhaustiveness for a multi-clause DECIDE\/MEANS pattern-matching group,
 -- run over the SOURCE clause matrix the parser attached to the fused
@@ -1219,27 +1288,6 @@ checkClauseMatrix dec dHead =
       PatVar a v | v `sameResolved` underscoreRef -> PatVar a scrutR
       p -> p
 
-    -- | Mirror of 'L4.Parser.patAlwaysMatchesAs', which the matrix analysis
-    -- MUST agree with: a bare pattern that reuses its own column's
-    -- GIVEN\/scrutinee name (or the anonymous wildcard) is compiled by the
-    -- desugarer as an unconditional match — 'L4.Parser.matchOne'\/'matchLast'
-    -- skip the column entirely, emitting no test — EVEN when that name is
-    -- also a nullary constructor of the column type. Re-resolving such a
-    -- pattern through 'checkPattern' would try constructor resolution first
-    -- ('inferPatternApp' before the variable fallback) and mis-read the row
-    -- as covering only that one constructor, producing a
-    -- 'PatternClausesMissing' warning (and, downstream, a DMN D-PARTIAL
-    -- Blocking) that contradicts the shipped runtime semantics of a
-    -- runtime-total group. Intercept before resolution and stand in the
-    -- wildcard the desugarer actually compiled ('desugarPat' turns 'PatVar'
-    -- into no guards). Note the reuse test is against THIS column's
-    -- scrutinee only: a bare name matching a DIFFERENT column's GIVEN, or
-    -- no GIVEN at all, still resolves normally — exactly as at runtime.
-    patIsColumnWildcard :: Resolved -> Pattern Name -> Bool
-    patIsColumnWildcard scrutR = \ case
-      PatApp _ n [] -> nameToText n == "_" || rawName n == rawName (getName scrutR)
-      _ -> False
-
     -- | Defensive: 'desugarPat' calls 'error' on a PatApp\/PatCons whose
     -- anno lacks 'resolvedInfo' (possible only for a rangeless anno —
     -- 'setAnnResolvedType' is a no-op without a range). Parser-built
@@ -1252,6 +1300,228 @@ checkClauseMatrix dec dHead =
       PatVar {}       -> True
       PatExpr {}      -> True -- unreachable: the opaque bail stood down first
       PatLit {}       -> True
+
+-- | Mirror of 'L4.Parser.patAlwaysMatchesAs', which every analysis of the
+-- source clause matrix MUST agree with: a bare pattern that reuses its own
+-- column's GIVEN\/scrutinee name (or the anonymous wildcard) is compiled by the
+-- desugarer as an unconditional match — 'L4.Parser.matchOne'\/'matchLast' skip
+-- the column entirely, emitting no test — EVEN when that name is also a nullary
+-- constructor of the column type. Re-resolving such a pattern through
+-- 'checkPattern' would try constructor resolution first ('inferPatternApp'
+-- before the variable fallback) and mis-read the row as covering only that one
+-- constructor, producing a 'PatternClausesMissing' warning (and, downstream, a
+-- DMN D-PARTIAL Blocking) that contradicts the shipped runtime semantics of a
+-- runtime-total group. Intercept before resolution and stand in the wildcard
+-- the desugarer actually compiled ('desugarPat' turns 'PatVar' into no guards).
+-- Note the reuse test is against THIS column's scrutinee only: a bare name
+-- matching a DIFFERENT column's GIVEN, or no GIVEN at all, still resolves
+-- normally — exactly as at runtime.
+patIsColumnWildcard :: Resolved -> Pattern Name -> Bool
+patIsColumnWildcard scrutR = \ case
+  PatApp _ n [] -> nameToText n == "_" || rawName n == rawName (getName scrutR)
+  _ -> False
+
+-- ----------------------------------------------------------------------------
+-- Note [What a later clause knows about its own columns]
+-- ----------------------------------------------------------------------------
+--
+-- SUM-TYPE-FIELDS-SPEC §5.1. A multi-clause group is first-match-wins, so the
+-- body of clause @m@ runs only for tuples that no earlier clause matched. That
+-- is a real, checkable fact about each COLUMN, and it is the fact S2 needs in
+-- order to accept
+--
+-- >  DECIDE f Landlord IS 0
+-- >  DECIDE f a        IS a's monthly_rent
+--
+-- when @Landlord@ is the only other constructor, and to REFUSE the same program
+-- when a third constructor without the field is still reachable.
+--
+-- The fact is computed here, from the SOURCE clause matrix the parser attached
+-- to the fused Decide, and NOT from the desugared tree: 'L4.Parser.matchClauses'
+-- emits ONE @__pm_fallthrough_k@ binding referenced from the @OTHERWISE@ of
+-- EVERY column, at different nesting levels with different residuals over
+-- different column types, so there is no single residual to copy onto it. One
+-- binding, several residuals — see Note [S2 inside a fall-through].
+--
+-- SOUNDNESS. A constructor @c@ is removed from column @j@'s possible-set at
+-- clause @m@ only when some earlier clause @i@ certainly matches EVERY tuple
+-- whose column @j@ is @c@:
+--
+--   (a) clause @i@'s column-@j@ pattern names, within THIS column's own type,
+--       the constructor @c@ — and is not the column-wildcard spelling the
+--       desugarer compiles to no test at all;
+--   (b) that pattern matches every value @c@ has: it supplies exactly @c@'s
+--       arity of sub-patterns and every one of them is certainly an irrefutable
+--       variable binding ('patIsCertainlyVar'). For a nullary @c@ that is the
+--       bare name, and @c@ has exactly one value anyway.
+--   (c) every OTHER column of clause @i@ matches anything.
+--
+-- Then clause @i@ fires for every such tuple and clause @m@ is unreachable for
+-- it. This is an argument about the clause list itself, so it holds for EVERY
+-- path that reaches the body, not for an enumerated subset of them.
+--
+-- Every uncertainty leaves @c@ IN the set, which widens it, which can only make
+-- S2 refuse more: a sub-pattern that might be refutable, an arity that does not
+-- line up, a literal, an @EXACTLY@\/expression pattern, a cons pattern, a
+-- column whose type cannot be enumerated. A narrowing that errs permissively is
+-- invisible (Note [Narrowing is a check-time fact]); one that errs restrictively
+-- is a message someone can argue with.
+
+-- | One cell of the source clause matrix, classified for
+-- 'clauseColumnFacts'.
+data ClauseCell
+  = CellWild
+    -- ^ Matches EVERY value of its column: the column-wildcard idiom
+    -- ('patIsColumnWildcard'), or a bare name that is not a constructor of the
+    -- column's type at all — which 'inferPattern' resolves as a fresh variable
+    -- binding (@inferPatternApp … \`orElse\` inferPatternVar@).
+  | CellConsumes !Resolved
+    -- ^ Matches every value of exactly one constructor of the column's type.
+  | CellOpaque
+    -- ^ Anything else — a constructor pattern that might be refutable, a
+    -- literal, an expression or cons pattern, or any pattern at all in a column
+    -- whose type the checker cannot enumerate. Matches an unknown subset, so it
+    -- neither consumes nor stands aside.
+
+-- | Is this sub-pattern CERTAINLY an irrefutable variable binding?
+--
+-- Only a bare name that matches no constructor anywhere in scope. A bare name
+-- that does match one is tried as that constructor FIRST
+-- (@inferPatternApp … \`orElse\` inferPatternVar@, and 'resolveConstructor'
+-- resolves by 'rawName' across the whole environment, imports included), so it
+-- may well be refutable; and this is the only judgement made without knowing
+-- the sub-pattern's own type, so it has to be the conservative one.
+patIsCertainlyVar :: Set RawName -> Pattern Name -> Bool
+patIsCertainlyVar ctorNames = \ case
+  PatVar {}     -> True
+  PatApp _ n [] -> not (rawName n `Set.member` ctorNames)
+  _             -> False
+
+-- | Every constructor 'RawName' in scope — read from 'entityInfo' rather than
+-- from 'constructorsInScopeFromEntityInfo', because the latter deliberately
+-- omits @CONTRACT@'s constructors ('builtinNonExhaustiveTypeUniques') and a
+-- name missing from THIS set would be mistaken for a variable.
+allConstructorRawNames :: EntityInfo -> Set RawName
+allConstructorRawNames ei =
+  Set.fromList [ rawName n | (n, KnownTerm _ Constructor) <- Map.elems ei ]
+
+-- | Classify one cell. Wildcard-ness is decided BEFORE anything about the
+-- column's type, because that is the order the desugarer decides it in.
+classifyClauseCell :: EntityInfo -> Set RawName -> Maybe (Unique, [Resolved]) -> Resolved -> Pattern Name -> ClauseCell
+classifyClauseCell ei ctorNames mcol scrutR pat
+  | patIsColumnWildcard scrutR pat = CellWild
+  | otherwise = case (mcol, pat) of
+      (_, PatVar {})            -> CellWild
+      (Nothing, _)              -> CellOpaque
+      (Just (_, ctors), PatApp _ n ps) ->
+        case List.find (\ c -> rawName n == rawName (getName c)) ctors of
+          Just c
+            | constructorArity ei c == length ps
+            , all (patIsCertainlyVar ctorNames) ps -> CellConsumes c
+            | otherwise                            -> CellOpaque
+          -- Not a constructor of this column's type, so 'inferPattern' binds it
+          -- as a variable — and a variable pattern matches anything.
+          Nothing | null ps                        -> CellWild
+                  | otherwise                      -> CellOpaque
+      _                                            -> CellOpaque
+
+-- | The column's sum type and its constructors, or 'Nothing' when the checker
+-- cannot enumerate them HERE — an untyped @GIVEN@ whose column type is still an
+-- inference variable at this point, a type whose head is not a type
+-- application, or one deliberately excluded from enumeration
+-- ('builtinNonExhaustiveTypeUniques'). 'Nothing' is "I do not know", never "no
+-- constructors", and it is what keeps the old suppression alive for that
+-- column instead of refusing a read for a fact that was never established.
+clauseColumnUniverse :: EntityInfo -> Map Unique [Resolved] -> Resolved -> Check (Maybe (Unique, [Resolved]))
+clauseColumnUniverse ei ctorsOf scrutR =
+  case Map.lookup (getUnique scrutR) ei of
+    Just (_, KnownTerm ty _) -> do
+      ty' <- applySubst ty
+      pure case ty' of
+        TyApp _ tyR _ | ctors@(_ : _) <- Map.findWithDefault [] (getUnique tyR) ctorsOf ->
+          Just (getUnique tyR, ctors)
+        _ -> Nothing
+    _ -> pure Nothing
+
+-- | See Note [What a later clause knows about its own columns].
+--
+-- Returns (1) the per-clause narrowings on the group's column binders, keyed by
+-- 0-based clause index, and (2) the columns for which nothing could be computed
+-- and which therefore keep the old suppression
+-- ('CheckEnv.clauseSuppressColumns').
+--
+-- Runs BEFORE the body is checked, which is why it reads the column types
+-- through 'applySubst' and treats an unresolved one as unknown rather than
+-- waiting: 'checkClauseMatrix' can afford to run afterwards because it only
+-- warns, but a narrowing has to be in scope while the body it is about is being
+-- checked.
+clauseColumnFacts :: Decide Name -> FunTypeSig -> Check (Maybe (Map Int [(Resolved, Narrowing)]), Set Unique)
+clauseColumnFacts dec dHead =
+  case view annPmMatrix (getAnno dec) of
+    -- Not a fused clause group at all — distinct from a group that yields an
+    -- empty table, and the distinction is load-bearing: see
+    -- 'CheckEnv.clauseNarrowings'.
+    Nothing -> pure (Nothing, Set.empty)
+    Just matrix
+      -- Column-count mismatch with any clause stands the whole computation
+      -- down (mirrors 'L4.Parser.matchOne', which ignores extra patterns), and
+      -- falls back to suppressing reads on every column.
+      | null colScruts || any (\ cl -> length cl.patterns /= length colScruts) matrix.clauses
+      -> pure (Just Map.empty, allColumns)
+      | otherwise -> do
+          ei <- asks (.entityInfo)
+          let ctorsOf   = constructorsInScopeFromEntityInfo ei
+              ctorNames = allConstructorRawNames ei
+          cols <- traverse (clauseColumnUniverse ei ctorsOf) colScruts
+          let rows :: [[ClauseCell]]
+              rows =
+                [ zipWith3 (classifyClauseCell ei ctorNames) cols colScruts cl.patterns
+                | cl <- matrix.clauses
+                ]
+              -- What clause @i@ certainly consumes in column @j@ — conditions
+              -- (a), (b) and (c) of the note, in that order.
+              consumedBy :: [ClauseCell] -> Int -> Maybe Resolved
+              consumedBy cells j = do
+                CellConsumes c <- pure (cells !! j)
+                guard (and [ isWildCell cell | (jj, cell) <- zip [0 ..] cells, jj /= (j :: Int) ])
+                pure c
+              -- Column @j@'s narrowing at clause @m@, if the clauses above it
+              -- consume anything there at all.
+              columnEntry :: Int -> Int -> [(Resolved, Narrowing)]
+              columnEntry m j =
+                let consumed =
+                      nubOrdOn getUnique
+                        [ c | cells <- take m rows, Just c <- [consumedBy cells j] ]
+                in case (cols !! j, consumed) of
+                     (Just (tyU, ctors), _ : _)
+                       | Just poss <-
+                           possibleConstructors
+                             ( Set.fromList (getUnique <$> ctors)
+                                 Set.\\ Set.fromList (getUnique <$> consumed) )
+                       -> [ ( colScruts !! j
+                            , MkNarrowing poss tyU
+                                (NarrowedByEarlierClauses (getName <$> consumed))
+                            ) ]
+                     -- Nothing consumed, or every constructor consumed (the
+                     -- clause is unreachable): record nothing, which leaves the
+                     -- whole type possible. Widening is the safe direction.
+                     _ -> []
+              table =
+                Map.fromList
+                  [ (m, entry)
+                  | m <- [1 .. length matrix.clauses - 1]
+                  , let entry = concatMap (columnEntry m) [0 .. length colScruts - 1]
+                  , not (null entry)
+                  ]
+          pure (Just table, Set.fromList [ getUnique r | (r, Nothing) <- zip colScruts cols ])
+  where
+    MkAppForm _ _ colScruts _ = dHead.rappForm
+
+    allColumns = Set.fromList (getUnique <$> colScruts)
+
+    isWildCell = \ case
+      CellWild -> True
+      _        -> False
 
 -- | We allow the following cases:
 --
@@ -2811,9 +3081,10 @@ projectionBaseOf = \ case
 -- which does not declare it. See Note [S2: no projection without narrowing].
 --
 -- Silent — records nothing — for anything that is not a declared field
--- selector, for a domain whose constructors cannot be enumerated, and inside a
--- synthesised multi-clause fall-through body (Note [S2 has no obligation
--- inside a fall-through]).
+-- selector, and for a domain whose constructors cannot be enumerated. It is
+-- also silent for ONE shape inside a synthesised multi-clause fall-through:
+-- an un-narrowed read on a column whose possible-set could not be computed
+-- ('isFallthroughColumnRead', Note [S2 inside a fall-through]).
 checkPartialProjection
   :: Maybe SrcRange
      -- ^ where the read is; 'Nothing' for a desugared node with no range
@@ -2825,12 +3096,10 @@ checkPartialProjection
      -- ^ the base it is read from; 'Nothing' for a selector used as a value
   -> Check ()
 checkPartialProjection mRange sel selTy mBase = do
-  suppressed <- asks (.inSyntheticFallthrough)
   ei <- asks (.entityInfo)
   case Map.lookup (getUnique sel) ei of
     Just (_, KnownTerm _ Selector)
-      | not suppressed
-      , Just tyR <- selectorDomainType selTy
+      | Just tyR <- selectorDomainType selTy
       -> go ei tyR
     _ -> pure ()
   where
@@ -2847,29 +3116,75 @@ checkPartialProjection mRange sel selTy mBase = do
       -- than not reporting.
       unless (Set.null universe || null declared) do
         mbn <- traverse narrowingOfBase mBase
-        let mNw = mbn >>= (.narrowing)
-            -- THE CLAMP. Both fallbacks widen; see Note [S2 …].
-            (possible, mWhy) = case mNw of
-              Just nw
-                | nw.ofType == tyU
-                , p0 <- Set.intersection (possibleConstructorSet nw.possible) universe
-                , not (Set.null p0)
-                -> (p0, Just nw.reason)
-              _ -> (universe, Nothing)
-            declaring = Set.fromList (getUnique <$> declared)
-            missing   = [ c | c <- ctors
-                            , getUnique c `Set.member` possible
-                            , not (getUnique c `Set.member` declaring) ]
-        unless (null missing) $
-          deferPartialProjection
-            MkPartialProjection
-              { readRange     = mRange
-              , field         = getName sel
-              , declaredBy    = getName <$> declared
-              , stillPossible = getName <$> missing
-              , base          = maybe BaseNone (projectionBaseOf . (.shape)) mbn
-              , why           = fromMaybe (NotNarrowed (getName tyR)) mWhy
-              }
+        -- Note [S2 inside a fall-through] justifies suppressing ONE shape, and
+        -- the test is made HERE, where the base's shape is known, rather than
+        -- before the check as a blanket flag.
+        suppressed <- isFallthroughColumnRead ei mbn
+        unless suppressed do
+          let mNw = mbn >>= (.narrowing)
+              -- THE CLAMP. Both fallbacks widen; see Note [S2 …].
+              (possible, mWhy) = case mNw of
+                Just nw
+                  | nw.ofType == tyU
+                  , p0 <- Set.intersection (possibleConstructorSet nw.possible) universe
+                  , not (Set.null p0)
+                  -> (p0, Just nw.reason)
+                _ -> (universe, Nothing)
+              declaring = Set.fromList (getUnique <$> declared)
+              missing   = [ c | c <- ctors
+                              , getUnique c `Set.member` possible
+                              , not (getUnique c `Set.member` declaring) ]
+          unless (null missing) $
+            deferPartialProjection
+              MkPartialProjection
+                { readRange     = mRange
+                , field         = getName sel
+                , declaredBy    = getName <$> declared
+                , stillPossible = getName <$> missing
+                , base          = maybe BaseNone (projectionBaseOf . (.shape)) mbn
+                , why           = fromMaybe (NotNarrowed (getName tyR)) mWhy
+                }
+
+-- | The one read Note [S2 inside a fall-through] justifies suppressing: an
+-- UN-NARROWED read whose base is a binder denoting a column of an enclosing
+-- clause group whose possible-set the checker could not compute
+-- ('CheckEnv.fallthroughColumns').
+--
+-- …or, when the group could not be seen at all
+-- ('CheckEnv.fallthroughUnanalysed'), any un-narrowed read on a bare binder.
+--
+-- Everything else is checked. 'Nothing' — a bare selector used as a value — has
+-- no base at all, so no residual could ever have covered it; a constructed base
+-- is statically one constructor; a nested @WHERE@ helper's own parameter is not
+-- a column; and a base that IS narrowed has a narrowing S2 can judge on its own
+-- terms, so a WRONG narrowing inside a fall-through (@CONSIDER s WHEN Agent a
+-- THEN s's monthly_rent@) is refused again where the blanket flag silenced it.
+--
+-- The alias walk is 'lookupNarrowing''s, for the same reason and with the same
+-- depth guard: @WHERE b MEANS a@ makes a read on @b@ a read on @a@. A chain
+-- whose end is a CONSTRUCTOR is deliberately not followed — that base is
+-- narrowed, hence not this shape.
+isFallthroughColumnRead :: EntityInfo -> Maybe BaseNarrowing -> Check Bool
+isFallthroughColumnRead ei = \ case
+  Just (MkBaseNarrowing (BaseIsBinder r) Nothing) -> do
+    unanalysed <- asks (.fallthroughUnanalysed)
+    cols <- asks (.fallthroughColumns)
+    if unanalysed then pure True
+      else if Set.null cols then pure False
+      else walk (0 :: Int) cols (getUnique r)
+  _ -> pure False
+  where
+    walk depth cols u
+      | u `Set.member` cols = pure True
+      | depth > 8           = pure False
+      | otherwise = do
+          bodies <- use #constBodies
+          case Map.lookup u bodies of
+            Just b
+              | BaseIsBinder r' <- classifyBase ei b
+              , getUnique r' /= u
+              -> walk (depth + 1) cols (getUnique r')
+            _ -> pure False
 
 -- | S2 at an application site (@f a@). Only a one-argument application is
 -- checked: a selector has arity one, so a longer resolved-argument list means
@@ -4334,8 +4649,34 @@ checkBranch
   -> Check (Branch Resolved)
 checkBranch ec ei cl mResidual scrutinee tscrutinee tresult (MkBranch ann' (When ann pat) e)  = do
   (rpat', extends) <- checkPattern (ExpectPatternScrutineeContext scrutinee) pat tscrutinee
-  let narrowed = branchNarrowings ei cl mResidual scrutinee rpat'
-  (rpat, re) <- extendKnownMany extends $ withNarrowings narrowed do
+  -- A catch-all @WHEN b@ binds @b@ to the WHOLE scrutinee value, so @b@ is that
+  -- value under a second name and inherits BOTH what the arms above left
+  -- ('mResidual', handled by 'branchNarrowings') and whatever is already known
+  -- about the scrutinee itself. The second half is not decoration: this is
+  -- exactly what 'L4.Parser.matchLast' compiles a final clause written with a
+  -- fresh binder into — @DECIDE f a IS a's monthly_rent@ becomes
+  -- @CONSIDER s WHEN a THEN a's monthly_rent@, a FIRST arm, whose residual is
+  -- therefore 'Nothing' — so without it the clause-matrix narrowing on @s@
+  -- would never reach the read.
+  --
+  -- Sound because it is the same fact about the same value, not a new one; and
+  -- 'withNarrowings' intersects, so it can only shrink what @b@ could be.
+  (catchAllExtra, columnAlias) <- case armEffect rpat' of
+    ArmCatchAll b -> case classifyBase ei scrutinee of
+      BaseIsBinder r -> do
+        mnw <- lookupNarrowing r
+        pure ([ (b, nw) | Just nw <- [mnw] ], Just (getUnique r, getUnique b))
+      _ -> pure ([], Nothing)
+    _ -> pure ([], Nothing)
+  let narrowed = branchNarrowings ei cl mResidual scrutinee rpat' <> catchAllExtra
+      -- …and, for the same reason, when the scrutinee is a column whose
+      -- possible-set could NOT be computed, the alias inherits the suppression
+      -- rather than being refused for a fact that was never established.
+      growSuppression env = case columnAlias of
+        Just (ru, bu) | ru `Set.member` env.fallthroughColumns ->
+          env { fallthroughColumns = Set.insert bu env.fallthroughColumns }
+        _ -> env
+  (rpat, re) <- extendKnownMany extends $ local growSuppression $ withNarrowings narrowed do
     re' <- checkExpr ec e tresult
     (,)
       -- See Note [Adding type information to all binders]
@@ -6964,6 +7305,10 @@ prettyPartialProjection p =
       NarrowedByConstruction c ->
         [ "It is written here as " <> tick c <> ", and " <> tick c <> " does not"
         , "declare " <> fld <> "."
+        ]
+      NarrowedByEarlierClauses consumed ->
+        [ "The clauses above this one already match " <> andList consumed <> ","
+        , "so " <> orList p.stillPossible <> " is what is left to reach here."
         ]
       NarrowedByResidual consumed refutable ->
         consumedLine consumed <> concatMap refutableLines refutable <> tail'

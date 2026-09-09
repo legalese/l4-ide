@@ -1,0 +1,148 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: partial-projection-fallthrough.l4
+  Hidden: no
+  Range: 32:25-32:41
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    `monthly_rent` is a field of `Tenant` only.
+    But `s` could also be `Agent`, which has no `monthly_rent`.
+
+    The clauses above this one already match `Landlord`,
+    so `Agent` is what is left to reach here.
+
+    Narrow `s` first:
+
+      EVERY Tenant s …
+      CONSIDER s WHEN Tenant t THEN … s's monthly_rent …
+
+    (or just `THEN t` when the field is the whole payload), or put the read
+    under an `OTHERWISE` after the other arms — or declare `monthly_rent` on
+    `Agent` too.
+
+File: partial-projection-fallthrough.l4
+  Hidden: no
+  Range: 43:36-43:48
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    `monthly_rent` is a field of `Tenant` only.
+    But whatever it is applied to could also be `Landlord` or `Agent`, which have no `monthly_rent`.
+
+    There is no base here to narrow: a selector used as a value has nothing
+    to be narrowed by, so every constructor of `Actor` can reach
+    this read.
+
+    Read the field through a name you have narrowed instead:
+
+      GIVEN x YIELD CONSIDER x WHEN Tenant t THEN t OTHERWISE …
+
+    or declare `monthly_rent` on `Landlord` or `Agent` too.
+
+File: partial-projection-fallthrough.l4
+  Hidden: no
+  Range: 51:32-51:58
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    `monthly_rent` is a field of `Tenant` only.
+    But `theLandlord` could also be `Landlord`, which has no `monthly_rent`.
+
+    It is written here as `Landlord`, and `Landlord` does not
+    declare `monthly_rent`.
+
+    Read the field from a value that can be `Tenant`, or
+    declare `monthly_rent` on `Landlord` too.
+
+File: partial-projection-fallthrough.l4
+  Hidden: no
+  Range: 64:24-64:40
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    `monthly_rent` is a field of `Tenant` only.
+    But `x` could also be `Landlord` or `Agent`, which have no `monthly_rent`.
+
+    Nothing here narrows `x`: it is used at the whole type `Actor`,
+    so every constructor of `Actor` can reach this read.
+
+    Narrow `x` first:
+
+      EVERY Tenant x …
+      CONSIDER x WHEN Tenant t THEN … x's monthly_rent …
+
+    (or just `THEN t` when the field is the whole payload), or put the read
+    under an `OTHERWISE` after the other arms — or declare `monthly_rent` on
+    `Landlord` or `Agent` too.
+
+File: partial-projection-fallthrough.l4
+  Hidden: no
+  Range: 74:21-74:37
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    `monthly_rent` is a field of `Tenant` only.
+    But `a` could also be `Agent`, which has no `monthly_rent`.
+
+    The `WHEN Agent …` branch narrows it to `Agent` — and
+    `Agent` does not declare `monthly_rent`.
+
+    Narrow `a` first:
+
+      EVERY Tenant a …
+      CONSIDER a WHEN Tenant t THEN … a's monthly_rent …
+
+    (or just `THEN t` when the field is the whole payload), or put the read
+    under an `OTHERWISE` after the other arms — or declare `monthly_rent` on
+    `Agent` too.
+
+File: partial-projection-fallthrough.l4
+  Hidden: no
+  Range: 86:33-86:49
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    `monthly_rent` is a field of `Tenant` only.
+    But `a` could also be `Landlord` or `Agent`, which have no `monthly_rent`.
+
+    Nothing here narrows `a`: it is used at the whole type `Actor`,
+    so every constructor of `Actor` can reach this read.
+
+    Narrow `a` first:
+
+      EVERY Tenant a …
+      CONSIDER a WHEN Tenant t THEN … a's monthly_rent …
+
+    (or just `THEN t` when the field is the whole payload), or put the read
+    under an `OTHERWISE` after the other arms — or declare `monthly_rent` on
+    `Landlord` or `Agent` too.
+
+File: partial-projection-fallthrough.l4
+  Hidden: no
+  Range: 96:35-96:51
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    `monthly_rent` is a field of `Tenant` only.
+    But `a` could also be `Landlord` or `Agent`, which have no `monthly_rent`.
+
+    Nothing here narrows `a`: it is used at the whole type `Actor`,
+    so every constructor of `Actor` can reach this read.
+
+    Narrow `a` first:
+
+      EVERY Tenant a …
+      CONSIDER a WHEN Tenant t THEN … a's monthly_rent …
+
+    (or just `THEN t` when the field is the whole payload), or put the read
+    under an `OTHERWISE` after the other arms — or declare `monthly_rent` on
+    `Landlord` or `Agent` too.

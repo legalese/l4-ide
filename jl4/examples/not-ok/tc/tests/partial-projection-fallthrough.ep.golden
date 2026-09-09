@@ -1,0 +1,96 @@
+-- SUM-TYPE-FIELDS-SPEC §5.1. The refusals inside a multi-clause group; the
+-- green side is `ok/sum-fields/fallthrough.l4`.
+--
+-- Every program below type-checked clean before this rule and then DIED AT RUN
+-- TIME, with a message about a CONSIDER the drafter never wrote (§1.1) — which
+-- is exactly the complaint §3 S2 exists to answer. Worse, the same logic
+-- spelled as a hand-written CONSIDER was already refused with a good message,
+-- so one spelling taught and the other crashed.
+--
+-- Sites 2, 3 and 4 are shapes NO residual could ever have covered: a selector
+-- used as a value has no base at all, a base written as some other constructor
+-- is already as narrow as it gets, and a nested helper's own parameter is not a
+-- column of the group. Site 1 is the shape the clause narrowing DOES cover —
+-- and still refuses, because the group is genuinely partial. Sites 5 and 6 are
+-- the two ways of asking for more narrowing than the clauses give.
+--
+-- (No IMPORT: this file's golden would otherwise carry an import-resolution
+-- log, and `apply` below is all that prelude was wanted for.)
+
+DECLARE Actor IS ONE OF
+    Landlord
+    Agent
+    Tenant   HAS monthly_rent IS A NUMBER
+
+-- 1. THE GROUP'S OWN COLUMN, still reachable by a constructor without the
+--    field. Clause 1 consumes `Landlord`, so `Agent` — and only `Agent` — is
+--    what is left to reach clause 2. The message must say so, and must talk
+--    about CLAUSES, not about branches of a CONSIDER that is not in the source.
+GIVEN s IS AN Actor
+GIVETH A NUMBER
+DECIDE rent Landlord IS 0
+DECIDE rent s        IS s's monthly_rent
+
+-- 2. THE SELECTOR AS A VALUE, with no base at all. There is nothing for a
+--    clause to have narrowed, so being in a later clause changes nothing.
+GIVEN f IS A FUNCTION FROM Actor TO NUMBER
+GIVETH A NUMBER
+`apply` f MEANS f Agent
+
+GIVEN s IS AN Actor
+GIVETH A NUMBER
+DECIDE asValue Landlord IS 0
+DECIDE asValue s        IS `apply` monthly_rent
+
+-- 3. A BASE WRITTEN AS ANOTHER CONSTRUCTOR. `theLandlord` is a `Landlord`
+--    however the surrounding clauses fell out, so the read is simply wrong
+--    about which constructor it reads from.
+GIVEN s IS AN Actor
+GIVETH A NUMBER
+DECIDE constructed Landlord IS 0
+DECIDE constructed s        IS theLandlord's monthly_rent
+    WHERE
+        theLandlord MEANS Landlord
+
+-- 4. A NESTED HELPER'S OWN PARAMETER. `x` is bound by the helper's GIVEN, not
+--    by the clause group, so it stands at the whole type no matter where the
+--    helper is written.
+GIVEN s IS AN Actor
+GIVETH A NUMBER
+DECIDE viaHelper Landlord IS 0
+DECIDE viaHelper s        IS helper s
+    WHERE
+        GIVEN x IS AN Actor
+        helper x MEANS x's monthly_rent
+
+-- 5. NARROWED TO THE WRONG ARM, inside a later clause. The clause narrowing
+--    says `Agent` or `Tenant`; the `WHEN Agent` then says `Agent`. Being in a
+--    fall-through must not silence a `CONSIDER` the drafter DID write.
+GIVEN s IS AN Actor
+GIVETH A NUMBER
+DECIDE wrongArm Landlord IS 0
+DECIDE wrongArm a        IS
+    CONSIDER a
+    WHEN Agent THEN a's monthly_rent
+    OTHERWISE       0
+
+-- 6. TWO COLUMNS, AND THE EARLIER CLAUSE TESTS BOTH. `dueFrom FALSE Landlord`
+--    does not match clause 1, so clause 2 runs with `a = Landlord`. Nothing is
+--    consumed in the second column, and the read is refused at the whole type —
+--    the same program with the first column widened to the wildcard spelling is
+--    case 5 of the ok file, and is safe.
+GIVEN flag IS A BOOLEAN
+      s    IS AN Actor
+GIVETH A NUMBER
+DECIDE dueFrom TRUE Landlord IS 0
+DECIDE dueFrom flag a        IS a's monthly_rent
+
+-- 7. A CLAUSE THAT BINDS THE PAYLOAD REFUTABLY. `Tenant 1500` matches only the
+--    `Tenant`s whose rent is 1500, so it does NOT consume the constructor and a
+--    `Tenant` still reaches clause 2 — which is fine, but `Landlord` and
+--    `Agent` reach it too. Case 6 of the ok file is the irrefutable spelling
+--    (`Tenant r`), which does consume.
+GIVEN s IS AN Actor
+GIVETH A NUMBER
+DECIDE refutable (Tenant 1500) IS 1
+DECIDE refutable a             IS a's monthly_rent
