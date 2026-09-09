@@ -92,8 +92,17 @@ for (const f of skillFiles) {
 }
 
 // --- copy -------------------------------------------------------------------
-fs.rmSync(OUT, { recursive: true, force: true });
+// Clear the bundle's CONTENTS but keep `.git`. The bundle is meant to be a
+// published repository whose history is the record of what shipped when, and
+// an earlier version of this line removed the directory whole -- silently
+// deleting that history on the next build, which is how the first bundle repo
+// lost its initial commit. Preserving it is what makes "regenerate, then
+// commit the diff" a workable publish model.
 fs.mkdirSync(OUT, { recursive: true });
+for (const e of fs.readdirSync(OUT)) {
+  if (e === ".git") continue;
+  fs.rmSync(path.join(OUT, e), { recursive: true, force: true });
+}
 
 function copyInto(relSrc, relDest) {
   const src = path.join(REPO, relSrc);
