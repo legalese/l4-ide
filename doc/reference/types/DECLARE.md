@@ -83,9 +83,11 @@ GIVETH A NUMBER
 > But `a` could also be `Landlord`, which has no `rent`.
 
 This is a refusal at check time, not a surprise at run time. The same question used to be accepted
-and then die halfway through a run, on whichever case first turned out to be a `Landlord`.
+and then die halfway through a run, on whichever case first turned out to be a `Landlord`. There is
+one narrow case where it still can — a `GIVEN` you left untyped — and it is the last bullet under
+"What does not narrow" below.
 
-**How to narrow.** Four ways, all of which say the same thing — "here, this value is a `Tenant`":
+**How to narrow.** Five ways, all of which say the same thing — "here, this value is a `Tenant`":
 
 ```l4
 -- 1. Take the value apart. The branch you are in tells the checker what `a` is,
@@ -123,7 +125,25 @@ GIVETH A DEONTIC Actor Action
         WHO    t's rent AT LEAST 1000
         MUST   Sign (EXACTLY t)
         WITHIN 14
+
+-- 5. Write the rule as several clauses. The clauses above a given one have
+--    already matched their cases, so those cases cannot reach it — the same
+--    reasoning as the OTHERWISE in 3, spelled without a CONSIDER.
+GIVEN a IS AN Actor
+GIVETH A NUMBER
+DECIDE `rent owed by` (Landlord addr name) IS 0
+DECIDE `rent owed by` a                    IS a's rent
 ```
+
+Clause order narrows only as far as it truly can. If the type had a third case — say an `Agent`,
+which also has no `rent` — then an `Agent` would still reach the second clause, and it is refused,
+naming the case that got through:
+
+> `rent` is a field of `Tenant` only.
+> But `a` could also be `Agent`, which has no `rent`.
+>
+> The clauses above this one already match `Landlord`,
+> so `Agent` is what is left to reach here.
 
 **What does not narrow.** These are the cases people meet by accident, so it is worth knowing them
 before the error does:
@@ -142,6 +162,36 @@ before the error does:
 - **A name that stands for another name inherits its narrowing.** `WHERE b MEANS a` makes `b` as
   narrow as `a` is at that point, so naming a subexpression never changes whether the file checks.
   A name that stands for something else — `b MEANS f a`, `b MEANS w's inner` — narrows nothing.
+- **Naming the _read_ in a `WHERE` puts it outside the branch that would have made it safe.**
+  `CONSIDER a WHEN Tenant t THEN rent OTHERWISE 0 WHERE rent MEANS a's rent` is refused even though
+  nothing would ever have gone wrong at run time, because a `WHERE`'s definitions are checked before
+  the body that narrows `a`. Move the read inside the branch — `WHEN Tenant t THEN a's rent` — or
+  match the payload. This is the opposite of the bullet above it: naming the **base** is free,
+  naming the **projection** is not.
+- **A clause only uses up a case when its _other_ columns accept anything.** With two parameters,
+  `DECIDE f TRUE Landlord IS 0` does not use up `Landlord`, because `f FALSE Landlord` skips that
+  clause and lands on the next one — so a read of a `Tenant`-only field there is refused. Widening
+  the other column (`DECIDE f flag Landlord IS 0`) uses it up and the read is fine. Same rule as the
+  `WHEN Tenant "Alice" 1500` bullet above, one level up: a clause that tests something extra matches
+  fewer values, so it consumes nothing.
+- **A `GIVEN` with no type is the one case that still gets through, and it is the only place a
+  partial read can still fail at run time.** Writing `GIVEN a` instead of `GIVEN a IS AN Actor`
+  leaves the checker without a set of cases to reason about at the moment it works out what each
+  clause has used up, so it cannot check the read and does not pretend to:
+
+  ```l4
+  GIVEN a                                  -- no type
+  DECIDE `rent owed by` Landlord IS 0
+  DECIDE `rent owed by` a        IS a's rent   -- accepted, and can die at run time
+  ```
+
+  If a third case reaches the second clause, the run stops there:
+
+  > The value `Agent` has no `rent` field.
+  > `rent` is declared on `Tenant` only.
+
+  Write the type. The same file with `GIVEN a IS AN Actor` is checked properly, and you get the
+  refusal above instead of the failed run.
 
 **A field read with no value in sight.** A field is an ordinary function, so `map rent everyone` is
 the same partial question written another way, and it is refused for the same reason. There is
