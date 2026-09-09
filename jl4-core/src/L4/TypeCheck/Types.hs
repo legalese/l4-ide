@@ -661,6 +661,147 @@ lookupByFirstKeyword kw reg =
 lookupByCanonicalName :: RawName -> MixfixRegistry -> [FunTypeSig]
 lookupByCanonicalName cn reg = fromMaybe [] $ Map.lookup cn reg.byCanonicalName
 
+-- ----------------------------------------------------------------------------
+-- Narrowing (SUM-TYPE-FIELDS-SPEC §3 S3)
+-- ----------------------------------------------------------------------------
+
+-- | The constructors a binder could still be, at some point in a body.
+--
+-- __Emptiness is unrepresentable, by construction__ — the type is a
+-- distinguished member plus the rest, not a 'Set'. That is deliberate and it is
+-- the single most important property here. SUM-TYPE-FIELDS-SPEC §3 S3: /"An
+-- unknown constructor set is 'every constructor', never the empty set … an
+-- empty narrowing would make @missing@ empty too, silently certifying every
+-- projection in that body."/ A narrowing that is wrong in the permissive
+-- direction is invisible, so the representation refuses to express it: there is
+-- no value of this type standing for "nothing is possible", and 'Nothing' —
+-- absence of a narrowing — is the only way to say "I do not know".
+--
+-- Build with 'possibleConstructors' (which returns 'Nothing' for an empty set)
+-- or 'singlePossibleConstructor'; read with 'possibleConstructorSet'.
+data PossibleConstructors =
+  MkPossibleConstructors !Unique !(Set Unique)
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass (NFData)
+
+-- | The constructors, as a set. Always non-empty.
+possibleConstructorSet :: PossibleConstructors -> Set Unique
+possibleConstructorSet (MkPossibleConstructors u us) = Set.insert u us
+
+-- | 'Nothing' when the set is empty — which means "no narrowing", never
+-- "narrowed to nothing". See 'PossibleConstructors'.
+possibleConstructors :: Set Unique -> Maybe PossibleConstructors
+possibleConstructors s = uncurry MkPossibleConstructors <$> Set.minView s
+
+-- | Narrowed to exactly one constructor: @EVERY Tenant t@, @WHEN Tenant t@.
+singlePossibleConstructor :: Unique -> PossibleConstructors
+singlePossibleConstructor u = MkPossibleConstructors u Set.empty
+
+-- | 'Nothing' when the two sets are disjoint. Callers must NOT read that as
+-- "narrowed to nothing" — see 'intersectNarrowing', which keeps the outer fact.
+intersectPossibleConstructors :: PossibleConstructors -> PossibleConstructors -> Maybe PossibleConstructors
+intersectPossibleConstructors a b =
+  possibleConstructors (Set.intersection (possibleConstructorSet a) (possibleConstructorSet b))
+
+-- | Why a binder is narrowed to what it is narrowed to. Carried on the
+-- narrowing itself so that S4's diagnostic cannot be written without it:
+-- SUM-TYPE-FIELDS-SPEC §3.2 makes /explaining the narrowing/ — not merely
+-- reporting the missing field — the test of whether an S3 rule earned its
+-- place.
+data NarrowingReason
+  = NotNarrowed Name
+    -- ^ Never stored in a 'Narrowing' (absence is how "not narrowed" is
+    -- recorded); it is S4's payload for a binder nothing narrowed, carrying the
+    -- type it is bound at.
+  | NarrowedByCast Name
+    -- ^ @EVERY Tenant t@ — the quantifier's /narrowing constructor/ (§0: never
+    -- "the cast" in the type sense).
+  | NarrowedByWhen Name
+    -- ^ @WHEN Tenant t@, which narrows the SCRUTINEE, not @t@ (§3 S3).
+  | NarrowedByConstruction Name
+    -- ^ The base is syntactically a constructor application (@(Tenant OF 7)@,
+    -- @Tenant WITH …@) or a nullary constructor, so it /is/ that constructor
+    -- and no rule had to narrow it (§3 S3's exception). Not in the plan's
+    -- enumeration; without it S4 has no sentence for this base shape, and §3.2
+    -- requires every raise site to be able to explain itself.
+  | NarrowedByResidual [Name] [Pattern Resolved]
+    -- ^ An @OTHERWISE@, or a trailing catch-all @WHEN other@: the constructors
+    -- the preceding arms CONSUMED, and the arms that matched a constructor but
+    -- did not consume it because their sub-patterns are refutable. The second
+    -- list is what §3.2's required sentence (/"the @WHEN Tenant 1500@ branch
+    -- matches only some @Tenant@s"/) is built from.
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass (NFData)
+
+-- | What the checker knows about a binder beyond its declared type.
+data Narrowing =
+  MkNarrowing
+    { possible :: !PossibleConstructors
+      -- ^ the constructors this binder could still be, here
+    , ofType   :: !Unique
+      -- ^ the sum type's own 'Unique'. THE ANTI-STALENESS GUARD: S2 must
+      -- discard a narrowing whose 'ofType' is not the selector's domain type
+      -- head, so a narrowing can never certify a projection on another type.
+    , reason   :: !NarrowingReason
+    }
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass (NFData)
+
+-- | Combine a narrowing being recorded (@new@) with one already in scope for
+-- the same binder (@old@). SUM-TYPE-FIELDS-SPEC §3 S3: /"a nested narrowing
+-- intersects"/.
+--
+-- Two fallbacks, both deliberately RESTRICTIVE (they keep the larger set, which
+-- can only make S2 refuse more, never certify more):
+--
+--   * a disagreement about which type is being narrowed keeps the outer fact;
+--   * an EMPTY intersection keeps the outer fact — an empty narrowing would
+--     certify every projection below it (see 'PossibleConstructors').
+--
+-- The 'reason' follows the fact that actually determined the result: when the
+-- new narrowing does not shrink what was already known, the OLD reason is kept,
+-- so the diagnostic never blames a branch that changed nothing.
+intersectNarrowing :: Narrowing -> Narrowing -> Narrowing
+intersectNarrowing new old
+  | new.ofType /= old.ofType = old
+  | otherwise =
+      case intersectPossibleConstructors new.possible old.possible of
+        Nothing   -> old
+        Just both
+          | possibleConstructorSet both == possibleConstructorSet old.possible ->
+              MkNarrowing both old.ofType old.reason
+          | otherwise ->
+              MkNarrowing both new.ofType new.reason
+
+-- | What a projection base looks like to the narrowing analysis
+-- (SUM-TYPE-FIELDS-SPEC §3 S3's list of base shapes).
+data ProjectionBaseShape
+  = BaseIsBinder !Resolved
+    -- ^ a bare name. NOTE that this is @App ann r []@: 'L4.Syntax.Var' is an
+    -- (implicitly bidirectional) pattern synonym for exactly that, so matching
+    -- on 'L4.Syntax.Var' catches every bare identifier, however it was built.
+  | BaseIsConstructor !Resolved
+    -- ^ @(Tenant OF 7)@, @Tenant WITH …@, or a nullary constructor: statically
+    -- that constructor.
+  | BaseIsOther !Text
+    -- ^ a projection, an application, an @IF@\/@CONSIDER@ result, … — never
+    -- narrowed, and the 'Text' says what it is, for the diagnostic.
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass (NFData)
+
+-- | The answer 'L4.TypeCheck.narrowingOfBase' gives S2: what the base is, and
+-- what — if anything — the checker knows it can still be.
+--
+-- @'narrowing' == 'Nothing'@ is "not narrowed", i.e. /every/ constructor of its
+-- type is still possible. It is never "narrowed to nothing".
+data BaseNarrowing =
+  MkBaseNarrowing
+    { shape     :: !ProjectionBaseShape
+    , narrowing :: !(Maybe Narrowing)
+    }
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass (NFData)
+
 data CheckEnv =
   MkCheckEnv
     { moduleUri            :: !NormalizedUri
@@ -731,6 +872,30 @@ data CheckEnv =
     -- (lexical shadowing), so we must track them explicitly: they are absent
     -- from 'sectionPaths', which otherwise conflates them with top-level and
     -- imported bindings.
+    , narrowings           :: !(Map Unique Narrowing)
+    -- ^ SUM-TYPE-FIELDS-SPEC §3 S3. For a binder the checker knows more about
+    -- than its declared type says: which constructors it could STILL be, here.
+    --
+    -- KEY: the binder's 'Unique' — @'getUnique' r@ on the 'Resolved' it was
+    -- 'def'd as. Exactly the key 'markLocalBindings' uses, and exactly the key
+    -- that survives 'defAka', which mints a SECOND 'Resolved' with the SAME
+    -- 'Unique' and a different 'Name'\/range — S1's shared-field merge relies
+    -- on that, so a 'Resolved'- or 'Name'-keyed map would already be split
+    -- across arms today, and a 'RawName'-keyed one would conflate shadowed
+    -- binders.
+    --
+    -- ABSENCE means "every constructor of its type". There is no entry meaning
+    -- "no constructor": 'PossibleConstructors' cannot express one.
+    --
+    -- Written ONLY through 'withNarrowing', which is a plain Reader 'local'.
+    -- That is why this lives on 'CheckEnv' and not on 'CheckState': a narrowing
+    -- must UNSET when its scope closes, and only the Reader half does that.
+    -- 'CheckState' is threaded and backtracked through the nondeterministic
+    -- search and accumulates monotonically ('sectionPaths', 'constBodies').
+    --
+    -- RESET at the import boundary ('unionImportedCheckEnv'), beside
+    -- 'localBindings': a narrowing is a fact about a binder inside one body of
+    -- THIS module and means nothing across an @IMPORT@.
     }
   deriving stock (Eq, Generic, Show)
   deriving anyclass (NFData)
@@ -784,6 +949,7 @@ unionImportedCheckEnv accEnv depEnvironment depEntityInfo depMixfixRegistry depI
     , errorContext = None
     , sectionStack = []
     , localBindings = Set.empty
+    , narrowings = Map.empty
     }
 
 newtype SectionNames =
@@ -1995,6 +2161,25 @@ markLocalBindings cis env =
     insertCi :: Set Unique -> CheckInfo -> Set Unique
     insertCi acc ci = foldl' (\s r -> Set.insert (getUnique r) s) acc ci.names
 
+-- | Record, for the duration of the given computation, that a binder can only
+-- be one of a set of constructors (SUM-TYPE-FIELDS-SPEC §3 S3).
+--
+-- A plain Reader 'local', so the fact unsets exactly when its scope closes, and
+-- is correctly scoped inside each forked overload branch. A narrowing already
+-- in scope for the same binder is INTERSECTED with (see 'intersectNarrowing').
+withNarrowing :: Unique -> Narrowing -> Check a -> Check a
+withNarrowing u nw =
+  local \env ->
+    env { narrowings = Map.insertWith intersectNarrowing u nw env.narrowings }
+
+-- | 'withNarrowing' for each of several binders; the identity for none. An
+-- empty list is how "narrows nothing" is spelled — see 'PossibleConstructors'
+-- for why the alternative (an empty constructor set) does not exist.
+-- Takes the binder's 'Resolved' rather than its 'Unique' so a caller cannot key
+-- a narrowing on the wrong kind of 'Unique'; 'withNarrowing' is the primitive.
+withNarrowings :: [(Resolved, Narrowing)] -> Check a -> Check a
+withNarrowings = foldr (\ (r, nw) f -> withNarrowing (getUnique r) nw . f) id
+
 -- | Extend the scope of the 'CheckEnv' with all '[CheckInfo]'.
 extendEnv :: [CheckInfo] -> CheckEnv -> CheckEnv
 extendEnv cis env =
@@ -2023,6 +2208,7 @@ extendEnv cis env =
     , inNonexhaustiveDecide = e.inNonexhaustiveDecide
     , sectionStack = e.sectionStack
     , localBindings = e.localBindings
+    , narrowings = e.narrowings
     }
     where
       u :: Unique

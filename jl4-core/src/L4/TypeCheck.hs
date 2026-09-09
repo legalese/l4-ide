@@ -12,6 +12,10 @@ module L4.TypeCheck
   , initialCheckState
   , initialCheckEnv
   , isQuantifier
+    -- S3's whole interface to S2 (SUM-TYPE-FIELDS-SPEC §3 S3): given a
+    -- projection base, what shape it is and what it can still be. Nothing in
+    -- the tree calls it yet; S2 is what will.
+  , narrowingOfBase
   , prettyCheckError
   , prettyCheckErrorWithContext
   -- 'severity' is re-exported via @module X@ (it lives in
@@ -154,6 +158,7 @@ mkInitialCheckEnv moduleUri environment entityInfo =
     , moduleUri
     , sectionStack = []
     , localBindings = Set.empty
+    , narrowings = Map.empty
     }
 
 -- | Main entry point for scope- and type-checking.
@@ -362,8 +367,8 @@ withExtraMixfix mixfixAdds =
     -- positional match: 'mixfixRegistry' is a duplicated field name, so a
     -- record update here would be ambiguous under DuplicateRecordFields
     updateMixfix :: MixfixRegistry -> CheckEnv -> CheckEnv
-    updateMixfix adds (MkCheckEnv a b c d e f g reg cf cs sb sd ir ne h i lb) =
-      MkCheckEnv a b c d e f g (unionMixfixRegistry adds reg) cf cs sb sd ir ne h i lb
+    updateMixfix adds (MkCheckEnv a b c d e f g reg cf cs sb sd ir ne h i lb nw) =
+      MkCheckEnv a b c d e f g (unionMixfixRegistry adds reg) cf cs sb sd ir ne h i lb nw
 
 dedupCheckInfos :: [CheckInfo] -> [CheckInfo]
 dedupCheckInfos = go Set.empty []
@@ -2091,7 +2096,26 @@ checkDeonton ann subject action due mjoin hence lest partyT actionT =
       mRollR <- traverse (\e -> checkExpr ExpectQuantifierRollContext e (list partyT)) mRoll
       rv <- def v
       rv' <- setAnnResolvedTypeOfResolved partyT (Just Local) rv
-      extendKnown (makeKnown rv (KnownTerm partyT Local)) do
+      -- SUM-TYPE-FIELDS-SPEC §3 S3: the CHECK-TIME MIRROR of the evaluator's
+      -- roll filter. @EVERY Tenant t@ already narrows the roll at run time
+      -- ('L4.EvaluateLazy.Machine' @QuantCast@, which admits only values built
+      -- by that constructor); this tells the checker the same thing.
+      --
+      -- Wrapping the 'extendKnown' below — and nothing above it — is what
+      -- scopes the fact over exactly the five positions §2.4 gives @v@ (the WHO
+      -- filter, the action, and the act's WITHIN, HENCE and LEST), plus the
+      -- action's PROVIDED guard, which 'checkDeontonBody' reaches. It
+      -- deliberately does NOT cover 'joinR' or 'mRollR': see the 33-line
+      -- comment above for why those must not see the member at all.
+      --
+      -- The narrowing constructor itself is untouched: it is still stored in
+      -- the AST below, which is what the roll filter reads.
+      castEnv <- asks (.entityInfo)
+      let castNarrowing =
+            mCastR >>= narrowingFromConstructor castEnv
+                        (constructorsInScopeFromEntityInfo castEnv) NarrowedByCast
+          underNarrowing = withNarrowings [ (rv, nw) | Just nw <- [castNarrowing] ]
+      underNarrowing $ extendKnown (makeKnown rv (KnownTerm partyT Local)) do
         filterR <- traverse (\e -> checkExpr ExpectQuantifierFilterContext e boolean) mFilter
         -- The performer/actor agreement check ('checkRegulativeActorAgreement')
         -- is silent for a computed party (actors-and-actions.md §7); a bound
@@ -2454,6 +2478,271 @@ constructorArity ei r = case Map.lookup (getUnique r) ei of
       Fun _ args t -> length args + countArgs t
       _            -> 0
 
+-- ----------------------------------------------------------------------------
+-- Note [Narrowing is a check-time fact]
+-- ----------------------------------------------------------------------------
+--
+-- SUM-TYPE-FIELDS-SPEC §3 S3. The evaluator has always known that
+-- @EVERY Tenant t@ only ever binds @t@ to a @Tenant@ (its roll filter,
+-- 'L4.EvaluateLazy.Machine' @QuantCast@) and that inside @WHEN Tenant t@ the
+-- scrutinee is a @Tenant@. The checker did not. These functions teach it: they
+-- record, per binder 'Unique' and scoped by 'withNarrowing' (a Reader 'local'),
+-- which constructors that binder could STILL be.
+--
+-- NOTHING READS THIS YET. It is the fact S2 ('no projection without narrowing')
+-- will consult through 'narrowingOfBase'; until S2 lands the language accepts
+-- exactly what it accepted before.
+--
+-- Three invariants, each of which is the difference between "restrictive" and
+-- "silently wrong":
+--
+--   * absence means "every constructor of its type", and there is no value
+--     meaning "no constructor" — see 'PossibleConstructors', where emptiness is
+--     unrepresentable. A narrowing that is wrong in the PERMISSIVE direction
+--     certifies a projection that then dies at run time, and nothing shows.
+--   * an unknown universe records NOTHING. 'constructorsInScopeFromEntityInfo'
+--     deliberately excludes @CONTRACT@ ('builtinNonExhaustiveTypeUniques'), so
+--     "this type has no constructors" and "I cannot enumerate this type" are
+--     the same observation, and the safe reading is the second.
+--   * every fallback here keeps the LARGER set (see 'intersectNarrowing'),
+--     which can only make S2 refuse more.
+
+-- | The narrowing a constructor gives the value it was matched against, built
+-- from, or quantified over: exactly that constructor, of the type it belongs
+-- to.
+--
+-- 'Nothing' when the universe is not enumerable — see Note [Narrowing is a
+-- check-time fact].
+--
+-- Takes the constructor map rather than rebuilding it:
+-- 'constructorsInScopeFromEntityInfo' is a fold over the whole 'entityInfo', so
+-- calling it once per @WHEN@ arm instead of once per @CONSIDER@ would be a real
+-- cost on a file like @actus-core.l4@.
+narrowingFromConstructor
+  :: EntityInfo -> Map Unique [Resolved]
+  -> (Name -> NarrowingReason) -> Resolved -> Maybe Narrowing
+narrowingFromConstructor ei cl mkReason rc = do
+  (_, KnownTerm cty Constructor) <- Map.lookup (getUnique rc) ei
+  tyU <- resultTypeHeadUnique cty
+  -- Membership, not just non-emptiness: if this constructor is not one of the
+  -- ones S2 will enumerate for the type, a narrowing to it would subtract from
+  -- a set it is not in.
+  guard (getUnique rc `elem` fmap getUnique (Map.findWithDefault [] tyU cl))
+  pure (MkNarrowing (singlePossibleConstructor (getUnique rc)) tyU (mkReason (getName rc)))
+
+-- | The 'Unique' of the sum type a constructor belongs to.
+constructorTypeUnique :: EntityInfo -> Resolved -> Maybe Unique
+constructorTypeUnique ei rc = do
+  (_, KnownTerm cty Constructor) <- Map.lookup (getUnique rc) ei
+  resultTypeHeadUnique cty
+
+-- | Classify a projection base (SUM-TYPE-FIELDS-SPEC §3 S3's base shapes).
+--
+-- It consults 'entityInfo' rather than the syntax alone because a nullary
+-- constructor and a bare binder are the SAME shape — @App ann r []@ — and which
+-- one it is is a fact about what @r@ names, not about how it was written. That
+-- is also what gives §3 S3's "a nullary constructor is statically that
+-- constructor" exception for free.
+--
+-- 'L4.Syntax.Var' is an implicitly bidirectional pattern synonym for
+-- @App ann n []@ ('L4.Syntax':395-396), so the first arm below catches every
+-- bare identifier however it was built — the parser's @nameAsApp@ 'App', the
+-- computed-field rewrite's 'Var', all of it.
+classifyBase :: EntityInfo -> Expr Resolved -> ProjectionBaseShape
+classifyBase ei = \ case
+  Var _ r                     -> byEntity r
+  App _ r (_ : _) | isCtor r  -> BaseIsConstructor r
+  AppNamed _ r _ _ | isCtor r -> BaseIsConstructor r
+  Proj {}                     -> BaseIsOther "a projection"
+  App {}                      -> BaseIsOther "an application"
+  AppNamed {}                 -> BaseIsOther "an application"
+  IfThenElse {}               -> BaseIsOther "the result of an IF"
+  MultiWayIf {}               -> BaseIsOther "the result of an IF"
+  Consider {}                 -> BaseIsOther "the result of a CONSIDER"
+  _                           -> BaseIsOther "a computed value"
+  where
+    isCtor r = case Map.lookup (getUnique r) ei of
+      Just (_, KnownTerm _ Constructor) -> True
+      _                                 -> False
+
+    byEntity r
+      | isCtor r  = BaseIsConstructor r
+      | otherwise = BaseIsBinder r
+
+-- | __S2's entry point.__ Given a projection base, say what shape it is and
+-- what — if anything — the checker knows it can still be
+-- (SUM-TYPE-FIELDS-SPEC §3 S3).
+--
+-- @'narrowing' == 'Nothing'@ is "not narrowed", i.e. every constructor of the
+-- base's type is still possible. It is never "narrowed to nothing".
+--
+-- Exported (and, until S2 lands, otherwise unused) because it is the whole
+-- interface S3 owes S2.
+narrowingOfBase :: Expr Resolved -> Check BaseNarrowing
+narrowingOfBase e = do
+  ei <- asks (.entityInfo)
+  let sh = classifyBase ei e
+  MkBaseNarrowing sh <$> case sh of
+    BaseIsBinder r      -> lookupNarrowing r
+    BaseIsConstructor c ->
+      pure (narrowingFromConstructor ei (constructorsInScopeFromEntityInfo ei)
+              NarrowedByConstruction c)
+    BaseIsOther _       -> pure Nothing
+
+-- | The narrowing in scope for a binder, following alias chains AT THE READ
+-- (SUM-TYPE-FIELDS-SPEC §3 S3's last bullet, and §3.1 for why it is not
+-- optional).
+--
+-- @WHERE b MEANS a@ makes @b@'s narrowing @a@'s narrowing. Resolving here
+-- rather than copying at the binding site is what makes an alias bound OUTSIDE
+-- a @CONSIDER@ and read INSIDE two different branches see each branch's own
+-- narrowing. Chains follow 'Unique's, so shadowing is handled by construction,
+-- and they stop at the first body that is not a bare binder: @b MEANS f a@ and
+-- @b MEANS w's inner@ are not aliases and get no narrowing.
+--
+-- The chain source is 'constBodies', which 'inferDecide' fills for every
+-- nullary @MEANS@ and which local @WHERE@\/@LET@ decides reach through
+-- 'inferLocalDecl'. Two honest limits, both restrictive: 'constBodies' is
+-- monotonic and never scoped (a sibling @WHERE@'s entry outlives its scope —
+-- harmless, since 'Unique's are distinct per binding, but do not read this map
+-- as "in scope"), and it is reset at the import boundary, so an alias defined
+-- in an imported module gets no narrowing.
+--
+-- The depth guard is 'subjectOfActionExpr''s, for the same reason.
+lookupNarrowing :: Resolved -> Check (Maybe Narrowing)
+lookupNarrowing = go (0 :: Int) Nothing . getUnique
+  where
+    go :: Int -> Maybe Narrowing -> Unique -> Check (Maybe Narrowing)
+    go depth acc u
+      | depth > 8 = pure acc
+      | otherwise = do
+          nws <- asks (.narrowings)
+          ei  <- asks (.entityInfo)
+          let acc' = combine acc (Map.lookup u nws)
+          bodies <- use #constBodies
+          case Map.lookup u bodies of
+            Just b
+              | BaseIsBinder r' <- classifyBase ei b
+              , getUnique r' /= u
+              -> go (depth + 1) acc' (getUnique r')
+            _ -> pure acc'
+
+    -- The narrowing found deeper in the chain is the "new" one, so when it is
+    -- strictly tighter the diagnostic names the branch that actually narrowed.
+    combine :: Maybe Narrowing -> Maybe Narrowing -> Maybe Narrowing
+    combine Nothing  m        = m
+    combine (Just a) Nothing  = Just a
+    combine (Just a) (Just b) = Just (intersectNarrowing b a)
+
+-- | What a @WHEN@ arm does to the residual — the set of constructors that can
+-- still reach a later arm (SUM-TYPE-FIELDS-SPEC §3 S3).
+data ArmEffect
+  = ArmConsumes !Resolved
+    -- ^ irrefutable: every value of that constructor is matched here, so it is
+    -- removed from the residual.
+  | ArmRefutable !Resolved
+    -- ^ matched a constructor but only SOME of its values (@WHEN Tenant 1500@),
+    -- so the constructor STAYS in the residual — and this is the arm §3.2's
+    -- required sentence has to name.
+  | ArmCatchAll !Resolved
+    -- ^ a bare binder, i.e. a trailing catch-all @WHEN other@: its binder gets
+    -- the residual, exactly as an @OTHERWISE@ does.
+  | ArmIrrelevant
+    -- ^ a list pattern, a literal, an expression pattern: consumes no
+    -- constructor and explains nothing.
+
+-- | Classify a resolved @WHEN@ pattern. SUM-TYPE-FIELDS-SPEC §3 S3: __an arm
+-- consumes its constructor only if its sub-patterns are irrefutable__ — every
+-- one a plain variable.
+--
+-- SPEC CORRECTION (substantive). §3 S3 says the residual "must reuse that
+-- predicate", meaning 'patternHasOpaque'. __It cannot.__
+-- @patternHasOpaque (PatApp _ Tenant [PatApp _ Some [PatVar n]])@ is
+-- @any patternHasOpaque [PatApp _ Some [PatVar n]]@ = @any patternHasOpaque
+-- [PatVar n]@ = 'False', so 'patternHasOpaque' certifies @WHEN Tenant (Some n)@
+-- as irrefutable — and that is one of the three examples §3 itself names as
+-- MUST-NOT-CONSUME. It catches 'PatLit' and 'PatExpr' only, i.e. two of the
+-- three, which would leave the residual unsound in the permissive (invisible)
+-- direction. This tests for irrefutability directly instead.
+--
+-- 'patternHasOpaque' is unchanged: it answers a different question (what the
+-- exhaustiveness guard model cannot reason about) and 'checkConsider' and
+-- 'checkClauseMatrix' depend on its current answer. The two disagreeing is
+-- correct: @WHEN Tenant (Some n)@ leaves @Tenant@ in the residual while
+-- 'analyzePatternMatch' may still call the @CONSIDER@ exhaustive.
+--
+-- This must run on the RESOLVED pattern: in the Name pass a plain variable
+-- sub-pattern is @PatApp _ n []@, byte-identical to a nullary constructor
+-- pattern; only 'inferPattern' turns it into a 'PatVar'
+-- (@inferPatternApp ann n [] \`orElse\` inferPatternVar n@).
+armEffect :: Pattern Resolved -> ArmEffect
+armEffect = \ case
+  PatApp _ c ps
+    | all isPatVar ps -> ArmConsumes c
+    | otherwise       -> ArmRefutable c
+  PatVar _ b          -> ArmCatchAll b
+  _                   -> ArmIrrelevant
+  where
+    isPatVar = \ case
+      PatVar {} -> True
+      _         -> False
+
+-- | The residual being accumulated across a @CONSIDER@'s arms.
+data Residual =
+  MkResidual
+    { resConsumed      :: !(Set Unique)
+    , resConsumedNames :: ![Name]           -- ^ reverse order
+    , resRefutable     :: ![Pattern Resolved] -- ^ reverse order
+    , resTyU           :: !(Maybe Unique)   -- ^ the scrutinee's type, from the arms
+    }
+
+emptyResidual :: Residual
+emptyResidual = MkResidual Set.empty [] [] Nothing
+
+-- | The narrowing an @OTHERWISE@ (or a trailing catch-all) gets from the arms
+-- before it.
+--
+-- The type universe comes from the branch HEADS' own constructor types, not
+-- from 'applySubst' on the scrutinee: that needs no substitution and is
+-- available exactly when it is needed. (§3 S3 frames the unknown-set rule
+-- around @applySubst@; 'checkBranch' runs before 'checkConsider' zonks, so
+-- making the residual depend on the zonk would have forced a restructure the
+-- branch-head source avoids.)
+--
+-- DEVIATION from the implementation plan, which recorded a residual only when
+-- @universe \\\\ consumed@ was STRICTLY SMALLER than the universe. That would
+-- have made §3.2's own bad day — @CONSIDER a WHEN Tenant 1500 THEN 1 OTHERWISE
+-- a's deposit@ — record nothing, because a refutable arm consumes nothing; the
+-- 'NarrowedByResidual' payload would never be built and S4 could not write the
+-- one sentence §3.2 says the residual rule must be able to write or be cut.
+-- Recording @possible = universe@ with an empty consumed list is sound (it
+-- certifies nothing an absent narrowing would not have certified) and carries
+-- the explanation.
+residualNarrowing :: Map Unique [Resolved] -> Residual -> Maybe Narrowing
+residualNarrowing cl acc = do
+  tyU <- acc.resTyU
+  let universe = Set.fromList (getUnique <$> Map.findWithDefault [] tyU cl)
+  poss <- possibleConstructors (universe Set.\\ acc.resConsumed)
+  pure
+    (MkNarrowing poss tyU
+      (NarrowedByResidual (reverse acc.resConsumedNames) (reverse acc.resRefutable)))
+
+-- | Fold one checked arm into the residual.
+extendResidual :: EntityInfo -> Branch Resolved -> Residual -> Residual
+extendResidual ei (MkBranch _ (When _ p) _) acc =
+  case armEffect p of
+    ArmConsumes c ->
+      acc { resConsumed      = Set.insert (getUnique c) acc.resConsumed
+          , resConsumedNames = getName c : acc.resConsumedNames
+          , resTyU           = acc.resTyU <|> constructorTypeUnique ei c
+          }
+    ArmRefutable c ->
+      acc { resRefutable = p : acc.resRefutable
+          , resTyU       = acc.resTyU <|> constructorTypeUnique ei c
+          }
+    _ -> acc
+extendResidual _ _ acc = acc
+
 -- | Type-check a @CONSIDER@ and run the pattern-match analysis
 -- (missing branches, redundant branches) over its arms.
 --
@@ -2476,9 +2765,21 @@ constructorArity ei r = case Map.lookup (getUnique r) ei of
 checkConsider :: ExpectationContext -> Anno -> Expr Name -> [Branch Name] -> Type' Resolved -> Check (Expr Resolved)
 checkConsider ec ann e branches t = do
   (re, te) <- inferExpr e
-  rbranches <- traverse (checkBranch ec re te t) branches
   ei <- asks (.entityInfo)
   let cl = constructorsInScopeFromEntityInfo ei
+  -- SUM-TYPE-FIELDS-SPEC §3 S3: a left FOLD, not a 'traverse', because each
+  -- arm's narrowing depends on every arm before it — an @OTHERWISE@ (and a
+  -- trailing catch-all) gets the residual. A Name-pass pre-scan cannot
+  -- substitute for this: irrefutability is undecidable before resolution (see
+  -- 'armEffect').
+  (_, revBranches) <-
+    foldM
+      (\ (acc, done) br -> do
+          rb <- checkBranch ec ei cl (residualNarrowing cl acc) re te t br
+          pure (extendResidual ei rb acc, rb : done))
+      (emptyResidual, [])
+      branches
+  let rbranches = reverse revBranches
   (scrutVar, pt) <- desugarBranches re rbranches
   let bs = concretizeInfo cl pt
 
@@ -3733,24 +4034,74 @@ findOptionallyNamedType n (ont : onts) = do
     (i, rn, t, onts') <- findOptionallyNamedType n onts
     pure (i, rn, t, ont : onts')
 
-checkBranch :: ExpectationContext -> Expr Resolved -> Type' Resolved -> Type' Resolved -> Branch Name -> Check (Branch Resolved)
-checkBranch ec scrutinee tscrutinee tresult (MkBranch ann' (When ann pat) e)  = do
+-- | Check one @CONSIDER@ arm, under whatever this arm narrows its scrutinee to
+-- (SUM-TYPE-FIELDS-SPEC §3 S3).
+--
+-- The 'Maybe' 'Narrowing' is the RESIDUAL from the arms before this one,
+-- computed by 'checkConsider'; a @WHEN Ctor …@ arm computes its own narrowing
+-- from its resolved pattern, which is why that cannot be done by the caller.
+--
+-- Note that the @Otherwise@ arm no longer ignores its scrutinee: un-ignoring it
+-- is the whole of what makes @jl4-core/libraries/actus-core.l4:311@ work
+-- (@OTHERWISE ccy's isoCode@ after ten @WHEN@s that cover every arm but the one
+-- declaring @isoCode@).
+checkBranch
+  :: ExpectationContext -> EntityInfo -> Map Unique [Resolved] -> Maybe Narrowing
+  -> Expr Resolved -> Type' Resolved -> Type' Resolved -> Branch Name
+  -> Check (Branch Resolved)
+checkBranch ec ei cl mResidual scrutinee tscrutinee tresult (MkBranch ann' (When ann pat) e)  = do
   (rpat', extends) <- checkPattern (ExpectPatternScrutineeContext scrutinee) pat tscrutinee
-  (rpat, re) <- extendKnownMany extends do
+  let narrowed = branchNarrowings ei cl mResidual scrutinee rpat'
+  (rpat, re) <- extendKnownMany extends $ withNarrowings narrowed do
     re' <- checkExpr ec e tresult
     (,)
       -- See Note [Adding type information to all binders]
       <$> (traverse resolvedType =<< nlgPattern rpat')
       <*> nlgExpr re'
   pure $ MkBranch ann' (When ann rpat) re
-checkBranch ec _scrutinee _tscrutinee tresult (MkBranch ann' (Otherwise ann) e) = do
-  re <- checkExpr ec e tresult
+checkBranch ec ei _cl mResidual scrutinee _tscrutinee tresult (MkBranch ann' (Otherwise ann) e) = do
+  re <- withNarrowings (scrutineeNarrowing ei scrutinee mResidual) (checkExpr ec e tresult)
   MkBranch ann' (Otherwise ann)
     -- We have to resolve NLG annotations now because
     -- bound variables are brought into scope.
     -- In the 'Otherwise' case, there are no new variables, but
     -- for consistency, we still resolve the NLG annotations now.
     <$> nlgExpr re
+
+-- | Key a narrowing on the scrutinee, when the scrutinee is a bare binder.
+-- SUM-TYPE-FIELDS-SPEC §3 S3: what a branch narrows is __the variable it
+-- scrutinises__ — @WHEN Tenant t@ binds @t@ to the constructor's PAYLOAD, not
+-- to the value, and there is no as-pattern. A scrutinee that is not a name has
+-- no binder to narrow.
+scrutineeNarrowing :: EntityInfo -> Expr Resolved -> Maybe Narrowing -> [(Resolved, Narrowing)]
+scrutineeNarrowing ei scrutinee mNw =
+  case (classifyBase ei scrutinee, mNw) of
+    (BaseIsBinder r, Just nw) -> [(r, nw)]
+    _                         -> []
+
+-- | What one @WHEN@ arm narrows, given the residual from the arms before it.
+--
+--   * @WHEN Tenant t@ narrows the SCRUTINEE to @Tenant@ (whether or not the
+--     sub-patterns are refutable: inside the arm the match has succeeded);
+--   * a trailing catch-all @WHEN other@ gives the residual to BOTH the
+--     scrutinee and @other@, exactly as an @OTHERWISE@ does for the scrutinee;
+--   * anything else narrows nothing.
+branchNarrowings
+  :: EntityInfo -> Map Unique [Resolved] -> Maybe Narrowing
+  -> Expr Resolved -> Pattern Resolved
+  -> [(Resolved, Narrowing)]
+branchNarrowings ei cl mResidual scrutinee rpat =
+  case armEffect rpat of
+    ArmConsumes c  -> fromConstructor c
+    ArmRefutable c -> fromConstructor c
+    ArmCatchAll b  ->
+      scrutineeNarrowing ei scrutinee mResidual
+        <> [ (b, nw) | Just nw <- [mResidual] ]
+    ArmIrrelevant  -> []
+  where
+    fromConstructor c =
+      scrutineeNarrowing ei scrutinee
+        (narrowingFromConstructor ei cl NarrowedByWhen c)
 
 checkPattern :: ExpectationContext -> Pattern Name -> Type' Resolved -> Check (Pattern Resolved, [CheckInfo])
 checkPattern ec p t = errorContext (WhileCheckingPattern p) do
