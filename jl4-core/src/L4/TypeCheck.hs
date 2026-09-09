@@ -1079,8 +1079,10 @@ inferDecide dec@(MkDecide ann _tysig appForm expr) = do
     -- non-exhaustive-pattern error. Each such interior binding is therefore
     -- partial BY CONSTRUCTION, and warning on it would (a) mis-report a
     -- total clause group as incomplete and (b) name an invisible binder at
-    -- <no location>. The double-underscore prefix is the desugarer's hygiene
-    -- marker (see 'L4.Parser.fallthroughName').
+    -- <no location>. The double-underscore prefix is the desugarer's intended
+    -- hygiene marker (see 'L4.Parser.fallthroughName') — but it is only a
+    -- convention, not a guarantee, which is why 'isSyntheticFallthrough'
+    -- checks the arity as well.
     --
     -- The suppression is CORRECT (not a known limitation) because the clause
     -- group is checked as a unit at the Decide level: 'checkClauseMatrix'
@@ -1100,9 +1102,22 @@ inferDecide dec@(MkDecide ann _tysig appForm expr) = do
     -- fallthrough-suppression and let the fallthrough variant suppress only
     -- RANGELESS CONSIDERs — synthetic nodes are 'emptyAnno', user nodes
     -- carry ranges.)
+    --
+    -- The name prefix is NOT hygienic, whatever 'L4.Parser.fallthroughName'
+    -- says: the lexer bars a BARE identifier starting with @_@, but a
+    -- backtick-quoted one is accepted, and 'L4.Print.quoteIfNeeded' emits
+    -- exactly that form — which is how a printed module gets back through the
+    -- front end in the first place, so the spelling cannot simply be banned.
+    -- So the ARITY is checked too. The desugarer's fall-through is a LET-bound
+    -- NULLARY decide by construction ('L4.Parser.matchClauses'; see also the
+    -- note on 'withClauseColumnFacts', which relies on it having no columns of
+    -- its own), and it survives the print round-trip nullary. A user-written
+    -- @DECIDE `__pm_fallthrough_0` a IS a's monthly_rent@ therefore no longer
+    -- switches S2 off for its own body — which it did, silently, and the
+    -- program died at run time.
     isSyntheticFallthrough :: Bool
     isSyntheticFallthrough = case appForm of
-      MkAppForm _ (MkName _ (NormalName t)) _ _ -> "__pm_fallthrough_" `Text.isPrefixOf` t
+      MkAppForm _ (MkName _ (NormalName t)) [] _ -> "__pm_fallthrough_" `Text.isPrefixOf` t
       _ -> False
 
     -- | The @k@ of @__pm_fallthrough_k@, i.e. the nesting level of this
@@ -1385,62 +1400,140 @@ data ClauseCell
 
 -- | Is this sub-pattern CERTAINLY an irrefutable variable binding?
 --
--- Only a bare name that matches no constructor anywhere in scope. A bare name
--- that does match one is tried as that constructor FIRST
+-- Only a bare name that no spelling in scope can resolve to a constructor. A
+-- bare name that can is tried as that constructor FIRST
 -- (@inferPatternApp … \`orElse\` inferPatternVar@, and 'resolveConstructor'
--- resolves by 'rawName' across the whole environment, imports included), so it
--- may well be refutable; and this is the only judgement made without knowing
--- the sub-pattern's own type, so it has to be the conservative one.
+-- looks the written 'RawName' up in 'CheckEnv.environment'), so it may well be
+-- refutable; and this is the only judgement made without knowing the
+-- sub-pattern's own type, so it has to be the conservative one.
 patIsCertainlyVar :: Set RawName -> Pattern Name -> Bool
 patIsCertainlyVar ctorNames = \ case
   PatVar {}     -> True
   PatApp _ n [] -> not (rawName n `Set.member` ctorNames)
   _             -> False
 
--- | Every constructor 'RawName' in scope — read from 'entityInfo' rather than
--- from 'constructorsInScopeFromEntityInfo', because the latter deliberately
--- omits @CONTRACT@'s constructors ('builtinNonExhaustiveTypeUniques') and a
--- name missing from THIS set would be mistaken for a variable.
-allConstructorRawNames :: EntityInfo -> Set RawName
-allConstructorRawNames ei =
-  Set.fromList [ rawName n | (n, KnownTerm _ Constructor) <- Map.elems ei ]
+-- | Every 'RawName' that ANY spelling in scope can resolve to a data
+-- constructor — read from 'CheckEnv.environment', which is what
+-- 'resolveConstructor' itself looks in.
+--
+-- NOT from 'entityInfo': that map is keyed by 'Unique', and 'qualifiedAliases'
+-- registers a constructor's section-qualified spelling with 'defAka' under the
+-- ORIGINAL'S UNIQUE, so the qualified 'Name' REPLACES the unqualified one at
+-- that key. Reading names out of 'entityInfo' therefore sees exactly one
+-- spelling per constructor, and for anything declared inside a @§@ that
+-- spelling is the qualified one — so an ordinary unqualified @Auto@ was
+-- missing from this set, and 'patIsCertainlyVar' certified a refutable
+-- constructor sub-pattern as an irrefutable binding. 'environment' has BOTH
+-- spellings as keys, which is why the same alias mechanism does not fool it.
+--
+-- Also not from 'constructorsInScopeFromEntityInfo', which deliberately omits
+-- @CONTRACT@'s constructors ('builtinNonExhaustiveTypeUniques'): a name missing
+-- from THIS set would be mistaken for a variable.
+constructorSpellings :: CheckEnv -> Set RawName
+constructorSpellings env =
+  Set.fromList
+    [ rn
+    | (rn, us) <- Map.toList env.environment
+    , any isCtor us
+    ]
+  where
+    isCtor u = case Map.lookup u env.entityInfo of
+      Just (_, KnownTerm _ Constructor) -> True
+      _                                 -> False
 
--- | Classify one cell. Wildcard-ness is decided BEFORE anything about the
--- column's type, because that is the order the desugarer decides it in.
-classifyClauseCell :: EntityInfo -> Set RawName -> Maybe (Unique, [Resolved]) -> Resolved -> Pattern Name -> ClauseCell
-classifyClauseCell ei ctorNames mcol scrutR pat
-  | patIsColumnWildcard scrutR pat = CellWild
+-- | Which constructor of THIS column's type, if any, does this pattern head
+-- name?
+--
+-- By identity, never by spelling: 'resolveConstructor' looks @n@'s written
+-- 'RawName' up in 'CheckEnv.environment' and then type-directs, so the answer
+-- is "the column constructor whose 'Unique' that spelling denotes". Comparing
+-- @rawName n@ against @rawName (getName c)@ instead asked whether the drafter
+-- happened to write the ONE spelling 'entityInfo' kept (see
+-- 'constructorSpellings'), which for a sectioned type is the qualified one —
+-- and got the answer wrong in BOTH directions: an unqualified pattern on a
+-- sectioned constructor was read as a variable (permissive: it made a
+-- refutable pattern look total), while the flagship idiom under a @§@ was read
+-- as consuming nothing (restrictive: a correct program refused with a
+-- diagnostic that denied its own clause 1 narrowed anything).
+--
+-- Three answers, not two: "no constructor of this column" and "more than one,
+-- and we decline to guess" must NOT be conflated, because the first is a
+-- variable binding (matches everything) and the second is a pattern we know
+-- nothing about (matches an unknown subset). Returning 'Nothing' for both
+-- would have let an ambiguous head be read as a wildcard, which narrows —
+-- the direction a mistake here must never fall.
+data ColumnHead
+  = HeadCtor !Resolved
+  | HeadNotCtor
+  | HeadAmbiguous
+
+columnConstructor :: CheckEnv -> [Resolved] -> Name -> ColumnHead
+columnConstructor env ctors n =
+  case [ c | c <- ctors, getUnique c `Set.member` us ] of
+    [c] -> HeadCtor c
+    []  -> HeadNotCtor
+    _   -> HeadAmbiguous
+  where
+    us = Set.fromList (Map.findWithDefault [] (rawName n) env.environment)
+
+-- | Classify one cell. Irrefutability is decided BEFORE anything about the
+-- column's type, because that is the order the desugarer decides it in: the
+-- column-wildcard idiom, a 'PatVar', and a bare name that can resolve to no
+-- constructor at all are each compiled to no test whatsoever, whether or not
+-- the checker can enumerate the column. Deciding them second made a
+-- don't-care column of an UNENUMERABLE type ('NUMBER', a synonym, @CONTRACT@)
+-- 'CellOpaque', which failed condition (c) for every OTHER column of the
+-- group — one unenumerable don't-care column refused the whole group.
+classifyClauseCell :: CheckEnv -> Set RawName -> Maybe (Unique, [Resolved]) -> Resolved -> Pattern Name -> ClauseCell
+classifyClauseCell env ctorNames mcol scrutR pat
+  | patIsColumnWildcard scrutR pat  = CellWild
+  | patIsCertainlyVar ctorNames pat = CellWild
   | otherwise = case (mcol, pat) of
-      (_, PatVar {})            -> CellWild
       (Nothing, _)              -> CellOpaque
       (Just (_, ctors), PatApp _ n ps) ->
-        case List.find (\ c -> rawName n == rawName (getName c)) ctors of
-          Just c
-            | constructorArity ei c == length ps
+        case columnConstructor env ctors n of
+          HeadCtor c
+            | constructorArity env.entityInfo c == length ps
             , all (patIsCertainlyVar ctorNames) ps -> CellConsumes c
             | otherwise                            -> CellOpaque
           -- Not a constructor of this column's type, so 'inferPattern' binds it
-          -- as a variable — and a variable pattern matches anything.
-          Nothing | null ps                        -> CellWild
-                  | otherwise                      -> CellOpaque
+          -- as a variable — and a variable pattern matches anything. (Only
+          -- reachable for a name that IS a constructor of some OTHER type,
+          -- 'patIsCertainlyVar' having taken the rest; such a column pattern
+          -- is a type error in practice, so the program is rejected either
+          -- way.)
+          HeadNotCtor | null ps                    -> CellWild
+                      | otherwise                  -> CellOpaque
+          HeadAmbiguous                            -> CellOpaque
       _                                            -> CellOpaque
 
 -- | The column's sum type and its constructors, or 'Nothing' when the checker
 -- cannot enumerate them HERE — an untyped @GIVEN@ whose column type is still an
--- inference variable at this point, a type whose head is not a type
--- application, or one deliberately excluded from enumeration
--- ('builtinNonExhaustiveTypeUniques'). 'Nothing' is "I do not know", never "no
--- constructors", and it is what keeps the old suppression alive for that
--- column instead of refusing a read for a fact that was never established.
-clauseColumnUniverse :: EntityInfo -> Map Unique [Resolved] -> Resolved -> Check (Maybe (Unique, [Resolved]))
-clauseColumnUniverse ei ctorsOf scrutR =
-  case Map.lookup (getUnique scrutR) ei of
+-- inference variable at this point, a type with no rigid head, or one
+-- deliberately excluded from enumeration ('builtinNonExhaustiveTypeUniques').
+-- 'Nothing' is "I do not know", never "no constructors", and it is what keeps
+-- the old suppression alive for that column instead of refusing a read for a
+-- fact that was never established.
+--
+-- The head is taken with 'rigidHeadOf', not by matching @TyApp@ on the
+-- substituted type: that match saw a type SYNONYM's name and gave up, so
+-- @DECLARE Person IS Actor@ — a nullary synonym, a chain of them, a
+-- parameterised one applied to arguments, an imported one — put the column
+-- back under the blanket suppression and the read died at run time.
+-- 'rigidHeadOf' chases the substitution, expands synonyms WITH their argument
+-- substitution, is fuel-guarded and declines quarantined cyclic synonyms. It
+-- is available at this point (this is the term phase; 'Unify' already expands
+-- synonyms here, which is what lets the very read we are about to check
+-- type-check at all).
+clauseColumnUniverse :: CheckEnv -> Map Unique [Resolved] -> Resolved -> Check (Maybe (Unique, [Resolved]))
+clauseColumnUniverse env ctorsOf scrutR =
+  case Map.lookup (getUnique scrutR) env.entityInfo of
     Just (_, KnownTerm ty _) -> do
-      ty' <- applySubst ty
-      pure case ty' of
-        TyApp _ tyR _ | ctors@(_ : _) <- Map.findWithDefault [] (getUnique tyR) ctorsOf ->
-          Just (getUnique tyR, ctors)
-        _ -> Nothing
+      subst <- use #substitution
+      pure do
+        tyU            <- rigidHeadOf env subst Set.empty ty
+        ctors@(_ : _)  <- Just (Map.findWithDefault [] tyU ctorsOf)
+        pure (tyU, ctors)
     _ -> pure Nothing
 
 -- | See Note [What a later clause knows about its own columns].
@@ -1469,21 +1562,35 @@ clauseColumnFacts dec dHead =
       | null colScruts || any (\ cl -> length cl.patterns /= length colScruts) matrix.clauses
       -> pure (Just Map.empty, allColumns)
       | otherwise -> do
-          ei <- asks (.entityInfo)
-          let ctorsOf   = constructorsInScopeFromEntityInfo ei
-              ctorNames = allConstructorRawNames ei
-          cols <- traverse (clauseColumnUniverse ei ctorsOf) colScruts
+          env <- ask
+          let ei        = env.entityInfo
+              ctorsOf   = constructorsInScopeFromEntityInfo ei
+              ctorNames = constructorSpellings env
+          cols <- traverse (clauseColumnUniverse env ctorsOf) colScruts
           let rows :: [[ClauseCell]]
               rows =
-                [ zipWith3 (classifyClauseCell ei ctorNames) cols colScruts cl.patterns
+                [ zipWith3 (classifyClauseCell env ctorNames) cols colScruts cl.patterns
                 | cl <- matrix.clauses
                 ]
+              -- Does this cell match EVERY value of its column? 'CellWild' by
+              -- construction — and so does a 'CellConsumes' of the column
+              -- type's ONLY constructor, which tests nothing: destructuring a
+              -- record column, or naming the sole arm of a one-arm sum, is
+              -- total. Reading only 'CellWild' here made those two idioms fail
+              -- condition (c) and refuse the whole group.
+              isTotalCell :: Int -> ClauseCell -> Bool
+              isTotalCell j = \ case
+                CellWild       -> True
+                CellConsumes _ -> case cols !! j of
+                  Just (_, [_]) -> True
+                  _             -> False
+                CellOpaque     -> False
               -- What clause @i@ certainly consumes in column @j@ — conditions
               -- (a), (b) and (c) of the note, in that order.
               consumedBy :: [ClauseCell] -> Int -> Maybe Resolved
               consumedBy cells j = do
                 CellConsumes c <- pure (cells !! j)
-                guard (and [ isWildCell cell | (jj, cell) <- zip [0 ..] cells, jj /= (j :: Int) ])
+                guard (and [ isTotalCell jj cell | (jj, cell) <- zip [0 ..] cells, jj /= (j :: Int) ])
                 pure c
               -- Column @j@'s narrowing at clause @m@, if the clauses above it
               -- consume anything there at all.
@@ -1518,10 +1625,6 @@ clauseColumnFacts dec dHead =
     MkAppForm _ _ colScruts _ = dHead.rappForm
 
     allColumns = Set.fromList (getUnique <$> colScruts)
-
-    isWildCell = \ case
-      CellWild -> True
-      _        -> False
 
 -- | We allow the following cases:
 --

@@ -9,3 +9,11 @@
 `dueFrom` with `FALSE` and `Tenant` with 1500
 `held` with `Renter` with 1500
 `held` with `Owner` with 4000
+`owedOn` with 3 and `Landlord`
+`owedOn` with 3 and `Tenant` with 1500
+`fromWrap` with `Wrap` with 1 and `Landlord`
+`fromWrap` with `Wrap` with 1 and `Tenant` with 1500
+`synRent` with `Landlord`
+`synRent` with `Tenant` with 1500
+`billed` with `Vacant`
+`billed` with `Occupied` with 250

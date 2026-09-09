@@ -146,3 +146,69 @@ File: partial-projection-fallthrough.l4
     (or just `THEN t` when the field is the whole payload), or put the read
     under an `OTHERWISE` after the other arms — or declare `monthly_rent` on
     `Landlord` or `Agent` too.
+
+File: partial-projection-fallthrough.l4
+  Hidden: no
+  Range: 108:28-108:44
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    `monthly_rent` is a field of `Tenant` only.
+    But `o` could also be `Agent`, which has no `monthly_rent`.
+
+    The clauses above this one already match `Landlord`,
+    so `Agent` is what is left to reach here.
+
+    Narrow `o` first:
+
+      EVERY Tenant o …
+      CONSIDER o WHEN Tenant t THEN … o's monthly_rent …
+
+    (or just `THEN t` when the field is the whole payload), or put the read
+    under an `OTHERWISE` after the other arms — or declare `monthly_rent` on
+    `Agent` too.
+
+File: partial-projection-fallthrough.l4
+  Hidden: no
+  Range: 122:34-122:50
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    `monthly_rent` is a field of `Tenant` only.
+    But `s` could also be `Landlord` or `Agent`, which have no `monthly_rent`.
+
+    Nothing here narrows `s`: it is used at the whole type `Actor`,
+    so every constructor of `Actor` can reach this read.
+
+    Narrow `s` first:
+
+      EVERY Tenant s …
+      CONSIDER s WHEN Tenant t THEN … s's monthly_rent …
+
+    (or just `THEN t` when the field is the whole payload), or put the read
+    under an `OTHERWISE` after the other arms — or declare `monthly_rent` on
+    `Landlord` or `Agent` too.
+
+File: partial-projection-fallthrough.l4
+  Hidden: no
+  Range: 145:32-145:46
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    `unit_price` is a field of `Usage` only.
+    But `c` could also be `Flat`, which has no `unit_price`.
+
+    Nothing here narrows `c`: it is used at the whole type `Charge`,
+    so every constructor of `Charge` can reach this read.
+
+    Narrow `c` first:
+
+      EVERY Usage c …
+      CONSIDER c WHEN Usage t THEN … c's unit_price …
+
+    (or just `THEN t` when the field is the whole payload), or put the read
+    under an `OTHERWISE` after the other arms — or declare `unit_price` on
+    `Flat` too.

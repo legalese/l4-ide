@@ -94,3 +94,52 @@ GIVEN s IS AN Actor
 GIVETH A NUMBER
 DECIDE refutable (Tenant 1500) IS 1
 DECIDE refutable a             IS a's monthly_rent
+
+-- 8. THE COLUMN'S TYPE WRITTEN AS A SYNONYM, and a constructor without the
+--    field still reaches the read. The synonym is expanded (case 9 of the ok
+--    file is the safe twin), so this is refused for the RIGHT reason — `Agent`
+--    survives clause 1 — and not silently accepted because the checker could
+--    not see through `Occupant` to the constructors at all.
+DECLARE Occupant IS Actor
+
+GIVEN o IS AN Occupant
+GIVETH A NUMBER
+DECIDE synRent Landlord IS 0
+DECIDE synRent o        IS o's monthly_rent
+
+-- 9. A DECLARATION SPELLED LIKE THE DESUGARER'S OWN FALL-THROUGH BINDING. The
+--    parser names the compiled tail of a clause group `__pm_fallthrough_k`, and
+--    a module the printer has re-emitted comes back through the front end
+--    carrying that name, so the checker cannot simply reject the spelling: a
+--    re-parsed fall-through has no clause matrix to consult and its reads must
+--    stay accepted. The provenance test therefore also requires the NULLARY
+--    appform the desugarer always builds. Written with an argument, as here,
+--    this is an ordinary user declaration and its read is checked like any
+--    other — before, the name alone switched the whole check off and the
+--    program died at run time.
+GIVEN s IS AN Actor
+GIVETH A NUMBER
+DECIDE `__pm_fallthrough_0` s IS s's monthly_rent
+
+-- 10. A SUB-PATTERN THAT IS A CONSTRUCTOR DECLARED IN A SECTION. `Flat Weekly`
+--     matches only the `Flat`s billed weekly, so a `Flat Metered` reaches
+--     clause 2 and clause 1 consumes nothing. The section gives `Weekly` a
+--     second, qualified spelling, and while the irrefutability test compared
+--     written names it did not recognise the unqualified one as a constructor:
+--     it called this pattern an irrefutable binding, recorded the whole
+--     constructor as consumed, and certified the read. (Kept last in the file
+--     because a heading is open-ended.)
+§ `Billing`
+
+DECLARE Cadence IS ONE OF
+    Weekly
+    Metered
+
+DECLARE Charge IS ONE OF
+    Flat    HAS cadence IS A Cadence
+    Usage   HAS unit_price IS A NUMBER
+
+GIVEN c IS A Charge
+GIVETH A NUMBER
+DECIDE priced (Flat Weekly) IS 0
+DECIDE priced c             IS c's unit_price

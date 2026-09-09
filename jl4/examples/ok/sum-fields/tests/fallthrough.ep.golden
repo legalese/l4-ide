@@ -104,3 +104,73 @@ DECIDE held a          IS a's deposit
 
 #EVAL held (Renter OF 1500)
 #EVAL held (Owner OF 4000)
+
+-- 7. A DON'T-CARE COLUMN THE CHECKER CANNOT ENUMERATE, spelled with a FRESH
+--    binder. `m` is a name no constructor answers to, so the desugarer compiles
+--    it to no test — clause 1 fires for every number paired with a `Landlord`,
+--    exactly as it would with a `BOOLEAN` there. Whether the OTHER column's
+--    type happens to be enumerable has no bearing on this one's meaning, and
+--    for a while it decided the answer: this program was refused while the same
+--    shape over a `BOOLEAN` (case 5) was accepted, and renaming `m` to `n` also
+--    made it pass.
+GIVEN n  IS A NUMBER
+      p2 IS A Party
+GIVETH A NUMBER
+DECIDE owedOn m Landlord IS 0
+DECIDE owedOn n a        IS a's monthly_rent
+
+#EVAL owedOn 3 Landlord
+#EVAL owedOn 3 (Tenant OF 1500)
+
+-- 8. A DON'T-CARE COLUMN DESTRUCTURED AS A RECORD. `Wrap` is the only
+--    constructor of its type, so `Wrap x` tests nothing: clause 1 fires for
+--    every `Wrap` paired with a `Landlord`, and the second column's `Landlord`
+--    is genuinely consumed. Naming the sole arm of a one-arm sum is the same
+--    shape.
+DECLARE Wrap HAS inner IS A NUMBER
+
+GIVEN w IS A Wrap
+      p3 IS A Party
+GIVETH A NUMBER
+DECIDE fromWrap (Wrap x) Landlord IS 0
+DECIDE fromWrap w        a        IS a's monthly_rent
+
+#EVAL fromWrap (Wrap OF 1) Landlord
+#EVAL fromWrap (Wrap OF 1) (Tenant OF 1500)
+
+-- 9. THE COLUMN'S TYPE WRITTEN AS A SYNONYM. `Occupant` is `Party`, so the
+--    constructors to be consumed are `Party`'s. The column universe is taken
+--    with the checker's own `rigidHeadOf`, which expands synonyms (chains and
+--    parameterised ones included) — matching the written type's head instead
+--    put this column back under the blanket suppression, and the read died at
+--    run time.
+DECLARE Occupant IS Party
+
+GIVEN o IS AN Occupant
+GIVETH A NUMBER
+DECIDE synRent Landlord IS 0
+DECIDE synRent o        IS o's monthly_rent
+
+#EVAL synRent Landlord
+#EVAL synRent (Tenant OF 1500)
+
+-- 10. THE SUM TYPE DECLARED INSIDE A SECTION. A `§` heading gives every name
+--     under it a second, section-qualified spelling that SHARES the original's
+--     identity; the clause analysis must compare identities, not spellings, or
+--     the flagship idiom is refused for a heading that changes nothing about
+--     the program. (Kept last in the file because a heading is open-ended.)
+§ `Occupancy`
+
+DECLARE Lease IS ONE OF
+    Vacant
+    Occupied HAS rent_due IS A NUMBER
+
+§ `Billing`
+
+GIVEN l IS A Lease
+GIVETH A NUMBER
+DECIDE billed Vacant IS 0
+DECIDE billed x      IS x's rent_due
+
+#EVAL billed Vacant
+#EVAL billed (Occupied OF 250)
