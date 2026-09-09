@@ -1,11 +1,21 @@
 # Fields on sum types: one selector per shared field, and no projection without narrowing
 
-**Status (2026-09-09): RULED by Meng, NOT BUILT.** Meng's mark, 2026-09-09, on being shown the two
-hazards below and the Haskell/OCaml comparison: _"Dying at run time is a bad look for a language in
-the FP tradition. … Write it up — let's take the best of both worlds from Haskell and OCaml."_ The
-rules in §3 are that ruling written out. Implementation was started the same day on
-`lang/whose-opening`; this header is updated when it lands. Nothing in this document describes the
-tree as it is today except §1 (measured) and §4 (measured); §3 and §5 describe what will be true.
+**Status (2026-09-09): RULED by Meng. S1 BUILT on `lang/whose-opening`; S2 and S3 NOT BUILT.**
+Meng's mark, 2026-09-09, on being shown the two hazards below and the Haskell/OCaml comparison:
+_"Dying at run time is a bad look for a language in the FP tradition. … Write it up — let's take
+the best of both worlds from Haskell and OCaml."_ The rules in §3 are that ruling written out.
+
+What is in the tree, as of the S1 commit on `lang/whose-opening` (2026-09-09): the §4 renames
+(commit `7cf1e0e9`), then S1's checker half (`inferConDecls`, Note [One selector per shared field]
+in `TypeCheck.hs`; the `SharedFieldTypeMismatch` error) and evaluator half (`evalConDecls` in
+`Machine.hs`) in one commit, with `ok/shared-field.l4` (the positional guard of §5 item 2, plus
+§1.2's program armed and traced) and `not-ok/tc/shared-field-type-mismatch.l4` as their goldens,
+and a drafter-facing section in `doc/reference/types/DECLARE.md`. §1.2 now returns `FULFILLED`;
+§1.1 is unchanged and still dies at run time, because that is S2's. The whole-tree `l4 check`
+sweep for the new declaration error (958 files) found zero sites. One limit recorded in §5 item 1:
+"same type" is by `typeKey` on the type as written, so a synonym beside its expansion is refused.
+
+§1 (measured) describes the tree before S1; §3 S2–S5 and §5 items 3–4 describe what will be true.
 
 **Owner:** this file. It is cross-referenced from `EVERY-EACH-QUANTIFIER-SPEC.md` §13.6.1 (which
 found the second hazard while asking whether `WHOSE` could be built) and from
@@ -305,7 +315,9 @@ sites that error, every one a declaration nothing reads (grep):** six inside gol
 `ok/elem.l4:48-51`, `ok/nlg_decide3.l4:1-4`, `ok/nlg_lin2.l4:1-4`,
 `lsp/semantic-tokens/declare.l4:16-19`), two under `doc/`
 (`doc/courses/advanced/module-a2-cross-cutting-examples.l4:34-36`,
-`doc/reference/types/for-all-example.l4:71-74`), three green files under `jl4/experiments/`.
+`doc/reference/types/for-all-example.l4:71-74` — and the same block quoted in
+`doc/reference/types/for-all.md:58-59`, a seventh copy of the idiom found while renaming), three
+green files under `jl4/experiments/`.
 **RULED 2026-09-09 (Meng): rename them, following Haskell** — `payload` → `leftValue`/`rightValue`
 applied identically in all six; `contractType` → `basicType`/`exoticType`/`combinedType`/
 `creditEnhancementType`. The `actus-core` rename is a public API change for any downstream
@@ -382,6 +394,13 @@ This is where the work is expected to land; the implementer re-checks each ancho
    **Corrected:** the grouping cannot live in `inferConDecl` — only `inferTypeDecl`'s `EnumDecl`
    arm (`:1448-1453`) holds all the constructors, and field types must be resolved across arms
    before any selector is minted. Later arms get `defAka` (same `Unique`, their own name and range).
+   **BUILT 2026-09-09** as `inferConDecls`, which both the `EnumDecl` and the `RecordDecl` arm go
+   through. One limit, measured while building: "the same type" is `typeKey` on the field type
+   **as written**. A synonym is not expanded, because in the type-declaration phase the environment
+   holds a synonym's name but not yet its body (the body goes out through `publicNames` and is seen
+   by the term phase); an expansion via `pureExpandSynonym` at this site was tried and was a no-op.
+   So `deposit IS A Money` beside `deposit IS A NUMBER` is refused, with both spellings in the
+   message. Lifting this needs the synonym bodies threaded into the declaration phase; not done.
 2. **The selector's body — there is no desugar.** ~~Find where that body is synthesised (the
    desugar …) and widen it.~~ **Wrong, corrected 2026-09-09.** The body is built at
    module-evaluation time by `evalConDecl` (`Machine.hs:4207-4231`) as a one-branch `CONSIDER`, and
@@ -392,7 +411,9 @@ This is where the work is expected to land; the implementer re-checks each ancho
    declaring constructor, each carrying that constructor's own arity and that field's index —
    fields are stored **positionally** (`ValueLazy.hs:83`) and two arms may place the field
    differently. **S1's checker and evaluator halves must land in one commit**, and the guard is a
-   probe with the shared field at index 1 on one arm and 0 on the other.
+   probe with the shared field at index 1 on one arm and 0 on the other. **BUILT 2026-09-09** as
+   `evalConDecls`; the guard is `ok/shared-field.l4`, whose `Landlord HAS addr, name` /
+   `Tenant HAS name, rent` reads both arms, positionally and through `WITH`.
 3. **Narrowing in the check environment.** ~~Add it on the local binding … at the three sites.~~
    **Corrected:** `KnownTerm`/`TermKind` is the wrong home — `TermKind` is a `Serialise`d AST type
    read by the LSP, with ~130 sites. The precedented home is a new field on `CheckEnv` beside
@@ -434,8 +455,10 @@ This is where the work is expected to land; the implementer re-checks each ancho
 
 - ~~**Same name, different types across arms, as two selectors chosen by expected type.**~~
   **CLOSED 2026-09-09 (Meng): follow Haskell, rename the sites.** The `Left`/`Right` `payload` idiom
-  was put forward as the use case this bullet invited and was declined; see §4 for the eleven sites
-  and the chosen names.
+  was put forward as the use case this bullet invited and was declined; see §4 for the twelve sites
+  (eleven when first counted; the `for-all.md` quotation was the twelfth) and the chosen names.
+  Landed as commit `7cf1e0e9`; `git show 7cf1e0e9 -- '*.l4'` is the list of what S1's declaration
+  error would otherwise have refused.
 - **Docassemble's existing refusal of the merged shape** (`Docassemble/Lower.hs:2320-2353`, fixture
   `docassemble/not-ok/payload-name-collision.l4`, CI-pinned). It tells a drafter to rename what S1
   makes one field. Reword as an exporter limit, or lower a merged field to one question? Open.

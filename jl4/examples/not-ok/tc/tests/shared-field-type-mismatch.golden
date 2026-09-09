@@ -1,0 +1,37 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: shared-field-type-mismatch.l4
+  Hidden: no
+  Range: 8:18-8:22
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The field name is declared by more than one constructor of this type,
+    but they do not agree on its type:
+
+      in Landlord: name (at shared-field-type-mismatch.l4:8:18-22) of type STRING
+      in Tenant: name (at shared-field-type-mismatch.l4:9:18-22) of type NUMBER
+      in Agent: name (at shared-field-type-mismatch.l4:10:18-22) of type STRING
+
+    A field that several constructors share is one field, and it has one type.
+    Give it the same type on every constructor that declares it, or use a different name on each.
+
+File: shared-field-type-mismatch.l4
+  Hidden: no
+  Range: 14:7-14:25
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    There are multiple definitions for the identifier
+
+      name
+
+    and I do not have sufficient information to make a choice between them.
+    The options are:
+
+      name (defined at shared-field-type-mismatch.l4:10:18-22) of type FUNCTION FROM Actor TO STRING
+      name (defined at shared-field-type-mismatch.l4:8:18-22) of type FUNCTION FROM Actor TO STRING
+      name (defined at shared-field-type-mismatch.l4:9:18-22) of type FUNCTION FROM Actor TO NUMBER

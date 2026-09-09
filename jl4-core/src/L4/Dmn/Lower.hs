@@ -3984,8 +3984,11 @@ lowerModule opts modul@(MkModule _ uri _) =
     [ getUnique n | Declare _ (MkDeclare _ _ _ td) <- decls, n <- selectorNames td ]
       <> map (getUnique . decideResolved) computedSelectorDecides
 
+  -- Deduped by 'Unique': a field two constructors share is ONE selector (see
+  -- Note [One selector per shared field] in "L4.TypeCheck"), and listing it
+  -- once per arm would make its FEEL path step `name_2` under 'uniquifyIn'.
   selectorNames = \case
-    EnumDecl _ cds    -> [n | MkConDecl _ _ fs <- cds, MkTypedName _ n _ _ _ <- fs]
+    EnumDecl _ cds    -> nubOrdOn getUnique [n | MkConDecl _ _ fs <- cds, MkTypedName _ n _ _ _ <- fs]
     RecordDecl _ _ fs -> [n | MkTypedName _ n _ _ _ <- fs]
     SynonymDecl _ _   -> []
     OpaqueDecl _      -> []

@@ -1,0 +1,54 @@
+IMPORT prelude
+-- SUM-TYPE-FIELDS-SPEC §3 S1: a field that two or more constructors declare
+-- with the same name AND the same type is ONE selector, total over the
+-- constructors that declare it.
+--
+-- `name` sits at index 1 on Landlord and at index 0 on Tenant. Fields are
+-- stored positionally, so the merged selector has to carry each constructor's
+-- own arity and index (spec §5 item 2). This file is the guard against a
+-- checker-only merge, under which the LAST arm's one-branch closure wins and
+-- the Landlord read below dies at run time.
+
+DECLARE Actor IS ONE OF
+    Landlord HAS addr IS A STRING, name IS A STRING
+    Tenant   HAS name IS A STRING, rent IS A NUMBER
+
+DECLARE Action IS ONE OF
+    Sign HAS signer IS AN Actor
+
+theLandlord MEANS Landlord OF "1 Main St", "Ms Ng"
+alice       MEANS Tenant OF "Alice", 1500
+bob         MEANS Tenant WITH name IS "Bob", rent IS 900
+mrNg        MEANS Landlord WITH addr IS "2 High St", name IS "Mr Ng"
+
+-- read on each arm, built positionally and by keyword
+#EVAL theLandlord's name
+#EVAL alice's name
+#EVAL bob's name
+#EVAL mrNg's name
+
+-- the merged selector is an ordinary function
+#EVAL name theLandlord
+#EVAL map name (LIST theLandlord, alice, bob, mrNg)
+
+-- the fields each arm keeps to itself are untouched
+#EVAL theLandlord's addr
+#EVAL alice's rent
+
+-- Spec §1.2: the shared field read inside a quantifier's filter, armed and
+-- traced. Before S1 this was "multiple definitions for the identifier `name`".
+everyone MEANS LIST theLandlord, alice, bob
+
+GIVETH A DEONTIC Actor Action
+`alice signs` MEANS
+    EVERY a IN everyone WHO a's name EQUALS "Alice" MUST Sign (EXACTLY a) WITHIN 14
+
+#TRACE `alice signs` AT 0 WITH PARTY alice DOES Sign alice AT 1
+
+-- The filter has to READ the field off every member, landlord included, even
+-- when nobody passes it.
+GIVETH A DEONTIC Actor Action
+`nobody signs` MEANS
+    EVERY a IN everyone WHO a's name EQUALS "Zed" MUST Sign (EXACTLY a) WITHIN 14
+
+#TRACE `nobody signs` AT 0 WITH PARTY alice DOES Sign alice AT 1

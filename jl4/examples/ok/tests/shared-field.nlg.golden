@@ -1,0 +1,10 @@
+`theLandlord` 's `name`
+`alice` 's `name`
+`bob` 's `name`
+`mrNg` 's `name`
+`name` with `theLandlord`
+`map` with `name` and list of `theLandlord`, `alice`, `bob` and `mrNg`
+`theLandlord` 's `addr`
+`alice` 's `rent`
+executing contract `alice signs` at 0 with the following events:  party `alice` did `Sign` with `alice` at 1
+executing contract `nobody signs` at 0 with the following events:  party `alice` did `Sign` with `alice` at 1

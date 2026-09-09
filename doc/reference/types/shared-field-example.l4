@@ -1,0 +1,29 @@
+IMPORT prelude
+
+-- A field that two or more constructors declare with the same name and the
+-- same type is ONE field. Its position in each constructor does not matter:
+-- `name` is the second field of a Landlord and the first of a Tenant.
+
+DECLARE Actor IS ONE OF
+    Landlord HAS addr IS A STRING, name IS A STRING
+    Tenant   HAS name IS A STRING, rent IS A NUMBER
+
+theLandlord MEANS Landlord OF "1 Main St", "Ms Ng"
+alice       MEANS Tenant WITH name IS "Alice", rent IS 1500
+
+#EVAL theLandlord's name                   -- "Ms Ng"
+#EVAL alice's name                         -- "Alice"
+#EVAL map name (LIST theLandlord, alice)   -- LIST "Ms Ng", "Alice"
+
+-- A field on only SOME constructors is a partial field. `rent` is a Tenant's
+-- alone, so read it only where the value is known to be a Tenant:
+
+GIVEN a IS AN Actor
+GIVETH A NUMBER
+`rent owed by` a MEANS
+    CONSIDER a
+    WHEN Tenant name rent THEN rent
+    OTHERWISE 0
+
+#EVAL `rent owed by` alice                 -- 1500
+#EVAL `rent owed by` theLandlord           -- 0

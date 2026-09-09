@@ -113,6 +113,12 @@ data CheckError =
   | InconsistentNameInSignature Name (Maybe Name)
   | InconsistentNameInAppForm Name (Maybe Name)
   | NonDistinctError NonDistinctContext [[Name]]
+  | SharedFieldTypeMismatch Name [(Name, Name, Type' Resolved)]
+    -- ^ Two or more constructors of one type declare a field of the same name
+    -- but at different types. A field shared by several constructors is ONE
+    -- selector (SUM-TYPE-FIELDS-SPEC §3 S1), so it must have one type.
+    -- Arguments: the field's first occurrence, then every occurrence in
+    -- declaration order as (constructor, field occurrence, declared type).
   | AmbiguousTermError Name [(Resolved, Type' Resolved)]
   | AmbiguousOperatorError Text
   | AmbiguousTypeError Name [(Resolved, Kind)]
@@ -484,6 +490,7 @@ instance HasSrcRange CheckError where
   rangeOf (OutOfScopeError n _)             = rangeOf n
   rangeOf (InconsistentNameInSignature n _) = rangeOf n
   rangeOf (InconsistentNameInAppForm n _)   = rangeOf n
+  rangeOf (SharedFieldTypeMismatch n _)     = rangeOf n
   rangeOf (CheckInfo _ mr)                  = mr
   rangeOf (RegulativeActorMismatch p _ _)   = rangeOf p
   rangeOf (JoinWithoutEvery j)              = rangeOf j
