@@ -249,6 +249,50 @@ selectors; under S3 with a narrowing constructor it is that arm's fields. The in
 therefore **safe to open** once this document is built, and `WHOSE`'s check-time "naming the missing
 cast" promise is S2+S4 applied inside the filter — not a separate mechanism.
 
+### 3.2 The magic budget — a constraint on S3, RECORDED 2026-09-09 (Meng)
+
+> _"The more magic a language contains — and I know these features are intended to make life easier
+> for the drafter — the more magic in practice the harder it is to teach and explain and
+> troubleshoot. So, a balance to consider."_
+
+Taken as a binding constraint on this ruling, not a preference. Where the budget is actually spent:
+
+| rule                              | magic  | why                                                                          |
+| --------------------------------- | ------ | ---------------------------------------------------------------------------- |
+| S1, one selector per shared field | none   | it _removes_ a surprise — today one written field is two partial functions   |
+| S2, refuse partial projection     | none   | a refusal; the error message is the lesson, delivered when it is needed      |
+| S3, `EVERY Tenant t` narrows `t`  | low    | the narrowing constructor is written at the site                             |
+| S3, an alias sees through         | low    | it makes _nothing_ happen; noticeable only by its absence (§3.1)             |
+| S3, `WHEN Tenant t` narrows `a`   | medium | the drafter wrote `t`; the thing that changed is `a`                         |
+| S3, `OTHERWISE` residual          | HIGH   | depends on every preceding branch, and on their sub-patterns' irrefutability |
+
+**So the whole budget is S3's, and most of it is the residual.** The bad day is concrete: one
+drafter writes `WHEN Tenant t THEN … OTHERWISE a's deposit` and it works, another writes
+`WHEN Tenant 1500 THEN … OTHERWISE a's deposit` and it does not, and the difference is a property of
+a sub-pattern three lines above the error.
+
+**The asymmetry that makes this tractable: magic that REJECTS is cheap to teach, magic that ACCEPTS
+is expensive.** S2 teaches itself at the moment of failure. S3 accepting means that when it does not
+fire, the drafter meets "why did it work there and not here?" with no local explanation.
+
+**Therefore, a hard requirement on S4, and the test of whether a rule has earned its place:** the
+diagnostic must explain the **narrowing**, not merely report the missing field. Not _"`deposit` is a
+field of `Landlord` only"_ but _"…and the `WHEN Tenant 1500` branch matches only some `Tenant`s, so a
+`Tenant` can still reach here."_ **If that sentence cannot be written for a rule, the rule is too
+clever and is cut.** The residual rule is the one to test this against first, because it is the one
+that needs it most.
+
+Two consequences to carry:
+
+- **Cut order, if teaching proves hard in practice.** Drop the `OTHERWISE` residual first (cost:
+  `actus-core.l4:311` is rewritten as `WHEN \`ACTUS Other\` s THEN s`, and drafters write one more
+branch); then the `WHEN`-narrows-scrutinee rule (cost: S2 becomes markedly more restrictive).
+  Never S1 or S2 — they are the ruling.
+- **An explicit escape hatch is worth more than another narrowing rule.** §6's `a's? monthly_rent`
+  returning `MAYBE` is the anti-magic lever: it lets a drafter opt out of the narrowing analysis
+  entirely and say what they mean, and it is teachable in one sentence. If S3 keeps growing rules to
+  cover shapes, that is the signal to build the escape hatch instead.
+
 ## 4. Blast radius, and the gate S2 must pass before it is an error
 
 **S1 is a widening**, smaller than first stated. A single-arm field's selector is unchanged, and a
