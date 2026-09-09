@@ -23,7 +23,7 @@ board MEANS LIST a, b
 -- 1. No join line: each director owes an approval by day 10, on their own.
 GIVETH A DEONTIC Actor Action
 `each approves` MEANS
-    EVERY Director d WHO elem d board MUST Approve (EXACTLY d) WITHIN 10
+    EVERY Director d IN board MUST Approve (EXACTLY d) WITHIN 10
 
 #TRACE `each approves` AT 0 WITH
   PARTY a DOES Approve a AT 1
@@ -41,7 +41,7 @@ GIVETH A DEONTIC Actor Action
 --    writes a LEST on the join.
 GIVETH A DEONTIC Actor Action
 `the resolution` MEANS
-    EVERY Director d WHO elem d board MAY Approve (EXACTLY d) WITHIN 30
+    EVERY Director d IN board MAY Approve (EXACTLY d) WITHIN 30
         ONCE ALL HAVE HENCE FULFILLED
 
 #TRACE `the resolution` AT 0 WITH
@@ -56,7 +56,7 @@ GIVETH A DEONTIC Actor Action
 --    barrier is achieved when the deadline passes with nobody having sublet.
 GIVETH A DEONTIC Actor Action
 `no subletting` MEANS
-    EVERY Director d WHO elem d board SHANT Sublet (EXACTLY d) WITHIN 30
+    EVERY Director d IN board SHANT Sublet (EXACTLY d) WITHIN 30
         ONCE ALL HAVE HENCE FULFILLED LEST BREACH
 
 #TRACE `no subletting` AT 0 WITH
@@ -71,7 +71,7 @@ GIVETH A DEONTIC Actor Action
 --    still miss if the LAST of them lands after day 10.
 GIVETH A DEONTIC Actor Action
 `quorum by ten` MEANS
-    EVERY Director d WHO elem d board MUST Approve (EXACTLY d) WITHIN 30
+    EVERY Director d IN board MUST Approve (EXACTLY d) WITHIN 30
         ONCE ALL HAVE WITHIN 10 HENCE FULFILLED
 
 #TRACE `quorum by ten` AT 0 WITH
@@ -86,7 +86,7 @@ GIVETH A DEONTIC Actor Action
 --    each act, or nothing would ever expire and the rule could never fail.
 GIVETH A DEONTIC Actor Action
 `approve, or else` MEANS
-    EVERY Director d WHO elem d board MUST Approve (EXACTLY d)
+    EVERY Director d IN board MUST Approve (EXACTLY d)
         UPON EACH WITHIN 10
         HENCE FULFILLED
         LEST  BREACH BY d
@@ -103,10 +103,9 @@ GIVETH A DEONTIC Actor Action
 --    inner rule is armed at the outer join, so its five days run from there.
 GIVETH A DEONTIC Actor Action
 `then all confirm` MEANS
-    EVERY Director d WHO elem d board MUST Approve (EXACTLY d) WITHIN 10
+    EVERY Director d IN board MUST Approve (EXACTLY d) WITHIN 10
         ONCE ALL HAVE
-        HENCE (EVERY Director e
-                   WHO    elem e board
+        HENCE (EVERY Director e IN board
                    MUST   Sublet (EXACTLY e)
                    WITHIN 5)
 

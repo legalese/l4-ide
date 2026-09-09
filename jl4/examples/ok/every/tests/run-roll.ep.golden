@@ -15,11 +15,18 @@ IMPORT prelude
 --
 -- Since 2026-09-08 the roll can be said outright instead — `EVERY Tenant t IN
 -- tenants` — and that is the spelling to reach for; see run-in.l4, and
--- EVERY-EACH-QUANTIFIER-SPEC section 11.0.2. This file is kept in the older
--- form deliberately, as the witness that it still works. Note in particular
--- that its `circular` case below could NOT simply be rewritten with `IN`: the
--- explicit form catches that mistake at check time, so the run-time refusal
--- this file witnesses would have nowhere left to be seen.
+-- EVERY-EACH-QUANTIFIER-SPEC section 11.0.2.
+--
+-- THE OLDER SPELLING IS DEPRECATED as of 2026-09-08 (spec section 13.5), and
+-- the rest of the corpus was migrated off it on 2026-09-09. THIS FILE WAS NOT,
+-- deliberately: a spelling that still runs still needs tests, and this is the
+-- file that tests it. If a future change removes the inference, this file is
+-- what will go red, and that is the point of it.
+--
+-- Note in particular that its `circular` case below could NOT simply be
+-- rewritten with `IN`: the explicit form catches that mistake at check time,
+-- so the run-time refusal this file witnesses would have nowhere left to be
+-- seen. That is why the deprecation was a migration and not a removal.
 
 DECLARE Actor IS ONE OF
     Landlord HAS name IS A STRING

@@ -1949,6 +1949,19 @@ maybeEvaluate env = either (continueExpr env) continueBackward
 -- @elem v xs@ conjunct is a perfectly good FILTER in its own right, so
 -- reading a roll out of it costs nothing when no roll was written.
 --
+-- DEPRECATED as a spelling, 2026-09-08 (§13.5), and note what that does and
+-- does not mean for this function. It is NOT scheduled for removal, and there
+-- is deliberately NO warning: the recognition happens here, in the evaluator,
+-- and 'L4.EvaluateLazy.Machine' imports 'L4.TypeCheck' rather than the other
+-- way round, so a check-time warning would mean moving this function across a
+-- module boundary or keeping one rule in two phases. The corpus was migrated
+-- instead (§13.5), and what still exercises this path is
+-- @jl4\/examples\/ok\/every\/run-roll.l4@, which exists for that purpose --
+-- including its @circular@ rule, whose run-time refusal has no @IN@
+-- counterpart because an @IN@ roll naming the member is caught at check time.
+-- If you are here to delete this, read §13.5 first: it says what a removal
+-- would need, and a warning is the first step, not this.
+--
 -- Matched by SPELLING — the function must be called @elem@ — which is the
 -- device the parser already uses for @EACH@ in @UPON EACH@ and for @TIMEZONE@.
 -- A user-defined two-argument @elem@ that shadows the prelude's would be taken
@@ -1989,8 +2002,8 @@ rollCallRefusal = Text.unwords
   , "normally open: `Tenant HAS name IS A STRING` has infinitely many values."
   , "Name the list with IN, as `EVERY Tenant t IN tenants MUST ...`,"
   , "with `tenants` a LIST of the party type."
-  , "(An `elem` condition still works - `EVERY Tenant t WHO elem t tenants` -"
-  , "but IN says it outright and is checked earlier.)"
+  , "(The older `EVERY Tenant t WHO elem t tenants` spelling is DEPRECATED"
+  , "and still runs, but IN says the roll outright and is checked earlier.)"
   , "(EVERY-EACH-QUANTIFIER-SPEC sections 11.0.2 and 2.2.7.5 point 5;"
   , "doc/reference/regulative/EVERY.md.)"
   ]
@@ -2004,10 +2017,12 @@ circularRollRefusal :: Text
 circularRollRefusal = Text.unwords
   [ "EVERY's roll cannot mention the member it is drawing. The list after"
   , "`elem` is read once, before there is any member to speak of, so it may"
-  , "not depend on one: write `WHO elem t tenants`, not"
-  , "`WHO elem t (peersOf t)`. To narrow the group by something about each"
-  , "member, put that in a further condition -"
-  , "`WHO elem t tenants AND isAdult t`."
+  , "not depend on one. Say the roll outright with IN -"
+  , "`EVERY Tenant t IN tenants` - which also moves you off the DEPRECATED"
+  , "`WHO elem` spelling that is the only way to reach this message. To"
+  , "narrow the group by something about each member, put that in a WHO"
+  , "condition, where the member IS in scope -"
+  , "`EVERY Tenant t IN tenants WHO isAdult t`."
   ]
 
 -- | Arm a quantified obligation: start the roll call.

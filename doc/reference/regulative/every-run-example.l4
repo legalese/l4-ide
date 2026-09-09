@@ -5,7 +5,9 @@ IMPORT prelude
 -- Every rule here names its group with `IN tenants` — the roll. That is what
 -- makes it runnable: see "Where the group comes from" on EVERY.md. (An older
 -- spelling put the same list in the WHO condition, as `WHO elem t tenants`.
--- It still works; `IN` is the one to write now.)
+-- That spelling is DEPRECATED as of 2026-09-08: it still runs and nothing
+-- warns you, but `IN` is the one to write. every-example.l4 keeps one
+-- labelled specimen of it so the shape stays recognisable.)
 
 DECLARE Actor IS ONE OF
     Landlord HAS name IS A STRING

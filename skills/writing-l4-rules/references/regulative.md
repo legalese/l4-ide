@@ -1,6 +1,6 @@
 # Regulative Rules Reference
 
-Deep dive on L4's regulative machinery: obligations, permissions, prohibitions, deadlines, consequences, and contract-trace simulation. This is L4's unique strength and the part most likely to trip a general-purpose large language model.
+Deep dive on L4's regulative machinery: obligations, permissions, prohibitions, deadlines, consequences, obligations that bind a whole group at once, and contract-trace simulation. This is L4's unique strength and the part most likely to trip a general-purpose large language model.
 
 **Canonical reference:** <https://legalese.com/l4/reference/regulative.md>
 
@@ -15,6 +15,11 @@ Deep dive on L4's regulative machinery: obligations, permissions, prohibitions, 
 - [PROVIDED and EXACTLY — action matching](#provided-and-exactly--action-matching)
 - [WITHIN — deadlines](#within--deadlines)
 - [Composition: RAND and ROR](#composition-rand-and-ror)
+- [EVERY — one obligation per member of a group](#every--one-obligation-per-member-of-a-group)
+  - [The group must be given as a list, after `IN`](#1-the-group-must-be-given-as-a-list-after-in)
+  - [The join line is mandatory whenever there is a `HENCE` or a `LEST`](#2-the-join-line-is-mandatory-whenever-there-is-a-hence-or-a-lest)
+  - [Write `EXACTLY t` in the action, not `t`](#3-write-exactly-t-in-the-action-not-t)
+  - [Do not write the deprecated `WHO elem` roll](#do-not-write-the-deprecated-who-elem-roll)
 - [Recursive obligations](#recursive-obligations)
 - [#TRACE — simulating contract execution](#trace--simulating-contract-execution)
   - [What may go in the `WITH` block](#what-may-go-in-the-with-block)
@@ -201,6 +206,113 @@ ROR
 ```
 
 `AND` and `OR` at the top level of a regulative rule are also accepted as composition forms in many programs; the authoritative semantics live at <https://legalese.com/l4/reference/regulative.md>.
+
+---
+
+## EVERY — one obligation per member of a group
+
+`PARTY` names one actor. `EVERY` binds the same obligation to **every member of a group at once**, and — this is the part `PARTY` cannot do at all — gives you one place to say what happens when they have acted.
+
+```l4
+EVERY Tenant t IN tenants          -- one obligation per tenant, all live at once
+    MUST   Sign (EXACTLY t)
+    WITHIN 14
+    ONCE   ALL HAVE                -- the JOIN LINE: fires once, at the last signature
+    HENCE  FULFILLED
+    LEST   BREACH
+```
+
+Read it aloud and it says what it does: _every tenant t in tenants must sign, within fourteen days; once all of them have, it is fulfilled, and otherwise it is breached._
+
+Everything after the first line is the same as under `PARTY` — same modals, same `WITHIN`, `HENCE`, `LEST`, `PROVIDED`. **Three things are new, and all three are places a general-purpose model reliably gets wrong.**
+
+### 1. The group must be given as a list, after `IN`
+
+A party type is normally open: `Tenant HAS name IS A STRING` has one constructor and infinitely many values, so "every tenant" is not something the machine can count out. You have to hand it the list. That list is called the **roll**.
+
+**A rule with no roll parses and type-checks and then refuses at run time.** Verified against the compiler on 2026-09-09; the message is:
+
+> EVERY has nothing to draw its cast from. Running a quantified obligation needs a list of the parties it ranges over, because a party type is normally open… Name the list with IN, as `EVERY Tenant t IN tenants MUST ...`, with `tenants` a LIST of the party type.
+
+So `l4 check` passing is **not** evidence that a quantified rule will run. Give it an `IN`.
+
+The roll may be any expression of type `LIST` of the party type — a literal, a name, a call. Three things about it are worth knowing before you debug them:
+
+- **It is read once**, when the rule meets its event stream, and the group is fixed from then on. Somebody added to the list later does not join a group already running.
+- **It cannot mention the member.** `EVERY Tenant t IN (peersOf t)` asks the list to know its own answer; the member is not in scope there. To narrow by something about each member, use `WHO`, where it is. One sharp edge: what the checker rejects is a name it cannot find, so if the file happens to define something else called `t` at the top level, the `t` inside `IN` quietly means **that** one and nothing is reported. Give the member a name nothing else in the file uses.
+- **A name listed twice is counted twice.** Under a barrier that is harmless; under a fork the continuation fires once per copy, so one payment earns two receipts.
+
+### 2. The join line is mandatory whenever there is a `HENCE` or a `LEST`
+
+There are two ways a group can trigger a follow-on, they mean different things, and L4 refuses to guess:
+
+| join line       | shape       | fires                                |
+| --------------- | ----------- | ------------------------------------ |
+| `ONCE ALL HAVE` | **barrier** | once, when the last member has acted |
+| `UPON EACH`     | **fork**    | once per member, as each one acts    |
+
+Use the barrier when the follow-on is about the group (`ONCE ALL HAVE HENCE` `` `the tenancy begins` ``). Use the fork when it is about the individual (`UPON EACH HENCE PARTY landlord MUST` issue **that** tenant a receipt). Under a fork the member is in scope in the continuation, which is what makes "a receipt to whoever paid" expressible.
+
+Omitting it is a check-time error, and the message names both spellings:
+
+> An EVERY with a HENCE or LEST needs a join line saying when it fires. Write one of `ONCE ALL HAVE` … `UPON EACH` … There is no default: the two readings differ, and guessing one would silently change the rule.
+
+The line goes **between the act's `WITHIN` and the `HENCE`**, indented past the `EVERY`. A rule with no `HENCE` and no `LEST` needs no join line.
+
+**Clause order silently decides which deadline you wrote.** A `WITHIN` _before_ the join line bounds each member's act; the same `WITHIN` _after_ it bounds the whole group. Both parse, both check, and the formatter prints either back unchanged, so nothing will tell you which one you got. Write the act's `WITHIN` first, as every example here does.
+
+### 3. Write `EXACTLY t` in the action, not `t`
+
+The action is a **pattern**, exactly as it is under `PARTY`. A bare name in a pattern is a _new_ name matching anything — so `MUST Sign t` does not mean "t signs"; it introduces a second `t` that matches any signer at all, and a stranger's signature would discharge the tenant's duty.
+
+The checker catches this one:
+
+> The action of this EVERY binds a new name `t` … which is spelled like the quantifier's own variable `t`. An action is a pattern, so this would be a fresh name matching anyone, not a reference to the member. To mean the member, write `EXACTLY t` in that position.
+
+It only checks the **innermost** `EVERY`, though. In a nested rule an inner action writing the _outer_ quantifier's variable is accepted and silently binds a fresh name. Write `EXACTLY` for every quantifier variable you mean, at every depth.
+
+Other arguments may still be patterns: `MUST Pay (EXACTLY t) (EXACTLY theLandlord) amount` pins payer and payee and binds `amount` to whatever was paid, which is then in scope in `PROVIDED`, `HENCE` and `LEST`.
+
+### `WHO` narrows the group
+
+Three things filter, in this order: the roll gives the starting list, the kind word after `EVERY` drops anyone not of that kind, and `WHO` drops anyone it is false for.
+
+```l4
+EVERY Tenant t IN tenants
+    WHO NOT (t EQUALS (Tenant OF "Carol"))
+```
+
+`WHO` takes any Boolean expression in which the member is free — a field comparison, a prelude call, a named helper applied to it.
+
+### Do not write the deprecated `WHO elem` roll
+
+Before `IN` existed the roll had to be smuggled into the `WHO` condition:
+
+```l4
+EVERY Tenant t
+    WHO elem t tenants          -- DEPRECATED (2026-09-08). Do not write this.
+```
+
+**It still runs and nothing warns you**, which is exactly why it needs to be in this file: a model trained on older L4 will produce it, and neither the compiler nor the test suite will object. Recognise it, and write `IN` instead. The rewrite is mechanical:
+
+| old                             | new                     |
+| ------------------------------- | ----------------------- |
+| `WHO elem t tenants`            | `IN tenants`            |
+| `WHO elem t tenants AND <rest>` | `IN tenants WHO <rest>` |
+
+An `elem` condition **beside** an `IN` roll is an ordinary narrowing condition and is perfectly fine — only an `elem` standing in for a missing roll is deprecated.
+
+### What is coarser than it looks
+
+Say these plainly to a user rather than letting them discover them:
+
+- **A failed barrier's breach names NOBODY.** A barrier's `LEST` belongs to the join, not to any member, so it may not name `t` — the checker refuses `LEST BREACH BY t` — and a bare `LEST BREACH` yields a bare `BREACH` with no party. A constant works (`LEST BREACH BY theLandlord BECAUSE "…"`) but is a party you chose, not the one who failed. Who is outstanding shows up in the **residual**, not the breach. Use the fork if the failure has to name the member.
+- **The count and measure joins are not built.** `ONCE SOME 2 OF … HAVE` and `ONCE sum OF amount AT LEAST rent` do not parse. Only `ONCE ALL HAVE` and `UPON EACH` do.
+- **`NO Tenant t MAY …`** is designed but not built; write the `SHANT` form.
+- **A residual barrier loses its join line**, so feeding a residual more events runs the members and not the join. Run the whole stream at once.
+- **The BPMN export draws a barrier and a fork identically**, and its fidelity report does not mention the join at all — so the two rules produce byte-identical output. Read the `.l4`, never the diagram, to tell which join a rule has. The reference page reports that the WASM export refuses an `EVERY` rule outright rather than compiling it wrongly; that one is not re-verified here.
+
+Full treatment, including the state-graph behaviour and the measured sharp edges: <https://legalese.com/l4/reference/regulative/EVERY.md>.
 
 ---
 

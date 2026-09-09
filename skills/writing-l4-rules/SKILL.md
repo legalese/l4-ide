@@ -195,7 +195,26 @@ Actions with fields are **enum constructors** — apply them to arguments like a
 
 **Write `BECAUSE "reason"` on every `LEST BREACH`.** The language accepts the bare `LEST BREACH` and `LEST BREACH BY <party>` too — that is why you will see all three spellings — but the reason string is what a trace prints back, and it is what a legal reviewer or a downstream system reads. A breach with no reason reports the failure without saying which clause failed.
 
-Full treatment — `RAND`/`ROR` composition, `PROVIDED` guards, `EXACTLY` matching, recursive obligations, and `#TRACE` simulation — is in [references/regulative.md](references/regulative.md).
+**When the duty falls on a group, not one named party, use `EVERY`.** `PARTY` names one actor; `EVERY` binds the same obligation to every member of a list and gives you one place to hang the follow-on:
+
+```l4
+EVERY Tenant t IN tenants          -- one obligation per tenant, all live at once
+    MUST   Sign (EXACTLY t)
+    WITHIN 14
+    ONCE   ALL HAVE                -- the join line: fires once, at the last signature
+    HENCE  `the tenancy begins`
+    LEST   BREACH
+```
+
+Three things about it are non-obvious enough that a general-purpose model gets them wrong by default, so check each one before you ship a quantified rule:
+
+1. **The group must be a list, given after `IN`.** Without it the rule parses and type-checks and then **refuses at run time** — so `l4 check` passing is not evidence it will run.
+2. **The join line is mandatory whenever there is a `HENCE` or `LEST`**, and picks the meaning: `ONCE ALL HAVE` fires once when the last member acts (a **barrier**); `UPON EACH` fires once per member as each acts (a **fork**). There is no default.
+3. **Write `EXACTLY t` in the action.** A bare `t` there is a fresh pattern name matching _anyone_, so a stranger's act would discharge the member's duty.
+
+Do **not** write `EVERY Tenant t WHO elem t tenants`: that is the pre-2026-09-08 spelling of the roll, deprecated, and it still runs with no warning of any kind. `WHO elem t xs` becomes `IN xs`; `WHO elem t xs AND p` becomes `IN xs WHO p`.
+
+Full treatment — `RAND`/`ROR` composition, `PROVIDED` guards, `EXACTLY` matching, `EVERY` and its join lines, recursive obligations, and `#TRACE` simulation — is in [references/regulative.md](references/regulative.md).
 
 ### 6. Validate with the `l4` CLI
 

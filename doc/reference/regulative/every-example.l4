@@ -70,8 +70,14 @@ GIVETH A DEONTIC Actor Action
         MUST   Sign (EXACTLY t)
         WITHIN 14
 
--- the older spelling of the same thing: the roll read out of the WHO
--- condition. Still runs; `IN` is the one to write now.
+-- THE DEPRECATED SPELLING of the same thing: the roll read out of the WHO
+-- condition, from before `IN` existed. Deprecated 2026-09-08; it still runs
+-- and nothing warns you, but `IN` is the one to write. Kept here, and only
+-- here among the doc examples, as the labelled specimen -- so that a reader
+-- who meets this shape in older material can recognise it. To move a rule
+-- across: `WHO elem t xs` becomes `IN xs`, and `WHO elem t xs AND p` becomes
+-- `IN xs WHO p` -- which is exactly the difference between this rule and the
+-- one immediately above it.
 GIVETH A DEONTIC Actor Action
 `the listed tenants sign, the old way` MEANS
     EVERY Tenant t

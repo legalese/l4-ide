@@ -30,8 +30,7 @@ tenants     MEANS LIST alice, bob, carol
 
 GIVETH A DEONTIC Actor Action
 `the tenancy` MEANS
-    EVERY Tenant t
-        WHO    elem t tenants
+    EVERY Tenant t IN tenants
         MUST   Sign (EXACTLY t)
         WITHIN 14
         ONCE   ALL HAVE
@@ -91,8 +90,7 @@ GIVETH A DEONTIC Actor Action
 -- continuation -- so this is refused when the rule is run, by name.
 GIVETH A DEONTIC Actor Action
 `whose tenancy` MEANS
-    EVERY Tenant t
-        WHO    elem t tenants
+    EVERY Tenant t IN tenants
         MUST   Sign (EXACTLY t)
         WITHIN 14
         ONCE   ALL HAVE

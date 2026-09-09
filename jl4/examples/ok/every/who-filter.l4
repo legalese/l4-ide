@@ -18,8 +18,7 @@ tenants MEANS LIST (Tenant OF "Alice"), (Tenant OF "Bob"), (Tenant OF "Carol")
 -- the filter on its own line
 GIVETH A DEONTIC Actor Action
 `the listed tenants sign` MEANS
-    EVERY Tenant t
-        WHO    elem t tenants
+    EVERY Tenant t IN tenants
         MUST   Sign (EXACTLY t)
         WITHIN 14
         ONCE   ALL HAVE

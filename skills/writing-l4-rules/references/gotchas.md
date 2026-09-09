@@ -27,6 +27,7 @@ Things that will trip up a general-purpose large language model because they are
 - [Annotation fence](#annotation-fence)
 - [A library's own example definitions are visible to importers](#a-librarys-own-example-definitions-are-visible-to-importers)
 - [NLG and reference annotations](#nlg-and-reference-annotations)
+- [`EVERY … WHO elem` is deprecated and nothing tells you](#every--who-elem-is-deprecated-and-nothing-tells-you)
 
 ---
 
@@ -370,6 +371,35 @@ rest. A file that imports `hierarchy` and defines its own `amended` fails with
 `There are multiple definitions for the identifier` naming `hierarchy.l4:298`, one of the
 library's own examples (measured 2026-09-05). If a plain name collides with something you did not
 define, look in the library you imported, and rename yours.
+
+---
+
+## `EVERY … WHO elem` is deprecated and nothing tells you
+
+This one belongs here rather than only in the regulative reference, because it is the shape a model
+trained on older L4 will reach for by default and **no part of the toolchain objects**: it parses,
+type-checks, runs, and produces the right answer.
+
+```l4
+EVERY Tenant t
+    WHO elem t tenants          -- DEPRECATED 2026-09-08. Silent. Do not write it.
+```
+
+Before the `IN` clause existed, the group a quantified obligation ranges over — its **roll** — had to
+be smuggled into the `WHO` condition as an `elem` test, and the evaluator would pick the list back
+out. Since 2026-09-08 the roll is said outright, and the older spelling is deprecated: still
+running, not scheduled for removal, and **with no warning of any kind** — no diagnostic, no note in
+the trace, no editor mark. Documentation is the only thing that will tell you, which is why it is
+written down twice.
+
+The rewrite is mechanical: `WHO elem t xs` becomes `IN xs`, and `WHO elem t xs AND p` becomes
+`IN xs WHO p`.
+
+An `elem` condition **beside** an `IN` roll is not this trap — it is an ordinary narrowing
+condition and is fine. Only an `elem` standing in for a missing roll is the deprecated form.
+
+See [regulative.md](regulative.md#do-not-write-the-deprecated-who-elem-roll) for why it was
+deprecated and what else `EVERY` needs.
 
 ---
 
