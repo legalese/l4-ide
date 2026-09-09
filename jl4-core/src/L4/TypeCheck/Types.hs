@@ -146,6 +146,17 @@ data CheckError =
     -- selector (SUM-TYPE-FIELDS-SPEC §3 S1), so it must have one type.
     -- Arguments: the field's first occurrence, then every occurrence in
     -- declaration order as (constructor, field occurrence, declared type).
+  | PartialProjection PartialProjection
+    -- ^ SUM-TYPE-FIELDS-SPEC §3 S2: a field is read from a value that could
+    -- still be a constructor which does not declare it. An ERROR, deliberately
+    -- and from the start of its shipped life — §4's gate: /"S2 does not land as
+    -- a warning … a warning is the GHC compromise this document exists to
+    -- decline"/. It briefly existed as a 'CheckWarning' on this branch so §4's
+    -- three rigs could count the corpus before the language narrowed; that form
+    -- is gone, and there is no flag that brings it back.
+    --
+    -- Raised by 'L4.TypeCheck.flushPartialProjections' rather than at the read;
+    -- see 'CheckState.pendingPartialProjections' for why.
   | AmbiguousTermError Name [(Resolved, Type' Resolved)]
   | AmbiguousOperatorError Text
   | AmbiguousTypeError Name [(Resolved, Kind)]
@@ -308,15 +319,6 @@ data CheckWarning
     -- the elaborations 'L4.Desugar.desugarSectionGivens' prepends for a
     -- section @GIVEN@ reach the same code and never draw it
     -- ('L4.Names.isSectionBinderElaboration').
-  | PartialProjectionWarning PartialProjection
-    -- ^ SUM-TYPE-FIELDS-SPEC §3 S2, in its MEASUREMENT form. The ruling is
-    -- that this is an ERROR (§4's gate: /"S2 does not land as a warning …
-    -- a warning is the GHC compromise this document exists to decline"/); it
-    -- exists as a warning only between the commit that builds the check and
-    -- the commit that promotes it, so §4's three rigs can count the corpus
-    -- sites before the language narrows. Promotion moves this constructor to
-    -- 'CheckError' and changes nothing else: the payload and the renderer are
-    -- already shared.
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
@@ -542,7 +544,7 @@ instance HasSrcRange CheckError where
   -- The read's OWN range, carried on the payload: this diagnostic is raised by
   -- 'L4.TypeCheck.inferTopDecl' after the fork it was recorded in has been
   -- pruned, where the ambient 'errorContext' no longer points at the read.
-  rangeOf (CheckWarning (PartialProjectionWarning p)) = p.readRange
+  rangeOf (PartialProjection p)             = p.readRange
   rangeOf (SuspiciousBinderPattern b _)     = rangeOf b
   rangeOf (MisattachedSectionGiven n _)     = rangeOf n
   rangeOf (UnreadImplicitSupply _ b)        = rangeOf b

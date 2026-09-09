@@ -2893,7 +2893,7 @@ flushPartialProjections = do
   pend <- use #pendingPartialProjections
   unless (null pend) do
     assign #pendingPartialProjections []
-    traverse_ (addWarning . PartialProjectionWarning) (List.nub (reverse pend))
+    traverse_ (addError . PartialProjection) (List.nub (reverse pend))
 
 -- | What a @WHEN@ arm does to the residual — the set of constructors that can
 -- still reach a later arm (SUM-TYPE-FIELDS-SPEC §3 S3).
@@ -6639,6 +6639,7 @@ prettyCheckError (SharedFieldTypeMismatch n occs)           =
   , "A field that several constructors share is one field, and it has one type."
   , "Give it the same type on every constructor that declares it, or use a different name on each."
   ]
+prettyCheckError (PartialProjection p)                       = prettyPartialProjection p
 prettyCheckError (IncorrectArgsNumberApp r expected given)   =
   [ "The function"
   , ""
@@ -6894,9 +6895,11 @@ prettyMixfixMatchError funcName = \case
 --      advice would produce a second S2 error. It is: give the value a name,
 --      then narrow the name; or match the payload.
 --
--- One renderer, shared: at promotion (§4's gate step 2) this constructor moves
--- to 'CheckError' and its caller changes from 'prettyCheckWarning' to
--- 'prettyCheckError'. This function does not move.
+-- Renders 'L4.TypeCheck.Types.PartialProjection', which is a 'CheckError' and
+-- therefore blocking. It was a 'CheckWarning' for exactly the span of §4's
+-- gate step 1 — long enough to count the corpus — and was promoted, with the
+-- six measured sites repaired, in the same change (§4's gate steps 2 and 3).
+-- There is no warning form left and no flag that restores one.
 prettyPartialProjection :: PartialProjection -> [Text]
 prettyPartialProjection p =
   headline <> ("" : whyLines) <> ("" : repairLines)
@@ -7089,7 +7092,6 @@ prettyCheckWarning = \ case
     , ""
     , "where a and b are the GIVEN inputs."
     ]
-  PartialProjectionWarning p -> prettyPartialProjection p
   DeprecatedAssume info ->
     [ "ASSUME is an older way of introducing a name, and it is being retired."
     , "Nothing is broken: the file still checks, runs and exports as before."
