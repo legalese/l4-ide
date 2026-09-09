@@ -721,7 +721,7 @@ Three parts of the ruling that are easy to get wrong:
    expecting "'s", "--", "..", "...", "/*", "//", …
    ```
 3. **Never bare juxtaposition.** Dropping the `...` is function application, and it type-errors on any
-   node whose head is a record binder:
+   node whose head is a record-typed name:
 
    ```
    You are giving 1 input to
