@@ -315,7 +315,10 @@ sites that error, every one a declaration nothing reads (grep):** six inside gol
 (`jl4-core/libraries/actus-core.l4:59-63`, `contractType` at four types; the
 `Left HAS payload IS AN a / Right HAS payload IS A b` idiom in `ok/datatypes.l4:22-25`,
 `ok/elem.l4:48-51`, `ok/nlg_decide3.l4:1-4`, `ok/nlg_lin2.l4:1-4`,
-`lsp/semantic-tokens/declare.l4:16-19`), two under `doc/`
+`lsp/semantic-tokens/declare.l4:16-19`), **and a seventh copy of the same idiom found only when the
+renames were made** — `doc/reference/types/for-all.md:58-59` quotes the block as a fenced `l4`
+example, so the page and its example file had to be renamed together or they would have disagreed;
+this list was built from `.l4` files and prose copies are invisible to that method. Two under `doc/`
 (`doc/courses/advanced/module-a2-cross-cutting-examples.l4:34-36`,
 `doc/reference/types/for-all-example.l4:71-74` — and the same block quoted in
 `doc/reference/types/for-all.md:58-59`, a seventh copy of the idiom found while renaming), three

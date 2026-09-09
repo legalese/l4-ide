@@ -180,6 +180,17 @@ jl4-test` once (it creates them and fails), then again to prove they hold, then 
 `.golden` files — `.actual` is gitignored. Read them before committing: blessing output you have not
 looked at is how a wrong answer becomes the expected answer.
 
+**That recipe is for goldens that do not exist yet. An EXISTING golden is never rewritten for you.**
+`failFirstTime` covers only the missing-golden case; on a _mismatch_ the suite writes
+`<stem>.actual` beside the golden and fails, and running it again fails identically forever. Blessing
+an edited golden is a manual `cp <stem>.actual <stem>.golden` after diffing the two — which is the
+right shape, since it forces the read the paragraph above demands. Do not conclude from a second red
+run that your change is wrong.
+
+> **Why.** 2026-09-09: an agent renaming corpus fields was told "run it once, it creates/updates,
+> run it again" and read the second failure as a defect in its own edit. It cost a re-derivation to
+> notice the suite had been telling it the truth both times.
+
 > **Why.** This went off twice in one day. The BNA corpus landed without goldens in PR #195 and was
 > repaired by #202; eleven hours later the Jersey charities cleanroom did the same in #201 and was
 > repaired by #212 — after it had already knocked another PR out of the merge queue. `etc/check-corpus-goldens.mjs`
@@ -225,6 +236,18 @@ can resolve different prelude versions. Rebuild, or drop the pin.
 > `setFromList`. The same probe on the 4 Aug installed binary with its embedded prelude: zero
 > errors. The mismatch was one `@nonexhaustive` annotation the older parser could not read, and
 > nothing in the output said so.
+
+**And editing a library `.l4` does not rebuild the binary that embeds it.** `cabal build jl4:l4`
+answers `Up to date` after a change to `jl4-core/libraries/*.l4`, because the embedded copy is data,
+not a Haskell dependency cabal tracks that way. So the same binary now behaves one way with
+`JL4_LIBRARY_PATH` pinned at the tree and another way with it unset — the _other_ half of the trap
+above, reached from the library side rather than the binary side. If you edit a library and then
+test with the embedded prelude, you are testing the old library.
+
+> **Why.** 2026-09-09: a corpus rename touched `jl4-core/libraries/actus-core.l4`; every check that
+> pinned `JL4_LIBRARY_PATH` saw the rename and every check that did not would have seen the old
+> field names. It was caught only because the agent noticed `cabal build` claiming `Up to date`
+> after an edit it had just made.
 
 **The same trap arrives from the CORPUS side, and the paragraph above does not cover it**: a binary
 older than the code it reads reports newly-landed **syntax** as broken source. Since #335
