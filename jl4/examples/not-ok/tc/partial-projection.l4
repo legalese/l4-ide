@@ -71,3 +71,20 @@ GIVETH A NUMBER
 
 GIVETH A NUMBER
 `as a value` MEANS `apply` monthly_rent
+
+-- 7. EVERY CONSTRUCTOR ALREADY TAKEN. The arms above consume `Landlord` AND
+--    `Tenant`, so the residual is empty — and an empty clamp would certify
+--    every read under it, so the clamp is widened back to the whole type. That
+--    widening is sound: nothing reaches this read at all. But it is not
+--    "nothing narrowed this", which is what the message said before
+--    `NarrowedByExhaustedBranches` existed — an explanation that is
+--    affirmatively wrong about what happened, which is the one thing §3.2
+--    rules out. Read the golden: the message says the arms took everything,
+--    and the repair is to delete the arm rather than to narrow anything.
+GIVEN a IS AN Actor
+GIVETH A NUMBER
+`exhausted` a MEANS
+    CONSIDER a
+    WHEN Landlord d THEN 0
+    WHEN Tenant   r THEN 1
+    OTHERWISE a's monthly_rent

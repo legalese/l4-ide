@@ -776,6 +776,18 @@ data NarrowingReason
     -- never wrote — which is §1.1's own complaint about the run-time error
     -- this check replaces. The list is never empty: no narrowing is recorded
     -- when nothing is consumed.
+  | NarrowedByExhaustedBranches [Name]
+    -- ^ An @OTHERWISE@ (or trailing catch-all) whose preceding arms consumed
+    -- EVERY constructor of the scrutinee's type: the read is unreachable.
+    --
+    -- The clamp is widened back to the whole universe here, because a narrowing
+    -- to the empty set would certify every projection below it (see
+    -- 'PossibleConstructors'). That widening is sound but it is NOT "nothing
+    -- narrowed this" — and saying so is the one thing §3.2 forbids, since it
+    -- is affirmatively false about what happened. This constructor is what
+    -- lets S4 report the widening honestly instead of borrowing
+    -- 'NotNarrowed'\'s sentence. The list is the constructors consumed above,
+    -- and is never empty (an empty universe records no narrowing at all).
   | NarrowedByResidual [Name] [Pattern Resolved]
     -- ^ An @OTHERWISE@, or a trailing catch-all @WHEN other@: the constructors
     -- the preceding arms CONSUMED, and the arms that matched a constructor but

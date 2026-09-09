@@ -69,6 +69,20 @@ data UserEvalException =
     BlackholeForced (Expr Resolved)
   | EqualityOnUnsupportedType WHNF WHNF
   | NonExhaustivePatterns (Either Reference WHNF) -- ^ 'Right' the forced scrutinee value when available, 'Left' the raw reference otherwise
+  | PartialSelector Name [Name] (Either Reference WHNF)
+    -- ^ A FIELD SELECTOR was applied to a constructor that does not declare the
+    -- field: the field, the constructors that do declare it, and the value it
+    -- was applied to ('Right' when forced, as for 'NonExhaustivePatterns').
+    --
+    -- Distinct from 'NonExhaustivePatterns' because the CONSIDER it falls off
+    -- is not one the drafter wrote — 'L4.EvaluateLazy.Machine.evalConDecls'
+    -- synthesises one branch per DECLARING constructor — and because the
+    -- checker emitted no exhaustiveness warning about it: that CONSIDER is not
+    -- in the source to be warned about, and where the read sits inside a
+    -- multi-clause fall-through the clause group above it is perfectly
+    -- exhaustive. Reporting it as a missing WHEN branch sent the reader
+    -- looking for a CONSIDER they never wrote and for a warning that was never
+    -- emitted (SUM-TYPE-FIELDS-SPEC §1.1).
   | StackOverflow
   | DivisionByZero BinOp
   | NotAnInteger BinOp Rational
@@ -103,6 +117,24 @@ prettyInternalEvalException = \ case
 indentSingle :: Text -> Text
 indentSingle = ("  " <>)
 
+-- | A name in backticks, rendered by its LAST component. Mirrors
+-- 'L4.TypeCheck.prettyPartialProjection'\'s @shortText@, and for the same
+-- reason: @addQualifiedAliases@ publishes a section-qualified alias for every
+-- constructor and selector, so the unshortened name may be something the
+-- drafter never wrote.
+tickName :: Name -> Text
+tickName n = "`" <> short (rawName n) <> "`"
+  where
+    short (QualifiedName _ final) = final
+    short other                   = rawNameToText other
+
+commaAnd :: [Text] -> Text
+commaAnd = \ case
+  []       -> ""
+  [x]      -> x
+  [x, y]   -> x <> " and " <> y
+  (x : xs) -> x <> ", " <> commaAnd xs
+
 indentMany :: LayoutPrinter a => a -> [Text]
 indentMany = map ind . Text.lines .  prettyLayout
   where
@@ -125,6 +157,20 @@ prettyUserEvalException = \ case
        , "Add a WHEN branch for this case, or a catch-all OTHERWISE branch."
        , "The typechecker's exhaustiveness warning lists all missing branches."
        ]
+  -- Deliberately says nothing about a CONSIDER, a WHEN branch, or the
+  -- exhaustiveness warning: there is no CONSIDER here that the reader wrote,
+  -- and no warning was emitted about this. See 'PartialSelector'.
+  PartialSelector fld declaredBy val ->
+    [ "The value" ]
+    <> either indentMany indentMany val
+    <> [ "has no " <> tickName fld <> " field."
+       , tickName fld <> " is declared on " <> onlyList declaredBy <> "."
+       ]
+    where
+      onlyList = \ case
+        []  -> "no constructor of this type"
+        [n] -> tickName n <> " only"
+        ns  -> commaAnd (tickName <$> ns) <> " only"
   StackOverflow ->
     [ "Stack overflow: "
     , "Recursion depth of " <> Text.textShow maximumFrameDepth

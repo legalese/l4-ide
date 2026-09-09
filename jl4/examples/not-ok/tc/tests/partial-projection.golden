@@ -100,7 +100,7 @@ File: partial-projection.l4
   Code: <none>
   Message:
     `monthly_rent` is a field of `Tenant` only.
-    But the value it is read from could also be `Landlord`, which has no `monthly_rent`.
+    But the value it is read from can only be `Landlord`, which has no `monthly_rent`.
 
     It is written here as `Landlord`, and `Landlord` does not
     declare `monthly_rent`.
@@ -127,3 +127,21 @@ File: partial-projection.l4
       GIVEN x YIELD CONSIDER x WHEN Tenant t THEN t OTHERWISE …
 
     or declare `monthly_rent` on `Landlord` too.
+
+File: partial-projection.l4
+  Hidden: no
+  Range: 90:15-90:31
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    `monthly_rent` is a field of `Tenant` only.
+    But `a` could also be `Landlord`, which has no `monthly_rent`.
+
+    The branches above already match `Landlord` and `Tenant` — every
+    constructor of this type — so nothing reaches this read at all.
+    It is checked against the whole type because there is no narrower
+    answer to check it against.
+
+    Delete this arm — it is unreachable — or make one of the branches
+    above match fewer values, so that something can reach here.

@@ -100,6 +100,33 @@ everyone MEANS LIST Landlord, (Tenant OF 1500)
   F, otherwise byte-identical). The narrowing constructor filters the roll before the filter runs,
   so the projection never meets a `Landlord`. **Narrowing works — at run time.**
 
+**ANSWERED 2026-09-09: the run-time message quoted above no longer exists, and the second bullet's
+complaint about it is discharged.** The quote stays as probe E2 recorded it. What the evaluator says
+now, where a partial selector still reaches run time (§5.1's two holes, and any `l4 run` on a file
+that failed to check), is:
+
+```
+The value
+  Landlord
+has no `monthly_rent` field.
+`monthly_rent` is declared on `Tenant` only.
+```
+
+It says nothing about a `CONSIDER`, nothing about adding a `WHEN` branch, and — deliberately —
+nothing about the exhaustiveness warning, because **no such warning was emitted**. It could not have
+been: the `CONSIDER` being fallen off is the selector closure `evalConDecls` synthesises, one arm
+per declaring constructor, and it is not in the source to be warned about. Where the read sits in a
+multi-clause fall-through the clause group above it is perfectly exhaustive, so the checker has
+nothing to say either. The old third sentence sent the reader hunting for a diagnostic that does not
+exist, about a construct they did not write — §1.1's own complaint, one layer down.
+
+Mechanically: `UserEvalException` gained `PartialSelector`, distinct from `NonExhaustivePatterns`; a
+`Consider` the evaluator synthesises carries `Syntax.SelectorConsider` on its annotation, and the
+machine threads that origin to the fall-off. A hand-written non-exhaustive `CONSIDER` is unchanged
+and keeps the exhaustiveness sentence. `ok/sum-fields/partial-selector-runtime.l4` pins the new
+message — it is under `ok/` precisely because it checks clean and then dies, which is what §5.1's
+untyped-`GIVEN` hole means.
+
 ### 1.2 Hazard 2 — a field on _every_ arm at the same type: cannot be read at all
 
 ```l4
@@ -292,17 +319,50 @@ them. The two repairs that do compile:
 The second is the idiom §4 measured real drafters already using ("they destructure rather than
 project").
 
-The exact wording is the implementer's; the three contents — field, missing arms, repair — are not,
-and the phrase _could also be_ is the stable marker the §4 gate greps for.
+The exact wording is the implementer's; the three contents — field, missing arms, repair — are not.
 
-**That marker is emitted STRUCTURALLY, not as a per-form prose choice** (built 2026-09-09). A
-singleton narrowing (`EVERY Landlord a … a's monthly_rent`) has no natural "also", and the
-bare-selector form has no value to say it about — so leaving the phrase to each form's prose would
-have let a form omit it, and §4's gate detects sites _by grepping for it_, which would then report a
-false zero and promote a hard error over sites nobody read. The renderer therefore emits one
-unconditional line built from the still-possible-but-not-declaring list, which S2 guarantees is
-non-empty whenever the diagnostic exists. A later gate should still prefer counting by the
-constructor over counting by the phrase.
+**The marker is emitted STRUCTURALLY, not as a per-form prose choice** (built 2026-09-09). A form
+that omits it makes a counting gate report a **false zero** and promote a hard error over sites
+nobody read, so it cannot be left to each form's prose.
+
+**ANSWERED 2026-09-09: the marker is `" a field of "`, not `could also be`.** It moved, and the
+connective it used to be now varies with the narrowing reason.
+
+The old marker cost a sentence that contradicted itself. On a base written **as** a constructor,
+`(Landlord OF 4000)'s monthly_rent`, the message said the value _"could **also** be `Landlord`"_ and
+then, two lines later, _"It is written here **as** `Landlord`"_. There is no "also": the value is
+that constructor and nothing else. The reason the ruling gave for keeping the phrase unconditional
+was that "§4's gate detects sites by grepping for it, which would then report a false zero" — **that
+gate has now been run and closed** (§4 gate steps 1–3), so the reason has expired, while the prose
+defect would have shipped. This paragraph's own last sentence already said a later gate _"should
+prefer counting by the constructor over counting by the phrase"_.
+
+What is emitted now:
+
+- the headline's **first line** always reads `` `f` is a field of … ``, from `onlyList`, which has
+  a branch for every shape of `declaredBy` including the empty one. `L4.TypeCheck.s4Marker` is that
+  literal, named in the source so a gate and the renderer cannot drift apart. It never had to carry
+  meaning, so no future edit to how a sentence reads can break a count.
+- the **connective** is `could also be` for `NotNarrowed`, `NarrowedByWhen`, `NarrowedByCast`,
+  `NarrowedByEarlierClauses`, `NarrowedByResidual` and `NarrowedByExhaustedBranches`, and
+  `can only be` for `NarrowedByConstruction` — the one reason under which no set-shrinking happened
+  at all, because the base **is** that constructor syntactically.
+
+Witnessed by `not-ok/tc/partial-projection.l4` case 5 and
+`not-ok/tc/partial-projection-fallthrough.l4`'s constructed-base case; both goldens re-blessed in
+the same change, and each moved by exactly one line.
+
+**A THIRD DEFECT of the same kind, fixed in the same change: the fully exhausted residual.** When a
+`CONSIDER`'s arms consume every constructor, the residual set is empty; an empty clamp would certify
+every read below it, so the clamp is widened back to the whole type. That widening is sound — the
+read is unreachable — but it was recorded by producing **no narrowing at all**, so S4 fell through
+to `NotNarrowed` and said _"Nothing here narrows `a`: it is used at the whole type `Actor`"_ about a
+read sitting under a fully exhaustive `CONSIDER`. That is the opposite of what happened, and §3.2
+rules out exactly this: a diagnostic that explains the narrowing **wrongly** fails S4's acceptance
+test as surely as one that does not explain it at all. `NarrowedByExhaustedBranches` now carries the
+widening, the message names the arms that took everything, and the repair is to delete the
+unreachable arm rather than to narrow anything. Witnessed by `not-ok/tc/partial-projection.l4`
+case 7.
 
 **S5 — what this does for `WHOSE`.** `EVERY-EACH-QUANTIFIER-SPEC.md` §13.6.1 found that the
 corrected totality rule (open the fields present on every constructor the member could still be)
@@ -444,6 +504,12 @@ exists — see the status header), with the worktree binary and `JL4_LIBRARY_PAT
 tree's libraries. **Both the expected counts and the measured ones are recorded below**, per §4's own
 instruction that the expectations were "to be confirmed, not assumed" — do not overwrite one with the
 other.
+
+> **The marker this run grepped for is no longer the marker.** Every `grep 'could also be'` recorded
+> below is what was actually run on 2026-09-09 and stays as written. A gate run **after** that date
+> must grep `L4.TypeCheck.s4Marker` — the literal `" a field of "` — because the connective now
+> varies with the narrowing reason (§3 S4, ANSWERED 2026-09-09). Better still, count by the
+> `PartialProjection` constructor and not by prose at all.
 
 | site                                              | expected | measured | class                                   |
 | ------------------------------------------------- | -------- | -------- | --------------------------------------- |

@@ -160,7 +160,7 @@ data Frame =
   | RestoreCurrentParty (Maybe Text)
   | App1 {- -} [Reference] (Maybe (Type' Resolved)) -- Added type for type-directed builtins
   | IfThenElse1 {- -} (Expr Resolved) (Expr Resolved) Environment
-  | ConsiderWhen1 Reference {- -} (Expr Resolved) [Branch Resolved] Environment
+  | ConsiderWhen1 ConsiderOrigin Reference {- -} (Expr Resolved) [Branch Resolved] Environment
   | PatNil0
   | PatCons0 (Pattern Resolved) Environment (Pattern Resolved)
   | PatCons1 {- -} Reference Environment (Pattern Resolved)
@@ -755,9 +755,39 @@ preAllocateRef r = do
   traceEval (AllocPre r rf)
   pure (getUnique r, rf)
 
+-- | Where the @CONSIDER@ whose branches are being matched came from.
+--
+-- Read ONCE off the node's annotation, by 'considerOrigin' in 'forwardExpr',
+-- and then threaded through 'Config' and the 'ConsiderWhen1' frame. It has to
+-- be threaded because its only consumer is the fall-off case ('matchBranches'
+-- with no branches left), and by then the node is gone: 'patternMatchFailure'
+-- re-enters the remaining branch list from the frame after each failed match,
+-- so the frame is the one place that still knows.
+data ConsiderOrigin
+  = ConsiderWritten
+    -- ^ a @CONSIDER@ in the source, or a desugaring of one. Falling off the end
+    -- is 'L4.EvaluateLazy.Exceptions.NonExhaustivePatterns'.
+  | ConsiderSelector !Name ![Name]
+    -- ^ the one-branch-per-declaring-constructor closure 'evalConDecls'
+    -- synthesises for a field selector: the field, and the constructors that
+    -- declare it. Falling off the end means the field was read from a
+    -- constructor that does not have it, which is
+    -- 'L4.EvaluateLazy.Exceptions.PartialSelector' and reads nothing like a
+    -- missing @WHEN@ branch.
+  deriving stock (Generic, Show)
+  deriving anyclass NFData
+
+-- | Read the origin off a @CONSIDER@'s annotation. Only 'evalConDecls' ever
+-- sets 'Syntax.selectorConsider', so every @CONSIDER@ that came from a source
+-- file — and every desugaring of one — answers 'ConsiderWritten'.
+considerOrigin :: Anno -> ConsiderOrigin
+considerOrigin ann = case ann.extra.selectorConsider of
+  Nothing  -> ConsiderWritten
+  Just sel -> ConsiderSelector sel.field sel.declaredBy
+
 data Config
   = ForwardMachine Environment (Expr Resolved)
-  | MatchBranchesMachine Reference Environment [Branch Resolved]
+  | MatchBranchesMachine ConsiderOrigin Reference Environment [Branch Resolved]
   | MatchPatternMachine Reference Environment (Pattern Resolved)
   | BackwardMachine WHNF
   | EvalRefMachine Reference
@@ -770,8 +800,8 @@ continueExpr :: Environment -> Expr Resolved -> Machine Config
 continueExpr env e = pure (ForwardMachine env e)
 {-# INLINE continueExpr #-}
 
-continueBranches :: Reference -> Environment -> [Branch Resolved] -> Machine Config
-continueBranches r env e = pure (MatchBranchesMachine r env e)
+continueBranches :: ConsiderOrigin -> Reference -> Environment -> [Branch Resolved] -> Machine Config
+continueBranches o r env e = pure (MatchBranchesMachine o r env e)
 {-# INLINE continueBranches #-}
 
 continuePattern :: Reference -> Environment -> Pattern Resolved -> Machine Config
@@ -925,9 +955,9 @@ forwardExpr env = \ case
     desugarMultiWayIf :: [GuardedExpr Resolved] -> Expr Resolved -> Expr Resolved
     desugarMultiWayIf [] o = o
     desugarMultiWayIf (MkGuardedExpr _ann c f : es') o = IfThenElse emptyAnno c f $ desugarMultiWayIf es' o
-  Consider _ann e branches -> do
+  Consider ann e branches -> do
     rf <- allocate_ e env
-    continueBranches rf env branches
+    continueBranches (considerOrigin ann) rf env branches
   Lit _ann lit -> do
     rval <- runLit lit
     continueBackward rval
@@ -1205,7 +1235,7 @@ backward val = withPoppedFrame $ \ case
 
       _ -> internalException $ RuntimeTypeError $
         "expected a BOOLEAN but found: " <> prettyLayout val <> " when evaluating IF-THEN-ELSE"
-  Just (ConsiderWhen1 _scrutinee e _branches env) -> do
+  Just (ConsiderWhen1 _origin _scrutinee e _branches env) -> do
     case val of
       ValEnvironment env' ->
         continueExpr (Map.union env' env) e
@@ -2542,22 +2572,26 @@ matchGivens' closureEnv ns f rs = do
         internalException $
           RuntimeTypeError "given signatures' values' lengths do not match"
 
-matchBranches :: Reference -> Environment -> [Branch Resolved] -> Machine Config
-matchBranches scrutinee _env [] = do
+matchBranches :: ConsiderOrigin -> Reference -> Environment -> [Branch Resolved] -> Machine Config
+matchBranches origin scrutinee _env [] = do
   -- The scrutinee has been forced by the failed branch matches, so we can
   -- usually show the actual value in the error instead of a heap reference.
   thunk <- readThunk scrutinee
-  userException $ NonExhaustivePatterns case thunk of
-    WHNF val          -> Right val
-    -- A context-dependent cache still holds the value the branches were
-    -- matched against, so it names the scrutinee just as well as a plain
-    -- 'WHNF'; we are inside that very force, so it cannot be stale here.
-    WHNFWhen _ val _ _ -> Right val
-    Unevaluated{}     -> Left scrutinee
-matchBranches _scrutinee env (MkBranch _ann (Otherwise _ann') e : _) =
+  let
+    val = case thunk of
+      WHNF v          -> Right v
+      -- A context-dependent cache still holds the value the branches were
+      -- matched against, so it names the scrutinee just as well as a plain
+      -- 'WHNF'; we are inside that very force, so it cannot be stale here.
+      WHNFWhen _ v _ _ -> Right v
+      Unevaluated{}   -> Left scrutinee
+  userException case origin of
+    ConsiderWritten             -> NonExhaustivePatterns val
+    ConsiderSelector fld declBy -> PartialSelector fld declBy val
+matchBranches _origin _scrutinee env (MkBranch _ann (Otherwise _ann') e : _) =
   continueExpr env e
-matchBranches scrutinee env (MkBranch _ann (When _ann' pat) e : branches) = do
-  pushFrame (ConsiderWhen1 scrutinee e branches env)
+matchBranches origin scrutinee env (MkBranch _ann (When _ann' pat) e : branches) = do
+  pushFrame (ConsiderWhen1 origin scrutinee e branches env)
   continuePattern scrutinee env pat
 
 matchPattern :: Reference -> Environment -> Pattern Resolved -> Machine Config
@@ -2587,8 +2621,8 @@ patternMatchFailure :: Machine Config
 patternMatchFailure = withPoppedFrame $ \ case
   Nothing ->
     internalException UnhandledPatternMatch
-  Just (ConsiderWhen1 scrutinee _ branches env) ->
-    continueBranches scrutinee env branches
+  Just (ConsiderWhen1 origin scrutinee _ branches env) ->
+    continueBranches origin scrutinee env branches
   -- we have unwound the frame that would reenter when scrutinizing the event
   Just (ContractFrame (Contract11 ActionDoesn'tmatch {..})) -> do
     newTime <- allocateValue time
@@ -4278,10 +4312,23 @@ evalConDecls env conDecls = do
             MkBranch emptyAnno (When emptyAnno (PatApp emptyAnno conRef (PatVar emptyAnno <$> args)))  --   Con y_1 ... y_n ->
               (App emptyAnno body [])                                                                  --     y_i
         let
+          -- The CONSIDER is synthesised, so falling off the end of it must not
+          -- be reported as a missing WHEN branch: the drafter wrote no
+          -- CONSIDER here and the checker emitted no exhaustiveness warning
+          -- about one. The marker is what lets 'matchBranches' say instead
+          -- which field was read from which constructor. It carries the
+          -- DECLARING constructors — one per arm, in arm order — because the
+          -- arms are exactly the constructors that have the field.
+          selAnno =
+            emptyAnno
+              & annSelectorConsider
+              .~ Just (MkSelectorConsider
+                   (TypeCheck.getName sn)
+                   [ TypeCheck.getName n | (n, _, _) <- occs ])
           sel =
             ValClosure
               (MkGivenSig emptyAnno [MkOptionallyTypedName emptyAnno arg Nothing Nothing])  -- \ x ->
-              (Consider emptyAnno (App emptyAnno argRef []) branches)                       -- case x of ...
+              (Consider selAnno (App emptyAnno argRef []) branches)                         -- case x of ...
               emptyEnvironment
         updateTerm env sn (WHNF sel)
 

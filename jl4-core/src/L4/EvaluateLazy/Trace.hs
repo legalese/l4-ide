@@ -308,6 +308,7 @@ printUserEvalExceptionShort :: UserEvalException -> Doc ann
 printUserEvalExceptionShort (BlackholeForced _)             = "loop detected"
 printUserEvalExceptionShort (EqualityOnUnsupportedType _ _) = "called equality on unsupported type"
 printUserEvalExceptionShort (NonExhaustivePatterns _)       = "non-exhaustive patterns"
+printUserEvalExceptionShort (PartialSelector _ _ _)         = "field read from a constructor that does not declare it"
 printUserEvalExceptionShort StackOverflow                   = "stack overflow"
 printUserEvalExceptionShort (DivisionByZero _)              = "division by zero"
 printUserEvalExceptionShort (NotAnInteger _ _)              = "not an integer"

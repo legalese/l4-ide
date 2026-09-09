@@ -183,8 +183,8 @@ runConfig = \ case
     traceEval (Enter expr)
     next <- forwardExpr env expr
     runConfig next
-  MatchBranchesMachine scrutinee env branches -> do
-    next <- matchBranches scrutinee env branches
+  MatchBranchesMachine origin scrutinee env branches -> do
+    next <- matchBranches origin scrutinee env branches
     runConfig next
   MatchPatternMachine r env pat -> do
     next <- matchPattern r env pat

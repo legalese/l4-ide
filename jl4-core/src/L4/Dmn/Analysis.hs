@@ -550,7 +550,7 @@ analyzeSafety inp cg decides =
       [ issue "L11" e
           ("the projection `" <> unqualifiedNameToText (TC.getName fld)
              <> "` scrutinises a multi-constructor IS ONE OF whose constructors do not all declare that field; \
-                \the selector application raises NonExhaustivePatterns at run time even though no CONSIDER is in sight")
+                \the selector application raises PartialSelector at run time")
       | s == StrictPos
       , Just ctors <- [enumOfOperand base]
       , length ctors > 1

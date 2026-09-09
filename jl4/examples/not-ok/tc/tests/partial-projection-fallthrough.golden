@@ -51,7 +51,7 @@ File: partial-projection-fallthrough.l4
   Code: <none>
   Message:
     `monthly_rent` is a field of `Tenant` only.
-    But `theLandlord` could also be `Landlord`, which has no `monthly_rent`.
+    But `theLandlord` can only be `Landlord`, which has no `monthly_rent`.
 
     It is written here as `Landlord`, and `Landlord` does not
     declare `monthly_rent`.

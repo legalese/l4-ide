@@ -631,6 +631,36 @@ The typechecker's exhaustiveness warning lists all missing branches.
 
 ---
 
+### Field read from a constructor that does not have it, at runtime
+
+**Error message:**
+
+```
+The value
+  Agent
+has no `monthly_rent` field.
+`monthly_rent` is declared on `Tenant` only.
+```
+
+**What went wrong:** A field of an `IS ONE OF` type was read from a value whose constructor does not declare that field. When only some constructors of a type have a field, the selector for it is partial: `monthly_rent` is a function that works on a `Tenant` and on nothing else.
+
+Most reads like this are refused at check time, with a longer message that names the constructors that can still reach the read and shows how to narrow the value first. This runtime version is what you see when the check could not rule it out — most often because the parameter has no declared type, so the checker did not know which constructors were in play — or when you ran a file that failed to check.
+
+Note that this is **not** a missing `CONSIDER` branch, even though it may look like one: there is no `CONSIDER` in your program. The one being fallen off is the selector itself, which L4 builds with one branch per declaring constructor. Nothing was left out of a match, and no exhaustiveness warning was emitted about it.
+
+**How to fix it:** Give the parameter its type, so the read is checked rather than deferred to runtime:
+
+```l4
+GIVEN s IS AN Actor
+GIVETH A NUMBER
+DECIDE rent Landlord IS 0
+DECIDE rent s        IS s's monthly_rent
+```
+
+That turns the crash into a check-time error whose message tells you which constructor is the problem. Then narrow the value before reading the field — see [DECLARE](../types/DECLARE.md) for the ways a value gets narrowed — or declare the field on the other constructors too.
+
+---
+
 ### DEONTIC rule does not execute
 
 **Symptom:** You defined a DEONTIC rule (MUST, MAY, SHANT) but nothing happens when you evaluate it.

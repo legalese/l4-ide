@@ -3294,14 +3294,34 @@ emptyResidual = MkResidual Set.empty [] [] Nothing
 -- Recording @possible = universe@ with an empty consumed list is sound (it
 -- certifies nothing an absent narrowing would not have certified) and carries
 -- the explanation.
+--
+-- THE EXHAUSTED CASE. When the arms above consume every constructor, the
+-- residual set is EMPTY, and 'possibleConstructors' answers 'Nothing' for it —
+-- an empty clamp would certify every projection below it. The widening back to
+-- the universe is therefore forced and is sound (the read is unreachable). But
+-- it used to be recorded by returning 'Nothing' from this function altogether,
+-- which is how S4 came to say /"Nothing here narrows @a@: it is used at the
+-- whole type @Actor@"/ about a read that sits under a fully exhaustive
+-- CONSIDER — the opposite of what happened, and the one failure mode §3.2 says
+-- these diagnostics must not have. 'NarrowedByExhaustedBranches' carries the
+-- widening so the message can report it.
 residualNarrowing :: Map Unique [Resolved] -> Residual -> Maybe Narrowing
 residualNarrowing cl acc = do
   tyU <- acc.resTyU
   let universe = Set.fromList (getUnique <$> Map.findWithDefault [] tyU cl)
-  poss <- possibleConstructors (universe Set.\\ acc.resConsumed)
-  pure
-    (MkNarrowing poss tyU
-      (NarrowedByResidual (reverse acc.resConsumedNames) (reverse acc.resRefutable)))
+  case possibleConstructors (universe Set.\\ acc.resConsumed) of
+    Just poss ->
+      pure
+        (MkNarrowing poss tyU
+          (NarrowedByResidual (reverse acc.resConsumedNames) (reverse acc.resRefutable)))
+    Nothing -> do
+      -- Empty residual. If the universe itself is empty we know nothing about
+      -- the type and record nothing, exactly as before; otherwise every
+      -- constructor was consumed above.
+      poss <- possibleConstructors universe
+      pure
+        (MkNarrowing poss tyU
+          (NarrowedByExhaustedBranches (reverse acc.resConsumedNames)))
 
 -- | Fold one checked arm into the residual.
 extendResidual :: EntityInfo -> Branch Resolved -> Residual -> Residual
@@ -7212,15 +7232,39 @@ prettyMixfixMatchError funcName = \case
     prettyRawName (QualifiedName qs t) = Text.intercalate "." (toList qs) <> "." <> t
     prettyRawName (PreDef predef) = predef
 
+-- | The stable, connective-independent marker every S4 headline carries, for
+-- any future gate that wants to COUNT S4 sites in a corpus. It is emitted by
+-- 'prettyPartialProjection'\'s @onlyList@, which has a branch for every shape
+-- of 'PartialProjection.declaredBy', so no message can omit it.
+--
+-- Prefer counting by 'PartialProjection' itself where the checker is in
+-- reach — §3 S4 said so even while the marker was a phrase, and a structured
+-- count cannot be broken by an edit to the prose at all.
+s4Marker :: Text
+s4Marker = " a field of "
+
 -- | S4's diagnostic (SUM-TYPE-FIELDS-SPEC §3 S4), in three paragraphs:
 --
---   1. __what is wrong__, always carrying the phrase @could also be@. §3 S4
---      makes that the stable marker §4's gate greps for, so it is emitted
---      UNCONDITIONALLY and structurally — from 'stillPossible', which S2
---      guarantees is non-empty whenever this value exists — rather than being
---      left to a per-form prose choice. A marker that some forms omit makes
---      the gate report a false zero and promote a hard error over sites nobody
---      read.
+--   1. __what is wrong__, always carrying 's4Marker' — the phrase
+--      @\" a field of \"@, emitted UNCONDITIONALLY and structurally by
+--      'onlyList', which has a branch for every shape of 'declaredBy'
+--      including the empty one. That is the stable marker a gate greps for.
+--
+--      It USED to be the connective @could also be@, on the argument that a
+--      marker some forms omit makes a gate report a false zero. The argument
+--      was right; the marker was the wrong one, and it cost a sentence that
+--      contradicts itself: on a base written AS a constructor, the message
+--      said the value /\"could also be @Landlord@\"/ and then, two lines
+--      later, /\"It is written here as @Landlord@\"/. There is no \"also\" —
+--      the value is that constructor and nothing else. The connective now
+--      varies with 'why' (see 'connective'), and the marker moved to a phrase
+--      that never had to carry meaning in the first place, so nothing about a
+--      future count depends on how a sentence reads. §4's gate has been run
+--      and closed, and §3 S4 records the change.
+--   1a. __the connective__ is @could also be@ wherever the possible set is a
+--      genuine residue the checker could not shrink further, and @can only be@
+--      for 'NarrowedByConstruction', where the base IS that constructor
+--      syntactically and no set-shrinking happened at all.
 --   2. __why the value can still reach this read__ — §3.2's hard requirement,
 --      and the test of whether an S3 rule earned its place: /"the diagnostic
 --      must explain the NARROWING, not merely report the missing field. If
@@ -7268,10 +7312,19 @@ prettyPartialProjection p =
     tick n = "`" <> shortText n <> "`"
 
     headline =
-      [ fld <> " is " <> onlyList p.declaredBy <> "."
-      , "But " <> subj <> " could also be " <> orList p.stillPossible <> ", which "
+      [ fld <> " is" <> onlyList p.declaredBy <> "."
+      , "But " <> subj <> " " <> connective <> " " <> orList p.stillPossible <> ", which "
           <> hasHave p.stillPossible <> " no " <> fld <> "."
       ]
+
+    -- The one place the first sentence may not say "also": a base written AS a
+    -- constructor is that constructor, so "could ALSO be `Landlord`" followed
+    -- by "It is written here as `Landlord`" contradicts itself. Every other
+    -- reason leaves a genuine residue of two-or-more-or-unshrunk possibilities
+    -- and keeps the "also".
+    connective = case p.why of
+      NarrowedByConstruction _ -> "can only be"
+      _                        -> "could also be"
 
     whyLines = case p.why of
       -- The "not narrowed" explanation is per base shape, because the REASON
@@ -7310,6 +7363,17 @@ prettyPartialProjection p =
         [ "The clauses above this one already match " <> andList consumed <> ","
         , "so " <> orList p.stillPossible <> " is what is left to reach here."
         ]
+      -- NOT "nothing narrows it". The arms above narrowed it all the way to
+      -- NOTHING, and the clamp was widened back to the whole type only because
+      -- an empty clamp would certify every read below it. Saying "nothing
+      -- narrows it" here is affirmatively wrong about what happened, which is
+      -- the one thing §3.2 rules out.
+      NarrowedByExhaustedBranches consumed ->
+        [ "The branches above already match " <> andList consumed <> " — every"
+        , "constructor of this type — so nothing reaches this read at all."
+        , "It is checked against the whole type because there is no narrower"
+        , "answer to check it against."
+        ]
       NarrowedByResidual consumed refutable ->
         consumedLine consumed <> concatMap refutableLines refutable <> tail'
         where
@@ -7340,6 +7404,12 @@ prettyPartialProjection p =
       (NarrowedByConstruction c, _) ->
         [ "Read the field from a value that can be " <> orList p.declaredBy <> ", or"
         , "declare " <> fld <> " on " <> tick c <> " too."
+        ]
+      -- "Narrow it first" is not advice for code nothing can reach; the arms
+      -- above have already narrowed it as far as narrowing goes.
+      (NarrowedByExhaustedBranches _, _) ->
+        [ "Delete this arm — it is unreachable — or make one of the branches"
+        , "above match fewer values, so that something can reach here."
         ]
       (_, base') -> byBase base'
 
@@ -7391,10 +7461,12 @@ prettyPartialProjection p =
     hasHave [_] = "has"
     hasHave _   = "have"
 
+    -- Every branch begins with 's4Marker', so the marker is present in every
+    -- S4 message by construction rather than by prose choice.
     onlyList = \ case
-      []      -> "a field of no constructor of this type"
-      [n]     -> "a field of " <> tick n <> " only"
-      ns      -> "a field of " <> andList ns <> " only"
+      []      -> s4Marker <> "no constructor of this type"
+      [n]     -> s4Marker <> tick n <> " only"
+      ns      -> s4Marker <> andList ns <> " only"
 
     orList  = joinWith "or"
     andList = joinWith "and"

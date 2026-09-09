@@ -720,6 +720,25 @@ instance NFData PmMatrix where
 instance ToExpr PmMatrix where
   toExpr (MkPmMatrix s cs) = toExpr (s, cs)
 
+-- | Marks a @CONSIDER@ that no drafter wrote: the one-branch-per-declaring-
+-- constructor closure 'L4.EvaluateLazy.Machine.evalConDecls' synthesises for a
+-- field selector. Attached at eval time, consumed once — by the machine, when
+-- every branch has failed — so that the run-time error can name the field and
+-- the constructors that declare it, instead of reporting a missing @WHEN@
+-- branch in a @CONSIDER@ that is not in the source and citing an exhaustiveness
+-- warning that was never emitted (SUM-TYPE-FIELDS-SPEC §1.1).
+--
+-- It lives on the annotation for the same reason 'PmMatrix' does: the consumer
+-- is downstream of the point where the structure is known, and the node is the
+-- only thing that survives the trip. Nothing parses, prints or serialises it —
+-- these annotations are built by the evaluator and never leave its heap.
+data SelectorConsider = MkSelectorConsider
+  { field      :: Name    -- ^ the field being read
+  , declaredBy :: [Name]  -- ^ the constructors that declare it, in order
+  }
+  deriving stock (GHC.Generic, Eq, Ord, Show)
+  deriving anyclass (SOP.Generic, ToExpr, NFData)
+
 -- NOTE on serialisation: adding 'pmMatrix' below changes the CBOR shape of
 -- 'Extension' — jl4-service's AST-cache blobs from before the change will
 -- fail to deserialise and the cache re-fills; that is the cache's normal
@@ -727,22 +746,23 @@ instance ToExpr PmMatrix where
 -- instance here, the fix is to add the instance (see the CPP block at the
 -- bottom of this module), not to remove the field.
 data Extension = Extension
-  { resolvedInfo :: Maybe Info
-  , nlg          :: Maybe Nlg
-  , desc         :: Maybe Desc
-  , ref          :: Maybe Ref
-  , fixityAnn    :: Maybe Fixity
-  , pmMatrix     :: Maybe PmMatrix
+  { resolvedInfo     :: Maybe Info
+  , nlg              :: Maybe Nlg
+  , desc             :: Maybe Desc
+  , ref              :: Maybe Ref
+  , fixityAnn        :: Maybe Fixity
+  , pmMatrix         :: Maybe PmMatrix
+  , selectorConsider :: Maybe SelectorConsider
   }
   deriving stock (GHC.Generic, Eq, Ord, Show)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
 instance Semigroup Extension where
-  Extension i1 nlg1 desc ref1 fix1 pm1 <> Extension i2 nlg2 desc' ref2 fix2 pm2 =
-    Extension (i1 <|> i2) (nlg1 <|> nlg2) (desc <|> desc') (ref1 <|> ref2) (fix1 <|> fix2) (pm1 <|> pm2)
+  Extension i1 nlg1 desc ref1 fix1 pm1 sc1 <> Extension i2 nlg2 desc' ref2 fix2 pm2 sc2 =
+    Extension (i1 <|> i2) (nlg1 <|> nlg2) (desc <|> desc') (ref1 <|> ref2) (fix1 <|> fix2) (pm1 <|> pm2) (sc1 <|> sc2)
 
 instance Monoid Extension where
-  mempty = Extension Nothing Nothing Nothing Nothing Nothing Nothing
+  mempty = Extension Nothing Nothing Nothing Nothing Nothing Nothing Nothing
 
 data Info =
     TypeInfo (Type' Resolved) (Maybe TermKind)
@@ -752,7 +772,7 @@ data Info =
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
 instance Default Extension where
-  def = Extension Nothing Nothing Nothing Nothing Nothing Nothing
+  def = Extension Nothing Nothing Nothing Nothing Nothing Nothing Nothing
 
 annoOf :: HasAnno a => Lens' a (Anno' a)
 annoOf = lens
@@ -776,6 +796,9 @@ annFixity = #extra % #fixityAnn
 
 annPmMatrix :: Lens' Anno (Maybe PmMatrix)
 annPmMatrix = #extra % #pmMatrix
+
+annSelectorConsider :: Lens' Anno (Maybe SelectorConsider)
+annSelectorConsider = #extra % #selectorConsider
 
 setNlg :: Nlg -> Anno -> Anno
 setNlg n a = a & annNlg ?~ n
@@ -1275,6 +1298,10 @@ instance Serialise PmMatrixClause where
 instance Serialise PmMatrix where
   encode (MkPmMatrix s cs) = encode (s, cs)
   decode = (\ (s, cs) -> MkPmMatrix s cs) <$> decode
+-- Never actually written to a cache — 'SelectorConsider' is set by the
+-- evaluator on a node it built itself — but 'Extension' is one product, so the
+-- instance has to exist for the field to.
+deriving anyclass instance Serialise SelectorConsider
 deriving anyclass instance Serialise Extension
 deriving anyclass instance Serialise Info
 deriving anyclass instance Serialise TermKind
