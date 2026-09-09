@@ -1,0 +1,82 @@
+IMPORT prelude
+
+-- A field on only SOME constructors of a type is a PARTIAL field. `rent` is a
+-- Tenant's alone; a Landlord has no `rent` at all. So `a's rent` on a value
+-- that could still be either is refused when the file is checked — try it by
+-- uncommenting the line at the bottom.
+--
+-- Everything below is a way of telling the checker "here, this value is a
+-- Tenant", after which the read is fine.
+
+DECLARE Actor IS ONE OF
+    Landlord HAS addr IS A STRING, name IS A STRING
+    Tenant   HAS name IS A STRING, rent IS A NUMBER
+
+DECLARE Action IS ONE OF
+    Sign HAS signer IS AN Actor
+
+theLandlord MEANS Landlord OF "1 Main St", "Ms Ng"
+alice       MEANS Tenant OF "Alice", 1500
+bob         MEANS Tenant OF "Bob", 900
+everyone    MEANS LIST theLandlord, alice, bob
+
+-- 1. Take the value apart. The branch you are in tells the checker what `a`
+--    is, so the read is legal inside that branch and nowhere else.
+GIVEN a IS AN Actor
+GIVETH A NUMBER
+`rent, taken apart` a MEANS
+    CONSIDER a
+    WHEN Landlord addr name THEN 0
+    WHEN Tenant name rent   THEN a's rent
+
+#EVAL `rent, taken apart` alice           -- 1500
+#EVAL `rent, taken apart` theLandlord     -- 0
+
+-- 2. Read the payload straight out of the pattern. Shorter, and it needs no
+--    projection at all. Usually the one you want.
+GIVEN a IS AN Actor
+GIVETH A NUMBER
+`rent, from the pattern` a MEANS
+    CONSIDER a
+    WHEN Tenant name rent THEN rent
+    OTHERWISE 0
+
+#EVAL `rent, from the pattern` alice        -- 1500
+#EVAL `rent, from the pattern` theLandlord  -- 0
+
+-- 3. An OTHERWISE gets whatever the branches above it did not take. Landlord
+--    is used up above, so only a Tenant can reach here.
+GIVEN a IS AN Actor
+GIVETH A NUMBER
+`rent, after OTHERWISE` a MEANS
+    CONSIDER a
+    WHEN Landlord addr name THEN 0
+    OTHERWISE a's rent
+
+#EVAL `rent, after OTHERWISE` alice         -- 1500
+#EVAL `rent, after OTHERWISE` theLandlord   -- 0
+
+-- 4. In a quantified rule, name the constructor. `EVERY Tenant t` says the
+--    rule ranges over tenants, so `t's rent` in the filter is safe.
+GIVETH A DEONTIC Actor Action
+`rich tenants sign` MEANS
+    EVERY Tenant t IN everyone
+        WHO    t's rent AT LEAST 1000
+        MUST   Sign (EXACTLY t)
+        WITHIN 14
+
+-- A field is an ordinary function, so passing it around is the same partial
+-- question written another way, and it is refused the same way. Read the field
+-- through a name you have narrowed instead.
+#EVAL map (GIVEN x YIELD CONSIDER x
+                         WHEN Tenant name rent THEN rent
+                         OTHERWISE 0)
+          everyone                              -- LIST 0, 1500, 900
+
+-- Uncomment either of these to see the refusal and its explanation.
+--
+-- GIVEN a IS AN Actor
+-- GIVETH A NUMBER
+-- `rent, un-narrowed` a MEANS a's rent
+--
+-- #EVAL map rent everyone

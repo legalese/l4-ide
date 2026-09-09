@@ -61,18 +61,94 @@ alice       MEANS Tenant OF "Alice", 1500
 The field's position does not matter: `name` is the second field of a `Landlord` and the first of a
 `Tenant`.
 
-Two limits:
-
-- The same name at **different** types on two constructors is an error at the declaration, and the
-  message names each constructor and the type it gives the field. Give the field one type, or give
-  it two names. The types have to be written the same way: a synonym (`DECLARE Money IS NUMBER`)
-  and the type it stands for count as different here.
-- A field declared on only **some** constructors is a partial field. Reading it from a value built
-  by a constructor that does not declare it fails when the program runs, not when it is checked.
-  Take the value apart with `CONSIDER` first, or, in a quantified rule, name the constructor
-  (`EVERY Tenant t …`) so the rule ranges only over values that have the field.
+One limit: the same name at **different** types on two constructors is an error at the declaration,
+and the message names each constructor and the type it gives the field. Give the field one type, or
+give it two names. The types have to be written the same way: a synonym (`DECLARE Money IS NUMBER`)
+and the type it stands for count as different here.
 
 **Example file:** [shared-field-example.l4](shared-field-example.l4)
+
+#### A field on only some constructors
+
+`rent` above is a `Tenant`'s alone. A `Landlord` has no `rent` — there is nothing for the question
+to read — so L4 will not let you ask it unless it can see that the value is a `Tenant`:
+
+```l4
+GIVEN a IS AN Actor
+GIVETH A NUMBER
+`rent owed by` a MEANS a's rent   -- refused
+```
+
+> `rent` is a field of `Tenant` only.
+> But `a` could also be `Landlord`, which has no `rent`.
+
+This is a refusal at check time, not a surprise at run time. The same question used to be accepted
+and then die halfway through a run, on whichever case first turned out to be a `Landlord`.
+
+**How to narrow.** Four ways, all of which say the same thing — "here, this value is a `Tenant`":
+
+```l4
+-- 1. Take the value apart. The branch you are in tells the checker what `a` is,
+--    so the read is legal inside that branch and nowhere else.
+GIVEN a IS AN Actor
+GIVETH A NUMBER
+`rent owed by` a MEANS
+    CONSIDER a
+    WHEN Landlord addr name THEN 0
+    WHEN Tenant name rent   THEN a's rent
+
+-- 2. Read the payload straight out of the pattern, which is shorter and needs
+--    no projection at all. Usually the one you want.
+GIVEN a IS AN Actor
+GIVETH A NUMBER
+`rent owed by` a MEANS
+    CONSIDER a
+    WHEN Tenant name rent THEN rent
+    OTHERWISE 0
+
+-- 3. An OTHERWISE gets whatever the branches above it did not take. `Landlord`
+--    is used up by the branch above, so only a `Tenant` can reach here.
+GIVEN a IS AN Actor
+GIVETH A NUMBER
+`rent owed by` a MEANS
+    CONSIDER a
+    WHEN Landlord addr name THEN 0
+    OTHERWISE a's rent
+
+-- 4. In a quantified rule, name the constructor. `EVERY Tenant t` says the rule
+--    ranges over tenants, so `t's rent` in the filter is safe.
+GIVETH A DEONTIC Actor Action
+`rich tenants sign` MEANS
+    EVERY Tenant t IN everyone
+        WHO    t's rent AT LEAST 1000
+        MUST   Sign (EXACTLY t)
+        WITHIN 14
+```
+
+**What does not narrow.** These are the cases people meet by accident, so it is worth knowing them
+before the error does:
+
+- **A `GIVEN` parameter is not narrowed by anything.** `GIVEN a IS AN Actor` says `a` is an `Actor`,
+  which is the whole type. Only the body can narrow it.
+- **Only a plain name can be narrowed.** `p's birthPlace's val` is a projection, not a name, so
+  there is no name for a branch to attach the fact to. Give it a name first
+  (`CONSIDER v … WHERE v MEANS p's birthPlace`), or — usually better — match the payload:
+  `CONSIDER p's birthPlace WHEN Just place THEN place's town`.
+- **A branch only uses up its constructor if it matches every one of them.**
+  `WHEN Tenant name rent` takes every `Tenant`, so nothing is left for a later `OTHERWISE`.
+  `WHEN Tenant "Alice" 1500` takes only the tenant called Alice paying 1500, so a `Tenant` can still
+  reach the `OTHERWISE` — and a read of a `Landlord`-only field there is refused. The message names
+  the branch that did it, so you do not have to work out which one.
+- **A name that stands for another name inherits its narrowing.** `WHERE b MEANS a` makes `b` as
+  narrow as `a` is at that point, so naming a subexpression never changes whether the file checks.
+  A name that stands for something else — `b MEANS f a`, `b MEANS w's inner` — narrows nothing.
+
+**A field read with no value in sight.** A field is an ordinary function, so `map rent everyone` is
+the same partial question written another way, and it is refused for the same reason. There is
+nothing there to narrow, so the repair is to read the field through a name you have narrowed:
+`map (GIVEN x YIELD CONSIDER x WHEN Tenant name rent THEN rent OTHERWISE 0) everyone`.
+
+**Example file:** [partial-field-example.l4](partial-field-example.l4)
 
 ### Computed Fields (Methods)
 
