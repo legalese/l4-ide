@@ -312,6 +312,28 @@ applied identically in all six; `contractType` → `basicType`/`exoticType`/`com
 `Basic WITH contractType IS …`; the tree has none. The use case the first draft of §6 asked for was
 considered and declined.
 
+**A second corpus, reviewed 2026-09-09: `~/src/legalese/canon`, 59 `.l4` files, none live.**
+Baseline 53 pass / 6 fail, all six pre-existing and unrelated (cross-directory `IMPORT`, a
+`NOT`-precedence gotcha, a concatenation fragment). **S1 breaking sites: zero** — no field name
+repeats at a different type anywhere. Two same-name-same-type sites (`sg-childcare-leave.l4:240-241`,
+`probate-administration-act.l4:2038-2039`) are widened by S1 and are never read today. **S2 breaking
+sites: zero.**
+
+**And the reason is worth more than the count.** Every one of the eight sum types with a
+some-but-not-all field is read through the **payload binder** — `CONSIDER … WHEN `died on` d THEN d`
+— never through `scrutinee's field`. Across the whole corpus the projection form of those ten field
+names has **zero** occurrences. So the idiom real drafters already use is the one S2 permits without
+any narrowing rule at all: they destructure rather than project.
+
+**What that does to §3.2's budget.** It is evidence _against_ the medium-magic rule and _for_ the
+high-magic one, which is the opposite of what one would guess. The `WHEN`-narrows-scrutinee rule has
+**no demonstrated user** in either corpus; the `OTHERWISE` residual has exactly one
+(`actus-core.l4:311`) and no clean alternative, because an `OTHERWISE` has no pattern to bind from.
+The two are not separable — both are the one mechanism "the scrutinee is narrowed by the branch you
+are in", which is also the whole of what has to be taught. The teaching cost is therefore not in the
+mechanism but concentrated entirely in the **irrefutability sub-rule** on the residual, which is
+where §3.2's explain-the-narrowing requirement has to do its work or the rule is cut.
+
 **S2 is a narrowing of the accepted language**, and its landing shape turns on a count a grep
 cannot make — it needs the checker, because whether a base is narrowed is a fact about scope, not
 spelling. **Gate, in order — unchanged in substance, corrected in mechanics:**
