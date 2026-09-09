@@ -103,8 +103,8 @@ startup MEANS
 -- these are used for the Provisions below.
 -- They describe the parties who can take actions, and the actions they can take.
 DECLARE Actor IS ONE OF
-   ActorCompany  HAS actor IS A Company
-   ActorInvestor HAS actor IS AN Investor
+   ActorCompany  HAS actingCompany IS A Company
+   ActorInvestor HAS actingInvestor IS AN Investor
 DECLARE Action IS ONE OF
    Notify HAS actor IS AN Actor
               contents IS A Notice

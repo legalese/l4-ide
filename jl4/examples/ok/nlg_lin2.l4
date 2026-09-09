@@ -1,7 +1,7 @@
 DECLARE Choice OF a, b
   IS ONE OF
-    Left  HAS payload IS AN a
-    Right HAS payload IS A  b
+    Left  HAS leftValue  IS AN a
+    Right HAS rightValue IS A  b
 
 GIVETH Choice OF NUMBER, NUMBER
 DECIDE choice IS Left 5
