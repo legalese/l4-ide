@@ -1578,7 +1578,30 @@ it does any of:
 2. **construct a payload-carrying constructor** of one;
 3. `CONSIDER` one with a **payload-binding arm**;
 
-or transitively calls a decision that is. A decision that `CONSIDER`s such a union over its **nullary
+or transitively calls a decision that is.
+
+> **READING FORM (1) IS NOW UNREACHABLE BY CONSTRUCTION, 2026-09-09** — from the L4 side, not this
+> one. `SUM-TYPE-FIELDS-SPEC.md` §3 S2 makes `disposal's `term in years`a **check-time error**
+whenever the base could still be a constructor that does not declare the field, which is exactly
+reading form (1)'s premise. So no type-checking L4 program can present that shape to this exporter
+any more, and R4-a's own exhibit —` `stated term` ``in`jl4/examples/dmn/sumtype.l4`— was
+rewritten as a`CONSIDER`(that spec's §4, ruled by Meng). The consequences, all measured and all
+recorded in`SUM-TYPE-FIELDS-SPEC.md` §4.2:
+>
+> - `decision_stated_term` keeps `D-SUMTYPE` **`Blocking`** under reading form (3) instead — a
+>   payload-binding arm — so **R4-a's verdict on this decision is unchanged**, and so is the KIE
+>   `HarnessMustFail` leg: the emitted `<text>` is still raw L4 no engine can compile;
+> - it loses its `D-PARTIAL` finding, because the `CONSIDER` is total. `D-PARTIAL` keeps its coverage
+>   through `deontic-verdict`, `svc` and `regcf-corpus`;
+> - **L11 is not dead code.** `jl4/tests/DmnExport.hs`'s L11 fixture now reaches the same hazard
+>   through a multi-clause `DECIDE`, which is the one route SUM-TYPE-FIELDS-SPEC §5.1 leaves open by
+>   design. Measured: it checks clean and still draws L11's `D-PARTIAL`.
+>
+> Do not delete reading form (1) from the list above. It describes an IR shape the exporter can still
+> be handed — through that fall-through hole, and through any future front end — and a refusal that
+> stops being reachable from today's surface syntax is not a refusal that has stopped mattering.
+
+A decision that `CONSIDER`s such a union over its **nullary
 arms only** is **`Lossy`**, naming the constructors that have no cell — it is not refused, because
 **[E]** the emitted table is exact when an `OTHERWISE` covers them and, when it does not, the defect
 is L1's and identical for a plain enum. A decision that merely **threads** a record containing such a

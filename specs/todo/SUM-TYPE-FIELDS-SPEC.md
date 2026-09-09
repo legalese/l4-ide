@@ -1,11 +1,14 @@
 # Fields on sum types: one selector per shared field, and no projection without narrowing
 
-**Status (2026-09-09): RULED by Meng. On `lang/whose-opening`: S1 BUILT; S3 BUILT; S2's check BUILT
-AS A WARNING, which is NOT yet the error the ruling requires — §4's gate step 2 is not done.**
-The warning exists only so §4's three rigs can count the corpus before the language narrows; §4 is
-explicit that _"S2 does not land as a warning"_. Until the promotion commit lands, this branch
-accepts every program it accepted before, and the run-time death of §1.1 is still reachable.
-The gate's measurement HAS been run — see §4.1 for the counts and what remains to repair.
+**Status (2026-09-09): RULED by Meng, and BUILT. On `lang/whose-opening`: S1, S2, S3 and S4 are all
+in the tree, and S2 is an ERROR — §4's gate has been run end to end (steps 1, 2 and 3).**
+The warning form S2 briefly wore so §4's three rigs could count the corpus is GONE: there is no flag
+that restores it, and `PartialProjection` is a `CheckError` (`TypeCheck/Types.hs:149`) whose renderer
+`prettyPartialProjection` (`TypeCheck.hs:6903`) is reached from `prettyCheckError`. The run-time
+death of §1.1 is no longer reachable from a type-checking program except through the two measured,
+stated holes in §5.1. §4.1 records the measured counts and where the measurement contradicted §4's
+predictions; §4.2 records the six repairs, the promotion, and what they cost; §4.3 the fixtures.
+S5 remains DESIGN — `WHOSE` is not built.
 Meng's mark, 2026-09-09, on being shown the two hazards below and the Haskell/OCaml comparison:
 _"Dying at run time is a bad look for a language in the FP tradition. … Write it up — let's take
 the best of both worlds from Haskell and OCaml."_ The rules in §3 are that ruling written out.
@@ -17,14 +20,19 @@ in `TypeCheck.hs`; the `SharedFieldTypeMismatch` error) and evaluator half (`eva
 (the positional guard of §5 item 2, a `GIVEN a IS AN Actor` reader doing `a's name`, and §1.2's
 program armed and traced) and `not-ok/tc/sum-field-type-conflict.l4` (the declaration error beside
 a merged field on the same type), each with its four goldens, and a drafter-facing section in
-`doc/reference/types/DECLARE.md`. §1.2 now returns `FULFILLED`;
-§1.1 is unchanged and still dies at run time, because that is S2's. The whole-tree `l4 check`
+`doc/reference/types/DECLARE.md`. §1.2 now returns `FULFILLED`. The whole-tree `l4 check`
 sweep for the new declaration error (958 files) found zero sites. One limit recorded in §5 item 1:
 "same type" is by `typeKey` on the type as written, so a synonym beside its expansion is refused.
 
+(This paragraph described the tree at the S1 commit, and said there that _"§1.1 is unchanged and
+still dies at run time, because that is S2's"_. **That sentence was true then and is FALSE now:**
+S2 is built and blocking, so §1.1's program is refused at check time and `ok/sum-fields/narrowing.l4`
+is the same program with `EVERY Tenant a`, armed and green.)
+
 §1 (measured) describes the tree before S1. §3 S3 and §5 item 3 are BUILT (commit `92e12d27`);
-§3 S2's check and §3 S4's diagnostic are built as a warning (§4.1); §3 S5 and §4's gate step 2
-still describe what will be true.
+§3 S2's check and §3 S4's diagnostic are BUILT and BLOCKING — as a warning in `0ea70d3f`, promoted
+to an error with the six corpus repairs in the same change (§4.1). Only §3 S5 still describes what
+will be true.
 
 **Owner:** this file. It is cross-referenced from `EVERY-EACH-QUANTIFIER-SPEC.md` §13.6.1 (which
 found the second hazard while asking whether `WHOSE` could be built) and from
@@ -144,7 +152,7 @@ naming no arm, and hazard 1 is Haskell's run-time throw, minus even the warning.
 
 **The ruling is to take the correct half from each.**
 
-## 3. The rules — RULED 2026-09-09 (Meng); S1 BUILT, S2 and S3 NOT BUILT
+## 3. The rules — RULED 2026-09-09 (Meng); S1, S2, S3 and S4 BUILT; S5 not built
 
 **S1 — one selector per shared field (Haskell's half).** When two or more constructors of one sum
 type declare a field with the same name **and the same type**, they denote **one** selector, total
@@ -429,13 +437,13 @@ case is a NEW check-time fact about the scrutinee (S3 above). And there is **zer
 coverage of a quantifier-narrowed projection anywhere in the tree — every `every/` filter uses
 `elem` or `EQUALS` — so the new `ok/` fixture is that path's only test, not a supplement.
 
-### 4.1 The gate's measurement, RUN 2026-09-09 — and what it leaves to do
+### 4.1 The gate's measurement, RUN 2026-09-09
 
-S2's check and S4's diagnostic are built as a **warning** (see the status header). The gate's step 1
-has been run over all three rigs against that warning, with the worktree binary and
-`JL4_LIBRARY_PATH` pinned to this tree's libraries. **Both the expected counts and the measured ones
-are recorded below**, per §4's own instruction that the expectations were "to be confirmed, not
-assumed" — do not overwrite one with the other.
+The gate's step 1 was run over all three rigs against the warning form of S2 (which no longer
+exists — see the status header), with the worktree binary and `JL4_LIBRARY_PATH` pinned to this
+tree's libraries. **Both the expected counts and the measured ones are recorded below**, per §4's own
+instruction that the expectations were "to be confirmed, not assumed" — do not overwrite one with the
+other.
 
 | site                                              | expected | measured | class                                   |
 | ------------------------------------------------- | -------- | -------- | --------------------------------------- |
@@ -459,20 +467,120 @@ Everything else in the tree is silent: `ok/**`, `legal/**` apart from the one fi
   fix S3, not the corpus — and it is why the corpus was not "repaired" for something that was the
   checker's fault.
 
-**What step 2 and step 3 still owe.** Repair the six (B) sites, re-run the three rigs to a zero
-count, and promote in the same change — the payload, the renderer and the raise path are already
-shared, so promotion moves one constructor from `CheckWarning` to `CheckError` and switches one
-`addWarning` to `addError`. `severity`'s catch-all makes it blocking with no edit to `severity` and
-none to `viableCandidate` (see §5 item 4). Until then **`cabal test jl4-test` is RED**, with exactly
-one failure — `legal/british-citizen-act.l4`, whose golden now carries four warnings. That golden
-must NOT be blessed: the warnings are about to become errors and change shape, and the file is
-about to be repaired so that they disappear altogether.
+**Where the measurement contradicted §4's own description of the gate.** Recorded because §4's gate
+text is what a later reader will follow, and two of its three rigs are not what it says they are.
 
-Two repairs carry a consequence a reviewer must accept on purpose, both already ruled in §4:
-`british-citizen-act.l4` gains a `CONSIDER` and `Nothing` then yields `FALSE` where it crashed; and
-`sumtype.l4` is the DMN KIE MustFail exhibit for ruling R4-a, so the DMN spec records that R4-a's
-example is now unreachable by construction and `l4-cli-test` says whether the MustFail expectation
-changes.
+- **§4's gate item 1 is WRONG about rig 3.** It says _"(3) `l4-cli-test`, which owns
+  `jl4/examples/dmn/sumtype.l4`"_. It does not. `grep -n sumtype jl4/tests-cli/Main.hs` returns only
+  `sumtypeGolden = "examples/dmn/expected/sumtype.dmn"` — the PRE-EMITTED artefact, never the `.l4`.
+  The single leg that touches it is `pendingWith`-skipped without `L4_DMN_ENGINE_CHECK=1`. The `.l4`
+  SOURCE is owned by **rig 1**, through `jl4/tests/DmnExport.hs`'s `goldenSubjects`. Worse, rig 3
+  cannot count S2 sites at all: `l4-cli-test` prints a subprocess's output only when an assertion
+  fails, so on a green run its log is empty and `grep 'could also be'` returns a **false zero**. Rig
+  3's tree was measured instead by sweeping all 54 `jl4/tests-cli/fixtures/**/*.l4` with `l4 check`
+  directly — zero markers. **Report the clean tree, not the zero.**
+- **§4's rig-2 file list is not the complement of the golden globs.** `git ls-files '*.l4'` = 960;
+  the golden globs cover 464; §4's rig-2 list covers 388; leaving **108 tracked `.l4` in neither**
+  (`jl4/tests-cli/fixtures` 54, `jl4-mlir` 21, `paper/` 17, `p4-design/scratch` 11, 5 strays). All
+  108 were swept — 95 pass, 13 deliberate negative fixtures, zero markers — and
+  `464 + 388 + 108 = 960` with both `comm` directions empty, so every tracked `.l4` was measured
+  exactly once. A later gate should sweep `git ls-files '*.l4'` rather than a hand-kept tree list.
+- **Rig 1's `lsp/**`globs cannot carry a checker diagnostic either.** The 12 semantic-tokens and 1
+hover fixtures go through`SemanticTokens.hs`/`Hover.hs`, not `checkFile`, so their `.actual`can
+never hold an S2 message. All 13 were swept directly with`l4 check`: zero markers.
+
+**The zero has two stated bounds, and a later reader should quote them rather than the bare count.**
+Both are in §5.1 and both are permissive, so they are places the run-time death of §1.1 survives:
+`checkPartialProjection` returns silently inside a synthesised multi-clause fall-through
+(`CheckEnv.inSyntheticFallthrough`), and it bails silently when the resolved name is not a
+`KnownTerm _ Selector`, when `selectorDomainType` finds no type-application head, when the
+constructor universe is unenumerable (`CONTRACT`), or when `declared` is empty. The measured six is
+therefore a lower bound on the language's real exposure — which §4.2's L11 fixture now demonstrates
+rather than merely asserts.
+
+### 4.2 Gate steps 2 and 3, DONE 2026-09-09 — the repairs, the promotion, and what they cost
+
+All six (B) sites are repaired, the three rigs re-measured to **zero**, and S2 promoted in the same
+change. Promotion was exactly what §4.1 predicted: `PartialProjectionWarning` on `CheckWarning`
+became `PartialProjection` on `CheckError`, `addWarning` became `addError` in
+`flushPartialProjections`, and the renderer moved caller from `prettyCheckWarning` to
+`prettyCheckError`. `severity`'s catch-all does the rest; `severity` and `viableCandidate` are
+untouched, as §5 item 4 says they must be.
+
+| file                                        | repair                                                                           | semantics                                                   |
+| ------------------------------------------- | -------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `legal/british-citizen-act.l4:94-97` (four) | `CONSIDER p's birthPlace` / `birthDate` with `WHEN Just …` and `OTHERWISE FALSE` | **CHANGES** — see below                                     |
+| `dmn/sumtype.l4:142`                        | `CONSIDER disposal WHEN lease t THEN t OTHERWISE 0`                              | **CHANGES** — see below                                     |
+| `experiments/safe-post.l4:258`              | `CONSIDER …'s security's Quantity WHEN Shares count price THEN count / …`        | nominally changes, observably does not (`l4 run` identical) |
+
+**Two consequences a reviewer accepts on purpose, both ruled in §4 before the work started.**
+
+- **`british-citizen-act.l4` now answers `FALSE` where it crashed.** A `NaturalPerson` whose
+  `birthPlace` or `birthDate` is `Nothing` used to reach the desugared one-branch `CONSIDER` and die
+  at run time with §1.1's message. It now yields `FALSE`, which is also what the statute means: a
+  person whose birthplace is not recorded is not shown to have been born in the UK. Blast radius is
+  nil beyond that — all four `DECIDE`s are declared and never read in the file, and the file's two
+  `#EVAL`s still return `TRUE` / `TRUE` (measured).
+- **`sumtype.l4` loses its D-PARTIAL finding, and R4-a's example is unreachable by construction.**
+  Measured with `l4 export --to dmn --fidelity-report`: blocking findings 3 → 2,
+  `[D-PARTIAL] blocking — decision_stated_term` gone, `D-SUMTYPE` blocking retained, lossy 8 and
+  advisory 9 unchanged. `jl4/tests/DmnExport.hs`'s `decision_stated_term` assertion is updated to
+  `[("D-SUMTYPE", Blocking)]` with that reasoning written beside it, and all four `expected/sumtype.*`
+  goldens are re-blessed. D-PARTIAL keeps its coverage: `deontic-verdict`, `svc` and `regcf-corpus`
+  carry it, and its own `describe` block still runs.
+
+**The MustFail expectation: it does NOT flip, and that was MEASURED, not reasoned about.** §4 ruled
+_"let the MustFail expectation change if the model then builds"_. It does not build — the fallback
+`<text>` is still raw L4 — so `jl4/tests-cli/Main.hs`'s KIE leg stays `HarnessMustFail`. What
+changed is the CAUSE STRING, and it was re-measured by running `etc/kie-dmn-check/run.sh` on the
+regenerated `sumtype.dmn` (KIE 8.44.0.Final): the leg's
+`Unknown variable 'disposal.term_in_years'` becomes
+`Error compiling FEEL expression 'CONSIDER disposal WHEN lease t THEN t OTHERWISE 0' … syntax error
+near 'disposal'`, with `ERR_COMPILING_FEEL`, `decision_stated_term_literal`, `XSD valid`,
+`TYPE_DEF_NOT_FOUND`/`Grade_optional` and `<<< FAILED` all unchanged.
+
+**One thing the promotion broke that §4 did not predict, and it is not a corpus site.**
+`jl4/tests/DmnExport.hs`'s _"L11: refuses a projection over a multi-constructor enum missing the
+field"_ built its DRG from an inline `` `the radius` s MEANS s's radius ``, and its own comment said
+_"`l4 check` says 'Check succeeded' on the rejecting shape"_. Under S2 it does not, so `drgGeneral`'s
+`error "source failed to typecheck"` threw instead of the test running. **L11 is not thereby dead
+code**, and the replacement fixture is what proves it: the same hazard is still reachable through
+§5.1's hole 1 —
+
+```l4
+DECLARE Shape IS ONE OF
+    Nothingness
+    Circle HAS radius IS A NUMBER
+GIVEN s IS A Shape
+GIVETH A NUMBER
+DECIDE `the radius` Nothingness IS 0
+DECIDE `the radius` s           IS s's radius
+```
+
+— which checks clean (S2 records nothing inside a synthesised fall-through body), still raises
+`NonExhaustivePatterns`, and still draws L11's `D-PARTIAL` (measured). The fixture is now that
+program, with the reasoning beside it. **This is the first demonstrated user of §5.1's hole 1**, and
+it is worth more than the old fixture was: it exhibits the hole rather than describing it.
+
+### 4.3 The fixtures S2, S3 and S4 ship with
+
+- **`ok/sum-fields/narrowing.l4`** — the four narrowing paths, each ARMED. The quantifier's
+  narrowing constructor is the one §4 said had **zero** coverage anywhere in the tree, so this is
+  that path's only test; the other three are a `WHEN` scrutinee, an `OTHERWISE` residual, and an
+  alias, plus an alias chain ending at a construction. `#TRACE` returns `FULFILLED`; every `#EVAL`
+  returns 1500 or 0 on the arm it should.
+- **`not-ok/tc/partial-projection.l4`** — six sites, ONE PER SHAPE the S4 renderer can produce:
+  un-narrowed binder, the refutable-arm residual (whose message names `` `WHEN Tenant 1500` `` — §3.2's
+  hard requirement, and the acceptance test for the highest-magic rule), narrowed to the wrong arm by
+  a `WHEN`, a non-binder base, a value written as a constructor, and the bare selector as a value.
+- **`not-ok/tc/partial-projection-overload.l4`** — the overload trap of §5 item 4, pinned by CONTENT
+  and not merely by redness: two unrelated types both declare `rent`, and the golden holds S2's
+  message rather than `AmbiguousTermError` or `InternalAmbiguityError`. If the deferral is ever
+  undone, this is the golden that says so.
+- **`doc/reference/types/partial-field-example.l4`** — the drafter-facing example, linked from
+  `doc/reference/types/DECLARE.md`'s new "A field on only some constructors" section (CLAUDE.md §6).
+  That section replaced a bullet which said the partial read _"fails when the program runs, not when
+  it is checked"_ — true when it was written and false the moment S2 landed.
 
 ## 5. Implementation sketch — what the first reader of the code should verify, not follow blindly
 
@@ -529,13 +637,54 @@ Resolved)]` (`TypeCheck/Types.hs:116`, `rangeOf` `:493` anchored on the first oc
    The narrowing constructor is resolved at `:1896`, 45 lines above — and it is **not** discarded
    (it is stored in the AST at `:1959`, which is what the evaluator's roll filter reads); it is
    merely unused for the member's binding.
+
+   **BUILT 2026-09-09 (`92e12d27`). Five corrections to the paragraph above, all measured while
+   building — every line number in it is pre-S1 and none of them survives.** As of this commit:
+   `data CheckEnv` is `Types.hs:905-1010`, `localBindings` is `:965`, and the new
+   `narrowings :: !(Map Unique Narrowing)` is `:975` (appended LAST, deliberately — see the next
+   point). `checkDeonton` is `TypeCheck.hs:2095`, its member binding `:2092-2094`, the narrowing
+   constructor resolved at `:2049` (the "45 lines above" survives exactly), and stored in the AST at
+   `:2112`. `checkBranch` is `:4331`, `checkConsider` is `:3026`.
+
+   - **"four construction sites" is wrong: there are four record CONSTRUCTIONS and a FIFTH
+     occurrence.** `TypeCheck.hs:365` is a POSITIONAL pattern over every field of `CheckEnv`, whose
+     own comment explains why (a duplicated field name makes a record update ambiguous under
+     `DuplicateRecordFields`). It fails with a constructor-arity error, not `-Wmissing-fields`, so it
+     is the one site the warning machinery does not point you at — and if the new field is added
+     anywhere but LAST, that pattern silently binds the wrong fields to the wrong letters and still
+     compiles.
+   - **§3 S3's "the residual must reuse `patternHasOpaque`" is UNSOUND and was not built.**
+     `patternHasOpaque` recurses through sub-patterns and answers `False` for
+     `WHEN Tenant (Some n)` — which is one of the three shapes §3 S3 itself names as MUST-NOT-CONSUME.
+     Reusing it would have left the residual wrong in the PERMISSIVE (invisible) direction, the exact
+     failure the sub-rule exists to prevent. What is built instead is `armEffect`
+     (`TypeCheck.hs:2939`, over `data ArmEffect` at `:2900`), which tests irrefutability directly —
+     every sub-pattern a plain variable — rather than testing for the absence of two opaque shapes.
+     `patternHasOpaque` (`:3683`) is UNCHANGED: it answers a different question, and `checkConsider`
+     and `checkClauseMatrix` depend on its current answer. The two disagreeing is correct.
+   - **A bare identifier does NOT parse as `Var`.** `atomicExpr'` produces `App ann n []` and nothing
+     normalises it later; `Var` is a pattern synonym for exactly that shape, and is otherwise emitted
+     only by the computed-field rewrite and the clause-matrix fallthrough. A base test written as
+     `case e of Var _ r -> …` compiles, type-checks and NEVER FIRES — S3 would silently do nothing
+     and S2 would then refuse every drafter-written projection. `classifyBase` (`:2613`) matches both
+     shapes, and consults `entityInfo` rather than the syntax, which is what gives §3 S3's
+     "a nullary constructor is statically that constructor" exception for free.
+   - **The alias rule needed no new state.** `constBodies` already holds every nullary `MEANS` body,
+     including local `WHERE`/`LET` ones, and `checkExpr`'s `Where` case runs `inferLocalDecl` before
+     the body — so resolving the chain AT THE READ (`lookupNarrowing`, `:2686`) is both possible and,
+     per §3 S3, required: it is what makes an alias bound outside a `CONSIDER` and read inside two
+     branches see each branch's own narrowing.
+
 4. **Totality at the projection.** ~~`inferRecordProjection` is `:3125-3152` (`:3047-3072` is the
    `Proj` dispatcher); the insertion point is after `matchFunTy` (`:3137`).~~ Those anchors are
    pre-S1. The selector's declaring constructors need **no new state**: each constructor's
    `KnownTerm conType Constructor` already names its selectors' own `Def`s as the argument names,
    and `constructorsInScopeFromEntityInfo` enumerates a type's constructors — both confirmed while
-   building. **BUILT 2026-09-09 as a warning** (`checkPartialProjection` in `TypeCheck.hs`, under
-   Note [S2: no projection without narrowing]), with **four** insertion points, not one, because §3
+   building. **BUILT 2026-09-09** (`checkPartialProjection`, `TypeCheck.hs:2817`, under
+   Note [S2: no projection without narrowing]; drained by `flushPartialProjections` `:2891` from
+   `inferTopDecl` `:903`; rendered by `prettyPartialProjection` `:6903`) — as a warning in
+   `0ea70d3f` for the length of §4's gate step 1, then **promoted to a `CheckError` in the same
+   change as the six repairs** (§4.2). With **four** insertion points, not one, because §3
    S2's second ruling covers three forms: `inferRecordProjection` (`a's f`), the `Proj` dispatcher's
    qualified-name branch (`` `Section`.f ``), `inferExpr`'s **`Var`** case (a bare selector as a
    value), and `inferFlatApp`'s `directApp`/`variadicRescue` (`f a`). The bare form lands in the
@@ -564,7 +713,15 @@ Resolved)]` (`TypeCheck/Types.hs:116`, `rangeOf` `:493` anchored on the first oc
    **self-contained**: every name and every list is resolved at the read, because `entityInfo` is
    scoped by `local` and a type `DECLARE`d inside a `WHERE` is out of scope by flush time.
    Measured: two types both declaring `rent`, read at one of them, produces S4's message and not
-   `AmbiguousTermError`. A `not-ok/tc` fixture must still pin that.
+   `AmbiguousTermError`. **PINNED 2026-09-09** by
+   `not-ok/tc/partial-projection-overload.l4`, whose golden holds that message — the fixture asserts
+   the CONTENT, not merely that the file is red, because `AmbiguousTermError` would keep it red.
+
+   **One scope limit worth stating so the next reader does not re-derive it, verified not assumed:**
+   a COMPUTED field (`MEANS` inside a `DECLARE`) is excluded from S2, and that is sound rather than a
+   hole. `desugarCFDeclare` (`L4/Desugar.hs:270-280`) pattern-matches `RecordDecl` and never
+   `EnumDecl`, so a computed field can only ever be declared on a single-constructor record and can
+   never be partial.
 
 5. **Evaluator.** ~~needs no change if the merged selector's body is total over its arms.~~
    **Backwards — nothing makes it total.** See item 2.
@@ -593,7 +750,17 @@ getUnique` on the `EnumDecl` case. Hover and `@desc` are range-keyed and
    `.golden` holds the declaration error and nothing else). The `ok/` file is also the only witness
    the `prettyLayout round-trip` property has for a merged field. Docs: the "A field on several
    constructors" section of `doc/reference/types/DECLARE.md` and its linked
-   `shared-field-example.l4`. S2's and S3's fixtures are NOT BUILT.
+   `shared-field-example.l4`.
+
+   **S2's, S3's and S4's share BUILT 2026-09-09** — the three corpus fixtures and their twelve
+   goldens are listed in §4.2's own subsection, and the drafter-facing half is
+   `doc/reference/types/DECLARE.md`'s new "A field on only some constructors" section plus
+   `doc/reference/types/partial-field-example.l4` (`doc/test-docs.sh`: 102 L4 files valid, 1469
+   links, 0 orphans). That section also **retracted** a sentence the S1 docs left behind — the old
+   second bullet said a partial read _"fails when the program runs, not when it is checked"_, which
+   S2 made false; the section now states the four ways to narrow AND, per CLAUDE.md §6's "state the
+   limits", the four shapes that are NOT narrowed (a `GIVEN` parameter, a non-binder base, a
+   refutable `WHEN` arm, an alias that names something other than a binder).
 
 ## 5.1 Two holes S2 has, both measured, both permissive — state them before promoting
 
@@ -675,4 +842,8 @@ nothing, so the residual stays too big. The residual's soundness now depends on 
 - `EVERY-EACH-QUANTIFIER-SPEC.md` §13.6.1 — found hazard 2 and the terminology drift; points here.
 - `IMPLICIT-PROPS-DESIGN.md` §11.7 R5 — its "fields present on every constructor" rule is safe under
   S1; a one-line pointer is added there.
-- `doc/` — the drafter-facing page, when built (CLAUDE.md §6: not done until it exists).
+- `doc/reference/types/DECLARE.md` — the drafter-facing sections "A field on several constructors"
+  (S1) and "A field on only some constructors" (S2/S3/S4), with
+  `shared-field-example.l4` and `partial-field-example.l4` beside them. BUILT 2026-09-09.
+- `DMN-EXPORT-PROGRAM-MODEL-SPEC.md` R4-a — its example is now unreachable by construction; §4.2
+  above records what that changed in `sumtype.l4`, `DmnExport.hs` and the KIE MustFail leg.
