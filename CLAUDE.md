@@ -206,9 +206,13 @@ and `failFirstTime` is `True`, so a `.l4` with no `tests/` directory turns the w
 will not see it: no paths filter matches a `.l4` under `jl4/examples/`, so the Haskell job does not
 run on your PR, and the failure surfaces on the next person's branch instead.
 
-**Which globs, exactly** (`jl4/tests/Main.hs:78-90`, kept in step by `etc/check-corpus-goldens.mjs:32-43`):
-`ok/**`, `legal/**`, `not-ok/tc/**`, `not-ok/nlg/**`, `not-ok/export-*.l4`, `lsp/semantic-tokens/**`,
-`lsp/hover/**`, and `jl4-core/libraries/*.l4`. **`jl4/examples/docassemble/` and
+**Which globs, exactly** — there are **nine** (`jl4/tests/Main.hs:79-98`, kept in step by
+`etc/check-corpus-goldens.mjs`'s `ROOTS`): `ok/**`, `legal/**`, `not-ok/tc/**`, `not-ok/nlg/**`,
+`not-ok/export-*.l4`, `lsp/semantic-tokens/**`, `lsp/hover/**`, `jl4-core/libraries/*.l4`, and
+**`not-ok/import/*-refused.l4`** — the last of which this list omitted until 2026-09-10, which threw
+off a spec's whole-tree arithmetic. Note its shape: it picks the _importer_ out by name because only
+the importer is meant to fail, and the library file beside it is deliberately in no glob at all, so
+`not-ok/import/` is a directory where some files are goldened and some are not. **`jl4/examples/docassemble/` and
 `jl4/examples/openfisca/` are in NO glob**, which is why their `.l4` files carry no `tests/`
 directory and adding one there needs no goldens. State this rule with its scope: an earlier
 unqualified reading of this paragraph sent a session hunting a golden trap in `docassemble/` that

@@ -3183,14 +3183,24 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       -- does not type-check at all and 'drgGeneral' throws on it rather than
       -- producing a DRG to inspect.
       --
-      -- L11 is NOT thereby dead code, and this fixture is what proves it. The
-      -- source below is the SAME hazard reached through the ONE route S2
-      -- deliberately leaves open — §5.1 hole 1: S2 records nothing inside the
-      -- synthesised fall-through body of a multi-clause group, because
-      -- 'L4.Parser.matchClauses' compiles clauses 2..n into a LET-bound decide
-      -- that is checked outside the OTHERWISE meant to cover it. So this
-      -- checks clean (measured), it still raises NonExhaustivePatterns on a
-      -- `Circle`-less input, and L11 is the only thing that sees it.
+      -- L11 is NOT thereby dead code, and this fixture is what proves it: the
+      -- source below checks clean, so 'drgGeneral' has a DRG to inspect, and
+      -- L11's D-PARTIAL note is still drawn on it (measured).
+      --
+      -- CORRECTED 2026-09-10. This comment used to say the source reached "the
+      -- SAME hazard through the ONE route S2 deliberately leaves open — §5.1
+      -- hole 1", i.e. that S2 recorded nothing inside a synthesised
+      -- fall-through body. That hole was closed by 655b272b and the claim is
+      -- now false in both directions. The source checks clean because the
+      -- clause narrowing is CORRECT: clause 1 consumes `Nothingness`, so the
+      -- binder in clause 2 can only be a `Circle`, which DOES declare
+      -- `radius`. Measured: it evaluates 0 and 7, and raises no
+      -- NonExhaustivePatterns at all — there is no hazard left in it.
+      --
+      -- What keeps L11 alive is that D-PARTIAL is drawn off the IR SHAPE,
+      -- independently of whether the checker would refuse the source. That is
+      -- why this test stayed green across 655b272b without being touched, and
+      -- it is the property worth preserving if the fixture is ever rewritten.
       it "L11: refuses a projection over a multi-constructor enum missing the field" $ do
         let drg = drgOf
               "DECLARE Shape IS ONE OF\n\
@@ -3203,12 +3213,22 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
         [n | n <- notesOf "D-PARTIAL" drg, Text.isInfixOf "L11" n.message]
           `shouldSatisfy` (not . null)
 
-      -- The "every constructor declares the field" acceptance is DEFENSIVE:
-      -- probing shows the checker rejects that shape as an ambiguous selector
-      -- (two same-typed `size` definitions), so today the reachable accepting
-      -- branch is the single-payload-constructor enum. Should the checker
-      -- learn to disambiguate, the exporter's all-constructors test is
-      -- already right.
+      -- The "every constructor declares the field" acceptance is REACHABLE.
+      --
+      -- It used to be defensive, and this comment used to say so: probing
+      -- showed the checker rejecting that shape as an ambiguous selector (two
+      -- same-typed `size` definitions), leaving the single-payload-constructor
+      -- enum as the only reachable accepting branch. SUM-TYPE-FIELDS-SPEC §3
+      -- S1 removed that — a field declared at ONE type on several constructors
+      -- is ONE selector, total over them — so there is no longer a pair for
+      -- anything to disambiguate.
+      --
+      -- The conditional the comment ended on ("should the checker learn to
+      -- disambiguate") is therefore discharged the other way: it learned to
+      -- MERGE. Measured 2026-09-10: `Circle HAS size` beside `Square HAS size`
+      -- with `\`the size\` s MEANS s's size` checks clean and evaluates 3 and
+      -- 4. The exporter's all-constructors test was already right, and a
+      -- fixture exercising it is now writable and worth adding.
       it "L11: accepts the projection on a single-payload-constructor enum" $ do
         let drg = drgOf
               "DECLARE Wrapped IS ONE OF\n\

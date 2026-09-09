@@ -1594,25 +1594,34 @@ it does any of:
 or transitively calls a decision that is.
 
 > **READING FORM (1) IS NOW UNREACHABLE BY CONSTRUCTION, 2026-09-09** — from the L4 side, not this
-> one. `SUM-TYPE-FIELDS-SPEC.md` §3 S2 makes `disposal's `term in years`a **check-time error**
-whenever the base could still be a constructor that does not declare the field, which is exactly
-reading form (1)'s premise. So no type-checking L4 program can present that shape to this exporter
-any more, and R4-a's own exhibit —` `stated term` ``in`jl4/examples/dmn/sumtype.l4`— was
-rewritten as a`CONSIDER`(that spec's §4, ruled by Meng). The consequences, all measured and all
-recorded in`SUM-TYPE-FIELDS-SPEC.md` §4.2:
+> one. `SUM-TYPE-FIELDS-SPEC.md` §3 S2 makes ``disposal's `term in years` `` a **check-time error**
+> whenever the base could still be a constructor that does not declare the field, which is exactly
+> reading form (1)'s premise. So no type-checking L4 program can present that shape to this exporter
+> any more, and R4-a's own exhibit — ``…'s `stated term` `` in `jl4/examples/dmn/sumtype.l4` — was
+> rewritten as a `CONSIDER` (that spec's §4, ruled by Meng). The consequences, all measured and all
+> recorded in `SUM-TYPE-FIELDS-SPEC.md` §4.2:
 >
 > - `decision_stated_term` keeps `D-SUMTYPE` **`Blocking`** under reading form (3) instead — a
 >   payload-binding arm — so **R4-a's verdict on this decision is unchanged**, and so is the KIE
 >   `HarnessMustFail` leg: the emitted `<text>` is still raw L4 no engine can compile;
 > - it loses its `D-PARTIAL` finding, because the `CONSIDER` is total. `D-PARTIAL` keeps its coverage
 >   through `deontic-verdict`, `svc` and `regcf-corpus`;
-> - **L11 is not dead code.** `jl4/tests/DmnExport.hs`'s L11 fixture now reaches the same hazard
->   through a multi-clause `DECIDE`, which is the one route SUM-TYPE-FIELDS-SPEC §5.1 leaves open by
->   design. Measured: it checks clean and still draws L11's `D-PARTIAL`.
+> - **L11 is not dead code.** `jl4/tests/DmnExport.hs`'s L11 fixture still draws L11's `D-PARTIAL`
+>   (measured), so the note has a live witness.
+>
+>   **CORRECTED 2026-09-10.** This bullet used to say the fixture "reaches the same hazard through a
+>   multi-clause `DECIDE`, which is the one route SUM-TYPE-FIELDS-SPEC §5.1 leaves open by design".
+>   That route was closed by `655b272b` and the sentence is now false twice over. The fixture checks
+>   clean because the clause narrowing is **correct** — clause 1 consumes `Nothingness`, so the
+>   binder is a `Circle`, which does declare `radius` — and measured, the program evaluates `0` and
+>   `7` with no run-time death in it at all. It reaches no hazard. What keeps L11 alive is that
+>   `D-PARTIAL` is drawn off the **IR shape**, independently of whether the checker refuses the
+>   source, which is why the test stayed green across that change without being touched.
 >
 > Do not delete reading form (1) from the list above. It describes an IR shape the exporter can still
-> be handed — through that fall-through hole, and through any future front end — and a refusal that
-> stops being reachable from today's surface syntax is not a refusal that has stopped mattering.
+> be handed — through `SUM-TYPE-FIELDS-SPEC.md` §5.1's surviving untyped-`GIVEN` hole, and through
+> any future front end — and a refusal that stops being reachable from today's surface syntax is not
+> a refusal that has stopped mattering.
 
 A decision that `CONSIDER`s such a union over its **nullary
 arms only** is **`Lossy`**, naming the constructors that have no cell — it is not refused, because

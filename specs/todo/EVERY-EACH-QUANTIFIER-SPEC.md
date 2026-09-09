@@ -2990,11 +2990,21 @@ consulted.** So:
    arm declaring it. The cast requirement then falls out for sums instead of being imposed on
    products.
 
-2. **A partial projection fails at RUN time, not check time, and says something unrelated.**
+2. ~~**A partial projection fails at RUN time, not check time, and says something unrelated.**
    With `Party IS ONE OF Landlord | Tenant HAS monthly_rent`, `t's monthly_rent` on a `Landlord`
    produces: _"The value `Landlord` reached a CONSIDER that has no branch for it. Add a WHEN branch
    for this case, or a catch-all OTHERWISE branch."_ A drafter who wrote neither a `CONSIDER` nor a
-   `WHEN` will not recognise their own program in that sentence.
+   `WHEN` will not recognise their own program in that sentence.~~
+   **RETRACTED 2026-09-10 — `SUM-TYPE-FIELDS-SPEC.md` §3 S2 and S4 made both halves false.**
+   Measured on `lang/whose-opening`: the exact §13.6 shape — `EVERY a IN everyone WHO
+a's monthly_rent AT LEAST 1000` over that very type — is now refused at **check** time, and the
+   message names the field, the arm that lacks it, why nothing narrowed the base, and the repairs:
+   _"`monthly_rent` is a field of `Tenant` only. But `a` could also be `Landlord`, which has no
+   `monthly_rent`. Nothing here narrows `a`: it is used at the whole type `Party` …"_ So it is not
+   run time, and it is not unrelated. The run-time message quoted above no longer exists either;
+   where a partial selector still reaches run time at all, the evaluator now says _"The value
+   `Landlord` has no `monthly_rent` field."_ What survives from this point is the derivation it fed:
+   the totality rule of point 1.
 
 3. ~~**The "same field on two arms, opposite polarity" hazard is already impossible — but by
    forbidding the modelling.** Declaring `Landlord HAS amount_due` beside `Tenant HAS amount_due`
@@ -3258,7 +3268,10 @@ separable from the general mechanism?**
    `checkQuantifierCast` does `(rc, ct) <- resolveConstructor c; t <- instantiate ct`
    (`TypeCheck.hs:2004-2010`), called from `:1896`. `inferConDecl` builds that constructor type as
    `fun (typedNameOptionallyNamedType <$> rtns) …` (`:1536`), where each argument carries the
-   selector's own `Resolved` name minted by `inferSelector` (`:1599-1616`), and `instantiate`
+   selector's own `Resolved` name minted by ~~`inferSelector` (`:1599-1616`)~~ — **`inferSelector`
+   was deleted by `SUM-TYPE-FIELDS-SPEC.md` §3 S1 (2026-09-09); the mint moved into `inferConDecls`
+   (`TypeCheck.hs:1941`), which now issues ONE selector per shared field rather than one per
+   constructor** — and `instantiate`
    substitutes only `Forall` variables (`:537-541`), so the **named** argument vector survives.
 2. **The scope hook is one local call.** `extendKnown (makeKnown rv (KnownTerm partyT Local))`
    (`:1941`) wraps the filter check at `:1942`. The cast (`:1896`) and the roll (`:1938`) are both
@@ -3315,19 +3328,28 @@ DECLARE Actor IS ONE OF
 …  EVERY a IN everyone WHO a's name EQUALS "alice" …
 ```
 
-fails at **check** time with _"There are multiple definitions for the identifier `name` … name … of
+~~fails at **check** time with _"There are multiple definitions for the identifier `name` … name … of
 type FUNCTION FROM Actor TO STRING"_ listed twice, plus a cascading second error on `__EQUALS__`.
 `resolveProjectionLabel` applies **no** viability filter
 (`TypeCheck/Types.hs:1387-1389`), so two same-typed selectors share a `typeKey`, survive
 `selectByProximity`, and reach `ambiguousTerm`. **This is true of hand-written `t's f` today** —
 `WHOSE` neither causes it nor worsens it. It has never been seen because no corpus site reads a
 doubly-declared field; `who-filter.l4` and `run-in.l4` are green precisely because they only ever
-declare one.
+declare one.~~
 
-Two consequences worth carrying: the diagnostic names neither the arms nor the projection, so a
+**RETRACTED 2026-09-10, with the headline above — this paragraph was left in the present tense when
+the headline was struck.** Measured on `lang/whose-opening`: the program in the fence prints
+`Check succeeded.` Under S1 the two arms mint **one** selector (`inferConDecls`, Note [One selector
+per shared field]), so there is no pair for `selectByProximity` to arbitrate and nothing reaches
+`ambiguousTerm`. The stated mechanism cannot fire because its premise — two same-typed selectors
+sharing a `typeKey` — no longer describes the tree.
+
+~~Two consequences worth carrying: the diagnostic names neither the arms nor the projection, so a
 drafter will not recognise their program in it; and the corrected totality rule would open exactly
 this unreadable set, since the intersection over constructors **is** the set of names declared on
-every arm.
+every arm.~~ Both survive only as history. There is no diagnostic to name anything, and the set the
+totality rule opens is **readable** — which is precisely what `SUM-TYPE-FIELDS-SPEC.md` §3 S5 turns
+on when it says the intersection rule is now safe to open.
 
 #### What is NOT ruled here, and is Meng's — RULED later the same day, see `SUM-TYPE-FIELDS-SPEC.md`
 
@@ -3339,17 +3361,35 @@ every arm.
 > The list below is kept as the record of what was open when the separability question was
 > answered. Note also that file's §0 on the word "cast": this document uses it for the ensemble,
 > and the constructor in `EVERY Tenant t` is properly the **narrowing constructor**.
+>
+> **Update 2026-09-10: S1, S2, S3 and S4 are now BUILT on `lang/whose-opening`, and the answers
+> below are measured against that binary rather than predicted.** S5 — the `WHOSE`-specific part —
+> is still DESIGN. **`WHOSE` itself is NOT built: no parser support, no goldens, nothing.** What
+> changed is that the two hazards this subsection was built around are fixed, so the reasons items 1
+> and 3 gave for being unsettled have expired. Item 2 is untouched by any of it.
 
-None of the following is settled, because each changes what a drafter must write (assignment §7):
+~~None of the following is settled~~ **Item 2 is the only one still open (updated 2026-09-10);
+items 1 and 3 were answered by `SUM-TYPE-FIELDS-SPEC.md`,** because each changes what a drafter must
+write (assignment §7):
 
 1. **What `EVERY t WHOSE f` should do on a sum type when `f` is not on every arm** — refuse and name
    the missing cast, open the intersection, or require a cast outright.
+   **ANSWERED 2026-09-10, see `SUM-TYPE-FIELDS-SPEC.md` §3 S2/S4: refuse, and name the arm that
+   lacks the field.** That is not a `WHOSE` decision — it is what S2 already does to any partial
+   read, and S4 supplies the wording. Measured: `EVERY Landlord a … a's monthly_rent` renders the
+   `NarrowedByCast` message, pinned as case 8 of `not-ok/tc/partial-projection.l4`. The
+   third option, "require a cast outright", is foreclosed by S5: the intersection is safe to open.
 2. **What it should do for the castless form.** Note this form is live and goldened:
    `ok/every/run-roll.l4:62-72` is captioned _"No cast word at all"_ and carries a `#TRACE`;
    `ok/every/bare-variable.l4` is a second. A design that refuses castless `WHOSE` would make it
    strictly weaker than the `WHO` spelling that works today.
+   **STILL OPEN — this is the one that is.**
 3. **Whether the doubly-declared-field defect above is fixed first, and how** — a per-arm
    disambiguation is a language change, not a `WHOSE` change.
+   **ANSWERED 2026-09-10, see `SUM-TYPE-FIELDS-SPEC.md` §3 S1: it was fixed first, and NOT by the
+   per-arm disambiguation this item contemplates.** The checker learned to **merge** — one selector
+   per shared field, total over the declaring arms — so the defect is gone rather than arbitrated.
+   Measured: the fenced program above now prints `Check succeeded.`
 
 #### Method, and what was not checked
 
@@ -3362,7 +3402,9 @@ castless form was "unusable" (refuted by `run-roll.l4`), and an over-claim that
 survived all three. One hypothesis raised during this work — that the field/top-level collision might
 already be a loud ambiguity, since `inferSelector` puts fields in the term namespace — was **refuted
 by measurement**: `monthly_rent MEANS 42` beside `DECLARE Party HAS monthly_rent` evaluates a bare
-read to `42`, silently. §13.6's "two silences" framing stands, and its mechanism is now known to be
+read to `42`, silently. (`inferSelector` is the name the function had when this was written; S1
+deleted it on 2026-09-09 and the mint is now `inferConDecls`. The refutation is unaffected — fields
+are still in the term namespace — but do not go looking for the function.) §13.6's "two silences" framing stands, and its mechanism is now known to be
 type-directed candidate filtering.
 
 Not checked: nothing was built for `WHOSE`; no golden was written or blessed; the DMN/Catala/Blawx/
