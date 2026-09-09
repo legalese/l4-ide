@@ -5,8 +5,10 @@ in the tree, and S2 is an ERROR — §4's gate has been run end to end (steps 1,
 The warning form S2 briefly wore so §4's three rigs could count the corpus is GONE: there is no flag
 that restores it, and `PartialProjection` is a `CheckError` (`TypeCheck/Types.hs:149`) whose renderer
 `prettyPartialProjection` (`TypeCheck.hs:6903`) is reached from `prettyCheckError`. The run-time
-death of §1.1 is no longer reachable from a type-checking program except through the two measured,
-stated holes in §5.1. §4.1 records the measured counts and where the measurement contradicted §4's
+death of §1.1 is no longer reachable from a type-checking program except through the measured,
+stated gaps in §5.1 — **one** permissive hole with a demonstrated user (an untyped `GIVEN` column of
+a multi-clause group), one that exists only for re-parsed printer output, and four silent bails
+inside the check itself. §4.1 records the measured counts and where the measurement contradicted §4's
 predictions; §4.2 records the six repairs, the promotion, and what they cost; §4.3 the fixtures.
 S5 remains DESIGN — `WHOSE` is not built.
 Meng's mark, 2026-09-09, on being shown the two hazards below and the Haskell/OCaml comparison:
@@ -21,8 +23,15 @@ in `TypeCheck.hs`; the `SharedFieldTypeMismatch` error) and evaluator half (`eva
 program armed and traced) and `not-ok/tc/sum-field-type-conflict.l4` (the declaration error beside
 a merged field on the same type), each with its four goldens, and a drafter-facing section in
 `doc/reference/types/DECLARE.md`. §1.2 now returns `FULFILLED`. The whole-tree `l4 check`
-sweep for the new declaration error (958 files) found zero sites. One limit recorded in §5 item 1:
+sweep for the new declaration error found zero sites. One limit recorded in §5 item 1:
 "same type" is by `typeKey` on the type as written, so a synonym beside its expansion is refused.
+
+> **The file count this sweep recorded — 958 — is not reproducible and has been dropped rather than
+> guessed at (2026-09-09).** `git ls-tree -r --name-only <c> | grep -c '\.l4$'` gives **960** at the
+> S1 commit `73507cd8` and at every commit after it on this branch, and **957** at the rename commit
+> `7cf1e0e9` before it. 958 is neither. The zero-sites result is left standing — it is what the run
+> reported — but a later gate should re-derive its denominator from `git ls-files '*.l4'` at a
+> **named** commit rather than inherit this one. §4.1 does exactly that.
 
 (This paragraph described the tree at the S1 commit, and said there that _"§1.1 is unchanged and
 still dies at run time, because that is S2's"_. **That sentence was true then and is FALSE now:**
@@ -234,9 +243,18 @@ draft of this rule misread what a `WHEN` pattern binds:
   `Landlord` only) would compute `missing = ∅`, raise nothing, and still die at run time on
   `Tenant OF 1600`. The checker already draws this distinction for exhaustiveness — it refuses to
   reason over opaque arms precisely so "a partial literal match [is not] certified exhaustive"
-  (`TypeCheck.hs:2313-2320`, `patternHasOpaque` `:2962-2968`) — and the residual must reuse that
-  predicate rather than `hintSuspiciousBinders`' head-only heuristic (`:2889-2896`), which is a
-  hint's approximation and not sound for this purpose.
+  (`TypeCheck.hs`'s exhaustiveness check, `patternHasOpaque` at `:4018`) — ~~and the residual must
+  reuse that predicate rather than `hintSuspiciousBinders`' head-only heuristic (`:2889-2896`),
+  which is a hint's approximation and not sound for this purpose.~~
+
+  **CORRECTED 2026-09-09, see §5 item 3 — reusing `patternHasOpaque` is UNSOUND**, so the
+  instruction struck above was not followed. It recurses through sub-patterns and answers `False`
+  for `WHEN Tenant (Some n)`, which is one of the three shapes this very sub-rule names as
+  must-not-consume. What is built instead is `armEffect`, which tests irrefutability directly.
+  `patternHasOpaque` is unchanged and answers a different question. The rest of the struck sentence
+  stands: `hintSuspiciousBinders`' head-only heuristic remains unsound for this purpose, which was
+  the point of naming it. (The two line anchors this sentence used to carry, `:2313-2320` and
+  `:2962-2968`, were pre-S3 and no longer point at anything relevant.)
 
   **An unknown constructor set is "every constructor", never the empty set.** If the scrutinee's
   type is still an inference variable after `applySubst`, or its head is not a key of
@@ -367,9 +385,14 @@ case 7.
 **S5 — what this does for `WHOSE`.** `EVERY-EACH-QUANTIFIER-SPEC.md` §13.6.1 found that the
 corrected totality rule (open the fields present on every constructor the member could still be)
 opened exactly the set that could not be read. Under S1 that set is a set of total, unambiguous
-selectors; under S3 with a narrowing constructor it is that arm's fields. The intersection rule is
-therefore **safe to open** once this document is built, and `WHOSE`'s check-time "naming the missing
-cast" promise is S2+S4 applied inside the filter — not a separate mechanism.
+selectors; under S3 with a narrowing constructor it is that arm's fields. **The intersection rule is
+therefore safe to open, and the condition is discharged: S1–S4 are built (§4.1, §4.2), so "once this
+document is built" is now "now".** `WHOSE`'s check-time "naming the missing cast" promise is S2+S4
+applied inside the filter — not a separate mechanism, and measured: `EVERY Landlord a …
+a's monthly_rent` already renders it, pinned as case 8 of `not-ok/tc/partial-projection.l4`.
+
+**`WHOSE` itself is still NOT built.** Discharging the condition removes the blocker S5 named; it
+does not implement the feature. S5 remains DESIGN, exactly as the status header says.
 
 ### 3.2 The magic budget — a constraint on S3, RECORDED 2026-09-09 (Meng)
 
@@ -407,8 +430,8 @@ that needs it most.
 Two consequences to carry:
 
 - **Cut order, if teaching proves hard in practice.** Drop the `OTHERWISE` residual first (cost:
-  `actus-core.l4:311` is rewritten as `WHEN \`ACTUS Other\` s THEN s`, and drafters write one more
-branch); then the `WHEN`-narrows-scrutinee rule (cost: S2 becomes markedly more restrictive).
+  `actus-core.l4:311` is rewritten as ``WHEN `ACTUS Other` s THEN s``, and drafters write one more
+  branch); then the `WHEN`-narrows-scrutinee rule (cost: S2 becomes markedly more restrictive).
   Never S1 or S2 — they are the ruling.
 - **An explicit escape hatch is worth more than another narrowing rule.** §6's `a's? monthly_rent`
   returning `MAYBE` is the anti-magic lever: it lets a drafter opt out of the narrowing analysis
@@ -514,7 +537,7 @@ other.
 | site                                              | expected | measured | class                                   |
 | ------------------------------------------------- | -------- | -------- | --------------------------------------- |
 | `jl4/examples/legal/british-citizen-act.l4:94-97` | 4        | **4**    | (B) — the `p's birthPlace's val` chains |
-| `jl4/examples/dmn/sumtype.l4:139-142`             | 1        | **1**    | (B) — `disposal's \`term in years\``    |
+| `jl4/examples/dmn/sumtype.l4:139-142`             | 1        | **1**    | (B) — ``disposal's `term in years` ``   |
 | `jl4/experiments/safe-post.l4:258`                | 1 (or 2) | **1**    | (B) — `…'s security's Quantity's count` |
 | (A) sites, anywhere                               | none     | **none** | S3's residual holds                     |
 
@@ -545,24 +568,40 @@ text is what a later reader will follow, and two of its three rigs are not what 
   fails, so on a green run its log is empty and `grep 'could also be'` returns a **false zero**. Rig
   3's tree was measured instead by sweeping all 54 `jl4/tests-cli/fixtures/**/*.l4` with `l4 check`
   directly — zero markers. **Report the clean tree, not the zero.**
-- **§4's rig-2 file list is not the complement of the golden globs.** `git ls-files '*.l4'` = 960;
-  the golden globs cover 464; §4's rig-2 list covers 388; leaving **108 tracked `.l4` in neither**
-  (`jl4/tests-cli/fixtures` 54, `jl4-mlir` 21, `paper/` 17, `p4-design/scratch` 11, 5 strays). All
-  108 were swept — 95 pass, 13 deliberate negative fixtures, zero markers — and
-  `464 + 388 + 108 = 960` with both `comm` directions empty, so every tracked `.l4` was measured
-  exactly once. A later gate should sweep `git ls-files '*.l4'` rather than a hand-kept tree list.
-- **Rig 1's `lsp/**`globs cannot carry a checker diagnostic either.** The 12 semantic-tokens and 1
-hover fixtures go through`SemanticTokens.hs`/`Hover.hs`, not `checkFile`, so their `.actual`can
-never hold an S2 message. All 13 were swept directly with`l4 check`: zero markers.
+- **§4's rig-2 file list is not the complement of the golden globs.** Re-derived 2026-09-09 against
+  **one named commit**, `0ea70d3f` — the commit the warning form existed on, and so the only tree
+  the three-rig measurement could have run against. `git ls-tree -r --name-only 0ea70d3f` gives
+  **960** tracked `.l4`. The **nine** golden globs of `jl4/tests/Main.hs` — including
+  `not-ok/import/*-refused.l4`, which the repo `CLAUDE.md` §3.1 list omits — cover **464** (461
+  without that glob). §4's rig-2 trees (`doc/`, the un-globbed part of `jl4/examples`,
+  `jl4/experiments/`) cover **389**, leaving **107 tracked `.l4` in neither**
+  (`jl4/tests-cli/fixtures` 54, `jl4-mlir` 21, `paper/` 17, `p4-design/scratch` 11, and **four**
+  strays: `etc/m3-probes/distribution-probe.l4`, `jl4-proleg/l4/burden.l4`,
+  `jl4/ok/inert/simple.l4`, `skills/writing-l4-rules/assets/example-parking.l4`). All 107 were
+  swept — zero markers — and `464 + 389 + 107 = 960` with both `comm` directions empty, so every
+  tracked `.l4` was measured exactly once.
 
-**The zero has two stated bounds, and a later reader should quote them rather than the bare count.**
-Both are in §5.1 and both are permissive, so they are places the run-time death of §1.1 survives:
-`checkPartialProjection` returns silently inside a synthesised multi-clause fall-through
-(`CheckEnv.inSyntheticFallthrough`), and it bails silently when the resolved name is not a
-`KnownTerm _ Selector`, when `selectorDomainType` finds no type-application head, when the
-constructor universe is unenumerable (`CONTRACT`), or when `declared` is empty. The measured six is
-therefore a lower bound on the language's real exposure — which §4.2's L11 fixture now demonstrates
-rather than merely asserts.
+  > **This bullet previously read 388 / 108 / "5 strays", which does not close.** Those numbers are
+  > reachable only by moving exactly one of three files out of rig 2, and the text never said which;
+  > its own breakdown then named five strays where only four files sit outside the listed trees. The
+  > three genuinely ambiguous files are `jl4/examples/implicit-assume-test.l4` and the two
+  > non-`-refused` files in `jl4/examples/not-ok/import/`, which are in no golden glob **by design**
+  > (the refusal glob picks the importer out by name, and the library beside it is deliberately
+  > un-globbed). All three are counted in rig 2 above. A later gate should sweep
+  > `git ls-files '*.l4'` at a named commit rather than a hand-kept tree list.
+
+- **Rig 1's `lsp` globs cannot carry a checker diagnostic either.** The 12 semantic-tokens and 1
+  hover fixtures go through `SemanticTokens.hs`/`Hover.hs`, not `checkFile`, so their `.actual` can
+  never hold an S2 message. All 13 were swept directly with `l4 check`: zero markers.
+
+**The zero has stated bounds, and a later reader should quote them rather than the bare count.**
+They are enumerated in §5.1, which is where they belong; this paragraph used to state a second bound
+that appeared nowhere in §5.1, and used to call it one of "two … both in §5.1", which was wrong on
+both counts. The permissive exits from `checkPartialProjection` are: the untyped-`GIVEN` clause
+column (§5.1 item 1), the re-parsed-printer-output case (item 2), and four silent bails — not a
+`KnownTerm _ Selector`, no `selectorDomainType` head, an unenumerable universe (`CONTRACT`), or an
+empty `declared` (item 3). The measured six is therefore a lower bound on the language's real
+exposure.
 
 ### 4.2 Gate steps 2 and 3, DONE 2026-09-09 — the repairs, the promotion, and what they cost
 
@@ -623,22 +662,49 @@ DECIDE `the radius` Nothingness IS 0
 DECIDE `the radius` s           IS s's radius
 ```
 
-— which checks clean (S2 records nothing inside a synthesised fall-through body), still raises
-`NonExhaustivePatterns`, and still draws L11's `D-PARTIAL` (measured). The fixture is now that
-program, with the reasoning beside it. **This is the first demonstrated user of §5.1's hole 1**, and
-it is worth more than the old fixture was: it exhibits the hole rather than describing it.
+— which checks clean, still raises `NonExhaustivePatterns`, and still draws L11's `D-PARTIAL`
+(measured). The fixture is now that program, with the reasoning beside it. **This is the first
+demonstrated user of §5.1's hole 1**, and it is worth more than the old fixture was: it exhibits the
+hole rather than describing it.
+
+> **CORRECTED 2026-09-09, after `655b272b` closed hole 1.** Two of the three claims in the paragraph
+> above are now false, and the third is true for a different reason. The program still **checks
+> clean** — but not because S2 records nothing inside a fall-through. It checks clean because the
+> clause narrowing is now real and _correct_: clause 1 consumes `Nothingness`, so `s` in clause 2 is
+> narrowed to `Circle`, and `Circle` **does** declare `radius`. The read is total, so there is
+> nothing for S2 to refuse. Measured: `#EVAL` returns `0` and `7`, and **no `NonExhaustivePatterns`
+> is raised at all** — the program has no run-time death left in it. It is therefore **not** a
+> demonstrated user of hole 1, or of any hole; hole 1 as written no longer exists, and its surviving
+> residual needs an **untyped** `GIVEN` column, which this fixture does not have.
+>
+> L11 is still not dead code, and this fixture still earns its place — the exporter's `D-PARTIAL`
+> note is drawn off the IR shape, independently of whether the checker refuses the source, which is
+> exactly why the test remains green. But it now demonstrates the exporter's analysis, not a hole in
+> S2. The file that demonstrates the surviving hole is
+> `ok/sum-fields/partial-selector-runtime.l4`.
 
 ### 4.3 The fixtures S2, S3 and S4 ship with
 
 - **`ok/sum-fields/narrowing.l4`** — the four narrowing paths, each ARMED. The quantifier's
   narrowing constructor is the one §4 said had **zero** coverage anywhere in the tree, so this is
   that path's only test; the other three are a `WHEN` scrutinee, an `OTHERWISE` residual, and an
-  alias, plus an alias chain ending at a construction. `#TRACE` returns `FULFILLED`; every `#EVAL`
-  returns 1500 or 0 on the arm it should.
-- **`not-ok/tc/partial-projection.l4`** — six sites, ONE PER SHAPE the S4 renderer can produce:
+  alias, plus an alias chain ending at a construction. `#TRACE` returns `FULFILLED`; the `#EVAL`s
+  return 1500 or 0 on the arm they should, except the last pair of the alias chain, which reads 1500
+  off `alice` and **4000** off `theLandlord`'s own `deposit` (`narrowing.l4:95`,
+  `tests/narrowing.golden:21`). The nine armed values are `FULFILLED`, then 1500, 0, 1500, 0, 1500,
+  0, 1500, 4000. (This bullet used to say "every `#EVAL` returns 1500 or 0", which the golden
+  contradicts.)
+- **`not-ok/tc/partial-projection.l4`** — **eight** sites, ONE PER SHAPE the S4 renderer can produce:
   un-narrowed binder, the refutable-arm residual (whose message names `` `WHEN Tenant 1500` `` — §3.2's
   hard requirement, and the acceptance test for the highest-magic rule), narrowed to the wrong arm by
-  a `WHEN`, a non-binder base, a value written as a constructor, and the bare selector as a value.
+  a `WHEN`, a non-binder base, a value written as a constructor, the bare selector as a value, the
+  fully exhausted residual (`NarrowedByExhaustedBranches`), and — added 2026-09-09 — narrowed to the
+  wrong arm by a **quantifier** (`NarrowedByCast`). The renderer branches on `NarrowingReason` and
+  `NotNarrowed` splits three further ways on the base's shape, so eight is the full enumeration;
+  `NarrowedByEarlierClauses`, the ninth reason, is pinned next door in
+  `not-ok/tc/partial-projection-fallthrough.l4` because it needs a clause group to exist at all.
+  `NarrowedByCast` had **no witness anywhere in the tree** before case 8, which is the same zero
+  coverage §4 records for the quantifier-narrowed projection.
 - **`not-ok/tc/partial-projection-overload.l4`** — the overload trap of §5 item 4, pinned by CONTENT
   and not merely by redness: two unrelated types both declare `rent`, and the golden holds S2's
   message rather than `AmbiguousTermError` or `InternalAmbiguityError`. If the deferral is ever
@@ -828,50 +894,105 @@ getUnique` on the `EnumDecl` case. Hover and `@desc` are range-keyed and
    limits", the four shapes that are NOT narrowed (a `GIVEN` parameter, a non-binder base, a
    refutable `WHEN` arm, an alias that names something other than a binder).
 
-## 5.1 Two holes S2 has, both measured, both permissive — state them before promoting
+### 5.1 What S2 does not guarantee — one permissive hole, one printer-only hole, four silent bails, one restrictive limit
 
-A permissive hole means the run-time death of §1.1 is still reachable there. Neither is a reason not
-to promote; both are reasons to say so out loud, because §3.2's asymmetry cuts the other way for a
-rule that _fails to reject_: there is no error message to teach the lesson.
+Only a **permissive** gap lets the run-time death of §1.1 through. None is a reason not to promote;
+all are reasons to say so out loud, because §3.2's asymmetry cuts the other way for a rule that
+_fails to reject_: there is no error message to teach the lesson.
 
-1. **A later clause of a multi-clause `DECIDE`/`MEANS` group carries no S2 guarantee.**
-   `L4.Parser.matchClauses` compiles clauses 2..n into a `LET`-bound nullary decide
+> **REWRITTEN 2026-09-09. The hole this section was built around is CLOSED** (commit `655b272b`),
+> and the paragraph below that said the repair "is unsound and must not be built" was describing a
+> _different_ repair from the one that was built. The struck text is kept because §4.2, §4.1,
+> `jl4/tests/DmnExport.hs` and `DMN-EXPORT-PROGRAM-MODEL-SPEC.md` all cite "§5.1 hole 1" by number,
+> and because deleting it would destroy the evidence that the ruling moved.
+
+1. ~~**A later clause of a multi-clause `DECIDE`/`MEANS` group carries no S2 guarantee.**~~
+   **CLOSED 2026-09-09, and replaced by the much narrower residual below.**
+
+   ~~`L4.Parser.matchClauses` compiles clauses 2..n into a `LET`-bound nullary decide
    (`__pm_fallthrough_k`) referenced from the `OTHERWISE` of every column, and `checkExpr` checks a
    `LetIn`'s declarations **before** its body — so that body is checked entirely outside the
-   `OTHERWISE` whose residual is meant to cover it. Without a suppression, the canonical idiom
+   `OTHERWISE` whose residual is meant to cover it. So S2 records **nothing** inside a synthesised
+   fall-through body (`CheckEnv.inSyntheticFallthrough`).~~ That field no longer exists.
+
+   The struck paragraph then said: _"Covering clause matrices properly means narrowing at the
+   **clause-matrix level** — per column, per clause, off `dHead.rappForm` — not through the
+   desugared `LET`."_ **That is exactly what was built**, so the adjacent warning that "the obvious
+   repair is unsound and must not be built" stands as written and was never violated: the unsound
+   repair it names is copying one residual onto the `__pm_fallthrough_` binding, which is not what
+   `clauseColumnFacts` does. It reads the source clause matrix (`Extension.pmMatrix`) and computes a
+   real per-column, per-clause possible-set; a constructor leaves a column's set only when an
+   earlier clause certainly matches every tuple carrying it there. `markFallthrough` then installs
+   clause k+1's entry over `__pm_fallthrough_k`'s body as an ordinary `Narrowing`.
+
+   Measured on this branch's binary, with the type declared:
 
    ```l4
-   DECIDE f Landlord IS 0
-   DECIDE f a        IS a's monthly_rent
+   DECLARE Actor IS ONE OF
+       Landlord
+       Agent
+       Tenant   HAS monthly_rent IS A NUMBER
+   GIVEN s IS AN Actor
+   GIVETH A NUMBER
+   DECIDE r Landlord IS 0
+   DECIDE r s        IS s's monthly_rent   -- REFUSED at check time
    ```
 
-   — total, green, and evaluating correctly today (measured, both a one-column and a two-column
-   probe) — becomes an S2 site. So S2 records **nothing** inside a synthesised fall-through body
-   (`CheckEnv.inSyntheticFallthrough`, set from the same `isSyntheticFallthrough` test
-   `inferDecide` already computes, and deliberately not the `inNonexhaustiveDecide` flag beside it,
-   which an author's `@nonexhaustive` also sets).
+   > `monthly_rent` is a field of `Tenant` only.
+   > But `s` could also be `Agent`, which has no `monthly_rent`.
+   >
+   > The clauses above this one already match `Landlord`,
+   > so `Agent` is what is left to reach here.
 
-   **The obvious repair is unsound and must not be built.** Copying the residual onto the
-   `__pm_fallthrough_` binding certifies projections under the wrong one: `matchOne` emits the same
-   reference from the `OTHERWISE` of _every_ column, at different nesting levels with different
-   residuals over different column types. One binding, several residuals. Covering clause matrices
-   properly means narrowing at the **clause-matrix level** — per column, per clause, off
-   `dHead.rappForm` — not through the desugared `LET`.
+   Drop `Agent` from the type and the same program is **accepted** and evaluates `0` / `1500`. The
+   asymmetry §1.1 complained of — the `CONSIDER` spelling refused, the `DECIDE` spelling silently
+   fatal — is gone. `NarrowedByEarlierClauses` is the reason that renders it; `ok/sum-fields/fallthrough.l4`
+   and `not-ok/tc/partial-projection-fallthrough.l4` are the fixtures.
 
-2. **A projection _named_ in a `WHERE` is checked un-narrowed.**
+   **What survives is one column shape, and it is the only permissive hole with a demonstrated
+   user.** An **untyped** `GIVEN` column is still an inference variable when the narrowing table is
+   built — the table has to be built before the body is checked — so that column gets no
+   possible-set, and an un-narrowed read on it (or on a catch-all binder or `MEANS` alias of it)
+   inside a later clause is suppressed. `CheckEnv.clauseSuppressColumns` carries exactly those
+   columns; `isFallthroughColumnRead` is the test. Measured: the program above with `GIVEN s` and no
+   type reports `Check succeeded.` and then dies, and `ok/sum-fields/partial-selector-runtime.l4` is
+   that file, under `ok/` precisely because it checks clean. Closing it needs the column's type
+   earlier than the checker has it.
+
+2. **A module that has been through `prettyLayout` and re-parsed keeps the old, wider suppression.**
+   `l4 batch`, the REPL and the print round-trip test re-emit the desugared tree, and
+   `Extension.pmMatrix` does not survive printing — there is no clause group left to analyse, only
+   the `__pm_fallthrough_` bindings. `CheckEnv.clauseNarrowings` is therefore a `Maybe`, and
+   `Nothing` restores suppression for un-narrowed bare-binder reads.
+
+   This is **not** a language-level hole: the source was checked against the real matrix on the
+   first pass, and this exists so `l4 batch` does not reject a file `l4 check` has just accepted. It
+   is also strictly narrower than the old behaviour — a bare selector used as a value and a
+   constructed base stay checked even here.
+
+3. **Four silent bails inside `checkPartialProjection` itself, all permissive.** These were stated
+   only in §4.1 and belong here. `checkPartialProjection` records nothing when the resolved name is
+   not a `KnownTerm _ Selector`; when `selectorDomainType` finds no type-application head; when the
+   constructor universe is unenumerable (`Set.null universe` — `CONTRACT` is deliberately excluded
+   from the enumeration); or when `declared` is empty, which means the model above is wrong about
+   the selector and reporting from a wrong model is worse than not reporting. None has a
+   demonstrated user; they are read off the guard and the `unless`, not probed.
+
+4. **A projection _named_ in a `WHERE` is checked un-narrowed — RESTRICTIVE, not permissive.**
    `CONSIDER a WHEN Tenant t THEN rent OTHERWISE 0 WHERE rent MEANS a's monthly_rent` is refused
-   though it is total and lazy. Same root cause as (1) — the `WHERE`'s declarations are checked
-   before the body that narrows — and a different direction from §3.1, which is about aliasing the
-   **base**, not naming the **projection**. This one is restrictive, not permissive, so it will
-   surface as a refusal a drafter can act on; the repair is to move the read inside the branch.
+   though it is total and lazy, because the `WHERE`'s declarations are checked before the body that
+   narrows. A different direction from §3.1, which is about aliasing the **base**, not naming the
+   **projection**. Because it is restrictive it surfaces as a refusal a drafter can act on (measured:
+   it renders the `NotNarrowed` message), and it cannot cause a run-time death; the repair is to
+   move the read inside the branch.
 
 Two smaller notes, both restrictive and both silent:
 
 - an alias defined in an **imported** module gets no narrowing — both import merge sites reset
   `constBodies`;
 - a mis-spelled constructor pattern (`WHEN Agency` for `Agent`) resolves via
-  `inferPatternApp … \`orElse\` inferPatternVar`to a fresh catch-all binder, which consumes
-nothing, so the residual stays too big. The residual's soundness now depends on that`orElse`;
+  ``inferPatternApp … `orElse` inferPatternVar`` to a fresh catch-all binder, which consumes
+  nothing, so the residual stays too big. The residual's soundness now depends on that `orElse`;
   a change to it moves this rule.
 
 ## 6. Not ruled here
