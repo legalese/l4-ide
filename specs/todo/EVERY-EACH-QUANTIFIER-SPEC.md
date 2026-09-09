@@ -3264,18 +3264,32 @@ separable from the general mechanism?**
 
 **Answer: SEPARABLE.** R5 does not have to be built first. Four independent supports, each cited:
 
+> **ALL LINE ANCHORS IN POINTS 1 AND 2 WERE RE-MEASURED 2026-09-10**, against the tree at the documentation
+> commit that immediately follows `5ba5f94b` on `lang/whose-opening`. They needed it for a reason worth naming: points
+> 1 and 2 both said **`TypeCheck.hs:1941`**, for two entirely different functions — point 1's was a
+> correct anchor for `inferConDecls` added when `inferSelector` was deleted, point 2's was a
+> pre-existing and by then stale anchor for the quantifier's `extendKnown`. They landed one line
+> apart, so the collision read like a cross-reference. Neither is `:1941` now, and each is named
+> along with its line so the pair can never be confused again.
+
 1. **The cast's field vector is already computed at the filter-check point, and thrown away.**
    `checkQuantifierCast` does `(rc, ct) <- resolveConstructor c; t <- instantiate ct`
-   (`TypeCheck.hs:2004-2010`), called from `:1896`. `inferConDecl` builds that constructor type as
-   `fun (typedNameOptionallyNamedType <$> rtns) …` (`:1536`), where each argument carries the
+   (`TypeCheck.hs:2646-2650`), called from `:2519`. `inferConDecls` builds that constructor type as
+   `conType = forall' … (fun (typedNameOptionallyNamedType <$> rtns) …)` (`:2117`), where each
+   argument carries the
    selector's own `Resolved` name minted by ~~`inferSelector` (`:1599-1616`)~~ — **`inferSelector`
    was deleted by `SUM-TYPE-FIELDS-SPEC.md` §3 S1 (2026-09-09); the mint moved into `inferConDecls`
-   (`TypeCheck.hs:1941`), which now issues ONE selector per shared field rather than one per
+   (`TypeCheck.hs:2074`), which now issues ONE selector per shared field rather than one per
    constructor** — and `instantiate`
-   substitutes only `Forall` variables (`:537-541`), so the **named** argument vector survives.
-2. **The scope hook is one local call.** `extendKnown (makeKnown rv (KnownTerm partyT Local))`
-   (`:1941`) wraps the filter check at `:1942`. The cast (`:1896`) and the roll (`:1938`) are both
+   substitutes only `Forall` variables (`:547-551`), so the **named** argument vector survives.
+   (The `:1536` anchor this sentence carried for `inferConDecl` was pre-S1: that function no longer
+   builds the constructor type, it delegates to `inferConDecls` as a one-arm group.)
+2. **The scope hook is one local call.** `extendKnown (makeKnown rv (KnownTerm partyT Local))` — in
+   `checkDeonton`'s `Every` arm, `TypeCheck.hs:2583` — wraps the filter check at `:2584`. The cast
+   (`:2519`) and the roll (`:2561`) are both
    checked strictly before it, so `partyT` is concrete by then whenever either is written.
+   Since S3 landed, that `extendKnown` is itself wrapped by `underNarrowing` (`:2582`), which is
+   where `EVERY Tenant t` becomes a check-time fact about `t`.
 3. **R5's three hardest obligations are vacuous for one record.** The six-level rank
    (`IMPLICIT-PROPS-DESIGN.md:1133-1136`) has one occupant; the two-opened-records collision error
    is unreachable; the `WITH` suppliability rule does not apply to a `KnownTerm _ Local`.

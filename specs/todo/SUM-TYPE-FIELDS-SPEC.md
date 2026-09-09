@@ -1,16 +1,30 @@
 # Fields on sum types: one selector per shared field, and no projection without narrowing
 
-**Status (2026-09-09): RULED by Meng, and BUILT. On `lang/whose-opening`: S1, S2, S3 and S4 are all
+**Status (2026-09-10): RULED by Meng, and BUILT. On `lang/whose-opening`: S1, S2, S3 and S4 are all
 in the tree, and S2 is an ERROR — §4's gate has been run end to end (steps 1, 2 and 3).**
 The warning form S2 briefly wore so §4's three rigs could count the corpus is GONE: there is no flag
 that restores it, and `PartialProjection` is a `CheckError` (`TypeCheck/Types.hs:149`) whose renderer
-`prettyPartialProjection` (`TypeCheck.hs:6903`) is reached from `prettyCheckError`. The run-time
+`prettyPartialProjection` (`TypeCheck.hs:7421`) is reached from `prettyCheckError`. The run-time
 death of §1.1 is no longer reachable from a type-checking program except through the measured,
-stated gaps in §5.1 — **one** permissive hole with a demonstrated user (an untyped `GIVEN` column of
-a multi-clause group), one that exists only for re-parsed printer output, and four silent bails
-inside the check itself. §4.1 records the measured counts and where the measurement contradicted §4's
+stated gaps in §5.1 — **two** permissive holes, both re-measured on this branch's binary at
+`5ba5f94b`: an untyped `GIVEN` column of a multi-clause group, and a hand-written **nullary**
+declaration spelled with the desugarer's reserved fall-through name. Beside them, one gap that
+exists only for re-parsed printer output, and four silent bails inside the check itself.
+§4.1 records the measured counts and where the measurement contradicted §4's
 predictions; §4.2 records the six repairs, the promotion, and what they cost; §4.3 the fixtures.
 S5 remains DESIGN — `WHOSE` is not built.
+
+> **This paragraph said "**one** permissive hole" until 2026-09-10, and that was wrong in two
+> directions at once.** It was written from a single probe rather than from the code, and
+> `clauseColumnUniverse`'s own Haddock enumerates **three** conditions under which a column gets no
+> possible-set — an unresolved inference variable, a type with no rigid head, and a head with no
+> enumerable constructors. At the time it was written a **type synonym** on the column type was a
+> second live hole (`DECLARE Person IS Actor` put the column straight back under the blanket
+> suppression); that one is CLOSED by `5ba5f94b`, and a **different** second hole — the nullary
+> fall-through spelling — was open the whole time and unstated. §5.1 now derives the list from the
+> code rather than from a probe, and says for each condition whether it is a live hole and how that
+> was measured.
+
 Meng's mark, 2026-09-09, on being shown the two hazards below and the Haskell/OCaml comparison:
 _"Dying at run time is a bad look for a language in the FP tradition. … Write it up — let's take
 the best of both worlds from Haskell and OCaml."_ The rules in §3 are that ruling written out.
@@ -111,8 +125,8 @@ everyone MEANS LIST Landlord, (Tenant OF 1500)
 
 **ANSWERED 2026-09-09: the run-time message quoted above no longer exists, and the second bullet's
 complaint about it is discharged.** The quote stays as probe E2 recorded it. What the evaluator says
-now, where a partial selector still reaches run time (§5.1's two holes, and any `l4 run` on a file
-that failed to check), is:
+now, where a partial selector still reaches run time (§5.1's two permissive holes and its
+printer-only one, and any `l4 run` on a file that failed to check), is:
 
 ```
 The value
@@ -133,8 +147,8 @@ Mechanically: `UserEvalException` gained `PartialSelector`, distinct from `NonEx
 `Consider` the evaluator synthesises carries `Syntax.SelectorConsider` on its annotation, and the
 machine threads that origin to the fall-off. A hand-written non-exhaustive `CONSIDER` is unchanged
 and keeps the exhaustiveness sentence. `ok/sum-fields/partial-selector-runtime.l4` pins the new
-message — it is under `ok/` precisely because it checks clean and then dies, which is what §5.1's
-untyped-`GIVEN` hole means.
+message — it is under `ok/` precisely because it checks clean and then dies, which is what §5.1
+item 1's hole (a), the untyped `GIVEN`, means.
 
 ### 1.2 Hazard 2 — a field on _every_ arm at the same type: cannot be read at all
 
@@ -159,8 +173,13 @@ everyone MEANS LIST (Landlord OF "L"), (Tenant OF "alice")
 
 ### 1.3 Why: L4 has no "the field `name` of `Actor`" — it has per-constructor selectors
 
-`inferConDecl` runs once per constructor (`TypeCheck.hs:1452`) and calls `inferSelector` once per
-field (`:1534`, `:1599-1616`). So `Landlord HAS name` and `Tenant HAS name` mint **two independent
+**Every line number in §1.3 and §1.4 is PRE-S1, and is left that way deliberately** — §1 records the
+tree as it was before this ruling, and re-pointing its anchors at today's code would describe a tree
+in which the sentences around them are false. `inferSelector` does not exist any more; see §5 item 1
+for where the mint went.
+
+`inferConDecl` runs once per constructor (`TypeCheck.hs:1452`, pre-S1) and calls `inferSelector` once
+per field (`:1534`, `:1599-1616`, both pre-S1). So `Landlord HAS name` and `Tenant HAS name` mint **two independent
 definitions** — two `Unique`s, one spelling, one type `Actor → STRING`. Each is **partial**: it is
 a `CONSIDER` over the constructors with one branch, which is exactly what hazard 1's run-time
 message is describing. `ensureDistinct NonDistinctSelectors` (`:1531`) runs _inside_
@@ -172,8 +191,9 @@ ambiguity error is the checker correctly reporting that there are two; it simply
 and if it picked one, that one would still die on the other arm.
 
 And the narrowing constructor cannot help at check time because it does not narrow the _type_:
-`checkDeonton` binds the member as `KnownTerm partyT Local` (`TypeCheck.hs:1941`) whether or not
-one is written. The narrowing lives only in the evaluator's roll filter.
+`checkDeonton` binds the member as `KnownTerm partyT Local` (`TypeCheck.hs:1941`, pre-S1; it is
+`:2583` today, and S3 has since wrapped it in `underNarrowing` so this paragraph's conclusion no
+longer holds — see §3 S3) whether or not one is written. The narrowing lives only in the evaluator's roll filter.
 
 ## 2. What the two traditions do, and which half of each is worth having
 
@@ -203,7 +223,7 @@ field, the arms that lack it, and the repair (narrow with a constructor pattern,
 narrowing constructor). ~~There is no run-time path: after S2, the `CONSIDER`-has-no-branch message
 of §1.1 is unreachable from a projection.~~ **Corrected and extended 2026-09-09 (Meng, second
 ruling):** a selector is a first-class function — `Proj` lowers to plain application
-(`Machine.hs:836-837`) — so `monthly_rent a` and `map monthly_rent everyone` are the same partial
+(`EvaluateLazy/Machine.hs:866-867`, re-measured 2026-09-10) — so `monthly_rent a` and `map monthly_rent everyone` are the same partial
 function and died identically (probe q3). **S2 therefore covers all three forms:** the projection
 `e's f`, the application `f e` (checked exactly as `e's f`), and a bare partial selector used as a
 value, which has no base to narrow and is refused with "write a `CONSIDER`". Only then is the
@@ -218,8 +238,8 @@ draft of this rule misread what a `WHEN` pattern binds:
   action, and the act's `WITHIN`/`HENCE`/`LEST` (the same positions §2.4 says `t` scopes over);
 - a `CONSIDER a … WHEN Tenant t THEN …` branch narrows **the scrutinee `a`**, not `t`. In L4
   `WHEN Tenant t` binds `t` to the constructor's **payload**: `inferPatternApp` checks sub-patterns
-  against the constructor's argument types (`TypeCheck.hs:3647-3660`, `matchPatFunTy` `:4162`) and
-  the evaluator agrees (`Machine.hs:2558-2560`). Measured: `WHEN Tenant t THEN t's monthly_rent` is
+  against the constructor's argument types (`inferPatternApp`, `TypeCheck.hs:4928`; `matchPatFunTy` `:5414`) and
+  the evaluator agrees (`PatApp0`/`PatApp1`, `EvaluateLazy/Machine.hs:1272-1289`, re-measured 2026-09-10). Measured: `WHEN Tenant t THEN t's monthly_rent` is
   a **type error** today ("expected to be of type `Actor` but is here of type `NUMBER`"), while
   `WHEN Tenant t THEN a's monthly_rent` checks and evaluates. There is no as-pattern. So what a
   branch narrows is the variable it scrutinises, when that is a bare name. This is flow typing,
@@ -243,7 +263,7 @@ draft of this rule misread what a `WHEN` pattern binds:
   `Landlord` only) would compute `missing = ∅`, raise nothing, and still die at run time on
   `Tenant OF 1600`. The checker already draws this distinction for exhaustiveness — it refuses to
   reason over opaque arms precisely so "a partial literal match [is not] certified exhaustive"
-  (`TypeCheck.hs`'s exhaustiveness check, `patternHasOpaque` at `:4018`) — ~~and the residual must
+  (`TypeCheck.hs`'s exhaustiveness check, `patternHasOpaque` at `:4151`) — ~~and the residual must
   reuse that predicate rather than `hintSuspiciousBinders`' head-only heuristic (`:2889-2896`),
   which is a hint's approximation and not sound for this purpose.~~
 
@@ -265,13 +285,62 @@ draft of this rule misread what a `WHEN` pattern binds:
   projection. This is the same failure shape as the residual above: a narrowing that is wrong in the
   permissive direction is invisible;
 
+- **the clauses of a fused multi-clause group narrow their own column binders** (**BUILT
+  2026-09-09** as `clauseColumnFacts`, repaired 2026-09-10 by `5ba5f94b`; **added to this list
+  2026-09-10**, having been built and shipped without ever being written down as an S3 site —
+  which is how it acquired three defects in one round with nothing in §3 or §3.2 to test them
+  against). `DECIDE r Landlord IS 0` / `DECIDE r s IS s's monthly_rent` narrows `s` in the second
+  clause to everything `Landlord` did not take. This is the `OTHERWISE` residual one level up,
+  spelled without a `CONSIDER`, and it is what makes the two spellings of §1.1's program agree.
+
+  It is computed off the **source clause matrix** (`Extension.pmMatrix`), per column, per clause —
+  not off the desugared `LET`, and not by copying one residual onto the `__pm_fallthrough_`
+  binding, which would be unsound (see §5.1 item 1).
+
+  **The soundness condition, and it is a conjunction of four.** An earlier clause `i` removes
+  constructor `c` from column `j`'s possible-set at clause `m > i` only if **all** of:
+
+  - **(a)** clause `i`'s pattern in column `j` names a constructor of column `j`'s **own type** —
+    decided by `Unique`, never by spelling (`columnConstructor`, `TypeCheck.hs:1494`). Spelling is
+    not a usable key here: `qualifiedAliases` (`:5535`) registers a constructor's section-qualified
+    `Name` with `defAka` under the **original's** `Unique`, and `entityInfo` is keyed by `Unique`, so
+    for anything declared inside a `§` the qualified spelling is the only one that map holds.
+  - **(b)** it supplies exactly that constructor's arity, and **every** sub-pattern is a plain binder
+    — the same irrefutability test `armEffect` applies to a `WHEN` arm, for the same reason
+    (`WHEN Tenant 1500` consumes nothing, and neither does `DECIDE f (Tenant 1500) …`).
+  - **(c)** **every other column of clause `i` matches every value of its own column.** A clause that
+    tests something extra matches fewer tuples, so it consumes nothing anywhere:
+    `DECIDE f On Landlord IS 0` does not use up `Landlord`, because `f Off Landlord` skips it.
+    "Matches every value" is a plain binder or the column-wildcard idiom — and also a pattern naming
+    the column type's **sole** constructor with irrefutable sub-patterns, which tests nothing (a
+    destructured record column, a one-arm sum).
+  - **(d)** column `j`'s own constructor set is **enumerable at the point the table is built**. When
+    it is not, no narrowing is recorded and that column keeps the OLD suppression instead — §5.1
+    item 1 is the list of when that happens, and which case of it is a live hole.
+
+  Conditions (a)–(c) each err **restrictively** when they fail, which is the direction §3.2 requires;
+  (d) errs permissively, which is why §5.1 enumerates it from the code rather than from a probe.
+
 - a base that is **not a bare binder** — `p's birthPlace's val`, `(f a)'s x`, an `IF` or `CONSIDER`
   result — could still be **every** constructor, always; the only repair is to name it
   (`CONSIDER p's birthPlace WHEN Just place THEN …`). Exception: a base that is syntactically a
   constructor application (`(Tenant OF 7)'s rent`, `Tenant WITH …`) or a nullary constructor is
   statically that constructor (taken on the plan's default, §6 item 5);
-- a function or `GIVEN` parameter is **not** narrowed by anything: `GIVEN a IS AN Actor` leaves `a`
-  at the whole type, so `a's monthly_rent` is an S2 error there until the body narrows it;
+- a function or `GIVEN` parameter is not narrowed by its **declaration**: `GIVEN a IS AN Actor`
+  leaves `a` at the whole type, so `a's monthly_rent` is an S2 error until something narrows it.
+
+  > **CORRECTED 2026-09-10.** This bullet used to read _"is **not** narrowed by anything … until the
+  > **body** narrows it"_, which the clause-order site above made false on the day it was built and
+  > which stood uncorrected through two rounds. A `GIVEN` parameter that is a **column of a fused
+  > clause group** is narrowed by the clauses above the one it is read in — and that is not "the
+  > body", it is the enclosing declaration's own clause matrix, outside every body. The same
+  > sentence was copied into `doc/reference/types/DECLARE.md`, where it sat two paragraphs below a
+  > worked example of exactly the narrowing it denied; both are fixed in the same change.
+
+  What is still true, and is the useful half: the **type annotation** narrows nothing, and a `GIVEN`
+  parameter that is not a clause column is narrowed only by a `CONSIDER`, an `EVERY`, or an alias
+  chain reaching one of those;
+
 - **an alias sees through to what it names** (**RULED 2026-09-09**, Meng). `WHERE b MEANS a`, where
   `a` is a binder, makes `b`'s narrowing `a`'s narrowing. Implement it by resolving the base through
   alias chains **at the read** and consulting the root binder's narrowing in the scope of that read
@@ -402,14 +471,22 @@ does not implement the feature. S5 remains DESIGN, exactly as the status header 
 
 Taken as a binding constraint on this ruling, not a preference. Where the budget is actually spent:
 
-| rule                              | magic  | why                                                                          |
-| --------------------------------- | ------ | ---------------------------------------------------------------------------- |
-| S1, one selector per shared field | none   | it _removes_ a surprise — today one written field is two partial functions   |
-| S2, refuse partial projection     | none   | a refusal; the error message is the lesson, delivered when it is needed      |
-| S3, `EVERY Tenant t` narrows `t`  | low    | the narrowing constructor is written at the site                             |
-| S3, an alias sees through         | low    | it makes _nothing_ happen; noticeable only by its absence (§3.1)             |
-| S3, `WHEN Tenant t` narrows `a`   | medium | the drafter wrote `t`; the thing that changed is `a`                         |
-| S3, `OTHERWISE` residual          | HIGH   | depends on every preceding branch, and on their sub-patterns' irrefutability |
+| rule                              | magic   | why                                                                                               |
+| --------------------------------- | ------- | ------------------------------------------------------------------------------------------------- |
+| S1, one selector per shared field | none    | it _removes_ a surprise — today one written field is two partial functions                        |
+| S2, refuse partial projection     | none    | a refusal; the error message is the lesson, delivered when it is needed                           |
+| S3, `EVERY Tenant t` narrows `t`  | low     | the narrowing constructor is written at the site                                                  |
+| S3, an alias sees through         | low     | it makes _nothing_ happen; noticeable only by its absence (§3.1)                                  |
+| S3, `WHEN Tenant t` narrows `a`   | medium  | the drafter wrote `t`; the thing that changed is `a`                                              |
+| S3, `OTHERWISE` residual          | HIGH    | depends on every preceding branch, and on their sub-patterns' irrefutability                      |
+| S3, clause order narrows a column | HIGHEST | the residual rule's dependency, plus a dependency on every OTHER column of every preceding clause |
+
+**The last row was added 2026-09-10, and it was missing for the whole time the rule was shipping.**
+That is worth stating plainly rather than quietly filling in: the rule was built, promoted to an
+error, and repaired twice while §3.2 — the section whose job is to price exactly this — did not know
+it existed. It is rated **above** the residual because it is the residual's dependency **plus** one
+more: the `OTHERWISE` residual depends on the preceding branches and their sub-patterns, and this
+depends on all of that **and** on every other column of every preceding clause (condition (c)).
 
 **So the whole budget is S3's, and most of it is the residual.** The bad day is concrete: one
 drafter writes `WHEN Tenant t THEN … OTHERWISE a's deposit` and it works, another writes
@@ -427,12 +504,68 @@ field of `Landlord` only"_ but _"…and the `WHEN Tenant 1500` branch matches on
 clever and is cut.** The residual rule is the one to test this against first, because it is the one
 that needs it most.
 
+#### The clause-order rule against §3.2's own test — RUN 2026-09-10, and it half passes
+
+This rule has now produced three defects in one repair round, so the test is applied to it rather
+than assumed. Both messages below are the S4 renderer's actual output on this branch's binary at
+`5ba5f94b`; the probes are named so they can be re-run.
+
+**It PASSES in the accepting-then-refusing direction**, which is the one §3.2 says is expensive.
+When the clauses above **do** consume something and a constructor still survives, the diagnostic
+names both halves of the reasoning (`pr/multiclause.l4`):
+
+> `monthly_rent` is a field of `Tenant` only.
+> But `s` could also be `Agent`, which has no `monthly_rent`.
+>
+> The clauses above this one already match `Landlord`,
+> so `Agent` is what is left to reach here.
+
+That is exactly the sentence §3.2 demands: it explains the **narrowing**, not just the missing field.
+It also now names the surviving constructor by its **unqualified** spelling even when the type is
+declared inside a `§` (probe `res/r13`), which it did not before `5ba5f94b`.
+
+**It FAILS when a clause consumes NOTHING, and that is the case a drafter will actually meet.**
+Condition (c) is invisible in the output. Probe `pr/m3-sibling-tested.l4` —
+`DECIDE f On Landlord IS 0` / `DECIDE f g a IS a's monthly_rent` — is refused with:
+
+> `monthly_rent` is a field of `Tenant` only.
+> But `a` could also be `Landlord`, which has no `monthly_rent`.
+>
+> Nothing here narrows `a`: it is used at the whole type `Actor`,
+> so every constructor of `Actor` can reach this read.
+
+"Nothing here narrows `a`" is **true** and **unhelpful**: it does not say that clause 1 would have
+narrowed `a` had its `On` column been a plain binder, and the drafter who widens that one unrelated
+column watches the error disappear for a reason the compiler never stated. That is §3.2's bad day
+almost verbatim, one column over. The identical silence covers a literal or `EXACTLY` sub-pattern in
+an earlier clause (probes `pr/m1`, `pr/m4`).
+
+**The consequence, recorded rather than acted on.** Under §3.2's stated test the rule has NOT fully
+earned its place, and the cut order below should carry it. It is **not** cut today, and the reason
+is measured rather than preferential: both cuts that were costed — restricting the rule to
+single-column groups, and reverting it wholesale — turn `pr/m3-sibling-tested` and
+`pr/h3-section-2col-death` from a correct refusal into a program that checks clean and dies at run
+time, i.e. each cut is strictly **more permissive** than what is in the tree, which §3.2's own
+asymmetry ranks worst. What is owed instead is a message: when a column's possible-set is unnarrowed
+**and** the enclosing declaration is a fused clause group, S4 should say which earlier clause failed
+which condition. Until that is written, this rule is spending magic it has not paid for.
+
 Two consequences to carry:
 
 - **Cut order, if teaching proves hard in practice.** Drop the `OTHERWISE` residual first (cost:
   `actus-core.l4:311` is rewritten as ``WHEN `ACTUS Other` s THEN s``, and drafters write one more
   branch); then the `WHEN`-narrows-scrutinee rule (cost: S2 becomes markedly more restrictive).
   Never S1 or S2 — they are the ruling.
+
+  **The clause-order rule is NOT first in this order, despite scoring HIGHEST above** (added
+  2026-09-10). Cutting it does not restore the pre-rule behaviour; it restores a **blanket
+  suppression** that accepts programs which die at run time (measured: `pr/m3-sibling-tested`,
+  `pr/h3-section-2col-death`). A cut that trades a refusal for a death is not on this list. The
+  cut that _is_ available, if the rule proves unteachable, is to keep the analysis and make S2
+  **refuse** every column it could not enumerate instead of suppressing the read — restrictive,
+  noisy, and it would close §5.1's remaining permissive holes. That has not been costed against the
+  corpus.
+
 - **An explicit escape hatch is worth more than another narrowing rule.** §6's `a's? monthly_rent`
   returning `MAYBE` is the anti-magic lever: it lets a drafter opt out of the narrowing analysis
   entirely and say what they mean, and it is teachable in one sentence. If S3 keeps growing rules to
@@ -597,11 +730,18 @@ text is what a later reader will follow, and two of its three rigs are not what 
 **The zero has stated bounds, and a later reader should quote them rather than the bare count.**
 They are enumerated in §5.1, which is where they belong; this paragraph used to state a second bound
 that appeared nowhere in §5.1, and used to call it one of "two … both in §5.1", which was wrong on
-both counts. The permissive exits from `checkPartialProjection` are: the untyped-`GIVEN` clause
-column (§5.1 item 1), the re-parsed-printer-output case (item 2), and four silent bails — not a
-`KnownTerm _ Selector`, no `selectorDomainType` head, an unenumerable universe (`CONTRACT`), or an
-empty `declared` (item 3). The measured six is therefore a lower bound on the language's real
-exposure.
+both counts. The permissive exits from `checkPartialProjection` are: the **two** clause-column holes
+of §5.1 item 1 — an untyped `GIVEN` column, and a hand-written nullary declaration spelled with the
+desugarer's reserved fall-through name — the re-parsed-printer-output case (item 2), and four silent
+bails — not a `KnownTerm _ Selector`, no `selectorDomainType` head, an unenumerable universe
+(`CONTRACT`), or an empty `declared` (item 3). The measured six is therefore a lower bound on the
+language's real exposure.
+
+> **CORRECTED 2026-09-10.** This sentence said "the untyped-`GIVEN` clause column", singular, which
+> was the same undercount as the status header's. It was also written while a **type synonym** on a
+> column type was a third exit; that one is closed (`5ba5f94b`) and would otherwise have belonged
+> here. The exits are now derived in §5.1 from `clauseColumnUniverse`'s own conditions rather than
+> from whichever probe was to hand.
 
 ### 4.2 Gate steps 2 and 3, DONE 2026-09-09 — the repairs, the promotion, and what they cost
 
@@ -718,6 +858,19 @@ hole rather than describing it.
 
 This is where the work is expected to land; the implementer re-checks each anchor.
 
+> **EVERY anchor in this section was re-measured on 2026-09-10 against the tree at the documentation
+> commit that immediately follows `5ba5f94b` on `lang/whose-opening`** — not against `5ba5f94b`
+> itself, because that commit touches three comments in `TypeCheck.hs` and so moves everything below
+> `:1050` down. Anchors are given as
+> `file:line` for a definition's first line. Two earlier rounds each re-measured _some_ of them and
+> left the rest: `c26496cd` added 91 lines to `EvaluateLazy/Machine.hs` and invalidated item 2's
+> three; `ea06a1ce` re-measured item 1 and left item 2 wrong, plus two more inside the sentence it
+> was editing. **A partial re-measurement is worse than none**, because the ones it fixed vouch for
+> the ones it did not. If you re-measure, re-measure the section.
+>
+> Anchors that are explicitly labelled _pre-S1_ below are **not** re-measured: they are struck text
+> kept as evidence that a claim moved, and pointing them at today's tree would erase that.
+
 1. **Selector generation** (`inferConDecl` `:1530-1553`, `inferSelector` `:1599-1616`). Group a
    type's fields by name across all its constructors before minting selectors. One group → one
    `Resolved` selector, one `CheckInfo`, one `KnownTerm … Selector` of type `T → fieldT`. A group
@@ -726,13 +879,13 @@ This is where the work is expected to land; the implementer re-checks each ancho
    **Corrected:** the grouping cannot live in `inferConDecl` — only `inferTypeDecl`'s `EnumDecl`
    arm (`:1448-1453`) holds all the constructors, and field types must be resolved across arms
    before any selector is minted. Later arms get `defAka` (same `Unique`, their own name and range).
-   **BUILT 2026-09-09** as `inferConDecls` (`TypeCheck.hs:1941`, with Note [One selector per
-   shared field] at `:1881` and `data FieldOccurrence` at `:1927` — re-measured 2026-09-10; the
-   anchors first written here were from the S1 tree and the two commits since have moved them, so
-   treat every line number in this §5 as needing a `grep` before it is trusted), which both the `EnumDecl`
-   arm (`:1448-1454`) and the `RecordDecl` arm (via `inferConDecl` `:1533`, the one-arm case) go
+   **BUILT 2026-09-09** as `inferConDecls` (`TypeCheck.hs:2074`, with Note [One selector per
+   shared field] at `:2014` and `data FieldOccurrence` at `:2060`), which both the `EnumDecl`
+   arm of `inferTypeDecl` (`:1918`, calling at `:1923`) and the `RecordDecl` arm (via
+   `inferConDecl` `:2003`, calling at `:2005`, the one-arm case) go
    through; `inferSelector` is gone. The error is `SharedFieldTypeMismatch Name [(Name, Name, Type'
-Resolved)]` (`TypeCheck/Types.hs:143`, `rangeOf` `:531` anchored on the first occurrence),
+Resolved)]` (`TypeCheck/Types.hs:143`, `rangeOf` `:531` anchored on the first occurrence — both
+   still correct),
    raised inside the existing `WhileCheckingDeclare`
    context; on disagreement the group falls back to today's per-arm selectors, so a read of the
    disputed field in the same file gets today's ambiguity rather than a cascade. One limit,
@@ -750,13 +903,16 @@ Resolved)]` (`TypeCheck/Types.hs:143`, `rangeOf` `:531` anchored on the first oc
    earlier arms die with §1.1's message. No corpus golden would catch it. The evaluator change is
    the widening, not an optional follow-up: one closure per field `Unique`, one branch per
    declaring constructor, each carrying that constructor's own arity and that field's index —
-   fields are stored **positionally** (`ValueLazy.hs:83`) and two arms may place the field
-   differently. **S1's checker and evaluator halves must land in one commit**, and the guard is a
-   probe with the shared field at index 1 on one arm and 0 on the other. **BUILT 2026-09-09** as
-   `evalConDecls` (`Machine.hs:4233-4276`; the `:4207-4231`/`:4230` anchors above are the pre-S1
-   tree, and `updateTerm` is now `:4181`): one closure per selector `Unique`, its body a `CONSIDER`
+   fields are stored **positionally** — `ValConstructor Resolved [a]`,
+   `jl4-core/src/L4/Evaluate/ValueLazy.hs:83`, still the line it was — and two arms may place the
+   field differently. **S1's checker and evaluator halves must land in one commit**, and the guard is
+   a probe with the shared field at index 1 on one arm and 0 on the other. **BUILT 2026-09-09** as
+   `evalConDecls` (`jl4-core/src/L4/EvaluateLazy/Machine.hs:4267-4322`; the `:4207-4231`/`:4230`
+   anchors above are the pre-S1 tree, and `updateTerm` is `:4215`): one closure per selector
+   `Unique`, its body a `CONSIDER`
    with one branch per declaring constructor, each carrying that constructor's own arity and that
-   field's index; `scanTypeDecl` (`:4015-4019`) dedupes by `Unique` so `preAllocate` allocates one
+   field's index; `scanTypeDecl` (`:4049-4056`) dedupes by `Unique` (`nubOrdOn getUnique`) so
+   `preAllocate` allocates one
    cell. The guard is `ok/sum-fields/shared-field.l4`, whose `Landlord HAS addr, name` /
    `Tenant HAS name, rent` reads both arms, positionally and through `WITH`, and through a
    `GIVEN a IS AN Actor` reader. Cosmetic only: the closure's lambda argument is named after the
@@ -773,15 +929,22 @@ Resolved)]` (`TypeCheck/Types.hs:143`, `rangeOf` `:531` anchored on the first oc
    merely unused for the member's binding.
 
    **BUILT 2026-09-09 (`92e12d27`). Five corrections to the paragraph above, all measured while
-   building — every line number in it is pre-S1 and none of them survives.** As of this commit:
+   building — every line number in it is pre-S1 and none of them survives.** ~~As of this commit:
    `data CheckEnv` is `Types.hs:905-1010`, `localBindings` is `:965`, and the new
-   `narrowings :: !(Map Unique Narrowing)` is `:975` (appended LAST, deliberately — see the next
-   point). `checkDeonton` is `TypeCheck.hs:2095`, its member binding `:2092-2094`, the narrowing
-   constructor resolved at `:2049` (the "45 lines above" survives exactly), and stored in the AST at
-   `:2112`. `checkBranch` is `:4331`, `checkConsider` is `:3026`.
+   `narrowings :: !(Map Unique Narrowing)` is `:975`.~~ **Re-measured 2026-09-10**, because the
+   `92e12d27` numbers had themselves gone stale and this paragraph is the one a reader trusts:
+   `data CheckEnv` is `TypeCheck/Types.hs:927-1093`, `localBindings` is `:987`, and
+   `narrowings :: !(Map Unique Narrowing)` is `:997` — appended LAST, deliberately, see the next
+   point; the three fields the clause-order rule added since (`clauseNarrowings`,
+   `clauseSuppressColumns`, `fallthroughColumns`, `fallthroughUnanalysed`) are appended after it for
+   the same reason. `checkDeonton` is `TypeCheck.hs:2498`, its member binding `:2583`, the narrowing
+   constructor built at `:2579-2581` from the cast resolved at `:2519`, and stored in the AST at
+   `:2601`. **"the narrowing constructor resolved 45 lines above" no longer survives** — it is 60
+   lines above, and the arithmetic was never the point; the ordering is. `checkBranch` is `:4799`,
+   `checkConsider` is `:3494`.
 
    - **"four construction sites" is wrong: there are four record CONSTRUCTIONS and a FIFTH
-     occurrence.** `TypeCheck.hs:365` is a POSITIONAL pattern over every field of `CheckEnv`, whose
+     occurrence.** `TypeCheck.hs:375-376` is a POSITIONAL pattern over every field of `CheckEnv`, whose
      own comment explains why (a duplicated field name makes a record update ambiguous under
      `DuplicateRecordFields`). It fails with a constructor-arity error, not `-Wmissing-fields`, so it
      is the one site the warning machinery does not point you at — and if the new field is added
@@ -792,20 +955,20 @@ Resolved)]` (`TypeCheck/Types.hs:143`, `rangeOf` `:531` anchored on the first oc
      `WHEN Tenant (Some n)` — which is one of the three shapes §3 S3 itself names as MUST-NOT-CONSUME.
      Reusing it would have left the residual wrong in the PERMISSIVE (invisible) direction, the exact
      failure the sub-rule exists to prevent. What is built instead is `armEffect`
-     (`TypeCheck.hs:2939`, over `data ArmEffect` at `:2900`), which tests irrefutability directly —
+     (`TypeCheck.hs:3387`, over `data ArmEffect` at `:3348`), which tests irrefutability directly —
      every sub-pattern a plain variable — rather than testing for the absence of two opaque shapes.
-     `patternHasOpaque` (`:3683`) is UNCHANGED: it answers a different question, and `checkConsider`
+     `patternHasOpaque` (`:4151`) is UNCHANGED: it answers a different question, and `checkConsider`
      and `checkClauseMatrix` depend on its current answer. The two disagreeing is correct.
    - **A bare identifier does NOT parse as `Var`.** `atomicExpr'` produces `App ann n []` and nothing
      normalises it later; `Var` is a pattern synonym for exactly that shape, and is otherwise emitted
      only by the computed-field rewrite and the clause-matrix fallthrough. A base test written as
      `case e of Var _ r -> …` compiles, type-checks and NEVER FIRES — S3 would silently do nothing
-     and S2 would then refuse every drafter-written projection. `classifyBase` (`:2613`) matches both
+     and S2 would then refuse every drafter-written projection. `classifyBase` (`:3016`) matches both
      shapes, and consults `entityInfo` rather than the syntax, which is what gives §3 S3's
      "a nullary constructor is statically that constructor" exception for free.
    - **The alias rule needed no new state.** `constBodies` already holds every nullary `MEANS` body,
      including local `WHERE`/`LET` ones, and `checkExpr`'s `Where` case runs `inferLocalDecl` before
-     the body — so resolving the chain AT THE READ (`lookupNarrowing`, `:2686`) is both possible and,
+     the body — so resolving the chain AT THE READ (`lookupNarrowing`, `:3089`) is both possible and,
      per §3 S3, required: it is what makes an alias bound outside a `CONSIDER` and read inside two
      branches see each branch's own narrowing.
 
@@ -813,10 +976,12 @@ Resolved)]` (`TypeCheck/Types.hs:143`, `rangeOf` `:531` anchored on the first oc
    `Proj` dispatcher); the insertion point is after `matchFunTy` (`:3137`).~~ Those anchors are
    pre-S1. The selector's declaring constructors need **no new state**: each constructor's
    `KnownTerm conType Constructor` already names its selectors' own `Def`s as the argument names,
-   and `constructorsInScopeFromEntityInfo` enumerates a type's constructors — both confirmed while
-   building. **BUILT 2026-09-09** (`checkPartialProjection`, `TypeCheck.hs:2817`, under
-   Note [S2: no projection without narrowing]; drained by `flushPartialProjections` `:2891` from
-   `inferTopDecl` `:903`; rendered by `prettyPartialProjection` `:6903`) — as a warning in
+   and `constructorsInScopeFromEntityInfo` (`:2883`) enumerates a type's constructors — both
+   confirmed while
+   building. **BUILT 2026-09-09** (`checkPartialProjection`, `TypeCheck.hs:3221`, under
+   Note [S2: no projection without narrowing] at `:3121`; drained by `flushPartialProjections`
+   `:3339` from `inferTopDecl` `:906`, called at `:909`; rendered by `prettyPartialProjection`
+   `:7421`) — as a warning in
    `0ea70d3f` for the length of §4's gate step 1, then **promoted to a `CheckError` in the same
    change as the six repairs** (§4.2). With **four** insertion points, not one, because §3
    S2's second ruling covers three forms: `inferRecordProjection` (`a's f`), the `Proj` dispatcher's
@@ -824,6 +989,9 @@ Resolved)]` (`TypeCheck/Types.hs:143`, `rangeOf` `:531` anchored on the first oc
    value), and `inferFlatApp`'s `directApp`/`variadicRescue` (`f a`). The bare form lands in the
    `Var` case and not in `inferFlatApp`: a bare identifier parses as `App ann n []`, `Var` is a
    pattern synonym for exactly that, and the `Var` arm sits above the `App` arm.
+   The four call sites, measured 2026-09-10: `TypeCheck.hs:3328` (the `f a` application, via
+   `inferFlatApp`'s shared helper), `:4263` (the `Var` case), `:4348` (`inferRecordProjection`) and
+   `:4360` (a bare selector as a value).
 
    The denominator is the **selector's own domain type head**, not the base's inferred type, which
    makes the whole check substitution-independent and removes the accuracy-versus-timing tension
@@ -838,8 +1006,13 @@ Resolved)]` (`TypeCheck/Types.hs:143`, `rangeOf` `:531` anchored on the first oc
    diagnostic _viable_, which `prune` then has to arbitrate — two viable candidates collapse to
    `InternalAmbiguityError`, the same ambiguity-instead-of-S4 outcome moved one step later.
 
+   (`viableCandidate`'s pre-S1 anchor `Types.hs:466-469` is struck text; the function is
+   `TypeCheck/Types.hs:510` today.)
+
    **What is built instead is deferral**, which needs no change to `severity` and none to
-   `viableCandidate`. The obligation is parked on a new `CheckState.pendingPartialProjections` and
+   `viableCandidate`. The obligation is parked on a new `CheckState.pendingPartialProjections`
+   (`TypeCheck/Types.hs:98`; the `CheckError` constructor `PartialProjection` is `:149` and the
+   payload record `data PartialProjection` is `:906`) and
    drained by `inferTopDecl`, which is the first point above every fork: `Check` returns a list of
    `(result, state)` pairs and `prune` returns exactly one, so the state that continues is the
    winning candidate's — its obligations survive and every loser's are discarded, by the same
@@ -853,7 +1026,7 @@ Resolved)]` (`TypeCheck/Types.hs:143`, `rangeOf` `:531` anchored on the first oc
 
    **One scope limit worth stating so the next reader does not re-derive it, verified not assumed:**
    a COMPUTED field (`MEANS` inside a `DECLARE`) is excluded from S2, and that is sound rather than a
-   hole. `desugarCFDeclare` (`L4/Desugar.hs:270-280`) pattern-matches `RecordDecl` and never
+   hole. `desugarCFDeclare` (`L4/Desugar.hs:270-280`, unmoved) pattern-matches `RecordDecl` and never
    `EnumDecl`, so a computed field can only ever be declared on a single-constructor record and can
    never be partial.
 
@@ -862,12 +1035,12 @@ Resolved)]` (`TypeCheck/Types.hs:143`, `rangeOf` `:531` anchored on the first oc
 6. **Consumers.** ~~sees one selector where it saw N.~~ **Backwards for almost all of them:** the
    schema, NLG and transpiler consumers read the AST's `ConDecl` field lists by name **text** and
    are unaffected. Exactly two `Unique`-keyed consumers change — the evaluator environment, and
-   DMN's `selectorNames`/`fieldScopes` (`Dmn/Lower.hs:3987-3994`), which must be deduped by
+   DMN's `selectorNames`/`fieldScopes` (`Dmn/Lower.hs:3990-3995` and `:4017`), which must be deduped by
    `Unique` or a merged field's FEEL step becomes `name_2` — **BUILT 2026-09-09**, `nubOrdOn
 getUnique` on the `EnumDecl` case. Hover and `@desc` are range-keyed and
    survive `defAka`; find-references improves; completion goes from two byte-identical items to one.
    Docassemble **already refuses** the S1-merged shape with a CI-pinned message
-   (`Docassemble/Lower.hs:2320-2353`) — under S1 those are one field, so that refusal must be
+   (`checkNameCollisions`, `Docassemble/Lower.hs:2320-2368`, its `Why` note at `:2305-2319`) — under S1 those are one field, so that refusal must be
    reworded as an exporter limit or lowered to one question (§6 item 4).
 7. **Goldens and docs.** New `ok/` fixtures for S1 (shared field read on both arms, armed and
    traced) and S3 (narrowed projection); new `not-ok/tc/` fixtures for S1's type-disagreement error
@@ -896,11 +1069,19 @@ getUnique` on the `EnumDecl` case. Hover and `@desc` are range-keyed and
    limits", the four shapes that are NOT narrowed (a `GIVEN` parameter, a non-binder base, a
    refutable `WHEN` arm, an alias that names something other than a binder).
 
-### 5.1 What S2 does not guarantee — one permissive hole, one printer-only hole, four silent bails, one restrictive limit
+### 5.1 What S2 does not guarantee — two permissive holes, one printer-only hole, four silent bails, one restrictive limit
 
 Only a **permissive** gap lets the run-time death of §1.1 through. None is a reason not to promote;
 all are reasons to say so out loud, because §3.2's asymmetry cuts the other way for a rule that
 _fails to reject_: there is no error message to teach the lesson.
+
+> **RE-DERIVED FROM THE CODE 2026-09-10, at `5ba5f94b`, and the count went from one to two.** The
+> previous revision of this section named one permissive hole, having reasoned from a single probe.
+> Item 1 below now works the other way round: it starts from `clauseColumnUniverse`'s conditions —
+> the function that decides whether a column gets a possible-set at all — enumerates every way it
+> can answer "I do not know", and says for each whether that is a live hole and how it was measured.
+> Two are live. The heading, the status header, §4.1 and the three neighbouring documents that
+> repeated the old count are corrected in the same change.
 
 > **REWRITTEN 2026-09-09. The hole this section was built around is CLOSED** (commit `655b272b`),
 > and the paragraph below that said the repair "is unsound and must not be built" was describing a
@@ -951,15 +1132,70 @@ _fails to reject_: there is no error message to teach the lesson.
    fatal — is gone. `NarrowedByEarlierClauses` is the reason that renders it; `ok/sum-fields/fallthrough.l4`
    and `not-ok/tc/partial-projection-fallthrough.l4` are the fixtures.
 
-   **What survives is one column shape, and it is the only permissive hole with a demonstrated
-   user.** An **untyped** `GIVEN` column is still an inference variable when the narrowing table is
-   built — the table has to be built before the body is checked — so that column gets no
-   possible-set, and an un-narrowed read on it (or on a catch-all binder or `MEANS` alias of it)
-   inside a later clause is suppressed. `CheckEnv.clauseSuppressColumns` carries exactly those
-   columns; `isFallthroughColumnRead` is the test. Measured: the program above with `GIVEN s` and no
-   type reports `Check succeeded.` and then dies, and `ok/sum-fields/partial-selector-runtime.l4` is
-   that file, under `ok/` precisely because it checks clean. Closing it needs the column's type
-   earlier than the checker has it.
+   **What survives, derived from the code rather than from a probe (2026-09-10, at `5ba5f94b`).**
+   A column keeps the OLD, suppress-the-read behaviour exactly when
+   `clauseColumnUniverse` (`TypeCheck.hs:1552`) answers `Nothing` for it — "I do not know", never
+   "no constructors". `CheckEnv.clauseSuppressColumns` carries those columns,
+   `markFallthrough` copies them into `fallthroughColumns`, and `isFallthroughColumnRead`
+   (`:3300`) is the test at the read. Its own Haddock enumerates the conditions; here is each one,
+   with whether it is a live hole.
+
+   The `pr/…` and `res/…` and `rd/…` names below are **session probe files, not corpus fixtures** —
+   they were written to measure these cases and are not in the tree. Each row says what its probe
+   is, so a later reader re-derives it rather than looking for a file. The corpus does hold the two
+   shapes worth pinning: `ok/sum-fields/fallthrough.l4` (the idiom, armed) and
+   `not-ok/tc/partial-projection-fallthrough.l4` (the refusals).
+
+   | condition                                                                                                                                                       | live permissive hole?                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+   | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+   | `rigidHeadOf` finds an unresolved **inference variable** — an untyped `GIVEN`                                                                                   | **YES.** Hole (a) below. Measured: `res/r1-untyped.l4` checks clean and dies.                                                                                                                                                                                                                                                                                                                                                                           |
+   | `rigidHeadOf` finds **no rigid head** — a `GIVEN … IS A TYPE` variable, a quarantined cyclic synonym, or fuel exhausted at 1000 expansions                      | **No.** A selector's domain is a concrete sum type, so a read on such a column does not type-check in the first place. Measured refused: `res/r6-typevar`, and `rd/rd8-selfsyn` (a self-referential `DECLARE Loop IS Loop`, refused at the declaration). The fuel limb is unreached rather than measured — `synonymExpansionFuel` is 1000 (`TypeCheck/Unify.hs:39-40`) and `Unify` would give up first.                                                 |
+   | the head has **no enumerable constructors** — `NUMBER`/`STRING`/`DATE`, an `ASSUME`d opaque type, or `CONTRACT` (excluded by `builtinNonExhaustiveTypeUniques`) | **No**, for the same reason, and measured in both roles. As the READ column the program is refused before S2 is reached, by the ordinary type error on the selector's domain (`rd/e1-read-number-col`, `rd/e2-read-assume-col`). As a **don't-care** column it no longer poisons its siblings (`res/r11-provision-col` checks and runs; `rd/rd7-assume-ty`, an `ASSUME`d column beside an `Actor` column, draws the correct S2 refusal on the `Actor`). |
+   | `clauseColumnFacts`'s **column-count bail**, which suppresses _every_ column of a group whose matrix does not line up with its appform                          | **No measured route.** With a type signature, a clause whose pattern count differs from the appform's is rejected first by the name/signature consistency check (`rd/cc-arity-sig`); without one, the group is still refused at the whole type (`rd/cc-arity-nosig`). Recorded as unmeasured rather than as safe.                                                                                                                                       |
+
+   A **type synonym** on the column type used to be a second live hole in this table and is not any
+   more: `clauseColumnUniverse` took the head by matching `TyApp` on the substituted type, saw the
+   synonym's own name and gave up, so `DECLARE Person IS Actor` put a **typed** `GIVEN` back under
+   the blanket suppression and the read died. `5ba5f94b` takes the head with the checker's own
+   `rigidHeadOf`, which chases the substitution and expands synonyms with their argument
+   substitution. Measured closed for a nullary synonym, a chain of them, a parameterised one applied
+   to arguments, and an imported one (`pr/d1-synonym`, `pr/h5-syn-dontcare`, `pr/h6-paramsyn`).
+
+   **Hole (a) — an untyped `GIVEN` column. Has a demonstrated user; not closable at proportionate
+   cost.** The column type is still an inference variable when the narrowing table is built, and the
+   table has to be built **before** the body is checked, because a narrowing must be in scope while
+   the body it constrains is checked. Resolving the variable requires the body to have been checked.
+   Both directions are stated in the tree itself (`TypeCheck.hs:1043-1048` against `:1570-1575`);
+   having both means checking the body twice. Measured: the program above with `GIVEN s` and no type
+   reports `Check succeeded.` and then dies, and `ok/sum-fields/partial-selector-runtime.l4` is that
+   file, under `ok/` precisely because it checks clean.
+
+   **Hole (b) — a hand-written NULLARY declaration spelled `` `__pm_fallthrough_<k>` ``. New to this
+   record 2026-09-10; it was open the whole time item 1 claimed to be the only hole.**
+   `L4.Parser.matchClauses` compiles clauses 2..n into a `LET`-bound nullary decide under that name,
+   and `isSyntheticFallthrough` (`TypeCheck.hs:1132`) recognises one by its name **and** its nullary
+   appform. A drafter who writes that name themselves is therefore treated as being inside a
+   fall-through; when the enclosing declaration is not a fused clause group there is no matrix to
+   consult, `CheckEnv.fallthroughUnanalysed` is set, and every un-narrowed read on a bare binder in
+   that body is suppressed. Measured (`res/r2-nullary-spoof.l4`) — this reports `Check succeeded.`
+   and then dies on `Agent`:
+
+   ```l4
+   GIVEN a IS AN Actor
+   GIVETH A NUMBER
+   DECIDE outer a IS `__pm_fallthrough_0`
+     WHERE
+       `__pm_fallthrough_0` MEANS a's monthly_rent
+   ```
+
+   The **unary** spelling of the same trick was open until `5ba5f94b` and is now refused; it is
+   pinned as case 9 of `not-ok/tc/partial-projection-fallthrough.l4`. The name itself **cannot be
+   banned**: `L4.Print.quoteIfNeeded` emits exactly that backticked form, and `l4 batch`, the REPL
+   and the round-trip test all re-parse it (item 2), so a module legitimately carrying it must keep
+   being accepted. Closing it properly means marking the synthesised `Decide` on its annotation at
+   desugar time **and** teaching `L4.Print` to re-emit a fused group from its matrix rather than from
+   the desugared `LET`, because the flag does not survive printing. That is a separate change with
+   its own round-trip risk; recorded, not attempted.
 
 2. **A module that has been through `prettyLayout` and re-parsed keeps the old, wider suppression.**
    `l4 batch`, the REPL and the print round-trip test re-emit the desugared tree, and
@@ -967,10 +1203,19 @@ _fails to reject_: there is no error message to teach the lesson.
    the `__pm_fallthrough_` bindings. `CheckEnv.clauseNarrowings` is therefore a `Maybe`, and
    `Nothing` restores suppression for un-narrowed bare-binder reads.
 
-   This is **not** a language-level hole: the source was checked against the real matrix on the
-   first pass, and this exists so `l4 batch` does not reject a file `l4 check` has just accepted. It
-   is also strictly narrower than the old behaviour — a bare selector used as a value and a
-   constructed base stay checked even here.
+   This is **not** a language-level hole _by this route_: the source was checked against the real
+   matrix on the first pass, and this exists so `l4 batch` does not reject a file `l4 check` has just
+   accepted. It is also strictly narrower than the old behaviour — a bare selector used as a value
+   and a constructed base stay checked even here. Measured 2026-09-10, so the "by this route" is not a hedge.
+   `l4 batch --validate-only` on the refused headline probe reports the S2 `check` error itself — so
+   the source is type-checked before anything is re-emitted — while on the accepted probe it gets
+   past checking and stops only for want of an `@export`. And `l4 format` is the EXACT printer:
+   `grep -c __pm_fallthrough_` over its output on a multi-clause file is **0**, so the formatter is
+   not a way in either.
+
+   **But the same suppression IS reachable from hand-written source, and that is hole (b) of item 1**
+   (2026-09-10). The only way in is to write the reserved name yourself. The two are one mechanism
+   read from two ends, which is why hole (b) cannot be closed by banning the name.
 
 3. **Four silent bails inside `checkPartialProjection` itself, all permissive.** These were stated
    only in §4.1 and belong here. `checkPartialProjection` records nothing when the resolved name is
@@ -987,6 +1232,25 @@ _fails to reject_: there is no error message to teach the lesson.
    **projection**. Because it is restrictive it surfaces as a refusal a drafter can act on (measured:
    it renders the `NotNarrowed` message), and it cannot cause a run-time death; the repair is to
    move the read inside the branch.
+
+5. **Five shapes an earlier clause can take that consume NOTHING — RESTRICTIVE, and each one is a
+   refusal a drafter will meet** (added 2026-09-10; the clause-order rule's own residual list, which
+   §3 S3's conditions (a)–(c) imply but which nothing stated). Each is sound — the pattern really is
+   refutable, or the clause really does test something extra — and each is pinned by a probe or by a
+   case of `not-ok/tc/partial-projection-fallthrough.l4`. In every one, the group is refused at the
+   **whole** column type, with the `NotNarrowed` message and no mention of the clause responsible
+   (see §3.2's run of its own test):
+
+   | what the earlier clause contains                                                       | probe                                                    |
+   | -------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+   | a literal (`DECIDE f 1 Landlord IS …`)                                                 | `pr/m1-literal`                                          |
+   | an `EXACTLY`/expression pattern                                                        | `pr/m4-exactly`                                          |
+   | a `FOLLOWED BY` cons pattern                                                           | `res/r7-consfirst`                                       |
+   | a constructor pattern with a **refutable** sub-pattern (`(Landlord Yes)`)              | `pr/m2-nested-ctor-subpat`, `res/r10-solector-refutable` |
+   | fine in its own column, but some OTHER column of that clause is TESTED (condition (c)) | `pr/m3-sibling-tested`                                   |
+
+   The last row is the one that will generate the support questions, because the pattern the drafter
+   is looking at is unimpeachable and the cause is a column they were not thinking about.
 
 Two smaller notes, both restrictive and both silent:
 
@@ -1005,7 +1269,7 @@ Two smaller notes, both restrictive and both silent:
   (eleven when first counted; the `for-all.md` quotation was the twelfth) and the chosen names.
   Landed as commit `7cf1e0e9`; `git show 7cf1e0e9 -- '*.l4'` is the list of what S1's declaration
   error would otherwise have refused.
-- **Docassemble's existing refusal of the merged shape** (`Docassemble/Lower.hs:2320-2353`, fixture
+- **Docassemble's existing refusal of the merged shape** (`checkNameCollisions`, `Docassemble/Lower.hs:2320-2368`, fixture
   `docassemble/not-ok/payload-name-collision.l4`, CI-pinned). It tells a drafter to rename what S1
   makes one field. Reword as an exporter limit, or lower a merged field to one question? Open.
 - **`@desc`/`@nlg` written differently on two arms of one merged field.** Today each registers under

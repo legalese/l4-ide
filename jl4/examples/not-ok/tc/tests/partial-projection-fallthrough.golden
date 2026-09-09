@@ -171,7 +171,7 @@ File: partial-projection-fallthrough.l4
 
 File: partial-projection-fallthrough.l4
   Hidden: no
-  Range: 122:34-122:50
+  Range: 131:34-131:50
   Source: check
   Severity: DiagnosticSeverity_Error
   Code: <none>
@@ -193,7 +193,7 @@ File: partial-projection-fallthrough.l4
 
 File: partial-projection-fallthrough.l4
   Hidden: no
-  Range: 145:32-145:46
+  Range: 154:32-154:46
   Source: check
   Severity: DiagnosticSeverity_Error
   Code: <none>

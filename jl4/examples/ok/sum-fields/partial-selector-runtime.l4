@@ -2,12 +2,18 @@
 -- run time.
 --
 -- This file is here under `ok/` for an uncomfortable reason: it checks clean
--- and then dies. That is the accepted residual hole in §5.1's clause-column
--- narrowing — an UNTYPED `GIVEN` column is still an inference variable when the
--- narrowing table is built, which has to happen before the body is checked, so
--- the column keeps the old suppression and S2 cannot refuse the read. Write
--- `GIVEN s IS AN Actor` instead and the same program is refused at check time;
--- that is `not-ok/tc/partial-projection-fallthrough.l4`.
+-- and then dies. That is hole (a) of §5.1 item 1, and the only residual hole in
+-- the clause-column narrowing itself — an UNTYPED `GIVEN` column is still an
+-- inference variable when the narrowing table is built, which has to happen
+-- before the body is checked, so the column keeps the old suppression and S2
+-- cannot refuse the read. Write `GIVEN s IS AN Actor` instead and the same
+-- program is refused at check time; that is
+-- `not-ok/tc/partial-projection-fallthrough.l4`.
+--
+-- §5.1 item 1 lists a SECOND permissive hole, which is not this mechanism and
+-- is not witnessed here: a hand-written NULLARY declaration spelled with the
+-- desugarer's reserved `__pm_fallthrough_` name. It has no corpus fixture
+-- because pinning it would mean shipping that spelling in the corpus.
 --
 -- The hole is why the RUN-TIME message still matters, and this file is what
 -- pins it. What it used to say was:

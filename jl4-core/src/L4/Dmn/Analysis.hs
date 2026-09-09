@@ -546,11 +546,22 @@ analyzeSafety inp cg decides =
       | s == StrictPos, not (primitiveOperand a)
       ]
         <> walkIssues s a
+    -- "CAN raise", not "raises", and the distinction is load-bearing rather
+    -- than stylistic. This guard is drawn off the IR SHAPE — a projection over a
+    -- multi-constructor enum not every arm of which declares the field — which
+    -- OVER-APPROXIMATES: the shape raises only when a value built by a
+    -- non-declaring constructor actually reaches the read, and a program whose
+    -- clause order rules those out never does. Measured 2026-09-10 on the L11
+    -- fixture in "jl4/tests/DmnExport.hs": it checks clean, evaluates 0 and 7,
+    -- and raises nothing — while still drawing this note, which is the property
+    -- that keeps L11 from being dead code. Said unconditionally (as this message
+    -- did between c26496cd and now) it asserts a run-time death about programs
+    -- that demonstrably do not have one.
     Proj _ base fld ->
       [ issue "L11" e
           ("the projection `" <> unqualifiedNameToText (TC.getName fld)
              <> "` scrutinises a multi-constructor IS ONE OF whose constructors do not all declare that field; \
-                \the selector application raises PartialSelector at run time")
+                \the selector application can raise PartialSelector at run time")
       | s == StrictPos
       , Just ctors <- [enumOfOperand base]
       , length ctors > 1

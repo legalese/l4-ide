@@ -3172,8 +3172,15 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       -- exercises this (0 Proj sites over a multi-constructor enum across
       -- all 62 files), so both sides are synthetic — deliberately. The
       -- exporter must refuse the rejecting shape, because the selector
-      -- application raises NonExhaustivePatterns at run time with no CONSIDER
-      -- in sight.
+      -- application CAN raise PartialSelector at run time with no CONSIDER in
+      -- sight.
+      --
+      -- (That sentence said "raises NonExhaustivePatterns" until 2026-09-10,
+      -- and was wrong twice: c26496cd split PartialSelector out of
+      -- NonExhaustivePatterns for exactly this path and did not update the
+      -- comment, and "raises" overstates a guard drawn off the IR shape — see
+      -- the note below, and the matching one at the L11 site in
+      -- "L4.Dmn.Analysis".)
       --
       -- ★ THE REJECTING SOURCE CHANGED, 2026-09-09. It was the bare
       -- @`the radius` s MEANS s's radius@, and the comment above it read

@@ -117,6 +117,15 @@ DECIDE synRent o        IS o's monthly_rent
 --    this is an ordinary user declaration and its read is checked like any
 --    other — before, the name alone switched the whole check off and the
 --    program died at run time.
+--
+--    WHAT THIS CASE DOES NOT PIN, said here so the arity test is not mistaken
+--    for a closed shape: the NULLARY spelling still switches the check off,
+--    because that is the one form the desugarer itself emits and so the one
+--    form that cannot be excluded. `DECIDE outer a IS `__pm_fallthrough_0`
+--    WHERE `__pm_fallthrough_0` MEANS a's monthly_rent` checks clean and dies
+--    at run time (measured 2026-09-10). It is hole (b) of §5.1 item 1, and it
+--    has no fixture because pinning it would mean shipping that spelling in
+--    the corpus.
 GIVEN s IS AN Actor
 GIVETH A NUMBER
 DECIDE `__pm_fallthrough_0` s IS s's monthly_rent

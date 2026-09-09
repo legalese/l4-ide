@@ -1619,9 +1619,17 @@ or transitively calls a decision that is.
 >   source, which is why the test stayed green across that change without being touched.
 >
 > Do not delete reading form (1) from the list above. It describes an IR shape the exporter can still
-> be handed — through `SUM-TYPE-FIELDS-SPEC.md` §5.1's surviving untyped-`GIVEN` hole, and through
-> any future front end — and a refusal that stops being reachable from today's surface syntax is not
-> a refusal that has stopped mattering.
+> be handed — through **both** of `SUM-TYPE-FIELDS-SPEC.md` §5.1 item 1's surviving permissive holes
+> (an untyped `GIVEN` column, and a hand-written nullary declaration spelled with the desugarer's
+> reserved `__pm_fallthrough_` name), and through any future front end — and a refusal that stops
+> being reachable from today's surface syntax is not a refusal that has stopped mattering.
+>
+> **The hole count here was "the surviving untyped-`GIVEN` hole", singular, until 2026-09-10.** That
+> was borrowed from the status header of the spec that owns it, which was itself wrong; §5.1 now
+> derives the list from `clauseColumnUniverse`'s own conditions and there are two. The correction
+> does not change this bullet's conclusion — one live hole would keep reading form (1) reachable —
+> but the number is quoted in a document that is not the owner, which is exactly where a borrowed
+> claim goes stale unnoticed.
 
 A decision that `CONSIDER`s such a union over its **nullary
 arms only** is **`Lossy`**, naming the constructors that have no cell — it is not refused, because
@@ -5210,10 +5218,11 @@ DECIDE `two clause partial` Green IS 2
 reports **two `Advisory` notes** (`D-ORDERDEPENDENT`, `D-INLINEDLOCAL`) and **no `D-PARTIAL`**.
 The model passes `--fail-on blocking` and answers `null` for `Blue`.
 
-**Why L1 cannot catch it.** `considerIssues` (`Dmn/Analysis.hs:543-557`) fires on
+**Why L1 cannot catch it.** `considerIssues` (`Dmn/Analysis.hs:620-643`, re-measured 2026-09-10;
+the `:543-557` this cited was already stale and pointed at the arithmetic issues) fires on
 `reportedMissing` — the oracle's warning ranges — or on `suppressed && not hasOtherwise`, where
 `suppressed` means an _opaque or literal_ pattern. A constructor-pattern group is neither, so with
-the warning gone both disjuncts are false. `matchClauses` (`Parser.hs:952`) makes this total for
+the warning gone both disjuncts are false. `matchClauses` (`Parser.hs:1031`, re-measured 2026-09-10) makes this total for
 n ≥ 2 clauses: the user's own Decide body always gets an `OTHERWISE` (the fall-through reference),
 and every un-defaulted arm lands inside a suppressed binding. So **multi-clause pattern-matching
 definitions are exempt from the totality side-condition entirely**, not merely under-reported.

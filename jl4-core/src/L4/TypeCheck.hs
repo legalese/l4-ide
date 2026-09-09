@@ -1052,9 +1052,12 @@ inferDecide dec@(MkDecide ann _tysig appForm expr) = do
               asks (.clauseNarrowings) >>= \ case
                 -- The enclosing declaration is not a fused clause group, so
                 -- there is no matrix to have read and no columns to name. See
-                -- 'CheckEnv.fallthroughUnanalysed': in practice this is a
+                -- 'CheckEnv.fallthroughUnanalysed': ordinarily this is a
                 -- module 'prettyLayout' re-emitted, whose reads were already
-                -- checked against the matrix in the source it came from.
+                -- checked against the matrix in the source it came from — but
+                -- a HAND-WRITTEN nullary @__pm_fallthrough_k@ reaches it too,
+                -- and that one is a live permissive hole. Its whole entry is on
+                -- 'CheckEnv.fallthroughUnanalysed'; do not re-derive it here.
                 Nothing -> local (\ env -> env { fallthroughUnanalysed = True }) act
                 Just tbl -> do
                   supp <- asks (.clauseSuppressColumns)
@@ -1115,6 +1118,17 @@ inferDecide dec@(MkDecide ann _tysig appForm expr) = do
     -- @DECIDE `__pm_fallthrough_0` a IS a's monthly_rent@ therefore no longer
     -- switches S2 off for its own body — which it did, silently, and the
     -- program died at run time.
+    --
+    -- WHAT THE ARITY CHECK DOES NOT CLOSE, stated because the sentence above
+    -- reads like it closed the shape rather than one spelling of it: a
+    -- hand-written NULLARY declaration with this name still satisfies the test,
+    -- by construction — that is the only spelling the desugarer produces, so it
+    -- is the one spelling that cannot be excluded. @DECIDE outer a IS
+    -- `__pm_fallthrough_0` WHERE `__pm_fallthrough_0` MEANS a's monthly_rent@
+    -- checks clean and dies at run time (measured 2026-09-10). It is hole (b)
+    -- of SUM-TYPE-FIELDS-SPEC §5.1 item 1, and closing it needs an annotation
+    -- set at desugar time plus a printer that re-emits a fused group from its
+    -- matrix — not a tighter predicate here.
     isSyntheticFallthrough :: Bool
     isSyntheticFallthrough = case appForm of
       MkAppForm _ (MkName _ (NormalName t)) [] _ -> "__pm_fallthrough_" `Text.isPrefixOf` t
@@ -1375,12 +1389,22 @@ patIsColumnWildcard scrutR = \ case
 -- it. This is an argument about the clause list itself, so it holds for EVERY
 -- path that reaches the body, not for an enumerated subset of them.
 --
--- Every uncertainty leaves @c@ IN the set, which widens it, which can only make
--- S2 refuse more: a sub-pattern that might be refutable, an arity that does not
--- line up, a literal, an @EXACTLY@\/expression pattern, a cons pattern, a
--- column whose type cannot be enumerated. A narrowing that errs permissively is
--- invisible (Note [Narrowing is a check-time fact]); one that errs restrictively
--- is a message someone can argue with.
+-- Every uncertainty about a PATTERN leaves @c@ IN the set, which widens it,
+-- which can only make S2 refuse more: a sub-pattern that might be refutable, an
+-- arity that does not line up, a literal, an @EXACTLY@\/expression pattern, a
+-- cons pattern. A narrowing that errs permissively is invisible (Note
+-- [Narrowing is a check-time fact]); one that errs restrictively is a message
+-- someone can argue with.
+--
+-- A COLUMN WHOSE TYPE CANNOT BE ENUMERATED IS THE EXCEPTION, and this note
+-- listed it with the others until 2026-09-10, which was wrong in the invisible
+-- direction. Such a column has no set to widen: 'clauseColumnFacts' returns it
+-- in the suppress set instead, and reads on it are SILENCED rather than refused
+-- (Note [S2 inside a fall-through]). That is the one permissive edge of this
+-- analysis, it is deliberate — refusing for a fact the checker merely could not
+-- establish is worse — and 'clauseColumnUniverse' enumerates exactly when it
+-- happens. SUM-TYPE-FIELDS-SPEC §5.1 item 1 says which of those cases is a live
+-- hole and how each was measured.
 
 -- | One cell of the source clause matrix, classified for
 -- 'clauseColumnFacts'.
@@ -1544,10 +1568,16 @@ clauseColumnUniverse env ctorsOf scrutR =
 -- ('CheckEnv.clauseSuppressColumns').
 --
 -- Runs BEFORE the body is checked, which is why it reads the column types
--- through 'applySubst' and treats an unresolved one as unknown rather than
--- waiting: 'checkClauseMatrix' can afford to run afterwards because it only
--- warns, but a narrowing has to be in scope while the body it is about is being
--- checked.
+-- through the substitution as it stands HERE ('clauseColumnUniverse', which
+-- hands @use #substitution@ to 'rigidHeadOf') and treats an unresolved one as
+-- unknown rather than waiting: 'checkClauseMatrix' can afford to run afterwards
+-- because it only warns, but a narrowing has to be in scope while the body it
+-- is about is being checked.
+--
+-- (This said \"through 'applySubst'\" until 2026-09-10. It never called that
+-- function; the reading goes through 'rigidHeadOf', which additionally expands
+-- synonyms, and the difference is the whole of the type-synonym repair in
+-- @5ba5f94b@.)
 clauseColumnFacts :: Decide Name -> FunTypeSig -> Check (Maybe (Map Int [(Resolved, Narrowing)]), Set Unique)
 clauseColumnFacts dec dHead =
   case view annPmMatrix (getAnno dec) of

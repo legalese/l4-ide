@@ -644,7 +644,7 @@ has no `monthly_rent` field.
 
 **What went wrong:** A field of an `IS ONE OF` type was read from a value whose constructor does not declare that field. When only some constructors of a type have a field, the selector for it is partial: `monthly_rent` is a function that works on a `Tenant` and on nothing else.
 
-Most reads like this are refused at check time, with a longer message that names the constructors that can still reach the read and shows how to narrow the value first. This runtime version is what you see when the check could not rule it out — most often because the parameter has no declared type, so the checker did not know which constructors were in play — or when you ran a file that failed to check.
+Most reads like this are refused at check time, with a longer message that names the constructors that can still reach the read and shows how to narrow the value first. This runtime version is what you see when you ran a file that failed to check, or when the check could not rule it out. There are exactly two ways the check cannot rule it out: the parameter has **no declared type**, so the checker did not know which constructors were in play (this is the common one, and it is fixed below); or the read sits inside a definition you named `` `__pm_fallthrough_0` `` or similar, which is a name L4 reserves for its own use — see the note at the end of [DECLARE](../types/DECLARE.md#a-field-on-only-some-constructors).
 
 Note that this is **not** a missing `CONSIDER` branch, even though it may look like one: there is no `CONSIDER` in your program. The one being fallen off is the selector itself, which L4 builds with one branch per declaring constructor. Nothing was left out of a match, and no exhaustiveness warning was emitted about it.
 

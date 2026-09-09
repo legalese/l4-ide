@@ -1073,13 +1073,23 @@ data CheckEnv =
     -- columns to name, and an un-narrowed read on ANY bare binder is
     -- suppressed — the behaviour the whole fall-through used to have.
     --
-    -- The one thing that gets here is a module 'L4.Print.prettyLayout' has
-    -- re-emitted and something has re-parsed: @l4 batch@, the REPL, and the
+    -- What gets here in the ordinary course is a module 'L4.Print.prettyLayout'
+    -- has re-emitted and something has re-parsed: @l4 batch@, the REPL, and the
     -- print round-trip test all do that, the printer emits the DESUGARED tree,
     -- and 'Extension.pmMatrix' does not survive the trip. The reads in such a
     -- module were checked against the real clause matrix in the source it was
     -- printed from; refusing them on the second pass would mean @l4 batch@
     -- rejecting a file @l4 check@ had just accepted.
+    --
+    -- It is NOT the only thing that gets here, and this comment said it was
+    -- until 2026-09-10 — a claim wrong in the permissive direction, which is
+    -- the invisible one. A HAND-WRITTEN nullary declaration spelled
+    -- @__pm_fallthrough_k@ satisfies 'isSyntheticFallthrough' too, and its
+    -- enclosing declaration need not be a fused clause group; then
+    -- 'clauseNarrowings' is @Nothing@, this flag is set, and an un-narrowed
+    -- read in that body is suppressed and dies at run time. Measured; it is
+    -- hole (b) of SUM-TYPE-FIELDS-SPEC §5.1 item 1, where the reason it cannot
+    -- be closed by banning the spelling is written out.
     }
   deriving stock (Eq, Generic, Show)
   deriving anyclass (NFData)

@@ -8,10 +8,12 @@ IMPORT prelude
 -- Everything below is a way of telling the checker "here, this value is a
 -- Tenant", after which the read is fine.
 --
--- One case is NOT checked, and it is the only way a partial read can still
--- fail at run time: a `GIVEN` you left untyped. Every parameter in this file
--- is written `IS AN Actor`, so every read below is checked all the way
--- through. See "What does not narrow" in DECLARE.md for the untyped case.
+-- TWO cases are NOT checked, and they are the two ways a partial read can
+-- still fail at run time. First: a `GIVEN` you left untyped. Every parameter
+-- in this file is written `IS AN Actor`, so every read below is checked all
+-- the way through. Second: a definition you named `__pm_fallthrough_0` or
+-- similar, which is a name L4 reserves for its own use — do not write one.
+-- See "What does not narrow" and "Two gaps, not one" in DECLARE.md.
 
 DECLARE Actor IS ONE OF
     Landlord HAS addr IS A STRING, name IS A STRING
