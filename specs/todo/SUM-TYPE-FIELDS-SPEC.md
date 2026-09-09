@@ -8,9 +8,11 @@ the best of both worlds from Haskell and OCaml."_ The rules in §3 are that ruli
 What is in the tree, as of the S1 commit on `lang/whose-opening` (2026-09-09): the §4 renames
 (commit `7cf1e0e9`), then S1's checker half (`inferConDecls`, Note [One selector per shared field]
 in `TypeCheck.hs`; the `SharedFieldTypeMismatch` error) and evaluator half (`evalConDecls` in
-`Machine.hs`) in one commit, with `ok/shared-field.l4` (the positional guard of §5 item 2, plus
-§1.2's program armed and traced) and `not-ok/tc/shared-field-type-mismatch.l4` as their goldens,
-and a drafter-facing section in `doc/reference/types/DECLARE.md`. §1.2 now returns `FULFILLED`;
+`Machine.hs`) in one commit, then the corpus fixtures that pin it (S1d): `ok/sum-fields/shared-field.l4`
+(the positional guard of §5 item 2, a `GIVEN a IS AN Actor` reader doing `a's name`, and §1.2's
+program armed and traced) and `not-ok/tc/sum-field-type-conflict.l4` (the declaration error beside
+a merged field on the same type), each with its four goldens, and a drafter-facing section in
+`doc/reference/types/DECLARE.md`. §1.2 now returns `FULFILLED`;
 §1.1 is unchanged and still dies at run time, because that is S2's. The whole-tree `l4 check`
 sweep for the new declaration error (958 files) found zero sites. One limit recorded in §5 item 1:
 "same type" is by `typeKey` on the type as written, so a synonym beside its expansion is refused.
@@ -394,8 +396,15 @@ This is where the work is expected to land; the implementer re-checks each ancho
    **Corrected:** the grouping cannot live in `inferConDecl` — only `inferTypeDecl`'s `EnumDecl`
    arm (`:1448-1453`) holds all the constructors, and field types must be resolved across arms
    before any selector is minted. Later arms get `defAka` (same `Unique`, their own name and range).
-   **BUILT 2026-09-09** as `inferConDecls`, which both the `EnumDecl` and the `RecordDecl` arm go
-   through. One limit, measured while building: "the same type" is `typeKey` on the field type
+   **BUILT 2026-09-09** as `inferConDecls` (`TypeCheck.hs:1604-1717`, with Note [One selector per
+   shared field] at `:1544-1587` and `data FieldOccurrence` at `:1590`), which both the `EnumDecl`
+   arm (`:1448-1454`) and the `RecordDecl` arm (via `inferConDecl` `:1533`, the one-arm case) go
+   through; `inferSelector` is gone. The error is `SharedFieldTypeMismatch Name [(Name, Name, Type'
+Resolved)]` (`TypeCheck/Types.hs:116`, `rangeOf` `:493` anchored on the first occurrence,
+   `prettyCheckError` `TypeCheck.hs:5985`), raised inside the existing `WhileCheckingDeclare`
+   context; on disagreement the group falls back to today's per-arm selectors, so a read of the
+   disputed field in the same file gets today's ambiguity rather than a cascade. One limit,
+   measured while building: "the same type" is `typeKey` on the field type
    **as written**. A synonym is not expanded, because in the type-declaration phase the environment
    holds a synonym's name but not yet its body (the body goes out through `publicNames` and is seen
    by the term phase); an expansion via `pureExpandSynonym` at this site was tried and was a no-op.
@@ -412,8 +421,14 @@ This is where the work is expected to land; the implementer re-checks each ancho
    fields are stored **positionally** (`ValueLazy.hs:83`) and two arms may place the field
    differently. **S1's checker and evaluator halves must land in one commit**, and the guard is a
    probe with the shared field at index 1 on one arm and 0 on the other. **BUILT 2026-09-09** as
-   `evalConDecls`; the guard is `ok/shared-field.l4`, whose `Landlord HAS addr, name` /
-   `Tenant HAS name, rent` reads both arms, positionally and through `WITH`.
+   `evalConDecls` (`Machine.hs:4233-4276`; the `:4207-4231`/`:4230` anchors above are the pre-S1
+   tree, and `updateTerm` is now `:4181`): one closure per selector `Unique`, its body a `CONSIDER`
+   with one branch per declaring constructor, each carrying that constructor's own arity and that
+   field's index; `scanTypeDecl` (`:4015-4019`) dedupes by `Unique` so `preAllocate` allocates one
+   cell. The guard is `ok/sum-fields/shared-field.l4`, whose `Landlord HAS addr, name` /
+   `Tenant HAS name, rent` reads both arms, positionally and through `WITH`, and through a
+   `GIVEN a IS AN Actor` reader. Cosmetic only: the closure's lambda argument is named after the
+   FIRST declaring constructor, as the one-arm code named it; nothing prints it.
 3. **Narrowing in the check environment.** ~~Add it on the local binding … at the three sites.~~
    **Corrected:** `KnownTerm`/`TermKind` is the wrong home — `TermKind` is a `Serialise`d AST type
    read by the LSP, with ~130 sites. The precedented home is a new field on `CheckEnv` beside
@@ -438,8 +453,9 @@ This is where the work is expected to land; the implementer re-checks each ancho
 6. **Consumers.** ~~sees one selector where it saw N.~~ **Backwards for almost all of them:** the
    schema, NLG and transpiler consumers read the AST's `ConDecl` field lists by name **text** and
    are unaffected. Exactly two `Unique`-keyed consumers change — the evaluator environment, and
-   DMN's `selectorNames`/`fieldScopes` (`Dmn/Lower.hs:3987-3991`), which must be deduped by
-   `Unique` or a merged field's FEEL step becomes `name_2`. Hover and `@desc` are range-keyed and
+   DMN's `selectorNames`/`fieldScopes` (`Dmn/Lower.hs:3987-3994`), which must be deduped by
+   `Unique` or a merged field's FEEL step becomes `name_2` — **BUILT 2026-09-09**, `nubOrdOn
+getUnique` on the `EnumDecl` case. Hover and `@desc` are range-keyed and
    survive `defAka`; find-references improves; completion goes from two byte-identical items to one.
    Docassemble **already refuses** the S1-merged shape with a CI-pinned message
    (`Docassemble/Lower.hs:2320-2353`) — under S1 those are one field, so that refusal must be
@@ -449,7 +465,17 @@ This is where the work is expected to land; the implementer re-checks each ancho
    and S2's partial-projection error with S4's message; the `.l4` and its four goldens in one
    commit, read before blessing, grepped for absolute paths. A `doc/` page or section — audience:
    a drafter who has never read this file — saying what a field on several arms means and why a
-   projection can be refused.
+   projection can be refused. **S1's share BUILT 2026-09-09:** `ok/sum-fields/shared-field.l4`
+   (the same field name and type on two arms at different positions; `#EVAL`s on both arms,
+   positionally and via `WITH`; `name` as a bare function and under `map`; a
+   `GIVEN a IS AN Actor` reader doing `a's name`; §1.2's quantifier program under `#TRACE`,
+   `FULFILLED` twice — the second trace's filter reads every member and nobody passes) and
+   `not-ok/tc/sum-field-type-conflict.l4` (`name` STRING/NUMBER across Landlord/Tenant, refused;
+   `addr` STRING on Landlord and Agent, merged and read on both without a diagnostic — the
+   `.golden` holds the declaration error and nothing else). The `ok/` file is also the only witness
+   the `prettyLayout round-trip` property has for a merged field. Docs: the "A field on several
+   constructors" section of `doc/reference/types/DECLARE.md` and its linked
+   `shared-field-example.l4`. S2's and S3's fixtures are NOT BUILT.
 
 ## 6. Not ruled here
 

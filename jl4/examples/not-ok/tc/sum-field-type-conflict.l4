@@ -1,0 +1,20 @@
+-- SUM-TYPE-FIELDS-SPEC §3 S1: the same field name at DIFFERENT types across
+-- the constructors of one type is an error at the declaration, naming every
+-- constructor and the type it gives the field.
+--
+-- The merge and the error coexist on one type, field by field: `name` is a
+-- STRING on Landlord and a NUMBER on Tenant, so it is refused; `addr` is a
+-- STRING on Landlord and on Agent, so it is ONE selector and the read of it
+-- below is unambiguous. The only diagnostic this file produces is the
+-- declaration error — `name` is never read.
+
+DECLARE Actor IS ONE OF
+    Landlord HAS name IS A STRING, addr IS A STRING
+    Tenant   HAS name IS A NUMBER
+    Agent    HAS addr IS A STRING
+
+theLandlord MEANS Landlord OF "L", "1 Main St"
+anAgent     MEANS Agent OF "2 High St"
+
+#EVAL theLandlord's addr
+#EVAL anAgent's addr

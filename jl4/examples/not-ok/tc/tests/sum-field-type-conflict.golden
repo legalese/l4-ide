@@ -1,0 +1,18 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: sum-field-type-conflict.l4
+  Hidden: no
+  Range: 12:18-12:22
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The field name is declared by more than one constructor of this type,
+    but they do not agree on its type:
+
+      in Landlord: name (at sum-field-type-conflict.l4:12:18-22) of type STRING
+      in Tenant: name (at sum-field-type-conflict.l4:13:18-22) of type NUMBER
+
+    A field that several constructors share is one field, and it has one type.
+    Give it the same type on every constructor that declares it, or use a different name on each.
