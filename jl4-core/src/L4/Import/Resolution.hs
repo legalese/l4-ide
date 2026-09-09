@@ -371,6 +371,11 @@ combineResolvedImports uri imports =
         , TypeCheck.constBodies = finalState.constBodies
         , TypeCheck.sectionPaths = finalState.sectionPaths
         , TypeCheck.deferredChoices = 0
+          -- A RESET: an S2 obligation belongs to the declaration it was
+          -- recorded in, and is drained by that declaration's 'inferTopDecl'
+          -- long before an import boundary is crossed (SUM-TYPE-FIELDS-SPEC
+          -- §3 S2). Nothing may be inherited from a dependency.
+        , TypeCheck.pendingPartialProjections = []
         }
     , finalEnv
     )
@@ -405,6 +410,7 @@ combineResolvedImports uri imports =
                -- imported 'Unique' is still never ranked (spec §5.5, FIX C).
              , TypeCheck.sectionPaths = Map.union accState.sectionPaths r.sectionPaths
              , TypeCheck.deferredChoices = 0
+             , TypeCheck.pendingPartialProjections = []
              }
          , TypeCheck.unionImportedCheckEnv accEnv r.environment resolvedEntityInfo r.mixfixRegistry r.implicitReaders
          )

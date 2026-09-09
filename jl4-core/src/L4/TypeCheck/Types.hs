@@ -95,6 +95,33 @@ data CheckState =
     -- 'prune', which all start from the same state, so the absolute value is
     -- meaningless and is never reset: 'prune' prefers the viable outcome with
     -- the fewest such choices when exactly one has the fewest.
+    , pendingPartialProjections :: ![PartialProjection]
+    -- ^ SUM-TYPE-FIELDS-SPEC §3 S2. Obligations recorded inside a forked
+    -- overload candidate and raised only once that fork has been pruned.
+    --
+    -- NOT raised at the read. §5 item 4 proposed exempting the S2 diagnostic
+    -- in 'viableCandidate' instead; that does not work. 'severity' is /"THE
+    -- canonical severity mapping — the one place that decides what blocks"/,
+    -- and an exemption there says a candidate carrying a blocking diagnostic
+    -- is still viable, which 'prune' must then arbitrate: two candidates
+    -- viable for different reasons collapse to 'InternalAmbiguityError', the
+    -- very ambiguity-instead-of-S4 outcome the exemption was meant to prevent,
+    -- moved one step later.
+    --
+    -- Deferral needs no such change. @Check@ is
+    -- @CheckEnv -> CheckState -> [(With CheckErrorWithContext a, CheckState)]@
+    -- and 'prune' returns exactly one @(result, state)@ pair, so the state
+    -- that continues is the WINNING candidate's: its obligations survive and
+    -- every loser's are discarded, by the same mechanism that already carries
+    -- 'constBodies' and 'sectionPaths' out of a fork.
+    --
+    -- Drained by 'L4.TypeCheck.inferTopDecl', which is exactly post-resolution:
+    -- the module traversal's own invariant is that @inferTopDecl@ prunes
+    -- Declare\/Decide\/Assume\/Timezone and @inferDirective@ prunes
+    -- LazyEval\/…, so every forking path below that point is already
+    -- collapsed. Nested sections recurse through @inferTopDecl@, so an inner
+    -- declaration drains first and the list never accumulates across
+    -- declarations.
     }
   deriving stock (Generic)
 
@@ -281,6 +308,15 @@ data CheckWarning
     -- the elaborations 'L4.Desugar.desugarSectionGivens' prepends for a
     -- section @GIVEN@ reach the same code and never draw it
     -- ('L4.Names.isSectionBinderElaboration').
+  | PartialProjectionWarning PartialProjection
+    -- ^ SUM-TYPE-FIELDS-SPEC §3 S2, in its MEASUREMENT form. The ruling is
+    -- that this is an ERROR (§4's gate: /"S2 does not land as a warning …
+    -- a warning is the GHC compromise this document exists to decline"/); it
+    -- exists as a warning only between the commit that builds the check and
+    -- the commit that promotes it, so §4's three rigs can count the corpus
+    -- sites before the language narrows. Promotion moves this constructor to
+    -- 'CheckError' and changes nothing else: the payload and the renderer are
+    -- already shared.
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
@@ -503,6 +539,10 @@ instance HasSrcRange CheckError where
   -- WhileCheckingDecide context range via @rangeOf e <|> rangeOf ctx@ above.
   rangeOf (CheckWarning (PatternClausesMissing r _ _)) = Just r
   rangeOf (CheckWarning (DeprecatedAssume info)) = rangeOf info.name
+  -- The read's OWN range, carried on the payload: this diagnostic is raised by
+  -- 'L4.TypeCheck.inferTopDecl' after the fork it was recorded in has been
+  -- pruned, where the ambient 'errorContext' no longer points at the read.
+  rangeOf (CheckWarning (PartialProjectionWarning p)) = p.readRange
   rangeOf (SuspiciousBinderPattern b _)     = rangeOf b
   rangeOf (MisattachedSectionGiven n _)     = rangeOf n
   rangeOf (UnreadImplicitSupply _ b)        = rangeOf b
@@ -802,6 +842,64 @@ data BaseNarrowing =
   deriving stock (Eq, Generic, Show)
   deriving anyclass (NFData)
 
+-- | What an S2 refusal is read /from/ — the shape the diagnostic has to talk
+-- about (SUM-TYPE-FIELDS-SPEC §3 S4's "two forms, one per base shape", plus a
+-- third the second ruling added).
+--
+-- This is the S4-facing counterpart of 'ProjectionBaseShape': the analysis
+-- classifies a resolved expression, the diagnostic carries only what it needs
+-- to write a sentence.
+data ProjectionBase
+  = BaseBinder Name
+    -- ^ @a's f@ or @f a@ where the base is a bare binder — the one shape a
+    -- narrowing rule can do anything about, and so the one whose repair text
+    -- can say "narrow @a@".
+  | BaseUnnamed Text
+    -- ^ a projection, an application, an @IF@\/@CONSIDER@ result, a
+    -- constructor application — never narrowed by a binder rule. The 'Text' is
+    -- the noun phrase ("a projection", "an application", …).
+  | BaseNone
+    -- ^ the selector used as a VALUE (@map OF monthly_rent, everyone@): there
+    -- is no base at all, so there is nothing to narrow and the repair is to
+    -- read the field through a name instead.
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass (NFData)
+
+-- | SUM-TYPE-FIELDS-SPEC §3 S2. A field is read from a value that could still
+-- be a constructor which does not declare it.
+--
+-- Self-contained ON PURPOSE. Every 'Name' and every list here is resolved at
+-- the moment the read is checked, because the obligation is not raised there:
+-- it is parked on 'CheckState.pendingPartialProjections' and drained by
+-- 'L4.TypeCheck.inferTopDecl' once the overload fork above it has been pruned.
+-- 'entityInfo' is a 'CheckEnv' field scoped by 'local', so a type @DECLARE@d
+-- inside a @WHERE@ is already out of scope by flush time; computing anything
+-- at the flush would silently mis-report it.
+--
+-- Carrying 'why' — the very 'NarrowingReason' the narrowing itself stores — is
+-- what makes §3.2's hard requirement STRUCTURAL: the error cannot be
+-- constructed without saying why the value can still reach this read.
+data PartialProjection =
+  MkPartialProjection
+    { readRange     :: !(Maybe SrcRange)
+      -- ^ where the read is; 'rangeOf' returns this. 'Maybe', not 'SrcRange':
+      -- desugared nodes carry 'emptyAnno' (the computed-field rewrite emits
+      -- @Proj emptyAnno …@), and inventing a range for those would put a
+      -- squiggle on someone else's code.
+    , field         :: !Name
+    , declaredBy    :: ![Name]
+      -- ^ constructors that DO declare the field, in declaration order
+    , stillPossible :: ![Name]
+      -- ^ constructors that can still reach this read and do NOT declare the
+      -- field, in declaration order. NON-EMPTY whenever this value exists —
+      -- that is what lets the renderer emit the @could also be@ marker
+      -- unconditionally instead of leaving it to a per-form prose choice.
+    , base          :: !ProjectionBase
+    , why           :: !NarrowingReason
+    }
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass (NFData)
+
 data CheckEnv =
   MkCheckEnv
     { moduleUri            :: !NormalizedUri
@@ -896,6 +994,15 @@ data CheckEnv =
     -- RESET at the import boundary ('unionImportedCheckEnv'), beside
     -- 'localBindings': a narrowing is a fact about a binder inside one body of
     -- THIS module and means nothing across an @IMPORT@.
+    , inSyntheticFallthrough :: !Bool
+    -- ^ Are we inside the body the parser synthesised for clause 2..n of a
+    -- multi-clause @DECIDE@\/@MEANS@ group (@__pm_fallthrough_k@)? If so, S2
+    -- records NOTHING — see Note [S2 has no obligation inside a fall-through].
+    --
+    -- Deliberately NOT 'inNonexhaustiveDecide', although @inferDecide@ sets
+    -- both from the same test: that flag is also set by an author's
+    -- @\@nonexhaustive@ decoration, and reusing it would silently extend this
+    -- hole to every decorated definition. Two questions, two flags.
     }
   deriving stock (Eq, Generic, Show)
   deriving anyclass (NFData)
@@ -950,6 +1057,7 @@ unionImportedCheckEnv accEnv depEnvironment depEntityInfo depMixfixRegistry depI
     , sectionStack = []
     , localBindings = Set.empty
     , narrowings = Map.empty
+    , inSyntheticFallthrough = False
     }
 
 newtype SectionNames =
@@ -2209,6 +2317,7 @@ extendEnv cis env =
     , sectionStack = e.sectionStack
     , localBindings = e.localBindings
     , narrowings = e.narrowings
+    , inSyntheticFallthrough = e.inSyntheticFallthrough
     }
     where
       u :: Unique

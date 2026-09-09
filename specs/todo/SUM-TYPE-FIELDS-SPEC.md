@@ -1,6 +1,11 @@
 # Fields on sum types: one selector per shared field, and no projection without narrowing
 
-**Status (2026-09-09): RULED by Meng. S1 BUILT on `lang/whose-opening`; S2 and S3 NOT BUILT.**
+**Status (2026-09-09): RULED by Meng. On `lang/whose-opening`: S1 BUILT; S3 BUILT; S2's check BUILT
+AS A WARNING, which is NOT yet the error the ruling requires — §4's gate step 2 is not done.**
+The warning exists only so §4's three rigs can count the corpus before the language narrows; §4 is
+explicit that _"S2 does not land as a warning"_. Until the promotion commit lands, this branch
+accepts every program it accepted before, and the run-time death of §1.1 is still reachable.
+The gate's measurement HAS been run — see §4.1 for the counts and what remains to repair.
 Meng's mark, 2026-09-09, on being shown the two hazards below and the Haskell/OCaml comparison:
 _"Dying at run time is a bad look for a language in the FP tradition. … Write it up — let's take
 the best of both worlds from Haskell and OCaml."_ The rules in §3 are that ruling written out.
@@ -17,7 +22,9 @@ a merged field on the same type), each with its four goldens, and a drafter-faci
 sweep for the new declaration error (958 files) found zero sites. One limit recorded in §5 item 1:
 "same type" is by `typeKey` on the type as written, so a synonym beside its expansion is refused.
 
-§1 (measured) describes the tree before S1; §3 S2–S5 and §5 items 3–4 describe what will be true.
+§1 (measured) describes the tree before S1. §3 S3 and §5 item 3 are BUILT (commit `92e12d27`);
+§3 S2's check and §3 S4's diagnostic are built as a warning (§4.1); §3 S5 and §4's gate step 2
+still describe what will be true.
 
 **Owner:** this file. It is cross-referenced from `EVERY-EACH-QUANTIFIER-SPEC.md` §13.6.1 (which
 found the second hazard while asking whether `WHOSE` could be built) and from
@@ -221,6 +228,17 @@ draft of this rule misread what a `WHEN` pattern binds:
   construction. Chains stop at the first definition that is not a bare binder: `b MEANS f a` and
   `b MEANS w's inner` are not aliases and get no narrowing.
 
+  **A chain that ends at a constructor application ends in a narrowing, not in nothing** (built
+  2026-09-09, with S2's warning). `theLandlord MEANS Landlord OF "1 Main St", "Ms Ng"` then
+  `theLandlord's addr` is the same fact as the inline exception two bullets above — "syntactically a
+  constructor application … is statically that constructor" — reached through one nullary `MEANS`
+  instead of written in place, and it is sound for the same reason: `constBodies` holds only
+  **nullary** `MEANS` bodies, so the binder denotes that construction unconditionally, and L4 has no
+  mutation. **This was measured, not anticipated:** without it the two S1 fixtures
+  `ok/sum-fields/shared-field.l4` and `not-ok/tc/sum-field-type-conflict.l4` are S2 sites — §4's
+  class (A), an S3 gap the gate says to fix in S3 rather than in the corpus. With it, the goldened
+  globs contain exactly the sites §4 predicted (§4.1).
+
 ### 3.1 Why the alias rule is not optional, and what it costs
 
 Flow-sensitive narrowing has a known asymmetry: **let-inlining preserves typeability, let-abstraction
@@ -249,10 +267,34 @@ binder identity: `CONSIDER w's inner WHEN Tenant t THEN (w's inner)'s monthly_re
 > `monthly_rent` too.
 
 > `monthly_rent` is a field of `Tenant` only, but the value it is read from could also be a
-> `Landlord`. Name it and narrow it first: `CONSIDER <that value> WHEN Tenant t THEN …`.
+> `Landlord`. ~~Name it and narrow it first: `CONSIDER <that value> WHEN Tenant t THEN …`.~~
+
+**The second form's repair text is CORRECTED, 2026-09-09, for the same reason the first form's was:
+it did not compile.** `CONSIDER <that value> WHEN Tenant t THEN … <that value>'s f …` is refused
+again, because a `CONSIDER` narrows **the binder it scrutinises** and a projection is not a binder
+(§3 S3, and §6's last-but-two bullet says the same thing in its own words). Every genuine (B) site
+the gate found is exactly this shape, so a wrong repair here would have been handed to every one of
+them. The two repairs that do compile:
+
+> Give it a name, then narrow the name:
+> `CONSIDER v WHEN Just t THEN … v's val … WHERE v MEANS <that value>`
+> — or match the payload directly, which needs no name at all:
+> `CONSIDER <that value> WHEN Just t THEN t`.
+
+The second is the idiom §4 measured real drafters already using ("they destructure rather than
+project").
 
 The exact wording is the implementer's; the three contents — field, missing arms, repair — are not,
 and the phrase _could also be_ is the stable marker the §4 gate greps for.
+
+**That marker is emitted STRUCTURALLY, not as a per-form prose choice** (built 2026-09-09). A
+singleton narrowing (`EVERY Landlord a … a's monthly_rent`) has no natural "also", and the
+bare-selector form has no value to say it about — so leaving the phrase to each form's prose would
+have let a form omit it, and §4's gate detects sites _by grepping for it_, which would then report a
+false zero and promote a hard error over sites nobody read. The renderer therefore emits one
+unconditional line built from the still-possible-but-not-declaring list, which S2 guarantees is
+non-empty whenever the diagnostic exists. A later gate should still prefer counting by the
+constructor over counting by the phrase.
 
 **S5 — what this does for `WHOSE`.** `EVERY-EACH-QUANTIFIER-SPEC.md` §13.6.1 found that the
 corrected totality rule (open the fields present on every constructor the member could still be)
@@ -387,6 +429,51 @@ case is a NEW check-time fact about the scrutinee (S3 above). And there is **zer
 coverage of a quantifier-narrowed projection anywhere in the tree — every `every/` filter uses
 `elem` or `EQUALS` — so the new `ok/` fixture is that path's only test, not a supplement.
 
+### 4.1 The gate's measurement, RUN 2026-09-09 — and what it leaves to do
+
+S2's check and S4's diagnostic are built as a **warning** (see the status header). The gate's step 1
+has been run over all three rigs against that warning, with the worktree binary and
+`JL4_LIBRARY_PATH` pinned to this tree's libraries. **Both the expected counts and the measured ones
+are recorded below**, per §4's own instruction that the expectations were "to be confirmed, not
+assumed" — do not overwrite one with the other.
+
+| site                                              | expected | measured | class                                   |
+| ------------------------------------------------- | -------- | -------- | --------------------------------------- |
+| `jl4/examples/legal/british-citizen-act.l4:94-97` | 4        | **4**    | (B) — the `p's birthPlace's val` chains |
+| `jl4/examples/dmn/sumtype.l4:139-142`             | 1        | **1**    | (B) — `disposal's \`term in years\``    |
+| `jl4/experiments/safe-post.l4:258`                | 1 (or 2) | **1**    | (B) — `…'s security's Quantity's count` |
+| (A) sites, anywhere                               | none     | **none** | S3's residual holds                     |
+
+Everything else in the tree is silent: `ok/**`, `legal/**` apart from the one file, `not-ok/**`,
+`lsp/**`, `jl4-core/libraries/*.l4`, all of `doc/`, and every backend example tree.
+
+**Three things the measurement settled that reading could not.**
+
+- **`actus-core.l4:311` does not fire.** §4 said "if it fires, the residual is wrong"; it does not,
+  so the `OTHERWISE` residual works on its only demonstrated user.
+- **`safe-post.l4` is ONE site, not two.** The open question in §4 was whether `:260`'s
+  `…'s security's Instrument` is also partial. It is not. (`safe-post-tests.l4` reports the same
+  `safe-post.l4:258` through its `IMPORT`; that is one site surfaced twice, not two sites.)
+- **The two S1 fixtures were (A) sites until S3 was extended** to follow an alias chain into a
+  constructor application (§3 S3). That is the gate's step 3 rule (A) working exactly as written —
+  fix S3, not the corpus — and it is why the corpus was not "repaired" for something that was the
+  checker's fault.
+
+**What step 2 and step 3 still owe.** Repair the six (B) sites, re-run the three rigs to a zero
+count, and promote in the same change — the payload, the renderer and the raise path are already
+shared, so promotion moves one constructor from `CheckWarning` to `CheckError` and switches one
+`addWarning` to `addError`. `severity`'s catch-all makes it blocking with no edit to `severity` and
+none to `viableCandidate` (see §5 item 4). Until then **`cabal test jl4-test` is RED**, with exactly
+one failure — `legal/british-citizen-act.l4`, whose golden now carries four warnings. That golden
+must NOT be blessed: the warnings are about to become errors and change shape, and the file is
+about to be repaired so that they disappear altogether.
+
+Two repairs carry a consequence a reviewer must accept on purpose, both already ruled in §4:
+`british-citizen-act.l4` gains a `CONSIDER` and `Nothing` then yields `FALSE` where it crashed; and
+`sumtype.l4` is the DMN KIE MustFail exhibit for ruling R4-a, so the DMN spec records that R4-a's
+example is now unreachable by construction and `l4-cli-test` says whether the MustFail expectation
+changes.
+
 ## 5. Implementation sketch — what the first reader of the code should verify, not follow blindly
 
 This is where the work is expected to land; the implementer re-checks each anchor.
@@ -442,15 +529,43 @@ Resolved)]` (`TypeCheck/Types.hs:116`, `rangeOf` `:493` anchored on the first oc
    The narrowing constructor is resolved at `:1896`, 45 lines above — and it is **not** discarded
    (it is stored in the AST at `:1959`, which is what the evaluator's roll filter reads); it is
    merely unused for the member's binding.
-4. **Totality at the projection.** `inferRecordProjection` is `:3125-3152` (`:3047-3072` is the
-   `Proj` dispatcher); the insertion point is after `matchFunTy` (`:3137`). The selector's declaring
-   constructors need **no new state**: each constructor's `KnownTerm conType Constructor` already
-   names its selectors' own `Def`s as the argument names (`:1536`, `:1552-1553`), and
-   `constructorsInScopeFromEntityInfo` (`:2241-2251`) enumerates a type's constructors. One trap:
-   the S2 error is raised inside a forked overload branch, so without an exemption in
+4. **Totality at the projection.** ~~`inferRecordProjection` is `:3125-3152` (`:3047-3072` is the
+   `Proj` dispatcher); the insertion point is after `matchFunTy` (`:3137`).~~ Those anchors are
+   pre-S1. The selector's declaring constructors need **no new state**: each constructor's
+   `KnownTerm conType Constructor` already names its selectors' own `Def`s as the argument names,
+   and `constructorsInScopeFromEntityInfo` enumerates a type's constructors — both confirmed while
+   building. **BUILT 2026-09-09 as a warning** (`checkPartialProjection` in `TypeCheck.hs`, under
+   Note [S2: no projection without narrowing]), with **four** insertion points, not one, because §3
+   S2's second ruling covers three forms: `inferRecordProjection` (`a's f`), the `Proj` dispatcher's
+   qualified-name branch (`` `Section`.f ``), `inferExpr`'s **`Var`** case (a bare selector as a
+   value), and `inferFlatApp`'s `directApp`/`variadicRescue` (`f a`). The bare form lands in the
+   `Var` case and not in `inferFlatApp`: a bare identifier parses as `App ann n []`, `Var` is a
+   pattern synonym for exactly that, and the `Var` arm sits above the `App` arm.
+
+   The denominator is the **selector's own domain type head**, not the base's inferred type, which
+   makes the whole check substitution-independent and removes the accuracy-versus-timing tension
+   §3 S3's sketch has.
+
+   ~~One trap: the S2 error is raised inside a forked overload branch, so without an exemption in
    `viableCandidate` (`Types.hs:466-469`) the branch merely fails and `prune` reports
-   `AmbiguousTermError` instead of S4 whenever two **types** share the field name — a common shape.
-   A `not-ok/tc` fixture must pin that.
+   `AmbiguousTermError` instead of S4 whenever two **types** share the field name.~~
+   **The trap is real; the proposed fix is REPLACED, 2026-09-09.** An exemption in
+   `viableCandidate` contradicts `severity`'s documented claim to be "THE canonical severity
+   mapping — the one place that decides what blocks", and it keeps a candidate carrying a blocking
+   diagnostic _viable_, which `prune` then has to arbitrate — two viable candidates collapse to
+   `InternalAmbiguityError`, the same ambiguity-instead-of-S4 outcome moved one step later.
+
+   **What is built instead is deferral**, which needs no change to `severity` and none to
+   `viableCandidate`. The obligation is parked on a new `CheckState.pendingPartialProjections` and
+   drained by `inferTopDecl`, which is the first point above every fork: `Check` returns a list of
+   `(result, state)` pairs and `prune` returns exactly one, so the state that continues is the
+   winning candidate's — its obligations survive and every loser's are discarded, by the same
+   mechanism that already carries `constBodies` out of a fork. The obligation is therefore
+   **self-contained**: every name and every list is resolved at the read, because `entityInfo` is
+   scoped by `local` and a type `DECLARE`d inside a `WHERE` is out of scope by flush time.
+   Measured: two types both declaring `rent`, read at one of them, produces S4's message and not
+   `AmbiguousTermError`. A `not-ok/tc` fixture must still pin that.
+
 5. **Evaluator.** ~~needs no change if the merged selector's body is total over its arms.~~
    **Backwards — nothing makes it total.** See item 2.
 6. **Consumers.** ~~sees one selector where it saw N.~~ **Backwards for almost all of them:** the
@@ -479,6 +594,52 @@ getUnique` on the `EnumDecl` case. Hover and `@desc` are range-keyed and
    the `prettyLayout round-trip` property has for a merged field. Docs: the "A field on several
    constructors" section of `doc/reference/types/DECLARE.md` and its linked
    `shared-field-example.l4`. S2's and S3's fixtures are NOT BUILT.
+
+## 5.1 Two holes S2 has, both measured, both permissive — state them before promoting
+
+A permissive hole means the run-time death of §1.1 is still reachable there. Neither is a reason not
+to promote; both are reasons to say so out loud, because §3.2's asymmetry cuts the other way for a
+rule that _fails to reject_: there is no error message to teach the lesson.
+
+1. **A later clause of a multi-clause `DECIDE`/`MEANS` group carries no S2 guarantee.**
+   `L4.Parser.matchClauses` compiles clauses 2..n into a `LET`-bound nullary decide
+   (`__pm_fallthrough_k`) referenced from the `OTHERWISE` of every column, and `checkExpr` checks a
+   `LetIn`'s declarations **before** its body — so that body is checked entirely outside the
+   `OTHERWISE` whose residual is meant to cover it. Without a suppression, the canonical idiom
+
+   ```l4
+   DECIDE f Landlord IS 0
+   DECIDE f a        IS a's monthly_rent
+   ```
+
+   — total, green, and evaluating correctly today (measured, both a one-column and a two-column
+   probe) — becomes an S2 site. So S2 records **nothing** inside a synthesised fall-through body
+   (`CheckEnv.inSyntheticFallthrough`, set from the same `isSyntheticFallthrough` test
+   `inferDecide` already computes, and deliberately not the `inNonexhaustiveDecide` flag beside it,
+   which an author's `@nonexhaustive` also sets).
+
+   **The obvious repair is unsound and must not be built.** Copying the residual onto the
+   `__pm_fallthrough_` binding certifies projections under the wrong one: `matchOne` emits the same
+   reference from the `OTHERWISE` of _every_ column, at different nesting levels with different
+   residuals over different column types. One binding, several residuals. Covering clause matrices
+   properly means narrowing at the **clause-matrix level** — per column, per clause, off
+   `dHead.rappForm` — not through the desugared `LET`.
+
+2. **A projection _named_ in a `WHERE` is checked un-narrowed.**
+   `CONSIDER a WHEN Tenant t THEN rent OTHERWISE 0 WHERE rent MEANS a's monthly_rent` is refused
+   though it is total and lazy. Same root cause as (1) — the `WHERE`'s declarations are checked
+   before the body that narrows — and a different direction from §3.1, which is about aliasing the
+   **base**, not naming the **projection**. This one is restrictive, not permissive, so it will
+   surface as a refusal a drafter can act on; the repair is to move the read inside the branch.
+
+Two smaller notes, both restrictive and both silent:
+
+- an alias defined in an **imported** module gets no narrowing — both import merge sites reset
+  `constBodies`;
+- a mis-spelled constructor pattern (`WHEN Agency` for `Agent`) resolves via
+  `inferPatternApp … \`orElse\` inferPatternVar`to a fresh catch-all binder, which consumes
+nothing, so the residual stays too big. The residual's soundness now depends on that`orElse`;
+  a change to it moves this rule.
 
 ## 6. Not ruled here
 

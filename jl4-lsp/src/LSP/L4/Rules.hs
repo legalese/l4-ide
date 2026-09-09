@@ -711,6 +711,11 @@ jl4Rules evalConfig rootDirectory recorder = do
             -- co-equal for overload resolution (spec §5.5, FIX C).
           , sectionPaths = Map.union cState.sectionPaths tcRes.sectionPaths
           , deferredChoices = 0
+            -- A RESET, beside 'deferredChoices' (mirrors
+            -- 'L4.Import.Resolution.combineResolvedImports'): an S2 obligation
+            -- is drained by the 'inferTopDecl' of the declaration that
+            -- recorded it, so none can be outstanding here.
+          , pendingPartialProjections = []
           }
         -- NOTE: tcRes.entityInfo is already zonked (the final substitution is
         -- applied when the TypeCheckResult is built below), as

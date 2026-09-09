@@ -136,6 +136,7 @@ mkInitialCheckState substitution =
     , constBodies  = Map.empty
     , sectionPaths = Map.empty
     , deferredChoices = 0
+    , pendingPartialProjections = []
     }
 
 mkInitialCheckEnv :: NormalizedUri -> Environment -> EntityInfo -> CheckEnv
@@ -159,6 +160,7 @@ mkInitialCheckEnv moduleUri environment entityInfo =
     , sectionStack = []
     , localBindings = Set.empty
     , narrowings = Map.empty
+    , inSyntheticFallthrough = False
     }
 
 -- | Main entry point for scope- and type-checking.
@@ -367,8 +369,8 @@ withExtraMixfix mixfixAdds =
     -- positional match: 'mixfixRegistry' is a duplicated field name, so a
     -- record update here would be ambiguous under DuplicateRecordFields
     updateMixfix :: MixfixRegistry -> CheckEnv -> CheckEnv
-    updateMixfix adds (MkCheckEnv a b c d e f g reg cf cs sb sd ir ne h i lb nw) =
-      MkCheckEnv a b c d e f g (unionMixfixRegistry adds reg) cf cs sb sd ir ne h i lb nw
+    updateMixfix adds (MkCheckEnv a b c d e f g reg cf cs sb sd ir ne h i lb nw ft) =
+      MkCheckEnv a b c d e f g (unionMixfixRegistry adds reg) cf cs sb sd ir ne h i lb nw ft
 
 dedupCheckInfos :: [CheckInfo] -> [CheckInfo]
 dedupCheckInfos = go Set.empty []
@@ -885,28 +887,47 @@ inferLocalDecl (LocalAssume ann assume) = do
   (rassume, extends) <- softprune $ inferAssume WrittenLocalAssume assume
   pure (LocalAssume ann rassume, extends)
 
+-- | One top-level declaration, plus the S2 flush.
+--
+-- SUM-TYPE-FIELDS-SPEC §3 S2: a partial-projection obligation is recorded
+-- inside whatever overload fork the read sits in and raised HERE, once that
+-- fork has been pruned. This is the first point above every fork — the module
+-- traversal's own invariant is that @inferTopDecl@ prunes
+-- Declare\/Decide\/Assume\/Timezone and 'inferDirective' prunes LazyEval\/… —
+-- and it is a point at which the losing candidates' obligations have already
+-- been discarded with their 'CheckState's. Nested sections recurse through
+-- this function, so an inner declaration flushes first.
+--
+-- See 'CheckState.pendingPartialProjections' for why raising at the read
+-- instead, with an exemption in 'viableCandidate', does not work.
+inferTopDecl :: AssumeOrigin -> TopDecl Name -> Check (TopDecl Resolved, [CheckInfo])
+inferTopDecl origin d = do
+  r <- inferTopDecl' origin d
+  flushPartialProjections
+  pure r
+
 -- | The 'AssumeOrigin' is read only by the 'Assume' case; 'inferSection'
 -- computes it per declaration.
-inferTopDecl :: AssumeOrigin -> TopDecl Name -> Check (TopDecl Resolved, [CheckInfo])
-inferTopDecl _ (Declare ann declare) = do
+inferTopDecl' :: AssumeOrigin -> TopDecl Name -> Check (TopDecl Resolved, [CheckInfo])
+inferTopDecl' _ (Declare ann declare) = do
   (rdeclare, extends) <- prune $ inferDeclare declare
   pure (Declare ann rdeclare, extends)
-inferTopDecl _ (Decide ann decide) = do
+inferTopDecl' _ (Decide ann decide) = do
   (rdecide, extends) <- prune $ inferDecide decide
   pure (Decide ann rdecide, extends)
-inferTopDecl origin (Assume ann assume) = do
+inferTopDecl' origin (Assume ann assume) = do
   (rassume, extends) <- prune $ inferAssume origin assume
   pure (Assume ann rassume, extends)
-inferTopDecl _ (Directive ann directive) = do
+inferTopDecl' _ (Directive ann directive) = do
   rdirective <- inferDirective directive
   pure (Directive ann rdirective, [])
-inferTopDecl _ (Import ann import_) = do
+inferTopDecl' _ (Import ann import_) = do
   rimport_ <- inferImport import_
   pure (Import ann rimport_, [])
-inferTopDecl _ (Section ann sec) = do
+inferTopDecl' _ (Section ann sec) = do
   (sec', extends) <- inferSection sec
   pure (Section ann sec', extends)
-inferTopDecl _ (Timezone ann tzExpr) = errorContext (WhileCheckingExpression tzExpr) do
+inferTopDecl' _ (Timezone ann tzExpr) = errorContext (WhileCheckingExpression tzExpr) do
   -- Both the 'errorContext' and the 'prune' are load-bearing (mirrors LazyEval):
   -- 'prune' collapses ambiguous candidates into an 'AmbiguousTermError' diagnostic
   -- (instead of crashing in 'runCheckUnique'), and the context supplies the
@@ -967,10 +988,51 @@ inferDecide dec@(MkDecide ann _tysig appForm expr) = do
         pure (decide, [dHead.name])
   where
     withNonexhaustiveFlag :: Check a -> Check a
-    withNonexhaustiveFlag
-      | Export.isNonexhaustiveDecide dec || isSyntheticFallthrough
-          = local (\env -> env { inNonexhaustiveDecide = True })
-      | otherwise                  = id
+    withNonexhaustiveFlag = markFallthrough . markNonexhaustive
+      where
+        markNonexhaustive :: Check a -> Check a
+        markNonexhaustive
+          | Export.isNonexhaustiveDecide dec || isSyntheticFallthrough
+              = local (\env -> env { inNonexhaustiveDecide = True })
+          | otherwise                  = id
+
+        -- Note [S2 has no obligation inside a fall-through]
+        --
+        -- SUM-TYPE-FIELDS-SPEC §3 S2, a MEASURED and DELIBERATE hole.
+        --
+        -- 'L4.Parser.matchClauses' compiles clauses 2..n of a multi-clause
+        -- group into a LET-bound nullary decide (@__pm_fallthrough_k@) and
+        -- references it from the @OTHERWISE@ of every column. 'checkExpr'
+        -- checks a @LetIn@'s declarations BEFORE its body, so that
+        -- fall-through body is checked entirely OUTSIDE the @OTHERWISE@ whose
+        -- residual is meant to cover it. Without this flag the canonical
+        -- idiom
+        --
+        -- >  DECIDE f Landlord IS 0
+        -- >  DECIDE f a        IS a's monthly_rent
+        --
+        -- — total, green, and evaluating correctly today — becomes an S2
+        -- site.
+        --
+        -- The obvious repair is UNSOUND and must not be built: copying the
+        -- residual onto the @__pm_fallthrough_@ binding certifies projections
+        -- under the wrong one, because 'L4.Parser.matchOne' emits the SAME
+        -- reference from the @OTHERWISE@ of EVERY column, at different
+        -- nesting levels with different residuals over different column
+        -- types. One binding, several residuals.
+        --
+        -- So S2 records nothing here. That is permissive — a later clause of
+        -- a multi-clause group carries no S2 guarantee, and a partial
+        -- projection there still dies at run time — and it is stated as a
+        -- limit in the spec rather than papered over. Covering clause
+        -- matrices properly means narrowing at the CLAUSE-MATRIX level
+        -- (per column, per clause, off @dHead.rappForm@), not through the
+        -- desugared @LET@.
+        markFallthrough :: Check a -> Check a
+        markFallthrough
+          | isSyntheticFallthrough
+              = local (\env -> env { inSyntheticFallthrough = True })
+          | otherwise = id
 
     -- The multi-clause pattern-matching desugaring (L4.Parser.matchClauses)
     -- binds the remaining clauses of a group as a LOCAL decide named
@@ -2600,6 +2662,18 @@ narrowingOfBase e = do
 -- and they stop at the first body that is not a bare binder: @b MEANS f a@ and
 -- @b MEANS w's inner@ are not aliases and get no narrowing.
 --
+-- ONE END OF A CHAIN IS NOT A DEAD END: a body that is a CONSTRUCTOR
+-- APPLICATION gives its binder that constructor. @theLandlord MEANS Landlord
+-- OF "1 Main St", "Ms Ng"@ then @theLandlord's addr@ is exactly §3 S3's
+-- "syntactically a constructor application … is statically that constructor"
+-- exception, reached through one nullary @MEANS@ instead of written inline,
+-- and it is sound for the same reason: 'constBodies' holds only NULLARY
+-- @MEANS@ bodies, so the binder denotes that construction unconditionally and
+-- L4 has no mutation to change it. (Measured: without this, the two S1
+-- fixtures @ok/sum-fields/shared-field.l4@ and
+-- @not-ok/tc/sum-field-type-conflict.l4@ are S2 sites — §4's class (A), an S3
+-- gap to fix in S3 rather than a corpus repair.)
+--
 -- The chain source is 'constBodies', which 'inferDecide' fills for every
 -- nullary @MEANS@ and which local @WHERE@\/@LET@ decides reach through
 -- 'inferLocalDecl'. Two honest limits, both restrictive: 'constBodies' is
@@ -2625,6 +2699,12 @@ lookupNarrowing = go (0 :: Int) Nothing . getUnique
               | BaseIsBinder r' <- classifyBase ei b
               , getUnique r' /= u
               -> go (depth + 1) acc' (getUnique r')
+            Just b
+              | BaseIsConstructor c <- classifyBase ei b
+              -> pure (combine acc'
+                        (narrowingFromConstructor ei
+                          (constructorsInScopeFromEntityInfo ei)
+                          NarrowedByConstruction c))
             _ -> pure acc'
 
     -- The narrowing found deeper in the chain is the "new" one, so when it is
@@ -2633,6 +2713,187 @@ lookupNarrowing = go (0 :: Int) Nothing . getUnique
     combine Nothing  m        = m
     combine (Just a) Nothing  = Just a
     combine (Just a) (Just b) = Just (intersectNarrowing b a)
+
+-- ----------------------------------------------------------------------------
+-- Note [S2: no projection without narrowing]
+-- ----------------------------------------------------------------------------
+--
+-- SUM-TYPE-FIELDS-SPEC §3 S2. A field read from a value that could still be a
+-- constructor which does not declare it is refused, because otherwise it dies
+-- at run time with a message about a @CONSIDER@ the drafter never wrote (§1.1).
+--
+-- THREE FORMS, all of them the same partial function. A selector is
+-- first-class and 'L4.Syntax.Proj' lowers to plain application, so @a's f@,
+-- @f a@ and a bare @f@ passed as a value all died identically (§3 S2, second
+-- ruling). Closing only the first would leave the run-time death reachable, so
+-- 'checkPartialProjection' is called from every site a selector can be
+-- resolved at:
+--
+--   * 'inferExpr'' @Proj@ → @inferRecordProjection@   — @a's f@
+--   * 'inferExpr'' @Proj@ → the qualified-name branch — @`Section`.f@
+--   * 'inferExpr'' @Var@                              — a bare selector as a VALUE
+--   * 'inferFlatApp' @directApp@ / @variadicRescue@   — @f a@
+--
+-- (@Var@ rather than @inferFlatApp@ is what catches the bare form: a bare
+-- identifier parses as @App ann n []@, and the @Var@ case — 'L4.Syntax.Var'
+-- being a pattern synonym for exactly that — sits ABOVE the @App@ case, so
+-- 'inferFlatApp' never sees a nullary application.)
+--
+-- THE DENOMINATOR IS THE SELECTOR'S OWN DOMAIN, not the base's inferred type.
+-- §3 S3 frames the unknown-set rule around @applySubst@ on the scrutinee; this
+-- check does not need the base's type at all. 'resolveProjectionLabel' and
+-- 'resolveTerm' hand over the selector's instantiated type @T -> fieldT@, and
+-- @T@'s head is what enumerates the constructors. That makes the whole check
+-- substitution-independent and removes the accuracy-versus-timing tension the
+-- spec's sketch has.
+--
+-- THE CLAMP (§3 S3's requirement (b)), in this exact order, so a stale or
+-- empty narrowing can NEVER certify a projection:
+--
+--   1. discard the narrowing outright unless its 'ofType' is this selector's
+--      domain head — the anti-staleness guard;
+--   2. intersect with the domain's own constructor set, and fall back to the
+--      WHOLE set if that intersection is empty;
+--   3. no narrowing at all, or an unenumerable universe, is likewise the whole
+--      set — or, for an empty universe, a bail.
+--
+-- Every fallback errs restrictively (it can only make S2 refuse more), because
+-- a narrowing that errs permissively is invisible.
+
+-- | The selectors a constructor declares, by 'Unique'.
+--
+-- Needs no new state: 'inferConDecls' already builds each constructor's
+-- @conType@ with the SELECTOR's own 'Resolved' as every argument's name, and
+-- S1's 'defAka' gives every arm of a shared field the SAME 'Unique' — which is
+-- exactly why a merged field is one member of this set and not several.
+constructorSelectorUniques :: EntityInfo -> Resolved -> Set Unique
+constructorSelectorUniques ei c = case Map.lookup (getUnique c) ei of
+  Just (_, KnownTerm cty Constructor) -> go cty
+  _                                   -> Set.empty
+  where
+    go = \ case
+      Forall _ _ t -> go t
+      Fun _ args t ->
+        Set.fromList [ getUnique r | MkOptionallyNamedType _ (Just r) _ <- args ] <> go t
+      _            -> Set.empty
+
+-- | The type a selector projects FROM: the head of its single argument's type.
+-- 'Nothing' when that head is not a type application (a bare type variable, a
+-- synonym head the environment cannot resolve), which is a bail, never an
+-- empty answer.
+selectorDomainType :: Type' Resolved -> Maybe Resolved
+selectorDomainType = \ case
+  Forall _ _ t                                 -> selectorDomainType t
+  Fun _ (MkOptionallyNamedType _ _ domT : _) _ -> headOf domT
+  _                                            -> Nothing
+  where
+    headOf = \ case
+      TyApp _ r _ -> Just r
+      _           -> Nothing
+
+-- | Record an S2 obligation for the enclosing declaration to raise. See
+-- 'CheckState.pendingPartialProjections' for why it is not raised here.
+deferPartialProjection :: PartialProjection -> Check ()
+deferPartialProjection p = modifying' #pendingPartialProjections (p :)
+
+-- | S4's payload view of a base shape.
+projectionBaseOf :: ProjectionBaseShape -> ProjectionBase
+projectionBaseOf = \ case
+  BaseIsBinder r      -> BaseBinder (getName r)
+  -- A constructor application is narrowed (to itself), so it never lacks a
+  -- reason; what it lacks is a NAME, and the repair is the same as for any
+  -- other unnamed value. 'NarrowedByConstruction' is what tells the reader it
+  -- was written as that constructor right here.
+  BaseIsConstructor _ -> BaseUnnamed "a constructed value"
+  BaseIsOther what    -> BaseUnnamed what
+
+-- | __S2.__ Refuse a field read from a value that could still be a constructor
+-- which does not declare it. See Note [S2: no projection without narrowing].
+--
+-- Silent — records nothing — for anything that is not a declared field
+-- selector, for a domain whose constructors cannot be enumerated, and inside a
+-- synthesised multi-clause fall-through body (Note [S2 has no obligation
+-- inside a fall-through]).
+checkPartialProjection
+  :: Maybe SrcRange
+     -- ^ where the read is; 'Nothing' for a desugared node with no range
+  -> Resolved
+     -- ^ the selector
+  -> Type' Resolved
+     -- ^ its INSTANTIATED type, @T -> fieldT@
+  -> Maybe (Expr Resolved)
+     -- ^ the base it is read from; 'Nothing' for a selector used as a value
+  -> Check ()
+checkPartialProjection mRange sel selTy mBase = do
+  suppressed <- asks (.inSyntheticFallthrough)
+  ei <- asks (.entityInfo)
+  case Map.lookup (getUnique sel) ei of
+    Just (_, KnownTerm _ Selector)
+      | not suppressed
+      , Just tyR <- selectorDomainType selTy
+      -> go ei tyR
+    _ -> pure ()
+  where
+    go ei tyR = do
+      let tyU      = getUnique tyR
+          ctors    = Map.findWithDefault [] tyU (constructorsInScopeFromEntityInfo ei)
+          universe = Set.fromList (getUnique <$> ctors)
+          declared = [ c | c <- ctors
+                         , getUnique sel `Set.member` constructorSelectorUniques ei c ]
+      -- An empty universe means UNKNOWN, never "no constructors": @CONTRACT@ is
+      -- deliberately excluded from the enumeration. An empty 'declared' means
+      -- this selector is not a field of its own domain type, i.e. the model
+      -- above is wrong about it — and reporting from a wrong model is worse
+      -- than not reporting.
+      unless (Set.null universe || null declared) do
+        mbn <- traverse narrowingOfBase mBase
+        let mNw = mbn >>= (.narrowing)
+            -- THE CLAMP. Both fallbacks widen; see Note [S2 …].
+            (possible, mWhy) = case mNw of
+              Just nw
+                | nw.ofType == tyU
+                , p0 <- Set.intersection (possibleConstructorSet nw.possible) universe
+                , not (Set.null p0)
+                -> (p0, Just nw.reason)
+              _ -> (universe, Nothing)
+            declaring = Set.fromList (getUnique <$> declared)
+            missing   = [ c | c <- ctors
+                            , getUnique c `Set.member` possible
+                            , not (getUnique c `Set.member` declaring) ]
+        unless (null missing) $
+          deferPartialProjection
+            MkPartialProjection
+              { readRange     = mRange
+              , field         = getName sel
+              , declaredBy    = getName <$> declared
+              , stillPossible = getName <$> missing
+              , base          = maybe BaseNone (projectionBaseOf . (.shape)) mbn
+              , why           = fromMaybe (NotNarrowed (getName tyR)) mWhy
+              }
+
+-- | S2 at an application site (@f a@). Only a one-argument application is
+-- checked: a selector has arity one, so a longer resolved-argument list means
+-- 'matchFunTy' already raised an arity error, and adding an S2 diagnostic on
+-- top of that would be a cascade about a call the drafter has to fix anyway.
+checkAppliedSelector :: Anno -> Resolved -> Type' Resolved -> [Expr Resolved] -> Check ()
+checkAppliedSelector ann rn t = \ case
+  [arg] -> checkPartialProjection (rangeOf ann) rn t (Just arg)
+  _     -> pure ()
+
+-- | Raise every S2 obligation the declaration just checked recorded, and clear
+-- the queue. Called by 'inferTopDecl', which is the first point above every
+-- overload fork (see 'CheckState.pendingPartialProjections').
+--
+-- 'List.nub' rather than a keyed dedupe: two obligations that are equal in
+-- every field — including their range, which may be 'Nothing' — describe one
+-- read, and two that differ in any field are two reads. Keying on the range
+-- alone would collapse every rangeless obligation in a declaration into one.
+flushPartialProjections :: Check ()
+flushPartialProjections = do
+  pend <- use #pendingPartialProjections
+  unless (null pend) do
+    assign #pendingPartialProjections []
+    traverse_ (addWarning . PartialProjectionWarning) (List.nub (reverse pend))
 
 -- | What a @WHEN@ arm does to the residual — the set of constructors that can
 -- still reach a later arm (SUM-TYPE-FIELDS-SPEC §3 S3).
@@ -2889,6 +3150,10 @@ inferFlatApp preambleErr ann n es = do
               let finalAnn = if needsAnnoRebuild
                              then rebuildMixfixAppAnno ann actualFuncName actualArgs
                              else ann
+              -- SUM-TYPE-FIELDS-SPEC §3 S2, form 2 (@f a@): a selector applied
+              -- directly is the same partial function as @a's f@ and is
+              -- checked identically.
+              checkAppliedSelector finalAnn rn t res
               pure (App finalAnn rn res, rt)
 
           variadicRescue = do
@@ -2911,6 +3176,7 @@ inferFlatApp preambleErr ann n es = do
                   pure (App (rebuildMixfixAppAnno ann actualFuncName collected) rn res, rt)
               _ -> do
                   (res, rt) <- matchFunTy False rn t actualArgs
+                  checkAppliedSelector ann rn t res
                   pure (App ann rn res, rt)
 
       case actualArgs of
@@ -3522,6 +3788,11 @@ inferExpr' g =
                   let qualifiedName = MkName (l ^. annoOf) qualifiedRawName
                   (resolved, pt) <- resolveTerm qualifiedName
                   t <- instantiate pt
+                  -- SUM-TYPE-FIELDS-SPEC §3 S2, form 3, section-qualified:
+                  -- 'publishSelector' calls 'addQualifiedAliases', so
+                  -- @`Section`.monthly_rent@ resolves here as an unapplied
+                  -- selector VALUE. No base to narrow.
+                  checkPartialProjection (rangeOf ann) resolved t Nothing
                   pure (Var ann resolved, t)
             _ -> inferRecordProjection ann e l  -- Not a valid chain, use record projection
       where
@@ -3603,10 +3874,22 @@ inferExpr' g =
               -- detonates arbitrarily far away (eval/nlg/serialization).
               _ -> error "internal error in matchFunTy: projection expected exactly one resolved argument"
 
+          -- SUM-TYPE-FIELDS-SPEC §3 S2, form 1 (@a's f@). All three dispatcher
+          -- call sites funnel here. See Note [S2: no projection without
+          -- narrowing].
+          checkPartialProjection (rangeOf projAnn) rl t (Just re)
+
           pure (Proj projAnn re rl, rt)
     Var ann n -> do
       (r, pt) <- resolveTerm n
       t <- instantiate pt
+      -- SUM-TYPE-FIELDS-SPEC §3 S2, form 3: a bare partial selector used as a
+      -- VALUE (@map OF monthly_rent, everyone@). This case, not
+      -- 'inferFlatApp', is where that lands — a bare identifier parses as
+      -- @App ann n []@ and 'L4.Syntax.Var' is a pattern synonym for exactly
+      -- that, so this arm sits above the @App@ arm and catches it. There is no
+      -- base, so there is nothing to narrow.
+      checkPartialProjection (rangeOf ann) r t Nothing
       pure (Var ann r, t)
     Lam ann givens e -> do
       (rgivens', rargts, extends) <- inferLamGivens givens
@@ -6587,6 +6870,194 @@ prettyMixfixMatchError funcName = \case
     prettyRawName (QualifiedName qs t) = Text.intercalate "." (toList qs) <> "." <> t
     prettyRawName (PreDef predef) = predef
 
+-- | S4's diagnostic (SUM-TYPE-FIELDS-SPEC §3 S4), in three paragraphs:
+--
+--   1. __what is wrong__, always carrying the phrase @could also be@. §3 S4
+--      makes that the stable marker §4's gate greps for, so it is emitted
+--      UNCONDITIONALLY and structurally — from 'stillPossible', which S2
+--      guarantees is non-empty whenever this value exists — rather than being
+--      left to a per-form prose choice. A marker that some forms omit makes
+--      the gate report a false zero and promote a hard error over sites nobody
+--      read.
+--   2. __why the value can still reach this read__ — §3.2's hard requirement,
+--      and the test of whether an S3 rule earned its place: /"the diagnostic
+--      must explain the NARROWING, not merely report the missing field. If
+--      that sentence cannot be written for a rule, the rule is too clever and
+--      is cut."/ It is written from 'why', which is the same 'NarrowingReason'
+--      the narrowing itself carries, so the error cannot be constructed
+--      without it.
+--   3. __a repair that compiles.__ Not negotiable and easy to get wrong: the
+--      spec's own first draft advised @WHEN Tenant t THEN t's monthly_rent@,
+--      which is a TYPE error (@t@ is the payload, not the value). The unnamed
+--      form's repair is likewise not "wrap it in a @CONSIDER@ and keep
+--      projecting" — a projection scrutinee is not narrowed either, so that
+--      advice would produce a second S2 error. It is: give the value a name,
+--      then narrow the name; or match the payload.
+--
+-- One renderer, shared: at promotion (§4's gate step 2) this constructor moves
+-- to 'CheckError' and its caller changes from 'prettyCheckWarning' to
+-- 'prettyCheckError'. This function does not move.
+prettyPartialProjection :: PartialProjection -> [Text]
+prettyPartialProjection p =
+  headline <> ("" : whyLines) <> ("" : repairLines)
+  where
+    fld  = tick p.field
+    -- The subject of the first sentence. Never an article-plus-name, so no
+    -- "a"/"an" decision has to be made about a drafter's identifier.
+    subj = case p.base of
+      BaseBinder n  -> tick n
+      BaseUnnamed _ -> "the value it is read from"
+      BaseNone      -> "whatever it is applied to"
+
+    -- Names are rendered by their LAST component. 'addQualifiedAliases'
+    -- publishes a section-qualified alias for every constructor and selector
+    -- under the same 'Unique', so 'entityInfo' may well hand back
+    -- @`British Citizen Act`.`Improved Readability Version`.Just@ — which is
+    -- not what the drafter wrote and not something they can paste into the
+    -- repair this message is recommending.
+    shortText :: Name -> Text
+    shortText n = case rawName n of
+      QualifiedName _ final -> final
+      other                 -> rawNameToText other
+
+    tick :: Name -> Text
+    tick n = "`" <> shortText n <> "`"
+
+    headline =
+      [ fld <> " is " <> onlyList p.declaredBy <> "."
+      , "But " <> subj <> " could also be " <> orList p.stillPossible <> ", which "
+          <> hasHave p.stillPossible <> " no " <> fld <> "."
+      ]
+
+    whyLines = case p.why of
+      -- The "not narrowed" explanation is per base shape, because the REASON
+      -- nothing narrowed it differs: a binder was simply never narrowed, an
+      -- unnamed value has no binder to narrow, and a bare selector has no
+      -- value at all.
+      NotNarrowed tyN -> case p.base of
+        BaseBinder n ->
+          [ "Nothing here narrows " <> tick n <> ": it is used at the whole type "
+              <> tick tyN <> ","
+          , "so every constructor of " <> tick tyN <> " can reach this read."
+          ]
+        BaseUnnamed what ->
+          [ "Nothing narrows it: the value is " <> what <> ", not a name, so there is no"
+          , "binder for a branch to narrow, and every constructor of " <> tick tyN
+          , "can reach this read."
+          ]
+        BaseNone ->
+          [ "There is no base here to narrow: a selector used as a value has nothing"
+          , "to be narrowed by, so every constructor of " <> tick tyN <> " can reach"
+          , "this read."
+          ]
+      NarrowedByCast c ->
+        [ "`EVERY " <> shortText c <> " …` narrows it to " <> tick c <> " — and"
+        , tick c <> " does not declare " <> fld <> "."
+        ]
+      NarrowedByWhen c ->
+        [ "The `WHEN " <> shortText c <> " …` branch narrows it to " <> tick c <> " — and"
+        , tick c <> " does not declare " <> fld <> "."
+        ]
+      NarrowedByConstruction c ->
+        [ "It is written here as " <> tick c <> ", and " <> tick c <> " does not"
+        , "declare " <> fld <> "."
+        ]
+      NarrowedByResidual consumed refutable ->
+        consumedLine consumed <> concatMap refutableLines refutable <> tail'
+        where
+          consumedLine [] = []
+          consumedLine cs = [ "The branches above consume " <> andList cs <> "." ]
+          -- §3.2's required sentence, one line per refutable arm so that the
+          -- phrase stays singular however many there are. The pattern is
+          -- printed in full — @WHEN Tenant 1500@, not @WHEN Tenant …@ — which
+          -- is what makes the explanation actionable.
+          refutableLines q =
+            [ "The `WHEN " <> prettyLayout q <> "` branch matches only some "
+                <> maybe "values" tick (patternHeadName q) <> " values,"
+            ]
+          tail'
+            | null refutable && null consumed =
+                [ "Nothing above this read narrows it, so every constructor can still"
+                , "reach here."
+                ]
+            | null refutable =
+                [ "so " <> orList p.stillPossible <> " is what is left to reach here." ]
+            | otherwise =
+                [ "so " <> orList p.stillPossible <> " can still reach here." ]
+
+    repairLines = case (p.why, p.base) of
+      -- A value written AS a constructor is already as narrow as it will ever
+      -- get, so "narrow it first" is not advice — the read is simply wrong
+      -- about which constructor it is reading from.
+      (NarrowedByConstruction c, _) ->
+        [ "Read the field from a value that can be " <> orList p.declaredBy <> ", or"
+        , "declare " <> fld <> " on " <> tick c <> " too."
+        ]
+      (_, base') -> byBase base'
+
+    byBase = \ case
+      BaseBinder n ->
+        [ "Narrow " <> tick n <> " first:"
+        , ""
+        , "  EVERY " <> firstDeclaring <> " " <> shortText n <> " …"
+        , "  CONSIDER " <> shortText n <> " WHEN " <> firstDeclaring <> " t THEN … "
+            <> shortText n <> "'s " <> shortText p.field <> " …"
+        , ""
+        , "(or just `THEN t` when the field is the whole payload), or put the read"
+        , "under an `OTHERWISE` after the other arms — or declare " <> fld <> " on"
+        , orList p.stillPossible <> " too."
+        ]
+      -- NOT "wrap it in a CONSIDER and keep projecting": a projection
+      -- scrutinee is not a binder either, so
+      -- @CONSIDER <value> WHEN C t THEN <value>'s f@ is refused again. The two
+      -- repairs below are the ones that compile, and the second is the idiom
+      -- §4 measured real drafters already using.
+      BaseUnnamed _ ->
+        [ "Give it a name, then narrow the name:"
+        , ""
+        , "  CONSIDER v WHEN " <> firstDeclaring <> " t THEN … v's " <> shortText p.field <> " …"
+        , "  WHERE v MEANS <that value>"
+        , ""
+        , "or match the payload directly, which needs no name at all:"
+        , ""
+        , "  CONSIDER <that value> WHEN " <> firstDeclaring <> " t THEN t"
+        , ""
+        , "or declare " <> fld <> " on " <> orList p.stillPossible <> " too."
+        ]
+      BaseNone ->
+        [ "Read the field through a name you have narrowed instead:"
+        , ""
+        , "  GIVEN x YIELD CONSIDER x WHEN " <> firstDeclaring <> " t THEN t OTHERWISE …"
+        , ""
+        , "or declare " <> fld <> " on " <> orList p.stillPossible <> " too."
+        ]
+
+    firstDeclaring = case p.declaredBy of
+      n : _ -> shortText n
+      []    -> "<constructor>"
+
+    patternHeadName = \ case
+      PatApp _ c _ -> Just (getName c)
+      _            -> Nothing
+
+    hasHave [_] = "has"
+    hasHave _   = "have"
+
+    onlyList = \ case
+      []      -> "a field of no constructor of this type"
+      [n]     -> "a field of " <> tick n <> " only"
+      ns      -> "a field of " <> andList ns <> " only"
+
+    orList  = joinWith "or"
+    andList = joinWith "and"
+
+    joinWith conj = \ case
+      []       -> "nothing"
+      [n]      -> tick n
+      [n1, n2] -> tick n1 <> " " <> conj <> " " <> tick n2
+      ns       -> Text.intercalate ", " (map tick (init ns))
+                    <> " " <> conj <> " " <> tick (last ns)
+
 prettyCheckWarning :: CheckWarning -> [Text]
 prettyCheckWarning = \ case
   PatternMatchRedundant b ->
@@ -6618,6 +7089,7 @@ prettyCheckWarning = \ case
     , ""
     , "where a and b are the GIVEN inputs."
     ]
+  PartialProjectionWarning p -> prettyPartialProjection p
   DeprecatedAssume info ->
     [ "ASSUME is an older way of introducing a name, and it is being retired."
     , "Nothing is broken: the file still checks, runs and exports as before."
