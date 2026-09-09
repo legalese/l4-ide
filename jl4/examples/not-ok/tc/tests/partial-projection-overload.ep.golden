@@ -1,0 +1,35 @@
+-- SUM-TYPE-FIELDS-SPEC §5 item 4: the OVERLOAD TRAP, pinned.
+--
+-- `rent` is a field of two UNRELATED types here, so the name resolves to two
+-- selectors and the checker forks an overload candidate for each. S2's
+-- diagnostic is recorded inside the surviving fork — but raising it THERE
+-- would make that candidate non-viable, and `prune` would then report
+-- "There are multiple definitions for the identifier `rent`" instead: an
+-- ambiguity error about a name that is not actually ambiguous, in place of the
+-- one message that says what is wrong.
+--
+-- So the obligation is parked on `CheckState.pendingPartialProjections` and
+-- drained by `inferTopDecl`, the first point above every fork. The state that
+-- continues is the winner's, so only the winner's obligations survive.
+--
+-- WHAT THIS FILE ASSERTS is therefore the golden's CONTENT and not merely that
+-- it is red: the message below must be S2's, naming `rent`, `Landlord` and
+-- `Actor`. If it ever becomes `AmbiguousTermError` or `InternalAmbiguityError`,
+-- the deferral has been undone.
+--
+-- (§5 item 4 first proposed exempting S2 in `viableCandidate` instead. That was
+-- REPLACED: it contradicts `severity`'s documented claim to be the one place
+-- that decides what blocks, and it leaves a candidate carrying a blocking
+-- diagnostic viable — so two candidates go viable and `prune` collapses them
+-- to `InternalAmbiguityError`, the same outcome moved one step later.)
+
+DECLARE Actor IS ONE OF
+    Landlord
+    Tenant HAS rent IS A NUMBER
+
+DECLARE Vehicle IS ONE OF
+    Car HAS rent IS A NUMBER
+
+GIVEN a IS AN Actor
+GIVETH A NUMBER
+`rent of` a MEANS a's rent

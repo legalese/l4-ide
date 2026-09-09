@@ -1,0 +1,73 @@
+-- SUM-TYPE-FIELDS-SPEC §3 S2: a field read from a value that could still be a
+-- constructor which does not declare it is refused at CHECK time. Before this
+-- rule every read below type-checked clean and died at run time, with a
+-- message about a CONSIDER the drafter never wrote (§1.1).
+--
+-- The positive side — the same reads, narrowed so that they are legal — is
+-- `ok/sum-fields/narrowing.l4`.
+--
+-- This file is also the acceptance test for §3 S4's DIAGNOSTIC requirement,
+-- which is stricter than "report the missing field": §3.2 makes the message
+-- explain the NARROWING, and says a rule for which that sentence cannot be
+-- written is too clever and is cut. So there is one site here per shape of
+-- explanation the renderer can produce, and the golden is where you read them.
+
+DECLARE Actor IS ONE OF
+    Landlord HAS deposit      IS A NUMBER
+    Tenant   HAS monthly_rent IS A NUMBER
+
+DECLARE Wrapper
+    HAS inner IS AN Actor
+
+-- 1. NOT NARROWED AT ALL. A GIVEN parameter stands at the whole type; nothing
+--    in a one-line body narrows it.
+GIVEN a IS AN Actor
+GIVETH A NUMBER
+`plain` a MEANS a's monthly_rent
+
+-- 2. THE RESIDUAL, and the sub-rule §3.2 says has to carry the teaching load.
+--    `WHEN Tenant 1500` matches only SOME `Tenant`s, so it does not consume
+--    the constructor and a `Tenant` still reaches the OTHERWISE. The message
+--    must name that branch: the difference between this and a green program is
+--    a property of a sub-pattern three lines above the error.
+GIVEN a IS AN Actor
+GIVETH A NUMBER
+`refutable residual` a MEANS
+    CONSIDER a
+    WHEN Tenant 1500 THEN 1
+    OTHERWISE a's deposit
+
+-- 3. NARROWED TO THE WRONG ARM by a `WHEN`. `Landlord` is a constructor of
+--    `Actor` and it simply has no `monthly_rent`; "narrow it first" would be
+--    no advice at all here.
+GIVEN a IS AN Actor
+GIVETH A NUMBER
+`wrong arm` a MEANS
+    CONSIDER a
+    WHEN Landlord d THEN a's monthly_rent
+    OTHERWISE 0
+
+-- 4. A BASE THAT IS NOT A NAME. `w's inner` is a projection, so there is no
+--    binder for any branch to narrow, and the repair is to give it a name or
+--    to match the payload — not to wrap it in a CONSIDER and keep projecting,
+--    which would be refused again.
+GIVEN w IS A Wrapper
+GIVETH A NUMBER
+`chained` w MEANS w's inner's monthly_rent
+
+-- 5. A VALUE WRITTEN AS A CONSTRUCTOR. Already as narrow as it will ever get,
+--    so the read is wrong about which constructor it is reading from.
+GIVETH A NUMBER
+`constructed` MEANS (Landlord OF 4000)'s monthly_rent
+
+-- 6. THE SELECTOR AS A VALUE, with no base at all. §3 S2's second ruling:
+--    `Proj` lowers to plain application, so a bare partial selector is the
+--    same partial function and died the same way. (`apply` is written out
+--    rather than imported so this file needs no prelude and its golden
+--    carries no import-resolution log.)
+GIVEN f IS A FUNCTION FROM Actor TO NUMBER
+GIVETH A NUMBER
+`apply` f MEANS f (Landlord OF 4000)
+
+GIVETH A NUMBER
+`as a value` MEANS `apply` monthly_rent

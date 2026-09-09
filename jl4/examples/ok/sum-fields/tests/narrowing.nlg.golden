@@ -1,0 +1,9 @@
+executing contract `rich tenants sign` at 0 with the following events:  party `alice` did `Sign` with `alice` at 1
+`rent via when` with `alice`
+`rent via when` with `theLandlord`
+`rent via otherwise` with `alice`
+`rent via otherwise` with `theLandlord`
+`rent via alias` with `alice`
+`rent via alias` with `theLandlord`
+`alice` 's `monthly_rent`
+`theLandlord` 's `deposit`

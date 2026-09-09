@@ -1,0 +1,24 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: partial-projection-overload.l4
+  Hidden: no
+  Range: 35:19-35:27
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    `rent` is a field of `Tenant` only.
+    But `a` could also be `Landlord`, which has no `rent`.
+
+    Nothing here narrows `a`: it is used at the whole type `Actor`,
+    so every constructor of `Actor` can reach this read.
+
+    Narrow `a` first:
+
+      EVERY Tenant a …
+      CONSIDER a WHEN Tenant t THEN … a's rent …
+
+    (or just `THEN t` when the field is the whole payload), or put the read
+    under an `OTHERWISE` after the other arms — or declare `rent` on
+    `Landlord` too.

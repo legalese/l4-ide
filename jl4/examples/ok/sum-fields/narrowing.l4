@@ -1,0 +1,100 @@
+IMPORT prelude
+-- SUM-TYPE-FIELDS-SPEC §3 S3: narrowing is a CHECK-TIME fact.
+--
+-- `monthly_rent` is declared by `Tenant` alone, so reading it off a value that
+-- could still be a `Landlord` is refused by §3 S2 — that refusal is pinned by
+-- `not-ok/tc/partial-projection.l4`. THIS file is the other side: four ways of
+-- telling the checker the value is a `Tenant`, each of which makes the very
+-- same read legal.
+--
+-- Every one of them is ARMED — `#EVAL` or `#TRACE` — because a narrowing that
+-- only satisfies the checker is worth nothing: the point is that the read is
+-- also SAFE, and before §3 S2 the un-narrowed form died at run time with a
+-- message about a CONSIDER the drafter never wrote (§1.1).
+--
+-- The quantifier case in particular is the ONLY test of that path anywhere in
+-- the tree: §4 measured that every existing `every/` filter narrows with `elem`
+-- or `EQUALS` and none with a narrowing constructor.
+
+DECLARE Actor IS ONE OF
+    Landlord HAS deposit      IS A NUMBER
+    Tenant   HAS monthly_rent IS A NUMBER
+
+DECLARE Action IS ONE OF
+    Sign HAS signer IS AN Actor
+
+theLandlord MEANS Landlord OF 4000
+alice       MEANS Tenant OF 1500
+bob         MEANS Tenant OF 900
+everyone    MEANS LIST theLandlord, alice, bob
+
+-- 1. THE NARROWING CONSTRUCTOR. `EVERY Tenant a` says the members are
+--    `Tenant`s, so `a's monthly_rent` in the WHO filter is total. The roll
+--    filter drops `theLandlord` before the filter ever sees it, which is what
+--    the checker has now learned to agree with.
+GIVETH A DEONTIC Actor Action
+`rich tenants sign` MEANS
+    EVERY Tenant a IN everyone
+        WHO    a's monthly_rent AT LEAST 1000
+        MUST   Sign (EXACTLY a)
+        WITHIN 14
+        ONCE   ALL HAVE
+        HENCE  FULFILLED
+        LEST   BREACH
+
+#TRACE `rich tenants sign` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+
+-- 2. A `WHEN` BRANCH NARROWS THE SCRUTINEE. The branch binds `t` to the
+--    PAYLOAD, not to the value; what it narrows is `a`, the name it is
+--    scrutinising. So `a's monthly_rent` is legal inside the branch and
+--    nowhere else in this function.
+GIVEN a IS AN Actor
+GIVETH A NUMBER
+`rent via when` a MEANS
+    CONSIDER a
+    WHEN Landlord d THEN 0
+    WHEN Tenant t   THEN a's monthly_rent
+
+#EVAL `rent via when` alice
+#EVAL `rent via when` theLandlord
+
+-- 3. AN `OTHERWISE` GETS THE RESIDUAL. `Landlord` is consumed by the branch
+--    above it — `WHEN Landlord d` is irrefutable, every sub-pattern a plain
+--    variable — so the only constructor left to reach the OTHERWISE is
+--    `Tenant`, and the read is total there.
+GIVEN a IS AN Actor
+GIVETH A NUMBER
+`rent via otherwise` a MEANS
+    CONSIDER a
+    WHEN Landlord d THEN 0
+    OTHERWISE a's monthly_rent
+
+#EVAL `rent via otherwise` alice
+#EVAL `rent via otherwise` theLandlord
+
+-- 4. AN ALIAS SEES THROUGH TO WHAT IT NAMES. `b MEANS a` is not a new value,
+--    so `b` is narrowed exactly where `a` is. This is what stops naming a
+--    subexpression from changing whether the program checks (§3.1).
+GIVEN a IS AN Actor
+GIVETH A NUMBER
+`rent via alias` a MEANS
+    CONSIDER a
+    WHEN Landlord d THEN 0
+    OTHERWISE b's monthly_rent
+    WHERE
+        b MEANS a
+
+#EVAL `rent via alias` alice
+#EVAL `rent via alias` theLandlord
+
+-- 4b. …and through a chain that ends at a CONSTRUCTION. `alice` is written as
+--     `Tenant OF 1500` and L4 has no mutation, so it denotes that construction
+--     unconditionally and the read needs no CONSIDER at all.
+#EVAL alice's monthly_rent
+#EVAL theLandlord's deposit
+
+-- A nullary constructor is statically itself, so a field of a DIFFERENT arm is
+-- still refused there — see `not-ok/tc/partial-projection.l4`. Nothing in this
+-- file relies on that; it is named so a reader does not assume 4b is a blanket
+-- permission.
