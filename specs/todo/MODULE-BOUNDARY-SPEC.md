@@ -399,7 +399,7 @@ already learned the opposite without noticing the collision.
 contradiction; neither was a measurement of the same thing. The list above replaces both.
 A `file:line` is only as good as the ref it was read at: these are pinned to `88d9f8b9`.)
 
-**Not corrected here: `skills/writing-l4-rules/SKILL.md`.** It carried the same falsehood as
+**Not corrected here: `.claude/skills/writing-l4-rules/SKILL.md`.** It carried the same falsehood as
 "The prelude is always available.", and PR #336 fixed it first and better — its replacement
 gives the failing probe verbatim and adds the transitive case (`hierarchy` opens with its own
 `IMPORT prelude`), which none of the five above mention. That version stands; this branch took

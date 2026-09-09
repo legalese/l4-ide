@@ -542,7 +542,7 @@ GIVETH A NUMBER
 _(Probe `q13b-current-rate.l4`, exit 0, one error: 90 for a 2023 rule date, where the answer is 70.
 Pinning the axis has no effect, because nothing reads it.)_
 
-**See** [the multi-temporal modeling tutorial](../../../../doc/tutorials/multi-temporal-modeling/multi-temporal-rule-modeling.md),
+**See** [the multi-temporal modeling tutorial](../../../../../doc/tutorials/multi-temporal-modeling/multi-temporal-rule-modeling.md),
 which builds the three axes up one at a time, and entry 4.8 for what happens when only part of a
 module is dated.
 

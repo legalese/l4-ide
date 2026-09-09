@@ -1161,7 +1161,7 @@ enacted.
 ### 11.4 Mechanism: the ledger is the defeater store
 
 A discretionary act is an **event in the state ledger** — machinery L4 already has
-(`RECORD`/`COMMIT`/`ATTEST`/`RECALL`; see `skills/writing-l4-rules/references/state-ledger.md`).
+(`RECORD`/`COMMIT`/`ATTEST`/`RECALL`; see `.claude/skills/writing-l4-rules/references/state-ledger.md`).
 A ministerial determination is an `ATTEST`ed official-record entry naming the power exercised,
 the grounds asserted, and the content decided. Evaluation of a defeasible node then:
 

@@ -3050,7 +3050,7 @@ capture, which is worse.** That is the objection in its strongest form and it st
 
   **Why it is withdrawn — 2: L4 already has it, and has had it all along.** The ellipsis operators
   are asyndetic con/disjunction: **`...` is implicit `AND`, `..` is implicit `OR`**
-  (`skills/writing-l4-rules/references/gotchas.md`, "Asyndetic operators"). They exist precisely so
+  (`.claude/skills/writing-l4-rules/references/gotchas.md`, "Asyndetic operators"). They exist precisely so
   a clause list "should read as a bulleted list rather than a prose 'A and B and C'", and they are
   not marginal — **591 asyndetic operator lines across the corpus, 405 of them `...`**. So the
   proposal was not a new mechanism, it was a second spelling of an existing one:

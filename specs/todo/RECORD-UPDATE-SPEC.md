@@ -22,7 +22,7 @@
 >
 > **Seed:** a user question — "in haskell if i want to update a record i give the name of the
 > existing record and i give overrides in braces. in l4 is there a similar syntax?" The answer today
-> is no, and `skills/writing-l4-rules/references/drafting-patterns.md:511` documents that as a
+> is no, and `.claude/skills/writing-l4-rules/references/drafting-patterns.md:511` documents that as a
 > **gotcha** with two workarounds. This spec asks whether the gotcha should become a feature.
 
 ---
@@ -275,7 +275,7 @@ demand. R1 does not rest on it; it rests on §2.2 and §2.3, whose sites are in 
 **The scan in §2 is not wrong, but it is narrow, and on its own it is misleading.** It only counts
 the identity-copy shape `f IS <base>'s f`. The corpus's _documented_ workaround is the other one —
 a **GIVEN-parameterised constructor factory** that spells every field as a literal and takes the
-varying ones as parameters (`skills/writing-l4-rules/references/drafting-patterns.md:511` names
+varying ones as parameters (`.claude/skills/writing-l4-rules/references/drafting-patterns.md:511` names
 exactly this manoeuvre). No `'s` projection appears, so the first regex is blind to all of it.
 
 Rescanned for that shape — a `MEANS <Type> WITH` body under a `GIVEN`, ≥6 fields, fewer parameters
@@ -1403,7 +1403,7 @@ that is exactly what a bad elaboration would break.
   subsumes the other, and #420's own status note says its `stateupdate` motivation is still blocked.
 - `specs/done/STATE-AS-LEDGER-SPEC.md` D1/D2 — the append-only ledger. §5.5: terminological overlap
   only; D1 cites `Foo WITH field IS value` approvingly as the register to match.
-- `skills/writing-l4-rules/references/drafting-patterns.md:511` — documents the absence as a gotcha
+- `.claude/skills/writing-l4-rules/references/drafting-patterns.md:511` — documents the absence as a gotcha
   with the two workarounds. **Update this in the same PR as any implementation** (CLAUDE.md §4).
 - `jl4-core/libraries/actus.l4:70` — `-- Note: L4 constructs new records rather than updating in
 place.` Delete this comment when the feature lands; it is the file's own apology for its absence.

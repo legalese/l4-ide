@@ -68,7 +68,7 @@ An actor may only perform its own actions.
 To make the Contractor the performer, build a second act with the Contractor in the first slot —
 one action type carries both directions.
 
-**See** [`doc/concepts/legal-modeling/actors-and-actions.md`](../../../../doc/concepts/legal-modeling/actors-and-actions.md)
+**See** [`doc/concepts/legal-modeling/actors-and-actions.md`](../../../../../doc/concepts/legal-modeling/actors-and-actions.md)
 for the whole of the performer canon, including the two construction styles and what the actor check
 does not catch; [regulative.md](../regulative.md) for `WITHIN`, `HENCE`/`LEST` and `#TRACE`; and
 entry [5.1](05-duties-powers-consequences.md#e5-1) before you reach for a deontic at all, because a
@@ -450,7 +450,7 @@ court considers the fittest" is still there to reach it.
 
 > "residents of New York **and** New Jersey may apply"
 >
-> — the worked pair in [`doc/tutorials/set-operators/sets-and-the-two-ands.md`](../../../../doc/tutorials/set-operators/sets-and-the-two-ands.md),
+> — the worked pair in [`doc/tutorials/set-operators/sets-and-the-two-ands.md`](../../../../../doc/tutorials/set-operators/sets-and-the-two-ands.md),
 > beside "cruel **and** unusual punishments". The tutorial cites the Singapore Court of Appeal (SGCA)
 > reading the same word as union in _Nam Hong Construction_ [2016] SGCA 42 and as conjunction in
 > _Sit Kwong Lam_ [2018] SGCA 14.
@@ -546,7 +546,7 @@ spellings of one office are two different parties:
 runs clean and prints `PARTY "the Registrar" …`. Nothing checks that the second office exists, and a
 `#TRACE` event spelled the other way will never match.
 
-**See** [`doc/concepts/legal-modeling/actors-and-actions.md`](../../../../doc/concepts/legal-modeling/actors-and-actions.md),
+**See** [`doc/concepts/legal-modeling/actors-and-actions.md`](../../../../../doc/concepts/legal-modeling/actors-and-actions.md),
 "Who may perform: one actor, some actors, any actor", for declaring a cast that is exactly the
 office-holders a Part names; entry [8.5](08-judgement-and-discretion.md#e8-5) for what to do when the
 office-holder's choice within that cast is a discretion.

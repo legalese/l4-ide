@@ -16,27 +16,34 @@ this is meant to extend
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const extensionRoot = path.resolve(__dirname, '..')
 const repoRoot = path.resolve(extensionRoot, '..', '..')
-// The skill's real home is the plugin's Agent Plugins location, `skills/` at
-// the repo root. `.claude/skills/` is only a symlink to it (so the skill still
-// auto-loads for anyone working in this repo), and symlinks don't survive
-// every checkout — read through the real path, not the link.
-const skillSrc = path.join(repoRoot, 'skills', 'writing-l4-rules')
+// The skill is an ordinary directory under `.claude/skills/`, beside
+// running-the-l4-pipeline. It used to sit at `skills/` — the Agent Plugins
+// location — with a symlink here, back when this repo was itself the
+// published plugin. The plugin now ships from legalese/l4-plugin, so that
+// reason is gone and neither path in this tree is a symlink any more.
+const skillSrc = path.join(repoRoot, '.claude', 'skills', 'writing-l4-rules')
 const skillDest = path.join(
   extensionRoot,
   'static',
   'skills',
   'writing-l4-rules'
 )
-if (fs.existsSync(skillSrc)) {
-  fs.rmSync(skillDest, { recursive: true, force: true })
-  fs.mkdirSync(path.dirname(skillDest), { recursive: true })
-  fs.cpSync(skillSrc, skillDest, { recursive: true })
-  console.log(`Bundled writing-l4-rules skill from ${skillSrc}`)
-} else {
-  console.warn(
-    `writing-l4-rules skill not found at ${skillSrc} — extension will not bundle it`
+// Fail the build rather than warn. This used to warn and carry on, which
+// produces a .vsix whose "install the skill" command has no skill to install
+// — a defect invisible here and visible only in a user's editor. The path is
+// exactly the kind of thing a directory move breaks, so let the move break
+// the build instead.
+if (!fs.existsSync(skillSrc)) {
+  throw new Error(
+    `writing-l4-rules skill not found at ${skillSrc}. The extension bundles it ` +
+      `into static/, so a missing skill is a build error, not a warning. If the ` +
+      `skill moved, update this path.`
   )
 }
+fs.rmSync(skillDest, { recursive: true, force: true })
+fs.mkdirSync(path.dirname(skillDest), { recursive: true })
+fs.cpSync(skillSrc, skillDest, { recursive: true })
+console.log(`Bundled writing-l4-rules skill from ${skillSrc}`)
 
 esbuild
   .build({

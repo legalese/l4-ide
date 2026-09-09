@@ -4,7 +4,9 @@ on:
   push:
     branches: [main]
     paths:
-      - "skills/writing-l4-rules/**"
+      - ".claude/skills/writing-l4-rules/**"
+      # The generator decides what ships, so a change to it changes the release.
+      - "etc/build-plugin-bundle.mjs"
       - ".claude-plugin/**"
       - "plugin.json"
       - "PLUGIN.md"
@@ -29,7 +31,7 @@ jobs:
           # Build number from the Actions run → 0.2.{build}
           BUILD="${{ github.run_number }}"
           # Get short hash of latest commit touching plugin directories
-          SHORT_SHA=$(git log -1 --format=%h -- skills/writing-l4-rules/ .claude-plugin/ plugin.json skill/ l4/)
+          SHORT_SHA=$(git log -1 --format=%h -- .claude/skills/writing-l4-rules/ etc/build-plugin-bundle.mjs .claude-plugin/ plugin.json)
           # Create version string
           VERSION="v0.2.${BUILD}"
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
@@ -56,14 +58,34 @@ jobs:
           mv .claude-plugin/marketplace.json.tmp .claude-plugin/marketplace.json
           cp .claude-plugin/marketplace.json .github/plugin/marketplace.json
 
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24.x"
+
+      - name: Build the plugin bundle
+        run: |
+          # One generator builds what is released here and what is published to
+          # the plugin repo, so the two cannot disagree about the plugin's
+          # contents. It also carries the ~49 example files the skill CITES:
+          # the skill teaches by worked example and names files it does not
+          # itself contain, so a skill-only package tells an agent to open a
+          # regcf.l4 that is not there. See etc/build-plugin-bundle.mjs for why
+          # that set is computed from the skill text rather than listed.
+          #
+          # It exits non-zero if any citation or link in the bundled skill does
+          # not resolve, so a release cannot ship dangling advice.
+          node etc/build-plugin-bundle.mjs "$RUNNER_TEMP/bundle"
+
       - name: Create plugin packages
         run: |
           # Remove existing packages if present
           rm -f writing-l4-rules.skill l4-plugin.zip
 
-          # Create skill-only package (for users who just want the SKILL.md + references)
+          # Skill-only package: SKILL.md + references, no cited examples. Named
+          # so on the release page, because a reader who takes only this gets a
+          # skill whose worked examples are not on their disk.
           (
-            cd skills/writing-l4-rules
+            cd "$RUNNER_TEMP/bundle/skills/writing-l4-rules"
             zip -r "$GITHUB_WORKSPACE/writing-l4-rules.skill" \
               assets/ \
               references/ \
@@ -74,16 +96,16 @@ jobs:
               -x "*/node_modules/.cache/*"
           )
 
-          # Create full plugin package: both manifests (Claude Code's
-          # .claude-plugin/ and the portable root plugin.json) + skill + docs.
-          zip -r l4-plugin.zip \
-            .claude-plugin/ \
-            plugin.json \
-            skills/writing-l4-rules/ \
-            PLUGIN.md \
-            -x "*.DS_Store" \
-            -x "*/__pycache__/*" \
-            -x "*/node_modules/.cache/*"
+          # Full plugin package: the whole bundle, exactly as it would be
+          # published -- both manifests, the skill, and the cited examples at
+          # the paths the skill names them by.
+          (
+            cd "$RUNNER_TEMP/bundle"
+            zip -qr "$GITHUB_WORKSPACE/l4-plugin.zip" . \
+              -x "*.DS_Store" \
+              -x "*/__pycache__/*" \
+              -x "*/node_modules/.cache/*"
+          )
 
           # Verify packages
           echo "=== Skill Package ==="
