@@ -6,7 +6,7 @@ fidelity report — dmnmd
       dmnmd has no <defaultOutputEntry>, so `is a sale`'s OTHERWISE became a final catch-all row — which overlaps every other rule, so the hit policy had to go from U down to F
       lost: the order-free reading of a Unique table
   [D-MD-NOLITERAL] blocking — decision_stated_term
-      `stated term` is a formula (disposal.term_in_years), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      `stated term` is a formula (CONSIDER disposal WHEN lease t THEN t OTHERWISE 0), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
   [D-MD-NOLITERAL] blocking — decision_claim_amount
       `claim amount` is a formula (c.amount), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table

@@ -10,7 +10,7 @@
 | 2 | assign | false |
 | 3 | - | false |
 
-<!-- OMITTED: `stated term` — a formula (disposal.term_in_years), and dmnmd has no boxed-expression form. Located, with its code, in the fidelity report. -->
+<!-- OMITTED: `stated term` — a formula (CONSIDER disposal WHEN lease t THEN t OTHERWISE 0), and dmnmd has no boxed-expression form. Located, with its code, in the fidelity report. -->
 
 <!-- OMITTED: `claim amount` — a formula (c.amount), and dmnmd has no boxed-expression form. Located, with its code, in the fidelity report. -->
 

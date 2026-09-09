@@ -255,7 +255,15 @@ GIVEN Company IS A Company
 `Capital Shares` MEANS
   sum OF
     map OF
-      GIVEN `Cap Table Entry` YIELD `Cap Table Entry`'s security's Quantity's count
+      -- `count` is a field of `Shares` alone, and the base here is a
+      -- projection chain rather than a name, so nothing narrows it: the
+      -- `filter` below restricts by the STRING tag `Instrument`, which is
+      -- data, not a constructor. Match the payload instead — the same idiom
+      -- this file already uses at `price per share` above.
+      GIVEN `Cap Table Entry` YIELD
+        CONSIDER `Cap Table Entry`'s security's Quantity
+            WHEN `Shares`  count price THEN count
+            WHEN `Dollars` money       THEN 0
       filter OF
          GIVEN `Cap Table Entry` YIELD `Cap Table Entry`'s security's Instrument EQUALS "Shares"
          Company's `Cap Table`

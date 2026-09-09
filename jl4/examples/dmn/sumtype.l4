@@ -136,10 +136,22 @@ DECIDE `is a sale` d IF
   OTHERWISE FALSE
 
 -- The `Blocking` arm: reading the payload itself.
+--
+-- This USED to be the bare projection `disposal's `term in years``, which is
+-- how R4-a's example was written. SUM-TYPE-FIELDS-SPEC §3 S2 refuses that at
+-- CHECK time now — a `GIVEN` parameter is at the whole type, so `sell` and
+-- `assign` reach the read and neither declares the field — so the example is
+-- unreachable by construction and the exhibit is the CONSIDER instead. The
+-- point it was making survives intact: FEEL has no tagged value, so the
+-- lowering of a payload read is still refused, and it still emits raw L4 that
+-- no engine can compile (DMN-EXPORT-PROGRAM-MODEL-SPEC R4-a). What changes is
+-- WHICH note fires — D-PARTIAL is gone, because the CONSIDER is total.
 GIVEN disposal IS A Disposal
 GIVETH A NUMBER
 `stated term` disposal MEANS
-  disposal's `term in years`
+  CONSIDER disposal
+  WHEN `lease` t THEN t
+  OTHERWISE 0
 
 -- Threading, not reading. Nothing here touches the sum type, so the table is
 -- fine; what is lost is the component's type, which FEEL cannot carry.

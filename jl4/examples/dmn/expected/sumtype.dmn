@@ -124,7 +124,7 @@
       <requiredInput href="#input_disposal"/>
     </informationRequirement>
     <literalExpression id="decision_stated_term_literal">
-      <text>disposal.term_in_years</text>
+      <text>CONSIDER disposal WHEN lease t THEN t OTHERWISE 0</text>
     </literalExpression>
   </decision>
   <decision id="decision_claim_amount" name="claim_amount" label="claim amount">

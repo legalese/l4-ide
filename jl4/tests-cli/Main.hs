@@ -2469,7 +2469,23 @@ spec bin = do
     --
     -- It goes RED if someone "fixes" `stated term`, which is the point: the
     -- refusal is now a measurement rather than an argument.
-    it "KIE REJECTS the refusal exhibit, and names the payload projection" $
+    --
+    -- ★ THE EXPECTATION CHANGED, 2026-09-09, and was RE-MEASURED rather than
+    -- reasoned about. SUM-TYPE-FIELDS-SPEC §3 S2 made `disposal's `term in
+    -- years`` a check-time error, so §4 of that spec ruled `stated term` be
+    -- rewritten as a CONSIDER; R4-a's original example is now unreachable by
+    -- construction. §4 said to "let the MustFail expectation change if the
+    -- model then builds". IT DOES NOT BUILD: the fallback `<text>` is still raw
+    -- L4, so KIE still rejects, and the leg is still HarnessMustFail. What
+    -- changed is only the CAUSE STRING, and both halves below are copied from
+    -- an actual run of `etc/kie-dmn-check/run.sh` on the regenerated
+    -- `sumtype.dmn` (KIE 8.44.0.Final, 2026-09-09):
+    --
+    --   was: Unknown variable 'disposal.term_in_years'
+    --   now: Error compiling FEEL expression
+    --        'CONSIDER disposal WHEN lease t THEN t OTHERWISE 0'
+    --        … syntax error near 'disposal'
+    it "KIE REJECTS the refusal exhibit, and names the payload read" $
       dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustFail
         sumtypeGolden [sumtypeGolden] \out -> do
           -- Not a schema failure: the file is valid DMN. It is the FEEL that
@@ -2483,7 +2499,12 @@ spec bin = do
           -- entirely different reason would have kept it green.
           out `shouldSatisfy` ("ERR_COMPILING_FEEL" `isInfixOf`)
           out `shouldSatisfy` ("decision_stated_term_literal" `isInfixOf`)
-          out `shouldSatisfy` ("Unknown variable 'disposal.term_in_years'" `isInfixOf`)
+          -- The whole L4 fallback is quoted back by KIE, so this asserts that
+          -- what the engine choked on is the raw L4 the exporter emitted and
+          -- not something else in the file.
+          out `shouldSatisfy`
+            ("'CONSIDER disposal WHEN lease t THEN t OTHERWISE 0'" `isInfixOf`)
+          out `shouldSatisfy` ("syntax error near 'disposal'" `isInfixOf`)
           out `shouldSatisfy` ("<<< FAILED" `isInfixOf`)
           -- A SECOND, independent error, measured 2026-07-31 and recorded here
           -- rather than tidied away: KIE resolves itemDefinition typeRefs in

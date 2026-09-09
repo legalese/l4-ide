@@ -89,12 +89,28 @@ DECIDE `after` IF
          ((year OF c) - 1900) * 365 + (month OF c) * 30   + (day OF c)
     <    (d's year    - 1900) * 365 + (d's month   * 30)  + (d's day)
 
+-- `birthPlace` and `birthDate` are each a `Maybe`, so a person may have
+-- neither. `val` is a field of `Just` alone, and `p's birthPlace` is a
+-- projection rather than a name, so nothing can narrow it: reading
+-- `p's birthPlace's val` would have to answer for a `Nothing`, and before
+-- SUM-TYPE-FIELDS-SPEC §3 S2 it answered at run time, by dying. Matching the
+-- payload is the repair the spec's §3 S4 recommends, and it says what the
+-- statute means: a person whose birthplace is not recorded is not shown to
+-- have been born in the UK.
 GIVEN p IS A NaturalPerson
 GIVETH A BOOLEAN
-DECIDE isBornInUK p IF "UK" EQUALS `English name` OF p's birthPlace's val
-DECIDE isBornInUS p IF "US" EQUALS `English name` OF p's birthPlace's val
-DECIDE afterCommencement p IF `after` (p's birthDate's val) commencement
-DECIDE afterAppointedDay p IF `after` (p's birthDate's val) `appointed day`
+DECIDE isBornInUK p IF CONSIDER p's birthPlace
+                       WHEN Just place THEN "UK" EQUALS place's `English name`
+                       OTHERWISE FALSE
+DECIDE isBornInUS p IF CONSIDER p's birthPlace
+                       WHEN Just place THEN "US" EQUALS place's `English name`
+                       OTHERWISE FALSE
+DECIDE afterCommencement p IF CONSIDER p's birthDate
+                              WHEN Just d THEN `after` d commencement
+                              OTHERWISE FALSE
+DECIDE afterAppointedDay p IF CONSIDER p's birthDate
+                              WHEN Just d THEN `after` d `appointed day`
+                              OTHERWISE FALSE
 
 GIVEN a IS A NUMBER
       b IS A NUMBER

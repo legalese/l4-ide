@@ -1740,14 +1740,27 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
         [n.message | n <- drgNotesAll drg, n.element == "decision_is_a_sale"]
           `shouldSatisfy` all (Text.isInfixOf "no cell is emitted for `lease`")
 
-      it "refuses a payload PROJECTION and only Lossy-reports a record that threads one" $ do
+      it "refuses a payload READ and only Lossy-reports a record that threads one" $ do
         drg <- sumtypeDrg
-        -- Phase 4 adds D-PARTIAL: the payload projection is ALSO L11's
-        -- refusal — a selector over a multi-constructor union raises
-        -- NonExhaustivePatterns at run time — so DMN-SAFE and the data-model
-        -- analysis state the same hazard from two sides, deliberately.
+        -- WAS: "refuses a payload PROJECTION", asserting
+        -- @[("D-SUMTYPE", Blocking), ("D-PARTIAL", Blocking)]@, when
+        -- `stated term` was the bare projection @disposal's `term in years`@.
+        --
+        -- SUM-TYPE-FIELDS-SPEC §3 S2 made that projection a CHECK-TIME error —
+        -- a `GIVEN` parameter is at the whole type, so `sell` and `assign`
+        -- reach the read — and §4 ruled the exhibit be rewritten with a
+        -- CONSIDER. So R4-a's example is now unreachable by construction: the
+        -- shape D-PARTIAL was reporting cannot be written any more, which is a
+        -- STRONGER guarantee than the note was, and D-PARTIAL correctly no
+        -- longer fires here. It keeps its coverage elsewhere —
+        -- `deontic-verdict`, `svc` and `regcf-corpus` all carry it, and the
+        -- `D-PARTIAL: the DMN-SAFE side-condition` block below is its home.
+        --
+        -- What is asserted here is unchanged in substance: reading a payload is
+        -- still Blocking, because FEEL has no tagged value and the CONSIDER
+        -- still falls back to raw L4 no engine can compile.
         [(n.code, n.severity) | n <- drgNotesAll drg, n.element == "decision_stated_term"]
-          `shouldBe` [("D-SUMTYPE", Blocking), ("D-PARTIAL", Blocking)]
+          `shouldBe` [("D-SUMTYPE", Blocking)]
         -- Threading is NOT reading: R4-a keeps this one, and only says the
         -- component's type could not be carried.
         -- (it is also a plain projection rather than a chain, so it carries the
@@ -3157,18 +3170,36 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
 
       -- fixture 9: L11's accepting AND rejecting branches. No corpus
       -- exercises this (0 Proj sites over a multi-constructor enum across
-      -- all 62 files), so both sides are synthetic — deliberately. `l4 check`
-      -- says "Check succeeded" on the rejecting shape; the exporter must
-      -- still refuse, because the selector application raises
-      -- NonExhaustivePatterns at run time with no CONSIDER in sight.
+      -- all 62 files), so both sides are synthetic — deliberately. The
+      -- exporter must refuse the rejecting shape, because the selector
+      -- application raises NonExhaustivePatterns at run time with no CONSIDER
+      -- in sight.
+      --
+      -- ★ THE REJECTING SOURCE CHANGED, 2026-09-09. It was the bare
+      -- @`the radius` s MEANS s's radius@, and the comment above it read
+      -- /"`l4 check` says 'Check succeeded' on the rejecting shape"/. That is
+      -- no longer true: SUM-TYPE-FIELDS-SPEC §3 S2 refuses a projection whose
+      -- base could still be a constructor lacking the field, so that source
+      -- does not type-check at all and 'drgGeneral' throws on it rather than
+      -- producing a DRG to inspect.
+      --
+      -- L11 is NOT thereby dead code, and this fixture is what proves it. The
+      -- source below is the SAME hazard reached through the ONE route S2
+      -- deliberately leaves open — §5.1 hole 1: S2 records nothing inside the
+      -- synthesised fall-through body of a multi-clause group, because
+      -- 'L4.Parser.matchClauses' compiles clauses 2..n into a LET-bound decide
+      -- that is checked outside the OTHERWISE meant to cover it. So this
+      -- checks clean (measured), it still raises NonExhaustivePatterns on a
+      -- `Circle`-less input, and L11 is the only thing that sees it.
       it "L11: refuses a projection over a multi-constructor enum missing the field" $ do
         let drg = drgOf
               "DECLARE Shape IS ONE OF\n\
+              \    Nothingness\n\
               \    Circle HAS radius IS A NUMBER\n\
-              \    Square HAS side   IS A NUMBER\n\
               \GIVEN s IS A Shape\n\
               \GIVETH A NUMBER\n\
-              \`the radius` s MEANS s's radius\n"
+              \DECIDE `the radius` Nothingness IS 0\n\
+              \DECIDE `the radius` s           IS s's radius\n"
         [n | n <- notesOf "D-PARTIAL" drg, Text.isInfixOf "L11" n.message]
           `shouldSatisfy` (not . null)
 
