@@ -2,6 +2,7 @@
 >
 > - DONE: `DO` primitive + `MUST`/`MAY`/`SHANT` sugar, `HENCE`/`LEST`, `FULFILLED`/`BREACH` terminals — `DeonticModal` incl. `DDo` in `jl4-core/src/L4/Syntax.hs:283-287`, parsed `jl4-core/src/L4/Parser.hs:1769-1794`, terminals in `StateGraph.hs`.
 > - OPEN: Phase 1b prepositional action args (`TO`/`WITH`/`BEFORE` still not action markers; `BEFORE` isn't even a keyword); Phase 2 backends (no UPPAAL/SPIN/NuSMV/Maude); Phase 3 LTL/CTL assertion language.
+> - RULED 2026-09-09 (T2): **contract time is discrete.** Phase 2's four backends are no longer four equals — see the block in Phase 2 below before choosing one.
 > - Note: related work is live in the `mengwong/bounded-deontics-paper` and `mengwong/verification-backend-lowering-spec` worktrees.
 
 # Bounded Deontics Specification
@@ -219,6 +220,54 @@ This would make `TO`, `WITH`, `BEFORE`, `UNDER`, etc. into structured argument m
 > Detailed architecture (fan-out to Z3/Alloy/TLA+/NuSMV/UPPAAL/TAPAAL, the core-IR
 > faithfulness obligation, and the defeasibility crux): see
 > [VERIFICATION-BACKEND-LOWERING-SPEC.md](../proposals/VERIFICATION-BACKEND-LOWERING-SPEC.md).
+
+> **CONTRACT TIME IS DISCRETE — RULED 2026-09-09 (bench card `T2`, collection `time-rulings`,
+> artifact "Contract Time Model"; Meng: _"let us record the T2 as discrete"_). This changes the
+> pricing of the four boxes below, so read it before taking one.**
+>
+> L4's timestamp type is dense — `ValNumber Rational`, `jl4-core/src/L4/Evaluate/ValueLazy.hs:52` —
+> and the corpus has never once used it densely: measured 2026-09-09, **0 fractional timestamps
+> against 1388 integer `AT` sites** across `jl4/examples`, `jl4-core/libraries` and `doc`. The ruling
+> makes the discreteness a fact of the language rather than an accident of the corpus.
+>
+> **What it buys, and why the tooling argument came third rather than first.**
+>
+> - `WAIT UNTIL` is already a **content-free time-advancing event**, so the regulative machine has
+>   reinvented `tock` without meaning to. Under discrete time, a `tock`-CSP encoding is close to an
+>   identity and FDR refinement checking comes nearly free.
+> - **SPIN and NuSMV over bounded integer clocks become live alternatives**, and may beat UPPAAL on
+>   encoding cost, because L4's clocks are per-obligation countdowns reset on match rather than
+>   free-running. **UPPAAL stops being necessary while staying available**; the four boxes below are
+>   no longer four equals.
+>
+> **What actually decided it, in the order weighed.** First, **the domain**: deontic deadlines are
+> discrete because legal time is written in named units — thirty days, the third business day, 5pm.
+> No contract could be produced whose _obligation_ turns on an instant that is not a multiple of some
+> stateable unit; continuous time enters law-adjacent work in valuation (accrual, option pricing),
+> which is a decision function and not the obligation axis. Note that discrete does **not** mean
+> day-granular: the unit is chosen, so "within 4 hours" is simply a finer one. Second, **the
+> asymmetry**: ruling discrete is free today and densifying later is a breaking change, so this is
+> the one direction that is cheap now and expensive later. Third, the tooling above.
+>
+> **An argument that was raised and did NOT decide it, recorded because it will be raised again.**
+> Meng recalled an earlier state-space explosion in time and proposed collapsing time into
+> equivalence classes over the interaction between deadlines — accepting some product explosion where
+> one deadline may fall either side of another — rather than "doing a Copenhagen Interpretation
+> forking new universes once every second". That construction is the **region/zone abstraction of
+> Alur–Dill**, which is what UPPAAL implements with difference-bound matrices, and it was **invented
+> for dense time**, because a continuum cannot be enumerated. So it is an argument that dense is
+> _tractable_, not an argument _for_ dense; the per-second forking picture is not what dense costs,
+> and no implementation in either regime works that way. The zone collapse remains available under
+> discrete, and more cheaply — bounded integer clocks with a symbolic encoding, no DBMs.
+>
+> **Flagged as NOT verified at the time of ruling.** A prior-art pass claimed that trace-relative
+> anchors become _undecidable_ under dense time. The result it is probably reaching for is real —
+> anchors comparing against event times push toward parametric timed automata, whose reachability is
+> undecidable (Alur–Henzinger–Vardi) — but it was not measured here and **nothing in the ruling rests
+> on it**. Check it before citing it.
+>
+> **What is given up, stated before the ruling and accepted:** a contract whose deadline is not
+> expressible in _any_ unit chooseable in advance. None could be constructed.
 
 - [ ] Transpile to UPPAAL (timed automata, CTL)
 - [ ] Transpile to SPIN/Promela (LTL model checking)

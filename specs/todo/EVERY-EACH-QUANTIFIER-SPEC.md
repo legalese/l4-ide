@@ -1693,7 +1693,7 @@ picked by an expression rather than named (R-Q7B's note); the date library (R-Q7
 whether an anchored `WITHIN` under `LEST` may name `THE JOIN` at all, which is a well-formedness
 question — under `LEST` the join did not fire.
 
-#### 5.1.2 `AFTER` and `BEFORE`: the window's two edges — MODIFIED 2026-09-07 (R-X5); the early act RULED (R-X6); not built
+#### 5.1.2 `AFTER` and `BEFORE`: the window's two edges — MODIFIED 2026-09-07 (R-X5); the early act RULED (R-X6); the origin the absolute forms needed RULED 2026-09-09 (T1, §5.1.2.1); not built
 
 This section answers the question in R-Q7A's note ("Shall we try to sketch a design for that now?").
 R-X6 is ruled and R-X5 is a design Meng modified and asked to have worked through; both are
@@ -1814,6 +1814,72 @@ the keyword table. Zero goldened corpus files, zero canon files, zero `doc/` fil
 offset is checked against `AFTER`'s at compile time (`AFTER 30 BEFORE 5` is an empty window and
 should be an error, not a rule that can never fire); and what the pair means under `LEST`, where the
 anchor is a missed deadline rather than a performance.
+
+##### 5.1.2.1 The absolute forms need an origin, and now have one — RULED 2026-09-09 (T1)
+
+**The mark.** Bench card `T1`, collection `time-rulings`, artifact "Contract Time Model". Meng's
+words: _"I prefer a and b."_ Recorded as **b**, because b's text is "**Also** make date, duration and
+instant distinct sorts" — it contains a's epoch rather than competing with it. So the ruling is:
+**declare the epoch, and separate the sorts.** Meng added a requirement neither option stated: the
+commencement must come in **both** forms — a fixed date pinned to a YMD, and a floating "whenever the
+contract begins" that starts the clock at day zero and expresses everything relative to it.
+
+**Why this section owns it.** The table above gives each edge an absolute form, `AFTER <date>` and
+`BEFORE <date>`, and those put a calendar quantity onto an axis whose zero point is per-contract and
+nowhere declared. T1 was raised as blocking them. It no longer does.
+
+**Meng's question, and the measurement that answers it.** _"doesn't a trace contain an initial time
+(often stated as 0) which we could use for this purpose?"_ **Yes — and more than the bench card
+allowed.** `#TRACE`'s start slot is an arbitrary expression, not a literal (`Contract Anno (Expr n)
+(Expr n) [Expr n]`, `Syntax.hs:197`), so **both of Meng's forms already run today.** Probed
+2026-09-09 against a binary built from this tree:
+
+```l4
+`pay within 14` MEANS PARTY Buyer MUST Pay WITHIN 14 HENCE FULFILLED LEST BREACH
+
+#TRACE `pay within 14` AT 0                             WITH PARTY Buyer DOES Pay AT 3
+                                                        -- FULFILLED   (floating: ticks from day zero)
+#TRACE `pay within 14` AT (DATE_SERIAL (YMD 2026 6 30)) WITH PARTY Buyer DOES Pay AT (DATE_SERIAL (YMD 2026 7 5))
+                                                        -- FULFILLED   (fixed: 5 days into a 14-day window)
+#TRACE `pay within 14` AT (DATE_SERIAL (YMD 2026 6 30)) WITH PARTY Buyer DOES Pay AT (DATE_SERIAL (YMD 2026 7 20))
+                                                        -- BREACH      (fixed: 20 days, window closed)
+```
+
+The calendar case works for the right reason: origin and stamps sit on one scale, so `WITHIN 14`
+means fourteen **days**.
+
+**So what is actually missing is narrower than "there is no origin", and it is exactly what a and b
+name.**
+
+1. **Nothing declares the origin at the CONTRACT level.** It lives in each `#TRACE`, so two traces of
+   one contract can silently disagree about when it began, and an `@export`ed decision function or a
+   bare `#EVAL` — neither of which has a trace — has no origin at all. That, and not the trace, is
+   what blocks an absolute edge: `BEFORE 2026-06-30` has to mean something where no trace exists.
+2. **Nothing checks that the scales agree.** Probed on the same binary:
+
+   ```l4
+   #TRACE `pay within 14` AT (DATE_SERIAL (YMD 2026 6 30)) WITH PARTY Buyer DOES Pay AT 3
+   ```
+
+   **checks clean — zero errors, zero warnings — and returns FULFILLED.** The act is 740,158 days
+   _before_ the contract commenced and it discharges a fourteen-day duty. The reverse mixing (origin
+   `0`, act stamped with a real date) returns `BREACH`, a right-looking verdict for the wrong reason.
+   Both sides are `NUMBER` and nothing separates them. **That silent, verdict-changing failure is the
+   whole case for the type separation in b**, and it is affordable now precisely because no corpus
+   file writes a date-shaped stamp today.
+
+**A consequence of wanting both forms that neither option stated, and that the build must handle.**
+The fixed form lets an absolute edge lower statically — `DATE_SERIAL(d) − DATE_SERIAL(commencement)`
+is computable at check time when the commencement is a literal date. **The floating form cannot**:
+its origin is not known until the trace supplies it, so `BEFORE 2026-06-30` under a floating
+commencement has to defer to run time. Option a's text ("absolute edges lower to
+`DATE_SERIAL(d) − DATE_SERIAL(commencement)`") is a compile-time story that is only true of the fixed
+form. R-X5's lowering is therefore **two mechanisms, not one**, and a design that assumes the
+compile-time one will be surprised by the floating case.
+
+**Not built.** No `COMMENCING` keyword exists, the sorts are not separated, and R-X5 itself remains
+unbuilt. What has changed is that R-X5 is no longer blocked on an unanswered question, and that the
+two things to build are named.
 
 #### 5.1.3 `THE OPENING` declined; the anchor slot becomes an expression over the trace. RULED 2026-09-08 (W3)
 
