@@ -2,13 +2,13 @@
 > the **FRONT END IS MERGED** — `every/build-1` landed on `unstable` as PR #360 (merge `734b8015`,
 > 2026-09-07), so the lexer, parser, name resolution, type checker, printers, NLG, document export
 > and state graph all carry `EVERY` and the join line on `unstable` today. **EVALUATION IS BUILT**
-> on `lang/every-runtime` (2026-09-08, unmerged at the time of writing): §3.1's barrier, §3.2's
+> on `lang/every-runtime`, MERGED to `unstable` 2026-09-08 as PR #370 (merge `6247ba69`): §3.1's barrier, §3.2's
 > fork, §3.3's distributive form, all four modals, R-T2's join deadline and nesting all run; see
 > §11.0.1 for exactly what was built and what was not, and §11.0 for the roll-call rule that made
 > it possible. The four witnesses are `jl4/examples/ok/every/run-{barrier,fork,roll,modals}.l4`.
 >
 > **THE ROLL IS NOW SAYABLE OUTRIGHT.** `EVERY Cast v IN xs` was RULED by Meng on 2026-09-08 and is
-> BUILT on `lang/every-in` (branched from `lang/every-runtime`, unmerged at the time of writing):
+> BUILT on `lang/every-in` (branched from `lang/every-runtime`), MERGED to `unstable` 2026-09-08 as PR #374 (merge `28c48e3f`):
 > see **§11.0.2**, with `jl4/examples/ok/every/run-in.l4` as its witness and §2.4's grammar
 > updated. `IN` is the spelling to reach for. The older inferred spelling of §11.0 —
 > `WHO elem t xs` — still runs unchanged for a rule that writes no `IN`, and whether it should be
@@ -1012,7 +1012,7 @@ Roll ::= 'IN' Expr                    -- RULED and BUILT 2026-09-08 (§11.0.2): 
 Filter ::= 'WHO' Expr                 -- R-Q4: a Boolean expression in which the bound variable is free;
 
                                       -- WHERE is not a filter word (it opens a where-block, Parser.hs:1334-1338).
-                                      -- 'WHOSE' Expr is PROPOSED, not ruled (§2.5, R-Q4)
+                                      -- 'WHOSE' Expr is PROPOSED, not ruled (§2.5, R-Q4; open questions in §13.6)
 
 DeonticModal ::= ('MUST' ['NOT'] | 'MAY' | 'SHANT' | 'DO') ['DO']
                                       -- 'DO' added 2026-09-07 (R-Q2; §2.2.7.4's house style). MUST NOT
@@ -1083,15 +1083,15 @@ has since been built, the entry says so and names the branch (R-Q1 is the one so
 Measurements are dated 2026-09-07 on `unstable` `5dc0ca19` unless stated; every file:line was
 re-opened on that tree when this section was written.
 
-| id   | question, in a phrase                                        | mark, verbatim                                                                                                              | ruling, in a sentence                                                                                                                                                                                                            | recorded in                                |
-| ---- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| R-Q1 | the join word: two quantifiers, or one word and a marker?    | **alternative** — _"E but with “ONCE EACH HAS \n HENCE”?"_                                                                  | One quantifier, `EVERY`; under it a continuation requires a join line: `ONCE ALL HAVE` (barrier), `UPON EACH` (fork; **words RULED 2026-09-07**); a bare `HENCE`/`LEST` is a check error. `HENCE FOR EACH` withdrawn.            | §2.2.6, §2.2.7.3–.6, §2.4, §3.1–§3.3, §15  |
-| R-Q2 | does a bare `ALL Pattern` mean anything?                     | **accept** — _"How do the quantifies interact with RAND ROR combinators? Docs need to show an example."_                    | Not a quantifier. `ALL` keeps `FOR ALL`, `RECALL ALL`, `ONCE ALL HAVE`, and becomes the `ALL OF` head of the prefix family. `DO` joins `DeonticModal`. The note is a docs requirement: §8.3 gains the example.                   | §2.2.7.4, §2.4, §8.3, §15                  |
-| R-Q3 | is `NO Tenant t MAY sublet` a form, and of what?             | **accept** — _"The NO P MUST A form feels like it belongs more to the bounded deontics discussion of dominators."_          | Sugar for `EVERY … SHANT` with the fork join; `HENCE` keeps `SHANT`'s meaning; `NO … MUST`/`SHANT`/`MUST NOT` refused with a naming message; the liberty form deferred to the bounded-deontics discussion.                       | §2.2.3, §2.2.7.4, §2.4, §15, status header |
-| R-Q4 | the filter word, and what the slot holds                     | **accept** — _"Perhaps the WHOSE projection could take advantage of the field-opening logic from the section-givens work."_ | `WHO` only; the slot is a Boolean expression naming the bound variable; §2.1's insertion rule withdrawn. `WHOSE` is **PROPOSED**, sequenced after `IMPLICIT-PROPS-DESIGN.md` §11.7 R5 is built.                                  | §2.1, §2.2.3, §2.3, §2.4, §15              |
-| R-Q5 | early failure: `LEST` at detection, or at the deadline?      | **accept** — _"d"_                                                                                                          | No modifier. The failure time is fixed by the layer the `LEST` attaches to — the state's deadline on the `ONCE … WITHIN` line; on the act layer, by the modal. Success time by modal. §13.1 closed.                              | §3.4, §5.2, §13.1                          |
-| R-Q6 | does R-T6's fixed cast bind `EVERY`; what on leave/join?     | **accept** — _"d"_                                                                                                          | Cast evaluated once at arming for the whole family; changes only on an explicit **edit** event (release / substitute / join) applied to the running barrier, completions and accumulator preserved. Events proposed, unbuilt.    | §2.2.7.8 (R-T6 row), §13.4                 |
-| R-Q7 | the continuation clock: `HENCE` from what, `LEST` from what? | **modify** — _"e but with a as default when no OF?"_                                                                        | A drafter may name the anchor (`WITHIN 5 days OF …`); unanchored, `HENCE` counts from the join's firing (today's rule) and `LEST` from the missed deadline (§5.2) — the latter a **change** from today's revealing-event anchor. | §2.4, §5.1, §5.2                           |
+| id   | question, in a phrase                                        | mark, verbatim                                                                                                              | ruling, in a sentence                                                                                                                                                                                                                                                                                                                                     | recorded in                                |
+| ---- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| R-Q1 | the join word: two quantifiers, or one word and a marker?    | **alternative** — _"E but with “ONCE EACH HAS \n HENCE”?"_                                                                  | One quantifier, `EVERY`; under it a continuation requires a join line: `ONCE ALL HAVE` (barrier), `UPON EACH` (fork; **words RULED 2026-09-07**); a bare `HENCE`/`LEST` is a check error. `HENCE FOR EACH` withdrawn.                                                                                                                                     | §2.2.6, §2.2.7.3–.6, §2.4, §3.1–§3.3, §15  |
+| R-Q2 | does a bare `ALL Pattern` mean anything?                     | **accept** — _"How do the quantifies interact with RAND ROR combinators? Docs need to show an example."_                    | Not a quantifier. `ALL` keeps `FOR ALL`, `RECALL ALL`, `ONCE ALL HAVE`, and becomes the `ALL OF` head of the prefix family. `DO` joins `DeonticModal`. The note is a docs requirement: §8.3 gains the example.                                                                                                                                            | §2.2.7.4, §2.4, §8.3, §15                  |
+| R-Q3 | is `NO Tenant t MAY sublet` a form, and of what?             | **accept** — _"The NO P MUST A form feels like it belongs more to the bounded deontics discussion of dominators."_          | Sugar for `EVERY … SHANT` with the fork join; `HENCE` keeps `SHANT`'s meaning; `NO … MUST`/`SHANT`/`MUST NOT` refused with a naming message; the liberty form deferred to the bounded-deontics discussion.                                                                                                                                                | §2.2.3, §2.2.7.4, §2.4, §15, status header |
+| R-Q4 | the filter word, and what the slot holds                     | **accept** — _"Perhaps the WHOSE projection could take advantage of the field-opening logic from the section-givens work."_ | `WHO` only; the slot is a Boolean expression naming the bound variable; §2.1's insertion rule withdrawn. `WHOSE` is **PROPOSED**, sequenced after `IMPLICIT-PROPS-DESIGN.md` §11.7 R5 is built — but see **§13.6**, which measures what R5 does and does not settle for it, and records a layout-conjoined form that would not need to wait on R5 at all. | §2.1, §2.2.3, §2.3, §2.4, §15              |
+| R-Q5 | early failure: `LEST` at detection, or at the deadline?      | **accept** — _"d"_                                                                                                          | No modifier. The failure time is fixed by the layer the `LEST` attaches to — the state's deadline on the `ONCE … WITHIN` line; on the act layer, by the modal. Success time by modal. §13.1 closed.                                                                                                                                                       | §3.4, §5.2, §13.1                          |
+| R-Q6 | does R-T6's fixed cast bind `EVERY`; what on leave/join?     | **accept** — _"d"_                                                                                                          | Cast evaluated once at arming for the whole family; changes only on an explicit **edit** event (release / substitute / join) applied to the running barrier, completions and accumulator preserved. Events proposed, unbuilt.                                                                                                                             | §2.2.7.8 (R-T6 row), §13.4                 |
+| R-Q7 | the continuation clock: `HENCE` from what, `LEST` from what? | **modify** — _"e but with a as default when no OF?"_                                                                        | A drafter may name the anchor (`WITHIN 5 days OF …`); unanchored, `HENCE` counts from the join's firing (today's rule) and `LEST` from the missed deadline (§5.2) — the latter a **change** from today's revealing-event anchor.                                                                                                                          | §2.4, §5.1, §5.2                           |
 
 **What decided each.**
 
@@ -2756,6 +2756,311 @@ which is a ruling and not an implementation choice.
 write, which §11.0.2 gives as the reason the build stopped short of it; the measurements above are
 the whole of what the build knows, and they are here so the ruling can be made without redoing
 them.
+
+### 13.6 `WHOSE`, and the R-Q4 problem it does not escape — OPEN, raised by Meng 2026-09-08
+
+> **Meng's mark, 2026-09-08, after the synthesis below was written:** _"Then my layout proposal fades
+> back into existing conjunctive/disjunctive over multiple lines, compatible with inert style. I
+> think this design had legs."_ The layout route is therefore **withdrawn by its proposer**, and the
+> `WHOSE`-as-opening reading is endorsed as a **direction**. It is not thereby built or ruled: the
+> three conditions under "What must be true" are unchanged and none has been discharged.
+
+R-Q4 (§2.5) withdrew the insertion rule: the `WHO` slot no longer holds a point-free predicate with
+the bound variable supplied as its first argument, because that rule could not type §2.1's own
+advertised example — `WHO is_adult AND is_shareholder AND NOT is_conflicted` applies `AND` and `NOT`
+to functions rather than to Booleans. Today the slot holds **a Boolean expression in which the bound
+variable is free**, written where it is used.
+
+Meng raised two things against that on 2026-09-08, one cosmetic and one not.
+
+**The cosmetic one: `WHO` reads as a pronoun awaiting a complement.** `WHEN` was proposed as an
+alternative. **It is not available.** `WHEN` is a lexer keyword (`("WHEN", TKWhen)`,
+`jl4-core/src/L4/Lexer.hs:289 @ 28c48e3f`) carrying **1605 corpus uses**, load-bearing in
+`CONSIDER … WHEN … THEN …`. Putting it in a second, unrelated grammatical role is not a rename, it
+is an overload. `WHOSE` by contrast is entirely free: **zero** lexer entries, and all seven corpus
+occurrences are English prose inside comments (`-- WHOSE RIGHT THIS IS`, in the
+`guardianship-of-infants-act` and `probate-administration-act` encodings).
+
+**The substantive one: computed fields make a possessive form attractive.** The proposal:
+
+```l4
+EVERY Tenant t IN arrears WHOSE monthly_rent AT LEAST 1000 MUST …
+```
+
+— where `arrears` is a dynamically constructed LIST of tenants behind on rent (the roll), not a
+number. As sugar this is `WHOSE f` ≡ `WHO t's f`, and every part it needs already exists: `AT LEAST`
+is an infix operator (`jl4-core/libraries/prelude.l4:780`), possessive projection is idiomatic
+(`a's age`, `a's income`), and computed fields are implemented (`COMPUTED-FIELDS-SPEC.md`).
+
+#### The objection, and why it does not land as stated
+
+Meng's objection was that resolving `monthly_rent` re-introduces the shoehorned first argument.
+**It does not, and the reason is a namespace separation rather than a convention.** `TypeCheck.hs`
+`@ 28c48e3f`: for `Proj ann e l`, when the base is a **local binding** — which the quantifier's
+member variable is — resolution goes straight to `inferRecordProjection` (`:3051-3053`), which
+resolves the label through `resolveProjectionLabel` (`:3133`). **The term environment is never
+consulted.** So:
+
+|                          | the retracted insertion rule                           | `WHOSE`                                                     |
+| ------------------------ | ------------------------------------------------------ | ----------------------------------------------------------- |
+| what follows the keyword | resolved as a **term**                                 | resolved as a **field label**                               |
+| what is supplied         | the member as a first **argument**                     | `t's` as a **projection**                                   |
+| why R-Q4 killed it       | `AND`/`NOT` are terms, so they got the member inserted | connectives are not field labels; the question cannot arise |
+
+#### Three things measured against the tree, one of which contradicts the obvious rule
+
+1. **"`WHOSE` requires a cast" would be wrong.** A plain product actor needs no cast and already
+   works: with `DECLARE Party HAS name IS A STRING`, `t's name EQUALS "alice"` type-checks and
+   evaluates. The rule to state is **totality** — the field must exist on every constructor the
+   member could still be. Product type: always. Sum type: only where the cast has narrowed to the
+   arm declaring it. The cast requirement then falls out for sums instead of being imposed on
+   products.
+
+2. **A partial projection fails at RUN time, not check time, and says something unrelated.**
+   With `Party IS ONE OF Landlord | Tenant HAS monthly_rent`, `t's monthly_rent` on a `Landlord`
+   produces: _"The value `Landlord` reached a CONSIDER that has no branch for it. Add a WHEN branch
+   for this case, or a catch-all OTHERWISE branch."_ A drafter who wrote neither a `CONSIDER` nor a
+   `WHEN` will not recognise their own program in that sentence.
+
+3. **The "same field on two arms, opposite polarity" hazard is already impossible — but by
+   forbidding the modelling.** Declaring `Landlord HAS amount_due` beside `Tenant HAS amount_due`
+   is refused at check time: _"There are multiple definitions for the identifier"_
+   (`TypeCheck.hs:5806`). Field names are flat across a sum type's constructors. That forecloses
+   the confusion, and it is worth recording that it forecloses it the blunt way; someone will
+   eventually want per-constructor fields that share a name.
+
+#### The angst, which is real and is NOT resolved by any of the above
+
+`WHOSE x AT LEAST N AND y EQUALS M`.
+
+Under one-atom scoping this is `t's x AT LEAST N AND y EQUALS M`, and **`y` resolves in the term
+namespace**. It will not type-error the way `is_adult AND is_shareholder` did — no connective
+receives an argument. It fails more quietly:
+
+- no such term exists → _"could not find a definition for y"_. Loud, survivable.
+- **a top-level `y` does exist → it silently means that instead.**
+
+And the silent case is reachable, not theoretical: **a term and a field may share a name.**
+`monthly_rent MEANS 42` alongside `DECLARE Party HAS monthly_rent` is accepted today (measured
+2026-09-08). This is the same hazard §11.0.2 already records for the `IN` roll, where a top-level
+`t MEANS carol` makes `IN (peersOf t)` resolve and check clean — one spelling, two meanings.
+
+**So one-atom scoping does not remove R-Q4's problem. It relocates it from a type error to a silent
+capture, which is worse.** That is the objection in its strongest form and it stands.
+
+#### The three routes, with what each costs
+
+- **`WHOSE` repeated per property** — `WHOSE x AT LEAST N AND WHOSE y EQUALS M`. English-natural,
+  unambiguous, needs no new resolution rule. Cost: nothing stops a drafter omitting the second
+  `WHOSE`, and the reward for omitting it is silence.
+- **Field-first resolution across the whole `WHOSE` expression** — any bare name that is a field of
+  the member's type becomes a projection. Gives the nicest surface. Cost: it is the retracted
+  design's shape again, and it is only safe if a field name and a term name cannot collide — which
+  today they can.
+- **Restrict `WHOSE` to a single comparison**, conjunctions falling back to `WHO`. Cheapest and
+  safest; buys the least.
+- \*\*~~Layout-conjoined `WHOSE`, one constraint per line~~ — proposed by Meng 2026-09-08 and
+  WITHDRAWN by him the same day, for two reasons that both turned out to be right. Kept here
+  because the reasoning is what closes the question:
+
+  ```l4
+  EVERY Tenant t IN arrears
+      WHOSE  monthly_rent  AT LEAST 1000
+             standing      EQUALS   "current"
+      MUST …
+  ```
+
+  **Always conjunction. Anything else — disjunction, negation, a mixed expression — must be written
+  with `WHO`,** where every name is explicit and nothing is implied.
+
+  **Why it dodges the whole problem rather than trading it.** The field is identified by
+  **position**, not by resolution: the first token of each line is a field, full stop. No bare name
+  inside a `WHOSE` ever has to be resolved against two namespaces, so R5's shadowing question does
+  not arise here at all — it stays R5's question, on R5's own terms. And because no connective
+  appears inside a `WHOSE`, the failure that killed the insertion rule has nothing to attach to.
+  Each line's remainder (`AT LEAST 1000`) is an ordinary expression in the ordinary namespace; a
+  constraint that needs another field says so with `t's`.
+
+  **Why it is withdrawn — 1: the synthesis below makes it unnecessary.** Under opening, the field
+  position is not what disambiguates a bare name; R5's rank is. One-constraint-per-line stops being
+  a disambiguator and becomes a formatting choice, which is a much better thing for it to be.
+
+  **Why it is withdrawn — 2: L4 already has it, and has had it all along.** The ellipsis operators
+  are asyndetic con/disjunction: **`...` is implicit `AND`, `..` is implicit `OR`**
+  (`skills/writing-l4-rules/references/gotchas.md`, "Asyndetic operators"). They exist precisely so
+  a clause list "should read as a bulleted list rather than a prose 'A and B and C'", and they are
+  not marginal — **591 asyndetic operator lines across the corpus, 405 of them `...`**. So the
+  proposal was not a new mechanism, it was a second spelling of an existing one:
+
+  ```l4
+  EVERY Tenant t IN arrears
+      WHOSE monthly_rent AT LEAST 1000
+        ... standing     EQUALS   "current"
+      MUST …
+  ```
+
+  And because `..` is already there beside `...`, the restriction the proposal needed —
+  _always conjunction, anything else falls back to `WHO`_ — is not needed either. Disjunction comes
+  for free in the same shape.
+
+  **And it is compatible with inert style, which an operator-free form would have fought.** In inert
+  style a string literal in Boolean context carries verbatim statutory prose and evaluates to its
+  context's identity, so the prose _rides between the operands_ — which requires an operand
+  position to ride in. Removing the connective removes the slot. That is the deeper reason the
+  withdrawal is right rather than merely convenient: the house style depends on the very thing the
+  proposal removed.
+
+#### What this turns on — and it is already ruled elsewhere, and already sequenced
+
+The route above that gives the nicest surface, field-first resolution, is **not a new proposal**. It
+is `IMPLICIT-PROPS-DESIGN.md` §11.7 **R5, field-opening, RULED 2026-09-04 (accept)**: the fields of
+a record-typed `GIVEN`, function or section are in scope **by bare name** within the function that
+sees the binder, with a defined rank — `WHERE`/`LET` locals, the function's own `GIVEN`, fields
+opened from it, section `GIVEN`s, fields opened from those, selectors — and a collision between two
+opened records sharing a field name is an **error**, at the read naming both and at the declaration
+that opens the second. `r's f` remains always available. It is ruled but **not built** ("implemented
+after discharge lands").
+
+And R-Q4's own mark already sequenced this work behind it, in Meng's words on 2026-09-07:
+
+> _"Perhaps the WHOSE projection could take advantage of the field-opening logic from the
+> section-givens work."_ — with `WHOSE` recorded **PROPOSED, sequenced after §11.7 R5 is built**
+> (§2.5, R-Q4; and `Filter ::= 'WHOSE' Expr` already carries that note in §15).
+
+So the question is not unanswered. It is **sequenced**, and this section's contribution is to say
+what R5 does and does not settle for it.
+
+**What R5 settles.** Two opened records sharing a field name collide loudly. A bare field name is a
+real, ranked binding rather than an ad-hoc insertion, so `WHOSE x AT LEAST N AND y EQUALS M` would
+resolve `y` as a field under an ordinary scoping rule — no whole-expression rewriting, and nothing
+for a connective to be applied to. That is a materially better answer than either the retracted
+insertion rule or one-atom sugar.
+
+**What R5 does not settle, and what this section exists to record.** Its rank list is entirely
+_local_: locals, `GIVEN`s, opened fields, section `GIVEN`s, selectors. **A top-level definition is
+not in it.** The collision that bites `WHOSE` is not two opened records — it is an opened field
+against a top-level `MEANS` of the same name, which is accepted today (measured 2026-09-08:
+`monthly_rent MEANS 42` alongside `DECLARE Party HAS monthly_rent`). Under R5's rank the opened
+field would presumably shadow the top-level name silently.
+
+**Which means the hazard does not disappear under R5 — it reverses direction.** Without opening,
+`y` silently means the top-level term. With opening, `y` silently means the field. Both are silent;
+they differ only in which reading a drafter loses. **That reversal is the angst, stated exactly**,
+and it is why this belongs in the spec rather than in a bench card: no mark on a card disposes of
+it, because the choice is not between safe and unsafe but between two silences.
+
+**The layout-conjoined route above would have been the one exception, by construction** — it did not
+pick a side of the reversal, it removed the question from this construct by making the field
+position syntactic. It is withdrawn anyway, because the synthesis below reaches the same place
+without a new mechanism, and because the language already had the layout it asked for. What survives
+from it is the observation that `WHOSE` need not wait on R5's top-level answer to be **useful**,
+only to be **complete** — which is a change to R-Q4's recorded sequencing and should be ruled as
+such.
+
+#### The measurement — RUN 2026-09-09, and it does not say what was hoped
+
+Across `jl4/examples/**` and `jl4-core/libraries/*`: **1146 distinct field names, 3462 top-level
+names, 30 that are both.** Cross-file overlap only bites under `IMPORT`, so the number that counts
+is **same-file collisions: 5** — four in `jl4/examples/legal/regcf/regcf-wizard.l4`, one in
+`jl4/examples/blawx/imported/beard_tax.l4`.
+
+**They are real, and they are deliberate.** `regcf-wizard.l4:597-602` is the purest form — a record
+construction in which the field and the value share a spelling:
+
+```l4
+`what you must still line up`  IS  `what you must still line up`
+`after you raise you must`     IS  `after you raise you must`
+`law as in force`              IS  `law as in force`
+```
+
+Left of `IS` is a **field** (`:167`, `:168`, `:170`); right of it is a **top-level `MEANS`**
+(`:363`, `:373`, `:393`). `beard_tax.l4` is the same idiom from the other side:
+`DECIDE facial_hair_length_mm x IF isJust (x's facial_hair_length_mm)` (`:63-64`) — a derived
+function named after the field it derives from, disambiguated by `x's`.
+
+**So the hoped-for answer — zero, therefore extend R5's rank to top-level names with a collision
+error — is not available.** That extension would refuse five sites of an idiom that says something
+a drafter should be able to say: _this field is that concept_. Worse, under a rank in which opened
+fields shadow top-level names, `` `law as in force` IS `law as in force` `` stops being a definition
+and becomes a **self-reference**, silently.
+
+**What the measurement does support**, and it is the better rule anyway: **an opened field must not
+shadow a top-level name, and a collision is an error only at an AMBIGUOUS READ — never at the
+declaration.** That is already R5's own shape for two opened records ("an error at the read naming
+both records"), extended to the top-level case rather than to the declaration site. `r's f` remains
+the escape hatch, and all five sites already use the explicit form where it matters.
+
+Method and its limits, so the count can be re-derived or disputed: field names were taken from
+lines matching `<name> IS A|AN|THE|ONE OF|LIST` indented under a `DECLARE`, top-level names from
+column-zero `<name> MEANS` and `DECIDE <name>`. Backtick identifiers are handled; `GIVETH`-only
+definitions and fields introduced by other spellings are not counted, so **5 is a floor, not a
+ceiling**.
+
+#### A synthesis, proposed 2026-09-08 (GM), not ruled: `WHOSE` is not sugar, it is R5 opening the member
+
+Meng asked for a Hegelian reading, and suggested field-opening as the route. It is, and the reason
+is that **thesis and antithesis share a false premise**.
+
+- **Thesis** (pre-R-Q4): the filter holds a point-free predicate and the member is _supplied_ to it.
+  Terse, English-shaped, and dead — because supplying means **applying**, and connectives are
+  applicable too.
+- **Antithesis** (R-Q4, current): the filter holds a Boolean expression and the member is _named_ in
+  it. Composes with anything, and costs the drafter a repeated `t` in every conjunct — the
+  "pronoun awaiting a complement" awkwardness that started this.
+
+Both assume the member reaches the filter by **application** — the only question being who applies
+it. R5 offers a third relation: the member reaches the filter by **scope**.
+
+**So read `WHOSE` not as sugar over `t's`, but as the keyword that OPENS the member's fields over
+the filter** — exactly what R5 already rules for a record-typed `GIVEN`, function or section, here
+extended to the binder a quantifier introduces. Then:
+
+```l4
+EVERY Tenant t WHOSE monthly_rent AT LEAST 1000 AND standing EQUALS "current"
+```
+
+is not a rewrite of anything. `monthly_rent` and `standing` are **opened fields resolving under
+R5's existing rank**; `AND` is just `AND`. Nothing is inserted, so the failure that killed the
+thesis has nothing to attach to — and nothing is repeated, so the antithesis's cost is paid off.
+The antithesis is preserved rather than discarded: `WHO t's monthly_rent …` stays available and
+stays the answer wherever explicitness is wanted, and `r's f` is always available under R5 anyway.
+
+**What this buys beyond the dilemma.**
+
+- **The layout-conjoined form becomes optional style, not load-bearing.** Under opening, one
+  constraint per line is a formatting choice a drafter may make for readability; it is no longer
+  the only thing standing between `y` and the wrong namespace. That is worth having either way, but
+  it should be chosen as style rather than adopted as a disambiguator.
+- **The totality rule arrives from the other direction, and arrives better.** Opening can only put
+  in scope the fields that exist on every constructor the member could still be. With a cast, that
+  is the cast's arm. Without one, on a sum type whose field names are flat, it is the empty set —
+  so `EVERY t WHOSE monthly_rent …` opens nothing and fails **at check time, naming the missing
+  cast**, instead of reaching a run-time _"reached a CONSIDER that has no branch for it"_ that
+  names neither the field nor the cast.
+
+**What must be true for this to work, stated so it can be refuted rather than assumed.**
+
+1. **R5 must extend from a record-typed binder to a CONSTRUCTOR's fields under a cast.** Its text
+   (§11.7) says "the fields of a record-typed `GIVEN`, function or section"; a sum type narrowed by
+   a cast is not that, and the extension is real work, not a reading.
+2. **The quantifier's member must count as a binder the function "sees".** R5's rank is
+   `WHERE`/`LET` locals, the function's own `GIVEN`, fields opened from it, section `GIVEN`s, fields
+   opened from those, selectors. A quantifier member is none of those, so it needs a rank position
+   of its own — innermost, since it is bound closest to the filter.
+3. **It does NOT close the top-level collision.** An opened field against a top-level `MEANS` of the
+   same name is still unresolved, because R5's rank has no entry for top-level names. The synthesis
+   does not answer that — it **relocates it to R5, where it belongs**, and where the machinery to
+   answer it (a rank plus a collision error) already exists. The measurement named above is what R5
+   would need.
+
+So the synthesis is not that the problem vanishes. It is that **the `WHOSE`-specific dilemma
+dissolves into an already-ruled mechanism**, leaving exactly one question, in the document that owns
+it, with the shape of its answer already ruled.
+
+**No recommendation is recorded here on purpose**, and unlike §13.5 the reason is not only that this
+changes what a drafter must write. It is that the question is **upstream of the quantifier**: it is
+about how L4 resolves an unqualified name in the presence of records, it is already ruled in another
+document as R5, and a filter clause is the wrong place to settle it.
 
 ## 14. Related Work
 
