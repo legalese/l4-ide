@@ -159,7 +159,12 @@ draft of this rule misread what a `WHEN` pattern binds:
   the evaluator agrees (`Machine.hs:2558-2560`). Measured: `WHEN Tenant t THEN t's monthly_rent` is
   a **type error** today ("expected to be of type `Actor` but is here of type `NUMBER`"), while
   `WHEN Tenant t THEN a's monthly_rent` checks and evaluates. There is no as-pattern. So what a
-  branch narrows is the variable it scrutinises, when that is a bare name;
+  branch narrows is the variable it scrutinises, when that is a bare name. This is flow typing,
+  which neither tradition in §2 has in that form; **CONFIRMED 2026-09-09 (Meng)**, and it is the
+  counterpart of the `OTHERWISE` ruling below rather than a separate idea — `actus-core.l4:311`
+  already depends on the scrutinee being narrowed. The rejected alternative was a no-op at
+  `CONSIDER`, with the payload reachable only through pattern binders (`THEN t`,
+  `WHEN Tenant name rent THEN rent`), which would have made S2 markedly more restrictive;
 - an `OTHERWISE` branch narrows the scrutinee to the **residual** — the constructors the preceding
   `WHEN`s did not consume — and a trailing catch-all `WHEN other THEN …` gives its binder the same
   residual (**RULED 2026-09-09**, Meng). The shipped `jl4-core/libraries/actus-core.l4:297-311`
@@ -194,7 +199,34 @@ draft of this rule misread what a `WHEN` pattern binds:
   constructor application (`(Tenant OF 7)'s rent`, `Tenant WITH …`) or a nullary constructor is
   statically that constructor (taken on the plan's default, §6 item 5);
 - a function or `GIVEN` parameter is **not** narrowed by anything: `GIVEN a IS AN Actor` leaves `a`
-  at the whole type, so `a's monthly_rent` is an S2 error there until the body narrows it.
+  at the whole type, so `a's monthly_rent` is an S2 error there until the body narrows it;
+- **an alias sees through to what it names** (**RULED 2026-09-09**, Meng). `WHERE b MEANS a`, where
+  `a` is a binder, makes `b`'s narrowing `a`'s narrowing. Implement it by resolving the base through
+  alias chains **at the read** and consulting the root binder's narrowing in the scope of that read
+  — not by copying a narrowing at the binding site. Read-time resolution is what makes an alias bound
+  _outside_ the `CONSIDER` and read _inside_ two different branches see each branch's own narrowing;
+  and because chains follow resolved `Unique`s rather than names, shadowing is handled by
+  construction. Chains stop at the first definition that is not a bare binder: `b MEANS f a` and
+  `b MEANS w's inner` are not aliases and get no narrowing.
+
+### 3.1 Why the alias rule is not optional, and what it costs
+
+Flow-sensitive narrowing has a known asymmetry: **let-inlining preserves typeability, let-abstraction
+does not.** Replacing `b` by `a` still checks; taking a checking `a's monthly_rent`, naming its base
+`b MEANS a`, and reading `b's monthly_rent` would not. Naming a subexpression is supposed to change
+nothing, and that is the property at stake — not referential transparency itself, which is untouched:
+`b` and `a` denote the same value and evaluate identically (measured 2026-09-09, probe I —
+`viaScrutinee` and `viaAlias` return 1500/1500 and 0/0, both green today).
+
+Every flow-sensitive system has this asymmetry — TypeScript's smart casts, Kotlin's, Typed Racket's
+occurrence typing. **What those languages have and L4 does not is a soundness excuse.** Kotlin cannot
+smart-cast through a `var`; TypeScript needed a dedicated feature (4.4 aliased conditions) restricted
+to `const`, because under mutation an alias may stop denoting the same value. **L4 has no mutation**,
+so an alias denotes its target unconditionally and there is no soundness obstacle whatsoever. The
+cost is bookkeeping, and declining to pay it would bend the property for no reason.
+
+The genuinely hard case remains out of scope, because it needs **expression** identity rather than
+binder identity: `CONSIDER w's inner WHEN Tenant t THEN (w's inner)'s monthly_rent` (§6).
 
 **S4 — the diagnostic.** S2's message must be recognisable to a drafter who never wrote a
 `CONSIDER`. Two forms, one per base shape (the first draft's repair text did not compile — see S3):
@@ -349,18 +381,8 @@ This is where the work is expected to land; the implementer re-checks each ancho
   needs expression identity. Open, and much harder; the repair is to name the value. Measured shape
   that checks and runs **today** and that S2 will refuse:
   `CONSIDER w's inner WHEN Tenant t THEN (w's inner)'s monthly_rent`.
-- **An alias of a narrowed binder.** `WHEN Tenant t THEN b's monthly_rent WHERE b MEANS a`
-  evaluates today; after S3 the alias `b` carries no narrowing and S2 fires. Neither shape is in the
-  corpus, so neither changes the gate counts, but both are (B) genuine-with-a-ruling rather than (A)
-  S3 gaps, and the gate reader must file them that way. Propagating a narrowing through a `LET`/
-  `WHERE` alias is the obvious extension and is not ruled.
-- **Whether narrowing the SCRUTINEE inside a `WHEN` branch is wanted at all.** As built it is flow
-  typing, which neither tradition in §2 has in that form. It is not free-standing: Meng's
-  `OTHERWISE` ruling already narrows the scrutinee (that is what `actus-core.l4:311` needs), so the
-  `WHEN` case is its counterpart and is implemented on that basis. The alternative — S3 is a no-op
-  at `CONSIDER`, and a drafter reads the payload through the pattern binders only
-  (`THEN t`, `WHEN Tenant name rent THEN rent`) — would make S2 markedly more restrictive. Confirm
-  or overturn; the implementation notes which was chosen.
+  (The alias case and the scrutinee question that stood here are now ruled — see §3 S3's last two
+  bullets and §3.1.)
 - **A partial projection that returns `MAYBE`** (`a's? monthly_rent`, or similar). Would give a
   drafter an explicit escape from S2 without a pattern. Not proposed; recorded so the door is known.
 - **Per-constructor fields that _share a name on purpose with different meanings_.** S1 merges
