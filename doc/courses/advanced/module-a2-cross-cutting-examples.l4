@@ -33,7 +33,7 @@ DECLARE Action IS ONE OF
     `determine appeal`
     `lodge appeal against` HAS `the decision` IS A Decision
     `determine appeal against` HAS `the decision` IS A Decision
-    `hear appeal` HAS `the decision` IS A `Commissioner Decision`
+    `hear appeal` HAS `the commissioner decision` IS A `Commissioner Decision`
     `issue warning`
     `comply with warning`
     `impose fine`

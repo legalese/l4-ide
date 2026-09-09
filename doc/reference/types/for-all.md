@@ -55,8 +55,8 @@ and returns a list of `b` values."
 ```l4
 DECLARE Choice OF a, b
   IS ONE OF
-    Left  HAS payload IS AN a
-    Right HAS payload IS A  b
+    Left  HAS leftValue  IS AN a
+    Right HAS rightValue IS A  b
 
 -- A function that handles either alternative
 § `Choosing`

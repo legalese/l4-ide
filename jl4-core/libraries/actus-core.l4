@@ -57,10 +57,10 @@ DECLARE `Credit Enhancement Contract Type` IS ONE OF
 
 -- Unified Contract Type (all types)
 DECLARE `Contract Type` IS ONE OF
-    `Basic` HAS contractType IS A `Basic Contract Type`
-    `Exotic` HAS contractType IS A `Exotic Basic Contract Type`
-    `Combined` HAS contractType IS A `Combined Contract Type`
-    `CreditEnhancement` HAS contractType IS A `Credit Enhancement Contract Type`
+    `Basic` HAS basicType IS A `Basic Contract Type`
+    `Exotic` HAS exoticType IS A `Exotic Basic Contract Type`
+    `Combined` HAS combinedType IS A `Combined Contract Type`
+    `CreditEnhancement` HAS creditEnhancementType IS A `Credit Enhancement Contract Type`
 
 -- =============================================================================
 §§ `Contract Role`
