@@ -145,6 +145,64 @@ DECIDE `coverage applies` IF
 
 `§`, `§§`, `§§§`, etc. mark sections — they are structural, not comments. Titles containing spaces, numbers, or punctuation must be backtick-quoted (`` §§ `1.2 Definitions` ``). See [references/gotchas.md](references/gotchas.md).
 
+#### Statutory tables: generate the layout, do not type it
+
+A rate table, a fee schedule, a salary scale — a source table with many columns
+produces very wide L4 if written the obvious way, and wide lines are what make an
+encoding unreviewable against the statute it mirrors. Three things fix that, and
+they are **separate levers that are easy to confuse**:
+
+| lever                        | what it actually buys                                                                                                                                                        |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| positional `OF` construction | **the width.** Measured on one row of a real 36×9 salary table: `WITH … IS …` 320 characters → `OF` 184                                                                      |
+| a ruler comment              | the column names, written **once** instead of on every row                                                                                                                   |
+| ditto `^`                    | **not width — ink.** A `^` is padded to the width of the token it replaces, so it cannot shorten a line. What it removes is repetition, so the eye lands only on what varies |
+
+Do not tell yourself ditto narrows anything. It does not, by construction, and
+reaching for it to save width will waste effort in cases where it saves none.
+
+```l4
+DECLARE `salary row` HAS `at rank 1` IS A NUMBER
+                         `at rank 2` IS A NUMBER
+                         `at rank 3` IS A NUMBER
+
+GIVEN `the seniority` IS A NUMBER
+GIVETH A `salary row`
+`the salary row for` MEANS
+  --                                                rank 1,   rank 2,   rank 3
+  BRANCH IF `the seniority` AT MOST 1 THEN `salary row` OF  6_300,    6_300,    6_615
+         IF `the seniority` EQUALS  2 THEN ^            ^   6_426,    6_426,    6_747
+         IF `the seniority` EQUALS  3 THEN ^            ^   6_554.52, 7_046.11, 7_397
+         OTHERWISE                        `salary row` OF  0,        0,        0
+```
+
+**The ruler is load-bearing, not decoration.** With positional `OF` the rank is
+written down nowhere else.
+
+**Emit tables from a script; do not hand-align them.** Ditto resolves by exact
+column, so a row that is a few spaces out fails with `unexpected ,` and a caret
+pointing into the middle of the row — a diagnostic that never says "your columns
+are misaligned". Compute the column widths and the ruler in the same code that
+lays out the rows, so the ruler cannot drift when a column widens. The Ofek
+Hadash encoding does this in a 93-line helper, `source/_tablefmt.py`; see
+`legalese/canon`, `subjects/il/ofek-hadash-2008/encodings/legalese/`, whose
+`NOTES.md` §9 is the fullest write-up of this discipline.
+
+Two token-level traps bite immediately, both verified:
+
+- **`AT MOST` is two tokens.** One `^` under it copies `AT` and the parser then
+  demands the rest — `unexpected ^`. In the table above `AT MOST` and `EQUALS`
+  are written out on every row deliberately.
+- **A backtick identifier is one token.** `` `at rank 2` `` cannot ditto down
+  from `` `at rank 1` ``; there is no sub-token to copy. Whole names ditto, parts
+  of names never do.
+
+`l4 format` preserves ditto exactly — measured byte-identical on the real 36×9
+file, 79 carets in and 79 out. Note that ditto in the l4-ide corpus is less well
+trodden: no `.ep.golden` covers a generated table of this shape, so if you emit
+one into `jl4/examples/**` you are on untested ground and should read the golden
+you generate rather than blessing it.
+
 ### 5. Model obligations and deadlines
 
 When the source text says "must", "may", "shall not", or mentions a deadline, use a regulative rule. The skeleton:
@@ -571,10 +629,33 @@ makes sense inside another arm's branch.
 ### Record construction and access
 
 ```l4
-Person WITH `name` IS "Alice", `age` IS 30
+Person WITH `name` IS "Alice", `age` IS 30   -- named
+Person OF "Alice", 30                        -- positional, same value
 person's `name`
 application's employee's nationality   -- chaining
 ```
+
+**Two constructions, and the choice is a real one.** `WITH … IS …` names each
+field; `OF` supplies them positionally in `DECLARE` order. `OF` is dramatically
+narrower — on a nine-column row, 320 characters against 184 — which is what makes
+wide statutory tables reviewable.
+
+The cost is that **`OF` is silently order-dependent**. Swap two same-typed fields
+in the `DECLARE` and every call site is now wrong, with no diagnostic at all:
+
+```l4
+DECLARE Pay HAS base  IS A NUMBER      -- swap these two lines and
+                bonus IS A NUMBER      -- `Pay OF 5000, 200` still typechecks,
+                                       -- but base and bonus have traded places
+```
+
+Verified: the values silently exchange and `l4 run` reports zero errors. On a
+salary rule that turns pay into bonus.
+
+So: **`OF` for a table whose columns are inherently positional and which carries a
+ruler comment naming them; `WITH` for a record whose fields a reader has to tell
+apart by name.** Do not use `OF` on a record of mixed meaning just because it is
+shorter.
 
 **There are two spellings for a record spread over several lines, and both
 parse.** Fields on continuation lines may each be led by a comma, or carry no
@@ -607,8 +688,13 @@ A directive is one line. Continuing an `#ASSERT` onto a second line that begins
 `EQUALS` is a parse error. The two exceptions: `#ASSERT REFUSED e` may put its
 `BECAUSE "…"` on the next line, and `#TRACE … WITH` takes its events on the
 lines that follow. Output is not always source: `#EVAL` prints an applied
-constructor with an `OF` that never appears in a file (`` `the levy is` OF 200 ``,
-`` LEFT OF `x` ``), so do not paste printed values back in as they are.
+function with an `OF` that you would not have written (`` `the levy is` OF 200 ``,
+`` LEFT OF `x` ``), so do not assume a printed value can be pasted back in.
+
+The exception is worth knowing, because it is the common case in a table: a
+**record constructor** prints in the positional `OF` form and that form _is_
+valid source. `#EVAL Pay OF 5000, 200` prints `Pay OF 5000, 200`, and pasting
+that back typechecks and evaluates. See [Record construction and access](#record-construction-and-access).
 
 ### Annotations
 

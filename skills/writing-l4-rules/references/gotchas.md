@@ -76,6 +76,25 @@ sky_is_romantic phase MEANS
 
 Each `^` stands for the token at the same column on the previous line. Without ditto you would repeat `phase EQUALS` four times. This is a legal-drafting affordance, not a general-purpose operator.
 
+**What ditto does and does not buy.** It does **not** shorten a line: a `^` is padded out to exactly the width of the token it replaces, so the column layout — and therefore the line length — is unchanged by construction. Measured on a real 36×9 salary table, converting a row to ditto saved _one_ character, and that was a rounding artefact. What it buys is data/ink: the repeated tokens become whitespace, so the eye lands only on what varies. Reach for it to make a table readable, never to make it fit. The lever that actually narrows a wide row is positional `OF` construction (320 characters → 184 on that same row).
+
+**Three traps, all verified:**
+
+- **`^` copies one token.** `AT MOST` is two, so a single caret beneath it copies `AT` and the parser then rejects the caret outright. Write two-word operators out in full on every row.
+- **A backtick identifier is one token.** `` `at rank 2` `` cannot ditto down from `` `at rank 1` `` — there is no sub-token to copy. Whole names ditto; parts of names never do.
+- **Column position is semantics, so editing a line silently rebinds every caret below it.** This is the one that costs real time, because nothing warns you:
+
+```l4
+small MEANS 10
+big   MEANS 90
+c1 MEANS small AT LEAST 5
+c2 MEANS ^     AT MOST  50   -- copies `small`; c2 is TRUE
+```
+
+Change line 3's subject to `big` — leaving the caret alone — and `c2` becomes FALSE, with no error and no warning, because the caret still resolves, just to a different token. If a caret's column lands on _nothing_, you get a loud `unexpected ^`; if it lands on the _wrong_ token you may get nothing at all. **So generate aligned tables from a script rather than hand-typing them**, and after editing any line in a dittoed block, re-check every caret beneath it.
+
+`l4 format` is not a threat to this style: measured on a real 36×9 dittoed file, its output is byte-identical, 79 carets in and 79 out.
+
 ---
 
 ## Asyndetic operators `...` and `..`
