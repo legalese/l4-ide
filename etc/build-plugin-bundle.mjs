@@ -388,7 +388,14 @@ const mb = (n) => (n / 1024 / 1024).toFixed(2);
 // it was generated from -- that mismatch is the whole point of the split.
 const PUBLISH_REPO = process.env.L4_PLUGIN_REPO || "legalese/l4-plugin";
 
-for (const f of ["plugin.json", ".claude-plugin/plugin.json", "PLUGIN.md"]) {
+for (const f of [
+  "plugin.json",
+  ".claude-plugin/plugin.json",
+  "PLUGIN.md",
+  // The manifests declare Apache-2.0. A public repository that declares a
+  // licence and does not ship its text has not actually granted one.
+  "LICENSE",
+]) {
   if (fs.existsSync(path.join(REPO, f))) copyInto(f, f);
 }
 
@@ -432,6 +439,23 @@ try {
 fs.writeFileSync(
   path.join(OUT, "README.md"),
   `# L4 Computational Law — plugin bundle
+
+> ## ⚠️ Experimental prototype — may be taken down at any time
+>
+> This repository is an experiment in packaging the L4 authoring skill so it can
+> be used **outside** the [l4-ide](https://github.com/legalese/l4-ide) monorepo,
+> whose plugin install otherwise resolves to a 289 MB clone to deliver half a
+> megabyte of skill.
+>
+> It has **not been through architectural review**. It is not a supported
+> product, it carries no compatibility promise, and it may be **moved, renamed,
+> restructured or deleted without notice or deprecation period**. The upstream
+> decision about whether the plugin should live in its own repository at all has
+> not been taken.
+>
+> If you depend on anything here, vendor it: take a copy, pin a commit, and do
+> not assume this URL resolves next month. The skill itself is stable and lives
+> in l4-ide; it is only this *packaging* that is provisional.
 
 **This directory is generated. Do not edit it by hand.** Every file here was
 copied out of [legalese/l4-ide](https://github.com/legalese/l4-ide) by
