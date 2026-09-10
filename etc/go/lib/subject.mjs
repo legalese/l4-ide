@@ -530,9 +530,20 @@ export function loadSubject(id, selectedEncoding = "primary") {
         );
       if (typeof e !== "object" || e === null || Array.isArray(e))
         die(`encodings['${encId}'] must be an object`);
-      checkKeys(`encodings['${encId}']`, e, ["modules", "checks", "legs"]);
+      // `roadmap` is the encoding's coverage contract — the enumeration of
+      // every unit of the source with a disposition. It belongs on the
+      // ENCODING and not on the subject because scope is a decision of the
+      // job: the same Act encoded twice, once for the grant machinery and
+      // once entire, has two different and equally honest roadmaps.
+      checkKeys(`encodings['${encId}']`, e, [
+        "modules",
+        "checks",
+        "legs",
+        "roadmap",
+      ]);
 
       const out = {
+        GO_S_ENCODING_ROADMAP: "",
         GO_S_ENCODING_MODULES: "",
         GO_S_MIN_DATED_ARMS: "",
         GO_S_MIN_ASSERTIONS: "",
@@ -581,6 +592,14 @@ export function loadSubject(id, selectedEncoding = "primary") {
       // population does. Which is why they now live WITH their encoding instead
       // of in a parallel `denovo.checks` — the pairing is structural, not a
       // convention a reader has to hold in their head.
+      // Like every other deposit path, this need not exist: `plan` reports it
+      // absent, which is a missing prerequisite and not a defect.
+      if (e.roadmap !== undefined) {
+        if (typeof e.roadmap !== "string" || !e.roadmap)
+          die(`encodings['${encId}'].roadmap must be a non-empty string`);
+        out.GO_S_ENCODING_ROADMAP = resolve(REPO, e.roadmap);
+      }
+
       if (e.checks !== undefined) {
         if (
           typeof e.checks !== "object" ||

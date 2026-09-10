@@ -102,12 +102,60 @@ for m in "${MODULES[@]}"; do
   [[ $rc -eq 0 ]] || FINDINGS=$((FINDINGS + 1))
 done
 
-METRICS=(--metric "modules=${#MODULES[@]}" --metric "typecheck_failures=$FINDINGS")
+# ---------------------------------------------------------------- the roadmap
+#
+# COVERAGE, which `l4 check` cannot see. The typecheck above proves the deposit
+# is L4 the toolchain accepts; it says nothing at all about how MUCH of the
+# source is in it. A module encoding Chapter 1 and stopping typechecks exactly
+# as cleanly as one encoding the whole Act, and every stage after this one
+# passes over it too, because none of them knows what the source contained.
+# That was the one large defect in this pipeline with no detector anywhere.
+#
+# The roadmap is the detector: an enumeration of every unit of the source with
+# a disposition, joined against the modules that claim to cover them. It is
+# declared per ENCODING (`encodings.<id>.roadmap`) because scope is a decision
+# of the job, not a property of the text.
+#
+# Absent, this whole block is a no-op and the stage behaves exactly as before,
+# so no existing subject changes. Declared-but-missing is a NOTE and not a
+# failure, for the same reason every other deposit is: a missing prerequisite
+# is not a defect. What DOES fail the stage is a roadmap that is present and
+# wrong, or one with units nobody has dispositioned.
+ROADMAP_METRICS=()
+ROADMAP_NOTE=""
+if [[ -n "${GO_S_ENCODING_ROADMAP:-}" ]]; then
+  if [[ ! -f "$GO_S_ENCODING_ROADMAP" ]]; then
+    ROADMAP_NOTE="the encoding declares a roadmap at $GO_S_ENCODING_ROADMAP and it is not there, so coverage is UNMEASURED for this run: nothing here or downstream can tell a complete encoding from one that stopped after the first chapter"
+  else
+    set +e
+    node "$GO_LIB/register-validate.mjs" encoding-roadmap \
+      "$GO_S_ENCODING_ROADMAP" ${GO_S_NATLANG_BUNDLE:+"$GO_S_NATLANG_BUNDLE"} \
+      >>"$LOG" 2>&1
+    rm_rc=$?
+    set -e
+    if [[ $rm_rc -ne 0 ]]; then
+      FINDINGS=$((FINDINGS + 1))
+      ROADMAP_NOTE="the roadmap at $GO_S_ENCODING_ROADMAP does not validate; see $LOG"
+    else
+      # Counted, not judged: the receipt carries the numbers and the reader
+      # decides what 33% accounted-for means for this subject.
+      TOTAL=$(node -e "process.stdout.write(String(JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')).units.length))" "$GO_S_ENCODING_ROADMAP")
+      DEFERRED=$(node -e "process.stdout.write(String(JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')).units.filter(u=>u.disposition==='deferred').length))" "$GO_S_ENCODING_ROADMAP")
+      ROADMAP_METRICS=(--metric "roadmap_units=$TOTAL" --metric "roadmap_deferred=$DEFERRED")
+      if [[ "$DEFERRED" -gt 0 ]]; then
+        ROADMAP_NOTE="$DEFERRED of $TOTAL enumerated source unit(s) are still DEFERRED — this encoding is incomplete by its own roadmap, and that is a statement about coverage, not about the L4 that is here"
+      fi
+    fi
+  fi
+fi
+
+METRICS=(--metric "modules=${#MODULES[@]}" --metric "typecheck_failures=$FINDINGS" "${ROADMAP_METRICS[@]+"${ROADMAP_METRICS[@]}"}")
 
 if [[ $FINDINGS -gt 0 ]]; then
   go_receipt --status DEGRADED \
     --reason "$FINDINGS of ${#MODULES[@]} deposited de novo module(s) do not typecheck; see $LOG" \
-    --artifact "$LOG" "${METRICS[@]}"
+    --artifact "$LOG" "${METRICS[@]}" \
+    ${ROADMAP_NOTE:+--note "$ROADMAP_NOTE"}
   exit "$GO_EXIT_FINDING"
 fi
 
@@ -119,4 +167,5 @@ go_receipt --status PASS \
   --oracle-because "typechecking is the compiler's own verdict on the module, and for 'l4 check' the exit code is the oracle: only a typecheck error produces exit 1. It proves the deposit is L4 the toolchain accepts. It proves NOTHING about fidelity to the source, about house style, or about whether the encoding answers anything — no #ASSERT is run here (that is P6) and no house-style check is applied here (that is p3-check, which runs over this same deposit in this same run)." \
   --artifact "$LOG" "${METRICS[@]}" \
   --note "P3's actual deliverable — 'isomorphic: a domain expert can review it against $GO_S_CITATION section by section' — is unverified by this stage and is HG1's subject (SPEC.md §7.3). A module that typechecks and says something else entirely reaches this same PASS" \
+  ${ROADMAP_NOTE:+--note "$ROADMAP_NOTE"} \
   --note "the two mechanisable P3 house rules (BRANCH over ELSE IF, an @ref on every dated arm) are p3-check's half of this phase: it runs over this run's same resolved module set, so read its receipt beside this one"

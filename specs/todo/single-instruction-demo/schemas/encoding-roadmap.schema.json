@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://legalese.com/l4/schemas/encoding-roadmap.schema.json",
+  "title": "Encoding roadmap",
+  "description": "An enumeration of every unit of a subject's source text, each with a disposition, deposited BEFORE encoding begins and updated as it proceeds. It exists because P3's oracle is `l4 check` and nothing else: a module that encodes Chapter 1 and stops typechecks exactly as well as one that encodes the whole Act, so under-coverage is the pipeline's one large defect with no detector at all. The roadmap turns 'did we encode all of it' from an unfalsifiable judgement into a join, the way P1's annotation inventory turns 'did we dispose of every amendment' into one. It is not a plan the encoder may revise silently: a unit dropped from the enumeration is a change to what was promised, and reads as one.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "roadmap_version",
+    "subject",
+    "encoding",
+    "granularity",
+    "source",
+    "units"
+  ],
+  "properties": {
+    "kind": {
+      "const": "encoding-roadmap"
+    },
+    "roadmap_version": {
+      "const": "1.0.0"
+    },
+    "subject": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The subject id, matching etc/go/subjects/<id>/."
+    },
+    "encoding": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The encoding id this roadmap is for. An occasion, not a position: the same source enumerated for two encodings gets two roadmaps, because scope is a decision of the job and not a property of the text."
+    },
+    "granularity": {
+      "type": "string",
+      "enum": ["part", "chapter", "section", "subsection", "paragraph"],
+      "description": "The level units are counted at. Recorded because '100% of 12 chapters' and '100% of 400 subsections' are not the same claim, and a reader comparing two subjects cannot tell which they are reading without it."
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["document_id", "enumeration_basis", "enumeration_complete"],
+      "properties": {
+        "document_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The P1 source-bundle document this enumerates. Enumerating from memory rather than from the captured text is the failure this artifact exists to catch, so the id is joined against the bundle."
+        },
+        "enumeration_basis": {
+          "type": "string",
+          "minLength": 12,
+          "description": "HOW the unit list was obtained, in a sentence a reader can repeat: 'every line matching ^[0-9]+\\\\. in source/PAA1934.txt', 'the Act's own arrangement-of-sections table at pp.1-3'. An enumeration nobody can re-derive is an assumption wearing an inventory's clothes."
+        },
+        "enumeration_complete": {
+          "type": "boolean",
+          "description": "True asserts this is every unit of the document at the stated granularity. False obliges enumeration_note. The flag exists so that 'I could not enumerate all of it' is a sayable answer, and nobody has to choose between overclaiming and stopping."
+        },
+        "enumeration_note": {
+          "type": "string",
+          "minLength": 12,
+          "description": "Required when enumeration_complete is false: what the enumeration is missing, and why."
+        }
+      }
+    },
+    "units": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Every unit, in source order. Source order is load-bearing: it is what makes 'encoded 1 to 4, then nothing' visible at a glance in the rendered table, which is the exact failure this artifact was built for.",
+      "items": {
+        "$ref": "#/$defs/unit"
+      }
+    }
+  },
+  "x-rules": [
+    {
+      "id": "unit-ids-unique",
+      "description": "No two units share an id. A duplicate id makes the coverage count meaningless and hides one of the two units from every join."
+    },
+    {
+      "id": "enumeration-note-required-when-incomplete",
+      "description": "enumeration_complete false requires enumeration_note. An incomplete enumeration is legitimate; an unexplained one is a silent cap on what the roadmap can ever detect."
+    },
+    {
+      "id": "reason-required-for-scope-decisions",
+      "description": "Dispositions out-of-scope and deferred require a reason of real length. 'Procedural machinery producing a fact the encoding takes as input' is a reason; 'not needed' is not. This is what makes a scope decision reviewable rather than merely recorded."
+    },
+    {
+      "id": "modules-required-for-encoded",
+      "description": "Dispositions encoded and inert require at least one module path. Without it the roadmap can only be checked against itself, and a unit can be marked encoded with nothing behind it."
+    },
+    {
+      "id": "modules-exist-on-disk",
+      "description": "Every module path a unit names must exist. Reported as a finding when the file is absent, so a roadmap cannot claim coverage in a module that was renamed or never written."
+    },
+    {
+      "id": "document-is-in-bundle",
+      "description": "source.document_id must name a document the P1 source-bundle captured. Reported as skip when the bundle is not supplied, never silently passed.",
+      "peer": "source-bundle"
+    }
+  ],
+  "$defs": {
+    "unit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "disposition"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The unit's citation as the source writes it: 's 13(2)', '227.100', 'Part 4'. Not a serial number, because the id is how a reader finds it in the text."
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The source's own heading, quoted rather than paraphrased where it has one."
+        },
+        "disposition": {
+          "type": "string",
+          "enum": ["encoded", "inert", "out-of-scope", "deferred"],
+          "description": "encoded: operative L4 exists. inert: carried as inert text, present but not active. out-of-scope: a deliberate decision not to encode, requiring a reason. deferred: intended and not done, requiring a reason \u2014 the status that makes an unfinished run say so out loud instead of looking finished."
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 12,
+          "description": "Required for out-of-scope and deferred."
+        },
+        "modules": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          },
+          "description": "For encoded and inert: the module path(s) where the unit landed. What makes the roadmap checkable against the tree rather than only against itself."
+        },
+        "anchor": {
+          "type": "string",
+          "description": "Optional pinpoint into the module: a section name or a declaration name. Deliberately not a line number \u2014 line numbers move under every edit, and a stale anchor that still resolves is worse than none."
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}
