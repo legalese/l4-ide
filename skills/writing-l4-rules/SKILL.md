@@ -186,7 +186,9 @@ are misaligned". Compute the column widths and the ruler in the same code that
 lays out the rows, so the ruler cannot drift when a column widens. The Ofek
 Hadash encoding does this in a 93-line helper, `source/_tablefmt.py`; see
 `legalese/canon`, `subjects/il/ofek-hadash-2008/encodings/legalese/`, whose
-`NOTES.md` §9 is the fullest write-up of this discipline.
+`NOTES.md` §9 is the fullest write-up of this discipline, and §9.2 — "Ditto fails
+loudly when it hits nothing, and silently when it hits the wrong thing" — carries
+the failure modes with a separator-by-separator table.
 
 Three token-level traps bite immediately, all verified. The first two are loud;
 the third is not, which is what makes it worth reading twice.
