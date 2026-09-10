@@ -209,6 +209,39 @@ Two structural observations worth carrying into any future emitter design:
    (`LOGIC-PROGRAMMING-BACKENDS-SPEC.md` §1.4) than to a typical programming-language variable
    name.
 
+### C.1 The test-fixture format (added 2026-09-10)
+
+Every `.yaml` rule file in `rulespec-us` ships beside a companion `.test.yaml` of named scenarios.
+Downloaded and read directly this session **[E, code]**:
+`raw.githubusercontent.com/TheAxiomFoundation/rulespec-us/main/us/statutes/7/2015/e.test.yaml`
+(152 lines). One scenario, in full:
+
+```yaml
+- name: half_time_higher_education_student_with_no_exception_is_ineligible
+  period: 2026-01
+  input:
+    us:statutes/7/2015/e#input.person_age_years: 25
+    us:statutes/7/2015/e#input.person_is_not_physically_or_mentally_fit: false
+    # … eighteen more fully-qualified input facts, one per line
+    us:statutes/7/2015/e#input.person_is_enrolled_at_least_half_time_in_institution_of_higher_education: true
+  output:
+    us:statutes/7/2015/e#student_age_exception_applies: not_holds
+    us:statutes/7/2015/e#student_exception_applies: not_holds
+    us:statutes/7/2015/e#student_ineligible_for_snap_participation: holds
+```
+
+Three things worth carrying forward: **(1)** every input and output key is the same durable,
+globally-unique identifier used in the rule file itself (`us:statutes/7/2015/e#…`), so a scenario
+is self-contained and resolvable without cross-referencing a separate registry. **(2)** outputs are
+recorded as `holds`/`not_holds` rather than bare `true`/`false` — the same closed-world-judgment
+vocabulary this project's own `negation-as-failure.l4` library uses (`LOGIC-PROGRAMMING-BACKENDS-SPEC.md`
+§3.4), which strongly suggests (not confirmed — the full `dtype` enumeration was not read) a third
+`unknown`/`presumed` state exists on the RuleSpec side too. **(3)** `period: 2026-01` pins the
+scenario to a specific month, which combines with the rule file's own `effective_from` versioning
+(§D below) to fully determine which rule version the scenario exercises — a temporal-scenario
+discipline this project's own `#EVAL`/`#ASSERT` corpus does not currently carry (an assertion here
+runs under whatever rule version is in force at evaluation time, not a scenario-pinned date).
+
 ## D. Stratum-by-stratum overlap (RuleSpec)
 
 | L4 stratum                                                        | RuleSpec construct                                                                                                                                                                                                                       | Verdict                                                       |
@@ -284,6 +317,44 @@ picks this up:
   (their gate: agreement with an independent oracle before publication, tracked via named,
   CI-enforced "known gap" lists that may only shrink).
 
+### F.1 Bidirectional exchange (backlogged 2026-09-10)
+
+A session on the Axiom side reached out directly (cross-session message, 2026-09-10) naming the
+same idea from their end: **bidirectional** import/export between RuleSpec encodings and L4
+projects, specifically as a **mutual sanity check** — L4 projects would cross-check against
+RuleSpec encodings for statutes Axiom has already ingested where domain overlap exists, and
+RuleSpec's own encodings would symmetrically benefit from an independent L4-side check. This is
+deliberately **not** the one-way "L4 → RuleSpec emitter" already discussed above (§F, bullet 3):
+that direction turns L4 into a RuleSpec _producer_; this item is about **two independently-authored
+encodings of the same statute checking each other**, in either direction, with neither treated as
+the reference.
+
+The mechanism is now concretely sketched, not just aspirational, because of what §C.1 found:
+**both sides already have the substrate.** RuleSpec's `.test.yaml` scenario files are exactly a
+named `input`→`output` fact/verdict table, keyed by durable identifiers, temporally pinned — the
+same shape as an L4 `#EVAL`/`#ASSERT`. Where an L4 corpus file and a `rulespec-us` file encode
+overlapping provisions of the same statute (the obvious first candidate, given this project's
+existing corpus: none of `jl4/examples/openfisca/` currently overlaps SNAP §2015(e) specifically,
+so the first overlap would need identifying, not assumed), a harness could:
+
+1. Take a `rulespec-us` `.test.yaml` scenario's `input` fact bundle, translate its durable
+   identifiers to the corresponding L4 `GIVEN`/`ASSUME` bindings by hand (or via a small mapping
+   table, once one exists), and compare the L4 evaluator's verdict against the scenario's recorded
+   `output`.
+2. Symmetrically, take an L4 corpus file's `#EVAL`/`#ASSERT` facts and check them against the
+   compiled RuleSpec artifact for the same provision, via the Rust/Python-bound engine or the WASM
+   build.
+3. Either direction is a **read-only cross-check**, not a transpiler: nothing needs to compile
+   from one format into the other for this to work, since both sides already speak "named facts in,
+   named judgment out" against citation-pinned identifiers. A full bidirectional _emitter_ (§F above
+   sketches the L4→RuleSpec half; the RuleSpec→L4 half is unexplored) would be strictly more work
+   than this scenario-level cross-check, and the cross-check is the part with an immediate,
+   low-cost payoff.
+
+Not scoped further than this — no ruling, no chosen first statute, no harness code. Tracked
+alongside the one-way emitter idea in `specs/roadmap/future-features.md` ("Bidirectional
+differential exchange with Axiom Foundation's RuleSpec").
+
 ## G. Sources
 
 **Primary, read directly in this session [E]:** `axiom.org/about`; `axiom.org/blog/axiom-launch`;
@@ -298,7 +369,9 @@ description: "Forked from OpenFisca-Core").
 
 **Primary code, downloaded and read in full [E, code]:**
 `raw.githubusercontent.com/TheAxiomFoundation/rulespec-us/main/us/statutes/7/2015/e.yaml` (300
-lines, read in two passes) — the source of every quotation in §C.
+lines, read in two passes) — the source of every quotation in §C; its companion
+`.../us/statutes/7/2015/e.test.yaml` (152 lines) — the source of §C.1, added 2026-09-10 in
+response to a cross-session request from an Axiom-side session about bidirectional exchange (§F.1).
 
 **Not independently verified this session [U]:** whether PolicyEngine's `variables/`/`parameters/`
 shape still matches current upstream OpenFisca closely enough for L4's existing OpenFisca emitter
