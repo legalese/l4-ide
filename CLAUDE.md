@@ -29,6 +29,29 @@ otherwise route around the rule; delete them once the rule is obviously self-jus
   mean. **The consequence that catches people: the shelf ships off `unstable`, so anything merged
   there can reach users at the next cut — "not released yet" is not a defence for a known defect.**
 
+### 1.0 The authoring skill lives in TWO repos — correct here, port in the same session
+
+`skills/writing-l4-rules/` is duplicated verbatim in **`legalese/l4-plugin`**, at the same path,
+described there as "the L4 authoring skill packaged for use outside the l4-ide monorepo". This repo
+is upstream: `.github/workflows/release-l4-skill.yml` packages the skill into `l4-plugin.zip`, and
+the marketplace entry is `/plugin marketplace add legalese/l4-ide`.
+
+**So a correction to the skill lands here first and is ported to `legalese/l4-plugin` in the same
+session**, per the user-level `CLAUDE.md` rule "when you correct a document, find its other copies
+first". Nothing synchronises them automatically and neither copy names the other, so a fix made in
+one is invisible to the other for as long as nobody notices.
+
+Two things make the port cheap, and both should be preserved: the copies are **byte-identical**
+(verify with `diff` after porting, not by eye), and the relative links inside `references/` resolve
+in both because the layout matches. One thing does not port: prose asserting something is
+"verifiable in situ" is false in the packaged bundle, which ships the skill **without**
+`jl4-core/src` beside it. Say which tree a check needs.
+
+> **Why.** PR #382 corrected two claims in the skill — `#EVAL`'s `OF` form, and a provenance note
+> asserting the DMN exporter was not on `unstable`. Both were equally wrong in `l4-plugin`, and
+> nothing in either repo pointed at the other. The duplication was found only by searching the org
+> for the repo name.
+
 ### 1.1 GitHub issue auto-close never fires here — close by hand
 
 Closing keywords (`Fixes #123`, `Closes #123`) only fire when a PR merges into **the repository's
