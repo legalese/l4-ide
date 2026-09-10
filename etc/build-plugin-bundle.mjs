@@ -144,8 +144,23 @@ for (const f of walk(BUNDLED_SKILL)) {
   if (after !== before) fs.writeFileSync(f, after);
 }
 
+// The standard library is compiled INTO the `l4` binary, wholesale: the
+// Template Haskell splice in jl4-core/src/L4/API/EmbeddedLibraries.hs embeds
+// every .l4 under jl4-core/libraries/, and the resolver reaches them under the
+// `jl4-embedded` scheme with no file on disk.
+//
+// So copying them here would not add a missing file, it would add a SECOND
+// copy at a path the skill cites -- and a second copy is worse than none.
+// CLAUDE.md 3.1: pointing an `l4` at a prelude NEWER than itself does not
+// report a version mismatch, it fails as cascading "could not find a
+// definition" errors for setFromList and every other prelude name, which reads
+// as a broken spec. A bundle that ages past the user's binary would manufacture
+// exactly that. The embedded copy is correct by construction, always.
+const RUNTIME_PROVIDED = /^jl4-core\/libraries\//;
+
 const carried = [];
 const skippedDirs = [];
+const fromRuntime = [];
 const unresolved = [];
 for (const [rel, whom] of [...cited].sort()) {
   const abs = path.join(REPO, rel);
@@ -158,6 +173,10 @@ for (const [rel, whom] of [...cited].sort()) {
     // gesture, not a citation; copying the tree would drag in megabytes the
     // skill never names. Recorded, not carried.
     skippedDirs.push(rel);
+    continue;
+  }
+  if (RUNTIME_PROVIDED.test(rel)) {
+    fromRuntime.push(rel);
     continue;
   }
   copyInto(rel, rel);
@@ -257,10 +276,19 @@ root. Nothing in the skill text was rewritten.
 The set is computed from the skill's own text, not from a maintained list, so
 citing a new example carries that example on the next build.
 
+One class is deliberately **not** carried: \`jl4-core/libraries/*.l4\`, the
+standard library. The \`l4\` binary embeds it at compile time and resolves it
+under the \`jl4-embedded\` scheme, so a copy here would be a second copy of
+something the runtime already has -- and a second copy that ages past the
+user's binary is worse than none, because an \`l4\` pointed at a prelude newer
+than itself does not report a version mismatch; it fails as cascading
+\`could not find a definition\` errors that read as a broken program.
+
 | | |
 |---|---|
 | skill | ${skillFiles.length} files |
 | cited material | ${carried.length} files |
+| cited but NOT carried | ${fromRuntime.length} standard-library files |
 | bundle | ${mb(skillBytes + bytes)} MB |
 | the repo it came from | 289 MB packed |
 
@@ -274,6 +302,10 @@ if (!quiet) {
   console.log(`bundle root : ${OUT}`);
   console.log(`skill       : ${skillFiles.length} files, ${mb(skillBytes)} MB`);
   console.log(`cited files : ${carried.length} carried, ${mb(bytes)} MB`);
+  if (fromRuntime.length)
+    console.log(
+      `runtime     : ${fromRuntime.length} cited file(s) NOT carried — the l4 binary embeds them`,
+    );
   console.log(`total       : ${mb(skillBytes + bytes)} MB`);
   if (skippedDirs.length) {
     console.log(`\ndirectory mentions, recorded but not carried:`);
@@ -302,6 +334,9 @@ for (const f of walk(BUNDLED_SKILL)) {
   const text = fs.readFileSync(f, "utf8");
   const who = path.relative(OUT, f);
   for (const m of text.matchAll(CITATION)) {
+    // A citation the `l4` binary answers is satisfied, not dangling. It has no
+    // file in the bundle by design -- see RUNTIME_PROVIDED above.
+    if (RUNTIME_PROVIDED.test(m[1])) continue;
     if (!fs.existsSync(path.join(OUT, m[1])))
       dangling.push([m[1], who, "citation"]);
   }
