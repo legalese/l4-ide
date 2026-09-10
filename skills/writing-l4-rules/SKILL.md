@@ -149,8 +149,19 @@ DECIDE `coverage applies` IF
 
 A rate table, a fee schedule, a salary scale — a source table with many columns
 produces very wide L4 if written the obvious way, and wide lines are what make an
-encoding unreviewable against the statute it mirrors. Three things fix that, and
-they are **separate levers that are easy to confuse**:
+encoding unreviewable against the statute it mirrors.
+
+**What the printed table already gets right.** A statute prints its headings once
+and repeats nothing else: every mark on the page is a figure that matters.
+Encoded the obvious way, one row of a nine-column scale runs to 320 characters,
+of which the nine figures that vary are the smallest part and the hardest to
+find. The aim is to give the encoding back the shape the source had — the
+headings said once, the repetition reduced to whitespace, and a reviewer checking
+one row against the printed table reading only what that row actually says. That
+is Tufte's data-ink ratio applied to source.
+
+Three things get you there, and they are **separate levers that are easy to
+confuse**:
 
 | lever                        | what it actually buys                                                                                                                                                        |
 | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -158,8 +169,8 @@ they are **separate levers that are easy to confuse**:
 | a ruler comment              | the column names, written **once** instead of on every row                                                                                                                   |
 | ditto `^`                    | **not width — ink.** A `^` is padded to the width of the token it replaces, so it cannot shorten a line. What it removes is repetition, so the eye lands only on what varies |
 
-Do not tell yourself ditto narrows anything. It does not, by construction, and
-reaching for it to save width will waste effort in cases where it saves none.
+Reach for `OF` when a row is too wide, and for ditto when a row is too noisy.
+They are not substitutes.
 
 ```l4
 DECLARE `salary row` HAS `at rank 1` IS A NUMBER
