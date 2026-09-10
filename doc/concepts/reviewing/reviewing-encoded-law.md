@@ -124,6 +124,29 @@ ssh-keygen -Y verify -f gates/allowed_signers -I reviewer@… -n l4-go-gate \
 
 Your signature never claims the law is good, or that the encoding is bug-free — machine gates own mechanical correctness. It claims one precise thing: _a named expert read this against its source and stands behind the correspondence._
 
+### Job three — is it all there?
+
+Your first two jobs both ask the same kind of question: _is what is written here right?_ Neither asks the other question, and the other question is easier to get wrong: **is what is written here all of it?**
+
+It is worth being clear about why nobody else is asking. The machine checks the encoding by compiling it, the way a spellchecker checks a letter — it can tell you the words are words, and it cannot tell you a page is missing. An encoding that covers the first chapter of an Act and stops compiles exactly as cleanly as one that covers the whole Act. Every later stage passes over it too, because none of them ever saw the Act.
+
+So each encoding now ships a **coverage summary**, in a file called `COMPLETION.md` beside it. It lists every section of the source in the order the source puts them, and says what happened to each one:
+
+- **encoded** — there is working logic for it.
+- **inert** — the text is carried along for reading, but nothing acts on it.
+- **out of scope** — somebody decided not to encode it, and had to write down why.
+- **deferred** — nobody has done it yet. This is the honest one, and the one to read first.
+
+Near the top there is a strip of symbols, one per section, in source order:
+
+```
+######--................
+```
+
+You do not need to decode it to use it. A run of `#` that stops and turns into dots is an encoding that ran out of steam partway through the Act — and seeing that takes a second, where reading a table of two hundred rows takes an afternoon.
+
+**What to do with it.** Two questions are yours, and neither is technical. First: are the _out of scope_ reasons ones you would defend to somebody who relied on this? "Procedural machinery that produces a fact the encoding takes as an input" is a reason a reviewer can weigh; "not needed" is not. Second: does the _deferred_ list contain anything a user of this encoding would assume was covered? A gap you know about is a scope decision. A gap the reader discovers themselves is a wrong answer.
+
 ## 5 · Coming from OPA / OIA — a translation table
 
 Reviewers arrive from several directions, and each brings a different half of the job already solved. A **practising lawyer** brings the reading — the instinct for where a provision is load-bearing and where it is boilerplate. A **legislative drafter** brings the awareness that ambiguity is sometimes deliberate and must be preserved rather than resolved. Someone who has built **guided interviews** or legal knowledge bases brings the lay reader's questions. None of these is a prerequisite; all of them transfer.
