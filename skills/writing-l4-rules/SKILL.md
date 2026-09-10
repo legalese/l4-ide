@@ -188,14 +188,22 @@ Hadash encoding does this in a 93-line helper, `source/_tablefmt.py`; see
 `legalese/canon`, `subjects/il/ofek-hadash-2008/encodings/legalese/`, whose
 `NOTES.md` §9 is the fullest write-up of this discipline.
 
-Two token-level traps bite immediately, both verified:
+Three token-level traps bite immediately, all verified. The first two are loud;
+the third is not, which is what makes it worth reading twice.
 
 - **`AT MOST` is two tokens.** One `^` under it copies `AT` and the parser then
   demands the rest — `unexpected ^`. In the table above `AT MOST` and `EQUALS`
   are written out on every row deliberately.
-- **A backtick identifier is one token.** `` `at rank 2` `` cannot ditto down
-  from `` `at rank 1` ``; there is no sub-token to copy. Whole names ditto, parts
-  of names never do.
+- **"The line above" means the previous _token-bearing_ line.** Blank lines and
+  comment-only lines are skipped, so the ruler comment above does not break the
+  rows beneath it. Any line with real tokens does become the new reference —
+  a `GIVETH` between two rules is the usual casualty.
+- **A backtick name dittoes whole, and answers with the wrong field.**
+  `` `at rank 2` `` cannot ditto from `` `at rank 1` ``: the caret copies the
+  earlier name entire, so the arm reads rank 1 for every rank, with **zero
+  errors**. On a salary table that is the wrong money. See
+  [references/gotchas.md](references/gotchas.md#the-ditto-operator-) for the
+  worked case.
 
 `l4 format` preserves ditto exactly — measured byte-identical on the real 36×9
 file, 79 carets in and 79 out. Note that ditto in the l4-ide corpus is less well
