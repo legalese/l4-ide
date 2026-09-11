@@ -722,6 +722,17 @@ calculus. Nothing transfers but the lessons.
 - Arias, Carro, Salazar, Marple & Gupta, _s(CASP): Constraint Answer Set
   Programming without Grounding_ (TPLP 2018) — justification trees and
   CLP(Q), the answer to ASP's arithmetic problem.
+- **Considered and placed elsewhere, 2026-09-08:** AustLII's DataLex/`yscript`
+  was researched as a candidate addition to this family ("possibly within
+  the Prolog family") and does not belong here — no LP substrate underneath
+  its interpreter, no multiplicity/burden/override construct, and its
+  nearest sibling in this project's own family taxonomy is DocAssemble
+  (interaction), not any target in this spec. Its one genuinely relevant
+  overlap — a decades-old, structure-derived `Why?`/`How?`/verbose-trace
+  explanation apparatus, the same audit-grade-explanation problem s(CASP)'s
+  justification trees solve here — is worth reading before designing L4's
+  own explanation UI further. See
+  `specs/research/DATALEX-YSCRIPT-RESEARCH.md`.
 
 ## 9. Cleanup items this spec inherits
 
