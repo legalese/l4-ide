@@ -4,6 +4,7 @@
 > - Only `UNLESS` exists as a keyword (`Lexer.hs:330`) but without the defeasibility semantics §6.1 proposes. "Next Steps" items 2-5 remain unstarted.
 > - §9 (`APPLIES`, added 2026-08-16) is likewise PROPOSED, not implemented — `APPLIES` is not a lexer keyword, and no per-provision applicability projections are derived anywhere in core.
 > - §10 (corpus survey, added 2026-08-28) is a **measurement of existing corpora**, not a proposal; it discharges "Next Steps" item 1 for the read side. The line references above were re-verified on that date; the 2026-07-03 audit's `Lexer.hs:230-299`/`:298` had drifted.
+> - §11 (added 2026-09-11) poses rulings **A1-A5** and is the place to answer them. None is decided; A1 is the one that does not defer.
 
 > **Prior art from the backend portfolio (added 2026-08-16):** two independently-implemented,
 > battle-tested target-side defeasibility mechanisms — and one ratified interchange standard —
@@ -35,6 +36,7 @@
 **Revised:** 2026-06-17 — added §2.8–2.9 (override as aspect-oriented _advice_; amendment as homoiconic source rewrite + the modular-verification boundary), §5.5–5.6 (AOP; PROLEG / negation-as-failure), §6.5–6.6 (advice as the organizing principle; relationship to `TYPICALLY`).
 **Revised:** 2026-08-16 — added §9 (`APPLIES`: the read side of override — the four-conjunct applicability decomposition, post-weaving semantics, closed-world elaboration and its cliff into homoiconicity, the _-plies_ philology) plus §9 references.
 **Revised:** 2026-08-19 — §9.4 corpus quotes upgraded from schematic/paraphrase to verbatim: Companies Act 2006 s 724 replaces the invented two-step example, HRA 1998 s 10(1)(a)/(4) now quoted rather than paraphrased; both verified against legislation.gov.uk (in-browser — direct fetches are bot-walled).
+**Revised:** 2026-09-11 — added §11: the five rulings the survey forces (A1-A5), each with its downstream forecast and its cost of being wrong, plus a proposed sequencing. §11.1 records that §10.2's lexer-hazard claim was withdrawn on checking the lexer, which weakened the main argument against a keyword; §11.2 adds the option §10.8 omitted — a verdict vocabulary in `jl4-core/libraries` rather than in the language. A1 (does `applies` include the in-force conjunct?) is flagged as the one ruling that does not defer. No ruling is decided; owner is Meng.
 **Revised:** 2026-08-28 — added §10, the corpus survey (559 sites across `legalese/canon` and `legalese/l4-ide`): `appl*` is four verbs of which only half are applicability; encoders already hand-roll §9.5's projections; a Boolean `applies` was measured insufficient (a six-member verdict, arrived at by adversarial review); four Acts encode "cannot be applied on this evidence" four incompatible ways; all three R10 escapes have witnesses. Discharges "Next Steps" item 1 for the read side, answers §7.1 and §9.9.1 (which had cited a §8.1 that never existed), and re-verifies the drifted `Lexer.hs` line references.
 **Branch:** mengwong/applies-corpus-survey (§10); mengwong/spec-notwithstanding (original)
 
@@ -1080,6 +1082,139 @@ Settled by measurement, and recorded here as the answer to §8 item 1 for the re
   a derived name in a reserved namespace.
 - **Q3.** Whether selector reads (§10.7) are the same construct returning a provision, or a
   different one.
+
+§11 restates Q1-Q3 as numbered rulings with their consequences forecast, and adds two the survey
+exposed that this list did not have.
+
+---
+
+## 11. The rulings the survey forces, and what each one costs
+
+> **Status (2026-09-11):** OPEN — no ruling below is decided. This section exists so that the
+> decision can be taken on the record rather than inferred from whatever gets built first, and so
+> that a later session can answer a ruling **in place** rather than re-deriving the options.
+> Decision owner: Meng. Nothing here is implemented.
+
+### 11.1 What review changed before any ruling was taken
+
+Recorded because it moved the answer, not just the wording. The first draft of §10.2 argued that
+the `appl*` homonymy was a **parsing** hazard, citing the mixfix collision traps. That inferred a
+hazard from a frequency count without reading the lexer, and it was wrong: backtick-quoted names
+are a single opaque token (`Lexer.hs:496-499`), so a reserved word cannot collide with them. The
+claim is withdrawn in §10.2 and the three risks that survive checking are named there.
+
+**Consequence for the rulings below:** the homonymy count was the main argument against spelling the
+read as a keyword, and it no longer carries that weight. A1-A5 are posed with the corrected version.
+
+### 11.2 A question that was missing: where does the verdict live?
+
+§10.8's Q1 offered a binary — Boolean primitive, or verdict primitive. That framing omitted the
+option with the most precedent in this repo. Three places can own an applicability verdict:
+
+| Home             | Mechanism                                                   | Precedent                                                                                        |
+| ---------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| **userland**     | each encoding declares its own enum                         | the status quo — and §10.5 measures its cost: four Acts, four incompatible conventions, one week |
+| **a library**    | one `DECLARE … IS ONE OF` in `jl4-core/libraries`, imported | `hierarchy.l4`, `jurisdiction.l4`, `legal-persons.l4`, the actus vocabulary family               |
+| **the language** | a primitive the typechecker and evaluator know about        | none for a domain vocabulary of this kind                                                        |
+
+The library option is absent from §10.8 and should not have been. It buys one shared vocabulary
+across subjects — which is what §10.5's finding actually asks for — while leaving the vocabulary
+revisable by a version bump rather than a language change.
+
+Second omission: **three-valued applicability needs no new construct.** `MAYBE BOOLEAN` is in the
+language, and the Guardianship of Infants encoding already used `NOTHING` for exactly this case
+(§10.5). Whatever else is decided, the uncertainty case is expressible today.
+
+### 11.3 The rulings
+
+Stable identifiers, for answering in place. Each says what it decides, what it forecloses, and how
+expensive it is to get wrong.
+
+---
+
+**A1. Does the derived `applies` include conjunct 1 (`inForce`)?**
+_Subsumes nothing; this ruling was not previously posed._
+
+The only ruling here that does not defer, because it is the one place the read side touches
+machinery that has already shipped. The four `EVAL` pins are live
+(`TEMPORAL_EVAL_SPEC.md`; `Environment.hs`), and purely-temporal applicability is being hand-written
+into the corpus now — Wills Act s 5(9) is nothing but a commencement boundary, and CA 2006
+s 724(5)(a) (§9.4) reads `applies` as of a past purchase.
+
+- If **yes**, every read composes with the ambient temporal context for free, and a read under
+  `EVAL … UNDER RULES EFFECTIVE AT` means what a lawyer would expect.
+- If **no**, `applies` is a within-version predicate and the corpus needs a second, temporal
+  predicate beside it permanently.
+
+**Cost of getting it wrong:** every subject encoded before this is settled picks an answer by
+accident, and the two answers are not interconvertible after the fact. This is the ruling to take
+first even if the rest wait.
+
+---
+
+**A2. Where does the verdict vocabulary live?** _Subsumes §10.8 Q1._
+Options and their forecast, per §11.2:
+
+| Choice                     | canon growth                                    | the six export backends                                           | verifier / ROBDD                         | NLG                                                      | reversibility       |
+| -------------------------- | ----------------------------------------------- | ----------------------------------------------------------------- | ---------------------------------------- | -------------------------------------------------------- | ------------------- |
+| Boolean, userland verdicts | re-invented per subject; measured cost in §10.5 | cleanest — every target is Boolean-native                         | cleanest                                 | neutral                                                  | high                |
+| Library verdict            | one vocabulary, imported                        | fine — an enum; DMN itemDefinitions already carry enums (PR #175) | unaffected: verify the Boolean conjuncts | gift — corpus verdict members are already full sentences | high (version bump) |
+| Language primitive         | one vocabulary, enforced                        | every backend must track vocabulary changes                       | typechecker coupling                     | same                                                     | low                 |
+
+**The honest uncertainty, which argues against the third column.** The six members of §10.4 were
+measured in **one subject, succession law**. Two of them — renvoi and empty-domain — may be
+conflict-of-laws artefacts rather than general structure. Freezing six members observed once into a
+language primitive would repeat, at much greater cost, exactly the over-generalisation §11.1
+withdrew.
+
+---
+
+**A3. How is applicability-under-uncertainty represented?** _Part of §10.8 Q1._
+`MAYBE BOOLEAN` (available today, already used for this in the corpus), a three-valued primitive, or
+a member of A2's verdict. §10.5 is the evidence that _something_ must be chosen: four Acts in one
+corpus chose four different things, each deliberately. Note the tie to the ladder's
+FALSE-vs-UNKNOWN axis (PR #191) and to §6.4's defeasible Boolean — a read that can be rebutted and a
+read that is unknown are different things, and the corpus conflates them today.
+
+---
+
+**A4. How is the read spelled?** _Subsumes §10.8 Q2. Recommended: defer._
+Keyword (`` `s 27` APPLIES TO p ``), derived projection names (`` `s 27 applies` p ``), a selector on
+the label (`` `s 27`'s `applies` p ``), or a stdlib mixfix. §11.1 removes the parsing objection to the
+first; the residual objections are the NLG round-trip and reader ambiguity.
+
+**Why defer:** the strongest argument for a keyword is readability under isomorphic drafting, and
+that argument is best settled by seeing what encoders write once the projections exist. Deriving
+names first (§11.4) costs nothing that a later keyword would have to undo — the keyword becomes
+sugar over names that already work.
+
+---
+
+**A5. Are selector reads the same construct?** _Subsumes §10.8 Q3._
+§10.7 found five reads that return _which_ provision governs rather than whether one does, two of
+them returning explanation prose rather than a label. Either applicability is a family of which the
+Boolean read is one member, or selectors are a separate construct that happens to share a verb. The
+second reading is cheaper; the first is the one that would let `` `which part of Rule 501(a)(4)
+applies to` `` and `` `the schedule that applies in` `` be generated rather than hand-written.
+
+### 11.4 Proposed sequencing, for whoever picks this up
+
+This is a proposal, not a ruling, and deliberately front-loads the reversible work.
+
+1. **Derive the four conjunct projections per labelled node (I1).** Needs no ruling: §10.3 measures
+   that encoders already hand-write exactly these, at every structural level (§10.7). Reversible,
+   and it gives §9.6's stratification check something to attach to. The pilot named in §8 item 6 —
+   Contracts (Rights of Third Parties) Act 2001 — still stands, and the survey adds two better ones:
+   Wills Act s 5(9)/s 27 and Charities (Jersey) Art 10(4)/27(1), which already have the hand-rolled
+   predicates to diff against.
+2. **Take A1**, because the corpus is accumulating reads that assume an answer.
+3. **A2 into `jl4-core/libraries`** if the library option is chosen, so subjects converge without the
+   language committing.
+4. **A4 and A5 after two more subjects** have used the projections.
+
+The write side (`SUBJECT TO` et al.) is not in this sequence and remains the larger prize: §10.3
+measures that weaving currently lives in comments, and three shipped export backends have
+defeasibility constructs with nothing in L4 to lower into them.
 
 ---
 
