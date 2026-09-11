@@ -78,6 +78,124 @@ Two consequences:
   the belief that motivates the whole project, and it has **not** been surveyed. Survey it first —
   it is a day of work and it could retire or reshape this entire item.
 
+  **Survey done — see §1.3.** It does not retire the item, but it reshapes it: the honest build in
+  TypeScript is an interpreter over the existing DMN XML, not a from-scratch transpiler, and the two
+  target ecosystems are not symmetric the way §1.2's framing implied.
+
+### 1.3 Survey results (2026-09-11): narrowed, not retired
+
+Conducted at Meng's request as the step-0 survey §1.2 called for. New evidence tag **[W
+<date>]** = read off the named public URL on that date, the web equivalent of `BACKEND-PORTFOLIO-SPEC.md`'s
+**[E]**; a claim tagged this way can go stale exactly as fast as any dated tree fact, and the same
+discipline applies — check the pointer, don't recite the finding.
+
+**Bottom line: no, there is still no adequate, actively-maintained, permissively-licensed,
+embeddable DMN engine for either ecosystem that consumes our `--to=dmn` output unchanged.** The
+gap §1.2 asserted is real. But the survey surfaced something §1.2 did not anticipate: both
+ecosystems carry a mature, MIT, actively-maintained **FEEL expression evaluator** as a reusable
+building block — and TypeScript additionally carries a DMN **1.3 XML parser** as a second building
+block, from the same upstream ecosystem. That changes what "build it" should mean for TypeScript
+specifically, and the note's §4/§5 need to account for that rather than treat TS and Go as one
+undifferentiated "write a transpiler" problem.
+
+**What does not work, and why:**
+
+| candidate                                                     | ecosystem | verdict                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ------------------------------------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `dmn-js` (bpmn.io/Camunda)                                    | JS        | **Not an engine.** "View, create and edit DMN decision tables ... in your browser" — a modeler/viewer, no evaluation capability at all **[W 2026-09-11]**, <https://bpmn.io/toolkit/dmn-js/>.                                                                                                                                                                                                                                                                                                                                               |
+| `dmn-eval-js` (mineko-io fork of HBTGmbH's `stx-dmn-eval-js`) | JS        | **Abandoned.** Feature shape is a near match — DMN 1.1 + S-FEEL, hit policies FIRST/UNIQUE/RULE ORDER/COLLECT (covers our UNIQUE/FIRST), `date()`/`duration()`, arithmetic, MIT — but its newest commit is dated 2020-07-14 — over **six years** stale as of this survey **[W 2026-09-11]**, <https://github.com/mineko-io/dmn-eval-js/commits/master>. Disqualified on maintenance alone.                                                                                                                                                  |
+| `global-soft-ba/decisionTable` (Go)                           | Go        | **Does not execute.** Builds decision tables via a Go code builder pattern, does not parse DMN XML, and hands off execution to GRULE rather than evaluating itself **[W 2026-09-11]**, <https://github.com/global-soft-ba/decisionTable>.                                                                                                                                                                                                                                                                                                   |
+| `hyperjumptech/grule-rule-engine` (Go)                        | Go        | **No DMN support at all.** Its own DSL (GRL); a 2021 issue asking for DMN/decision-table import is still open **[W 2026-09-11]**, <https://github.com/hyperjumptech/grule-rule-engine/issues/167>.                                                                                                                                                                                                                                                                                                                                          |
+| `pbinitiative/zenbpm` (Go)                                    | Go        | **Real engine, wrong shape for this use.** Executes DMN decision tables via FEEL, but is **AGPL-3.0** (commercial licence offered separately) and is documented as a server with REST/gRPC interfaces, not an importable library **[W 2026-09-11]**, <https://github.com/pbinitiative/zenbpm>. AGPL alone would rule out vendoring it into a customer's proprietary codebase without a commercial agreement from a _third_ party — precisely the "no operational dependency on us" constraint (1.1(3)), with "us" swapped for someone else. |
+| `adamecr/Common.DMN.Engine`                                   | —         | Surfaced in the Go search but is **.NET/C#, not Go** — genuinely parses DMN 1.1/1.3 XML, which is why it is worth naming as a future Java/C# data point, but it is out of scope here **[W 2026-09-11]**, <https://github.com/adamecr/Common.DMN.Engine>.                                                                                                                                                                                                                                                                                    |
+
+**The one candidate spanning both ecosystems: GoRules `zen-engine`.** Real engineering quality —
+Rust core, native bindings for Node.js _and_ Go (plus Python, Java, Kotlin, .NET, iOS, Android),
+MIT licensed, genuinely embeddable in-process (no daemon), and current: latest release 2026-08-24,
+about two and a half weeks before this survey **[W 2026-09-11]**,
+<https://github.com/gorules/zen>, <https://github.com/gorules/zen-go>. But it does **not** read DMN
+XML: it has its own JSON Decision Model (JDM) format and its own "ZEN Expression Language," which
+the documentation explicitly does not claim is FEEL-compatible — "ZEN appears to be a distinct
+custom language rather than an implementation of OMG FEEL" **[W 2026-09-11]**,
+<https://docs.gorules.io/learn/zen-language/syntax>. Adopting it means building a **new** lowering
+target (`Drg` → JDM + ZEN expression text), not reusing `--to=dmn` — comparable in scope to writing
+a source emitter, and the JDM artifact is a JSON graph, not source a reviewer reads the way §1's
+vendorability constraint (1.1.4) wants. Worth keeping on the table as a third design option (§1.3.3
+below), not as the "already exists" answer either target was hoping for.
+
+**What does work, as building blocks — TypeScript only, and it is a different shape of deliverable:**
+
+- **`nikku/feelin`** (MIT) — a standalone FEEL _expression_ evaluator, not a DMN executor: it parses
+  and evaluates one FEEL expression string against a context, nothing about decision tables, hit
+  policies, or DRG traversal. Written by a Camunda/bpmn-io principal engineer and used in production
+  inside Camunda Forms. Claims **"Full DMN TCK compliance"** for the FEEL grammar itself, with a
+  `docs/DMN_TCK.md` in the repo **[W 2026-09-11]**, <https://github.com/nikku/feelin>. Its README
+  advertises "temporal types and operations" and "built-in FEEL functions" generally; I could **not**
+  confirm at the `duration()`/`floor()`/date-subtraction-`.days` granularity our emitter actually
+  needs (§header facts above) — that is a one-afternoon check against our own goldens, not a
+  re-survey.
+- **`bpmn-io/dmn-moddle`** (MIT) — parses and serialises DMN **1.3** XML to/from a JS object model;
+  this is the library dmn-js itself uses internally to read the files it displays
+  **[W 2026-09-11]**, <https://github.com/bpmn-io/dmn-moddle>.
+- **Combined**, these two plus a hand-written dispatcher for the **two** hit policies we ever emit
+  (`HitUnique`/`HitFirst`, `jl4-core/src/L4/Dmn/IR.hs:568` **[E 2026-09-07]**) and for BKM
+  invocation is a buildable, narrowly-scoped DMN executor — reusing two mature, MIT, actively
+  maintained packages from the _same_ upstream ecosystem that built the DMN spec tooling we already
+  validate against, consuming our **existing** `--to=dmn` output completely unchanged. That is
+  real, and it is smaller and lower-risk than writing a TypeScript source transpiler from scratch.
+
+  **But notice what it is not.** §1's constraint 1.1(4) and Q5 both want a `.ts` file a developer
+  reads in code review. An interpreter walking a vendored DMN XML file is a different promise: the
+  reviewable artifact is a generic interpreter plus an opaque-ish XML payload, not a function
+  whose logic a reviewer can read top to bottom. Whether that substitution is acceptable is a real
+  design fork this survey surfaces and does not resolve — see §1.3.3.
+
+**For Go, no comparable second building block was found.** `pbinitiative/feel` (MIT) — descended
+from `superisaac/FEEL.go` — is a standalone FEEL interpreter with the same shape as `feelin`: no
+DMN-TCK compliance claim found (only baseline unit tests), and no sibling DMN-1.3-XML-parsing Go
+package surfaced in this search. This is a **negative search result, not a proof of absence** — it
+means nothing turned up, not that nothing exists; re-check before relying on it if this sits for a
+while. As things stand, Go has no analogous shortcut: it gets `pbinitiative/feel` as one ingredient
+short of the pair TypeScript got, one copyleft-and-server-shaped full engine (`zenbpm`) that is
+disqualified for this use, and `zen-engine`'s non-FEEL path available like TypeScript's is.
+
+#### 1.3.1 Why this does not retire the item
+
+§1.2 reasoned "if a good engine exists for a JVM partner, the honest answer is a `doc/` page, not a
+compiler" and asked whether the same was true here. For Go, and for a full-engine reading of
+"adequate" in TypeScript, the answer is still no: nothing found is simultaneously current,
+permissively licensed, a true in-process library, and a consumer of our existing DMN XML. The
+backlog item stands.
+
+#### 1.3.2 Why it is not a clean "go build it" either
+
+The asymmetry is the finding, not a footnote. TypeScript can lean on two mature upstream packages
+and ship something real comparatively cheaply; Go cannot lean on an equivalent pair today. That is
+a real, separate argument for TS-first (§5 already sequenced it that way on different grounds —
+Q6's missing sum type — and this adds a second, independent reason), and it means the two halves of
+this backlog item are no longer the same shape of work.
+
+#### 1.3.3 The fork this survey opens, unresolved here
+
+Three genuinely different things could ship under the name "TypeScript backend," and choosing
+between them is a design decision, not an implementation detail:
+
+1. **Source emitter** (the original framing, §1 and Q5): compile L4's `Drg`/constitutive-core IR to
+   idiomatic `.ts` source the customer vendors and a reviewer reads. Most work, best fit to the
+   vendorability constraint, no dependency on feelin/dmn-moddle at all.
+2. **Interpreter over existing DMN XML** (§1.3, this section): ship a small, open interpreter built
+   on `feelin` + `dmn-moddle`, that reads the `--to=dmn` output already produced today. Least new
+   code, reuses a shipped exporter unchanged, but the "reviewable `.ts` file" promise becomes
+   "reviewable interpreter plus an XML payload" — weaker on Q5, on a schedule that could ship first.
+3. **New IR target via `zen-engine`** (§1.3, the GoRules finding): lower to JDM + ZEN expression
+   text instead of either of the above, buying a single engine that covers both TypeScript _and_
+   Go from one lowering, at the cost of a JSON artifact instead of source or spec-standard XML.
+
+These are not mutually exclusive across the product's lifetime, but the first one built sets
+precedent under Q9 (open/commercial line) and under whatever Meng decides about vendorability.
+This choice should go back to Meng before any code is written — not resolved by momentum or by
+whichever is easiest to prototype first.
+
 ## 2. What it buys beyond the immediate ask
 
 - **It is the first execution target aimed at people who will never learn L4.** Every execution
@@ -272,16 +390,23 @@ the question in front of whoever owns that relationship early rather than at con
 
 ## 5. Sequencing — a suggestion, not a ruling
 
-0. **Survey first** (§1.2's caveat): confirm there is no adequate embedded DMN engine for
-   Node/TypeScript or Go. A day of work that could retire or reshape the item.
+0. **Survey first** (§1.2's caveat) — **DONE 2026-09-11, see §1.3.** Not retired; reshaped. Neither
+   ecosystem has an adequate off-the-shelf engine, but TypeScript has two mature building blocks
+   (`feelin` + `dmn-moddle`) Go does not, and §1.3.3 opens a three-way design fork (source emitter /
+   XML interpreter / `zen-engine` IR target) that did not exist before the survey and is not
+   resolved by it.
 1. **TypeScript.** The surface already exists with a review audience next door (`ts-shared/`, the
    web IDE, `jl4-client-rpc`), so an emitted module has an immediate consumer instead of a
-   hypothetical one — and it does not fight Q6.
+   hypothetical one — and it does not fight Q6. §1.3.2 adds a second, independent reason: it is the
+   ecosystem with building blocks to lean on.
 2. **Go.** Harder design (Q6), better numerics (Q1), and it benefits from a fragment boundary
-   settled by a target that did not fight it.
+   settled by a target that did not fight it. §1.3 found no comparable shortcut here, so this is
+   also the one that more clearly wants the original source-emitter framing rather than an
+   interpreter-over-XML shortcut.
 
 Q9 (the open/commercial line) gates step 1, not step 2: the first emitter to ship in the open sets
-the precedent for every one after it.
+the precedent for every one after it. §1.3.3's fork gates step 1 too, and independently: which of
+the three TypeScript shapes ships first is a design decision for Meng, not a sequencing detail.
 
 Java stays off the list until §1.2 is answered.
 
@@ -319,3 +444,34 @@ Per CLAUDE.md §4, a decision is recorded in its owning document in the same PR 
    lands before the work is closed out, with the limits (Q1, Q3, Q4), the regeneration story (Q8),
    and the licence of the generated code (Q10) stated on it. Nothing mechanical will catch the omission; the transpiler programme shipped
    five backends before anyone noticed that none of them appeared in the manual.
+
+## 8. Recommendations following the survey — advice, not a ruling
+
+Written 2026-09-11, immediately after §1.3's survey. These are suggestions for whoever picks this
+up next; nothing here is decided, and §7 still governs where an actual decision gets recorded.
+
+1. **Don't start building yet.** The survey changed the shape of the TypeScript half of this item
+   enough (§1.3.3's three-way fork) that writing code now would be picking one of three designs by
+   momentum rather than by decision. Take the fork back to Meng before any implementation PR.
+2. **Next concrete step is two small spikes, not a design doc.** Before committing to §1.3.3's
+   option 2 (the interpreter), hand-evaluate one shipped DMN golden
+   (e.g. a file under `jl4/examples/ok/` that already has `--to=dmn` output) through `dmn-moddle` +
+   `feelin` and confirm it parses and evaluates at least one FEEL cell correctly — this de-risks
+   the combination before it is designed around. Separately, hand-write one trivial decision as a
+   GoRules JDM document and run it through `zen-go` and `@gorules/zen-engine`, to get a feel (no
+   pun intended) for how far the ZEN expression language is from the FEEL surface §4 Q1–Q3
+   actually need. Both are hours, not days, and either could eliminate an option before anyone
+   designs around it.
+3. **Settle Q9 before either spike's result tempts a commit.** The interpreter-over-XML path
+   (§1.3.3 option 2) is now cheap enough to build that it _strengthens_ the case for shipping it as
+   the open proof-of-concept §3 already proposed — small, reuses a shipped exporter unchanged,
+   genuinely low-risk to give away. That is a reason to settle the open/commercial line sooner
+   rather than later, not a reason to skip settling it.
+4. **Re-run §1.3's Go half before it goes stale.** The "no comparable shortcut" finding rests on
+   one search session; it is the kind of negative result most likely to be overtaken by a new
+   release (`zenbpm` relicensing, a new Go FEEL-plus-DMN-XML package appearing). Anyone resuming
+   this item after more than a few months should re-check §1.3's Go row before trusting it, per the
+   note's own evidence-tag discipline.
+5. **Carry the fork forward into whichever spec it lands in.** If this reaches
+   `specs/todo/TYPESCRIPT-EXPORT-SPEC.md` (per §7.1), open it with §1.3.3's fork as the first ruling
+   to make — not as settled background, since nothing here settled it.
