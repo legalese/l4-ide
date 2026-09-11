@@ -605,7 +605,7 @@ is about the construct it names.
 that was proposed and not landed; it was written the day before the discharge change and went stale
 the day after). ``#EVAL `the fee` WITH `applicable rate` IS 0.2``, and the same form at `#ASSERT`
 and at an ordinary call site inside another rule. The supply reaches the rule _and everything it
-relies on_, so a rule that only touches the binder through a helper is supplied too; two different
+relies on_, so a rule that only touches the input through a helper is supplied too; two different
 values may be supplied in one expression, and each call gets its own. Values for a deployment still
 come from a web form, from `l4 batch --inputs cases.json`, or from the service request.
 
@@ -616,7 +616,7 @@ come from a web form, from `l4 batch --inputs cases.json`, or from the service r
 #ASSERT (`total` WITH `the teacher` IS `t1`) EQUALS 36          -- right
 ```
 
-and the diagnostic for the first names `__EQUALS__` and the binder, never `WITH` — so it does not
+and the diagnostic for the first names `__EQUALS__` and the input, never `WITH` — so it does not
 look like a precedence problem, which is what makes it worth knowing before you write the
 two-hundredth assertion.
 
@@ -710,13 +710,13 @@ l4 catala: cannot compile these decisions to Catala:
     a parameter instead
 ```
 
-Marking the helper `@export` too does lift it, and the Catala that comes out is correct — the binder
+Marking the helper `@export` too does lift it, and the Catala that comes out is correct — the section GIVEN
 becomes an `input` on every scope and the caller threads it. The price is one published scope per
-rule that reads the binder, where you wanted a helper. So this is a cost, not a wall; on a heading
+rule that reads the input, where you wanted a helper. So this is a cost, not a wall; on a heading
 with ten rules under it, it is a large one.
 
 That is ruled, not accidental: `specs/todo/IMPLICIT-PROPS-DESIGN.md` § 11.10 (**R10**, ruled
-2026-09-04) moves the backends onto the discharged AST, where the binder is an ordinary parameter
+2026-09-04) moves the backends onto the discharged AST, where the section GIVEN is an ordinary parameter
 and the refusal cannot arise. It is not yet built. Until it is, a module you will export to Catala
 is one to write with rule `GIVEN`s.
 

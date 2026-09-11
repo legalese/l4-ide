@@ -167,9 +167,26 @@ jobs:
               # ungated: on 2026-08-09 writing-l4-rules was still exhibiting a
               # corpus defect repaired that same day as the live present state,
               # and nothing would have run on a PR that touched only it.
-              # Verified before widening that `.claude/skills/**/*.md` is
-              # prettier-clean, so this adds coverage without turning CI red.
+              #
+              # THAT WIDENING NEVER ARRIVED, and the note that stood here -- "verified
+              # before widening that `.claude/skills/**/*.md` is prettier-clean, so this
+              # adds coverage without turning CI red" -- was true about the files and
+              # false about the coverage. `.claude/skills/writing-l4-rules` is a
+              # SYMLINK (mode 120000, target `../../skills/writing-l4-rules`), so that
+              # skill's 22 files are tracked under `skills/`, which this glob cannot
+              # match. Only `running-the-l4-pipeline` is a real directory under
+              # `.claude/`, and only it was ever gated. Both paths are named now: the
+              # symlink for the pipeline skill, the tracked tree for everything else.
+              #
+              # Worth knowing what this does and does not buy. Since `repo-wide` went
+              # unfiltered (f267cfb3), a skill-only PR ALREADY runs `prettier --check .`
+              # and the whole-tree link/anchor/orphan sweep -- so this is not the
+              # difference between some checks and none, as an earlier reading of the
+              # hole had it. `check-skill-drift.mjs` still hardcodes the pipeline
+              # skill. What `skills/**` buys today is that this filter's reach finally
+              # matches its claim, and that a future check over `skills/` fires.
               - '.claude/skills/**'
+              - 'skills/**'
               - 'specs/todo/single-instruction-demo/**'
             mlir:
               - 'jl4-mlir/**'
@@ -366,8 +383,18 @@ jobs:
       # motivated the checker were in `doc/reference/`, which this sweep no longer
       # visits. They were still violations -- of the "iff introduced" half of the
       # ruling, which is not yet enforced mechanically (CLAUDE.md section 7).
+      #
+      # `skills/` joins the list on 2026-09-09, extending that ruling one step: a
+      # skill is instruction, not a Diataxis reference, so the "iff the page
+      # introduces the term" licence does not apply to it. That extension is a
+      # READING of Meng's ruling and not the ruling itself -- deleting the one
+      # word reverses it. It was not free: the sweep found six live uses of
+      # `binder` in writing-l4-rules, every one of them ordinary prose rather
+      # than quoted compiler output, repaired in the same commit. That is the
+      # second time this skill has been measured teaching what the tree had
+      # already retired; the first is recorded on the `go` filter above.
       - name: No retired vocabulary in the learning-oriented pages
-        run: node etc/check-retired-terms.mjs --dir doc/tutorials doc/courses
+        run: node etc/check-retired-terms.mjs --dir doc/tutorials doc/courses skills
 
   # ============================================
   # Repo-wide invariants: unfiltered, no build
