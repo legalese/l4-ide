@@ -76,6 +76,40 @@ sky_is_romantic phase MEANS
 
 Each `^` stands for the token at the same column on the previous line. Without ditto you would repeat `phase EQUALS` four times. This is a legal-drafting affordance, not a general-purpose operator.
 
+**What ditto does and does not buy.** It does **not** shorten a line: a `^` is padded out to exactly the width of the token it replaces, so the column layout — and therefore the line length — is unchanged by construction. Measured on a real 36×9 salary table, converting a row to ditto saved _one_ character, and that was a rounding artefact. What it buys is data/ink: the repeated tokens become whitespace, so the eye lands only on what varies. Reach for it to make a table readable, never to make it fit. The lever that actually narrows a wide row is positional `OF` construction (320 characters → 184 on that same row).
+
+**The traps, all verified against the `l4` binary. Sort them by whether they are loud or silent — that asymmetry is the whole risk profile of this operator.**
+
+Loud, so cheap:
+
+- **`^` copies one token.** `AT MOST` is two, so a single caret beneath it copies `AT` and the parser then rejects the caret outright. Write two-word operators out in full on every row.
+- **"The line above" means the previous _token-bearing_ line.** Blank lines and comment-only lines are skipped, so you may separate the rows with either — `jl4/examples/ok/ditto.l4` does exactly that and says so. But any line carrying real tokens becomes the new reference line, and a type signature is the one that catches people: putting `GIVETH A NUMBER` between two rules makes the caret beneath it resolve against `GIVETH A NUMBER`. This is the first thing a model hand-writing two adjacent rules will hit.
+
+Silent, so expensive — these are the ones to design against:
+
+- **A backtick name dittoes whole, which quietly answers with the wrong field.** `` `at rank 2` `` cannot ditto down from `` `at rank 1` ``; there is no sub-token to copy, so the caret copies the earlier field name _entire_ and the rule reads the wrong column:
+
+```l4
+`amount` `the row` `the rank` MEANS
+    BRANCH IF `the rank` AT MOST 1 THEN `the row`'s `at rank 1`
+           OTHERWISE                    ^        ^  ^
+```
+
+The `OTHERWISE` arm answers with rank 1 for every rank there is — zero errors, exit 0, and on a salary table it is the wrong money. Whole names ditto; parts of names never do.
+
+- **Column position is semantics, so editing a line silently rebinds every caret below it.** Nothing warns you:
+
+```l4
+small MEANS 10
+big   MEANS 90
+c1 MEANS small AT LEAST 5
+c2 MEANS ^     AT MOST  50   -- copies `small`; c2 is TRUE
+```
+
+Change line 3's subject to `big` — leaving the caret alone — and `c2` becomes FALSE, with no error and no warning, because the caret still resolves, just to a different token. If a caret's column lands on _nothing_, you get a loud `unexpected ^`; if it lands on the _wrong_ token you may get nothing at all. **So generate aligned tables from a script rather than hand-typing them**, and after editing any line in a dittoed block, re-check every caret beneath it.
+
+`l4 format` is not a threat to this style: measured on a real 36×9 dittoed file, its output is byte-identical, 79 carets in and 79 out.
+
 ---
 
 ## Asyndetic operators `...` and `..`

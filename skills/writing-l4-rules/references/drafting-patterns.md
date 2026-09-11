@@ -150,6 +150,13 @@ DECLARE Occupier HAS
 enum), one `… WITH …` literal per row, and membership tested structurally with `any` + a local equality
 predicate.
 
+> **`WITH` is right here; it is not right for every table.** These columns mean different things and
+> are told apart by name, which is exactly when to spell the fields out. A table whose columns are
+> **inherently positional** — a rate scale, a salary grid, nine numbered ranks — wants positional
+> `OF` construction instead, plus a ruler comment naming the columns once. That is a width decision
+> with a real cost (`OF` is silently order-dependent), and it is set out in
+> [SKILL.md → Statutory tables: generate the layout, do not type it](../SKILL.md#statutory-tables-generate-the-layout-do-not-type-it).
+
 `ground-6.l4`:
 
 ```l4
@@ -243,11 +250,18 @@ Nothing below changes what you write. It is here because two further arguments f
 were made from the exporter that writes L4 out as DMN (Decision Model and Notation), whose
 expression language is FEEL, and retiring them silently would lose the measurements.
 
-> **Provenance.** These two rest on the DMN/FEEL exporter, which lives on the `mengwong/dmn-export`
-> line and is **not** on `unstable`: there is no `jl4-core/src/L4/Dmn/` and `l4 --help` has no `dmn`
-> subcommand here. Reported behaviour of another branch, not something to verify in situ. Re-check
-> against `specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §2.4 and §3 once that line merges — two
-> earlier versions of this passage stated the FEEL null semantics backwards.
+> **Provenance — corrected 2026-09-11.** This note used to say the DMN/FEEL exporter was **not** on
+> `unstable`, that there was no `jl4-core/src/L4/Dmn/`, and that the behaviour below could not be
+> verified in situ. **That line has since merged and all three claims are now false**: the directory
+> holds `Analysis.hs`, `Emit.hs`, `IR.hs`, `Lower.hs` and `Markdown.hs`, and the exporter is reached
+> as `l4 export --to dmn|dmn-md|bpmn` (there is no bare `dmn` subcommand, which is what the old
+> wording was probably reaching for). So this **is** checkable against the `l4-ide` tree now — note
+> that if you are reading this from the packaged plugin bundle rather than the monorepo, the
+> exporter's source is not beside you and you will need the `l4-ide` checkout. Note also that the two
+> bullets below were written from the branch and have not been re-measured against the merged
+> exporter by whoever corrected this provenance. Re-check them against
+> `specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §2.4 and §3, and against the exporter itself, before
+> relying on them; two earlier versions of this passage stated the FEEL null semantics backwards.
 
 - **A finite declared domain.** A nullary `IS ONE OF` is the one L4 type with a faithful image in
   FEEL/DMN, because its values serialise as strings; it lowers to `typeRef="string"`. `MAYBE T` is a

@@ -29,6 +29,43 @@ otherwise route around the rule; delete them once the rule is obviously self-jus
   mean. **The consequence that catches people: the shelf ships off `unstable`, so anything merged
   there can reach users at the next cut — "not released yet" is not a defence for a known defect.**
 
+### 1.0 The authoring skill lives in TWO repos — correct here, port in the same session
+
+`skills/writing-l4-rules/` is duplicated verbatim in **`legalese/l4-plugin`**, at the same path,
+described there as "the L4 authoring skill packaged for use outside the l4-ide monorepo". This repo
+is upstream: `.github/workflows/release-l4-skill.yml` packages the skill into `l4-plugin.zip`, and
+the marketplace entry is `/plugin marketplace add legalese/l4-ide`.
+
+**So a correction to the skill lands here first**, per the user-level `CLAUDE.md` rule "when you
+correct a document, find its other copies first". The bundle names this repo as its source, so the
+pointer home exists — what is missing is a working path back down.
+
+**The bundle is generated, not hand-maintained, and its generator is not in this repo.**
+`l4-plugin`'s README says in terms: _"This directory is generated. Do not edit it by hand … Every
+file here was copied out of legalese/l4-ide by `etc/build-plugin-bundle.mjs`; edits made here are
+lost on the next build."_ That script is **not on `unstable`**. It lives on the local-only branch
+`ci/skills-layout` (6 commits ahead, never pushed), so as of 2026-09-11 it exists on one machine.
+
+The consequence, which anyone porting a skill fix needs to know: **there is no sanctioned mechanism
+available.** A hand-port to `l4-plugin` is a stopgap that the next regeneration silently reverts,
+and regeneration itself is unavailable to anyone without that branch. **Landing
+`etc/build-plugin-bundle.mjs` is the fix**; until then, say in the porting PR that it was
+hand-copied and will be superseded.
+
+Two things make a hand-port survivable meanwhile: the copies are **byte-identical**, so verify with
+`diff` rather than by eye, and the relative links inside `references/` resolve in both because the
+layout matches. One thing does not port: prose asserting something is "verifiable in situ" is false
+in the packaged bundle, which ships the skill **without** `jl4-core/src` beside it. Say which tree a
+check needs. Note also that the README points at `.claude/skills/writing-l4-rules/`, which is the
+symlink; the tracked path is `skills/writing-l4-rules/` (see the skill-path symlink hazard).
+
+> **Why.** PR #382 corrected two claims in the skill — `#EVAL`'s `OF` form, and a provenance note
+> asserting the DMN exporter was not on `unstable`. Both were equally wrong in `l4-plugin`, and
+> nothing in this repo pointed at that one; the duplication was found only by searching the org for
+> the repo name. I then hand-edited the bundle, which its own README forbids on the first screen —
+> because I ported before reading it. The generator's absence from `unstable` was found only after
+> that, which is the more useful half of the finding.
+
 ### 1.1 GitHub issue auto-close never fires here — close by hand
 
 Closing keywords (`Fixes #123`, `Closes #123`) only fire when a PR merges into **the repository's
