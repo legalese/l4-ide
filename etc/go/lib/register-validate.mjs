@@ -50,6 +50,7 @@ export const SCHEMA_NAMES = [
   "fork-register",
   "external-modifications",
   "source-bundle",
+  "encoding-roadmap",
 ];
 
 function die(msg) {
@@ -319,6 +320,78 @@ function xor1(ctx, obj, path, a, b, rule) {
 }
 
 const RULES = {
+  // The roadmap is the coverage contract. P3's oracle is `l4 check` and nothing
+  // else, so an encoding that stops after Chapter 1 typechecks exactly as well
+  // as a complete one: under-coverage was the pipeline's one large defect with
+  // no detector anywhere. These rules make it a join instead of a judgement.
+  //
+  // The practice is not new — the sg-succession cleanroom already wrote a scope
+  // index and a closing "What is deliberately NOT encoded, and why" in prose,
+  // and reconciled the two BY HAND. That reconciliation had already been wrong
+  // once (s 56(1), s 62(4) and s 64(2)-(3) were named at their own sites and
+  // missing from the closing list). Four encodings of nineteen do it at all.
+  // This is that practice, promoted to a contract and taken off the human.
+  "encoding-roadmap": {
+    "unit-ids-unique": (ctx) => {
+      for (const id of dup(ctx.doc.units.map((u) => u.id)))
+        ctx.f("units", `duplicate unit id '${id}'`, "unit-ids-unique");
+    },
+    "enumeration-note-required-when-incomplete": (ctx) => {
+      if (
+        ctx.doc.source.enumeration_complete === false &&
+        !has(ctx.doc.source, "enumeration_note")
+      )
+        ctx.f(
+          "source.enumeration_note",
+          "enumeration_complete is false, which requires a note saying what is missing and why",
+          "enumeration-note-required-when-incomplete",
+        );
+    },
+    "reason-required-for-scope-decisions": (ctx) => {
+      ctx.doc.units.forEach((u, i) => {
+        if (!["out-of-scope", "deferred"].includes(u.disposition)) return;
+        if (!has(u, "reason"))
+          ctx.f(
+            `units[${i}].reason`,
+            `disposition '${u.disposition}' requires a reason; a scope decision without one cannot be reviewed`,
+            "reason-required-for-scope-decisions",
+          );
+      });
+    },
+    "modules-required-for-encoded": (ctx) => {
+      ctx.doc.units.forEach((u, i) => {
+        if (!["encoded", "inert"].includes(u.disposition)) return;
+        if (!has(u, "modules"))
+          ctx.f(
+            `units[${i}].modules`,
+            `disposition '${u.disposition}' requires at least one module path; without it the claim can only be checked against itself`,
+            "modules-required-for-encoded",
+          );
+      });
+    },
+    "modules-exist-on-disk": (ctx) => {
+      ctx.doc.units.forEach((u, i) => {
+        (u.modules ?? []).forEach((m, j) => {
+          if (!existsSync(resolve(REPO, m)))
+            ctx.f(
+              `units[${i}].modules[${j}]`,
+              `'${m}' does not exist; unit '${u.id}' claims coverage in a module that is not there`,
+              "modules-exist-on-disk",
+            );
+        });
+      });
+    },
+    "document-is-in-bundle": (ctx) => {
+      const bundle = ctx.peers["source-bundle"].doc;
+      const ids = (bundle.documents ?? []).map((d) => d.id);
+      if (!ids.includes(ctx.doc.source.document_id))
+        ctx.f(
+          "source.document_id",
+          `'${ctx.doc.source.document_id}' is not a document the bundle captured (${ids.join(", ") || "none"}); a roadmap enumerated from anything but the captured text is the failure this artifact exists to catch`,
+          "document-is-in-bundle",
+        );
+    },
+  },
   "fork-register": {
     "entry-ids-unique": (ctx) => {
       for (const id of dup(ctx.doc.entries.map((e) => e.id)))

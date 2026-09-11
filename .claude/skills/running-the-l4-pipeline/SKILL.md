@@ -323,6 +323,7 @@ Every deposit row reads `present`, `absent` or `undeclared`. `undeclared` means 
 },
 "encodings": {
   "cleanroom-2026-08": {
+    "roadmap": "jl4/examples/legal/<id>/cleanroom/roadmap.json",
     "modules": ["jl4/examples/legal/<id>/cleanroom/<id>-cleanroom.l4"],
     "checks":  { "min_dated_arms": 0, "min_assertions": 39 }
   }
@@ -390,7 +391,51 @@ Deposit the register; run the stage; the receipt is the fact. Run it **after** P
 
 This is [`writing-l4-rules`](../writing-l4-rules/SKILL.md)'s job, not this skill's, and the house rules are SPEC.md §4 P3's: inert style; `GIVEN` over `ASSUME` (unbound assumed terms stall `#EVAL`); `BRANCH` over `ELSE IF` chains; the shipped temporal mechanisms for rule versions, with an `@ref` citation on every dated arm. Encode from the **bundle**, not from the committed corpus — that independence is what the §8 diff is measuring, and reading the corpus destroys it silently and unrecoverably.
 
-Then deposit the module(s) at `denovo.modules` and run `p3-encode`. **Read what its PASS means before you rely on it.** The stage runs `l4 check` and nothing else: it proves the deposit is L4 the toolchain accepts. The two mechanisable house rules live in `p3-check`, which reads the subject's committed corpus — re-pointing it at a de novo deposit is unbuilt — and isomorphism, the actual deliverable, is HG1's. A module that typechecks and says something else entirely reaches the same PASS.
+Encoding runs in three passes, and the order is the point: **enumerate, then agree the nouns, then encode.** Doing them in any other order is how a run produces a fifth of a statute in a vocabulary the rest of it cannot use.
+
+#### P3.0 — the roadmap, before a line of L4
+
+**Enumerate every unit of the source first, and deposit that enumeration.** Not a plan in your head, not a list in the session: a file, at `encodings.<id>.roadmap`, conforming to `schemas/encoding-roadmap.schema.json`. Every unit gets an id as the source writes it, the source's own heading, and a disposition — `encoded`, `inert`, `out-of-scope` (with a reason) or `deferred` (with a reason).
+
+Everything starts `deferred`. You move each one as you land it. That is the whole mechanism, and it is doing something no other stage does.
+
+**Why this is not bookkeeping.** `p3-encode`'s oracle is `l4 check` and nothing else. It proves the deposit is L4 the toolchain accepts — so a module that encodes Chapter 1 and stops passes exactly as cleanly as one that encodes the whole Act, and every stage after it passes too, over a fifth of a statute. Isomorphism is HG1's, and HG1 is asked whether what is there is faithful, not whether it is all there. **Under-coverage was the one large defect in this pipeline with no detector anywhere.** The roadmap is the detector: it is the same move P1 makes with its annotation inventory and P2 with its `searches[]` — turning an unfalsifiable judgement into a join.
+
+Validate it, and let it fail:
+
+```bash
+node etc/go/lib/register-validate.mjs encoding-roadmap <roadmap.json> <source-bundle.json>
+```
+
+A unit marked `encoded` must name the module it landed in, and that module must exist. A unit ruled `out-of-scope` must give a reason of real length — "procedural machinery that produces a fact the encoding takes as an input" is a reason, "not needed" is not. `enumeration_complete: false` is a legitimate answer and obliges you to say what is missing; the flag exists so nobody has to choose between overclaiming and stopping.
+
+Then render the summary, and commit it beside the encoding:
+
+```bash
+node etc/go/lib/roadmap-report.mjs <roadmap.json> --out <encoding-dir>/COMPLETION.md
+```
+
+It exits 1 while anything is still `deferred`. That is not a failure to suppress — it is the run saying out loud that it is not finished. Units render in **source order**, and the coverage strip prints one glyph each, so an abandoned encoding looks like what it is: `######--................`.
+
+**Re-render it every time you land a unit.** A roadmap that is accurate only at the end was never load-bearing during the work, which is the only time it could have changed what you did.
+
+#### P3.1 — one pass for the shared ontology, before any rules
+
+**Read the whole source first and encode only the nouns.** One module, imported by every other: the entities, their fields, the enumerations — `DECLARE` and nothing else. No `DECIDE`, no `MEANS`, no `IF`, no deontic, no `#EVAL`.
+
+The membership test is the one `family-domain.l4` states, and it is a good one: **could a witness of ordinary competence depose to this fact, or does answering it require reading the Act?** Only the first kind belongs in the ontology. "Signed at the foot or end thereof" is a fact a witness can depose to; whether that makes the will valid is a rule, and belongs in the module for the section that says so.
+
+**Why a separate pass rather than growing it as you go.** Encoders working in parallel on different chapters will each invent a record for the same real-world thing, and the two will differ in ways that only surface when the modules have to compose — by which time both chapters are written against incompatible nouns and one of them gets rewritten. The sg-succession cleanroom is the worked instance: four Acts, one `family-domain.l4`, and its own header states the reason — the four Acts "are not four subjects, they are four views of one event", where the same human being is the PAA's "deceased", the Wills Act's "testator" and the ISA's "intestate". Declared once, all four modules read the same facts about the same people.
+
+A source with genuinely disjoint subject matter may not need one. Say so in the roadmap's notes rather than skipping the pass silently — the finding "these chapters share no nouns" is worth as much as the module would have been, and it is a finding, not an omission.
+
+#### P3.2 — encode the rest, in parallel, against that ontology
+
+With the nouns fixed, chapters are independent and can be encoded concurrently. Each encoder imports the ontology module and adds no entity of its own without putting it there first — an entity that appears in one chapter's module is a noun the next chapter cannot see.
+
+Land them one unit at a time, moving each from `deferred` in the roadmap as it goes. Then deposit the module(s) at `encodings.<id>.modules` and run `p3-encode`.
+
+**Read what its PASS means before you rely on it.** The stage runs `l4 check` and nothing else: it proves the deposit is L4 the toolchain accepts. The two mechanisable house rules live in `p3-check`, which reads the subject's committed corpus — re-pointing it at a de novo deposit is unbuilt — and isomorphism, the actual deliverable, is HG1's. A module that typechecks and says something else entirely reaches the same PASS. What the roadmap adds is the one thing that PASS never covered: whether the module is all of it.
 
 ### P4 — forks
 
