@@ -126,6 +126,20 @@ planner through to the wizard UI instead of discarding it after each "what's nex
 [Query Planning](../../doc/reference/query-planning/README.md#interactive-explanation-surface-backlog)
 for the doc-side writeup. Not scheduled.
 
+**Bidirectional differential exchange with Axiom Foundation's RuleSpec** (backlogged 2026-09-10,
+prompted by a cross-session request from an Axiom-side session, alongside
+[AXIOM-RULESPEC-POLICYENGINE-RESEARCH.md](../research/AXIOM-RULESPEC-POLICYENGINE-RESEARCH.md)
+§F.1). Not a one-way emitter in either direction — a **mutual sanity check**, where an L4
+corpus file and a `rulespec-us` encoding of the same statutory provision cross-validate each
+other's verdicts on shared fact scenarios, with neither side treated as the reference. Concretely
+buildable, not just aspirational: RuleSpec ships a per-provision `.test.yaml` scenario format
+(named `input`→`output` fact/verdict tables, keyed by durable citation-pinned identifiers,
+temporally pinned via `period:`) that is structurally the same shape as an L4 `#EVAL`/`#ASSERT` —
+so a harness in either direction is a translation of fact bundles across two naming schemes, not a
+full transpiler. First step for whoever picks this up: find an actual statute both this project's
+corpus and `rulespec-us` already encode (none identified yet — the SNAP student-exception example
+in the RuleSpec memo has no L4-side counterpart today) before writing any harness code.
+
 ---
 
 ## Recently Implemented
