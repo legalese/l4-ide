@@ -1,0 +1,155 @@
+{
+  "kind": "fork-register",
+  "register_version": 1,
+  "subject": "nz-online-safety-s5",
+  "interpretation_type": "Interpretation",
+  "note": "Exploratory register from a conversation-level grammatical analysis of cl 5(1)(b)(iii), Online Safety (Minimum Age and Child Safety Risk Assessment) Bill (NZ 2026 No 339, introduced 24 Aug 2026). No corresponding .l4 file has been written yet; `site.file` below is the path such an encoding would use if this subject is taken up. Not a committed corpus subject.",
+  "entries": [
+    {
+      "id": "F-S5B3-CONNSCOPE",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/nz-online-safety/onlinesafety.l4",
+        "anchor": "ageRestrictedPlatform",
+        "provisions": ["cl 5(1)(b)(iii)"]
+      },
+      "source": {
+        "quote": "uses artificial intelligence solely or primarily to simulate a social connection, an emotional connection, or any other form of personal connection with a user",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "Online Safety (Minimum Age and Child Safety Risk Assessment) Bill 2026 No 339, cl 5(1)(b)(iii)",
+            "url": "https://www.legislation.govt.nz/bill/government/2026/339/en/latest/#LMS1605908"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "Distributive",
+          "description": "'with a user' is right-node-raised across all three connection-types: a social connection [with a user], an emotional connection [with a user], or any other form of personal connection with a user.",
+          "status": "live",
+          "citations": [
+            { "kind": "provision", "cite": "cl 5(1)(b)(iii)" }
+          ]
+        },
+        {
+          "id": "LastAntecedent",
+          "description": "'with a user' attaches only to the final disjunct. 'A social connection' and 'an emotional connection' are read as complete predicates with no object specified.",
+          "status": "arguable",
+          "citations": [
+            { "kind": "authority", "cite": "Lockhart v United States, 577 US 347 (2016) (rule of the last antecedent applied over the series-qualifier canon, 5-3)" }
+          ],
+          "foreclosure": "the three conjuncts are right-node-raised around a shared 'with a user' PP -- ordinary parallel-NP coordination (cf. 'admires, and detests, modern art'). LastAntecedent requires 'a social connection' and 'an emotional connection' to be independently well-formed without an object, which they are not: unlike Lockhart's 'aggravated sexual abuse' / 'sexual abuse' (self-standing statutory categories that survive without 'involving a minor or ward'), 'connection' has no non-relational reading, so RNR's recoverability condition is met here in a way it wasn't obviously met there."
+        }
+      ],
+      "taken": {
+        "reading": "Distributive",
+        "mechanism": "encoded",
+        "rationale": "right-node raising is the default parse of parallel NP coordination, and is forced to be recoverable here because 'connection' is inherently a two-place relation -- there is no reading of a bare 'social connection' that means anything on its own."
+      },
+      "status": "resolved",
+      "cross_refs": [],
+      "notes": [
+        "Lockhart v United States is cited as the leading common-law statement of the competing canon (last antecedent vs. series-qualifier), not as binding NZ authority."
+      ]
+    },
+    {
+      "id": "F-S5B3-SOLELYSCOPE",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/nz-online-safety/onlinesafety.l4",
+        "anchor": "ageRestrictedPlatform",
+        "provisions": ["cl 5(1)(b)(iii)"]
+      },
+      "source": {
+        "quote": "uses artificial intelligence solely or primarily to simulate a social connection, an emotional connection, or any other form of personal connection with a user",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "Online Safety (Minimum Age and Child Safety Risk Assessment) Bill 2026 No 339, cl 5(1)(b)(iii)",
+            "url": "https://www.legislation.govt.nz/bill/government/2026/339/en/latest/#LMS1605908"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "PurposeScoped",
+          "description": "'solely or primarily' ranks the AI feature's purpose: its use must be aimed, wholly or mainly, at simulating a connection, regardless of what share of the overall service is AI-driven.",
+          "status": "live",
+          "citations": [
+            { "kind": "provision", "cite": "cl 5(1)(b)(iii)" }
+          ]
+        },
+        {
+          "id": "ExtentScoped",
+          "description": "'solely or primarily' ranks how AI-driven the service is overall; an incidental AI feature bolted onto an otherwise non-AI service would not satisfy this limb even if that one feature's sole function is to simulate a connection.",
+          "status": "arguable",
+          "citations": [
+            { "kind": "provision", "cite": "cl 5(1)(b)(iii)" }
+          ],
+          "foreclosure": "'solely or primarily' glued directly to a bare purpose infinitive ('... to simulate') is the standard drafting idiom for ranking purposes (cf. 'used solely for the purpose of'). An extent-of-business test would ordinarily modify a stative predicate about the service itself (e.g. 'a service whose functionality relies solely or primarily on artificial intelligence that simulates ...'), which this is not. A defendant could still argue it -- the attachment genuinely squints -- but the idiom disfavours it."
+        }
+      ],
+      "taken": {
+        "reading": "PurposeScoped",
+        "mechanism": "encoded",
+        "rationale": "linear adjacency to the infinitival purpose clause plus the idiomatic collocation both favour purpose-ranking; ExtentScoped would let any company escape (iii) merely by being large enough that the AI feature is a minority of its functionality, a threshold nothing else in the clause signals."
+      },
+      "status": "resolved",
+      "cross_refs": []
+    },
+    {
+      "id": "F-S5B3-SIMULATE",
+      "kind": "vagueness",
+      "materialisation": "interpretation-field",
+      "interpretation_field": "aiConnectionConstrual",
+      "site": {
+        "file": "jl4/examples/legal/nz-online-safety/onlinesafety.l4",
+        "anchor": "ageRestrictedPlatform",
+        "provisions": ["cl 5(1)(b)(iii)"]
+      },
+      "source": {
+        "quote": "uses artificial intelligence solely or primarily to simulate a social connection, an emotional connection, or any other form of personal connection with a user",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "Online Safety (Minimum Age and Child Safety Risk Assessment) Bill 2026 No 339, cl 5(1)(b)(iii)",
+            "url": "https://www.legislation.govt.nz/bill/government/2026/339/en/latest/#LMS1605908"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "DesignIntent",
+          "description": "the AI's purpose is assessed by the feature's stated or designed function.",
+          "status": "live",
+          "citations": [
+            { "kind": "provision", "cite": "cl 5(1)(b)(iii) 'to simulate'" }
+          ]
+        },
+        {
+          "id": "ObservedEffect",
+          "description": "the AI's purpose is assessed by what the feature functionally does for users in practice, regardless of its stated design goal.",
+          "status": "live",
+          "citations": [
+            { "kind": "provision", "cite": "cl 3 (Purpose)" }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "ObservedEffect",
+        "mechanism": "TYPICALLY",
+        "rationale": "an Act whose purpose (cl 3) is protecting children from AI-simulated-connection risk would be substantially defeated by a purely self-reported design-intent test; TYPICALLY favours the reading a regulator applying cl 3 is likeliest to take, without foreclosing DesignIntent, which remains live as a matter of construction."
+      },
+      "status": "resolved",
+      "divergence": "observable",
+      "witnesses": ["photobot-culling-feature"],
+      "cross_refs": [],
+      "notes": [
+        "Witness 'photobot-culling-feature': an AI feature on an otherwise non-AI photo-archive service that posts one daily approving comment on the user's best photo. Designed as a culling aid (DesignIntent: not covered); reported by users to drive validation-seeking behaviour indistinguishable in effect from a companion feature (ObservedEffect: covered). The two readings diverge on identical facts, which is what licenses divergence: observable."
+      ]
+    }
+  ]
+}
