@@ -165,9 +165,12 @@ reader, and §4's review table is where they are looked for.
 working titles in `README.md` are already that shape ("Specs are code", "The missing test
 suite"). If the claim will not fit in a title, it is two posts.
 
-**1,500–2,500 words.** Below that it is a note; above it, the reader who arrived from a link
-has left. Post 5's material, for example, is a paper's worth — the post gets the three beats
-and points at the paper for the rest.
+**2,000–2,500 words as the target; 3,500 as the ceiling.** Below 1,500 it is a note. The ceiling
+was 2,500 until post 1 came in at 3,200 with its critics asking for more, not less; Meng
+(2026-09-14): "If we have to go wordier I'm okay to increase the length limit." Length is earned
+by evidence and concession, never by survey — when a post is over target, the literature moves
+to footnotes first. Post 5's material, for example, is a paper's worth; the post gets the three
+beats and points at the paper for the rest.
 
 **Cold open on evidence.** A bug, a number, a comic, a sentence from a statute. Then back out
 to the claim. Never open with "In this post I will…".
