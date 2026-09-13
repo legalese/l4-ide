@@ -75,18 +75,52 @@ const MARKER = "CLITIC-VERB-OK";
 // required on the line, because a long name may wrap in a comment.
 const CLITIC = /['’]s\s+`(is|has)(\s+[^`]*)?`?/g;
 
+// RULE 2 -- the DECLARATION. Meng ruled on 2026-09-13 that a field named `is …`
+// or `has …` is wrong wherever it is declared, whether or not anything
+// dereferences it yet: "every l4 file is a training example ultimately", and a
+// DECLARE block is what an example teaches naming from. Measured at the time of
+// the ruling: 121 distinct is/has field names over 175 declaration sites, of
+// which 74 were clitic-dereferenced and 47 were not. Rule 1 alone would have
+// left those 47 in place, to be copied forward by the next encoder.
+//
+// The line must be INDENTED (a field sits under `DECLARE … HAS`), the name must
+// be followed directly by its type, and the type must not be a FUNCTION. Each
+// of those three exclusions is load-bearing and each was measured:
+//
+//   `is unreasonable` IS A FUNCTION FROM Conduct TO BOOLEAN   -- 44 of these
+//        an ASSUMEd PREDICATE, not an attribute. It is applied prefix --
+//        `` `is unreasonable` c `` -- where nothing else supplies the verb, so
+//        the verb belongs in the name and the ruling does not reach it.
+//   ASSUME `is unreasonable` c IS A BOOLEAN
+//        the same thing spelled with an explicit parameter; the `c` between name
+//        and type is what distinguishes it, which is why the regex allows no gap.
+//   `is a registered charity`  IS TRUE
+//        a record CONSTRUCTION, not a declaration. Renaming is driven by the
+//        declaration; constructions follow the rename and are not separately
+//        reported, or every fixture row would be a finding.
+//   HAS `has tickets` IS A BOOLEAN
+//        the FIRST field of a record shares the `HAS` line, so the optional
+//        `HAS` below is not cosmetic -- without it the first field of every
+//        DECLARE is invisible, which is the gap this file's own selftest caught.
+const DECL = /^\s+(HAS\s+)?`(is|has)\s+[^`]+`\s+IS\s+(A|AN|THE)\s+(?!FUNCTION\b)/;
+
 function scanText(text, label, sink) {
   const findings = [];
   text.split("\n").forEach((raw, i) => {
-    CLITIC.lastIndex = 0;
     const hits = [];
+
+    CLITIC.lastIndex = 0;
     let m;
     while ((m = CLITIC.exec(raw)) !== null) {
       // `` X's `is` `` on its own is a field named for the verb alone, which is
       // a different (and rarer) smell; this check is about the doubled verb.
       if (!m[2] || !m[2].trim()) continue;
-      hits.push({ file: label, line: i + 1, col: m.index + 1, verb: m[1], text: raw.trim() });
+      hits.push({ kind: "deref", file: label, line: i + 1, col: m.index + 1, text: raw.trim() });
     }
+
+    const d = DECL.exec(raw);
+    if (d) hits.push({ kind: "decl", file: label, line: i + 1, col: d[0].indexOf("`") + 1, text: raw.trim() });
+
     if (hits.length === 0) return;
     if (raw.includes(MARKER)) sink.push(`${label}:${i + 1}`);
     else findings.push(...hits);
@@ -150,6 +184,30 @@ const SELFTEST = [
     src: "-- nothing to suppress here.   CLITIC-VERB-OK" },
   { name: "prose in markdown quoting the wrong form is a finding", findings: 1, suppressed: 0,
     src: "…quote it back — ``IF applicant's `is existing customer` THEN…``" },
+
+  // -- rule 2, the declaration --
+  { name: "an is-prefixed field declaration is a finding", findings: 1, suppressed: 0,
+    src: "        `is bankrupt` IS A BOOLEAN" },
+  { name: "a has-prefixed field declaration is a finding", findings: 1, suppressed: 0,
+    src: "    HAS `has tickets`    IS A BOOLEAN" },
+  { name: "a trailing TYPICALLY does not hide the declaration", findings: 1, suppressed: 0,
+    src: "        `has capacity`   IS A BOOLEAN TYPICALLY TRUE" },
+  { name: "a non-boolean field counts too", findings: 1, suppressed: 0,
+    src: "        `has a date of transfer`                 IS A DATE" },
+  { name: "the repaired declaration is clean", findings: 0, suppressed: 0,
+    src: "        `bankrupt` IS A BOOLEAN" },
+  { name: "an ASSUMEd predicate typed as a FUNCTION is out of scope", findings: 0, suppressed: 0,
+    src: "          `is a Singapore offence` IS A FUNCTION FROM Offence TO BOOLEAN" },
+  { name: "an ASSUMEd predicate with an explicit parameter is out of scope",
+    findings: 0, suppressed: 0, src: "ASSUME `is unreasonable` c IS A BOOLEAN" },
+  { name: "a record construction is not a declaration", findings: 0, suppressed: 0,
+    src: "        `is a registered charity`                       IS TRUE" },
+  { name: "a construction assigning another name is not a declaration", findings: 0, suppressed: 0,
+    src: "        `has been extracted` IS `has been taken out`" },
+  { name: "a top-level rule name is not a field", findings: 0, suppressed: 0,
+    src: "`is disqualified` MEANS issuer's `a disqualifying event`" },
+  { name: "declaration and dereference on one line are two findings", findings: 2, suppressed: 0,
+    src: "    `is odd` IS A BOOLEAN -- see x's `is even`" },
 ];
 
 function selftest() {
@@ -211,11 +269,17 @@ if (findings.length === 0) {
 const byFile = new Map();
 for (const f of findings) byFile.set(f.file, (byFile.get(f.file) ?? 0) + 1);
 
+const nDecl = findings.filter((f) => f.kind === "decl").length;
+const nDeref = findings.length - nDecl;
 console.error(
-  `check-clitic-verbs: ${findings.length} finding(s) in ${byFile.size} file(s).\n` +
+  `check-clitic-verbs: ${findings.length} finding(s) in ${byFile.size} file(s) ` +
+    `(${nDecl} declaration, ${nDeref} dereference).\n` +
     `The clitic 's already supplies "is" and "has" -- start the field name at the\n` +
-    `complement: person's \`bankrupt\`, not person's \`is bankrupt\`.\n` +
+    `complement: person's \`bankrupt\`, not person's \`is bankrupt\`. A field named\n` +
+    `for the verb is wrong where it is DECLARED too, whether or not anything reads\n` +
+    `it yet, because every L4 file is ultimately a training example.\n` +
     `See doc/concepts/language-design/linguistic-syntax.md, "The Saxon Genitive".\n`,
 );
-for (const f of findings) console.error(`  ${f.file}:${f.line}:${f.col}  ${f.text}`);
+for (const f of findings)
+  console.error(`  ${f.file}:${f.line}:${f.col}  [${f.kind}]  ${f.text}`);
 process.exit(1);
