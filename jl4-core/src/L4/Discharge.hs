@@ -60,6 +60,7 @@ module L4.Discharge
   , implicitSupplySites
   , unreadImplicitSupplies
   , ambiguousImplicitSupplies
+  , misdeliveredImplicitSupplies
   , ambiguousRootBinders
   , implicitReaders
   ) where
@@ -486,6 +487,54 @@ ambiguousImplicitSupplies mod'
       [ (n, r)
       | (n, r) <- implicitSupplySites mod'
       , ambiguousFor (readSetOf n) r
+      ]
+ where
+  binders = sectionBinders mod'
+  rs      = readSets mod' binders
+  readSetOf n = fromMaybe [] (Map.lookup (getUnique n) rs)
+
+-- | Call sites whose supplied value was type-checked against ONE section binder
+-- and is then delivered to ANOTHER, declared at a different type.
+--
+-- smucclaw\/l4-ide#960, the residue of #956. 'L4.TypeCheck.sectionBinderFor'
+-- validates the value against the binder's DECLARED type, but only where the
+-- module has exactly one binder of that spelling; with two it returns 'Nothing'
+-- — deliberately, see its Haddock — and 'L4.TypeCheck.implicitSupply' falls back
+-- to @resolveTerm@, which answers in the CALLER's scope. Delivery meanwhile is
+-- decided here, by 'suppliesBinder' against the CALLEE's read-set. With two
+-- same-spelled binders at different types those two questions disagree, and
+-- then nothing has checked the value against the type it actually arrives at:
+-- #960's repro passes @l4 check@ and a @GIVETH A NUMBER@ rule returns a
+-- @STRING@.
+--
+-- __Why this can live here when the type check cannot.__ The read-set is the
+-- very fact 'L4.TypeCheck.sectionBinderFor' lacks while a body is being
+-- checked, and it exists by the time these whole-module checks run. Both halves
+-- of the comparison are already recorded and need no re-deriving: the binder
+-- the body check chose is the 'Resolved' carried in the 'NamedExpr'
+-- ('implicitSupplySites'), and the binder that receives is whichever
+-- 'suppliesBinder' selects. So this needs no re-checking of the expression, and
+-- none of R-X3's closure work.
+--
+-- __Only when the declared types actually differ__, by 'typeKey', as R3 already
+-- compares them in 'ambiguousRootBinders'. Two same-typed binders of one
+-- spelling are R3's business and are refused there; a disagreement that cannot
+-- change the value's type is not a defect and must not draw a diagnostic. This
+-- is also what keeps the check off the TDNR overload of @ok\/section-given-tdnr.l4@
+-- and @ok\/misc.l4@ — widening to the spelling alone is the reverted fix
+-- (legalese\/l4-ide#369) that this must not become.
+--
+-- Returns @(callee, binderCheckedAgainst, binderThatReceives)@.
+misdeliveredImplicitSupplies :: Module Resolved -> [(Resolved, Resolved, Resolved)]
+misdeliveredImplicitSupplies mod'
+  | Map.null binders = []
+  | otherwise =
+      [ (n, r, b.resolved)
+      | (n, r) <- implicitSupplySites mod'
+      , b <- take 1 (filter (suppliesBinder (readSetOf n) r) (readSetOf n))
+      , getUnique r /= getUnique b.resolved
+      , Just checked <- [Map.lookup (getUnique r) binders]
+      , fmap typeKey checked.typ /= fmap typeKey b.typ
       ]
  where
   binders = sectionBinders mod'

@@ -120,6 +120,14 @@ bump n MEANS n TIMES `the rate`
   inputs is an error**, when the name is neither of them. There is no way to
   tell which was meant; rename one of them, or hoist them to a common section
   heading if they are one thing.
+- **Two same-spelled section inputs at _different_ types is an error too**, even
+  when the name you wrote does match one of them. The two are told apart by the
+  heading they sit under, so the message names them `` `S1.rate` `` and
+  `` `S2.rate` ``, and says which one the value was checked against and which one
+  would actually receive it. The repair is the same: rename one, or hoist them
+  to a common heading. This one used to be accepted and then hand the rule a
+  value of the wrong type at run time — a rule declared `GIVETH A NUMBER`
+  returning a `STRING`, with nothing reported at any stage.
 - **A rule's own defaulted parameter cannot yet be omitted at a named site.**
   `TYPICALLY` on a _section_ input is honoured when nobody supplies it (see
   [TYPICALLY](../types/TYPICALLY.md)); on a rule's own `GIVEN` the checker still
