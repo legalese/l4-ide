@@ -38,6 +38,28 @@ does not have to rediscover them.
   effectively a practice direction — a patch beside a binding text that still carries the
   contradiction. The offer is to the drafters as much as to the reader. (Meng, 2026-09-13.)
 
+  **The double bind's shape and what ran the search — Meng, 2026-09-14, answering the post's
+  `[NEEDS MENG]` markers 1 and 2. Use these; the instrument stays unnamed.** His words: "in the
+  event of a data breach which has been assessed as being a notifiable data breach, the
+  organization must notify, as soon as possible, both the affected parties (users whose data was
+  exposed) and the government regulator. The government regulator may some time later advise the
+  organization to not advise the affected parties, presumably because major breaches call for
+  disaster management in some way, or maybe the breach was tied to a state sponsored actor and
+  geopolitical concerns may require a temporary pretense that the breach did not occur. I say
+  'presumably because' as I'm speculating from my own world knowledge, not from any direct
+  knowledge. That places the organization in a double bind: you must notify, and you must not
+  notify. Even if we read this with 'lex posterior' framing so that the organization stops
+  notifying users the moment they hear from the regulator, as a whole the system has already
+  leaked the fact that the breach was detected so somewhere some high level goal is going unmet."
+  On the tooling: "This analysis was done with an early version of our language and the UPPAAL
+  encoding was performed manually once the fragment of the regulation was understood." So the
+  post must say the UPPAAL model was hand-built from the understood fragment, not emitted by a
+  compiler — and that the reproduction is cheap today (write the L4; lower it to a timed
+  backend per `specs/proposals/VERIFICATION-BACKEND-LOWERING-SPEC.md`, which is a proposal with
+  Phase 1 ruled and nothing built). The regulator's reasons are Meng's speculation and are
+  reported as such or left out. Replace the spec's remediate/assessment fragment in the opening
+  with this real shape, names filed off.
+
 - **Post 9 (the call to action).** Meng (2026-09-14): "Feel like the series is lacking a call to
   action as the last post. What are we doing with these new capabilities?" Two calls, in his
   words. First: "an encoding of all the world's laws, one statute at a time: like Wikipedia but a
