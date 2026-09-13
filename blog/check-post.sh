@@ -24,6 +24,7 @@ for f in "$@"; do
   grep -qE '^#+ *Sources' "$f" || fail "no '## Sources' section"
   grep -qE '^\*\*STATUS' "$f" && true
   grep -n '\[UNVERIFIED' "$f" | head -5 | sed "s|^|warn $f: unverified marker at line |"
+  grep -n '\[NEEDS MENG' "$f" | head -8 | sed "s|^|warn $f: needs-Meng marker at line |"
   # word count of prose (front matter, Sources, stanza excluded)
   words=$(printf '%s\n' "$body" | awk '/^#+ *Sources/{exit} {print}' | wc -w | tr -d ' ')
   [ "$words" -ge 1500 ] && [ "$words" -le 2600 ] || warn "prose is $words words (target 1,500–2,500)"
