@@ -9,6 +9,10 @@
 % in the typeset bibliography):
 %   PDF-verified  — read from the actual PDF in the six-reader pass (citation-verification.md)
 %                   or the Kolt integrity check; metadata is authoritative.
+%   verified      — confirmed against an authoritative record this pass (publisher page,
+%                   dblp, arXiv full text), but not read from the PDF. The inline comment
+%                   on each such entry names what was actually checked. (Undocumented
+%                   here until 2026-09-11; the tier had been in use since the build.)
 %   standard      — well-established work; metadata from standard scholarly records,
 %                   NOT re-read this pass. Spot-check DOIs/pages before camera-ready.
 %   UNVERIFIED    — could not confirm; FLAGGED inline. Two of these:
@@ -744,4 +748,32 @@
   srctag    = {van der Meyden \& Maher 2025},
   status    = {verified}   % Springer + Waterstones/Blackwell's: hardcover 2 Oct 2025;
                            % legal-contract -> smart-contract case study of the YC SAFE
+}
+
+% ---- Wiles: an executable deontic formalism, and the first LLM-encoding datapoint ----
+% Two things for us. (1) An implementation of Reified I/O Logic -- the DAPRECO
+% formalism -- carrying obligations, permissions AND constitutive norms with
+% reified eventualities and temporal operators, i.e. a live comparator for the
+% executable/dynamic instantiations above. (2) Its §4 is the only LLM-formalisation
+% study we cite: of four English statements translated to the formalism, three ran,
+% read plausibly and encoded the WRONG norm, found only at write-up. That is the
+% loud/silent failure asymmetry with an author's own scrutiny as the control.
+% Small: n=4, one GPT-4 session, self-judged -- cite for the failure class, never
+% for a rate. §3.7 is separately useful: a style-guide-mild sentence formalised
+% faithfully, which the author concedes no lawyer will ever write.
+
+@misc{wiles2026complaw,
+  author        = {James K. Wiles},
+  title         = {{Implementing Computational Law in Wolfram Language for the Governance of Artificial Intelligence}},
+  year          = {2026},
+  eprint        = {2608.13958},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.AI},
+  note          = {arXiv:2608.13958v1, 14 August 2026},
+  srctag        = {Wiles 2026},
+  status        = {verified}   % arXiv HTML full text read 2026-09-11 (v1, CC BY 4.0);
+                               % PDF not read, so NOT PDF-verified. Author affiliation
+                               % Wolfram Institute. Formalism follows Robaldo et al.
+                               % 2020 (DAPRECO) -- that base cite is NOT yet in this
+                               % bib; add it if we lean on the I/O-logic lineage.
 }
