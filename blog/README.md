@@ -74,8 +74,14 @@ does not have to rediscover them.
   the finding was presented so that the adjusters who had helped were not exposed; management's
   response was about the liability an ambiguous consumer term carries, not about which reading
   to pay in future; the fix was to the wording, at the level of the logic, not to the payout
-  algorithm. The CJEU citation must be opened and checked before it enters the post (EUR-Lex
-  CELEX 62022CJ0263); state only what the judgment actually holds. Meng's closing phrase, "It was
+  algorithm. The CJEU citation checks out (searched 2026-09-14; EUR-Lex CELEX 62022CJ0263,
+  summary at CELEX 62022CJ0263_SUM): Judgment of the Court (Ninth Chamber), 20 April 2023, on a
+  reference from Portugal's Supremo Tribunal de Justiça — Directive 93/13/EEC on unfair terms in
+  consumer contracts, Articles 3–6; the transparency requirement; a group payment-protection
+  insurance contract; a term limiting or excluding cover that the consumer had not been informed
+  of. It is a transparency-and-disclosure case about a limiting term, not a case about an
+  ambiguous formula, so the post reports management's remark as their reading of their exposure
+  and describes the judgment as what it is. Open the judgment before quoting it. Meng's closing phrase, "It was
   about computability in the NP-hard sense," is his gloss — do not put "NP-hard" in the post
   unless the claim is made precise (NP-hardness is a complexity class, and the formal-methods
   critic will ask which problem was shown hard); the substance is that the defect was in the
