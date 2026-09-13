@@ -205,6 +205,14 @@ post:
   and then cites; it does not hide the point in a footnote or let the citation carry it.
 - **Read what you cite.** A 403 from a publisher is bot-blocking as often as it is a paywall
   (Woodcock & Larsen turned out to be CC-BY). Do not quote from an abstract.
+- **Know the field, past and present, before drafting.** Meng (2026-09-13): the author should "web
+  search the past and present of the part of the field it's writing about, not just parrot the
+  paper content but show familiarity with the broader context." Concretely: before a word is
+  drafted, find who did this first, what the canonical prior work is, what was tried and
+  abandoned, and what is happening now — in industry, in government rules-as-code programs, in
+  research — and weave it in the way Somers weaves in Lamport's biography: a name, a date, a
+  source, in passing. A reader who knows the field must never catch a post presenting as new
+  what is old. The review pass has a persona for exactly this (§7).
 - **Every number carries a date and a source, inline.** The tables in `paper/README.md`
   §Positioning are the house form: figure, period, "checked against", and a note when the
   source is hearsay or contradicted.
@@ -264,7 +272,12 @@ Act, the Jersey instruments — over new examples. One corpus, not two.
 
 1. Draft in a worktree (`~/src/legalese/l4wt/<name>`), never the reference checkout.
 2. Run `blog/check-post.sh` (structure, stanza, spelling, word count, and the tic lint) until it
-   is clean. PR to `unstable`. The PR checklist is §4's table.
+   is clean. Then the persona pass: six readers critique the draft — the target programmer and
+   the SME founder for confusions; a law-review editor, a formal-methods reviewer and a
+   computational-law veteran (unearned novelty: "this was Sergot in 1986") for unearned claims;
+   a magazine editor for voice — plus a fact-checker who opens every source live. Revise until
+   no critic has a blocking item. (First run 2026-09-13 as a Workflow; the script lives with the
+   session, not in the tree.) PR to `unstable`. The PR checklist is §4's table.
 3. When a post goes live, flip `status` to `published`, add the URL to the status header, and
    record the date the citations were last re-checked.
 4. If a later post or paper contradicts an earlier post, correct the earlier post in place with
