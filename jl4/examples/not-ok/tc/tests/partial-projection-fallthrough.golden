@@ -3,29 +3,30 @@ Typechecking successful
 Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
 File: partial-projection-fallthrough.l4
   Hidden: no
-  Range: 32:25-32:41
+  Range: 60:25-60:41
   Source: check
   Severity: DiagnosticSeverity_Error
   Code: <none>
   Message:
     `monthly_rent` is a field of `Tenant` only.
-    But `s` could also be `Agent`, which has no `monthly_rent`.
+    But `s` could also be `Landlord` or `Agent`, which have no `monthly_rent`.
 
-    The clauses above this one already match `Landlord`,
-    so `Agent` is what is left to reach here.
+    This is a later clause of a multi-clause rule, and a later clause is not
+    narrowed by the clauses above it: `s` is checked at the whole type
+    `Actor`, so every constructor of `Actor` can reach this read.
 
-    Narrow `s` first:
+    Write the group as one `CONSIDER`, which does narrow:
 
-      EVERY Tenant s …
-      CONSIDER s WHEN Tenant t THEN … s's monthly_rent …
+      CONSIDER s
+      WHEN Tenant t THEN … s's monthly_rent …
+      OTHERWISE …
 
-    (or just `THEN t` when the field is the whole payload), or put the read
-    under an `OTHERWISE` after the other arms — or declare `monthly_rent` on
-    `Agent` too.
+    (or just `THEN t` when the field is the whole payload), or declare `monthly_rent` on
+    `Landlord` or `Agent` too.
 
 File: partial-projection-fallthrough.l4
   Hidden: no
-  Range: 43:36-43:48
+  Range: 71:36-71:48
   Source: check
   Severity: DiagnosticSeverity_Error
   Code: <none>
@@ -45,7 +46,7 @@ File: partial-projection-fallthrough.l4
 
 File: partial-projection-fallthrough.l4
   Hidden: no
-  Range: 51:32-51:58
+  Range: 79:32-79:58
   Source: check
   Severity: DiagnosticSeverity_Error
   Code: <none>
@@ -61,7 +62,7 @@ File: partial-projection-fallthrough.l4
 
 File: partial-projection-fallthrough.l4
   Hidden: no
-  Range: 64:24-64:40
+  Range: 101:24-101:40
   Source: check
   Severity: DiagnosticSeverity_Error
   Code: <none>
@@ -69,21 +70,22 @@ File: partial-projection-fallthrough.l4
     `monthly_rent` is a field of `Tenant` only.
     But `x` could also be `Landlord` or `Agent`, which have no `monthly_rent`.
 
-    Nothing here narrows `x`: it is used at the whole type `Actor`,
-    so every constructor of `Actor` can reach this read.
+    This is a later clause of a multi-clause rule, and a later clause is not
+    narrowed by the clauses above it: `x` is checked at the whole type
+    `Actor`, so every constructor of `Actor` can reach this read.
 
-    Narrow `x` first:
+    Write the group as one `CONSIDER`, which does narrow:
 
-      EVERY Tenant x …
-      CONSIDER x WHEN Tenant t THEN … x's monthly_rent …
+      CONSIDER x
+      WHEN Tenant t THEN … x's monthly_rent …
+      OTHERWISE …
 
-    (or just `THEN t` when the field is the whole payload), or put the read
-    under an `OTHERWISE` after the other arms — or declare `monthly_rent` on
+    (or just `THEN t` when the field is the whole payload), or declare `monthly_rent` on
     `Landlord` or `Agent` too.
 
 File: partial-projection-fallthrough.l4
   Hidden: no
-  Range: 74:21-74:37
+  Range: 113:21-113:37
   Source: check
   Severity: DiagnosticSeverity_Error
   Code: <none>
@@ -105,7 +107,7 @@ File: partial-projection-fallthrough.l4
 
 File: partial-projection-fallthrough.l4
   Hidden: no
-  Range: 86:33-86:49
+  Range: 125:33-125:49
   Source: check
   Severity: DiagnosticSeverity_Error
   Code: <none>
@@ -113,21 +115,22 @@ File: partial-projection-fallthrough.l4
     `monthly_rent` is a field of `Tenant` only.
     But `a` could also be `Landlord` or `Agent`, which have no `monthly_rent`.
 
-    Nothing here narrows `a`: it is used at the whole type `Actor`,
-    so every constructor of `Actor` can reach this read.
+    This is a later clause of a multi-clause rule, and a later clause is not
+    narrowed by the clauses above it: `a` is checked at the whole type
+    `Actor`, so every constructor of `Actor` can reach this read.
 
-    Narrow `a` first:
+    Write the group as one `CONSIDER`, which does narrow:
 
-      EVERY Tenant a …
-      CONSIDER a WHEN Tenant t THEN … a's monthly_rent …
+      CONSIDER a
+      WHEN Tenant t THEN … a's monthly_rent …
+      OTHERWISE …
 
-    (or just `THEN t` when the field is the whole payload), or put the read
-    under an `OTHERWISE` after the other arms — or declare `monthly_rent` on
+    (or just `THEN t` when the field is the whole payload), or declare `monthly_rent` on
     `Landlord` or `Agent` too.
 
 File: partial-projection-fallthrough.l4
   Hidden: no
-  Range: 96:35-96:51
+  Range: 135:35-135:51
   Source: check
   Severity: DiagnosticSeverity_Error
   Code: <none>
@@ -135,43 +138,45 @@ File: partial-projection-fallthrough.l4
     `monthly_rent` is a field of `Tenant` only.
     But `a` could also be `Landlord` or `Agent`, which have no `monthly_rent`.
 
-    Nothing here narrows `a`: it is used at the whole type `Actor`,
-    so every constructor of `Actor` can reach this read.
+    This is a later clause of a multi-clause rule, and a later clause is not
+    narrowed by the clauses above it: `a` is checked at the whole type
+    `Actor`, so every constructor of `Actor` can reach this read.
 
-    Narrow `a` first:
+    Write the group as one `CONSIDER`, which does narrow:
 
-      EVERY Tenant a …
-      CONSIDER a WHEN Tenant t THEN … a's monthly_rent …
+      CONSIDER a
+      WHEN Tenant t THEN … a's monthly_rent …
+      OTHERWISE …
 
-    (or just `THEN t` when the field is the whole payload), or put the read
-    under an `OTHERWISE` after the other arms — or declare `monthly_rent` on
+    (or just `THEN t` when the field is the whole payload), or declare `monthly_rent` on
     `Landlord` or `Agent` too.
 
 File: partial-projection-fallthrough.l4
   Hidden: no
-  Range: 108:28-108:44
+  Range: 148:28-148:44
   Source: check
   Severity: DiagnosticSeverity_Error
   Code: <none>
   Message:
     `monthly_rent` is a field of `Tenant` only.
-    But `o` could also be `Agent`, which has no `monthly_rent`.
+    But `o` could also be `Landlord` or `Agent`, which have no `monthly_rent`.
 
-    The clauses above this one already match `Landlord`,
-    so `Agent` is what is left to reach here.
+    This is a later clause of a multi-clause rule, and a later clause is not
+    narrowed by the clauses above it: `o` is checked at the whole type
+    `Actor`, so every constructor of `Actor` can reach this read.
 
-    Narrow `o` first:
+    Write the group as one `CONSIDER`, which does narrow:
 
-      EVERY Tenant o …
-      CONSIDER o WHEN Tenant t THEN … o's monthly_rent …
+      CONSIDER o
+      WHEN Tenant t THEN … o's monthly_rent …
+      OTHERWISE …
 
-    (or just `THEN t` when the field is the whole payload), or put the read
-    under an `OTHERWISE` after the other arms — or declare `monthly_rent` on
-    `Agent` too.
+    (or just `THEN t` when the field is the whole payload), or declare `monthly_rent` on
+    `Landlord` or `Agent` too.
 
 File: partial-projection-fallthrough.l4
   Hidden: no
-  Range: 131:34-131:50
+  Range: 173:34-173:50
   Source: check
   Severity: DiagnosticSeverity_Error
   Code: <none>
@@ -193,7 +198,122 @@ File: partial-projection-fallthrough.l4
 
 File: partial-projection-fallthrough.l4
   Hidden: no
-  Range: 154:32-154:46
+  Range: 183:30-183:46
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    `monthly_rent` is a field of `Tenant` only.
+    But `p` could also be `Landlord` or `Agent`, which have no `monthly_rent`.
+
+    This is a later clause of a multi-clause rule, and a later clause is not
+    narrowed by the clauses above it: `p` is checked at the whole type
+    `Actor`, so every constructor of `Actor` can reach this read.
+
+    Write the group as one `CONSIDER`, which does narrow:
+
+      CONSIDER p
+      WHEN Tenant t THEN … p's monthly_rent …
+      OTHERWISE …
+
+    (or just `THEN t` when the field is the whole payload), or declare `monthly_rent` on
+    `Landlord` or `Agent` too.
+
+File: partial-projection-fallthrough.l4
+  Hidden: no
+  Range: 200:31-200:46
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    `ground_rent` is a field of `Leaseholder` only.
+    But `z` could also be `Freeholder`, which has no `ground_rent`.
+
+    This is a later clause of a multi-clause rule, and a later clause is not
+    narrowed by the clauses above it: `z` is checked at the whole type
+    `Solo`, so every constructor of `Solo` can reach this read.
+
+    Write the group as one `CONSIDER`, which does narrow:
+
+      CONSIDER z
+      WHEN Leaseholder t THEN … z's ground_rent …
+      OTHERWISE …
+
+    (or just `THEN t` when the field is the whole payload), or declare `ground_rent` on
+    `Freeholder` too.
+
+File: partial-projection-fallthrough.l4
+  Hidden: no
+  Range: 216:32-216:49
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    `monthly_rent` is a field of `Tenant` only.
+    But `s2` could also be `Landlord` or `Agent`, which have no `monthly_rent`.
+
+    This is a later clause of a multi-clause rule, and a later clause is not
+    narrowed by the clauses above it: `s2` is checked at the whole type
+    `Actor`, so every constructor of `Actor` can reach this read.
+
+    Write the group as one `CONSIDER`, which does narrow:
+
+      CONSIDER s2
+      WHEN Tenant t THEN … s2's monthly_rent …
+      OTHERWISE …
+
+    (or just `THEN t` when the field is the whole payload), or declare `monthly_rent` on
+    `Landlord` or `Agent` too.
+
+File: partial-projection-fallthrough.l4
+  Hidden: no
+  Range: 232:29-232:45
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    `monthly_rent` is a field of `Tenant` only.
+    But `a` could also be `Landlord` or `Agent`, which have no `monthly_rent`.
+
+    This is a later clause of a multi-clause rule, and a later clause is not
+    narrowed by the clauses above it: `a` is checked at the whole type
+    `Actor`, so every constructor of `Actor` can reach this read.
+
+    Write the group as one `CONSIDER`, which does narrow:
+
+      CONSIDER a
+      WHEN Tenant t THEN … a's monthly_rent …
+      OTHERWISE …
+
+    (or just `THEN t` when the field is the whole payload), or declare `monthly_rent` on
+    `Landlord` or `Agent` too.
+
+File: partial-projection-fallthrough.l4
+  Hidden: no
+  Range: 244:29-244:45
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    `monthly_rent` is a field of `Tenant` only.
+    But `y` could also be `Landlord` or `Agent`, which have no `monthly_rent`.
+
+    This is a later clause of a multi-clause rule, and a later clause is not
+    narrowed by the clauses above it: `y` is checked at the whole type
+    `Actor`, so every constructor of `Actor` can reach this read.
+
+    Write the group as one `CONSIDER`, which does narrow:
+
+      CONSIDER y
+      WHEN Tenant t THEN … y's monthly_rent …
+      OTHERWISE …
+
+    (or just `THEN t` when the field is the whole payload), or declare `monthly_rent` on
+    `Landlord` or `Agent` too.
+
+File: partial-projection-fallthrough.l4
+  Hidden: no
+  Range: 267:32-267:46
   Source: check
   Severity: DiagnosticSeverity_Error
   Code: <none>
@@ -201,14 +321,15 @@ File: partial-projection-fallthrough.l4
     `unit_price` is a field of `Usage` only.
     But `c` could also be `Flat`, which has no `unit_price`.
 
-    Nothing here narrows `c`: it is used at the whole type `Charge`,
-    so every constructor of `Charge` can reach this read.
+    This is a later clause of a multi-clause rule, and a later clause is not
+    narrowed by the clauses above it: `c` is checked at the whole type
+    `Charge`, so every constructor of `Charge` can reach this read.
 
-    Narrow `c` first:
+    Write the group as one `CONSIDER`, which does narrow:
 
-      EVERY Usage c …
-      CONSIDER c WHEN Usage t THEN … c's unit_price …
+      CONSIDER c
+      WHEN Usage t THEN … c's unit_price …
+      OTHERWISE …
 
-    (or just `THEN t` when the field is the whole payload), or put the read
-    under an `OTHERWISE` after the other arms — or declare `unit_price` on
+    (or just `THEN t` when the field is the whole payload), or declare `unit_price` on
     `Flat` too.

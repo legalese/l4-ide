@@ -3194,29 +3194,52 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       -- source below checks clean, so 'drgGeneral' has a DRG to inspect, and
       -- L11's D-PARTIAL note is still drawn on it (measured).
       --
-      -- CORRECTED 2026-09-10. This comment used to say the source reached "the
-      -- SAME hazard through the ONE route S2 deliberately leaves open — §5.1
-      -- hole 1", i.e. that S2 recorded nothing inside a synthesised
-      -- fall-through body. That hole was closed by 655b272b and the claim is
-      -- now false in both directions. The source checks clean because the
-      -- clause narrowing is CORRECT: clause 1 consumes `Nothingness`, so the
-      -- binder in clause 2 can only be a `Circle`, which DOES declare
-      -- `radius`. Measured: it evaluates 0 and 7, and raises no
-      -- NonExhaustivePatterns at all — there is no hazard left in it.
+      -- ★ AND CHANGED AGAIN, 2026-09-13. Between 2026-09-09 and now the source
+      -- was the two-clause group
       --
-      -- What keeps L11 alive is that D-PARTIAL is drawn off the IR SHAPE,
-      -- independently of whether the checker would refuse the source. That is
-      -- why this test stayed green across 655b272b without being touched, and
-      -- it is the property worth preserving if the fixture is ever rewritten.
+      -- >  DECIDE `the radius` Nothingness IS 0
+      -- >  DECIDE `the radius` s           IS s's radius
+      --
+      -- which checked clean because a later clause was narrowed by the clauses
+      -- above it. SUM-TYPE-FIELDS-SPEC §3.2's ruling CUT that rule: a partial
+      -- read in a later clause is now refused outright, so that source no
+      -- longer type-checks and 'drgGeneral' would throw on it.
+      --
+      -- THE OBVIOUS REWRITE DOES NOT WORK, and the reason is worth writing down
+      -- because it constrains every future one. The repair the refusal itself
+      -- recommends is a @CONSIDER@ — but 'walkIssues' visits every branch body
+      -- at 'LazyPos', and L11 is gated on 'StrictPos', so a read narrowed by a
+      -- @WHEN@ arm draws no note at all (measured: the note list came back
+      -- empty). The same goes for @OTHERWISE@, @IF@ and @BRANCH@. Every
+      -- narrowing form that a BRANCH provides puts the read in a lazy position
+      -- by construction, so no branch-narrowed program can witness L11.
+      --
+      -- WHAT IS LEFT is the one narrowing that is not a branch: a base written
+      -- AS a constructor ('NarrowedByConstruction'). @unit@ is a @Circle@
+      -- unconditionally, so @unit's radius@ type-checks, and it sits in the
+      -- decide's own body — 'StrictPos'.
+      --
+      -- This is a BETTER witness of the property the note is about, not a
+      -- weaker one. D-PARTIAL is drawn off the IR SHAPE — a 'Proj' over a
+      -- multi-constructor enum not every arm of which declares the field —
+      -- independently of what the checker knows, and the whole point of the
+      -- "CAN raise" wording (see the matching note at the L11 site in
+      -- "L4.Dmn.Analysis") is that the guard OVER-approximates. Here it
+      -- over-approximates visibly: the read provably cannot raise, and the note
+      -- fires anyway. Measured on this source: @l4 check@ succeeds and it
+      -- evaluates 7.
+      --
+      -- Any future rewrite must keep a 'Proj' over such an enum in a STRICT
+      -- position. Keeping the file merely type-checking is not enough.
       it "L11: refuses a projection over a multi-constructor enum missing the field" $ do
         let drg = drgOf
               "DECLARE Shape IS ONE OF\n\
               \    Nothingness\n\
               \    Circle HAS radius IS A NUMBER\n\
-              \GIVEN s IS A Shape\n\
               \GIVETH A NUMBER\n\
-              \DECIDE `the radius` Nothingness IS 0\n\
-              \DECIDE `the radius` s           IS s's radius\n"
+              \`the radius` MEANS unit's radius\n\
+              \  WHERE\n\
+              \    unit MEANS Circle OF 7\n"
         [n | n <- notesOf "D-PARTIAL" drg, Text.isInfixOf "L11" n.message]
           `shouldSatisfy` (not . null)
 
