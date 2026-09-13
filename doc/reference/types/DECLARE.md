@@ -83,12 +83,11 @@ GIVETH A NUMBER
 > But `a` could also be `Landlord`, which has no `rent`.
 
 This is a refusal at check time, not a surprise at run time. The same question used to be accepted
-and then die halfway through a run, on whichever case first turned out to be a `Landlord`. Two
-narrow cases are left where it still can: a `GIVEN` you left untyped, which is the last bullet under
-"What does not narrow" below, and a definition you named after one of the compiler's own — see
-"Two gaps, not one" after that list.
+and then die halfway through a run, on whichever case first turned out to be a `Landlord`. That no
+longer happens: if nothing in the program narrows the value, the read is refused, whatever shape the
+rule is written in and whether or not you wrote the types down.
 
-**How to narrow.** Five ways, all of which say the same thing — "here, this value is a `Tenant`":
+**How to narrow.** Four ways, all of which say the same thing — "here, this value is a `Tenant`":
 
 ```l4
 -- 1. Take the value apart. The branch you are in tells the checker what `a` is,
@@ -126,33 +125,67 @@ GIVETH A DEONTIC Actor Action
         WHO    t's rent AT LEAST 1000
         MUST   Sign (EXACTLY t)
         WITHIN 14
+```
 
--- 5. Write the rule as several clauses. The clauses above a given one have
---    already matched their cases, so those cases cannot reach it — the same
---    reasoning as the OTHERWISE in 3, spelled without a CONSIDER.
+**Writing the rule as several clauses is _not_ one of the ways.** This looks as though it ought to
+work — the clause above has already matched every `Landlord`, so surely only a `Tenant` can reach the
+second one — and it is refused anyway:
+
+```l4
 GIVEN a IS AN Actor
 GIVETH A NUMBER
 DECIDE `rent owed by` (Landlord addr name) IS 0
-DECIDE `rent owed by` a                    IS a's rent
+DECIDE `rent owed by` a                    IS a's rent   -- refused
 ```
 
-Clause order narrows only as far as it truly can. If the type had a third case — say an `Agent`,
-which also has no `rent` — then an `Agent` would still reach the second clause, and it is refused,
-naming the case that got through:
-
 > `rent` is a field of `Tenant` only.
-> But `a` could also be `Agent`, which has no `rent`.
+> But `a` could also be `Landlord`, which has no `rent`.
 >
-> The clauses above this one already match `Landlord`,
-> so `Agent` is what is left to reach here.
+> This is a later clause of a multi-clause rule, and a later clause is not
+> narrowed by the clauses above it: `a` is checked at the whole type
+> `Actor`, so every constructor of `Actor` can reach this read.
+>
+> Write the group as one `CONSIDER`, which does narrow:
+>
+> ```
+> CONSIDER a
+> WHEN Tenant t THEN … a's rent …
+> OTHERWISE …
+> ```
+>
+> (or just `THEN t` when the field is the whole payload), or declare `rent` on
+> `Landlord` too.
+
+A later clause of a multi-clause rule is checked at the parameter's whole type, always — even when
+the clauses above it are the only other cases the type has, so that nothing else _could_ reach it.
+The rule is deliberately blunt: it is one sentence to remember, it never lets a partial read through
+to a failed run, and the repair is mechanical. Write the group as one `CONSIDER`, which is way 3
+above:
+
+```l4
+GIVEN a IS AN Actor
+GIVETH A NUMBER
+`rent owed by` a MEANS
+    CONSIDER a
+    WHEN Landlord addr name THEN 0
+    OTHERWISE a's rent
+
+#EVAL `rent owed by` alice        -- 1500
+#EVAL `rent owed by` theLandlord  -- 0
+```
+
+Only the **read** has to move. Multi-clause rules are otherwise unaffected: it is reading a field
+that only some constructors declare, in a clause that is not the first, that is refused.
 
 **What does not narrow.** These are the cases people meet by accident, so it is worth knowing them
 before the error does:
 
 - **Writing the type down narrows nothing by itself.** `GIVEN a IS AN Actor` says `a` is an `Actor`,
   which is the whole type — so a read of a field that only some `Actor`s have is refused until one
-  of the five ways above applies to it. Way 5 is the one people forget: if `a` is a parameter of a
-  rule written as several clauses, the clauses above narrow it, and that happens outside any body.
+  of the four ways above applies to it.
+- **A later clause of a multi-clause rule is not narrowed by the clauses above it** — the case just
+  above, and the one people are most surprised by. Where the parameter's position in a `CONSIDER`
+  tells the checker something, its position in a list of clauses tells it nothing.
 - **Only a plain name can be narrowed.** `p's birthPlace's val` is a projection, not a name, so
   there is no name for a branch to attach the fact to. Give it a name first
   (`CONSIDER v … WHERE v MEANS p's birthPlace`), or — usually better — match the payload:
@@ -171,52 +204,16 @@ before the error does:
   the body that narrows `a`. Move the read inside the branch — `WHEN Tenant t THEN a's rent` — or
   match the payload. This is the opposite of the bullet above it: naming the **base** is free,
   naming the **projection** is not.
-- **A clause only uses up a case when its _other_ columns accept anything.** With two parameters,
-  `DECIDE f TRUE Landlord IS 0` does not use up `Landlord`, because `f FALSE Landlord` skips that
-  clause and lands on the next one — so a read of a `Tenant`-only field there is refused. Widening
-  the other column (`DECIDE f flag Landlord IS 0`) uses it up and the read is fine. Same rule as the
-  `WHEN Tenant "Alice" 1500` bullet above, one level up: a clause that tests something extra matches
-  fewer values, so it consumes nothing. **The message will not point at the clause that did it** —
-  it says only "Nothing here narrows `a`", so if a read you expected to be safe is refused, look up
-  at the earlier clauses' _other_ columns first. The same applies when an earlier clause's own
-  pattern is a literal, an `EXACTLY`, or a constructor with a non-binder inside it.
-- **A `GIVEN` with no type gets through, and it is the one gap you can meet by accident.** Writing
-  `GIVEN a` instead of `GIVEN a IS AN Actor` leaves the checker without a set of cases to reason
-  about at the moment it works out what each clause has used up, so it cannot check the read and
-  does not pretend to:
+- **Leaving the type off does not make the question easier.** `GIVEN a` with no type, or a rule with
+  no `GIVEN` line at all, is refused exactly as `GIVEN a IS AN Actor` is — the checker works out
+  which type the field belongs to from the field itself, not from what you wrote. There is no
+  spelling of a rule that gets an unnarrowed partial read past the check.
 
-  ```l4
-  GIVEN a                                  -- no type
-  DECIDE `rent owed by` Landlord IS 0
-  DECIDE `rent owed by` a        IS a's rent   -- accepted, and can die at run time
-  ```
-
-  If a third case reaches the second clause, the run stops there:
-
-  > The value `Agent` has no `rent` field.
-  > `rent` is declared on `Tenant` only.
-
-  Write the type. The same file with `GIVEN a IS AN Actor` is checked properly, and you get the
-  refusal above instead of the failed run.
-
-**Two gaps, not one — and the second is a name you should not write.** Everything above is the gap a
-drafter meets by accident. There is one more, and it is stated here because the rule is only worth
-what it is honest about. The compiler splits a several-clause rule into helper definitions of its
-own, named `` `__pm_fallthrough_0` ``, `` `__pm_fallthrough_1` `` and so on. If you write a
-definition with one of those names yourself, the checker takes your definition for one of its own
-and stops checking partial reads inside it — so this is accepted, and then dies:
-
-```l4
-GIVEN a IS AN Actor
-GIVETH A NUMBER
-DECIDE outer a IS `__pm_fallthrough_0`
-  WHERE
-    `__pm_fallthrough_0` MEANS a's rent   -- accepted, and can die at run time
-```
-
-Do not use those names. They are reserved, they carry no meaning of their own, and nothing else in
-L4 needs them. (They cannot simply be rejected: `l4 batch` and the REPL re-read printed programs
-that legitimately contain them.)
+`` `__pm_fallthrough_0` ``, `` `__pm_fallthrough_1` `` and so on are **reserved names**: the compiler
+uses them when it splits a several-clause rule into helper definitions. They carry no meaning of
+their own and nothing else in L4 needs them, so do not write one. Writing one no longer changes
+whether a partial read is checked — it only makes the refusal's explanation mention clauses you did
+not write.
 
 **A field read with no value in sight.** A field is an ordinary function, so `map rent everyone` is
 the same partial question written another way, and it is refused for the same reason. There is

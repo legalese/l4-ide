@@ -644,20 +644,33 @@ has no `monthly_rent` field.
 
 **What went wrong:** A field of an `IS ONE OF` type was read from a value whose constructor does not declare that field. When only some constructors of a type have a field, the selector for it is partial: `monthly_rent` is a function that works on a `Tenant` and on nothing else.
 
-Most reads like this are refused at check time, with a longer message that names the constructors that can still reach the read and shows how to narrow the value first. This runtime version is what you see when you ran a file that failed to check, or when the check could not rule it out. There are exactly two ways the check cannot rule it out: the parameter has **no declared type**, so the checker did not know which constructors were in play (this is the common one, and it is fixed below); or the read sits inside a definition you named `` `__pm_fallthrough_0` `` or similar, which is a name L4 reserves for its own use — see the note at the end of [DECLARE](../types/DECLARE.md#a-field-on-only-some-constructors).
+**You should not be able to reach this, and that is worth saying plainly.** Reads like this are refused at check time, with a longer message naming the constructors that can still reach the read and showing how to narrow the value first — and as of 2026-09-13 that refusal has no measured gap. Every `.l4` file in the repository that passes `l4 check` was run and none of them produces this message; a battery of thirteen further programs written to try to slip past the check was refused too. `l4 run` also stops at a failed check and does not evaluate anything, so "run a file that failed to check" is not a way back in either. This entry is kept because the exception still exists in the evaluator and a future front end, or a bug, could raise it — not because there is a known route to it.
+
+Until 2026-09-13 there were two such routes, and both are closed. Both went through the same rule: a read in a **later clause** of a multi-clause `DECIDE`/`MEANS` group used to be narrowed by the clauses above it, and where the checker could not work out the constructors of a column — because the column's type was still unknown at that point, or because the read sat inside a definition named `` `__pm_fallthrough_0` `` or similar, which is a name L4 reserves for its own use — it let the read through unchecked. A later clause is now refused outright, so there is no column to exempt. See ["A field on only some constructors"](../types/DECLARE.md#a-field-on-only-some-constructors) in DECLARE.
 
 Note that this is **not** a missing `CONSIDER` branch, even though it may look like one: there is no `CONSIDER` in your program. The one being fallen off is the selector itself, which L4 builds with one branch per declaring constructor. Nothing was left out of a match, and no exhaustiveness warning was emitted about it.
 
-**How to fix it:** Give the parameter its type, so the read is checked rather than deferred to runtime:
+**How to fix it:** Narrow the value before reading the field, or declare the field on the other constructors too. Note that writing the rule as several clauses is **not** narrowing — this is refused, not accepted:
 
 ```l4
 GIVEN s IS AN Actor
 GIVETH A NUMBER
 DECIDE rent Landlord IS 0
-DECIDE rent s        IS s's monthly_rent
+DECIDE rent s        IS s's monthly_rent   -- refused: a later clause is not narrowed
 ```
 
-That turns the crash into a check-time error whose message tells you which constructor is the problem. Then narrow the value before reading the field — see [DECLARE](../types/DECLARE.md) for the ways a value gets narrowed — or declare the field on the other constructors too.
+Write the group as one `CONSIDER` instead, naming the constructor that does declare the field:
+
+```l4
+GIVEN s IS AN Actor
+GIVETH A NUMBER
+rent s MEANS
+    CONSIDER s
+    WHEN Tenant t THEN s's monthly_rent
+    OTHERWISE 0
+```
+
+See [DECLARE](../types/DECLARE.md) for the four ways a value gets narrowed.
 
 ---
 

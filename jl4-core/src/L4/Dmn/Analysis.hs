@@ -550,20 +550,26 @@ analyzeSafety inp cg decides =
     -- than stylistic. This guard is drawn off the IR SHAPE — a projection over a
     -- multi-constructor enum not every arm of which declares the field — which
     -- OVER-APPROXIMATES: the shape raises only when a value built by a
-    -- non-declaring constructor actually reaches the read, and a program whose
-    -- @CONSIDER@ rules those out never does. Measured 2026-09-13 on the L11
-    -- fixture in "jl4/tests/DmnExport.hs": it checks clean, evaluates 0 and 7,
-    -- and raises nothing — while still drawing this note, which is the property
-    -- that keeps L11 from being dead code. Said unconditionally (as this message
-    -- did between c26496cd and 2026-09-10) it asserts a run-time death about
+    -- non-declaring constructor actually reaches the read, and a program that
+    -- rules those out never does. Measured 2026-09-13 on the L11 fixture in
+    -- "jl4/tests/DmnExport.hs": it checks clean, evaluates 7, and raises
+    -- nothing — while still drawing this note, which is the property that keeps
+    -- L11 from being dead code. Said unconditionally (as this message did
+    -- between c26496cd and 2026-09-10) it asserts a run-time death about
     -- programs that demonstrably do not have one.
     --
     -- (The example used to be a multi-clause group whose clause ORDER ruled the
     -- non-declaring constructors out. SUM-TYPE-FIELDS-SPEC §3.2's ruling of
     -- 2026-09-13 cut that narrowing — a later clause is now refused outright —
-    -- so clause order rules nothing out any more and the fixture was rewritten
-    -- to a @CONSIDER@. The over-approximation claim is unaffected; only the
-    -- example that witnesses it moved.)
+    -- so clause order rules nothing out any more and the fixture was rewritten.
+    -- NOT to a @CONSIDER@, which is what the refusal itself recommends and what
+    -- an earlier draft of this comment wrongly claimed was built: 'walkIssues'
+    -- visits every branch body at 'LazyPos' and L11 is gated on 'StrictPos', so
+    -- a branch-narrowed read draws no note at all. The fixture is a base
+    -- written AS a constructor (@unit's radius WHERE unit MEANS Circle OF 7@),
+    -- which narrows without a branch and so stays in a strict position. The
+    -- over-approximation claim is unaffected; only the example that witnesses
+    -- it moved.)
     Proj _ base fld ->
       [ issue "L11" e
           ("the projection `" <> unqualifiedNameToText (TC.getName fld)

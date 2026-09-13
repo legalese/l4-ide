@@ -1609,27 +1609,43 @@ or transitively calls a decision that is.
 > - **L11 is not dead code.** `jl4/tests/DmnExport.hs`'s L11 fixture still draws L11's `D-PARTIAL`
 >   (measured), so the note has a live witness.
 >
->   **CORRECTED 2026-09-10.** This bullet used to say the fixture "reaches the same hazard through a
->   multi-clause `DECIDE`, which is the one route SUM-TYPE-FIELDS-SPEC §5.1 leaves open by design".
->   That route was closed by `655b272b` and the sentence is now false twice over. The fixture checks
->   clean because the clause narrowing is **correct** — clause 1 consumes `Nothingness`, so the
->   binder is a `Circle`, which does declare `radius` — and measured, the program evaluates `0` and
->   `7` with no run-time death in it at all. It reaches no hazard. What keeps L11 alive is that
+>   ~~**CORRECTED 2026-09-10.** … The fixture checks clean because the clause narrowing is
+>   **correct** — clause 1 consumes `Nothingness`, so the binder is a `Circle`, which does declare
+>   `radius` — and measured, the program evaluates `0` and `7`…~~
+>
+>   **CORRECTED AGAIN 2026-09-14, and both halves of that were made false by one ruling.** > `SUM-TYPE-FIELDS-SPEC.md` §3.2's ruling of 2026-09-13 **cut** the clause narrowing: a partial
+>   read in a later clause is refused outright, so the two-clause fixture no longer type-checks and
+>   `drgGeneral` would throw on it. What keeps L11 alive is unchanged and is the durable half:
 >   `D-PARTIAL` is drawn off the **IR shape**, independently of whether the checker refuses the
->   source, which is why the test stayed green across that change without being touched.
+>   source.
 >
-> Do not delete reading form (1) from the list above. It describes an IR shape the exporter can still
-> be handed — through **both** of `SUM-TYPE-FIELDS-SPEC.md` §5.1 item 1's surviving permissive holes
-> (an untyped `GIVEN` column, and a hand-written nullary declaration spelled with the desugarer's
-> reserved `__pm_fallthrough_` name), and through any future front end — and a refusal that stops
-> being reachable from today's surface syntax is not a refusal that has stopped mattering.
+>   **The obvious rewrite does not work, and the reason constrains every future one — this is new
+>   information, measured while doing it.** The repair the refusal itself recommends is a
+>   `CONSIDER`; `walkIssues` visits every branch body at `LazyPos` (`Dmn/Analysis.hs:517-525` — the
+>   `IfThenElse`, `MultiWayIf` and `Consider` arms) and L11 is gated on `StrictPos`, so a read
+>   narrowed by a `WHEN`, an `OTHERWISE`, an `IF` or a multi-way guard draws **no note at all**
+>   (measured: the note list came back empty). **Every narrowing form a BRANCH supplies puts the read
+>   in a lazy position by construction, so no branch-narrowed program can witness L11.** A `Where`
+>   body is the exception that makes the replacement possible: it is walked at the enclosing
+>   strictness (`:526`). The fixture is therefore a base written **as** a constructor —
+>   `` `the radius` MEANS unit's radius WHERE unit MEANS Circle OF 7 `` — which checks clean and
+>   evaluates `7` (measured 2026-09-14 on the worktree binary at `7ae280e5`). It is a **better**
+>   witness of what the note is about, not a weaker one: the read provably cannot raise and the note
+>   fires anyway, which is the over-approximation the "CAN raise" wording exists for.
 >
-> **The hole count here was "the surviving untyped-`GIVEN` hole", singular, until 2026-09-10.** That
-> was borrowed from the status header of the spec that owns it, which was itself wrong; §5.1 now
-> derives the list from `clauseColumnUniverse`'s own conditions and there are two. The correction
-> does not change this bullet's conclusion — one live hole would keep reading form (1) reachable —
-> but the number is quoted in a document that is not the owner, which is exactly where a borrowed
-> claim goes stale unnoticed.
+> Do not delete reading form (1) from the list above. ~~It describes an IR shape the exporter can
+> still be handed — through **both** of `SUM-TYPE-FIELDS-SPEC.md` §5.1 item 1's surviving permissive
+> holes (an untyped `GIVEN` column, and a hand-written nullary declaration spelled with the
+> desugarer's reserved `__pm_fallthrough_` name)…~~ **Those two holes are CLOSED (2026-09-13), and
+> the reason to keep reading form (1) is now the other one this sentence already gave: any future
+> front end.** A refusal that has stopped being reachable from today's surface syntax has not stopped
+> mattering — and on this exporter's own side nothing changes, because `D-PARTIAL` is drawn off the
+> IR shape rather than off what the checker accepts.
+>
+> **The hole count here was "the surviving untyped-`GIVEN` hole", singular, until 2026-09-10; then
+> two; now none.** Each of those numbers was borrowed from the owning spec and each was wrong when
+> borrowed — which is exactly where a borrowed claim goes stale unnoticed. Quote
+> `SUM-TYPE-FIELDS-SPEC.md` §5.1's measurement and its stated bounds; do not restate a count here.
 
 A decision that `CONSIDER`s such a union over its **nullary
 arms only** is **`Lossy`**, naming the constructors that have no cell — it is not refused, because
