@@ -27,7 +27,9 @@ made of.
 
 **Third reader, over the shoulder: the lawyer and the law review.** The blog is not written for
 them, but it will be read by them, and it must not say anything the paper would have to walk
-back. If a post overclaims, the paper inherits the correction.
+back. If a post overclaims, the paper inherits the correction. The footnotes are for this reader
+(§6): law is a citation discipline, and a post with a proper apparatus is one the law review can
+cite.
 
 ## 2. Voice
 
@@ -239,8 +241,21 @@ Act, the Jersey instruments — over new examples. One corpus, not two.
   `**STATUS <date>: DRAFT — …**` — because a reader of the raw file sees that before any
   front matter renderer does. Present tense, dated, per l4-ide `CLAUDE.md` §4.1.
 - **Headings** in sentence case. Few of them: a 2,000-word post wants three or four.
-- **Links inline.** A "Sources" list at the end repeats every citation with its check date.
-  No footnotes: the web reader does not scroll down and back.
+- **Links inline for the web reader; footnotes and academic citations for the scholarly one —
+  use both, liberally.** L4 has been an academic research project at SMU for six years (Meng,
+  2026-09-13), and the posts prefigure papers; a post that cites the way a paper cites is in
+  character, not out of it. Markdown footnotes (`[^n]`) carry the apparatus — the DOI, the page,
+  the caveat about what the source does and does not show. A "Sources" list at the end still
+  repeats every citation with its check date, because that list is what the fact-check reads.
+- **Funding acknowledgement, verbatim, as the last thing in every post** (after Sources):
+
+  > This research is supported by the National Research Foundation (NRF), Singapore, under its
+  > Industry Alignment Fund – Pre-Positioning Programme, as the Research Programme in
+  > Computational Law. Any opinions, findings and conclusions or recommendations expressed in
+  > this material are those of the author(s) and do not reflect the views of National Research
+  > Foundation, Singapore.
+
+  `blog/check-post.sh` fails a post that lacks it or alters it.
 - **No images that carry the argument.** A ladder diagram or a table may illustrate; the text
   must stand without it (second reader: the model).
 - **Titles are sentences,** as in the arc table. Title case is not used.
@@ -248,7 +263,8 @@ Act, the Jersey instruments — over new examples. One corpus, not two.
 ## 7. Process
 
 1. Draft in a worktree (`~/src/legalese/l4wt/<name>`), never the reference checkout.
-2. PR to `unstable`. The PR checklist is §4's table.
+2. Run `blog/check-post.sh` (structure, stanza, spelling, word count, and the tic lint) until it
+   is clean. PR to `unstable`. The PR checklist is §4's table.
 3. When a post goes live, flip `status` to `published`, add the URL to the status header, and
    record the date the citations were last re-checked.
 4. If a later post or paper contradicts an earlier post, correct the earlier post in place with
