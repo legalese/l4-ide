@@ -132,9 +132,19 @@ const CLITIC = /['’]s\s+`(is|has)(\s+[^`]*)?`?/g;
 //        DECLARE is invisible, which is the gap this file's own selftest caught.
 const DECL = /^\s+(HAS\s+)?`(is|has)\s+[^`]+`\s+IS\s+(A|AN|THE)\s+(?!FUNCTION\b)/;
 
+// A marker covers its own line AND the block it introduces -- the contiguous
+// run of non-blank lines after it, ending at the first blank line. A negative
+// example is written as a heading comment (`-- WRONG - the clitic already
+// supplied "is".`) followed by the offending lines, and putting the marker on
+// every one of those lines would clutter the very lesson it protects. Ending at
+// a blank line keeps the scope small and visible: you can see what a marker
+// covers without counting.
 function scanText(text, label, sink) {
   const findings = [];
+  let armed = false;
   text.split("\n").forEach((raw, i) => {
+    if (raw.trim() === "") armed = false;
+    else if (raw.includes(MARKER)) armed = true;
     const hits = [];
 
     CLITIC.lastIndex = 0;
@@ -154,7 +164,7 @@ function scanText(text, label, sink) {
     } else if (d) hits.push({ kind: "decl", file: label, line: i + 1, col: d[0].indexOf("`") + 1, text: raw.trim() });
 
     if (hits.length === 0) return;
-    if (raw.includes(MARKER)) sink.push(`${label}:${i + 1}`);
+    if (raw.includes(MARKER) || armed) sink.push(`${label}:${i + 1}`);
     else findings.push(...hits);
   });
   return findings;
@@ -214,6 +224,11 @@ const SELFTEST = [
     src: "-- decided by Part 1's `is misconduct`.   -- CLITIC-VERB-OK module member" },
   { name: "the marker does nothing on a clean line", findings: 0, suppressed: 0,
     src: "-- nothing to suppress here.   CLITIC-VERB-OK" },
+  { name: "a marker covers the block it introduces, up to a blank line",
+    findings: 0, suppressed: 2,
+    src: "-- WRONG   CLITIC-VERB-OK\n    `is to the issuer`  IS A BOOLEAN\n    `has a date of transfer`  IS A DATE" },
+  { name: "a blank line ends the marker's reach", findings: 1, suppressed: 1,
+    src: "-- WRONG   CLITIC-VERB-OK\n    `is bankrupt` IS A BOOLEAN\n\n    `is solvent` IS A BOOLEAN" },
   { name: "prose in markdown quoting the wrong form is a finding", findings: 1, suppressed: 0,
     src: "…quote it back — ``IF applicant's `is existing customer` THEN…``" },
 
