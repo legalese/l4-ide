@@ -59,6 +59,7 @@ executable l4
     L4.Cli.Docassemble
     L4.Cli.Export
     L4.Cli.Format
+    L4.Cli.Graph
     L4.Cli.Nlg
     L4.Cli.OpenFisca
     L4.Cli.Render

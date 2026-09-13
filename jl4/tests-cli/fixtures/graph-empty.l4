@@ -1,0 +1,4 @@
+§ GraphEmptyFixture
+
+-- No definitions at all: the dependency graph of this module is degenerate.
+#EVAL 1 + 1

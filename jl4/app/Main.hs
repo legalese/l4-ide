@@ -36,6 +36,7 @@ import L4.Cli.Check (CheckOptions, checkCmd, checkOptionsParser)
 import L4.Cli.Docassemble (DocassembleOptions, docassembleCmd, docassembleOptionsParser)
 import L4.Cli.Export (ExportOptions, exportCmd, exportOptionsParser)
 import L4.Cli.Format (FormatOptions, formatCmd, formatOptionsParser)
+import L4.Cli.Graph (GraphOptions, graphCmd, graphOptionsParser)
 import L4.Cli.Nlg (NlgOptions, nlgCmd, nlgOptionsParser)
 import L4.Cli.OpenFisca (OpenFiscaOptions, openFiscaCmd, openFiscaOptionsParser)
 import L4.Cli.Render (RenderOptions, renderCmd, renderOptionsParser)
@@ -64,6 +65,7 @@ data Command
   | CmdDocassemble DocassembleOptions
   | CmdNlg        NlgOptions
   | CmdVerify     VerifyOptions
+  | CmdGraph      GraphOptions
 
 commandParser :: Parser Command
 commandParser =
@@ -131,6 +133,9 @@ commandParser =
            (info (helper <*> (CmdVerify <$> verifyOptionsParser))
              (progDesc "Look for unsatisfiable rules, dead branches, vacuous guards and unreachable outcomes in the boolean decision skeleton"
                <> footerDoc (Just (verbatim propositionalBound))))
+      <> command "graph"
+           (info (helper <*> (CmdGraph <$> graphOptionsParser))
+             (progDesc "Render the global dependency graph as DOT or Mermaid (an edge reads \"is defined in terms of\")"))
 
 -- | A footer that keeps the line breaks it was written with.
 --
@@ -190,6 +195,7 @@ main = do
     CmdDocassemble opts -> docassembleCmd opts
     CmdNlg        opts -> nlgCmd        opts
     CmdVerify     opts -> verifyCmd     opts
+    CmdGraph      opts -> graphCmd      opts
 
 -- Silence unused-imports warning when we only import Options for types
 -- indirectly via re-exports.

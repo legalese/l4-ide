@@ -1,5 +1,16 @@
 # Specification: Global Dependency Graph
 
+**Status (2026-08-27): Passes 1–3 built; the integration points are not.** `L4.DependencyGraph`
+(jl4-core) builds the graph over the resolved main module plus its import closure (Pass 1: nodes,
+edges, entry-point roots), detects cycles (`cyclicSccs` / `computedFieldCycles`, Pass 2), and
+computes reachability and dead code (`reachableFrom` / `unreachableFrom` over an explicit
+`RootSet`, Pass 3). Its consumers today are `L4.DependencyGraph.Render` (DOT + Mermaid) and the
+`l4 graph` CLI subcommand — see `CALL-GRAPH-MATERIALITY-SPEC.md` D1 and R5. None of the callers
+in the "Integration Points" table is built: `TypeCheck.hs` does not run cycle detection
+(computed-field cycle errors still come only from the intra-record check in `Desugar.hs` plus the
+evaluator's runtime blackhole detection), there are no LSP dead-code warnings or grey-out, no
+tree-shaking (Pass 4), and no `EvaluateLazy` hook.
+
 ## Motivation
 
 The computed fields implementation (see `COMPUTED-FIELDS-SPEC.md`, "Cross-Record Cycles") revealed that L4 lacks a global dependency graph. Intra-record cycles between computed fields are caught at compile time, but cross-record cycles through top-level bindings are only caught at runtime by the lazy evaluator's blackhole detection. A global dependency graph would close this gap and enable several other analyses.
@@ -14,7 +25,22 @@ A single global dependency graph supports three analyses:
 
 All three are different queries over the same graph.
 
+(2026-08-27: `CALL-GRAPH-MATERIALITY-SPEC.md` adds two further consumers of this same graph —
+call-graph visualization, and instance-relative materiality/counterfactual analysis. It defers to
+this spec on graph structure; nothing there re-decides anything here.)
+
 ## Graph Structure
+
+**Shipped structure (2026-08-27).** The implementation extends the three tables below in ways this
+spec did not anticipate, and the module haddock of `L4.DependencyGraph` is the authoritative record
+of each decision. In brief: a record's explicit constructor and an enum's member constructors are
+nodes distinct from their type (so `DECLARE Color IS ONE OF Red, Green` mints three nodes, not
+one), constructor arguments mint selector nodes, and a `DECLARE` carries structural edges — type →
+its selectors and constructors, record constructor → its type, selector/constructor → the
+references in its field/argument types — so a reachable type keeps its whole schema. The
+entry-point list additionally includes `#EVALTRACE` and `#ASSERT` directives and the references in
+a `TIMEZONE IS` expression, and entry points are harvested from the main module only (a
+dependency's directives run when *it* is the module being run, not when its importer is).
 
 ### Nodes
 
@@ -133,3 +159,5 @@ New module `L4.DependencyGraph` in `jl4-core`. Depends on the resolved AST (`Mod
 2. **Cross-module cycles:** If module A imports module B and both have computed fields that reference each other, should this be detected? The import resolution already detects cyclic imports, but computed field cycles could exist within a valid import DAG if the references are indirect.
 
 3. **Performance:** For large codebases, building the full dependency graph after every edit may be expensive. Consider incremental updates (only rebuild subgraphs for changed modules) or lazy construction (build on demand for specific analyses).
+
+4. **Node identity is not proposition identity (added 2026-08-27).** Two resolved names can denote the same proposition: a zero-arity `WHERE e MEANS m` gives `e` and `m` distinct Uniques, and any propositional analysis over this graph's nodes (satisfiability, materiality, question generation) must collapse them — measured consequence and fix in `specs/todo/WHERE-INLINING-SPEC.md` (PR #307). The graph itself should **keep** such bindings as nodes (they are drafter-written abstraction boundaries, and `CALL-GRAPH-MATERIALITY-SPEC.md` D5 folds on them); consumers doing propositional reasoning inline them first (`L4.Transform.inlineLocalBindings`). Whether the graph should carry a "definitionally-equal-to" edge kind so consumers need not re-derive the collapse is open.
