@@ -22,6 +22,17 @@ prefigures. The arc has already changed once (7 posts → 8) as material arrived
 | 8  | What formalization can't do         | `cls-determinacy-frontier/`                                 |
 | S1 | Seeing like a citizen               | `political-economy/` — standalone, runs any time            |
 
+## Framing constraints
+
+Things a post must say, or must not claim, recorded when they were decided so a later drafter
+does not have to rediscover them.
+
+- **Post 1.** We are not claiming incompetence on the part of the legislative drafters. The race
+  condition in the regulations turned out to be documented in the accompanying guidance, which
+  ameliorated it in practice. The claim is that our methods found it from the text of the rules
+  alone — which is both the more defensible claim and the more interesting one, since it is the
+  reader without the guidance who is caught. Both halves go in the post. (Meng, 2026-09-13.)
+
 Citation notes gathered per post live in the planning notes (a Claude memory file, not in this
 tree) until each post is drafted, at which point they move into the post's Sources list and are
 re-verified there.
