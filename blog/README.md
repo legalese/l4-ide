@@ -31,7 +31,11 @@ does not have to rediscover them.
   condition in the regulations turned out to be documented in the accompanying guidance, which
   ameliorated it in practice. The claim is that our methods found it from the text of the rules
   alone — which is both the more defensible claim and the more interesting one, since it is the
-  reader without the guidance who is caught. Both halves go in the post. (Meng, 2026-09-13.)
+  reader without the guidance who is caught. Both halves go in the post. And the gap is bridged
+  in more than one direction: found at drafting time, the same race condition could have been
+  fixed in the regulations themselves, earlier, rather than afterwards in guidance that is
+  effectively a practice direction — a patch beside a binding text that still carries the
+  contradiction. The offer is to the drafters as much as to the reader. (Meng, 2026-09-13.)
 
 Citation notes gathered per post live in the planning notes (a Claude memory file, not in this
 tree) until each post is drafted, at which point they move into the post's Sources list and are
