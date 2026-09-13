@@ -52,10 +52,10 @@ DECIDE `the person can vote` IF
 
 -- Does a transaction need review?
 GIVEN amount IS A NUMBER
-      `is high risk` IS A BOOLEAN
+      `high risk` IS A BOOLEAN
 GIVETH A BOOLEAN
 DECIDE `the transaction needs review` IF
-    amount > 10000 OR `is high risk`
+    amount > 10000 OR `high risk`
 
 -- Is the person a minor?
 GIVEN age IS A NUMBER

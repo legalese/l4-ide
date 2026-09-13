@@ -466,7 +466,7 @@ DECLARE Part4CourtOrder HAS
     `(g) making the administration of the charity subject to such supervision, restraint or conditions, from such time, and for such periods, as the court may specify`  IS A BOOLEAN
     `(h) requiring a governor who appears to the court to have engaged in any misconduct, or any other person who appears to be responsible for any misconduct, to take such steps as the court may direct to remedy the effects of the misconduct`  IS A BOOLEAN
     `(i) making such ancillary provision as the court thinks desirable`  IS A BOOLEAN
-    `is an order of some other kind, not among those listed in paragraph (3)`  IS A BOOLEAN
+    `an order of some other kind, not among those listed in paragraph (3)`  IS A BOOLEAN
 
 GIVEN o IS A Part4CourtOrder
 GIVETH A BOOLEAN
@@ -1205,7 +1205,7 @@ GIVETH A DEONTIC Actor Part4bAction
     `(g) making the administration of the charity subject to such supervision, restraint or conditions, from such time, and for such periods, as the court may specify`  IS FALSE
     `(h) requiring a governor who appears to the court to have engaged in any misconduct, or any other person who appears to be responsible for any misconduct, to take such steps as the court may direct to remedy the effects of the misconduct`  IS FALSE
     `(i) making such ancillary provision as the court thinks desirable`  IS TRUE
-    `is an order of some other kind, not among those listed in paragraph (3)`  IS FALSE
+    `an order of some other kind, not among those listed in paragraph (3)`  IS FALSE
 
 #ASSERT `Article 14(3) — the order is among those expressly listed` `an order suspending a governor, with ancillary provision`
 
@@ -1225,7 +1225,7 @@ GIVETH A DEONTIC Actor Part4bAction
     `(g) making the administration of the charity subject to such supervision, restraint or conditions, from such time, and for such periods, as the court may specify`  IS FALSE
     `(h) requiring a governor who appears to the court to have engaged in any misconduct, or any other person who appears to be responsible for any misconduct, to take such steps as the court may direct to remedy the effects of the misconduct`  IS FALSE
     `(i) making such ancillary provision as the court thinks desirable`  IS FALSE
-    `is an order of some other kind, not among those listed in paragraph (3)`  IS TRUE
+    `an order of some other kind, not among those listed in paragraph (3)`  IS TRUE
 
 #ASSERT NOT `Article 14(3) — the order is among those expressly listed` `an order the court sees fit, of a kind not listed`
 

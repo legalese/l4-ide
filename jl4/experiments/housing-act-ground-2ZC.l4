@@ -43,9 +43,9 @@ IMPORT daydate
 -- of the previous joint landlords".
 DECLARE QualifyingLandlordType HAS
   `is a private registered provider of social housing`                         IS A BOOLEAN  -- (a)
-  `is a tenant under an agricultural holding or farm business tenancy`         IS A BOOLEAN  -- (b)
+  `a tenant under an agricultural holding or farm business tenancy`         IS A BOOLEAN  -- (b)
   `held the dwelling-house for use as supported accommodation`                 IS A BOOLEAN  -- (c)
-  `is a company of which a local authority owns at least 50% of share capital` IS A BOOLEAN  -- (d)
+  `a company of which a local authority owns at least 50% of share capital` IS A BOOLEAN  -- (d)
 
 -- The operative atoms. The chapeau turns on the landlord having become the
 -- landlord by virtue of section 18 (a fact) and on the gap between that date and
@@ -90,11 +90,11 @@ GIVETH A BOOLEAN
         "(a) a private registered provider of social housing,"
     ..  `landlord type`'s `is a private registered provider of social housing`
     ..  "(b) a tenant of the superior landlord under a tenancy of an agricultural holding within the meaning of the Agricultural Holdings Act 1986 which is a tenancy to which that Act applies, or a farm business tenancy within the meaning of the Agricultural Tenancies Act 1995,"
-    ..  `landlord type`'s `is a tenant under an agricultural holding or farm business tenancy`
+    ..  `landlord type`'s `a tenant under an agricultural holding or farm business tenancy`
     ..  "(c) a person who held the dwelling-house for the purpose of making it available for occupation as supported accommodation, or"
     ..  `landlord type`'s `held the dwelling-house for use as supported accommodation`
     ..  "(d) a company of which a local authority owns at least 50% of the issued share capital."
-    ..  `landlord type`'s `is a company of which a local authority owns at least 50% of share capital`
+    ..  `landlord type`'s `a company of which a local authority owns at least 50% of share capital`
 
 §§ `The chapeau — became landlord by s.18 within 6 months of proceedings`
 
@@ -149,33 +149,33 @@ GIVETH A DEONTIC Actor Action
 
 `prev — private registered provider` MEANS QualifyingLandlordType WITH
   `is a private registered provider of social housing`                         IS TRUE
-  `is a tenant under an agricultural holding or farm business tenancy`         IS FALSE
+  `a tenant under an agricultural holding or farm business tenancy`         IS FALSE
   `held the dwelling-house for use as supported accommodation`                 IS FALSE
-  `is a company of which a local authority owns at least 50% of share capital` IS FALSE
+  `a company of which a local authority owns at least 50% of share capital` IS FALSE
 
 `prev — agricultural tenant` MEANS QualifyingLandlordType WITH
   `is a private registered provider of social housing`                         IS FALSE
-  `is a tenant under an agricultural holding or farm business tenancy`         IS TRUE
+  `a tenant under an agricultural holding or farm business tenancy`         IS TRUE
   `held the dwelling-house for use as supported accommodation`                 IS FALSE
-  `is a company of which a local authority owns at least 50% of share capital` IS FALSE
+  `a company of which a local authority owns at least 50% of share capital` IS FALSE
 
 `prev — supported accommodation holder` MEANS QualifyingLandlordType WITH
   `is a private registered provider of social housing`                         IS FALSE
-  `is a tenant under an agricultural holding or farm business tenancy`         IS FALSE
+  `a tenant under an agricultural holding or farm business tenancy`         IS FALSE
   `held the dwelling-house for use as supported accommodation`                 IS TRUE
-  `is a company of which a local authority owns at least 50% of share capital` IS FALSE
+  `a company of which a local authority owns at least 50% of share capital` IS FALSE
 
 `prev — LA-owned company` MEANS QualifyingLandlordType WITH
   `is a private registered provider of social housing`                         IS FALSE
-  `is a tenant under an agricultural holding or farm business tenancy`         IS FALSE
+  `a tenant under an agricultural holding or farm business tenancy`         IS FALSE
   `held the dwelling-house for use as supported accommodation`                 IS FALSE
-  `is a company of which a local authority owns at least 50% of share capital` IS TRUE
+  `a company of which a local authority owns at least 50% of share capital` IS TRUE
 
 `prev — none of the list` MEANS QualifyingLandlordType WITH
   `is a private registered provider of social housing`                         IS FALSE
-  `is a tenant under an agricultural holding or farm business tenancy`         IS FALSE
+  `a tenant under an agricultural holding or farm business tenancy`         IS FALSE
   `held the dwelling-house for use as supported accommodation`                 IS FALSE
-  `is a company of which a local authority owns at least 50% of share capital` IS FALSE
+  `a company of which a local authority owns at least 50% of share capital` IS FALSE
 
 -- The (a)-(d) list bites: each listed type qualifies; "none" does not.
 #ASSERT     `is one of the qualifying landlord types` `prev — private registered provider`

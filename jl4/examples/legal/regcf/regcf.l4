@@ -273,8 +273,8 @@ DECLARE IssuerProfile HAS
     `subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act`             IS A BOOLEAN
     `an investment company, or is excluded from the definition of investment company by section 3(b) or section 3(c)`    IS A BOOLEAN
     `subject to a disqualification as specified in section 227.503(a)`                                                   IS A BOOLEAN
-    `has sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement` IS A BOOLEAN
-    `has no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies` IS A BOOLEAN
+    `sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement` IS A BOOLEAN
+    `no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies` IS A BOOLEAN
 
 @ref 17 CFR 227.100(b)(1)
 GIVEN issuer IS AN IssuerProfile
@@ -306,13 +306,13 @@ GIVETH A BOOLEAN
 GIVEN issuer IS AN IssuerProfile
 GIVETH A BOOLEAN
 `(b)(5) — delinquent in ongoing annual reports` issuer MEANS
-        "(5)" ... issuer's `has sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement`
+        "(5)" ... issuer's `sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement`
 
 @ref 17 CFR 227.100(b)(6)
 GIVEN issuer IS AN IssuerProfile
 GIVETH A BOOLEAN
 `(b)(6) — no specific business plan, or a blank-check business plan` issuer MEANS
-        "(6)" ... issuer's `has no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies`
+        "(6)" ... issuer's `no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies`
 
 @ref 17 CFR 227.100(b) — the disjunction of exclusions
 GIVEN issuer IS AN IssuerProfile
@@ -903,8 +903,8 @@ DECIDE `the transaction qualifies for the section 4(a)(6) exemption` issuer offe
     `subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act`             IS FALSE
     `an investment company, or is excluded from the definition of investment company by section 3(b) or section 3(c)`    IS FALSE
     `subject to a disqualification as specified in section 227.503(a)`                                                   IS FALSE
-    `has sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement` IS FALSE
-    `has no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies` IS FALSE
+    `sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement` IS FALSE
+    `no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies` IS FALSE
 
 `a foreign issuer` MEANS IssuerProfile WITH
     name IS "Ausland GmbH"
@@ -912,8 +912,8 @@ DECIDE `the transaction qualifies for the section 4(a)(6) exemption` issuer offe
     `subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act`             IS FALSE
     `an investment company, or is excluded from the definition of investment company by section 3(b) or section 3(c)`    IS FALSE
     `subject to a disqualification as specified in section 227.503(a)`                                                   IS FALSE
-    `has sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement` IS FALSE
-    `has no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies` IS FALSE
+    `sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement` IS FALSE
+    `no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies` IS FALSE
 
 -- The limb the mirrored page omits: everything else is clean, but the issuer is
 -- behind on its Reg CF annual reports.
@@ -923,8 +923,8 @@ DECIDE `the transaction qualifies for the section 4(a)(6) exemption` issuer offe
     `subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act`             IS FALSE
     `an investment company, or is excluded from the definition of investment company by section 3(b) or section 3(c)`    IS FALSE
     `subject to a disqualification as specified in section 227.503(a)`                                                   IS FALSE
-    `has sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement` IS TRUE
-    `has no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies` IS FALSE
+    `sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement` IS TRUE
+    `no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies` IS FALSE
 
 `a blank-check issuer` MEANS IssuerProfile WITH
     name IS "SPAC-ish LLC"
@@ -932,8 +932,8 @@ DECIDE `the transaction qualifies for the section 4(a)(6) exemption` issuer offe
     `subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act`             IS FALSE
     `an investment company, or is excluded from the definition of investment company by section 3(b) or section 3(c)`    IS FALSE
     `subject to a disqualification as specified in section 227.503(a)`                                                   IS FALSE
-    `has sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement` IS FALSE
-    `has no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies` IS TRUE
+    `sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement` IS FALSE
+    `no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies` IS TRUE
 
 GIVEN `prior sales`   IS A NUMBER
       `maximum`       IS A NUMBER

@@ -213,7 +213,7 @@ DECIDE `commits cheating` IF
                                   .. "if he were not so deceived"
              AND         "which act or omission"
                      ..  `causes`
-                     OR  `is likely to cause`
+                     OR  `likely to cause`
                  ...     `damage`
                      OR  `harm`
                      ..  "to any person"

@@ -30,7 +30,7 @@ DECLARE Tenant
       @desc Whether this tenant signed the tenancy agreement
       `signed the agreement` IS A BOOLEAN
       @desc Whether this tenant has been evicted from a social tenancy before
-      `has been evicted` IS A BOOLEAN
+      `been evicted` IS A BOOLEAN
 
 DECLARE Household
     HAS
@@ -48,15 +48,15 @@ GIVEN h IS A Household @desc The household applying for the tenancy
 GIVETH A BOOLEAN
 DECIDE `the household is eligible` h IF
         all (GIVEN t YIELD `the tenant qualifies` t) (h's tenants)
-    AND NOT (any (GIVEN t YIELD t's `has been evicted`) (h's tenants))
+    AND NOT (any (GIVEN t YIELD t's `been evicted`) (h's tenants))
 
 -- Two adult signatories, neither previously evicted.
 #EVAL `the household is eligible` OF
         Household
         WITH
             tenants IS
-                LIST  (Tenant WITH age IS 30, `signed the agreement` IS TRUE, `has been evicted` IS FALSE)
-                    , (Tenant WITH age IS 25, `signed the agreement` IS TRUE, `has been evicted` IS FALSE)
+                LIST  (Tenant WITH age IS 30, `signed the agreement` IS TRUE, `been evicted` IS FALSE)
+                    , (Tenant WITH age IS 25, `signed the agreement` IS TRUE, `been evicted` IS FALSE)
 -- TRUE
 
 -- The first tenant is a minor. `all` fails on element 0, so nothing about
@@ -66,8 +66,8 @@ DECIDE `the household is eligible` h IF
         Household
         WITH
             tenants IS
-                LIST  (Tenant WITH age IS 17, `signed the agreement` IS TRUE, `has been evicted` IS FALSE)
-                    , (Tenant WITH age IS 25, `signed the agreement` IS TRUE, `has been evicted` IS FALSE)
+                LIST  (Tenant WITH age IS 17, `signed the agreement` IS TRUE, `been evicted` IS FALSE)
+                    , (Tenant WITH age IS 25, `signed the agreement` IS TRUE, `been evicted` IS FALSE)
 -- FALSE
 
 -- Both adults and both signed, but the second has been evicted before.
@@ -75,8 +75,8 @@ DECIDE `the household is eligible` h IF
         Household
         WITH
             tenants IS
-                LIST  (Tenant WITH age IS 30, `signed the agreement` IS TRUE, `has been evicted` IS FALSE)
-                    , (Tenant WITH age IS 25, `signed the agreement` IS TRUE, `has been evicted` IS TRUE)
+                LIST  (Tenant WITH age IS 30, `signed the agreement` IS TRUE, `been evicted` IS FALSE)
+                    , (Tenant WITH age IS 25, `signed the agreement` IS TRUE, `been evicted` IS TRUE)
 -- FALSE
 
 -- The empty household: vacuously eligible. See the header.

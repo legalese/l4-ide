@@ -190,7 +190,7 @@ Any identifier containing spaces or punctuation must be backtick-quoted:
 
 ```l4
 `the applicant`
-`has valid identification`
+`valid identification`
 `the person must not sell alcohol`
 ```
 

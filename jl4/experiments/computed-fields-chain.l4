@@ -23,14 +23,14 @@ DECLARE Driver HAS
     `age`               IS A NUMBER
     `years licensed`    IS A NUMBER
     `accident count`    IS A NUMBER
-    `has tickets`       IS A BOOLEAN
+    `tickets`       IS A BOOLEAN
     `adult`             IS A BOOLEAN
         MEANS `age` >= 18
     `experienced`       IS A BOOLEAN
         MEANS `years licensed` >= 2
     `risk category`     IS A `Risk Category`
         MEANS IF `accident count` = 0
-              THEN IF `has tickets` THEN `Medium Risk` ELSE `Low Risk`
+              THEN IF `tickets` THEN `Medium Risk` ELSE `Low Risk`
               ELSE IF `accident count` <= 2
                    THEN `High Risk`
                    ELSE `Uninsurable`
@@ -45,21 +45,21 @@ alice MEANS Driver WITH
     `age`            IS 25
     `years licensed` IS 3
     `accident count` IS 0
-    `has tickets`    IS FALSE
+    `tickets`    IS FALSE
 
 teen MEANS Driver WITH
     `name`           IS "Teen"
     `age`            IS 16
     `years licensed` IS 0
     `accident count` IS 0
-    `has tickets`    IS FALSE
+    `tickets`    IS FALSE
 
 risky MEANS Driver WITH
     `name`           IS "Risky"
     `age`            IS 40
     `years licensed` IS 10
     `accident count` IS 4
-    `has tickets`    IS TRUE
+    `tickets`    IS TRUE
 
 -- Computed field chain: eligible depends on adult and experienced
 #EVAL alice's `eligible`        -- TRUE  (adult=T, experienced=T, accidents<=3)

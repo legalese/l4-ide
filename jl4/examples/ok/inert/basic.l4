@@ -8,7 +8,7 @@
 `consideration present` MEANS TRUE
 `is over 21` MEANS TRUE
 `is married` MEANS TRUE
-`has parental consent` MEANS FALSE
+`parental consent` MEANS FALSE
 `condition one` MEANS TRUE
 `condition two` MEANS TRUE
 
@@ -22,7 +22,7 @@ DECIDE `person qualifies` IF
     ... `is over 21`
     ... "for better or for poorer"
     AND     `is married`
-        OR  `has parental consent`
+        OR  `parental consent`
 
 -- Test head position inert
 DECIDE `head inert` IF
