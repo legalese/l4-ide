@@ -60,6 +60,27 @@ does not have to rediscover them.
   reported as such or left out. Replace the spec's remediate/assessment fragment in the opening
   with this real shape, names filed off.
 
+  **The insurer — Meng, 2026-09-14, answering marker 3. Use this.** His words: "The insurer
+  reviewed what it had been doing — it had been making the larger payout, not the smaller — and
+  we had to finesse the explanation of the case to management because we were acutely aware that
+  the team of insurance adjusters who had been kindly assisting us with the pilot project could
+  potentially be penalized for overpaying. When we presented the findings at CxO level though the
+  top management simply observed that the newly discovered ambiguity of the contract may have
+  exposed them to a 'Ocidental – Companhia Portuguesa de Seguros de Vida v LP, C-263/22, CJEU,
+  20 April 2023' liability risk, and that clarifying the ambiguity would save them that
+  liability; no mention was made of whether they would lean stricter or stay generous in future
+  payouts. So the fix was at the right layer: at the abstract logic and not necessarily the
+  particular algorithm." What the post may say: the insurer had been paying the generous reading;
+  the finding was presented so that the adjusters who had helped were not exposed; management's
+  response was about the liability an ambiguous consumer term carries, not about which reading
+  to pay in future; the fix was to the wording, at the level of the logic, not to the payout
+  algorithm. The CJEU citation must be opened and checked before it enters the post (EUR-Lex
+  CELEX 62022CJ0263); state only what the judgment actually holds. Meng's closing phrase, "It was
+  about computability in the NP-hard sense," is his gloss — do not put "NP-hard" in the post
+  unless the claim is made precise (NP-hardness is a complexity class, and the formal-methods
+  critic will ask which problem was shown hard); the substance is that the defect was in the
+  logic of the term, not in any computation of it.
+
 - **Post 9 (the call to action).** Meng (2026-09-14): "Feel like the series is lacking a call to
   action as the last post. What are we doing with these new capabilities?" Two calls, in his
   words. First: "an encoding of all the world's laws, one statute at a time: like Wikipedia but a
