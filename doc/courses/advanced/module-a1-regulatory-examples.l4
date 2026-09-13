@@ -59,7 +59,7 @@ DECLARE Governor HAS
     `the name` IS A STRING
     `the date of birth` IS A DATE
     `the address` IS A STRING
-    `is bankrupt` IS A BOOLEAN
+    `bankrupt` IS A BOOLEAN
     `the convictions` IS A LIST OF Conviction
 
 -- Core financial information (Regulation 1, Core Info Regs 2018)
@@ -347,7 +347,7 @@ DECIDE `purpose valid at date` IF
     `the name` IS "John Smith"
     `the date of birth` IS Date 15 6 1975
     `the address` IS "123 Main Street, St Helier"
-    `is bankrupt` IS FALSE
+    `bankrupt` IS FALSE
     `the convictions` IS EMPTY
 
 -- Sample financial info

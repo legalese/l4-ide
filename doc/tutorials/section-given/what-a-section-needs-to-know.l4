@@ -152,7 +152,7 @@ GIVETH A BOOLEAN
 
 DECLARE Person
     HAS `offered an advantage`         IS A BOOLEAN
-        `is a foreign public official` IS A BOOLEAN
+        `a foreign public official` IS A BOOLEAN
 
 § `Bribery Act 2010`
 
@@ -167,7 +167,7 @@ GIVETH A BOOLEAN
           f IS A Person
 
 GIVETH A BOOLEAN
-`F is a foreign public official` MEANS f's `is a foreign public official`
+`F is a foreign public official` MEANS f's `a foreign public official`
 
 -- ====================================================================
 -- Concept 3, the same word for two things. Two sections may each name a

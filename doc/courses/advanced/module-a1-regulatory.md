@@ -92,7 +92,7 @@ DECLARE Governor HAS
     `the name` IS A STRING
     `the date of birth` IS A DATE
     `the address` IS A STRING
-    `is bankrupt` IS A BOOLEAN
+    `bankrupt` IS A BOOLEAN
     `the convictions` IS A LIST OF Conviction
 
 -- Core financial information (Regulation 1, Core Info Regs 2018)

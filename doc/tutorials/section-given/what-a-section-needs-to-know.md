@@ -416,7 +416,7 @@ They do it with letters too. Section 1 of the Bribery Act 2010 opens by introduc
 ```l4
 DECLARE Person
     HAS `offered an advantage`         IS A BOOLEAN
-        `is a foreign public official` IS A BOOLEAN
+        `a foreign public official` IS A BOOLEAN
 
 § `Bribery Act 2010`
 
@@ -431,7 +431,7 @@ GIVETH A BOOLEAN
           f IS A Person
 
 GIVETH A BOOLEAN
-`F is a foreign public official` MEANS f's `is a foreign public official`
+`F is a foreign public official` MEANS f's `a foreign public official`
 ```
 
 (`§§` is a heading one level down from `§`, the way a subsection sits under a section. `p` and `f` are ordinary L4 names — a single letter is as good a name as `alex`, and here it is the name the statute itself chose. `DECLARE Person` says what kind of thing a person is in this encoding, and `` p's `offered an advantage` `` reads one of those facts off `p`, the way the apostrophe reads in English.)

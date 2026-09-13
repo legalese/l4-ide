@@ -121,7 +121,7 @@ The ellipsis operators are implicit conjunction/disjunction — they let you wri
 
 ```l4
 DECIDE `eligible for discount` IF
-    `is existing customer`
+    `existing customer`
     ...
     `has clean payment history`
     ...

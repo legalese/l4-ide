@@ -269,9 +269,9 @@ GIVEN filing IS A `Form C filing`
 GIVETH AN EITHER STRING BOOLEAN
 `the filing is accepted` filing MEANS
     BRANCH
-       IF NOT filing's `has the required financial statements`
+       IF NOT filing's `required financial statements`
            THEN LEFT "rejected: the required financial statements are missing"
-       IF NOT filing's `is signed`
+       IF NOT filing's `signed`
            THEN LEFT "rejected: the filing is not signed"
        OTHERWISE RIGHT TRUE
 ```

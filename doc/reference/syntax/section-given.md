@@ -26,7 +26,7 @@ GIVETH A BOOLEAN
 
 GIVETH A BOOLEAN
 `is disqualified` MEANS
-    issuer's `has a disqualifying event`
+    issuer's `a disqualifying event`
 ```
 
 Both rules read `issuer`. Neither declares it.

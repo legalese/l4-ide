@@ -4,21 +4,21 @@
       "applicant": {
         "age": 50,
         "risk score": 0.8,
-        "is existing customer": false
+        "existing customer": false
       }
     },
     {
       "applicant": {
         "age": 35,
         "risk score": 0.4,
-        "is existing customer": true
+        "existing customer": true
       }
     },
     {
       "applicant": {
         "age": 35,
         "risk score": 0.4,
-        "is existing customer": false
+        "existing customer": false
       }
     }
   ],
@@ -27,21 +27,21 @@
       "applicant": {
         "age": 35,
         "risk score": 0.4,
-        "is existing customer": true
+        "existing customer": true
       }
     },
     {
       "applicant": {
         "age": 50,
         "risk score": 0.8,
-        "is existing customer": false
+        "existing customer": false
       }
     },
     {
       "applicant": {
         "age": 60,
         "risk score": 0.5,
-        "is existing customer": true
+        "existing customer": true
       }
     }
   ]
