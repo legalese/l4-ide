@@ -2369,7 +2369,7 @@ GIVETH A BOOLEAN
          OR g's `the kind of grant` EQUALS `letters of administration with the will annexed`)
     ... "to give such security as he is lawfully required to furnish"
     ... `security is lawfully required of some grantee` d g f `the date`
-    ... NOT (g's `given such security as is lawfully required to be furnished`)
+    ... NOT (g's `has given such security as is lawfully required to be furnished`)
     ... "neglects within one month of the date of the grant"
     AND `one month has expired from the date of the grant` g `the date`
 
@@ -3404,7 +3404,7 @@ GIVETH A Grant
         `the exception subject to which the grant is made` IS NOTHING
         `expired by effluxion of time or by the happening of the event or contingency on which it was limited` IS `it has expired`
         `revoked` IS FALSE
-        `given such security as is lawfully required to be furnished` IS `security has been given`
+        `has given such security as is lawfully required to be furnished` IS `security has been given`
         `been extracted` IS `been taken out`
         `sealed under section 47(1) of the Probate and Administration Act 1934` IS FALSE
         `the date of the sealing` IS NOTHING
@@ -4591,7 +4591,7 @@ GIVETH A `Deceased person`
         `the exception subject to which the grant is made` IS NOTHING
         `expired by effluxion of time or by the happening of the event or contingency on which it was limited` IS FALSE
         `revoked` IS TRUE
-        `given such security as is lawfully required to be furnished` IS TRUE
+        `has given such security as is lawfully required to be furnished` IS TRUE
         `been extracted` IS TRUE
         `sealed under section 47(1) of the Probate and Administration Act 1934` IS FALSE
         `the date of the sealing` IS NOTHING
@@ -6032,7 +6032,7 @@ GIVETH A Family
         `the exception subject to which the grant is made` IS JUST "the immovable property situated outside Singapore"
         `expired by effluxion of time or by the happening of the event or contingency on which it was limited` IS FALSE
         `revoked` IS FALSE
-        `given such security as is lawfully required to be furnished` IS TRUE
+        `has given such security as is lawfully required to be furnished` IS TRUE
         `been extracted` IS TRUE
         `sealed under section 47(1) of the Probate and Administration Act 1934` IS FALSE
         `the date of the sealing` IS NOTHING

@@ -69,6 +69,34 @@ const SKIP_DIRS = new Set([
 const EXTS = new Set([".l4", ".md"]);
 const MARKER = "CLITIC-VERB-OK";
 
+// EXEMPTIONS. Meng ruled on 2026-09-13 that rare exceptions may keep the verb
+// "especially if they are terms of art from the upstream source". The marker
+// above handles a one-off line; this list handles a NAME, because a name used in
+// forty places should not need forty markers -- and because the reason belongs
+// in one reviewable place rather than scattered through the corpus.
+//
+// The test that admits the first five is objective rather than a matter of
+// taste: the name contains a SECOND `is`/`has` inside it. A name we coined does
+// not do that. A limb quoted from a statute does, because the source sentence
+// has its own clauses -- and in each of these the chapeau does NOT supply the
+// verb (Reg CF's is bare: "if the issuer:"), so the limb carries it and matching
+// the source means carrying it too. Fidelity to the source is the ruling's own
+// stated rationale, so it is also the ruling's own limit.
+const EXEMPT = new Map([
+  ["has given such security as is lawfully required to be furnished",
+   "Probate and Administration Act limb, quoted; contains its own `is`"],
+  ["has no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies",
+   "17 CFR 227.100(b)(6), quoted; the chapeau does not supply the verb"],
+  ["has sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement",
+   "17 CFR 227.100(b)(5), quoted; the chapeau does not supply the verb"],
+  ["has that general control and management only on behalf of another person who has it in that other person's own right under the constitution of the entity",
+   "Charities (Jersey) Law limb, quoted; contains its own `has`"],
+  ["is calculated to facilitate, or is conducive or incidental to, the performance of any of the Commissioner's functions",
+   "Charities (Jersey) Law limb, quoted; contains its own `is`"],
+  ["has capacity",
+   "term of art in succession and mental-capacity law; `capacity` alone reads as an amount"],
+]);
+
 // `'s` (straight or curly apostrophe), whitespace, then a backticked name whose
 // first word is `is` or `has`. The name must continue past the verb -- a field
 // actually called `` `is` `` is not this bug -- and the closing backtick is not
@@ -115,11 +143,15 @@ function scanText(text, label, sink) {
       // `` X's `is` `` on its own is a field named for the verb alone, which is
       // a different (and rarer) smell; this check is about the doubled verb.
       if (!m[2] || !m[2].trim()) continue;
+      if (EXEMPT.has((m[1] + m[2]).trim())) continue;
       hits.push({ kind: "deref", file: label, line: i + 1, col: m.index + 1, text: raw.trim() });
     }
 
     const d = DECL.exec(raw);
-    if (d) hits.push({ kind: "decl", file: label, line: i + 1, col: d[0].indexOf("`") + 1, text: raw.trim() });
+    const dn = d && /`([^`]+)`/.exec(d[0]);
+    if (d && dn && EXEMPT.has(dn[1])) {
+      // named exemption: recorded once in EXEMPT, not repeated at every site
+    } else if (d) hits.push({ kind: "decl", file: label, line: i + 1, col: d[0].indexOf("`") + 1, text: raw.trim() });
 
     if (hits.length === 0) return;
     if (raw.includes(MARKER)) sink.push(`${label}:${i + 1}`);
@@ -191,7 +223,11 @@ const SELFTEST = [
   { name: "a has-prefixed field declaration is a finding", findings: 1, suppressed: 0,
     src: "    HAS `has tickets`    IS A BOOLEAN" },
   { name: "a trailing TYPICALLY does not hide the declaration", findings: 1, suppressed: 0,
-    src: "        `has capacity`   IS A BOOLEAN TYPICALLY TRUE" },
+    src: "        `has spousal approval`   IS A BOOLEAN TYPICALLY FALSE" },
+  { name: "a name on the EXEMPT list is not reported, at its declaration",
+    findings: 0, suppressed: 0, src: "        `has capacity`   IS A BOOLEAN TYPICALLY TRUE" },
+  { name: "a name on the EXEMPT list is not reported, at a dereference",
+    findings: 0, suppressed: 0, src: "    IF testator's `has capacity`" },
   { name: "a non-boolean field counts too", findings: 1, suppressed: 0,
     src: "        `has a date of transfer`                 IS A DATE" },
   { name: "the repaired declaration is clean", findings: 0, suppressed: 0,

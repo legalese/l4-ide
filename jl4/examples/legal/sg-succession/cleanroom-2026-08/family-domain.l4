@@ -1676,7 +1676,7 @@ DECLARE Grant HAS
     `revoked`                                          IS A BOOLEAN
 
     @ref Probate and Administration Act 1934 s 55(1)(c) — "neglects within one month of the date of the grant to give such security as he is lawfully required to furnish"; s 29(1)-(8), s 35(2)(b), s 49(1)
-    `given such security as is lawfully required to be furnished` IS A BOOLEAN
+    `has given such security as is lawfully required to be furnished` IS A BOOLEAN
     @ref Probate and Administration Act 1934 s 55(1)(e) — "where an administrator has failed to extract the grant of letters of administration"
     -- The administrator's counterpart of `Executor appointed by a will`'s
     -- `appeared and extracted probate` (s 13(1)(e)), which had none.

@@ -739,8 +739,8 @@ DECLARE IssuerProfile HAS
     `subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act`  IS A BOOLEAN
     `formerly subject to section 13 or 15(d) reporting, since terminated or suspended`  IS A BOOLEAN
     `an investment company as defined in section 3 of the Investment Company Act, or excluded from that definition by section 3(b) or section 3(c) of that Act`  IS A BOOLEAN
-    `has sold securities in reliance on section 4(a)(6)`                              IS A BOOLEAN
-    `has filed with the Commission and provided to investors the ongoing annual reports required during the two years immediately preceding the filing of the offering statement`  IS A BOOLEAN
+    `sold securities in reliance on section 4(a)(6)`                              IS A BOOLEAN
+    `filed with the Commission and provided to investors the ongoing annual reports required during the two years immediately preceding the filing of the offering statement`  IS A BOOLEAN
     `no specific business plan, or a business plan to engage in a merger or acquisition with an unidentified company or companies`  IS A BOOLEAN
 
     -- § 227.503, threaded through § 227.100(b)(4).
@@ -923,7 +923,7 @@ DECLARE FundingPortalProfile HAS
     `the succession is based solely on a change of the predecessor's date or state of incorporation, form of organization, or composition of a partnership`  IS A BOOLEAN
     `date of the succession`                                                          IS A DATE
     `date the successor filed a registration on Form Funding Portal`                  IS A DATE
-    `has ceased to operate as a funding portal`                                       IS A BOOLEAN
+    `ceased to operate as a funding portal`                                       IS A BOOLEAN
     `date the withdrawal was received by the Commission`                              IS A DATE
     `a longer period consented to by the funding portal or determined by the Commission by order`  IS A DATE
 
@@ -1551,8 +1551,8 @@ GIVETH A BOOLEAN
 GIVEN issuer IS AN IssuerProfile
 GIVETH A BOOLEAN
 `the issuer is delinquent in its ongoing reports` issuer MEANS
-        issuer's `has sold securities in reliance on section 4(a)(6)`
-    AND NOT issuer's `has filed with the Commission and provided to investors the ongoing annual reports required during the two years immediately preceding the filing of the offering statement`
+        issuer's `sold securities in reliance on section 4(a)(6)`
+    AND NOT issuer's `filed with the Commission and provided to investors the ongoing annual reports required during the two years immediately preceding the filing of the offering statement`
 
 -- § 227.100(b)(7) is [Reserved]. It is a deliberate labelled STUB rather than
 -- a silent gap: between 2021-01-14 and 2023-03-01 the paragraph carried the
@@ -2718,7 +2718,7 @@ DECIDE `the date the withdrawal becomes effective` portal IS
 GIVEN portal IS A FundingPortalProfile
 GIVETH A DEONTIC `Reg CF party` `Reg CF act`
 `the funding portal's withdrawal duty` portal MEANS
-    IF   portal's `has ceased to operate as a funding portal`
+    IF   portal's `ceased to operate as a funding portal`
     THEN PARTY `the funding portal`
          MUST  `file a withdrawal of registration on Form Funding Portal`
          HENCE FULFILLED
@@ -3221,8 +3221,8 @@ GIVETH AN IssuerProfile
     `subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act`  IS FALSE
     `formerly subject to section 13 or 15(d) reporting, since terminated or suspended`  IS FALSE
     `an investment company as defined in section 3 of the Investment Company Act, or excluded from that definition by section 3(b) or section 3(c) of that Act`  IS FALSE
-    `has sold securities in reliance on section 4(a)(6)`  IS `sold before`
-    `has filed with the Commission and provided to investors the ongoing annual reports required during the two years immediately preceding the filing of the offering statement`  IS TRUE
+    `sold securities in reliance on section 4(a)(6)`  IS `sold before`
+    `filed with the Commission and provided to investors the ongoing annual reports required during the two years immediately preceding the filing of the offering statement`  IS TRUE
     `no specific business plan, or a business plan to engage in a merger or acquisition with an unidentified company or companies`  IS FALSE
     `covered persons`  IS `people`
     `did not know and, in the exercise of reasonable care, could not have known that a disqualification existed`  IS FALSE
@@ -3468,7 +3468,7 @@ GIVETH A FundingPortalProfile
     `the succession is based solely on a change of the predecessor's date or state of incorporation, form of organization, or composition of a partnership`  IS FALSE
     `date of the succession`  IS YMD 1900 1 1
     `date the successor filed a registration on Form Funding Portal`  IS YMD 1900 1 1
-    `has ceased to operate as a funding portal`  IS FALSE
+    `ceased to operate as a funding portal`  IS FALSE
     `date the withdrawal was received by the Commission`  IS YMD 1900 1 1
     `a longer period consented to by the funding portal or determined by the Commission by order`  IS YMD 1900 1 1
     `a written consent and power of attorney appointing an agent in the United States obtained`  IS FALSE

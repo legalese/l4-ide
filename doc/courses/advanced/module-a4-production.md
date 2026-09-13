@@ -336,7 +336,7 @@ presumption_ attached to a field or parameter:
 ```l4
 DECLARE Party
     HAS name IS A STRING
-        `capacity`   IS A BOOLEAN TYPICALLY TRUE
+        `has capacity`   IS A BOOLEAN TYPICALLY TRUE
         `under duress`   IS A BOOLEAN TYPICALLY FALSE
         jurisdiction     IS A STRING  TYPICALLY "Singapore"
 ```

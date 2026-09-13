@@ -67,14 +67,14 @@ DECLARE Driver HAS
     `age`            IS A NUMBER
     `years licensed` IS A NUMBER
     `accident count` IS A NUMBER
-    `tickets`    IS A BOOLEAN
+    `ticketed`    IS A BOOLEAN
     `adult`          IS A BOOLEAN
         MEANS `age` >= 18
     `experienced`    IS A BOOLEAN
         MEANS `years licensed` >= 2
     `risk category`  IS A `Risk Category`
         MEANS IF `accident count` = 0
-              THEN IF `tickets` THEN `Medium Risk` ELSE `Low Risk`
+              THEN IF `ticketed` THEN `Medium Risk` ELSE `Low Risk`
               ELSE `High Risk`
     `eligible`       IS A BOOLEAN
         MEANS `adult`
@@ -86,14 +86,14 @@ safeDriver MEANS Driver WITH
     `age`            IS 30
     `years licensed` IS 5
     `accident count` IS 0
-    `tickets`    IS FALSE
+    `ticketed`    IS FALSE
 
 youngDriver MEANS Driver WITH
     `name`           IS "Young"
     `age`            IS 16
     `years licensed` IS 0
     `accident count` IS 0
-    `tickets`    IS FALSE
+    `ticketed`    IS FALSE
 
 -- chained: eligible depends on adult and experienced
 #EVAL safeDriver's `eligible`       -- TRUE

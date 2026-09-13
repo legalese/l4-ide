@@ -1248,7 +1248,7 @@ GIVETH A FalseInformation
     `a director of the company`                                  IS TRUE
     `a member of the management committee of the entity`         IS FALSE
     `under the constitution of the entity, has the general control and management of the administration of the entity`  IS FALSE
-    `that general control and management only on behalf of another person who has it in that other person's own right under the constitution of the entity`  IS FALSE
+    `has that general control and management only on behalf of another person who has it in that other person's own right under the constitution of the entity`  IS FALSE
 
 `no misconduct alleged` MEANS MisconductAllegation WITH
     `the actor is the registered charity or one of its governors`   IS FALSE

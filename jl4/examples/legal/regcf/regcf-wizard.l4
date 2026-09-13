@@ -203,8 +203,8 @@ GIVETH AN IssuerProfile
         `subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act` IS plan's `already files Exchange Act reports`
         `an investment company, or is excluded from the definition of investment company by section 3(b) or section 3(c)` IS plan's `an investment company`
         `subject to a disqualification as specified in section 227.503(a)`                                       IS plan's `a bad actor disqualification`
-        `sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement` IS plan's `behind on past Reg CF annual reports`
-        `no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies` IS plan's `no specific business plan`
+        `has sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement` IS plan's `behind on past Reg CF annual reports`
+        `has no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies` IS plan's `no specific business plan`
 
 GIVEN plan IS A RaisePlan
 GIVETH AN Offering

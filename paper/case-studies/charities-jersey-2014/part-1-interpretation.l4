@@ -194,7 +194,7 @@ DECLARE Officer HAS
     -- (7)(e)
     `under the constitution of the entity, has the general control and management of the administration of the entity`  IS A BOOLEAN
     -- (9)(a) — the "merely on behalf of another" carve-out
-    `that general control and management only on behalf of another person who has it in that other person's own right under the constitution of the entity`  IS A BOOLEAN
+    `has that general control and management only on behalf of another person who has it in that other person's own right under the constitution of the entity`  IS A BOOLEAN
 
 -- The (7)(a) case: "in the case of a trust or fideicommis". An entity is a trust
 -- or fideicommis if it falls within (1)(a) or (1)(b).
@@ -236,7 +236,7 @@ GIVETH A BOOLEAN
         ... NOT `entity falls within one of the cases in Article 2(7)(a) to (d)` e
         AND p's `under the constitution of the entity, has the general control and management of the administration of the entity`
         AND "(9)(a) a person is not a governor merely by virtue of exercising general control and management on behalf of another person who has the general control and management in that other person's own right under the constitution of the entity; and"
-        ... NOT p's `that general control and management only on behalf of another person who has it in that other person's own right under the constitution of the entity`
+        ... NOT p's `has that general control and management only on behalf of another person who has it in that other person's own right under the constitution of the entity`
         -- "(9)(b) a person is a governor whether that person has that general control
         --  and management alone or as one of a number of governors." — carried inert:
         --  it adds no condition, it removes one (no exclusivity requirement).
@@ -338,7 +338,7 @@ GIVETH A BOOLEAN
     `a director of the company`                                  IS TRUE
     `a member of the management committee of the entity`         IS FALSE
     `under the constitution of the entity, has the general control and management of the administration of the entity`  IS FALSE
-    `that general control and management only on behalf of another person who has it in that other person's own right under the constitution of the entity`  IS FALSE
+    `has that general control and management only on behalf of another person who has it in that other person's own right under the constitution of the entity`  IS FALSE
 
 #ASSERT `is a governor of` `Ms Le Brun, a director` `Jersey Heritage Ltd`
 
@@ -409,7 +409,7 @@ GIVETH A BOOLEAN
     `a director of the company`                                  IS FALSE
     `a member of the management committee of the entity`         IS TRUE
     `under the constitution of the entity, has the general control and management of the administration of the entity`  IS FALSE
-    `that general control and management only on behalf of another person who has it in that other person's own right under the constitution of the entity`  IS FALSE
+    `has that general control and management only on behalf of another person who has it in that other person's own right under the constitution of the entity`  IS FALSE
 
 #ASSERT `is a governor of` `Mr Renouf, on the management committee` `St Ouen Angling Club`
 
@@ -450,7 +450,7 @@ GIVETH A BOOLEAN
     `a director of the company`                                  IS FALSE
     `a member of the management committee of the entity`         IS FALSE
     `under the constitution of the entity, has the general control and management of the administration of the entity`  IS TRUE
-    `that general control and management only on behalf of another person who has it in that other person's own right under the constitution of the entity`  IS FALSE
+    `has that general control and management only on behalf of another person who has it in that other person's own right under the constitution of the entity`  IS FALSE
 
 `Ms Perchard, his delegate` MEANS Officer WITH
     name                                                            IS "Ms Perchard"
@@ -459,7 +459,7 @@ GIVETH A BOOLEAN
     `a director of the company`                                  IS FALSE
     `a member of the management committee of the entity`         IS FALSE
     `under the constitution of the entity, has the general control and management of the administration of the entity`  IS TRUE
-    `that general control and management only on behalf of another person who has it in that other person's own right under the constitution of the entity`  IS TRUE
+    `has that general control and management only on behalf of another person who has it in that other person's own right under the constitution of the entity`  IS TRUE
 
 #ASSERT `is a governor of` `Mr Ozouf, who holds control in his own right` `Guernsey Trust Co (a foreign entity)`
 -- Article 2(9)(a) bites: the delegate is NOT a governor.

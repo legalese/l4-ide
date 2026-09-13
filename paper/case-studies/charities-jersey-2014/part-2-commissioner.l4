@@ -160,7 +160,7 @@ DECLARE CommissionerProposedAct HAS
     description                                                     IS A STRING
 
     -- Article 4(2) — the chapeau test, and the parenthetical carve-out.
-    `calculated to facilitate, or is conducive or incidental to, the performance of any of the Commissioner's functions`  IS A BOOLEAN
+    `is calculated to facilitate, or is conducive or incidental to, the performance of any of the Commissioner's functions`  IS A BOOLEAN
     `the act of acting as a governor of a charity or of an entity with charitable purposes`  IS A BOOLEAN
 
     -- Article 4(3) — the three particular powers.
@@ -176,7 +176,7 @@ GIVETH A BOOLEAN
 `Article 4(2) — the act is within the general incidental power` a MEANS
         "(2) The Commissioner may do anything"
     ... "that is calculated to facilitate, or is conducive or incidental to, the performance of any of his or her functions."
-    ... a's `calculated to facilitate, or is conducive or incidental to, the performance of any of the Commissioner's functions`
+    ... a's `is calculated to facilitate, or is conducive or incidental to, the performance of any of the Commissioner's functions`
     AND "(other than acting as a governor of a charity or of an entity with charitable purposes)"
     ... NOT a's `the act of acting as a governor of a charity or of an entity with charitable purposes`
 
@@ -391,7 +391,7 @@ GIVETH A DEONTIC Actor Part2Action
 -- functions; not the act of acting as a governor. Within the 4(2) general power.
 `renting an office` MEANS CommissionerProposedAct WITH
     description                                                     IS "taking a lease of premises at Union Street"
-    `calculated to facilitate, or is conducive or incidental to, the performance of any of the Commissioner's functions`  IS TRUE
+    `is calculated to facilitate, or is conducive or incidental to, the performance of any of the Commissioner's functions`  IS TRUE
     `the act of acting as a governor of a charity or of an entity with charitable purposes`  IS FALSE
     `(3)(a) providing information to the public about the system of registration of charities, including information about the difference between charities and bodies with charitable purposes, about the advantages of donating to registered charities, and by way of model constitutions`  IS FALSE
     `(3)(b) advising the Minister as to the nature of charities in Jersey and as to the merits of any proposal for further regulation of charities`  IS FALSE
@@ -406,7 +406,7 @@ GIVETH A DEONTIC Actor Part2Action
 --     Article 4(2) forbids. The chapeau limb is TRUE; the carve-out knocks it out.
 `accepting a trusteeship of a registered charity` MEANS CommissionerProposedAct WITH
     description                                                     IS "the Commissioner joins the board of a registered charity"
-    `calculated to facilitate, or is conducive or incidental to, the performance of any of the Commissioner's functions`  IS TRUE
+    `is calculated to facilitate, or is conducive or incidental to, the performance of any of the Commissioner's functions`  IS TRUE
     `the act of acting as a governor of a charity or of an entity with charitable purposes`  IS TRUE
     `(3)(a) providing information to the public about the system of registration of charities, including information about the difference between charities and bodies with charitable purposes, about the advantages of donating to registered charities, and by way of model constitutions`  IS FALSE
     `(3)(b) advising the Minister as to the nature of charities in Jersey and as to the merits of any proposal for further regulation of charities`  IS FALSE
@@ -421,7 +421,7 @@ GIVETH A DEONTIC Actor Part2Action
 -- "without prejudice to the generality of his or her powers".
 `assisting the Guernsey Registrar of Charities` MEANS CommissionerProposedAct WITH
     description                                                     IS "helping an equivalent body in another jurisdiction"
-    `calculated to facilitate, or is conducive or incidental to, the performance of any of the Commissioner's functions`  IS FALSE
+    `is calculated to facilitate, or is conducive or incidental to, the performance of any of the Commissioner's functions`  IS FALSE
     `the act of acting as a governor of a charity or of an entity with charitable purposes`  IS FALSE
     `(3)(a) providing information to the public about the system of registration of charities, including information about the difference between charities and bodies with charitable purposes, about the advantages of donating to registered charities, and by way of model constitutions`  IS FALSE
     `(3)(b) advising the Minister as to the nature of charities in Jersey and as to the merits of any proposal for further regulation of charities`  IS FALSE
@@ -434,7 +434,7 @@ GIVETH A DEONTIC Actor Part2Action
 -- An act that is neither conducive nor a named 4(3) power: no power to do it.
 `sponsoring a football team` MEANS CommissionerProposedAct WITH
     description                                                     IS "buying the shirts for St Helier FC"
-    `calculated to facilitate, or is conducive or incidental to, the performance of any of the Commissioner's functions`  IS FALSE
+    `is calculated to facilitate, or is conducive or incidental to, the performance of any of the Commissioner's functions`  IS FALSE
     `the act of acting as a governor of a charity or of an entity with charitable purposes`  IS FALSE
     `(3)(a) providing information to the public about the system of registration of charities, including information about the difference between charities and bodies with charitable purposes, about the advantages of donating to registered charities, and by way of model constitutions`  IS FALSE
     `(3)(b) advising the Minister as to the nature of charities in Jersey and as to the merits of any proposal for further regulation of charities`  IS FALSE
