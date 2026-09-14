@@ -134,7 +134,18 @@ does not have to rediscover them.
   record is the PDPA model-checking paper; the CCLAW series on InK, read the same day, has no
   insurance paper — "Deontics and time in contracts: An executable semantics for the L4 DSL"
   (Watt, Goodenough, Wong, JURIX 2023) is about the Flood & Goodenough loan agreement. The
-  insurance pilot's public reference, if any, is still to be supplied.)
+  insurance pilot's public reference, if any, is still to be supplied.) **The year, found in the
+  tree 2026-09-14: 2023.** `smucclaw/usecases` (private working repo; cite only as "the
+  project's working repository") carries the insurance work: 752 commits in 2023, from an
+  insurance lexicon (2023-03-31) through Maude and s(CASP) experiments (April–July), a DMN
+  representation (2023-07-23), the `insurance_wiki` (Aug–Oct), `joe/insurance` (506 commits from
+  2023-04-10) and `ym/insurance` (195, Sep–Nov), to "L4 insurance policy encoding documentation"
+  dated 24 November 2023 (`smu/L4_insurance_policy_encoding_documentation.pdf`, added by Joe
+  Watt). There is also `Presentations/Presentation_2023_07_25_Eval_and_UI` (commits 25–26 July
+  2023) — whether that is the management presentation Meng remembers as lost is for him to say.
+  So the Ocidental date check passes: the judgment (20 April 2023) predates the pilot's
+  presentations, and both cases could have been cited. The post says the insurance pilot was in
+  2023; it does not name the insurer.
 
   **The New Zealand exercise — Meng, 2026-09-14, answering marker 4, with his May 2019 deck
   "Multi-Way Isomorphism in L4: a humble universal converter for rules as code" (Google Slides
