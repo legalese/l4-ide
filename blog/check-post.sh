@@ -27,7 +27,7 @@ for f in "$@"; do
   grep -n '\[NEEDS MENG' "$f" | head -8 | sed "s|^|warn $f: needs-Meng marker at line |"
   # word count of prose (front matter, Sources, stanza excluded)
   words=$(printf '%s\n' "$body" | awk '/^#+ *Sources/{exit} {print}' | wc -w | tr -d ' ')
-  [ "$words" -ge 1500 ] && [ "$words" -le 3500 ] || warn "prose is $words words (target 2,000–2,500; ceiling 3,500)"
+  [ "$words" -ge 1500 ] && [ "$words" -le 6000 ] || warn "prose is $words words (target 2,500–4,500; ceiling 6,000)"
   decl=$(sed -n 's/^words: *//p' "$f" | head -1); [ -n "$decl" ] && [ "${decl:-0}" -ne 0 ] && { d=$(( decl>words ? decl-words : words-decl )); [ "$d" -gt 150 ] && warn "front matter says words: $decl, counted $words"; }
   # US spelling: a short list of British forms that are not inside quotation marks
   brit=$(printf '%s\n' "$body" | grep -nE '\b([Ff]ormalis(e|ed|es|ing|ation)|[Rr]ecognis(e|ed|es|ing)|[Oo]rganis(e|ed|es|ation)|[Bb]ehaviour|[Cc]olour|[Ff]avour|[Ll]icence|[Pp]ractising|[Jj]udgement|[Aa]nalys(e|ed)|[Cc]entre|[Pp]rogramme)\b' | grep -vE 'Pre-Positioning Programme|Research Programme|Organisation for Economic|organisation-automaton|^[0-9]+:>' | grep -vE '"[^"]*\b([Ff]ormalis|[Rr]ecognis|[Bb]ehaviour|[Ll]icence|[Pp]ractising|[Pp]rogramme)[^"]*"' | cut -c1-120 | head -5)

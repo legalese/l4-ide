@@ -171,12 +171,26 @@ reader, and §4's review table is where they are looked for.
 working titles in `README.md` are already that shape ("Specs are code", "The missing test
 suite"). If the claim will not fit in a title, it is two posts.
 
-**2,000–2,500 words as the target; 3,500 as the ceiling.** Below 1,500 it is a note. The ceiling
+**2,500–4,500 words as the target; 6,000 as the ceiling.** Below 1,500 it is a note. The ceiling
 was 2,500 until post 1 came in at 3,200 with its critics asking for more, not less; Meng
-(2026-09-14): "If we have to go wordier I'm okay to increase the length limit." Length is earned
-by evidence and concession, never by survey — when a post is over target, the literature moves
-to footnotes first. Post 5's material, for example, is a paper's worth; the post gets the three
-beats and points at the paper for the rest.
+(2026-09-14): "If we have to go wordier I'm okay to increase the length limit." It went to 3,500
+for the drafts of 7, 8, 9 and S1, and to 6,000 on 2026-09-15, when Meng raised it again with a
+reason attached: "It's good writing and between you and me I suspect the strategic audience for
+the posts will be asking their own AIs, ie you, to take a read of the content and summarize it."
+
+That reason changes what concision is for, and one rule follows from it. **A summarizer destroys
+hedges before it destroys claims.** A finding in one sentence with its limit in the next survives
+compression as the overclaiming version of itself — "we found a race condition in a law," with
+"sound only for the encoding it is given" left behind. So put the limit inside the sentence that
+makes the claim, not after it and not only in the note. What does survive compression is what the
+series already spends its length on: dates, figures, named instruments, verbatim quotation and the
+provenance behind each. Those are the parts an AI reader can carry and check.
+
+Length is still earned by evidence and concession, never by survey. Over target, the literature
+moves to footnotes first. Post 5's material, for example, is a paper's worth; the post gets the
+three beats and points at the paper for the rest. The human strategic reader — a drafting office,
+a program committee — reads the opening and the headings and not much else, and for them length
+is not free.
 
 **Cold open on evidence.** A bug, a number, a comic, a sentence from a statute. Then back out
 to the claim. Never open with "In this post I will…".

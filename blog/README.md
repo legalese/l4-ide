@@ -3,8 +3,10 @@
 **STATUS 2026-09-14 (evening): DRAFTING.** Posts 1, 2, 3 and 5 have been machine-drafted, critiqued
 by six reader personas and a live fact-check, revised, and gated, with the bench answers of 2026-09-14 folded in; posts 4 and 6 have machine drafts
 with critiques gathered and revision pending; 7, 8, 9 and S1 exist as INITIAL DRAFTS (machine-drafted
-late on 2026-09-14, not yet critiqued, fact-checked or revised; all four run past the 3,500-word ceiling
-pending a concision pass). No post has been
+late on 2026-09-14, not yet critiqued, fact-checked or revised). The ceiling went from 3,500 to 6,000
+words on 2026-09-15 at Meng's direction, so only S1, at 6,927, is now over it; the concision pass is
+no longer a length exercise and cuts flab rather than substance. See `STYLE.md` §length for the
+reason he gave and the one drafting rule that follows from it. No post has been
 read by Meng. Every draft says so in its first
 line. This directory holds the style guide and the posts. It is the companion to [`paper/`](../paper/): each post puts one of the
 papers' positions in front of a general technical reader before the academic version lands. See
