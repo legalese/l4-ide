@@ -129,7 +129,12 @@ does not have to rediscover them.
   was not told of, under Directive 93/13). **One date check the drafter must do:** Ocidental was
   decided 20 April 2023. If the insurer pilot and its presentation predate that, the presentation
   cannot have cited it — say so, or cite Ocidental as the later authority for the same class. The
-  pilot's year is a [NEEDS MENG] until he gives it.
+  pilot's year is a [NEEDS MENG] until he gives it. (Meng pointed at
+  <https://ink.library.smu.edu.sg/cclaw/3/> for the insurance pilot on 2026-09-14, but that
+  record is the PDPA model-checking paper; the CCLAW series on InK, read the same day, has no
+  insurance paper — "Deontics and time in contracts: An executable semantics for the L4 DSL"
+  (Watt, Goodenough, Wong, JURIX 2023) is about the Flood & Goodenough loan agreement. The
+  insurance pilot's public reference, if any, is still to be supplied.)
 
   **The New Zealand exercise — Meng, 2026-09-14, answering marker 4, with his May 2019 deck
   "Multi-Way Isomorphism in L4: a humble universal converter for rules as code" (Google Slides
