@@ -1,8 +1,9 @@
 # The L4 blog — prefiguring the papers
 
-**STATUS 2026-09-14: DRAFTING.** Posts 1 and 2 have been machine-drafted, critiqued by six reader
-personas and a live fact-check, and revised; posts 3 and 5 have unrevised machine drafts; 4, 6, 7,
-8, 9 and S1 are not yet drafted. No post has been read by Meng. Every draft says so in its first
+**STATUS 2026-09-14 (evening): DRAFTING.** Posts 1, 2, 3 and 5 have been machine-drafted, critiqued
+by six reader personas and a live fact-check, revised, and gated; posts 4 and 6 have machine drafts
+with critiques gathered and revision pending; 7, 8, 9 and S1 are not yet drafted. No post has been
+read by Meng. Every draft says so in its first
 line. This directory holds the style guide and the posts. It is the companion to [`paper/`](../paper/): each post puts one of the
 papers' positions in front of a general technical reader before the academic version lands. See
 [`STYLE.md`](STYLE.md) for who that reader is and how a post is written.
@@ -108,8 +109,29 @@ does not have to rediscover them.
   a direction arrives — does so only by breaching the immediacy requirement in the interim, which
   is why a static read misses it and a timed model finds it. FORMAL-PAPER.md §3/§4.4's "two
   exhibits" and "secondary legislation" are the paper's looseness, not two engagements; the
-  post's marker on this point is CLOSED. Still open: whether the UPPAAL trace or diagram can be
-  shown (and whether the WAICOM PDF prints it).
+  post's marker on this point is CLOSED.
+  **THE TRACE CAN BE SHOWN — Meng supplied the PDF 2026-09-14 17:32 ("Compliance through model
+  checking.pdf", worktree root, untracked; 8 pages).** The paper prints the model: **Fig. 1**, three
+  interacting timed automata — (a) Commission, (b) Individual, (c) Organisation — and **Fig. 2**, the
+  UPPAAL simulator's failure trace. All four images are extracted unaltered into
+  `blog/assets/waicom-2022/` with a provenance README; embed Fig. 1(c) and Fig. 2 in post 1 by
+  relative path (`../assets/waicom-2022/…`) with captions naming the paper and the licence
+  (CC BY-NC-ND 4.0, copyright the authors). What the paper itself records (§3.1–3.2, read
+  2026-09-14) — use its words, not a paraphrase of Meng's: one clock `cl`; the breach must be
+  determined notifiable within 30 days (`isNotifiable and cl <= 30`, then `cl := 0`); the
+  Commission must then be notified within 3 days (`cl <= 3`, `notifyPDPC!`); the model
+  sequentialises the notifications, Commission first then the individual, "a modelling choice";
+  the Commission's decision to prohibit or request notification of the individual is autonomous.
+  The queries: `E<> I.informed and C.notifIndivRequested` holds (the good case);
+  `E<> I.informed and C.notifIndivProhibited` **also holds, and UPPAAL produces the trace of
+  Fig. 2** — "It comes about because the organization has no clue at which point the commission's
+  interdiction to inform the individual could intervene, and is therefore entitled to inform the
+  individual as soon as a data breach is identified"; and `E<> O.breachDeterminedNotifiable and
+  deadlock` holds — "no action is possible when the notification deadline of 3 days has been
+  exceeded." The trace's last state is `(notifIndivProhibited, informed, individualNotified)`.
+  Note the paper's own framing is "the individual is informed in spite of the commission having
+  prohibited it" plus a deadlock past the 3-day deadline; Meng's "must notify and must not notify"
+  is the same finding stated as a bind. Say both. Bench Q1 is thereby answered.
 
   **The insurer — Meng, 2026-09-14, answering marker 3. Use this.** His words: "The insurer
   reviewed what it had been doing — it had been making the larger payout, not the smaller — and
