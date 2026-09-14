@@ -92,8 +92,25 @@ does not have to rediscover them.
   insurance policies because these policies are invariably drafted and/or vetted by experts for
   the benefit of insurers so as to protect the latter's interest," and that an ambiguity in the
   extent of cover "should be construed against the respondent" insurer. A Singapore authority
-  suits a Singapore research group. Cite it for the rule of construction; cite _Ocidental_ only as
-  what management named.
+  suits a Singapore research group.
+  **SUPERSEDING CORRECTION on who raised the cases — Meng, 2026-09-14, later the same morning.** His
+  words: "Let's put in both Ocidental and Tay Eng Chuan; IIRC it was our presentation to management
+  at the insurer that highlighted these cases as risks, but the presentation is lost to time and I
+  have only a vague memory that it was this class of suit that we mentioned as representative of
+  'yes, insurers have some discretion — that's what adjusters do — but policies need to avoid
+  certain classes of unpredictability, and courts have agreed.'" So: the earlier note's "management
+  observed … a liability risk" is withdrawn as to attribution. The post says that *our*
+  presentation put the two cases in front of management as the class of risk an ambiguous term
+  carries, that the presentation is lost and this is Meng's recollection, hedged as he hedges it;
+  that management's response was about liability rather than about which reading to pay; and it
+  keeps the point Meng draws — adjusters exercise discretion by design; what a policy must avoid is
+  a class of unpredictability courts have refused to tolerate, which is what both cases stand for.
+  Both cases go in, each described as what it holds (Tay Eng Chuan: contra proferentem, ambiguity
+  in cover construed against the insurer; Ocidental: transparency and a limiting term the consumer
+  was not told of, under Directive 93/13). **One date check the drafter must do:** Ocidental was
+  decided 20 April 2023. If the insurer pilot and its presentation predate that, the presentation
+  cannot have cited it — say so, or cite Ocidental as the later authority for the same class. The
+  pilot's year is a [NEEDS MENG] until he gives it.
 
   **The New Zealand exercise — Meng, 2026-09-14, answering marker 4, with his May 2019 deck
   "Multi-Way Isomorphism in L4: a humble universal converter for rules as code" (Google Slides
