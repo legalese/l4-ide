@@ -61,6 +61,25 @@ does not have to rediscover them.
   Phase 1 ruled and nothing built). The regulator's reasons are Meng's speculation and are
   reported as such or left out. Replace the spec's remediate/assessment fragment in the opening
   with this real shape, names filed off.
+  **The year, and the paper — Meng, 2026-09-14: "the data-breach pilot was conducted 2022";
+  verified the same day.** The instrument is Singapore's Personal Data Protection Act, the data
+  breach notification obligation (the repos call it PDPA DBNO). Evidence: `smucclaw/dsl`
+  (`caseStudies/PDPA/README.org` created 2021-07-19; the `pdpadbno-*` encodings and parser tests
+  carry 16 commits in 2022 and 29 in 2023); `smucclaw/vue-pure-pdpa`, the web wizard behind
+  <https://smucclaw.github.io/mengwong/pdpa/> (first commit 2021-09-12; 185 commits in 2022); and
+  the paper: Avishkar Mahajan, Martin Strecker, Seng Joe Watt and Meng Weng Wong, "Compliance
+  through model checking," International Workshop on AI Compliance Mechanism (WAICOM 2022),
+  December 2022, SMU InK <https://ink.library.smu.edu.sg/cclaw/3/> (accepted version, CC
+  BY-NC-ND 4.0; record read 2026-09-14). Its abstract: "we describe part of a case study about
+  Singapore's Personal Data Protection Act, which we first presented informally, then formally as
+  interacting Timed Automata. From these, we derive desiderata on a language and verification
+  framework for reasoning about compliance." So the post can now name the instrument (the PDPA
+  and its breach-notification obligation — the agency stays unnamed only if Meng still wants it
+  so; the paper is public), give the year (2022), and cite the paper for the timed-automata
+  model. "Interacting Timed Automata" is the paper's phrase for the UPPAAL model; whether the
+  paper prints the trace or a figure is for the drafter to check in the PDF (InK sits behind a
+  bot wall for curl; open it in a browser). Note the site is a Vue app whose bundle contains the
+  strings "notifiable data breach?" and "notify?".
 
   **The insurer — Meng, 2026-09-14, answering marker 3. Use this.** His words: "The insurer
   reviewed what it had been doing — it had been making the larger payout, not the smaller — and
