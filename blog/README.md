@@ -119,7 +119,19 @@ does not have to rediscover them.
   not in the current tree. One thing the deck's slide order leaves open: whether the chart found
   the bug or reproduced one already found upstream — say "surfaced in our chart; fixed upstream by
   …" only if Meng confirms; otherwise "the chart shows the bug; the fix landed upstream." The
-  earlier "entire domain of possible scenarios" wording is retired: the domain was a grid. Meng's closing phrase, "It was
+  earlier "entire domain of possible scenarios" wording is retired: the domain was a grid.
+  **Checked on GitHub, 2026-09-14:** the upstream fix exists — OpenFisca-Aotearoa (then
+  `ServiceInnovationLab/openfisca-aotearoa`, now `BetterRules/openfisca-aotearoa`) commit
+  `68d839ebbd73`, Br3nda, **2019-05-09, "Clip excess to minimum zero (excess can't be negative)"**,
+  with "Tests for 2019, rates rebate: rebate, min and max" the same day — five days before the
+  shell prompt in Meng's deck (2019-05-14). Cite the commit. That ordering sharpens the open
+  question for Meng: did the chart prompt that commit, or did the deck reproduce a bug the
+  upstream team had just found? Until he answers, the post says the fix landed upstream on 9 May
+  2019 and that the chart shows the bug, and does not say who saw it first. The prototype itself
+  is public: `smucclaw/complaw` (last pushed 2024-07-10), path
+  `doc/ex-nz-rates-20200909/aotearoa-haskell/` (`app/Main.hs`, `l4/from-openfisca-rr.l4`); the
+  `legalese/complaw-deeptech` path in the deck is gone (404). So "the parser is not in the
+  repository" becomes "not in this repository; it is in `smucclaw/complaw`, path …". Meng's closing phrase, "It was
   about computability in the NP-hard sense," is his gloss — do not put "NP-hard" in the post
   unless the claim is made precise (NP-hardness is a complexity class, and the formal-methods
   critic will ask which problem was shown hard); the substance is that the defect was in the
