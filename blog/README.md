@@ -284,7 +284,10 @@ does not have to rediscover them.
   trial encodings model time as integer months with no temporal machinery; the 20 guided trials
   split 5–5 on whether month 7 is inside the pending window) — the post may not cite it until it
   is in a file. **Q4 — other:** "i have asked for a push and pr. you can cite the PR." — the post
-  cites the PR once its number exists; until then "pull request pending" with the branch name.
+  cites the PR: **legalese/l4-ide#387**, "paper(kant-replication): replicate Kant et al. 2025 with
+  L4, and audit the benchmark", open, head `60ee8d84`, branch `mengwong/kant-chubb` on origin —
+  checked with `git ls-remote` and `gh pr list` at 18:05 on 2026-09-14. A "[PR NUMBER PENDING]"
+  placeholder left by a reviser is to be replaced with #387.
   **Q5 (post 3) — anon:** attribute to "senior legislative drafter with deep roots in the Rules as
   Code movement"; the conversation occurred **circa 2026-07-15 at the CALC (Commonwealth
   Association of Legislative Counsel) conference in Singapore** and was recorded in session on
