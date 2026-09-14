@@ -80,6 +80,20 @@ does not have to rediscover them.
   paper prints the trace or a figure is for the drafter to check in the PDF (InK sits behind a
   bot wall for curl; open it in a browser). Note the site is a Vue app whose bundle contains the
   strings "notifiable data breach?" and "notify?".
+  **OPEN — a discrepancy the drafter must not resolve alone (found 2026-09-14 by the gate).**
+  `paper/formal-methods-in-law/FORMAL-PAPER.md` §4.4 lists TWO exhibits: "PDPA data-breach
+  notification race condition (our UPPAAL study). Interacting clocks (assessment window vs
+  notify-the-regulator window) reach a state where timely compliance is impossible — a
+  double-bind" AND "the government-agency race condition from our regulatory pilot — the same
+  shape, in live secondary legislation affecting citizens." `paper/icail/l4-icail.tex` §Experience
+  likewise calls the pilot's instrument "secondary legislation"; the PDPA is an Act. Meng's account
+  of 2026-09-14 describes ONE bind — must notify the individuals and the regulator; the regulator
+  may later direct not to notify the individuals — and points the "data-breach pilot" at the PDPA
+  wizard repo. So either (a) the WAICOM study and the government-agency pilot are one engagement
+  described twice, or (b) they are two, with two different binds (a deontic must/must-not, and a
+  clock collision). Until Meng says which, the post carries the bind he described, cites the
+  WAICOM paper for the timed-automata model, and keeps a [NEEDS MENG] asking which bind the
+  UPPAAL model found and whether the two exhibits are one engagement.
 
   **The insurer — Meng, 2026-09-14, answering marker 3. Use this.** His words: "The insurer
   reviewed what it had been doing — it had been making the larger payout, not the smaller — and
