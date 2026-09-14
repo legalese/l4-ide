@@ -110,8 +110,9 @@ does not have to rediscover them.
   is why a static read misses it and a timed model finds it. FORMAL-PAPER.md §3/§4.4's "two
   exhibits" and "secondary legislation" are the paper's looseness, not two engagements; the
   post's marker on this point is CLOSED.
-  **THE TRACE CAN BE SHOWN — Meng supplied the PDF 2026-09-14 17:32 ("Compliance through model
-  checking.pdf", worktree root, untracked; 8 pages).** The paper prints the model: **Fig. 1**, three
+  **THE TRACE CAN BE SHOWN — Meng supplied the PDF 2026-09-14 17:32 (saved as
+  `~/Dropbox/Documents/printed/Mahajan-Strecker-Watt-Wong-2022-Compliance-through-model-checking-WAICOM.pdf`;
+  8 pages; a symlink of the same name sits untracked in the worktree root for the harness).** The paper prints the model: **Fig. 1**, three
   interacting timed automata — (a) Commission, (b) Individual, (c) Organisation — and **Fig. 2**, the
   UPPAAL simulator's failure trace. All four images are extracted unaltered into
   `blog/assets/waicom-2022/` with a provenance README; embed Fig. 1(c) and Fig. 2 in post 1 by
