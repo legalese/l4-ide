@@ -263,6 +263,47 @@ does not have to rediscover them.
   canon repository's own status header (a scaffold with its first subject) is respected, not
   inflated; the Wikipedia analogy is made with Wikipedia's actual quality mechanisms in view.
 
+- **Bench marks, 2026-09-14 ~17:35–17:55** (artifact "Author queries, posts 1–5", collection
+  `blog-rulings`; Meng's words verbatim where quoted). **Q1** show — the WAICOM PDF supplied; see
+  above. **Q2** accept — the agency stays unnamed. **Q3 (post 2, blinding) — edit:** "tbh best
+  source is the history of what we did: look in ~/src/legalese/l4wt/kant-chubb, branch
+  mengwong/kant-chubb, under paper/kant-replication/" — reading order README.md (§4 "The harness"
+  is the methodological core; §1 what was measured; §2 what the original's method can't support;
+  §3 why our 0.889 is not yet a result), FOUNDATION.md (gold standard; §1.2 mechanical vs
+  interpretive; §1.3–1.4 the Q4/Q5 disagreements; §3 what L4 can express; §3.4 scorecard),
+  PROVENANCE.md (wrapper prompts verbatim; §6 disclosed gaps), source-defects.md (16 defects in the
+  published fixture; D1: the policy as printed never grants coverage because Kant et al.'s
+  reproduction deletes §2 BENEFITS), bench/ (bench.mjs, per-arm scripts, keys.json vs
+  keys-restored.json, PREREGISTRATION-restored.md run, PREREGISTRATION-go.md specified not run).
+  Encodings at jl4/examples/legal/chubb/; a copy deposited in legalese/canon at
+  subjects/us/chubb-hospital-cash/. **Two warnings:** bench/PREREGISTRATION-go.md is
+  result-adjacent and forbidden to encoder sandboxes — a blog reviser does not open it either; and
+  the memory system is a contamination channel (FOUNDATION.md T9) — the MEMORY.md index lines for
+  kant-chubb-replication and kant-guided-encoding stay finding-free; do not edit them. One finding
+  is recorded only in conversation, not in a repo file (the deadline survey: all 40 Prolog + 20 L4
+  trial encodings model time as integer months with no temporal machinery; the 20 guided trials
+  split 5–5 on whether month 7 is inside the pending window) — the post may not cite it until it
+  is in a file. **Q4 — other:** "i have asked for a push and pr. you can cite the PR." — the post
+  cites the PR once its number exists; until then "pull request pending" with the branch name.
+  **Q5 (post 3) — anon:** attribute to "senior legislative drafter with deep roots in the Rules as
+  Code movement"; the conversation occurred **circa 2026-07-15 at the CALC (Commonwealth
+  Association of Legislative Counsel) conference in Singapore** and was recorded in session on
+  2026-09-14 — so the post's "12 September" date is wrong and the invented "ruling" in note 8 comes
+  out. **Q6 (post 3) — not on record:** "This is a qualitative impression; a quantitative study
+  would have to be focus of future research similar to
+  https://popl22.sigplan.org/details/prolala-2022-papers/7/Cod-e-ifying-The-Law. The qualitative
+  impression is traceable to the work on the PDPA case and the insurance case; in both cases the
+  'client' assigned a business executive to review the encoding and even though they were not a
+  programmer they were able to review and sign off." — so the sentence stays, attributed as an
+  impression from two engagements, one executive each, with the PROLALA pointer for the study not
+  done. **Q7 (post 5) — not on record:** "perhaps we could look at the go-pipeline producing
+  output into the legalese/canon corpora and look for counts of forks, as a proxy for what's being
+  asked for here? We are still in the middle of research to answer these kinds of questions." —
+  keep the concession; name the fork register in canon as the instrument that will one day supply
+  the denominator. **Q8 — no mark; note cut off mid-sentence:** "Engineers who came up in the IETF
+  tradition, reading and implementing RFCs, are intimately familiar with RFC 2119 (BCP 14):" —
+  awaiting the rest.
+
 Citation notes gathered per post live in the planning notes (a Claude memory file, not in this
 tree) until each post is drafted, at which point they move into the post's Sources list and are
 re-verified there.
