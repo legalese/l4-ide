@@ -141,10 +141,14 @@ does not have to rediscover them.
   `ServiceInnovationLab/openfisca-aotearoa`, now `BetterRules/openfisca-aotearoa`) commit
   `68d839ebbd73`, Br3nda, **2019-05-09, "Clip excess to minimum zero (excess can't be negative)"**,
   with "Tests for 2019, rates rebate: rebate, min and max" the same day — five days before the
-  shell prompt in Meng's deck (2019-05-14). Cite the commit. That ordering sharpens the open
-  question for Meng: did the chart prompt that commit, or did the deck reproduce a bug the
-  upstream team had just found? Until he answers, the post says the fix landed upstream on 9 May
-  2019 and that the chart shows the bug, and does not say who saw it first. The prototype itself
+  shell prompt in Meng's deck (2019-05-14). Cite the commit. **ANSWERED — Meng, 2026-09-14:**
+  "the chart was not what prompted Br3nda's fix; they found it and we found it simultaneously;
+  they found it by inspection and reasoning; we found it by lightweight formal methods." So the
+  post says exactly that: two independent findings of the same defect in the same week, one by a
+  maintainer reading the code, one by a grid sweep over an isomorphic encoding — and neither
+  prompted the other. That is a better story than priority: the same bug, found two ways, and the
+  formal way is the one that scales to the cases nobody happens to read. Do not claim the chart
+  caused the fix. The prototype itself
   is public: `smucclaw/complaw` (last pushed 2024-07-10), path
   `doc/ex-nz-rates-20200909/aotearoa-haskell/` (`app/Main.hs`, `l4/from-openfisca-rr.l4`); the
   `legalese/complaw-deeptech` path in the deck is gone (404). So "the parser is not in the
