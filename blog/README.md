@@ -303,9 +303,29 @@ does not have to rediscover them.
   output into the legalese/canon corpora and look for counts of forks, as a proxy for what's being
   asked for here? We are still in the middle of research to answer these kinds of questions." —
   keep the concession; name the fork register in canon as the instrument that will one day supply
-  the denominator. **Q8 — no mark; note cut off mid-sentence:** "Engineers who came up in the IETF
-  tradition, reading and implementing RFCs, are intimately familiar with RFC 2119 (BCP 14):" —
-  awaiting the rest.
+  the denominator. **Q8 (post 1, the Berkman/CodeX sentence) — note completed 18:09, no mark needed; use it.**
+  Meng, verbatim: "Engineers who came up in the IETF tradition, reading and implementing RFCs, are
+  intimately familiar with the immortal words of RFC 2119 (BCP 14): [the boilerplate] The guru
+  who wrote that RFC, Scott Bradner, just happened to be hanging out at Harvard's Berkman Klein
+  Center, as is his wont, on a Thursday afternoon when I was presenting my plans for L4 as a
+  residential fellow; we connected over the formalization of normative specifications involving
+  deontic keywords. Technologists borrowed those terms from law decades ago, and built the
+  Internet with them; now it's time to return the debt with interest. At Berkman I studied the
+  social implications of moving rule-of-law onto a rules-as-code platform, and the questions
+  around unlicensed-practice-of-law (UPL) in an AI world. At Stanford at CodeX I studied the
+  programming language theory of specification languages, and how a controlled natural language
+  could sit at the intersection of law and code." **Verified 2026-09-14 against the RFC Editor:**
+  RFC 2119, "Key words for use in RFCs to Indicate Requirement Levels", S. Bradner, Harvard
+  University, March 1997, BCP 14; the boilerplate sentence is exactly as Meng quotes it (RFC
+  2119 p. 1: 'The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD",
+  "SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be interpreted as
+  described in RFC 2119.'); updated by RFC 8174 (B. Leiba, May 2017, also BCP 14), which the post
+  may note in a footnote. Bradner is listed as a Berkman Klein Center affiliate
+  (<https://cyber.harvard.edu/people/sob>). The Thursday, the presentation and the conversation
+  are Meng's recollection and are attributed as such; the year of the fellowship goes in once
+  confirmed. This replaces the credential sentence: the moment is Bradner and the RFC, and the
+  claim it carries — law lent the Internet MUST/SHOULD/MAY; L4 returns the loan — is the post's
+  own, in Meng's words.
 
 Citation notes gathered per post live in the planning notes (a Claude memory file, not in this
 tree) until each post is drafted, at which point they move into the post's Sources list and are
