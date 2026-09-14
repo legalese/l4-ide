@@ -322,8 +322,19 @@ does not have to rediscover them.
   described in RFC 2119.'); updated by RFC 8174 (B. Leiba, May 2017, also BCP 14), which the post
   may note in a footnote. Bradner is listed as a Berkman Klein Center affiliate
   (<https://cyber.harvard.edu/people/sob>). The Thursday, the presentation and the conversation
-  are Meng's recollection and are attributed as such; the year of the fellowship goes in once
-  confirmed. This replaces the credential sentence: the moment is Bradner and the RFC, and the
+  are Meng's recollection and are attributed as such. **Years, checked 2026-09-14:** Meng is in
+  the Berkman Klein Center's announced 2016–2017 community
+  (<https://hls.harvard.edu/today/berkman-klein-center-announces-2016-2017-community/>: "Meng
+  Weng Wong is a serial entrepreneur, angel investor, and computer scientist currently working on
+  Legalese.com…"), so the Bradner conversation is 2016–17; the CodeX year is not stated on any
+  page opened today (the FutureLaw 2019 speaker page names the Berkman and Ca' Foscari
+  fellowships only) — the post says "the following year" or leaves CodeX undated until Meng
+  confirms. **One more verified detail worth the sentence:** Meng is himself an RFC author —
+  RFC 4408, "Sender Policy Framework (SPF)", M. Wong and W. Schlitt, April 2006 (RFC Editor,
+  read 2026-09-14; the FutureLaw page says he "led the development and global adoption of the
+  email standard SPF") — so the Berkman moment is the author of BCP 14 meeting the author of
+  RFC 4408 over what MUST and MAY mean; the post may say so in one clause, since it is what makes
+  the "return the debt with interest" line his to say. This replaces the credential sentence: the moment is Bradner and the RFC, and the
   claim it carries — law lent the Internet MUST/SHOULD/MAY; L4 returns the loan — is the post's
   own, in Meng's words.
 
