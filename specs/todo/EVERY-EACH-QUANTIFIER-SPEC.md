@@ -1311,8 +1311,19 @@ branch was in the merge queue at the time):
   lane label. This is introduced by this branch — `unstable` has no quantifier to lose — and it is
   the one export gap a reader cannot discover from the export, because the artifact whose job is to
   list the losses is silent about it. Recorded on `doc/reference/regulative/EVERY.md` as well.
-  Not yet located: the collapse may be in the state graph the exporter reads or in
-  `L4.Bpmn.Lower`; whoever fixes it should measure which before writing a finding.
+  **LOCATED 2026-09-14, by source read on `unstable` `75068010`: it is the state graph, and
+  `L4.Bpmn.Lower` could not fix it — the distinction is gone before the exporter sees its input.**
+  `extractDeonton` (`jl4-core/src/L4/StateGraph.hs:673`) destructures
+  `MkDeonton{subject, action, due, hence, lest}` and **does not bind `join`**; because that is a
+  record pattern it kept compiling when the constructor grew, so nothing announced the loss.
+  `subjectText`'s header (`:884-890`) already says it outright — an `EVERY` is one node, the cast
+  is not fanned out, and _"the `ONCE …` join line is likewise not drawn"_ — which was a correct
+  phase-1 scope note and is a defect only because the language moved past phase 1. Corroborating:
+  `JoinOnce`/`JoinUpon` are referenced in nine modules under `jl4-core/src` (`Syntax`, `Parser`,
+  `Desugar`, `TypeCheck`, `TypeCheck.Annotation`, `Parser.ResolveAnnotation`, `Print`, `Nlg`,
+  `EvaluateLazy.Machine`) and in **no** `L4/Bpmn/*.hs` and **not** in `StateGraph.hs`. The fix is
+  scoped as **P2h** in `specs/todo/lexipedia-superset/LTS-VISUALISER.md` §4.9 and §7.2, which also
+  records what it does to that track's `DeonticStep` and correlation key. It moves P1's goldens.
 - `doc/reference/regulative/README.md:82-95` documents `WITHIN 5 days OF notice` as an anchored form.
   **Probed 2026-09-07:** it is a parse error (`unexpected OF` at the `OF`) on the installed binary of
   27 August and on the 4 September probe binary, with or without `days`. The page is owed a correction
