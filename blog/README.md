@@ -91,9 +91,25 @@ does not have to rediscover them.
   may later direct not to notify the individuals — and points the "data-breach pilot" at the PDPA
   wizard repo. So either (a) the WAICOM study and the government-agency pilot are one engagement
   described twice, or (b) they are two, with two different binds (a deontic must/must-not, and a
-  clock collision). Until Meng says which, the post carries the bind he described, cites the
-  WAICOM paper for the timed-automata model, and keeps a [NEEDS MENG] asking which bind the
-  UPPAAL model found and whether the two exhibits are one engagement.
+  clock collision). **ANSWERED — Meng, 2026-09-14 (afternoon):** "there was one engagement but
+  we worked it several ways: Uppaal and then Maude. The double bind was both deontic and temporal:
+  if the org notified the government then waited a while to notify the users they would
+  potentially be able to comply with a non-notification notice that arrived in the interim. The
+  only way to comply with a non-notification notice from the regulator is to violate the
+  immediate notification requirement to the affected users. And vice versa." So: ONE engagement
+  (the WAICOM study and the government-agency pilot are the same PDPA work), modeled twice
+  (UPPAAL, then Maude — the Maude work is the JURIX 2023 executable-semantics line, Watt,
+  Goodenough & Wong, so the post may say the same case was later re-run in Maude, citing that
+  paper only for the Maude semantics, not for the PDPA result unless the drafter opens it and
+  finds it there). The bind is deontic AND temporal at once, and the post should carry Meng's
+  exact structure: the immediacy duty to the users and the regulator's later non-notification
+  direction cannot both be satisfied; the only way to comply with either is to violate the other;
+  and the one path that "complies" with both — notify the regulator, then stall on the users until
+  a direction arrives — does so only by breaching the immediacy requirement in the interim, which
+  is why a static read misses it and a timed model finds it. FORMAL-PAPER.md §3/§4.4's "two
+  exhibits" and "secondary legislation" are the paper's looseness, not two engagements; the
+  post's marker on this point is CLOSED. Still open: whether the UPPAAL trace or diagram can be
+  shown (and whether the WAICOM PDF prints it).
 
   **The insurer — Meng, 2026-09-14, answering marker 3. Use this.** His words: "The insurer
   reviewed what it had been doing — it had been making the larger payout, not the smaller — and
