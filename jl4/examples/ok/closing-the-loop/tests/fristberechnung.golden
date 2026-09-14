@@ -1,0 +1,175 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+fristberechnung.l4:1155:1-53:
+  assertion satisfied
+fristberechnung.l4:1156:1-100:
+  assertion satisfied
+fristberechnung.l4:1157:1-42:
+  FUNCTION FROM `Die Art des Fristbeginns` TO BOOLEAN
+fristberechnung.l4:1161:1-63:
+  assertion satisfied
+fristberechnung.l4:1162:1-62:
+  assertion satisfied
+fristberechnung.l4:1163:1-63:
+  assertion satisfied
+fristberechnung.l4:1164:1-64:
+  assertion satisfied
+fristberechnung.l4:1165:1-74:
+  assertion satisfied
+fristberechnung.l4:1166:1-99:
+  assertion satisfied
+fristberechnung.l4:1167:1-62:
+  assertion satisfied
+fristberechnung.l4:1168:1-63:
+  assertion satisfied
+fristberechnung.l4:1169:1-99:
+  assertion satisfied
+fristberechnung.l4:1170:1-62:
+  assertion satisfied
+fristberechnung.l4:1171:1-98:
+  assertion satisfied
+fristberechnung.l4:1172:1-62:
+  assertion satisfied
+fristberechnung.l4:1173:1-62:
+  assertion satisfied
+fristberechnung.l4:1174:1-63:
+  assertion satisfied
+fristberechnung.l4:1175:1-63:
+  assertion satisfied
+fristberechnung.l4:1176:1-65:
+  assertion satisfied
+fristberechnung.l4:1177:1-75:
+  assertion satisfied
+fristberechnung.l4:1178:1-63:
+  assertion satisfied
+fristberechnung.l4:1179:1-76:
+  assertion satisfied
+fristberechnung.l4:1180:1-64:
+  assertion satisfied
+fristberechnung.l4:1181:1-76:
+  assertion satisfied
+fristberechnung.l4:1182:1-65:
+  assertion satisfied
+fristberechnung.l4:1183:1-66:
+  assertion satisfied
+fristberechnung.l4:1184:1-101:
+  assertion satisfied
+fristberechnung.l4:1185:1-63:
+  assertion satisfied
+fristberechnung.l4:1186:1-92:
+  assertion satisfied
+fristberechnung.l4:1187:1-100:
+  assertion satisfied
+fristberechnung.l4:1188:1-63:
+  assertion satisfied
+fristberechnung.l4:1189:1-65:
+  assertion satisfied
+fristberechnung.l4:1190:1-64:
+  assertion satisfied
+fristberechnung.l4:1191:1-108:
+  assertion satisfied
+fristberechnung.l4:1194:1-104:
+  assertion satisfied
+fristberechnung.l4:1195:1-113:
+  assertion satisfied
+fristberechnung.l4:1196:1-113:
+  assertion satisfied
+fristberechnung.l4:1197:1-112:
+  assertion satisfied
+fristberechnung.l4:1198:1-64:
+  assertion satisfied
+fristberechnung.l4:1199:1-64:
+  assertion satisfied
+fristberechnung.l4:1206:1-64:
+  assertion satisfied
+fristberechnung.l4:1207:1-90:
+  assertion satisfied
+fristberechnung.l4:1208:1-86:
+  assertion satisfied
+fristberechnung.l4:1209:1-79:
+  assertion satisfied
+fristberechnung.l4:1210:1-109:
+  assertion satisfied
+fristberechnung.l4:1211:1-87:
+  assertion satisfied
+fristberechnung.l4:1215:1-90:
+  assertion satisfied
+fristberechnung.l4:1216:1-90:
+  assertion satisfied
+fristberechnung.l4:1217:1-90:
+  assertion satisfied
+fristberechnung.l4:1218:1-92:
+  assertion satisfied
+fristberechnung.l4:1219:1-91:
+  assertion satisfied
+fristberechnung.l4:1226:1-65:
+  assertion satisfied
+fristberechnung.l4:1227:1-65:
+  assertion satisfied
+fristberechnung.l4:1228:1-67:
+  assertion satisfied
+fristberechnung.l4:1232:1-73:
+  assertion satisfied
+fristberechnung.l4:1233:1-73:
+  assertion satisfied
+fristberechnung.l4:1234:1-72:
+  assertion satisfied
+fristberechnung.l4:1238:1-70:
+  assertion satisfied
+fristberechnung.l4:1239:1-77:
+  assertion satisfied
+fristberechnung.l4:1240:1-84:
+  assertion satisfied
+fristberechnung.l4:1241:1-83:
+  assertion satisfied
+fristberechnung.l4:1245:1-102:
+  assertion satisfied
+fristberechnung.l4:1246:1-106:
+  assertion satisfied
+fristberechnung.l4:1247:1-163:
+  assertion satisfied
+fristberechnung.l4:1248:1-143:
+  assertion satisfied
+fristberechnung.l4:1252:1-161:
+  assertion satisfied
+fristberechnung.l4:1253:1-141:
+  assertion satisfied
+fristberechnung.l4:1260:1-101:
+  assertion satisfied
+fristberechnung.l4:1261:1-81:
+  assertion satisfied
+fristberechnung.l4:1271:1-107:
+  DATE OF 12, 3, 2026
+fristberechnung.l4:1272:1-142:
+  DATE OF 10, 3, 2026
+fristberechnung.l4:1276:1-74:
+  DATE OF 28, 2, 2026
+fristberechnung.l4:1277:1-67:
+  DATE OF 27, 2, 2026
+fristberechnung.l4:1280:1-91:
+  assertion satisfied
+fristberechnung.l4:1283:1-39:
+  DATE OF 28, 2, 2026
+fristberechnung.l4:1284:1-67:
+  DATE OF 27, 2, 2026
+fristberechnung.l4:1285:1-64:
+  DATE OF 2, 3, 2026
+fristberechnung.l4:1289:1-39:
+  DATE OF 28, 3, 2026
+fristberechnung.l4:1290:1-67:
+  DATE OF 31, 3, 2026
+fristberechnung.l4:1291:1-64:
+  DATE OF 1, 4, 2026
+fristberechnung.l4:1294:1-91:
+  assertion satisfied
+fristberechnung.l4:1295:1-93:
+  assertion satisfied
+fristberechnung.l4:1302:1-127:
+  12
+fristberechnung.l4:1303:1-119:
+  LIST DATE OF 28, 1, 2026, DATE OF 29, 1, 2026, DATE OF 30, 1, 2026, DATE OF 28, 2, 2026, DATE OF 30, 3, 2026, DATE OF 30, 4, 2026, DATE OF 30, 5, 2026, DATE OF 30, 6, 2026, DATE OF 30, 8, 2026, DATE OF 30, 9, 2026, DATE OF 30, 10, 2026, DATE OF 30, 11, 2026
+fristberechnung.l4:1304:1-121:
+  LIST DATE OF 28, 1, 2026, DATE OF 29, 1, 2026, DATE OF 30, 1, 2026, DATE OF 28, 2, 2026, DATE OF 30, 3, 2026, DATE OF 30, 5, 2026, DATE OF 30, 6, 2026, DATE OF 30, 8, 2026, DATE OF 30, 9, 2026, DATE OF 30, 11, 2026
+fristberechnung.l4:1305:1-110:
+  LIST DATE OF 29, 1, 2026, DATE OF 30, 1, 2026, DATE OF 31, 1, 2026, DATE OF 31, 3, 2026, DATE OF 31, 5, 2026, DATE OF 31, 8, 2026, DATE OF 31, 10, 2026

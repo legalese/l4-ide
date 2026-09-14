@@ -1,0 +1,10 @@
+Parsing successful
+Typechecking successful
+fristbeginn-nonexhaustive-control.l4:41:5-43:88:
+  I found a problem while checking the definition of `§ 187 Abs. 1 ist einschlägig bei (unvollständig)`:
+    The following branches still need to be considered:
+    
+      WHEN `Kontrollprobe — die Erschöpfungsprüfung des § 187, mit einem fehlenden Arm`.`der Tag der Geburt bei der Berechnung des Lebensalters` THEN
+    
+fristbeginn-nonexhaustive-control.l4:45:1-58:
+  FUNCTION FROM `Die Art des Fristbeginns` TO BOOLEAN
