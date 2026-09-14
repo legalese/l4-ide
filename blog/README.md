@@ -263,6 +263,92 @@ does not have to rediscover them.
   canon repository's own status header (a scaffold with its first subject) is respected, not
   inflated; the Wikipedia analogy is made with Wikipedia's actual quality mechanisms in view.
 
+  **Post 9 addendum — Meng, 2026-09-14 (evening), three more things the post carries.**
+
+  **(a) Position L4 as the spiritual heir of LegalRuleML: a lingua franca for the other rules-as-code
+  languages.** Meng's words: "i would like to position L4 as the spiritual heir of legalruleml -- a
+  lingua franca for other rules-as-code languages -- and we do have a backlog of exporter formats to
+  build out." Ground the claim in `specs/research/LEGALRULEML-RESEARCH.md` (memo of 2026-08-16, read
+  the whole thing): LegalRuleML is a real OASIS Standard (30 August 2021) designed as the interchange
+  hub for legal rules; it is deliberately semantics-free (§2.3: "independent from any legal ontology
+  and logic framework"); every reasoner that consumed it is dead (Regorous HTTP 410, SPINdle's host
+  fails DNS, LIME refuses connections — checked in that memo, re-check before printing); the TC's
+  GitHub repo has not been pushed since July 2020; and even its own community transcoded to SPINdle
+  to run anything. What it standardized well is the metadata layer: `LegalSource`/`LegalReference`
+  (Akoma Ntoso naming), `TemporalCharacteristic` (in-force/efficacy intervals), `Alternatives`
+  (competing interpretations) — and those three map onto L4's `@ref` provenance, `EVAL … UNDER RULES
+  EFFECTIVE AT`, and the ambiguity register closely enough that the memo calls it "independent
+  confirmation that L4's annotation layer is designed correctly." So the heir claim is: L4 takes up
+  the hub role LegalRuleML was built for and adds the thing it never had, an execution semantics
+  and working compilers out — and the debt is owed back, because a LegalRuleML *exporter* is on the
+  backlog (memo verdict: viable as a publication-and-provenance artifact, not an interoperability
+  bridge; ~60% mechanical XML; `WITHIN`, `HENCE`, `RAND`/`ROR`, `#TRACE` have no representation and
+  would be dropped with a diagnostic). Say "spiritual heir" as Meng's positioning, in his voice, and
+  put the memo's facts under it; do not claim compatibility, round-tripping, or endorsement by OASIS.
+  Also name Akoma Ntoso separately: `l4 render --format akn` emits LegalDocML 3.0 with FRBR metadata
+  today (run in the worktree 2026-09-14 on `jl4/examples/legal/bna/bna.l4`; `etc/go/phases/p7-akn.sh`
+  notes it is undocumented in `--help` and its oracle is well-formedness only).
+
+  **(b) A table of what L4 exports to today and what is in the backlog, with an "in progress"
+  column.** Every row below was verified in the worktree on 2026-09-14 (the built `l4` binary's
+  `--help` and subcommand help; `doc/exports/README.md`; `specs/proposals/BACKEND-PORTFOLIO-SPEC.md`
+  census refreshed 2026-08-28; the specs named). Re-verify any row you print by the pointer given;
+  the post's table may be shorter than this, but it must not be truer than this.
+
+  | target | family | status 2026-09-14 | pointer |
+  | --- | --- | --- | --- |
+  | OpenFisca (Python module) | execution | shipped: `l4 openfisca` | `doc/exports/openfisca.md`, `jl4-core/src/L4/OpenFisca/Emit.hs` |
+  | Catala (literate module + equivalence check) | execution | shipped: `l4 catala` | `doc/exports/catala.md`, `specs/todo/CATALA-EXPORT-SPEC.md` |
+  | MLIR → WebAssembly | execution | shipped in-tree, parity ledger | `jl4-mlir/README.md`, `FEATURE-PARITY-PLAN.md` |
+  | docassemble (interview YAML + fidelity report) | interaction | shipped: `l4 docassemble` | `doc/exports/docassemble.md` |
+  | Blawx / s(CASP) (project YAML, raw s(CASP); reads back with `--import`) | interaction/reasoning | shipped both directions: `l4 blawx` | `doc/exports/blawx.md`, `specs/todo/BLAWX-EXPORT-SPEC.md` |
+  | DMN, DMN-as-Markdown, BPMN (+ fidelity report) | interchange | shipped: `l4 export --to dmn\|dmn-md\|bpmn`; DMN BKM phases 4/5 and a new program model are planned | `doc/exports/dmn-bpmn.md`, `specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md` |
+  | Akoma Ntoso / LegalDocML 3.0 | interchange | shipped, undocumented: `l4 render --format akn` | `etc/go/phases/p7-akn.sh` |
+  | JSON Schema; HTML/text/JSON render; NLG prose (`l4 nlg`); GraphViz trace; state-graph DOT | documentation/interchange | shipped | `l4 --help` |
+  | Decision service API, MCP server, WebMCP page | deployment | shipped in `jl4-service` | `jl4-service/src/McpServer.hs`, `WebMCPPage.hs`, `jl4-service/README.md` §MCP |
+  | SWI-Prolog, Logical English, PROLEG, ErgoAI | reasoning | **in progress**: the shared relational middle-end landed 2026-08-18 (#272); s(CASP) shipped on it; the four emitters are unbuilt; `jl4-proleg` is a reader/printer, not a transpiler | `specs/proposals/LOGIC-PROGRAMMING-BACKENDS-SPEC.md` |
+  | Z3, Alloy, TLA+, NuSMV/nuXmv, UPPAAL, TAPAAL, SPIN, Maude | verification | **in progress**: proposal; Phase 1 rulings answered by Meng 2026-09-07; no prover in the tree; `l4 prove` is a thing to write | `specs/proposals/VERIFICATION-BACKEND-LOWERING-SPEC.md` |
+  | LegalRuleML | interchange | **backlog**: researched 2026-08-16; publication-and-provenance artifact | `specs/research/LEGALRULEML-RESEARCH.md` |
+  | NLG / TNR round-trip | documentation | **in progress**: on branch `nlg-roundtrip` | `jl4-core/src/L4/Nlg.hs` |
+  | TypeScript/JS library, Go | execution | **backlog**: named 2026-09-07, no spec; driver is on-prem deployment | portfolio spec §2.1 |
+  | Solidity / EVM | execution | **backlog**: plan document only | `jl4-mlir/SOLIDITY-BACKEND-PLAN.md` |
+  | RuleSpec (Axiom Foundation) | execution | **backlog**: researched 2026-09-09; "closest structural match to L4's design values" | `specs/research/AXIOM-RULESPEC-POLICYENGINE-RESEARCH.md` |
+  | DataLex / yscript (AustLII) | interaction | **backlog**: researched 2026-09-08 | `specs/research/DATALEX-YSCRIPT-RESEARCH.md` |
+  | RUML (Rulemapping) | interchange | **backlog, blocked**: the format is unpublished | `specs/research/RULEMAPPING-RUML-RESEARCH.md` |
+  | Lean, F\* | verification | **backlog**: named, no spec | portfolio spec §2.5 |
+
+  Rules for the table in the post: statuses are "shipped", "in progress", "backlog" — nothing
+  softer, nothing that reads as a promise; give the date the statuses were read; the pointer column
+  stays in the notes, not the body; do not print test counts (the portfolio spec's own warning: "a
+  figure is the highest-risk thing a cell can hold"). The frame from `doc/exports/README.md` is
+  usable in the post's voice: "L4 is where a rule is written down once, precisely. It is rarely
+  where the rule needs to live." And its two design rules: they are compilers, not converters
+  (each takes a subset, and says so); they would rather refuse than lie.
+
+  **(c) Why the pipeline is cheap: models write L4 without much coaching — as a conjecture, not a
+  finding.** Meng (2026-09-14) had a chat with ChatGPT
+  (<https://chatgpt.com/share/6aa7458b-309c-83ec-b36f-6a2fa51c1ab2>, "Haskell S Expressions"; the
+  final exchange is saved in the session scratchpad as `chatgpt-final-answer.md`) whose last turn
+  puts the hypothesis tidily: L4 asks a model for several small translations between
+  representations it already knows (English rule → controlled natural language → deontic/logical
+  structure → typed functions → Haskell-shaped machinery) rather than one leap; the keywords carry
+  their own semantics ("a person MUST pay the fee" is "already almost its own semantic annotation",
+  unlike `>>=`); so "language understanding supplies the intended meaning; programming-language
+  knowledge supplies the executable structure", and L4 is "almost perversely well matched to the
+  medium." Use one paragraph of this in post 9 as the reason the \$20 estimate is plausible, hedged
+  three ways: (1) it is a hypothesis, and one a model offered about models; (2) our only
+  measurement is the Kant replication in post 2 — one policy, nine questions, one model alias,
+  scores 0.900–0.967 across cells — which is not a language comparison; (3) the L4 sandboxes in that
+  replication got an L4-only "gotchas" block the provenance file flags as treatment-relevant, so
+  what our record shows is "a page of coaching", not "no coaching". The academic version of the
+  claim is a benchmark: EncodeBench (<https://encodebench.org/>, The Axiom Foundation, formalized
+  July 2026; four deterministic gates — encodes, compiles, passes CI, no number the source lacks;
+  UK v1 board 16 cases × 6 models, not reasoning-effort matched; it benchmarks RuleSpec, not L4).
+  Name it as the shape of the test L4 has not yet sat, not as evidence about L4. Meng's own
+  hesitation, verbatim: "Not sure if this is the approach we want to take or if we should save
+  this angle for something more academic" — so keep it to one paragraph and one note.
+
+
 - **Bench marks, 2026-09-14 ~17:35–17:55** (artifact "Author queries, posts 1–5", collection
   `blog-rulings`; Meng's words verbatim where quoted). **Q1** show — the WAICOM PDF supplied; see
   above. **Q2** accept — the agency stays unnamed. **Q3 (post 2, blinding) — edit:** "tbh best
