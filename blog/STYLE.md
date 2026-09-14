@@ -130,6 +130,11 @@ _delve_, _tapestry_, _testament to_, _underscore_ (verb), _robust_, _nuanced_, _
 a world where_, _elegant_ said of one's own explanation, and any sentence shaped "It's not X — it's
 Y" / "This isn't about X".
 
+**Exempt: quotations and cited titles.** A source's own words are never altered or omitted to
+satisfy the lint — a paper whose title contains "robust" is cited by its title. (Ruled 2026-09-14
+after a reviser left a title out of a footnote for this reason.) The lint skips quoted and
+italicized spans.
+
 **Soft (warn, then a human looks):** _genuinely_ and _leverage_ (both demoted from hard on
 2026-09-13: Gibson uses _genuinely_ twice, Somers _leverage_ once), _quietly_, _remarkably_, _of
 course_, _in other words_; a title over twelve words; and an **epigram ratio** over 25% —

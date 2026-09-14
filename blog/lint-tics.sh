@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # lint-tics.sh — grep a blog post for the verbal tics banned in blog/STYLE.md §2.3.
 # Usage: blog/lint-tics.sh blog/posts/*.md        exit 1 on any HARD hit; soft hits only warn.
+# Quoted spans and *italic* / _italic_ titles are exempt (2026-09-14: a reviser omitted a paper's
+# title to dodge the lint — never do that; the lint now skips quotations and titles).
 # Calibrated 2026-09-13 against Gibson / Asimov / Somers (x2): zero hard hits on all four after
 # 'genuinely' (Gibson x2) and 'leverage' (Somers) were demoted to soft. The epigram-closer warning
 # The epigram check is a ratio (warn above 25% of paragraphs); the exemplars run 6-19%.
@@ -12,6 +14,8 @@ rc=0
 for f in "$@"; do
   # strip fenced code and the YAML front matter so quoted L4 and metadata are not linted
   body=$(awk 'BEGIN{fm=0;code=0} NR==1&&/^---$/{fm=1;next} fm&&/^---$/{fm=0;next} fm{next} /^```/{code=!code;next} !code' "$f")
+  # quotations and cited titles keep their source's words: blank out "…", “…”, *…* and _…_ spans before linting
+  body=$(printf '%s\n' "$body" | perl -pe 's/"[^"\n]{1,300}"/"…"/g; s/\x{201C}[^\x{201D}\n]{1,300}\x{201D}/“…”/g; s/(?<![*\w])\*[^*\n]{1,200}\*(?![*\w])/*…*/g; s/(?<![_\w])_[^_\n]{1,200}_(?![_\w])/_…_/g')
   hard=$(printf '%s\n' "$body" | grep -n -i -E "$HARD")
   soft=$(printf '%s\n' "$body" | grep -n -i -E "$SOFT")
   title=$(sed -n 's/^title: *//p' "$f" | head -1); tw=$(printf '%s' "$title" | wc -w | tr -d ' ')
