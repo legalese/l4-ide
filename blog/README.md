@@ -93,7 +93,33 @@ does not have to rediscover them.
   the benefit of insurers so as to protect the latter's interest," and that an ambiguity in the
   extent of cover "should be construed against the respondent" insurer. A Singapore authority
   suits a Singapore research group. Cite it for the rule of construction; cite _Ocidental_ only as
-  what management named. Meng's closing phrase, "It was
+  what management named.
+
+  **The New Zealand exercise — Meng, 2026-09-14, answering marker 4, with his May 2019 deck
+  "Multi-Way Isomorphism in L4: a humble universal converter for rules as code" (Google Slides
+  1U4pQFXuVAocbwzF1nPtyhxH2SBza_7nEErLPE2lnAAw; text export read 2026-09-14). Use these.** His
+  words: "We did the work in a very early prototype of the L4 system; an early implementation just
+  using S-expressions in raw Haskell but that was enough to buy us QuickCheck." What the deck
+  shows: the scheme was the **rates rebate** (OpenFisca-Aotearoa's `rates_rebates` formula); the
+  Python parser was written by Varun Patro (NUS); the prototype's S-expressions had operators
+  named `SoMuchOf`, `Inxs` ("in excess of") and `IntDiv`; the bug was **the semantics of
+  "excess"** — "the amount by which a exceeds b" had been coded as `a − b` where the Act means
+  `max(0, a − b)`, so once combined income passed the threshold the "excess income" went negative
+  and the rebate went *up*, into negative rebates; it was found by **charting the rebate over a
+  grid** — combined income $12,000–$30,000 in $1,000 steps against rates of $100 upward in $100
+  steps, dependants 0 — and reading the sign ("this looks wrong"; after the fix, "this now
+  reflects legislative intent"); the deck credits the upstream fix to two OpenFisca-Aotearoa
+  contributors by GitHub handle (@Br3nda, @Verbman); the prototype's evaluator printed an
+  explanation trace in the Act's words ("560.00 — which is the lesser of …"), which the deck calls
+  putting the legislation into the debugger; the repository was
+  `legalese/complaw-deeptech`, path `ontologies/rules/aotearoa-haskell`; a shell prompt in the
+  deck is dated 2019-05-14. So the post says: rates rebate; a grid sweep with a human reading the
+  sign as the oracle (QuickCheck is Meng's recollection of what the prototype made possible — the
+  deck's evidence is the grid, so attribute QuickCheck to him and show the grid); the parser is
+  not in the current tree. One thing the deck's slide order leaves open: whether the chart found
+  the bug or reproduced one already found upstream — say "surfaced in our chart; fixed upstream by
+  …" only if Meng confirms; otherwise "the chart shows the bug; the fix landed upstream." The
+  earlier "entire domain of possible scenarios" wording is retired: the domain was a grid. Meng's closing phrase, "It was
   about computability in the NP-hard sense," is his gloss — do not put "NP-hard" in the post
   unless the claim is made precise (NP-hardness is a complexity class, and the formal-methods
   critic will ask which problem was shown hard); the substance is that the defect was in the
