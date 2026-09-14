@@ -1,8 +1,9 @@
 # Blog style guide
 
-**STATUS 2026-09-13: DRAFT, not yet applied to any post — no post exists.** Written before the
-first post so the first post has something to be checked against. Expect it to change when it
-meets one. Rulings marked _proposed_ are Meng's to make; everything else is copied from a source
+**STATUS 2026-09-14: IN USE.** Written on 2026-09-13 before any post existed; applied since to the
+first drafts and their persona reviews, which changed it (length ceiling raised to 3,500; footnotes
+welcomed; the NRF stanza; the field-research rule; the persona pass in §7). Expect it to keep
+changing as posts meet it. Rulings marked _proposed_ are Meng's to make; everything else is copied from a source
 named inline and re-checked on the date above.
 
 ## 1. Who reads this, and what for

@@ -1,7 +1,9 @@
 # The L4 blog — prefiguring the papers
 
-**STATUS 2026-09-13: PLANNED. No post drafted.** This directory holds the style guide and, once
-they exist, the posts. It is the companion to [`paper/`](../paper/): each post puts one of the
+**STATUS 2026-09-14: DRAFTING.** Posts 1 and 2 have been machine-drafted, critiqued by six reader
+personas and a live fact-check, and revised; posts 3 and 5 have unrevised machine drafts; 4, 6, 7,
+8, 9 and S1 are not yet drafted. No post has been read by Meng. Every draft says so in its first
+line. This directory holds the style guide and the posts. It is the companion to [`paper/`](../paper/): each post puts one of the
 papers' positions in front of a general technical reader before the academic version lands. See
 [`STYLE.md`](STYLE.md) for who that reader is and how a post is written.
 
@@ -81,7 +83,17 @@ does not have to rediscover them.
   insurance contract; a term limiting or excluding cover that the consumer had not been informed
   of. It is a transparency-and-disclosure case about a limiting term, not a case about an
   ambiguous formula, so the post reports management's remark as their reading of their exposure
-  and describes the judgment as what it is. Open the judgment before quoting it. Meng's closing phrase, "It was
+  and describes the judgment as what it is. Open the judgment before quoting it.
+  **A second case, from Meng (2026-09-14): _Tay Eng Chuan v Ace Insurance Ltd_ [2008] SGCA 26**
+  (Singapore Court of Appeal, CA 95/2007, decided 27 June 2008; read on eLitigation 2026-09-14).
+  This one is on point for the sentence the post already carries — "an ambiguity in a policy the
+  insurer wrote is, by the usual rule of construction, read against the insurer" — and can be its
+  citation: the Court held that the contra proferentem rule "is particularly pertinent in
+  insurance policies because these policies are invariably drafted and/or vetted by experts for
+  the benefit of insurers so as to protect the latter's interest," and that an ambiguity in the
+  extent of cover "should be construed against the respondent" insurer. A Singapore authority
+  suits a Singapore research group. Cite it for the rule of construction; cite _Ocidental_ only as
+  what management named. Meng's closing phrase, "It was
   about computability in the NP-hard sense," is his gloss — do not put "NP-hard" in the post
   unless the claim is made precise (NP-hardness is a complexity class, and the formal-methods
   critic will ask which problem was shown hard); the substance is that the defect was in the
