@@ -33,15 +33,30 @@
 --   line nor the count ("phase-2 limit", @Machine.barrierFinish@). With a
 --   'MarkingContext' read from the step log the 'Awaiting' place knows its
 --   progress and its threshold; with 'noContext' it is still emitted —
---   recognised by the sentinel's NAME — but its 'awProgress' is 'Nothing'.
---   A missing @Awaiting@ therefore means "no barrier"; an @Awaiting@ with
---   no progress means "run it with the log on".
+--   recognised by the sentinel's name AND its lack of a source range (the
+--   machine mints it with 'L4.Annotation.emptyAnno'; a drafter's own
+--   @`the join`@ has a range and is not mistaken for it) — but its
+--   'awProgress' is 'Nothing'. A missing @Awaiting@ therefore means "no
+--   barrier"; an @Awaiting@ with no progress means "run it with the log on".
 -- * A member's 'lnMember' is filled from the same context and is 'Nothing'
---   without it.
--- * The context is keyed by ACTION site ('contextOf'), so two casts drawn
---   from the same @EVERY@ in one trace — a @HENCE@ that re-enters its own
---   rule — collapse to the later one, silently. That is the cast register's
---   own limit (spec §4.3, "Not built"), inherited here, not added.
+--   without it. It is the FAMILY ('Family': join, total, join site), not
+--   the member's own record: the context is keyed by action site, which
+--   every member of a cast shares, so a per-member field read through it
+--   would be some other member's.
+-- * The arm count ('mcDone') is folded over the steps IN ORDER: a
+--   @MemberSatisfied n@ sets it to @n@, and the join's own terminal step
+--   ('JoinReleased', 'JoinExpired', 'JoinFailed', 'JoinStalled') resets it
+--   to zero, mirroring the machine's @registerCast@, which zeroes its
+--   counter every time the @EVERY@ is entered. So a @HENCE@ that re-enters
+--   its own barrier reads the second activation's count, not the first's
+--   final one. Taking the maximum instead — which this module did at first
+--   — reported @3 of 3@ for a re-entered barrier with one arm satisfied,
+--   with 'thresholdMet' true while the 'Awaiting' was still pending.
+-- * What that re-entry still collapses, silently, is the cast register
+--   itself: a second cast from the same site overwrites the first in
+--   'mcCasts'. Today the two casts are identical (same join, same total,
+--   same join site), so nothing observable is lost; that is the cast
+--   register's own limit (spec §4.3, "Not built"), inherited here.
 module L4.Lts.Marking
   ( -- * The marking
     NormPlacement (..)
@@ -52,12 +67,15 @@ module L4.Lts.Marking
   , Bearer (..)
   , Countdown (..)
   , Blame (..)
+  , Family (..)
   , Progress (..)
   , thresholdMet
   , blameOf
     -- * The raw walk
   , RawObligation (..)
   , liveObligations
+  , renderLive
+  , isCheckpoint
     -- * The context
   , MarkingContext (..)
   , noContext
@@ -126,11 +144,27 @@ data LiveNorm = MkLiveNorm
     -- ^ the @HENCE@ as the residual prints it; for a barrier member this is
     -- the machine's sentinel, @`the join`@
   , lnLest   :: !(Maybe Text)
-  , lnMember :: !(Maybe MemberOf)
+  , lnMember :: !(Maybe Family)
     -- ^ which @EVERY@ family this belongs to, when the context knows
   }
   deriving stock (Eq, Show, Generic)
   deriving anyclass NFData
+
+-- | An @EVERY@ family, as every member of its cast shares it: the
+-- 'MemberOf' fields that are the same for the whole cast, and nothing
+-- per-member. 'MemberOf.moIndex' is deliberately not carried — through a
+-- context keyed by action site it would be whichever member the log wrote
+-- last, which is nobody's in particular.
+data Family = MkFamily
+  { faJoin     :: !JoinKind
+  , faTotal    :: !Int
+  , faJoinSite :: !(Maybe SrcRange)
+  }
+  deriving stock (Eq, Show, Generic)
+  deriving anyclass NFData
+
+familyOf :: MemberOf -> Family
+familyOf m = MkFamily {faJoin = m.moJoin, faTotal = m.moTotal, faJoinSite = m.moJoinSite}
 
 -- | The party, as far as the machine has forced it. A @PARTY p@ obligation
 -- evaluates @p@ lazily, so a norm that never met an event may still hold
@@ -179,8 +213,10 @@ data Progress = MkProgress
   deriving stock (Eq, Show, Generic)
   deriving anyclass NFData
 
--- | Is the threshold met? The one place phase 3's count and measure forms
--- will add arms; there is deliberately no wildcard.
+-- | Is the threshold met? Phase 3's count and measure forms add arms here
+-- and at 'placementText''s @thresholdText@ (and in the machine, at
+-- @assembleQuantified@'s @threshold\@AllHave{}@); none of the three has a
+-- wildcard, so a new 'Threshold' constructor is a compile error at each.
 thresholdMet :: Progress -> Bool
 thresholdMet p = case p.prThreshold of
   AllHave _ -> p.prDone >= p.prTotal
@@ -190,15 +226,12 @@ thresholdMet p = case p.prThreshold of
 -- Both are read back out of the steps ('contextOf'), so nothing new is
 -- captured.
 data MarkingContext = MkMarkingContext
-  { mcCasts :: !(Map (Maybe SrcRange) MemberOf)
-    -- ^ per ACTION site, one member's record — 'moJoin', 'moTotal' and
-    -- 'moJoinSite' are the same for every member of a cast, and those are
-    -- what the marking reads. The per-member fields ('moIndex') are not
-    -- meaningful through this map; 'lnMember' carries them only as the
-    -- family's, not the member's.
+  { mcCasts :: !(Map (Maybe SrcRange) Family)
+    -- ^ per ACTION site, the family every member of the cast shares
   , mcDone  :: !(Map (Maybe SrcRange) Int)
-    -- ^ per JOIN site, the arms satisfied so far — the largest
-    -- 'MemberSatisfied' the log recorded
+    -- ^ per JOIN site, the arms satisfied so far in the CURRENT activation
+    -- of that barrier: the last 'MemberSatisfied' the log recorded since
+    -- the join's last terminal step, folded in log order
   }
   deriving stock (Eq, Show, Generic)
   deriving anyclass NFData
@@ -208,15 +241,42 @@ noContext :: MarkingContext
 noContext = MkMarkingContext Map.empty Map.empty
 
 -- | Read the context out of a directive's steps.
+--
+-- The arm count is a fold in step order, not a maximum: the machine zeroes
+-- its own counter at every @registerCast@ (each time the @EVERY@ is
+-- entered), so a barrier a @HENCE@ re-enters counts from one again, and the
+-- context must forget the first activation's count when the second begins.
+-- The step that marks the boundary is the join's own terminal — the one
+-- logged with the join site as its 'nkSite' and no membership — since the
+-- re-entry itself logs nothing.
 contextOf :: [DeonticStep] -> MarkingContext
 contextOf steps = MkMarkingContext
   { mcCasts = Map.fromList
-      [ (k.nkSite, m) | s <- steps, Just k <- [s.dsNorm], Just m <- [k.nkMember] ]
-  , mcDone = Map.fromListWith max
-      [ (m.moJoinSite, n)
-      | s <- steps, Just k <- [s.dsNorm], Just m <- [k.nkMember]
-      , Just (MemberSatisfied n _) <- [s.dsJoin] ]
+      [ (k.nkSite, familyOf m) | s <- steps, Just k <- [s.dsNorm], Just m <- [k.nkMember] ]
+  , mcDone = foldl' arm Map.empty steps
   }
+  where
+    arm done s = case s.dsNorm of
+      Nothing -> done
+      Just k -> case (k.nkMember, s.dsJoin) of
+        (Just m, Just (MemberSatisfied n _)) -> Map.insert m.moJoinSite n done
+        (Nothing, _) | joinTerminal s.dsOutcome -> Map.insert k.nkSite 0 done
+        _ -> done
+    -- the outcomes after which the barrier is gone and a re-entry starts
+    -- over; every 'StepOutcome' is named, so a new join outcome must choose
+    joinTerminal = \ case
+      JoinReleased    -> True
+      JoinExpired _ _ -> True
+      JoinFailed _    -> True
+      JoinStalled     -> True
+      Waiting         -> False
+      PartyMismatch   -> False
+      ActionMismatch  -> False
+      GuardFailed     -> False
+      Matched _       -> False
+      Expired _ _     -> False
+      Breached _      -> False
+      Joined _ _      -> False
 
 -- | The marking of a residual: §4.2a's fold, total over 'Value'.
 --
@@ -237,33 +297,24 @@ markingOf ctx v0 = places <> joins
     (places, barriers) = go v0
 
     -- the placements, and the join sites of every barrier member seen
-    go :: LayoutPrinter a => Value a -> ([NormPlacement], [(Maybe SrcRange, Maybe MemberOf)])
+    go :: LayoutPrinter a => Value a -> ([NormPlacement], [(Maybe SrcRange, Maybe Family)])
     go = \ case
       ValFulfilled -> ([], [])
       ValBreached r -> ([Violated (blameOf r)], [])
-      ValObligation _ party act due hence lest ->
-        let member = Map.lookup (rangeOf act) ctx.mcCasts
-            live = MkLiveNorm
-              { lnSite   = rangeOf act
-              , lnBearer = either (UnforcedParty . prettyLayout) (KnownParty . prettyLayout) party
-              , lnModal  = act.modal
-              , lnAction = prettyLayout act.action
-              , lnDue    = countdown due
-              , lnHence  = prettyLayout hence
-              , lnLest   = prettyLayout <$> lest
-              , lnMember = member
-              }
+      ValObligation env party act due hence lest ->
+        let raw = MkRawObligation {roEnv = env, roParty = party, roAction = act, roDue = due, roHence = hence, roLest = lest}
+            live = renderLive ctx raw
             barrier
-              | Just m <- member, isBarrier m.moJoin = [(m.moJoinSite, member)]
-              | isCheckpoint hence                    = [(rangeOf act, Nothing)]
-              | otherwise                             = []
+              | Just f <- live.lnMember, isBarrier f.faJoin = [(f.faJoinSite, live.lnMember)]
+              | isCheckpoint hence                          = [(rangeOf act, Nothing)]
+              | otherwise                                   = []
         in ([InEffect live], barrier)
       ValROp _ op l r -> operand op l <> operand op r
       ValQuantified _ deonton ->
         ([Created {crSite = rangeOf deonton, crSource = prettyLayout deonton}], [])
       _ -> ([], [])
 
-    operand :: LayoutPrinter a => RBinOp -> Either RExpr (Value a) -> ([NormPlacement], [(Maybe SrcRange, Maybe MemberOf)])
+    operand :: LayoutPrinter a => RBinOp -> Either RExpr (Value a) -> ([NormPlacement], [(Maybe SrcRange, Maybe Family)])
     operand _ (Left rexpr) = ([Created {crSite = rangeOf rexpr, crSource = prettyLayout rexpr}], [])
     operand ValROr (Right (ValBreached r)) = ([Lapsed (blameOf r)], [])
     operand _ (Right v) = go v
@@ -272,17 +323,37 @@ markingOf ctx v0 = places <> joins
     joins =
       [ Awaiting {awJoinSite = site, awProgress = progress member}
       | (site, member) <- nubOrdOn fst barriers ]
-    progress member = do
-      m <- member
-      threshold <- case m.moJoin of
-        Barrier th -> Just th
-        _          -> Nothing
+    -- exhaustive over 'JoinKind', as 'isBarrier' is: a new threshold-bearing
+    -- join kind is a compile error here, not a silent 'Nothing' that prints
+    -- as "progress unknown"
+    progress family = do
+      f <- family
+      threshold <- case f.faJoin of
+        Barrier th   -> Just th
+        Fork         -> Nothing
+        Distributive -> Nothing
       pure MkProgress
-        { prDone = Map.findWithDefault 0 m.moJoinSite ctx.mcDone
-        , prTotal = m.moTotal
+        { prDone = Map.findWithDefault 0 f.faJoinSite ctx.mcDone
+        , prTotal = f.faTotal
         , prThreshold = threshold }
 
-    countdown :: LayoutPrinter a => Either (Maybe RExpr) (Value a) -> Countdown
+-- | The 'InEffect' reading of one obligation. 'markingOf' uses it for every
+-- 'ValObligation' it meets, and "L4.Lts.WhatIf" uses it on the
+-- 'RawObligation' a candidate is built from, so the 'LiveNorm' a candidate
+-- carries is rendered from the same value the candidate's act is — not
+-- paired up with the marking afterwards.
+renderLive :: LayoutPrinter a => MarkingContext -> RawObligation a -> LiveNorm
+renderLive ctx raw = MkLiveNorm
+  { lnSite   = rangeOf raw.roAction
+  , lnBearer = either (UnforcedParty . prettyLayout) (KnownParty . prettyLayout) raw.roParty
+  , lnModal  = raw.roAction.modal
+  , lnAction = prettyLayout raw.roAction.action
+  , lnDue    = countdown raw.roDue
+  , lnHence  = prettyLayout raw.roHence
+  , lnLest   = prettyLayout <$> raw.roLest
+  , lnMember = Map.lookup (rangeOf raw.roAction) ctx.mcCasts
+  }
+  where
     countdown = \ case
       Left Nothing         -> NoDeadline
       Left (Just e)        -> UnforcedDeadline (prettyLayout e)
@@ -312,12 +383,15 @@ liveObligations = \ case
   where
     operand = either (const []) liveObligations
 
--- | The barrier checkpoint, as it stands in a member's @HENCE@ slot: the
--- machine mints it as a fresh name, so the name is the only handle.
+-- | The barrier checkpoint, as it stands in a member's @HENCE@ slot. The
+-- machine mints it as a fresh name under 'L4.Annotation.emptyAnno'
+-- (@startBarrier@, @barrierMember@), so it is the sentinel's name with NO
+-- source range; a drafter's own @`the join`@ written as a @HENCE@ carries
+-- the range it was parsed at, and is not one.
 isCheckpoint :: RExpr -> Bool
 isCheckpoint = \ case
-  Var _ r -> rawName (getOriginal r) == NormalName joinCheckpointName
-  _       -> False
+  e@(Var _ r) -> rawName (getOriginal r) == NormalName joinCheckpointName && isNothing (rangeOf e)
+  _           -> False
 
 blameOf :: LayoutPrinter a => ReasonForBreach a -> Blame
 blameOf = \ case
@@ -368,10 +442,10 @@ placementText = \ case
       NoDeadline         -> []
       UnforcedDeadline t -> ["WITHIN", t]
       Remaining r        -> ["WITHIN", prettyRatio r]
-    familyText m = case m.moJoin of
-      Barrier _    -> "a barrier of " <> textShow m.moTotal
-      Fork         -> "a fork of " <> textShow m.moTotal
-      Distributive -> "a cast of " <> textShow m.moTotal
+    familyText f = case f.faJoin of
+      Barrier _    -> "a barrier of " <> textShow f.faTotal
+      Fork         -> "a fork of " <> textShow f.faTotal
+      Distributive -> "a cast of " <> textShow f.faTotal
     thresholdText = \ case
       AllHave _ -> " (ONCE ALL HAVE)"
     blameText b = Text.unwords $ catMaybes

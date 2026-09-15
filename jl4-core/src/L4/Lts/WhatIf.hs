@@ -56,6 +56,8 @@ module L4.Lts.WhatIf
   , tickPast
     -- * The replay
   , whatIf
+  , tryCandidate
+  , confirmTick
   , Verdict (..)
   , Outcome (..)
   , EnabledSet (..)
@@ -86,11 +88,12 @@ import L4.EvaluateLazy
   , prettyEvalException
   , prettyRefusal
   )
-import L4.EvaluateLazy.DeonticStep (DeonticStep (..))
+import L4.EvaluateLazy.DeonticStep (DeonticStep (..), StepOutcome (..))
 import L4.EvaluateLazy.Machine (pattern ValFulfilled)
 import L4.Lts.Marking
 import L4.Syntax
 import qualified L4.TypeCheck as TypeCheck
+import L4.Utils.Ratio (prettyRatio)
 
 -- | Everything one replay needs.
 data Rig = MkRig
@@ -206,14 +209,16 @@ data Candidate = MkCandidate
 
 -- | Read the candidates off the position. In 'IO' because instantiating an
 -- @EXACTLY e@ reads the residual's heap ('reifyExpr').
+--
+-- Each candidate's 'LiveNorm' is rendered ('renderLive') from the very
+-- 'RawObligation' its act is built from, so the label and the act cannot
+-- come apart; the position's 'posMarking' is not consulted here.
 candidatesOf :: Position -> IO [Candidate]
 candidatesOf pos = case pos.posResidual of
   Nothing -> pure []
   Just residual -> do
-    let raws  = liveObligations residual
-        lives = [ n | InEffect n <- pos.posMarking ]
-        -- liveObligations and markingOf walk the value in the same order
-        paired = zip raws lives
+    let raws   = liveObligations residual
+        paired = [ (raw, renderLive pos.posContext raw) | raw <- raws ]
     acts <- for paired \ (raw, live) -> do
       party <- either (fmap Just . reifyExpr raw.roEnv) (reifyValue reifyNF) raw.roParty
       action <- patternExpr raw.roEnv raw.roAction.action
@@ -247,8 +252,10 @@ candidatesOf pos = case pos.posResidual of
 -- have scrutinised the later ones). So both cases add to 'posClock'. That
 -- is reasoning from the machine, checked on the fixtures (an unforced
 -- @WITHIN@ appeared only in a fresh position and in a fork continuation
--- armed by the last event), not a proof; if it fails the tick is late by
--- the gap, silently. The expression is read after 'reifyExpr'; if it is
+-- armed by the last event), not a proof. If it is wrong the tick lands
+-- short of the real deadline by the gap and reveals nothing — which
+-- 'confirmTick' turns into an 'Untried' naming this function, so the
+-- failure is loud. The expression is read after 'reifyExpr'; if it is
 -- still not a literal, the deadline is not known here and the reason says
 -- so.
 deadlineOf :: Rational -> RawObligation NF -> IO (Either Text Rational)
@@ -293,6 +300,50 @@ whatIf rig tr pos hyp = replay rig tr [hypotheticalExpr hyp] >>= pure . \ case
   Nothing -> (Untried "the replay produced no result", [])
   Just (res, steps) -> (classify (contextOf steps) res, afterCommonPrefix pos.posSteps steps)
 
+-- | One candidate, tried: 'whatIf' on its hypothetical, with the tick's
+-- stamp checked against what the machine did with it.
+--
+-- A 'TickPast' candidate's stamp is derived HERE ('deadlineOf', 'tickPast')
+-- from the machine's timing rule — anchor plus @WITHIN@, expiry on a stamp
+-- strictly past it — and §2.4 forbids trusting a derivation the evaluator
+-- has not confirmed. So a tick is held to reveal an expiry: the steps it
+-- caused must contain an 'Expired' or a 'JoinExpired'. If they do not, the
+-- arithmetic disagreed with the machine (an anchor read from the wrong
+-- clock would land the tick short by the gap) and the outcome is 'Untried'
+-- saying so, rather than an 'Advancing' that looks like a genuine advance
+-- and lets 'breaching' return @[]@ for a deadline that does breach.
+tryCandidate :: Rig -> Trace -> Position -> Candidate -> IO Outcome
+tryCandidate rig tr pos cand = case cand.cdHypothetical of
+  Left why -> pure MkOutcome {ocCandidate = cand, ocVerdict = Untried why, ocSteps = []}
+  Right hyp -> do
+    (verdict, steps) <- whatIf rig tr pos hyp
+    pure MkOutcome {ocCandidate = cand, ocVerdict = confirmTick cand.cdKind hyp steps verdict, ocSteps = steps}
+
+-- | The tick's self-check; see 'tryCandidate'. Only a 'TickPast' is held to
+-- it; an act is the machine's to route however it likes.
+confirmTick :: CandidateKind -> Hypothetical -> [DeonticStep] -> Verdict -> Verdict
+confirmTick kind hyp steps verdict = case (kind, hyp) of
+  (TickPast _ _, Tick _) | Untried _ <- verdict -> verdict   -- the replay already said why
+  (TickPast d _, Tick t)
+    | not (any revealsExpiry steps) -> Untried $
+        "the tick to " <> prettyRatio t <> " past the deadline computed as " <> prettyRatio d
+        <> " revealed no expiry: deadlineOf's arithmetic did not agree with the machine"
+  _ -> verdict
+  where
+    revealsExpiry s = case s.dsOutcome of
+      Expired _ _     -> True
+      JoinExpired _ _ -> True
+      Waiting         -> False
+      PartyMismatch   -> False
+      ActionMismatch  -> False
+      GuardFailed     -> False
+      Matched _       -> False
+      Breached _      -> False
+      Joined _ _      -> False
+      JoinReleased    -> False
+      JoinFailed _    -> False
+      JoinStalled     -> False
+
 -- | The replay's steps past the position's: the two logs agree up to the
 -- point where the hypothetical changes what the machine sees, and diverge
 -- there (a @Waiting@ in the position becomes a match in the replay, say).
@@ -322,11 +373,7 @@ enabledSet rig tr = position rig tr >>= \ case
   Nothing -> pure Nothing
   Just pos -> do
     cands <- candidatesOf pos
-    outcomes <- for cands \ cand -> case cand.cdHypothetical of
-      Left why -> pure MkOutcome {ocCandidate = cand, ocVerdict = Untried why, ocSteps = []}
-      Right hyp -> do
-        (verdict, steps) <- whatIf rig tr pos hyp
-        pure MkOutcome {ocCandidate = cand, ocVerdict = verdict, ocSteps = steps}
+    outcomes <- for cands (tryCandidate rig tr pos)
     pure (Just MkEnabledSet {esPosition = pos, esOutcomes = outcomes})
 
 -- | Endpoint 19: the candidates that lead to @FULFILLED@.

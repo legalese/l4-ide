@@ -20,7 +20,9 @@
 --      the tick breaches;
 --   6. a fork: each member's act advances its own continuation, and the
 --      other members are untouched;
---   7. the partition helpers agree with the verdicts.
+--   7. the partition helpers agree with the verdicts;
+--   8. a tick that reveals no expiry is refused, not reported as an
+--      advance: the deadline arithmetic is held to the machine's word.
 module LtsWhatIfSpec (spec) where
 
 import qualified Data.Text as Text
@@ -305,6 +307,31 @@ spec = describe "LTS-VISUALISER §2.4 / P2c: the enabled set by replay" $ do
         length es.esPosition.posSteps `shouldBe` 2   -- Alice matched, Bob waiting
         map (.dsOutcome) o.ocSteps `shouldBe` [Matched ToHence]
       [] -> expectationFailure "no outcomes"
+
+  it "8. a tick landing ON the deadline (what an anchor one unit low would produce) is Untried, naming deadlineOf; one past it breaches" $ do
+    mr <- rigOf mustSrc
+    (rig, tr) <- case mr of
+      Just (rig, tr : _) -> pure (rig, tr)
+      _ -> fail "no rig"
+    pos <- position rig tr >>= maybe (fail "no position") pure
+    cands <- candidatesOf pos
+    tick <- case [ c | c@MkCandidate {cdKind = TickPast 10 _} <- cands ] of
+      (c : _) -> pure c
+      []      -> fail "no tick candidate at 10"
+    -- as computed: one past the deadline, and the machine expires it
+    good <- tryCandidate rig tr pos tick
+    row good `shouldBe` Row (TickAt 11 ["Alice"]) (Breaches (Just "Alice"))
+    -- forced one unit short: the machine treats a stamp AT the deadline as
+    -- timely, so nothing expires, and the guard says so instead of Advancing
+    bad <- tryCandidate rig tr pos tick {cdHypothetical = Right (Tick 10)}
+    case bad.ocVerdict of
+      Untried why -> why `shouldBe` "the tick to 10 past the deadline computed as 10 revealed no expiry: deadlineOf's arithmetic did not agree with the machine"
+      other -> expectationFailure ("expected Untried, got " <> show other)
+    -- and without the guard it would have read as a plain advance
+    (raw, _) <- whatIf rig tr pos (Tick 10)
+    case raw of
+      Advancing m -> map placementText m `shouldBe` ["in effect: Alice MUST deliver WITHIN 0"]
+      other -> expectationFailure ("expected Advancing, got " <> show other)
 
   it "tickPast lands one unit past a lone deadline, and half-way to a nearer next one" $ do
     tickPast [10] 10 `shouldBe` 11

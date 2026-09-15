@@ -28,7 +28,13 @@
 --   B. a barrier with members pending marks each member InEffect and ONE
 --      Awaiting, whose progress the context supplies and 'noContext' cannot;
 --   K. a fork marks each member and each running continuation, and no
---      Awaiting.
+--      Awaiting;
+--
+-- and two ways the barrier's reading could lie, pinned not to:
+--
+--   R. a HENCE that re-enters its own barrier: the Awaiting reports the
+--      second activation's count, not the first's final one;
+--   S. a drafter's own `the join` written as a HENCE is not the sentinel.
 module LtsMarkingSpec (spec) where
 
 import qualified Data.Text as Text
@@ -84,13 +90,13 @@ markingAt n rs = case drop n rs of
 -- | A compact view of a placement, for pinning.
 data P
   = PCreated Text.Text
-  | PInEffect Text.Text DeonticModal Text.Text Countdown Text.Text (Maybe Family)
+  | PInEffect Text.Text DeonticModal Text.Text Countdown Text.Text (Maybe Fam)
   | PViolated (Maybe Text.Text) (Maybe Rational)
   | PLapsed (Maybe Text.Text) (Maybe Rational)
   | PAwaiting (Maybe (Int, Int, Bool))
   deriving stock (Eq, Show)
 
-data Family = FBarrier Int | FFork Int | FDistributive Int
+data Fam = FBarrier Int | FFork Int | FDistributive Int
   deriving stock (Eq, Show)
 
 view :: NormPlacement -> P
@@ -104,10 +110,10 @@ view = \ case
     bearer = \ case
       KnownParty t    -> t
       UnforcedParty t -> t
-    family m = case m.moJoin of
-      Barrier _    -> FBarrier m.moTotal
-      Fork         -> FFork m.moTotal
-      Distributive -> FDistributive m.moTotal
+    family f = case f.faJoin of
+      Barrier _    -> FBarrier f.faTotal
+      Fork         -> FFork f.faTotal
+      Distributive -> FDistributive f.faTotal
 
 prologue :: [Text.Text]
 prologue =
@@ -205,6 +211,39 @@ barrierSrc = Text.unlines $ everyPrologue <>
   , "#EVAL `the tenancy`"
   , ""
   , "#TRACE `the tenancy` AT 0 WITH"
+  ]
+
+-- R: a barrier whose HENCE is itself. The machine re-registers the cast on
+-- re-entry and zeroes its arm counter; the context must do the same.
+reentrantSrc :: Text.Text
+reentrantSrc = Text.unlines $ everyPrologue <>
+  [ "GIVETH A DEONTIC Actor Action"
+  , "`the tenancy` MEANS"
+  , "    EVERY Tenant t IN tenants"
+  , "        MUST   Sign (EXACTLY t)"
+  , "        WITHIN 14"
+  , "        ONCE   ALL HAVE"
+  , "        HENCE  `the tenancy`"
+  , "        LEST   BREACH"
+  , ""
+  , "#TRACE `the tenancy` AT 0 WITH"
+  , "  PARTY alice DOES Sign alice AT 1"
+  , "  PARTY bob   DOES Sign bob   AT 2"
+  , "  PARTY carol DOES Sign carol AT 3"
+  , "  PARTY alice DOES Sign alice AT 4"
+  ]
+
+-- S: a drafter's own `the join`, as a HENCE. Same name as the machine's
+-- sentinel; not a barrier.
+homonymSrc :: Text.Text
+homonymSrc = Text.unlines $ prologue <>
+  [ "GIVETH DEONTIC Person Action"
+  , "`the join` MEANS PARTY Bob MUST pay 50 WITHIN 5"
+  , ""
+  , "GIVETH DEONTIC Person Action"
+  , "c MEANS PARTY Alice MUST deliver WITHIN 10 HENCE `the join`"
+  , ""
+  , "#TRACE c AT 0 WITH"
   ]
 
 -- K: the fork
@@ -314,11 +353,47 @@ spec = describe "LTS-VISUALISER §4.2a: markingOf" $ do
       , PInEffect "Tenant OF \"Bob\"" DMust "Sign (EXACTLY t)" (Remaining 6) "PARTY theLandlord MUST Deliver (EXACTLY t) WITHIN 5" (Just (FFork 3))
       , PInEffect "Tenant OF \"Carol\"" DMust "Sign (EXACTLY t)" (Remaining 6) "PARTY theLandlord MUST Deliver (EXACTLY t) WITHIN 5" (Just (FFork 3)) ]
 
-  it "the raw walk yields exactly the InEffect places, in order" $ do
+  it "the raw walk yields exactly the InEffect places, in order: same sites, same bearers, same text" $ do
     rs <- runMarked forkSrc
     case rs of
-      ((Just v, _, m) : _) ->
-        length (liveObligations v) `shouldBe` length [ () | InEffect _ <- m ]
+      ((Just v, ctx, m) : _) -> do
+        let raws  = liveObligations v
+            lives = [ n | InEffect n <- m ]
+        length raws `shouldBe` 3
+        map (renderLive ctx) raws `shouldBe` lives
+      _ -> expectationFailure "no residual"
+
+  it "R. a HENCE that re-enters its own barrier: the Awaiting counts the second activation, 1 of 3, not the first's 3 of 3" $ do
+    rs <- runMarked reentrantSrc
+    map view (markingAt 0 rs) `shouldBe`
+      [ PInEffect "Tenant OF \"Bob\"" DMust "Sign (EXACTLY t)" (Remaining 13) "`the join`" (Just (FBarrier 3))
+      , PInEffect "Tenant OF \"Carol\"" DMust "Sign (EXACTLY t)" (Remaining 13) "`the join`" (Just (FBarrier 3))
+      , PAwaiting (Just (1, 3, False)) ]
+
+  it "R'. the steps behind R: three arms, a release, then one arm again" $ do
+    cfg <- resolveEvalConfig (Just fixedNow) apiDefaultPolicy
+    case checkWithImports (vfsFromList []) reentrantSrc of
+      Left errs -> expectationFailure ("typecheck failed: " <> show errs)
+      Right r -> do
+        (_, results) <- execEvalModuleWithDeonticLog cfg r.tcdEntityInfo emptyEnvironment r.tcdModule
+        case results of
+          ((_, steps) : _) ->
+            [ (n, o) | s <- steps, let o = s.dsOutcome
+                     , n <- case s.dsJoin of
+                         Just (MemberSatisfied k _) -> [Just k]
+                         _ | o == JoinReleased -> [Nothing]
+                         _ -> [] ]
+              `shouldBe` [ (Just 1, Matched ToHence), (Just 2, Matched ToHence), (Just 3, Matched ToHence)
+                         , (Nothing, JoinReleased), (Just 1, Matched ToHence) ]
+          [] -> expectationFailure "no results"
+
+  it "S. a drafter's own `the join` as a HENCE is not the sentinel: no Awaiting, with or without a context" $ do
+    rs <- runMarked homonymSrc
+    map view (markingAt 0 rs) `shouldBe`
+      [PInEffect "Alice" DMust "deliver" (UnforcedDeadline "10") "`the join`" Nothing]
+    case rs of
+      ((Just v, _, _) : _) -> map view (markingOf noContext v) `shouldBe`
+        [PInEffect "Alice" DMust "deliver" (UnforcedDeadline "10") "`the join`" Nothing]
       _ -> expectationFailure "no residual"
 
   it "placementText says what a list needs to say about a blocked continuation" $ do
