@@ -7,7 +7,14 @@ late on 2026-09-14, not yet critiqued, fact-checked or revised). The ceiling wen
 words on 2026-09-15 at Meng's direction, so only S1, at 6,927, is now over it; the concision pass is
 no longer a length exercise and cuts flab rather than substance. See `STYLE.md` §length for the
 reason he gave and the one drafting rule that follows from it. `blog/candidates/` holds material
-that is not yet a post. Two files. `decidability-and-expressiveness.md` is an outline with no
+that is not yet a post. Three files. `10-the-symbolic-half.md` is post 9's second call — the pitch
+to people building legal software, the export inventory and the LegalRuleML positioning — moved out
+on Meng's ruling of 2026-09-15, upholding the features editor's blocking item across both revision
+rounds that post 9 was making two claims where STYLE.md allows one. Its prose is the INITIAL
+DRAFT's, restored from `343eb0ac` at Meng's direction ("uncompress back to the original verbiage"),
+so it is 1,054 words with the full fourteen-row table rather than the 430 words and three rows the
+revisers had cut it to — and therefore predates the fact-check passes that ran over post 9, which
+its status header says in terms. Post 9 is 3,091 words and keeps the Rule-ipedia call alone. `decidability-and-expressiveness.md` is an outline with no
 prose and `sources_checked: never`, handed over on 2026-09-15 by the `lts-diagrams` session at
 Meng's direction. `S2-who-is-allowed-to-say-it.md` is the opposite — finished prose with its
 footnotes intact, the "Who is allowed to say it" section cut whole from S1 in its round-2
