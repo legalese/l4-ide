@@ -167,10 +167,10 @@
     {
       "id": "Canon corpus",
       "owner": "GM (build) · Meng (blessed list + pin policy)",
-      "kind": "ruled, not built",
-      "quick": false,
+      "kind": "ruled; shape chosen, confirm",
+      "quick": true,
       "raised": "2026-09-15",
-      "ask": "RULED 2026-09-15 (Meng): jl4/examples/legal stays the regression corpus; explicitly blessed canon dirs join it; subjects already in canon leave l4-ide; the rest stay. Spec: specs/todo/CANON-REGRESSION-CORPUS-SPEC.md (PR pending). Mechanism to build: etc/canon-pin.json (repo, sha, blessed[]); jl4-test reads it under L4_CANON_DIR and adds the blessed dirs to the golden globs; a `Canon Corpus` CI job checks canon out at the pin (public repo, no token); etc/go learns canon: paths. Then migrate chubb and sg-succession out. Two things need Meng, not GM: (1) the first blessed list — proposed: sg/child-support, sg/succession/legalese, sg/penal-code-1871, both chubb encodings; NOT cleanroom-2026-08 (fails l4 check at daydate.l4:104 on today's binary while its goldens say Evaluation successful) and NOT ofek-hadash / pdpa (no goldens); (2) blessed dirs must be on canon MAIN, and most of canon is on mengwong/drafts — so canon needs its own PR flow first.",
+      "ask": "RULED 2026-09-15 (Meng): jl4/examples/legal stays the regression corpus; explicitly blessed canon dirs join it; subjects already in canon leave l4-ide; the rest stay. Later the same evening: \"if it is really unpleasant to have regression CI split across to the canon repo then i'm okay with vendoring in\" — GM assessed that it is, and the spec (PR #396, §3B) chooses VENDORING: a mirror under jl4/examples/canon/<subject>/ at a pinned canon SHA (etc/canon-pin.json), etc/sync-canon.mjs --pull/--check/--bump, one CI job that only diffs the mirror against canon@pin, the golden harness gaining a canon/** glob, etc/go unchanged. Meng to CONFIRM the shape on return. Then GM builds it, then chubb and sg-succession move out of legal/. Still Meng's: the first blessed list (proposed: sg/child-support, sg/succession/legalese, sg/penal-code-1871, both chubb encodings; NOT cleanroom-2026-08 — fails l4 check at daydate.l4:104 on today's binary while its goldens say Evaluation successful; NOT ofek-hadash / pdpa — no goldens), and the rule that blessed dirs must be on canon MAIN, which means canon needs its own PR flow off mengwong/drafts first.",
       "unblocks": "deleting canon-duplicated subjects from l4-ide without losing regression coverage",
       "source": {
         "file": "specs/todo/CANON-REGRESSION-CORPUS-SPEC.md",
