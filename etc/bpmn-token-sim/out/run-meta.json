@@ -1,0 +1,17 @@
+{
+  "date": "2026-09-15T08:45:35.900Z",
+  "browser": "chrome 152.0.7977.83",
+  "node": "v26.4.0",
+  "npmLs": [
+    "bpmn-token-sim@0.1.0 /Users/mengwong/src/legalese/l4wt/lts-p2a/etc/bpmn-token-sim",
+    "├── bpmn-js-token-simulation@0.40.0",
+    "├── bpmn-js@18.28.0",
+    "├── esbuild@0.25.9",
+    "└── playwright@1.63.0"
+  ],
+  "viewport": {
+    "width": 1280,
+    "height": 860
+  },
+  "stepLimit": 12
+}

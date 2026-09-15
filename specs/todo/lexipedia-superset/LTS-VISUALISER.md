@@ -1064,6 +1064,39 @@ has neither of the two graph-native queries. That was structurally incapable of 
 now independent of the gate entirely; the gate is P2a′, which tests the question P2 actually
 leads with.
 
+> **RESULT — P2a, MEASURED 2026-09-15.** `bpmn-js-token-simulation` 0.40.0 over `bpmn-js` 18.28.0,
+> driven headlessly by `etc/bpmn-token-sim/` over all eight goldens in `jl4/examples/bpmn/expected/`;
+> report with per-fixture tables, screenshots and the simulator's own JSON in
+> [P2A-TOKEN-SIM-BASELINE.md](./P2A-TOKEN-SIM-BASELINE.md). In five lines:
+>
+> 1. **A token does not know its modality.** The same token, play button and pad sit on a `MUST`, a
+>    `MAY`, a `SHANT` and a `businessRuleTask`; on `offering` and both `regcf-*` prohibitions,
+>    "continue" on the `SHANT` task **is** the breach, and its timer is the compliance exit — the
+>    inverse of every `MUST` beside it, with no notational difference.
+> 2. **The barrier and the fork animate identically.** `tenancy-barrier` and `tenancy-fork` give
+>    the same scopes, triggers, history and end events (JSONs differ only in label text); the
+>    multi-instance task is one token and one click, never `n`, so `ONCE ALL HAVE` waits for nothing
+>    and `UPON EACH` fires once.
+> 3. **No clock, no guards, no unreachability.** No timer fired on its own in 4.5 s; every boundary
+>    was clickable at t = 0; `conditionExpression`s were never read (the arm is a gateway setting,
+>    default first flow); `regcf-advertising`'s _"unreachable: no WITHIN"_ boundary fired on request,
+>    to Fulfilled; `regcf-reporting`'s `P-CYCLE` looped twelve times to the step limit.
+> 4. **Breach does not end the process.** On `offering` the error end consumed its own token and the
+>    siblings ran on to _"Process finished"_ with two Fulfilled and two Breach exits; `handover` has
+>    no breach node at all, so the tenant's timeout ends in _"Fulfilled"_. `BREACH BY … BECAUSE …`
+>    appears nowhere.
+> 5. **What it does well:** four concurrent tokens in four lanes on `offering`'s `RAND`, and
+>    `consultation`'s one drawn join animating as a barrier.
+>
+> On this evidence the second conjunct of §7.3 — _the off-the-shelf simulator cannot answer "what do
+> I owe, what discharges it, what breaches it"_ — looks satisfied, and every gap is one P1's fidelity
+> report already names, shown in motion. **Unmeasured, and this block does not decide the gate:**
+> the first conjunct (P2a′, no reader has been shown a list or the animation); what a human, as
+> opposed to a script clicking what the tool offers, understands from the animation — the quantity
+> §7.4's studies are about; and whether a differently drawn BPMN (a multi-instance subProcess for the
+> fork, which `P-FORK` says the exporter does not emit) would animate better. Staging table above
+> left for the integrator.
+
 ### 7.3 The gate
 
 > **Build P2d/P2e only if P2a′ shows that readers cannot answer "what do I owe, what discharges

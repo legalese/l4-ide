@@ -312,6 +312,25 @@ reports exactly one `label-required` on each of the two deadlocking diagrams in
 `check-bpmn-soundness.mjs` catches with a witness trace and jBPM confirms
 independently.)
 
+## Watching it animate: the token-simulation baseline
+
+`etc/bpmn-token-sim/` drives bpmn.io's own `bpmn-js-token-simulation` over
+every file in `expected/`, headlessly, and screenshots what a reader would see.
+It is the P2a experiment of `specs/todo/lexipedia-superset/LTS-VISUALISER.md`
+§7.2, and its findings — case by case, what the animation can and cannot say
+about the rule — are in `specs/todo/lexipedia-superset/P2A-TOKEN-SIM-BASELINE.md`.
+It has its own `package.json` and touches no lockfile here:
+
+```sh
+cd etc/bpmn-token-sim && npm install && npm run build && npm run run
+```
+
+It is not a check and has no verdict. The short version of what it found
+(2026-09-15): the simulator accepts all eight files without complaint and
+animates a `MUST`, a `MAY` and a `SHANT` with the same token and the same
+buttons; `tenancy-barrier` and `tenancy-fork` animate identically; timers
+never fire on their own; and a breach end event does not stop the siblings.
+
 ## Asking an actual engine: the jBPM/KIE second opinion
 
 Both checks above are ours. `etc/check-bpmn-kie.sh` runs somebody else's — jBPM
