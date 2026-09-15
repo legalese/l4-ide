@@ -226,7 +226,8 @@ entry 4.3, for the measured forms.
 **There is no `BEFORE` for an absolute deadline in this release.** `MUST pay BEFORE 30` does not
 read as a deadline at all — the parser takes it as applying the action to two arguments, and the
 check fails with `You are giving 2 inputs to pay … but it is not a function, so it takes none`
-(probe `g14-before-deadline.l4`, exit 1). Use `WITHIN`.
+(probe `g14-before-deadline.l4`, exit 1). Use `WITHIN`: relative as `WITHIN d`, absolute as
+`WITHIN d OF instant` — `WITHIN 0 OF (YMD 2026 6 30)` is "by 30 June 2026".
 
 ---
 

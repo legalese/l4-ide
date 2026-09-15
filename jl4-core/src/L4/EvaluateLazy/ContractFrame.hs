@@ -106,7 +106,11 @@ data ContractFrame
   -- anchored @WITHIN@ inside it names the obligation the continuation is
   -- ATTACHED to when it runs — also when the continuation arrived as a value
   -- (a @GIVEN k IS A DEONTIC …@ parameter, a @WHERE@ local) whose closure
-  -- captured some other obligation's bindings, or none.
+  -- captured some other obligation's bindings, or none. Pushed at every
+  -- hand-off, and again before each operand of a compound is evaluated
+  -- ('L4.EvaluateLazy.Machine.operandHandoff'), because a compound's value
+  -- holds its operands as expressions and a value one of them evaluates to
+  -- is not reached by rebinding the compound.
   deriving stock Show
 
 data ScrutinizeEvents = ScrutinizeEvents

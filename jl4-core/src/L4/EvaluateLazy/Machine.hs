@@ -1141,6 +1141,11 @@ backward val = withPoppedFrame $ \ case
         -- apply the arguments of the left hand expression to the
         -- expression
         pushFrame f
+        -- R-Q7B: the operand is handed off here, exactly as a HENCE's
+        -- value is, so a continuation that arrives as a VALUE inside a
+        -- compound anchors to the obligation the compound is attached
+        -- to ('operandHandoff').
+        operandHandoff env rexpr1
         maybeEvaluate env rexpr1 -- TODO: build application
       ValUnaryBuiltinFun fn -> do
         r <- expect1 rs
@@ -1951,6 +1956,8 @@ backwardContractFrame val = \ case
     pushCFrame $ RBinOp2 MkRBinOp2 {rval1 = val, ..}
     -- pass the arguments to the regulative expression
     pushFrame $ App1 args Nothing
+    -- R-Q7B: the right operand is handed off like the left one was
+    operandHandoff env rexpr2
     maybeEvaluate env rexpr2
 
   RBinOp2 MkRBinOp2 {..}
@@ -2064,7 +2071,10 @@ backwardContractFrame val = \ case
     -- environment here ('bindLifecycle'), which is what an anchored
     -- @WITHIN … OF THE JOIN \/ THE DEADLINE \/ THE ARMING@ inside it reads
     -- (R-Q7B). An @A AND B@ continuation captures this environment for
-    -- both operands, so both see the one obligation whose hand-off this is.
+    -- both operand EXPRESSIONS, so an operand written inline sees the one
+    -- obligation whose hand-off this is; an operand that turns out to be a
+    -- value built elsewhere is handed off again, with this same lifecycle,
+    -- when the compound is applied ('operandHandoff').
     --
     -- A barrier's SENTINEL ('barrierMember') is the one continuation that
     -- takes a third argument: the member's absolute deadline, when it has
@@ -2715,19 +2725,53 @@ bindLifecycle lc =
 -- | Rebind a hand-off's lifecycle into the continuation VALUE it is about to
 -- apply, so the anchors inside name this hand-off's obligation whatever the
 -- value's closure captured. Reaches every obligation-shaped value: a single
--- obligation, an armed-but-not-run EVERY, and both operands of a compound —
--- the two expressions of @A AND B@ share one environment, and an operand
--- already reduced to a value is rebound recursively. Anything else (a
+-- obligation, an armed-but-not-run EVERY, and a compound. For a compound
+-- only the compound's OWN environment is rebound here; its operands are
+-- handed off one at a time when the compound is applied ('operandHandoff'),
+-- because an operand written as an expression is not a value yet — it is
+-- evaluated later, in 'App1' and 'RBinOp1', and may then turn out to be a
+-- continuation built somewhere else (a @GIVEN k IS A DEONTIC@ parameter, a
+-- @WHERE@ local). Rebinding the two operand expressions' shared environment
+-- here does nothing for such a value, which carries its own (measured
+-- before 'operandHandoff' existed: @HENCE (k RAND …)@ with @k@ a parameter
+-- anchored @OF THE JOIN@ read the join of the obligation @k@ was WRITTEN
+-- under — 3 + 5 = 8 instead of 50 + 5 = 55, exit 0). Anything else (a
 -- sentinel, FULFILLED, a breach) has no anchors and passes through.
 rebindLifecycle :: Lifecycle -> WHNF -> WHNF
-rebindLifecycle lc = go
-  where
-    go = \ case
-      ValObligation env party act due followup lest ->
-        ValObligation (bindLifecycle lc env) party act due followup lest
-      ValQuantified env deonton -> ValQuantified (bindLifecycle lc env) deonton
-      ValROp env op r1 r2       -> ValROp (bindLifecycle lc env) op (fmap go r1) (fmap go r2)
-      v                         -> v
+rebindLifecycle lc = \ case
+  ValObligation env party act due followup lest ->
+    ValObligation (bindLifecycle lc env) party act due followup lest
+  ValQuantified env deonton -> ValQuantified (bindLifecycle lc env) deonton
+  ValROp env op r1 r2       -> ValROp (bindLifecycle lc env) op r1 r2
+  v                         -> v
+
+-- | The lifecycle a compound's environment carries, read back under the
+-- three uniques. Exact, because 'bindLifecycle' deletes the positions a
+-- hand-off does not have; 'Nothing' when no obligation has handed off to
+-- this environment at all (the top level).
+lifecycleOf :: Environment -> Maybe Lifecycle
+lifecycleOf env = do
+  armed <- Map.lookup lifecycleArmingUnique env
+  pure MkLifecycle
+    { join     = Map.lookup lifecycleJoinUnique env
+    , deadline = Map.lookup lifecycleDeadlineUnique env
+    , armed
+    }
+
+-- | Hand an operand of a compound off before it is evaluated and applied:
+-- push a 'Handoff' carrying the lifecycle the compound's environment holds,
+-- so the operand's VALUE is rebound the way a HENCE's or LEST's value is.
+-- Only an operand still written as an EXPRESSION is handed off. One already
+-- reduced to a value was built by the machine in this compound's own
+-- context — a fork's member ('randFoldWHNF', whose environment binds THE
+-- ARMING to the EVERY's own arming for a demoted join-line deadline and
+-- must keep it), or this compound's residual ('RBinOp2') — and carries the
+-- bindings it needs. At the top level there is no lifecycle and nothing is
+-- pushed: the operand keeps whatever its closure captured, as before.
+operandHandoff :: Environment -> MaybeEvaluated -> Machine ()
+operandHandoff env = \ case
+  Left _  -> for_ (lifecycleOf env) (pushFrame . ContractFrame . Handoff)
+  Right _ -> pure ()
 
 -- | Resolve a lifecycle anchor: the binding, or the fallback (THE ARMING with
 -- no enclosing obligation is the obligation's own arming), or — for an

@@ -322,7 +322,41 @@ run-anchors.l4:464:1-467:52:
       MUST Deliver (EXACTLY theLandlord)
     before their deadline, which was at
       108
-run-anchors.l4:482:1-484:50:
+run-anchors.l4:489:1-493:36:
+  FULFILLED
+run-anchors.l4:495:1-499:36:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Deliver OF (Landlord OF "Ms Ng")
+    at
+      56
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Deliver (EXACTLY theLandlord)
+    before their deadline, which was at
+      55
+run-anchors.l4:507:1-511:37:
+  FULFILLED
+run-anchors.l4:513:1-517:37:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Deliver OF (Landlord OF "Ms Ng")
+    at
+      109
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Deliver (EXACTLY theLandlord)
+    before their deadline, which was at
+      108
+run-anchors.l4:533:1-536:51:
+  FULFILLED
+run-anchors.l4:552:1-554:50:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -336,7 +370,27 @@ run-anchors.l4:482:1-484:50:
       MUST Deliver (EXACTLY theLandlord)
     before their deadline, which was at
       5
-run-anchors.l4:501:1-503:51:
+run-anchors.l4:564:1-567:35:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Deliver OF (Landlord OF "Ms Ng")
+    at
+      6
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Deliver (EXACTLY theLandlord)
+    before their deadline, which was at
+      5
+run-anchors.l4:601:1-604:51:
+  WITHIN … OF THE JOIN names a position in the life of the obligation this one is the continuation of, and here that position does not exist. One of: this is the HENCE of a barrier whose cast was EMPTY, so nobody had a deadline to meet and the ONCE line names none (THE DEADLINE); this obligation was passed as a value and attached under a LEST, whose join never fired (THE JOIN), or under an obligation with no WITHIN (THE DEADLINE); or it is running with no enclosing obligation at all. Anchor it to THE ARMING or to an instant, give the enclosing obligation the WITHIN, or guard an EVERY that may range over nobody.
+run-anchors.l4:612:1-616:36:
+  WITHIN … OF THE JOIN names a position in the life of the obligation this one is the continuation of, and here that position does not exist. One of: this is the HENCE of a barrier whose cast was EMPTY, so nobody had a deadline to meet and the ONCE line names none (THE DEADLINE); this obligation was passed as a value and attached under a LEST, whose join never fired (THE JOIN), or under an obligation with no WITHIN (THE DEADLINE); or it is running with no enclosing obligation at all. Anchor it to THE ARMING or to an instant, give the enclosing obligation the WITHIN, or guard an EVERY that may range over nobody.
+run-anchors.l4:624:1-627:51:
+  WITHIN … OF THE DEADLINE names a position in the life of the obligation this one is the continuation of, and here that position does not exist. One of: this is the HENCE of a barrier whose cast was EMPTY, so nobody had a deadline to meet and the ONCE line names none (THE DEADLINE); this obligation was passed as a value and attached under a LEST, whose join never fired (THE JOIN), or under an obligation with no WITHIN (THE DEADLINE); or it is running with no enclosing obligation at all. Anchor it to THE ARMING or to an instant, give the enclosing obligation the WITHIN, or guard an EVERY that may range over nobody.
+run-anchors.l4:647:1-649:51:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -350,7 +404,7 @@ run-anchors.l4:501:1-503:51:
       MUST Deliver (EXACTLY theLandlord)
     before their deadline, which was at
       33
-run-anchors.l4:511:1-513:51:
+run-anchors.l4:657:1-658:51:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -364,11 +418,11 @@ run-anchors.l4:511:1-513:51:
       MUST Deliver (EXACTLY theLandlord)
     before their deadline, which was at
       13
-run-anchors.l4:523:1-20:
+run-anchors.l4:668:1-20:
   PARTY alice MUST Sign (EXACTLY alice) WITHIN 30 HENCE (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5 OF THE JOIN) LEST BREACH
-run-anchors.l4:525:1-526:35:
+run-anchors.l4:670:1-671:35:
   PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5 OF THE DEADLINE HENCE FULFILLED
-run-anchors.l4:528:1-530:36:
+run-anchors.l4:673:1-675:36:
   PARTY Landlord OF "Ms Ng" MUST Deliver (EXACTLY theLandlord) WITHIN 15 HENCE FULFILLED
-run-anchors.l4:534:1-67:
+run-anchors.l4:679:1-67:
   PARTY alice MUST Sign (EXACTLY alice) WITHIN 7 OF THE ARMING HENCE FULFILLED
