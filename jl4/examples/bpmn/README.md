@@ -347,20 +347,23 @@ cd etc/bpmn-token-sim && npm ci && npm run build && npm run run
 ```
 
 It is not a check and has no verdict. The short version of what it found
-(2026-09-15, re-run 2026-09-15 17:19 UTC over all fourteen — 2026-09-16 in Singapore): the simulator accepts every
+(2026-09-15, re-run 2026-09-15 17:19 UTC over all fourteen — 2026-09-16 in
+Singapore — and again at 20:25 UTC after `d544ed22`): the simulator accepts every
 file without complaint and animates a `MUST`, a `MAY` and a `SHANT` with the
-same token and the same buttons; `tenancy-barrier` and `tenancy-fork` animate
-identically, and so do the `modals-shant-*` pair; no timer fired on its own in
-4.5 s of wall clock (the simulator has no clock — timers are play buttons); a
-breach end event does not stop the siblings; and the `SHANT`'s
-`completionCondition` is imported but never consulted — one instance, one click.
-The one barrier/fork pair that animates differently is `modals-may-*`, where
-the fork's lapse timer lands on the chair's `MUST Publish` and the barrier's
-lands on Fulfilled. The runtime does what the barrier draws in both cases: a
-permission nobody exercised creates no duty (`ok/every/run-modals.l4` §7,
-measured 2026-09-16), so the fork's drawing is wrong there and not yet fixed; `Lower.hs`'s
-`KNOWN WRONG` note names both shapes (the bare `PARTY … MAY` it was written for,
-and this one), and LTS-VISUALISER.md §4.9 has the traces.
+same token and the same buttons; every barrier/fork pair animates identically —
+`tenancy-*`, `modals-shant-*`, `modals-must-*` and, since `d544ed22`,
+`modals-may-*`; no timer fired on its own in 4.5 s of wall clock (the simulator
+has no clock — timers are play buttons); a breach end event does not stop the
+siblings; and the `SHANT`'s `completionCondition` is imported but never
+consulted — one instance, one click. The 17:19 run had found one pair that
+differed: `modals-may-fork`'s lapse timer landed on the chair's `MUST Publish`
+where the barrier's landed on Fulfilled. The runtime does what the barrier drew
+in both cases — a permission nobody exercised creates no duty
+(`ok/every/run-modals.l4` §7, measured 2026-09-16) — so the fork's drawing was
+wrong; `d544ed22` fixed the state graph, the golden now reads `Boundary_0 →
+End_2`, and the 20:25 run animates the pair identically (measured;
+`P2A-TOKEN-SIM-BASELINE.md` §3.7). `Lower.hs`'s `KNOWN WRONG` note is back to
+naming one shape, the bare `PARTY … MAY` it was written for.
 
 ## Asking an actual engine: the jBPM/KIE second opinion
 
