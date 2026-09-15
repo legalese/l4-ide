@@ -10,6 +10,48 @@ sources_checked: 2026-09-14
 
 **STATUS 2026-09-15: LIFTED SECTION, NOT A DRAFT.** This is the section "Who is allowed to say it" cut from `blog/posts/S1-seeing-like-a-citizen.md` in its round-2 revision, on the features editor's ruling that it carried a second claim (who holds the license to read a rule aloud, as against whether the bound person can read it) and thirty percent of that post's prose. The prose below is the text as it stood in S1 on 2026-09-15, with two fact-check corrections applied (Upsolve's program was designed and the suit filed before any volunteer advised anyone, so "trained" became "set out to train"; the sentence "Singapore's rule does not say what people assume" was cut as narrating its own reveal). It has not been reshaped into a post: no cold open, no three beats, no hand-off. The footnotes are renumbered from 1; their sources were checked live on 2026-09-14 and 2026-09-15 as each note says, and they will need re-checking when this is drafted. Two questions for Meng before anyone drafts it: whether it becomes S2 in the arc, and whether the answer-shape proposal at the end (specified in `paper/political-economy/SIDEBAR-who-acts.md`, unbuilt) is a thing the post may propose or only describe.
 
+<!--
+POSSIBLE DIRECTION, NOT RESEARCHED — Meng, 2026-09-15: "at some point this whole UPL business is
+going to go the way of the Seven Dirty Words."
+
+NOTHING BELOW HAS BEEN OPENED. No case here was read, in the original or otherwise; this is a
+sketch of an argument recorded so it is not lost, and every proposition in it needs checking
+before a word of it reaches the body. It is a candidate cold open for this section, which
+currently has none because it was lifted out of the middle of S1.
+
+The analogy. Broadcast indecency regulation was upheld on a rationale tied to its medium —
+pervasiveness in the home, accessibility to children — and then not extended to the internet,
+and when the question returned decades later it was disposed of without reaching the merits. The
+doctrine was never overruled. It was stranded: consumption moved to pipes the rationale did not
+reach, and the rule became a tax on whoever was still in the regulated channel. (Pacifica 1978,
+Reno 1997, Fox 2012, as recalled — all three to be read.)
+
+Why it fits. That is the same mechanism as this section's who-is-bound paragraph: not repeal,
+bypass. The rule binds hardest the supplier with a named director and reachable assets and not
+at all the anonymous offshore one. And the Second Circuit's move in Upsolve — regulates speech,
+but by the circumstances in which it is given rather than its content, so the easier test — is
+doctrinally a cousin of a medium-specific carve-out. Worth checking whether that reading holds
+up or is a false friend.
+
+Two reasons it may not fit, which the section should carry if it runs this at all:
+
+  1. The harm theories differ in kind. Broadcast indecency named an offence; UPL names a loss —
+     a missed deadline, a default entered, an elderly testator under undue influence. Theories
+     that name a loss do not decay the way theories that name an offence do. Note 5's Hansard
+     quote is a real harm, and the section already says so.
+  2. The near-term evidence runs the other way, and it is already in this file. Utah's sandbox
+     went from 39 authorised entities to 11 while Arizona's went from 19 to 136 (note 8). That
+     is divergence, not decay — what you would expect before a settlement rather than after one.
+     A profession with political organisation defends its boundary in a way broadcasters never
+     had to; the MP asking to extend the rule declared she practises in estate matters (note 5).
+
+The testable form, which is the part worth keeping. If the prediction is right, the thing to
+watch is not whether UPL is struck down but whether the exemption routes get used — the licence
+surviving as a signal while ceasing to be a prohibition. Singapore has held s 34(2) since 2011
+and we did not find rules made under it (note 9). That unused power is the tell, and it is
+already the falsification condition this section closes on.
+-->
+
 A legible rule still needs someone who is allowed to show it to you. Upsolve, a nonprofit founded in 2016 to help people file for bankruptcy free, set out to train non-lawyer volunteers — among them a pastor, the Reverend John Udo-Okon — to give free, individualized advice on one New York form: the check-the-box answer to a consumer-debt suit, which on one amicus brief's account is a quarter of the state's court filings, and which a defendant who does not answer loses by default.[^1] On the State's reading of New York's unauthorized practice of law (UPL) statutes that is a crime, so Upsolve sued before finding out. In May 2022 a federal district judge enjoined the state, treating the rules as a restriction on speech for what it says, the kind US courts test hardest, and finding they failed. On September 9, 2025, the Second Circuit vacated the injunction: the rules regulate speech, the court agreed, but by the circumstances in which it is given rather than by its content, which calls for an easier test — the state must show the rule serves a real interest without burdening more speech than it needs to — and the district court had not applied it. On remand, in March 2026, the district court did, and upheld the rules.[^2] As of this writing a trained volunteer in New York may not tell a neighbor which box to check.
 
 The Legal Profession Act 1966 (LPA) has no general "practice of law" offense, and the phrase "legal advice" appears nowhere in it. Section 33(1) makes it an offense for an unauthorized person to act as an advocate or solicitor, and a 1988 case, *Turner (East Asia) v Builders Federal*, reads that to cover anything "customarily … within his exclusive function to provide, eg giving advice on legal rights and obligations." Section 33(2) separately lists paperwork — documents relating to property or a proceeding, probate papers, letters threatening proceedings — done "directly or indirectly."[^3] The two limbs treat money differently: under section 33(1), the advice limb, doing it for free is no defense at all; under section 33(2), the paperwork limb, the accused escapes only by proving there was no expectation of "fee, gain or reward." A free tool that advises is caught; a free tool that only fills in forms has a defense to carry; a paid tool has neither. And the High Court held in *Public Prosecutor v Lim Tean* this year that the section 33(1) offense is a conduct crime, complete without harm to anyone, because the provision "serves to help preserve public confidence in the legal profession."[^4] That is the conventional rationale for a conduct offense, and it is also what a protectionism reading predicts — an offense calibrated to the boundary of a profession rather than to harm to a consumer — seen from the other side. The profession's own members argue for extending it in the same terms: a member of parliament who practices in estate matters asked this February for non-lawyer will-writing to be regulated, because the average Singaporean cannot tell legal advice from the other kind and because "unscrupulous operators also risk tarnishing the reputation of our legal professions."[^5] That the consumer cannot audit the supply is an argument for anything that makes quality legible; a license was the answer available in 1966.
