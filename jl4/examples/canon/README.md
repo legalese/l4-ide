@@ -40,9 +40,13 @@ moment this tree and canon at the pin disagree.
 ## Goldens, and why a stale one is not a failure
 
 These goldens came from canon. When the compiler's output moves, canon's copies go stale — and
-that is ordinary, not broken: it is the reason the pin exists. Blocking an l4-ide PR until a
-second repository has re-blessed would reintroduce the cross-repo deadlock vendoring was chosen
-to avoid. So `--check` lists differing goldens separately and exits 0 on them.
+that is ordinary, not broken: it is the reason the pin exists.
+
+**`--check` cannot tell you which of two things happened**, and does not pretend to. A stale
+canon golden and a hand-edit of the mirror produce the identical diff. The difference is
+non-fatal because making it fatal would block every l4-ide PR on canon's blessing cadence, not
+because a hand-edit has been ruled out — so read the diff rather than the exit code. The only
+legitimate way to move a golden here is to re-bless it in canon and bump the pin.
 
 The regression itself still runs: `canon/**` is an ordinary golden glob in `jl4/tests/Main.hs`,
 with the same semantics as `legal/**` — four goldens per file, `failFirstTime`, `--accept` to

@@ -144,7 +144,11 @@ what was implemented, with the two departures named under _What review changed_.
   and are still globbed, so those two subjects are duplicated _within this repository_ until §4
   runs. That is deliberate — ship the mechanism, see it green, then move.
 - **The merge-queue requirement.** `Canon Mirror` is not a required check in the ruleset.
-- **The pin is on a shelf, not on canon `main`**, which §3A.4/§3B.6 require. None of the five
+- **The pin is on a canon BRANCH, not on `main`**, which §3A.4/§3B.6 require. It is
+  `gm/rebless-2026-09-15`, cut from `mengwong/drafts`, created because the first run needed a
+  re-blessed golden. It stays valid when that branch merges — a merge does not change the
+  commit. None of the five blessed dirs is on `main` yet, so the requirement cannot be met
+  today. None of the five
   blessed dirs is on `main` yet, so the requirement cannot be met today; the pin's header says the
   target is `main` and `--pull` fails loudly if the shelf SHA is rebased away.
 

@@ -110,7 +110,22 @@ export function classify(rel) {
  * edit here; that is the intended cost.
  */
 export function included(rel) {
-  if (rel.endsWith(".l4")) return true;
+  // `.l4` IS SCOPED BY DIRECTORY, not admitted at any depth.
+  //
+  // An unscoped `endsWith(".l4")` looks harmless and is not. Live at this pin:
+  // `subjects/il/ofek-hadash-2008/encodings/legalese/source/_salary-table-tail.l4`
+  // is a BUILD FRAGMENT, not a module — it opens with a bare `§§`, has no
+  // `IMPORT prelude`, and is concatenated by a python script in the same
+  // directory. Vendoring it would promote it to a top-level corpus file and
+  // demand four goldens for something that cannot stand alone. `ofek` is
+  // unblessed today, so this is latent rather than live — and the pin's header
+  // says it is unblessed only "until they have goldens", which is precisely the
+  // day this would fire.
+  //
+  // So: a module at the directory root, or under `cases/`. Those are the two
+  // layouts canon actually uses for modules at this pin.
+  if (rel.endsWith(".l4"))
+    return !rel.includes("/") || rel.startsWith("cases/");
   if (rel.startsWith("tests/") && rel.endsWith(".golden")) return true;
   return rel === "encoding.json" || rel === "SOURCE-LICENSE.md";
 }
@@ -297,9 +312,13 @@ function report(findings) {
     out.push(
       `DIFFERING goldens (${goldens.length}) — NOT fatal:`,
       ...goldens.map((f) => `  ${f}`),
-      `  A golden differs when the compiler's output moved since canon last blessed.`,
-      `  That is ordinary and is why the pin exists; it must not block an l4-ide PR on`,
-      `  canon's blessing cadence. Re-bless in canon and bump the pin when convenient.`,
+      `  THIS SCRIPT CANNOT TELL WHY. Two causes produce the identical diff: the`,
+      `  compiler's output moved since canon last blessed (ordinary, and the reason the`,
+      `  pin exists), or somebody hand-edited the mirror to make a red suite green`,
+      `  (which is the thing the mirror is not for). It is non-fatal because treating`,
+      `  the first as fatal would block every l4-ide PR on canon's blessing cadence —`,
+      `  not because the second has been ruled out. Check the diff before believing it.`,
+      `  The legitimate route is: re-bless in canon, then --bump the pin.`,
     );
   return { text: out.join("\n"), fatal: sources.length > 0, goldens };
 }
@@ -344,7 +363,10 @@ function selftest() {
   mk(join(canon, from, "tests", "a.golden"), "GA\n");
   mk(join(canon, from, "tests", "c.golden"), "GC\n");
   mk(join(canon, from, "encoding.json"), "{}\n");
-  mk(join(canon, from, "report", "big.md"), "ignored\n");
+  // `.l4`, NOT `.md`: a fixture that plants an extension the allowlist would
+  // reject anyway tests nothing. This one fails against the unscoped rule.
+  mk(join(canon, from, "report", "big.l4"), "ignored\n");
+  mk(join(canon, from, "source", "_fragment.l4"), "ignored\n");
   mk(join(canon, from, "registers", "r.json"), "ignored\n");
   const pin = { repo: "r", sha: "0".repeat(40), blessed: [{ from, to: "x" }] };
 
@@ -352,6 +374,10 @@ function selftest() {
   ok(
     "the allowlist keeps report/ and registers/ out of the mirror",
     ![...want.keys()].some((k) => /report|registers/.test(k)),
+  );
+  ok(
+    "...including a .l4 inside them — the extension alone does not admit a file",
+    !want.has("x/big.l4") && !want.has("x/_fragment.l4"),
   );
   ok(
     "a cases/ file is HOISTED to the directory root, where its golden is",
@@ -393,7 +419,11 @@ function selftest() {
     ok("...and is NOT fatal", r.fatal === false);
     ok(
       "...and the output says why it is not fatal",
-      /must not block an l4-ide PR/.test(r.text),
+      /would block every l4-ide PR on canon's blessing cadence/.test(r.text),
+    );
+    ok(
+      "...and refuses to claim it knows WHY the golden differs",
+      /CANNOT TELL WHY/.test(r.text),
     );
   }
   // A golden and a source differing together: still fatal, both reported.
@@ -543,10 +573,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
         process.exit(EXIT.FINDING);
       }
       process.stderr.write(
-        `sync-canon: mirror matches ${pin.repo}@${pin.sha.slice(0, 12)}` +
-          (r.goldens.length
-            ? ` (${r.goldens.length} golden(s) differ, reported above, not fatal)\n`
-            : `\n`),
+        r.goldens.length
+          ? `sync-canon: sources match ${pin.repo}@${pin.sha.slice(0, 12)}; ` +
+              `${r.goldens.length} golden(s) DIFFER (listed above, not fatal)\n`
+          : `sync-canon: mirror matches ${pin.repo}@${pin.sha.slice(0, 12)}\n`,
       );
       process.exit(EXIT.CLEAN);
     }

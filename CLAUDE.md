@@ -207,19 +207,19 @@ will not see it: no paths filter matches a `.l4` under `jl4/examples/`, so the H
 run on your PR, and the failure surfaces on the next person's branch instead.
 
 **Which globs, exactly** (`jl4/tests/Main.hs:78-90`, kept in step by `etc/check-corpus-goldens.mjs:32-43`):
-`ok/**`, `legal/**`, **`canon/**`**, `not-ok/tc/**`, `not-ok/nlg/**`, `not-ok/export-_.l4`,
-`lsp/semantic-tokens/**`, `lsp/hover/**`, and `jl4-core/libraries/_.l4`. **`canon/**` is the
-VENDORED MIRROR** of blessed directories in `legalese/canon`, at the SHA in
+`ok/**`, `legal/**`, `canon/**`, `not-ok/tc/**`, `not-ok/nlg/**`, `not-ok/export-*.l4`,
+`lsp/semantic-tokens/**`, `lsp/hover/**`, and `jl4-core/libraries/*.l4`. The `canon/**` entry is
+the VENDORED MIRROR of blessed directories in `legalese/canon`, at the SHA in
 `etc/canon-pin.json` — do not edit it or bless its goldens by hand; edit in canon and
 `node etc/sync-canon.mjs --bump <sha>`. The `Canon Mirror` CI job fails when the mirror and
-canon at the pin disagree. **`jl4/examples/docassemble/` and
-`jl4/examples/openfisca/` are in NO glob**, which is why their `.l4` files carry no `tests/`
-directory and adding one there needs no goldens. State this rule with its scope: an earlier
-unqualified reading of this paragraph sent a session hunting a golden trap in `docassemble/` that
-does not exist there. Generate them by running `cabal test
-jl4-test` once (it creates them and fails), then again to prove they hold, then commit **only** the
-`.golden` files — `.actual` is gitignored. Read them before committing: blessing output you have not
-looked at is how a wrong answer becomes the expected answer.
+canon at the pin disagree.
+
+> **Do not wrap a code span in bold when the span itself ends in two asterisks.** Doing that
+> unbalances markdown emphasis for the rest of the paragraph, and `prettier --write` then
+> silently rewrites two LATER, untouched globs: the asterisk in the export-placement glob and
+> the one in the libraries glob each become an underscore. Measured 2026-09-15 — it reached a
+> commit, in the one paragraph whose whole job is to state the globs exactly, and nothing
+> complained. Plain backticks with no bold are inert; use those.
 
 > **Why.** This went off twice in one day. The BNA corpus landed without goldens in PR #195 and was
 > repaired by #202; eleven hours later the Jersey charities cleanroom did the same in #201 and was
