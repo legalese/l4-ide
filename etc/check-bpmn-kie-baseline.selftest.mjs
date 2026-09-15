@@ -30,6 +30,13 @@ const BASELINE_PATH = HERE + "bpmn-kie-baseline.txt";
 // A faithful abridgement of the real harness output: the lines the comparator
 // reads, in the order it reads them, with the prose tails intact so that the
 // "prose churn is tolerated" cases below are testing the real shapes.
+//
+// It is a fixture, so it moves only by hand: when etc/bpmn-kie-baseline.txt
+// gains a row, this transcript gains the matching FILE block, or the
+// "unmutated transcript is clean" case below fails on NOT CHECKED. Extended
+// 2026-09-16 with the eight EVERY goldens (tenancy-*, modals-*) after that
+// is exactly what happened on #395: the baseline went to fourteen rows and
+// CI's first step in the BPMN job was this file, red.
 const TRANSCRIPT = `jBPM/KIE second opinion  (jbpm-bpmn2 7.74.1.Final)
 
 =========================================================
@@ -50,6 +57,54 @@ FILE  handover.bpmn
    ERROR   Unable to Analyse Expression
    -> jBPM REJECTS this file. NOT EXECUTED, so nothing below was checked.
 
+=========================================================
+FILE  modals-may-barrier.bpmn
+=========================================================
+[PHASE 0 adapt] 3 adaptation(s) — see the header for which are flavor axes and which are gaps
+[PHASE 1 compile] errors=2 warnings=0
+   ERROR   Process 'the resolution' [Process_the_resolution]: Node 'null' [2] ForEach has no variable name
+   ERROR   Process 'the resolution' [Process_the_resolution]: Node 'null' [2] ForEach has no collection expression
+   -> jBPM REJECTS this file. NOT EXECUTED, so nothing below was checked.
+=========================================================
+FILE  modals-may-fork.bpmn
+=========================================================
+[PHASE 0 adapt] 3 adaptation(s) — see the header for which are flavor axes and which are gaps
+[PHASE 1 compile] errors=2 warnings=0
+   ERROR   Process 'each approval is published' [Process_each_approval_is_published]: Node 'null' [2] ForEach has no variable name
+   ERROR   Process 'each approval is published' [Process_each_approval_is_published]: Node 'null' [2] ForEach has no collection expression
+   -> jBPM REJECTS this file. NOT EXECUTED, so nothing below was checked.
+=========================================================
+FILE  modals-must-barrier-both-deadlines.bpmn
+=========================================================
+[PHASE 0 adapt] 2 adaptation(s) — see the header for which are flavor axes and which are gaps
+[PHASE 1 compile] errors=2 warnings=0
+   ERROR   Process 'quorum by ten' [Process_quorum_by_ten]: Node 'null' [2] ForEach has no variable name
+   ERROR   Process 'quorum by ten' [Process_quorum_by_ten]: Node 'null' [2] ForEach has no collection expression
+   -> jBPM REJECTS this file. NOT EXECUTED, so nothing below was checked.
+=========================================================
+FILE  modals-must-fork-join-deadline.bpmn
+=========================================================
+[PHASE 0 adapt] 2 adaptation(s) — see the header for which are flavor axes and which are gaps
+[PHASE 1 compile] errors=2 warnings=0
+   ERROR   Process 'approve, or else' [Process_approve__or_else]: Node 'null' [2] ForEach has no variable name
+   ERROR   Process 'approve, or else' [Process_approve__or_else]: Node 'null' [2] ForEach has no collection expression
+   -> jBPM REJECTS this file. NOT EXECUTED, so nothing below was checked.
+=========================================================
+FILE  modals-shant-barrier.bpmn
+=========================================================
+[PHASE 0 adapt] 2 adaptation(s) — see the header for which are flavor axes and which are gaps
+[PHASE 1 compile] errors=2 warnings=0
+   ERROR   Process 'no subletting' [Process_no_subletting]: Node 'null' [2] ForEach has no variable name
+   ERROR   Process 'no subletting' [Process_no_subletting]: Node 'null' [2] ForEach has no collection expression
+   -> jBPM REJECTS this file. NOT EXECUTED, so nothing below was checked.
+=========================================================
+FILE  modals-shant-fork.bpmn
+=========================================================
+[PHASE 0 adapt] 2 adaptation(s) — see the header for which are flavor axes and which are gaps
+[PHASE 1 compile] errors=2 warnings=0
+   ERROR   Process 'no subletting, severally' [Process_no_subletting__severally]: Node 'null' [2] ForEach has no variable name
+   ERROR   Process 'no subletting, severally' [Process_no_subletting__severally]: Node 'null' [2] ForEach has no collection expression
+   -> jBPM REJECTS this file. NOT EXECUTED, so nothing below was checked.
 =========================================================
 FILE  offering.bpmn
 =========================================================
@@ -83,8 +138,24 @@ FILE  regcf-resale.bpmn
 [PHASE 1 compile] errors=6 warnings=0
    ERROR   Unable to Analyse Expression
    -> jBPM REJECTS this file. NOT EXECUTED, so nothing below was checked.
+=========================================================
+FILE  tenancy-barrier.bpmn
+=========================================================
+[PHASE 0 adapt] 3 adaptation(s) — see the header for which are flavor axes and which are gaps
+[PHASE 1 compile] errors=2 warnings=0
+   ERROR   Process 'the tenancy' [Process_the_tenancy]: Node 'null' [2] ForEach has no variable name
+   ERROR   Process 'the tenancy' [Process_the_tenancy]: Node 'null' [2] ForEach has no collection expression
+   -> jBPM REJECTS this file. NOT EXECUTED, so nothing below was checked.
+=========================================================
+FILE  tenancy-fork.bpmn
+=========================================================
+[PHASE 0 adapt] 3 adaptation(s) — see the header for which are flavor axes and which are gaps
+[PHASE 1 compile] errors=2 warnings=0
+   ERROR   Process 'receipts' [Process_receipts]: Node 'null' [2] ForEach has no variable name
+   ERROR   Process 'receipts' [Process_receipts]: Node 'null' [2] ForEach has no collection expression
+   -> jBPM REJECTS this file. NOT EXECUTED, so nothing below was checked.
 
-RESULT: 4 file(s) with findings.
+RESULT: 12 file(s) with findings.
 `;
 
 const BASELINE = parseBaseline(readFileSync(BASELINE_PATH, "utf8"));
@@ -125,24 +196,28 @@ console.log("\n-- the fixture itself must match the committed baseline --\n");
 console.log("\n-- regressions the gate MUST catch --\n");
 
 caughtAs(
-  "a fifth golden starts being rejected",
+  "a new golden starts being rejected",
   (t) =>
     t.replace(
-      "RESULT: 4 file(s) with findings.",
+      "RESULT: 12 file(s) with findings.",
       `=========================================================
 FILE  brand-new.bpmn
 =========================================================
 [PHASE 1 compile] errors=2 warnings=0
    -> jBPM REJECTS this file. NOT EXECUTED, so nothing below was checked.
 
-RESULT: 5 file(s) with findings.`,
+RESULT: 13 file(s) with findings.`,
     ),
   "UNBASELINED",
 );
 
 caughtAs(
   "a file silently stops being checked (narrowed glob)",
-  (t) => t.replace(/=+\nFILE {2}regcf-resale\.bpmn\n[\s\S]*?(?=\nRESULT:)/, ""),
+  (t) =>
+    t.replace(
+      /=+\nFILE {2}regcf-resale\.bpmn\n[\s\S]*?(?=\n=+\nFILE|\nRESULT:)/,
+      "",
+    ),
   "NOT CHECKED",
 );
 
@@ -188,7 +263,7 @@ caughtAs(
 
 caughtAs(
   "the harness tally moves on its own",
-  (t) => t.replace("RESULT: 4 file(s)", "RESULT: 3 file(s)"),
+  (t) => t.replace("RESULT: 12 file(s)", "RESULT: 11 file(s)"),
   "RESULT",
 );
 
