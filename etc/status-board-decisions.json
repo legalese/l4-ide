@@ -206,6 +206,58 @@
         "anchor": "**What review changed**",
         "ref": "origin/mengwong/canon-vendor"
       }
+    },
+    {
+      "id": "state-graphs",
+      "owner": "GM",
+      "kind": "small PR, gated",
+      "quick": true,
+      "raised": "2026-09-16",
+      "ask": "jl4/examples/state-graphs/*.dot (37 files) are drifted against the exporter on unstable — pre-existing, found by #399's consistency pass. One `regenerate.sh` run and one commit, AFTER #395 (the join line) and #399 merge so the regenerated set is stable; read the diff — it should be the join-line change plus whatever moved since. Handed to GM by lts-diagrams-2.",
+      "unblocks": "a checked-in state-graph set that matches the exporter",
+      "source": {
+        "file": "jl4/examples/state-graphs/regenerate.sh",
+        "anchor": "regenerate"
+      }
+    },
+    {
+      "id": "Dominators §7",
+      "owner": "GM (papers bench)",
+      "kind": "doc correction, gated",
+      "quick": true,
+      "raised": "2026-09-16",
+      "ask": "paper/bounded-deontics/draft/bd-sections-7-9.tex:83 says 'the dominator query and the verification backends are' not implemented (and paper/formal-methods-in-law/FORMAL-PAPER.md:296 lists the dominator query under 'Designed, not yet built'). That becomes false the moment #399 merges (L4.StateGraph.Dominators, `l4 state-graph --dominators`, doc/reference/regulative/STATE-GRAPH.md). Edit AFTER #399 lands, not before — the anti-drift rule cuts both ways. Handed to GM by lts-diagrams-2.",
+      "unblocks": "the paper agreeing with the tree",
+      "source": {
+        "file": "paper/bounded-deontics/draft/bd-sections-7-9.tex",
+        "anchor": "the dominator query and the verification backends are"
+      }
+    },
+    {
+      "id": "Prune glob",
+      "owner": "Meng (homelab launchd on nye)",
+      "kind": "ops decision",
+      "quick": true,
+      "raised": "2026-09-16",
+      "ask": "The weekly worktree prune never reaches /Volumes/transcend/src/l4wt, and 41 trees live there tonight after lts-diagrams-2 moved 14 idle ones to free the native disk (98% → 23% used). GM's recommendation: add the second glob, but (1) `git worktree lock --reason 'removable volume'` every transcend tree so `git worktree prune` cannot drop their admin entries while the volume is unmounted, and (2) have the job skip the transcend glob when the mount is absent. Also: trees created under the `legalese` login fail with 'dubious ownership' once moved (git checks the owner of .git/worktrees/<name>); mengwong has `safe.directory '/Volumes/transcend/src/l4wt/*'` now, the legalese login would need its own entry. The change lives in the homelab repo — session homelab-fc is idle if you want it done there.",
+      "unblocks": "the prune job covering the trees that actually accumulate",
+      "source": {
+        "file": "etc/verify-branch.sh",
+        "anchor": "worktree"
+      }
+    },
+    {
+      "id": "§7.3 reader",
+      "owner": "Meng (scheduling)",
+      "kind": "human experiment",
+      "quick": false,
+      "raised": "2026-09-16",
+      "ask": "If the §7.3 gate's human reader experiment is to run (as opposed to the LLM proxy in etc/lts-reader-proxy/ on #401), a person has to be scheduled against the three artefacts the proxy already prepared — list / DOT / BPMN per contract, plus the question sheet in the manifest. A GM scheduling item, not an agent one; Meng names the reader.",
+      "unblocks": "the LTS visualiser's human-readability claim resting on a human",
+      "source": {
+        "file": "specs/todo/lexipedia-superset/LTS-VISUALISER.md",
+        "anchor": "7.3"
+      }
     }
   ]
 }
