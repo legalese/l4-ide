@@ -27,73 +27,165 @@ import { execSync } from "node:child_process";
 import { readdirSync, statSync, readFileSync, existsSync } from "node:fs";
 import { join, extname } from "node:path";
 
-const sh = (c) => { try { return execSync(c, {encoding:"utf8", stdio:["ignore","pipe","ignore"]}).trim(); } catch { return ""; } };
-const j  = (c) => { const o = sh(c); try { return o ? JSON.parse(o) : null; } catch { return null; } };
+const sh = (c) => {
+  try {
+    return execSync(c, {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+  } catch {
+    return "";
+  }
+};
+const j = (c) => {
+  const o = sh(c);
+  try {
+    return o ? JSON.parse(o) : null;
+  } catch {
+    return null;
+  }
+};
 const REPO = "legalese/l4-ide";
 
 // ---------------------------------------------------------------- in flight
-const prs = j(`gh pr list --repo ${REPO} --state open --limit 100 --json number,title,headRefName,baseRefName,isDraft,mergeStateStatus,reviewDecision,updatedAt,additions,deletions,changedFiles`) ?? [];
-const inFlight = prs.filter(p => p.baseRefName === "unstable");
-const train    = prs.filter(p => p.baseRefName !== "unstable");
+const prs =
+  j(
+    `gh pr list --repo ${REPO} --state open --limit 100 --json number,title,headRefName,baseRefName,isDraft,mergeStateStatus,reviewDecision,updatedAt,additions,deletions,changedFiles`,
+  ) ?? [];
+const inFlight = prs.filter((p) => p.baseRefName === "unstable");
+const train = prs.filter((p) => p.baseRefName !== "unstable");
 
 // ------------------------------------------------------------------ rulings
-const walk = (d) => !existsSync(d) ? [] : readdirSync(d).flatMap(e => {
-  const p = join(d, e); return statSync(p).isDirectory() ? walk(p) : extname(p) === ".md" ? [p] : [];
-});
-const STATES = ["RULED","ANSWERED","ACCEPTED","DECLINED","UNDECIDED","OPEN","PROPOSED","DEFERRED","SUPERSEDED","RETRACTED"];
+const walk = (d) =>
+  !existsSync(d)
+    ? []
+    : readdirSync(d).flatMap((e) => {
+        const p = join(d, e);
+        return statSync(p).isDirectory()
+          ? walk(p)
+          : extname(p) === ".md"
+            ? [p]
+            : [];
+      });
+const STATES = [
+  "RULED",
+  "ANSWERED",
+  "ACCEPTED",
+  "DECLINED",
+  "UNDECIDED",
+  "OPEN",
+  "PROPOSED",
+  "DEFERRED",
+  "SUPERSEDED",
+  "RETRACTED",
+];
 const specs = walk("specs").map((f) => {
   const t = readFileSync(f, "utf8");
-  const status = (/^\*\*Status:?\*\*\s*(.+)$/m.exec(t)?.[1] ?? "").replace(/\s+/g," ").slice(0,90);
-  const dated = {}, undated = {};
+  const status = (/^\*\*Status:?\*\*\s*(.+)$/m.exec(t)?.[1] ?? "")
+    .replace(/\s+/g, " ")
+    .slice(0, 90);
+  const dated = {},
+    undated = {};
   for (const s of STATES) {
-    const d = (t.match(new RegExp(`\\b${s}\\b\\s+\\d{4}-\\d{2}-\\d{2}`, "g")) ?? []).length;
+    const d = (
+      t.match(new RegExp(`\\b${s}\\b\\s+\\d{4}-\\d{2}-\\d{2}`, "g")) ?? []
+    ).length;
     const a = (t.match(new RegExp(`\\b${s}\\b`, "g")) ?? []).length;
     if (d) dated[s] = d;
     if (a - d) undated[s] = a - d;
   }
-  return { file: f, area: f.split("/")[1] ?? "-", status, dated, undated,
-           nDated: Object.values(dated).reduce((a,b)=>a+b,0),
-           nUndated: Object.values(undated).reduce((a,b)=>a+b,0) };
+  return {
+    file: f,
+    area: f.split("/")[1] ?? "-",
+    status,
+    dated,
+    undated,
+    nDated: Object.values(dated).reduce((a, b) => a + b, 0),
+    nUndated: Object.values(undated).reduce((a, b) => a + b, 0),
+  };
 });
 
 // -------------------------------------------------------------------- shelf
 sh("git fetch origin unstable -q");
-const rels = (sh(`gh release list --repo legalese/prereleases --limit 10`) || "").split("\n").filter(Boolean).map((l) => {
-  const c = l.split("\t"); const tag = c[2] ?? ""; const sha = tag.split("-").pop();
-  const behind = sha && sh(`git cat-file -e ${sha} 2>/dev/null && echo ok`) ? Number(sh(`git rev-list --count ${sha}..origin/unstable`) || 0) : null;
-  return { tag, published: c[3] ?? "", sha, behind };
-});
-const shelfAssets = (j(`gh release view ${rels[0]?.tag} --repo legalese/prereleases --json assets`)?.assets ?? [])
-  .map(a => ({ name: a.name, mb: +(a.size/1048576).toFixed(1) }));
+const rels = (
+  sh(`gh release list --repo legalese/prereleases --limit 10`) || ""
+)
+  .split("\n")
+  .filter(Boolean)
+  .map((l) => {
+    const c = l.split("\t");
+    const tag = c[2] ?? "";
+    const sha = tag.split("-").pop();
+    const behind =
+      sha && sh(`git cat-file -e ${sha} 2>/dev/null && echo ok`)
+        ? Number(sh(`git rev-list --count ${sha}..origin/unstable`) || 0)
+        : null;
+    return { tag, published: c[3] ?? "", sha, behind };
+  });
+const shelfAssets = (
+  j(`gh release view ${rels[0]?.tag} --repo legalese/prereleases --json assets`)
+    ?.assets ?? []
+).map((a) => ({ name: a.name, mb: +(a.size / 1048576).toFixed(1) }));
 
 // -------------------------------------------------------------------- canon
 const canonMeta = j(`gh api repos/legalese/canon`);
-const canonBranches = (j(`gh api repos/legalese/canon/branches --paginate`) ?? []).map((b) => {
-  const tree = j(`gh api "repos/legalese/canon/git/trees/${b.commit.sha}?recursive=1"`);
-  const blobs = (tree?.tree ?? []).filter(x => x.type === "blob");
-  return { name: b.name, sha: b.commit.sha.slice(0,8), files: blobs.length,
-           l4: blobs.filter(x => x.path.endsWith(".l4")).length,
-           md: blobs.filter(x => x.path.endsWith(".md")).length,
-           mb: +(blobs.reduce((a,x)=>a+(x.size||0),0)/1048576).toFixed(1) };
+const canonBranches = (
+  j(`gh api repos/legalese/canon/branches --paginate`) ?? []
+).map((b) => {
+  const tree = j(
+    `gh api "repos/legalese/canon/git/trees/${b.commit.sha}?recursive=1"`,
+  );
+  const blobs = (tree?.tree ?? []).filter((x) => x.type === "blob");
+  return {
+    name: b.name,
+    sha: b.commit.sha.slice(0, 8),
+    files: blobs.length,
+    l4: blobs.filter((x) => x.path.endsWith(".l4")).length,
+    md: blobs.filter((x) => x.path.endsWith(".md")).length,
+    mb: +(blobs.reduce((a, x) => a + (x.size || 0), 0) / 1048576).toFixed(1),
+  };
 });
 
-const data = { generatedAt: new Date().toISOString(), inFlight, train, specs, rels, shelfAssets, canonMeta, canonBranches,
-               unstableHead: sh("git rev-parse --short origin/unstable"),
-               mainHead: sh("git rev-parse --short origin/main"),
-               mainBehind: Number(sh("git rev-list --count origin/main..origin/unstable") || 0) };
+const data = {
+  generatedAt: new Date().toISOString(),
+  inFlight,
+  train,
+  specs,
+  rels,
+  shelfAssets,
+  canonMeta,
+  canonBranches,
+  unstableHead: sh("git rev-parse --short origin/unstable"),
+  mainHead: sh("git rev-parse --short origin/main"),
+  mainBehind: Number(
+    sh("git rev-list --count origin/main..origin/unstable") || 0,
+  ),
+};
 
-if (process.argv.includes("--json")) { console.log(JSON.stringify(data, null, 1)); process.exit(0); }
+if (process.argv.includes("--json")) {
+  console.log(JSON.stringify(data, null, 1));
+  process.exit(0);
+}
 process.stdout.write(render(data));
 
 // --------------------------------------------------------------------- view
-function esc(s){ return String(s ?? "").replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
-function render(d){
-const noStatus = d.specs.filter(s => !s.status);
-const totDated = d.specs.reduce((a,s)=>a+s.nDated,0), totUndated = d.specs.reduce((a,s)=>a+s.nUndated,0);
-const red = d.train.filter(p=>p.mergeStateStatus==="UNSTABLE").length;
-const unreviewed = d.train.filter(p=>!p.reviewDecision).length;
-const stateAgg = {}; for(const s of d.specs) for(const [k,v] of Object.entries(s.dated)) stateAgg[k]=(stateAgg[k]||0)+v;
-return `<title>L4 Programme Board</title>
+function esc(s) {
+  return String(s ?? "").replace(
+    /[&<>]/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c],
+  );
+}
+function render(d) {
+  const noStatus = d.specs.filter((s) => !s.status);
+  const totDated = d.specs.reduce((a, s) => a + s.nDated, 0),
+    totUndated = d.specs.reduce((a, s) => a + s.nUndated, 0);
+  const red = d.train.filter((p) => p.mergeStateStatus === "UNSTABLE").length;
+  const unreviewed = d.train.filter((p) => !p.reviewDecision).length;
+  const stateAgg = {};
+  for (const s of d.specs)
+    for (const [k, v] of Object.entries(s.dated))
+      stateAgg[k] = (stateAgg[k] || 0) + v;
+  return `<title>L4 Programme Board</title>
 <style>
 :root{--bg:#faf9f7;--fg:#1c1a17;--dim:#6b6560;--line:#e0dcd5;--card:#fff;--accent:#8a5a2b;--red:#a33a2a;--amber:#9a7a1a;--green:#3f6b3a;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17161a;--fg:#eae7e2;--dim:#9b948c;--line:#33302c;--card:#1f1e22;--accent:#d9a05b;--red:#e07a63;--amber:#d4ad4a;--green:#82b478}}
@@ -128,39 +220,66 @@ a{color:var(--accent)}
 <h2>In flight<span class="n">PRs targeting unstable — ${d.inFlight.length}</span></h2>
 <p class="lede">Everything actually moving. Distinct from the release train at the bottom, which is a different queue.</p>
 <div class="scroll"><table><tr><th>PR</th><th>branch</th><th>checks</th><th>review</th><th>size</th><th>updated</th></tr>
-${d.inFlight.map(p=>`<tr><td><a href="https://github.com/${REPO}/pull/${p.number}">#${p.number}</a>${p.isDraft?' <span class="pill warn">draft</span>':""}</td><td>${esc(p.headRefName)}</td><td>${p.mergeStateStatus==="UNSTABLE"?'<span class="pill bad">failing</span>':p.mergeStateStatus==="CLEAN"?'<span class="pill ok">clean</span>':`<span class="pill warn">${esc(p.mergeStateStatus)}</span>`}</td><td>${p.reviewDecision?esc(p.reviewDecision):'<span class="pill warn">none</span>'}</td><td class="n">${p.changedFiles}f</td><td>${esc((p.updatedAt||"").slice(0,10))}</td></tr>`).join("")}
+${d.inFlight.map((p) => `<tr><td><a href="https://github.com/${REPO}/pull/${p.number}">#${p.number}</a>${p.isDraft ? ' <span class="pill warn">draft</span>' : ""}</td><td>${esc(p.headRefName)}</td><td>${p.mergeStateStatus === "UNSTABLE" ? '<span class="pill bad">failing</span>' : p.mergeStateStatus === "CLEAN" ? '<span class="pill ok">clean</span>' : `<span class="pill warn">${esc(p.mergeStateStatus)}</span>`}</td><td>${p.reviewDecision ? esc(p.reviewDecision) : '<span class="pill warn">none</span>'}</td><td class="n">${p.changedFiles}f</td><td>${esc((p.updatedAt || "").slice(0, 10))}</td></tr>`).join("")}
 </table></div>
 
 <h2>Rulings<span class="n">${totDated} dated · ${totUndated} undated · ${d.specs.length} spec files</span></h2>
 <p class="lede">Counted, not inferred. A dated marker (<span style="font-family:var(--mono)">RULED 2026-09-04</span>) is trustworthy; a bare state word in prose is not, so the two are never added together.</p>
-<div class="cards">${Object.entries(stateAgg).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([k,v])=>`<div class="card"><div class="k">${esc(k)}</div><div class="v">${v}</div></div>`).join("")}</div>
+<div class="cards">${Object.entries(stateAgg)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(
+      ([k, v]) =>
+        `<div class="card"><div class="k">${esc(k)}</div><div class="v">${v}</div></div>`,
+    )
+    .join("")}</div>
 <div class="note"><b>${noStatus.length} of ${d.specs.length} spec files carry no <span style="font-family:var(--mono)">**Status:**</span> header</b>, so their state is genuinely unknown rather than open. That gap is the finding, not a rendering problem — a spec with no header cannot be triaged without reading it.</div>
 <div class="scroll"><table><tr><th>spec</th><th>status header</th><th class="n">dated</th><th class="n">undated</th></tr>
-${d.specs.filter(s=>s.nDated||s.status).sort((a,b)=>b.nDated-a.nDated).slice(0,22).map(s=>`<tr><td>${esc(s.file.replace("specs/",""))}</td><td>${s.status?esc(s.status):'<span class="pill warn">none</span>'}</td><td class="n">${s.nDated||""}</td><td class="n">${s.nUndated||""}</td></tr>`).join("")}
+${d.specs
+  .filter((s) => s.nDated || s.status)
+  .sort((a, b) => b.nDated - a.nDated)
+  .slice(0, 22)
+  .map(
+    (s) =>
+      `<tr><td>${esc(s.file.replace("specs/", ""))}</td><td>${s.status ? esc(s.status) : '<span class="pill warn">none</span>'}</td><td class="n">${s.nDated || ""}</td><td class="n">${s.nUndated || ""}</td></tr>`,
+  )
+  .join("")}
 </table></div>
 
 <h2>Build shelf<span class="n">legalese/prereleases</span></h2>
 <p class="lede">What a user who installs today actually gets, and how far behind the tree it is.</p>
 <div class="scroll"><table><tr><th>tag</th><th>published</th><th class="n">commits behind unstable</th></tr>
-${d.rels.map((r,i)=>`<tr><td>${esc(r.tag)}${i===0?' <span class="pill ok">current</span>':""}</td><td>${esc((r.published||"").slice(0,10))}</td><td class="n">${r.behind===null?"—":r.behind>200?`<span class="pill bad">${r.behind}</span>`:r.behind>40?`<span class="pill warn">${r.behind}</span>`:`<span class="pill ok">${r.behind}</span>`}</td></tr>`).join("")}
+${d.rels.map((r, i) => `<tr><td>${esc(r.tag)}${i === 0 ? ' <span class="pill ok">current</span>' : ""}</td><td>${esc((r.published || "").slice(0, 10))}</td><td class="n">${r.behind === null ? "—" : r.behind > 200 ? `<span class="pill bad">${r.behind}</span>` : r.behind > 40 ? `<span class="pill warn">${r.behind}</span>` : `<span class="pill ok">${r.behind}</span>`}</td></tr>`).join("")}
 </table></div>
-<p class="lede" style="margin-top:9px">Assets on the current shelf: ${d.shelfAssets.map(a=>`${esc(a.name.replace(/^l4-|\.tar\.gz$/g,""))} <b>${a.mb}MB</b>`).join(" · ")}</p>
+<p class="lede" style="margin-top:9px">Assets on the current shelf: ${d.shelfAssets.map((a) => `${esc(a.name.replace(/^l4-|\.tar\.gz$/g, ""))} <b>${a.mb}MB</b>`).join(" · ")}</p>
 
 <h2>Canon<span class="n">legalese/canon · ${d.canonBranches.length} branches</span></h2>
 <p class="lede">Encoded law by branch. <span style="font-family:var(--mono)">.l4</span> count is the one that matters; bytes are mostly source PDFs and prose.</p>
 <div class="scroll"><table><tr><th>branch</th><th>head</th><th class="n">.l4</th><th class="n">.md</th><th class="n">files</th><th class="n">MB</th></tr>
-${d.canonBranches.sort((a,b)=>b.l4-a.l4).map(b=>`<tr><td>${esc(b.name)}${b.name===d.canonMeta?.default_branch?' <span class="pill ok">default</span>':""}</td><td>${esc(b.sha)}</td><td class="n">${b.l4}</td><td class="n">${b.md}</td><td class="n">${b.files}</td><td class="n">${b.mb}</td></tr>`).join("")}
+${d.canonBranches
+  .sort((a, b) => b.l4 - a.l4)
+  .map(
+    (b) =>
+      `<tr><td>${esc(b.name)}${b.name === d.canonMeta?.default_branch ? ' <span class="pill ok">default</span>' : ""}</td><td>${esc(b.sha)}</td><td class="n">${b.l4}</td><td class="n">${b.md}</td><td class="n">${b.files}</td><td class="n">${b.mb}</td></tr>`,
+  )
+  .join("")}
 </table></div>
 
 <h2>Release train<span class="n">unstable → main · ${d.train.length} PRs · main is ${d.mainBehind} commits behind unstable</span></h2>
 <p class="lede">Last, because it moves glacially. These are review slices, not work in flight — leave them alone.</p>
 <div class="cards">
 <div class="card"><div class="k">slices open</div><div class="v">${d.train.length}</div></div>
-<div class="card"><div class="k">failing checks</div><div class="v" style="color:${red?"var(--red)":"var(--green)"}">${red}</div></div>
-<div class="card"><div class="k">no review yet</div><div class="v" style="color:${unreviewed===d.train.length?"var(--amber)":"var(--fg)"}">${unreviewed}</div></div>
+<div class="card"><div class="k">failing checks</div><div class="v" style="color:${red ? "var(--red)" : "var(--green)"}">${red}</div></div>
+<div class="card"><div class="k">no review yet</div><div class="v" style="color:${unreviewed === d.train.length ? "var(--amber)" : "var(--fg)"}">${unreviewed}</div></div>
 </div>
 <div class="scroll"><table><tr><th>PR</th><th>branch</th><th>base</th><th>checks</th><th>review</th><th class="n">files</th></tr>
-${d.train.sort((a,b)=>a.number-b.number).map(p=>`<tr><td><a href="https://github.com/${REPO}/pull/${p.number}">#${p.number}</a></td><td>${esc(p.headRefName.replace(/^claude\//,""))}</td><td>${esc(p.baseRefName.replace(/^claude\//,""))}</td><td>${p.mergeStateStatus==="UNSTABLE"?'<span class="pill bad">failing</span>':p.mergeStateStatus==="CLEAN"?'<span class="pill ok">clean</span>':`<span class="pill warn">${esc(p.mergeStateStatus)}</span>`}</td><td>${p.reviewDecision?esc(p.reviewDecision):'<span class="pill warn">none</span>'}</td><td class="n">${p.changedFiles}</td></tr>`).join("")}
+${d.train
+  .sort((a, b) => a.number - b.number)
+  .map(
+    (p) =>
+      `<tr><td><a href="https://github.com/${REPO}/pull/${p.number}">#${p.number}</a></td><td>${esc(p.headRefName.replace(/^claude\//, ""))}</td><td>${esc(p.baseRefName.replace(/^claude\//, ""))}</td><td>${p.mergeStateStatus === "UNSTABLE" ? '<span class="pill bad">failing</span>' : p.mergeStateStatus === "CLEAN" ? '<span class="pill ok">clean</span>' : `<span class="pill warn">${esc(p.mergeStateStatus)}</span>`}</td><td>${p.reviewDecision ? esc(p.reviewDecision) : '<span class="pill warn">none</span>'}</td><td class="n">${p.changedFiles}</td></tr>`,
+  )
+  .join("")}
 </table></div>
 </div>`;
 }

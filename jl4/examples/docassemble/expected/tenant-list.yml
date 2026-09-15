@@ -48,11 +48,11 @@ fields:
     datatype: yesnoradio
     help: "Whether this tenant signed the tenancy agreement"
 ---
-id: q_h.tenants[i].has_been_evicted
+id: q_h.tenants[i].been_evicted
 question: |
-  has been evicted
+  been evicted
 fields:
-  - "has been evicted": h.tenants[i].has_been_evicted
+  - "been evicted": h.tenants[i].been_evicted
     datatype: yesnoradio
     help: "Whether this tenant has been evicted from a social tenancy before"
 ---
@@ -60,7 +60,7 @@ id: c_the_household_is_eligible
 reconsider: True
 code: |
   # L4: `the household is eligible`
-  the_household_is_eligible = (all(((_t.age >= 18) and _t.signed_the_agreement) for _t in h.tenants) and (not any(_t.has_been_evicted for _t in h.tenants)))
+  the_household_is_eligible = (all(((_t.age >= 18) and _t.signed_the_agreement) for _t in h.tenants) and (not any(_t.been_evicted for _t in h.tenants)))
 depends on:
   - h.tenants
 sets:
