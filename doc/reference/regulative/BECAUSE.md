@@ -12,7 +12,7 @@ BREACH BY LIST party, party BECAUSE reason
 
 Where:
 
-- `party` - The party responsible for the breach (optional). After `BY` you may write one party, or a `LIST` of them when several share the blame
+- `party` - The party responsible for the breach (optional). After `BY` you may write one party, or a `LIST` of them when several share the blame — one entry each, in order
 - `reason` - A STRING explaining why the breach occurred
 
 ## Purpose
@@ -123,7 +123,7 @@ BREACH can be used in several forms:
 
 ### Several parties
 
-`BY` takes a `LIST` as well as a single party, for a breach that several parties carry together. The list can be written out or computed, and it is read when the breach happens: the same party named twice is named once, and a list with nobody in it is an error when the rule runs — a breach blames at least one party, so write no `BY` at all to blame nobody.
+`BY` takes a `LIST` as well as a single party, for a breach that several parties carry together. The list can be written out or computed, and it is read when the breach happens. Every name in it becomes one line of the answer, in the order written, each carrying the `BECAUSE`; the same party named twice is named twice — nothing is collapsed, so a list that says a party is in breach two ways says so.
 
 ```l4
 LEST BREACH BY LIST Seller, Carrier BECAUSE "goods lost in transit"
@@ -134,11 +134,15 @@ prints, when it fires:
 ```
 DEONTIC BREACHED:
   BREACH
-  BY LIST Seller, Carrier
-  BECAUSE "goods lost in transit"
+  BY Seller BECAUSE "goods lost in transit"
+  BY Carrier BECAUSE "goods lost in transit"
 ```
 
-You do not have to write the list yourself when the language already knows who failed. When both sides of a `RAND` are lost, the breach names both sides' parties; when several members of an `EVERY … ONCE ALL HAVE` group fail and the group has no `LEST`, the breach names every one of them. See [EVERY](EVERY.md#what-runs-today-and-what-does-not).
+A breach blames at least one party, so a list with nobody in it is refused, and which check catches it depends on how it was written: a literal — `BY EMPTY`, or `BY (LIST)` with nothing inside — is an error when the file is checked, before anything runs; a computed list that turns out to be empty when the breach happens is an error when the rule runs, naming the clause. To blame nobody, write no `BY` at all.
+
+When the party type is itself a `LIST` (a group as one party, `DEONTIC (LIST OF STRING) Action`), `BY` followed by such a list names that one party, not its members; a list of such lists names several.
+
+You do not have to write the list yourself when the language already knows who failed. When both sides of a `RAND` are lost, the breach names both sides' failures, each with its own reason or its own missed deadline; when several members of an `EVERY … ONCE ALL HAVE` group fail and the group has no `LEST`, the breach names every one of them, each with their own deadline. See [EVERY](EVERY.md#what-runs-today-and-what-does-not).
 
 ## Best Practices
 

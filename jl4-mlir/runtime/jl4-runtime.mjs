@@ -989,12 +989,14 @@ function deonticBreachToWire(b) {
   //     top-level BREACH). Emitted for EVERY explicit breach, including the
   //     clause-less @LEST BREACH@ where party/detail are null.
   //
-  // Both carry the BLAME SET (R-T3, EVERY-EACH-QUANTIFIER-SPEC §6.1, built
-  // 2026-09-15): beside the scalar 'obligatedParty' / 'party' the reference
-  // emits the array 'obligatedParties' / 'parties' — every party in breach,
-  // of which the scalar is the head. This runtime models one obligation at a
-  // time (no RAND / EVERY), so its array is always the singleton of the
-  // scalar, and null where the scalar is null.
+  // Both carry the BLAME LIST (R-T3, EVERY-EACH-QUANTIFIER-SPEC §6.1, built
+  // 2026-09-15; per-entry detail and no dedup RULED the same day): beside the
+  // scalars, which describe the ANCHORING failure, the reference emits
+  // 'obligatedParties' / 'parties' (every party named, in order, with
+  // duplicates), 'failures' (one object per failed obligation, in the same
+  // order) and 'anchor' (the anchor's index into 'failures'). This runtime
+  // models one obligation at a time (no RAND / EVERY), so its arrays are
+  // always the singleton of the scalar's failure, and 'anchor' is 0.
   if (b && b._deadlineMissed) {
     const d = b._deadlineMissed;
     // 'deadline' (absolute, = obligationStart + WITHIN) and 'timestamp'
@@ -1004,9 +1006,18 @@ function deonticBreachToWire(b) {
     // "5.0000000000000044e-2").
     return {
       BREACH: {
+        anchor: 0,
         deadline: ratToAesonValue(d.deadline),
         eventAction: d.eventAction,
         eventParty: d.eventParty,
+        failures: [
+          {
+            action: d.obligationAction,
+            deadline: ratToAesonValue(d.deadline),
+            party: d.obligatedParty,
+            reason: "deadline_missed",
+          },
+        ],
         obligatedParties: [d.obligatedParty],
         obligatedParty: d.obligatedParty,
         obligationAction: d.obligationAction,
@@ -1022,8 +1033,16 @@ function deonticBreachToWire(b) {
   const party = b == null ? null : b.by;
   return {
     BREACH: {
+      anchor: 0,
       detail: detail == null ? null : detail,
-      parties: party == null ? null : [party],
+      failures: [
+        {
+          detail: detail == null ? null : detail,
+          party: party == null ? null : party,
+          reason: "explicit",
+        },
+      ],
+      parties: party == null ? [] : [party],
       party: party == null ? null : party,
       reason: "explicit",
     },

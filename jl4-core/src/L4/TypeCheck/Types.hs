@@ -235,6 +235,12 @@ data CheckError =
     -- ^ An @ONCE …@ join line under a @PARTY@ subject. The join says when a
     -- cast's continuation fires, and a single party is not a cast. Carries
     -- the join for its source range. (EVERY-EACH-QUANTIFIER-SPEC R-Q1.)
+  | EmptyBreachBy (Expr Name)
+    -- ^ @BREACH BY@ given a list literal with nobody in it (@EMPTY@, or
+    -- @LIST@ with no elements). A breach blames at least one party, and a
+    -- literal is decidable here; a COMPUTED list that turns out empty is
+    -- refused when the rule runs instead (R-T3, EVERY-EACH-QUANTIFIER-SPEC
+    -- §6.1). Carries the expression for its source range.
   | ContinuationWithoutJoin (Expr Name)
     -- ^ A @HENCE@ or @LEST@ directly under an @EVERY@ with no @ONCE@ line.
     -- The join is mandatory there (R-Q1, RULED 2026-09-07): a default would
@@ -491,6 +497,7 @@ data ExpectationContext =
   | ExpectAsStringArgumentContext -- argument of AS STRING
   | ExpectTypicallyValueContext Name -- TYPICALLY value must match the declared type
   | ExpectBreachReasonContext -- reason argument of BREACH
+  | ExpectBreachPartyContext -- the BY argument of BREACH: a party, or a LIST of parties
   | ExpectRefuseMessageContext -- message argument of REFUSE
   | ExpectRecordCellContext -- cell (path) argument of RECORD/COMMIT/ATTEST
   | ExpectQuantifierCastContext -- the constructor after EVERY must build values of the party type
@@ -601,6 +608,7 @@ instance HasSrcRange CheckError where
   rangeOf (CheckInfo _ mr)                  = mr
   rangeOf (RegulativeActorMismatch p _ _)   = rangeOf p
   rangeOf (JoinWithoutEvery j)              = rangeOf j
+  rangeOf (EmptyBreachBy e)                 = rangeOf e
   rangeOf (ContinuationWithoutJoin e)       = rangeOf e
   rangeOf (ActionPatternReference n _)      = rangeOf n
   rangeOf (ActionPatternNotComparable e _)  = rangeOf e

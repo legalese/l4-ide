@@ -1,0 +1,14 @@
+-- EVERY-EACH-QUANTIFIER-SPEC §6.1, R-T3: `BREACH BY` given a list literal
+-- with nobody in it is refused when the file is CHECKED — a breach blames at
+-- least one party, and a literal is decidable here. Both spellings of the
+-- literal are caught; a computed list that turns out empty is refused when
+-- the rule runs instead (ok/every/run-blame.l4, `blame nobody`).
+
+DECLARE Person IS ONE OF Alice, Bob
+DECLARE Action IS ONE OF deliver
+
+`by empty` MEANS
+    PARTY Alice MUST deliver WITHIN 5 LEST BREACH BY EMPTY
+
+`by list of nothing` MEANS
+    PARTY Alice MUST deliver WITHIN 5 LEST BREACH BY (LIST)

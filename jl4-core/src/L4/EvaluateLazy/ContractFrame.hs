@@ -78,11 +78,9 @@ data ContractFrame
   -- failure can be picked out once every member has run (R-T3, spec §6.1).
   | BreachBy BreachByFrame
   -- ^ @BREACH BY e@: the party expression, forced. A LIST is walked one cons
-  -- cell per step (R-T3: @BY@ takes a party or a list of parties); anything
-  -- else is the one party.
-  | BreachParties BreachPartiesFrame
-  -- ^ The blame set of a breach: each party forced in turn so the set can be
-  -- deduplicated by party key, keeping the first occurrence.
+  -- cell per step (R-T3: @BY@ takes a party or a list of parties), one
+  -- declared failure per element, duplicates kept; anything else is the one
+  -- party.
   | ResolveParty ResolvePartyFrame
   -- ^ STATE-AS-LEDGER: on the deadline-passed / LEST path the obligation party is
   --   still an unevaluated expression; this frame forces it to a WHNF (via
@@ -304,9 +302,12 @@ data BarrierFailure
       , failEvsRef  :: Reference   -- ^ the residual stream that followed the miss
       }
     -- ^ reported through the failpoint sentinel — a barrier WITH a @LEST@.
-    -- The anchor is the revealing event's stamp (spec §5.2's deadline anchor
-    -- is not built); ordering by it orders by the missed deadline, because
-    -- every member scans the same stream.
+    -- 'failAt' is the sentinel's anchor forced, and 'failTimeRef' the same
+    -- value as the reference the @LEST@ is handed, so the ordering key IS the
+    -- anchor. Today it reads the revealing event's stamp (spec §5.2's
+    -- deadline anchor is not built), which orders by the missed deadline up
+    -- to ties — a tie is the same revealing event, so the same anchor and
+    -- residual either way (see 'barrierFinish').
   | BarrierBreached
       { failReason :: ReasonForBreach Reference }
     -- ^ the member's own breach — a barrier WITHOUT a @LEST@ mints no
@@ -333,16 +334,6 @@ data BreachByFrame = BreachByFrame
   , acc      :: [Reference]        -- ^ list elements collected so far, reversed
   , mReason  :: Maybe Reference    -- ^ the @BECAUSE@, allocated
   , clause   :: Text               -- ^ where the @BREACH@ was written, for the empty-list error
-  }
-  deriving stock Show
-
--- | The blame set under construction: 'anchor' is the reason whose party slot
--- the deduplicated set replaces once every party has been forced.
-data BreachPartiesFrame = BreachPartiesFrame
-  { anchor  :: ReasonForBreach Reference
-  , seen    :: [(Text, Reference)] -- ^ parties kept so far, keyed, most recent first
-  , current :: Reference           -- ^ the party being forced
-  , rest    :: [Reference]         -- ^ parties still to force, in order
   }
   deriving stock Show
 

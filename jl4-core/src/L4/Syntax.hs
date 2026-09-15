@@ -362,7 +362,9 @@ data Expr n =
     -- or a @LIST@ of parties (R-T3, EVERY-EACH-QUANTIFIER-SPEC §6.1, built
     -- 2026-09-15): the checker accepts either at the contract's party type
     -- and leaves no mark, so the machine tells them apart by the value's
-    -- shape. An empty list is a run-time error, not a breach naming nobody.
+    -- shape — one declared failure per element, duplicates kept. A list
+    -- literal with nobody in it is a check-time error; a computed list that
+    -- turns out empty is a run-time error. Neither is a breach naming nobody.
   | Refuse     Anno (Expr n)
     -- ^ @REFUSE "message"@ — the model declines to answer. Evaluating a
     -- 'Refuse' raises a refusal: a determinate outcome that is neither a value,
@@ -465,9 +467,10 @@ data Subject n
     -- @IN@, the machine falls back to reading it out of an @elem v xs@
     -- conjunct of the filter (spec §11.0). See
     -- 'L4.EvaluateLazy.Machine.startRollCall'. Blame on a failed barrier
-    -- with no @LEST@ is spec §6.1's SET: every member that did not complete,
-    -- in roll order ('ReasonForBreach' carries a 'NonEmpty' of parties; R-T3,
-    -- built 2026-09-15). A barrier's own @LEST BREACH@ names whom the drafter
+    -- with no @LEST@ is spec §6.1's blame list: every member that did not
+    -- complete, in roll order, each with its own action and deadline
+    -- ('ReasonForBreach' carries a non-empty list of failures; R-T3, built
+    -- 2026-09-15). A barrier's own @LEST BREACH@ names whom the drafter
     -- names — a party, or @BY LIST a, b@ — and nobody otherwise.
   deriving stock (GHC.Generic, Eq, Ord, Show, Functor, Foldable, Traversable)
   deriving anyclass (SOP.Generic, ToExpr, NFData)

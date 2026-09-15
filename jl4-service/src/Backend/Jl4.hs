@@ -30,7 +30,6 @@ import Optics ((^.), (%))
 
 import Language.LSP.Protocol.Types (normalizedFilePathToUri, toNormalizedFilePath)
 import System.FilePath ((<.>), takeFileName)
-import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as StrictMap
 import qualified Data.Set as Set
 import qualified L4.API.EmbeddedLibraries as EmbeddedLibraries
@@ -1246,42 +1245,88 @@ serializeDue ei (Right val)        = valueToFnLiteral ei val
 
 -- | Serialize a breach reason to FnLiteral.
 --
--- The blame set (R-T3, EVERY-EACH-QUANTIFIER-SPEC §6.1, built 2026-09-15): a
--- compound breach names every party that failed. On this wire the scalar
--- @obligatedParty@ \/ @party@ is the HEAD of the set and the array
--- @obligatedParties@ \/ @parties@ is the whole set, in operand \/ roll order;
--- for a single obligation's breach the array is the one-element list. The
--- jl4-mlir runtime mirrors this object byte-for-byte
+-- The blame set (R-T3, EVERY-EACH-QUANTIFIER-SPEC §6.1, built 2026-09-15;
+-- per-entry detail and no dedup RULED the same day): a breach names every
+-- obligation that failed. On this wire the scalars (@obligatedParty@ \/
+-- @obligationAction@ \/ @deadline@, or @party@ \/ @detail@) describe the
+-- ANCHOR — the failure the breach's time comes from, one coherent obligation
+-- — the array @obligatedParties@ \/ @parties@ is every party named in
+-- operand \/ roll order with duplicates, @failures@ is one object per failed
+-- obligation in the same order, and @anchor@ is the anchor's index into it.
+-- For a single obligation's breach the arrays are one-element. The jl4-mlir
+-- runtime mirrors this object byte-for-byte
 -- (@jl4-mlir/runtime/jl4-runtime.mjs@, 'deonticBreachToWire'), so a key added
 -- here is added there in the same change.
 serializeBreachReason :: (Monad m) => EntityInfo -> Eval.ReasonForBreach Eval.NF -> ExceptT EvaluatorError m FnLiteral
 serializeBreachReason ei = \case
-  Eval.DeadlineMissed evParty evAction evTimestamp oblParties oblAction oblDeadline -> do
+  Eval.DeadlineMissed evParty evAction evTimestamp blame -> do
     evPartyLit <- nfToFnLiteral ei evParty
     evActionLit <- nfToFnLiteral ei evAction
-    oblPartyLits <- traverse (nfToFnLiteral ei) oblParties
-    let oblActionLit = serializeRAction oblAction
-    pure $ FnObject
+    anchorLits <- case blame.anchor of
+      Eval.MissedDeadline party action deadline -> do
+        partyLit <- nfToFnLiteral ei party
+        pure
+          [ ("obligatedParty", partyLit)
+          , ("obligationAction", (serializeRAction action).actionPat)
+          , ("deadline", FnLitDouble $ fromRational deadline)
+          ]
+      -- unreachable by construction (a DeadlineMissed is anchored at a
+      -- missed deadline); still a well-formed object rather than a crash
+      Eval.DeclaredBreach mParty mReason -> do
+        partyLit <- maybe (pure FnUnknown) (nfToFnLiteral ei) mParty
+        reasonLit <- maybe (pure FnUnknown) (nfToFnLiteral ei) mReason
+        pure [ ("obligatedParty", partyLit), ("detail", reasonLit) ]
+    arrays <- blameLits "obligatedParties" blame
+    pure $ FnObject $
       [ ("reason", FnLitString "deadline_missed")
       , ("eventParty", evPartyLit)
       , ("eventAction", evActionLit)
       , ("timestamp", FnLitDouble $ fromRational evTimestamp)
-      , ("obligatedParty", NE.head oblPartyLits)
-      , ("obligatedParties", FnArray (NE.toList oblPartyLits))
-      , ("obligationAction", oblActionLit.actionPat)
-      , ("deadline", FnLitDouble $ fromRational oblDeadline)
       ]
-  Eval.ExplicitBreach mParties mReason -> do
-    partyLits <- traverse (traverse (nfToFnLiteral ei)) mParties
-    reasonLit <- case mReason of
-      Just nf -> nfToFnLiteral ei nf
-      Nothing -> pure FnUnknown
-    pure $ FnObject
-      [ ("reason", FnLitString "explicit")
-      , ("party", maybe FnUnknown NE.head partyLits)
-      , ("parties", maybe FnUnknown (FnArray . NE.toList) partyLits)
-      , ("detail", reasonLit)
-      ]
+      <> anchorLits <> arrays
+  Eval.ExplicitBreach blame -> do
+    anchorLits <- case blame.anchor of
+      Eval.DeclaredBreach mParty mReason -> do
+        partyLit <- maybe (pure FnUnknown) (nfToFnLiteral ei) mParty
+        reasonLit <- maybe (pure FnUnknown) (nfToFnLiteral ei) mReason
+        pure [ ("party", partyLit), ("detail", reasonLit) ]
+      -- unreachable by construction, as above
+      Eval.MissedDeadline party action deadline -> do
+        partyLit <- nfToFnLiteral ei party
+        pure
+          [ ("party", partyLit)
+          , ("obligationAction", (serializeRAction action).actionPat)
+          , ("deadline", FnLitDouble $ fromRational deadline)
+          ]
+    arrays <- blameLits "parties" blame
+    pure $ FnObject $ [ ("reason", FnLitString "explicit") ] <> anchorLits <> arrays
+  where
+    -- the parties (under the given key), the failures, and the anchor's index
+    blameLits partiesKey blame = do
+      partyLits <- traverse (nfToFnLiteral ei) (Eval.blameParties blame)
+      failureLits <- traverse failureLit (toList (Eval.blameList blame))
+      pure
+        [ (partiesKey, FnArray partyLits)
+        , ("failures", FnArray failureLits)
+        , ("anchor", FnLitInt (fromIntegral (Eval.anchorIndex blame)))
+        ]
+    failureLit = \case
+      Eval.MissedDeadline party action deadline -> do
+        partyLit <- nfToFnLiteral ei party
+        pure $ FnObject
+          [ ("reason", FnLitString "deadline_missed")
+          , ("party", partyLit)
+          , ("action", (serializeRAction action).actionPat)
+          , ("deadline", FnLitDouble $ fromRational deadline)
+          ]
+      Eval.DeclaredBreach mParty mReason -> do
+        partyLit <- maybe (pure FnUnknown) (nfToFnLiteral ei) mParty
+        reasonLit <- maybe (pure FnUnknown) (nfToFnLiteral ei) mReason
+        pure $ FnObject
+          [ ("reason", FnLitString "explicit")
+          , ("party", partyLit)
+          , ("detail", reasonLit)
+          ]
 
 -- ----------------------------------------------------------------------------
 -- L4 helpers

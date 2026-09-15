@@ -807,9 +807,9 @@ document until 2026-09-07, when both were ruled out of it: `ALL` is not a quanti
    parties**. Until 2026-09-15 a `RAND`/`ROR` breach carried **one operand** — the machine picked
    left for `RAND` and right for `ROR` by timestamp tie-break ("consistently with CSL"), the same
    gap the six-ways page recorded for the any-join. **BUILT 2026-09-15 (R-T3), see §6.1:** the
-   breach carries a non-empty list of parties, `RAND`/`ROR` union both operands', a barrier names
-   every non-completer, and `BY` takes a list. The quantified `BY EVERY t` spelling itself is not
-   ruled and not built.
+   breach carries a non-empty list of failures, each with its own detail and none deduplicated
+   (ruled the same day), `RAND`/`ROR` carry both operands', a barrier names every non-completer,
+   and `BY` takes a list. The quantified `BY EVERY t` spelling itself is not ruled and not built.
 5. **The domain is the cast, filtered.** `EVERY Tenant t` over a constructor with a payload
    (`Tenant HAS name IS A STRING`) ranges over an open type and needs §2.1's `WHO member_of …`
    filter, exactly as the existing `EVERY` does. **This point is the one the run time turned into
@@ -931,10 +931,14 @@ reader need not open the artifact, and so that the measurements can be re-run.
   out of order wrt time". A set is what a wizard or an export needs to answer "who is in breach". 34
   golden files print a breach; those with compound failure will re-bless with the fuller answer when
   this is built. _Since built (2026-09-15): the syntax node is unchanged — the list reading is a
-  typing rule, not a constructor — and the run-time `ReasonForBreach` carries `NonEmpty`; one
-  golden with compound failure re-blessed (`ok/tests/deontic-breach-semantics.golden`, four
-  traces), and the count of goldens printing a breach on that HEAD was nine, not 34 (measured
-  with `grep -rl 'DEONTIC BREACHED' jl4 jl4-core`). §6.1 has the build record._
+  typing rule, not a constructor — and the run-time `ReasonForBreach` carries a non-empty list of
+  failures; one existing golden set with compound failure re-blessed
+  (`ok/tests/deontic-breach-semantics.golden`, four traces, and its `.ep.golden` twin for comment
+  lines), and the count of golden files containing `DEONTIC BREACHED` was eight at `e578654c` —
+  not 34 — and is nine on the branch's HEAD counting the new `run-blame.golden`
+  (`grep -rl 'DEONTIC BREACHED' jl4 jl4-core --include='*.golden'`; without the include the same
+  grep also hits two `.hs` files and a README, and no grep tried reproduces 34). §6.1 has the
+  build record._
 - **R-T4.** The prelude already has `count`, `sum`, `product`, `maximum`, `minimum`, `all`, `any`,
   `elem` (`jl4-core/libraries/prelude.l4`); `OF`, `AT` and `LEAST` are keywords. The sugar desugars
   to the prelude call over the projected list of matching performances; the general Boolean form
@@ -2056,73 +2060,110 @@ computeBlame bo tr =
 
 The sketch above is a design record and is left as it was written: `BarrierObligation`,
 `computeBlame` and `Set Party` do not exist in the tree. What the tree has, and what each decision
-below rests on, is recorded here against the build's own HEAD.
+below rests on, is recorded here against the branch's HEAD after the adversarial pass of
+2026-09-15 (the first build's shape is recorded where the pass reversed it, so a later reader can
+see what changed and why).
 
-**The representation is `NonEmpty`, not `Set`.** Meng, 2026-09-15: _"did we consider a NonEmpty
-list?"_ The sketch said `Set Party`, and a non-empty list had not been considered. It was built as
-`NonEmpty`, for three reasons. (1) A failed barrier has at least one non-completer and a failed
-`RAND` at least one failed operand, so the invariant belongs in the type: `ExplicitBreach (Maybe a)`
-becomes `Maybe (NonEmpty a)` cleanly, where a plain list would make `Just []` a second spelling of
-`Nothing`. (2) Roll order is already the determinism the goldens rely on (§11.0.1: "reversing the
-roll reverses which member is named"), and the party is a heap `Reference` — a `Set` would need every
+**The ruling that decided the shape.** Meng, 2026-09-15, in session, after the first build had
+started: _"let's not bother deduping the ReasonForBreach -- maybe we need to be able to say, 'well,
+Alice screwed the pooch two different ways'"_. Two things follow and both are built: **no
+deduplication** — one entry per failed obligation, the same party as many times as she failed — and
+**per-entry detail** — an entry says what was failed, not just who, because `[alice, alice]` cannot
+say the two ways. The first build had done the opposite on both counts (a `NonEmpty` of bare
+parties, deduplicated by ledger key, beside ONE anchoring action and deadline); the adversarial
+pass found it (eight blockers from three checkers, all the same defect) and replaced it.
+
+**The representation is a non-empty list of failures, not `Set`.** Meng, 2026-09-15: _"did we
+consider a NonEmpty list?"_ The sketch said `Set Party`, and a non-empty list had not been
+considered. It was built as a non-empty list, for three reasons. (1) A failed barrier has at least
+one non-completer and a failed `RAND` at least one failed operand, so the invariant belongs in the
+type. (2) Roll order is already the determinism the goldens rely on (§11.0.1: "reversing the roll
+reverses which member is named"), and the party is a heap `Reference` — a `Set` would need every
 party forced and keyed by `partyKeyWHNF` just to have an `Ord`, and would then print in key order
 rather than the drafter's. (3) The singleton prints byte-identically to the one-party form, so only
 goldens with a compound failure move.
 
 ```haskell
--- jl4-core/src/L4/Evaluate/ValueLazy.hs:113-117
+-- jl4-core/src/L4/Evaluate/ValueLazy.hs:105-145
+data Failure a
+  = MissedDeadline a (RAction Resolved) Rational   -- the party, the action it owed, the deadline it missed
+  | DeclaredBreach (Maybe a) (Maybe a)              -- BREACH [BY p] [BECAUSE r]: the party named, if any; the reason, if any
+
+data Blame a = Blame { before :: [Failure a], anchor :: Failure a, after :: [Failure a] }
+
 data ReasonForBreach a
-  = DeadlineMissed a a Rational (NonEmpty a) (RAction Resolved) Rational
-  | ExplicitBreach (Maybe (NonEmpty a)) (Maybe a)
+  = DeadlineMissed a a Rational (Blame a)   -- revealing event's party, action and stamp; the failures
+  | ExplicitBreach (Blame a)
 ```
 
-**Order and deduplication.** Operand order for `RAND`/`ROR` (left operand's parties first), roll
-order for a barrier; deduplicated by party key — `partyKeyWHNF`, the same key that names a party's
-ledger (`Machine.hs:2417`) — keeping the first occurrence. Keying needs each party forced, and a
-party inside a breach is usually still a thunk (the `BY` expression; an obligation's party no event
-ever reached), so the set is settled by a frame that forces one party per step (`BreachParties`,
-`ContractFrame.hs:341`, `Machine.hs:1816`; entered through `blameParties`, `Machine.hs:2440`). One
-consequence: a compound breach now forces the parties of BOTH operands, where before the discarded
-operand's party was never evaluated.
+**The entry is sum-typed** (`Failure`, `ValueLazy.hs:105`): a missed deadline carries the party, the
+action and the deadline; a declared breach carries whom `BY` named, if anyone, and its `BECAUSE`, if
+any. That is what lets the union across breach kinds carry each side's own detail without inventing
+anything — which is the objection the first build raised against per-entry detail ("a party from an
+`ExplicitBreach` operand has no deadline") and the ruling answered. A bare `LEST BREACH` is one
+entry naming nobody, so two bare breaches under `RAND` are two entries (each prints
+`BY (nobody named)`); no corpus golden has that shape.
 
-**`RAND`/`ROR`: the union, anchored as before.** When both operands are breached, the result keeps
-today's anchor — the earlier breach for `RAND`, the later for `ROR`, by the revealing stamp, tie to
-the left for `RAND` and the right for `ROR`, an untimestamped `ExplicitBreach` treated as
-simultaneous — and blames the union of both operands' parties (`Machine.hs:1862-1894`). The anchor's
-revealing event, action, deadline and `BECAUSE` are carried; only WHO changes, not WHEN and not WHY.
-Two bare `BREACH`es still name nobody.
+**The anchor is marked by position, not by index or by a second copy** (`Blame`, `ValueLazy.hs:120`):
+the list is a zipper `before ++ [anchor] ++ after`, so the anchor is always one of the entries, the
+order is the drafter's, and there is no index to go out of range. The two constructors of
+`ReasonForBreach` say what KIND of failure the breach is anchored at — `DeadlineMissed` carries the
+revealing event beside the blame, `ExplicitBreach` carries no time — and a compound keeps the
+anchor's constructor (`rebase`, `Machine.hs:2442`). That a `DeadlineMissed` is anchored at a
+`MissedDeadline` is an invariant of construction, not of the type; every constructor site builds it
+so, and the printer and both wires handle the other case as a well-formed object rather than a
+crash.
 
-**The shape of `DeadlineMissed`: one anchor, a set of parties.** The brief left open whether
-`DeadlineMissed` should carry one `(party, action, deadline)` per failed obligation or one
-`NonEmpty party` beside the anchoring failure's action and deadline. Built as the latter. A
-per-obligation triple is the more informative shape when every failure is a missed deadline — a
-barrier with per-member `WITHIN`s would print each member's own deadline — but a party contributed by
-an `ExplicitBreach` operand has neither an action nor a deadline, so the union across breach kinds
-(`explicit or deadline` in `ok/deontic-breach-semantics.l4`) would have to invent one or make both
-optional; and the wire would stop being the scalar-plus-array the brief required. The cost of the
-shape chosen is visible in `run-blame.l4`'s `staggered signing, no reparation`: the breach is anchored
-at Carol's failure (deadline 5) and names Bob, Carol in roll order, so the head of the list is not
-the anchor's party and "their deadline, which was at 5" is the anchor's, not Bob's. The printer says
-`parties`, plural, for exactly this reason (`Print.hs:1228`). A reviewer who wants the per-party
-shape reverses one constructor, one printer arm and one JSON object.
+**Order, and no deduplication.** Operand order for `RAND`/`ROR` (left operand's failures first),
+roll order for a barrier, list order for `BY LIST`. Nothing collapses: `PARTY alice MUST Sign RAND
+PARTY alice MUST Refund`, both missed, names Alice twice, once with each action (`run-blame.l4`,
+`alice twice`); `BREACH BY LIST alice, bob, alice` names her twice (`joint and several`); a roll
+that lists a member twice fails her twice. The first build's `BreachParties` frame, which forced
+each party to key it, is gone — nothing needs the parties forced, and they stay thunks until the
+result is normalised (`EvaluateLazy.hs`, `nfAux`, now a plain `traverse` over the derived
+`Traversable`).
+
+**`RAND`/`ROR`: the concatenation, anchored as before.** When both operands are breached, the
+result keeps today's anchor — the earlier breach for `RAND`, the later for `ROR`, by the revealing
+stamp, tie to the left for `RAND` and the right for `ROR`, an untimestamped `ExplicitBreach` treated
+as simultaneous — and carries both operands' failures in operand order (`Machine.hs:1883-1891`;
+`anchorLeft`/`anchorRight`, `ValueLazy.hs:179-184`). Only WHEN is decided by the anchor; each entry
+keeps its own action and deadline or its own `BECAUSE`, so nothing is read off the wrong side. In
+particular, when both sides wrote a `LEST BREACH … BECAUSE`, neither carries a time, so the anchor
+falls to the left for `RAND` and the right for `ROR` regardless of when each was lost — that
+affects only which side dates the breach, and since 2026-09-15 no user document claims the
+surviving reason is "the side lost first/last" (the first build's docs did; the pass corrected
+them). Two bare `BREACH`es are two entries naming nobody.
 
 **The barrier runs every member before deciding.** `Barrier1` no longer ends the scan at the first
-failure; each failure is recorded (`BarrierStepFrame.failures`, `ContractFrame.hs:286`) and
-`barrierFinish` (`Machine.hs:2300`) decides once the queue is empty:
+failure; each failure is recorded (`BarrierStepFrame.failures`, `ContractFrame.hs:284`) and
+`barrierFinish` (`Machine.hs:2306`) decides once the queue is empty. One consequence the first
+build did not record and the pass did: a member later on the roll is now evaluated after an earlier
+one has failed, so an error in its `WITHIN` (or anywhere its run reaches — `probes/pQ-later-error.l4`
+in the scratch dir: a `1 DIVIDED BY 0` deadline on the second member) is now the barrier's verdict
+where before 2026-09-15 it was masked by the first member's breach. The same is true of `RAND`/`ROR`
+only insofar as both operands were always run; it is new for the barrier.
 
 - **no `LEST`:** one `DeadlineMissed`, anchored at the earliest failure by R-Q5's failure time —
   the smallest missed deadline for `MUST`/`DO`, the violating event's stamp for `SHANT`, both of which
-  are the `deadline` field the member's own breach carries — and naming every failed member in roll
-  order. Ties keep the first in roll order (`earliestFailure`, `Machine.hs:2337`).
+  are the `deadline` the member's own anchoring `MissedDeadline` carries — and naming every failed
+  member in roll order, each with its own action and deadline. Ties keep the first in roll order
+  (`earliestFailure`, `Machine.hs:2352`, which returns the roll position so the concatenation is
+  built around it, `Machine.hs:2310`).
 - **with a `LEST`:** the `LEST` runs once, with the anchor and residual stream of the earliest
-  failure. The failpoint sentinel carries only the revealing event's stamp (§5.2's deadline anchor is
-  NOT built here; the anchor's VALUE is untouched, one change in one place for the §5.2 track), and
-  the failures are ordered by that stamp. That orders by the missed deadline, because every member
-  scans the same stream: an earlier deadline is revealed by an earlier-or-equal event, and a tie is
-  the same event, hence the same anchor and the same residual — so the answer cannot differ from
-  ordering by deadline. `run-blame.l4`'s `staggered signing` pins it: Carol, last on the roll with
-  five days, fails first, and the landlord's reparation is anchored at her failure (deadline 11),
-  not at Bob's (23).
+  failure. The ordering key is the failpoint sentinel's own anchor, forced (`BarrierFailedAt.failAt`,
+  `ContractFrame.hs:298`; it is the same reference the `LEST` is handed), so whatever §5.2 makes the
+  anchor read, the ordering follows — there is no second key to switch. Today the anchor reads the
+  revealing event's stamp (§5.2's deadline anchor is NOT built here; the anchor's VALUE is untouched,
+  one change in one place for the §5.2 track), which orders by the missed deadline **up to ties**:
+  every member scans the same stream, so an earlier deadline is revealed by an earlier-or-equal
+  event; two deadlines revealed by the same event tie, the tie keeps the first in roll order, and
+  that is the same event — same anchor, same residual — so the answer cannot differ from ordering
+  by deadline. (The first build's comment said "orders by the missed deadline" without the tie
+  qualifier; the pass measured deadlines 5 and 6 under one `WAIT UNTIL 10`, both rolls, and found
+  the residual identical, `probes/gate/g7-stamp-tie.l4`.) `run-blame.l4`'s `staggered signing` pins
+  it: Carol, last on the roll with five days, fails first, and the landlord's reparation is anchored
+  at her failure (deadline 11), not at Bob's (23).
 - **`MAY` under a barrier with no `LEST`:** a lapsed permission is recorded as `lapsed`, and the
   verdict stays `FULFILLED` — the join cannot fire and nothing was owed — exactly as when the lapse
   ended the scan; `run-modals.l4`'s `the resolution` is unchanged.
@@ -2136,34 +2177,87 @@ failure; each failure is recorded (`BarrierStepFrame.failures`, `ContractFrame.h
   it is a language decision, not an implementation detail.
 - The two REFUSALS of §11.0.1 and the same-instant tie imprecision are unchanged.
 
-**`BREACH BY <list>`.** The checker (`checkBreachParty`, `TypeCheck.hs:1874`) infers the `BY`
+**`BREACH BY <list>`.** The checker (`checkBreachParty`, `TypeCheck.hs:1899`) infers the `BY`
 expression and reads its type: a `LIST OF t` unifies `t` with the party type, anything else is the
 party. Deterministic rather than a `choose` between the two readings, because an unresolved party
 type would otherwise leave both branches viable and report an ambiguity where today there is none.
-The syntax node is unchanged and carries no mark, so the machine decides by the value's shape
-(`BreachBy`, `Machine.hs:1803`): a `ValCons` is walked and its elements deduplicated, anything else
-is the one party, and `ValNil` is a user-facing error naming the clause (`emptyBreachByRefusal`,
-`Machine.hs:2449`) — a breach blames at least one party; write no `BY` to blame nobody. Given up: a
-contract whose party type is itself a `LIST` cannot write `BREACH BY` with that whole list; no corpus
-file has such a party type.
+A `BREACH` checked against a known `DEONTIC` type — a `LEST`, a `RAND` operand, a top-level
+`x MEANS BREACH BY …` under a `GIVETH` — now unifies with it FIRST (`checkExpr`, `TypeCheck.hs:1859`),
+so the `BY` is read against the rule's party type rather than a fresh one; the first build inferred
+it fresh and unified afterwards, which is why a mismatch there was reported against "the HENCE
+clause" of the rule rather than the `BY`. A mismatch now says `BREACH BY`
+(`ExpectBreachPartyContext`). The syntax node is unchanged and carries no mark, so the machine
+decides by the value's shape (`BreachBy`, `Machine.hs:1809`): a `ValCons` is walked, one declared
+failure per element in list order, duplicates kept, the head the (nominal) anchor; anything else is
+the one party. Three things the pass changed here:
 
-**Printing and the wire.** Singletons print as before. A plural `DeadlineMissed` prints
-`surpassed the deadline of parties` with one party per line; a plural `ExplicitBreach` prints the
-source form, `BY LIST p, q` (`Print.hs:1228`). `l4 batch --json` keeps `obligatedParty` / `party` as
-the HEAD of the set and adds `obligatedParties` / `parties` (`ValueLazyJSON.hs:101-115`); the
-jl4-service wire does the same, which also closes the divergence its notes recorded — it used to drop
-the obligated party altogether (`jl4-service/src/Backend/Jl4.hs:1257`); the jl4-mlir runtime mirrors
-both keys as the singleton of its scalar (`jl4-mlir/runtime/jl4-runtime.mjs:981`, `:915`), its pure
-unit tests updated, the full parity harness NOT run on this branch (it runs only on `jl4-mlir/**`
-changes in CI and is advisory). For a right-anchored compound (`ROR`, or a `RAND` whose right operand
-failed first) the scalar is now the LEFT operand's party rather than the anchor's — a value change
-confined to compound breaches, which the old wire named by tie-break anyway.
+- **A party type that is itself a `LIST`** — `DEONTIC (LIST OF STRING) Action` with
+  `BREACH BY (LIST "a", "b")` — type-checked and ran before this branch and the first build gave it
+  up ("the list reading wins"). Restored: when the party type and the `BY` expression's type are
+  both fully known and are the SAME list type (a structural comparison on `typeKey`, not a
+  unification), the drafter named one party whose value is a list, and the checker rewrites the
+  expression as the one-element list `LIST e`, which the machine walks into exactly that one party
+  (`TypeCheck.hs:1899-1925`). The wrap is idempotent under re-check — `l4 batch` re-prints the
+  module and the printed `LIST (LIST "a", "b")` takes the element reading, whose element type is the
+  party type — and invisible to exactprint, which prints the parsed tree. Witness: `run-blame.l4`,
+  `the pair delivers`; a list of such lists still names several.
+- **A list literal with nobody in it is refused at check time** (`EmptyBreachBy`,
+  `TypeCheck/Types.hs:206`): `BY EMPTY` and `BY (LIST)` both, one error each, named at the
+  expression. The first build refused only at run time and only when the `LEST` fired, so a rule
+  whose `LEST` never fired shipped the defect silently. A COMPUTED list that turns out empty keeps
+  the run-time refusal naming the clause (`emptyBreachByRefusal`, `Machine.hs:2448`;
+  `run-blame.l4`, `blame nobody`). Witness for the check-time half:
+  `jl4/examples/not-ok/tc/breach-by-empty.l4`.
+- Dedup of the list's elements is gone (above).
 
-**Measured on the build's HEAD.** One existing golden moved, `ok/tests/deontic-breach-semantics.golden`:
-its four both-breached traces name both parties. `run-barrier.golden` and `run-modals.golden` are
-unchanged (their failures are singletons, a bare `LEST BREACH`, or a lapsed `MAY`). Nine
-`run-blame.l4` traces pin the six behaviours the brief listed, the no-`LEST` staggered anchor, the
-dedup of `alice RAND alice`, and the empty-list refusal.
+**Printing.** Singletons print as before. A compound prints one entry per failure, in order, each
+with its own detail (`Print.hs:1231-1274`): under a missed-deadline anchor, the revealing event's
+three lines and then `revealed the breach of` followed by the entries — a party and, indented, `who
+had to do obligatory action … before their deadline, which was at …`, or a party and its `BECAUSE`;
+under a declared anchor, `BREACH` followed by one `BY p BECAUSE r` line per entry (a missed-deadline
+entry there is `BY p` with its action and deadline indented under it; an entry naming nobody is
+`BY (nobody named)`). The first build's `surpassed the deadline of parties` header, which listed
+bare parties under ONE action and deadline, printed Bob as having missed a deadline of 5 when his
+was 14 (`run-blame.golden`, `staggered signing, no reparation`) and Alice as having had to
+`deliver` when she owed `pay 1` and was blamed by declaration (`deontic-breach-semantics.golden`,
+`explicit or deadline`) — false statements, blessed; both goldens re-blessed and read.
+
+**The wire** (`ValueLazyJSON.hs:108-168`; jl4-service `Backend/Jl4.hs:1260`; the jl4-mlir runtime
+mirror `jl4-runtime.mjs:981`, its pure unit tests updated, the parity harness NOT run on this
+branch). Additive over the one-party form:
+
+- the scalars — `obligatedParty` / `obligationAction` / `deadline` on `deadline_missed`, `party` /
+  `reason` (`detail` on the service wire) on `explicit_breach` — describe the **anchor**, so they
+  are one coherent obligation and, for a single obligation's breach, exactly what the old wire
+  carried. **This deviates from the brief's "keep a scalar `party` (the head)", deliberately:** the
+  head is the anchor only for a left-anchored compound, and the first build's head-party beside the
+  anchor's action and deadline named an obligation nobody had (`{"obligatedParty":"Bob",
+"obligationAction":"MUST pay 100","deadline":5}` for `(Bob deliver/14) RAND (Alice pay/5)`, where
+  the base `e578654c` wire said Alice — measured by three checkers on `probes/pG-json.l4`). The
+  brief's own requirement that the scalar stay backward compatible for its readers is met by the
+  anchor and not by the head.
+- `obligatedParties` / `parties`: every party named, in order, with duplicates; an entry naming
+  nobody contributes nothing (`[]`, not `null`, when none does).
+- `failures`: one object per failed obligation, in the same order —
+  `{"type":"deadline_missed","party","action","deadline"}` or
+  `{"type":"explicit_breach","party","reason"}` (`"reason"`-keyed on the service wire, with
+  `detail` for the text, matching its scalar vocabulary).
+- `anchor`: the anchor's index into `failures`.
+
+**Measured on the branch's HEAD.** Goldens that moved against `e578654c`: one existing golden set
+— `ok/tests/deontic-breach-semantics.golden` (its four both-breached traces, now one entry each with
+its own detail) and its `.ep.golden` twin (comment lines only, 246 lines before and after) — plus
+the new `ok/every/run-blame.{golden,ep.golden,nlg.golden,schema.golden}` and
+`not-ok/tc/breach-by-empty.{golden,ep.golden,nlg.golden,schema.golden}`. `run-barrier.golden`,
+`run-modals.golden`, `run-fork.golden`, `contracts.golden`, `prohibition.golden`,
+`temporal-pin-deep.golden` and `regcf.golden` are unchanged (their failures are singletons, a bare
+`LEST BREACH`, or a lapsed `MAY`). Goldens containing `DEONTIC BREACHED`: eight at `e578654c`,
+nine on this HEAD counting the new `run-blame.golden` (`grep -rl 'DEONTIC BREACHED' jl4 jl4-core
+--include='*.golden'`; without the include the same grep also hits `Print.hs`, `StateGraph.hs` and
+a README, which is how the first build's "nine, measured with `grep -rl … jl4 jl4-core`" came to
+name a command that returns twelve). Ten `run-blame.l4` traces pin the six behaviours the brief
+listed, the no-`LEST` staggered anchor, the un-deduplicated `alice RAND alice` and
+`BY LIST alice, bob, alice`, the run-time empty-list refusal, and the list-typed party.
 
 ### 6.2 Causal Blame Analysis
 
@@ -2506,12 +2600,14 @@ put to Meng as an open question, not decided by the build.
 **§6.1's blame set (R-T3).** Until then a failed barrier named ONE non-completer, the first in roll
 order, because `ReasonForBreach` carried one party (measured 2026-09-08: reversing the roll reversed
 which member was named, so the choice was deterministic and it was roll order). Now `ReasonForBreach`
-carries a `NonEmpty` of parties; a barrier runs every member before deciding and, with no `LEST`,
-names every non-completer in roll order, anchored at the earliest failure; with a `LEST`, runs it
-once, anchored at the earliest failure rather than the first in roll order; `RAND`/`ROR` blame the
-union of both operands' parties; and `BREACH BY` takes a list. §6.1.1 has the decisions, including
-the two this build did not make: a barrier's own `LEST BREACH` still names whom the drafter names,
-and the anchor's VALUE is still the revealing stamp (next bullet).
+carries a non-empty list of FAILURES — one per failed obligation, each with its own action and
+deadline or its own `BECAUSE`, no deduplication (Meng's ruling of 2026-09-15, quoted in §6.1.1); a
+barrier runs every member before deciding and, with no `LEST`, names every non-completer in roll
+order, anchored at the earliest failure; with a `LEST`, runs it once, anchored at the earliest
+failure rather than the first in roll order; `RAND`/`ROR` carry both operands' failures; and
+`BREACH BY` takes a list. §6.1.1 has the decisions, including the two this build did not make: a
+barrier's own `LEST BREACH` still names whom the drafter names, and the anchor's VALUE is still the
+revealing stamp (next bullet).
 
 **Not built, and each one is a place a run gives a coarser answer than this document specifies:**
 
@@ -2577,9 +2673,53 @@ suffix, or the whole stream trimmed to events strictly after the join) needs a t
 its own frames. A `SHANT` barrier ties by construction, but harmlessly: every member completes at
 the same revealing event and their residual streams are identical.
 
-**What the adversarial pass of 2026-09-15 changed** (the blame-set build, R-T3):
+**What the adversarial pass of 2026-09-15 changed** (the blame-set build, R-T3). Eighteen findings
+were raised by three checkers and each refuted by two more; none was refuted by both, so all
+eighteen were applied. The eight blockers were one defect seen from six angles — the first build
+implemented the paragraph of the brief that Meng's ruling had struck through — and one type change
+discharged them; the rest are listed by what actually changed:
 
-_pending, filled after the refute stage._
+- Replaced the deduplicated `NonEmpty` of bare parties beside one anchoring action/deadline with a
+  non-empty list of sum-typed failures, each carrying its own detail, anchored by position; removed
+  the `BreachParties` keying frame and the dedup in `BreachBy`, `RBinOp2` and `barrierFinish`
+  (SEM-1, SEM-2, G1, G2, G3, F1, F2; §6.1.1, `ValueLazy.hs:105-145`). `alice RAND alice` now names
+  Alice twice with each action; `BY LIST alice, bob, alice` names her twice; `explicit or deadline`
+  no longer prints Alice as having had to `deliver`.
+- Made the wire's scalars describe the anchor rather than the head, so `obligatedParty` /
+  `obligationAction` / `deadline` are one obligation again (as on `e578654c`); added `failures` and
+  `anchor` beside `obligatedParties` / `parties`, on `batch --json`, jl4-service and the jl4-mlir
+  mirror (SEM-3, G3, F2). The deviation from the brief's "the head" is recorded in §6.1.1.
+- Replaced the printed plural — bare parties under one action and deadline — with one entry per
+  failure, each with its own detail; re-blessed and read `deontic-breach-semantics.golden` and
+  `run-blame.golden` (G2, G3).
+- Removed the claim that a compound's `BECAUSE` is "the side lost first / lost last" from
+  `several-parties.md`, `what-follows.md` and the skill's `regulative.md`: with a `BECAUSE` on both
+  sides neither carries a time, so it was always the left for `RAND` and the right for `ROR`. Each
+  entry now carries its own `BECAUSE`, so the question no longer arises; the docs say what the
+  anchor decides (the date) and what it does not (SEM-4, G4).
+- Restored `BREACH BY <list>` for a rule whose party type is itself a `LIST`, which the first build
+  had given up: a `BY` expression of exactly the party's list type is one party, wrapped as a
+  one-element list for the machine; a `BREACH` checked against a known `DEONTIC` type unifies with
+  it before reading the `BY`; a mismatch is reported against `BREACH BY` (SEM-5; witness
+  `run-blame.l4` `the pair delivers`).
+- Recorded that every barrier member is now run after an earlier failure, so a later member's
+  error becomes the verdict where it used to be masked (SEM-6; §6.1.1, `barrierFinish` docstring,
+  EVERY.md).
+- Refused a literal empty list in `BREACH BY` at check time (`BY EMPTY`, `BY (LIST)`), keeping the
+  run-time refusal for a computed list; witness `not-ok/tc/breach-by-empty.l4` (SEM-7 — one
+  checker refuted it as beyond the brief, the other confirmed it as a loud-over-silent gain the
+  brief neither required nor forbade; applied).
+- Corrected §6.1.1's account of the brief ("left open", "scalar-plus-array the brief required")
+  and recorded Meng's sentence verbatim, dated (F3).
+- Corrected the R-T3 row's golden count to eight at `e578654c` and nine on this HEAD, by a command
+  that reproduces it (G5); counted the `.ep.golden` twin among the goldens that moved (G6).
+- Reworded "ordering by stamp orders by the missed deadline" to "up to ties" and said that the
+  ordering key is the sentinel's anchor, so §5.2 cannot desynchronise them (G7 — one checker
+  refuted the failure scenario, the other confirmed the over-sharpening; the wording changed, the
+  ordering did not).
+- Added `LEST BREACH BY LIST …` to the regulative README's BREACH syntax and examples (F4).
+
+Raised and refuted by both checkers: none.
 
 **A defect found on the way, and fixed here because the fork's own example needs it.** `EXACTLY e`
 in the **second or later** argument of an action pattern raised `is not in scope` at run time.

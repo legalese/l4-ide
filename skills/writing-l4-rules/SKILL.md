@@ -272,7 +272,7 @@ Both type names may be backticked multi-word names, as in `` GIVETH A DEONTIC `A
 
 Actions with fields are **enum constructors** — apply them to arguments like any function (`` `pay invoice` amt recipient ``). Don't use `WITH` inside a `MUST`/`MAY` action; `WITH` is for record construction, not enum constructors.
 
-**Write `BECAUSE "reason"` on every `LEST BREACH`.** The language accepts the bare `LEST BREACH`, `LEST BREACH BY <party>` and `LEST BREACH BY LIST <party>, <party>` too — that is why you will see the other spellings — but the reason string is what a trace prints back, and it is what a legal reviewer or a downstream system reads. A breach with no reason reports the failure without saying which clause failed.
+**Write `BECAUSE "reason"` on every `LEST BREACH`.** The language accepts the bare `LEST BREACH`, `LEST BREACH BY <party>` and `LEST BREACH BY LIST <party>, <party>` too — that is why you will see the other spellings — but the reason string is what a trace prints back, and it is what a legal reviewer or a downstream system reads. A breach with no reason reports the failure without saying which clause failed. (A list literal with nobody in it, `BY EMPTY`, is a check-time error.)
 
 **When the duty falls on a group, not one named party, use `EVERY`.** `PARTY` names one actor; `EVERY` binds the same obligation to every member of a list and gives you one place to hang the follow-on:
 

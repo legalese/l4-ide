@@ -297,15 +297,17 @@ dropping the keyword there.
 
 ## BREACH (Terminal Violation State)
 
-Terminal deontic value indicating that an obligation has been violated. Used as the consequence in LEST clauses. Can optionally specify the responsible party and a reason.
+Terminal deontic value indicating that an obligation has been violated. Used as the consequence in LEST clauses. Can optionally specify the responsible party — one, or a `LIST` of several — and a reason.
 
 ### Syntax
 
 ```l4
 LEST BREACH
 LEST BREACH BY party
+LEST BREACH BY LIST party, party
 LEST BREACH BECAUSE reason
 LEST BREACH BY party BECAUSE reason
+LEST BREACH BY LIST party, party BECAUSE reason
 ```
 
 ### Examples
@@ -316,6 +318,9 @@ LEST BREACH
 
 -- With responsible party
 LEST BREACH BY Seller
+
+-- With several responsible parties, one line of the answer each
+LEST BREACH BY LIST Seller, Carrier BECAUSE "goods lost in transit"
 
 -- With reason
 LEST BREACH BECAUSE "delivery deadline exceeded"
