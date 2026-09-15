@@ -6,7 +6,7 @@
     "wolf gets deleted.",
     "",
     "Measured 2026-08-18 against the binary built in this worktree, on",
-    "jl4/examples/legal/sg-succession/sg-succession.l4.",
+    "jl4/examples/canon/sg/succession/sg-succession.l4.",
     "",
     "`regulative_rules` IS DELIBERATELY EMPTY, and that is a fact about the",
     "corpus rather than a gap in the measurement. This encoding is entirely",
@@ -18,7 +18,7 @@
     "application are the obvious candidates -- this list and that leg both change."
   ],
   "measured_on": "2026-08-18",
-  "measured_against": "jl4/examples/legal/sg-succession/sg-succession.l4",
+  "measured_against": "jl4/examples/canon/sg/succession/sg-succession.l4",
   "enums": {
     "export_to": ["dmn", "dmn-md", "bpmn"],
     "export_flavor": ["camunda", "kie"],

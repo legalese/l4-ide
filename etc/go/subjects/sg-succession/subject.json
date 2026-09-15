@@ -79,16 +79,16 @@
   "citation": "Wills Act 1838; Intestate Succession Act 1967; Probate and Administration Act 1934; Guardianship of Infants Act 1934 (Singapore)",
   "source_url": "https://sso.agc.gov.sg/Act/ISA1967",
   "encoding": {
-    "main": "jl4/examples/legal/sg-succession/sg-succession.l4",
-    "wizard": "jl4/examples/legal/sg-succession/sg-succession-wizard.l4",
+    "main": "jl4/examples/canon/sg/succession/sg-succession.l4",
+    "wizard": "jl4/examples/canon/sg/succession/sg-succession-wizard.l4",
     "modules": [
-      "jl4/examples/legal/sg-succession/sg-succession-domain.l4",
-      "jl4/examples/legal/sg-succession/sg-wills.l4",
-      "jl4/examples/legal/sg-succession/sg-isa.l4",
-      "jl4/examples/legal/sg-succession/sg-paa.l4",
-      "jl4/examples/legal/sg-succession/sg-succession.l4",
-      "jl4/examples/legal/sg-succession/sg-succession-cases.l4",
-      "jl4/examples/legal/sg-succession/sg-succession-wizard.l4"
+      "jl4/examples/canon/sg/succession/sg-succession-domain.l4",
+      "jl4/examples/canon/sg/succession/sg-wills.l4",
+      "jl4/examples/canon/sg/succession/sg-isa.l4",
+      "jl4/examples/canon/sg/succession/sg-paa.l4",
+      "jl4/examples/canon/sg/succession/sg-succession.l4",
+      "jl4/examples/canon/sg/succession/sg-succession-cases.l4",
+      "jl4/examples/canon/sg/succession/sg-succession-wizard.l4"
     ]
   },
   "checks": {

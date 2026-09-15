@@ -458,7 +458,7 @@ Two uses, in order of cheapness:
    s 23. That is a finding a drafting office can act on, which is Matt's
    interest and PLUS's own stated aim, met from the outside.
 
-A pilot is already half-built: `jl4/examples/legal/sg-succession/` encodes the
+A pilot is already half-built: `jl4/examples/canon/sg/succession/` encodes the
 Wills Act 1838, the Intestate Succession Act 1967, the Probate and
 Administration Act 1934 and the Guardianship of Infants Act 1934 from the
 2020 text, with batteries and asserts. The pre-revision text of the same
