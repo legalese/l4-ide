@@ -574,7 +574,7 @@ deadline` and a tick AT the deadline reveals nothing); and a listed refusal, whe
   `price`, which the what-if cannot choose"), a `WITHIN` that was never evaluated and is not a
   literal (`deadlineOf`, `:264`). Refusals are listed, not dropped: an enabled set that omitted
   them would say "nothing else can happen". Each candidate's `LiveNorm` is rendered by
-  `renderLive` (`Marking.hs:345`) from the very `RawObligation` its act is built from — the
+  `renderLive` (`Marking.hs:354`) from the very `RawObligation` its act is built from — the
   first cut paired `liveObligations` with the marking's `InEffect` list by `zip`, on the
   unguarded assumption that two walks agree in order; review 2026-09-15 replaced that with one
   walk.
@@ -1018,20 +1018,20 @@ rival, and is why P2a′ can be built before any precondition is closed.
 **LANDED 2026-09-15 (P2c), on `lts/p2b-step-log` (merged into `lts/p2-stack` 2026-09-15, not yet in `unstable`; the §7.2 P2c
 row and the P2h row's second-half status were updated at integration — the `Threshold`-shaped `markingOf` half has
 landed, the drawing rule has not).** `jl4-core/src/L4/Lts/Marking.hs`, `markingOf ::
-LayoutPrinter a => MarkingContext -> Value a -> [NormPlacement]` (`:294`). The sketch above is superseded by the module; this block records where
+LayoutPrinter a => MarkingContext -> Value a -> [NormPlacement]` (`:303`). The sketch above is superseded by the module; this block records where
 the built type departs from it and why, and what was measured.
 
-- **The final `NormPlacement`** (`Marking.hs:100`): `Created {crSite, crSource}` (Symboleo's
+- **The final `NormPlacement`** (`Marking.hs:109`): `Created {crSite, crSource}` (Symboleo's
   `Create`, past-participled), `InEffect LiveNorm` (Symboleo's `InEffect`, exactly), `Violated
 Blame` (Anderson/Meyer's violation atom; Symboleo's state is `Violation`), `Lapsed Blame`
   (**ours** — R12 ANSWERED 2026-09-16, below), and the join state `Awaiting {awJoinSite,
-awProgress :: Maybe Progress}` (`:121`). `LiveNorm` carries the site (`rangeOf` the `RAction`), the bearer as
+awProgress :: Maybe Progress}` (`:130`). `LiveNorm` carries the site (`rangeOf` the `RAction`), the bearer as
   `KnownParty`/`UnforcedParty` (a `PARTY p` that never met an event still holds the expression),
   the modal, the action pattern, a `Countdown` (`NoDeadline | UnforcedDeadline Text | Remaining
 Rational` — the residual `WITHIN` is a number only once the obligation has scrutinised an event;
   before that it is the unevaluated expression, measured on the fixtures marked B″ and K), the
   `HENCE`/`LEST` text, and `lnMember :: Maybe Family` from the context — the family (join,
-  total, join site; `Family`, `:158`), not a `MemberOf`: through a context keyed by action site
+  total, join site; `Family`, `:167`), not a `MemberOf`: through a context keyed by action site
   a `moIndex` would be whichever member the log wrote last, so it is not carried (review
   2026-09-15; the first cut exposed `MemberOf` with an index that was nobody's). Fulfilled marks `[]`, as
   sketched — there is no `Discharged` place; §3.1's row was the table, §4.2a's fold is the rule.
@@ -1040,8 +1040,8 @@ Rational` — the residual `WITHIN` is a number only once the obligation has scr
   the other, and is `Created` with the whole rule's range and source (`markingOf`'s
   `ValQuantified` arm). It was not in the sketch because the sketch predates the quantifier.
 - **The join, against `Threshold`.** `Progress = {prDone, prTotal, prThreshold :: Threshold
-Resolved}`. Phase 3's count and measure forms add arms at `thresholdMet` (`:220`), at
-  `placementText`'s `thresholdText` (`:449`), and in the machine at `assembleQuantified`'s
+Resolved}`. Phase 3's count and measure forms add arms at `thresholdMet` (`:229`), at
+  `placementText`'s `thresholdText` (`:458`), and in the machine at `assembleQuantified`'s
   `threshold@AllHave{}` (`Machine.hs:2435`); none of the three has a wildcard, so a new
   `Threshold` constructor is a compile error at each. (An earlier version of this sentence said
   `thresholdMet` was "the one place"; it was not, even within `Marking.hs`.) The same discipline
@@ -1056,7 +1056,7 @@ Nothing` and print as "run with the step log on". To get the
   the `RAND` fold of its pending members whose `HENCE`/`LEST` slots hold the machine's sentinels
   (`barrierFinish`, `Machine.hs:2583`, "Phase-2 limit: the residual does NOT carry the JOIN
   LINE"). Neither the count nor the total nor the threshold is in the value. So `markingOf` takes
-  a `MarkingContext` (`:228`, `contextOf :: [DeonticStep] -> MarkingContext`, `:252`), read back
+  a `MarkingContext` (`:237`, `contextOf :: [DeonticStep] -> MarkingContext`, `:261`), read back
   out of P2b's steps: casts by ACTION site from any step's `nkMember`, arms-done per JOIN site by
   a fold IN STEP ORDER — a `MemberSatisfied n` sets the site's count to `n`, and the join's own
   terminal (`JoinReleased`/`JoinExpired`/`JoinFailed`/`JoinStalled`, keyed by the join site in
@@ -1085,8 +1085,8 @@ False)`; R′ pins the step sequence the reading depends on. Without a context (
   total, join site) is the first's. What the context does NOT inherit is the count: that is
   folded per activation, above. (This sentence first read "adds nothing to it", written before
   the maximum-fold bug was found; it did add something, and the fold is the repair.)
-- **`liveObligations`** (`:377`) is the same walk unrendered, for "L4.Lts.WhatIf", which needs
-  the value and not its text, and `renderLive` (`:345`) is the `InEffect` reading of one raw
+- **`liveObligations`** (`:386`) is the same walk unrendered, for "L4.Lts.WhatIf", which needs
+  the value and not its text, and `renderLive` (`:354`) is the `InEffect` reading of one raw
   obligation, used by `markingOf` for every `ValObligation` and by `candidatesOf` for every
   candidate; the K fixture asserts `map (renderLive ctx) (liveObligations v)` equals the
   `InEffect` list exactly — sites, bearers, text — not merely in length.
@@ -1154,8 +1154,8 @@ violation, unsTermination}`. (§3.1 and `Marking.hs` write `InEffect`, as the fi
   prose does the same (p. 39: _"Conditional obligations are created (instantiated) when their
   triggers become true"_). Kept.
 - **`Violated` — Anderson/Meyer, as recorded; Symboleo's state is `Violation`** and its event is
-  `Violated`. The provenance line stands; the Haddock (`Marking.hs:17-18`) does not yet say
-  which is which — that is the NOT BUILT block below.
+  `Violated`. The provenance line stands, and the Haddock (`Marking.hs:19-20`) now says which is
+  which — see the BUILT block below.
 - **`Lapsed` — ours. No Symboleo state covers it, and the two candidates both mislead.** What
   `Lapsed` marks is a `ValBreached` operand of a surviving `ROr`: the machine **did** conclude a
   breach of that alternative, with blame (§3.1's counterexample), and only the compound is not
@@ -1188,26 +1188,19 @@ Proposition: PAnd ({POr.left=current} "or" right=PAnd)*` (thesis Listing A.1, pr
   label it with Symboleo's name, or the picture will say "cancelled" where the evaluator said
   "performed".
 
-**NOT BUILT 2026-09-16 — the `Marking.hs` Haddock still carries the pre-ruling text.**
-`jl4-core/src/L4/Lts/Marking.hs:12-24`, the module's "Provenance of the lifecycle vocabulary"
-list, reads `'Lapsed' is a COINAGE of this spec (§4.2a, ruling R12 open)` and `Symboleo may have
-a state for it; that is R8's reading task` (`:19`, `:21`), cites Symboleo's states without naming
-them (`:14-15`), and the constructor comments write `Symboleo /created/` and `/inEffect/`
-(`:108`, `:113`) where the figures print `Create` and `InEffect`. A comment-only correction was
-written on this branch — `1603ae64` and `a627e7f3`, 19 lines added, 10 removed, no code — and
-reverted on 2026-09-16, because this track (R8-R12, cut from `lts/p2-followups`) is gated on
-`git diff --name-only lts/p2-followups...HEAD | grep -E '\.hs$|\.cabal$'` being empty: no
-Haskell, Haddock included. The revert also un-shifted the ten `Marking.hs` line cites in this
-section, which the reverted commits had moved to `+4` and then, after the second commit grew the
-header by five more lines without re-anchoring, left five lines short of every definition they
-name; they are now checked against the tree at `lts/p2-followups` (`data NormPlacement` `:100`,
-`Awaiting` `:121`, `Family` `:158`, `thresholdMet` `:220`, `MarkingContext` `:228`, `contextOf`
-`:252`, `markingOf` `:294`, `renderLive` `:345`, `liveObligations` `:377`, `thresholdText`
-`:449`). What would make this block true-and-closed: in the next track that is allowed to touch
-Haskell, re-apply the two commits' `Marking.hs` hunks (`git show 1603ae64 a627e7f3 --
-jl4-core/src/L4/Lts/Marking.hs`; the text is the one this block's bullets agree with) and shift
-the ten cites above by whatever the header grows — measure it, do not assume `+9`. Until then a
-reader of the Haddock alone gets the answer as it stood on 2026-09-15; the ruling is here.
+**BUILT 2026-09-16 (second pass) — the `Marking.hs` Haddock now carries the ruling.** The
+comment-only correction first written as `1603ae64` and `a627e7f3` and reverted by `b9f13f0f`
+(the R8-R12 track was gated on touching no Haskell, Haddock included) was re-applied verbatim
+from those two commits' `Marking.hs` hunks on `lts/p2-followups`: the module's "Provenance of the
+lifecycle vocabulary" list (`jl4-core/src/L4/Lts/Marking.hs:12-33`) now names Symboleo's
+`Create`/`InEffect` (`:14-18`), gives `Violation` as Symboleo's counterpart of `Violated`
+(`:19-20`), and states R12's answer for `Lapsed` in the softened form the bullets above use —
+one lifecycle per obligation instance, `POr` disjunct or separate obligation, `Discharge`
+reachable from `Create` or `InEffect` (`:21-30`); the constructor comments write `Symboleo's
+@Create@` and `@InEffect@` (`:117`, `:122`) and `(R12, ours)` (`:127`). 19 lines added, 10
+removed, no code; the header grew by **+9**, measured, and the ten line cites in this section
+plus `renderLive` (§2.4), `NormPlacement` (§4.2a) and `lnBearer` (§4.3) were re-anchored by
+that amount against the tree. `cabal build jl4-core` clean under `-Wall -Werror`.
 
 ### 4.3 The one piece of new back end: a deontic step log
 
@@ -1441,7 +1434,7 @@ at arming:
 
 - `NormKey.nkBearerName :: Maybe Text` (`DeonticStep.hs:138`) is the party's `Value NF`
   rendered through `prettyLayout` — the same printer and shape `L4.Lts.Marking.renderLive` uses
-  for `lnBearer` (`Marking.hs:348`) — so the two compare by `==`. `nkBearer` is **kept**, not
+  for `lnBearer` (`Marking.hs:357`) — so the two compare by `==`. `nkBearer` is **kept**, not
   repurposed: it is the key the cast register (`dlMembers`) is looked up by at `armNormKey`, and
   it exists before any field has been forced, which the name does not. `EventKey.ekPartyName`
   (`:205`) and `BreachSummary.bsBlameName` (`:349`) are the same rendering for the event's party

@@ -11,14 +11,23 @@
 --
 -- == Provenance of the lifecycle vocabulary
 --
--- * 'Created' and 'InEffect' are Symboleo's lifecycle states (Sharifi et al.,
---   RE 2020), as §2.3 borrows them. 'Created' is the F3 distinction drawn: a
---   norm the machine has not entered, as opposed to one it has discharged.
+-- * 'Created' and 'InEffect' are Symboleo's lifecycle states @Create@ and
+--   @InEffect@ (Sharifi et al., RE 2020, Fig. 2; read 2026-09-16, R8), as
+--   §2.3 borrows them — @Create@ past-participled to match its siblings.
+--   'Created' is the F3 distinction drawn: a norm the machine has not
+--   entered, as opposed to one it has discharged.
 -- * 'Violated' is Anderson\/Meyer's violation atom (§2.2): the machine
---   concluded a breach.
--- * 'Lapsed' is a COINAGE of this spec (§4.2a, ruling R12 open): an @ROR@
---   alternative that is definitively lost while the compound is not
---   violated. Symboleo may have a state for it; that is R8's reading task.
+--   concluded a breach. Symboleo's state for the same thing is @Violation@.
+-- * 'Lapsed' is this spec's own coinage (§4.2a; R12 ANSWERED 2026-09-16):
+--   an @ROR@ alternative that is definitively lost while the compound is
+--   not violated. Symboleo has one lifecycle per obligation instance; an
+--   alternative there is either a separate obligation (simply in
+--   @Violation@) or a disjunct of one obligation's consequent (@POr@,
+--   thesis Listing A.1), and neither encoding has a state for "this
+--   disjunct is lost but the obligation stands". Its @Discharge@ (reached
+--   by @Expired@ from @Create@ or by @Discharged@ from @InEffect@) and
+--   @Unsuccessful Termination@ are both cancellations without breach and
+--   would erase the blame this carries.
 -- * 'Awaiting' is the join state §4.9 asks for: a barrier's continuation,
 --   marked but not enabled until its 'Threshold' is met. It has no
 --   Symboleo name; it is the Petri-net "place with too few tokens".
@@ -105,17 +114,17 @@ data NormPlacement
       , crSource :: !Text
         -- ^ the branch as the residual prints it
       }
-    -- ^ Symboleo /created/: a branch the machine has not entered. Two value
+    -- ^ Symboleo's @Create@: a branch the machine has not entered. Two value
     -- shapes land here — a @Left rexpr@ operand of a 'ValROp' (§4.2a fact
     -- 4: "already present in the runtime type"), and a 'ValQuantified',
     -- an @EVERY@ that has not met its event stream and so has no cast yet.
   | InEffect !LiveNorm
-    -- ^ Symboleo /inEffect/: a 'ValObligation' the machine is holding
+    -- ^ Symboleo's @InEffect@: a 'ValObligation' the machine is holding
     -- against the event stream.
   | Violated !Blame
     -- ^ Anderson\/Meyer: a 'ValBreached' the machine concluded.
   | Lapsed !Blame
-    -- ^ §4.2a's coinage (R12): a breached operand of a surviving @ROR@. The
+    -- ^ §4.2a's coinage (R12, ours): a breached operand of a surviving @ROR@. The
     -- alternative is gone; the compound is not violated. Drawing this red
     -- is the lie §3.1's counterexample exists to prevent.
   | Awaiting
