@@ -66,6 +66,6 @@ the difference between `lifetime Gift-line cash for` with `Devi` and `lifetime G
 `the change to the employer's cost` with `the parent of three`, `the reference day` and `the live reading` is equal to 600
 `the reform costs this employer more money` with `the parent of three`, `the reference day` and `the live reading`
 not `the reform costs this employer more money` with `the parent of one`, `the reference day` and `the live reading`
-`is barred from leave for the child` with `the natural father`, `TRUE` and `FALSE`
-not `is barred from leave for the child` with `the natural father`, `TRUE` and `TRUE`
+`is barred from leave for the child` with `the male employee`, `TRUE` and `FALSE`
+not `is barred from leave for the child` with `the male employee`, `TRUE` and `TRUE`
 not `is barred from leave for the child` with `the parent of one`, `TRUE` and `FALSE`

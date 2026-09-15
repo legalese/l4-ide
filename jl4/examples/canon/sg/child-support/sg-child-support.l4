@@ -15,7 +15,7 @@ TIMEZONE IS "Asia/Singapore"
 
 DECLARE ChildFacts
     HAS `date of birth`                IS A DATE
-        `is a Singapore citizen`       IS A BOOLEAN
+        `a Singapore citizen`       IS A BOOLEAN
         `birth order`                  IS A NUMBER
         `co-matching already received` IS A NUMBER
 
@@ -25,7 +25,7 @@ GIVETH A Child
     Child WITH
         `name`                     IS "this child"
         `date of birth`            IS facts's `date of birth`
-        `is a Singapore citizen`   IS facts's `is a Singapore citizen`
+        `a Singapore citizen`   IS facts's `a Singapore citizen`
         `birth order`              IS facts's `birth order`
         `parents lawfully married` IS TRUE
 
@@ -48,7 +48,7 @@ DECLARE Entitlement
 GIVEN facts IS A ChildFacts
 GIVETH AN Entitlement
 `the entitlement of` facts MEANS
-    IF   NOT facts's `is a Singapore citizen`
+    IF   NOT facts's `a Singapore citizen`
     THEN `nothing at all`
     ELSE Entitlement WITH
             `Baby Gift cash`              IS `the cash actually paid as a Gift to` child
@@ -141,7 +141,7 @@ DECLARE LeaveFacts
         `children aged seven to twelve`   IS A NUMBER
         `months served this period`       IS A NUMBER
         `gross daily rate`                IS A NUMBER
-        `is the natural father`           IS A BOOLEAN
+        `the natural father`           IS A BOOLEAN
 
 -- The leave module counts children out of a list, because CDCSA s 12B
 -- bands on the ages of actual children. A caller who has only the counts
@@ -152,7 +152,7 @@ GIVETH A Parent
 `the parent described by` facts `on` day MEANS
     Parent WITH
         `name`                      IS "this parent"
-        `is the natural father`     IS facts's `is the natural father`
+        `the natural father`     IS facts's `the natural father`
         `months served this period` IS facts's `months served this period`
         `gross daily rate`          IS facts's `gross daily rate`
         `children`                  IS append (`stand-ins` (facts's `children aged under seven`) 3)
@@ -166,7 +166,7 @@ GIVETH A Parent
             ELSE (Child WITH
                     `name`                     IS "a child"
                     `date of birth`            IS Date (DATE_DAY day) (DATE_MONTH day) (DATE_YEAR day MINUS age)
-                    `is a Singapore citizen`   IS TRUE
+                    `a Singapore citizen`   IS TRUE
                     `birth order`              IS 1
                     `parents lawfully married` IS TRUE)
                  FOLLOWED BY `stand-ins` (n MINUS 1) age

@@ -13,6 +13,12 @@
         },
         "Person": {
             "properties": {
+                "a Child Development Account": {
+                    "type": "boolean"
+                },
+                "a Singapore citizen": {
+                    "type": "boolean"
+                },
                 "birth order": {
                     "type": "number"
                 },
@@ -24,21 +30,15 @@
                 },
                 "born on or after the Package commences": {
                     "type": "boolean"
-                },
-                "has a Child Development Account": {
-                    "type": "boolean"
-                },
-                "is a Singapore citizen": {
-                    "type": "boolean"
                 }
             },
             "required": [
                 "birth year",
                 "born on or after the Package commences",
                 "born on or after the Cash Gift enhancement",
-                "has a Child Development Account",
+                "a Child Development Account",
                 "birth order",
-                "is a Singapore citizen"
+                "a Singapore citizen"
             ],
             "type": "object"
         }
