@@ -6,7 +6,17 @@ with critiques gathered and revision pending; 7, 8, 9 and S1 exist as INITIAL DR
 late on 2026-09-14, not yet critiqued, fact-checked or revised). The ceiling went from 3,500 to 6,000
 words on 2026-09-15 at Meng's direction, so only S1, at 6,927, is now over it; the concision pass is
 no longer a length exercise and cuts flab rather than substance. See `STYLE.md` §length for the
-reason he gave and the one drafting rule that follows from it. No post has been
+reason he gave and the one drafting rule that follows from it. `blog/candidates/` holds material
+that is not yet a post: one file so far, `decidability-and-expressiveness.md`, an outline with no
+prose and `sources_checked: never`, handed over on 2026-09-15 by the `lts-diagrams` session at
+Meng's direction. It is deliberately outside `posts/` — it carries no arc number and would fail
+`check-post.sh` on both `status:` and length. **Two questions for Meng before anyone drafts it**,
+both stated in the file itself: whether it becomes a tenth post (its claim is distinct from post
+4's and post 6's, and folding it into either would give that post two claims — but growing the arc
+is not a call to make by default), and which facet it takes, since post 6 already claims
+`formal-methods-in-law/`. Its load-bearing citation, Hack 1976 on undecidability of Petri net
+language equivalence, is unverified; if it fails, beat 2 rebuilds on Dufourd, Finkel and
+Schnoebelen 1998. No post has been
 read by Meng. Every draft says so in its first
 line. This directory holds the style guide and the posts. It is the companion to [`paper/`](../paper/): each post puts one of the
 papers' positions in front of a general technical reader before the academic version lands. See
