@@ -148,6 +148,15 @@ data CheckError =
     -- same-spelled binders, and its own 'Unique' matched none of them, so there
     -- is no way to tell which was meant. Arguments: the callee, the supplied
     -- name. See 'L4.Discharge.ambiguousImplicitSupplies'.
+  | MisdeliveredImplicitSupply Resolved Resolved Resolved
+    -- ^ A @WITH@ site whose value was type-checked against one section binder
+    -- and would be delivered to another of the same spelling, declared at a
+    -- different type. Arguments: the callee, the binder checked against, the
+    -- binder that receives. smucclaw\/l4-ide#960 — the two questions are
+    -- answered in different scopes ('L4.TypeCheck.sectionBinderFor' abstains
+    -- once a spelling has two binders; 'L4.Discharge.suppliesBinder' decides
+    -- delivery from the callee's read-set), so nothing checks the value against
+    -- the type it arrives at. See 'L4.Discharge.misdeliveredImplicitSupplies'.
   | AmbiguousRootBinders Resolved Name [Resolved]
     -- ^ A root — a directive, or an @\@export@ed definition — whose read-set
     -- holds two or more same-spelled section binders (R3). Whatever a supply
@@ -500,6 +509,7 @@ instance HasSrcRange CheckError where
   rangeOf (MisattachedSectionGiven n _)     = rangeOf n
   rangeOf (UnreadImplicitSupply _ b)        = rangeOf b
   rangeOf (AmbiguousImplicitSupply _ r)     = rangeOf r
+  rangeOf (MisdeliveredImplicitSupply _ r _) = rangeOf r
   rangeOf (AmbiguousRootBinders r _ _)      = rangeOf r
   rangeOf (ImplicitCrossesImport r _)       = rangeOf r
   rangeOf (RestatedSectionBinder n)         = rangeOf n
