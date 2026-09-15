@@ -150,6 +150,7 @@ library
     L4.EvaluateLazy.GraphVizOptions
     L4.EvaluateLazy.Trace
     L4.StateGraph
+    L4.StateGraph.Dominators
     L4.ExactPrint
     L4.Discharge
     L4.Export
@@ -247,6 +248,7 @@ test-suite jl4-core-test
     BitemporalRecallSpec
     TraceOrderingSpec
     StateGraphSpec
+    DominatorsSpec
     RelationalSpec
     BlawxAssumeSpec
     BlawxNlgSpec

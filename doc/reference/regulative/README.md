@@ -481,5 +481,6 @@ saleContract MEANS
 
 ## See Also
 
+- **[State graphs and `--dominators`](state-graph.md)** - Drawing a contract with `l4 state-graph`, and asking which acts every path to `FULFILLED` or `BREACH` must pass through
 - **[Foundation Course: Regulative Rules](../../courses/foundation/module-6-regulative.md)** - Tutorial
 - **[Regulative Rules Concept](../../concepts/legal-modeling/regulative-rules.md)** - Conceptual overview
