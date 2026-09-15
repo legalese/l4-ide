@@ -79,6 +79,65 @@ TIMEZONE IS "Etc/UTC"
 -- and Children Act 2002, in force 30 December 2005.
 `the designated-territory amendment` MEANS Date 30 12 2005
 
+§ `Which territories, and the designation that never came`
+
+-- s 50(1), from Annex A of jl4/examples/legal/bna/source-s1.txt, verbatim:
+--
+--   "designated territory" means a qualifying territory, or the Sovereign
+--       Base Areas of Akrotiri and Dhekelia, which is designated by Her
+--       Majesty by Order in Council under subsection (14)
+--
+--   "qualifying territory" means a British overseas territory other than the
+--       Sovereign Base Areas of Akrotiri and Dhekelia;
+--
+--   "the United Kingdom" means Great Britain, Northern Ireland and the
+--       Islands, taken together;   ["the Islands" = the Channel Islands and
+--                                   the Isle of Man]
+--
+-- So "designated territory" is NOT "any British overseas territory". It is a
+-- SUBSET, fixed by an Order in Council under s 50(14), and s 50(14) permits
+-- designation only where the 1993 Hague Intercountry Adoption Convention is
+-- in force in the territory.
+--
+-- THE CANDIDATE SET. Schedule 6 as amended by the British Overseas
+-- Territories Act 2002, in force 26 February 2002 and unchanged at
+-- December 2005 -- fourteen territories:
+--
+--   Anguilla; Bermuda; British Antarctic Territory; British Indian Ocean
+--   Territory; Cayman Islands; Falkland Islands; Gibraltar; Montserrat;
+--   Pitcairn, Henderson, Ducie and Oeno Islands; St Helena and Dependencies;
+--   South Georgia and the South Sandwich Islands; the Sovereign Base Areas
+--   of Akrotiri and Dhekelia; Turks and Caicos Islands; Virgin Islands.
+--
+-- Thirteen of those are qualifying territories; the Sovereign Base Areas are
+-- excluded from that term and named separately in the definition, so all
+-- fourteen are candidates for designation.
+--
+-- THE ACTUAL SET, DECEMBER 2005: on the record reached on 2026-09-15,
+-- EMPTY -- and the reason is upstream of any Order. Designation needs the
+-- Convention in force in the territory. The HCCH status table for the 1993
+-- Convention records exactly ONE United Kingdom territorial extension: the
+-- Isle of Man (extended 1 July 2003, in force 1 November 2003). The Isle of
+-- Man is not a British overseas territory; it is one of "the Islands", which
+-- s 50(1) folds into "the United Kingdom" itself. So it needs no
+-- designation, and it is not one. No British overseas territory appears.
+--
+-- Consequence: the words F16 inserted on 30 December 2005 look inoperative
+-- on their face -- there was no territory an adopter could be habitually
+-- resident in that would satisfy the new arm of limb (b).
+--
+-- WHAT THAT IS AND IS NOT. It is the absence of a record, not a proved
+-- negative. No Order in Council under s 50(14) was found either way, and the
+-- searches run were: the HCCH status table and its UK extensions page, and
+-- legislation.gov.uk for the Schedule 6 list. A designation could exist that
+-- those did not surface, and one could be made later if the Convention were
+-- extended. This is a question for a lawyer, not a conclusion of this file.
+--
+-- So the encoding below splits what a single Boolean would fuse: WHERE the
+-- adopters are habitually resident, and WHETHER that place was designated.
+-- Cases 5, 6 and 9 set the designation TRUE as an explicit counterfactual,
+-- and Case 10 runs the world as the record actually has it.
+
 § `The facts, as they stood on the day`
 
 -- Each fact is a ledger cell. A write under EVAL UNDER VALID TIME carries a
@@ -94,14 +153,21 @@ TIMEZONE IS "Etc/UTC"
 `the adopter habitually resident in the United Kingdom` MEANS
     fromMaybe FALSE (RECALL `the adopter is habitually resident in the United Kingdom`)
 
-`the adopter habitually resident in a designated territory` MEANS
-    fromMaybe FALSE (RECALL `the adopter is habitually resident in a designated territory`)
+`the adopter habitually resident in the territory` MEANS
+    fromMaybe FALSE (RECALL `the adopter is habitually resident in a qualifying territory or the Sovereign Base Areas`)
 
 `the second adopter habitually resident in the United Kingdom` MEANS
     fromMaybe FALSE (RECALL `the second adopter is habitually resident in the United Kingdom`)
 
-`the second adopter habitually resident in a designated territory` MEANS
-    fromMaybe FALSE (RECALL `the second adopter is habitually resident in a designated territory`)
+`the second adopter habitually resident in the territory` MEANS
+    fromMaybe FALSE (RECALL `the second adopter is habitually resident in a qualifying territory or the Sovereign Base Areas`)
+
+-- The separate question s 50(1) makes it: has that territory been designated
+-- by Order in Council under s 50(14)? A place can be a British overseas
+-- territory and not a designated territory, which on the record is the
+-- position of every one of them.
+`the territory is designated under s 50(14)` MEANS
+    fromMaybe FALSE (RECALL `the territory is designated by Order in Council under s 50(14)`)
 
 `a joint adoption` MEANS
     fromMaybe FALSE (RECALL `the adoption is a joint adoption`)
@@ -120,11 +186,13 @@ TIMEZONE IS "Etc/UTC"
     (DATE_SERIAL `RULES EFFECTIVE DATE`) AT LEAST (DATE_SERIAL `the substitution of s 1(5) and (5A)`)
 
 GIVEN `resident in the United Kingdom` IS A BOOLEAN
-      `resident in a designated territory` IS A BOOLEAN
+      `resident in the territory` IS A BOOLEAN
 GIVETH A BOOLEAN
-`habitual residence qualifies` `resident in the United Kingdom` `resident in a designated territory` MEANS
+`habitual residence qualifies` `resident in the United Kingdom` `resident in the territory` MEANS
         `resident in the United Kingdom`
-    OR  (`the designated-territory words are in force` AND `resident in a designated territory`)
+    OR  (`the designated-territory words are in force`
+             AND `resident in the territory`
+             AND `the territory is designated under s 50(14)`)
 
 § `The requirements`
 
@@ -141,12 +209,12 @@ GIVETH A BOOLEAN
         THEN TRUE
         ELSE (`habitual residence qualifies`
                   `the adopter habitually resident in the United Kingdom`
-                  `the adopter habitually resident in a designated territory`)
+                  `the adopter habitually resident in the territory`)
              AND (IF NOT `a joint adoption`
                   THEN TRUE
                   ELSE `habitual residence qualifies`
                            `the second adopter habitually resident in the United Kingdom`
-                           `the second adopter habitually resident in a designated territory`)
+                           `the second adopter habitually resident in the territory`)
 
 @ref British Nationality Act 1981 s 1(5A)
 `1(5A) — the requirements are met` MEANS
@@ -232,31 +300,34 @@ GIVETH A BOOLEAN
     ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adoption is a Convention adoption effected under the law of a country or territory outside the United Kingdom` IS FALSE) ),
     ( `the requirements are met, on the text in force on the day of the order` (Date 1 6 2004) )
 
--- CASE 5. Convention adoption effected 1 June 2004. Sole adopter, a British
+-- CASE 5. COUNTERFACTUAL: assumes the territory was designated (see the
+-- section above -- on the record, none was). Convention adoption effected 1 June 2004. Sole adopter, a British
 -- citizen, habitually resident in a designated territory and NOT in the
 -- United Kingdom. On 1 June 2004 limb (b) still read "habitually resident in
 -- the United Kingdom" and stopped there -- the designated-territory words
 -- were not inserted until 30 December 2005. Requirements NOT met.
--- expected: LIST TRUE, FALSE, TRUE, FALSE, TRUE, FALSE
+-- expected: LIST TRUE, FALSE, TRUE, FALSE, TRUE, TRUE, FALSE
 #EVAL LIST
     ( `EVAL UNDER VALID TIME` (Date 12 3 1995) (RECORD `the adopter is a British citizen` IS TRUE) ),
     ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adopter is habitually resident in the United Kingdom` IS FALSE) ),
-    ( `EVAL UNDER VALID TIME` (Date 1 1 1990) (RECORD `the adopter is habitually resident in a designated territory` IS TRUE) ),
+    ( `EVAL UNDER VALID TIME` (Date 1 1 1990) (RECORD `the adopter is habitually resident in a qualifying territory or the Sovereign Base Areas` IS TRUE) ),
     ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adoption is a joint adoption` IS FALSE) ),
     ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adoption is a Convention adoption effected under the law of a country or territory outside the United Kingdom` IS TRUE) ),
+    ( `EVAL UNDER VALID TIME` (Date 1 1 1990) (RECORD `the territory is designated by Order in Council under s 50(14)` IS TRUE) ),
     ( `the requirements are met, on the text in force on the day of the order` (Date 1 6 2004) )
 
 -- CASE 6. Case 5's facts, on Case 5's day, read against the text as it stood
 -- on 1 June 2006. Nothing about the adoption has changed; only the words
 -- have. This is the counterfactual the statute cannot ask and the two axes
 -- can, and it isolates what F16 did.
--- expected: LIST TRUE, FALSE, TRUE, FALSE, TRUE, FALSE, TRUE
+-- expected: LIST TRUE, FALSE, TRUE, FALSE, TRUE, TRUE, FALSE, TRUE
 #EVAL LIST
     ( `EVAL UNDER VALID TIME` (Date 12 3 1995) (RECORD `the adopter is a British citizen` IS TRUE) ),
     ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adopter is habitually resident in the United Kingdom` IS FALSE) ),
-    ( `EVAL UNDER VALID TIME` (Date 1 1 1990) (RECORD `the adopter is habitually resident in a designated territory` IS TRUE) ),
+    ( `EVAL UNDER VALID TIME` (Date 1 1 1990) (RECORD `the adopter is habitually resident in a qualifying territory or the Sovereign Base Areas` IS TRUE) ),
     ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adoption is a joint adoption` IS FALSE) ),
     ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adoption is a Convention adoption effected under the law of a country or territory outside the United Kingdom` IS TRUE) ),
+    ( `EVAL UNDER VALID TIME` (Date 1 1 1990) (RECORD `the territory is designated by Order in Council under s 50(14)` IS TRUE) ),
     ( `the requirements are met, on the facts at` (Date 1 6 2004) `under the text at` (Date 1 6 2004) ),
     ( `the requirements are met, on the facts at` (Date 1 6 2004) `under the text at` (Date 1 6 2006) )
 
@@ -268,7 +339,7 @@ GIVETH A BOOLEAN
     ( `EVAL UNDER VALID TIME` (Date 12 3 1995) (RECORD `the adopter is a British citizen` IS TRUE) ),
     ( `EVAL UNDER VALID TIME` (Date 1 1 1990) (RECORD `the adopter is habitually resident in the United Kingdom` IS TRUE) ),
     ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the second adopter is habitually resident in the United Kingdom` IS FALSE) ),
-    ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the second adopter is habitually resident in a designated territory` IS FALSE) ),
+    ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the second adopter is habitually resident in a qualifying territory or the Sovereign Base Areas` IS FALSE) ),
     ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adoption is a joint adoption` IS TRUE) ),
     ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adoption is a Convention adoption effected under the law of a country or territory outside the United Kingdom` IS TRUE) ),
     ( `the requirements are met, on the text in force on the day of the order` (Date 1 6 2006) )
@@ -310,13 +381,39 @@ GIVETH A BOOLEAN
 -- The axes do not decide which is right. They make the disagreement visible
 -- and force the choice to be stated, which is the argument for keeping them
 -- apart. See the header for what is and is not on record.
--- expected: LIST TRUE, FALSE, TRUE, FALSE, TRUE, TRUE, TRUE, FALSE, FALSE, TRUE
+-- expected: LIST TRUE, FALSE, TRUE, FALSE, TRUE, TRUE, TRUE, TRUE, FALSE, FALSE, TRUE
 #EVAL LIST
     ( `EVAL UNDER VALID TIME` (Date 12 3 1995) (RECORD `the adopter is a British citizen` IS TRUE) ),
     ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adopter is habitually resident in the United Kingdom` IS FALSE) ),
-    ( `EVAL UNDER VALID TIME` (Date 1 1 1990) (RECORD `the adopter is habitually resident in a designated territory` IS TRUE) ),
+    ( `EVAL UNDER VALID TIME` (Date 1 1 1990) (RECORD `the adopter is habitually resident in a qualifying territory or the Sovereign Base Areas` IS TRUE) ),
     ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the second adopter is habitually resident in the United Kingdom` IS FALSE) ),
-    ( `EVAL UNDER VALID TIME` (Date 1 1 1990) (RECORD `the second adopter is habitually resident in a designated territory` IS TRUE) ),
+    ( `EVAL UNDER VALID TIME` (Date 1 1 1990) (RECORD `the second adopter is habitually resident in a qualifying territory or the Sovereign Base Areas` IS TRUE) ),
+    ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adoption is a joint adoption` IS TRUE) ),
+    ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adoption is a Convention adoption effected under the law of a country or territory outside the United Kingdom` IS TRUE) ),
+    ( `EVAL UNDER VALID TIME` (Date 1 1 1990) (RECORD `the territory is designated by Order in Council under s 50(14)` IS TRUE) ),
+    ( `the requirements are met, on the text in force on the day of the order` (Date 1 6 2004) ),
+    ( `the requirements are met, asked on` (Date 1 6 2005) `about an order of` (Date 1 6 2004) ),
+    ( `the requirements are met, asked on` (Date 1 6 2006) `about an order of` (Date 1 6 2004) )
+
+-- CASE 10. THE WORLD AS THE RECORD HAS IT.
+--
+-- Case 9's facts and Case 9's questions, with the one counterfactual removed:
+-- no Order in Council under s 50(14) has designated the territory, because
+-- the 1993 Convention is not in force in any British overseas territory. The
+-- adopters are habitually resident in a British overseas territory, which is
+-- not the same thing as a designated territory.
+--
+-- Every answer is FALSE, on both readings and at every date, and the 2005
+-- amendment changes nothing. The retrospectivity question in the header is
+-- real but, on this record, moot: the words F16 inserted have no territory
+-- to bite on. It would stop being moot the day a designation is made.
+-- expected: LIST TRUE, FALSE, TRUE, FALSE, TRUE, TRUE, TRUE, FALSE, FALSE, FALSE
+#EVAL LIST
+    ( `EVAL UNDER VALID TIME` (Date 12 3 1995) (RECORD `the adopter is a British citizen` IS TRUE) ),
+    ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adopter is habitually resident in the United Kingdom` IS FALSE) ),
+    ( `EVAL UNDER VALID TIME` (Date 1 1 1990) (RECORD `the adopter is habitually resident in a qualifying territory or the Sovereign Base Areas` IS TRUE) ),
+    ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the second adopter is habitually resident in the United Kingdom` IS FALSE) ),
+    ( `EVAL UNDER VALID TIME` (Date 1 1 1990) (RECORD `the second adopter is habitually resident in a qualifying territory or the Sovereign Base Areas` IS TRUE) ),
     ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adoption is a joint adoption` IS TRUE) ),
     ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adoption is a Convention adoption effected under the law of a country or territory outside the United Kingdom` IS TRUE) ),
     ( `the requirements are met, on the text in force on the day of the order` (Date 1 6 2004) ),

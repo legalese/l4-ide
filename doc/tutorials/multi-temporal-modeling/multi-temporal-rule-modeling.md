@@ -394,6 +394,25 @@ which is right.** They make the disagreement visible and force the choice to
 be stated, which is the argument for keeping them apart — a single "as at"
 date hides it.
 
+One more turn, and it is the one that makes the example concrete. "Designated
+territory" is not "any British overseas territory". Section 50(1) defines it as
+a qualifying territory (or the Sovereign Base Areas) *"which is designated by
+Her Majesty by Order in Council under subsection (14)"*, and s 50(14) permits
+designation only where the 1993 Hague Intercountry Adoption Convention is in
+force there. The HCCH status table records exactly one United Kingdom
+territorial extension of that Convention — the Isle of Man, which s 50(1)
+already folds into "the United Kingdom" and which needs no designation. No
+British overseas territory appears. So on the record reached, the set of
+designated territories in December 2005 was **empty**, and the words F16
+inserted had no territory to bite on.
+
+The file therefore splits what one Boolean would fuse — *where* the adopters
+are habitually resident, and *whether that place was designated*. Case 10 runs
+the world as the record has it and every answer is `FALSE`, on both readings,
+at every date. The retrospectivity question stays real and becomes moot, and
+would stop being moot the day a designation is made. That is a conclusion the
+encoding produces rather than asserts, which is the point.
+
 Its other eight cases are worth reading for the valid-time axis alone: an
 adopter naturalised two years *after* the order (not met, though a plain
 Boolean field would say met), one naturalised *on* the day (met — the interval
