@@ -28,7 +28,12 @@ canon stay where they are.
 - **Only two l4-ide subjects duplicate canon today.** `legal/chubb/chubb.l4` is byte-identical to
   `subjects/us/chubb-hospital-cash/encodings/blind-inert-2026-08/chubb.l4`. `legal/sg-succession/`
   has seven `.l4`; five are the same names as `subjects/sg/succession/encodings/legalese/` and two
-  (`sg-succession-cases.l4`, `sg-succession-wizard.l4`) have no canon counterpart. `regcf`, `bna`,
+  (`sg-succession-cases.l4`, `sg-succession-wizard.l4`) ~~have no canon counterpart~~.
+  **Corrected 2026-09-15: true of `sg-succession-wizard.l4` only.** `sg-succession-cases.l4` IS in
+  canon, at `.../encodings/legalese/cases/` — byte-identical, and all four of its goldens
+  byte-identical too (measured at `9a1a3155`). It was missed for the same reason the count in the
+  fourth bullet was: it sits one level down, in `cases/`. The count got corrected and the two
+  sentences resting on it did not, which is the drift this document is otherwise about. `regcf`, `bna`,
   `charities-cleanroom` and the seven single-file subjects are not in canon.
 - **What hangs off the two:** an `etc/go/subjects/<subject>/subject.json` each, pointing at
   `jl4/examples/legal/...` paths (every registered subject does — `chubb`, `regcf`, `sg-succession`);
@@ -41,7 +46,11 @@ canon stay where they are.
 - **canon's encoding dirs already carry the four jl4-test goldens per file** (`tests/<stem>.{golden,
 ep.golden,nlg.golden,schema.golden}`) — `sg/child-support/encodings/legalese` ~~5~~ **6** `.l4` / 24
   goldens, `sg/succession/encodings/legalese` ~~5~~ **6** / 24, both chubb encodings 1 / 4 each,
-  `sg/penal-code-1871` 1 / 4. `il/ofek-hadash-2008` (9 `.l4`) and `sg/pdpa-2012` carry none.
+  `sg/penal-code-1871` 1 / 4. `il/ofek-hadash-2008` (~~9~~ **10** `.l4`) and `sg/pdpa-2012` carry none.
+  The tenth is `source/_salary-table-tail.l4` — the SAME "missed the one a level down" error, in
+  the very bullet that corrects it elsewhere. It is not a module: bare `§§`, no `IMPORT prelude`,
+  concatenated by a script beside it. `sync-canon.mjs`'s allowlist excludes it by directory, so
+  blessing ofek later will not vendor it.
   **Corrected 2026-09-15 while building §3B:** each of those two dirs keeps a SIXTH `.l4`
   one level down, in `cases/`, which the original count missed. The GOLDEN count was right all
   along — 24 is 6 stems × 4 — so the two halves of that sentence disagreed with each other and
@@ -218,8 +227,10 @@ what was implemented, with the two departures named under _What review changed_.
   confirmed ones and drop the date suffix — `blind-inert`, `blind-guarded`, `sg/child-support`,
   `sg/succession`, `sg/penal-code-1871`. Said here rather than silently rewritten, because a
   migration section that quietly agrees with the code teaches nobody which one moved.
-- `legal/sg-succession` → `sg-succession-cases.l4` and `sg-succession-wizard.l4` land in canon's
+- `legal/sg-succession` → ~~`sg-succession-cases.l4` and~~ `sg-succession-wizard.l4` lands in canon's
   `sg/succession/encodings/legalese/` first (with goldens, same commit); then the dir is deleted;
+  **Corrected 2026-09-15: `sg-succession-cases.l4` is ALREADY there**, with its four goldens, all
+  byte-identical to l4-ide's copies. Only the wizard has to move.
   `etc/go/subjects/sg-succession` → the mirror path; the three spec citations retarget to the
   mirror paths.
 - `jl4/examples/legal/README.md` states the split: what is here and why, what is in canon and
