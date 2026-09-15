@@ -131,7 +131,7 @@ nodeLines depth node = case node.nodeKind of
           [("id", "ErrorDef_" <> node.nodeId), ("errorRef", sharedErrorId)]
       | isError
       ]
-  Task -> element "bpmn:task" [] []
+  Task -> element "bpmn:task" [] (multiInstanceLines (depth + 1) node)
   Gateway kind flow ->
     element (gatewayTag kind) [("gatewayDirection", flowDirection flow)] []
   Boundary host trigger ->
@@ -152,6 +152,19 @@ nodeLines depth node = case node.nodeKind of
           then [selfClose depth tag as]
           else [openTag depth tag as] <> body <> [closeTag depth tag]
   nameAttr = [("name", node.nodeName) | not (Text.null node.nodeName)]
+
+-- | The loop characteristics of an @EVERY@'s task — see 'MultiInstance' for
+-- why it carries neither a cardinality nor a collection. Emitted after the
+-- @\<documentation\>@, which is the order the schema gives an activity's
+-- children.
+multiInstanceLines :: Int -> FlowNode -> [Text]
+multiInstanceLines depth node =
+  [ selfClose
+      depth
+      "bpmn:multiInstanceLoopCharacteristics"
+      [("id", "MultiInstance_" <> node.nodeId), ("isSequential", "false")]
+  | Just ParallelMultiInstance <- [node.nodeMultiInstance]
+  ]
 
 gatewayTag :: GatewayKind -> Text
 gatewayTag = \case

@@ -15,6 +15,7 @@ did not. Predicates are a different matter, and belong to the ladder; see
 | `handover.l4`     | A deadline that is a _name_ (no timer, no invented duration), a `RAND` and a `ROR`, and permissions whose deadlines are drawn as lapse timers |
 | `consultation.l4` | The only one that draws a converging parallel gateway: a `RAND` of deadline-free permissions, one branch of which is a chain                  |
 | `../legal/regcf/regcf.l4` | The real 992-line Reg CF corpus — **three** rules, so three golden pairs (`regcf-reporting`, `regcf-advertising`, `regcf-resale`): a renewing obligation drawn as a loop, `IF`-headed duties with guarded gateway arms, named deadlines, two prohibitions. Read from `examples/legal/`, not copied here — see below |
+| `tenancy.l4`      | A quantified obligation (`EVERY`) under each join — **two** rules, so two golden pairs (`tenancy-barrier`, `tenancy-fork`): a parallel multi-instance task, `P-CAST` on both, `P-FORK` on the fork alone. The witness that a barrier and a fork export differently; see below |
 
 ## The Reg CF goldens are cut from the corpus itself
 
@@ -76,6 +77,31 @@ Three directories of `.bpmn`, read by `etc/check-bpmn-soundness.selftest.mjs`:
 | `expected/` | exporter goldens, reproducible byte-for-byte by `l4 export` | SOUND       |
 | `sound/`    | hand-written diagrams the gate must **not** flag            | SOUND       |
 | `unsound/`  | hand-written and historical diagrams the gate **must** catch | UNSOUND, on a named property |
+
+## A quantified obligation is one multi-instance task
+
+`tenancy.l4` is the reference page's own pair (`doc/reference/regulative/every-run-example.l4`)
+with the traces left out. Until 2026-09-15 the two rules exported to byte-identical XML and a
+byte-identical fidelity report, because `L4.StateGraph.extractDeonton` never read `Deonton.join`
+— the fix is recorded in `specs/todo/EVERY-EACH-QUANTIFIER-SPEC.md` §2.5. What they export to now:
+
+- **The task carries `<multiInstanceLoopCharacteristics isSequential="false">`** with neither a
+  `loopCardinality` nor a `loopDataInputRef`: an `EVERY`'s cast is fixed only when the rule runs,
+  and inventing either attribute would be a claim the source does not make. `P-CAST` (advisory)
+  says so and names the roll (`tenants`) an engine would need as the collection. jBPM confirms the
+  gap — it rejects both files with _ForEach has no collection expression_ — which is why both sit
+  in `etc/bpmn-kie-baseline.txt` as class (d), REJECTED, while our own token-play gate and
+  bpmn-moddle accept them.
+- **The barrier (`ONCE ALL HAVE`) needs nothing more.** A parallel multi-instance activity fires
+  its outgoing flow once, when the last instance completes — that _is_ the barrier, and the
+  documentation on the task says so.
+- **The fork (`UPON EACH`) is the one BPMN cannot draw this way.** The source fires the
+  continuation once per member as that member completes; the activity fires once, after all of
+  them. `P-FORK` (lossy) reports it. Saying once-per-member in BPMN means a multi-instance
+  subProcess enclosing the continuation, which this exporter does not emit.
+- **A deadline written only on the join line arms the boundary timer** (`memberDeadline` in
+  `L4.StateGraph`, mirroring the evaluator). When the act has a deadline of its own, that one is
+  on the timer and the join line's is reported undrawn as `P-JOIN-DEADLINE` (lossy).
 
 ## What can be joined, and why so little of it
 

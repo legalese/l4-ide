@@ -54,6 +54,24 @@
 #                      that would satisfy jBPM stays an option, not built.
 #   regcf-resale       as regcf-advertising: (b) narrowed to the boundary event,
 #                      (c) new on the wired guard.
+#
+# ADDED 2026-09-15 — two goldens for the quantified obligation (EVERY), one
+# per join, as the witness that a barrier and a fork no longer export
+# byte-identically (RESULT 4 -> 6 for that reason and no other; the six
+# earlier rows did not move):
+#
+#   tenancy-barrier    class (d) NEW: REJECTED on the multi-instance activity —
+#   tenancy-fork       "ForEach has no variable name" / "has no collection
+#                      expression". The exporter draws an EVERY as a parallel
+#                      <multiInstanceLoopCharacteristics> with neither a
+#                      loopCardinality nor a loopDataInputRef, because the cast
+#                      is a run-time fact (R-T6) and inventing either would be a
+#                      claim the source does not make; P-CAST says exactly this,
+#                      and names the roll an engine would need. jBPM asking for
+#                      the collection is the gap the note predicts, measured.
+#                      Our own token-play gate (check-bpmn-soundness.mjs) and
+#                      bpmn-moddle both accept both files. Execution is a
+#                      NON-GOAL; a future data-object emission would close (d).
 
 consultation.bpmn       errors=0 warnings=0 verdict=COMPLETED
 handover.bpmn           errors=4 warnings=0 verdict=REJECTED
@@ -61,5 +79,7 @@ offering.bpmn           errors=0 warnings=0 verdict=ABORTED
 regcf-advertising.bpmn  errors=4 warnings=0 verdict=REJECTED
 regcf-reporting.bpmn    errors=1 warnings=0 verdict=REJECTED
 regcf-resale.bpmn       errors=6 warnings=0 verdict=REJECTED
+tenancy-barrier.bpmn    errors=2 warnings=0 verdict=REJECTED
+tenancy-fork.bpmn       errors=2 warnings=0 verdict=REJECTED
 
-RESULT 4
+RESULT 6

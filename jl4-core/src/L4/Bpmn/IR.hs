@@ -38,6 +38,7 @@ module L4.Bpmn.IR
     -- * Flow nodes and sequence flows
   , FlowNode (..)
   , NodeKind (..)
+  , MultiInstance (..)
   , GatewayKind (..)
   , GatewayFlow (..)
   , BoundaryTrigger (..)
@@ -226,6 +227,22 @@ data NodeKind
 data GatewayKind = ExclusiveGateway | ParallelGateway
   deriving stock (Eq, Show)
 
+-- | @\<multiInstanceLoopCharacteristics isSequential="false"\>@ on a task: one
+-- instance per member of an @EVERY@'s cast, all live at once.
+--
+-- Deliberately without a @loopCardinality@ and without a @loopDataInputRef@.
+-- L4 fixes the cast only when the rule runs (EVERY-EACH-QUANTIFIER-SPEC R-T6),
+-- so the file can say "many, in parallel" and cannot say how many; inventing
+-- either attribute would be a claim the source does not make. @P-CAST@ tells
+-- the reader an engine will need one supplied.
+--
+-- The completion rule of a parallel multi-instance activity — the outgoing
+-- flow fires once, when the last instance has completed — is exactly the
+-- barrier (@ONCE ALL HAVE@), which is why the barrier needs no further shape.
+-- The fork (@UPON EACH@) is the one BPMN cannot draw this way; see @P-FORK@.
+data MultiInstance = ParallelMultiInstance
+  deriving stock (Eq, Show)
+
 -- | BPMN 2.0 §10.5.1 Table 10.100 makes @gatewayDirection@ a /claim about the
 -- edges/, not a caption: @Diverging@ MUST NOT have multiple incoming flows,
 -- @Converging@ MUST NOT have multiple outgoing, @Mixed@ has both, and
@@ -260,6 +277,8 @@ data FlowNode = FlowNode
     nodeDoc :: !(Maybe Text)
   , -- | The party this node belongs to; 'Nothing' lands in the default lane.
     nodeLane :: !(Maybe Text)
+  , -- | Set on the task of an @EVERY@ obligation and on nothing else.
+    nodeMultiInstance :: !(Maybe MultiInstance)
   }
   deriving stock (Eq, Show)
 

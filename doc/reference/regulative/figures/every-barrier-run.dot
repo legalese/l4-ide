@@ -1,0 +1,12 @@
+digraph barrier_run {
+  rankdir=LR; fontname="Helvetica"; node [fontname="Helvetica", fontsize=11, shape=box, style="rounded,filled", fillcolor="#ffffff"]; edge [fontname="Helvetica", fontsize=10];
+  label="the tenancy — ONCE ALL HAVE (barrier).  Trace: Alice signs at 1, Bob at 2, Carol at 9; landlord delivers at 13.\nDrawn by hand from the measured #TRACE in every-run-example.l4; the compiler does not emit this picture yet."; labelloc=t; fontsize=12;
+  subgraph cluster_members { label="three member obligations, all live from day 0, each WITHIN 14"; style=dashed; color="#6f42c1";
+    a [label="Alice MUST Sign\ndone: day 1"]; b [label="Bob MUST Sign\ndone: day 2"]; c [label="Carol MUST Sign\ndone: day 9"];
+  }
+  join [label="ONCE ALL HAVE\nfires ONCE — day 9\n(the last act)", shape=diamond, fillcolor="#e6dcf5"];
+  h [label="theLandlord MUST Deliver\nWITHIN 5 — clock starts day 9\ndue day 14; done day 13"];
+  f [label="FULFILLED", shape=doublecircle, fillcolor="#d4edda"];
+  a -> join [label="day 1", color="#28a745"]; b -> join [label="day 2", color="#28a745"]; c -> join [label="day 9", color="#28a745", penwidth=2];
+  join -> h [label="one continuation", color="#28a745"]; h -> f [color="#28a745"];
+}
