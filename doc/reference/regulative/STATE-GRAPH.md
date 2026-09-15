@@ -20,8 +20,8 @@ for the web editor alike; the web editor gets it from the release that carries t
 you do not see it there yet, that release has not shipped.
 
 ```l4
-GIVETH A DEONTIC Actor Action
-`the tenancy` MEANS                        -- ← "Show state graph" appears above this rule
+GIVETH A DEONTIC Actor Action              -- ← "Show state graph" appears above this line
+`the tenancy` MEANS
     EVERY Tenant t IN tenants
         MUST   Sign (EXACTLY t)
         WITHIN 14
@@ -46,9 +46,10 @@ the pane is honest about being the source.
 
 The pane is a snapshot. It does not redraw itself as you edit; click **Show state graph** again to
 see the map for the rule as it now stands. In the web editor the pane is also shared with the
-decision graph, which _does_ redraw on every edit — so your next keystroke hands the pane back to
-the ladder, and the map is gone until you click again. In Visual Studio Code the map has a pane of
-its own and stays put, stale, until you click again.
+decision graph, which _does_ redraw on every edit — so if a decision graph has already been shown
+for this file, your next keystroke hands the pane back to it, and the map is gone until you click
+again. In Visual Studio Code the map has a pane of its own and stays put, stale, until you click
+again.
 
 ## Getting the map from the command line
 
@@ -88,7 +89,7 @@ So the conventions are:
 | a red dashed arrow            | the `LEST` path, captioned by what reaches it: `timeout` for a `MUST` whose deadline passed, `violation` for a `SHANT` whose forbidden thing was done, `lapses` for a `MAY` nobody exercised |
 | `[14]` on an arrow            | the `WITHIN` deadline                                                                                                                                                                        |
 | `ONCE ALL HAVE` / `UPON EACH` | for an `EVERY` rule, whether the next step waits for the whole group or fires for each member                                                                                                |
-| a diamond                     | a fork: `RAND` (every branch runs) or `ROR` (exactly one does), or an `IF` choosing between rules                                                                                            |
+| a diamond                     | a fork, captioned `ALL OF` for a `RAND` (every branch runs) or `ONE OF` for an `ROR` (exactly one does) or an `IF` choosing between rules                                                    |
 
 ## Asking what has to happen: `--dominators`
 
@@ -139,8 +140,10 @@ Under `RAND` both acts are required to fulfil, so both are listed; and either de
 breaches the whole, so nothing dominates breach. Under `ROR` it is the other way round: either act
 suffices to fulfil, so neither is listed; but the contract is breached only when **both**
 alternatives have been lost, so both deadlines are on every path to breach. (A single missed
-deadline under `ROR` leaves the other alternative open — a `#TRACE` at that moment reports the
-remaining obligation, not a breach.)
+deadline under `ROR` leaves the other alternative open. `l4 run` on a `#TRACE` at that moment prints
+the lost alternative's breach `OR` the remaining obligation — the contract as a whole is not
+breached; `l4 lts` says so directly, `Standing: in progress`, and marks the lost alternative as no
+longer available.)
 
 ### Every state, not only the ends
 
@@ -209,9 +212,9 @@ complete.
 **It shows where the rule can go, not where it is.** Nothing on the map says which place the rule
 is in _now_, for a particular contract on a particular day, or who is currently on the hook. That
 question — "given what has happened so far, what is outstanding, and for whom?" — is answered by
-running the rule with `#TRACE` (see [the regulative reference](README.md#testing-with-trace)), not
-by the map. A map with every road on it is not a map with a "you are here" dot, and this one has no
-dot.
+running the rule with `#TRACE` (see [the regulative reference](README.md#testing-with-trace)) or,
+read out as a list, by `l4 lts` (see [What is owed now](lts-list.md)), not by the map. A map with
+every road on it is not a map with a "you are here" dot, and this one has no dot.
 
 **It shows one rule at a time.** A `HENCE` or `LEST` that hands over to another named rule is drawn
 as an arrow into a place labelled `next` (for `HENCE`) or `failure` (for `LEST`), and stops there.
@@ -232,9 +235,9 @@ tenants.
 **Conditions are labels, not logic.** A `PROVIDED` guard, or the `IF` that chooses between two
 rules, appears as text on an arrow. The map does not work out when the condition holds.
 
-**Some rules have no map yet.** A rule whose body is not a `PARTY … MUST/MAY/SHANT …`, `RAND`,
-`ROR`, or an `IF` choosing between those — for instance one that only refers to another rule by
-name — is not drawn, and the editor offers nothing above it.
+**Some rules have no map yet.** A rule whose body is not a `PARTY … MUST/MAY/SHANT …`,
+`EVERY … MUST …`, `RAND`, `ROR`, or an `IF` choosing between those — for instance one that only
+refers to another rule by name — is not drawn, and the editor offers nothing above it.
 
 **A rule that renews itself is a loop.** `HENCE` back into the rule's own name draws an arrow back
 to the start, so a renewing duty is drawn as a cycle rather than a dead end.
@@ -253,7 +256,8 @@ shown above); a reader of the picture alone has to supply it.
   join the map labels
 - [DMN and BPMN](../../exports/dmn-bpmn.md) — the same state graph, exported as a BPMN process
   diagram for tools that read that format
-- [What is owed now: `l4 lts`](lts-list.md) — the "you are here" dot this map lacks: what a `#TRACE`
-  leaves outstanding, and what would discharge or breach it
+- [What is owed now: `l4 lts`](lts-list.md) — what a `#TRACE` leaves outstanding, as a list, and
+  what would discharge or breach it: the position this map does not mark (it is not drawn onto the
+  map; see that page's Limits)
 - [`l4` command line](../../tutorials/getting-started/l4-cli.md) — the `state-graph` verb among
   the others
