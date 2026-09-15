@@ -3,7 +3,7 @@
   "browser": "chrome 152.0.7977.83",
   "node": "v26.4.0",
   "npmLs": [
-    "bpmn-token-sim@0.1.0 /Users/mengwong/src/legalese/l4wt/lts-p2a/etc/bpmn-token-sim",
+    "bpmn-token-sim@0.1.0 etc/bpmn-token-sim",
     "├── bpmn-js-token-simulation@0.40.0",
     "├── bpmn-js@18.28.0",
     "├── esbuild@0.25.9",

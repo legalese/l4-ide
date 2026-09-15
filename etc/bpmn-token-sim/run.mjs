@@ -238,7 +238,11 @@ for (const fixture of fixtures) {
   );
 }
 
-const npmLs = execSync("npm ls --depth=0", { cwd: here }).toString();
+// `npm ls` heads its listing with the package's absolute path; the file is
+// committed as evidence, so that line is made repo-relative.
+const npmLs = execSync("npm ls --depth=0", { cwd: here })
+  .toString()
+  .replaceAll(here, "etc/bpmn-token-sim");
 const meta = {
   date: new Date().toISOString(),
   browser: `${browserArg} ${version}`,
