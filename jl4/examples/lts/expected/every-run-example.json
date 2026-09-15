@@ -27,7 +27,7 @@
           "action": "Sign OF …",
           "at": 1,
           "kind": "act",
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Alice\""
         },
         "join": {
           "done": 1,
@@ -39,7 +39,7 @@
           "member": 1,
           "modal": "MUST",
           "of": 3,
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Alice\""
         },
         "outcome": {
           "then": "hence",
@@ -53,14 +53,14 @@
           "action": "Sign OF …",
           "at": 1,
           "kind": "act",
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Alice\""
         },
         "norm": {
           "activation": 2,
           "member": 2,
           "modal": "MUST",
           "of": 3,
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Bob\""
         },
         "outcome": {
           "what": "partyMismatch"
@@ -73,7 +73,7 @@
           "action": "Sign OF …",
           "at": 2,
           "kind": "act",
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Bob\""
         },
         "join": {
           "done": 2,
@@ -85,7 +85,7 @@
           "member": 2,
           "modal": "MUST",
           "of": 3,
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Bob\""
         },
         "outcome": {
           "then": "hence",
@@ -99,14 +99,14 @@
           "action": "Sign OF …",
           "at": 1,
           "kind": "act",
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Alice\""
         },
         "norm": {
           "activation": 3,
           "member": 3,
           "modal": "MUST",
           "of": 3,
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Carol\""
         },
         "outcome": {
           "what": "partyMismatch"
@@ -119,14 +119,14 @@
           "action": "Sign OF …",
           "at": 2,
           "kind": "act",
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Bob\""
         },
         "norm": {
           "activation": 3,
           "member": 3,
           "modal": "MUST",
           "of": 3,
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Carol\""
         },
         "outcome": {
           "what": "partyMismatch"
@@ -139,7 +139,7 @@
           "action": "Sign OF …",
           "at": 9,
           "kind": "act",
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Carol\""
         },
         "join": {
           "done": 3,
@@ -151,7 +151,7 @@
           "member": 3,
           "modal": "MUST",
           "of": 3,
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Carol\""
         },
         "outcome": {
           "then": "hence",
@@ -177,12 +177,12 @@
           "action": "Deliver OF …",
           "at": 13,
           "kind": "act",
-          "party": "Landlord OF …"
+          "party": "Landlord OF \"Ms Ng\""
         },
         "norm": {
           "activation": 1,
           "modal": "MUST",
-          "party": "Landlord OF …"
+          "party": "Landlord OF \"Ms Ng\""
         },
         "outcome": {
           "then": "hence",
@@ -221,7 +221,7 @@
           "action": "Sign OF …",
           "at": 1,
           "kind": "act",
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Alice\""
         },
         "join": {
           "done": 1,
@@ -233,7 +233,7 @@
           "member": 1,
           "modal": "MUST",
           "of": 3,
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Alice\""
         },
         "outcome": {
           "then": "hence",
@@ -247,14 +247,14 @@
           "action": "Sign OF …",
           "at": 1,
           "kind": "act",
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Alice\""
         },
         "norm": {
           "activation": 2,
           "member": 2,
           "modal": "MUST",
           "of": 3,
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Bob\""
         },
         "outcome": {
           "what": "partyMismatch"
@@ -267,7 +267,7 @@
           "action": "Sign OF …",
           "at": 2,
           "kind": "act",
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Bob\""
         },
         "join": {
           "done": 2,
@@ -279,7 +279,7 @@
           "member": 2,
           "modal": "MUST",
           "of": 3,
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Bob\""
         },
         "outcome": {
           "then": "hence",
@@ -293,14 +293,14 @@
           "action": "Sign OF …",
           "at": 1,
           "kind": "act",
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Alice\""
         },
         "norm": {
           "activation": 3,
           "member": 3,
           "modal": "MUST",
           "of": 3,
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Carol\""
         },
         "outcome": {
           "what": "partyMismatch"
@@ -313,14 +313,14 @@
           "action": "Sign OF …",
           "at": 2,
           "kind": "act",
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Bob\""
         },
         "norm": {
           "activation": 3,
           "member": 3,
           "modal": "MUST",
           "of": 3,
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Carol\""
         },
         "outcome": {
           "what": "partyMismatch"
@@ -340,7 +340,7 @@
           "member": 3,
           "modal": "MUST",
           "of": 3,
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Carol\""
         },
         "outcome": {
           "deadline": 14,
@@ -403,7 +403,7 @@
           "action": "Pay OF …, …, …",
           "at": 1,
           "kind": "act",
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Alice\""
         },
         "join": {
           "kind": "fork",
@@ -415,7 +415,7 @@
           "member": 1,
           "modal": "MUST",
           "of": 3,
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Alice\""
         },
         "outcome": {
           "then": "hence",
@@ -429,12 +429,12 @@
           "action": "Receipt OF …, …, …",
           "at": 2,
           "kind": "act",
-          "party": "Landlord OF …"
+          "party": "Landlord OF \"Ms Ng\""
         },
         "norm": {
           "activation": 1,
           "modal": "MUST",
-          "party": "Landlord OF …"
+          "party": "Landlord OF \"Ms Ng\""
         },
         "outcome": {
           "then": "hence",
@@ -448,14 +448,14 @@
           "action": "Pay OF …, …, …",
           "at": 1,
           "kind": "act",
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Alice\""
         },
         "norm": {
           "activation": 2,
           "member": 2,
           "modal": "MUST",
           "of": 3,
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Bob\""
         },
         "outcome": {
           "what": "partyMismatch"
@@ -468,14 +468,14 @@
           "action": "Receipt OF …, …, …",
           "at": 2,
           "kind": "act",
-          "party": "Landlord OF …"
+          "party": "Landlord OF \"Ms Ng\""
         },
         "norm": {
           "activation": 2,
           "member": 2,
           "modal": "MUST",
           "of": 3,
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Bob\""
         },
         "outcome": {
           "what": "partyMismatch"
@@ -488,7 +488,7 @@
           "action": "Pay OF …, …, …",
           "at": 3,
           "kind": "act",
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Bob\""
         },
         "join": {
           "kind": "fork",
@@ -500,7 +500,7 @@
           "member": 2,
           "modal": "MUST",
           "of": 3,
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Bob\""
         },
         "outcome": {
           "then": "hence",
@@ -514,12 +514,12 @@
           "action": "Receipt OF …, …, …",
           "at": 4,
           "kind": "act",
-          "party": "Landlord OF …"
+          "party": "Landlord OF \"Ms Ng\""
         },
         "norm": {
           "activation": 2,
           "modal": "MUST",
-          "party": "Landlord OF …"
+          "party": "Landlord OF \"Ms Ng\""
         },
         "outcome": {
           "then": "hence",
@@ -533,14 +533,14 @@
           "action": "Pay OF …, …, …",
           "at": 1,
           "kind": "act",
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Alice\""
         },
         "norm": {
           "activation": 3,
           "member": 3,
           "modal": "MUST",
           "of": 3,
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Carol\""
         },
         "outcome": {
           "what": "partyMismatch"
@@ -553,14 +553,14 @@
           "action": "Receipt OF …, …, …",
           "at": 2,
           "kind": "act",
-          "party": "Landlord OF …"
+          "party": "Landlord OF \"Ms Ng\""
         },
         "norm": {
           "activation": 3,
           "member": 3,
           "modal": "MUST",
           "of": 3,
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Carol\""
         },
         "outcome": {
           "what": "partyMismatch"
@@ -573,14 +573,14 @@
           "action": "Pay OF …, …, …",
           "at": 3,
           "kind": "act",
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Bob\""
         },
         "norm": {
           "activation": 3,
           "member": 3,
           "modal": "MUST",
           "of": 3,
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Carol\""
         },
         "outcome": {
           "what": "partyMismatch"
@@ -593,14 +593,14 @@
           "action": "Receipt OF …, …, …",
           "at": 4,
           "kind": "act",
-          "party": "Landlord OF …"
+          "party": "Landlord OF \"Ms Ng\""
         },
         "norm": {
           "activation": 3,
           "member": 3,
           "modal": "MUST",
           "of": 3,
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Carol\""
         },
         "outcome": {
           "what": "partyMismatch"
@@ -613,7 +613,7 @@
           "action": "Pay OF …, …, …",
           "at": 5,
           "kind": "act",
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Carol\""
         },
         "join": {
           "kind": "fork",
@@ -625,7 +625,7 @@
           "member": 3,
           "modal": "MUST",
           "of": 3,
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Carol\""
         },
         "outcome": {
           "then": "hence",
@@ -639,12 +639,12 @@
           "action": "Receipt OF …, …, …",
           "at": 6,
           "kind": "act",
-          "party": "Landlord OF …"
+          "party": "Landlord OF \"Ms Ng\""
         },
         "norm": {
           "activation": 3,
           "modal": "MUST",
-          "party": "Landlord OF …"
+          "party": "Landlord OF \"Ms Ng\""
         },
         "outcome": {
           "then": "hence",
@@ -705,7 +705,7 @@
           "action": "Pay OF …, …, …",
           "at": 1,
           "kind": "act",
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Alice\""
         },
         "join": {
           "kind": "fork",
@@ -717,7 +717,7 @@
           "member": 1,
           "modal": "MUST",
           "of": 3,
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Alice\""
         },
         "outcome": {
           "then": "hence",
@@ -731,12 +731,12 @@
           "action": "Receipt OF …, …, …",
           "at": 2,
           "kind": "act",
-          "party": "Landlord OF …"
+          "party": "Landlord OF \"Ms Ng\""
         },
         "norm": {
           "activation": 1,
           "modal": "MUST",
-          "party": "Landlord OF …"
+          "party": "Landlord OF \"Ms Ng\""
         },
         "outcome": {
           "then": "hence",
@@ -750,14 +750,14 @@
           "action": "Pay OF …, …, …",
           "at": 1,
           "kind": "act",
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Alice\""
         },
         "norm": {
           "activation": 2,
           "member": 2,
           "modal": "MUST",
           "of": 3,
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Bob\""
         },
         "outcome": {
           "what": "partyMismatch"
@@ -770,14 +770,14 @@
           "action": "Receipt OF …, …, …",
           "at": 2,
           "kind": "act",
-          "party": "Landlord OF …"
+          "party": "Landlord OF \"Ms Ng\""
         },
         "norm": {
           "activation": 2,
           "member": 2,
           "modal": "MUST",
           "of": 3,
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Bob\""
         },
         "outcome": {
           "what": "partyMismatch"
@@ -790,14 +790,14 @@
           "action": null,
           "at": 5,
           "kind": "act",
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Carol\""
         },
         "norm": {
           "activation": 2,
           "member": 2,
           "modal": "MUST",
           "of": 3,
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Bob\""
         },
         "outcome": {
           "what": "partyMismatch"
@@ -810,14 +810,14 @@
           "action": null,
           "at": 6,
           "kind": "act",
-          "party": "Landlord OF …"
+          "party": "Landlord OF \"Ms Ng\""
         },
         "norm": {
           "activation": 2,
           "member": 2,
           "modal": "MUST",
           "of": 3,
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Bob\""
         },
         "outcome": {
           "what": "partyMismatch"
@@ -830,7 +830,7 @@
           "action": null,
           "at": 20,
           "kind": "act",
-          "party": "Landlord OF …"
+          "party": "Landlord OF \"Ms Ng\""
         },
         "join": {
           "kind": "fork",
@@ -842,7 +842,7 @@
           "member": 2,
           "modal": "MUST",
           "of": 3,
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Bob\""
         },
         "outcome": {
           "deadline": 7,
@@ -854,7 +854,7 @@
       {
         "clock": null,
         "outcome": {
-          "by": "Tenant OF …",
+          "by": "Tenant OF \"Bob\"",
           "what": "breached"
         },
         "scrutiny": "noEvent"
@@ -865,14 +865,14 @@
           "action": "Pay OF …, …, …",
           "at": 1,
           "kind": "act",
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Alice\""
         },
         "norm": {
           "activation": 3,
           "member": 3,
           "modal": "MUST",
           "of": 3,
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Carol\""
         },
         "outcome": {
           "what": "partyMismatch"
@@ -885,14 +885,14 @@
           "action": "Receipt OF …, …, …",
           "at": 2,
           "kind": "act",
-          "party": "Landlord OF …"
+          "party": "Landlord OF \"Ms Ng\""
         },
         "norm": {
           "activation": 3,
           "member": 3,
           "modal": "MUST",
           "of": 3,
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Carol\""
         },
         "outcome": {
           "what": "partyMismatch"
@@ -905,7 +905,7 @@
           "action": "Pay OF …, …, …",
           "at": 5,
           "kind": "act",
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Carol\""
         },
         "join": {
           "kind": "fork",
@@ -917,7 +917,7 @@
           "member": 3,
           "modal": "MUST",
           "of": 3,
-          "party": "Tenant OF …"
+          "party": "Tenant OF \"Carol\""
         },
         "outcome": {
           "then": "hence",
@@ -931,12 +931,12 @@
           "action": "Receipt OF …, …, …",
           "at": 6,
           "kind": "act",
-          "party": "Landlord OF …"
+          "party": "Landlord OF \"Ms Ng\""
         },
         "norm": {
           "activation": 2,
           "modal": "MUST",
-          "party": "Landlord OF …"
+          "party": "Landlord OF \"Ms Ng\""
         },
         "outcome": {
           "then": "hence",

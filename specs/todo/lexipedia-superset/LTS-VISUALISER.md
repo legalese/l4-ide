@@ -1063,7 +1063,8 @@ The off path is proved unchanged by rendering every fixture both ways.
 (19 of them in this spec); the same variable and `cabal test jl4-test`: 3143 examples, 0 failures, no golden moved — including after `Barrier1` started throwing on an unnamed terminal, so no corpus file reaches one.
 One thing the fixtures found that the design did not predict: `partyKeyWHNF` renders a
 constructor party with its unforced fields as heap addresses (`Tenant OF &161@main.l4`), which is
-the ledger's existing key and is pinned by prefix, not by value; `ekAction` does the same.
+the ledger's existing key and is pinned by prefix, not by value; `ekAction` does the same. (The
+bearer half of this is answered by the LANDED 2026-09-16 block below; `ekAction` still is.)
 
 About `Waiting` under a barrier, stated with its scope: a barrier member that **completes** never
 logs `Waiting`, because its match hands control to the checkpoint sentinel; a member still
@@ -1073,8 +1074,9 @@ logs nothing for it (fixture 11; the corpus shows the same residual at
 earlier revision of this paragraph, stated the first half as a universal; that was one fixture in
 which every member matched, generalised to a case it had not measured.
 
-**Not built.** `dsClock` for `Joined` and `Breached` (no time in the frame or the expression arm);
-a site for the compound (needs `ValROp` to carry its annotation); the residual's `NormKey` — a
+**Not built.** `dsClock` for `Joined` and `Breached` (no time in the frame or the expression arm;
+for `Joined`, see the LANDED 2026-09-16 block for why the one time the frame could carry was
+declined); a site for the compound (needs `ValROp` to carry its annotation); the residual's `NormKey` — a
 `ValObligation` returned as the value of a directive carries no key, so a residual re-applied by a
 later milestone (live mode, §4.5) starts a fresh activation count. The cast register is keyed by
 `(action site, bearer)` value alone, with no activation in the key, so an `EVERY` whose `HENCE`
@@ -1096,6 +1098,65 @@ assertion — fixtures 10–17; `Barrier4` re-derived the `LEST`-vs-breach routi
 moved into `barrierStateMissed`'s arms; `Barrier1` classified with a wildcard — now explicit and
 loud; and the "only extra work is a lazy `NormKey`" claim was narrower than what shipped — widened
 above. Declined, with the reason recorded in "Not built": keying the cast register by activation.
+
+**LANDED 2026-09-16 — the bearer, recorded at the match and made comparable (P2b follow-up, on
+`lts/p2b-bearer`).** Three things had one cause: `--steps` printed `Tenant OF …` for a
+record-shaped party (§7.6 "What it cannot"), the key could not be compared with a `LiveNorm`'s
+`lnBearer` (§7.6 review finding 2, and `confirmAct`'s rank heuristic under an `EVERY`), and the
+member ordinal was doing the reader's work of telling members apart. The cause was that
+`nkBearer` is `partyKeyWHNF` at arming: the ledger key, whose unforced fields print as heap
+addresses. Fixed by recording a second rendering **where the machine forces the fields**, not
+at arming:
+
+- `NormKey.nkBearerName :: Maybe Text` (`DeonticStep.hs:138`) is the party's `Value NF`
+  rendered through `prettyLayout` — the same printer and shape `L4.Lts.Marking.renderLive` uses
+  for `lnBearer` (`Marking.hs:348`) — so the two compare by `==`. `nkBearer` is **kept**, not
+  repurposed: it is the key the cast register (`dlMembers`) is looked up by at `armNormKey`, and
+  it exists before any field has been forced, which the name does not. `EventKey.ekPartyName`
+  (`:205`) and `BreachSummary.bsBlameName` (`:349`) are the same rendering for the event's party
+  and a breach's blame.
+- The rendering is `peekNF` (`Machine.hs:416`): a `traverse` over the `Value` that reads each
+  reference with `peekWHNF` and answers `Nothing` as soon as one is still a thunk, with
+  `nfAux`'s depth cutoff. **It never forces.** `peekName` (`:430`) is its `prettyLayout`.
+- Where it is read: `Contract8` (`:1913`, `naming party norm`) — the party equality at `Contract7`
+  has just forced the fields (all of them on a match, up to the first difference on a mismatch),
+  and the named key is carried into `Contract9`/`Contract11`/`Contract1` so `GuardFailed`,
+  `ActionMismatch`, `Matched` and the following `Waiting` all carry it; `ResolveParty` (`:1996`)
+  for the expiry path; `Contract5`'s no-`LEST` breach and `breachSummary` (`:525`) peek the
+  breach's party cell the same way; `armNormKey` (`:471`) peeks at arming too, which is `Nothing`
+  unless something earlier forced the fields. With the log off, `naming` is the old pure
+  `bearing` behind one `asks`.
+- Measured, `jl4-core/test/DeonticStepSpec.hs` fixture 18 (`:663`): on fixture 6's barrier every
+  member step names `Tenant OF "Alice"` / `Tenant OF "Bob"`, the landlord's `Landlord OF "Ms
+Ng"`, and the event party alongside; on fixture 15's expiry the `Expired` step at
+  `ResolveParty` is named and the join's own step and the `Breached` are not; at the barrier's
+  **outset** (no event compared) both `Waiting` steps have `nkBearerName = Nothing` while
+  `nkBearer` is still the `Tenant OF &…` form — the log did not force the fields for its own
+  sake; a nullary `PARTY Alice` renders `Alice` both ways. The log-off equivalence test covers
+  the new fixture.
+- `confirmAct` (`WhatIf.hs:384`) now finds the candidate's own step by **site and bearer**
+  (`:405`: `nkBearerName == Just name` for a `KnownParty`), and the most-specific-reason rank is
+  **retired**. An `UnforcedParty` candidate has no rendered name to compare and takes every step
+  at its site as its own — such an obligation is not an `EVERY` member (the roll call forces
+  every member), so its site has one bearer. Measured, `LtsListSpec.hs` case 6 (`:207`): a
+  barrier of two with `PROVIDED t EQUALS bob` — Alice's act is `PassedOver GuardFalse` and the
+  step that carried it has her name, the other member's look at the same event has Bob's; Bob's
+  act advances. Cases 1, 4 and 5 and `LtsWhatIfSpec` are unchanged.
+- The renderer (`List.hs:468`, `partyText`) prints the name when the log had it and the elided
+  key otherwise, in text and JSON. Goldens: `every-run-example.txt`/`.json` moved **only** in
+  party text — 72 text lines and 71 `"party"`/`"by"` JSON lines, checked by `diff` before
+  blessing; `contracts.*` (nullary parties) and `tenancy.*` (fresh positions: `Waiting` before any
+  comparison, still `Tenant OF …`) did not move. The CLI's output is byte-identical to the
+  blessed goldens. `--json`'s `format` stays `1`: `party` and `by` are free text, not
+  discriminators, and mean what they meant; only the rendering is fuller.
+- **Not built:** `ekAction` is still the elided layout (`Sign OF …`) — the action is unpacked
+  only as far as the rule's pattern needs, and naming it fully would need the same peek over a
+  value the machine may not have forced; the page says so. `dsClock` for `Joined`: the one time
+  `RBinOp2` could carry with a single field is the compound's **arming** time (the `[time,
+events]` args of `RBinOp1`), which is neither when the join reduced nor when a breach
+  materialised — a fork's `both parts together: breached` after day 20 would print `at 0`. That
+  misleads more than `at —`; the honest clock (the later of the operands') is not on the frame.
+  Left as is.
 
 ### 4.4 The gotcha the animator must model: an event can be scrutinised twice
 
@@ -1887,18 +1948,22 @@ steps, what the contract did with each event so far.
   above on small casts, and stated on the page as proportional to the live obligations.
 - **Nothing about where in the contract you are, or what happens after** the one step "move
   things along" shows (§1.1a).
-- **The step log's party keys are partly-evaluated layouts.** `nkBearer` is `partyKeyWHNF`
-  (`DeonticStep.hs:117-127`, `Machine.hs:2624`): for a constructor party with unforced fields
-  that is `Tenant OF &229@file.l4`, a heap reference. The renderer elides the reference to `…`
-  (`elide`, `List.hs:455`) and the member ordinal is what tells the members apart; the page says
-  so. **Not built:** a key that carries the party's forced form once the machine has it. That is
-  P2b's business (the log peeks and never forces), and the fix would be to record the bearer at
-  the match, where the party has been forced, rather than at arming.
+- **The step log's party keys are partly-evaluated layouts — RESOLVED 2026-09-16 for parties.**
+  `nkBearer` is `partyKeyWHNF`: for a constructor party with unforced fields that is
+  `Tenant OF &229@file.l4`, a heap reference, and as first built the renderer elided it to `…`
+  and left the member ordinal to tell the members apart. The fix was as predicted here: record
+  the bearer at the match, where the machine has forced the party, rather than at arming —
+  `nkBearerName`, `ekPartyName`, `bsBlameName`, peeked and never forced; see the LANDED
+  2026-09-16 block in §4.3. `--steps` now reads `Tenant OF "Bob" does Sign OF … at 2; Tenant OF
+"Bob" MUST (member 2 of 3)`. What remains elided is the **act** (`Sign OF …`) and a party on a
+  step logged before any comparison forced its fields (a `still waiting` at the outset); the page
+  says which.
 
 **REVIEWED 2026-09-15 — what two read-only reviews changed, on the same branch.** Ten findings;
 eight acted on, one rejected, one moot. (1) **Next deadline from refused ticks** — fixed as above
 (`rpNext` confirmed-only, `rpUnknown` named). (2) **Pass-over reason from the wrong norm** under
-`RAND`/`ROR` — fixed in `confirmAct`, §2.4. (3) **"the ledger key upper-cases"** — a mechanism
+`RAND`/`ROR` — fixed in `confirmAct`, §2.4 (by site; under an `EVERY`, by a specificity rank
+until 2026-09-16, and by bearer since — §4.3's LANDED 2026-09-16 block). (3) **"the ledger key upper-cases"** — a mechanism
 misattributed; corrected at both sites (`List.hs:379`, above). (4) **`at —` has three causes, not
 two** — the explicit `BREACH` (`Machine.hs:1189`, `every-run-example.txt:32,75`) added to the
 page and to `DeonticStep.hs`'s header. (5) **"in the order it happened"** over-described the

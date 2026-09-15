@@ -18,7 +18,12 @@
 --   5. a tick the machine refused ('confirmTick') is not the next
 --      deadline: the number 'deadlineOf' computed and the machine did not
 --      bear out is exactly the one §2.4 forbids printing, and the
---      obligation is named as one whose deadline is not known.
+--      obligation is named as one whose deadline is not known;
+--   6. under an @EVERY@ the pass-over reason is the candidate's own
+--      member's, found by BEARER: the members share a site, and the step
+--      log's rendered bearer name is what the candidate's 'lnBearer' is
+--      compared with — and the step log prints record-shaped parties by
+--      name.
 module LtsListSpec (spec) where
 
 import Data.Foldable (for_)
@@ -30,7 +35,8 @@ import L4.Import.Resolution (TypeCheckWithDepsResult (..))
 import L4.EvaluateLazy (resolveEvalConfig)
 import L4.EvaluateLazy.Machine (emptyEnvironment)
 import L4.Lts.List
-import L4.Lts.Marking (LiveNorm (..))
+import L4.EvaluateLazy.DeonticStep (DeonticStep (..), NormKey (..), StepOutcome (..))
+import L4.Lts.Marking (Bearer (..), LiveNorm (..))
 import L4.Lts.WhatIf
 import L4.TracePolicy (apiDefaultPolicy)
 
@@ -86,6 +92,34 @@ compoundSrc op = Text.unlines $ prologue <>
   , ""
   , "#TRACE both AT 0 WITH"
   ]
+
+-- 6. a barrier of two record-shaped parties whose PROVIDED holds for one
+--    member only, and the same barrier with one event
+everySrc :: [Text.Text] -> Text.Text
+everySrc events = Text.unlines $
+  [ "IMPORT prelude"
+  , "DECLARE Actor IS ONE OF"
+  , "    Landlord HAS name IS A STRING"
+  , "    Tenant   HAS name IS A STRING"
+  , "DECLARE Action IS ONE OF"
+  , "    Sign    HAS signer IS AN Actor"
+  , "    Deliver HAS who    IS AN Actor"
+  , "theLandlord MEANS Landlord OF \"Ms Ng\""
+  , "alice       MEANS Tenant OF \"Alice\""
+  , "bob         MEANS Tenant OF \"Bob\""
+  , "tenants     MEANS LIST alice, bob"
+  , "GIVETH A DEONTIC Actor Action"
+  , "`the tenancy` MEANS"
+  , "    EVERY Tenant t IN tenants"
+  , "        MUST   Sign (EXACTLY t)"
+  , "        PROVIDED t EQUALS bob"
+  , "        WITHIN 14"
+  , "        ONCE   ALL HAVE"
+  , "        HENCE  (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5)"
+  , "        LEST   BREACH"
+  , ""
+  , "#TRACE `the tenancy` AT 0 WITH"
+  ] <> map ("  " <>) events
 
 spec :: Spec
 spec = describe "LTS-VISUALISER §1.1a / P2a′: the list" $ do
@@ -169,3 +203,49 @@ spec = describe "LTS-VISUALISER §1.1a / P2a′: the list" $ do
     txt `shouldNotSatisfy` Text.isInfixOf "Next deadline: 3"
     -- and the owed line falls back to "due within", not the refuted number
     txt `shouldSatisfy` Text.isInfixOf "B MUST payment OF 5 — due within 3 from now"
+
+  it "6. under an EVERY the pass-over reason is the candidate's own member's, found by bearer; the steps name record-shaped parties" $ do
+    rig <- rigOf (everySrc [])
+    tr <- case tracesOf rig.rigModule of
+      (t : _) -> pure t
+      []      -> fail "no trace"
+    es <- enabledSet rig tr >>= maybe (fail "no enabled set") pure
+    -- Alice's act meets her own obligation (GuardFailed: the PROVIDED names
+    -- Bob) and Bob's (PartyMismatch); Bob's act meets his own (Matched)
+    -- and Alice's (PartyMismatch). The members share one site; only the
+    -- bearer tells the steps apart.
+    [ (bearerText n, o.ocVerdict) | o <- passedOver es, ActBy n <- [o.ocCandidate.cdKind] ]
+      `shouldBe` [("Tenant OF \"Alice\"", PassedOver GuardFalse)]
+    [ bearerText n | o <- advancing es, ActBy n <- [o.ocCandidate.cdKind] ]
+      `shouldBe` ["Tenant OF \"Bob\""]
+    -- the step that carried the reason is keyed by the candidate's own
+    -- bearer, in the rendering 'lnBearer' uses
+    for_ (passedOver es) \ o -> case o.ocCandidate.cdKind of
+      ActBy n -> do
+        let own = [ s | s <- o.ocSteps, Just k <- [s.dsNorm], k.nkBearerName == Just (bearerText n) ]
+        -- (the Waiting that follows the pass-over keeps the name: once
+        -- the fields have been forced, every later step of the scrutiny
+        -- knows them)
+        map (.dsOutcome) own `shouldBe` [GuardFailed, Waiting]
+        -- and the other member's look at the same event is a different bearer
+        [ k.nkBearerName | s <- o.ocSteps, Just k <- [s.dsNorm], s.dsOutcome == PartyMismatch ]
+          `shouldBe` [Just "Tenant OF \"Bob\""]
+      _ -> expectationFailure "a pass-over that is not an act"
+    -- with an event, --steps prints the parties by name on both halves of
+    -- the line, and the ledger key's heap address reaches nobody
+    rig' <- rigOf (everySrc ["PARTY bob DOES Sign bob AT 1"])
+    tr' <- case tracesOf rig'.rigModule of
+      (t : _) -> pure t
+      []      -> fail "no trace"
+    rp <- reportOf rig' tr' >>= maybe (fail "no report") pure
+    let steps = renderReport True rp
+    -- (Alice's obligation never looked at the act — the party mismatched
+    -- first — so the act is "something"; the party it did look at is named)
+    steps `shouldSatisfy` Text.isInfixOf "at 1: Tenant OF \"Bob\" does something at 1; Tenant OF \"Alice\" MUST (member 1 of 2) — not this party's event; passed over"
+    steps `shouldSatisfy` Text.isInfixOf "at 1: Tenant OF \"Bob\" does Sign OF … at 1; Tenant OF \"Bob\" MUST (member 2 of 2) — done; on to what follows (1 of 2 have acted; the shared next step waits for the rest)"
+    steps `shouldNotSatisfy` Text.isInfixOf "Tenant OF …"
+  where
+    bearerText :: LiveNorm -> Text.Text
+    bearerText n = case n.lnBearer of
+      KnownParty t    -> t
+      UnforcedParty t -> t

@@ -36,6 +36,9 @@
 --  16. a barrier with no LEST whose MAY member lets its permission lapse —
 --      JoinStalled;
 --  17. a barrier with no LEST whose MUST member misses — JoinFailed ToBreach;
+--  18. a record-shaped party (@Tenant OF "Alice"@): the key carries the
+--      bearer's rendered NAME from the step where the machine had forced
+--      its fields, and not before;
 --
 -- plus: the log-off path returns the same results as the log-on path, and
 -- a directive with no regulative content logs nothing.
@@ -125,6 +128,16 @@ keyPrefix = Text.takeWhile (/= '&')
 
 rawBearer :: DeonticStep -> Maybe Text.Text
 rawBearer s = (.nkBearer) =<< s.dsNorm
+
+-- | The bearer as the list writes it ('nkBearerName'): the forced value,
+-- fields and all, rendered as "L4.Lts.Marking" renders a live norm's
+-- party — so @Tenant OF "Alice"@, comparable by equality. Recorded only
+-- once the party comparison has forced the fields; 'Nothing' before.
+bearerName :: DeonticStep -> Maybe Text.Text
+bearerName s = (.nkBearerName) =<< s.dsNorm
+
+eventPartyName :: DeonticStep -> Maybe Text.Text
+eventPartyName s = (.ekPartyName) =<< s.dsEvent
 
 -- | The member's site and membership, for the EVERY shapes, so the tests can
 -- say "one site, two bearers, two ordinals".
@@ -266,6 +279,22 @@ forkSrc = Text.unlines $ everyPrologue <>
   , "  PARTY theLandlord DOES Deliver alice AT 2"
   , "  PARTY bob   DOES Sign bob   AT 3"
   , "  PARTY theLandlord DOES Deliver bob AT 4"
+  ]
+
+-- 18. the barrier at its outset: no event has been compared, so no
+--     member's fields have been forced
+barrierFreshSrc :: Text.Text
+barrierFreshSrc = Text.unlines $ everyPrologue <>
+  [ "GIVETH A DEONTIC Actor Action"
+  , "`the tenancy` MEANS"
+  , "    EVERY Tenant t IN tenants"
+  , "        MUST   Sign (EXACTLY t)"
+  , "        WITHIN 14"
+  , "        ONCE   ALL HAVE"
+  , "        HENCE  (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5)"
+  , "        LEST   BREACH"
+  , ""
+  , "#TRACE `the tenancy` AT 0 WITH"
   ]
 
 -- 8. the join-line deadline: everyone signs, the last one after day 5
@@ -428,12 +457,13 @@ allSrcs =
   , ("or", orSrc), ("barrier", barrierSrc), ("fork", forkSrc), ("join-deadline", joinDeadlineSrc)
   , ("or-left", orLeftSrc), ("waiting", waitingSrc), ("barrier-waiting", barrierWaitingSrc)
   , ("prohibition", prohibitionSrc), ("guard", guardSrc), ("action-mismatch", actionMismatchSrc)
-  , ("barrier-fail", barrierFailSrc), ("barrier-stall", barrierStallSrc), ("barrier-breach", barrierBreachSrc) ]
+  , ("barrier-fail", barrierFailSrc), ("barrier-stall", barrierStallSrc), ("barrier-breach", barrierBreachSrc)
+  , ("barrier-fresh", barrierFreshSrc) ]
 
 -- | The 'Breached' step an explicit @BREACH@ with no @BY@ logs.
 bareBreach :: Row
 bareBreach = Row Nothing 0 Nothing
-  (Breached MkBreachSummary {bsBlame = Nothing, bsStamp = Nothing, bsDeadline = Nothing})
+  (Breached MkBreachSummary {bsBlame = Nothing, bsBlameName = Nothing, bsStamp = Nothing, bsDeadline = Nothing})
   NoEvent Nothing Nothing Nothing
 
 spec :: Spec
@@ -481,7 +511,7 @@ spec = describe "the deontic step log (LTS-VISUALISER §4.3, P2b)" $ do
       , Row (Just "Bob")   1 (Just DMust) (Expired ToBreach 3) WitnessedOnly (Just 5) (Just 0) Nothing
       , Row Nothing 0 Nothing
           (Joined ValROr MkJoinNote
-            { jnResult   = JoinBreached MkBreachSummary {bsBlame = Just "Bob", bsStamp = Just 5, bsDeadline = Just 3}
+            { jnResult   = JoinBreached MkBreachSummary {bsBlame = Just "Bob", bsBlameName = Just "Bob", bsStamp = Just 5, bsDeadline = Just 3}
             , jnWinner   = Just RightSide
             , jnTieBreak = True })
           NoEvent Nothing Nothing Nothing
@@ -629,6 +659,38 @@ spec = describe "the deontic step log (LTS-VISUALISER §4.3, P2b)" $ do
         -- JoinFailed ToLest is: the member's DeadlineMissed carries it
       , Row Nothing 1 (Just DMust) (JoinFailed ToBreach) NoEvent Nothing (Just 20) Nothing
       ]
+
+  it "18. a record-shaped party: the rendered name is recorded once the party comparison has forced the fields, not before" $ do
+    -- With events (fixture 6's source): Alice's match, Bob's mismatch and
+    -- Bob's match all lie past the party equality at Contract7, which
+    -- forces the fields on both sides, so every member step names its
+    -- bearer and its event's party in the list's own rendering. The
+    -- expiry path (fixture 15's source) names the bearer at ResolveParty.
+    rs <- runLogged barrierSrc
+    let ss = stepsOf 0 rs
+    map bearerName ss `shouldBe`
+      [ Just "Tenant OF \"Alice\"", Just "Tenant OF \"Bob\"", Just "Tenant OF \"Bob\"", Nothing, Just "Landlord OF \"Ms Ng\"" ]
+    map eventPartyName ss `shouldBe`
+      [ Just "Tenant OF \"Alice\"", Just "Tenant OF \"Alice\"", Just "Tenant OF \"Bob\"", Nothing, Just "Landlord OF \"Ms Ng\"" ]
+    -- the ledger key stays what it was: the same head, an unforced-field
+    -- address after it. The two fields are two renderings, not one moved.
+    map (fmap keyPrefix . rawBearer) ss `shouldBe`
+      [ Just "Tenant OF ", Just "Tenant OF ", Just "Tenant OF ", Nothing, Just "Landlord OF " ]
+    rs15 <- runLogged barrierFailSrc
+    map bearerName (stepsOf 0 rs15) `shouldBe`
+      [ Just "Tenant OF \"Alice\"", Just "Tenant OF \"Bob\"", Just "Tenant OF \"Bob\"", Nothing, Nothing ]
+    -- Before any event: the roll call has forced each member to WHNF (the
+    -- cast test needs the constructor) but nothing has looked at a field,
+    -- so the key is the address form and the name is Nothing. The log
+    -- did not force it for its own sake.
+    fresh <- runLogged barrierFreshSrc
+    let ws = stepsOf 0 fresh
+    map (\ s -> s.dsOutcome) ws `shouldBe` [Waiting, Waiting]
+    map bearerName ws `shouldBe` [Nothing, Nothing]
+    map (fmap keyPrefix . rawBearer) ws `shouldBe` [Just "Tenant OF ", Just "Tenant OF "]
+    -- A nullary constructor party renders the same both ways.
+    rs1 <- runLogged matchSrc
+    map bearerName (stepsOf 0 rs1) `shouldBe` [Just "Alice", Just "Bob"]
 
   it "the log-off path is unchanged: every fixture renders the same result both ways" $
     for_ allSrcs \(name, src) -> do
