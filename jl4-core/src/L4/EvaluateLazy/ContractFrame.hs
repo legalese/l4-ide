@@ -70,6 +70,14 @@ data ContractFrame
   | Barrier2 BarrierStampFrame
   -- ^ EVERY, the barrier: a completing member's timestamp, forced, so the
   -- last completion (@t_last@, spec §3.4) can be picked out.
+  | Barrier2b BarrierDueFrame
+  -- ^ EVERY, the barrier: a completing member's absolute act deadline,
+  -- forced, so the LATEST of them — the instant by which all performance
+  -- fell due — can be kept for @OF THE DEADLINE@ in the @HENCE@ (R-Q7B).
+  | BarrierEmpty BarrierEmptyFrame
+  -- ^ EVERY, the barrier over an EMPTY cast: the arming time, forced, which
+  -- is when "all zero of them" have acted, so the join fires there — through
+  -- the @ONCE@ line's @WITHIN@ when it has one, like any other join.
   | Barrier3 BarrierStateDueFrame
   -- ^ EVERY, the barrier: the @WITHIN@ on the @ONCE@ line (R-T2), evaluated
   -- after every member has completed, to bound the whole (spec §2.2.7.5 pt 3).
@@ -82,6 +90,14 @@ data ContractFrame
   --   'maybeEvaluate') so it can be keyed and the followup (e.g. a RECORD in a
   --   breach reparation) attributed to the real acting party, not the anonymous
   --   ledger. Mirrors how 'Contract6 PartyWHNF' forces the party on the match path.
+  | Handoff Lifecycle
+  -- ^ R-Q7B: the value a @HENCE@ or @LEST@ evaluated to, about to be applied
+  -- to @[time, events]@. Rebinds the hand-off's 'Lifecycle' into that value's
+  -- own environment ('L4.EvaluateLazy.Machine.rebindLifecycle'), so that an
+  -- anchored @WITHIN@ inside it names the obligation the continuation is
+  -- ATTACHED to when it runs — also when the continuation arrived as a value
+  -- (a @GIVEN k IS A DEONTIC …@ parameter, a @WHERE@ local) whose closure
+  -- captured some other obligation's bindings, or none.
   deriving stock Show
 
 data ScrutinizeEvents = ScrutinizeEvents
@@ -303,12 +319,9 @@ data BarrierStepFrame = BarrierStepFrame
     -- when a deadline expression wrote to the ledger.
   , current :: WHNF                -- ^ the member obligation just applied
   , queue   :: [WHNF]              -- ^ members not yet run
-  , tLast   :: Maybe (Rational, Reference, Maybe Reference)
-    -- ^ the latest completion so far, the event stream that followed it, and
-    -- that member's absolute deadline when it had one: the anchor and
-    -- residual the @HENCE@ is handed (spec §3.4, §5.1), and what @OF THE
-    -- DEADLINE@ in the @HENCE@ names when the @ONCE@ line has no @WITHIN@
-    -- of its own (R-Q7B).
+  , tLast   :: Maybe (Rational, Reference)
+    -- ^ the latest completion so far and the event stream that followed it:
+    -- the anchor and residual the @HENCE@ is handed (spec §3.4, §5.1).
     --
     -- The TIE is decided by roll order — the first member to reach a given
     -- stamp keeps its stream. That is deterministic but not exact: when two
@@ -316,7 +329,16 @@ data BarrierStepFrame = BarrierStepFrame
     -- the other's completing event, so an act stamped at the join can reach
     -- the continuation. Getting it exactly right means trimming the stream to
     -- events strictly after the join, which needs frames of its own; the
-    -- limit is written into spec §11.0.1 and onto the doc page.
+    -- limit is written into spec §11.0.1 and onto the doc page. The tie
+    -- decides the STREAM only: the deadline the @HENCE@ may anchor to is
+    -- 'dueLatest', which no ordering can change.
+  , dueLatest :: Maybe Rational
+    -- ^ the latest of the completed members' absolute act deadlines so far —
+    -- the instant by which all performance fell due, and what @OF THE
+    -- DEADLINE@ in the @HENCE@ names when the @ONCE@ line has no @WITHIN@
+    -- of its own (R-Q7B). A maximum, so the roll's order cannot move it;
+    -- absent while no completed member had a deadline (the members either
+    -- all have one or none does, since they share one act @WITHIN@).
   , pending :: [WHNF]              -- ^ members still awaiting an event, reversed
   }
   deriving stock Show
@@ -328,9 +350,20 @@ data BarrierStampFrame = BarrierStampFrame
   }
   deriving stock Show
 
+-- | The completing member's absolute deadline is being forced ('Barrier2b').
+newtype BarrierDueFrame = BarrierDueFrame
+  { step :: BarrierStepFrame }
+  deriving stock Show
+
+-- | The barrier's cast was empty; its arming time is being forced
+-- ('BarrierEmpty'), which is when its join fires.
+newtype BarrierEmptyFrame = BarrierEmptyFrame
+  { ctx :: QuantCtx }
+  deriving stock Show
+
 data BarrierStateDueFrame = BarrierStateDueFrame
   { ctx        :: QuantCtx
-  , joinTime   :: Rational      -- ^ when the last member completed
+  , joinTime   :: Rational      -- ^ when the last member completed (the arming, for an empty cast)
   , joinEvents :: Reference     -- ^ the stream that followed it
   }
   deriving stock Show
@@ -357,19 +390,32 @@ data ResolvePartyFrame = ResolvePartyFrame
 -- JOIN@, @OF THE DEADLINE@, @OF THE ARMING@). Built by the obligation at the
 -- moment it hands off to its @HENCE@ or @LEST@, and bound into the
 -- continuation's environment under machine-minted names no program can
--- spell ('L4.EvaluateLazy.Machine.bindLifecycle'), so a nested obligation's
--- own hand-off shadows it: the NEAREST enclosing obligation is the one an
--- anchor names, which is also what the type checker assumes.
+-- spell ('L4.EvaluateLazy.Machine.bindLifecycle'): every hand-off REPLACES
+-- all three bindings — a position this hand-off does not have is deleted,
+-- never inherited from an outer obligation — and the value the continuation
+-- evaluated to is rebound the same way before it is applied ('Handoff'), so
+-- the obligation an anchor names is the one whose hand-off this is: the
+-- NEAREST enclosing one, dynamically, which for a continuation written
+-- inline is also the one the type checker assumes.
 data Lifecycle = MkLifecycle
   { join     :: Maybe Reference
     -- ^ the instant the join fired — the hand-off clock under @HENCE@. Absent
     -- under @LEST@: the join did not fire (the checker refuses @THE JOIN@
     -- there).
   , deadline :: Maybe Reference
-    -- ^ the obligation's ABSOLUTE deadline, when it had a @WITHIN@: the
-    -- act's, or under a barrier the @ONCE@ line's when written and otherwise
-    -- the act deadline of the member whose completion fired the join or
-    -- whose expiry failed it.
+    -- ^ the obligation's ABSOLUTE deadline, when it had one to hand off:
+    --
+    --   * a @PARTY@ obligation's act @WITHIN@;
+    --   * a barrier's @HENCE@: the @ONCE@ line's @WITHIN@ when written (the
+    --     deadline on the whole, R-T2), otherwise the latest of the members'
+    --     act deadlines — the instant by which all performance fell due —
+    --     and absent for an empty cast with no @ONCE@-line @WITHIN@;
+    --   * a barrier's @LEST@: the deadline that was actually missed — the
+    --     failing member's act deadline when a member expired
+    --     ('L4.EvaluateLazy.Machine.barrierFail'), the @ONCE@ line's when
+    --     everyone acted but the last act landed after it
+    --     ('L4.EvaluateLazy.Machine.barrierStateMissed');
+    --   * under a fork, the member's own.
   , armed    :: Reference
     -- ^ when the obligation was entered.
   }

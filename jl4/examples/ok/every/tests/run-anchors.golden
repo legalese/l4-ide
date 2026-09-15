@@ -1,9 +1,9 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
-run-anchors.l4:47:1-49:51:
+run-anchors.l4:50:1-52:51:
   FULFILLED
-run-anchors.l4:51:1-53:51:
+run-anchors.l4:54:1-56:51:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -17,9 +17,9 @@ run-anchors.l4:51:1-53:51:
       MUST Deliver (EXACTLY theLandlord)
     before their deadline, which was at
       13
-run-anchors.l4:67:1-69:51:
+run-anchors.l4:70:1-72:51:
   FULFILLED
-run-anchors.l4:71:1-73:51:
+run-anchors.l4:74:1-76:51:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -33,9 +33,9 @@ run-anchors.l4:71:1-73:51:
       MUST Deliver (EXACTLY theLandlord)
     before their deadline, which was at
       35
-run-anchors.l4:90:1-91:36:
-  FULFILLED
 run-anchors.l4:93:1-94:36:
+  FULFILLED
+run-anchors.l4:96:1-97:36:
   DEONTIC BREACHED:
     party
       Tenant OF "Alice"
@@ -49,9 +49,9 @@ run-anchors.l4:93:1-94:36:
       MUST Sign (EXACTLY alice)
     before their deadline, which was at
       15
-run-anchors.l4:113:1-116:36:
+run-anchors.l4:116:1-119:36:
   FULFILLED
-run-anchors.l4:118:1-121:36:
+run-anchors.l4:121:1-124:36:
   DEONTIC BREACHED:
     party
       Tenant OF "Alice"
@@ -65,7 +65,7 @@ run-anchors.l4:118:1-121:36:
       MUST Sign (EXACTLY alice)
     before their deadline, which was at
       45
-run-anchors.l4:130:1-131:36:
+run-anchors.l4:133:1-134:36:
   DEONTIC BREACHED:
     party
       Tenant OF "Alice"
@@ -79,7 +79,7 @@ run-anchors.l4:130:1-131:36:
       MUST Sign (EXACTLY alice)
     before their deadline, which was at
       10
-run-anchors.l4:144:1-145:36:
+run-anchors.l4:147:1-148:36:
   DEONTIC BREACHED:
     party
       Tenant OF "Alice"
@@ -93,9 +93,9 @@ run-anchors.l4:144:1-145:36:
       MUST Sign (EXACTLY alice)
     before their deadline, which was at
       25
-run-anchors.l4:155:1-156:63:
+run-anchors.l4:158:1-159:63:
   FULFILLED
-run-anchors.l4:158:1-159:62:
+run-anchors.l4:161:1-162:62:
   DEONTIC BREACHED:
     party
       Tenant OF "Alice"
@@ -109,7 +109,7 @@ run-anchors.l4:158:1-159:62:
       MUST Sign (EXACTLY alice)
     before their deadline, which was at
       740161
-run-anchors.l4:168:1-169:62:
+run-anchors.l4:171:1-172:62:
   DEONTIC BREACHED:
     party
       Tenant OF "Alice"
@@ -123,7 +123,7 @@ run-anchors.l4:168:1-169:62:
       MUST Sign (EXACTLY alice)
     before their deadline, which was at
       740156
-run-anchors.l4:180:1-181:35:
+run-anchors.l4:183:1-184:35:
   DEONTIC BREACHED:
     party
       Tenant OF "Alice"
@@ -137,9 +137,9 @@ run-anchors.l4:180:1-181:35:
       MUST Sign (EXACTLY alice)
     before their deadline, which was at
       6
-run-anchors.l4:205:1-208:51:
+run-anchors.l4:208:1-211:51:
   FULFILLED
-run-anchors.l4:210:1-213:51:
+run-anchors.l4:213:1-216:51:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -153,7 +153,7 @@ run-anchors.l4:210:1-213:51:
       MUST Deliver (EXACTLY theLandlord)
     before their deadline, which was at
       19
-run-anchors.l4:215:1-217:50:
+run-anchors.l4:218:1-220:50:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -167,7 +167,7 @@ run-anchors.l4:215:1-217:50:
       MUST Refund (EXACTLY theLandlord)
     before their deadline, which was at
       19
-run-anchors.l4:230:1-233:51:
+run-anchors.l4:233:1-236:51:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -181,14 +181,88 @@ run-anchors.l4:230:1-233:51:
       MUST Deliver (EXACTLY theLandlord)
     before their deadline, which was at
       35
-run-anchors.l4:250:1-253:36:
+run-anchors.l4:251:1-254:50:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Refund OF (Landlord OF "Ms Ng")
+    at
+      20
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund (EXACTLY theLandlord)
+    before their deadline, which was at
+      19
+run-anchors.l4:268:1-271:50:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Refund OF (Landlord OF "Ms Ng")
+    at
+      36
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund (EXACTLY theLandlord)
+    before their deadline, which was at
+      35
+run-anchors.l4:296:1-299:51:
   FULFILLED
-run-anchors.l4:255:1-258:36:
+run-anchors.l4:301:1-304:51:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Deliver OF (Landlord OF "Ms Ng")
+    at
+      26
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Deliver (EXACTLY theLandlord)
+    before their deadline, which was at
+      25
+run-anchors.l4:306:1-309:51:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Deliver OF (Landlord OF "Ms Ng")
+    at
+      26
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Deliver (EXACTLY theLandlord)
+    before their deadline, which was at
+      25
+run-anchors.l4:325:1-326:51:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Deliver OF (Landlord OF "Ms Ng")
+    at
+      36
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Deliver (EXACTLY theLandlord)
+    before their deadline, which was at
+      35
+run-anchors.l4:343:1-345:50:
+  WITHIN … OF THE DEADLINE names a position in the life of the obligation this one is the continuation of, and here that position does not exist. One of: this is the HENCE of a barrier whose cast was EMPTY, so nobody had a deadline to meet and the ONCE line names none (THE DEADLINE); this obligation was passed as a value and attached under a LEST, whose join never fired (THE JOIN), or under an obligation with no WITHIN (THE DEADLINE); or it is running with no enclosing obligation at all. Anchor it to THE ARMING or to an instant, give the enclosing obligation the WITHIN, or guard an EVERY that may range over nobody.
+run-anchors.l4:362:1-365:36:
+  FULFILLED
+run-anchors.l4:367:1-370:36:
   DEONTIC BREACHED:
     BREACH
-run-anchors.l4:272:1-274:37:
+run-anchors.l4:384:1-386:37:
   FULFILLED
-run-anchors.l4:276:1-279:51:
+run-anchors.l4:388:1-391:51:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -202,7 +276,7 @@ run-anchors.l4:276:1-279:51:
       MUST Refund (EXACTLY theLandlord)
     before their deadline, which was at
       106
-run-anchors.l4:298:1-301:51:
+run-anchors.l4:410:1-413:51:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -216,11 +290,85 @@ run-anchors.l4:298:1-301:51:
       MUST Deliver (EXACTLY theLandlord)
     before their deadline, which was at
       16
-run-anchors.l4:311:1-20:
+run-anchors.l4:443:1-446:51:
+  FULFILLED
+run-anchors.l4:448:1-451:51:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Deliver OF (Landlord OF "Ms Ng")
+    at
+      56
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Deliver (EXACTLY theLandlord)
+    before their deadline, which was at
+      55
+run-anchors.l4:459:1-462:52:
+  FULFILLED
+run-anchors.l4:464:1-467:52:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Deliver OF (Landlord OF "Ms Ng")
+    at
+      109
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Deliver (EXACTLY theLandlord)
+    before their deadline, which was at
+      108
+run-anchors.l4:482:1-484:50:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Deliver OF (Landlord OF "Ms Ng")
+    at
+      6
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Deliver (EXACTLY theLandlord)
+    before their deadline, which was at
+      5
+run-anchors.l4:501:1-503:51:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Deliver OF (Landlord OF "Ms Ng")
+    at
+      34
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Deliver (EXACTLY theLandlord)
+    before their deadline, which was at
+      33
+run-anchors.l4:511:1-513:51:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Deliver OF (Landlord OF "Ms Ng")
+    at
+      14
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Deliver (EXACTLY theLandlord)
+    before their deadline, which was at
+      13
+run-anchors.l4:523:1-20:
   PARTY alice MUST Sign (EXACTLY alice) WITHIN 30 HENCE (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5 OF THE JOIN) LEST BREACH
-run-anchors.l4:313:1-314:35:
+run-anchors.l4:525:1-526:35:
   PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5 OF THE DEADLINE HENCE FULFILLED
-run-anchors.l4:316:1-318:36:
+run-anchors.l4:528:1-530:36:
   PARTY Landlord OF "Ms Ng" MUST Deliver (EXACTLY theLandlord) WITHIN 15 HENCE FULFILLED
-run-anchors.l4:322:1-67:
+run-anchors.l4:534:1-67:
   PARTY alice MUST Sign (EXACTLY alice) WITHIN 7 OF THE ARMING HENCE FULFILLED

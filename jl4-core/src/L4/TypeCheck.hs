@@ -2012,9 +2012,15 @@ checkDeadline pos (MkDeadline dann d ma) = do
   maR <- traverse (checkAnchor pos) ma
   pure (MkDeadline dann dR maR)
   where
-    ctx = case pos of
-      ActDeadline      -> ExpectRegulativeDeadlineContext
-      JoinLineDeadline -> ExpectJoinDeadlineContext
+    -- An anchored deadline's duration is everything before OF, and inside
+    -- an unbracketed duration OF is never application ('L4.Parser.deadline',
+    -- @ofIsAnchor@). The commonest way to get a non-NUMBER there is to have
+    -- meant @f OF x@ as a call, so a mismatch next to an anchor says so; the
+    -- unanchored wording is kept for the unanchored form (its goldens hold).
+    ctx = case (pos, ma) of
+      (_, Just _)              -> ExpectAnchoredDurationContext
+      (ActDeadline, Nothing)      -> ExpectRegulativeDeadlineContext
+      (JoinLineDeadline, Nothing) -> ExpectJoinDeadlineContext
 
 -- | The anchor after @OF@.
 --
@@ -6167,13 +6173,16 @@ prettyCheckError (AnchorUnavailable a reason) =
   case reason of
     NoEnclosingObligation ->
       [ "OF " <> word <> " names a position in the life of the obligation this one"
-      , "is the continuation of — but this obligation is not inside any HENCE or"
-      , "LEST, so there is no such obligation."
+      , "is the continuation of — but this obligation is not WRITTEN inside any"
+      , "HENCE or LEST: it is at the top level, or defined in a WHERE, and the"
+      , "checker cannot see which obligation (if any) it will be attached to."
       , ""
-      , "Move the rule under the HENCE or LEST whose " <> noun <> " it means, or anchor"
-      , "it to an instant instead: WITHIN d OF <a NUMBER or DATE expression>."
-      , "(OF THE ARMING is allowed here: it is this obligation's own arming,"
-      , "which is where an unanchored WITHIN already counts from.)"
+      , "Write the anchored obligation inline, under the HENCE or LEST whose " <> noun
+      , "it means, or anchor it to an instant instead: WITHIN d OF <a NUMBER or"
+      , "DATE expression>. (OF THE ARMING is allowed here: it is the arming of"
+      , "whatever obligation this one is attached to when it runs, or its own"
+      , "when there is none, which is where an unanchored WITHIN already counts"
+      , "from.)"
       ]
     OnJoinLine ->
       [ "OF " <> word <> " cannot anchor the WITHIN on a join line."
@@ -6588,6 +6597,14 @@ prettyTypeMismatch ExpectQuantifierRollContext expected given =
     ] expected given
 prettyTypeMismatch ExpectJoinDeadlineContext expected given =
   standardTypeMismatch [ "The WITHIN on a join line (the deadline on the whole) is expected to be of type" ] expected given
+prettyTypeMismatch ExpectAnchoredDurationContext expected given =
+  standardTypeMismatch
+    [ "In WITHIN d OF anchor, everything before OF is the duration d, and inside"
+    , "it OF is never a function call: WITHIN f OF x means f anchored at x. To"
+    , "apply a function in the duration, bracket it (WITHIN (f OF x) OF ...) or"
+    , "juxtapose its arguments (WITHIN f x OF ...). The duration is expected to"
+    , "be of type"
+    ] expected given
 
 -- | Best effort, only small numbers will occur"
 prettyOrdinal :: Int -> Text

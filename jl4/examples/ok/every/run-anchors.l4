@@ -14,8 +14,10 @@ IMPORT daydate
 --   OF e               an instant: a NUMBER on the trace's clock, or a DATE
 --
 -- where "enclosing" means the obligation whose HENCE or LEST this one is the
--- continuation of. Every trace below pins one anchor to a number, and the
--- number the breach reports is the deadline the anchor produced.
+-- continuation of — the one it is ATTACHED to when it runs (the section "A
+-- continuation that arrives as a value" pins that). Every trace below pins
+-- one anchor to a number, and the number the breach reports is the deadline
+-- the anchor produced.
 
 DECLARE Actor IS ONE OF
     Landlord HAS name IS A STRING
@@ -25,6 +27,7 @@ DECLARE Action IS ONE OF
     Sign    HAS signer IS AN Actor
     Deliver HAS who    IS AN Actor
     Refund  HAS who    IS AN Actor
+    Smoke   HAS who    IS AN Actor
 
 theLandlord MEANS Landlord OF "Ms Ng"
 alice       MEANS Tenant OF "Alice"
@@ -184,15 +187,15 @@ GIVETH A DEONTIC Actor Action
 § `Under a barrier`
 
 -- THE DEADLINE in a barrier's HENCE is the ONCE line's WITHIN when one is
--- written — the deadline on the whole (R-T2) — and otherwise the act deadline
--- of the member whose completion fired the join. Here there is no ONCE-line
--- WITHIN: every member was due at 14, so the landlord's five days run from
--- 14, not from Bob's signature at 9. Delivery at 19 is timely; at 20 the
--- breach reports 14 + 5 = 19.
+-- written — the deadline on the whole (R-T2) — and otherwise the latest of
+-- the members' act deadlines, the instant by which all performance fell
+-- due. Here there is no ONCE-line WITHIN: every member was due at 14, so
+-- the landlord's five days run from 14, not from Bob's signature at 9.
+-- Delivery at 19 is timely; at 20 the breach reports 14 + 5 = 19.
 --
--- Under the barrier's LEST, THE DEADLINE is the deadline the failing member
--- missed: Bob's, at 14. The refund is due 14 + 5 = 19 whether the miss came
--- to light at day 15 or day 20.
+-- Under the barrier's LEST, THE DEADLINE is the deadline that was actually
+-- missed — here the failing member's: Bob's, at 14. The refund is due
+-- 14 + 5 = 19 whether the miss came to light at day 15 or day 20.
 GIVETH A DEONTIC Actor Action
 `the tenancy` MEANS
     EVERY Tenant t IN tenants
@@ -231,6 +234,115 @@ GIVETH A DEONTIC Actor Action
   PARTY alice DOES Sign alice AT 1
   PARTY bob   DOES Sign bob   AT 9
   PARTY theLandlord DOES Deliver theLandlord AT 36
+
+-- With BOTH layers written, THE DEADLINE under the LEST is whichever was
+-- actually missed. Bob misses his act deadline, 14, and his late signature
+-- at 15 reveals it: the refund runs from 14, not from the group's 30 — due
+-- 14 + 5 = 19, so a refund at 20 breaches reporting 19.
+GIVETH A DEONTIC Actor Action
+`the tenancy, a member late` MEANS
+    EVERY Tenant t IN tenants
+        MUST   Sign (EXACTLY t)
+        WITHIN 14
+        ONCE   ALL HAVE WITHIN 30
+        HENCE  FULFILLED
+        LEST   (PARTY theLandlord MUST Refund (EXACTLY theLandlord) WITHIN 5 OF THE DEADLINE)
+
+#TRACE `the tenancy, a member late` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+  PARTY bob   DOES Sign bob   AT 15
+  PARTY theLandlord DOES Refund theLandlord AT 20
+
+-- And the other layer: every member signs within the act's 40, but the last
+-- signature, at 31, lands after the ONCE line's 30. That is the deadline
+-- the LEST counts from: 30 + 5 = 35, so a refund at 36 breaches reporting 35.
+GIVETH A DEONTIC Actor Action
+`the tenancy, the group late` MEANS
+    EVERY Tenant t IN tenants
+        MUST   Sign (EXACTLY t)
+        WITHIN 40
+        ONCE   ALL HAVE WITHIN 30
+        HENCE  FULFILLED
+        LEST   (PARTY theLandlord MUST Refund (EXACTLY theLandlord) WITHIN 5 OF THE DEADLINE)
+
+#TRACE `the tenancy, the group late` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+  PARTY bob   DOES Sign bob   AT 31
+  PARTY theLandlord DOES Refund theLandlord AT 36
+
+-- Members may be due at different times. THE DEADLINE in the HENCE is then
+-- the LATEST of their deadlines — when all performance had fallen due —
+-- and not the deadline of whoever happened to complete last, so the order
+-- the roll names them in cannot move it. Alice is due at 20, Bob at 10;
+-- both have signed by day 9, so the landlord's five days run from 20:
+-- delivery at 25 is timely, and at 26 the breach reports 25 — from either
+-- roll, and whether or not the two signatures share a stamp.
+GIVEN t IS AN Actor GIVETH A NUMBER
+grace t MEANS
+    CONSIDER t
+    WHEN Tenant n   THEN (IF n EQUALS "Alice" THEN 20 ELSE 10)
+    WHEN Landlord n THEN 0
+
+GIVEN roll IS A LIST OF Actor
+GIVETH A DEONTIC Actor Action
+`per member` roll MEANS
+    EVERY Tenant t IN roll
+        MUST   Sign (EXACTLY t)
+        WITHIN grace t
+        ONCE   ALL HAVE
+        HENCE  (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5 OF THE DEADLINE)
+        LEST   BREACH
+
+#TRACE `per member` (LIST alice, bob) AT 0 WITH
+  PARTY alice DOES Sign alice AT 5
+  PARTY bob   DOES Sign bob   AT 9
+  PARTY theLandlord DOES Deliver theLandlord AT 25
+
+#TRACE `per member` (LIST alice, bob) AT 0 WITH
+  PARTY alice DOES Sign alice AT 9
+  PARTY bob   DOES Sign bob   AT 9
+  PARTY theLandlord DOES Deliver theLandlord AT 26
+
+#TRACE `per member` (LIST bob, alice) AT 0 WITH
+  PARTY alice DOES Sign alice AT 9
+  PARTY bob   DOES Sign bob   AT 9
+  PARTY theLandlord DOES Deliver theLandlord AT 26
+
+-- A barrier over NOBODY is joined at its arming — "all zero of them have
+-- acted" is true at once — and its HENCE fires there. THE DEADLINE in that
+-- HENCE is the ONCE line's WITHIN when written: 0 + 30, so delivery is due
+-- 35 and the breach at 36 reports 35.
+nobody MEANS LIST
+
+GIVETH A DEONTIC Actor Action
+`nobody, bounded as a whole` MEANS
+    EVERY Tenant t IN nobody
+        MUST   Sign (EXACTLY t)
+        ONCE   ALL HAVE WITHIN 30
+        HENCE  (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5 OF THE DEADLINE)
+        LEST   BREACH
+
+#TRACE `nobody, bounded as a whole` AT 0 WITH
+  PARTY theLandlord DOES Deliver theLandlord AT 36
+
+-- With only an act WITHIN, nobody had a deadline to meet, so there is none
+-- for THE DEADLINE to name: the run refuses and says so — also when the
+-- EVERY sits under an obligation that has a deadline of its own, which is
+-- NOT borrowed (the landlord's 10 here plays no part).
+GIVETH A DEONTIC Actor Action
+`nobody, act deadline only` MEANS
+    PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 10
+    HENCE (EVERY Tenant t IN nobody
+              MUST   Sign (EXACTLY t)
+              WITHIN 3
+              ONCE   ALL HAVE
+              HENCE  (PARTY theLandlord MUST Refund (EXACTLY theLandlord) WITHIN 5 OF THE DEADLINE)
+              LEST   BREACH)
+    LEST  BREACH
+
+#TRACE `nobody, act deadline only` AT 0 WITH
+  PARTY theLandlord DOES Deliver theLandlord AT 2
+  PARTY theLandlord DOES Refund theLandlord AT 16
 
 -- A join line's own WITHIN may be anchored too — to THE ARMING (the EVERY's
 -- own arming, which is also what it counts from unanchored) or to an
@@ -299,6 +411,106 @@ GIVETH A DEONTIC Actor Action
   PARTY alice DOES Sign alice AT 1
   PARTY bob   DOES Sign bob   AT 9
   PARTY theLandlord DOES Deliver theLandlord AT 17
+
+
+§ `A continuation that arrives as a value`
+
+-- The anchors name the obligation a continuation is ATTACHED to when it
+-- runs, not the one it happens to be written under. `after k` is Bob's
+-- obligation with k as its HENCE; the landlord's obligation is written
+-- under Alice's HENCE and handed to `after`, so when it runs it is Bob's
+-- continuation. OF THE JOIN is Bob's signature at 50 — the same instant an
+-- unanchored WITHIN 5 in that place counts from — so delivery at 55 is
+-- timely and at 56 the breach reports 55; OF THE DEADLINE is Bob's
+-- deadline, 3 + 100 = 103, so delivery at 108 is timely and at 109 the
+-- breach reports 108. (The checker sees only where an anchor is WRITTEN,
+-- so it refuses THE JOIN and THE DEADLINE at the top level and in a WHERE;
+-- a value carrying THE JOIN that is later attached under a LEST is refused
+-- when it runs, not before.)
+GIVEN k IS A DEONTIC Actor Action
+GIVETH A DEONTIC Actor Action
+after k MEANS
+    PARTY bob MUST Sign (EXACTLY bob) WITHIN 100
+    HENCE k
+    LEST  BREACH
+
+GIVETH A DEONTIC Actor Action
+`handed on, the join` MEANS
+    PARTY alice MUST Sign (EXACTLY alice) WITHIN 10
+    HENCE (after (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5 OF THE JOIN))
+    LEST  BREACH
+
+#TRACE `handed on, the join` AT 0 WITH
+  PARTY alice DOES Sign alice AT 3
+  PARTY bob   DOES Sign bob   AT 50
+  PARTY theLandlord DOES Deliver theLandlord AT 55
+
+#TRACE `handed on, the join` AT 0 WITH
+  PARTY alice DOES Sign alice AT 3
+  PARTY bob   DOES Sign bob   AT 50
+  PARTY theLandlord DOES Deliver theLandlord AT 56
+
+GIVETH A DEONTIC Actor Action
+`handed on, the deadline` MEANS
+    PARTY alice MUST Sign (EXACTLY alice) WITHIN 10
+    HENCE (after (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5 OF THE DEADLINE))
+    LEST  BREACH
+
+#TRACE `handed on, the deadline` AT 0 WITH
+  PARTY alice DOES Sign alice AT 3
+  PARTY bob   DOES Sign bob   AT 50
+  PARTY theLandlord DOES Deliver theLandlord AT 108
+
+#TRACE `handed on, the deadline` AT 0 WITH
+  PARTY alice DOES Sign alice AT 3
+  PARTY bob   DOES Sign bob   AT 50
+  PARTY theLandlord DOES Deliver theLandlord AT 109
+
+-- A WHERE local is the same case. `cure` is defined outside the HENCE and
+-- attached to Alice's obligation when her HENCE fires, so OF THE ARMING is
+-- Alice's arming, 0, exactly as if `cure` had been written inline: the
+-- deadline is 5, and delivery at 6 breaches reporting 5. Factoring an
+-- inline continuation out into a WHERE does not move its deadline.
+GIVETH A DEONTIC Actor Action
+`factored out` MEANS
+    PARTY alice MUST Sign (EXACTLY alice) WITHIN 10
+    HENCE cure
+    LEST  BREACH
+    WHERE
+      cure MEANS PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5 OF THE ARMING
+
+#TRACE `factored out` AT 0 WITH
+  PARTY alice DOES Sign alice AT 3
+  PARTY theLandlord DOES Deliver theLandlord AT 6
+
+
+§ `A prohibition kept: the join is the event that revealed it`
+
+-- Alice must not smoke for ten days. Nothing happens on day 10 itself; the
+-- machine learns the prohibition was kept when the next event arrives —
+-- Bob's signature at 30 — and that is where the HENCE's clock starts,
+-- anchored or not: OF THE JOIN is 30, so delivery is due 33 and at 34 the
+-- breach reports 33. To count from the day the prohibition was discharged,
+-- anchor to THE DEADLINE: 10 + 3 = 13, and delivery at 14 reports 13.
+GIVETH A DEONTIC Actor Action
+`kept, the join` MEANS
+    PARTY alice SHANT Smoke (EXACTLY alice) WITHIN 10
+    HENCE (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 3 OF THE JOIN)
+    LEST  BREACH
+
+#TRACE `kept, the join` AT 0 WITH
+  PARTY bob DOES Sign bob AT 30
+  PARTY theLandlord DOES Deliver theLandlord AT 34
+
+GIVETH A DEONTIC Actor Action
+`kept, the deadline` MEANS
+    PARTY alice SHANT Smoke (EXACTLY alice) WITHIN 10
+    HENCE (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 3 OF THE DEADLINE)
+    LEST  BREACH
+
+#TRACE `kept, the deadline` AT 0 WITH
+  PARTY bob DOES Sign bob AT 30
+  PARTY theLandlord DOES Deliver theLandlord AT 14
 
 
 § `What a residual prints`

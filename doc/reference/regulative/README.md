@@ -84,14 +84,20 @@ The duration is a `NUMBER` of clock units — the same units the trace's timesta
 
 The duration can be anchored with `OF`, and then the deadline is **absolute**: the anchor's instant plus the duration, whatever the clock read when the obligation was entered. The anchor is one of:
 
-| Anchor            | Names                                                                                         |
-| ----------------- | --------------------------------------------------------------------------------------------- |
-| `OF THE JOIN`     | the instant the enclosing obligation was completed (under `HENCE` this is the default, named) |
-| `OF THE DEADLINE` | the enclosing obligation's deadline (its `WITHIN`)                                            |
-| `OF THE ARMING`   | the instant the enclosing obligation was entered                                              |
-| `OF expression`   | an instant: a `NUMBER` on the trace's clock, or a `DATE`                                      |
+| Anchor            | Names                                                                                           |
+| ----------------- | ----------------------------------------------------------------------------------------------- |
+| `OF THE JOIN`     | the instant the enclosing obligation's `HENCE` fired (under `HENCE` this is the default, named) |
+| `OF THE DEADLINE` | the enclosing obligation's deadline (its `WITHIN`)                                              |
+| `OF THE ARMING`   | the instant the enclosing obligation was entered                                                |
+| `OF expression`   | an instant: a `NUMBER` on the trace's clock, or a `DATE`                                        |
 
-"The enclosing obligation" is the one whose `HENCE` or `LEST` this obligation is the continuation of. `THE`, `JOIN`, `DEADLINE` and `ARMING` are matched by spelling in this one position; none of the three nouns is reserved, so a program may still name a value `DEADLINE`.
+"The enclosing obligation" is the one whose `HENCE` or `LEST` this obligation is the continuation of — the one it is attached to when it runs. Usually that is the obligation it is written under; but a continuation can also arrive as a value (a rule with `GIVEN k IS A DEONTIC …` that ends `HENCE k`, or a `WHERE` local), and then the anchors name the obligation it is handed to, not the one it was written under. It is the _nearest_ enclosing obligation: two levels down, `THE ARMING` is the middle obligation's arming, not the outermost rule's, so "within 10 days of this agreement" (below) works from one level down, where the phrase is written.
+
+For a `MUST`, `DO` or `MAY`, the join is the act that completed it. For a prohibition (`SHANT`) that was kept, the `HENCE` fires when the machine _learns_ it was kept — the first event after its deadline, not the deadline itself — and `THE JOIN` is that instant, the same one an unanchored `WITHIN` counts from. To count from the day a prohibition was discharged, anchor to `THE DEADLINE`.
+
+`THE` is a keyword; `JOIN`, `DEADLINE` and `ARMING` are matched by spelling in this one position and are not reserved, so a program may still name a value `DEADLINE`.
+
+Inside the duration, `OF` is always the anchor — everywhere in it, not only at the front — so `WITHIN f OF x` means `f` anchored at `x`, and so does an `OF` inside an `IF` branch, an operator's operand or a `WHERE` in the duration. To apply a function there, bracket the call (`WITHIN (f OF x) OF THE JOIN`) or juxtapose its arguments (`WITHIN f x OF THE JOIN`); the checker's message says so when the duration turns out to be a function.
 
 ### Examples
 
@@ -116,7 +122,9 @@ cure MEANS
   LEST  BREACH
 
 -- "Within 10 days of this agreement": counts from when the outer obligation
--- was entered, however long the buyer took to pay
+-- was entered, however long the buyer took to pay. (One level down only:
+-- an obligation nested a level deeper would count from the seller's
+-- arming, the nearest enclosing obligation.)
 GIVETH A DEONTIC Person Action
 `of this agreement` MEANS
   PARTY Buyer MUST pay 100 WITHIN 30
@@ -128,7 +136,7 @@ GIVETH A DEONTIC Person Action
 absolute MEANS PARTY Seller MUST deliver WITHIN 5 OF closingDate
 ```
 
-A unit word is ordinary L4, not syntax: `WITHIN 5 days OF THE DEADLINE` checks once `days` is defined (`GIVEN n IS A NUMBER GIVETH A NUMBER DECIDE n days IS n`), and fails with _could not find a definition for the identifier `days`_ until it is.
+A unit word is ordinary L4, not syntax: `WITHIN 5 days OF THE DEADLINE` checks once `days` is defined (`GIVEN n IS A NUMBER GIVETH A NUMBER DECIDE n days IS n`). Until it is, the file fails — how depends on what else is in scope. In a file with no imports and no other mixfix definition, like the one above, `5 days` parses as an application and the checker reports _could not find a definition for the identifier `days`_; once any mixfix operator is in scope (after `IMPORT prelude`, say, or one `DECIDE a plus b IS …`), the parser only accepts operator words it knows, and stops at `days` with _unexpected days_. Either way the fix is the one-line definition.
 
 An anchored deadline may already be in the past when the obligation is entered — `WITHIN 5 OF closingDate` on a contract that begins after `closingDate + 5`. That is not an error: the first event reveals the expiry, exactly as if the deadline had been missed by waiting.
 
@@ -145,7 +153,12 @@ The type checker refuses a lifecycle anchor where the position it names does not
 - `THE DEADLINE` where the enclosing obligation has no `WITHIN` at all.
 - An `OF` expression that is neither a `NUMBER` nor a `DATE`.
 
-A top-level rule referenced by name inside a `HENCE` (`HENCE cure`) is checked where it is written, at the top level, and so cannot use `THE JOIN` or `THE DEADLINE`: write the anchored obligation inline under the `HENCE`.
+The checker sees only where an anchor is _written_. A top-level rule referenced by name inside a `HENCE` (`HENCE cure`), and a `WHERE` local, are checked where they are written — outside any `HENCE` or `LEST` — and so cannot use `THE JOIN` or `THE DEADLINE`: write the anchored obligation inline under the `HENCE`. `THE ARMING` is accepted there, and when the rule runs it names the arming of the obligation the continuation is attached to (its own, when there is none), so factoring an inline continuation out into a `WHERE` does not move its deadline.
+
+Two refusals only a run can make, because the checker cannot see them, are reported when the rule runs, naming the cause:
+
+- `THE DEADLINE` in the `HENCE` of a barrier (`ONCE ALL HAVE`) whose group turned out to be _empty_ and whose `ONCE` line has no `WITHIN` — nobody had a deadline to meet, so there is none to name.
+- An obligation written under one `HENCE` and handed on as a value to a place where the position does not exist — `THE JOIN` attached under a `LEST`, `THE DEADLINE` attached under an obligation with no `WITHIN`.
 
 Under `EVERY` the same anchors work on the act's `WITHIN`, and a join line's own `WITHIN` may be anchored to `THE ARMING` or to an instant; see [EVERY](EVERY.md#anchored-deadlines-under-a-join).
 
