@@ -257,10 +257,16 @@ That file is deleted. The extractor now reads `IF`/`ELSE` chains directly
 - **Left-to-right stops meaning time.** `P-CYCLE` on the reporting process: this layout ranks a node
   by its longest path from the start, and a node on a loop has none.
 - **A loop makes the gateway mixed, and not every engine has that shape.** With the renewal edge
-  drawn, `Split_0` has two incoming flows (`Start_0` and `Task_4`) and three outgoing, so its
-  `gatewayDirection` is `Mixed`. BPMN 2.0 permits that — §10.5.2 allows a gateway to be mixed —
-  and `bpmn-moddle` reports 0 warnings. jBPM does not implement it: `Unknown gateway direction:
-  Mixed`.
+  drawn straight into the gateway, `Split_0` had two incoming flows (`Start_0` and `Task_4`) and
+  three outgoing, so its `gatewayDirection` was `Mixed`. BPMN 2.0 permits that — §10.5.2 allows a
+  gateway to be mixed — and `bpmn-moddle` reports 0 warnings. jBPM does not implement it:
+  `Unknown gateway direction: Mixed`. **Since 2026-08-02 (commit `30308c4f`) that is no longer the
+  shipped shape:** `Decide_0`, the `businessRuleTask`, sits in front of `Split_0` and takes both
+  arrivals, so the gateway is a plain 1-in/3-out `Diverging` and jBPM rejects the file one node
+  earlier instead — `This type of node [Decide_0, ongoing reporting obligation] cannot have more
+  than one incoming connection!` (re-measured 2026-09-15; the class-(a′) row of
+  `specs/todo/lexipedia-superset/PROCESS-TRACK.md` records the same relocation on 2026-08-02).
+  The rest of this bullet is the record of the mixed-gateway measurement as it was made.
 
   The shipped file used to say `Diverging` here, which was simply false — §10.5.1 Table 10.100 says
   `Diverging` MUST NOT have multiple incoming — and neither script looked at the attribute, so it
