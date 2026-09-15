@@ -64,7 +64,7 @@ Before:
 ASSUME issuer IS AN IssuerProfile
 
 GIVETH A BOOLEAN
-`is disqualified` MEANS issuer's `has a disqualifying event`
+`is disqualified` MEANS issuer's `a disqualifying event`
 ```
 
 After:
@@ -74,7 +74,7 @@ After:
     GIVEN issuer IS AN IssuerProfile
 
 GIVETH A BOOLEAN
-`is disqualified` MEANS issuer's `has a disqualifying event`
+`is disqualified` MEANS issuer's `a disqualifying event`
 ```
 
 The indentation is what makes a `GIVEN` the section's rather than one rule's: a

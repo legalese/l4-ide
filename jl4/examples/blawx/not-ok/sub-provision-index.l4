@@ -13,9 +13,9 @@
 -- by name rather than emitting a document that looks fine and is not.
 
 DECLARE Director HAS
-    `is bankrupt` IS A BOOLEAN
+    `bankrupt` IS A BOOLEAN
 
 @export 4. 5. A director is disqualified.
 GIVEN d IS A Director
 GIVETH A BOOLEAN
-DECIDE `is disqualified` d IF d's `is bankrupt`
+DECIDE `is disqualified` d IF d's `bankrupt`

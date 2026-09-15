@@ -78,7 +78,7 @@ IMPORT `sg-succession-domain`
 DECLARE Applicant
     HAS `name`                                          IS A STRING
         -- s 3(1), s 5(1): renunciation
-        `has renounced the right to such grant`         IS A BOOLEAN
+        `renounced the right to such grant`         IS A BOOLEAN
         -- s 6(6): "trust corporation" means the Public Trustee OR a licensed
         -- trust company. The two limbs are separate facts, because s 29(4)
         -- exempts only the Public Trustee from security while s 6(2) accepts
@@ -283,7 +283,7 @@ GIVETH A BOOLEAN
 GIVEN p IS AN Applicant
 GIVETH A BOOLEAN
 `renunciation precludes` p MEANS
-    p's `has renounced the right to such grant`
+    p's `renounced the right to such grant`
 
 -- NOT MODELLED, AND WHY. s 3(2) (renunciation orally on the hearing, or in
 -- writing attested by an advocate and solicitor) and s 4 (the citation
@@ -495,7 +495,7 @@ GIVETH A BOOLEAN
 GIVEN a IS AN Administration
 GIVETH A BOOLEAN
 `section 13(1)(b) the executors are legally incapable or have renounced in` a MEANS
-    all (GIVEN p YIELD p's `legally incapable of acting as such` OR p's `has renounced the right to such grant`) executors
+    all (GIVEN p YIELD p's `legally incapable of acting as such` OR p's `renounced the right to such grant`) executors
     WHERE
       executors MEANS `the executors appointed by the will in` a
 
@@ -1808,7 +1808,7 @@ GIVEN nm IS A STRING
 GIVETH AN Applicant
 `an able and willing executor named` nm MEANS
     Applicant WITH `name` IS nm
-                 , `has renounced the right to such grant` IS FALSE
+                 , `renounced the right to such grant` IS FALSE
                  , `the Public Trustee` IS FALSE
                  , `a corporation licensed as a trust company under the Trust Companies Act 2005` IS FALSE
                  , `an infant` IS FALSE
@@ -1830,7 +1830,7 @@ GIVEN nm IS A STRING
 GIVETH AN Applicant
 `an executor who has renounced named` nm MEANS
     Applicant WITH `name` IS nm
-                 , `has renounced the right to such grant` IS TRUE
+                 , `renounced the right to such grant` IS TRUE
                  , `the Public Trustee` IS FALSE
                  , `a corporation licensed as a trust company under the Trust Companies Act 2005` IS FALSE
                  , `an infant` IS FALSE
@@ -1854,7 +1854,7 @@ GIVEN nm IS A STRING
 GIVETH AN Applicant
 `an infant executor named` nm MEANS
     Applicant WITH `name` IS nm
-                 , `has renounced the right to such grant` IS FALSE
+                 , `renounced the right to such grant` IS FALSE
                  , `the Public Trustee` IS FALSE
                  , `a corporation licensed as a trust company under the Trust Companies Act 2005` IS FALSE
                  , `an infant` IS TRUE
@@ -1876,7 +1876,7 @@ GIVEN nm IS A STRING
 GIVETH AN Applicant
 `a universal or residuary legatee named` nm MEANS
     Applicant WITH `name` IS nm
-                 , `has renounced the right to such grant` IS FALSE
+                 , `renounced the right to such grant` IS FALSE
                  , `the Public Trustee` IS FALSE
                  , `a corporation licensed as a trust company under the Trust Companies Act 2005` IS FALSE
                  , `an infant` IS FALSE
@@ -1898,7 +1898,7 @@ GIVEN nm IS A STRING
 GIVETH AN Applicant
 `a creditor named` nm MEANS
     Applicant WITH `name` IS nm
-                 , `has renounced the right to such grant` IS FALSE
+                 , `renounced the right to such grant` IS FALSE
                  , `the Public Trustee` IS FALSE
                  , `a corporation licensed as a trust company under the Trust Companies Act 2005` IS FALSE
                  , `an infant` IS FALSE
@@ -1920,7 +1920,7 @@ GIVEN nm IS A STRING
 GIVETH AN Applicant
 `a widow or next of kin named` nm MEANS
     Applicant WITH `name` IS nm
-                 , `has renounced the right to such grant` IS FALSE
+                 , `renounced the right to such grant` IS FALSE
                  , `the Public Trustee` IS FALSE
                  , `a corporation licensed as a trust company under the Trust Companies Act 2005` IS FALSE
                  , `an infant` IS FALSE
@@ -1946,7 +1946,7 @@ GIVEN nm IS A STRING
 GIVETH AN Applicant
 `a widow or next of kin who has not applied named` nm MEANS
     Applicant WITH `name` IS nm
-                 , `has renounced the right to such grant` IS FALSE
+                 , `renounced the right to such grant` IS FALSE
                  , `the Public Trustee` IS FALSE
                  , `a corporation licensed as a trust company under the Trust Companies Act 2005` IS FALSE
                  , `an infant` IS FALSE
@@ -1968,7 +1968,7 @@ GIVEN nm IS A STRING
 GIVETH AN Applicant
 `a licensed trust company named` nm MEANS
     Applicant WITH `name` IS nm
-                 , `has renounced the right to such grant` IS FALSE
+                 , `renounced the right to such grant` IS FALSE
                  , `the Public Trustee` IS FALSE
                  , `a corporation licensed as a trust company under the Trust Companies Act 2005` IS TRUE
                  , `an infant` IS FALSE

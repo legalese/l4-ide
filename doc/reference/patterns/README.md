@@ -165,7 +165,7 @@ GIVEN `by deceiving any person`   IS A BOOLEAN
       `cause the delivery`        IS A BOOLEAN
       `intentionally`             IS A BOOLEAN
       `causes`                    IS A BOOLEAN
-      `is likely to cause`        IS A BOOLEAN
+      `likely to cause`        IS A BOOLEAN
       `damage`                    IS A BOOLEAN
       `harm`                      IS A BOOLEAN
 DECIDE `commits cheating` IF
@@ -180,7 +180,7 @@ DECIDE `commits cheating` IF
     OR  `intentionally` .. "induces the person so deceived"
         ... "which act or omission"
                 ..  `causes`
-                OR  `is likely to cause`
+                OR  `likely to cause`
             ...     `damage`
                 OR  `harm`
                 ..  "to any person"
@@ -204,7 +204,7 @@ DECIDE `commits cheating` IF
 ```l4
 DECIDE `is eligible` IF
         `meets age requirement`
-    AND `has valid ID`
+    AND `valid ID`
  UNLESS  `is disqualified`
 ```
 
@@ -213,7 +213,7 @@ This is semantically identical to:
 ```l4
 DECIDE `is eligible` IF
         `meets age requirement`
-    AND `has valid ID`
+    AND `valid ID`
     AND NOT `is disqualified`
 ```
 

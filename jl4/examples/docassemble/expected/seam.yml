@@ -9,11 +9,11 @@ id: objects_main
 objects:
   - t: DAObject
 ---
-id: q_t.is_a_residential_tenancy
+id: q_t.a_residential_tenancy
 question: |
-  is a residential tenancy
+  a residential tenancy
 fields:
-  - "is a residential tenancy": t.is_a_residential_tenancy
+  - "a residential tenancy": t.a_residential_tenancy
     datatype: yesnoradio
     help: "Whether the letting is of a dwelling occupied as a home"
 ---
@@ -37,9 +37,9 @@ id: c_notice_rule_satisfied_the_rule_applies
 reconsider: True
 code: |
   # L4: `the rule applies`
-  notice_rule_satisfied_the_rule_applies = t.is_a_residential_tenancy
+  notice_rule_satisfied_the_rule_applies = t.a_residential_tenancy
 depends on:
-  - t.is_a_residential_tenancy
+  - t.a_residential_tenancy
 sets:
   - notice_rule_satisfied_the_rule_applies
 ---
@@ -126,7 +126,7 @@ question: |
   Every question this interview can ask, and the answer it has.
 review:
   - note: |
-      is a residential tenancy: ${ showifdef('t.is_a_residential_tenancy', '**not asked**') }
+      a residential tenancy: ${ showifdef('t.a_residential_tenancy', '**not asked**') }
   - note: |
       written notice was given: ${ showifdef('t.written_notice_was_given', '**not asked**') }
   - note: |

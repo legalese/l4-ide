@@ -31,6 +31,19 @@ The Saxon genitive, by contrast, is immediately legible to anyone who reads Engl
 
 **The clitic supplies the verb, so the field name should not.** `'s` reads as both "is" and "has": `` transfer's `to the issuer` `` already means _the transfer **is** to the issuer_, and `` person's `age` `` already means _the person **has** an age_. A field named `` `is to the issuer` `` says it twice. Start the name at the complement. This matters beyond neatness, because the field name is what a ladder diagram prints beside its node and what a generated wizard asks the user -- and because statutes do the same thing, letting a chapeau supply the verb for every limb beneath it.
 
+Two later rulings (2026-09-13) settle how far this reaches. It binds **every** `.l4` and `.md` file,
+not only the pages that teach style — because every L4 file is ultimately something a reader, or a
+model, learns the style from. And it binds the **declaration**: a field named `` `is bankrupt` `` is
+wrong where it is declared, whether or not anything reads it through the clitic yet.
+
+The exception is for a name carried verbatim from the source, where the statute's own limb supplies
+the verb because its chapeau does not. Those keep it. The practical test is that such a name usually
+contains a second `is` or `has` inside itself, which a name we coined does not.
+
+One thing this deliberately does not do: it does not push you toward writing predicates in prefix
+position (`` `is bankrupt` person ``) so that the verb has somewhere to live. That form is available
+— a field is also a projection function — but it is not the style L4 is designed around.
+
 **Technical detail:** The `'s` operator chains naturally, just as it does in English. `company's ceo's name` accesses the `name` field of the `ceo` field of the `company` record. When used as an argument to a function, wrap in parentheses: `f (record's field)`.
 
 For the full syntax specification, see the [Genitive reference](../../reference/syntax/README.md).
@@ -213,7 +226,7 @@ DECIDE `commits cheating` IF
                                   .. "if he were not so deceived"
              AND         "which act or omission"
                      ..  `causes`
-                     OR  `is likely to cause`
+                     OR  `likely to cause`
                  ...     `damage`
                      OR  `harm`
                      ..  "to any person"

@@ -121,7 +121,7 @@ The ellipsis operators are implicit conjunction/disjunction — they let you wri
 
 ```l4
 DECIDE `eligible for discount` IF
-    `is existing customer`
+    `existing customer`
     ...
     `has clean payment history`
     ...
@@ -190,7 +190,7 @@ Any identifier containing spaces or punctuation must be backtick-quoted:
 
 ```l4
 `the applicant`
-`has valid identification`
+`valid identification`
 `the person must not sell alcohol`
 ```
 

@@ -54,13 +54,13 @@ DECIDE blocked IF TRUE UNLESS TRUE
 
 § `Legal exception pattern`
     GIVEN `is a citizen` IS A BOOLEAN
-          `has resided for 5 years` IS A BOOLEAN
-          `has been disqualified` IS A BOOLEAN
+          `resided for 5 years` IS A BOOLEAN
+          `been disqualified` IS A BOOLEAN
 
 DECIDE `is eligible` IF
       `is a citizen`
-  AND `has resided for 5 years`
-  UNLESS `has been disqualified`
+  AND `resided for 5 years`
+  UNLESS `been disqualified`
 ```
 
 This reads naturally and correctly evaluates as:
@@ -75,7 +75,7 @@ UNLESS works well with L4's layout-sensitive syntax:
 
 ```l4
 DECIDE `can enter premises` IF
-         `has valid badge`
+         `valid badge`
   AND    `during business hours`
   AND    `not on restricted list`
   UNLESS `building is closed`
@@ -89,8 +89,8 @@ UNLESS applies to the entire OR expression:
 -- "Eligible if employee OR contractor, UNLESS terminated"
 DECIDE `has access` IF
          `is employee`
-  OR     `is contractor`
-  UNLESS `has been terminated`
+  OR     `contractor`
+  UNLESS `been terminated`
 
 -- Evaluates as: (is employee OR is contractor) AND NOT has been terminated
 ```

@@ -197,7 +197,7 @@ DECIDE `the loan is approved` IF
 -- Insurance premium calculation
 GIVEN `the insured age` IS A NUMBER
       `the coverage amount` IS A NUMBER
-      `is smoker` IS A BOOLEAN
+      `smoker` IS A BOOLEAN
 GIVETH A NUMBER
 `the annual premium` MEANS
     `the base premium` * `the age factor` * `the smoking factor`
@@ -212,7 +212,7 @@ GIVETH A NUMBER
                 OTHERWISE 2.0
 
         `the smoking factor` MEANS
-            IF `is smoker` THEN 1.5 ELSE 1.0
+            IF `smoker` THEN 1.5 ELSE 1.0
 
 -- =======================================
 -- SECTION 6: Real-World Contract Scenarios

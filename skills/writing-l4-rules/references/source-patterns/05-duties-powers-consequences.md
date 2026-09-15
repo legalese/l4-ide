@@ -33,7 +33,7 @@ GIVEN `the person` IS AN Applicant
 GIVETH A BOOLEAN
 `s 6(1) — a licence may be granted to` `the person` MEANS
         `the person`'s `age in years` AT LEAST 18
-    AND NOT `the person`'s `has been disqualified under section 9`
+    AND NOT `the person`'s `been disqualified under section 9`
 ```
 
 _(Neither feature; checked on the section-`GIVEN` binary, exit 0.)_

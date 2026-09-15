@@ -49,7 +49,7 @@ Add inline `@desc` annotations to `GIVEN` parameters so API consumers can learn 
 GIVEN applicant IS A Applicant @desc The applicant to check
 GIVETH A BOOLEAN
 DECIDE `qualifies for discount` IF
-    applicant's `is existing customer`
+    applicant's `existing customer`
     AND applicant's `risk score` <= 0.5
 ```
 
@@ -137,7 +137,7 @@ curl -X POST https://api.legalese.cloud/{orgSlug}/insurance-premium/functions/ca
       "applicant": {
         "age": 35,
         "risk-score": 0.4,
-        "is-existing-customer": true
+        "existing-customer": true
       }
     }
   }'
@@ -154,7 +154,7 @@ curl -X POST https://api.legalese.cloud/{orgSlug}/insurance-premium/functions/qu
       "applicant": {
         "age": 35,
         "risk-score": 0.4,
-        "is-existing-customer": true
+        "existing-customer": true
       }
     }
   }'
@@ -168,7 +168,7 @@ Not sure which inputs matter? Use the query-plan endpoint to ask only the questi
 curl -X POST https://api.legalese.cloud/{orgSlug}/insurance-premium/functions/calculate-premium/query-plan \
   -H "Authorization: Bearer sk_..." \
   -H "Content-Type: application/json" \
-  -d '{"arguments": {"applicant": {"is-existing-customer": true}}}'
+  -d '{"arguments": {"applicant": {"existing-customer": true}}}'
 ```
 
 This returns which inputs are still needed, ranked by their impact on the result.
@@ -208,7 +208,7 @@ curl -X POST https://mcp.legalese.cloud/{orgSlug}/insurance-premium \
         "applicant": {
           "age": 35,
           "risk-score": 0.4,
-          "is-existing-customer": true
+          "existing-customer": true
         }
       }
     }

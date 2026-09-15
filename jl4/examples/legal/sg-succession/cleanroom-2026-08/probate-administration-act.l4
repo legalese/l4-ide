@@ -590,7 +590,7 @@ GIVETH A LIST OF Grantee
 -- deemed renunciation for failing to file a notice of intention to contest)
 -- are NOT encoded: they are procedural machinery that PRODUCES a fact, and the
 -- fact itself is already in the shared ontology as `Executor appointed by a
--- will`'s `has renounced the right to act as such`. What IS encoded is s 5(1),
+-- will`'s `renounced the right to act as such`. What IS encoded is s 5(1),
 -- because it is that fact's operative consequence.
 
 @ref Probate and Administration Act 1934 s 5(1) — "The renunciation, whether made expressly in the manner provided by section 3, or constructively in the manner provided by section 4, shall preclude the person so renouncing from applying thereafter for probate or letters of administration."
@@ -626,7 +626,7 @@ GIVEN x IS AN `Executor appointed by a will`
 GIVETH A BOOLEAN
 `s 5(1) — precluded from applying thereafter for probate or letters of administration` x MEANS
     `s 5(1) — the person so renouncing is precluded from applying thereafter for probate or letters of administration`
-        (x's `has renounced the right to act as such`)
+        (x's `renounced the right to act as such`)
 
 
 § `Part 3 — Grant of probate or letters of administration`
@@ -1091,7 +1091,7 @@ GIVEN x IS AN `Executor appointed by a will`, `the date` IS A DATE
 GIVETH A BOOLEAN
 `s 13(1)(b) — this executor is disqualified` x `the date` MEANS
         `s 13(1)(b) — this executor is legally incapable of acting as such` x `the date`
-    OR  x's `has renounced the right to act as such`
+    OR  x's `renounced the right to act as such`
 
 GIVEN w IS A Will, `the date` IS A DATE
 GIVETH A BOOLEAN
@@ -1147,7 +1147,7 @@ GIVETH A BOOLEAN
 `s 13(1)(d) — this executor died before obtaining probate or before having administered all the estate of the deceased` d x MEANS
         `has died` (x's `the executor`)
     AND (   NOT (`s 13(1)(d) — this executor obtained probate` d x)
-         OR NOT (x's `has administered all the estate of the deceased`))
+         OR NOT (x's `administered all the estate of the deceased`))
 
 GIVEN d IS A `Deceased person`, w IS A Will
 GIVETH A BOOLEAN
@@ -2408,7 +2408,7 @@ GIVETH A BOOLEAN
 `a grant of letters of administration that has not been extracted` g MEANS
         (   g's `the kind of grant` EQUALS `letters of administration`
          OR g's `the kind of grant` EQUALS `letters of administration with the will annexed`)
-    AND NOT (g's `has been extracted`)
+    AND NOT (g's `been extracted`)
 
 @ref Probate and Administration Act 1934 s 55(1)(f) — "where after the death of a last surviving executor or administrator of a deceased person’s estate 6 months have elapsed and no application for the representation of the estate has been made"
 -- "a last surviving" — SO EVERY personal representative must have died, and
@@ -2859,7 +2859,7 @@ GIVETH A DEONTIC `A party under the Probate and Administration Act` `An act unde
 --       ss 3-4   renunciation: the oral or attested writing (s 3(2)), the
 --                citation, the notice of intention to contest and the deemed
 --                renunciation for failing to file it (s 4(2)-(3)). The fact is
---                `has renounced the right to act as such`; s 5(1) IS encoded,
+--                `renounced the right to act as such`; s 5(1) IS encoded,
 --                and is stated over a proved renunciation so that it reaches
 --                s 3(1)'s whole class and not only appointed executors — see
 --                the domain gap recorded at that site.
@@ -3318,19 +3318,19 @@ GIVETH A `Collateral relative`
         `of the whole blood or of the half blood` IS `of the whole blood`
 
 GIVEN p IS A Person
-      `is incapable otherwise` IS A BOOLEAN
-      `has renounced` IS A BOOLEAN
-      `has extracted probate` IS A BOOLEAN
-      `has administered the estate` IS A BOOLEAN
+      `incapable otherwise` IS A BOOLEAN
+      `renounced` IS A BOOLEAN
+      `extracted probate` IS A BOOLEAN
+      `administered the estate` IS A BOOLEAN
 GIVETH AN `Executor appointed by a will`
-`a PAA executor` p `is incapable otherwise` `has renounced` `has extracted probate` `has administered the estate` MEANS
+`a PAA executor` p `incapable otherwise` `renounced` `extracted probate` `administered the estate` MEANS
     `Executor appointed by a will` WITH
         `the executor` IS p
         `the appointment, express or implied` IS `express`
-        `legally incapable of acting as such, otherwise than under section 21(1) or section 22(1)` IS `is incapable otherwise`
-        `has renounced the right to act as such` IS `has renounced`
-        `appeared and extracted probate` IS `has extracted probate`
-        `has administered all the estate of the deceased` IS `has administered the estate`
+        `legally incapable of acting as such, otherwise than under section 21(1) or section 22(1)` IS `incapable otherwise`
+        `renounced the right to act as such` IS `renounced`
+        `appeared and extracted probate` IS `extracted probate`
+        `administered all the estate of the deceased` IS `administered the estate`
 
 GIVEN p IS A Person, `the kind` IS A `Kind of disposition`, `the value` IS A Money, `is beneficial` IS A BOOLEAN
 GIVETH A Disposition
@@ -3391,10 +3391,10 @@ GIVEN `the kind` IS A `Kind of grant`
       `the limitation of this grant` IS A `Limitation on the grant`
       `the granting court` IS A `The court that made the grant`
       `security has been given` IS A BOOLEAN
-      `has been taken out` IS A BOOLEAN
+      `been taken out` IS A BOOLEAN
       `it has expired` IS A BOOLEAN
 GIVETH A Grant
-`a PAA grant` `the kind` `the grantees of this grant` `the date of this grant` `the limitation of this grant` `the granting court` `security has been given` `has been taken out` `it has expired` MEANS
+`a PAA grant` `the kind` `the grantees of this grant` `the date of this grant` `the limitation of this grant` `the granting court` `security has been given` `been taken out` `it has expired` MEANS
     Grant WITH
         `the kind of grant` IS `the kind`
         `the grantees` IS `the grantees of this grant`
@@ -3405,7 +3405,7 @@ GIVETH A Grant
         `expired by effluxion of time or by the happening of the event or contingency on which it was limited` IS `it has expired`
         `revoked` IS FALSE
         `has given such security as is lawfully required to be furnished` IS `security has been given`
-        `has been extracted` IS `has been taken out`
+        `been extracted` IS `been taken out`
         `sealed under section 47(1) of the Probate and Administration Act 1934` IS FALSE
         `the date of the sealing` IS NOTHING
 
@@ -3423,9 +3423,9 @@ GIVEN p IS A Person
       `the reference for the infant of whom he is guardian` IS A STRING
       `how he was appointed` IS A `How the guardian was appointed`
       `of the person or of the property, or both` IS A `Kind of guardianship`
-      `has been removed` IS A BOOLEAN
+      `been removed` IS A BOOLEAN
 GIVETH A Guardian
-`a PAA guardian` p `the reference for the infant of whom he is guardian` `how he was appointed` `of the person or of the property, or both` `has been removed` MEANS
+`a PAA guardian` p `the reference for the infant of whom he is guardian` `how he was appointed` `of the person or of the property, or both` `been removed` MEANS
     Guardian WITH
         `the guardian` IS p
         `the reference for the infant` IS `the reference for the infant of whom he is guardian`
@@ -3435,20 +3435,20 @@ GIVETH A Guardian
         `refuses to act` IS FALSE
         `the mother or father objects to his so acting` IS FALSE
         `considers that the mother or father is unfit to have the custody of the infant` IS FALSE
-        `removed from his guardianship by the court` IS `has been removed`
+        `removed from his guardianship by the court` IS `been removed`
         `has given security` IS FALSE
         `the court has otherwise ordered as to security` IS FALSE
-        `has sold, mortgaged, exchanged, or otherwise parted with the possession of any of the movable or immovable property of the infant` IS FALSE
-        `has leased land belonging to the infant` IS FALSE
+        `sold, mortgaged, exchanged, or otherwise parted with the possession of any of the movable or immovable property of the infant` IS FALSE
+        `leased land belonging to the infant` IS FALSE
         `the term of the lease, in years` IS NOTHING
-        `has the permission of the court to deal with the property of the infant` IS FALSE
-        `has given a good discharge for a legacy or other capital moneys payable to or receivable by the infant` IS FALSE
+        `the permission of the court to deal with the property of the infant` IS FALSE
+        `given a good discharge for a legacy or other capital moneys payable to or receivable by the infant` IS FALSE
         `the court has otherwise ordered as to giving a good discharge` IS FALSE
         `the provision made out of the income of the property of the infant for his maintenance and education` IS
             `A periodical sum` WITH
                 `the sum` IS 0
                 `the period` IS `monthly`
-        `has the permission of the court to apply a sum exceeding $100 per month` IS FALSE
+        `the permission of the court to apply a sum exceeding $100 per month` IS FALSE
 
 GIVEN p IS A Person, `the guardians` IS A LIST OF Guardian
 GIVETH AN Infant
@@ -4592,7 +4592,7 @@ GIVETH A `Deceased person`
         `expired by effluxion of time or by the happening of the event or contingency on which it was limited` IS FALSE
         `revoked` IS TRUE
         `has given such security as is lawfully required to be furnished` IS TRUE
-        `has been extracted` IS TRUE
+        `been extracted` IS TRUE
         `sealed under section 47(1) of the Probate and Administration Act 1934` IS FALSE
         `the date of the sealing` IS NOTHING
 `a grant of probate to Goh, in Chan’s lifetime` MEANS
@@ -6033,7 +6033,7 @@ GIVETH A Family
         `expired by effluxion of time or by the happening of the event or contingency on which it was limited` IS FALSE
         `revoked` IS FALSE
         `has given such security as is lawfully required to be furnished` IS TRUE
-        `has been extracted` IS TRUE
+        `been extracted` IS TRUE
         `sealed under section 47(1) of the Probate and Administration Act 1934` IS FALSE
         `the date of the sealing` IS NOTHING
 #ASSERT     `s 26(2) — a further grant may be made of the part of the estate excepted` `a grant excepting part of the estate`

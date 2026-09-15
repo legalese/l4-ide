@@ -17,7 +17,7 @@
             "type": "number",
             "x-sanitized-name": "arrears-when-the-notice-was-served"
           },
-          "has persistently paid rent late": {
+          "persistently paid rent late": {
             "description": " `Have you frequently paid your rent late — even if you are now up to date?`",
             "type": "boolean",
             "x-sanitized-name": "has-persistently-paid-rent-late"
@@ -40,14 +40,14 @@
           "rent amount each time",
           "arrears when the notice was served",
           "arrears expected at the hearing",
-          "has persistently paid rent late"
+          "persistently paid rent late"
         ],
         "required": [
           "how often rent is due",
           "rent amount each time",
           "arrears when the notice was served",
           "arrears expected at the hearing",
-          "has persistently paid rent late"
+          "persistently paid rent late"
         ],
         "type": "object",
         "x-l4-type": "Situation"

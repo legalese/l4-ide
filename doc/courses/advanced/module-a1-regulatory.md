@@ -92,7 +92,7 @@ DECLARE Governor HAS
     `the name` IS A STRING
     `the date of birth` IS A DATE
     `the address` IS A STRING
-    `is bankrupt` IS A BOOLEAN
+    `bankrupt` IS A BOOLEAN
     `the convictions` IS A LIST OF Conviction
 
 -- Core financial information (Regulation 1, Core Info Regs 2018)
@@ -118,7 +118,7 @@ DECLARE `Charity Status` IS ONE OF
     Deregistered HAS
         `the reason` IS A STRING
         `the date` IS A DATE
-        `is retrospective` IS A BOOLEAN
+        `retrospective` IS A BOOLEAN
 
 -- Main charity record
 DECLARE `Registered Charity` HAS
@@ -300,7 +300,7 @@ DECLARE `Register Event` IS ONE OF
         `the charity record` IS A `Registered Charity`
         `the reason` IS A STRING
         `the date` IS A DATE
-        `is retrospective` IS A BOOLEAN
+        `retrospective` IS A BOOLEAN
     `annual return filed` HAS
         `the charity record` IS A `Registered Charity`
         `the year` IS A NUMBER

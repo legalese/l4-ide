@@ -1243,10 +1243,10 @@ GIVETH A FalseInformation
 -- The governor: a director of the (company) entity, so Art 2(7)(c) makes her a governor.
 `Mme Bisson, a governor` MEANS Officer WITH
     name                                                            IS "Mme Bisson"
-    `is a trustee or fideicommissaire of the trust or fideicommis`  IS FALSE
-    `is a member of the council of the foundation`                  IS FALSE
-    `is a director of the company`                                  IS TRUE
-    `is a member of the management committee of the entity`         IS FALSE
+    `a trustee or fideicommissaire of the trust or fideicommis`  IS FALSE
+    `a member of the council of the foundation`                  IS FALSE
+    `a director of the company`                                  IS TRUE
+    `a member of the management committee of the entity`         IS FALSE
     `under the constitution of the entity, has the general control and management of the administration of the entity`  IS FALSE
     `has that general control and management only on behalf of another person who has it in that other person's own right under the constitution of the entity`  IS FALSE
 

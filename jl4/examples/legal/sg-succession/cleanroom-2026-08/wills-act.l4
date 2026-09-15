@@ -2678,14 +2678,14 @@ GIVETH A Guardian
     `removed from his guardianship by the court`             IS FALSE
     `has given security`                                    IS TRUE
     `the court has otherwise ordered as to security`          IS FALSE
-    `has sold, mortgaged, exchanged, or otherwise parted with the possession of any of the movable or immovable property of the infant` IS FALSE
-    `has leased land belonging to the infant`                IS FALSE
+    `sold, mortgaged, exchanged, or otherwise parted with the possession of any of the movable or immovable property of the infant` IS FALSE
+    `leased land belonging to the infant`                IS FALSE
     `the term of the lease, in years`                        IS NOTHING
-    `has the permission of the court to deal with the property of the infant` IS FALSE
-    `has given a good discharge for a legacy or other capital moneys payable to or receivable by the infant` IS FALSE
+    `the permission of the court to deal with the property of the infant` IS FALSE
+    `given a good discharge for a legacy or other capital moneys payable to or receivable by the infant` IS FALSE
     `the court has otherwise ordered as to giving a good discharge` IS FALSE
     `the provision made out of the income of the property of the infant for his maintenance and education` IS (`A periodical sum` WITH `the sum` IS 0, `the period` IS `monthly`)
-    `has the permission of the court to apply a sum exceeding $100 per month` IS FALSE
+    `the permission of the court to apply a sum exceeding $100 per month` IS FALSE
 
 GIVEN
     `the other party`                  IS A Person
@@ -2819,9 +2819,9 @@ GIVETH AN `Executor appointed by a will`
     `the executor`                                     IS `the person appointed`
     `the appointment, express or implied`              IS `express`
     `legally incapable of acting as such, otherwise than under section 21(1) or section 22(1)` IS FALSE
-    `has renounced the right to act as such`           IS FALSE
+    `renounced the right to act as such`           IS FALSE
     `appeared and extracted probate`                   IS TRUE
-    `has administered all the estate of the deceased`  IS FALSE
+    `administered all the estate of the deceased`  IS FALSE
 GIVEN
     `(2)(a)`    IS A BOOLEAN
     `(2)(b)(i)` IS A BOOLEAN
@@ -3046,7 +3046,7 @@ GIVETH A Grant
     `expired by effluxion of time or by the happening of the event or contingency on which it was limited` IS FALSE
     `revoked`                              IS FALSE
     `has given such security as is lawfully required to be furnished` IS TRUE
-    `has been extracted`                   IS TRUE
+    `been extracted`                   IS TRUE
     `sealed under section 47(1) of the Probate and Administration Act 1934` IS `it was sealed under section 47(1)`
     `the date of the sealing`              IS `the date it was sealed`
 

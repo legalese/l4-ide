@@ -2328,20 +2328,20 @@ GIVETH A Guardian
     `removed from his guardianship by the court` IS FALSE
     `has given security`                 IS TRUE
     `the court has otherwise ordered as to security` IS FALSE
-    `has sold, mortgaged, exchanged, or otherwise parted with the possession of any of the movable or immovable property of the infant` IS FALSE
-    `has leased land belonging to the infant` IS FALSE
+    `sold, mortgaged, exchanged, or otherwise parted with the possession of any of the movable or immovable property of the infant` IS FALSE
+    `leased land belonging to the infant` IS FALSE
     `the term of the lease, in years`     IS NOTHING
-    `has the permission of the court to deal with the property of the infant` IS FALSE
+    `the permission of the court to deal with the property of the infant` IS FALSE
     -- The guardian has PURPORTED to discharge the share. Whether that discharge
     -- is good is GIA s 17's question and not this Act's; the fact is recorded so
     -- that the question can be asked of this record at all.
-    `has given a good discharge for a legacy or other capital moneys payable to or receivable by the infant` IS TRUE
+    `given a good discharge for a legacy or other capital moneys payable to or receivable by the infant` IS TRUE
     `the court has otherwise ordered as to giving a good discharge` IS FALSE
     `the provision made out of the income of the property of the infant for his maintenance and education`
         IS (`A periodical sum` WITH
                 `the sum`    IS 0
                 `the period` IS `monthly`)
-    `has the permission of the court to apply a sum exceeding $100 per month` IS FALSE
+    `the permission of the court to apply a sum exceeding $100 per month` IS FALSE
 
 GIVEN `the child` IS A Person
       `his father` IS A MAYBE Person
@@ -4199,7 +4199,7 @@ GIVETH A Marriage
 -- module is putting the same file.
 #ASSERT count (`the ISA Amirah, an infant concerned in the estate`'s `the guardians of the infant`) EQUALS 1
 #ASSERT `the ISA Amirah, an infant concerned in the estate`'s `the capital of the property of the infant` EQUALS 500_000
-#ASSERT `the ISA Bakar, guardian of Amirah's property`'s `has given a good discharge for a legacy or other capital moneys payable to or receivable by the infant`
+#ASSERT `the ISA Bakar, guardian of Amirah's property`'s `given a good discharge for a legacy or other capital moneys payable to or receivable by the infant`
 #ASSERT NOT `the ISA Bakar, guardian of Amirah's property`'s `the court has otherwise ordered as to giving a good discharge`
 -- The share is $500,000 in money, which is what "capital moneys payable to or
 -- receivable by an infant" measures. s 9 is the conversion this Act supplies.
