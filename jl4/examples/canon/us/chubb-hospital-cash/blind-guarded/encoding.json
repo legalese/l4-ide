@@ -1,0 +1,7 @@
+{
+  "encoder": "blind-guarded-2026-08",
+  "status": "experimental",
+  "version": "0.1.0",
+  "modules": ["chubb-denovo.l4"],
+  "scope": "A SECOND, INDEPENDENT encoding of the same synthetic policy, written by a different agent in guarded-rows style and blind both to the answer key and to the inert encoding beside it, so the two can be compared as evidence rather than one checked against itself. It exists to be diffed: the l4-ide pipeline's section 8 oracle compares it against the inert row behaviourally. It reaches the same nine answers. It carries NO #ASSERT of its own -- the assertions live in the inert row -- so any test-count claim about this file is zero, and the l4-ide run reports its test stage DEGRADED for exactly that reason. Ranked third of three on isomorphism by the reviewing auditors. Deposited because the comparison is the point, not because it is the better encoding."
+}

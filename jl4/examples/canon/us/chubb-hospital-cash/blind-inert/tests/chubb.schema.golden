@@ -1,0 +1,166 @@
+{
+    "$defs": {
+        "Cause": {
+            "enum": [
+                "Skydiving",
+                "Service in the military",
+                "Service as a fire fighter",
+                "Service in the police",
+                "A cause not named in Section 2.1"
+            ],
+            "type": "string"
+        },
+        "Claim": {
+            "properties": {
+                "a dispute or disagreement has arisen regarding a matter pertaining to or concerning this Policy": {
+                    "type": "boolean"
+                },
+                "a valid arbitration award has been issued": {
+                    "type": "boolean"
+                },
+                "that wellness visit was with a qualified medical provider": {
+                    "type": "boolean"
+                },
+                "the event causing the sickness or accidental injury arose directly or indirectly out of": {
+                    "items": {
+                        "$ref": "#/$defs/Cause"
+                    },
+                    "type": "array"
+                },
+                "the hospitalization on which the claim is premised was for": {
+                    "$ref": "#/$defs/Ground of hospitalization"
+                },
+                "the month in which a wellness visit for yourself occurred": {
+                    "anyOf": [
+                        {
+                            "type": "number"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "the month in which arbitration was commenced": {
+                    "anyOf": [
+                        {
+                            "type": "number"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "the month in which there was a misrepresentation or material withholding of information provided by you to the Company": {
+                    "anyOf": [
+                        {
+                            "type": "number"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "the month in which there was fraud": {
+                    "anyOf": [
+                        {
+                            "type": "number"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "the month in which written confirmation from that medical provider was supplied to us": {
+                    "anyOf": [
+                        {
+                            "type": "number"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "the month in which written proof of claim was submitted to us": {
+                    "anyOf": [
+                        {
+                            "type": "number"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "the month in which you seek to recover on this Policy": {
+                    "anyOf": [
+                        {
+                            "type": "number"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "the month of the hospitalization on which the claim is premised": {
+                    "type": "number"
+                },
+                "the month on which the parties were unable to settle the dispute or difference": {
+                    "anyOf": [
+                        {
+                            "type": "number"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "the month the applicable premium for the policy period was paid": {
+                    "anyOf": [
+                        {
+                            "type": "number"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "this agreement is signed": {
+                    "type": "boolean"
+                },
+                "your age in years at the time of the hospitalization": {
+                    "type": "number"
+                }
+            },
+            "required": [
+                "this agreement is signed",
+                "the month of the hospitalization on which the claim is premised",
+                "the hospitalization on which the claim is premised was for",
+                "your age in years at the time of the hospitalization",
+                "the event causing the sickness or accidental injury arose directly or indirectly out of",
+                "that wellness visit was with a qualified medical provider",
+                "a dispute or disagreement has arisen regarding a matter pertaining to or concerning this Policy",
+                "a valid arbitration award has been issued"
+            ],
+            "type": "object"
+        },
+        "Ground of hospitalization": {
+            "enum": [
+                "Sickness",
+                "Accidental injury",
+                "Neither sickness nor accidental injury"
+            ],
+            "type": "string"
+        }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "Decide whether a benefit is payable on a claim under the Codex hospitalization policy",
+    "properties": {
+        "claim": {
+            "$ref": "#/$defs/Claim"
+        }
+    },
+    "required": [
+        "claim"
+    ],
+    "title": "a benefit is payable on this claim",
+    "type": "object"
+}

@@ -79,6 +79,12 @@ main = do
   okFiles <- sort <$> globDir1 (compile "ok/**/*.l4") examplesRoot
   librariesFiles <- sort <$> globDir1 (compile "*.l4") (dataDirCore </> "libraries")
   legalFiles <- sort <$> globDir1 (compile "legal/**/*.l4") examplesRoot
+  -- The VENDORED canon mirror (etc/canon-pin.json, etc/sync-canon.mjs). Same
+  -- semantics as legal/**: four goldens per file, failFirstTime, --accept to
+  -- bless. It is a copy of blessed directories in legalese/canon at a pinned
+  -- SHA -- do not edit it here; edit in canon and bump the pin. The `Canon
+  -- Mirror` CI job fails when this tree and canon@pin disagree.
+  canonFiles <- sort <$> globDir1 (compile "canon/**/*.l4") examplesRoot
   tcFailsFiles <- sort <$> globDir1 (compile "not-ok/tc/**/*.l4") examplesRoot
   nlgFailsFiles <- sort <$> globDir1 (compile "not-ok/nlg/**/*.l4") examplesRoot
   semanticTokenFiles <- sort <$> globDir1 (compile "lsp/semantic-tokens/**/*.l4") examplesRoot
@@ -102,13 +108,20 @@ main = do
       corpusNonEmpty "ok"              okFiles
       corpusNonEmpty "libraries"       librariesFiles
       corpusNonEmpty "legal"           legalFiles
+      corpusNonEmpty "canon"           canonFiles
       corpusNonEmpty "tc-fails"        tcFailsFiles
       corpusNonEmpty "nlg-fails"       nlgFailsFiles
       corpusNonEmpty "semantic-tokens" semanticTokenFiles
       corpusNonEmpty "hover"           hoverFiles
       corpusNonEmpty "export-placement" exportPlacementFiles
       corpusNonEmpty "import-refusal"   importRefusalFiles
-    describe "ok files" $ tests evalConfig (True, True) (okFiles <> legalFiles <> librariesFiles) examplesRoot
+    -- ONE name for the corpus these three blocks share. It was written out
+    -- three times, and adding canon/** would have made that four places to keep
+    -- in step -- the exact shape of drift CLAUDE.md warns about, and invisible
+    -- when it happens because a block that silently covers fewer files still
+    -- passes.
+    let goldenCorpus = okFiles <> legalFiles <> librariesFiles <> canonFiles
+    describe "ok files" $ tests evalConfig (True, True) goldenCorpus examplesRoot
     -- Invariant: exactprint is the identity on the source for every parseable
     -- corpus file. This is the single guard against the whole class of
     -- format-mangling bugs (mixfix/event reordering, dropped TIMEZONE/DECIDE
@@ -117,7 +130,7 @@ main = do
     -- it silently records mangled output — this compares against the verbatim
     -- source and so cannot bless a regression.
     describe "exactprint identity (source round-trips l4 format)" $
-      forM_ (okFiles <> legalFiles <> librariesFiles) $ \inputFile ->
+      forM_ goldenCorpus $ \inputFile ->
         it (makeRelative examplesRoot inputFile) $
           jl4ExactPrintIdentity evalConfig inputFile
     -- Invariant: the *other* printer round-trips too. `l4 batch` (and the REPL)
@@ -128,7 +141,7 @@ main = do
     -- so it is asserted as a property over the whole corpus rather than on a
     -- fixture: exactly the files the "ok files" block typechecks.
     describe "prettyLayout round-trip (filter -> print -> parse; #932)" $
-      forM_ (okFiles <> legalFiles <> librariesFiles) $ \inputFile ->
+      forM_ goldenCorpus $ \inputFile ->
         it (makeRelative examplesRoot inputFile) $
           jl4PrettyLayoutRoundTrip evalConfig inputFile
     describe "tc fails" $ tests evalConfig (False, True) tcFailsFiles examplesRoot

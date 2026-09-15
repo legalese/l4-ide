@@ -1,0 +1,11 @@
+{
+  "encoder": "legalese",
+  "display_name": "Penal Code s 301 — transferred malice",
+  "status": "draft",
+  "version": "0.0.1",
+  "license": "Apache-2.0",
+  "maintainer": { "name": "Legalese Pte. Ltd.", "github": "legalese" },
+  "modules": ["culpable-homicide-301.l4"],
+  "versions_encoded": ["as amended by Act 15 of 2019, in force 1 January 2020"],
+  "scope": "Section 301 only. The descriptions of culpable homicide that s 301 transfers are declared as an ontology sourced to ss 299-300; neither of those sections is itself encoded, and neither is s 26G, whose subsection (1) disapplies it where s 301(1) applies."
+}

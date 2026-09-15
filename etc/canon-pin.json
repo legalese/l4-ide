@@ -1,0 +1,84 @@
+{
+  "_comment": [
+    "THE PIN: which commit of legalese/canon the vendored mirror under",
+    "jl4/examples/canon/ is a copy of, and which of its directories are blessed",
+    "as part of this repository's regression corpus.",
+    "",
+    "Ruled 2026-09-15 by Meng; the ruling is quoted verbatim in",
+    "specs/todo/CANON-REGRESSION-CORPUS-SPEC.md §1. jl4/examples/legal/ IS the",
+    "language's regression corpus and stays one; these canon directories join",
+    "it; a subject already in canon leaves l4-ide (moved, not lost); the rest",
+    "stay where they are.",
+    "",
+    "DO NOT EDIT THE MIRROR. Edit in canon, then `etc/sync-canon.mjs --bump",
+    "<sha>`. CI runs `--check` on every PR and fails when the mirror and canon",
+    "disagree, which is what makes this DETECTED duplication rather than the",
+    "silent kind.",
+    "",
+    "--- the SHA is on a person's shelf, and that is a known compromise -------",
+    "",
+    "SPEC §3B.6 says a blessed dir 'lives on canon main'. This pin does not:",
+    "299dd490 is on `mengwong/drafts`, because that is where the content is —",
+    "measured 2026-09-15, canon main holds 3319 files / 55 .l4 against drafts'",
+    "3572 / 59, and none of the five directories below is on main yet. A SHA on",
+    "a shelf can be rebased away, and if that happens `--pull` will fail to",
+    "fetch it: the failure is loud, which is the property being relied on.",
+    "",
+    "THE TARGET IS CANON MAIN. When these directories reach it, re-pin to a main",
+    "SHA and delete this paragraph rather than softening it.",
+    "",
+    "--- what is NOT blessed, and why ----------------------------------------",
+    "",
+    "sg/succession/encodings/cleanroom-2026-08 — two of its files",
+    "(family-cases.l4, probate-administration-act.l4) exit non-zero from",
+    "`l4 check` on today's binary, on an Info-level diagnostic at",
+    "daydate.l4:104:8-104:50, WHILE THEIR COMMITTED GOLDENS SAY 'Evaluation",
+    "successful'. The goldens were blessed by an older binary. That is exactly",
+    "the drift this mechanism exists to make visible, so the directory stays out",
+    "until its goldens are re-blessed in canon.",
+    "",
+    "il/ofek-hadash-2008 and sg/pdpa-2012 — no goldens at all. A directory with",
+    "no goldens cannot be a regression corpus; `failFirstTime` would write them",
+    "on the first run and pass on the second, which tests the harness and not",
+    "the compiler.",
+    "",
+    "--- the flattening, which is the one place the mirror is not verbatim ----",
+    "",
+    "Two blessed directories keep a cases file one level down, in `cases/`,",
+    "while its goldens sit in the directory-level `tests/`. jl4/tests/Main.hs",
+    "derives a golden's path as `takeDirectory inputFile </> \"tests\"`, so a",
+    "file at `cases/x.l4` is looked up at `cases/tests/x.golden` — and canon has",
+    "no `cases/tests/` directory anywhere (measured at this pin). The mirror",
+    "therefore HOISTS `cases/*.l4` to the directory root, which is the only",
+    "layout in which canon's own goldens are the ones the harness reads.",
+    "sync-canon.mjs applies the same rule in both directions, so `--check` is",
+    "not fooled by it, and refuses on a name collision rather than overwriting."
+  ],
+  "repo": "legalese/canon",
+  "sha": "299dd490c16696ac4dbc3f1f703ecc733abd72df",
+  "ref": "mengwong/drafts",
+  "pinned": "2026-09-15",
+  "blessed": [
+    {
+      "from": "subjects/sg/child-support/encodings/legalese",
+      "to": "sg/child-support"
+    },
+    {
+      "from": "subjects/sg/succession/encodings/legalese",
+      "to": "sg/succession"
+    },
+    {
+      "from": "subjects/sg/penal-code-1871/encodings/legalese",
+      "to": "sg/penal-code-1871"
+    },
+    {
+      "from": "subjects/us/chubb-hospital-cash/encodings/blind-inert-2026-08",
+      "to": "us/chubb-hospital-cash/blind-inert"
+    },
+    {
+      "from": "subjects/us/chubb-hospital-cash/encodings/blind-guarded-2026-08",
+      "to": "us/chubb-hospital-cash/blind-guarded"
+    }
+  ],
+  "include": ["*.l4", "tests/*.golden", "encoding.json", "SOURCE-LICENSE.md"]
+}
