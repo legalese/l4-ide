@@ -1,0 +1,130 @@
+IMPORT policy
+
+-- Standing preamble, applied to every question below: assume all
+-- conditions unrelated to that question are met, and no exclusions
+-- unrelated to it apply. Concretely, unless a question's own facts say
+-- otherwise:
+--   * there is no fraud or misrepresentation;
+--   * the wellness visit itself is treated as having happened comfortably
+--     on time (month 1), since none of the nine questions give a separate
+--     fact about when the visit itself -- as opposed to the written
+--     confirmation of it -- took place;
+--   * the written confirmation of the wellness visit is treated as having
+--     been supplied on time (month 1) whenever a question does not mention
+--     it at all;
+--   * the hospitalization month defaults to 1 (comfortably inside the
+--     one-year term) whenever a question does not give it a number.
+-- Also assumed, per the task's own preamble: the agreement has been signed
+-- and the premium paid on time.
+
+-- Q1: hospitalized by burns suffered while on duty as a firefighter.
+-- The cause is squarely "service as a fire fighter" (Section 2.1, item 3).
+q1 MEANS Claim WITH
+    `cause of hospitalization`    IS `Firefighter Service`
+    `age at hospitalization`      IS 40
+    `hospitalization month`       IS 1
+    `wellness visit month`        IS JUST 1
+    `wellness confirmation month` IS JUST 1
+    `fraud or misrepresentation`  IS FALSE
+#EVAL `covered` q1
+
+-- Q2: 78 years old at the time of hospitalization -- below the age-80
+-- exclusion threshold in Section 2.1, item 5.
+q2 MEANS Claim WITH
+    `cause of hospitalization`    IS Other
+    `age at hospitalization`      IS 78
+    `hospitalization month`       IS 1
+    `wellness visit month`        IS JUST 1
+    `wellness confirmation month` IS JUST 1
+    `fraud or misrepresentation`  IS FALSE
+#EVAL `covered` q2
+
+-- Q3: hospitalized for pneumonia 5 months after the effective date, age 65.
+-- Pneumonia is not an excluded cause, age is below 80, and 5 months is
+-- comfortably before either wellness-condition deadline.
+q3 MEANS Claim WITH
+    `cause of hospitalization`    IS Other
+    `age at hospitalization`      IS 65
+    `hospitalization month`       IS 5
+    `wellness visit month`        IS JUST 1
+    `wellness confirmation month` IS JUST 1
+    `fraud or misrepresentation`  IS FALSE
+#EVAL `covered` q3
+
+-- Q4: hospitalized after a fall while traveling abroad; confirmation of
+-- the wellness visit was given 8 months after the effective date -- after
+-- the Section 1.3 / 7-month deadline, so the condition was violated and
+-- the policy stands canceled under Section 1.2. A fall is not an excluded
+-- cause, and Section 3.1.1 covers the insured worldwide, so "abroad" does
+-- not matter.
+q4 MEANS Claim WITH
+    `cause of hospitalization`    IS Other
+    `age at hospitalization`      IS 40
+    `hospitalization month`       IS 1
+    `wellness visit month`        IS JUST 1
+    `wellness confirmation month` IS JUST 8
+    `fraud or misrepresentation`  IS FALSE
+#EVAL `covered` q4
+
+-- Q5: hospitalized for punching his own face to show off for friends, with
+-- no fraud or misrepresentation. Self-inflicted horseplay is not on the
+-- Section 2.1 exclusion list, so nothing excludes it.
+q5 MEANS Claim WITH
+    `cause of hospitalization`    IS Other
+    `age at hospitalization`      IS 40
+    `hospitalization month`       IS 1
+    `wellness visit month`        IS JUST 1
+    `wellness confirmation month` IS JUST 1
+    `fraud or misrepresentation`  IS FALSE
+#EVAL `covered` q5
+
+-- Q6: injured while skydiving, age 79, wellness-visit proof provided 6.5
+-- months after the effective date. Skydiving is excluded outright
+-- (Section 2.1, item 1) regardless of the age or the wellness timing.
+q6 MEANS Claim WITH
+    `cause of hospitalization`    IS Skydiving
+    `age at hospitalization`      IS 79
+    `hospitalization month`       IS 1
+    `wellness visit month`        IS JUST 1
+    `wellness confirmation month` IS JUST 6.5
+    `fraud or misrepresentation`  IS FALSE
+#EVAL `covered` q6
+
+-- Q7: hospitalized for a heart attack, wellness-visit proof submitted 2
+-- months after the effective date, age 75. Not an excluded cause, age
+-- below 80, and well within both wellness-condition deadlines.
+q7 MEANS Claim WITH
+    `cause of hospitalization`    IS Other
+    `age at hospitalization`      IS 75
+    `hospitalization month`       IS 1
+    `wellness visit month`        IS JUST 1
+    `wellness confirmation month` IS JUST 2
+    `fraud or misrepresentation`  IS FALSE
+#EVAL `covered` q7
+
+-- Q8: injured in a military training exercise, hospitalization within the
+-- policy term, no fraud. A training exercise performed as part of
+-- military service is "service in the military" (Section 2.1, item 2).
+q8 MEANS Claim WITH
+    `cause of hospitalization`    IS `Military Service`
+    `age at hospitalization`      IS 40
+    `hospitalization month`       IS 1
+    `wellness visit month`        IS JUST 1
+    `wellness confirmation month` IS JUST 1
+    `fraud or misrepresentation`  IS FALSE
+#EVAL `covered` q8
+
+-- Q9: hospitalized because the claimant's son bit his ankle; wellness-visit
+-- proof provided 6 months after the effective date; the claimant was
+-- serving as a police officer at the time. The cause of the injury is the
+-- bite, not the claimant's police service -- being a police officer does
+-- not itself trigger Section 2.1, item 4, because the injury did not arise
+-- out of that service.
+q9 MEANS Claim WITH
+    `cause of hospitalization`    IS Other
+    `age at hospitalization`      IS 40
+    `hospitalization month`       IS 1
+    `wellness visit month`        IS JUST 1
+    `wellness confirmation month` IS JUST 6
+    `fraud or misrepresentation`  IS FALSE
+#EVAL `covered` q9

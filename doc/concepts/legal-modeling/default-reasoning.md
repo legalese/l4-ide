@@ -23,13 +23,13 @@ L4 provides `UNLESS` for exactly this structure. Semantically it is just conjunc
 ```l4
 § `Eligibility`
     GIVEN `is a citizen` IS A BOOLEAN
-          `has resided for 5 years` IS A BOOLEAN
-          `has been disqualified` IS A BOOLEAN
+          `resided for 5 years` IS A BOOLEAN
+          `been disqualified` IS A BOOLEAN
 
 DECIDE `is eligible` IF
       `is a citizen`
-  AND `has resided for 5 years`
-  UNLESS `has been disqualified`
+  AND `resided for 5 years`
+  UNLESS `been disqualified`
 ```
 
 This evaluates as `(citizen AND resided) AND NOT disqualified` — the whole eligibility test, subject to the exception — without any parentheses. The code has the same shape as the sentence: rule first, exception last.

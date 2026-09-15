@@ -1,0 +1,148 @@
+-- Encoding of the CODEX INSURANCE LIMITED hospitalization policy (fixtures/chubb-policy.txt).
+--
+-- Scope and conventions:
+--   * Per the task instructions, "This agreement is signed" (S.1.1(1)) and "the applicable
+--     premium ... has been paid" (S.1.1(2)) are assumed always TRUE and are not modeled.
+--   * All dates/times other than the claimant's age are encoded RELATIVE to the policy's
+--     effective date, as a NUMBER of months elapsed since that date. There is never a need
+--     to compute the time elapsed between two absolute dates.
+--   * The claimant's age is an ordinary NUMBER of years; it is not relative to the effective
+--     date.
+--   * Rules only: this module defines no claim data. Per-claim facts belong in apply.l4.
+
+§ `The Claim`
+
+-- One fully-specified hospitalization claim, as narrated by a claimant. Every field is a
+-- fact the claimant (or the record) supplies; the "arose out of ..." fields, and the
+-- "caused by sickness or accidental injury" field, are the causal/classificatory findings a
+-- claims handler would make from the underlying story -- e.g. merely holding a job in the
+-- police does not by itself make `arose out of service in the police` TRUE; the injury must
+-- actually stem from that service.
+DECLARE Claim HAS
+    `hospitalization time`                                              IS A NUMBER
+    `claimant age at hospitalization`                                   IS A NUMBER
+    `caused by sickness or accidental injury`                           IS A BOOLEAN
+    `arose out of skydiving`                                            IS A BOOLEAN
+    `arose out of service in the military`                              IS A BOOLEAN
+    `arose out of service as a fire fighter`                            IS A BOOLEAN
+    `arose out of service in the police`                                IS A BOOLEAN
+    `wellness visit time`                                               IS A MAYBE NUMBER
+    `wellness visit confirmation time`                                  IS A MAYBE NUMBER
+    `fraud or misrepresentation or material withholding of information` IS A BOOLEAN
+
+§ `Section 1 -- Policy in Effect and Conditions`
+
+§§ `1.3 -- the wellness-visit condition`
+
+-- "... a wellness visit ... occurring no later than the 6th month anniversary of the
+--  effective date of this policy."
+`wellness visit deadline in months` MEANS 6
+
+-- "No later than the 7th month anniversary of the effective date of this policy, you will
+--  supply us with written confirmation ..."
+`wellness visit confirmation deadline in months` MEANS 7
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`condition 1.3 has been satisfied in a timely fashion` claim MEANS
+    CONSIDER claim's `wellness visit time`
+    WHEN NOTHING THEN FALSE
+    WHEN JUST v THEN
+        CONSIDER claim's `wellness visit confirmation time`
+        WHEN NOTHING THEN FALSE
+        WHEN JUST c THEN
+                v AT MOST `wellness visit deadline in months`
+            AND c AT MOST `wellness visit confirmation deadline in months`
+
+-- S.1.1(3): "The condition set out in Section 1.3 is still pending or has been satisfied in
+-- a timely fashion." Pending covers the case where confirmation has not yet been supplied,
+-- but the 7-month deadline for supplying it has not yet passed at the time of the
+-- hospitalization either -- so no breach can be found yet.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`condition 1.3 is still pending` claim MEANS
+    CONSIDER claim's `wellness visit confirmation time`
+    WHEN JUST c THEN FALSE
+    WHEN NOTHING THEN
+        claim's `hospitalization time` AT MOST `wellness visit confirmation deadline in months`
+
+§§ `1.2 -- cancelation`
+
+-- The one-year policy term: "will last for a period of one year from that date" (S.3.6,
+-- referred to as "Section 5" in S.1.2's cross-reference to the fixture's own numbering).
+`policy term in months` MEANS 12
+
+-- S.1.2: "Cancelation will be deemed to have occurred if there is fraud, or any
+-- misrepresentation or material withholding of ... information ..., or if the condition set
+-- out in Section 1.3 has not been satisfied in a timely fashion. It will also be
+-- automatically canceled ... on the last day of the policy term ..."
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`policy has been canceled` claim MEANS
+        claim's `fraud or misrepresentation or material withholding of information`
+    OR  NOT (   `condition 1.3 has been satisfied in a timely fashion` claim
+             OR `condition 1.3 is still pending` claim)
+    OR  claim's `hospitalization time` GREATER THAN `policy term in months`
+
+§§ `1.1 -- policy in effect`
+
+-- S.1.1: "The policy will be in effect if: (1) This agreement is signed, (2) The applicable
+-- premium ... has been paid, and (3) The condition set out in Section 1.3 is still pending
+-- or has been satisfied in a timely fashion, and (4) The policy has not been canceled."
+-- Conditions (1) and (2) are assumed TRUE per the task instructions and are omitted here.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`policy is in effect at the time of hospitalization` claim MEANS
+        (   `condition 1.3 has been satisfied in a timely fashion` claim
+         OR `condition 1.3 is still pending` claim)
+    AND NOT (`policy has been canceled` claim)
+
+§ `Section 2 -- General Exclusions`
+
+-- "... if your age at the time of the hospitalization is equal to or greater than 80 years
+--  of age."
+`minimum excluded age` MEANS 80
+
+-- S.2.1: "Your policy will not apply to, and no benefit will be paid with respect to, any
+-- event causing sickness or accidental injury arising directly or indirectly out of:
+-- (1) Skydiving; or (2) Service in the military; or (3) Service as a fire fighter; or
+-- (4) Service in the police; or (5) [age at least 80]."
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`hospitalization is excluded under section 2` claim MEANS
+        claim's `arose out of skydiving`
+    OR  claim's `arose out of service in the military`
+    OR  claim's `arose out of service as a fire fighter`
+    OR  claim's `arose out of service in the police`
+    OR  claim's `claimant age at hospitalization` AT LEAST `minimum excluded age`
+
+§ `Section 3 -- General Conditions`
+
+-- 3.1 "Your Policy insures You twenty-four (24) hours a day anywhere in the world." There is
+-- no territorial or time-of-day restriction to model: `covered` below imposes none, so e.g.
+-- being hospitalized while traveling abroad carries no penalty on its own.
+--
+-- 3.2 Arbitration is a dispute-resolution and claims-timing mechanism (mandatory
+-- arbitration, a condition precedent to Our liability once a dispute exists, a 60-day
+-- standstill on suing after proof of claim is submitted). It presupposes an active dispute
+-- or a claim already lodged; it does not bear on whether a given hospitalization is, on its
+-- face, a covered event, so it plays no part in `covered` below.
+--
+-- 3.3 Laws of New York, 3.4 US Currency, and 3.5 Premium (paid in one lump sum at signing)
+-- are administrative/procedural terms with no bearing on whether a given hospitalization is
+-- covered.
+--
+-- 3.6 Policy Term is modeled above as `policy term in months`, used by
+-- `policy has been canceled`.
+
+§ `Coverage decision`
+
+-- S.1.1: benefit payment is conditioned on (a) the policy being in effect at the time of the
+-- hospitalization "for sickness or accidental injury on which the claim ... is premised",
+-- and (b) the event not falling within a Section 2 exclusion.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+covered claim MEANS
+        `policy is in effect at the time of hospitalization` claim
+    AND claim's `caused by sickness or accidental injury`
+    AND NOT (`hospitalization is excluded under section 2` claim)

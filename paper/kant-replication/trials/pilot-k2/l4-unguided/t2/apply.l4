@@ -1,0 +1,140 @@
+IMPORT policy
+
+-- Standing preamble (applies to every question below): assume all other
+-- conditions for the policy to apply are met, and no other exclusions apply,
+-- except for whatever the individual question puts in issue. The agreement is
+-- always signed and the premium always paid on time (see policy.l4's header).
+--
+-- Any field not mentioned by a question is set to the value that keeps that
+-- unrelated condition satisfied / that unrelated exclusion clear:
+--   `time of hospitalization`                           defaults to 0 (comfortably
+--       inside both the 7-month wellness deadline and the 12-month policy term)
+--   `fraud, misrepresentation, or material withholding`  defaults to FALSE
+--   `written confirmation supplied at`                   defaults to NOTHING
+--       (nothing on file yet -- fine whenever the hospitalization itself is
+--       being assessed at or before the 7-month mark, per § 1.3)
+--   `wellness visit occurred at`                         defaults to NOTHING
+--       (not separately at issue in any of these nine questions)
+--   `cause of the hospitalization`                       defaults to
+--       `Not one of the enumerated excluded activities`
+--   `age at the time of hospitalization`                 defaults to 40
+--       (comfortably under the age-80 exclusion)
+
+-- Q1: hospitalized by burns suffered while doing my duty as a firefighter.
+-- The burns arose directly out of firefighting duty -- § 2.1(3).
+q1 MEANS Claim WITH
+    `time of hospitalization`                           IS 0
+    `fraud, misrepresentation, or material withholding`  IS FALSE
+    `written confirmation supplied at`                   IS NOTHING
+    `wellness visit occurred at`                         IS NOTHING
+    `cause of the hospitalization`                       IS `Service as a Fire Fighter`
+    `age at the time of hospitalization`                 IS 40
+#EVAL `covered` q1
+
+-- Q2: 78 years old at the time of hospitalization. Under the age-80 threshold,
+-- and no excluded activity is in issue.
+q2 MEANS Claim WITH
+    `time of hospitalization`                           IS 0
+    `fraud, misrepresentation, or material withholding`  IS FALSE
+    `written confirmation supplied at`                   IS NOTHING
+    `wellness visit occurred at`                         IS NOTHING
+    `cause of the hospitalization`                       IS `Not one of the enumerated excluded activities`
+    `age at the time of hospitalization`                 IS 78
+#EVAL `covered` q2
+
+-- Q3: hospitalized for pneumonia 5 months after the effective date; age 65.
+-- Pneumonia is a sickness, not one of the four enumerated excluded activities.
+-- No confirmation is on file, but at 5 months the § 1.3 deadline (month 7)
+-- has not yet passed, so the condition is merely "still pending" -- which
+-- § 1.1(3) treats as sufficient for the policy to remain in effect.
+q3 MEANS Claim WITH
+    `time of hospitalization`                           IS 5
+    `fraud, misrepresentation, or material withholding`  IS FALSE
+    `written confirmation supplied at`                   IS NOTHING
+    `wellness visit occurred at`                         IS NOTHING
+    `cause of the hospitalization`                       IS `Not one of the enumerated excluded activities`
+    `age at the time of hospitalization`                 IS 65
+#EVAL `covered` q3
+
+-- Q4: hospitalized due to a fall while traveling abroad; confirmation of the
+-- wellness visit was given 8 months after the effective date. A fall is not an
+-- excluded activity, and § 3.1.1 confirms worldwide coverage, so "abroad" is a
+-- non-issue -- but 8 months is past the month-7 deadline in § 1.3, so the
+-- confirmation was not supplied in a timely fashion, which cancels the policy
+-- under § 1.2 regardless of the fall itself.
+q4 MEANS Claim WITH
+    `time of hospitalization`                           IS 0
+    `fraud, misrepresentation, or material withholding`  IS FALSE
+    `written confirmation supplied at`                   IS JUST 8
+    `wellness visit occurred at`                         IS NOTHING
+    `cause of the hospitalization`                       IS `Not one of the enumerated excluded activities`
+    `age at the time of hospitalization`                 IS 40
+#EVAL `covered` q4
+
+-- Q5: hospitalized for punching my own face to show off for friends; no fraud
+-- or misrepresentation. Self-inflicted horseplay is not one of the four
+-- enumerated excluded activities in § 2.1 -- that list is closed, and does not
+-- reach intentional or reckless self-harm generally.
+q5 MEANS Claim WITH
+    `time of hospitalization`                           IS 0
+    `fraud, misrepresentation, or material withholding`  IS FALSE
+    `written confirmation supplied at`                   IS NOTHING
+    `wellness visit occurred at`                         IS NOTHING
+    `cause of the hospitalization`                       IS `Not one of the enumerated excluded activities`
+    `age at the time of hospitalization`                 IS 40
+#EVAL `covered` q5
+
+-- Q6: injury sustained while skydiving; age 79 at hospitalization; wellness
+-- visit confirmed 6.5 months after the effective date. The wellness condition
+-- is satisfied (6.5 <= 7) and age is under 80, but the skydiving exclusion in
+-- § 2.1(1) applies on its own and is sufficient to bar coverage.
+q6 MEANS Claim WITH
+    `time of hospitalization`                           IS 0
+    `fraud, misrepresentation, or material withholding`  IS FALSE
+    `written confirmation supplied at`                   IS JUST 6.5
+    `wellness visit occurred at`                         IS NOTHING
+    `cause of the hospitalization`                       IS `Skydiving`
+    `age at the time of hospitalization`                 IS 79
+#EVAL `covered` q6
+
+-- Q7: hospitalized for a heart attack; wellness visit confirmed 2 months after
+-- the effective date; age 75. A heart attack is a sickness, not an excluded
+-- activity; age is under 80; the wellness condition is satisfied well within
+-- the 7-month deadline.
+q7 MEANS Claim WITH
+    `time of hospitalization`                           IS 0
+    `fraud, misrepresentation, or material withholding`  IS FALSE
+    `written confirmation supplied at`                   IS JUST 2
+    `wellness visit occurred at`                         IS NOTHING
+    `cause of the hospitalization`                       IS `Not one of the enumerated excluded activities`
+    `age at the time of hospitalization`                 IS 75
+#EVAL `covered` q7
+
+-- Q8: injured in a military training exercise; hospitalization occurred within
+-- the policy term; no fraud. A training exercise is itself service in the
+-- military, so § 2.1(2) applies and bars coverage regardless of the policy
+-- otherwise being in effect (term not expired, no fraud).
+q8 MEANS Claim WITH
+    `time of hospitalization`                           IS 6
+    `fraud, misrepresentation, or material withholding`  IS FALSE
+    `written confirmation supplied at`                   IS NOTHING
+    `wellness visit occurred at`                         IS NOTHING
+    `cause of the hospitalization`                       IS `Service in the Military`
+    `age at the time of hospitalization`                 IS 40
+#EVAL `covered` q8
+
+-- Q9: hospitalized because my son bit my ankle; wellness visit confirmed 6
+-- months after the effective date; I was serving as a police officer at the
+-- time. Being a serving police officer does not, by itself, make a dog/child
+-- bite at home "arise out of" police service under § 2.1(4) -- there is no
+-- causal link between the injury and police duties, so the excluded-activity
+-- classification is "none of the above" here. The wellness condition is
+-- satisfied (6 <= 7).
+q9 MEANS Claim WITH
+    `time of hospitalization`                           IS 0
+    `fraud, misrepresentation, or material withholding`  IS FALSE
+    `written confirmation supplied at`                   IS JUST 6
+    `wellness visit occurred at`                         IS NOTHING
+    `cause of the hospitalization`                       IS `Not one of the enumerated excluded activities`
+    `age at the time of hospitalization`                 IS 40
+#EVAL `covered` q9

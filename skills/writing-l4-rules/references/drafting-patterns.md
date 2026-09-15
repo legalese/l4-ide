@@ -128,18 +128,18 @@ FALSE.
 DECLARE Occupier HAS
     name                                                  IS A STRING
     `is the landlord`                                     IS A BOOLEAN   -- (a)
-    `is the landlord's spouse, civil partner or cohabitant`  IS A BOOLEAN -- (b)
-    `is the landlord's parent`                            IS A BOOLEAN   -- (c)(i)
+    `the landlord's spouse, civil partner or cohabitant`  IS A BOOLEAN -- (b)
+    `the landlord's parent`                            IS A BOOLEAN   -- (c)(i)
     -- ... grandparent / sibling / child / grandchild ...
-    `is a child or grandchild of the landlord's partner`  IS A BOOLEAN   -- (d)
+    `a child or grandchild of the landlord's partner`  IS A BOOLEAN   -- (d)
     `is other`                                            IS A BOOLEAN   -- none of (a)-(d); NOT in the disjunction
 
 `is a qualifying occupier` occupier MEANS
         "(a) the landlord;"                  ... occupier's `is the landlord`
-    ..  "(b) the landlord's spouse ..."      ... occupier's `is the landlord's spouse, civil partner or cohabitant`
-    ..  "(c) the landlord's— (i) parent;"    ... occupier's `is the landlord's parent`
+    ..  "(b) the landlord's spouse ..."      ... occupier's `the landlord's spouse, civil partner or cohabitant`
+    ..  "(c) the landlord's— (i) parent;"    ... occupier's `the landlord's parent`
     ..  -- ... limbs (ii)-(v) ...
-    ..  "(d) a child or grandchild ..."      ... occupier's `is a child or grandchild of the landlord's partner`
+    ..  "(d) a child or grandchild ..."      ... occupier's `a child or grandchild of the landlord's partner`
     -- `is other` is deliberately NOT a disjunct: an off-list occupier is FALSE.
 ```
 
@@ -545,7 +545,7 @@ the securities_, and `` transfer's `days since the securities were issued` `` al
 transfer **has** days since…_. Writing the verb into the field name says it twice.
 
 ```l4
--- WRONG — the clitic already supplied "is".
+-- WRONG — the clitic already supplied "is".   CLITIC-VERB-OK negative example
     `is to the issuer of the securities`     IS A BOOLEAN
     `has a date of transfer`                 IS A DATE
 
@@ -559,6 +559,35 @@ This is not tidiness. The field name is what the **ladder prints** beside its no
 it costs fidelity: 17 CFR 227.501(a)(1) says "To the issuer of the securities" — the statute starts
 at the complement too, because its own chapeau ("unless such securities are transferred:") supplied
 the verb. Matching that is the whole point.
+
+**Ruling (Meng, 2026-09-13) — it binds the DECLARATION, and it binds everywhere.** Two extensions
+to the above, both from the same day:
+
+1. **Everywhere.** No clitic dereference of an attribute or computed field whose name starts with
+   `is ` or `has `, in any `.l4` or `.md` in the repo — not only the pages that teach style.
+   Meng's reason: _"every l4 file is a training example ultimately."_
+2. **Declarations too.** A field named `` `is bankrupt` `` is wrong where it is DECLARED, whether or
+   not anything dereferences it yet, for the same reason: a `DECLARE` block is what an example
+   teaches naming from. At the ruling there were 121 such names over 175 declaration sites, 74
+   dereferenced and 47 not.
+
+**And the exception.** Rare exceptions may keep the verb, _"especially if they are terms of art from
+the upstream source"_. The test used is objective rather than a matter of taste: **the name contains
+a second `is`/`has` inside it.** A name we coined does not do that; a limb quoted from a statute does,
+because the source sentence has its own clauses — and where the chapeau does not supply the verb
+(Reg CF's is bare, "if the issuer:") the limb carries it, so matching the source means carrying it
+too. Fidelity to the source is this ruling's own rationale, so it is also its own limit.
+
+**What NOT to design toward.** The same ruling declines the Prolog-style prefix predicate
+(`` `is bankrupt` person ``) as a reason to keep the verb: drafters will not take to it. Where a
+genuine predicate is wanted, that is an `ASSUME … IS A FUNCTION FROM … TO BOOLEAN`, which is not an
+attribute and which this ruling does not reach.
+
+**Enforcement.** `etc/check-clitic-verbs.mjs` checks both rules over every `.l4` and `.md`. It is a
+separate file from `etc/check-retired-terms.mjs` on purpose: that one blanks code spans and fenced
+blocks before searching, because its terms are prose words, and this rule lives only inside code.
+Exceptions are either a `CLITIC-VERB-OK` marker on the line, or — for a name used in many places —
+an entry in the checker's `EXEMPT` list with its reason.
 
 ### Spell the last connective — `..` … `OR`, and `...` … `AND`
 

@@ -103,7 +103,7 @@ first; this spec proposes the fourth, with the fifth as its institutional specia
 The Reg CF encoding punts the predicate into the fact schema. The issuer supplies:
 
 ```l4
-`has sold securities in reliance on section 4(a)(6)`   IS A BOOLEAN     -- regcf-denovo.l4:739
+`sold securities in reliance on section 4(a)(6)`   IS A BOOLEAN     -- regcf-denovo.l4:739
 `closings in reliance on section 4(a)(6)`              IS A LIST OF Closing  -- :751
 `previously sold securities in reliance on section 4(a)(6)`  IS A BOOLEAN   -- :755
 ```

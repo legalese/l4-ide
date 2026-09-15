@@ -1,0 +1,176 @@
+IMPORT prelude
+
+§ `Fact schema (verbatim from inputs/schema.md)`
+
+DECLARE Ground IS ONE OF Sickness, `Accidental injury`, Neither
+
+DECLARE Cause IS ONE OF
+  Skydiving, `Military service`, Firefighting, `Police service`, Other
+
+DECLARE Claim
+  HAS `agreement signed`                           IS A BOOLEAN
+      `premium paid month`                         IS A MAYBE NUMBER
+      `hospitalization month`                      IS A NUMBER
+      `hospitalization ground`                     IS A Ground
+      `age at hospitalization`                     IS A NUMBER
+      `causes`                                     IS A LIST OF Cause
+      `fraud month`                                IS A MAYBE NUMBER
+      `misrepresentation month`                    IS A MAYBE NUMBER
+      `wellness visit month`                       IS A MAYBE NUMBER
+      `wellness visit provider qualified`          IS A BOOLEAN
+      `written confirmation month`                 IS A MAYBE NUMBER
+      `dispute arisen`                             IS A BOOLEAN
+      `unable to settle month`                     IS A MAYBE NUMBER
+      `arbitration commenced month`                IS A MAYBE NUMBER
+      `valid arbitration award issued`             IS A BOOLEAN
+      `written proof of claim month`               IS A MAYBE NUMBER
+      `recovery sought month`                      IS A MAYBE NUMBER
+      `policy term months`                         IS A NUMBER
+      `confined in us hospital`                    IS A BOOLEAN
+      `continuous confinement days`                IS A MAYBE NUMBER
+      `claim made setting out basis`               IS A BOOLEAN
+
+§§ `Supporting helpers (verbatim from inputs/schema.md; do not redefine)`
+
+GIVEN  `event month` IS A MAYBE NUMBER
+       `limit month` IS A NUMBER
+GIVETH A BOOLEAN
+`no later than` MEANS
+  CONSIDER `event month`
+    WHEN NOTHING THEN FALSE
+    WHEN JUST m  THEN m AT MOST `limit month`
+
+GIVEN  cs IS A LIST OF Cause
+       c  IS A Cause
+GIVETH A BOOLEAN
+`arose out of` MEANS elem c cs
+
+§ `1. Policy in effect and conditions`
+
+-- 1.3: "No later than the 7th month anniversary ... you will supply us with written
+-- confirmation from the medical provider ... of a wellness visit ... with a qualified
+-- medical provider occurring no later than the 6th month anniversary."
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `wellness condition satisfied timely` claim IF
+        `no later than` (claim's `wellness visit month`) 6
+    AND claim's `wellness visit provider qualified`
+    AND `no later than` (claim's `written confirmation month`) 7
+
+-- 1.1(3): "is still pending or has been satisfied in a timely fashion". 1.1 assesses
+-- the policy's effect "at the time of the hospitalization", so "still pending" is
+-- read here as: the 7-month deadline has not yet passed as of the hospitalization.
+-- (Judgement call -- see NOTES.md.)
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `wellness visit condition ok` claim IF
+        claim's `hospitalization month` AT MOST 7
+    OR  `wellness condition satisfied timely` claim
+
+-- 1.1: agreement signed, premium paid, the 1.3 condition (pending/satisfied), and no
+-- cancellation (1.2: fraud, misrepresentation, the 1.3 condition failing, or the term
+-- having run out).
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `policy in effect` claim IF
+        claim's `agreement signed`
+    AND isJust (claim's `premium paid month`)
+    AND isNothing (claim's `fraud month`)
+    AND isNothing (claim's `misrepresentation month`)
+    AND `wellness visit condition ok` claim
+    AND claim's `hospitalization month` AT MOST claim's `policy term months`
+
+§ `2. Benefits`
+
+-- 2.1: "confined in a hospital as a result of sickness or accidental Injury".
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `sickness or accidental injury` claim IS
+    CONSIDER claim's `hospitalization ground`
+    WHEN Sickness            THEN TRUE
+    WHEN `Accidental injury` THEN TRUE
+    WHEN Neither             THEN FALSE
+
+-- 2.1/2.2: confinement in a US hospital, for no more than 365 continuous days.
+-- 2.3: a claim must be made setting out the basis for it.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `benefit conditions met` claim IF
+        `sickness or accidental injury` claim
+    AND claim's `confined in us hospital`
+    AND `no later than` (claim's `continuous confinement days`) 365
+    AND claim's `claim made setting out basis`
+
+§ `3. General exclusions`
+
+-- 3.1(1)-(4): sickness or injury arising directly or indirectly out of skydiving,
+-- military service, firefighting, or police service.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `excluded activity present` claim IS
+    any (GIVEN c YIELD `arose out of` (claim's `causes`) c) (LIST Skydiving, `Military service`, Firefighting, `Police service`)
+
+-- 3.1(5): age 80 or over at the time of hospitalization.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `no excluded cause` claim IF
+        NOT `excluded activity present` claim
+    AND claim's `age at hospitalization` LESS THAN 80
+
+§ `4. General conditions`
+
+§§ `4.2 Arbitration`
+
+-- "arbitration to be commenced within three (3) months from the day such parties
+-- are unable to settle". Never commencing (NOTHING) fails via `no later than`'s own
+-- NOTHING case, matching "any ... right to make a claim ... shall be extinguished".
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `arbitration commenced within deadline` claim IS
+    CONSIDER claim's `unable to settle month`
+    WHEN NOTHING THEN TRUE
+    WHEN JUST u  THEN `no later than` (claim's `arbitration commenced month`) (u PLUS 3)
+
+-- "the issuance of a valid arbitration award shall also be a condition precedent
+-- to our liability ... [w]here there is a dispute or disagreement".
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `arbitration timely and awarded` claim IF
+        `arbitration commenced within deadline` claim
+    AND claim's `valid arbitration award issued`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `arbitration condition ok` claim IF
+        NOT claim's `dispute arisen`
+    OR  `arbitration timely and awarded` claim
+
+-- "In no case shall You seek to recover on this Policy before the expiration of
+-- sixty (60) days after written proof of claim has been submitted". 60 days is
+-- rounded to 2 months to match the schema's month-denominated fields (judgement
+-- call -- see NOTES.md).
+GIVEN claim IS A Claim
+      r     IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `proof submitted long enough before` claim r IS
+    CONSIDER claim's `written proof of claim month`
+    WHEN NOTHING THEN FALSE
+    WHEN JUST p  THEN r AT LEAST (p PLUS 2)
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `recovery not premature` claim IS
+    CONSIDER claim's `recovery sought month`
+    WHEN NOTHING THEN TRUE
+    WHEN JUST r  THEN `proof submitted long enough before` claim r
+
+§ `Top-level decision`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE covered claim IF
+        `policy in effect` claim
+    AND `benefit conditions met` claim
+    AND `no excluded cause` claim
+    AND `arbitration condition ok` claim
+    AND `recovery not premature` claim

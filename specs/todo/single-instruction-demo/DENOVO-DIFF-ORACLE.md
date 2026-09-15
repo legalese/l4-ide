@@ -10,7 +10,10 @@ happened via the charities cleanroom, PR #201). Read that 80/80 with its qualifi
 committed map declares `battery.perturbation.enabled=false` ("off by construction"), so 0
 leaves were perturbed, the Sensitivity table is empty, and the agreement count is unweighted
 by leaf inertness — the receipt says so (`leaves_perturbed=0`, `perturbation_enabled=false`,
-added 2026-08-09 after the first run published the number unqualified). The stage follows the deposit contract — no
+added 2026-08-09 after the first run published the number unqualified). **That sentence is about
+the `regcf` map specifically and is still true of it (verified 2026-09-01).** It is no longer true
+of every committed map: `jl4/examples/legal/chubb/denovo/surface-map.json` declares
+`enabled=true` as of 2026-09-01, which the per-field `freeze` in §4 is what made possible. The stage follows the deposit contract — no
 declared `denovo.surface_map`, or a map not yet on disk, is `SKIPPED` with the key named — and
 maps the comparator's exit contract onto the lattice: 0 and 1 (divergence is a finding, not a
 failure) are a completed measurement, 2 and 4 are a `DEGRADED` receipt naming the harness error.
@@ -158,7 +161,34 @@ longest labels.
   around each. The seed cases are where a human already wrote the regime boundaries down; this
   tries each of them everywhere rather than only where it was written;
 - `slots.<n>.thresholds` is the manual escape hatch for a statutory boundary that appears in no
-  case at all.
+  case at all;
+- `slots.<n>.domains` discards candidates the generator can propose but the instrument cannot
+  mean — `{"integer": true, "min": 0}` on a month field drops the `½` multiplier's half-months and
+  the unconditional `-1` probe's month-before-the-effective-date. A divergence on a value the
+  subject matter does not admit is noise wearing the costume of a finding;
+- `slots.<n>.freeze` names fields inside a slot that must never be mutated.
+
+**Why a per-FIELD freeze exists, when `slots.<n>.perturb: false` already freezes a slot.**
+`perturb` is all-or-nothing, which is unusable when both encodings take exactly one argument and
+only some of its fields are safely comparable. A **union-payload** row — one object carrying both
+sides' vocabularies, each side reading its own out of it via `JSONDECODE` — will contain fields
+that only ONE side declares, paired with a twin the other side declares instead. Mutating such a
+field moves one side and leaves the other reading its own untouched twin, and the divergence that
+produces is a fact about the map rather than about either encoding.
+
+The `chubb` subject is the worked case. Its map note recorded the problem and turned perturbation
+off over it: the corpus dates the premium, the fraud and the misrepresentation-or-withholding as
+`MAYBE NUMBER` months while the de novo asks undated `BOOLEAN`s, and the two enum-valued families
+are carried as separate keys per side because the modules spell their constructors differently.
+Eleven keys, five families, no way to freeze them and mutate the rest. **Measured 2026-09-01**:
+with those eleven frozen and month/age domains declared, the battery goes from 2,741 rows to 1,458
+and the witness count from 217 to 107 — and every one of the 110 that disappeared was a map
+artifact, while the finding that mattered survived intact.
+
+**Frozen fields are named in `battery.frozen_fields` in every report.** A frozen field is a piece
+of the surface that was not measured; agreement on it is silence, and a reader who does not know it
+was frozen would read that silence as evidence. This is the same argument the Sensitivity table
+makes about inert leaves, applied one step earlier.
 
 For `regcf` that is 16 seeds → 2,928 perturbations → 2,944 rows.
 

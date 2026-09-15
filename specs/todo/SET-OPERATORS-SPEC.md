@@ -2112,12 +2112,12 @@ code (and in the ladder, as an `InertE` leaf) while the operative connective is 
 
 ```l4
 GIVEN `is a resident of New York`   IS A BOOLEAN
-      `is a resident of New Jersey` IS A BOOLEAN
+      `a resident of New Jersey` IS A BOOLEAN
 DECIDE `may apply per s 1` IF
         "residents of"
     ..  `is a resident of New York`
     ..  "and"
-    ..  `is a resident of New Jersey`
+    ..  `a resident of New Jersey`
 ```
 
 This dissolves the isomorphism tension of §16: token fidelity via scaffolding, semantic honesty

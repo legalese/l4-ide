@@ -1,0 +1,261 @@
+IMPORT policy
+
+-- Standing preamble (applies to every query below): assume all other
+-- conditions are met and no other exclusions apply; the agreement has been
+-- signed and the premium has been paid on time. Every field not put in
+-- issue by the question text is set here to a value that keeps every other
+-- coverage condition satisfied and no exclusion triggered.
+
+-- Q1: hospitalized by burns suffered while doing my duty as a firefighter.
+-- The burns are an accidental injury; the cause is service as a
+-- firefighter, one of the four listed general exclusions.
+q1 MEANS Claim WITH
+  `agreement signed`                           IS TRUE
+  `premium paid month`                         IS JUST 0
+  `hospitalization month`                      IS 3
+  `hospitalization ground`                     IS `Accidental injury`
+  `age at hospitalization`                     IS 45
+  `causes`                                     IS LIST Firefighting
+  `fraud month`                                IS NOTHING
+  `misrepresentation month`                    IS NOTHING
+  `wellness visit month`                       IS JUST 5
+  `wellness visit provider qualified`          IS TRUE
+  `written confirmation month`                 IS JUST 6
+  `dispute arisen`                             IS FALSE
+  `unable to settle month`                     IS NOTHING
+  `arbitration commenced month`                IS NOTHING
+  `valid arbitration award issued`             IS FALSE
+  `written proof of claim month`               IS JUST 3
+  `recovery sought month`                      IS NOTHING
+  `policy term months`                         IS 12
+  `confined in us hospital`                    IS TRUE
+  `continuous confinement days`                IS JUST 5
+  `claim made setting out basis`               IS TRUE
+#EVAL covered q1
+
+-- Q2: 78 years old at the time of hospitalization. 78 is below the age-80
+-- general exclusion. No specific ailment is named, so an ordinary,
+-- non-excluded sickness is assumed.
+q2 MEANS Claim WITH
+  `agreement signed`                           IS TRUE
+  `premium paid month`                         IS JUST 0
+  `hospitalization month`                      IS 3
+  `hospitalization ground`                     IS Sickness
+  `age at hospitalization`                     IS 78
+  `causes`                                     IS LIST Other
+  `fraud month`                                IS NOTHING
+  `misrepresentation month`                    IS NOTHING
+  `wellness visit month`                       IS JUST 5
+  `wellness visit provider qualified`          IS TRUE
+  `written confirmation month`                 IS JUST 6
+  `dispute arisen`                             IS FALSE
+  `unable to settle month`                     IS NOTHING
+  `arbitration commenced month`                IS NOTHING
+  `valid arbitration award issued`             IS FALSE
+  `written proof of claim month`               IS JUST 3
+  `recovery sought month`                      IS NOTHING
+  `policy term months`                         IS 12
+  `confined in us hospital`                    IS TRUE
+  `continuous confinement days`                IS JUST 5
+  `claim made setting out basis`               IS TRUE
+#EVAL covered q2
+
+-- Q3: hospitalized for pneumonia 5 months after the effective date; age 65
+-- at hospitalization. Pneumonia is a sickness; no excluded cause; age is
+-- well under 80.
+q3 MEANS Claim WITH
+  `agreement signed`                           IS TRUE
+  `premium paid month`                         IS JUST 0
+  `hospitalization month`                      IS 5
+  `hospitalization ground`                     IS Sickness
+  `age at hospitalization`                     IS 65
+  `causes`                                     IS LIST Other
+  `fraud month`                                IS NOTHING
+  `misrepresentation month`                    IS NOTHING
+  `wellness visit month`                       IS JUST 5
+  `wellness visit provider qualified`          IS TRUE
+  `written confirmation month`                 IS JUST 6
+  `dispute arisen`                             IS FALSE
+  `unable to settle month`                     IS NOTHING
+  `arbitration commenced month`                IS NOTHING
+  `valid arbitration award issued`             IS FALSE
+  `written proof of claim month`               IS JUST 5
+  `recovery sought month`                      IS NOTHING
+  `policy term months`                         IS 12
+  `confined in us hospital`                    IS TRUE
+  `continuous confinement days`                IS JUST 4
+  `claim made setting out basis`               IS TRUE
+#EVAL covered q3
+
+-- Q4: hospitalized due to a fall while traveling abroad; written
+-- confirmation of the wellness visit was given 8 months after the
+-- effective date. 8 months is later than the 7-month deadline in 1.3, and
+-- "traveling abroad" is read as hospitalization outside the United States,
+-- so `confined in us hospital` is FALSE -- see NOTES.md.
+q4 MEANS Claim WITH
+  `agreement signed`                           IS TRUE
+  `premium paid month`                         IS JUST 0
+  `hospitalization month`                      IS 5
+  `hospitalization ground`                     IS `Accidental injury`
+  `age at hospitalization`                     IS 40
+  `causes`                                     IS LIST Other
+  `fraud month`                                IS NOTHING
+  `misrepresentation month`                    IS NOTHING
+  `wellness visit month`                       IS JUST 5
+  `wellness visit provider qualified`          IS TRUE
+  `written confirmation month`                 IS JUST 8
+  `dispute arisen`                             IS FALSE
+  `unable to settle month`                     IS NOTHING
+  `arbitration commenced month`                IS NOTHING
+  `valid arbitration award issued`             IS FALSE
+  `written proof of claim month`               IS JUST 5
+  `recovery sought month`                      IS NOTHING
+  `policy term months`                         IS 12
+  `confined in us hospital`                    IS FALSE
+  `continuous confinement days`                IS JUST 4
+  `claim made setting out basis`               IS TRUE
+#EVAL covered q4
+
+-- Q5: hospitalized for punching my own face to show off for my friends; no
+-- fraud or misrepresentation committed. A deliberate, self-inflicted act
+-- done on purpose is neither a sickness nor an accidental injury -- see
+-- NOTES.md.
+q5 MEANS Claim WITH
+  `agreement signed`                           IS TRUE
+  `premium paid month`                         IS JUST 0
+  `hospitalization month`                      IS 3
+  `hospitalization ground`                     IS Neither
+  `age at hospitalization`                     IS 30
+  `causes`                                     IS LIST Other
+  `fraud month`                                IS NOTHING
+  `misrepresentation month`                    IS NOTHING
+  `wellness visit month`                       IS JUST 5
+  `wellness visit provider qualified`          IS TRUE
+  `written confirmation month`                 IS JUST 6
+  `dispute arisen`                             IS FALSE
+  `unable to settle month`                     IS NOTHING
+  `arbitration commenced month`                IS NOTHING
+  `valid arbitration award issued`             IS FALSE
+  `written proof of claim month`               IS JUST 3
+  `recovery sought month`                      IS NOTHING
+  `policy term months`                         IS 12
+  `confined in us hospital`                    IS TRUE
+  `continuous confinement days`                IS JUST 2
+  `claim made setting out basis`               IS TRUE
+#EVAL covered q5
+
+-- Q6: hospitalized due to an injury sustained while skydiving; age 79 at
+-- hospitalization; proof of the wellness visit provided 6.5 months after
+-- the effective date. Skydiving is one of the four listed general
+-- exclusions; age 79 does not itself trigger the age-80 exclusion, and the
+-- 6.5-month confirmation is within the 7-month deadline.
+q6 MEANS Claim WITH
+  `agreement signed`                           IS TRUE
+  `premium paid month`                         IS JUST 0
+  `hospitalization month`                      IS 5
+  `hospitalization ground`                     IS `Accidental injury`
+  `age at hospitalization`                     IS 79
+  `causes`                                     IS LIST Skydiving
+  `fraud month`                                IS NOTHING
+  `misrepresentation month`                    IS NOTHING
+  `wellness visit month`                       IS JUST 5
+  `wellness visit provider qualified`          IS TRUE
+  `written confirmation month`                 IS JUST 6.5
+  `dispute arisen`                             IS FALSE
+  `unable to settle month`                     IS NOTHING
+  `arbitration commenced month`                IS NOTHING
+  `valid arbitration award issued`             IS FALSE
+  `written proof of claim month`               IS JUST 5
+  `recovery sought month`                      IS NOTHING
+  `policy term months`                         IS 12
+  `confined in us hospital`                    IS TRUE
+  `continuous confinement days`                IS JUST 3
+  `claim made setting out basis`               IS TRUE
+#EVAL covered q6
+
+-- Q7: hospitalized for a heart attack; proof of the wellness visit
+-- submitted 2 months after the effective date; age 75 at hospitalization.
+-- A heart attack is a sickness; no excluded cause; age is under 80; the
+-- confirmation is well within the 7-month deadline.
+q7 MEANS Claim WITH
+  `agreement signed`                           IS TRUE
+  `premium paid month`                         IS JUST 0
+  `hospitalization month`                      IS 4
+  `hospitalization ground`                     IS Sickness
+  `age at hospitalization`                     IS 75
+  `causes`                                     IS LIST Other
+  `fraud month`                                IS NOTHING
+  `misrepresentation month`                    IS NOTHING
+  `wellness visit month`                       IS JUST 1
+  `wellness visit provider qualified`          IS TRUE
+  `written confirmation month`                 IS JUST 2
+  `dispute arisen`                             IS FALSE
+  `unable to settle month`                     IS NOTHING
+  `arbitration commenced month`                IS NOTHING
+  `valid arbitration award issued`             IS FALSE
+  `written proof of claim month`               IS JUST 4
+  `recovery sought month`                      IS NOTHING
+  `policy term months`                         IS 12
+  `confined in us hospital`                    IS TRUE
+  `continuous confinement days`                IS JUST 3
+  `claim made setting out basis`               IS TRUE
+#EVAL covered q7
+
+-- Q8: hospitalized after being injured in a military training exercise;
+-- hospitalization occurred within the policy term; no fraud committed. A
+-- training exercise is read as service in the military (the exclusion
+-- reaches injury arising "directly or indirectly" out of that service) --
+-- see NOTES.md.
+q8 MEANS Claim WITH
+  `agreement signed`                           IS TRUE
+  `premium paid month`                         IS JUST 0
+  `hospitalization month`                      IS 6
+  `hospitalization ground`                     IS `Accidental injury`
+  `age at hospitalization`                     IS 30
+  `causes`                                     IS LIST `Military service`
+  `fraud month`                                IS NOTHING
+  `misrepresentation month`                    IS NOTHING
+  `wellness visit month`                       IS JUST 5
+  `wellness visit provider qualified`          IS TRUE
+  `written confirmation month`                 IS JUST 6
+  `dispute arisen`                             IS FALSE
+  `unable to settle month`                     IS NOTHING
+  `arbitration commenced month`                IS NOTHING
+  `valid arbitration award issued`             IS FALSE
+  `written proof of claim month`               IS JUST 6
+  `recovery sought month`                      IS NOTHING
+  `policy term months`                         IS 12
+  `confined in us hospital`                    IS TRUE
+  `continuous confinement days`                IS JUST 4
+  `claim made setting out basis`               IS TRUE
+#EVAL covered q8
+
+-- Q9: hospitalized due to my son biting me in the ankle; proof of the
+-- wellness visit provided 6 months after the effective date; I was serving
+-- as a police officer at the time of hospitalization. The bite has no
+-- causal connection to police service -- being a police officer is the
+-- claimant's occupation, not the cause of a domestic bite injury -- so the
+-- cause is Other, not Police service. See NOTES.md.
+q9 MEANS Claim WITH
+  `agreement signed`                           IS TRUE
+  `premium paid month`                         IS JUST 0
+  `hospitalization month`                      IS 6
+  `hospitalization ground`                     IS `Accidental injury`
+  `age at hospitalization`                     IS 35
+  `causes`                                     IS LIST Other
+  `fraud month`                                IS NOTHING
+  `misrepresentation month`                    IS NOTHING
+  `wellness visit month`                       IS JUST 6
+  `wellness visit provider qualified`          IS TRUE
+  `written confirmation month`                 IS JUST 6
+  `dispute arisen`                             IS FALSE
+  `unable to settle month`                     IS NOTHING
+  `arbitration commenced month`                IS NOTHING
+  `valid arbitration award issued`             IS FALSE
+  `written proof of claim month`               IS JUST 6
+  `recovery sought month`                      IS NOTHING
+  `policy term months`                         IS 12
+  `confined in us hospital`                    IS TRUE
+  `continuous confinement days`                IS JUST 3
+  `claim made setting out basis`               IS TRUE
+#EVAL covered q9

@@ -1,0 +1,61 @@
+-- smucclaw/l4-ide#960 — a `WITH` supply mis-delivered across two same-spelled
+-- section binders declared at DIFFERENT types.
+--
+-- Before the fix this file printed `Check succeeded.` and `#EVAL f` returned
+-- the STRING "oops" from a rule declared `GIVETH A NUMBER`. Nothing was
+-- reported at any stage, which is #956's exact observable in the one
+-- configuration #956's fix (legalese/l4-ide#369) explicitly scoped out.
+--
+-- WHY IT GOT THROUGH. Two questions are answered in two different scopes and
+-- nothing made them agree:
+--
+--   * WHICH BINDER'S TYPE IS THE VALUE CHECKED AGAINST?  `sectionBinderFor`
+--     answers this, but only where the module has ONE binder of the spelling;
+--     with two it returns `Nothing` — deliberately, see its Haddock — and
+--     `implicitSupply` falls back to `resolveTerm`, which answers in the
+--     CALLER's scope. Here the caller is `S3`, and it finds `S2`'s `rate`,
+--     declared A STRING. "oops" checks against it fine.
+--
+--   * WHICH BINDER ACTUALLY RECEIVES THE VALUE?  `Discharge.suppliesBinder`
+--     answers this, by matching the spelling against the CALLEE's READ-SET.
+--     `g` reads `S1`'s `rate`, declared A NUMBER.
+--
+-- So the value was validated against `S2.rate` and delivered to `S1.rate`, and
+-- no rule ever compared the two. The repair is a fourth whole-module check,
+-- `Discharge.misdeliveredImplicitSupplies`, which can ask the question the type
+-- checker cannot because the read-set — the very fact `sectionBinderFor` lacks
+-- while a body is being checked — exists by the time it runs.
+--
+-- WHAT THIS FIXTURE PINS, and why each part is here:
+--
+--   1. The error fires at all, at the supply site (line 44, `rate` in the
+--      `WITH`), not at either `GIVEN` line.
+--   2. Both binders print SECTION-QUALIFIED — `S2.rate` and `S1.rate`. This is
+--      load-bearing, not cosmetic: the whole content of the error is that two
+--      DIFFERENT binders share one spelling, so a message printing them both
+--      bare would name the problem and then hide it. Offering two candidates
+--      under identical spellings is precisely the defect that sank the reverted
+--      fix in legalese/l4-ide#369, and the golden is what keeps it from coming
+--      back.
+--   3. It fires on the DIFFERENT-TYPE case only. The same-typed pair is R3's
+--      business (`not-ok/tc/section-given-root-ambiguous.l4`) and must keep
+--      being refused there, by that error and not this one; widening this to
+--      the spelling alone is the other reverted fix from #369.
+
+IMPORT prelude
+
+§ `S1`
+    GIVEN rate IS A NUMBER
+GIVETH A NUMBER
+g MEANS rate
+
+§ `S2`
+    GIVEN rate IS A STRING
+GIVETH A STRING
+h MEANS rate
+
+§ `S3`
+GIVETH A NUMBER
+f MEANS g WITH rate IS "oops"
+
+#EVAL f

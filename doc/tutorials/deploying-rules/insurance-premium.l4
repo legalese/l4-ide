@@ -6,7 +6,7 @@
 DECLARE Applicant
     HAS `age` IS A NUMBER
         `risk score` IS A NUMBER
-        `is existing customer` IS A BOOLEAN
+        `existing customer` IS A BOOLEAN
 
 -- The primary function, marked as the default export
 @export default Calculate the insurance premium for an applicant
@@ -15,7 +15,7 @@ GIVETH A NUMBER
 DECIDE `calculate premium` IS
     IF applicant's `risk score` > 0.7
     THEN applicant's `age` * 100
-    ELSE IF applicant's `is existing customer`
+    ELSE IF applicant's `existing customer`
          THEN applicant's `age` * 40
          ELSE applicant's `age` * 60
 
@@ -24,7 +24,7 @@ DECIDE `calculate premium` IS
 GIVEN applicant IS A Applicant @desc The applicant to check
 GIVETH A BOOLEAN
 DECIDE `qualifies for discount` IF
-    applicant's `is existing customer`
+    applicant's `existing customer`
     AND applicant's `risk score` <= 0.5
 
 -- Internal helper — not exported (no @export annotation)

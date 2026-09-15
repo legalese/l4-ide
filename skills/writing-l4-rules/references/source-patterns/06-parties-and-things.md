@@ -238,7 +238,7 @@ fills.
 >
 > — `jl4/examples/legal/sg-succession/sg-paa.l4:472-474`, Probate and Administration Act 1934
 > s 13(1). Limb (b) is encoded at `:498` as
-> ``all (GIVEN p YIELD p's `legally incapable of acting as such` OR p's `has renounced the right to such grant`) executors``.
+> ``all (GIVEN p YIELD p's `legally incapable of acting as such` OR p's `renounced the right to such grant`) executors``.
 
 **It is doing** quantifying over a collection whose size the drafter does not know: every executor,
 each of the governors, all of its purposes.
@@ -248,12 +248,12 @@ each of the governors, all of its purposes.
 ```l4
 DECLARE Executor HAS
     `name`                                  IS A STRING
-    `has renounced the right to such grant` IS A BOOLEAN
+    `renounced the right to such grant` IS A BOOLEAN
 
 GIVEN executors IS A LIST OF Executor
 GIVETH A BOOLEAN
 `s 13(1)(b) -- every executor appointed by the will has renounced` executors MEANS
-    all (GIVEN p YIELD p's `has renounced the right to such grant`) executors
+    all (GIVEN p YIELD p's `renounced the right to such grant`) executors
 ```
 
 **Know what the empty list does.** A universal over nothing is `TRUE`:
@@ -355,7 +355,7 @@ own has nothing to cross-reference with.
 ```l4
 DECLARE Person HAS
     `the reference for this person`   IS A STRING   -- equality of THIS field is identity
-    `is a beneficiary under the will` IS A BOOLEAN
+    `a beneficiary under the will` IS A BOOLEAN
 
 GIVEN a IS A Person
       b IS A Person

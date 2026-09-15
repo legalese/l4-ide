@@ -1,0 +1,30 @@
+{
+  "_comment": [
+    "Measured defects used as NEGATIVE CONTROLS. House convention: a negative",
+    "control that stops reproducing is itself a finding, so a leg that expects a",
+    "defect and does not find it reports BROKEN telling you to delete the entry,",
+    "rather than quietly turning green. Every entry must have been MEASURED on the",
+    "date it records; nothing here may be predicted.",
+    "",
+    "NOTHING HAS BEEN MEASURED FOR THIS SUBJECT, so this file declares no group at",
+    "all, and that is deliberate. subject.mjs requires the file to EXIST; only",
+    "etc/go/lib/known-defects.mjs reads its groups, and only p7-wizard calls it --",
+    "a leg this subject does not declare, because it has no wizard module. An",
+    "empty-but-present group would be a claim that a leg's controls are vacuous;",
+    "no group at all is the honest statement that no leg here consumes one. If a",
+    "group is ever needed, known-defects.mjs refuses with 'no group <name>', which",
+    "names the gap instead of hiding it.",
+    "",
+    "DO NOT CONFUSE THIS FILE WITH THE FIXTURE'S DEFECTS. The source text carries",
+    "20 recorded drafting defects (D1-D20 in the foundation phase's",
+    "runs/source-defects.md, summarised in NOTES.md). Those are defects in the",
+    "INSTRUMENT, found by reading it; this file is for defects in the PIPELINE'S",
+    "PROJECTIONS of it, found by running them. They are different kinds of thing",
+    "and the drafting defects do not belong here -- recording them here would make",
+    "a leg assert that a badly drafted policy keeps being badly drafted, which no",
+    "leg measures and no run could falsify.",
+    "",
+    "See etc/go/subjects/regcf/known-defects.json for the entry shape and for the",
+    "convention that an empty group states its reason."
+  ]
+}

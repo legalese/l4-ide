@@ -1,0 +1,60 @@
+{
+  "kind": "source-bundle",
+  "bundle_version": 1,
+  "subject": "chubb",
+  "citation": "Appendix A.1, \"Simplified Chubb Hospital Cash Benefit Policy\", in Kant, Nabi, Kant, Scharrer, Ma & Nabi, \"Towards Robust Legal Reasoning: Harnessing Logical LLMs in Law\", arXiv:2502.17638v1 [cs.CY], 24 February 2025. A synthetic specimen printed in a research paper — abridged and anonymised by its authors, never issued to anyone, and not an instrument in force.",
+  "retrieved": "2026-08-31",
+  "note": "The source deposit for a REPLICATION, not for a body of law. The instrument is Appendix A.1 of arXiv:2502.17638v1 — a synthetic insurance policy the paper's own authors wrote, abridged from a Chubb hospital-cash form and renamed to the fictional \"CODEX INSURANCE LIMITED\". Six things a reader has to be told, none of which the schema has a field for.\n\n(1) THERE IS NO AUTHORISING INSTRUMENT, and no document here carries role 'instrument'. That role is for \"the text the subject is MADE UNDER\" — an enabling statute, a parent Act. A research fixture is made under nothing, so listing one would be a fabrication, and the schema has no `instrument_absent_reason` to pair with the absence the way it pairs `in_force_absent_reason` with a missing currency banner. This note is therefore the only place the fact can live, and it is recorded here deliberately rather than left silent.\n\n(2) THE SOURCE IS NOT LAW-FREE, THOUGH: it contains an internally contradictory choice of law, and that contradiction is material. Clause 3.2.1 refers disputes to arbitration \"in accordance with the provisions of the Arbitration Act (Cap. 10)\" while clause 3.3.1 elects \"the laws of New York\" and clause 3.4.1 requires payment in United States currency. \"Cap. 10\" is Singapore's citation form, not New York's: the Arbitration Act (Cap. 10) is a Singapore statute, and New York's arbitration law is CPLR Article 75, with the Federal Arbitration Act in the field where it applies. Which of those a New York-governed policy is arbitrated under is exactly the question clause 3.2.1 fails to pose. (That last sentence is an external legal claim about New York and Singapore law; nothing in this tree checks it.) The Cap. 10 reference is template residue the paper's anonymisation missed. It is defect D8 of the fixture audit (runs/source-defects.md; FOUNDATION.md §2.2). Neither statute is fetched or listed as a document, because neither authorises the policy and neither is encoded: 3.2.1 is a dispute-resolution term with no computational content. Recorded so that a later reader who assumes one coherent governing law knows the text does not supply one.\n\n(3) THE ANNOTATION INVENTORY IS EMPTY, AND THAT IS A FINDING, NOT AN OMISSION. A synthetic appendix has no publisher apparatus: no textual-amendment markers, no \"Modifications etc. (not altering text)\" list, no commencement or extent notes, no editorial footnotes — arXiv publishes none over a paper's appendix, and the appendix prints none of its own. The A.1 document therefore carries `\"annotations\": []`, an explicit empty sweep rather than an absent key. It could not be spelled the way this run was asked to spell it: an `annotation_group` requires `markers` with `minItems: 1`, so \"the inventory is complete and it is empty\" is unrepresentable, and with it goes the `inventory_note` slot where this sentence belongs. Consequence for P2: no group declares `inventory_complete`, so the cross-file `annotation-inventory-disposed` rule has nothing to join on and external-modifications.json's `dispositions` is correctly empty.\n\n(4) THE PAPER PDF IS HASHED BUT NOT HELD IN-TREE. `kant2025-arxiv-v1` records a real sha256 computed over the 320,902-byte PDF this run downloaded from arXiv, but gives no `integrity.local_path`: a third-party paper is not redistributed into this repo, and its licence was not established. The digest is still checkable by anyone — re-download https://arxiv.org/pdf/2502.17638v1 and hash it — but the validator will not re-hash it here, and reports nothing rather than a skip. The two digests that ARE re-hashed by the validator are the extracts below and the assembled artifact, which are the bytes P3 actually encodes from and the bytes the answer key is read off.\n\n(5) APPENDIX A.2 IS LISTED WITH ROLE 'guidance', WHICH IS A JUDGEMENT. A.2 is the paper's nine queries and its nine one-word answers — the benchmark's entire ground truth. It is not a source of encoded text (nothing in it is formalised) and not corroboration (it confirms no rendering), so neither of those roles fits. 'guidance' is the closest true thing: it is the issuing body's own non-binding reading of its own instrument, published alongside it, which is exactly what an agency guidance note is. It is pinned here because the measurement phase scores against these bytes and because FOUNDATION.md §1.1 records that the key gives no clause citation and no rationale — so the bytes are all there is to cite.\n\n(6) THE EXTRACTS ARE WORD-VERBATIM, NOT BYTE-VERBATIM. Both were taken from the PDF's text layer, with the PDF's line breaks, leading indentation and the page-12 folio removed — that folio is interleaved mid-sentence in clause 3.2.1 (\"shall You seek 12 to recover\"), so a byte-faithful extract would carry a page number into the operative text. Every word, punctuation mark and clause number is the paper's; identity was checked by whitespace-normalised diff against kant.txt lines 678-746 (A.1) and 747-771 (A.2). No `retrieval_cost` is recorded anywhere in this bundle: the PDF fetch was made by an earlier phase which did not measure itself, and a fabricated zero would be worse than the silence.",
+  "in_force_absent_reason": "The instrument is synthetic and has never been in force. \"CODEX INSURANCE LIMITED\" does not exist, the insured is a blank line (\"________________\"), no effective date is ever filled in, and no policy on these terms was issued to anyone. There is accordingly no insurer, regulator or publisher whose currency banner could be quoted: arXiv prints no currency statement over a paper's appendix, and the appendix prints none of its own. This is a source that states no currency, which the schema distinguishes from a source whose currency we merely did not look for — and the difference is recorded here on purpose.",
+  "assembled": {
+    "local_path": "jl4/examples/legal/chubb/denovo/source-policy.txt",
+    "sha256": "b9f5d037cf449710a804c4746a2894180eaa618f2ea09315919e3f3ab80269c1",
+    "note": "The provenance-headed artifact P3 encodes from: a PROVENANCE header naming the paper, the PDF digest, the extraction rule and the absent authorising instrument, followed by the verbatim A.1 policy text. The header's body is identical to source/appendix-a1.txt, which is listed separately as a document so the policy bytes can be hashed on their own, without our header in them."
+  },
+  "documents": [
+    {
+      "id": "kant2025-arxiv-v1",
+      "role": "scholarship",
+      "title": "Towards Robust Legal Reasoning: Harnessing Logical LLMs in Law (arXiv:2502.17638v1)",
+      "citation": "Manuj Kant, Sareh Nabi, Manav Kant, Roland Scharrer, Megan Ma & Marzieh Nabi, \"Towards Robust Legal Reasoning: Harnessing Logical LLMs in Law\", arXiv:2502.17638v1 [cs.CY], 24 Feb 2025, DOI 10.48550/arXiv.2502.17638",
+      "url": "https://arxiv.org/abs/2502.17638",
+      "retrieved": "2026-08-31",
+      "retrieval_method": "direct",
+      "integrity": {
+        "sha256": "252d1837b00ca70087d465929f08dd6584cdaebaf70f4878ff323d2f088c4b04"
+      },
+      "covers_absent_reason": "A paper states no range of law. It has a submission date (24 Feb 2025) and, as at the sweep, exactly one version — but neither is a period during which anything was in force, and the fixture it contains never was. Writing a range here would invent a currency the document does not claim.",
+      "annotations": []
+    },
+    {
+      "id": "policy-appendix-a1",
+      "role": "current",
+      "title": "Simplified Chubb Hospital Cash Benefit Policy (Appendix A.1), verbatim extract",
+      "citation": "arXiv:2502.17638v1, Appendix A.1, pp. 12-13",
+      "url": "https://arxiv.org/pdf/2502.17638v1",
+      "retrieved": "2026-08-31",
+      "retrieval_method": "manual",
+      "integrity": {
+        "sha256": "1ea09b2164266e691152131b1f534b5189519bfbac456d91c8d6e8c7c7c625a5",
+        "local_path": "jl4/examples/legal/chubb/denovo/source/appendix-a1.txt"
+      },
+      "covers_absent_reason": "The policy states its own term as \"one year from\" an effective date that the document never supplies — the insured's name is a blank line and clause 3.6 defers the effective date to a signature that was never made. So the instrument names a duration and no dates, and there is no range to record. Note that this is not a mere omission: FOUNDATION.md §1.3 finds that the missing operative moment is exactly what makes the benchmark's Query 4 under-determined.",
+      "annotations": []
+    },
+    {
+      "id": "answer-key-appendix-a2",
+      "role": "guidance",
+      "title": "Queries and Correct Answers for Empirical Evaluation on Chubb Contract (Appendix A.2), verbatim extract",
+      "citation": "arXiv:2502.17638v1, Appendix A.2, p. 13",
+      "url": "https://arxiv.org/pdf/2502.17638v1",
+      "retrieved": "2026-08-31",
+      "retrieval_method": "manual",
+      "integrity": {
+        "sha256": "32d9c77de640cc8c5120b64c8c2b4653c0a91130fce9606137c7f916c7a0b1b1",
+        "local_path": "jl4/examples/legal/chubb/denovo/source/appendix-a2.txt"
+      },
+      "covers_absent_reason": "A nine-item answer key states no range of law. It is the authors' reading of the fixture as at publication, and it carries no dates of its own.",
+      "annotations": []
+    }
+  ]
+}

@@ -793,18 +793,18 @@ DECLARE Guardian HAS
     `the court has otherwise ordered as to security` IS A BOOLEAN
 
     @ref Guardianship of Infants Act 1934 s 16(1)(a) — "sell, mortgage, exchange, or otherwise part with the possession of any of the movable or immovable property of the infant"
-    `has sold, mortgaged, exchanged, or otherwise parted with the possession of any of the movable or immovable property of the infant` IS A BOOLEAN
+    `sold, mortgaged, exchanged, or otherwise parted with the possession of any of the movable or immovable property of the infant` IS A BOOLEAN
     @ref Guardianship of Infants Act 1934 s 16(1)(b) — "lease any land belonging to the infant for a term exceeding one year"
     -- The term is separate because s 16(1)(b) bites only on a term
     -- "exceeding one year"; a shorter lease is not within the prohibition.
     -- NOTHING where no land has been leased.
-    `has leased land belonging to the infant`        IS A BOOLEAN
+    `leased land belonging to the infant`        IS A BOOLEAN
     `the term of the lease, in years`                IS A MAYBE NUMBER
     @ref Guardianship of Infants Act 1934 s 16(1) — "shall not, without the permission of the court"
-    `has the permission of the court to deal with the property of the infant` IS A BOOLEAN
+    `the permission of the court to deal with the property of the infant` IS A BOOLEAN
 
     @ref Guardianship of Infants Act 1934 s 17 — "A guardian of the property of an infant shall not, unless in any case the court otherwise orders, be empowered to give a good discharge for any legacy or other capital moneys payable to or receivable by an infant"
-    `has given a good discharge for a legacy or other capital moneys payable to or receivable by the infant` IS A BOOLEAN
+    `given a good discharge for a legacy or other capital moneys payable to or receivable by the infant` IS A BOOLEAN
     `the court has otherwise ordered as to giving a good discharge` IS A BOOLEAN
 
     @ref Guardianship of Infants Act 1934 s 18(1) — "A guardian of the property of an infant may make reasonable provision out of the income of such property for his maintenance and education, having regard to his station in life; but no sum exceeding $100 per month may be so applied without the permission of the court"
@@ -815,7 +815,7 @@ DECLARE Guardian HAS
     -- because that is what the cap measures.
     `the provision made out of the income of the property of the infant for his maintenance and education` IS AN `A periodical sum`
     @ref Guardianship of Infants Act 1934 s 18(1) — "without the permission of the court"
-    `has the permission of the court to apply a sum exceeding $100 per month` IS A BOOLEAN
+    `the permission of the court to apply a sum exceeding $100 per month` IS A BOOLEAN
 
 @ref Guardianship of Infants Act 1934 s 3, s 4, s 6, s 7, s 11, s 16, s 18, s 19; Probate and Administration Act 1934 s 6(2), s 21, s 63; Wills Act 1838 s 27(3)
 --
@@ -1022,11 +1022,11 @@ DECLARE `Executor appointed by a will` HAS
     -- an executor was an infant and simultaneously not legally incapable.
     `legally incapable of acting as such, otherwise than under section 21(1) or section 22(1)` IS A BOOLEAN
     @ref Probate and Administration Act 1934 s 13(1)(b) — "have renounced the right to act as such"; ss 3-5, the renunciation machinery that produces the fact
-    `has renounced the right to act as such`           IS A BOOLEAN
+    `renounced the right to act as such`           IS A BOOLEAN
     @ref Probate and Administration Act 1934 s 13(1)(e) — "the executors appointed by any will do not appear and extract probate"
     `appeared and extracted probate`                   IS A BOOLEAN
     @ref Probate and Administration Act 1934 s 13(1)(d) — "before having administered all the estate of the deceased"
-    `has administered all the estate of the deceased`  IS A BOOLEAN
+    `administered all the estate of the deceased`  IS A BOOLEAN
 
 @ref Wills Act 1838 s 10(1), s 20, s 26; Probate and Administration Act 1934 s 13(2)(a), s 13(2)(d), Second Schedule paras 1-2, 5-7
 --
@@ -1680,7 +1680,7 @@ DECLARE Grant HAS
     @ref Probate and Administration Act 1934 s 55(1)(e) — "where an administrator has failed to extract the grant of letters of administration"
     -- The administrator's counterpart of `Executor appointed by a will`'s
     -- `appeared and extracted probate` (s 13(1)(e)), which had none.
-    `has been extracted`                               IS A BOOLEAN
+    `been extracted`                               IS A BOOLEAN
 
     @ref Wills Act 1838 s 28(5) — "where a grant consists of any probate, or letters of administration with the will annexed, sealed under section 47(1) of the Probate and Administration Act 1934, the grant is deemed to be made on the date of sealing"; Probate and Administration Act 1934 s 47(1)-(2)
     `sealed under section 47(1) of the Probate and Administration Act 1934` IS A BOOLEAN

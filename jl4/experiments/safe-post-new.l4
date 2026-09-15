@@ -25,7 +25,7 @@ IMPORT daydate
     jurisdiction      IS "Delaware"
     `governing law`   IS "State of Delaware"
     version           IS "Post-Money Valuation Cap"
-    `is modified`     IS FALSE
+    `modified`     IS FALSE
 
 -- ============================================================================
 §§ `Key Terms`
@@ -65,7 +65,7 @@ DECLARE `Agreement Template`
         jurisdiction      IS A STRING
         `governing law`   IS A STRING
         version           IS A STRING
-        `is modified`     IS A BOOLEAN
+        `modified`     IS A BOOLEAN
 
 DECLARE Company
     HAS name                     IS A STRING
@@ -113,7 +113,7 @@ DECLARE `Cap Table Entry`
 DECLARE Options
     HAS `option type`   IS A STRING
         `share count`   IS A NUMBER
-        `is vested`     IS A BOOLEAN
+        `vested`     IS A BOOLEAN
 
 -- "Promised Options" means promised but ungranted Options
 DECLARE `Promised Options`
@@ -532,9 +532,9 @@ GIVETH A BOOLEAN
 
 -- If not accredited at Equity Financing, Company may void Safe
 GIVEN investor             IS AN Investor
-      `is accredited now`  IS A BOOLEAN
+      `accredited now`  IS A BOOLEAN
 GIVETH A BOOLEAN
-`Company may void Safe` MEANS NOT `is accredited now`
+`Company may void Safe` MEANS NOT `accredited now`
 
 -- ============================================================================
 § `Section 5: Miscellaneous`
@@ -547,12 +547,12 @@ GIVETH A BOOLEAN
 --   (ii) majority-in-interest of Safes with same terms
 
 GIVEN `has investor consent`  IS A BOOLEAN
-      `has majority consent`  IS A BOOLEAN
-      `is purchase amount change` IS A BOOLEAN
+      `majority consent`  IS A BOOLEAN
+      `purchase amount change` IS A BOOLEAN
 GIVETH A BOOLEAN
 `amendment is valid` MEANS
   `has investor consent`
-  OR (`has majority consent` AND NOT `is purchase amount change`)
+  OR (`majority consent` AND NOT `purchase amount change`)
 
 -- "Majority-in-interest" means holders with >50% of total Purchase Amount
 GIVEN `consenting purchase amounts` IS A NUMBER

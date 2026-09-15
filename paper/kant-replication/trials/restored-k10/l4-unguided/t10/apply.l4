@@ -1,0 +1,147 @@
+IMPORT policy
+
+-- Standing preamble (queries-blind.md): "Assuming all other conditions are met
+-- and no other exclusions apply (where by 'other,' I mean anything not
+-- referenced in the query that follows)." Signing and timely premium payment
+-- are likewise assumed throughout (policy.l4 does not model them).
+--
+-- For every fact not mentioned by a given query, a value is chosen that keeps
+-- every OTHER condition/exclusion satisfied/inapplicable, so that only the
+-- facts the query actually states can determine the result. Judgement calls
+-- made in choosing those values are recorded in NOTES.md.
+
+-- Q1: hospitalized by burns suffered while doing my duty as a firefighter.
+q1 MEANS Claim WITH
+    `cause of hospitalization`                                          IS `Accidental Injury`
+    `excluded activity`                                                 IS JUST `Firefighter Service`
+    `age at hospitalization`                                            IS 40
+    `hospital located in the United States`                             IS TRUE
+    `days confined in hospital`                                         IS 1
+    `hospitalization months after the effective date`                   IS 1
+    `wellness visit occurred months after the effective date`           IS JUST 1
+    `wellness visit confirmation given months after the effective date` IS JUST 2
+    `fraud misrepresentation or material withholding of information`    IS FALSE
+
+#EVAL `covered` q1
+
+-- Q2: 78 years old at the time of hospitalization.
+q2 MEANS Claim WITH
+    `cause of hospitalization`                                          IS Sickness
+    `excluded activity`                                                 IS NOTHING
+    `age at hospitalization`                                            IS 78
+    `hospital located in the United States`                             IS TRUE
+    `days confined in hospital`                                         IS 1
+    `hospitalization months after the effective date`                   IS 1
+    `wellness visit occurred months after the effective date`           IS JUST 1
+    `wellness visit confirmation given months after the effective date` IS JUST 2
+    `fraud misrepresentation or material withholding of information`    IS FALSE
+
+#EVAL `covered` q2
+
+-- Q3: hospitalized for pneumonia 5 months after the policy's effective date;
+-- age at hospitalization 65.
+q3 MEANS Claim WITH
+    `cause of hospitalization`                                          IS Sickness
+    `excluded activity`                                                 IS NOTHING
+    `age at hospitalization`                                            IS 65
+    `hospital located in the United States`                             IS TRUE
+    `days confined in hospital`                                         IS 1
+    `hospitalization months after the effective date`                   IS 5
+    `wellness visit occurred months after the effective date`           IS JUST 1
+    `wellness visit confirmation given months after the effective date` IS JUST 2
+    `fraud misrepresentation or material withholding of information`    IS FALSE
+
+#EVAL `covered` q3
+
+-- Q4: hospitalized due to a fall while traveling abroad; confirmation of the
+-- wellness visit given 8 months after the policy's effective date.
+q4 MEANS Claim WITH
+    `cause of hospitalization`                                          IS `Accidental Injury`
+    `excluded activity`                                                 IS NOTHING
+    `age at hospitalization`                                            IS 40
+    `hospital located in the United States`                             IS FALSE
+    `days confined in hospital`                                         IS 1
+    `hospitalization months after the effective date`                   IS 8
+    `wellness visit occurred months after the effective date`           IS JUST 3
+    `wellness visit confirmation given months after the effective date` IS JUST 8
+    `fraud misrepresentation or material withholding of information`    IS FALSE
+
+#EVAL `covered` q4
+
+-- Q5: hospitalized for punching my own face to show off for my friends; no
+-- fraud or misrepresentation.
+q5 MEANS Claim WITH
+    `cause of hospitalization`                                          IS `Intentional Self Inflicted Injury`
+    `excluded activity`                                                 IS NOTHING
+    `age at hospitalization`                                            IS 40
+    `hospital located in the United States`                             IS TRUE
+    `days confined in hospital`                                         IS 1
+    `hospitalization months after the effective date`                   IS 1
+    `wellness visit occurred months after the effective date`           IS JUST 1
+    `wellness visit confirmation given months after the effective date` IS JUST 2
+    `fraud misrepresentation or material withholding of information`    IS FALSE
+
+#EVAL `covered` q5
+
+-- Q6: hospitalized due to an injury sustained while skydiving; age 79 at
+-- hospitalization; proof of wellness visit provided 6.5 months after the
+-- policy's effective date.
+q6 MEANS Claim WITH
+    `cause of hospitalization`                                          IS `Accidental Injury`
+    `excluded activity`                                                 IS JUST Skydiving
+    `age at hospitalization`                                            IS 79
+    `hospital located in the United States`                             IS TRUE
+    `days confined in hospital`                                         IS 1
+    `hospitalization months after the effective date`                   IS 3
+    `wellness visit occurred months after the effective date`           IS JUST 2
+    `wellness visit confirmation given months after the effective date` IS JUST 6.5
+    `fraud misrepresentation or material withholding of information`    IS FALSE
+
+#EVAL `covered` q6
+
+-- Q7: hospitalized for a heart attack; proof of wellness visit submitted 2
+-- months after the policy's effective date; age 75 at hospitalization.
+q7 MEANS Claim WITH
+    `cause of hospitalization`                                          IS Sickness
+    `excluded activity`                                                 IS NOTHING
+    `age at hospitalization`                                            IS 75
+    `hospital located in the United States`                             IS TRUE
+    `days confined in hospital`                                         IS 1
+    `hospitalization months after the effective date`                   IS 2
+    `wellness visit occurred months after the effective date`           IS JUST 1
+    `wellness visit confirmation given months after the effective date` IS JUST 2
+    `fraud misrepresentation or material withholding of information`    IS FALSE
+
+#EVAL `covered` q7
+
+-- Q8: hospitalized after being injured in a military training exercise; the
+-- hospitalization occurred within the policy term; no fraud committed.
+q8 MEANS Claim WITH
+    `cause of hospitalization`                                          IS `Accidental Injury`
+    `excluded activity`                                                 IS JUST `Military Service`
+    `age at hospitalization`                                            IS 40
+    `hospital located in the United States`                             IS TRUE
+    `days confined in hospital`                                         IS 1
+    `hospitalization months after the effective date`                   IS 5
+    `wellness visit occurred months after the effective date`           IS JUST 1
+    `wellness visit confirmation given months after the effective date` IS JUST 2
+    `fraud misrepresentation or material withholding of information`    IS FALSE
+
+#EVAL `covered` q8
+
+-- Q9: hospitalized due to my son biting me in the ankle; proof of wellness
+-- visit provided 6 months after the effective date; serving as a police
+-- officer at the time of hospitalization (but the injury did not arise out
+-- of that service -- see NOTES.md).
+q9 MEANS Claim WITH
+    `cause of hospitalization`                                          IS `Accidental Injury`
+    `excluded activity`                                                 IS NOTHING
+    `age at hospitalization`                                            IS 40
+    `hospital located in the United States`                             IS TRUE
+    `days confined in hospital`                                         IS 1
+    `hospitalization months after the effective date`                   IS 3
+    `wellness visit occurred months after the effective date`           IS JUST 3
+    `wellness visit confirmation given months after the effective date` IS JUST 6
+    `fraud misrepresentation or material withholding of information`    IS FALSE
+
+#EVAL `covered` q9

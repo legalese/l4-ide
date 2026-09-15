@@ -55,7 +55,7 @@ describe('classifyWidget', () => {
   })
   it('classifies number / boolean leaves correctly', () => {
     expect(classifyWidget(sitProps['rent amount each time'])).toBe('number')
-    expect(classifyWidget(sitProps['has persistently paid rent late'])).toBe(
+    expect(classifyWidget(sitProps['persistently paid rent late'])).toBe(
       'boolean'
     )
   })
@@ -85,7 +85,7 @@ describe('orderedChildKeys', () => {
       'rent amount each time',
       'arrears when the notice was served',
       'arrears expected at the hearing',
-      'has persistently paid rent late',
+      'persistently paid rent late',
     ])
   })
   it('appends a key missing from propertyOrder rather than dropping it', () => {
@@ -152,7 +152,7 @@ describe('seed / validate / toArguments', () => {
     const sit = m.situation as FormState
     expect(sit['how often rent is due']).toBe('')
     expect(sit['rent amount each time']).toBeNull()
-    expect(sit['has persistently paid rent late']).toBeNull()
+    expect(sit['persistently paid rent late']).toBeNull()
   })
 
   it('flags every required leaf when the form is empty', () => {
@@ -167,7 +167,7 @@ describe('seed / validate / toArguments', () => {
     sit['rent amount each time'] = Infinity
     sit['arrears when the notice was served'] = Number.NaN
     sit['arrears expected at the hearing'] = 0
-    sit['has persistently paid rent late'] = false
+    sit['persistently paid rent late'] = false
     const errs = validate(root, m)
     expect(Object.values(errs)).toContain('Please enter a number, like 500')
   })
@@ -179,7 +179,7 @@ describe('seed / validate / toArguments', () => {
     sit['rent amount each time'] = -100
     sit['arrears when the notice was served'] = -50
     sit['arrears expected at the hearing'] = 0
-    sit['has persistently paid rent late'] = false
+    sit['persistently paid rent late'] = false
     const errs = validate(root, m)
     expect(Object.values(errs)).toContain('Amount cannot be negative')
   })
@@ -191,7 +191,7 @@ describe('seed / validate / toArguments', () => {
     sit['rent amount each time'] = 100
     sit['arrears when the notice was served'] = 1300
     sit['arrears expected at the hearing'] = 1400
-    sit['has persistently paid rent late'] = false
+    sit['persistently paid rent late'] = false
 
     const args = toArguments(root, m)
     expect(args).toEqual({
@@ -200,12 +200,10 @@ describe('seed / validate / toArguments', () => {
         'rent amount each time': 100,
         'arrears when the notice was served': 1300,
         'arrears expected at the hearing': 1400,
-        'has persistently paid rent late': false,
+        'persistently paid rent late': false,
       },
     })
     expect(typeof args.situation['rent amount each time']).toBe('number')
-    expect(typeof args.situation['has persistently paid rent late']).toBe(
-      'boolean'
-    )
+    expect(typeof args.situation['persistently paid rent late']).toBe('boolean')
   })
 })

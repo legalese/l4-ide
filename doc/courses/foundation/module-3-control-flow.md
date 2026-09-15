@@ -141,7 +141,7 @@ The pattern `first FOLLOWED BY rest` destructures a list into its head and tail.
 DECIDE `the person can vote` IF age >= 18 AND `is registered`
 
 -- OR: At least one condition must be true
-DECIDE `the transaction needs review` IF amount > 10000 OR `is high risk`
+DECIDE `the transaction needs review` IF amount > 10000 OR `high risk`
 
 -- NOT: Negation
 DECIDE `the person is a minor` IF NOT age >= 18

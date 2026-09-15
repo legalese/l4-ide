@@ -1,0 +1,1361 @@
+IMPORT prelude
+IMPORT daydate
+IMPORT feiertage
+
+§ `BGB Buch 1, Abschnitt 5, Titel 2 — Fristen, Termine (§§ 186–193)`
+
+-- ===========================================================================
+-- GEGENSTAND. Die §§ 186–193 BGB, isomorph formalisiert, und daneben — im
+-- Anhang A — die Rekonstruktion desjenigen Verfahrens, das Heydari & Leowald
+-- (2026), Teil III.A, in Prosa beschreiben. Die beiden Arme rechnen
+-- nebeneinander, damit man sie subtrahieren kann.
+--
+-- KEINE UHR. Es gibt hier kein TIMEZONE, kein TODAY, kein NOW und kein
+-- ungebundenes RULES EFFECTIVE DATE. Jedes Datum ist ein festes YMD-Literal.
+-- Eine Fristberechnung, die die Wanduhr liest, ist nicht prüfbar und
+-- widerspricht sich über zwei Läufe hinweg selbst. Wer "heute" meint, reicht
+-- es als Parameter herein. Das ist eine Entscheidung, kein Versehen.
+--
+-- DATE IST EIN TAG. Jedes Datumsfeld benennt DENJENIGEN TAG, MIT DESSEN
+-- ABLAUF die Frist endet — nicht einen Zeitpunkt. "Ablauf des Tages" ist
+-- 24:00 Uhr; das Modell kennt diese Stunde nicht. Siehe §§ Grenzen, Punkt 2.
+--
+-- EINHEIT. Keine deontische Schicht, absichtlich. Kein PARTY … MUST …
+-- WITHIN n irgendwo. Siehe §§ Grenzen, Punkt 8.
+-- ===========================================================================
+
+§§ `Die Typen`
+
+§§§ `§ 187 — die Art des Fristbeginns`
+
+-- Die Konstruktornamen sind die AUSLÖSER DES GESETZES, nicht die des
+-- Aufsatzes. Teil III.A stellt einander "event-triggered" und
+-- "date-triggered" gegenüber. Das benennt die falsche Bedingung: § 187 Abs. 2
+-- knüpft daran an, dass der BEGINN EINES TAGES der maßgebende Zeitpunkt ist,
+-- nicht daran, ob ein Datum genannt ist. Eine Lieferung um 14:00 Uhr an einem
+-- bekannten Kalendertag ist ein "in den Lauf eines Tages fallender Zeitpunkt"
+-- und damit § 187 Abs. 1, obwohl das Datum feststeht. Diese Namen sind die
+-- Weigerung der Kodierung, den Fehler mitzusprechen.
+@ref BGB § 187 Abs. 1 — "Ist für den Anfang einer Frist ein Ereignis oder ein in den Lauf eines Tages fallender Zeitpunkt maßgebend, so wird bei der Berechnung der Frist der Tag nicht mitgerechnet, in welchen das Ereignis oder der Zeitpunkt fällt"; Abs. 2 Satz 1 — "Ist der Beginn eines Tages der für den Anfang einer Frist maßgebende Zeitpunkt, so wird dieser Tag bei der Berechnung der Frist mitgerechnet"; Abs. 2 Satz 2 — "Das Gleiche gilt von dem Tage der Geburt bei der Berechnung des Lebensalters"
+DECLARE `Die Art des Fristbeginns` IS ONE OF
+    `ein Ereignis oder ein in den Lauf eines Tages fallender Zeitpunkt`
+    `der Beginn eines Tages`
+    `der Tag der Geburt bei der Berechnung des Lebensalters`
+
+§§§ `Die Fristdauer`
+
+-- Die Satzform, nicht fünf Konstruktoren mit je einem Zahlfeld: gleiche
+-- Feldnamen über mehrere Konstruktoren eines Summentyps liessen sich aus dem
+-- Baum nicht als zulässig belegen, und die Satzform stellt die Frage nicht.
+--
+-- `Jahre` ist eine EIGENE Einheit und wird NICHT zu 12 × n Monaten
+-- normalisiert: § 188 Abs. 2 führt das Jahr getrennt von den Monaten auf,
+-- während § 188 Abs. 3 nur von einer "nach Monaten bestimmten" Frist spricht.
+-- Hält man `Jahre` getrennt, bleibt die streitige Konstruktion (Regel R1,
+-- Beispiel 16) sichtbar, statt in einer Multiplikation zu verschwinden.
+DECLARE Fristeinheit IS ONE OF
+    Tage
+    Wochen
+    Monate
+    Jahre
+    `Monate und ein halber Monat`
+
+DECLARE Fristdauer HAS
+    `die Zahl`    IS A NUMBER
+    `die Einheit` IS A Fristeinheit
+
+§§§ `§ 193 — der Gegenstand`
+
+-- Vier, nicht zwei und nicht drei. Die beiden unmittelbaren Glieder benennt
+-- § 193 getrennt, und die Unterscheidung kostet nichts; das dritte ist
+-- analoge Anwendung; das vierte ist Nichtanwendung.
+@ref BGB § 193 — "Ist an einem bestimmten Tage oder innerhalb einer Frist eine Willenserklärung abzugeben oder eine Leistung zu bewirken"; BGH, Urt. v. 6.12.2007 – III ZR 146/07 — § 193 gilt entsprechend für Verjährungsfristen
+DECLARE `Der Gegenstand` IS ONE OF
+    `eine Willenserklärung ist abzugeben`
+    `eine Leistung ist zu bewirken`
+    `eine Verjährungsfrist läuft ab`
+    `eine Rechtsfolge tritt lediglich ein`
+
+§§§ `Der Fall, der Termin, und das Prüfprotokoll`
+
+DECLARE Fristfall HAS
+    -- EIN Feld trägt die ZWEI Bezugstage des Gesetzes, unterschieden durch
+    -- `die Art des Fristbeginns`. Unter Abs. 1 ist es der Tag, IN DEN das
+    -- Ereignis fällt (der Bezug von § 188 Abs. 2 Alt. 1). Unter Abs. 2 ist es
+    -- der ERSTE TAG DER FRIST (der Bezug von Alt. 2).
+    -- NICHT `der maßgebende Tag` nennen: das ist § 188 Abs. 3s Wort für einen
+    -- dritten und wieder anderen Tag.
+    `der Anknüpfungstag`          IS A DATE
+    -- AUSLEGUNGSEINGABEN, keine Ableitungen. Welche der beiden Regeln des
+    -- § 187 greift und ob § 193 sachlich einschlägig ist, wird durch
+    -- Auslegung des Rechtsgeschäfts nach § 186 ermittelt. Der Kern prüft,
+    -- dass die Fallunterscheidung total und disjunkt ist; er kann nicht
+    -- prüfen, dass die Eingabe stimmt. Das ist die ehrliche Angabe, wo die
+    -- Garantie anfängt.
+    `die Art des Fristbeginns`    IS A `Die Art des Fristbeginns`
+    `die Fristdauer`              IS A Fristdauer
+    `der Gegenstand der Frist`    IS A `Der Gegenstand`
+    `die maßgebenden Orte`        IS A `Die maßgebenden Orte`
+    -- § 186s Naht: die §§ 187–193 sind AUSLEGUNGSVORSCHRIFTEN und weichen
+    -- einer abweichenden Bestimmung. Siehe §§ Grenzen, Punkt 6, zur Grobheit
+    -- dieser Naht.
+    `eine abweichende Bestimmung` IS A MAYBE DATE
+
+@ref BGB § 192 — "Unter Anfang des Monats wird der erste, unter Mitte des Monats der 15., unter Ende des Monats der letzte Tag des Monats verstanden"
+DECLARE Monatstermin IS ONE OF
+    `Anfang des Monats`
+    `Mitte des Monats`
+    `Ende des Monats`
+
+-- Die Feldnamen sind bewusst ANDERS geschrieben als die des Fristfalls: dass
+-- zwei Sätze einen Feldnamen teilen dürfen, liess sich nicht belegen, und
+-- Umbenennen kostet nichts.
+DECLARE Terminfall HAS
+    `der bestimmte Tag`           IS A DATE
+    `der Gegenstand des Termins`  IS A `Der Gegenstand`
+    `die Orte des Termins`        IS A `Die maßgebenden Orte`
+
+-- Die oberste Ebene gibt DIESEN SATZ zurück, nicht MAYBE Fristberechnung.
+-- Die Verdrängung des § 186 sitzt im MAYBE-DATE-Feld und in der Flagge; ein
+-- MAYBE-Rückgabewert machte jede der rund fünfzig Behauptungen zweiwertig.
+DECLARE Fristberechnung HAS
+    `der Anknüpfungstag`                          IS A DATE
+    `der Fristbeginn`                             IS A DATE
+    `der letzte Tag der Frist vor § 193`          IS A DATE
+    `eine abweichende Bestimmung geht vor`        IS A BOOLEAN
+    `§ 188 Abs. 3 wurde angewandt`                IS A BOOLEAN
+    `§ 193 wurde angewandt`                       IS A BOOLEAN
+    `§ 193 wurde nur entsprechend angewandt`      IS A BOOLEAN
+    `die Feiertagsangabe ist gesichert`           IS A BOOLEAN
+    `der letzte Tag der Frist`                    IS A DATE
+    `der Beginn der Rechtsfolge`                  IS A DATE
+
+§§ `§ 186 — Geltungsbereich`
+
+@ref BGB § 186 — "Für die in Gesetzen, gerichtlichen Verfügungen und Rechtsgeschäften enthaltenen Frist- und Terminsbestimmungen gelten die Auslegungsvorschriften der §§ 187 bis 193"
+GIVEN f IS A Fristfall
+GIVETH A BOOLEAN
+`§ 186 — eine abweichende Bestimmung geht vor bei` f MEANS
+    CONSIDER f's `eine abweichende Bestimmung`
+    WHEN NOTHING THEN FALSE
+    WHEN JUST d  THEN TRUE
+
+§§ `§ 187 — Fristbeginn`
+
+GIVEN a IS A `Die Art des Fristbeginns`
+GIVETH A BOOLEAN
+`§ 187 Abs. 1 ist einschlägig bei` a MEANS
+    CONSIDER a
+    WHEN `ein Ereignis oder ein in den Lauf eines Tages fallender Zeitpunkt` THEN TRUE
+    WHEN `der Beginn eines Tages`                                            THEN FALSE
+    WHEN `der Tag der Geburt bei der Berechnung des Lebensalters`            THEN FALSE
+
+GIVEN a IS A `Die Art des Fristbeginns`
+GIVETH A BOOLEAN
+`§ 187 Abs. 2 ist einschlägig bei` a MEANS
+    CONSIDER a
+    WHEN `ein Ereignis oder ein in den Lauf eines Tages fallender Zeitpunkt` THEN FALSE
+    WHEN `der Beginn eines Tages`                                            THEN TRUE
+    WHEN `der Tag der Geburt bei der Berechnung des Lebensalters`            THEN TRUE
+
+GIVEN a IS A `Die Art des Fristbeginns`
+GIVETH A BOOLEAN
+`genau eine Regel des § 187 greift bei` a MEANS
+        ((`§ 187 Abs. 1 ist einschlägig bei` a) OR (`§ 187 Abs. 2 ist einschlägig bei` a))
+    AND (NOT ((`§ 187 Abs. 1 ist einschlägig bei` a) AND (`§ 187 Abs. 2 ist einschlägig bei` a)))
+
+GIVETH A LIST OF `Die Art des Fristbeginns`
+`alle Arten des Fristbeginns` MEANS
+    LIST `ein Ereignis oder ein in den Lauf eines Tages fallender Zeitpunkt`, `der Beginn eines Tages`, `der Tag der Geburt bei der Berechnung des Lebensalters`
+
+-- § 187 Abs. 1: der Tag, in den das Ereignis fällt, wird NICHT mitgerechnet,
+-- die Frist läuft also ab dem Folgetag. NICHT nach `on day` greifen —
+-- daydate.l4:589-593 setzt die GEGENTEILIGE Konvention um (d + n − 1, der
+-- Auslösetag zählt als Tag 1).
+GIVEN f IS A Fristfall
+GIVETH A DATE
+`§ 187 — der Fristbeginn bei` f MEANS
+    IF   `§ 187 Abs. 1 ist einschlägig bei` (f's `die Art des Fristbeginns`)
+    THEN `the day after` (f's `der Anknüpfungstag`)
+    ELSE f's `der Anknüpfungstag`
+
+§§ `§ 188 — Fristende`
+
+§§§ `§ 188 Abs. 3 — der fehlende maßgebende Tag, als Melder`
+
+-- Die Klammerung steckt in `add months`; nichts dort meldet, OB sie gegriffen
+-- hat, und genau davon hängt die Subtraktion in Alt. 2 ab. Der Test ist
+-- exakt, nicht heuristisch: `add months` erhält DATE_DAY genau dann, wenn es
+-- den entsprechenden Tag im Zielmonat gibt.
+@ref BGB § 188 Abs. 3 — "Fehlt bei einer nach Monaten bestimmten Frist in dem letzten Monat der für ihren Ablauf maßgebende Tag, so endigt die Frist mit dem Ablauf des letzten Tages dieses Monats"
+GIVEN n IS A NUMBER
+      d IS A DATE
+GIVETH A BOOLEAN
+`§ 188 Abs. 3 — der maßgebende Tag fehlt nach` n `Monaten ab` d MEANS
+    NOT (DATE_DAY (`add months` d n) EQUALS DATE_DAY d)
+
+§§§ `§ 188 Abs. 1 — nach Tagen bestimmte Fristen`
+
+-- Kein Entsprechungstest, also kann § 188 Abs. 3 hier nicht beissen: es gibt
+-- keinen "entsprechenden Tag", der fehlen könnte.
+@ref BGB § 188 Abs. 1 — "Eine nach Tagen bestimmte Frist endigt mit dem Ablauf des letzten Tages der Frist"
+GIVEN n IS A NUMBER
+      b IS A DATE
+GIVETH A DATE
+`§ 188 Abs. 1 — das Ende einer Frist von` n `Tagen ab dem Fristbeginn` b MEANS
+    b PLUS (n MINUS 1)
+
+§§§ `§ 188 Abs. 2 — nach Wochen, Monaten, Jahren bestimmte Fristen`
+
+-- ZWEI Glieder mit ZWEI VERSCHIEDENEN Bezugstagen, ausgewählt danach, welche
+-- Regel des § 187 gegriffen hat. Alt. 1 knüpft an den Tag an, IN DEN das
+-- Ereignis fällt, und subtrahiert NICHTS. Alt. 2 knüpft an den ERSTEN TAG DER
+-- FRIST an und nimmt den VORHERGEHENDEN Tag. Teil III.A hat eine Regel für
+-- beides; keine einzelne Regel kann das.
+@ref BGB § 188 Abs. 2 — "endigt … im Falle des § 187 Abs. 1 mit dem Ablauf desjenigen Tages der letzten Woche oder des letzten Monats, welcher durch seine Benennung oder seine Zahl dem Tage entspricht, in den das Ereignis oder der Zeitpunkt fällt, im Falle des § 187 Abs. 2 mit dem Ablauf desjenigen Tages der letzten Woche oder des letzten Monats, welcher dem Tage vorhergeht, der durch seine Benennung oder seine Zahl dem Anfangstag der Frist entspricht"
+GIVEN n IS A NUMBER
+      e IS A DATE
+GIVETH A DATE
+`§ 188 Abs. 2 Alt. 1 — das Ende einer Wochenfrist von` n `Wochen ab dem Ereignistag` e MEANS
+    e PLUS (7 TIMES n)
+
+GIVEN n IS A NUMBER
+      s IS A DATE
+GIVETH A DATE
+`§ 188 Abs. 2 Alt. 2 — das Ende einer Wochenfrist von` n `Wochen ab dem Anfangstag` s MEANS
+    `the day before` (s PLUS (7 TIMES n))
+
+GIVEN n IS A NUMBER
+      e IS A DATE
+GIVETH A DATE
+`§ 188 Abs. 2 Alt. 1 — das Ende einer Monatsfrist von` n `Monaten ab dem Ereignistag` e MEANS
+    `add months` e n
+
+-- DIE BEWACHTE SUBTRAKTION — Regel R2.
+-- Fehlt der maßgebende Tag, so endigt die Frist nach § 188 Abs. 3 mit dem
+-- Ablauf des LETZTEN TAGES DIESES MONATS. Abs. 3 VERDRÄNGT damit den
+-- "vorhergehenden Tag" des Abs. 2 Alt. 2; er wird nicht zusätzlich auf ihn
+-- angewandt. Die andere Lesart — `add months … MINUS 1` in jedem Fall —
+-- ergäbe für die am 29.2.2008 Geborenen den 27.2.2026 und damit einen Tag
+-- rechtswidriger Volljährigkeit. Festgenagelt durch Beispiel 9b.
+GIVEN n IS A NUMBER
+      s IS A DATE
+GIVETH A DATE
+`§ 188 Abs. 2 Alt. 2 — das Ende einer Monatsfrist von` n `Monaten ab dem Anfangstag` s MEANS
+    IF   `§ 188 Abs. 3 — der maßgebende Tag fehlt nach` n `Monaten ab` s
+    THEN `add months` s n
+    ELSE `the day before` (`add months` s n)
+
+§§ `§ 189 — Berechnung einzelner Fristen`
+
+@ref BGB § 189 Abs. 1 — "Unter einem halben Jahr wird eine Frist von sechs Monaten, unter einem Vierteljahr eine Frist von drei Monaten, unter einem halben Monat eine Frist von 15 Tagen verstanden"
+GIVETH A Fristdauer
+`§ 189 Abs. 1 — ein halbes Jahr` MEANS Fristdauer WITH
+    `die Zahl`    IS 6
+    `die Einheit` IS Monate
+
+GIVETH A Fristdauer
+`§ 189 Abs. 1 — ein Vierteljahr` MEANS Fristdauer WITH
+    `die Zahl`    IS 3
+    `die Einheit` IS Monate
+
+-- Ein halber Monat ist eine TAGES-Frist von 15, keine Monatsfrist. Deshalb
+-- gilt für ihn § 188 Abs. 1 und nicht der Entsprechungstest — und deshalb
+-- sind "sechs Wochen" (42 Tage) und "ein Monat und ein halber" nicht
+-- dasselbe. Beispiel 12 gegen Beispiel 12b.
+GIVETH A Fristdauer
+`§ 189 Abs. 1 — ein halber Monat` MEANS Fristdauer WITH
+    `die Zahl`    IS 15
+    `die Einheit` IS Tage
+
+-- Regel R5: der Monatsteil läuft zuerst durch § 188 Abs. 2; die 15 Tage sind
+-- eine Frist nach § 188 Abs. 1, die AM TAG NACH dem letzten Tag des
+-- Monatsteils beginnt. Die Gegenlesart — die Alt.-2-Subtraktion einmal ganz
+-- am Ende — ist verworfen; festgenagelt durch Beispiel 12.
+@ref BGB § 189 Abs. 2 — "Ist eine Frist auf einen oder mehrere ganze Monate und einen halben Monat gestellt, so sind die 15 Tage zuletzt zu zählen"
+GIVEN n IS A NUMBER
+      f IS A Fristfall
+GIVETH A DATE
+`§ 189 Abs. 2 — das Ende einer Frist von` n `Monaten und einem halben Monat bei` f MEANS
+    `§ 188 Abs. 1 — das Ende einer Frist von` (`§ 189 Abs. 1 — ein halber Monat`'s `die Zahl`) `Tagen ab dem Fristbeginn` (`the day after` monatsteil)
+    WHERE
+        monatsteil MEANS
+            IF   `§ 187 Abs. 1 ist einschlägig bei` (f's `die Art des Fristbeginns`)
+            THEN `§ 188 Abs. 2 Alt. 1 — das Ende einer Monatsfrist von` n `Monaten ab dem Ereignistag` (f's `der Anknüpfungstag`)
+            ELSE `§ 188 Abs. 2 Alt. 2 — das Ende einer Monatsfrist von` n `Monaten ab dem Anfangstag` (f's `der Anknüpfungstag`)
+
+§§ `Die Verteilung über die §§ 188, 189`
+
+-- Regel R1: § 188 Abs. 3 erfasst auch eine nach JAHREN bestimmte Frist. Ein
+-- Jahr ist ein "mehrere Monate umfassender Zeitraum", und die herrschende
+-- Praxis klammert (29.2.2024 + 1 Jahr = 28.2.2025). Die Gegenlesart stützt
+-- sich darauf, dass § 188 Abs. 2 das Jahr GETRENNT von den Monaten aufführt,
+-- während Abs. 3 nur von "nach Monaten bestimmt" spricht. Das ist
+-- Konstruktion, nicht Text. Festgenagelt durch Beispiel 16.
+GIVEN f IS A Fristfall
+GIVETH A DATE
+`§§ 188, 189 — der letzte Tag der Frist vor § 193 bei` f MEANS
+    CONSIDER (f's `die Fristdauer`)'s `die Einheit`
+    WHEN Tage   THEN `§ 188 Abs. 1 — das Ende einer Frist von` zahl `Tagen ab dem Fristbeginn` (`§ 187 — der Fristbeginn bei` f)
+    WHEN Wochen THEN (IF abs1 THEN `§ 188 Abs. 2 Alt. 1 — das Ende einer Wochenfrist von` zahl `Wochen ab dem Ereignistag` anker ELSE `§ 188 Abs. 2 Alt. 2 — das Ende einer Wochenfrist von` zahl `Wochen ab dem Anfangstag` anker)
+    WHEN Monate THEN (IF abs1 THEN `§ 188 Abs. 2 Alt. 1 — das Ende einer Monatsfrist von` zahl `Monaten ab dem Ereignistag` anker ELSE `§ 188 Abs. 2 Alt. 2 — das Ende einer Monatsfrist von` zahl `Monaten ab dem Anfangstag` anker)
+    WHEN Jahre  THEN (IF abs1 THEN `§ 188 Abs. 2 Alt. 1 — das Ende einer Monatsfrist von` (12 TIMES zahl) `Monaten ab dem Ereignistag` anker ELSE `§ 188 Abs. 2 Alt. 2 — das Ende einer Monatsfrist von` (12 TIMES zahl) `Monaten ab dem Anfangstag` anker)
+    WHEN `Monate und ein halber Monat` THEN `§ 189 Abs. 2 — das Ende einer Frist von` zahl `Monaten und einem halben Monat bei` f
+    WHERE
+        zahl  MEANS (f's `die Fristdauer`)'s `die Zahl`
+        anker MEANS f's `der Anknüpfungstag`
+        abs1  MEANS `§ 187 Abs. 1 ist einschlägig bei` (f's `die Art des Fristbeginns`)
+
+§§ `§ 190 — Fristverlängerung`
+
+-- Regel R3: "Ablauf der vorigen Frist" ist der Ablauf NACH § 193. Verlegt
+-- § 193 den Tag, so läuft die vorige Frist mit dem Werktag ab, und von dort
+-- rechnet die neue. Die Gegenlesart nimmt den Ablauf VOR § 193. Beispiel 13
+-- unterscheidet die beiden NICHT (der 1.4.2026 ist ein Mittwoch). Damit die
+-- Gabelung nicht bloss BEHAUPTET, sondern GEDRUCKT wird, steht die verworfene
+-- Gegenlesart unten als eigene Definition daneben, und ein Paar von #EVALs
+-- weiter unten lässt beide auf Beispiel 4 los, das sie trennt:
+-- 12.3.2026 nach der genommenen, 10.3.2026 nach der verworfenen Lesart.
+-- Die neue Frist ist von Bauart her eine BEGINNFRIST: sie läuft ab 00:00 des
+-- Tages nach dem Ablauf, dieser Tag zählt also mit.
+@ref BGB § 190 — "Im Falle der Verlängerung einer Frist wird die neue Frist von dem Ablauf der vorigen Frist an berechnet"
+GIVEN d IS A Fristdauer
+      f IS A Fristfall
+GIVETH A Fristfall
+`§ 190 — der Fristfall der um` d `verlängerten Frist zu` f MEANS Fristfall WITH
+    `der Anknüpfungstag`          IS `the day after` (`das Fristende zu` f)
+    `die Art des Fristbeginns`    IS `der Beginn eines Tages`
+    `die Fristdauer`              IS d
+    `der Gegenstand der Frist`    IS f's `der Gegenstand der Frist`
+    `die maßgebenden Orte`        IS f's `die maßgebenden Orte`
+    `eine abweichende Bestimmung` IS NOTHING
+
+-- DIE VERWORFENE GEGENLESART ZU R3, ausgeschrieben, damit das Paar von
+-- #EVALs unten sie drucken kann. Sie rechnet ab dem Ablauf VOR § 193. Sie ist
+-- KEIN Teil der Kodierung des Gesetzes; sie steht hier ausschliesslich, um
+-- die Gabelung sichtbar zu machen.
+GIVEN d IS A Fristdauer
+      f IS A Fristfall
+GIVETH A Fristfall
+`§ 190 (verworfene Gegenlesart) — der Fristfall der um` d `verlängerten Frist vor § 193 zu` f MEANS Fristfall WITH
+    `der Anknüpfungstag`          IS `the day after` (`§§ 188, 189 — der letzte Tag der Frist vor § 193 bei` f)
+    `die Art des Fristbeginns`    IS `der Beginn eines Tages`
+    `die Fristdauer`              IS d
+    `der Gegenstand der Frist`    IS f's `der Gegenstand der Frist`
+    `die maßgebenden Orte`        IS f's `die maßgebenden Orte`
+    `eine abweichende Bestimmung` IS NOTHING
+
+§§ `§ 191 — Berechnung von Zeiträumen`
+
+-- Gibt eine ZAHL zurück, kein Datum, und kann deshalb § 193 nicht speisen:
+-- ein nicht zusammenhängender Zeitraum hat keinen letzten Tag. Das ist das
+-- Gesetz, kein Modellierungsfehler — und der Grund, warum diese Datei drei
+-- Einstiegspunkte hat und nicht einen.
+-- Die 30 und die 365 sind LITERALE. Nicht `Days in a month` (30.436875) oder
+-- `Days in a year` (365.2425) nehmen: das sind Mittelwerte.
+@ref BGB § 191 — "Ist ein Zeitraum nach Monaten oder nach Jahren in dem Sinne bestimmt, dass er nicht zusammenhängend zu verlaufen braucht, so wird der Monat zu 30, das Jahr zu 365 Tagen gerechnet"
+GIVEN d IS A Fristdauer
+GIVETH A NUMBER
+`§ 191 — die Zahl der Tage eines nicht zusammenhängenden Zeitraums von` d MEANS
+    CONSIDER d's `die Einheit`
+    WHEN Monate THEN (d's `die Zahl`) TIMES 30
+    WHEN Jahre  THEN (d's `die Zahl`) TIMES 365
+    WHEN Tage   THEN REFUSE "§ 191 gilt nur für nach Monaten oder nach Jahren bestimmte Zeiträume"
+    WHEN Wochen THEN REFUSE "§ 191 gilt nur für nach Monaten oder nach Jahren bestimmte Zeiträume"
+    WHEN `Monate und ein halber Monat` THEN REFUSE "§ 191 gilt nur für nach Monaten oder nach Jahren bestimmte Zeiträume"
+
+§§ `§ 192 — Anfang, Mitte, Ende des Monats`
+
+GIVEN d IS A DATE
+GIVETH A DATE
+`der letzte Tag des Monats von` d MEANS
+    YMD (DATE_YEAR d) (DATE_MONTH d) (`Days in month` d)
+
+@ref BGB § 192 — "Unter Anfang des Monats wird der erste, unter Mitte des Monats der 15., unter Ende des Monats der letzte Tag des Monats verstanden"
+GIVEN t IS A Monatstermin
+      m IS A NUMBER
+      y IS A NUMBER
+GIVETH A DATE
+`§ 192 — der Tag des Termins` t `im Monat` m `des Jahres` y MEANS
+    CONSIDER t
+    WHEN `Anfang des Monats` THEN YMD y m 1
+    WHEN `Mitte des Monats`  THEN YMD y m 15
+    WHEN `Ende des Monats`   THEN `der letzte Tag des Monats von` (YMD y m 1)
+
+§§ `§ 193 — Sonn- und Feiertag, Sonnabend`
+
+-- § 193 hat eine VORBEDINGUNG, und Teil III.A lässt sie fallen. Die Norm
+-- greift nur, wo eine Willenserklärung abzugeben oder eine Leistung zu
+-- bewirken ist. Wo eine Rechtsfolge lediglich eintritt, greift sie nicht.
+-- Dass die Gerichte die Verjährungsfristen nur im Wege der ANALOGIE erreicht
+-- haben, ist der unmittelbare Beleg dafür, dass die Vorbedingung echt ist und
+-- trägt: bei unmittelbarer Anwendbarkeit hätte es der Analogie nicht bedurft.
+GIVEN g IS A `Der Gegenstand`
+GIVETH A BOOLEAN
+`§ 193 ist unmittelbar anwendbar auf` g MEANS
+    CONSIDER g
+    WHEN `eine Willenserklärung ist abzugeben`   THEN TRUE
+    WHEN `eine Leistung ist zu bewirken`         THEN TRUE
+    WHEN `eine Verjährungsfrist läuft ab`        THEN FALSE
+    WHEN `eine Rechtsfolge tritt lediglich ein`  THEN FALSE
+
+-- Eine STIPULATION, keine Ableitung: L4 kennt keine Analogie. Jede künftige
+-- analoge Erstreckung ist eine Codeänderung. Siehe §§ Grenzen, Punkt 5.
+@ref BGH, Urt. v. 6.12.2007 – III ZR 146/07 — § 193 BGB gilt entsprechend für den Ablauf von Verjährungsfristen
+GIVEN g IS A `Der Gegenstand`
+GIVETH A BOOLEAN
+`§ 193 ist entsprechend anwendbar auf` g MEANS
+    CONSIDER g
+    WHEN `eine Willenserklärung ist abzugeben`   THEN FALSE
+    WHEN `eine Leistung ist zu bewirken`         THEN FALSE
+    WHEN `eine Verjährungsfrist läuft ab`        THEN TRUE
+    WHEN `eine Rechtsfolge tritt lediglich ein`  THEN FALSE
+
+GIVEN g IS A `Der Gegenstand`
+GIVETH A BOOLEAN
+`§ 193 ist anwendbar auf` g MEANS
+    (`§ 193 ist unmittelbar anwendbar auf` g) OR (`§ 193 ist entsprechend anwendbar auf` g)
+
+-- Regel R4: "am Erklärungs- ODER Leistungsort" wird als VEREINIGUNG gelesen —
+-- ein Tag, der an EINEM der maßgebenden Orte Feiertag ist, verlegt den
+-- Termin. Die Gegenlesarten (Durchschnitt; oder allein der Leistungsort) sind
+-- verworfen. Festgenagelt durch Beispiel 8a gegen 8b.
+@ref BGB § 193 — "fällt der bestimmte Tag oder der letzte Tag der Frist auf einen Sonntag, einen am Erklärungs- oder Leistungsort staatlich anerkannten allgemeinen Feiertag oder einen Sonnabend"
+GIVEN d IS A DATE
+      o IS A `Die maßgebenden Orte`
+GIVETH A BOOLEAN
+`§ 193 verdrängt den Tag` d `an den Orten` o MEANS
+        (NOT (`is weekday` d))
+    OR  any (GIVEN l YIELD `ein gesetzlicher Feiertag am Tag` d `im Land` l) (o's `die Länder`)
+
+-- Nur vorwärts, und der Basisfall gibt sein Argument unverändert zurück.
+-- Das ist der strukturelle Grund für I2; die Stichprobe unten bestätigt ihn
+-- nur. Die Abbruchgarantie liegt darin, dass keine Landesliste alle Tage
+-- eines Jahres enthält — festgenagelt in feiertage.l4.
+GIVEN d IS A DATE
+      o IS A `Die maßgebenden Orte`
+GIVETH A DATE
+`§ 193 — der nächste Werktag ab` d `an den Orten` o MEANS
+    IF   `§ 193 verdrängt den Tag` d `an den Orten` o
+    THEN `§ 193 — der nächste Werktag ab` (`the day after` d) `an den Orten` o
+    ELSE d
+
+-- DIE GEMEINSAME ERSETZUNG. Beide Glieder des § 193 — der "bestimmte Tag"
+-- und der "letzte Tag der Frist" — laufen hier durch, damit das Termin-Glied
+-- kein Sonderfall ist.
+GIVEN g IS A `Der Gegenstand`
+      d IS A DATE
+      o IS A `Die maßgebenden Orte`
+GIVETH A DATE
+`§ 193 — der an die Stelle tretende Tag für` g `am Tag` d `an den Orten` o MEANS
+    IF   `§ 193 ist anwendbar auf` g
+    THEN `§ 193 — der nächste Werktag ab` d `an den Orten` o
+    ELSE d
+
+§§ `Die drei Einstiegspunkte`
+
+GIVEN a IS A DATE
+      b IS A DATE
+GIVETH A LIST OF DATE
+`die Tage von` a `bis` b MEANS
+    map (GIVEN s YIELD DATE_FROM_SERIAL s) (range (DATE_SERIAL a) (DATE_SERIAL b))
+
+-- DIE NAHT DES § 186, und wie WEIT sie reicht — Regel R6.
+-- Setzt das Rechtsgeschäft einen anderen Tag, so verdrängt das die RECHNUNG
+-- der §§ 187–189: nicht mehr das Gesetz bestimmt den letzten Tag der Frist,
+-- sondern die Bestimmung. § 193 bleibt davon UNBERÜHRT. Denn der so gesetzte
+-- Tag ist gerade der "bestimmte Tag", von dem § 193 spricht — und für ihn
+-- ordnet § 193 die Verlegung auf den nächsten Werktag an. Die Gegenlesart
+-- (eine Datumsbestimmung verdränge die §§ 187–193 ALS SATZ) ist verworfen:
+-- sie liesse `das Fristende zu` und `der Termintag zu`, die in dieser Datei
+-- dieselbe Rechtsfrage stellen, verschieden antworten. Wer § 193 zusätzlich
+-- verdrängen will, muss dafür einen eigenen Befund haben (die Parteien haben
+-- einen genauen Zeitpunkt festgelegt); das Modell kennt dieses zweite Feld
+-- nicht — siehe §§ Grenzen, Punkt 6.
+-- Festgenagelt durch Beispiel 17 (der gesetzte Tag ist ein Sonntag).
+GIVEN f IS A Fristfall
+GIVETH A DATE
+`der von § 193 zu prüfende Tag bei` f MEANS
+    CONSIDER f's `eine abweichende Bestimmung`
+    WHEN JUST x  THEN x
+    WHEN NOTHING THEN `§§ 188, 189 — der letzte Tag der Frist vor § 193 bei` f
+
+-- GEMESSENER MANGEL IM SCHEMA-SCHREIBER.
+-- `tests/fristberechnung.schema.golden` enthält DOPPELT UTF-8-KODIERTE
+-- Umlaute: aus `der Anknüpfungstag` (c3 bc) wird dort `der AnknÃ¼pfungstag`
+-- (c3 83 c2 bc), jedes Byte der UTF-8-Folge noch einmal als UTF-8 kodiert.
+-- Das Auswertungs-Golden und das NLG-Golden derselben Datei geben dieselben
+-- Umlaute KORREKT wieder; nur der Schema-Pfad ist betroffen.
+-- Der Mangel liegt NICHT in dieser Datei: die Quelle ist sauberes UTF-8.
+-- URSACHE, benannt statt bloss beschrieben: jl4/tests/Main.hs:429 schreibt
+-- `BL.unpack (AP.encodePretty schema)`, wobei `BL` Data.ByteString.Lazy.Char8
+-- ist — jedes UTF-8-BYTE wird dort zu einem Char abgeschnitten — und
+-- Main.hs:434 gibt dieses Ergebnis an `writeFile`, das jeden dieser Chars
+-- erneut als UTF-8 kodiert. Die drei anderen Goldens laufen über
+-- `Text.writeFile` (Main.hs:172, :224, :406) und sind deshalb sauber.
+-- DIESE DATEI IST NICHT DER ERSTE ZEUGE. Gemessen über alle *.schema.golden
+-- in jl4/ und jl4-core/ gibt es ZWEI mit Zeichen ausserhalb von ASCII, und
+-- der andere ist älter: jl4/examples/legal/regcf/denovo/tests/
+-- regcf-denovo.schema.golden:224 trägt `Â§` (c3 82 c2 a7), also U+00A7
+-- doppelt kodiert, bei sauberer Quelle (regcf-denovo.l4:771). Der Mangel hat
+-- also nicht überlebt, weil ihn nie jemand ausgelöst hätte, sondern weil `Â§`
+-- niemandem als kaputt ins Auge fällt.
+-- Das Golden wird hier bewusst mit dem Mangel eingefroren, damit CI ihn
+-- festhält, statt ihn wieder unsichtbar zu machen. Wird er behoben, ÄNDERN
+-- SICH BEIDE GOLDENS, und das ist dann die richtige Antwort, nicht ein
+-- Rückschritt.
+@export
+GIVEN f IS A Fristfall
+GIVETH A DATE
+`das Fristende zu` f MEANS
+    `§ 193 — der an die Stelle tretende Tag für` (f's `der Gegenstand der Frist`) `am Tag` (`der von § 193 zu prüfende Tag bei` f) `an den Orten` (f's `die maßgebenden Orte`)
+
+-- Die Mehrheit tritt um 00:00 des FOLGENDEN Tages ein: § 188 gibt den Tag, mit
+-- dessen ABLAUF die Frist endet. Wer beides gleichsetzt, verschiebt jede
+-- Altersgrenze um einen Tag.
+GIVEN f IS A Fristfall
+GIVETH A DATE
+`der Beginn der Rechtsfolge zu` f MEANS `the day after` (`das Fristende zu` f)
+
+GIVEN t IS A Terminfall
+GIVETH A DATE
+`der Termintag zu` t MEANS
+    `§ 193 — der an die Stelle tretende Tag für` (t's `der Gegenstand des Termins`) `am Tag` (t's `der bestimmte Tag`) `an den Orten` (t's `die Orte des Termins`)
+
+§§ `Das Prüfprotokoll`
+
+-- JEDE FLAGGE BERICHTET ÜBER DEN WEG, DEN DIE ANTWORT WIRKLICH GENOMMEN HAT.
+-- Verdrängt eine abweichende Bestimmung nach § 186 die Rechnung, so ist
+-- § 188 Abs. 3 NICHT angewandt worden — die Klammer hat dann nichts
+-- entschieden — und § 193 ist auf den GESETZTEN Tag angewandt worden, nicht
+-- auf den rohen. Beides aus `roh` abzuleiten, hiesse ein Protokoll zu
+-- drucken, das eine Rechnung behauptet, die die Antwort nicht bestimmt hat.
+GIVEN f IS A Fristfall
+GIVETH A Fristberechnung
+`die Fristberechnung zu` f MEANS Fristberechnung WITH
+    `der Anknüpfungstag`                     IS f's `der Anknüpfungstag`
+    `der Fristbeginn`                        IS `§ 187 — der Fristbeginn bei` f
+    `der letzte Tag der Frist vor § 193`     IS massgeblich
+    `eine abweichende Bestimmung geht vor`   IS ueberschrieben
+    `§ 188 Abs. 3 wurde angewandt`           IS klammer
+    `§ 193 wurde angewandt`                  IS verlegt
+    `§ 193 wurde nur entsprechend angewandt` IS (verlegt AND (`§ 193 ist entsprechend anwendbar auf` (f's `der Gegenstand der Frist`)))
+    `die Feiertagsangabe ist gesichert`      IS gesichert
+    `der letzte Tag der Frist`               IS ende
+    `der Beginn der Rechtsfolge`             IS `the day after` ende
+    WHERE
+        -- `roh` ist die Rechnung der §§ 188, 189. `massgeblich` ist der Tag,
+        -- den § 193 tatsächlich vorgefunden hat: unter § 186 der gesetzte,
+        -- sonst der rohe. Die beiden fallen nur auseinander, wenn eine
+        -- abweichende Bestimmung vorliegt.
+        roh         MEANS `§§ 188, 189 — der letzte Tag der Frist vor § 193 bei` f
+        massgeblich MEANS `der von § 193 zu prüfende Tag bei` f
+        ueberschrieben MEANS `§ 186 — eine abweichende Bestimmung geht vor bei` f
+        ende    MEANS `das Fristende zu` f
+        zahl    MEANS (f's `die Fristdauer`)'s `die Zahl`
+        anker   MEANS f's `der Anknüpfungstag`
+        klammerRoh MEANS
+            CONSIDER (f's `die Fristdauer`)'s `die Einheit`
+            WHEN Monate THEN `§ 188 Abs. 3 — der maßgebende Tag fehlt nach` zahl `Monaten ab` anker
+            WHEN Jahre  THEN `§ 188 Abs. 3 — der maßgebende Tag fehlt nach` (12 TIMES zahl) `Monaten ab` anker
+            WHEN Tage   THEN FALSE
+            WHEN Wochen THEN FALSE
+            WHEN `Monate und ein halber Monat` THEN `§ 188 Abs. 3 — der maßgebende Tag fehlt nach` zahl `Monaten ab` anker
+        klammer MEANS (NOT ueberschrieben) AND klammerRoh
+        verlegt MEANS
+                (`§ 193 ist anwendbar auf` (f's `der Gegenstand der Frist`))
+            AND (`§ 193 verdrängt den Tag` massgeblich `an den Orten` (f's `die maßgebenden Orte`))
+        -- Geprüft wird JEDER Tag vom maßgeblichen bis zum endgültigen, nicht
+        -- nur die beiden Enden: die Rolle fragt jeden Zwischentag ab. Der
+        -- Rundlauf geht über `massgeblich`, NICHT über `roh`: § 193 verschiebt
+        -- von `massgeblich` aus nur vorwärts, das Fenster ist deshalb nie
+        -- leer. Über `roh` wäre es bei einer früher gesetzten abweichenden
+        -- Bestimmung LEER, und `all` über EMPTY ist TRUE — die Flagge meldete
+        -- dann "gesichert", ohne einen einzigen Tag angesehen zu haben.
+        gesichert MEANS
+                (NOT ((f's `die maßgebenden Orte`)'s `ein maßgebender Ort liegt außerhalb Deutschlands`))
+            AND all (GIVEN d YIELD all (GIVEN l YIELD `die Feiertagsangabe ist gesichert am Tag` d `im Land` l) ((f's `die maßgebenden Orte`)'s `die Länder`)) (`die Tage von` massgeblich `bis` ende)
+
+§§ `Anhang A — Teil III.A von Heydari & Leowald (2026), rekonstruiert`
+
+-- Vier Sätze Prosa, und sie legen keine Umsetzung fest. Drei Lesarten stehen
+-- hier nebeneinander; sie weichen um bis zu vier Tage voneinander ab.
+-- Das ist das Ergebnis, nicht der Einertumult: die Dramatik ist eine Folge
+-- der Unterbestimmtheit, nicht das Argument.
+@ref Heydari & Leowald (2026), "Closing the Loop", Teil III.A — "the start-date computation directly instantiates the default operator"
+GIVEN f IS A Fristfall
+GIVETH A DATE
+`Teil III.A — der Beginn bei` f MEANS `§ 187 — der Fristbeginn bei` f
+
+-- WÖRTLICH: "the raw deadline adds the statutory duration … rounding mode
+-- DOWN". Auf den BEGINN addiert, wie geschrieben, ohne die −1, die § 188
+-- Abs. 2 Alt. 2 verlangt und die der Aufsatz nirgends nennt.
+-- WELCHER ARM VOM AUFSATZ STAMMT, und welcher von uns: NUR der Monatsarm
+-- rekonstruiert Text, den der Aufsatz wirklich geschrieben hat. Teil III.A
+-- kennt weder eine Tages- noch eine Wochen- noch eine gemischte Frist — das
+-- ist der erste Befund der Verdikt-Tabelle im README. Die vier übrigen Arme
+-- sind die WOHLWOLLENDSTE Fortschreibung, die sich angeben lässt, und sie
+-- stehen hier allein, damit die Funktion total ist. NICHTS, was in dieser
+-- Datei GEMESSEN wird, hängt an ihnen: die Schlagzeile (Beispiel 6c, 6d) und
+-- alle vier Rundläufe laufen über den Monatsarm.
+@ref Heydari & Leowald (2026), Teil III.A — "the raw deadline adds the statutory duration … with rounding mode DOWN (matching § 188(3))"
+GIVEN f IS A Fristfall
+GIVETH A DATE
+`Teil III.A — die rohe Frist (wörtlich) bei` f MEANS
+    CONSIDER (f's `die Fristdauer`)'s `die Einheit`
+    WHEN Tage   THEN beginn PLUS zahl
+    WHEN Wochen THEN beginn PLUS (7 TIMES zahl)
+    WHEN Monate THEN `add months` beginn zahl
+    WHEN Jahre  THEN `add years` beginn zahl
+    WHEN `Monate und ein halber Monat` THEN (`add months` beginn zahl) PLUS 15
+    WHERE
+        beginn MEANS `Teil III.A — der Beginn bei` f
+        zahl   MEANS (f's `die Fristdauer`)'s `die Zahl`
+
+-- WOHLWOLLEND: dieselbe Rechnung mit der Reparatur, die der Satz des § 188
+-- Abs. 2 verlangt, aber der Aufsatz nicht ausspricht. Das ist die STÄRKSTE
+-- Lesart des Aufsatzes — und auch sie weicht vom Gesetz ab.
+GIVEN f IS A Fristfall
+GIVETH A DATE
+`Teil III.A — die rohe Frist (wohlwollend) bei` f MEANS
+    `the day before` (`Teil III.A — die rohe Frist (wörtlich) bei` f)
+
+-- § 193 UNBEDINGT angewandt — die fallengelassene Vorbedingung.
+@ref Heydari & Leowald (2026), Teil III.A — "deadlines falling on Sundays, public holidays, or Saturdays extend to the next working day"
+GIVEN f IS A Fristfall
+GIVETH A DATE
+`Teil III.A — das Fristende (wörtlich) bei` f MEANS
+    `§ 193 — der nächste Werktag ab` (`Teil III.A — die rohe Frist (wörtlich) bei` f) `an den Orten` (f's `die maßgebenden Orte`)
+
+GIVEN f IS A Fristfall
+GIVETH A DATE
+`Teil III.A — das Fristende (wohlwollend) bei` f MEANS
+    `§ 193 — der nächste Werktag ab` (`Teil III.A — die rohe Frist (wohlwollend) bei` f) `an den Orten` (f's `die maßgebenden Orte`)
+
+§§ `Die Fälle`
+
+§§§ `Die Baumuster`
+
+GIVETH A `Die maßgebenden Orte`
+`in Berlin` MEANS `Die maßgebenden Orte` WITH
+    `die Länder` IS (LIST `Berlin`)
+    `ein maßgebender Ort liegt außerhalb Deutschlands` IS FALSE
+
+GIVETH A `Die maßgebenden Orte`
+`in Bayern` MEANS `Die maßgebenden Orte` WITH
+    `die Länder` IS (LIST `Bayern`)
+    `ein maßgebender Ort liegt außerhalb Deutschlands` IS FALSE
+
+GIVETH A `Die maßgebenden Orte`
+`in Sachsen` MEANS `Die maßgebenden Orte` WITH
+    `die Länder` IS (LIST `Sachsen`)
+    `ein maßgebender Ort liegt außerhalb Deutschlands` IS FALSE
+
+GIVEN n IS A NUMBER
+      e IS A DATE
+      g IS A `Der Gegenstand`
+      o IS A `Die maßgebenden Orte`
+GIVETH A Fristfall
+`eine Tagesfrist von` n `Tagen ab dem Ereignis am` e `wegen` g `an den Orten` o MEANS Fristfall WITH
+    `der Anknüpfungstag`          IS e
+    `die Art des Fristbeginns`    IS `ein Ereignis oder ein in den Lauf eines Tages fallender Zeitpunkt`
+    `die Fristdauer`              IS Fristdauer WITH
+                                        `die Zahl`    IS n
+                                        `die Einheit` IS Tage
+    `der Gegenstand der Frist`    IS g
+    `die maßgebenden Orte`        IS o
+    `eine abweichende Bestimmung` IS NOTHING
+
+GIVEN n IS A NUMBER
+      e IS A DATE
+      g IS A `Der Gegenstand`
+      o IS A `Die maßgebenden Orte`
+GIVETH A Fristfall
+`eine Wochenfrist von` n `Wochen ab dem Ereignis am` e `wegen` g `an den Orten` o MEANS Fristfall WITH
+    `der Anknüpfungstag`          IS e
+    `die Art des Fristbeginns`    IS `ein Ereignis oder ein in den Lauf eines Tages fallender Zeitpunkt`
+    `die Fristdauer`              IS Fristdauer WITH
+                                        `die Zahl`    IS n
+                                        `die Einheit` IS Wochen
+    `der Gegenstand der Frist`    IS g
+    `die maßgebenden Orte`        IS o
+    `eine abweichende Bestimmung` IS NOTHING
+
+GIVEN n IS A NUMBER
+      e IS A DATE
+      g IS A `Der Gegenstand`
+      o IS A `Die maßgebenden Orte`
+GIVETH A Fristfall
+`eine Monatsfrist von` n `Monaten ab dem Ereignis am` e `wegen` g `an den Orten` o MEANS Fristfall WITH
+    `der Anknüpfungstag`          IS e
+    `die Art des Fristbeginns`    IS `ein Ereignis oder ein in den Lauf eines Tages fallender Zeitpunkt`
+    `die Fristdauer`              IS Fristdauer WITH
+                                        `die Zahl`    IS n
+                                        `die Einheit` IS Monate
+    `der Gegenstand der Frist`    IS g
+    `die maßgebenden Orte`        IS o
+    `eine abweichende Bestimmung` IS NOTHING
+
+GIVEN n IS A NUMBER
+      s IS A DATE
+      g IS A `Der Gegenstand`
+      o IS A `Die maßgebenden Orte`
+GIVETH A Fristfall
+`eine Beginnfrist von` n `Monaten ab dem Anfangstag` s `wegen` g `an den Orten` o MEANS Fristfall WITH
+    `der Anknüpfungstag`          IS s
+    `die Art des Fristbeginns`    IS `der Beginn eines Tages`
+    `die Fristdauer`              IS Fristdauer WITH
+                                        `die Zahl`    IS n
+                                        `die Einheit` IS Monate
+    `der Gegenstand der Frist`    IS g
+    `die maßgebenden Orte`        IS o
+    `eine abweichende Bestimmung` IS NOTHING
+
+§§§ `Beispiel 1 — §§ 187 Abs. 1, 188 Abs. 1: eine Tagesfrist`
+
+`Beispiel 1` MEANS `eine Tagesfrist von` 14 `Tagen ab dem Ereignis am` (YMD 2026 6 1) `wegen` `eine Leistung ist zu bewirken` `an den Orten` `in Berlin`
+
+§§§ `Beispiel 2 — §§ 187 Abs. 1, 188 Abs. 2 Alt. 1: dieselbe Auslösung, eine Monatsfrist`
+
+`Beispiel 2` MEANS Fristfall WITH
+    `der Anknüpfungstag`          IS YMD 2026 6 1
+    `die Art des Fristbeginns`    IS `ein Ereignis oder ein in den Lauf eines Tages fallender Zeitpunkt`
+    `die Fristdauer`              IS Fristdauer WITH
+                                        `die Zahl`    IS 1
+                                        `die Einheit` IS Monate
+    `der Gegenstand der Frist`    IS `eine Leistung ist zu bewirken`
+    `die maßgebenden Orte`        IS `in Berlin`
+    `eine abweichende Bestimmung` IS NOTHING
+
+§§§ `Beispiel 3a und 3b — dasselbe Datum, zwei Glieder des § 188 Abs. 2, ein Tag Abstand`
+
+`Beispiel 3a` MEANS Fristfall WITH
+    `der Anknüpfungstag`          IS YMD 2026 3 1
+    `die Art des Fristbeginns`    IS `ein Ereignis oder ein in den Lauf eines Tages fallender Zeitpunkt`
+    `die Fristdauer`              IS Fristdauer WITH
+                                        `die Zahl`    IS 1
+                                        `die Einheit` IS Monate
+    `der Gegenstand der Frist`    IS `eine Leistung ist zu bewirken`
+    `die maßgebenden Orte`        IS `in Berlin`
+    `eine abweichende Bestimmung` IS NOTHING
+
+`Beispiel 3b` MEANS Fristfall WITH
+    `der Anknüpfungstag`          IS YMD 2026 3 1
+    `die Art des Fristbeginns`    IS `der Beginn eines Tages`
+    `die Fristdauer`              IS Fristdauer WITH
+                                        `die Zahl`    IS 1
+                                        `die Einheit` IS Monate
+    `der Gegenstand der Frist`    IS `eine Leistung ist zu bewirken`
+    `die maßgebenden Orte`        IS `in Berlin`
+    `eine abweichende Bestimmung` IS NOTHING
+
+§§§ `Beispiel 4 und 5 — § 188 Abs. 3, im Gemein- und im Schaltjahr`
+
+`Beispiel 4` MEANS Fristfall WITH
+    `der Anknüpfungstag`          IS YMD 2026 1 31
+    `die Art des Fristbeginns`    IS `ein Ereignis oder ein in den Lauf eines Tages fallender Zeitpunkt`
+    `die Fristdauer`              IS Fristdauer WITH
+                                        `die Zahl`    IS 1
+                                        `die Einheit` IS Monate
+    `der Gegenstand der Frist`    IS `eine Leistung ist zu bewirken`
+    `die maßgebenden Orte`        IS `in Berlin`
+    `eine abweichende Bestimmung` IS NOTHING
+
+`Beispiel 5` MEANS Fristfall WITH
+    `der Anknüpfungstag`          IS YMD 2024 1 31
+    `die Art des Fristbeginns`    IS `ein Ereignis oder ein in den Lauf eines Tages fallender Zeitpunkt`
+    `die Fristdauer`              IS Fristdauer WITH
+                                        `die Zahl`    IS 1
+                                        `die Einheit` IS Monate
+    `der Gegenstand der Frist`    IS `eine Leistung ist zu bewirken`
+    `die maßgebenden Orte`        IS `in Berlin`
+    `eine abweichende Bestimmung` IS NOTHING
+
+§§§ `Beispiel 6 und 6c — die Klammer vertauscht sich nicht mit der Verschiebung`
+
+-- Beispiel 6 ist der Fall, an dem Teil III.A vom Gesetz abweicht: das
+-- Ereignis fällt auf den 30., der Zielmonat hat nur 28 Tage, und die Klammer
+-- muss auf den aus dem EREIGNISTAG abgeleiteten Tag greifen, nicht auf einen
+-- aus dem verschobenen Beginn abgeleiteten.
+`Beispiel 6` MEANS Fristfall WITH
+    `der Anknüpfungstag`          IS YMD 2026 1 30
+    `die Art des Fristbeginns`    IS `ein Ereignis oder ein in den Lauf eines Tages fallender Zeitpunkt`
+    `die Fristdauer`              IS Fristdauer WITH
+                                        `die Zahl`    IS 1
+                                        `die Einheit` IS Monate
+    `der Gegenstand der Frist`    IS `eine Leistung ist zu bewirken`
+    `die maßgebenden Orte`        IS `in Berlin`
+    `eine abweichende Bestimmung` IS NOTHING
+
+-- Beispiel 6c ist Beispiel 6 mit einer BLOSSEN RECHTSFOLGE statt einer
+-- Leistung. Das nimmt § 193 aus dem gesetzlichen Arm heraus, während der
+-- unbedingte § 193 des Aufsatzes auf dessen Arm bleibt — und erst dadurch
+-- trennen sich alle DREI Lesarten. Mit einer Leistung (Beispiel 6) landet die
+-- wörtliche Lesart auf Sa 28.2. und wird von § 193 auf den 2.3. getragen, wo
+-- sie zufällig mit dem Gesetz zusammenfällt.
+`Beispiel 6c` MEANS Fristfall WITH
+    `der Anknüpfungstag`          IS YMD 2026 1 30
+    `die Art des Fristbeginns`    IS `ein Ereignis oder ein in den Lauf eines Tages fallender Zeitpunkt`
+    `die Fristdauer`              IS Fristdauer WITH
+                                        `die Zahl`    IS 1
+                                        `die Einheit` IS Monate
+    `der Gegenstand der Frist`    IS `eine Rechtsfolge tritt lediglich ein`
+    `die maßgebenden Orte`        IS `in Berlin`
+    `eine abweichende Bestimmung` IS NOTHING
+
+-- Beispiel 6d ist der Tag, an dem die drei Lesarten am WEITESTEN
+-- auseinanderliegen: vier Tage. Das Ereignis fällt auf den 28. Februar, den
+-- letzten Tag eines kurzen Monats. Das Gesetz knüpft an den 28. an und
+-- klammert nicht (der 28. März gibt es); die wörtliche Lesart des Aufsatzes
+-- rechnet ab dem 1. März und landet auf dem 1. April; die wohlwollende nimmt
+-- davon den Vortag, den 31. März. Bloss eine Rechtsfolge, damit § 193 im
+-- gesetzlichen Arm aussen vor bleibt.
+`Beispiel 6d` MEANS Fristfall WITH
+    `der Anknüpfungstag`          IS YMD 2026 2 28
+    `die Art des Fristbeginns`    IS `ein Ereignis oder ein in den Lauf eines Tages fallender Zeitpunkt`
+    `die Fristdauer`              IS Fristdauer WITH
+                                        `die Zahl`    IS 1
+                                        `die Einheit` IS Monate
+    `der Gegenstand der Frist`    IS `eine Rechtsfolge tritt lediglich ein`
+    `die maßgebenden Orte`        IS `in Berlin`
+    `eine abweichende Bestimmung` IS NOTHING
+
+§§§ `Beispiel 7 — § 193, der Termin fällt auf einen Sonntag`
+
+`Beispiel 7` MEANS Fristfall WITH
+    `der Anknüpfungstag`          IS YMD 2026 2 1
+    `die Art des Fristbeginns`    IS `ein Ereignis oder ein in den Lauf eines Tages fallender Zeitpunkt`
+    `die Fristdauer`              IS Fristdauer WITH
+                                        `die Zahl`    IS 1
+                                        `die Einheit` IS Monate
+    `der Gegenstand der Frist`    IS `eine Willenserklärung ist abzugeben`
+    `die maßgebenden Orte`        IS `in Berlin`
+    `eine abweichende Bestimmung` IS NOTHING
+
+§§§ `Beispiel 8, 8a bis 8c in Berlin — § 193 ist ORTSABHÄNGIG, nicht forumsabhängig`
+
+`Beispiel 8` MEANS Fristfall WITH
+    `der Anknüpfungstag`          IS YMD 2026 4 1
+    `die Art des Fristbeginns`    IS `ein Ereignis oder ein in den Lauf eines Tages fallender Zeitpunkt`
+    `die Fristdauer`              IS Fristdauer WITH
+                                        `die Zahl`    IS 1
+                                        `die Einheit` IS Monate
+    `der Gegenstand der Frist`    IS `eine Leistung ist zu bewirken`
+    `die maßgebenden Orte`        IS `in Berlin`
+    `eine abweichende Bestimmung` IS NOTHING
+
+`Beispiel 8a` MEANS Fristfall WITH
+    `der Anknüpfungstag`          IS YMD 2026 5 4
+    `die Art des Fristbeginns`    IS `ein Ereignis oder ein in den Lauf eines Tages fallender Zeitpunkt`
+    `die Fristdauer`              IS Fristdauer WITH
+                                        `die Zahl`    IS 1
+                                        `die Einheit` IS Monate
+    `der Gegenstand der Frist`    IS `eine Leistung ist zu bewirken`
+    `die maßgebenden Orte`        IS `in Bayern`
+    `eine abweichende Bestimmung` IS NOTHING
+
+`Beispiel 8b` MEANS Fristfall WITH
+    `der Anknüpfungstag`          IS YMD 2026 5 4
+    `die Art des Fristbeginns`    IS `ein Ereignis oder ein in den Lauf eines Tages fallender Zeitpunkt`
+    `die Fristdauer`              IS Fristdauer WITH
+                                        `die Zahl`    IS 1
+                                        `die Einheit` IS Monate
+    `der Gegenstand der Frist`    IS `eine Leistung ist zu bewirken`
+    `die maßgebenden Orte`        IS `in Berlin`
+    `eine abweichende Bestimmung` IS NOTHING
+
+`Beispiel 8c` MEANS Fristfall WITH
+    `der Anknüpfungstag`          IS YMD 2026 10 18
+    `die Art des Fristbeginns`    IS `ein Ereignis oder ein in den Lauf eines Tages fallender Zeitpunkt`
+    `die Fristdauer`              IS Fristdauer WITH
+                                        `die Zahl`    IS 1
+                                        `die Einheit` IS Monate
+    `der Gegenstand der Frist`    IS `eine Leistung ist zu bewirken`
+    `die maßgebenden Orte`        IS `in Sachsen`
+    `eine abweichende Bestimmung` IS NOTHING
+
+`Beispiel 8c in Berlin` MEANS Fristfall WITH
+    `der Anknüpfungstag`          IS YMD 2026 10 18
+    `die Art des Fristbeginns`    IS `ein Ereignis oder ein in den Lauf eines Tages fallender Zeitpunkt`
+    `die Fristdauer`              IS Fristdauer WITH
+                                        `die Zahl`    IS 1
+                                        `die Einheit` IS Monate
+    `der Gegenstand der Frist`    IS `eine Leistung ist zu bewirken`
+    `die maßgebenden Orte`        IS `in Berlin`
+    `eine abweichende Bestimmung` IS NOTHING
+
+§§§ `Beispiel 9 und 9b — § 187 Abs. 2 Satz 2, die Volljährigkeit`
+
+-- § 193 greift hier NICHT: es ist weder eine Willenserklärung abzugeben noch
+-- eine Leistung zu bewirken. Ein Geburtstag verschiebt sich nicht auf den
+-- nächsten Werktag. Die unbedingte Regel des Aufsatzes schöbe die
+-- Volljährigkeit auf Montag, den 21.9.2026 — siehe den Anhang.
+`Beispiel 9` MEANS Fristfall WITH
+    `der Anknüpfungstag`          IS YMD 2008 9 20
+    `die Art des Fristbeginns`    IS `der Tag der Geburt bei der Berechnung des Lebensalters`
+    `die Fristdauer`              IS Fristdauer WITH
+                                        `die Zahl`    IS 18
+                                        `die Einheit` IS Jahre
+    `der Gegenstand der Frist`    IS `eine Rechtsfolge tritt lediglich ein`
+    `die maßgebenden Orte`        IS `in Berlin`
+    `eine abweichende Bestimmung` IS NOTHING
+
+-- Am Schalttag geboren. Hier trägt Regel R2: § 188 Abs. 3 VERDRÄNGT den
+-- "vorhergehenden Tag" des Abs. 2 Alt. 2. Die naive Lesart `add years … MINUS
+-- 1` gäbe den 27.2.2026 und damit einen Tag rechtswidriger Volljährigkeit.
+`Beispiel 9b` MEANS Fristfall WITH
+    `der Anknüpfungstag`          IS YMD 2008 2 29
+    `die Art des Fristbeginns`    IS `der Tag der Geburt bei der Berechnung des Lebensalters`
+    `die Fristdauer`              IS Fristdauer WITH
+                                        `die Zahl`    IS 18
+                                        `die Einheit` IS Jahre
+    `der Gegenstand der Frist`    IS `eine Rechtsfolge tritt lediglich ein`
+    `die maßgebenden Orte`        IS `in Berlin`
+    `eine abweichende Bestimmung` IS NOTHING
+
+§§§ `Beispiel 10 und 10b — die Vorbedingung des § 193 in BEIDE Richtungen`
+
+`Beispiel 10` MEANS Fristfall WITH
+    `der Anknüpfungstag`          IS YMD 2026 9 18
+    `die Art des Fristbeginns`    IS `ein Ereignis oder ein in den Lauf eines Tages fallender Zeitpunkt`
+    `die Fristdauer`              IS Fristdauer WITH
+                                        `die Zahl`    IS 1
+                                        `die Einheit` IS Monate
+    `der Gegenstand der Frist`    IS `eine Rechtsfolge tritt lediglich ein`
+    `die maßgebenden Orte`        IS `in Berlin`
+    `eine abweichende Bestimmung` IS NOTHING
+
+`Beispiel 10b` MEANS Fristfall WITH
+    `der Anknüpfungstag`          IS YMD 2026 9 18
+    `die Art des Fristbeginns`    IS `ein Ereignis oder ein in den Lauf eines Tages fallender Zeitpunkt`
+    `die Fristdauer`              IS Fristdauer WITH
+                                        `die Zahl`    IS 1
+                                        `die Einheit` IS Monate
+    `der Gegenstand der Frist`    IS `eine Willenserklärung ist abzugeben`
+    `die maßgebenden Orte`        IS `in Berlin`
+    `eine abweichende Bestimmung` IS NOTHING
+
+§§§ `Beispiel 11 — § 193 ENTSPRECHEND, BGH III ZR 146/07`
+
+-- Regelmäßige Verjährung, §§ 195, 199 Abs. 1 BGB: sie beginnt mit dem Schluss
+-- des Jahres, in dem der Anspruch entstand — eine Beginnfrist. Ablauf Sa
+-- 31.12.2005; Klage am Mo 2.1.2006 war rechtzeitig.
+-- DAS JAHR WIRD AUS DEM KANDIDATENTAG GELESEN: der 1.1.2006 ist Sonntag UND
+-- Neujahr, und er liegt im Folgejahr des rohen Fristendes.
+`Beispiel 11` MEANS Fristfall WITH
+    `der Anknüpfungstag`          IS YMD 2003 1 1
+    `die Art des Fristbeginns`    IS `der Beginn eines Tages`
+    `die Fristdauer`              IS Fristdauer WITH
+                                        `die Zahl`    IS 3
+                                        `die Einheit` IS Jahre
+    `der Gegenstand der Frist`    IS `eine Verjährungsfrist läuft ab`
+    `die maßgebenden Orte`        IS `in Berlin`
+    `eine abweichende Bestimmung` IS NOTHING
+
+§§§ `Beispiel 12 und 12b — § 189 Abs. 2 gegen sechs Wochen`
+
+`Beispiel 12` MEANS Fristfall WITH
+    `der Anknüpfungstag`          IS YMD 2026 4 15
+    `die Art des Fristbeginns`    IS `ein Ereignis oder ein in den Lauf eines Tages fallender Zeitpunkt`
+    `die Fristdauer`              IS Fristdauer WITH
+                                        `die Zahl`    IS 1
+                                        `die Einheit` IS `Monate und ein halber Monat`
+    `der Gegenstand der Frist`    IS `eine Leistung ist zu bewirken`
+    `die maßgebenden Orte`        IS `in Berlin`
+    `eine abweichende Bestimmung` IS NOTHING
+
+`Beispiel 12b` MEANS `eine Wochenfrist von` 6 `Wochen ab dem Ereignis am` (YMD 2026 4 15) `wegen` `eine Leistung ist zu bewirken` `an den Orten` `in Berlin`
+
+§§§ `Beispiel 13 — § 190, die Verlängerung läuft ab dem ALTEN Ablauf`
+
+GIVETH A Fristdauer
+`zwei Wochen` MEANS Fristdauer WITH
+    `die Zahl`    IS 2
+    `die Einheit` IS Wochen
+
+-- Eine TAGES-Verlängerung, weil eine Wochenverlängerung die Gabelung des
+-- § 190 nicht trennen kann: sie erhält den Wochentag, und die verworfene
+-- Lesart landete dann wieder auf einem Sonnabend, den § 193 auf denselben
+-- Montag trüge wie die genommene. Gemessen, nicht vermutet.
+GIVETH A Fristdauer
+`zehn Tage` MEANS Fristdauer WITH
+    `die Zahl`    IS 10
+    `die Einheit` IS Tage
+
+`Beispiel 13` MEANS `§ 190 — der Fristfall der um` `zwei Wochen` `verlängerten Frist zu` `Beispiel 3a`
+
+§§§ `Beispiel 14 — § 191, ein nicht zusammenhängender Zeitraum`
+
+-- § 191 nimmt eine FRISTDAUER, keinen Fristfall, und gibt eine Zahl zurück.
+-- Das Baumuster dieses Beispiels ist deshalb eine Fristdauer und heisst nach
+-- ihrem Inhalt; es gibt hier bewusst keinen Wert namens `Beispiel 14`.
+GIVETH A Fristdauer
+`sechs Monate` MEANS Fristdauer WITH
+    `die Zahl`    IS 6
+    `die Einheit` IS Monate
+
+-- Für die JAHRES-Alternative des § 191, die sonst von nichts gelesen würde.
+GIVETH A Fristdauer
+`ein Jahr` MEANS Fristdauer WITH
+    `die Zahl`    IS 1
+    `die Einheit` IS Jahre
+
+§§§ `Beispiel 15 — §§ 192, 193: das Glied "an einem bestimmten Tage"`
+
+`Beispiel 15` MEANS Terminfall WITH
+    `der bestimmte Tag`          IS `§ 192 — der Tag des Termins` `Ende des Monats` `im Monat` 10 `des Jahres` 2026
+    `der Gegenstand des Termins` IS `eine Leistung ist zu bewirken`
+    `die Orte des Termins`       IS `in Berlin`
+
+§§§ `Beispiel 16 — § 188 Abs. 3 bei einer JAHRESFRIST, Regel R1`
+
+`Beispiel 16` MEANS Fristfall WITH
+    `der Anknüpfungstag`          IS YMD 2024 2 29
+    `die Art des Fristbeginns`    IS `ein Ereignis oder ein in den Lauf eines Tages fallender Zeitpunkt`
+    `die Fristdauer`              IS Fristdauer WITH
+                                        `die Zahl`    IS 1
+                                        `die Einheit` IS Jahre
+    `der Gegenstand der Frist`    IS `eine Leistung ist zu bewirken`
+    `die maßgebenden Orte`        IS `in Berlin`
+    `eine abweichende Bestimmung` IS NOTHING
+
+§§§ `Beispiel 17 — § 186, die abweichende Bestimmung geht vor`
+
+`Beispiel 17` MEANS Fristfall WITH
+    `der Anknüpfungstag`          IS YMD 2026 1 30
+    `die Art des Fristbeginns`    IS `ein Ereignis oder ein in den Lauf eines Tages fallender Zeitpunkt`
+    `die Fristdauer`              IS Fristdauer WITH
+                                        `die Zahl`    IS 1
+                                        `die Einheit` IS Monate
+    `der Gegenstand der Frist`    IS `eine Leistung ist zu bewirken`
+    `die maßgebenden Orte`        IS `in Berlin`
+    `eine abweichende Bestimmung` IS JUST (YMD 2026 3 15)
+
+-- Beispiel 17b setzt einen Tag, der VOR dem rohen Fristende liegt — und
+-- sogar vor dem Anknüpfungstag. Es ist die Grenze der beiden Invarianten:
+-- unter § 186 gilt weder I1' noch I2, weil beide über die gesetzliche
+-- Rechnung sprechen und diese hier verdrängt ist. Der 15.1.2026 ist ein
+-- Donnerstag und in Berlin kein Feiertag, § 193 verschiebt ihn also nicht;
+-- der Befund ist die Verdrängung, nicht ein Wochenendeffekt.
+`Beispiel 17b` MEANS Fristfall WITH
+    `der Anknüpfungstag`          IS YMD 2026 1 30
+    `die Art des Fristbeginns`    IS `ein Ereignis oder ein in den Lauf eines Tages fallender Zeitpunkt`
+    `die Fristdauer`              IS Fristdauer WITH
+                                        `die Zahl`    IS 1
+                                        `die Einheit` IS Monate
+    `der Gegenstand der Frist`    IS `eine Leistung ist zu bewirken`
+    `die maßgebenden Orte`        IS `in Berlin`
+    `eine abweichende Bestimmung` IS JUST (YMD 2026 1 15)
+
+§§§ `Das Gegenbeispiel zur Invariante I1 des Aufsatzes`
+
+-- Eine EINTÄGIGE BEGINNFRIST. § 187 Abs. 2: der 1.3. zählt mit, Fristbeginn
+-- ist der 1.3. § 188 Abs. 1: der letzte Tag der Frist ist `1.3. PLUS 0`, also
+-- der 1.3. selbst. Damit ist das Fristende GLEICH dem Anknüpfungstag, und
+-- "deadline > trigger" ist FALSCH.
+`Gegenbeispiel zu I1` MEANS Fristfall WITH
+    `der Anknüpfungstag`          IS YMD 2026 3 1
+    `die Art des Fristbeginns`    IS `der Beginn eines Tages`
+    `die Fristdauer`              IS Fristdauer WITH
+                                        `die Zahl`    IS 1
+                                        `die Einheit` IS Tage
+    `der Gegenstand der Frist`    IS `eine Rechtsfolge tritt lediglich ein`
+    `die maßgebenden Orte`        IS `in Berlin`
+    `eine abweichende Bestimmung` IS NOTHING
+
+§§ `Die Invarianten des Aufsatzes`
+
+-- I1, wie der Aufsatz sie formuliert: "the kernel verifies for all inputs
+-- that deadline > trigger". Bei TAGESKÖRNUNG ist das FALSCH; das
+-- Gegenbeispiel steht oben. Die Invariante überlebt nur bei
+-- ZEITPUNKTSKÖRNUNG (Ablauf 24:00 > Auslösung 00:00) — und die Rede des
+-- Aufsatzes von "rounding mode DOWN" setzt Tageskörnung voraus.
+@ref Heydari & Leowald (2026), Teil III.A — "The kernel verifies for all inputs that deadline > trigger"
+GIVEN f IS A Fristfall
+GIVETH A BOOLEAN
+`Invariante I1 — das Fristende liegt nach dem Anknüpfungstag bei` f MEANS
+    (`das Fristende zu` f) `is after` (f's `der Anknüpfungstag`)
+
+GIVEN f IS A Fristfall
+GIVETH A BOOLEAN
+`Invariante I1' — das Fristende liegt nicht vor dem Anknüpfungstag bei` f MEANS
+    NOT ((`das Fristende zu` f) `is before` (f's `der Anknüpfungstag`))
+
+-- I2 ist VON BAUART WAHR — ABER NUR IM REGELFALL DES § 186, also nur, wo
+-- `eine abweichende Bestimmung` NOTHING ist. Dort gilt: der Basisfall von
+-- `der nächste Werktag ab` gibt sein Argument unverändert zurück, und jeder
+-- rekursive Aufruf geht auf `the day after`, also ist das Fristende nie
+-- früher als der rohe Tag. Das ist eine einzeilige strukturelle Induktion,
+-- die L4 nicht aussprechen kann. Die Stichprobe unten BESTÄTIGT sie und ist
+-- NICHT der Grund, warum sie gilt. Beides zu verwechseln ist genau die
+-- Überbehauptung, auf die diese Datei antwortet.
+-- AUSSERHALB des Regelfalls ist I2 SCHLICHT FALSCH: setzt das Rechtsgeschäft
+-- einen früheren Tag, so spricht `roh` über eine Rechnung, die die Antwort
+-- nicht bestimmt hat. Dasselbe gilt für I1'. Die Grenze ist nicht bloss
+-- aufgeschrieben, sondern durch Beispiel 17b ROT FESTGENAGELT — so, wie es
+-- oben schon mit I1 gemacht ist. Die Rundläufe unten können sie nicht sehen:
+-- `eine Monatsereignisfrist ab` baut über `eine Monatsfrist von`, und das
+-- schreibt `eine abweichende Bestimmung IS NOTHING` fest.
+@ref Heydari & Leowald (2026), Teil III.A — "… and deadline ≥ raw_deadline"
+GIVEN f IS A Fristfall
+GIVETH A BOOLEAN
+`Invariante I2 — § 193 verschiebt nur vorwärts bei` f MEANS
+    (`das Fristende zu` f) AT LEAST (`§§ 188, 189 — der letzte Tag der Frist vor § 193 bei` f)
+
+§§ `Die Rundläufe`
+
+GIVEN y IS A NUMBER
+GIVETH A LIST OF DATE
+`die Tage des Jahres` y MEANS `die Tage von` (YMD y 1 1) `bis` (YMD y 12 31)
+
+GIVEN d IS A DATE
+GIVETH A Fristfall
+`eine Monatsereignisfrist ab` d MEANS
+    `eine Monatsfrist von` 1 `Monaten ab dem Ereignis am` d `wegen` `eine Leistung ist zu bewirken` `an den Orten` `in Berlin`
+
+GIVEN d IS A DATE
+GIVETH A Fristfall
+`eine Monatsbeginnfrist ab` d MEANS
+    `eine Beginnfrist von` 1 `Monaten ab dem Anfangstag` d `wegen` `eine Leistung ist zu bewirken` `an den Orten` `in Berlin`
+
+GIVEN d IS A DATE
+GIVETH A BOOLEAN
+`Gesetz und Teil III.A stimmen vor § 193 überein am` d MEANS
+    (`§§ 188, 189 — der letzte Tag der Frist vor § 193 bei` (`eine Monatsereignisfrist ab` d)) EQUALS (`Teil III.A — die rohe Frist (wohlwollend) bei` (`eine Monatsereignisfrist ab` d))
+
+GIVEN d IS A DATE
+GIVETH A BOOLEAN
+`Gesetz und Teil III.A stimmen im Ergebnis überein am` d MEANS
+    (`das Fristende zu` (`eine Monatsereignisfrist ab` d)) EQUALS (`Teil III.A — das Fristende (wohlwollend) bei` (`eine Monatsereignisfrist ab` d))
+
+-- Der deutsche Merksatz: "eine Beginnfrist endet genau einen Tag früher als
+-- eine gleich lange Ereignisfrist". Er ist FALSCH, und zwar genau dort, wo
+-- § 188 Abs. 3 greift: die Klammer wirft beide Glieder auf denselben Tag.
+GIVEN d IS A DATE
+GIVETH A BOOLEAN
+`die Beginnfrist endet einen Tag früher am` d MEANS
+    ((`§§ 188, 189 — der letzte Tag der Frist vor § 193 bei` (`eine Monatsereignisfrist ab` d)) MINUS (`§§ 188, 189 — der letzte Tag der Frist vor § 193 bei` (`eine Monatsbeginnfrist ab` d))) EQUALS 1
+
+§§ `Prüfungen`
+
+§§§ `§ 187 — Erschöpfung und Disjunktheit`
+
+-- DIES IST DIE EINZIGE BEHAUPTUNG DIESER DATEI, DIE L4 VOLLSTÄNDIG ABTRÄGT
+-- statt sie zu bestichproben: der Konstruktorbereich ist endlich und
+-- aufzählbar, und die Liste unten ist er. Alles andere unten ist eine
+-- beschränkte Prüfung über ein angegebenes Fenster.
+-- WARUM DIE HANDGEPFLEGTE LISTE DIE AUFZÄHLUNG WIRKLICH IST — das ist keine
+-- Behauptung, sondern ein benannter Mechanismus: ein vierter Konstruktor im
+-- DECLARE oben machte `§ 187 Abs. 1 ist einschlägig bei` und `§ 187 Abs. 2
+-- ist einschlägig bei` UNVOLLSTÄNDIG, und diese Meldung erreicht
+-- `tests/fristberechnung.golden` (genau die Meldung, die
+-- `fristbeginn-nonexhaustive-control.l4` als Kontrolle festhält). Die
+-- Längenprüfung darunter fängt den anderen Weg ab: eine Erweiterung des
+-- DECLARE, bei der jemand die Liste zu ergänzen vergisst.
+#ASSERT count `alle Arten des Fristbeginns` EQUALS 3
+#ASSERT all (GIVEN a YIELD `genau eine Regel des § 187 greift bei` a) `alle Arten des Fristbeginns`
+#CHECK `§ 187 Abs. 1 ist einschlägig bei`
+
+§§§ `Die sechzehn belegten Fälle`
+
+#ASSERT (`das Fristende zu` `Beispiel 1`) EQUALS YMD 2026 6 15
+#ASSERT (`das Fristende zu` `Beispiel 2`) EQUALS YMD 2026 7 1
+#ASSERT (`das Fristende zu` `Beispiel 3a`) EQUALS YMD 2026 4 1
+#ASSERT (`das Fristende zu` `Beispiel 3b`) EQUALS YMD 2026 3 31
+#ASSERT (`§ 187 — der Fristbeginn bei` `Beispiel 3b`) EQUALS YMD 2026 3 1
+#ASSERT (`§§ 188, 189 — der letzte Tag der Frist vor § 193 bei` `Beispiel 4`) EQUALS YMD 2026 2 28
+#ASSERT (`das Fristende zu` `Beispiel 4`) EQUALS YMD 2026 3 2
+#ASSERT (`das Fristende zu` `Beispiel 5`) EQUALS YMD 2024 2 29
+#ASSERT (`§§ 188, 189 — der letzte Tag der Frist vor § 193 bei` `Beispiel 6`) EQUALS YMD 2026 2 28
+#ASSERT (`das Fristende zu` `Beispiel 6`) EQUALS YMD 2026 3 2
+#ASSERT (`§§ 188, 189 — der letzte Tag der Frist vor § 193 bei` `Beispiel 7`) EQUALS YMD 2026 3 1
+#ASSERT (`das Fristende zu` `Beispiel 7`) EQUALS YMD 2026 3 2
+#ASSERT (`das Fristende zu` `Beispiel 8`) EQUALS YMD 2026 5 4
+#ASSERT (`das Fristende zu` `Beispiel 8a`) EQUALS YMD 2026 6 5
+#ASSERT (`das Fristende zu` `Beispiel 8b`) EQUALS YMD 2026 6 4
+#ASSERT (`das Fristende zu` `Beispiel 8c`) EQUALS YMD 2026 11 19
+#ASSERT (`das Fristende zu` `Beispiel 8c in Berlin`) EQUALS YMD 2026 11 18
+#ASSERT (`das Fristende zu` `Beispiel 9`) EQUALS YMD 2026 9 19
+#ASSERT (`der Beginn der Rechtsfolge zu` `Beispiel 9`) EQUALS YMD 2026 9 20
+#ASSERT (`das Fristende zu` `Beispiel 9b`) EQUALS YMD 2026 2 28
+#ASSERT (`der Beginn der Rechtsfolge zu` `Beispiel 9b`) EQUALS YMD 2026 3 1
+#ASSERT (`das Fristende zu` `Beispiel 10`) EQUALS YMD 2026 10 18
+#ASSERT (`das Fristende zu` `Beispiel 10b`) EQUALS YMD 2026 10 19
+#ASSERT (`§§ 188, 189 — der letzte Tag der Frist vor § 193 bei` `Beispiel 11`) EQUALS YMD 2005 12 31
+#ASSERT (`das Fristende zu` `Beispiel 11`) EQUALS YMD 2006 1 2
+#ASSERT (`die Fristberechnung zu` `Beispiel 11`)'s `§ 193 wurde nur entsprechend angewandt`
+#ASSERT (`§§ 188, 189 — der letzte Tag der Frist vor § 193 bei` `Beispiel 12`) EQUALS YMD 2026 5 30
+#ASSERT (`das Fristende zu` `Beispiel 12`) EQUALS YMD 2026 6 1
+#ASSERT (`das Fristende zu` `Beispiel 12b`) EQUALS YMD 2026 5 27
+#ASSERT (`das Fristende zu` `Beispiel 13`) EQUALS YMD 2026 4 15
+#ASSERT (`§ 191 — die Zahl der Tage eines nicht zusammenhängenden Zeitraums von` `sechs Monate`) EQUALS 180
+-- Das Jahr zu 365, ohne Schaltjahrempfindlichkeit — das ist das Überraschende
+-- an § 191 und stand bis hierher von nichts gedeckt.
+#ASSERT (`§ 191 — die Zahl der Tage eines nicht zusammenhängenden Zeitraums von` `ein Jahr`) EQUALS 365
+#ASSERT (`§ 192 — der Tag des Termins` `Anfang des Monats` `im Monat` 10 `des Jahres` 2026) EQUALS YMD 2026 10 1
+#ASSERT (`§ 192 — der Tag des Termins` `Mitte des Monats` `im Monat` 10 `des Jahres` 2026) EQUALS YMD 2026 10 15
+#ASSERT (`§ 192 — der Tag des Termins` `Ende des Monats` `im Monat` 10 `des Jahres` 2026) EQUALS YMD 2026 10 31
+#ASSERT (`der Termintag zu` `Beispiel 15`) EQUALS YMD 2026 11 2
+#ASSERT (`das Fristende zu` `Beispiel 16`) EQUALS YMD 2025 2 28
+-- Beispiel 17: der gesetzte Tag ist Sonntag, der 15.3.2026, und § 193 trägt
+-- ihn auf Montag, den 16.3. Der gesetzte Tag verdrängt die RECHNUNG der
+-- §§ 187–189, nicht die Verlegungsregel — siehe die Regel R6 oben. Das
+-- Protokoll berichtet entsprechend: § 188 Abs. 3 hat NICHT entschieden,
+-- obwohl die rohe Rechnung geklammert hätte, und der Tag vor § 193 ist der
+-- GESETZTE, nicht der rohe.
+#ASSERT (`das Fristende zu` `Beispiel 17`) EQUALS YMD 2026 3 16
+#ASSERT (`die Fristberechnung zu` `Beispiel 17`)'s `eine abweichende Bestimmung geht vor`
+#ASSERT NOT (`die Fristberechnung zu` `Beispiel 17`)'s `§ 188 Abs. 3 wurde angewandt`
+#ASSERT     (`die Fristberechnung zu` `Beispiel 17`)'s `§ 193 wurde angewandt`
+#ASSERT (`die Fristberechnung zu` `Beispiel 17`)'s `der letzte Tag der Frist vor § 193` EQUALS YMD 2026 3 15
+#ASSERT (`die Fristberechnung zu` `Beispiel 17`)'s `die Feiertagsangabe ist gesichert`
+
+§§§ `§ 188 Abs. 3 — der Melder, unmittelbar behauptet`
+
+#ASSERT     `§ 188 Abs. 3 — der maßgebende Tag fehlt nach` 1 `Monaten ab` (YMD 2026 1 31)
+#ASSERT     `§ 188 Abs. 3 — der maßgebende Tag fehlt nach` 1 `Monaten ab` (YMD 2026 1 30)
+#ASSERT NOT `§ 188 Abs. 3 — der maßgebende Tag fehlt nach` 1 `Monaten ab` (YMD 2026 1 28)
+#ASSERT     `§ 188 Abs. 3 — der maßgebende Tag fehlt nach` 216 `Monaten ab` (YMD 2008 2 29)
+#ASSERT NOT `§ 188 Abs. 3 — der maßgebende Tag fehlt nach` 48 `Monaten ab` (YMD 2008 2 29)
+
+§§§ `§ 189 Abs. 1 — die Begriffsbestimmungen`
+
+-- Diese drei sind KEINE Zierde: `ein halber Monat` wird von § 189 Abs. 2
+-- oben tatsächlich gelesen, statt dort als 15 hineingeschrieben zu werden.
+-- Ein halber Monat ist eine TAGES-Frist — daher `Tage`, nicht `Monate`.
+#ASSERT (`§ 189 Abs. 1 — ein halbes Jahr`'s `die Zahl`) EQUALS 6
+#ASSERT (`§ 189 Abs. 1 — ein Vierteljahr`'s `die Zahl`) EQUALS 3
+#ASSERT (`§ 189 Abs. 1 — ein halber Monat`'s `die Zahl`) EQUALS 15
+-- Die EINHEIT ist die Hälfte der Begriffsbestimmung, die § 189 Abs. 2 oben
+-- wirklich liest, und ohne diese drei Zeilen bliebe sie ungedeckt: `ein
+-- halbes Jahr` als 6 JAHRE deklariert käme durch.
+#ASSERT (`§ 189 Abs. 1 — ein halbes Jahr`'s `die Einheit`) EQUALS Monate
+#ASSERT (`§ 189 Abs. 1 — ein Vierteljahr`'s `die Einheit`) EQUALS Monate
+#ASSERT (`§ 189 Abs. 1 — ein halber Monat`'s `die Einheit`) EQUALS Tage
+
+§§§ `§ 193 — die Vorbedingung`
+
+#ASSERT     `§ 193 ist anwendbar auf` `eine Leistung ist zu bewirken`
+#ASSERT NOT `§ 193 ist anwendbar auf` `eine Rechtsfolge tritt lediglich ein`
+#ASSERT     `§ 193 ist entsprechend anwendbar auf` `eine Verjährungsfrist läuft ab`
+#ASSERT NOT `§ 193 ist unmittelbar anwendbar auf` `eine Verjährungsfrist läuft ab`
+
+§§§ `Die Invarianten`
+
+#ASSERT NOT (`Invariante I1 — das Fristende liegt nach dem Anknüpfungstag bei` `Gegenbeispiel zu I1`)
+#ASSERT     `Invariante I1' — das Fristende liegt nicht vor dem Anknüpfungstag bei` `Gegenbeispiel zu I1`
+#ASSERT all (GIVEN d YIELD `Invariante I1' — das Fristende liegt nicht vor dem Anknüpfungstag bei` (`eine Monatsereignisfrist ab` d)) (`die Tage des Jahres` 2026)
+#ASSERT all (GIVEN d YIELD `Invariante I2 — § 193 verschiebt nur vorwärts bei` (`eine Monatsereignisfrist ab` d)) (`die Tage des Jahres` 2026)
+-- Derselbe Rundlauf über die BEGINNFRIST. Ohne ihn deckte das Fenster nur
+-- eines der beiden Glieder des § 188 Abs. 2 ab — und das Gegenbeispiel zu I1
+-- lebt gerade im anderen.
+#ASSERT all (GIVEN d YIELD `Invariante I1' — das Fristende liegt nicht vor dem Anknüpfungstag bei` (`eine Monatsbeginnfrist ab` d)) (`die Tage des Jahres` 2026)
+#ASSERT all (GIVEN d YIELD `Invariante I2 — § 193 verschiebt nur vorwärts bei` (`eine Monatsbeginnfrist ab` d)) (`die Tage des Jahres` 2026)
+
+-- DIE GRENZE DER BEIDEN INVARIANTEN, rot festgenagelt statt bloss im
+-- Kommentar behauptet: unter § 186 gelten sie nicht, weil sie beide über die
+-- gesetzliche Rechnung sprechen und diese dort verdrängt ist. Ein Rundlauf
+-- kann das nie zeigen — die Baumuster setzen `eine abweichende Bestimmung`
+-- durchweg auf NOTHING.
+#ASSERT NOT (`Invariante I1' — das Fristende liegt nicht vor dem Anknüpfungstag bei` `Beispiel 17b`)
+#ASSERT NOT (`Invariante I2 — § 193 verschiebt nur vorwärts bei` `Beispiel 17b`)
+
+§§§ `§ 190 — die Gabelung, gedruckt statt behauptet`
+
+-- Regel R3, beide Lesarten auf Beispiel 4 (rohes Ende Sa 28.2.2026, nach
+-- § 193 Mo 2.3.2026), um zehn Tage verlängert:
+--   genommen   — ab dem Ablauf NACH § 193 (3.3.) → Do 12.3.2026
+--   verworfen  — ab dem Ablauf VOR  § 193 (1.3.) → Di 10.3.2026
+-- Beide Tage sind Werktage in Berlin, § 193 trägt also keinen von beiden
+-- weiter; der Abstand von zwei Tagen ist ganz die Gabelung.
+#EVAL `das Fristende zu` (`§ 190 — der Fristfall der um` `zehn Tage` `verlängerten Frist zu` `Beispiel 4`)
+#EVAL `das Fristende zu` (`§ 190 (verworfene Gegenlesart) — der Fristfall der um` `zehn Tage` `verlängerten Frist vor § 193 zu` `Beispiel 4`)
+
+§§§ `Das Differential — die Schlagzeile`
+
+#EVAL `§§ 188, 189 — der letzte Tag der Frist vor § 193 bei` `Beispiel 6`
+#EVAL `Teil III.A — die rohe Frist (wohlwollend) bei` `Beispiel 6`
+-- Das Fristende zu Beispiel 6 ist oben unter den sechzehn belegten Fällen
+-- festgenagelt; hier steht ihm der Arm des Aufsatzes gegenüber.
+#ASSERT (`Teil III.A — das Fristende (wohlwollend) bei` `Beispiel 6`) EQUALS YMD 2026 2 27
+
+-- EIN AUSLÖSER, DREI ANTWORTEN. Das ist das Ergebnis dieser Datei.
+#EVAL `das Fristende zu` `Beispiel 6c`
+#EVAL `Teil III.A — das Fristende (wohlwollend) bei` `Beispiel 6c`
+#EVAL `Teil III.A — das Fristende (wörtlich) bei` `Beispiel 6c`
+
+-- UND DER WEITESTE ABSTAND, VIER TAGE: Beispiel 6d, Ereignis am 28.2.2026.
+-- 28.3. (Gesetz) / 31.3. (wohlwollend) / 1.4. (wörtlich).
+#EVAL `das Fristende zu` `Beispiel 6d`
+#EVAL `Teil III.A — das Fristende (wohlwollend) bei` `Beispiel 6d`
+#EVAL `Teil III.A — das Fristende (wörtlich) bei` `Beispiel 6d`
+
+-- Die fallengelassene Vorbedingung des § 193, zweimal:
+#ASSERT (`Teil III.A — das Fristende (wohlwollend) bei` `Beispiel 9`) EQUALS YMD 2026 9 21
+#ASSERT (`Teil III.A — das Fristende (wohlwollend) bei` `Beispiel 10`) EQUALS YMD 2026 10 19
+
+§§§ `Die Rundläufe`
+
+-- FENSTER: das Kalenderjahr 2026, eine einmonatige Ereignisfrist, Leistung,
+-- Berlin. Ein Rundlauf, dessen Grenzen nicht aufgeschrieben sind, liest sich
+-- wie ein Beweis. Dies ist keiner.
+#EVAL count (filter (GIVEN d YIELD NOT (`Gesetz und Teil III.A stimmen vor § 193 überein am` d)) (`die Tage des Jahres` 2026))
+#EVAL filter (GIVEN d YIELD NOT (`Gesetz und Teil III.A stimmen vor § 193 überein am` d)) (`die Tage des Jahres` 2026)
+#EVAL filter (GIVEN d YIELD NOT (`Gesetz und Teil III.A stimmen im Ergebnis überein am` d)) (`die Tage des Jahres` 2026)
+#EVAL filter (GIVEN d YIELD NOT (`die Beginnfrist endet einen Tag früher am` d)) (`die Tage des Jahres` 2026)
+
+§§ `Grenzen — was diese Kodierung NICHT kann`
+
+-- 1. SIE KANN NICHT EINORDNEN. Welches Glied des § 187 greift und ob § 193
+--    sachlich einschlägig ist, sind Auslegungseingaben nach § 186. Der Kern
+--    prüft, dass die Fallunterscheidung total und disjunkt ist; dass die
+--    Eingabe stimmt, kann er nicht prüfen. Das ist die grösste
+--    Überbehauptung des Aufsatzes, und wir machen sie sichtbar statt sie zu
+--    beheben.
+-- 2. DATE IST TAGESKÖRNIG. "Ablauf des Tages" ist 24:00, "in den Lauf eines
+--    Tages fallender Zeitpunkt" ist eine Uhrzeit. Nach Stunden bemessene
+--    Fristen (die § 193 ohnehin ausnimmt) sind ganz ausserhalb. Genau
+--    deshalb ist I1 so falsch, wie der Aufsatz sie formuliert.
+-- 3. UNTERHALB DES LANDES GEREGELTE FEIERTAGE SIND UNERREICHBAR. Mariä
+--    Himmelfahrt in Bayern, Fronleichnam in Teilen Sachsens und Thüringens,
+--    das Augsburger Friedensfest. Diese Paare setzen `die Feiertagsangabe
+--    ist gesichert` auf FALSE, statt zu antworten. NICHTS ZWINGT EINEN
+--    AUFRUFER, DIE FLAGGE ZU LESEN — das ist der eine verbliebene Pfad
+--    dieser Datei zu einer falschen Antwort mit Rückgabewert 0. Die Decke
+--    ist hier PRÜFBAR IM SINNE EINER REVISION, nicht verifizierbar.
+-- 4. DER KALENDER HAT EINE ZEITACHSE, DIE WIR NUR TEILWEISE MODELLIEREN.
+--    Vier Einführungen sind im Jahr geschaltet; der Rest der Tabelle steht
+--    auf dem Stand 2026-09-14, und vor 2000 liegt ausserhalb des Fensters.
+--    L4s Achse EVAL UNDER RULES EFFECTIVE AT ist die grundsätzliche Heimat
+--    dafür und eine Folgearbeit, keine v1.
+-- 5. DIE ANALOGIE DES § 193 IST EINE STIPULATION, KEINE ABLEITUNG. BGH III
+--    ZR 146/07 ist ein Konstruktor. L4 kennt keine Analogie; jede künftige
+--    analoge Erstreckung ist eine Codeänderung.
+-- 6. DIE VERDRÄNGUNGSNAHT DES § 186 IST GROB. Ein MAYBE DATE kann sagen
+--    "das Rechtsgeschäft setzt einen anderen Tag". Es kann nicht sagen "es
+--    gilt ein anderes REGIME" — § 222 ZPO übernimmt die §§ 187–193 und fügt
+--    einen eigenen Abs. 2 hinzu, § 31 VwVfG ebenso, die VO (EWG, Euratom)
+--    Nr. 1182/71 weicht ganz ab. Das ist eine strukturelle Lücke.
+--    Es kann auch nicht sagen "und § 193 ist mitverdrängt". Regel R6 oben
+--    entscheidet, dass ein gesetzter Tag die RECHNUNG der §§ 187–189
+--    verdrängt und § 193 gerade NICHT, weil der gesetzte Tag der "bestimmte
+--    Tag" des § 193 ist. Wer auch § 193 verdrängen will, braucht den weiteren
+--    Befund, dass die Parteien einen genauen ZEITPUNKT festgelegt haben, und
+--    dafür fehlt dem Satz ein zweites Feld. Was diese Naht sonst noch kostet,
+--    steht bei den Invarianten: I1' und I2 sprechen über die gesetzliche
+--    Rechnung und gelten deshalb ausserhalb des Regelfalls nicht
+--    (Beispiel 17b).
+-- 7. § 191 GIBT EINE ZAHL ZURÜCK UND KANN § 193 NICHT SPEISEN. Ein nicht
+--    zusammenhängender Anspruch hat keinen letzten Tag. Diese Asymmetrie ist
+--    das Gesetz, kein Modellierungsfehler — aber sie ist der Grund, warum
+--    diese Datei drei Einstiegspunkte hat und nicht einen.
+-- 8. KEINE DEONTISCHE SCHICHT, ABSICHTLICH. `WITHIN` nimmt eine blosse ZAHL,
+--    hält keine Einheit fest und zählt Takte auf einer namenlosen Zeitachse.
+--    Eine über § 188 Abs. 3 und § 193 kalendergenau errechnete Frist lässt
+--    sich ihm nicht übergeben, ohne beides zu verlieren.
+-- 9. § 192 DECKT NUR ANFANG, MITTE UND ENDE DES MONATS — weil § 192 nur
+--    diese deckt.
+-- 10. NICHTS AUSSER DER ERSCHÖPFUNGSPRÜFUNG DES § 187 IST EIN BEWEIS. Jene
+--    wird vollständig abgetragen, weil ihr Bereich endlich ist. Alles andere
+--    ist eine beschränkte Prüfung über ein angegebenes Fenster oder ein
+--    strukturelles Argument, das L4 nicht aussprechen kann.

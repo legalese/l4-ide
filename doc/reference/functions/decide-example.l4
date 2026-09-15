@@ -2,7 +2,7 @@
 
 § `DECIDE keyword examples`
     GIVEN `person age` IS A NUMBER
-          `has valid ID` IS A BOOLEAN
+          `valid ID` IS A BOOLEAN
 
 -- Simple Named Values
 
@@ -43,7 +43,7 @@ GIVEN age IS A NUMBER
 -- Boolean Decisions with IF
 
 DECIDE `can enter venue` IF
-  `person age` >= 21 AND `has valid ID`
+  `person age` >= 21 AND `valid ID`
 
 #CHECK `can enter venue`
 

@@ -468,13 +468,10 @@
                     "format": "date",
                     "type": "string"
                 },
+                "filed with the Commission and provided to investors the ongoing annual reports required during the two years immediately preceding the filing of the offering statement": {
+                    "type": "boolean"
+                },
                 "formerly subject to section 13 or 15(d) reporting, since terminated or suspended": {
-                    "type": "boolean"
-                },
-                "has filed with the Commission and provided to investors the ongoing annual reports required during the two years immediately preceding the filing of the offering statement": {
-                    "type": "boolean"
-                },
-                "has sold securities in reliance on section 4(a)(6)": {
                     "type": "boolean"
                 },
                 "holders of record": {
@@ -507,6 +504,9 @@
                 "required to file reports under section 13(a) or section 15(d) of the Exchange Act": {
                     "type": "boolean"
                 },
+                "sold securities in reliance on section 4(a)(6)": {
+                    "type": "boolean"
+                },
                 "subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act": {
                     "type": "boolean"
                 },
@@ -526,8 +526,8 @@
                 "subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act",
                 "formerly subject to section 13 or 15(d) reporting, since terminated or suspended",
                 "an investment company as defined in section 3 of the Investment Company Act, or excluded from that definition by section 3(b) or section 3(c) of that Act",
-                "has sold securities in reliance on section 4(a)(6)",
-                "has filed with the Commission and provided to investors the ongoing annual reports required during the two years immediately preceding the filing of the offering statement",
+                "sold securities in reliance on section 4(a)(6)",
+                "filed with the Commission and provided to investors the ongoing annual reports required during the two years immediately preceding the filing of the offering statement",
                 "no specific business plan, or a business plan to engage in a merger or acquisition with an unidentified company or companies",
                 "covered persons",
                 "did not know and, in the exercise of reasonable care, could not have known that a disqualification existed",

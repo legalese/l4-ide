@@ -1,0 +1,160 @@
+-- CODEX INSURANCE LIMITED policy — encoding of the contract, rules only.
+--
+-- All dates/times other than the claimant's age are represented as NUMBER offsets
+-- in months relative to the policy's effective date (per the task instructions: no
+-- elapsed-time-between-two-dates calculation is ever required, so the DATE type is
+-- not needed anywhere in this file).
+--
+-- Section 1.1(1) "this agreement is signed" and 1.1(2) "the applicable premium ...
+-- has been paid" are ASSUMED throughout (per task instructions) and are therefore
+-- not modelled as checkable facts on the Claim record.
+
+§ `Definitions`
+
+DECLARE Claim HAS
+    `age at the time of hospitalization`                                                  IS A NUMBER
+    `months after the effective date when the hospitalization occurred`                   IS A NUMBER
+    `months after the effective date when the wellness visit occurred`                    IS A NUMBER
+    `months after the effective date when the wellness visit was confirmed to the insurer` IS A NUMBER
+    `due to skydiving`                                                                     IS A BOOLEAN
+    `due to service in the military`                                                       IS A BOOLEAN
+    `due to service as a fire fighter`                                                     IS A BOOLEAN
+    `due to service in the police`                                                         IS A BOOLEAN
+    `for sickness`                                                                         IS A BOOLEAN
+    `for accidental injury`                                                                IS A BOOLEAN
+    `fraud or misrepresentation or material withholding of information`                    IS A BOOLEAN
+
+§ `1. Policy in effect and conditions`
+
+§§ `1.3 — wellness-visit confirmation deadline`
+
+-- "... you will supply us with written confirmation ... of a wellness visit for
+-- yourself with a qualified medical provider occurring no later than the 6th month
+-- anniversary of the effective date of this policy" — two separate temporal limbs:
+-- the visit itself must occur by month 6, and confirmation of it must be supplied
+-- by month 7.
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`the wellness visit occurred in time` claim MEANS
+    claim's `months after the effective date when the wellness visit occurred` AT MOST 6
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`the confirmation of the wellness visit was supplied in time` claim MEANS
+    claim's `months after the effective date when the wellness visit was confirmed to the insurer` AT MOST 7
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`condition 1.3 satisfied in a timely fashion` claim MEANS
+        `the wellness visit occurred in time` claim
+    AND `the confirmation of the wellness visit was supplied in time` claim
+
+-- 1.1(3): "is still pending" — the 7-month deadline for supplying confirmation has
+-- not yet arrived, measured as of the hospitalization (the moment at which "policy
+-- in effect" is being asked). While pending, the claimant gets the benefit of the
+-- doubt: the deadline has not yet been missed.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`condition 1.3 still pending` claim MEANS
+    claim's `months after the effective date when the hospitalization occurred` AT MOST 7
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`condition 1.3 pending or satisfied` claim MEANS
+        `condition 1.3 still pending` claim
+    OR  `condition 1.3 satisfied in a timely fashion` claim
+
+§§ `1.2 — cancelation`
+
+-- Read literally and in isolation, "cancelation ... if the condition set out in
+-- Section 1.3 has not been satisfied in a timely fashion" would cancel the policy
+-- from day one, before the 7-month deadline even arrives — which would make 1.1(3)'s
+-- express "is still pending" carve-out meaningless. Harmonized here so that
+-- cancelation on this ground requires the deadline to have actually passed (i.e.
+-- NOT still pending) without a timely satisfaction; see NOTES.md.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`policy canceled for a late wellness-visit confirmation` claim MEANS
+    NOT `condition 1.3 pending or satisfied` claim
+
+-- 3.6: the policy term is one year from the effective date; 1.2: the policy is
+-- automatically canceled on the last day of that term.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`policy canceled at the end of the policy term` claim MEANS
+    claim's `months after the effective date when the hospitalization occurred` GREATER THAN 12
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`policy canceled` claim MEANS
+        claim's `fraud or misrepresentation or material withholding of information`
+    OR  `policy canceled for a late wellness-visit confirmation` claim
+    OR  `policy canceled at the end of the policy term` claim
+
+§§ `1.1 — policy in effect`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`policy in effect at the time of the hospitalization` claim MEANS
+        `condition 1.3 pending or satisfied` claim          -- 1.1(3)
+    AND NOT `policy canceled` claim                          -- 1.1(4)
+
+-- "... hospitalization for sickness or accidental injury on which the claim for
+-- such benefit is premised."
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`hospitalization is for sickness or accidental injury` claim MEANS
+        claim's `for sickness`
+    OR  claim's `for accidental injury`
+
+§ `2. General exclusions`
+
+-- "Your policy will not apply to, and no benefit will be paid with respect to, any
+-- event causing sickness or accidental injury arising directly or indirectly out
+-- of: 1. Skydiving; or 2. Service in the military; or 3. Service as a fire
+-- fighter; or 4. Service in the police; or 5. [age >= 80]."
+--
+-- Each of the four activity exclusions is modelled as a CAUSAL fact — "arose
+-- directly or indirectly out of" the activity — not as a mere status of the
+-- claimant at the time of hospitalization. Merely holding a job (soldier,
+-- firefighter, police officer) at the time of an unrelated injury does not, on
+-- this reading, trigger the exclusion; the injury must actually arise from that
+-- service. See NOTES.md.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`general exclusion applies` claim MEANS
+        "(1) skydiving"              ... claim's `due to skydiving`
+    ..  "(2) military service"       ... claim's `due to service in the military`
+    ..  "(3) fire fighter service"   ... claim's `due to service as a fire fighter`
+    ..  "(4) police service"         ... claim's `due to service in the police`
+    OR  "(5) age at least 80"        ... claim's `age at the time of hospitalization` AT LEAST 80
+
+-- 3. General conditions — none of these add a further gate on substantive coverage,
+-- so (unlike Parts 1 and 2 above) this part carries no `§` section of its own; each
+-- clause is noted here for completeness/auditability only.
+--
+-- 3.1 "Your Policy insures You twenty-four (24) hours a day anywhere in the world."
+--     No territorial or time-of-day exclusion exists anywhere in this contract, so
+--     there is nothing to gate.
+-- 3.2 Arbitration — a claims-recovery / dispute-resolution precondition (referral to
+--     arbitration, the 60-day wait after proof of claim, extinguishment for failing
+--     to arbitrate within 3 months of an impasse), not a condition of substantive
+--     coverage. None of the benchmark questions posit a dispute, so this is not
+--     wired into `covered` below.
+-- 3.3-3.5 Governing law, currency, and premium timing are boilerplate with no
+--     bearing on whether a given hospitalization is covered. 3.5's lump-sum timing
+--     is covered by the task's standing assumption that the premium has already
+--     been paid on time.
+-- 3.6 Policy term: one year from the effective date. See
+--     `policy canceled at the end of the policy term` above, which implements the
+--     automatic cancelation this section and 1.2 together describe.
+
+§ `Top-level decision`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`covered` claim MEANS
+        `policy in effect at the time of the hospitalization` claim
+    AND `hospitalization is for sickness or accidental injury` claim
+    AND NOT `general exclusion applies` claim

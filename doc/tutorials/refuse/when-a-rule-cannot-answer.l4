@@ -138,17 +138,17 @@ GIVETH A NUMBER
 -- acts on.
 
 DECLARE `Form C filing`
-    HAS `has the required financial statements` IS A BOOLEAN
-        `is signed` IS A BOOLEAN
+    HAS `required financial statements` IS A BOOLEAN
+        `signed` IS A BOOLEAN
 
 @ref 17 CFR 227.203(a)(1) — the Form C and what it must include
 GIVEN filing IS A `Form C filing`
 GIVETH AN EITHER STRING BOOLEAN
 `the filing is accepted` filing MEANS
     BRANCH
-       IF NOT filing's `has the required financial statements`
+       IF NOT filing's `required financial statements`
            THEN LEFT "rejected: the required financial statements are missing"
-       IF NOT filing's `is signed`
+       IF NOT filing's `signed`
            THEN LEFT "rejected: the filing is not signed"
        OTHERWISE RIGHT TRUE
 
@@ -159,7 +159,7 @@ GIVETH A STRING
     WHEN LEFT reason THEN reason
     WHEN RIGHT accepted THEN "accepted"
 
-`Foundry Labs' unsigned filing` MEANS `Form C filing` WITH `has the required financial statements` IS TRUE, `is signed` IS FALSE
+`Foundry Labs' unsigned filing` MEANS `Form C filing` WITH `required financial statements` IS TRUE, `signed` IS FALSE
 
 #EVAL `what the intermediary tells the issuer` `Foundry Labs' unsigned filing`
 
