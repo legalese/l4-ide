@@ -166,16 +166,20 @@
     },
     {
       "id": "Canon corpus",
-      "owner": "go-pipeline-diagram (build) · GM (push/PR)",
-      "kind": "confirmed; in build",
-      "quick": false,
+      "owner": "Meng (review + enqueue #398; merge gm/rebless into drafts)",
+      "kind": "built; PR open",
+      "quick": true,
       "raised": "2026-09-15",
-      "ask": "CONFIRMED by Meng 2026-09-15 evening: vendoring (spec PR #396 §3B), and the first blessed list — sg/child-support, sg/succession/legalese, sg/penal-code-1871, both chubb encodings — pinned at canon mengwong/drafts 299dd490 (\"we may change it in future, but let's at least give the mechanism a shake\"). Deputy go-pipeline-diagram briefed 12:25Z to build: etc/canon-pin.json, jl4/examples/canon/<subject>/ mirror, etc/sync-canon.mjs --pull/--check/--bump with selftests, the canon/** golden glob in jl4/tests/Main.hs + etc/check-corpus-goldens.mjs, one `Canon Mirror` CI job, spec/CLAUDE.md/README updates. Known wrinkle to measure: cases/ subdirs vs the harness's <dir>/tests/ golden layout. Migration of legal/chubb and legal/sg-succession is the NEXT PR, after Meng has seen the mechanism green. Results land in the GM outbox.",
+      "ask": "BUILT — PR #398 (mengwong/canon-vendor @ 61e098fa, 7 commits, 0 behind dece633a). The shake worked on run one: canon's sg-csp.golden was stale (predates the ASSUME-retirement notice, #328–#332); re-blessed IN CANON as 9a1a3155 on branch gm/rebless-2026-09-15 (cut from mengwong/drafts 299dd490 — Meng's shelf untouched), pin bumped, 90/0. Ruling recorded in §3B: blessed = goldens match the pinned binary UNDER THE HARNESS; l4 check exit is necessary, not sufficient. Two refuters found ten defects in the deputy's own work, all fixed in-branch. Full local gate 8/8 at 0e4efe66 (+ rebase only). NOT CHECKED: the `Canon Mirror` job has never run in GitHub Actions — a bare-SHA shallow fetch from a runner is unverified; watch its first CI run before making it required. Meng's three asks: (1) review/enqueue #398; (2) merge canon branch gm/rebless-2026-09-15 into mengwong/drafts with a MERGE commit (squash/rebase mints a new SHA; the pin survives only because delete_branch_on_merge is false); (3) then the §4 migration of legal/chubb and legal/sg-succession is the next PR — say go. Pre-existing checker gap found on the way: smucclaw#963.",
       "unblocks": "deleting canon-duplicated subjects from l4-ide without losing regression coverage",
       "source": {
         "file": "specs/todo/CANON-REGRESSION-CORPUS-SPEC.md",
-        "anchor": "**Status:** RULED 2026-09-15 (Meng), NOT BUILT",
-        "ref": "origin/spec/canon-regression"
+        "anchor": "UNDER THE HARNESS",
+        "ref": "origin/mengwong/canon-vendor"
+      },
+      "verify": {
+        "cmd": "gh pr view 398 --repo legalese/l4-ide --json state --jq .state",
+        "pendingWhen": "^OPEN$"
       }
     }
   ]
