@@ -107,6 +107,26 @@ etc/go/go.sh run --subject regcf --encoding primary
 - **`--fixed-now ISO8601`** pins the clock threaded into every `run`, `check`, `render` and `batch`. It defaults to a fixed value on purpose: an unpinned clock makes two runs of the same corpus disagree.
 - **`L4_GO_REQUIRED=1`** turns every `SKIPPED` into exit 5. That is what CI wants and what a laptop does not.
 
+### 3a. Bracket your own working time, or the front end is invisible
+
+`p9-cost` measures every token spent inside the run's window, and that window opens at the run's **first journal record**. Reading the statute, arguing with its cross-references and writing the L4 all happen before the driver is first invoked — so the most expensive part of encoding a body of law lands outside the only instrument that measures it, and the whole-session column is the only bound left, which includes everything else you did that day.
+
+Open the run first, then bracket the work:
+
+```bash
+etc/go/go.sh run --subject regcf --encoding primary --through p0-preflight   # opens the run, prints the id
+etc/go/go.sh work begin --run-id <id> --phase p3-encode                      # ...then go and encode
+etc/go/go.sh work end   --run-id <id> --phase p3-encode
+etc/go/go.sh run --subject regcf --encoding primary --run-id <id>            # resume; the window already covers it
+```
+
+**Key idioms:**
+
+- **`--through p0-preflight` is how you open a run without committing to anything.** It is cheap, it declares the corpus, and it writes the `run_begin` the brackets hang from.
+- **This is the only thing you ever tell the journal that it cannot check.** Everything else is measured by the driver or read out of a harness transcript. A `work` bracket is your claim about which phase you were on, so the ledger lets it **label** spend and never lets it widen `busy_ms_lower_bound`, which stays a floor over driver-attested time.
+- **An unclosed bracket is closed at the next `stage_begin` or `work begin`.** Forgetting `work end` costs you precision, not the timeline.
+- **Bracket the phase you are actually on.** A bracket labelled `p3-encode` that covers an afternoon of reading case law makes the P3 ratio wrong, and the ratio is what the cost projection is built from.
+
 ### 4. Read the statuses, and resist the urge to make them green
 
 A run reports one row per declared stage. What the regcf sidecar's primary-encoding run measures, as a worked example:
@@ -148,9 +168,35 @@ etc/go/go.sh run --subject regcf --encoding primary \
   --waive HG1="this replays the already-reviewed committed encoding; no new encoding exists for a domain expert to review"
 ```
 
+**Most of the time you need none of this.** With no review on record, HG1 grants itself
+**provisionally** and the run proceeds to the end — because the stages behind HG1 produce the
+evidence a review reads, and refusing to compute them until somebody had reviewed was backwards.
+You will see:
+
+```
+go: HG1 has no review on record — proceeding PROVISIONALLY.
+...
+go: VERDICT: PROVISIONAL
+```
+
+Every artifact is stamped `provisional`, none is servable, and the verdict is never `COMPLETE`.
+Nothing behind HG1 is outward-facing — P10 is HG2's and the MCP leg has its own loopback fence —
+so a provisional run publishes nothing.
+
+- **`--require-review`** restores the old behaviour: refuse at `p6-tests`, exit 3, `VERDICT: GATE`.
+  That is what CI wants when a run must not proceed unreviewed.
+- **`--provisional HG1="reason"`** records your reason instead of the canned `AUTOMATIC:` one.
+  Worth doing when the review is scheduled, or when you know something the canned text does not.
+- **After a review, run it again.** If the review tweaked the encoding, the corpus digest moves,
+  the grant goes stale, and the fresh run covers what the reviewer actually approved. If the
+  review signed an unmoved corpus, re-running promotes: the stages replay, the same bytes are
+  re-admitted under the signature, and the verdict returns to `COMPLETE`.
+
 **Key idioms:**
 
 - **A waiver is a verdict, not an absence.** It lands on the journal and prints in the report's Gates section with your reason attached. A waiver that is not in the report is impossible.
+- **Pick the state that is TRUE.** A waiver says the review did not apply; a provisional grant says it has not happened. Passing both for one gate is refused as contradictory. Before the provisional state existed, `--waive` was the only route and so it got used for both, which made the report's gate table say something false.
+- **There is no `--allow-provisional`.** `store cat` will serve waived bytes under `--allow-waived`, because a waiver is a judgement a caller can read and weigh. A provisional grant has no judgement in it to weigh, so the remedy is the review, not a flag.
 - **Write the reason for the reader, not for the parser.** Someone will read it a year from now trying to work out whether the gate mattered.
 - **HG2 cannot be waived** — `go.sh run --waive HG2=…` exits 2, so this is the driver's rule and not only the skill's. HG1 covers work that has already been reviewed by other means; HG2 covers anything outward-facing, and there is no circumstance in which an agent should decide that on its own. See [references/gates.md](references/gates.md).
 
@@ -193,6 +239,48 @@ Two things worth knowing when you read the figures:
 - **`busy_ms_lower_bound` is a floor.** Time you spend reasoning between two tool calls is real work that leaves no interval to measure, and the ledger counts none of it rather than guessing.
 
 If you ran a leg by hand, or from something that sets no session id, the row records `null` and the report says a leg was unattributable — which is the honest reading, and the reason the stage will not print a zero.
+
+### 7f. Project what the next one will cost
+
+A cost ledger is a numerator. To forecast an ingestion programme you need the denominator — how much law went in — and the ratio between them, which is a fact about this pipeline that can only be measured by running it.
+
+```bash
+# the denominator: measure the SOURCE, not the encoding
+node etc/go/lib/source-metrics.mjs --json <subject>/source/ > /tmp/src.json
+
+# the ratio: what one real run actually cost over that source
+node etc/go/lib/estimate-cost.mjs calibrate \
+  --ledger "$TMPDIR/l4-go/<run-id>/cost-ledger.json" --sources /tmp/src.json \
+  --subject sg-succession --model claude-opus-5 --append etc/go/lib/cost-calibration.json
+
+# the projection: apply it to law nobody has encoded yet
+node etc/go/lib/estimate-cost.mjs project --sources <some other statute>/
+```
+
+**Key idioms:**
+
+- **Measure the source, not the directory.** Pointing `source-metrics.mjs` at a subject directory counts the `.l4` encoding and its goldens as if they were statute. The denominator is the text that went **in**.
+- **Read the `BASIS` block before quoting the number.** At n=1 it says n=1 and prints no interval, because there is nothing to take an interval over. Treat it as an order of magnitude.
+- **Only calibrated models are measured.** The other rows are that one observation rescaled by price, which assumes every model spends the same tokens on the same work — it does not. Calibrating a second model is the point of an independent re-encoding (SPEC.md §8.0).
+- **A refusal to print is doing its job.** `estimate-cost.mjs` exits 1 rather than use a price table older than its own staleness bound, because a stale price does not fail — it prints a confident wrong dollar figure. Re-read the pricing page, update `model-prices.json` **and** its `measured` date in the same edit.
+- **Caching is modelled; batch and effort are not.** Every output states which exclusions applied.
+
+### 7g. Where the output is destined
+
+Every run's report now carries a **destined for** row, and `p10-publish` prints the same destination in its refusal. Nothing publishes — P10 still exits 3 — but the destination is computed rather than described, so it is something you can check:
+
+```
+legalese/canon @ mengwong/drafts : subjects/sg/succession/encodings/cleanroom-2026-08/ (branch via gh)
+```
+
+**Key idioms:**
+
+- **The branch is yours, not Meng's.** It resolves to `<your-username>/drafts` — from `gh api user` first, then `git config github.user`, then `$USER`. Running this out of `legalese/l4-plugin` lands your encoding on your own shelf. Override with `L4_GO_CANON_BRANCH`.
+- **Check the branch when it came from `$USER`.** The destination line says which source answered. An OS account name need not be a GitHub login, and when it is not, the branch names a shelf belonging to nobody on a public repo.
+- **`main` is refused, and so is any non-drafts branch.** An encoding stays on a drafts shelf until its source-terms question is settled.
+- **A subject with no `canon` block has no destination**, and P10 says so instead of guessing. Declare one with `"canon": { "subject_path": "sg/succession" }` — the grammar is canon's `docs/directory-conventions.md`.
+- **The row id is the encoding id.** No mapping to remember: canon's drafts branch already files `cleanroom-2026-08` under that name.
+- **`primary` is refused as a row name.** It is the driver's selector, not a directory — canon rules that no row is primary. The committed encoding takes the name its sidecar gives it in `canon.primary_row`, naming the occasion the way canon's other rows do (`legalese-2026-09`). Neither committed sidecar declares one yet, so `--encoding primary` currently reports no destination, which is the honest answer rather than a made-up path.
 
 ### 7a. The store: what outlives the run
 

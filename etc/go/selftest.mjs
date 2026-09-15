@@ -36,6 +36,7 @@ import {
   networkClass,
   pipelineFromJournal,
   segKey,
+  segTitle,
   unionMs,
 } from "./lib/cost-ledger.mjs";
 import {
@@ -474,6 +475,68 @@ check(
   "a run that declares NOTHING is INCOMPLETE, not vacuously COMPLETE",
   runVerdict({ declared: [], receipts: [], gates: [] }).verdict ===
     "INCOMPLETE",
+);
+// ---- the provisional grant: passage without standing ----------------------
+//
+// The value of the state is entirely in what it REFUSES to say. These pin the
+// refusals, because the failure mode is not that provisional stops working —
+// it is that it quietly starts reading as COMPLETE.
+check(
+  "a PROVISIONAL gate does not block the run",
+  runVerdict({
+    declared,
+    receipts: ok,
+    gates: [{ gate: "HG1", state: "provisional", reason: "review pending" }],
+  }).exit === 0,
+);
+check(
+  "but the verdict is PROVISIONAL, never COMPLETE",
+  runVerdict({
+    declared,
+    receipts: ok,
+    gates: [{ gate: "HG1", state: "provisional", reason: "review pending" }],
+  }).verdict === "PROVISIONAL",
+);
+check(
+  "promotion works: a later SATISFIED row for the same gate restores COMPLETE",
+  runVerdict({
+    declared,
+    receipts: ok,
+    gates: [
+      { gate: "HG1", state: "provisional", reason: "review pending" },
+      { gate: "HG1", state: "satisfied" },
+    ],
+  }).verdict === "COMPLETE",
+);
+check(
+  "a provisional grant on ONE gate does not promote another",
+  runVerdict({
+    declared,
+    receipts: ok,
+    gates: [
+      { gate: "HG1", state: "provisional", reason: "pending" },
+      { gate: "HG2", state: "satisfied" },
+    ],
+  }).verdict === "PROVISIONAL",
+);
+check(
+  "INCOMPLETE outranks PROVISIONAL — an unfinished run is not merely unreviewed",
+  runVerdict({
+    declared,
+    receipts: ok.slice(0, 2),
+    gates: [{ gate: "HG1", state: "provisional", reason: "pending" }],
+  }).verdict === "INCOMPLETE",
+);
+check(
+  "and a REFUSED gate still outranks it",
+  runVerdict({
+    declared,
+    receipts: ok,
+    gates: [
+      { gate: "HG1", state: "provisional", reason: "pending" },
+      { gate: "HG2", state: "refused", reason: "no signature" },
+    ],
+  }).verdict === "GATE",
 );
 check(
   "BROKEN outranks GATE",
@@ -2278,6 +2341,8 @@ process.stdout.write("\n-- cost accounting --\n");
     check("bracketsFrom pairs each executed stage once", br.length === 2);
     const at = (sec) =>
       Date.parse(`2026-01-01T00:00:${String(sec).padStart(2, "0")}.000Z`);
+    const at30iso = () => "2026-01-01T00:00:30.000Z";
+    const at35iso = () => "2026-01-01T00:00:35.000Z";
     check(
       "labelAt is total over the timeline",
       segKey(labelAt(at(5), br)) === "before:a" &&
@@ -2291,6 +2356,67 @@ process.stdout.write("\n-- cost accounting --\n");
       segKey(labelAt(at(10), br)) === "during:a" &&
         segKey(labelAt(at(20), br)) === "during:a",
     );
+
+    // ---- agent `work` brackets: they LABEL spend and never ATTEST time ------
+    //
+    // The gap between two phase scripts is where every token of a human-gated
+    // pipeline actually goes, and before these rows it was one unattributable
+    // bucket. What follows pins the containment, not just the feature: a work
+    // bracket must be opt-in, must lose to a driver bracket on any overlap, and
+    // must close itself when the agent forgets to.
+    {
+      const W = [
+        rows[0],
+        rows[1], // stage a: 10s..20s
+        { kind: "work", phase: "p3-encode", state: "begin", ts: at30iso() },
+        { kind: "work", phase: "p3-encode", state: "end", ts: at35iso() },
+        rows[2],
+        rows[3], // stage b: 40s..50s
+      ];
+      check(
+        "work rows are IGNORED unless includeWork is asked for",
+        bracketsFrom(W).length === 2,
+      );
+      const bw = bracketsFrom(W, { includeWork: true });
+      check("and become a bracket when it is", bw.length === 3);
+      check(
+        "the agent's gap is now attributed to the phase it declared",
+        segKey(labelAt(at(32), bw)) === "encoding:p3-encode",
+      );
+      check(
+        "…under a title that never reads as a driver measurement",
+        segTitle(labelAt(at(32), bw)) === "agent working on p3-encode",
+      );
+      check(
+        "while the driver's own stages are untouched",
+        segKey(labelAt(at(15), bw)) === "during:a" &&
+          segKey(labelAt(at(45), bw)) === "during:b",
+      );
+
+      // An agent that crashes mid-phase is ordinary. The bracket it leaves must
+      // degrade to "until something else happened", not swallow the run.
+      const unclosed = bracketsFrom(
+        [
+          rows[0],
+          rows[1],
+          { kind: "work", phase: "p3-encode", state: "begin", ts: at30iso() },
+          rows[2],
+          rows[3],
+        ],
+        { includeWork: true },
+      );
+      check(
+        "an unclosed work bracket is closed at the next stage_begin",
+        unclosed.length === 3 &&
+          unclosed.some(
+            (b) => b.stage === "p3-encode" && b.to === at(40) && b.declared,
+          ),
+      );
+      check(
+        "so it never shadows the stage that followed it",
+        segKey(labelAt(at(45), unclosed)) === "during:b",
+      );
+    }
     check(
       "a stage re-run inside one journal contributes two brackets, not one",
       bracketsFrom([
@@ -2321,6 +2447,13 @@ process.stdout.write("\n-- the driver --\n");
 // go.sh's two `--inputs` no-op blocks in step; the idempotence checks below
 // compare against it as a SET, not as a count.
 const NEVER_REPLAY = ["p9-cost", "p9-report", "p9-explain"];
+
+// go.sh's HG1_EXEMPT, restated here as the thing the tests measure against.
+// Restated and not imported: this file is where the membership is PINNED, and a
+// pin that reads its expectation out of the code it is pinning cannot fail.
+// Changing the set is a spec change (SPEC.md §7.3), so it should cost two edits
+// and a deliberate one here.
+const HG1_EXEMPT_EXPECTED = ["p9-cost"];
 
 // THE ASSERTION THAT DID NOT EXIST, and whose absence is total when it bites.
 //
@@ -2361,9 +2494,25 @@ const NEVER_REPLAY = ["p9-cost", "p9-report", "p9-explain"];
     process.stdout.write(
       `     ungated at or after p6-tests: ${ungated.join(", ")}\n`,
     );
+  // HG1_EXEMPT, MEASURED FROM THE DRIVER'S OWN PLAN rather than grepped out of
+  // go.sh. The criterion is at the declaration: HG1 certifies the ENCODING, and
+  // p9-cost measures the RUN — it reports identical figures over an isomorphic
+  // encoding and a nonsensical one, so a domain expert's signature has no
+  // purchase on it. The set is pinned to exactly one member because the
+  // cheapest way to smuggle unreviewed work past HG1 would be to add its stage
+  // here, and that must be a test failure and not a judgement call.
   check(
-    "every declared primary stage sequenced at or after p6-tests is gated",
-    plan.status === 0 && from >= 0 && ungated.length === 0,
+    "the set of ungated stages at or after P6 is exactly HG1_EXEMPT",
+    plan.status === 0 &&
+      from >= 0 &&
+      ungated.length === HG1_EXEMPT_EXPECTED.length &&
+      ungated.every((s) => HG1_EXEMPT_EXPECTED.includes(s)),
+  );
+  check(
+    "every declared primary stage sequenced at or after p6-tests is gated, HG1_EXEMPT aside",
+    plan.status === 0 &&
+      from >= 0 &&
+      ungated.every((s) => HG1_EXEMPT_EXPECTED.includes(s)),
   );
   check(
     "the never-replaying stages are declared primary members, and the plan names them",
@@ -2420,12 +2569,20 @@ const NEVER_REPLAY = ["p9-cost", "p9-report", "p9-explain"];
       // declared stage, so it is outside the rule either way.
       const declared = pr.filter((r) => r.gate !== "NOT WIRED");
       check(
-        `every declared ${label} stage from P6 onward is HG1-gated, and none before P6 is`,
+        `every declared ${label} stage from P6 onward is HG1-gated, HG1_EXEMPT aside, and none before P6 is`,
         declared.every((r) =>
-          phase(r.stage) >= 6 && r.gate !== "HG2"
+          phase(r.stage) >= 6 &&
+          r.gate !== "HG2" &&
+          !HG1_EXEMPT_EXPECTED.includes(r.stage)
             ? r.gate === "HG1"
             : r.gate !== "HG1",
         ),
+      );
+      check(
+        `every HG1_EXEMPT stage declared on the ${label} path is ungated, on both paths alike`,
+        declared
+          .filter((r) => HG1_EXEMPT_EXPECTED.includes(r.stage))
+          .every((r) => r.gate === "-"),
       );
     }
   }
@@ -2901,6 +3058,165 @@ if (!process.argv.includes("--with-driver")) {
       "--waive HG2 is refused by the driver, not only by the skill",
       r.status === 2 && /--waive HG2 is REFUSED/.test(r.stderr),
     );
+  }
+
+  // ...and neither is it provisional-able. A new grant state is exactly the
+  // shape of change that reopens a closed hole: HG2's unwaivability was
+  // enforced in one place, and a second granting state that skipped that place
+  // would restore the self-service route past the only gate that has none.
+  {
+    const go = (...extra) =>
+      spawnSync(
+        "bash",
+        [
+          resolve(HERE, "go.sh"),
+          "run",
+          "--encoding",
+          "primary",
+          "--subject",
+          FIXTURE_SUBJECT,
+          "--through",
+          "p0-preflight",
+          ...extra,
+        ],
+        { env, encoding: "utf8" },
+      );
+
+    const r1 = go(
+      "--provisional",
+      "HG2=publishing while permission is pending",
+    );
+    check(
+      "--provisional HG2 is refused by the driver",
+      r1.status === 2 && /--provisional HG2 is REFUSED/.test(r1.stderr),
+    );
+    check(
+      "and says why HG2 differs: its downstream stage IS the outward act",
+      // The CLI's wording, not checkClaim's — they refuse the same thing in
+      // different places and say so differently, and asserting one against the
+      // other is how this check first went red.
+      /downstream of HG2 is a briefing pack/.test(r1.stderr),
+    );
+
+    const r2 = go("--provisional", "HG1=");
+    check(
+      "a provisional grant with no reason is refused, like a waiver with none",
+      r2.status === 2 && /needs a reason/.test(r2.stderr),
+    );
+
+    // The two states make CONTRADICTORY claims about the same gate. Accepting
+    // both would put two granting rows on the journal and let the report print
+    // whichever one flattered the run.
+    const r3 = go(
+      "--waive",
+      "HG1=the review did not apply",
+      "--provisional",
+      "HG1=the review has not happened",
+    );
+    check(
+      "--waive HG1 and --provisional HG1 together are refused as contradictory",
+      r3.status === 2 && /contradictory/.test(r3.stderr),
+    );
+  }
+
+  // HG1 FALLS BACK TO PROVISIONAL RATHER THAN STOPPING THE RUN.
+  //
+  // The stages behind HG1 produce the evidence a review reads, so refusing to
+  // compute them until somebody has reviewed had the order backwards. What must
+  // NOT relax with it is anything about the claims — hence the pins below on the
+  // marker in the reason, on HG2 being excluded, and on the strict mode still
+  // existing for anyone who wants the old behaviour.
+  {
+    const go = (...extra) =>
+      spawnSync(
+        "bash",
+        [
+          resolve(HERE, "go.sh"),
+          "run",
+          "--encoding",
+          "primary",
+          "--subject",
+          FIXTURE_SUBJECT,
+          "--through",
+          "p0-preflight",
+          ...extra,
+        ],
+        { env, encoding: "utf8" },
+      );
+
+    const src = readFileSync(resolve(HERE, "go.sh"), "utf8");
+    check(
+      "the automatic grant is HG1-only — HG2 is excluded by the branch condition",
+      /\$gate"\s*==\s*"HG1"\s*&&\s*"\$REQUIRE_REVIEW"\s*-eq\s*0/.test(src),
+    );
+    check(
+      "the automatic grant's reason is MARKED automatic, so a reader can tell it from a human's",
+      /--reason "AUTOMATIC: no HG1 review is on record/.test(src),
+    );
+    check(
+      "and it records state `provisional`, never satisfied or waived",
+      /--gate "\$gate" --state provisional/.test(src),
+    );
+    check(
+      "--require-review exists as a case arm, so the strict behaviour is still reachable",
+      /--require-review\)/.test(src),
+    );
+    // The automatic grant must not pre-empt an explicit one: a human who typed a
+    // reason has said something the canned text has not, and losing it would
+    // make the report print the weaker claim.
+    check(
+      "an explicit --waive HG1 is still honoured rather than replaced by the automatic grant",
+      /--state waived/.test(src) && /WAIVERS\[@\]/.test(src),
+    );
+    const r = go("--require-review");
+    check(
+      "a --require-review run still starts (the flag is accepted, not an unknown option)",
+      !/unknown option/.test(r.stderr),
+    );
+  }
+
+  // checkClaim is the LEDGER's guard, and the ledger is never swept: a
+  // provisional-HG2 record there would be a permanent claim that publication
+  // went ahead pending permission. Tested at the writer as well as at the CLI,
+  // because the CLI is not the only caller.
+  {
+    const store = mkdtempSync(resolve(tmpdir(), "l4-go-hg2p-"));
+    const run = resolve(store, "r");
+    mkdirSync(run, { recursive: true });
+    writeFileSync(resolve(run, ".corpus-members.json"), "[]");
+    // Resolved here rather than borrowed from an outer scope: the other RECEIPT
+    // bindings are local to blocks further down the file, so referring to one
+    // from here threw a ReferenceError — and only under --with-driver, which is
+    // not the invocation most runs use. A test that crashes in the mode nobody
+    // runs is a test that is not there.
+    const RECEIPT_BIN = resolve(HERE, "lib/receipt.mjs");
+    const r = spawnSync(
+      "node",
+      [
+        RECEIPT_BIN,
+        "gate",
+        "--run",
+        run,
+        "--gate",
+        "HG2",
+        "--state",
+        "provisional",
+        "--subject",
+        "sg",
+        "--run-id",
+        "r",
+        "--covers-from",
+        resolve(run, ".corpus-members.json"),
+        "--reason",
+        "pending",
+      ],
+      { env: { ...process.env, L4_GO_STORE: store }, encoding: "utf8" },
+    );
+    check(
+      "the writer refuses a provisional HG2 blessing even when the CLI is bypassed",
+      r.status === 4 && /HG2 admits no provisional grant/.test(r.stderr),
+    );
+    rmSync(store, { recursive: true, force: true });
   }
 
   // --- g2 replay correctness (D9, 2026-08-09) -------------------------------
@@ -7289,6 +7605,77 @@ process.stdout.write("\n-- the blessing edge --\n");
       "produced_under is DERIVED from the journal, never accepted as a CLI flag",
       !/args\.blessing/.test(src) && /gated_stages/.test(src),
     );
+
+    // ---- provisional: the stage runs, and NOTHING it makes is servable ------
+    const prov = mkRun(store, GATED);
+    grant(store, prov, "provisional", ["--reason", "HG1 review is pending"]);
+    // The artifact must EXIST for this one: an absent artifact is recorded
+    // `absent` with no sha256, and a servability check over nothing would pass
+    // for the wrong reason.
+    mkdirSync(resolve(prov, "artifacts"), { recursive: true });
+    writeFileSync(resolve(prov, "artifacts", "a.txt"), "provisional bytes\n");
+    const r5 = stage(store, prov, "PASS", [
+      ...OK,
+      "--artifact",
+      resolve(prov, "artifacts", "a.txt"),
+    ]);
+    check(
+      "with a PROVISIONAL grant the stage runs and may write PASS",
+      r5.status === 0,
+    );
+    const pp = lastEnd(prov)?.produced_under;
+    check(
+      "and the receipt is stamped provisional, not satisfied and not waived",
+      pp?.state === "provisional",
+    );
+    check(
+      "carrying the reason, so the report can say what is still owed",
+      pp?.reason === "HG1 review is pending",
+    );
+    {
+      const sha = lastEnd(prov)?.artifacts?.find((a) => a.sha256)?.sha256;
+      const s = sha ? Store.servability(store, sha) : null;
+      check(
+        "a PASS produced under a provisional grant is NOT servable",
+        s?.servable === false && s?.state === "provisional",
+      );
+    }
+    rmSync(store, { recursive: true, force: true });
+  }
+
+  // THE RANKING IS OF CLAIMS, NOT OF RECENCY. A waiver is a judgement that the
+  // review did not apply; a provisional grant says it has not happened. Over the
+  // same bytes the waiver must win whichever row the ledger happens to hold
+  // first, or a provisional re-run would silently downgrade reviewed work —
+  // and, worse, the reverse ordering would let a provisional grant be dressed up
+  // by a later waiver.
+  {
+    const store = mkdtempSync(resolve(tmpdir(), "l4-go-l2p-"));
+    for (const order of [
+      ["provisional", "waived"],
+      ["waived", "provisional"],
+    ]) {
+      let sha = null;
+      for (const st of order) {
+        const run = mkRun(store, GATED);
+        grant(store, run, st, ["--reason", `${st} here`]);
+        // THE SAME BYTES under both grants — that is the whole point of the
+        // ranking, which is content-addressed.
+        mkdirSync(resolve(run, "artifacts"), { recursive: true });
+        writeFileSync(resolve(run, "artifacts", "a.txt"), "same bytes\n");
+        stage(store, run, "PASS", [
+          ...OK,
+          "--artifact",
+          resolve(run, "artifacts", "a.txt"),
+        ]);
+        sha = lastEnd(run)?.artifacts?.find((a) => a.sha256)?.sha256 ?? sha;
+      }
+      const s = sha ? Store.servability(store, sha) : null;
+      check(
+        `waived outranks provisional over the same bytes (${order.join(" then ")})`,
+        s?.state === "waived" && s?.servable === false,
+      );
+    }
     rmSync(store, { recursive: true, force: true });
   }
 
@@ -8495,6 +8882,196 @@ process.stdout.write("\n-- store verbs --\n");
   );
 }
 // ===== END review findings ==================================================
+
+// ===== the canon destination, and its fence =================================
+//
+// p10 refuses and will keep refusing, so none of this is exercised by a real
+// deposit. That is exactly why it is pinned: the fence has to be correct on the
+// day the stage stops refusing, and by then nobody will remember it was never
+// run. The property that matters is not "the path is right" — it is that the
+// pipeline CANNOT name the default branch and cannot silently name one person's
+// shelf for everybody.
+{
+  process.stdout.write("\n-- the canon destination --\n");
+  const D = await import("./lib/canon-destination.mjs");
+  const noTools = () => {
+    throw new Error("not installed");
+  };
+  const ok = { subjectPath: "sg/succession", row: "cleanroom-2026-08" };
+
+  check(
+    "the repository is not a parameter — it is R1's ruling",
+    D.CANON_REPO === "legalese/canon",
+  );
+
+  for (const bad of ["main", "master"]) {
+    let threw = null;
+    try {
+      D.resolveDestination({ ...ok, branch: bad, env: {}, exec: noTools });
+    } catch (e) {
+      threw = e.message;
+    }
+    check(
+      `'${bad}' is REFUSED as a deposit target`,
+      threw !== null && /REFUSED/.test(threw),
+    );
+  }
+  {
+    let threw = null;
+    try {
+      D.resolveDestination({
+        ...ok,
+        branch: "feature/nice-idea",
+        env: {},
+        exec: noTools,
+      });
+    } catch (e) {
+      threw = e.message;
+    }
+    check(
+      "a branch that is not a drafts shelf is refused, naming the shape expected",
+      threw !== null && /drafts/.test(threw),
+    );
+  }
+
+  // THE DERIVATION ORDER, and the reason it is an order: `gh` answers the
+  // question actually being asked (a GitHub login for a GitHub branch), while
+  // $USER answers a different one that is usually but not always the same.
+  const ghSays = (who) => (cmd) => {
+    if (cmd === "gh") return who;
+    throw new Error("no");
+  };
+  check(
+    "the owner comes from `gh` when it can answer",
+    D.resolveDestination({
+      ...ok,
+      env: { USER: "someone-else" },
+      exec: ghSays("realname"),
+    }).branch === "realname/drafts",
+  );
+  check(
+    "…falling back to git config github.user",
+    D.resolveDestination({
+      ...ok,
+      env: { USER: "someone-else" },
+      exec: (cmd, args) => {
+        if (cmd === "git" && args.includes("github.user")) return "configured";
+        throw new Error("no");
+      },
+    }).branch === "configured/drafts",
+  );
+  {
+    const d = D.resolveDestination({
+      ...ok,
+      env: { USER: "osname" },
+      exec: noTools,
+    });
+    check("…and finally to $USER", d.branch === "osname/drafts");
+    check(
+      "but a $USER-derived branch WARNS, because an OS account is not a GitHub login",
+      d.branch_source === "os-user" &&
+        d.warnings.some((w) => /need not be a GitHub login/.test(w)),
+    );
+  }
+  {
+    const d = D.resolveDestination({ ...ok, env: {}, exec: noTools });
+    check(
+      "with nothing able to name an owner the branch is null, not a default person",
+      d.branch === null && d.branch_source === null,
+    );
+    check(
+      "and describe() says so rather than printing a plausible wrong branch",
+      /<USERNAME>\/drafts/.test(D.describe(d)),
+    );
+  }
+  check(
+    "an explicit --branch beats every derivation",
+    D.resolveDestination({
+      ...ok,
+      branch: "aswathy/drafts",
+      env: { L4_GO_CANON_BRANCH: "mengwong/drafts", USER: "x" },
+      exec: ghSays("y"),
+    }).branch === "aswathy/drafts",
+  );
+  check(
+    "and L4_GO_CANON_BRANCH beats the derivation but not an explicit flag",
+    D.resolveDestination({
+      ...ok,
+      env: { L4_GO_CANON_BRANCH: "aswathy/drafts", USER: "x" },
+      exec: ghSays("y"),
+    }).branch === "aswathy/drafts",
+  );
+
+  // The layout is canon's Q3 shape: the encoding row sits one level BELOW the
+  // subject, and the row id is the sidecar's own encoding id — which canon's
+  // drafts branch already agrees with.
+  // `primary` is the driver's SELECTOR and not a row name. Filing the committed
+  // encoding at `encodings/primary/` would re-create, in the law repository, the
+  // privilege SPEC.md §8.0 and canon's own Q3 both remove — and the law
+  // repository is the more durable of the two places to get it wrong.
+  {
+    let threw = null;
+    try {
+      D.resolveDestination({
+        subjectPath: "us/regcf",
+        row: "primary",
+        branch: "a/drafts",
+        env: {},
+        exec: noTools,
+      });
+    } catch (e) {
+      threw = e.message;
+    }
+    check(
+      "'primary' is REFUSED as a canon row name — no row is primary",
+      threw !== null && /no row is primary/.test(threw),
+    );
+    check(
+      "and the refusal names the sidecar key that fixes it",
+      threw !== null && /canon\.primary_row/.test(threw),
+    );
+  }
+
+  check(
+    "the encoding row sits under subjects/<path>/encodings/<row>",
+    D.resolveDestination({ ...ok, branch: "a/drafts", env: {}, exec: noTools })
+      .encoding_dir === "subjects/sg/succession/encodings/cleanroom-2026-08",
+  );
+
+  // ADVISORY, not fatal: canon's directory-conventions.md is PROPOSED and its
+  // own main branch holds `western-australia/`. A validator that refused would
+  // reject paths that are correct for the tree as it stands.
+  {
+    const d = D.resolveDestination({
+      subjectPath: "western-australia/residential-tenancies-act",
+      row: "legalese-2026-09",
+      branch: "a/drafts",
+      env: {},
+      exec: noTools,
+    });
+    check(
+      "a non-conforming jurisdiction component WARNS and does not fail",
+      d.encoding_dir.startsWith("subjects/western-australia/") &&
+        d.warnings.some((w) => /PROPOSED/.test(w)),
+    );
+  }
+  for (const bad of ["", "regcf", "/us/regcf", "us/Reg CF"]) {
+    let threw = null;
+    try {
+      D.resolveDestination({
+        subjectPath: bad,
+        row: "r",
+        branch: "a/drafts",
+        env: {},
+        exec: noTools,
+      });
+    } catch (e) {
+      threw = e.message;
+    }
+    check(`subject_path '${bad}' is rejected`, threw !== null);
+  }
+}
+// ===== END canon destination ================================================
 
 process.stdout.write(
   `\n${failures === 0 ? "selftest: all checks passed" : `selftest: ${failures} FAILED`}${skips ? ` (${skips} skipped)` : ""}\n`,

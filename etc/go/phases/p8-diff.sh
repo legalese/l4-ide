@@ -170,7 +170,7 @@ METRICS=(
   --metric "density_method=#ASSERT directive lines / non-comment GIVETH|DECIDE|MEANS occurrences (the SPEC.md §8.1 proxy; l4 verify's summary.decisions is a different denominator and is not used)"
 )
 
-DIVERGE_NOTE="divergences do not demote this status: SPEC.md §8 rules that a run finding a defect is a BETTER pass, and each witness's disposition is a reading of the law — the report artifact carries every one as UNTRIAGED for the skill and HG1 to triage, never this script"
+DIVERGE_NOTE="divergences do not demote this status: SPEC.md §8 rules that a run finding a defect is a BETTER pass, and each witness's disposition (converge / fork / defect, SPEC.md §8.0) is a reading of the law — the report artifact carries every one as UNTRIAGED for the skill and HG1 to triage, never this script"
 # The sensitivity note must not point at an empty table as if it were
 # reassurance. When nothing was perturbed, say that nothing was measured on
 # that axis; the old note said "read the Sensitivity table beside the

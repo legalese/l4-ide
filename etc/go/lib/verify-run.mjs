@@ -122,13 +122,25 @@ const verdict = runVerdict({
 const gateOrder = [];
 if (wantGates) {
   const GATED_BY = begin?.gated_stages ? JSON.parse(begin.gated_stages) : {};
-  // A gate is granted by its EARLIEST satisfied/waived row. A later duplicate
-  // row for the same gate re-states an authorisation that already existed, and
-  // measuring stage order against the duplicate would report every stage the
-  // first grant legitimately authorised.
+  // A gate is granted by its EARLIEST satisfied/waived/provisional row. A later
+  // duplicate row for the same gate re-states an authorisation that already
+  // existed, and measuring stage order against the duplicate would report every
+  // stage the first grant legitimately authorised.
+  //
+  // `provisional` is in this set because it is what ACTUALLY let the stages
+  // run, and the ordering check asks exactly that question: did the gated work
+  // begin before the thing that authorised it. Leaving it out would have made
+  // every provisionally-granted run invisible to the one check the acting agent
+  // cannot pre-satisfy — the weakest grant would have had the least scrutiny,
+  // which is backwards.
   const firstGrant = new Map();
   for (const g of gates) {
-    if (g.state !== "satisfied" && g.state !== "waived") continue;
+    if (
+      g.state !== "satisfied" &&
+      g.state !== "waived" &&
+      g.state !== "provisional"
+    )
+      continue;
     if (!firstGrant.has(g.gate)) firstGrant.set(g.gate, g);
   }
   for (const g of gates) {

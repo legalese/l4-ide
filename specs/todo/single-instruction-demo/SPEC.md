@@ -268,8 +268,9 @@ representation of the same rule — a factual note of where we disagree with it.
 #### P9.2 — What the run cost (added 2026-08-25)
 
 **Status (2026-08-25): BUILT.** The stage is `p9-cost`, declared in both `PRIMARY_STAGES` and
-`DEPOSIT_STAGES` immediately before `p9-report`, HG1-gated by §7.3's derivation like everything from
-P6 on. It writes `cost-ledger.json`; `render-report.mjs` renders it under **What this run cost**.
+`DEPOSIT_STAGES` immediately before `p9-report`, ~~HG1-gated by §7.3's derivation like everything from
+P6 on~~ — **HG1-EXEMPT since 2026-09-15; see §7.3.0 for the criterion and why gating it was
+backwards.** It writes `cost-ledger.json`; `render-report.mjs` renders it under **What this run cost**.
 The measuring code is `etc/go/lib/cost-ledger.mjs`, the clock is `etc/go/lib/clock.sh`, and the
 journal is at **schema 6**.
 
@@ -335,6 +336,54 @@ nothing.
 without notice. A stale rate table would put a confident wrong figure in a document whose whole
 premise is that every number has a journal row behind it.
 
+#### P9.3 — The front end, and the denominator. RULED 2026-09-15.
+
+P9.2's first stated boundary is that **the window understates the front**: it opens at the run's
+first journal record, so reading the statute and deciding what to encode — most of what encoding
+a body of law actually costs — fell outside the only instrument that measures cost. The
+whole-session column was the honest upper bound and it is a loose one, because it includes
+everything else that session did that day. Two additions close it, and neither pretends to more
+evidence than it has.
+
+**`go.sh work begin|end --phase <stage>` brackets the agent's own working time.** It writes a
+`work` row, and it is **the only claim in the journal**: everything else there is measured by the
+driver or read out of a file the harness wrote, while a `work` bracket is the agent saying which
+phase it was working on. It is admitted because the alternative is not a better number but _no_
+number. The claim is contained rather than trusted — `cost-ledger.mjs` keeps two bracket sets, so
+a `work` bracket may **label** spend and may never widen `busy_ms_lower_bound`, which stays a
+floor over driver-attested time. Whose tokens they are is still observed from
+`CLAUDE_CODE_SESSION_ID`; only which phase they belong to is declared. An unclosed bracket is
+closed at the next `stage_begin` or `work begin`, so a crashed agent degrades to "until something
+else happened" rather than swallowing the timeline.
+
+**`source-metrics.mjs` measures the input.** Every cost figure is a numerator, and a numerator
+forecasts nothing: "this run cost $40" does not say what the next statute costs; "this run cost
+$40 over 18,000 words of source" does, to the extent the ratio holds. It counts bytes, chars,
+lines and words, with "word" defined as a maximal run of non-whitespace — reproducible rather
+than linguistic, because the ratio it feeds is measured rather than assumed. Binary files are
+reported as **skipped**, never counted as text: a PDF read as text yields a denominator that is
+not wrong so much as meaningless.
+
+**`estimate-cost.mjs` is the projector, and it has two asymmetric verbs.** `calibrate` records
+what a real run cost over a real body of law; `project` applies recorded calibrations to law that
+has not been encoded yet. Three properties are load-bearing, and all three exist to stop a
+projection reading as a quote:
+
+- **Every projection states its `n`.** At n=1 it says so, names the subject and model it came
+  from, and prints no interval, because there is nothing to take an interval over.
+- **Only calibrated models are measured; the other rows are that observation rescaled by
+  price**, which assumes every model spends the same tokens on the same work. It does not, and
+  the output says so. Calibrating each model separately is exactly the comparison §8.0 describes.
+- **Prices are a measurement with an expiry.** `model-prices.json` carries `measured`, `source`
+  and `stale_after_days`, and the projector **refuses** past the bound rather than printing a
+  confident wrong dollar figure. Caching is modelled from measured cache tokens; batch pricing
+  and effort level are not modelled, and every output says which exclusions apply.
+
+Prices live in their own file and their own tool, never in `cost-ledger.mjs`, for the reason that
+file already gives in its own header: token counts are facts about a run, prices are facts about
+a contract, and a stale rate table inside the ledger would put a wrong number in a report whose
+whole premise is that every number has a row behind it.
+
 #### P9.1 — The explainer report (a sibling, not a rewrite)
 
 **Status (2026-08-03): BUILT at v0, with one named gap.** The stage is `p9-explain`, declared in
@@ -390,6 +439,65 @@ stand-it-up-yourself (`EXP-E15`).
 GitHub first: a corpus-of-law repository **separate from l4-ide** (`jl4/examples/` and
 `experiments/` are not the right long-term home — R1). Upload to lexipedia too if their format
 and licensing admit it (R2). Publication is outward-facing and human-gated (§7.3).
+
+#### P10.1 — The destination is computed, and the branch belongs to the depositor. RULED 2026-09-15.
+
+P10 refuses and will keep refusing until depositing is an HG2 act somebody has signed. It now
+nonetheless **computes and prints the exact destination it would write to**, because a refusal
+that names a directory is one the reader can check, and because the fence is then built and
+exercised before the feature that needs it — the same order the MCP leg's loopback guard was
+built in.
+
+| part       | value                                              | where it comes from                                        |
+| ---------- | -------------------------------------------------- | ---------------------------------------------------------- |
+| repository | `legalese/canon`                                   | R1. Not a parameter                                        |
+| branch     | `<username>/drafts`                                | **resolved from whoever is running** — see below           |
+| directory  | `subjects/<subject_path>/encodings/<encoding-id>/` | the sidecar's `canon.subject_path`, and the run's encoding |
+
+**The branch is derived, never defaulted to a person.** `mengwong/drafts` is where Meng's
+encodings go; somebody running the same pipeline out of `legalese/l4-plugin` must land on
+**their** shelf. A hardcoded default would quietly put every contributor's work on one person's
+branch and the failure would look like success. `lib/canon-destination.mjs` resolves an owner in
+order and **records which source answered**, because they are not equally trustworthy: `gh api
+user` (the GitHub identity itself — the only source answering the question actually asked),
+then `git config github.user`, then `$USER`. A `$USER`-derived branch carries a warning: an OS
+account name need not be a GitHub login, and when it is not, the result is a shelf belonging to
+nobody on a public repository. With nothing able to name an owner the branch is **null**, and
+the tooling says so rather than choosing. `L4_GO_CANON_BRANCH` overrides.
+
+**Never the default branch.** `main` and `master` are refused outright, and so is any branch
+that does not look like a drafts shelf. An encoding lands on a drafts branch and stays there
+until its source-terms question is settled; a deposit straight onto `main` is a larger outward
+act than the one HG2 was asked about.
+
+**`primary` is refused as a row name.** It is the driver's selector for the committed encoding
+— a fine run parameter and a terrible directory name, because filing one encoding at
+`encodings/primary/` re-creates in the law repository the privilege §8.0 and canon's own Q3 both
+remove, and the law repository is the more durable of the two places to get it wrong. The
+committed encoding takes the name its sidecar gives it in `canon.primary_row`, naming the
+occasion the way canon's other rows do (`legalese-2026-09`). With none declared there is no
+destination, and P10 says so. _This was got wrong first: the destination initially emitted
+`encodings/primary/`, in the same change that ruled no row is primary._
+
+**The row id is the encoding id, and that is an observation rather than a convention invented
+here**: canon's drafts branch already holds
+`subjects/sg/succession/encodings/cleanroom-2026-08/`, filed under exactly the id this
+pipeline's sidecar calls that encoding. The two vocabularies already agreed; the default keeps
+them agreeing.
+
+**The path grammar is advisory, with a reason.** canon's `docs/directory-conventions.md` is
+**proposed, not adopted** — it says so in its own header — and canon's `main` holds
+`western-australia/`, `singapore/` and `european-union/`, which predate it and do not conform,
+while its drafts branch holds `sg/`, `il/`, `us/` and `contracts/`, which do. So a
+non-conforming path **warns and does not fail**: refusing would enforce, from the tools
+repository, a convention the law repository has not adopted, and would reject paths that are
+correct for the tree as it stands. When the conventions land, the warning becomes a refusal in
+one edit.
+
+**A subject with no `canon` block has no destination**, and P10 says exactly that rather than
+guessing one. A guessed path on a public repository is worse than an absent one. The run record
+carries the destination **path only** — the branch is resolved at deposit time, so freezing one
+person's shelf onto a run record would record the wrong kind of fact.
 
 ## 5. Component inventory — verified 2026-07-31
 
@@ -477,6 +585,80 @@ tests are treated as specifications); **HG2**, Meng's go on anything outward-fac
 the corpus repo, publishing the report, any lexipedia contact. Everything else runs
 autonomously.
 
+#### 7.3.0 What HG1 gates, and the criterion that decides it. RULED 2026-09-15.
+
+"HG1 blocks P6 onward" was implemented as a derivation over phase numbers (`>= 6`, minus
+HG2's). That is the right shape — one rule, applied, rather than two hand-kept lists — but the
+sentence it implements is about **standing**, not about phase ordinals, and the derivation
+over-approximated it in one measured case.
+
+**The criterion: HG1 gates a stage whose output makes a claim about the ENCODING.** HG1
+certifies that the L4 says what the law says; a stage whose output is not a statement about the
+encoding is not a stage a domain expert's signature has any purchase on.
+
+**`p9-cost` fails that criterion and is exempt.** It measures the _run_ — wall clock off the
+journal, tokens off the harness transcripts — and reports identical figures over an isomorphic
+encoding and a nonsensical one. Gating it bought nothing and cost the thing the numbers are
+for: **you cannot forecast what encoding a body of law costs if the cost ledger is only
+readable after a review that has not happened yet**, which is the question the whole ingestion
+programme turns on. The driver's exempt set is `HG1_EXEMPT` and `etc/go/selftest.mjs` pins it
+to exactly this one member, measured from `go.sh plan`'s own output rather than grepped out of
+the source: adding a stage to it is a change to this ruling, and the cheapest way to smuggle
+unreviewed work past HG1 would be to add its stage there quietly.
+
+#### 7.3.2 HG1 admits a THIRD state: `provisional`. RULED 2026-09-15.
+
+§7.3's own words are "after P5, **before P6's tests are treated as specifications**". The gate
+is about what the downstream artifacts are permitted to _claim_, not about whether the machine
+may compute them — and the distinction is worth a state of its own, because running P6 and P8
+before the review is what puts the divergence witnesses and the `unsat`/`dead-branch` findings
+**in front of** the reviewer. **A provisional run is the briefing pack for HG1, not a way
+around it.** Withholding the evidence until after the review had the order backwards.
+
+**It is the DEFAULT, not an opt-in** (amended 2026-09-15, on Meng's instruction: "I want HG1 to
+be okay with not being human-reviewed; the subsequent phases can still run"). A run with no
+review on record records a provisional grant automatically, with a reason marked `AUTOMATIC:`
+so a reader can tell it from a human's, and proceeds. `--require-review` restores the refusal
+(exit 3, `VERDICT: GATE`) for CI or for anyone who wants a run to stop; `--provisional
+HG1="reason"` records your own reason in place of the canned one.
+
+This is safe precisely because **nothing behind HG1 is outward-facing** — P10 is HG2's, and the
+MCP leg has its own loopback fence — so the stages produce local evidence and publish nothing.
+The automatic grant is HG1-only; HG2 is excluded by the branch condition, because its subject is
+an outward-facing act and there is no evidence to gather ahead of it.
+
+**Re-running after a review is the ordinary path.** A review that tweaks the encoding moves the
+corpus digest, the grant goes stale, and a fresh run records one over what the reviewer actually
+approved. A review that signs an unmoved corpus promotes: the stages replay and the same bytes
+are re-admitted under the signature.
+
+Whichever way it is granted, the row carries `state: provisional`, a reason, and the corpus
+digest — bound to content exactly as a waiver is (§6.2). Then:
+
+- the stages behind HG1 **run**, and every receipt they write carries
+  `produced_under.state: provisional`, derived from the journal by `receipt.mjs` and assertable
+  by no phase script;
+- **nothing produced under it is servable.** `store.mjs` ranks the grant states
+  `satisfied > waived > provisional` — a ranking of how much has been _claimed_, not of
+  recency — and there is deliberately no `--allow-provisional` to match `--allow-waived`: a
+  waiver is a judgement a caller can read and weigh, while a provisional grant says only that
+  the review has not happened, so the remedy is the review and not a flag;
+- the run verdict is **`PROVISIONAL`**, at exit 0. The accounting is complete and the review is
+  not. It is not a flavour of `COMPLETE`, because `COMPLETE` is the word a reader skims for;
+- **promotion is free and content-addressed.** Sign HG1 over an unmoved corpus and re-run: the
+  stages replay, the same bytes are re-admitted under the satisfied blessing, and the verdict
+  returns to `COMPLETE`. No separate promotion machinery exists or is needed.
+
+**HG2 admits no provisional grant**, and the refusal is enforced twice — at the driver
+(`--provisional HG2` exits 2) and at the ledger writer (`checkClaim`), because the CLI is not
+the only caller and a provisional-HG2 record in a ledger nothing sweeps would be a permanent
+claim that publication went ahead pending permission. The reason differs from the waiver
+refusal and is stated separately: nothing downstream of HG2 is _evidence for_ HG2 — P10 is the
+outward act itself.
+
+`verify-run.mjs` counts a provisional grant when it checks that a gate was recorded before the
+work it gates began. Leaving it out would have given the weakest grant the least scrutiny.
+
 #### 7.3.1 HG1 is expected to be WAIVED, and the pipeline must not wait for it. RULED 2026-09-06.
 
 Rulings-bench card `D10-corpus-selection`, marked **accept** by Meng 2026-09-06. **This is a design
@@ -523,10 +705,56 @@ The de novo run (G2) re-derives Reg CF from source **without reading the existin
 then diffs its encoding against `jl4/examples/legal/regcf/regcf.l4`:
 
 - **Agreements** validate both encodings.
-- **Disagreements** are triaged: encoding error (fix), genuine ambiguity (both readings join
-  the fork register), or improvement over the hand corpus (backport).
+- **Disagreements** are triaged: ~~encoding error (fix), genuine ambiguity (both readings join
+  the fork register), or improvement over the hand corpus (backport)~~ — **superseded by §8.0,
+  ruled 2026-09-15.** The vocabulary is now **converge / fork / defect**; `backport`
+  presupposed a privileged original, which §8.0 removes.
 - The triage table goes into the conversion report. A de novo run that merely reproduces the
   corpus is a pass; one that finds a defect in it is a better pass.
+
+### 8.0 It is an inter-encoder agreement study, not an acceptance test. RULED 2026-09-15.
+
+The framing above treats the hand-built corpus as an oracle and the second run as a candidate
+sitting an exam. That was the right frame when there was one encoding and the question was
+"can the pipeline reproduce it". It is the wrong frame now, for two reasons, and the second is
+the serious one.
+
+**It presupposes a privileged original.** "An improvement over the hand corpus (backport)" only
+parses if one encoding is the incumbent. Nothing about a second, independent encoding of a
+statute makes it the challenger.
+
+**It contradicts `legalese/canon`'s own ruling.** `docs/directory-conventions.md` Q3: encodings
+are equal rows under `encodings/`, **no row is primary** — "canon records, and does not
+choose." Meanwhile this pipeline's sidecar carries `encoding` (singular, privileged) beside
+`encodings` (plural, the rest), and the driver spells the privilege out loud as
+`--encoding primary`. The repository that holds the law and the tool that produces it disagreed
+about whether an encoding can be primary.
+
+**The reframe.** A second run is an **independent re-encoding**, and the diff between two
+independent encodings measures **reproducibility**, not conformance. This changes what a
+divergence _is_: where two independent encoders reach different answers on the same facts, the
+pipeline has found an ambiguity **empirically** — which is exactly what P4's fork register is
+for, arrived at by measurement instead of by introspection. The triage vocabulary follows:
+
+| disposition | means                                                                                   |
+| ----------- | --------------------------------------------------------------------------------------- |
+| `converge`  | both encodings agree. Evidence about the reading, proportional to their independence    |
+| `fork`      | both are defensible readings of the same text — opens or confirms a fork-register entry |
+| `defect`    | one is wrong against the source. Which one is a finding, not a presumption              |
+
+**What this makes possible, and what it costs.** Independence is the whole value, and it is
+also the thing most easily lost: two encodings by the same model from the same prompt agree for
+reasons that have nothing to do with the law. So the encoder is now a recorded dimension —
+`encodings.<id>.encoder` carries `model`, `date` and `skill_version`, with `model` written as
+the exact API model id — and a `converge` row is worth reading only alongside the two encoder
+blocks that produced it. Two encodings by _different_ models that converge is a much stronger
+signal than two by the same one; the schema now lets a reader tell those apart, which it could
+not before.
+
+**Deliberately not renamed.** `denovo-diff.mjs`, the `denovo.*` sidecar keys, and the
+`--encoding primary` selector keep their spellings. Renaming costs four regenerated goldens and
+a build, and the identifiers are not the ruling; when a rename is worth its own change, this
+section is the argument for it. The _vocabulary_ the reports print changes now.
 
 **Built 2026-08-02; wired and first exercised in-pipeline 2026-08-09, by the `p8-diff` stage.**
 The comparator is `etc/go/lib/denovo-diff.mjs` and its pairing

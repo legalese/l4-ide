@@ -83,6 +83,18 @@ switch (verb) {
           (s.state === "waived"
             ? "  It was produced under a WAIVER, not a signature. Pass --allow-waived to serve it\n" +
               "  anyway; the waiver's reason is above and belongs in whatever you say about the result.\n"
+            : "") +
+          // NO --allow-provisional, deliberately. A waiver is a judgement that
+          // the review did not apply to this work, so a caller who reads the
+          // reason can decide the risk is theirs to take. A provisional grant
+          // says the review has not happened YET — there is no judgement to
+          // read and nothing for the caller to weigh, and the remedy is not a
+          // flag, it is the review. Adding an override here would make the
+          // weaker grant the easier one to serve from.
+          (s.state === "provisional"
+            ? "  It was produced under a PROVISIONAL grant: the HG1 review has NOT happened.\n" +
+              "  There is no flag for this. Sign HG1 over this corpus and re-run — the bytes that\n" +
+              "  have not moved are re-admitted under the signature and become servable.\n"
             : ""),
       );
       process.exit(EXIT.REFUSED);
@@ -227,7 +239,17 @@ switch (verb) {
       for (const m of b.covers ?? []) if (m.sha256) roots.add(m.sha256);
     for (const r of indexRecords(root)) {
       const s = servability(root, r.sha256);
-      if (s.state === "satisfied" || s.state === "waived") roots.add(r.sha256);
+      // `provisional` is a reachability root for the reason the state exists:
+      // those artifacts ARE the briefing pack a pending HG1 review is waiting
+      // to read. Sweeping them because they are unsigned would delete the
+      // evidence while the reviewer is on their way to it, and the run would
+      // have to be repeated to get back exactly the bytes the gate is about.
+      if (
+        s.state === "satisfied" ||
+        s.state === "waived" ||
+        s.state === "provisional"
+      )
+        roots.add(r.sha256);
     }
     const cutoff = Date.now() - keepDays * 86400000;
     let swept = 0;
@@ -287,7 +309,12 @@ switch (verb) {
     for (const r of indexRecords(root)) {
       if (existsSync(objectPath(root, r.sha256))) continue;
       const st = servability(root, r.sha256);
-      if (st.state === "satisfied" || st.state === "waived") missing++;
+      if (
+        st.state === "satisfied" ||
+        st.state === "waived" ||
+        st.state === "provisional"
+      )
+        missing++;
     }
     if (missing)
       problems.push(

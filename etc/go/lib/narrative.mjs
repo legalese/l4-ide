@@ -53,6 +53,7 @@ export const RESERVED_STATUS_WORDS = [
   "BROKEN",
   "COMPLETE",
   "INCOMPLETE",
+  "PROVISIONAL",
 ];
 
 /**

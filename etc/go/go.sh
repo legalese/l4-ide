@@ -33,10 +33,20 @@
 #
 #     run     --subject ID [--encoding primary|ID|undeclared] [--run-id ID]
 #             [--through STAGE] [--only STAGE] [--waive HG1=REASON]
-#             [--fixed-now ISO8601]
+#             [--provisional HG1=REASON] [--fixed-now ISO8601]
 #
 #             HG1 is the only waivable gate. HG2 guards anything outward-facing
 #             and opens on a signature or not at all; --waive HG2 exits 2.
+#
+#             HG1 DEFAULTS TO A PROVISIONAL GRANT: with no review on record the
+#             run proceeds rather than stopping, because the stages behind HG1
+#             produce the evidence a review reads. Every artifact is stamped
+#             provisional, none is servable, and the verdict is PROVISIONAL
+#             rather than COMPLETE. --require-review restores the old refusal
+#             (exit 3, VERDICT GATE) for anyone who wants it, CI included.
+#             --provisional HG1=REASON records your own reason instead of the
+#             canned one. It is not a weaker waiver: a waiver says the review
+#             did not apply. --provisional HG2 exits 2, like --waive HG2.
 #     doctor  [--subject ID] [--encoding primary|ID|undeclared]
 #             the front-door forecast: which declared stages will run whole,
 #             which will SKIP and why, each with its remedy. Runs no stage.
@@ -53,6 +63,13 @@
 #             R13: the account of a SUBJECT across every run whose evidence
 #             survives, not of one run. Each phase resolves to CURRENT, STALE
 #             or NEVER RUN. Exit: 0 none stale · 1 something is stale.
+#     work    begin|end --phase STAGE [--run-id ID] [--note TEXT]
+#             Bracket the AGENT's own working time against a phase, so the
+#             tokens spent reading a statute and writing the L4 are attributed
+#             to P1/P3 instead of landing in an unlabelled gap between two
+#             phase scripts. It is the agent's CLAIM about its own clock: it
+#             may label spend and may never widen the attested busy floor.
+#             Open a run first with `run --through p0-preflight`.
 #     gc      [--keep N]
 #     new-subject ID --citation TEXT --source-url URL [--display-name TEXT]
 #             [--encoding-main PATH] [--force]
@@ -86,6 +103,11 @@
 #     L4_GO_REQUIRED       1 ⇒ any SKIPPED stage is fatal (exit 5), as CI
 #                          wants; `run` refuses at the door when the doctor
 #                          forecasts one, rather than minutes in
+#     L4_GO_CANON_BRANCH   the drafts shelf p10 would deposit to. Derived from
+#                          the GitHub login of whoever is running when unset
+#                          (gh -> git config github.user -> $USER), so a
+#                          contributor lands on THEIR <username>/drafts and not
+#                          on somebody else's. `main` is refused outright.
 #     L4_GO_FIXED_NOW      pin the clock (default 2025-01-31T00:00:00Z)
 
 set -euo pipefail
@@ -162,6 +184,30 @@ DEPOSIT_STAGES=(p1-ingest p2-sweep p3-encode p3-check p4-forks p5-gate p6-tests 
 gated_by_HG1=""
 gated_by_HG2="p10-publish"
 
+# HG1_EXEMPT — stages at or after P6 that HG1 nonetheless does not gate.
+#
+# THE CRITERION, so this list can be argued with rather than merely obeyed:
+# HG1 certifies that the ENCODING says what the law says. A stage is gated by it
+# when the stage's output makes a claim about the encoding. `p9-cost` makes no
+# such claim: it measures the RUN — wall clock off the journal, tokens off the
+# harness transcripts — and reports the identical figures whether the encoding
+# under measurement is isomorphic or nonsense. A domain expert's signature has
+# no purchase on it, and requiring one bought nothing while costing the thing
+# the numbers are FOR: you cannot forecast what encoding a body of law costs if
+# the cost ledger is only readable after a review that has not happened yet.
+#
+# It was gated because the `>= 6` derivation below implements SPEC.md §7.3's
+# sentence "HG1 blocks P6 onward", and p9-cost's phase number is 9. That is the
+# derivation over-approximating the sentence, not the sentence deciding the
+# case; §7.3 now states the criterion and names this exemption. See also
+# ORCHESTRATOR.md §6.5.
+#
+# ADDING TO THIS LIST IS A SPEC CHANGE, and etc/go/selftest.mjs pins the set to
+# exactly this one member so it cannot grow by accident: a stage that makes any
+# claim about the encoding belongs behind the gate, and the cheapest way to
+# smuggle unreviewed work past HG1 would be to quietly add its stage here.
+HG1_EXEMPT="p9-cost"
+
 usage() {
   # DERIVED, not a hardcoded last line. `sed -n '2,60p'` truncated the block the
   # moment the header grew past 60 lines — R9's rewrite pushed it to 89, so
@@ -209,6 +255,8 @@ ONLY=""
 KEEP=5
 WANT_GATES=0
 declare -a WAIVERS=()
+declare -a PROVISIONALS=()
+REQUIRE_REVIEW=0
 NEW_ID=""
 NEW_DISPLAY_NAME=""
 NEW_CITATION=""
@@ -216,6 +264,9 @@ NEW_SOURCE_URL=""
 NEW_ENCODING=""
 NEW_FORCE=0
 declare -a STORE_ARGS=()
+declare -a ARGS=()
+PHASE=""
+NOTE=""
 STAGE_ONLY=""
 WANT_JSON=0
 ENCODING_ID=""
@@ -260,6 +311,25 @@ while [[ $# -gt 0 ]]; do
     --waive)
       need_val "$@"
       WAIVERS+=("$2")
+      shift 2
+      ;;
+    --provisional)
+      need_val "$@"
+      PROVISIONALS+=("$2")
+      shift 2
+      ;;
+    --require-review)
+      REQUIRE_REVIEW=1
+      shift
+      ;;
+    --phase)
+      need_val "$@"
+      PHASE="$2"
+      shift 2
+      ;;
+    --note)
+      need_val "$@"
+      NOTE="$2"
       shift 2
       ;;
     --fixed-now)
@@ -359,6 +429,9 @@ while [[ $# -gt 0 ]]; do
         shift
       elif [[ "$CMD" == "store" ]]; then
         STORE_ARGS+=("$1")
+        shift
+      elif [[ "$CMD" == "work" && "$1" != -* ]]; then
+        ARGS+=("$1")
         shift
       else
         die_usage "unknown option $1"
@@ -575,6 +648,10 @@ if [[ $_NEEDS_SUBJECT -eq 1 ]]; then
   gated_by_HG1=""
   for s in "${DECLARED_STAGES[@]}"; do
     [[ " $gated_by_HG2 " == *" $s "* ]] && continue
+    # HG1_EXEMPT: at or after P6 but making no claim about the encoding. The
+    # criterion and the reason the set has exactly one member are at its
+    # declaration; selftest.mjs pins the membership.
+    [[ " $HG1_EXEMPT " == *" $s "* ]] && continue
     _n="${s#p}"
     _n="${_n%%-*}"
     [[ "$_n" =~ ^[0-9]+$ ]] || continue
@@ -874,10 +951,15 @@ latest_run() {
 
 # gate_grant_state JOURNAL GATE CORPUS_DIGEST -> open | stale | closed
 #
-# A gate is open only while a granting row (satisfied or waived) records the
-# corpus digest this run is actually using. `stale` means the gate WAS granted
-# and the corpus has moved since, which is the case the design's "a post-gate
-# edit re-opens the gate" claim is about.
+# A gate is open only while a granting row (satisfied, waived or provisional)
+# records the corpus digest this run is actually using. `stale` means the gate
+# WAS granted and the corpus has moved since, which is the case the design's "a
+# post-gate edit re-opens the gate" claim is about.
+#
+# `provisional` grants PASSAGE and withholds STANDING: it is a granting row here
+# so the stages run, while store.mjs refuses to serve what they produce and
+# verdict.mjs refuses to call the run COMPLETE. Keeping the two questions apart
+# is the whole point of the state — see the --provisional block in cmd_run.
 #
 # This replaces a grep for any granting row anywhere in the journal. That grep
 # memoised the gate for the life of the run directory, so one waiver covered
@@ -892,7 +974,10 @@ gate_grant_state() {
         .read(journal)
         .filter((r) => r.kind === "gate" && r.gate === gate);
       const granting = rows.filter(
-        (r) => r.state === "satisfied" || r.state === "waived",
+        (r) =>
+          r.state === "satisfied" ||
+          r.state === "waived" ||
+          r.state === "provisional",
       );
       const open = granting.some((r) => r.corpus_digest === digest);
       process.stdout.write(open ? "open" : granting.length ? "stale" : "closed");
@@ -929,6 +1014,50 @@ cmd_status() {
   local run
   run="$(resolve_run)" || exit $?
   node "$LIB/verify-run.mjs" "$run"
+}
+
+# THE FRONT END OF THE PIPELINE, WHICH NOTHING ELSE CAN SEE.
+#
+# p9-cost measures every token a session spent inside the run's window, and the
+# window opens at the run's first journal record. Reading the statute, arguing
+# with its cross-references and writing the L4 all happen BEFORE the driver is
+# first invoked, so the most expensive part of encoding a body of law fell
+# outside the only instrument that measures cost. The whole-session column was
+# the honest upper bound and it is a loose one: it includes everything else the
+# session did that day.
+#
+# `work begin` / `work end` close that gap by letting the agent bracket its own
+# working time against a phase name. It is a CLAIM and the ledger treats it as
+# one — see the `work` case in lib/receipt.mjs for what that buys and what it
+# does not. The workflow it is built for:
+#
+#   go.sh run --subject X --through p0-preflight      # opens the run, prints the id
+#   go.sh work begin --run-id <id> --phase p1-ingest  # ...then go and do the work
+#   go.sh work end   --run-id <id> --phase p1-ingest
+#   go.sh run --subject X --run-id <id>               # resume; the window already covers it
+#
+# `--through p0-preflight` is what opens a run without committing to anything:
+# it is cheap, it declares the corpus, and it writes the run_begin the brackets
+# hang from.
+cmd_work() {
+  local state="${ARGS[0]:-}"
+  [[ "$state" == "begin" || "$state" == "end" ]] ||
+    die_usage "work needs a state: 'begin' or 'end'"
+  [[ -n "$PHASE" ]] || die_usage \
+    "work needs --phase <stage-id>; an unlabelled bracket is the unattributable gap this command exists to remove"
+  local run
+  run="$(resolve_run)" || exit $?
+  [[ -f "$run/journal.ndjson" ]] || {
+    echo "go.sh: $run has no journal — open a run first:" >&2
+    echo "  etc/go/go.sh run --subject <id> --through p0-preflight" >&2
+    exit 2
+  }
+  node "$LIB/receipt.mjs" work --run "$run" --phase "$PHASE" --state "$state" \
+    ${NOTE:+--note "$NOTE"}
+  echo "go: work $state recorded for $PHASE in $(basename "$run")"
+  [[ "$state" == "begin" ]] &&
+    echo "go:   close it with: etc/go/go.sh work end --run-id $(basename "$run") --phase $PHASE"
+  return 0
 }
 
 # R13's fold: the account of a SUBJECT, across every run whose evidence survives.
@@ -1312,8 +1441,26 @@ EOF
   # run_begin is written once per run dir, not once per invocation: a resumed
   # run is the same run.
   if [[ ! -f "$RUN/journal.ndjson" ]]; then
+    # WHERE THIS ENCODING IS DESTINED, recorded at run_begin so the report stays
+    # a function of the journal and nothing else.
+    #
+    # The BRANCH is deliberately not part of it. Which drafts shelf an encoding
+    # lands on is a fact about WHO deposits it, resolved at deposit time by
+    # lib/canon-destination.mjs from the person actually running — so freezing
+    # one person's shelf onto a run record would be recording the wrong kind of
+    # fact, and would also put a `gh` call on the critical path of every run.
+    # `primary` is the driver's SELECTOR, never a row name — canon rules that no
+    # row is primary, so the committed encoding files under the name the sidecar
+    # gives it. With none declared there is no destination, and the report says
+    # that rather than naming `encodings/primary/`.
+    local canon_dest="" canon_row="$GO_S_ENCODING_ID"
+    [[ "$canon_row" == "primary" ]] && canon_row="${GO_S_CANON_PRIMARY_ROW:-}"
+    if [[ -n "${GO_S_CANON_PATH:-}" && -n "$canon_row" ]]; then
+      canon_dest="subjects/$GO_S_CANON_PATH/encodings/$canon_row"
+    fi
     node "$LIB/receipt.mjs" run-begin --run "$RUN" \
       --run-id "$RUN_ID" --encoding "$GO_S_ENCODING_ID" --subject "$SUBJECT" \
+      --canon-destination "$canon_dest" \
       --repo-head "$head" --tree-state "$tree_state" --fixed-now "$FIXED_NOW" \
       --l4-binary "$L4" --declared "$(echo "$stages" | tr '\n' ',')" \
       --gated-stages "{\"HG1\":[$(for x in $gated_by_HG1; do printf '"%s",' "$x"; done | sed 's/,$//')],\"HG2\":[$(for x in $gated_by_HG2; do printf '"%s",' "$x"; done | sed 's/,$//')]}"
@@ -1403,6 +1550,67 @@ EOF
     fi
   done
 
+  # --- provisional grants: review PENDING, not review DISPENSED WITH ---------
+  #
+  # SPEC.md §7.3's sentence is "after P5, BEFORE P6'S TESTS ARE TREATED AS
+  # SPECIFICATIONS". The gate is about the STANDING of the downstream artifacts,
+  # not about whether the machine may compute them — and the difference is worth
+  # having a state for, because running P6 and P8 before the review is what puts
+  # the divergence witnesses and the unsat/dead-branch findings IN FRONT OF the
+  # reviewer. A provisional run is the briefing pack for HG1, not a way around
+  # it.
+  #
+  # Before this state existed the only route was `--waive HG1`, which asserts
+  # the gate did not apply. Saying that when the review is merely pending is a
+  # lie of exactly the kind the report's gate table exists to make impossible,
+  # and it was the only route anyone could take — so the honest state had to be
+  # built or the dishonest one kept being used.
+  #
+  # What provisional does NOT do: it does not make anything servable. store.mjs
+  # ranks it below `waived`, and the artifacts carry `produced_under.state
+  # provisional` on every receipt, derived from this row by receipt.mjs and
+  # never assertable by a phase script. The run verdict is PROVISIONAL, not
+  # COMPLETE. And it binds to the corpus digest exactly as a waiver does, so an
+  # edit after the grant re-opens the gate.
+  local p
+  for p in "${PROVISIONALS[@]:-}"; do
+    [[ -n "$p" ]] || continue
+    gname="${p%%=*}"
+    greason="${p#*=}"
+    if [[ "$gname" == "HG2" ]]; then
+      cat >&2 <<EOF
+go.sh: --provisional HG2 is REFUSED.
+
+HG2 is Meng's go on a specific outward-facing act. There is no provisional
+version of that: the artifacts either may be shown to other people or they may
+not, and nothing downstream of HG2 is a briefing pack for it — P10 IS the
+outward act. HG1 is provisional-able because its downstream stages produce
+evidence FOR the review; HG2's downstream stage produces consequences.
+
+  etc/go/gate-request.sh HG2 --run <rundir>     # prints the payload to sign
+  ssh-keygen -Y sign -f <key> -n l4-go-gate-hg2 <rundir>/HG2.payload.txt
+EOF
+      exit 2
+    fi
+    [[ "$gname" == "HG1" ]] || die_usage "--provisional: unknown gate '$gname'; SPEC.md §7.3 defines HG1 and HG2, and only HG1 admits a provisional grant"
+    [[ -n "$greason" && "$greason" != "$gname" ]] || die_usage "--provisional $gname= needs a reason; like a waiver, a provisional grant is a verdict and the report has to be able to print it"
+    for w in "${WAIVERS[@]:-}"; do
+      [[ "${w%%=*}" == "$gname" ]] && die_usage "--waive $gname and --provisional $gname are contradictory: a waiver says the review did not apply, a provisional grant says it has not happened yet. Pick the one that is true."
+    done
+  done
+  for p in "${PROVISIONALS[@]:-}"; do
+    [[ -n "$p" ]] || continue
+    gname="${p%%=*}"
+    greason="${p#*=}"
+    node "$LIB/receipt.mjs" gate --run "$RUN" --gate "$gname" --state provisional \
+      --subject "$SUBJECT" --run-id "$RUN_ID" --covers-from "$RUN/.corpus-members.json" \
+      --corpus-digest "$corpus_digest" --reason "$greason"
+    echo "go: gate $gname PROVISIONAL — $greason"
+    echo "go:   downstream stages will RUN and every artifact they produce is stamped provisional."
+    echo "go:   Nothing is servable, the verdict will be PROVISIONAL, and $gname is still open."
+    echo "go:   Sign it over corpus $corpus_digest and re-run to promote what has not moved."
+  done
+
   # --- dispatch --------------------------------------------------------------
   local overall=0
   local s
@@ -1444,6 +1652,39 @@ EOF
             --signer "$(cat "$RUN/$gate.signer" 2>/dev/null || echo "")" \
             --payload-digest "$(node "$LIB/digest.mjs" "$RUN/$gate.payload.txt" 2>/dev/null || echo "")" \
             --signature-file "$RUN/$gate.payload.txt.sig"
+        elif [[ "$gate" == "HG1" && "$REQUIRE_REVIEW" -eq 0 ]]; then
+          # HG1 FALLS BACK TO A PROVISIONAL GRANT RATHER THAN STOPPING THE RUN.
+          #
+          # The stages behind HG1 produce the EVIDENCE the review reads — P6's
+          # divergence witnesses, P8's unsat and dead-branch findings, the
+          # projections, the report. Refusing to compute them until somebody has
+          # reviewed the encoding had the order backwards: it withheld the
+          # reviewer's material until after the review.
+          #
+          # Nothing about the claims is relaxed. The artifacts are stamped
+          # `produced_under.state: provisional`, store.mjs refuses to serve any
+          # of them, and the run verdict is PROVISIONAL and never COMPLETE. What
+          # changes is only that the pipeline stops DEMANDING the review before
+          # it will do the work, which is safe precisely because nothing behind
+          # HG1 is outward-facing — P10 is HG2's, and the MCP leg has its own
+          # loopback fence.
+          #
+          # After a review that tweaks the encoding, re-run: the corpus digest
+          # moves, this grant goes stale, and a fresh one is recorded over what
+          # the reviewer actually approved. After a review that signs an unmoved
+          # corpus, re-run and the same bytes are re-admitted under the
+          # signature — `satisfied` outranks this everywhere.
+          #
+          # HG2 IS DELIBERATELY NOT IN THIS BRANCH. Its subject is an
+          # outward-facing act, so there is no evidence-gathering to do ahead of
+          # it and nothing to be provisional about.
+          node "$LIB/receipt.mjs" gate --run "$RUN" --gate "$gate" --state provisional \
+            --subject "$SUBJECT" --run-id "$RUN_ID" --covers-from "$RUN/.corpus-members.json" \
+            --corpus-digest "$corpus_digest" \
+            --reason "AUTOMATIC: no HG1 review is on record over this corpus. The stages behind the gate ran to produce the evidence such a review would read; nothing they produced is servable, and the run verdict is PROVISIONAL rather than COMPLETE. Pass --require-review to refuse instead."
+          echo "go: HG1 has no review on record — proceeding PROVISIONALLY." >&2
+          echo "go:   Every artifact from here is stamped provisional and none is servable." >&2
+          echo "go:   The verdict will be PROVISIONAL, not COMPLETE. --require-review refuses instead." >&2
         else
           node "$LIB/receipt.mjs" gate --run "$RUN" --gate "$gate" --state refused \
             --subject "$SUBJECT" --run-id "$RUN_ID" --covers-from "$RUN/.corpus-members.json" \
@@ -1787,6 +2028,7 @@ case "$CMD" in
   readset) cmd_readset ;;
   subject-report) cmd_subject_report ;;
   store) cmd_store ;;
+  work) cmd_work ;;
   help | -h | --help) usage ;;
   *) die_usage "unknown command '$CMD'" ;;
 esac
