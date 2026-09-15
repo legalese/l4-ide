@@ -353,9 +353,16 @@ tryCandidate rig tr pos cand = case cand.cdHypothetical of
 -- Which step's reason: the candidate's own obligation is the one at the
 -- candidate's site ('LiveNorm.lnSite' against 'NormKey.nkSite') with the
 -- candidate's bearer ('LiveNorm.lnBearer' against 'NormKey.nkBearerName',
--- which the machine records in the same rendering once the party
--- comparison has forced the party's fields — so on the candidate's own
--- pass-over step, which lies past that comparison, it is always known).
+-- which the machine records in the same rendering where the party
+-- comparison has forced the party's fields). The name is known on the
+-- candidate's own pass-over step for a narrower reason than "the
+-- comparison ran": the hypothetical act is BY the candidate's bearer, so
+-- its own obligation's party comparison MATCHED, and a match forces every
+-- field. A mismatch does not: the equality stops at the first field that
+-- differs, so another member whose party differs from the actor's in an
+-- earlier field is logged with no name on that step (measured,
+-- @LtsListSpec@ case 7) — but that step is not the candidate's, and the
+-- filter here only needs the candidate's own to be named.
 -- Under an @RAND@\/@ROR@ the other side's obligation scrutinises the same
 -- event and logs its own pass-over first, in the machine's order, so the
 -- first reason in the log is the wrong norm's; the site tells them apart.

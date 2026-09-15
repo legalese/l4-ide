@@ -522,7 +522,7 @@ deadline` and a tick AT the deadline reveals nothing); and a listed refusal, whe
   member acts 184 µs and 313 µs; the tick 83 µs. `ok/contracts.l4` trace 1 (three events):
   position 38 µs; the tick 93 µs. The first `position` call on a fresh module costs ~40 ms, which
   is the type-check being forced, not the replay. See R11.
-- **The act is held to the machine's word too** (`confirmAct`, `:372`; **REVIEWED 2026-09-15**,
+- **The act is held to the machine's word too** (`confirmAct`, `:391`; **REVIEWED 2026-09-15**,
   moved here from the list renderer). The candidate set is read off the residual before the guard
   is asked (G9), so an act whose `PROVIDED` comes out false is a candidate and the replay reports
   it as `Advancing` to the position's own marking. P2a′ first corrected that in the renderer
@@ -531,9 +531,11 @@ deadline` and a tick AT the deadline reveals nothing); and a listed refusal, whe
   `Matched`, `Expired`, `Breached` or join terminal is `PassedOver reason` (`Verdict`, `:284`;
   `PassOver`, `:299`: `GuardFalse`/`WrongAct`/`WrongParty`/`NoTaker`), so `advancing` and the
   list agree by construction. The reason is the candidate's OWN obligation's — the step at the
-  candidate's site (`lnSite` against `nkSite`), most specific first — because under an
-  `RAND`/`ROR` the other side scrutinises the event first and logs its wrong-party first, which
-  the first cut reported. Measured, on
+  candidate's site and with the candidate's bearer (`lnSite` against `nkSite`, `lnBearer`
+  against `nkBearerName`; §4.3 LANDED 2026-09-16 — as first landed the site's reasons were
+  ranked most specific first, a rank retired when the bearer became comparable) — because under
+  an `RAND`/`ROR` the other side scrutinises the event first and logs its wrong-party first,
+  which the first cut reported, and under an `EVERY` the members share the site. Measured, on
   `(PARTY S MUST payment EXACTLY 1 WITHIN 3) RAND (PARTY B MUST payment EXACTLY 5 PROVIDED FALSE WITHIN 3)`
   at its outset, B's act, before the fix: "it is not this party's to do" (the CLI, 2026-09-15);
   after: "its condition (PROVIDED) does not hold", and the same under `ROR` (`LtsListSpec.hs`,
@@ -808,26 +810,26 @@ Rational` — the residual `WITHIN` is a number only once the obligation has scr
 - **The join, against `Threshold`.** `Progress = {prDone, prTotal, prThreshold :: Threshold
 Resolved}`. Phase 3's count and measure forms add arms at `thresholdMet` (`:220`), at
   `placementText`'s `thresholdText` (`:449`), and in the machine at `assembleQuantified`'s
-  `threshold@AllHave{}` (`Machine.hs:2376`); none of the three has a wildcard, so a new
+  `threshold@AllHave{}` (`Machine.hs:2435`); none of the three has a wildcard, so a new
   `Threshold` constructor is a compile error at each. (An earlier version of this sentence said
   `thresholdMet` was "the one place"; it was not, even within `Marking.hs`.) The same discipline
   holds for `JoinKind`: `markingOf`'s `progress` names `Fork` and `Distributive` rather than
   wildcarding them, so a future threshold-bearing join kind cannot fall through to `awProgress =
 Nothing` and print as "run with the step log on". To get the
   threshold to the marking, `DeonticStep.JoinKind`'s `Barrier` now carries it (`Barrier
-!(Threshold Resolved)`, `DeonticStep.hs:160`; `isBarrier` for the tests and `tellRoutedStep`),
-  written at `registerCast` (`Machine.hs:473`) from the `JoinOnce` in hand. One `Awaiting` is
+!(Threshold Resolved)`, `DeonticStep.hs:182`; `isBarrier` for the tests and `tellRoutedStep`),
+  written at `registerCast` (`Machine.hs:514`) from the `JoinOnce` in hand. One `Awaiting` is
   emitted per barrier, after the members, however many are still pending.
 - **Where the barrier's state comes from — the honest part.** The residual of a pending barrier is
   the `RAND` fold of its pending members whose `HENCE`/`LEST` slots hold the machine's sentinels
-  (`barrierFinish`, `Machine.hs:2524`, "Phase-2 limit: the residual does NOT carry the JOIN
+  (`barrierFinish`, `Machine.hs:2583`, "Phase-2 limit: the residual does NOT carry the JOIN
   LINE"). Neither the count nor the total nor the threshold is in the value. So `markingOf` takes
   a `MarkingContext` (`:228`, `contextOf :: [DeonticStep] -> MarkingContext`, `:252`), read back
   out of P2b's steps: casts by ACTION site from any step's `nkMember`, arms-done per JOIN site by
   a fold IN STEP ORDER — a `MemberSatisfied n` sets the site's count to `n`, and the join's own
   terminal (`JoinReleased`/`JoinExpired`/`JoinFailed`/`JoinStalled`, keyed by the join site in
   its `nkSite`) resets it to zero, mirroring `registerCast`'s `Map.insert jsite 0`
-  (`Machine.hs:482`) at every entry. Nothing new is captured. **The first cut took the maximum
+  (`Machine.hs:523`) at every entry. Nothing new is captured. **The first cut took the maximum
   `MemberSatisfied` instead**, and review 2026-09-15 found what that does to a `HENCE` that
   re-enters its own barrier: the machine zeroes its counter, the log reads `1 3, 2 3, 3 3,
   JoinReleased, 1 3`, and the maximum reported `3 of 3` with `thresholdMet` true while the
@@ -835,9 +837,9 @@ Nothing` and print as "run with the step log on". To get the
   four events): the old fold gives `PAwaiting (Just (3, 3, True))`, the in-order fold `(1, 3,
 False)`; R′ pins the step sequence the reading depends on. Without a context (`noContext`) the
   `Awaiting` is still emitted — the member is recognised by the checkpoint sentinel in its
-  `HENCE`: its NAME, `joinCheckpointName` (`Machine.hs:2482`, now a named constant and exported),
+  `HENCE`: its NAME, `joinCheckpointName` (`Machine.hs:2541`, now a named constant and exported),
   AND the absence of a source range, since the machine mints it under `emptyAnno`
-  (`Machine.hs:2470`, `:2498`) and a drafter's own `the join` written as a `HENCE` carries
+  (`Machine.hs:2522`, `:2550`) and a drafter's own `the join` written as a `HENCE` carries
   one (fixture S: no `Awaiting` for the homonym, with or without a context; the first cut matched
   by name alone) — but its `awProgress` is `Nothing`. The rule for a reader: no `Awaiting` means
   no barrier; an `Awaiting` with no progress means the residual was read without its run's log.
@@ -964,15 +966,18 @@ this block records where the built types depart from it, and why.
   which is not a norm instance (§2.3 gives places to obligations, not connectives) and, because
   `ValROp` carries no annotation, has no site. Every other step has a key.
 - `dsEvent :: Maybe EventKey` with `EventKey = {ekStamp, ekParty :: Maybe Text, ekAction :: Maybe
-Text}` — the sketch left `EventKey` undefined. Party and action are peeked.
+Text}` — the sketch left `EventKey` undefined. Party and action are peeked. (Since the LANDED
+  2026-09-16 block below: `+ ekPartyName`, and `NormKey` `+ nkBearerName`, the party rendered as
+  the list renders it, recorded where the machine forced its fields; `nkBearer` stays the ledger
+  key.)
 - `Scrutiny` gains `NoEvent` for the steps no event caused (`Waiting`, `Joined`, the join's own).
   `Reoffered` takes precedence over the other two: it marks the continuation's second look at a
   re-offered event, whatever that look decided; a consumer counting events counts it as zero.
 - `NormKey` gains `nkMember :: Maybe MemberOf` — §4.9's per-member identity, see below. `nkBearer`
   is a `Maybe`: a `PARTY p` obligation forces `p` lazily (at `Contract6` on the match path, at
   `ResolveParty` on the expiry path), so the bearer is refreshed at `Contract6`
-  (`Machine.hs:1858`) and an `Expired` step is built at `Contract5` but **logged at
-  `ResolveParty`** (`:1941`), where the party is known. Measured: an expiry with no `LEST` never
+  (`Machine.hs:1904`) and an `Expired` step is built at `Contract5` but **logged at
+  `ResolveParty`** (`:1992`), where the party is known. Measured: an expiry with no `LEST` never
   forces the party; the breach's own party cell is peeked instead, so `PARTY Alice` (a nullary
   constructor, allocated as a value) is known and a computed party would not be.
 - `StepOutcome`: the sketch's `Breached !BreachSummary` survives for exactly one site — the
@@ -988,7 +993,7 @@ Text}` — the sketch left `EventKey` undefined. Party and action are peeked.
   Three join-level outcomes were added for the `EVERY` machinery, which the sketch predates: `JoinReleased`,
   `JoinExpired !Branch !Rational`, `JoinFailed !Branch`, plus `JoinStalled` for the one arm of
   `Barrier1` that is neither (a `MAY` member lapsed under a barrier with no `LEST`). `Barrier1`
-  matches its two terminals explicitly and throws on anything else (`Machine.hs:2007-2019`), so a
+  matches its two terminals explicitly and throws on anything else (`Machine.hs:2059-2071`), so a
   new terminal value is a loud failure rather than a silent `JoinStalled`.
 - `Branch` is `ToHence | ToLest | ToBreach` as sketched. Under a barrier the member's slots hold the
   join's sentinels, so for a norm whose `nkMember` is `Barrier`, `ToHence` reads "reported
@@ -998,8 +1003,8 @@ The write is `tellDeonticStep :: DeonticStep -> Eval ()` (`Machine.hs:364`), mod
 `traceEval`: an optional `IORef (DList DeonticStep)` in the reader env (`EvalState.deonticLog`,
 `:286`), off by default (R5). `DeonticLog` carries two counters beside the steps — per-site
 activations for `nkActivation`, and an `EVERY` cast register `(action site, bearer) ↦ MemberOf`,
-written when a family is assembled (`registerCast`, `:473`) and read when a member's obligation
-meets the stream (`armNormKey`, `:430`) — because the `ValObligation` a member becomes has no slot
+written when a family is assembled (`registerCast`, `:514`) and read when a member's obligation
+meets the stream (`armNormKey`, `:454`) — because the `ValObligation` a member becomes has no slot
 for its membership and adding one is a value-type change P2b declined. With the log off the
 machine computes nothing for it, but it does carry state it never reads: a lazy `norm :: NormKey`
 through the eleven `Contract*` frame records and `QuantCtx` (`ContractFrame.hs:88` onward), which
@@ -1007,7 +1012,7 @@ nothing forces; the `ev'reoffered :: Bool` the machine already computed at `Cont
 carried through six more records past `Contract5`, the only frame that consults it
 (`ContractFrame.hs:143-188`); and a `pending :: Maybe DeonticStep` on `ResolvePartyFrame`
 (`:324`), always `Nothing` when the log is off. One hot-path arm was also **restructured**, not
-merely instrumented: the both-breached tie-break at `RBinOp2` (`Machine.hs:2084-2097`) went from
+merely instrumented: the both-breached tie-break at `RBinOp2` (`Machine.hs:2136-2149`) went from
 `vt <= vt' / otherwise / _` to `vt < vt' / vt' < vt / _` so the arm can expose which side won and
 whether the tie-break chose it. Checked by hand: `vt == vt'` now falls through to the `_` arm and
 picks the same operand the old `<=` branch did for both operators; the strict cases are
@@ -1100,7 +1105,7 @@ loud; and the "only extra work is a lazy `NormKey`" claim was narrower than what
 above. Declined, with the reason recorded in "Not built": keying the cast register by activation.
 
 **LANDED 2026-09-16 — the bearer, recorded at the match and made comparable (P2b follow-up, on
-`lts/p2b-bearer`).** Three things had one cause: `--steps` printed `Tenant OF …` for a
+`lts/p2b-bearer`; not pushed, no PR as of 2026-09-16).** Three things had one cause: `--steps` printed `Tenant OF …` for a
 record-shaped party (§7.6 "What it cannot"), the key could not be compared with a `LiveNorm`'s
 `lnBearer` (§7.6 review finding 2, and `confirmAct`'s rank heuristic under an `EVERY`), and the
 member ordinal was doing the reader's work of telling members apart. The cause was that
@@ -1118,15 +1123,21 @@ at arming:
 - The rendering is `peekNF` (`Machine.hs:416`): a `traverse` over the `Value` that reads each
   reference with `peekWHNF` and answers `Nothing` as soon as one is still a thunk, with
   `nfAux`'s depth cutoff. **It never forces.** `peekName` (`:430`) is its `prettyLayout`.
-- Where it is read: `Contract8` (`:1913`, `naming party norm`) — the party equality at `Contract7`
+- Where it is read: `Contract8` (`:1914`, `naming party norm`) — the party equality at `Contract7`
   has just forced the fields (all of them on a match, up to the first difference on a mismatch),
   and the named key is carried into `Contract9`/`Contract11`/`Contract1` so `GuardFailed`,
-  `ActionMismatch`, `Matched` and the following `Waiting` all carry it; `ResolveParty` (`:1996`)
-  for the expiry path; `Contract5`'s no-`LEST` breach and `breachSummary` (`:525`) peek the
-  breach's party cell the same way; `armNormKey` (`:471`) peeks at arming too, which is `Nothing`
-  unless something earlier forced the fields. With the log off, `naming` is the old pure
+  `ActionMismatch`, `Matched` and the following `Waiting` all carry it; `ResolveParty` (`:1997`)
+  for the expiry path; `Contract5`'s no-`LEST` breach and `breachSummary` (`:526`) peek the
+  breach's party cell the same way; `armNormKey` (`:468`) peeks at arming too, which is `Nothing`
+  unless something earlier forced the fields. **The mismatch half of that parenthesis is a
+  limit, not a footnote** (MEASURED 2026-09-16, below): the equality (`EqConstructor3`,
+  `Machine.hs:1520`) answers `FALSE` at the first field pair that differs and never touches the
+  rest, so a `PartyMismatch` step for a party whose _earlier_ field differed from the actor's has
+  `nkBearerName = Nothing`, and so does the `Waiting` after it. Every party in the corpus and in
+  fixtures 18 / case 6 has one field, where "the first difference" is also the last, which is
+  why the first write-up read as if a mismatch named the party too. With the log off, `naming` is the old pure
   `bearing` behind one `asks`.
-- Measured, `jl4-core/test/DeonticStepSpec.hs` fixture 18 (`:663`): on fixture 6's barrier every
+- Measured, `jl4-core/test/DeonticStepSpec.hs` fixture 18 (`:682`): on fixture 6's barrier every
   member step names `Tenant OF "Alice"` / `Tenant OF "Bob"`, the landlord's `Landlord OF "Ms
 Ng"`, and the event party alongside; on fixture 15's expiry the `Expired` step at
   `ResolveParty` is named and the join's own step and the `Breached` are not; at the barrier's
@@ -1134,20 +1145,28 @@ Ng"`, and the event party alongside; on fixture 15's expiry the `Expired` step a
   `nkBearer` is still the `Tenant OF &…` form — the log did not force the fields for its own
   sake; a nullary `PARTY Alice` renders `Alice` both ways. The log-off equivalence test covers
   the new fixture.
-- `confirmAct` (`WhatIf.hs:384`) now finds the candidate's own step by **site and bearer**
-  (`:405`: `nkBearerName == Just name` for a `KnownParty`), and the most-specific-reason rank is
-  **retired**. An `UnforcedParty` candidate has no rendered name to compare and takes every step
+- `confirmAct` (`WhatIf.hs:391`) now finds the candidate's own step by **site and bearer**
+  (`:412`: `nkBearerName == Just name` for a `KnownParty`), and the most-specific-reason rank is
+  **retired**. The candidate's own step is named for a narrower reason than "the comparison ran":
+  the hypothetical act is _by_ the candidate's bearer, so its own obligation's party comparison
+  matched, and a match forces every field; the other members' mismatch steps may carry no name
+  (the limit above) and are not the ones the filter wants. An `UnforcedParty` candidate has no rendered name to compare and takes every step
   at its site as its own — such an obligation is not an `EVERY` member (the roll call forces
-  every member), so its site has one bearer. Measured, `LtsListSpec.hs` case 6 (`:207`): a
+  every member), so its site has one bearer. Measured, `LtsListSpec.hs` case 6 (`:230`; case 7, the two-field limit, `:271`): a
   barrier of two with `PROVIDED t EQUALS bob` — Alice's act is `PassedOver GuardFalse` and the
   step that carried it has her name, the other member's look at the same event has Bob's; Bob's
   act advances. Cases 1, 4 and 5 and `LtsWhatIfSpec` are unchanged.
 - The renderer (`List.hs:468`, `partyText`) prints the name when the log had it and the elided
   key otherwise, in text and JSON. Goldens: `every-run-example.txt`/`.json` moved **only** in
-  party text — 72 text lines and 71 `"party"`/`"by"` JSON lines, checked by `diff` before
-  blessing; `contracts.*` (nullary parties) and `tenancy.*` (fresh positions: `Waiting` before any
+  party text — `git diff lts/p2-followups...HEAD -- jl4/examples/lts/expected/every-run-example.txt
+| grep -c '^[-+] '` = 78 (39 pairs, every one carrying `Tenant OF`/`Landlord OF`), and 144 on
+  the `.json` (72 pairs: 71 `"party"`, 1 `"by"`), checked by `diff` before blessing (the commit
+  message's 72/71 were the first pass's counts, before the `by` lines named the fork's breach);
+  `contracts.*` (nullary parties) and `tenancy.*` (fresh positions: `Waiting` before any
   comparison, still `Tenant OF …`) did not move. The CLI's output is byte-identical to the
-  blessed goldens. `--json`'s `format` stays `1`: `party` and `by` are free text, not
+  blessed goldens — measured against an `exe:l4` rebuilt from HEAD (the first pass ran the diff
+  with a binary older than its last edits, which printed `Tenant OF …` on the three `by` lines
+  the goldens name; see MEASURED 2026-09-16 below). `--json`'s `format` stays `1`: `party` and `by` are free text, not
   discriminators, and mean what they meant; only the rendering is fuller.
 - **Not built:** `ekAction` is still the elided layout (`Sign OF …`) — the action is unpacked
   only as far as the rule's pattern needs, and naming it fully would need the same peek over a
@@ -1158,10 +1177,43 @@ events]` args of `RBinOp1`), which is neither when the join reduced nor when a b
   misleads more than `at —`; the honest clock (the later of the operands') is not on the frame.
   Left as is.
 
+**MEASURED 2026-09-16 — the review of the block above, re-run against a fresh binary.** A read-only
+review found that every artefact the block's measurements were taken with predated the last source
+edit (`exe:l4` 01:22:57 and `jl4-core-test` 01:28:22 against `Machine.hs` 01:32:59; only
+`jl4-test`, linked 01:33:24, was fresh), and that the "who looked is named" claim held only for
+one-field parties. Re-measured at HEAD, one `cabal` at a time:
+
+- `cabal build exe:l4`, then `l4 lts doc/reference/regulative/every-run-example.l4 --steps | diff -
+jl4/examples/lts/expected/every-run-example.txt` and the same with `--steps --json` against the
+  `.json`: both `diff` exit 0. (The stale exe differed on exactly three lines — the `BREACH
+declared by` and two `both parts together: breached by` lines, which it printed as `Tenant OF
+…` — so the golden was right and the exe was behind.)
+- A two-field party, `Tenant HAS name IS A STRING, age IS A NUMBER`, `alice MEANS Tenant OF
+"Alice", 30`, `bob MEANS Tenant OF "Bob", 40`, the barrier of `every-run-example.l4`, one event
+  `PARTY alice DOES Sign alice AT 1`: `l4 lts --steps` prints `at 1: Tenant OF "Alice", 30 does
+Sign OF … at 1; Tenant OF …, … MUST (member 2 of 2) — not this party's event; passed over` and
+  then `at 1: Tenant OF …, … MUST (member 2 of 2) — no more events; still waiting`. With the
+  fields the other way round (`age` first, both 30, so the difference is in the LAST field) both
+  lines name `Tenant OF 30, "Bob"`. That is the equality's short-circuit, exactly as the
+  parenthesis above says and the page now says. With `PROVIDED t EQUALS bob` on the same
+  two-field barrier, Alice's act is still `PassedOver GuardFalse` and Bob's advances: `confirmAct`
+  is unaffected, for the reason now written beside it.
+- Pinned: `LtsListSpec.hs` case 7 (the two-field barrier: verdicts as case 6; the other member's
+  `PartyMismatch` step has `nkBearerName = Nothing`; `--steps` prints the two elided lines above)
+  and, in `DeonticStepSpec.hs` fixture 18, a `bsBlameName` assertion on a record-shaped `LEST
+BREACH BY t` (`forkBreachSrc`: the fork of `every-run-example.l4` with Bob never signing;
+  `Breached` carries `bsBlame = Just "Tenant OF &…"`, `bsBlameName = Just "Tenant OF \"Bob\""`).
+  `JL4_LIBRARY_PATH=$PWD/jl4-core/libraries cabal test jl4-core-test`: 651 examples, 0 failures.
+- Not changed: `reasonFor`'s middle fallback (`mapMaybe reason (map snd atSite)`) was reviewed as
+  a duplicate of `own` for an `UnforcedParty` candidate. It is — but for a `KnownParty` it is the
+  documented "no step with the bearer's name at the site" fallback, `atSite` is `let`-bound and
+  traversed, not recomputed, and dropping it would change behaviour for a case the comment names.
+  Kept.
+
 ### 4.4 The gotcha the animator must model: an event can be scrutinised twice
 
 Expiry re-offers the revealing event to the continuation, at most once, marked by store address
-(`markReoffered`/`isReoffered`, `Machine.hs:516-524`; the rule is documented at `:1480-1526` and
+(`markReoffered`/`isReoffered`, `Machine.hs:767-778`; the rule is documented at `:1808-1839` and
 again in `ContractFrame.hs:68-75`). It exists to keep recursive `HENCE`/`LEST` continuations with
 non-positive deadlines terminating — the motivating case in the comment being
 `x MEANS PARTY p MUST a WITHIN d LEST x`.
@@ -1913,7 +1965,7 @@ UNTIL` sentinels — the builtins `neverMatchesParty`/`neverMatchesAct`, whose s
 not given a `rename` (`jl4-core/src/L4/TypeCheck/Environment/TH.hs:66`, `mkBuiltin`; the two are
 listed without one at `Environment.hs:101`) — are rendered as "the clock runs to t with nothing
 happening" and never printed. (The first write-up credited the upper-casing to "the ledger key";
-`partyKeyWHNF`, `Machine.hs:2624`, does no casing. Corrected on review 2026-09-15.)
+`partyKeyWHNF`, `Machine.hs:2683`, does no casing. Corrected on review 2026-09-15.)
 
 **Measured** (as first landed; the review block below re-measures what it changed). `cabal test
 jl4-test -m "lts list"`: 12 examples, 0 failures — six goldens
@@ -1955,9 +2007,12 @@ steps, what the contract did with each event so far.
   the bearer at the match, where the machine has forced the party, rather than at arming —
   `nkBearerName`, `ekPartyName`, `bsBlameName`, peeked and never forced; see the LANDED
   2026-09-16 block in §4.3. `--steps` now reads `Tenant OF "Bob" does Sign OF … at 2; Tenant OF
-"Bob" MUST (member 2 of 3)`. What remains elided is the **act** (`Sign OF …`) and a party on a
-  step logged before any comparison forced its fields (a `still waiting` at the outset); the page
-  says which.
+"Bob" MUST (member 2 of 3)`. What remains elided is the **act** (`Sign OF …`) and a party
+  whose fields no comparison has forced _all_ of: a `still waiting` at the outset, and — measured
+  2026-09-16, §4.3 — a party with two or more fields whose _earlier_ field differed from the
+  actor's, since the equality stops there (its `not this party's event` step and the `Waiting`
+  after it print `Tenant OF …, …`). One-field parties, the whole corpus, never hit the second
+  case. The page says which.
 
 **REVIEWED 2026-09-15 — what two read-only reviews changed, on the same branch.** Ten findings;
 eight acted on, one rejected, one moot. (1) **Next deadline from refused ticks** — fixed as above
@@ -1965,7 +2020,7 @@ eight acted on, one rejected, one moot. (1) **Next deadline from refused ticks**
 `RAND`/`ROR` — fixed in `confirmAct`, §2.4 (by site; under an `EVERY`, by a specificity rank
 until 2026-09-16, and by bearer since — §4.3's LANDED 2026-09-16 block). (3) **"the ledger key upper-cases"** — a mechanism
 misattributed; corrected at both sites (`List.hs:379`, above). (4) **`at —` has three causes, not
-two** — the explicit `BREACH` (`Machine.hs:1189`, `every-run-example.txt:32,75`) added to the
+two** — the explicit `BREACH` (`Machine.hs:1235`, `every-run-example.txt:32,75`) added to the
 page and to `DeonticStep.hs`'s header. (5) **"in the order it happened"** over-described the
 step log — the page now says the order is the contract's (member by member, branch by branch) and
 that `at t:` is the obligation's clock, not the event's. (6) **`advancing` disagreed with the

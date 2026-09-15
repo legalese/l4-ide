@@ -281,6 +281,25 @@ forkSrc = Text.unlines $ everyPrologue <>
   , "  PARTY theLandlord DOES Deliver bob AT 4"
   ]
 
+-- 18. the fork whose second member never signs: the landlord's day-20
+--     delivery reveals Bob's expiry, and his LEST is BREACH BY t
+forkBreachSrc :: Text.Text
+forkBreachSrc = Text.unlines $ everyPrologue <>
+  [ "GIVETH A DEONTIC Actor Action"
+  , "`receipts` MEANS"
+  , "    EVERY Tenant t IN tenants"
+  , "        MUST   Sign (EXACTLY t)"
+  , "        WITHIN 7"
+  , "        UPON   EACH"
+  , "        HENCE  (PARTY theLandlord MUST Deliver (EXACTLY t) WITHIN 5)"
+  , "        LEST   BREACH BY t"
+  , ""
+  , "#TRACE `receipts` AT 0 WITH"
+  , "  PARTY alice DOES Sign alice AT 1"
+  , "  PARTY theLandlord DOES Deliver alice AT 2"
+  , "  PARTY theLandlord DOES Deliver bob AT 20"
+  ]
+
 -- 18. the barrier at its outset: no event has been compared, so no
 --     member's fields have been forced
 barrierFreshSrc :: Text.Text
@@ -458,7 +477,7 @@ allSrcs =
   , ("or-left", orLeftSrc), ("waiting", waitingSrc), ("barrier-waiting", barrierWaitingSrc)
   , ("prohibition", prohibitionSrc), ("guard", guardSrc), ("action-mismatch", actionMismatchSrc)
   , ("barrier-fail", barrierFailSrc), ("barrier-stall", barrierStallSrc), ("barrier-breach", barrierBreachSrc)
-  , ("barrier-fresh", barrierFreshSrc) ]
+  , ("barrier-fresh", barrierFreshSrc), ("fork-breach", forkBreachSrc) ]
 
 -- | The 'Breached' step an explicit @BREACH@ with no @BY@ logs.
 bareBreach :: Row
@@ -691,6 +710,13 @@ spec = describe "the deontic step log (LTS-VISUALISER §4.3, P2b)" $ do
     -- A nullary constructor party renders the same both ways.
     rs1 <- runLogged matchSrc
     map bearerName (stepsOf 0 rs1) `shouldBe` [Just "Alice", Just "Bob"]
+    -- A record-shaped blame: `LEST BREACH BY t` under a fork, where t is
+    -- Bob. The breach's party cell is the member's own, forced by the roll
+    -- call and the comparisons before it, so the summary names him in
+    -- the list's rendering beside the ledger key.
+    rsFork <- runLogged forkBreachSrc
+    [ (fmap keyPrefix b.bsBlame, b.bsBlameName) | s <- stepsOf 0 rsFork, Breached b <- [s.dsOutcome] ]
+      `shouldBe` [(Just "Tenant OF ", Just "Tenant OF \"Bob\"")]
 
   it "the log-off path is unchanged: every fixture renders the same result both ways" $
     for_ allSrcs \(name, src) -> do
