@@ -1,6 +1,8 @@
 # Release model — how `unstable` reaches `main`, and what a release actually is
 
-> **Status: the ROUTE is ruled, 2026-09-06. Wave 3 is NOT started and needs Meng's go on scope.**
+> **Status: the ROUTE is ruled, 2026-09-06. Wave 3 is NOT started and needs Meng's go on scope —
+> DEFERRED by Meng 2026-09-15: _"don't worry about unstable→main; we work off unstable."_ Nothing
+> is waiting on it; the 26 open slices stay open for review and are not to be closed or rebased.**
 > Rulings-bench card `D9-release-and-partition`, marked **decline** — that is, the card's
 > _recommended_ option A was declined and its option D was taken. This file is the ruling's home
 > because the tree had no release document: a grep for one matched only `release-l4-skill.yml` and

@@ -19,6 +19,18 @@
 // ORDER OF PANES is Meng's: in-flight first, then rulings, shelf, canon, and
 // the unstable -> main release train LAST, "because it moves glacially".
 //
+// TWO PANES ADDED 2026-09-15, both ahead of in-flight, after Meng asked for
+// "PR'ed vs committed vs in-flight vs backlogged" and said "a bunch of things
+// were blocked on me". WAITING ON A HUMAN reads etc/status-board-decisions.json
+// -- a queue, not a record: every entry points at the document that owns the
+// decision (CLAUDE.md §4) by file + anchor string, and the anchor is re-read
+// here at generation time so an entry is flagged STALE the moment the sentence
+// it cites is gone. An entry with a `verify` command retires itself when the
+// tree shows the thing done. COMMITTED, NOT PR'D is computed from git: remote
+// branches ahead of unstable, not merged, no open PR, touched in the last 45
+// days -- the tier between "in a worktree" and "in flight" that nothing else
+// showed, and where the five APPLIES rulings turned out to be hiding.
+//
 // Usage:  node etc/status-board.mjs > board.html
 //         node etc/status-board.mjs --json      (the collected data, no HTML)
 // Needs `gh` authenticated. Network calls are the slow part (~10s).
@@ -54,6 +66,66 @@ const prs =
   ) ?? [];
 const inFlight = prs.filter((p) => p.baseRefName === "unstable");
 const train = prs.filter((p) => p.baseRefName !== "unstable");
+
+// -------------------------------------------------------- waiting on a human
+sh("git fetch origin -q");
+const squash = (s) => String(s ?? "").replace(/\s+/g, " ");
+const register = j("cat etc/status-board-decisions.json") ?? { decisions: [] };
+const decisions = register.decisions.map((e) => {
+  const text = e.source?.ref
+    ? sh(`git show ${e.source.ref}:${e.source.file}`)
+    : existsSync(e.source?.file ?? "")
+      ? readFileSync(e.source.file, "utf8")
+      : "";
+  const anchored =
+    !!e.source?.anchor && squash(text).includes(squash(e.source.anchor));
+  // Empty output means the check could not run (gh unauthenticated, grep -c
+  // exiting 1 on a zero count, ...). That is UNVERIFIED, never RESOLVED: a
+  // check that retires an entry by failing would drop R1 off the board on the
+  // first flaky network call, which is the one direction this must not err.
+  let resolved = false,
+    unverified = false;
+  if (e.verify?.cmd) {
+    const out = sh(e.verify.cmd);
+    if (out === "") unverified = true;
+    else resolved = !new RegExp(e.verify.pendingWhen).test(out);
+  }
+  return { ...e, anchored, resolved, unverified };
+});
+
+// --------------------------------------------------------- committed, no PR
+const prHeads = new Set(prs.map((p) => p.headRefName));
+const cutoff = Date.now() - 45 * 86400e3;
+const committed = sh(
+  "git for-each-ref --format='%(refname:short)%09%(committerdate:short)%09%(authorname)' refs/remotes/origin",
+)
+  .split("\n")
+  .map((l) => l.split("\t"))
+  .filter(
+    ([r, d]) =>
+      r &&
+      !/^origin\/(HEAD|main|unstable)$/.test(r) &&
+      !/^origin\/(gh-readonly-queue|claude\/aug2026)/.test(r) &&
+      new Date(d).getTime() > cutoff,
+  )
+  .map(([r, d, a]) => {
+    const b = r.replace(/^origin\//, "");
+    if (prHeads.has(b)) return null;
+    if (sh(`git merge-base --is-ancestor ${r} origin/unstable && echo y`))
+      return null;
+    const ahead = Number(sh(`git rev-list --count origin/unstable..${r}`) || 0);
+    if (!ahead) return null;
+    return {
+      branch: b,
+      last: d,
+      author: a,
+      ahead,
+      behind: Number(sh(`git rev-list --count ${r}..origin/unstable`) || 0),
+      subject: sh(`git log -1 --format=%s ${r}`).slice(0, 110),
+    };
+  })
+  .filter(Boolean)
+  .sort((a, b) => (a.last < b.last ? 1 : -1));
 
 // ------------------------------------------------------------------ rulings
 const walk = (d) =>
@@ -148,6 +220,8 @@ const canonBranches = (
 
 const data = {
   generatedAt: new Date().toISOString(),
+  decisions,
+  committed,
   inFlight,
   train,
   specs,
@@ -185,6 +259,16 @@ function render(d) {
   for (const s of d.specs)
     for (const [k, v] of Object.entries(s.dated))
       stateAgg[k] = (stateAgg[k] || 0) + v;
+  const live = d.decisions.filter((e) => !e.resolved && !e.deferred);
+  const quick = live.filter((e) => e.quick);
+  const stale = d.decisions.filter((e) => !e.anchored);
+  const decRow = (e) =>
+    `<div class="dec${e.resolved ? " done" : ""}${e.deferred ? " parked" : ""}">
+<div class="dec-h"><span class="dec-id">${esc(e.id)}</span><span class="dec-kind">${esc(e.kind)}</span><span class="dec-owner">${esc(e.owner)}</span>${e.quick && !e.resolved && !e.deferred ? '<span class="pill ok">minutes</span>' : ""}${e.resolved ? '<span class="pill ok">resolved — delete this entry</span>' : ""}${e.deferred ? `<span class="pill warn">deferred ${esc(e.deferred)}</span>` : ""}${e.anchored ? "" : '<span class="pill bad">STALE — anchor not found</span>'}${e.unverified ? '<span class="pill warn">verify cmd failed</span>' : ""}<span class="dec-raised">raised ${esc(e.raised)}</span></div>
+<div class="dec-ask">${esc(e.ask)}</div>
+${e.next ? `<div class="dec-meta"><b>then:</b> ${esc(e.next)}</div>` : ""}
+<div class="dec-meta"><b>unblocks:</b> ${esc(e.unblocks)} · <b>owned by:</b> <span style="font-family:var(--mono)">${esc(e.source?.file)}${e.source?.ref ? ` @ ${esc(e.source.ref)}` : ""}</span></div>
+</div>`;
   return `<title>L4 Programme Board</title>
 <style>
 :root{--bg:#faf9f7;--fg:#1c1a17;--dim:#6b6560;--line:#e0dcd5;--card:#fff;--accent:#8a5a2b;--red:#a33a2a;--amber:#9a7a1a;--green:#3f6b3a;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
@@ -212,10 +296,25 @@ td.n{text-align:right;font-variant-numeric:tabular-nums}
 .card .v{font-size:23px;font-variant-numeric:tabular-nums;margin-top:1px}
 .note{background:var(--card);border-left:3px solid var(--accent);padding:9px 13px;margin:12px 0;font-size:13.5px;border-radius:0 5px 5px 0}
 a{color:var(--accent)}
+.dec{background:var(--card);border:1px solid var(--line);border-radius:7px;padding:10px 14px;margin:8px 0}
+.dec.done{opacity:.55}.dec.parked{opacity:.7;border-style:dashed}
+.dec-h{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline;font-family:var(--mono);font-size:12px;margin-bottom:5px}
+.dec-id{font-weight:700;font-size:14px;color:var(--accent)}.dec-kind{color:var(--dim)}.dec-owner{color:var(--fg)}.dec-raised{color:var(--dim);margin-left:auto}
+.dec-ask{font-size:14px}.dec-meta{font-size:12.5px;color:var(--dim);margin-top:4px}
 </style>
 <div class="wrap">
 <h1>L4 Programme Board</h1>
 <div class="sub">generated ${esc(d.generatedAt)} · unstable ${esc(d.unstableHead)} · main ${esc(d.mainHead)} · regenerate with <b>node etc/status-board.mjs</b></div>
+
+<h2>Waiting on a human<span class="n">${live.length} live · ${quick.length} answerable in minutes · ${d.decisions.length - live.length} deferred or resolved</span></h2>
+<p class="lede">The queue, in the order to take it. Each entry names the document that owns the decision; the anchor it cites was re-read when this page was generated${stale.length ? ` — <b>${stale.length} could not be found and are marked STALE</b>` : ", and every one was found"}. Marks go in the owning document, not here.</p>
+${[...live.filter((e) => e.quick), ...live.filter((e) => !e.quick), ...d.decisions.filter((e) => e.deferred || e.resolved)].map(decRow).join("")}
+
+<h2>Committed, not PR'd<span class="n">${d.committed.length} branches · pushed, ahead of unstable, no PR, touched in 45 days</span></h2>
+<p class="lede">Work that exists on origin but is in nobody's queue. The tier between a worktree and a PR — this is where things go quiet.</p>
+<div class="scroll"><table><tr><th>branch</th><th>last commit</th><th>author</th><th class="n">ahead</th><th class="n">behind</th><th>head commit</th></tr>
+${d.committed.map((b) => `<tr><td>${esc(b.branch)}</td><td>${esc(b.last)}</td><td>${esc(b.author)}</td><td class="n">${b.ahead}</td><td class="n">${b.behind > 300 ? `<span class="pill bad">${b.behind}</span>` : b.behind > 60 ? `<span class="pill warn">${b.behind}</span>` : b.behind}</td><td>${esc(b.subject)}</td></tr>`).join("")}
+</table></div>
 
 <h2>In flight<span class="n">PRs targeting unstable — ${d.inFlight.length}</span></h2>
 <p class="lede">Everything actually moving. Distinct from the release train at the bottom, which is a different queue.</p>

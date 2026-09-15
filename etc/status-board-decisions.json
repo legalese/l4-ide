@@ -1,0 +1,185 @@
+{
+  "_readme": [
+    "The queue of decisions waiting on a named human, rendered by etc/status-board.mjs as its first pane.",
+    "This is a QUEUE, not a record: a decision is recorded in its owning document (CLAUDE.md §4), and each entry here points at that document by file + anchor string.",
+    "The generator re-reads every anchor at generation time and flags the entry STALE if the anchor is gone, so an entry cannot outlive the sentence it points at without being noticed.",
+    "`verify` is an optional shell command; while its output matches `pendingWhen` the entry is live, otherwise the generator reports it RESOLVED and it should be deleted in the next edit. EMPTY output (command failed, gh not authenticated, grep -c exiting 1 on zero) means UNVERIFIED and the entry stays live — a check must never retire an entry by failing.",
+    "`ref` (optional) reads the anchor at a git ref instead of the working tree — for decisions posed on a branch that has not landed.",
+    "Retire an entry by deleting it in the same PR that records the ruling. Do not leave answered entries here to rot."
+  ],
+  "decisions": [
+    {
+      "id": "R1",
+      "owner": "Meng",
+      "kind": "admin action",
+      "quick": true,
+      "raised": "2026-09-13",
+      "ask": "Add `Corpus Goldens Present` and `Repo-Wide Invariants` to ruleset 18543507's required status checks. Ruleset-only; needs repo-admin, which only Meng has. Marked ACCEPT on the housekeeping bench 2026-09-13 — the action itself has not happened.",
+      "unblocks": "R2 (drop the TypeScript job's duplicate format:check) — the xpile-docassemble session is idle on it",
+      "source": {
+        "file": ".github/workflows/pr-checks.yml",
+        "anchor": "name: Repo-Wide Invariants"
+      },
+      "verify": {
+        "cmd": "gh api repos/legalese/l4-ide/rulesets/18543507 --jq '.rules[]|select(.type==\"required_status_checks\")|.parameters.required_status_checks[].context' | grep -c 'Repo-Wide Invariants' || true",
+        "pendingWhen": "^0$"
+      }
+    },
+    {
+      "id": "A1–A5",
+      "owner": "Meng",
+      "kind": "ruling ×5",
+      "quick": true,
+      "raised": "2026-09-11",
+      "ask": "The five APPLIES read-side rulings the corpus survey forces — posed in §11.3 on branch mengwong/applies-corpus-survey @ 682b7eaa, which was committed after #315 merged and never PR'd, so they are not even on unstable. A1 first (does derived `applies` include conjunct 1, inForce? yes/no — the two answers are not interconvertible after the fact); A2 verdict vocabulary lives in userland Booleans / a library enum / a language primitive (the spec argues against the primitive); A3 uncertainty as MAYBE BOOLEAN / three-valued primitive / verdict member; A4 how the read is spelled (spec recommends DEFER); A5 are selector reads the same construct (family, or separate — separate is cheaper, family lets them be generated).",
+      "unblocks": "any further subject that reads applicability — each one currently picks an answer by accident",
+      "source": {
+        "file": "specs/todo/SUBJECT-TO-NOTWITHSTANDING-SPEC.md",
+        "anchor": "**A1. Does the derived `applies` include conjunct 1 (`inForce`)?**",
+        "ref": "origin/mengwong/applies-corpus-survey"
+      },
+      "next": "GM rebases the branch (3 docs commits, 594 behind), records the marks in §11.3, PRs it."
+    },
+    {
+      "id": "#392",
+      "owner": "Meng",
+      "kind": "confirm + review",
+      "quick": true,
+      "raised": "2026-09-15",
+      "ask": "PR #392 (smucclaw#960 fix) narrows the accepted language: a WITH supply checked against one section binder and delivered to another same-spelled binder of a different type is now refused. Zero corpus sites affected. Meng asked for the PR with the §7 note in front of him; confirm on review, then say enqueue. It is 127 behind after this morning's merges and the 958-file sweep has not been re-run over #386's renames — GM will rebase and re-sweep before enqueue.",
+      "unblocks": "closing smucclaw/l4-ide#960 by hand (CLAUDE.md §1.1)",
+      "source": {
+        "file": "doc/reference/functions/WITH.md",
+        "anchor": "**Two same-spelled section inputs at _different_ types is an error too**",
+        "ref": "origin/fix/with-supply-two-binders"
+      },
+      "verify": {
+        "cmd": "gh pr view 392 --repo legalese/l4-ide --json state --jq .state",
+        "pendingWhen": "^OPEN$"
+      }
+    },
+    {
+      "id": "WHOSE",
+      "owner": "Meng",
+      "kind": "go / no-go",
+      "quick": true,
+      "raised": "2026-09-14",
+      "ask": "lang/whose-opening @ 68b1ae35: 30 commits, self-verified only (etc/verify-branch.sh green; the final adversarial round was killed twice by session limits), now 166 behind unstable. Options: (a) GM rebases and runs a refuter panel, then PRs — recommended; (b) park; (c) PR as-is. The narrowing rule Meng cut on 2026-09-13 is already reflected (a later DECIDE clause is refused outright). WHOSE itself is unbuilt; the branch is S2/S3.",
+      "unblocks": "the EVERY-EACH §13.6 direction Meng endorsed 2026-09-08",
+      "source": {
+        "file": "specs/todo/EVERY-EACH-QUANTIFIER-SPEC.md",
+        "anchor": "### 13.6 `WHOSE`, and the R-Q4 problem it does not escape — OPEN, raised by Meng 2026-09-08"
+      }
+    },
+    {
+      "id": "Ground 8",
+      "owner": "Meng",
+      "kind": "interpretation",
+      "quick": true,
+      "raised": "2026-08",
+      "ask": "housing-act-ground-8.l4 bundles `weekly or fortnightly` as one RentPeriod variant and applies 13× the per-period rent uniformly, so a fortnightly tenant is tested at ~26 weeks — under-stating a mandatory-eviction risk. Options in the spec: split the enum (weekly / fortnightly, 6.5× threshold); normalise fortnightly → weekly-equivalent; or constrain the demo to weekly/monthly. The interpretation note at ~lines 92–102 of the .l4 is where the answer belongs.",
+      "unblocks": "the Lawmaker demo inviting real tenancies rather than the four scripted fixtures",
+      "source": {
+        "file": "specs/todo/housing-act-citizen-wizard-demo.md",
+        "anchor": "left for Meng to decide"
+      }
+    },
+    {
+      "id": "TS shape",
+      "owner": "Meng",
+      "kind": "design ruling",
+      "quick": false,
+      "raised": "2026-09-11",
+      "ask": "Which of the three TypeScript backend shapes ships first: a source emitter from the constitutive-core IR, an interpreter over the DMN XML we already export, or a new IR target via zen-engine JDM. Also gated by Q9 (the open/commercial line). The spec (§1.3.3) records the fork and no recommendation; nothing is built and nobody is waiting, so this is a ruling to take when the exporter is scheduled, not before.",
+      "unblocks": "step 1 of the GP-language backend roadmap (PR #371, merged)",
+      "source": {
+        "file": "specs/roadmap/general-purpose-language-backends.md",
+        "anchor": "which of\nthe three TypeScript shapes ships first is a design decision for Meng"
+      }
+    },
+    {
+      "id": "Drafts",
+      "owner": "Meng",
+      "kind": "triage",
+      "quick": true,
+      "raised": "2026-09-15",
+      "ask": "Three draft PRs against unstable with no motion: #216 (DMN differential handoff, 2026-08-04, marked 'not for merge' by its own author), #309 (call-graph materiality spec+paper, 2026-08-27, TypeScript check failing since), #326 (YC SAFE product-line spec, 2026-09-03). Close, finish, or leave as parked? A draft that is never going to merge should be closed so the in-flight pane means something.",
+      "unblocks": "an in-flight pane that only lists things in flight",
+      "source": {
+        "file": "etc/status-board.mjs",
+        "anchor": "Everything actually moving"
+      },
+      "verify": {
+        "cmd": "gh pr list --repo legalese/l4-ide --state open --base unstable --json number,isDraft --jq '[.[]|select(.isDraft)]|length'",
+        "pendingWhen": "^[1-9]"
+      }
+    },
+    {
+      "id": "Branches",
+      "owner": "Meng",
+      "kind": "triage",
+      "quick": true,
+      "raised": "2026-09-15",
+      "ask": "Six mengwong/* branches from 2026-08-26 to 09-08 are ahead of unstable by 1–8 commits with no PR: sg-child-support (+7, the Addendum A pricing commits), sg-family-gia (+8), go-cost-accounting (+2), r2-vocab / r4-readsets / r9-milestone (merge-commit residue). Delete, or does any of them hold work to land? GM will not delete another person's remote branch unasked. backup/refuse-pre-drop (+9) and webchat-mobile-ui (Thomas, +8, 1686 behind) are listed but not proposed for deletion.",
+      "unblocks": "a 'committed, not PR'd' pane short enough to read",
+      "source": {
+        "file": "etc/status-board.mjs",
+        "anchor": "Committed, not PR"
+      }
+    },
+    {
+      "id": "Wave 3",
+      "owner": "Meng",
+      "kind": "scope",
+      "quick": false,
+      "raised": "2026-09-06",
+      "deferred": "2026-09-15 — Meng: \"don't worry about unstable→main; we work off unstable\"",
+      "ask": "Wave 3 of the unstable→main topic slices needs Meng's go on how the tree is sliced. Deferred by Meng on 2026-09-15; recorded in RELEASE-MODEL-SPEC.md's header in the same PR as this entry. Listed so nobody re-raises it.",
+      "unblocks": "nothing anyone is waiting on",
+      "source": {
+        "file": "specs/todo/RELEASE-MODEL-SPEC.md",
+        "anchor": "needs Meng's go on scope"
+      }
+    },
+    {
+      "id": "Build go",
+      "owner": "Meng",
+      "kind": "scope",
+      "quick": false,
+      "raised": "2026-09-07",
+      "ask": "Everything on the EVERY/EACH arc is RULED, NOT BUILT: R-Q1–R-Q7 (§2.5), R-Q7A–C anchors (§5.1.1), R-X5/R-X6 window edges (§5.1.2), T1 origin (§5.1.2.1), R-T1–R-T6 threshold joins (§2.2.7.8), UPON EACH. Likewise R5 field opening for rule bodies (2026-09-04). No parser production exists for any of it. Is there a build wave, and which construct first? This is a sequencing call, not a few-minutes ruling.",
+      "unblocks": "the whole quantifier / threshold / anchor programme moving from spec to compiler",
+      "source": {
+        "file": "specs/todo/EVERY-EACH-QUANTIFIER-SPEC.md",
+        "anchor": "ruled, not built"
+      }
+    },
+    {
+      "id": "Plugin Q1",
+      "owner": "Thomas",
+      "kind": "design ruling",
+      "quick": true,
+      "raised": "2026-09-09",
+      "ask": "ci/skills-layout (+6, pushed 2026-09-11, no PR) moves skills/writing-l4-rules to .claude/skills/, deletes the symlink, and adds etc/build-plugin-bundle.mjs. Right only if Q1 = 'the plugin moves to its own repo' — and legalese/l4-plugin now exists, so Q1 is easier to answer yes than when posed. Thomas chose skills/ in 4c4c5ed4 for Agent Plugins 1.0; it is his call. Meng may want to nudge.",
+      "unblocks": "the plugin bundle being regenerable by anyone, not one machine",
+      "source": {
+        "file": "specs/todo/PLUGIN-DISTRIBUTION-PROPOSAL.md",
+        "anchor": "Q1",
+        "ref": "origin/ci/skills-layout"
+      }
+    },
+    {
+      "id": "HITL debt",
+      "owner": "Meng",
+      "kind": "standing",
+      "quick": false,
+      "raised": "2026-09-13",
+      "ask": "Meng's own note on the housekeeping bench: \"there is generally a HITL debt — Meng needs to read and tweak encoded l4, and the rest of the system needs to adapt its encoding style guidance to track.\" No mechanism exists for that loop yet. Not a ruling; a standing obligation the board should keep visible until a mechanism is proposed.",
+      "unblocks": "encoding-style guidance that tracks what Meng actually changes",
+      "source": {
+        "file": "skills/writing-l4-rules/references/drafting-patterns.md",
+        "anchor": "Ruling (Meng, 2026-09-13)"
+      }
+    }
+  ]
+}
