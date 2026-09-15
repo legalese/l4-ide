@@ -4,7 +4,7 @@
 // Usage:
 //   node etc/sync-canon.mjs --check          diff mirror against canon@pin (CI)
 //   node etc/sync-canon.mjs --pull           rewrite the mirror from canon@pin
-//   node etc/sync-canon.mjs --bump <sha>     repoint the pin, then pull
+//   node etc/sync-canon.mjs --bump <sha> [--ref <branch>]  repoint the pin, then pull
 //   node etc/sync-canon.mjs --selftest       (also what CI runs)
 //
 // Exit: 0 clean · 1 findings · 2 usage · 3 canon unreachable at the pin
@@ -86,9 +86,32 @@ export function readPin(path = PIN_PATH) {
     throw new Error(`canon-pin.json: 'sha' must be 40 hex characters`);
   if (!Array.isArray(p.blessed) || !p.blessed.length)
     throw new Error("canon-pin.json: 'blessed' must be a non-empty array");
-  for (const b of p.blessed)
+  // Paths are validated as rigorously as the sha. The asymmetry was the finding:
+  // a 40-hex regex on one field and nothing at all on the two that become
+  // filesystem paths. A `to` of "../../../escaped" resolves OUTSIDE the mirror,
+  // and doPull writes it AFTER rmSync(MIRROR) has already run.
+  const seen = new Set();
+  for (const b of p.blessed) {
     if (!b?.from || !b?.to)
       throw new Error("canon-pin.json: every blessed entry needs from and to");
+    for (const [k, v] of [
+      ["from", b.from],
+      ["to", b.to],
+    ])
+      if (v.startsWith("/") || v.split("/").includes(".."))
+        throw new Error(
+          `canon-pin.json: blessed ${k} '${v}' must be a relative path with no '..' segment`,
+        );
+    // Two entries sharing a `to` merge two canon directories into one mirror
+    // directory. Only FILENAME collisions were refused, so disjoint filenames
+    // interleaved silently -- after which no single canon directory is the
+    // thing the mirror is a copy of, and --check still says it matches.
+    if (seen.has(b.to))
+      throw new Error(
+        `canon-pin.json: two blessed entries share to '${b.to}'. A mirror directory is a copy of ONE canon directory; merging two makes --check meaningless for both.`,
+      );
+    seen.add(b.to);
+  }
   return p;
 }
 
@@ -338,6 +361,39 @@ function doPull(pin, canonRoot) {
   return want.size;
 }
 
+/**
+ * Rewrite the pin AS DATA, and prove the write took.
+ *
+ * It was a regex over the raw text, replacing the FIRST `"sha": "<40hex>"` in
+ * the file and never checking it hit the live field. MEASURED: with a sibling
+ * object carrying its own `sha` key above `repo`, one bump printed
+ * `pin -> <new>` and `mirror rewritten from ...@<OLD>` in the same breath, exit
+ * 0, live sha untouched, `--check` clean forever after. Two lines of one command
+ * contradicting each other is the worst shape this can fail in, because the
+ * second line is the one nobody re-reads.
+ *
+ * `ref` and `pinned` move WITH the sha. They did not, and it had already gone
+ * live once: the first pin bump left `ref` naming a branch the new commit was
+ * not on, and `ref`'s only use in code is the failure message that tells
+ * somebody where to look for it. A field that travels with the sha has to be
+ * written by the code that writes the sha, or it is a stale claim waiting.
+ */
+export function writePin(sha, ref, path = PIN_PATH) {
+  const doc = JSON.parse(readFileSync(path, "utf8"));
+  doc.sha = sha;
+  doc.pinned = new Date().toISOString().slice(0, 10);
+  // An unnamed ref is recorded as null rather than left stale: a reader who
+  // sees null knows nothing, a reader who sees the previous branch is misled.
+  doc.ref = ref ?? null;
+  writeFileSync(path, JSON.stringify(doc, null, 2) + "\n");
+  const back = readPin(path);
+  if (back.sha !== sha)
+    throw new Error(
+      `the pin did not take: asked for ${sha}, file now reads ${back.sha}`,
+    );
+  return back;
+}
+
 // ---------------------------------------------------------------- selftest ---
 //
 // Each case mutates a fake mirror and asserts the finding. The three GM named
@@ -506,6 +562,86 @@ function selftest() {
     process.stdout.write("skip .actual probe — no mirror on disk\n");
   }
 
+  // writePin edits DATA and verifies. The regex it replaced hit the first
+  // `"sha"` in the file, which a sibling key could steal.
+  {
+    const pf = join(root, "pin.json");
+    writeFileSync(
+      pf,
+      JSON.stringify(
+        {
+          previous: { sha: "a".repeat(40) },
+          repo: "r",
+          sha: "b".repeat(40),
+          ref: "old/branch",
+          pinned: "2000-01-01",
+          blessed: [{ from: "f", to: "t" }],
+        },
+        null,
+        2,
+      ),
+    );
+    const back = writePin("c".repeat(40), "new/branch", pf);
+    ok(
+      "writePin moves the LIVE sha, not a sibling key's",
+      back.sha === "c".repeat(40),
+    );
+    const doc = JSON.parse(readFileSync(pf, "utf8"));
+    ok("...leaving the decoy untouched", doc.previous.sha === "a".repeat(40));
+    ok("...and moves ref with it", doc.ref === "new/branch");
+    ok("...and re-dates `pinned`", doc.pinned !== "2000-01-01");
+    writePin("d".repeat(40), null, pf);
+    ok(
+      "an unnamed ref is recorded NULL, never left stale",
+      JSON.parse(readFileSync(pf, "utf8")).ref === null,
+    );
+  }
+
+  // Paths become filesystem writes, after rmSync(MIRROR). They are validated
+  // as rigorously as the sha now.
+  for (const bad of ["../../../escaped", "/abs", "a/../../b"]) {
+    const pf = join(root, "badpath.json");
+    writeFileSync(
+      pf,
+      JSON.stringify({
+        repo: "r",
+        sha: "e".repeat(40),
+        blessed: [{ from: "f", to: bad }],
+      }),
+    );
+    let threw = null;
+    try {
+      readPin(pf);
+    } catch (e) {
+      threw = e.message;
+    }
+    ok(`a blessed 'to' of '${bad}' is refused`, threw !== null);
+  }
+  {
+    const pf = join(root, "dupto.json");
+    writeFileSync(
+      pf,
+      JSON.stringify({
+        repo: "r",
+        sha: "e".repeat(40),
+        blessed: [
+          { from: "a", to: "same" },
+          { from: "b", to: "same" },
+        ],
+      }),
+    );
+    let threw = null;
+    try {
+      readPin(pf);
+    } catch (e) {
+      threw = e.message;
+    }
+    ok(
+      "two blessed entries sharing a 'to' are refused, not merged",
+      threw !== null && /share to/.test(threw),
+    );
+  }
+
   rmSync(root, { recursive: true, force: true });
   process.stdout.write(
     bad
@@ -536,19 +672,26 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     process.exit(EXIT.USAGE);
   }
 
+  // The pin file is written AFTER the fetch succeeds, not before. Writing first
+  // left a mutated, TRACKED file behind on every failed fetch -- measured: a bad
+  // sha printed "pin -> 1111...", failed with "not our ref", and exited non-zero
+  // with the bogus sha still on disk.
+  let bumpTo = null;
+  let bumpRef = null;
   if (mode === "--bump") {
-    const sha = argv[1];
-    if (!/^[0-9a-f]{40}$/.test(sha ?? "")) {
+    bumpTo = argv[1];
+    if (!/^[0-9a-f]{40}$/.test(bumpTo ?? "")) {
       process.stderr.write("sync-canon: --bump needs a 40-hex sha\n");
       process.exit(EXIT.USAGE);
     }
-    const raw = readFileSync(PIN_PATH, "utf8");
-    writeFileSync(
-      PIN_PATH,
-      raw.replace(/("sha":\s*")[0-9a-f]{40}(")/, `$1${sha}$2`),
-    );
-    process.stderr.write(`sync-canon: pin -> ${sha}\n`);
-    pin = readPin();
+    const ri = argv.indexOf("--ref");
+    bumpRef = ri >= 0 ? (argv[ri + 1] ?? null) : null;
+    if (!bumpRef)
+      process.stderr.write(
+        "sync-canon: NOTE - no --ref given, so 'ref' will be recorded as null.\n" +
+          `  Pass --ref <branch> to say where ${bumpTo.slice(0, 12)} lives; a stale ref is worse than none.\n`,
+      );
+    pin = { ...pin, sha: bumpTo }; // fetch at the NEW sha
   }
 
   let canonRoot;
@@ -580,6 +723,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       );
       process.exit(EXIT.CLEAN);
     }
+    if (bumpTo !== null) writePin(bumpTo, bumpRef);
     const n = doPull(pin, canonRoot);
     process.stderr.write(
       `sync-canon: mirror rewritten from ${pin.repo}@${pin.sha.slice(0, 12)} — ${n} file(s)\n`,
