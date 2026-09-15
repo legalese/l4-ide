@@ -78,9 +78,11 @@ export class StateGraphPanel {
   }
 
   /**
-   * The rule the pane was showing is no longer at the position the lens named
-   * (it moved under an edit the tracker could not follow, or was deleted).
-   * Keep the last picture, say so, and stop refreshing until the next click.
+   * The pane could not be redrawn from this edit: the rule is no longer at
+   * the position the lens named (it moved under an edit the tracker could
+   * not follow, or was deleted), or the file does not parse right now. Keep
+   * the last picture and say so; whether to keep asking is the caller's
+   * call, and the next successful `refresh` clears the note.
    */
   async markStale(reason: string): Promise<void> {
     if (!this.#panel) return

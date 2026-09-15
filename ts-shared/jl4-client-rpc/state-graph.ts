@@ -31,6 +31,51 @@ export function isStateGraphResponse(x: unknown): x is StateGraphResponse {
 }
 
 /**
+ * What the wasm shim answers instead of a {@link StateGraphResponse} when it
+ * could not draw (`L4.API.l4StateGraphByName`): `notFound` is set only when
+ * the module checked and no rule of that name has a graph. Without it the
+ * error is the module failing to parse or check — the ordinary state of a
+ * file halfway through an edit.
+ */
+export interface StateGraphFailure {
+  error: string
+  notFound?: boolean
+}
+
+/** `x` is the wasm shim's "could not draw" reply. */
+export function isStateGraphFailure(x: unknown): x is StateGraphFailure {
+  return (
+    typeof x === 'object' &&
+    x !== null &&
+    typeof (x as { error?: unknown }).error === 'string'
+  )
+}
+
+/**
+ * The language server's refusal when the position the pane is following no
+ * longer starts a regulative rule (`LSP.L4.Actions.stateGraphAtPos`). Its
+ * other refusal, "Could not check …", is the transient one: the file did not
+ * parse or check on this keystroke.
+ */
+const STATE_GRAPH_GONE = 'No regulative rule starts at that position'
+
+/**
+ * A refresh after an edit failed: is the pane's target gone for good, so
+ * the host should keep the last picture and stop asking until the next
+ * click? Or did the file merely not parse or check right now, so the host
+ * should keep the target and ask again on the next edit — as the decision
+ * graph's autorefresh does? `failure` is either the exception a language
+ * server's refusal arrives as, or the wasm shim's {@link StateGraphFailure}.
+ * Anything unrecognised counts as transient: a pane that keeps asking is
+ * recoverable by typing, a pane that has let go is not.
+ */
+export function stateGraphTargetGone(failure: unknown): boolean {
+  if (isStateGraphFailure(failure)) return failure.notFound === true
+  const message = failure instanceof Error ? failure.message : String(failure)
+  return message.includes(STATE_GRAPH_GONE)
+}
+
+/**
  * One incremental document change, as VS Code's `TextDocumentContentChangeEvent`
  * and Monaco's shim both report it: a 0-indexed `range` that `text` replaces.
  * Structural, so neither host has to import the other's API.

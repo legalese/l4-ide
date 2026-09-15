@@ -32,6 +32,7 @@ import {
   makeLspRelayRequestType,
   makeL4RpcRequestType,
   isStateGraphResponse,
+  stateGraphTargetGone,
   trackSrcPos,
   type DirectiveResult,
   type SrcPos,
@@ -456,15 +457,24 @@ export async function activate(context: ExtensionContext) {
             }
           } catch (e) {
             if (generation !== stateGraphGeneration) return
-            // The server refuses when no regulative rule starts there any
-            // more (renamed to a non-rule, made boolean, moved past the
-            // tracker). Keep the last picture; stop asking until the next click.
-            lastStateGraphTarget = null
-            await stateGraphPanel.markStale(
-              `No state graph at the rule's position after this edit (${
-                e instanceof Error ? e.message : String(e)
-              }). Press "Show state graph" again to redraw.`
-            )
+            if (stateGraphTargetGone(e)) {
+              // The server refuses when no regulative rule starts there any
+              // more (renamed to a non-rule, made boolean, moved past the
+              // tracker). Keep the last picture; stop asking until the next click.
+              lastStateGraphTarget = null
+              await stateGraphPanel.markStale(
+                `No state graph at the rule's position after this edit (${
+                  e instanceof Error ? e.message : String(e)
+                }). Press "Show state graph" again to redraw.`
+              )
+            } else {
+              // "Could not check": the file does not parse or check right
+              // now, which is where every edit passes through. Keep the
+              // picture and the target; the next edit asks again.
+              await stateGraphPanel.markStale(
+                'Waiting for the file to parse; this is the rule as it last checked.'
+              )
+            }
           }
         }
       },

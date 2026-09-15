@@ -4,7 +4,11 @@
  *  package has the `node --test` rig and that one does not). */
 import { test, describe } from 'node:test'
 import * as assert from 'node:assert/strict'
-import { trackSrcPos, type ContentChange } from 'jl4-client-rpc'
+import {
+  stateGraphTargetGone,
+  trackSrcPos,
+  type ContentChange,
+} from 'jl4-client-rpc'
 import {
   renderStateGraphHtml,
   stateGraphCsp,
@@ -168,5 +172,51 @@ describe('trackSrcPos', () => {
       trackSrcPos(at, [change(0, 0, 0, 0, 'x\n'), change(1, 0, 3, 0, '')]),
       { line: 9, column: 1 }
     )
+  })
+})
+
+describe('stateGraphTargetGone', () => {
+  // The two refusals `LSP.L4.Actions.stateGraphAtPos` can send back, as the
+  // client's sendRequest throws them.
+  test('the language server\'s "no regulative rule starts there" is gone for good', () => {
+    assert.equal(
+      stateGraphTargetGone(
+        new Error(
+          'No regulative rule starts at that position (the program may have changed between pressing the code lens and rendering it)'
+        )
+      ),
+      true
+    )
+  })
+
+  test('the language server\'s "Could not check" is transient: the file is mid-edit', () => {
+    assert.equal(
+      stateGraphTargetGone(new Error('Could not check file:///t.l4.')),
+      false
+    )
+  })
+
+  // The wasm shim's { error, notFound? } (`L4.API.l4StateGraphByName`).
+  test("the wasm shim's notFound is gone; a bare error is a parse or check failure", () => {
+    assert.equal(
+      stateGraphTargetGone({ error: "Rule 'x' not found", notFound: true }),
+      true
+    )
+    assert.equal(
+      stateGraphTargetGone({
+        error: 'unexpected end of input',
+        notFound: false,
+      }),
+      false
+    )
+    assert.equal(
+      stateGraphTargetGone({ error: 'unexpected end of input' }),
+      false
+    )
+  })
+
+  test('anything unrecognised is transient: keep asking rather than let go', () => {
+    assert.equal(stateGraphTargetGone(new Error('socket closed')), false)
+    assert.equal(stateGraphTargetGone(undefined), false)
   })
 })

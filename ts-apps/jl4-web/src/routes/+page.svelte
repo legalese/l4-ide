@@ -30,7 +30,9 @@
     EvalDirectiveResultRequestType,
     QueryPlanRequestType,
     makeL4RpcRequestType,
+    isStateGraphFailure,
     isStateGraphResponse,
+    stateGraphTargetGone,
     trackSrcPos,
     type DirectiveResult,
     type SrcPos,
@@ -205,19 +207,32 @@
         if (isStateGraphResponse(reply)) {
           stateGraph = { name: reply.name, dot: reply.dot }
           stateGraphStale = null
+        } else if (isStateGraphFailure(reply) && !stateGraphTargetGone(reply)) {
+          // The wasm shim could not check the file: it does not parse right
+          // now, which is where every edit passes through. Keep the picture
+          // and the target; the next edit asks again.
+          stateGraphStale =
+            'Waiting for the file to parse; this is the rule as it last checked.'
         } else {
-          // The wasm shim answers null when the rule is gone or has no graph
+          // The wasm shim answers notFound (or null) when the rule is gone
+          // or has no graph
           stateGraphTarget = null
           stateGraphStale =
             'No state graph for this rule after that edit. Press "Show state graph" again to redraw.'
         }
       } catch (e) {
         if (generation !== stateGraphGeneration) return
-        // The language server refuses when no regulative rule starts there
-        stateGraphTarget = null
-        stateGraphStale = `No state graph at the rule's position after that edit (${
-          e instanceof Error ? e.message : String(e)
-        }). Press "Show state graph" again to redraw.`
+        if (stateGraphTargetGone(e)) {
+          // The language server refuses when no regulative rule starts there
+          stateGraphTarget = null
+          stateGraphStale = `No state graph at the rule's position after that edit (${
+            e instanceof Error ? e.message : String(e)
+          }). Press "Show state graph" again to redraw.`
+        } else {
+          // "Could not check": transient, as above
+          stateGraphStale =
+            'Waiting for the file to parse; this is the rule as it last checked.'
+        }
       }
     },
     150
