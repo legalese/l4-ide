@@ -1,16 +1,16 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
-run-stack.l4:64:47-58:
+run-stack.l4:71:47-58:
   I found a problem while checking the definition of `staggered`:
     In this action, `theLandlord` refers to
     
-      theLandlord (at run-stack.l4:34:1-12)
+      theLandlord (at run-stack.l4:41:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-stack.l4:66:1-70:20:
+run-stack.l4:73:1-77:20:
   FULFILLED
-run-stack.l4:72:1-76:20:
+run-stack.l4:79:1-83:20:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -24,9 +24,9 @@ run-stack.l4:72:1-76:20:
       MUST Refund theLandlord
     before their deadline, which was at
       10
-run-stack.l4:82:1-86:20:
+run-stack.l4:89:1-93:20:
   FULFILLED
-run-stack.l4:88:1-92:20:
+run-stack.l4:95:1-99:20:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -40,7 +40,7 @@ run-stack.l4:88:1-92:20:
       MUST Refund theLandlord
     before their deadline, which was at
       10
-run-stack.l4:106:1-109:50:
+run-stack.l4:115:1-118:50:
   DEONTIC BREACHED:
     party
       NEVERMATCHESPARTY
@@ -54,7 +54,7 @@ run-stack.l4:106:1-109:50:
       MUST Refund theLandlord
     before their deadline, which was at
       10
-run-stack.l4:111:1-114:50:
+run-stack.l4:120:1-123:50:
   DEONTIC BREACHED:
     party
       NEVERMATCHESPARTY
@@ -68,16 +68,16 @@ run-stack.l4:111:1-114:50:
       MUST Refund theLandlord
     before their deadline, which was at
       10
-run-stack.l4:138:47-58:
+run-stack.l4:148:47-58:
   I found a problem while checking the definition of `may approve`:
     In this action, `theLandlord` refers to
     
-      theLandlord (at run-stack.l4:34:1-12)
+      theLandlord (at run-stack.l4:41:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-stack.l4:140:1-144:20:
+run-stack.l4:150:1-154:20:
   FULFILLED
-run-stack.l4:146:1-150:20:
+run-stack.l4:156:1-160:20:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -91,7 +91,7 @@ run-stack.l4:146:1-150:20:
       MUST Refund theLandlord
     before their deadline, which was at
       10
-run-stack.l4:152:1-156:20:
+run-stack.l4:162:1-166:20:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -105,7 +105,7 @@ run-stack.l4:152:1-156:20:
       MUST Refund theLandlord
     before their deadline, which was at
       10
-run-stack.l4:158:1-161:50:
+run-stack.l4:168:1-171:50:
   DEONTIC BREACHED:
     party
       NEVERMATCHESPARTY
@@ -119,7 +119,7 @@ run-stack.l4:158:1-161:50:
       MUST Refund theLandlord
     before their deadline, which was at
       10
-run-stack.l4:163:1-166:50:
+run-stack.l4:173:1-176:50:
   DEONTIC BREACHED:
     party
       NEVERMATCHESPARTY
@@ -133,18 +133,18 @@ run-stack.l4:163:1-166:50:
       MUST Refund theLandlord
     before their deadline, which was at
       10
-run-stack.l4:168:1-171:38:
+run-stack.l4:178:1-181:38:
   FULFILLED
-run-stack.l4:189:47-58:
+run-stack.l4:199:47-58:
   I found a problem while checking the definition of `do staggered`:
     In this action, `theLandlord` refers to
     
-      theLandlord (at run-stack.l4:34:1-12)
+      theLandlord (at run-stack.l4:41:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-stack.l4:191:1-195:20:
+run-stack.l4:201:1-205:20:
   FULFILLED
-run-stack.l4:197:1-201:20:
+run-stack.l4:207:1-211:20:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -158,7 +158,7 @@ run-stack.l4:197:1-201:20:
       MUST Refund theLandlord
     before their deadline, which was at
       10
-run-stack.l4:203:1-207:20:
+run-stack.l4:213:1-217:20:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -172,16 +172,16 @@ run-stack.l4:203:1-207:20:
       MUST Refund theLandlord
     before their deadline, which was at
       10
-run-stack.l4:226:47-58:
+run-stack.l4:236:47-58:
   I found a problem while checking the definition of `no smoking`:
     In this action, `theLandlord` refers to
     
-      theLandlord (at run-stack.l4:34:1-12)
+      theLandlord (at run-stack.l4:41:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-stack.l4:228:1-232:20:
+run-stack.l4:238:1-242:20:
   FULFILLED
-run-stack.l4:234:1-238:20:
+run-stack.l4:244:1-248:20:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -195,7 +195,7 @@ run-stack.l4:234:1-238:20:
       MUST Refund theLandlord
     before their deadline, which was at
       10
-run-stack.l4:240:1-244:20:
+run-stack.l4:250:1-254:20:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -209,13 +209,13 @@ run-stack.l4:240:1-244:20:
       MUST Refund theLandlord
     before their deadline, which was at
       10
-run-stack.l4:260:1-264:20:
+run-stack.l4:270:1-274:20:
   FULFILLED
-run-stack.l4:266:1-270:20:
+run-stack.l4:276:1-280:20:
   FULFILLED
-run-stack.l4:277:1-281:20:
+run-stack.l4:287:1-291:20:
   FULFILLED
-run-stack.l4:283:1-286:50:
+run-stack.l4:293:1-296:50:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -229,7 +229,7 @@ run-stack.l4:283:1-286:50:
       MUST Refund theLandlord
     before their deadline, which was at
       19
-run-stack.l4:288:1-291:50:
+run-stack.l4:298:1-301:50:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -243,28 +243,28 @@ run-stack.l4:288:1-291:50:
       MUST Refund theLandlord
     before their deadline, which was at
       19
-run-stack.l4:304:27-32:
+run-stack.l4:314:27-32:
   I found a problem while checking the definition of `both anchored`:
     In this action, `alice` refers to
     
-      alice (at run-stack.l4:35:1-6)
+      alice (at run-stack.l4:42:1-6)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-stack.l4:305:44-55:
+run-stack.l4:315:44-55:
   I found a problem while checking the definition of `both anchored`:
     In this action, `theLandlord` refers to
     
-      theLandlord (at run-stack.l4:34:1-12)
+      theLandlord (at run-stack.l4:41:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-stack.l4:306:38-41:
+run-stack.l4:316:38-41:
   I found a problem while checking the definition of `both anchored`:
     In this action, `bob` refers to
     
-      bob (at run-stack.l4:36:1-4)
+      bob (at run-stack.l4:43:1-4)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-stack.l4:309:1-311:20:
+run-stack.l4:319:1-321:20:
   DEONTIC BREACHED:
     party
       NEVERMATCHESPARTY

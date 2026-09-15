@@ -1,0 +1,252 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+run-lest.l4:66:1-67:20:
+  PARTY Landlord OF "Ms Ng" MUST Refund (EXACTLY theLandlord) WITHIN 1 HENCE FULFILLED
+run-lest.l4:69:1-71:50:
+  FULFILLED
+run-lest.l4:73:1-75:50:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Refund OF (Landlord OF "Ms Ng")
+    at
+      18
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund (EXACTLY theLandlord)
+    before their deadline, which was at
+      15
+run-lest.l4:85:1-86:20:
+  PARTY Landlord OF "Ms Ng" MUST Refund (EXACTLY theLandlord) WITHIN 1 HENCE FULFILLED
+run-lest.l4:88:1-90:50:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Refund OF (Landlord OF "Ms Ng")
+    at
+      18
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund (EXACTLY theLandlord)
+    before their deadline, which was at
+      15
+run-lest.l4:97:1-98:50:
+  FULFILLED
+run-lest.l4:100:1-101:50:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Refund OF (Landlord OF "Ms Ng")
+    at
+      18
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund (EXACTLY theLandlord)
+    before their deadline, which was at
+      15
+run-lest.l4:110:1-111:21:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      100
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund (EXACTLY theLandlord)
+    before their deadline, which was at
+      15
+run-lest.l4:133:1-137:20:
+  FULFILLED
+run-lest.l4:139:1-143:20:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Refund OF (Landlord OF "Ms Ng")
+    at
+      11
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund (EXACTLY theLandlord)
+    before their deadline, which was at
+      10
+run-lest.l4:145:1-149:20:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Refund OF (Landlord OF "Ms Ng")
+    at
+      11
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund (EXACTLY theLandlord)
+    before their deadline, which was at
+      10
+run-lest.l4:156:1-159:50:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      20
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund (EXACTLY theLandlord)
+    before their deadline, which was at
+      10
+run-lest.l4:161:1-164:50:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      20
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund (EXACTLY theLandlord)
+    before their deadline, which was at
+      10
+run-lest.l4:177:1-181:20:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Refund OF (Landlord OF "Ms Ng")
+    at
+      11
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund (EXACTLY theLandlord)
+    before their deadline, which was at
+      10
+run-lest.l4:200:1-203:50:
+  FULFILLED
+run-lest.l4:205:1-208:50:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Refund OF (Landlord OF "Ms Ng")
+    at
+      20
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund (EXACTLY theLandlord)
+    before their deadline, which was at
+      19
+run-lest.l4:225:1-227:49:
+  FULFILLED
+run-lest.l4:229:1-231:49:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Refund OF (Landlord OF "Ms Ng")
+    at
+      9
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund (EXACTLY theLandlord)
+    before their deadline, which was at
+      8
+run-lest.l4:239:1-241:49:
+  FULFILLED
+run-lest.l4:263:1-268:20:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      20
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund (EXACTLY theLandlord)
+    before their deadline, which was at
+      15
+run-lest.l4:274:1-279:20:
+  FULFILLED
+run-lest.l4:282:1-286:50:
+  FULFILLED
+run-lest.l4:288:1-292:50:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Refund OF (Landlord OF "Ms Ng")
+    at
+      16
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund (EXACTLY theLandlord)
+    before their deadline, which was at
+      15
+run-lest.l4:305:1-310:20:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      20
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund (EXACTLY theLandlord)
+    before their deadline, which was at
+      15
+run-lest.l4:324:1-325:19:
+  PARTY Landlord OF "Ms Ng" MUST Refund (EXACTLY theLandlord) WITHIN 2 HENCE FULFILLED
+run-lest.l4:327:1-329:50:
+  FULFILLED
+run-lest.l4:331:1-333:50:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Refund OF (Landlord OF "Ms Ng")
+    at
+      11
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund (EXACTLY theLandlord)
+    before their deadline, which was at
+      10
+run-lest.l4:342:1-343:20:
+  PARTY Landlord OF "Ms Ng" MUST Refund (EXACTLY theLandlord) WITHIN 1 HENCE FULFILLED
+run-lest.l4:360:1-361:19:
+  PARTY Tenant OF "Alice" MUST Sign (EXACTLY alice) WITHIN 13 HENCE FULFILLED LEST (BREACH BY alice BECAUSE "the second chance was missed too")
+run-lest.l4:363:1-365:36:
+  FULFILLED
+run-lest.l4:367:1-369:36:
+  DEONTIC BREACHED:
+    BREACH
+    BY Tenant OF "Alice"
+    BECAUSE "the second chance was missed too"
+run-lest.l4:389:1-390:21:
+  PARTY alice MUST Sign (EXACTLY alice) WITHIN 3 HENCE FULFILLED LEST `sign, or try again`
+run-lest.l4:392:1-394:37:
+  PARTY alice MUST Sign (EXACTLY alice) WITHIN 3 HENCE FULFILLED LEST `sign, or try again`

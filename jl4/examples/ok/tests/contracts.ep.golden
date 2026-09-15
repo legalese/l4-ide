@@ -30,6 +30,10 @@ aContract MEANS
   PARTY S DOES delivery AT 2
   PARTY B DOES payment 20 AT 4
 
+-- B's payment was due by 5 (delivery at 2 + 3); the payment at 6 reveals the
+-- miss and is not the fine. The fine's three days count from the missed
+-- deadline, 5 (EVERY-EACH-QUANTIFIER-SPEC §5.2), so it is due by 8 and the
+-- payment at 9 is late: BREACHED, deadline 8.
 #TRACE aContract AT 0 WITH
   PARTY S DOES delivery AT 2
   PARTY B DOES payment 30 AT 6

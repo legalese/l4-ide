@@ -37,7 +37,10 @@
 > - **Rulings so far:** R-T1–R-T6 (§2.2.7.8, 2026-09-06); the pattern spelling (§2.4, 2026-09-07);
 >   **R-Q1–R-Q7 (§2.5, 2026-09-07)**; **R-Q7A–R-Q7C, the anchor's spelling (§5.1.1, 2026-09-07;
 >   BUILT 2026-09-15 on `every/anchors`, witness `jl4/examples/ok/every/run-anchors.l4`; the
->   mechanism and the build decisions are recorded under §5.1.1 and §11.0.1)**; **R-X5 (the window's edges, modified) and R-X6 (the early act, ruled),
+>   mechanism and the build decisions are recorded under §5.1.1 and §11.0.1)**; **§5.2's `LEST`
+>   clock — R-Q7's unanchored default and R-Q5's failure time — BUILT 2026-09-16 on
+>   `every/lest-anchor`, witness `jl4/examples/ok/every/run-lest.l4`, mechanism and decisions
+>   under §5.2.1**; **R-X5 (the window's edges, modified) and R-X6 (the early act, ruled),
 >   §5.1.2, 2026-09-07, not built**; and three on 2026-09-08 — **W3, `THE OPENING` declined and
 >   the anchor slot ruled to become a trace expression (§5.1.3, direction only, not built)**, and
 >   **the roll call, how a run gets its cast (§11.0, ANSWERED and BUILT)**, and
@@ -1125,7 +1128,7 @@ re-opened on that tree when this section was written.
 | R-Q4 | the filter word, and what the slot holds                     | **accept** — _"Perhaps the WHOSE projection could take advantage of the field-opening logic from the section-givens work."_ | `WHO` only; the slot is a Boolean expression naming the bound variable; §2.1's insertion rule withdrawn. `WHOSE` is **PROPOSED**, sequenced after `IMPLICIT-PROPS-DESIGN.md` §11.7 R5 is built — but see **§13.6**, which measures what R5 does and does not settle for it, and records a layout-conjoined form that would not need to wait on R5 at all. | §2.1, §2.2.3, §2.3, §2.4, §15              |
 | R-Q5 | early failure: `LEST` at detection, or at the deadline?      | **accept** — _"d"_                                                                                                          | No modifier. The failure time is fixed by the layer the `LEST` attaches to — the state's deadline on the `ONCE … WITHIN` line; on the act layer, by the modal. Success time by modal. §13.1 closed.                                                                                                                                                       | §3.4, §5.2, §13.1                          |
 | R-Q6 | does R-T6's fixed cast bind `EVERY`; what on leave/join?     | **accept** — _"d"_                                                                                                          | Cast evaluated once at arming for the whole family; changes only on an explicit **edit** event (release / substitute / join) applied to the running barrier, completions and accumulator preserved. Events proposed, unbuilt.                                                                                                                             | §2.2.7.8 (R-T6 row), §13.4                 |
-| R-Q7 | the continuation clock: `HENCE` from what, `LEST` from what? | **modify** — _"e but with a as default when no OF?"_                                                                        | A drafter may name the anchor (`WITHIN 5 days OF …`); unanchored, `HENCE` counts from the join's firing (today's rule) and `LEST` from the missed deadline (§5.2) — the latter a **change** from today's revealing-event anchor.                                                                                                                          | §2.4, §5.1, §5.2                           |
+| R-Q7 | the continuation clock: `HENCE` from what, `LEST` from what? | **modify** — _"e but with a as default when no OF?"_                                                                        | A drafter may name the anchor (`WITHIN 5 days OF …`); unanchored, `HENCE` counts from the join's firing (today's rule) and `LEST` from the missed deadline (§5.2) — the latter a **change** from the tree's earlier revealing-event anchor, BUILT 2026-09-16 (§5.2.1).                                                                                    | §2.4, §5.1, §5.2                           |
 
 **What decided each.**
 
@@ -1283,7 +1286,7 @@ HENCE` fires when the permission is exercised (`Machine.hs:1669-1671`), so a dra
   period starts. Meng's mark chose the named-anchor mechanism (option e) with option a as the default
   for an unanchored `WITHIN`; the GM reads "a" as covering both halves of option a — `HENCE` from the
   firing, `LEST` from the missed deadline, the latter recorded in §5.2 as a change (GM's reading,
-  2026-09-07). The card's earlier `BY date` escape hatch is struck: R-T2 says nothing about `BY`, a
+  2026-09-07) and built 2026-09-16 (§5.2.1). The card's earlier `BY date` escape hatch is struck: R-T2 says nothing about `BY`, a
   deadline `BY` is unruled and unbuilt, and `TKBy` today serves only `FOLLOWED BY`, `DIVIDED BY`
   (`Parser.hs:1659`, `:1663`) and `BREACH … BY` (`:2484`). The example is §5.1's escrow chain.
 
@@ -1367,9 +1370,12 @@ branch was in the merge queue at the time):
   states the three lifecycle anchors, the date form and the refusals, and says in one sentence
   that nothing separates a date-serial trace from a floating-origin one (§5.1.2.1 point 2, T1
   not built).
-- `doc/tutorials/obligations/what-follows.md:153` and `:470` teach today's `LEST` anchor (the first
+- ~~`doc/tutorials/obligations/what-follows.md:153` and `:470` teach today's `LEST` anchor (the first
   event after the deadline) and a `WITHIN 13` workaround built on it. When R-Q7's `LEST` default is
-  built (§5.2) that page changes and the trace goldens re-bless.
+  built (§5.2) that page changes and the trace goldens re-bless.~~ **DISCHARGED 2026-09-16** by the
+  build of §5.2 (§5.2.1): the page was rewritten for the deadline clock, its pasted residuals
+  re-run (`WITHIN 13`, `WITHIN 6`), the workaround struck, and the trace goldens re-blessed in the
+  same change.
 - In this document: extend §3–§9 to `SHANT` (R-Q3); define the release / substitute / join events
   (R-Q6, §13.4). The fork's words (R-Q1) were ruled 2026-09-07 and are recorded above; **the anchor
   spellings (R-Q7) were ruled the same day and are recorded at §5.1.1** — `OF` alone as the connective,
@@ -1520,6 +1526,8 @@ What "at the deadline" costs, measured by the refuters and recorded in §5.2: to
 only when a later-stamped event **reveals** the miss, and the breach carries the revealing event's
 stamp (`stamp` bound at `Machine.hs:1522`, written into the breach at `:1606`); time alone breaches
 nothing. Dating the failure to the deadline changes that stamp, and the trace goldens that print it.
+(The §5.2 build of 2026-09-16 moved the `LEST` continuation's CLOCK to the deadline and left this
+stamp where it was — §5.2.1, "What is NOT moved".)
 §4.1's `boFailed` ("parties who cannot complete") is therefore populated by a `SHANT` violation
 before the deadline and by every non-completer at the deadline, and by nothing else.
 
@@ -1647,7 +1655,8 @@ policy — the drafter names the anchor, and the language supplies a default whe
    reports the continuation's deadline as 8 — act + `WITHIN`, not 5 (from arming) and not 15 (from
    the barrier's own deadline) — and an intervening `WAIT UNTIL` leaves it unmoved. It is the only
    option under which a cast of one behaves like today's `PARTY`. Under `LEST`, the default is the
-   **missed deadline** — §5.2, where it is recorded as a change.
+   **missed deadline** — §5.2, where it was recorded as a change and, since 2026-09-16, as built
+   (§5.2.1).
 
 The cost the ruling accepts: an early-completing cast gives the continuation an early deadline
 ("within five days of the last signature", not "on the completion date"); the named anchor is what
@@ -1865,8 +1874,11 @@ event that revealed the deadline had passed — the hand-off clock, `Machine.hs`
 not the deadline itself, so `OF THE JOIN` there is today's unanchored clock said out loud and `OF
 THE DEADLINE` is the way to count from the discharge (witness: `kept, the join`, 30 + 3 = 33;
 `kept, the deadline`, 10 + 3 = 13; the doc page states it). Binding `join` to the deadline on that
-path instead was not done: it would part `OF THE JOIN` from the unanchored default, which §5.2's
-track is the one to move, for the single-party path and the barrier together.
+path instead was not done: it would part `OF THE JOIN` from the unanchored default. §5.2's track
+(BUILT 2026-09-16, §5.2.1) moved the unanchored default under `LEST` — for the single-party path
+and the barrier together, through one reference — and left this `HENCE` alone, so `OF THE JOIN` and
+the unanchored clock still coincide here; whether both should move to the deadline is recorded in
+§5.2.1 as open to Meng's ruling.
 
 **Threading, chosen: bindings in the continuation's environment, rebound into its value.** At
 every hand-off the machine builds a `Lifecycle` (`ContractFrame.hs:404`: the join instant under
@@ -1996,9 +2008,9 @@ around each continuation, `Types.hs:785`, `TypeCheck.hs:2095`):
 
 1. `THE JOIN` and `THE DEADLINE` with no enclosing obligation (top level) — refused.
 2. `THE JOIN` under `LEST` — refused: the join did not fire. This is the conservative reading of
-   the question this section left open; the alternative (bind it to the revealing stamp, today's
-   unanchored `LEST` clock) was not taken because it would give the name a meaning §5.2 is about to
-   take away from the default.
+   the question this section left open; the alternative (bind it to the revealing stamp, the
+   unanchored `LEST` clock of the time) was not taken because it would give the name a meaning
+   §5.2 was about to take away from the default — and did, on 2026-09-16 (§5.2.1).
 3. `THE JOIN` and `THE DEADLINE` on a join line — refused: that `WITHIN` is what defines both.
 4. `THE DEADLINE` where the enclosing obligation has no `WITHIN` on its act or its join line —
    refused. Not in the brief; the checker can see it, and the run time would otherwise have had to
@@ -2033,7 +2045,8 @@ text.
 
 **Not built here.** `AFTER` (held, §5.1.2 — the next track, stacked on this branch); §5.2's `LEST`
 default (a different stack — `OF THE DEADLINE` on a `LEST` is that clock said explicitly, witness
-`cure from the deadline`, and is the workaround until §5.2 lands); T1's `COMMENCING`/sort
+`cure from the deadline`, and was the workaround until §5.2 landed on 2026-09-16, §5.2.1; the two
+spellings now agree for every failure but a `SHANT` violation); T1's `COMMENCING`/sort
 separation (§5.1.2.1) — so nothing separates a floating-origin trace from a date-serial one, and a
 `DATE` anchor on a trace that starts `AT 0` counts from a serial in the hundreds of thousands,
 silently, which the doc page says in one sentence; §5.1.3's expression-over-trace slot; `THE
@@ -2295,22 +2308,189 @@ The text of this section before 2026-09-07 — "deadline failure: `t_ref = deadl
 `t_ref = detection_time`" — assumed an early-failure event the tree does not have (R-Q5); the
 `SHANT` line above is what "early failure" turns out to mean.
 
-**What the machine does today, and why this is a change.** The machine anchors a `LEST`
-continuation at the stamp of the event that **revealed** the miss, not at the deadline. The comment
-at `Machine.hs:1550-1552` says so in terms — "the continuation's clock is anchored at the revealing
-event's stamp (the README is silent on the anchor; this is the historical behavior)" — and
-`:1583-1589` implements it, carrying the revealing event's `ev'timeR` into the continuation's frame.
-The refuters' probe: `PARTY P MUST sign WITHIN 10 LEST PARTY Q MUST release WITHIN 5`, the miss
-revealed by an event at 14, reports Q's deadline as 19 (14 + 5), not 15 (10 + 5); a release at 18
-comes back `FULFILLED`. Under that rule the defaulting party controls when its own cure period starts
-— a maker who misses the date and then stays silent has no return-of-funds deadline until someone
-else acts — which is why the deadline anchor was chosen over the status quo (listed on the bench as
-its own option so that choosing this was visibly a decision). The anchor is a timestamp computed
-when the miss is revealed; firing still waits for an event, so no timer is needed.
+**What the machine did before this was built, and why it was a change.** Until 2026-09-16 the
+machine anchored a `LEST` continuation at the stamp of the event that **revealed** the miss, not
+at the deadline. The comment at `Machine.hs:1550-1552` (on `unstable` `5dc0ca19`; `:1633-1637` on
+`every/anchors-on-blame` `6a8295bf`, the commit this was built on) said so in terms — "the
+continuation's clock is anchored at the revealing event's stamp (the README is silent on the
+anchor; this is the historical behavior)" — and `reofferResolve` implemented it, carrying the
+revealing event's `ev'timeR` into the continuation's frame. The refuters' probe: `PARTY P MUST sign
+WITHIN 10 LEST PARTY Q MUST release WITHIN 5`, the miss revealed by an event at 14, reported Q's
+deadline as 19 (14 + 5), not 15 (10 + 5); a release at 18 came back `FULFILLED`. Under that rule
+the defaulting party controlled when its own cure period started — a maker who misses the date and
+then stays silent had no return-of-funds deadline until someone else acted — which is why the
+deadline anchor was chosen over the status quo (listed on the bench as its own option so that
+choosing this was visibly a decision). The anchor is a timestamp computed when the miss is
+revealed; firing still waits for an event, so no timer is needed.
 
-Blast radius when built: the single-party `LEST` anchor and every trace golden that prints a
-reparation deadline; and `doc/tutorials/obligations/what-follows.md:153` and `:470`, which teach
-today's rule and a `WITHIN 13` workaround built on it (§2.5's owed list).
+#### 5.2.1 BUILT 2026-09-16 — one anchor mechanism, the state-layer stream, and what moved
+
+Built on `every/lest-anchor`, cut from `every/anchors-on-blame` at `6a8295bf` (nine commits over
+`origin/unstable` `0b640727`), so it lands AFTER that branch. Witness:
+`jl4/examples/ok/every/run-lest.l4` (33 directives, nine sections: the spec's own probe with its
+anchored twin, silence, the barrier unanchored beside `run-stack.l4`'s anchored form, the fork,
+`SHANT`, the state layer, `MAY` and `DO`, a chain, a `LEST` that names itself). Line numbers below
+are on the build commit of this section, as its subject line names; they are NOT re-cited by later
+commits, which say so in their own ledger entries.
+
+**The mechanism: one place, one reference.** `Contract5`'s expiry branch already computed the
+absolute deadline (`Machine.hs:1608`) and allocated it as `deadlineR` for `THE DEADLINE` (`:1691`).
+The change is that under `LEST` the continuation's CLOCK is that same reference: `clockAt`
+(`:1696`) picks `deadlineR` for a `LEST` hand-off and the revealing event's stamp for a `HENCE`
+hand-off, on both the re-offer branch and the consume branch (`:1704`, `:1711`), and `ResolveParty`
+carries it to `continueWithFollowup` as the `time` the continuation is applied to (`:1820`;
+`ResolvePartyFrame.time`, `ContractFrame.hs:145`). So `WITHIN d` and `WITHIN d OF THE DEADLINE`
+under a `LEST` read one reference and cannot drift apart (item 4 of the build brief: they coincide
+by construction, and the `Lifecycle` haddock says so, `ContractFrame.hs:615`). Nothing else
+chooses a clock:
+
+- A **barrier member** is an ordinary `ValObligation` whose `LEST` slot holds the failpoint
+  sentinel, so its expiry goes through the same branch and hands the sentinel `deadlineR` as its
+  anchor — its first argument — and, as its fourth, the very same reference (`continueWithFollowup`
+  `:2208`; `sentinelArgs` `:2540`, whose haddock records that the two are one reference on purpose).
+  `Barrier5` forces it as `failAt` (`:1948`), `earliestFailure` orders by it (`:2700`), and
+  `barrierFail` (`:2794`) hands it on unchanged: the barrier's `LEST` counts from the
+  earliest-failing member's deadline with **no code change in the barrier at all** — which is the
+  "one mechanism" the old `barrierFail` haddock asked for. `THE DEADLINE` under a barrier's `LEST`
+  and the unanchored default now agree (witness `staggered` vs `staggered, anchored`: 10 and 10).
+- The **fork** carries the drafter's `LEST` on each member, so each member's reparation counts from
+  that member's own deadline (witness `each signs or refund`: refunds due 10 and 19).
+- **`SHANT`** was already R-Q5's failure time: `Contract10`'s `DMustNot` arm (`:1777`) hands the
+  violating event's stamp as the clock, and the violating event is consumed, not re-offered.
+  Untouched, and now the one failure where the plain `WITHIN` and `OF THE DEADLINE` differ
+  (witness `no smoking`: due 8; `no smoking, anchored`: due 19).
+- A **`MAY`** lapse routes to `LEST` (`:1718`) and counts from the deadline as a `MUST` does; a
+  **`DO`** is a `MUST` here. Both witnessed (§7 of the witness).
+
+**Ordering keys after the change.** `earliestFailure`'s primary key IS R-Q5's failure time for
+every modal now, so for `MUST`/`DO`/`MAY` the stack's third key (`failDue`, `Barrier5b` `:1963`)
+can no longer separate anything the first two tied — two such members with one anchor have one
+deadline and are revealed by one event. It is kept, and its haddocks say it is redundant
+(`barrierFinish` `:2646`, `BarrierFailedAt` `ContractFrame.hs:446`), rather than half-removed;
+removing it is a larger diff than this change and touches the stack's witnesses. Which member a
+barrier anchors at does not change: the revealing stamp was monotone in the deadline, and the
+`run-stack.l4` tie cases (§3, §3b) give the same numbers — decided now on the first key, which the
+witness's comments say. `run-stack.golden` is identical up to the source line ranges those
+comment edits shifted (checked with the ranges normalised).
+
+**The termination argument, re-read.** Each real event is still re-offered at most once, marked by
+store address; what changed is WHY a marked event can reveal a second expiry. Before, only a
+non-positive computed `WITHIN` could put a continuation's deadline before the re-offered stamp;
+now that is the ordinary case whenever the miss came to light late, and the marked event is then
+consumed — the intended semantics, not a corner. The stream strictly shrinks on every other step,
+so evaluation terminates (`Machine.hs` NOTE above `:1691`; witness §9, `sign, or try again`, with
+`WAIT UNTIL 100` alone and with a signature at 101 after it: a residual both times, the fifth
+incarnation in the second). The corpus's recursive witness, `deontic-breach-semantics.l4` (f),
+prints the same residual as before.
+
+**The consume branch** (a marked event revealing a second expiry, `:1704`) also anchors at the
+deadline: the failure time is the deadline whether the event that revealed the miss was fresh or
+already re-offered. The alternative — keep the marked event's stamp there — would have made the
+same miss count from two different instants depending on how the revealing event arrived. Open to
+Meng's ruling; it decides only the numbers in `deontic-breach-semantics.l4`'s `nested peel`
+(deadlines 2, 5, 15 rather than 2, 5, 30), not its verdict.
+
+**The state-layer stream (R1-5 from the stack's round 1, applied here).** `barrierStateMissed`
+(`:2821`) no longer hands the `LEST` the whole stream from the arming. It walks the barrier's stream
+from its arming to the first event stamped strictly after the state deadline — three new frames,
+`BarrierTrim` / `BarrierTrimEvent` / `BarrierTrimStamp` (`:2017-2043`; `ContractFrame.hs:88-97`,
+records `:562-583`), one cons cell per step, modelled on `Contract1`–`Contract3` — and applies the
+`LEST` to the stream from that cell on (`barrierStateLest`, `:2836`), the same shape the act layer
+gives its `LEST`. The walk is a prefix-drop, not a filter: it stops at the first event past the
+deadline and keeps everything after it. A trace is stamp-sorted (`TraceOrderingSpec`), so the two
+readings agree on every trace `l4 run` can see; they would differ only on an unsorted stream fed
+through the service, which is not exercised. Witness §6: a refund at 1, before anyone had acted,
+no longer discharges the reparation (`BREACHED` reporting 15, where the whole stream gave
+`FULFILLED`); a refund at 11 — after the state deadline of 10, before the late signature at 12 —
+does, which the join's own residual `joinEvents` (starting after the LAST completion) would have
+missed; 15 timely, 16 late; the anchored twin gives the same 15.
+
+**The ledger (item 5 of the build brief) — a measurement, not a decision.** The brief asked
+whether a `RECORD` inside a `LEST` continuation is stamped at the revealing event or at the
+deadline. Neither: a ledger append's transaction time is the ROOT eval clock, a `UTCTime`
+(`runRecord`, `getEvalTime`), never the contract clock, and no expression can read the contract
+clock. Measured on both binaries with `JL4_FIXED_NOW` pinned (probe `ledger-lest.l4`, a `RECORD`
+under a `LEST` reached by `WAIT UNTIL 14`): `at=2025-01-31T15:45:30Z` before and after, with only
+the residual moving (`WITHIN 5` → `WITHIN 1`). No ledger golden moves. There is nothing here for
+Meng to rule on unless the contract clock is one day made readable, at which point the question
+returns. (The brief's path `doc/reference/ledger` does not exist; the ledger's page is
+`doc/tutorials/multi-temporal-modeling/multi-temporal-rule-modeling.md`.)
+
+**What is NOT moved, on purpose.**
+
+- **The breach's own date.** A `DeadlineMissed` is still stamped at the event that revealed it and
+  carries the deadline it missed (`:1733`; `EVERY.md`'s "dated at the event that revealed"). §3.4's
+  last paragraph says dating the failure to the deadline would change that stamp and the goldens
+  that print it; that is a separate change and no ruling asks for it.
+- **A kept `SHANT`'s `HENCE`.** Its clock and its `THE JOIN` are still the revealing event's stamp
+  (`clockAt True`, `:1696`; §5.1.1.1's "For a kept `SHANT` the join is the event that revealed the
+  deadline had passed"; `README.md`'s kept-prohibition sentence; witness `run-anchors.l4` `kept,
+the join`, 33). §3.4 says a `SHANT` barrier "achieves at the deadline", and R-Q7 says a `HENCE`
+  counts from the join's firing, so a reading under which that `HENCE` should count from the
+  window's end (10 + 3 = 13, what `OF THE DEADLINE` gives today) is available; the ruling of §5.2
+  is about `LEST`, and this track did not move a `HENCE`. **Open to Meng's ruling**, recorded here
+  as the next item on this axis. If moved: `run-anchors.golden` `kept, the join` 33 → 13,
+  `README.md`'s sentence, `Syntax.hs`'s `THE JOIN` bullet, and a `SHANT` barrier's join time
+  (`Barrier2`'s `tLast` becomes the window's end).
+- Which member a barrier anchors at (the stack settled it); `AFTER`/`BEFORE`; `SOME m OF`.
+
+**Goldens.** Read before promotion, each with the reason the diff is right:
+
+- NEW `ok/every/tests/run-lest.{golden,ep.golden,nlg.golden,schema.golden}` — the 33 results
+  hand-computed in the witness's comments before the run, and matched; the pre-change numbers the
+  comments quote were measured on the parent's binary.
+- `ok/tests/deontic-breach-semantics.golden`: `anchor at reveal` — renamed `anchor at the
+deadline` — residual `WITHIN 3` → `BREACHED` at 7 reporting 5 (the `LEST` counts from 2, is due
+  at 5, and the re-offered Bob@7 reveals that too); `nested peel` `FULFILLED` → `BREACHED` at 30
+  reporting 15 (layers due at 2, 5, 15; Bob's delivery at 35 is never reached). Comments rewritten;
+  `.ep.golden` moves with them.
+- `ok/every/tests/run-blame.golden`: `staggered signing`'s refund deadline 11 → 8 (Carol's 5 + 3,
+  not the revealing 8 + 3); the refund at 12 still late. Comment rewritten; `.ep.golden` moves.
+- `legal/tests/promissory-note.golden`: the late-payment residual `WITHIN 61` → `WITHIN 44` — the
+  reparation counts from the missed first deadline (day 41 after 4 February 2025), so 61 days end
+  at day 102 and 44 remain on 3 April (day 58). Comment rewritten; `.ep.golden` moves.
+- `ok/tests/contracts.golden`: the third trace `FULFILLED` → `BREACHED` at 9 reporting 8 (B's
+  fine counts from the missed 5, not from the late payment at 6). A comment added; `.ep.golden`
+  moves.
+- `ok/every/tests/run-{stack,anchors}.{golden,ep.golden}`: comment edits only (the anchor
+  sentence in each header; `run-stack.l4` §3/§3b say how the tie is now decided), so the
+  `.ep.golden` moves and the `.golden` moves by source line ranges alone — every result block is
+  identical with the ranges normalised, which is the check that which member anchors did not
+  change. `run-blame.golden` likewise carries a shifted line cite inside a refusal message.
+- Nothing else moved. Every `ok/ledger` golden is byte-identical (the ledger measurement above).
+
+**Docs, same commit.** `doc/tutorials/obligations/what-follows.md`: the second-clock paragraph
+rewritten for the deadline (`WITHIN 13` and `WITHIN 6` as the pasted residuals, day 21, no
+workaround), Mr Lim's fourteen days from day 7 (his day-20 payment still timely; the day-22 case
+measured), the recap bullet and the table row; every pasted output re-run. `doc/reference/regulative/README.md`:
+the `WITHIN` paragraph's "today" sentence replaced, and the `LEST` section gains the rule by layer
+and modal, in a table, with the `OF THE DEADLINE` equivalence and the `SHANT` exception.
+`doc/reference/regulative/EVERY.md`: the two "not built" bullets deleted (the failed-barrier clock,
+the state-layer stream), the `LEST` paragraph states the rule, the header's verified line dated.
+`doc/concepts/legal-modeling/regulative-layer-whole.md`: the clock bullet and the built/proposed
+table (the blame-set row, built 2026-09-15 by the parent branch, moved to the built column while
+there). `skills/writing-l4-rules/references/regulative.md`: the unanchored default, which the
+skill had never stated, added beside the anchored form. Three doc `.l4` files' outputs move
+(`what-follows.l4`, `regulative-layer-whole-example.l4`, `courses/advanced/module-a2-cross-cutting-examples.l4`);
+only the first has its residuals pasted on a page.
+
+**For downstream re-pinning (item 9 of the build brief).** The clocks that move: the unanchored
+`LEST` deadline under a missed `MUST`/`DO`/`MAY` — single-party, fork member, and barrier
+member-failure (`JoinFailed` in `lts/p2-stack`'s terms) — from revealing stamp + `d` to deadline
+
+- `d`; and the state-layer `LEST`'s residual stream (events after the state deadline). Unchanged:
+  `memberDue`, `joinStateDue`, `MAY`-lapse routing (an expired `MAY` under a fork spawns no
+  continuation; under a barrier with no `LEST`, `FULFILLED`), the breach stamp, every `HENCE` clock
+  (`JoinExpired`'s included), `THE DEADLINE`, the `SHANT` `LEST`, and the number of times a
+  barrier's `LEST` fires (once).
+
+**Not verified here.** The full `etc/verify-branch.sh` as one run (the Verify stage's); the §3.2.1
+evaluation differential (no printer is touched); `jl4-service-test`, `jl4-lsp-test`,
+`jl4-websessions-test`, `jl4-mlir-test` beyond `cabal build all`; an unsorted event stream through
+the service (where prefix-drop and filter would differ); `lts/p2-stack` and PR #395's pins, which
+are not in this tree.
+
+**What the adversarial pass of 2026-09-16 changed.** Pending, filled after the refute stage.
 
 ### 5.3 Temporal Forking (MAY Exercise)
 
@@ -2452,9 +2632,11 @@ only insofar as both operands were always run; it is new for the barrier.
 - **with a `LEST`:** the `LEST` runs once, with the anchor and residual stream of the earliest
   failure. The ordering key is the failpoint sentinel's own anchor, forced (`BarrierFailedAt.failAt`,
   `ContractFrame.hs:298`; it is the same reference the `LEST` is handed), so whatever §5.2 makes the
-  anchor read, the ordering follows — there is no second key to switch. Today the anchor reads the
-  revealing event's stamp (§5.2's deadline anchor is NOT built here; the anchor's VALUE is untouched,
-  one change in one place for the §5.2 track), which — **for `MUST`/`DO`/`MAY`** — orders by the
+  anchor read, the ordering follows — there is no second key to switch. On this branch the anchor
+  read the revealing event's stamp (§5.2's deadline anchor was NOT built here; the anchor's VALUE
+  was untouched, one change in one place for the §5.2 track — which made it on 2026-09-16, §5.2.1,
+  after which the anchor IS the failure time and the "up to ties" reasoning that follows is
+  history), which — **for `MUST`/`DO`/`MAY`** — ordered by the
   missed deadline **up to ties**: every member scans the same stream, so an earlier deadline is
   revealed by an earlier-or-equal event; two deadlines revealed by the same event tie, the tie
   keeps the first in roll order, and that is the same event — same anchor, same residual — so the
@@ -2602,7 +2784,9 @@ deontic step log both rest on them). (1) **A barrier's `LEST` fires ONCE, for th
 blame LIST grows; the number of `LEST` firings does not (`barrierFinish`, `Machine.hs:2306`, runs
 the `LEST` once with the earliest failure's anchor and residual). (2) **The anchor is the earliest
 failure by R-Q5's failure time, and its VALUE is the revealing event's stamp** — the deadline
-anchor of §5.2 is not built on this branch.
+anchor of §5.2 is not built on this branch. (Built 2026-09-16 on `every/lest-anchor`, §5.2.1: the
+anchor's VALUE is now the failure time itself — the missed deadline for `MUST`/`DO`/`MAY`, the
+violating stamp for `SHANT`; invariant (1) stands.)
 
 **Owed downstream, not done here.** The BPMN export's barrier `LEST` arm is a bare
 `<endEvent errorRef="Error_breach">` (`L4.Bpmn.Emit`'s `sharedErrorId`, wired from
@@ -2982,14 +3166,23 @@ failure rather than the first in roll order; `RAND`/`ROR` carry both operands' f
 barrier's own `LEST BREACH` still names whom the drafter names, and the anchor's VALUE is still the
 revealing stamp (next bullet).
 
+**Built 2026-09-16**, on `every/lest-anchor` (cut from `every/anchors-on-blame`), witnessed by
+`jl4/examples/ok/every/run-lest.l4` — **§5.2's deadline anchor** (R-Q7's unanchored `LEST` default,
+R-Q5's failure time). Until then a `LEST` continuation was anchored at the revealing event's stamp,
+and this list carried it as "still owed" with the note that the phase-2 build had deliberately made
+`EVERY` match the single-party path so that §5.2 stayed one change in one place. It was: the
+single obligation's expiry now hands its `LEST` the missed deadline as the clock (`MUST`/`DO`/`MAY`;
+a `SHANT`'s `LEST` already counted from the violation), and a barrier member — a single obligation
+whose `LEST` slot holds the failpoint sentinel — carries that same reference to the barrier, so the
+barrier's `LEST` counts from the earliest-failing member's deadline with no change of its own.
+`THE DEADLINE` under a `LEST` and the unanchored default are one reference. The state-layer `LEST`
+(`barrierStateMissed`) is now handed the events after the state deadline, not the whole stream
+(the stack's round-1 finding R1-5, below). §5.2.1 has the mechanism, the decisions (the consume
+branch anchors at the deadline; a kept `SHANT`'s `HENCE` is NOT moved and is recorded as open),
+the goldens that moved with one reason each, the docs, and the clocks downstream re-pins against.
+
 **Not built, and each one is a place a run gives a coarser answer than this document specifies:**
 
-- **§5.2's deadline anchor.** A `LEST` continuation is anchored at the revealing event's stamp, not
-  at the missed deadline. §5.2 records that changing this changes the **single-party** path and
-  every trace golden that prints a reparation deadline; the build deliberately made `EVERY` match
-  the single-party path rather than diverge from it, so that §5.2 remains one change to make in one
-  place. It is still owed. (Since 2026-09-15 a barrier's `LEST` is anchored at the EARLIEST failure,
-  which is R-Q5's ordering; what the anchor reads at that failure is still the stamp.)
 - **The residual of an unfinished barrier** is the outstanding members' obligations — with their
   deadlines correctly decremented, and carrying the machine's two sentinels in their `HENCE` and
   `LEST` slots (they print as `` `the join` `` and `` `the join fails` ``) — but WITHOUT the join
@@ -3180,7 +3373,8 @@ under a LEST`, `handed under a LEST, in a compound`, `handed to no WITHIN` — t
   (`within-example.l4`), `EVERY.md`'s "Anchored deadlines under a join", and the
   `writing-l4-rules` skill's three copies of the "does not parse" claim corrected.
 
-**Not built**, each named in §5.1.1.1's last paragraph: `AFTER`; §5.2's `LEST` default; T1's epoch
+**Not built**, each named in §5.1.1.1's last paragraph: `AFTER`; §5.2's `LEST` default (built
+2026-09-16 by its own track, §5.2.1); T1's epoch
 and sorts (so the floating-origin/date-serial confusion is a stated limit, not a check); §5.1.3's
 expression-over-trace slot; `THE OPENING`; `SOME m OF`; a way for a deep continuation to name a
 non-nearest obligation's arming.
@@ -3243,7 +3437,8 @@ Raised and NOT changed, with the reason: binding `THE ARMING` on a nested `EVERY
 the `EVERY`'s own arming (both refuters: it contradicts the nearest-enclosing rule and
 `EVERY.md`'s "as on a `PARTY` rule in the same place"; a doc sentence was added instead);
 binding a kept `SHANT`'s join to its deadline (it would part `OF THE JOIN` from the unanchored
-clock, which §5.2's track owns; documented instead); resetting the `OF`-is-anchor flag inside
+clock, which §5.2's track owns; documented instead — that track, 2026-09-16, moved the `LEST`
+clock only and left this open to Meng's ruling, §5.2.1); resetting the `OF`-is-anchor flag inside
 `IF`/`WHERE`/operand positions of the duration (the whole-slot rule is the simpler statement and
 the bracketing fix is one keystroke; documented, and the checker now names it); making the
 `unexpected OF` parse error inside an unclosed `IF` list `OF` (megaparsec reports what the open
@@ -3484,9 +3679,12 @@ none.
   at `Barrier4`, `Machine.hs:1954-1964`), is wrong in the other direction: it starts after the
   LAST completion, which is after the state deadline, so a refund at 11 — after the trigger at
   10, before Bob's 12 — would be invisible. The right stream starts at the first event after the
-  state deadline, which no frame computes today (it needs a stamp-walk of `ctx.events`), and it
-  is §5.2-adjacent work, out of this stack's scope. `EVERY.md` now states the limit under "Runs,
-  but not yet as the design says", next to the same-instant bullet.
+  state deadline, which no frame computed then (it needs a stamp-walk of `ctx.events`), and it
+  was §5.2-adjacent work, out of this stack's scope. `EVERY.md` stated the limit under "Runs,
+  but not yet as the design says", next to the same-instant bullet. **Applied 2026-09-16 by the
+  §5.2 track** (§5.2.1): the `BarrierTrim` frames walk the stream to the first event past the
+  state deadline, witness `run-lest.l4` §6 (the refund at 1 no longer discharges; a refund at 11
+  does), and the `EVERY.md` bullet is gone.
 - **The stacking paragraph's `barrierJoined` and `earliestFailure` cite ranges were off by a line
   or stopped mid-function**, and its "(a lapsed `MAY` no longer returns through the join tail)"
   parenthetical described a history neither parent had (on both, a lapsed `MAY`'s `ValFulfilled`

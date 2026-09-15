@@ -1854,24 +1854,44 @@ backwardContractFrame val = \ case
       -- continuation, which then processes the event). So we re-offer the
       -- revealing event to the HENCE/LEST continuation — e.g. a payment
       -- arriving after the deadline must still be able to discharge the LEST
-      -- reparation it was authored for. The continuation's clock is anchored
-      -- at the revealing event's stamp (the README is silent on the anchor;
-      -- this is the historical behavior), so the re-offered event decrements
-      -- the continuation's WITHIN by zero.
+      -- reparation it was authored for.
+      --
+      -- The continuation's CLOCK — what an unanchored WITHIN inside it
+      -- counts from (R-Q7's default, spec §5.1/§5.2) — depends on the slot:
+      --
+      --   * under LEST it is the FAILURE TIME, which R-Q5 fixes by modal:
+      --     for MUST/DO/MAY the deadline that was just missed (§5.2, built
+      --     2026-09-16), so a defaulting party's silence cannot postpone
+      --     the start of its own cure period; the re-offered event then
+      --     decrements the continuation's WITHIN by the time that had
+      --     already passed since the deadline. It is the SAME reference
+      --     THE DEADLINE reads in that continuation ('lifecycleAt'), so
+      --     @WITHIN d@ and @WITHIN d OF THE DEADLINE@ agree under LEST by
+      --     construction. (For SHANT the failure is a violation, handled
+      --     at 'Contract10' with the violating event's own stamp.)
+      --   * under HENCE — here, a kept prohibition — it is the hand-off,
+      --     i.e. the revealing event's stamp, which is also THE JOIN there
+      --     (spec §5.1.1.1; moving a kept SHANT's join to its deadline is
+      --     a separate decision, not taken here).
+      --
+      -- Before 2026-09-16 both slots used the revealing event's stamp,
+      -- which made the re-offered event decrement a LEST's WITHIN by zero.
       --
       -- Termination: an event is re-offered AT MOST ONCE. Peeling one
       -- syntactic HENCE/LEST layer per re-offer is NOT enough on its own,
       -- because a continuation may recursively reference the enclosing
-      -- obligation (e.g. @x MEANS PARTY p MUST a WITHIN d LEST x@): the
-      -- continuation re-anchors at the revealing stamp, so a non-positive
-      -- computed WITHIN makes its deadline already expired for the very same
-      -- event, and unconditional re-offering would loop forever. Hence each
-      -- re-offered event is marked (by store address, 'markReoffered'); when
-      -- a marked event reveals yet another expiry, the continuation consumes
-      -- it — the pre-re-offer behavior — instead of re-offering it again
-      -- ('ev'reoffered', computed at Contract1). Each real event thus funds
-      -- at most one extra scrutiny, and the event list strictly shrinks on
-      -- every other step, so evaluation terminates.
+      -- obligation (e.g. @x MEANS PARTY p MUST a WITHIN d LEST x@), and
+      -- because a LEST continuation counts from the missed deadline, its
+      -- own deadline can lie BEFORE the re-offered event's stamp — the
+      -- ordinary case whenever the miss came to light late — so the very
+      -- same event reveals a second expiry, and unconditional re-offering
+      -- would loop forever. Hence each re-offered event is marked (by store
+      -- address, 'markReoffered'); when a marked event reveals yet another
+      -- expiry, the continuation consumes it — the pre-re-offer behavior —
+      -- instead of re-offering it again ('ev'reoffered', computed at
+      -- Contract1). Each real event thus funds at most one extra scrutiny,
+      -- and the event list strictly shrinks on every other step, so
+      -- evaluation terminates.
       --
       -- STATE-AS-LEDGER (M4) integration: rather than calling 'continueWithFollowup'
       -- directly (as the re-offer logic did before the ledger landed),
@@ -1884,7 +1904,13 @@ backwardContractFrame val = \ case
         -- What the continuation may anchor to (R-Q7B): the deadline that
         -- just passed, this obligation's arming, and — only when the
         -- continuation is the HENCE, i.e. the join fired — the hand-off
-        -- clock as THE JOIN.
+        -- clock as THE JOIN. Under LEST the hand-off clock IS 'deadlineR'
+        -- (§5.2): one reference, read both as the unanchored default and
+        -- as THE DEADLINE, so the two cannot drift apart. A barrier member
+        -- hands that same reference to the failure sentinel as its anchor
+        -- ('continueWithFollowup', 'sentinelArgs'), which is how the
+        -- barrier's LEST comes to count from the failing member's deadline
+        -- without a mechanism of its own ('barrierFail').
         deadlineR <- allocateValue (ValNumber deadline)
         -- P2b: the 'Expired' step. It is built here, where the deadline and
         -- the revealing event are in hand, but LOGGED at the ResolveParty
@@ -1905,21 +1931,24 @@ backwardContractFrame val = \ case
               { join = if isHence then Just t else Nothing
               , deadline = Just deadlineR
               , armed }
+            clockAt isHence stampR = if isHence then stampR else deadlineR
             reofferResolve isHence followup' branch = do
               pending <- expiredStep branch Nothing
               if ev'reoffered
                 then do
                   -- this event was already re-offered once and has now
-                  -- revealed a second expiry: consume it (see NOTE above)
+                  -- revealed a second expiry: consume it (see NOTE above).
+                  -- The failure time is the deadline whether the event
+                  -- that revealed the miss was fresh or already marked.
                   t <- allocateValue ev'time
-                  pushCFrame (ResolveParty ResolvePartyFrame {followup = followup', env, events, time = t, pending, seen, lifecycle = lifecycleAt isHence t})
+                  pushCFrame (ResolveParty ResolvePartyFrame {followup = followup', env, events, time = clockAt isHence t, pending, seen, lifecycle = lifecycleAt isHence t})
                   maybeEvaluate env party
                 else do
                   ev'timeR <- allocateValue ev'time
                   evR <- allocateValue (ValEvent ev'party ev'act ev'timeR)
                   markReoffered evR
                   eventsR <- allocateValue (ValCons evR events)
-                  pushCFrame (ResolveParty ResolvePartyFrame {followup = followup', env, events = eventsR, time = ev'timeR, pending, seen, lifecycle = lifecycleAt isHence ev'timeR})
+                  pushCFrame (ResolveParty ResolvePartyFrame {followup = followup', env, events = eventsR, time = clockAt isHence ev'timeR, pending, seen, lifecycle = lifecycleAt isHence ev'timeR})
                   maybeEvaluate env party
         case act.modal of
           DMustNot ->
@@ -1929,12 +1958,17 @@ backwardContractFrame val = \ case
           DMay ->
             -- Permission was NOT EXERCISED: per the README default-consequence
             -- matrix, expiry of a MAY routes to LEST (default FULFILLED);
-            -- HENCE fires only when the permitted action is taken.
+            -- HENCE fires only when the permitted action is taken. The
+            -- LEST counts from the deadline, as a MUST's does (R-Q5: a MAY
+            -- fails at its deadline).
             reofferResolve False (fromMaybe fulfilExpr lest) ToLest
           _ -> -- DMust, DDo: deadline passed = failure
             case lest of
               Nothing -> do
                 -- NOTE: this is not too nice, but not wanting this would require to change `App1` to take MaybeEvaluated's
+                -- The breach is DATED at the revealing event ('stamp') and
+                -- carries the deadline it missed; §5.2 moves the LEST's
+                -- clock, not this stamp (spec §3.4's last paragraph).
                 partyR <- either (`allocate_` env) allocateValue party
                 -- P2b: no continuation to force the party in; the bearer is
                 -- what the breach's own party cell holds, if anything has
@@ -2001,9 +2035,15 @@ backwardContractFrame val = \ case
             -- Prohibition violated: action was done, trigger LEST clause
             Just lestFollowup -> do
               matchedStep ToLest
+              -- The LEST counts from the violating event's own stamp,
+              -- which 'time' already is here ('Contract6' set it): R-Q5's
+              -- failure time for SHANT, the one modal whose failure is an
+              -- act rather than a lapse (spec §5.2). The violating event
+              -- is consumed, not re-offered — 'events' is what followed it.
               timeR <- allocateValue time
               deadlineR <- absoluteDeadline time due
-              -- LEST: the join did not fire, so no THE JOIN (R-Q7B)
+              -- LEST: the join did not fire, so no THE JOIN (R-Q7B); THE
+              -- DEADLINE is the window's end, which is NOT the clock here
               let lifecycle = MkLifecycle {join = Nothing, deadline = deadlineR, armed}
               continueWithFollowup (Just (partyKeyWHNF party)) lifecycle (env `Map.union` henceEnv) lestFollowup events timeR seen
             -- No LEST clause: immediate breach
@@ -2053,6 +2093,8 @@ backwardContractFrame val = \ case
     -- 'val' is the obligation party, now forced to WHNF by 'maybeEvaluate env party'
     -- on the deadline-passed / LEST path. Key it exactly as the matched HENCE path
     -- does, so a RECORD in the followup/reparation attributes to the real party.
+    -- 'time' is the continuation's clock as 'Contract5' chose it: the
+    -- missed deadline under LEST, the revealing event's stamp under HENCE.
     continueWithFollowup (Just (partyKeyWHNF val)) lifecycle env followup events time seen
   -- R-Q7B: the continuation's value, about to meet its [time, events]: make
   -- the anchors inside it name THIS hand-off's obligation, whatever
@@ -2109,13 +2151,16 @@ backwardContractFrame val = \ case
       -- barrier's LEST needs — so it runs ONCE, after every member has been
       -- run ('barrierFinish'), anchored at the EARLIEST failure, and no
       -- member is ever applied to the stream a second time. The anchor is
-      -- forced here so the failures can be ordered. The sentinel also
-      -- carries the stream position of the event that revealed the miss
-      -- (its third argument; forced next, 'Barrier5c') and the member's
-      -- missed deadline (its fourth, when it had one; 'Barrier5b'), which is
-      -- what OF THE DEADLINE in the LEST names (R-Q5's act layer, R-Q7B):
-      -- kept beside the anchor, so the LEST is handed the deadline of the
-      -- member whose failure anchors it.
+      -- forced here so the failures can be ordered; it is R-Q5's failure
+      -- time as 'Contract5' and 'Contract10' compute it for a single
+      -- obligation — the member's missed deadline for MUST/DO/MAY (§5.2),
+      -- its violating event's stamp for SHANT. The sentinel also carries
+      -- the stream position of the event that revealed the miss (its third
+      -- argument; forced next, 'Barrier5c') and the member's deadline (its
+      -- fourth, when it had one; 'Barrier5b'), which is what OF THE
+      -- DEADLINE in the LEST names (R-Q7B): kept beside the anchor, so the
+      -- LEST is handed the deadline of the member whose failure anchors it
+      -- — for MUST/DO/MAY the very same reference as the anchor.
       ValConstructor n args
         | Just fp <- failpoint, n `sameResolved` fp
         , Just (dRef, pRef, tRef, evRef) <- sentinelArgs args -> do
@@ -2173,8 +2218,11 @@ backwardContractFrame val = \ case
   -- is forced next ('Barrier5c'): it breaks a tie between two failures at
   -- one stamp that two DIFFERENT events revealed (a SHANT barrier, where the
   -- failure is the member's own violating event). Then the member's
-  -- deadline, when it had one ('Barrier5b'): it breaks a tie between two
-  -- failures the SAME event revealed.
+  -- deadline, when it had one ('Barrier5b'). Since the anchor became the
+  -- deadline for MUST/DO/MAY (§5.2, 2026-09-16) the third key can no
+  -- longer separate what the first two tied: two such members with one
+  -- anchor have one deadline, and are revealed by one event. It is kept,
+  -- and documented as redundant, rather than half-removed.
   Barrier5 BarrierFailStampFrame {..} -> do
     stamp <- assertTime val
     pushCFrame (Barrier5c BarrierFailPosFrame {step, failAt = stamp, timeRef, evsRef, dueRef})
@@ -2240,6 +2288,33 @@ backwardContractFrame val = \ case
         tRef <- allocateValue (ValNumber joinTime)
         dRef <- allocateValue (ValNumber stateDeadline)
         fireBarrierHence ctx (Just dRef) tRef joinEvents
+  -- EVERY, the barrier, the state layer's LEST ('barrierStateMissed'): the
+  -- walk from the barrier's arming to the first event stamped after the
+  -- state deadline, one cons cell per step — the cell, then its event, then
+  -- the event's stamp — so the LEST is handed the stream from that event
+  -- on, as the act layer hands its LEST the stream from the revealing
+  -- event on. The walk stops at the FIRST such event and keeps everything
+  -- after it (a trace is stamp-sorted, so that is also every such event).
+  BarrierTrim BarrierTrimFrame {..} -> case val of
+    ValNil -> barrierStateLest ctx lestExpr cutoffRef cell
+    ValCons e es -> do
+      pushCFrame (BarrierTrimEvent BarrierTrimCellFrame {rest = es, ..})
+      continueRef e
+    _ -> internalException $ RuntimeTypeError $
+      "expected LIST EVENT but found: " <> prettyLayout val <> " when trimming a barrier's stream to its state deadline"
+  BarrierTrimEvent BarrierTrimCellFrame {..} -> case val of
+    ValEvent _ _ tR -> do
+      pushCFrame (BarrierTrimStamp BarrierTrimCellFrame {..})
+      continueRef tR
+    _ -> internalException $ RuntimeTypeError $
+      "expected an EVENT but found: " <> prettyLayout val <> " when trimming a barrier's stream to its state deadline"
+  BarrierTrimStamp BarrierTrimCellFrame {..} -> do
+    stamp <- assertTime val
+    if stamp > cutoff
+      then barrierStateLest ctx lestExpr cutoffRef cell
+      else do
+        pushCFrame (BarrierTrim BarrierTrimFrame {cell = rest, ..})
+        continueRef rest
   RBinOp1 MkRBinOp1 {..}
     -- NOTE: this is weirdly asymmetric because
     -- in case of AND we can never abort earlier but have to instead
@@ -2777,6 +2852,13 @@ barrierMember ctx cp cpRef mfail mdue (mref, mval) =
 -- stream every continuation receives, then the stream position of the event
 -- the hand-off happened at, then the member's absolute deadline when it had
 -- one. See 'barrierMember' and 'continueWithFollowup'.
+--
+-- For a MUST\/DO\/MAY member's failure the first and the fourth are the SAME
+-- reference (§5.2: the LEST's clock is the missed deadline, and 'Contract5'
+-- hands one 'deadlineR' as both). That is deliberate, not a duplicate to
+-- fold away: the fourth argument is what OF THE DEADLINE reads and exists
+-- for the checkpoint and the SHANT failure too, where it differs from the
+-- first.
 sentinelArgs :: [Reference] -> Maybe (Maybe Reference, Reference, Reference, Reference)
 sentinelArgs = \ case
   [tRef, evRef, pRef]       -> Just (Nothing, pRef, tRef, evRef)
@@ -2860,28 +2942,27 @@ barrierNext step = case step.queue of
 --     ('BarrierFailedAt'). The @LEST@ runs ONCE, with the anchor, the
 --     residual stream AND the missed deadline (R-Q7B's @THE DEADLINE@) of
 --     the EARLIEST failure. The ordering key is the sentinel's own anchor,
---     forced ('failAt' is the same reference the @LEST@ is handed), so
---     whatever §5.2 makes that anchor read, the ordering follows it. Today
---     it reads the revealing event's stamp. For @MUST@\/@DO@\/@MAY@ that
---     orders by the missed deadline UP TO TIES: every member scans the same
---     stream, so an earlier deadline is revealed by an earlier-or-equal
---     event; two deadlines revealed by the same event tie. For @SHANT@ the
---     stamp is the violating event's own, which the window's end does not
---     order, and two members violated at one stamp are two DIFFERENT events
---     with two different residuals — a tie there is NOT the same event. So
---     a tie on the stamp is broken first by the stream position ('failPos':
---     the failure the stream reached first, whose residual still holds
---     whatever followed it; measured before this key, a refund between two
---     same-stamp violations was dropped from the chosen residual and the
---     verdict flipped, spec §11.0.1 round 1), which only the same event
---     ties — hence the same anchor and the same residual, but not the same
---     deadline, and @OF THE DEADLINE@ in the @LEST@ reads the chosen
---     member's, so that tie is broken by the deadline missed ('failDue';
---     measured before this key: `LIST alice, bob, carol` reported 19 and the
---     reversed roll 10 for the same events) — and only a tie on all three
---     keeps the first in roll order, which then names the same anchor,
---     residual and deadline either way. §5.2's change of what the anchor IS
---     is not built here.
+--     forced ('failAt' is the same reference the @LEST@ is handed), and
+--     since 2026-09-16 that anchor IS R-Q5's failure time (§5.2): for
+--     @MUST@\/@DO@\/@MAY@ the member's missed deadline, for @SHANT@ its
+--     violating event's stamp — so the primary key orders by the failure
+--     time directly, for every modal. For @MUST@\/@DO@\/@MAY@ a tie on it
+--     is two members with one deadline, which the same event reveals, so
+--     the later keys tie too and roll order names the same anchor, residual
+--     and deadline either way. For @SHANT@ the window's end does not order
+--     the failures at all, and two members violated at one stamp are two
+--     DIFFERENT events with two different residuals — a tie there is NOT
+--     the same event. So a tie on the stamp is broken first by the stream
+--     position ('failPos': the failure the stream reached first, whose
+--     residual still holds whatever followed it; measured before this key,
+--     a refund between two same-stamp violations was dropped from the
+--     chosen residual and the verdict flipped, spec §11.0.1 round 1), which
+--     only the same event ties; then by the deadline ('failDue', added when
+--     the anchor was still the revealing stamp and one event could reveal
+--     two deadlines — measured then: `LIST alice, bob, carol` reported 19
+--     and the reversed roll 10 for the same events; now redundant for every
+--     modal, kept rather than half-removed), and only a tie on all three
+--     keeps the first in roll order.
 --   * with no @LEST@, each failure is the member's own breach
 --     ('BarrierBreached'). The verdict is ONE breach: anchored at the
 --     earliest failure — the smallest missed deadline for @MUST@\/@DO@, the
@@ -3039,10 +3120,12 @@ fireBarrierHence ctx deadlineRef timeRef eventsRef = do
 -- stream twice.
 --
 -- The anchor is therefore the machine's usual one for a single-party
--- obligation — the revealing event's stamp, not the missed deadline. §5.2
--- rules that this should become the deadline, for the single-party path and
--- this one together; making only this one diverge would leave the language
--- with two anchors.
+-- obligation, by construction: the member IS a single obligation, and its
+-- 'Contract5' (a missed MUST\/DO\/MAY: the deadline, §5.2 since 2026-09-16)
+-- or 'Contract10' (a SHANT violation: the event's stamp) chose the clock
+-- before the sentinel ever saw it. There is one anchor mechanism in the
+-- language and this function adds nothing to it — which is why it did not
+-- change when the single-party clock did.
 --
 -- The LEST is the drafter's expression, run as written: a bare @LEST BREACH@
 -- names nobody, and @LEST BREACH BY LIST a, b@ names whom the drafter named.
@@ -3078,7 +3161,16 @@ barrierFail ctx deadlineRef timeRef eventsRef = case ctx.deonton.lest of
 -- deadline, which bounds the whole (R-T2).
 --
 -- The LEST is anchored at the state deadline, which is also what THE
--- DEADLINE names in it (R-Q5's state layer, R-Q7B).
+-- DEADLINE names in it (R-Q5's state layer, R-Q7B), and it is handed the
+-- events AFTER that deadline — the same shape the act layer gives its LEST
+-- (from the revealing event on), found here by walking the barrier's stream
+-- from its arming to the first event stamped past the deadline
+-- ('BarrierTrim'). Until 2026-09-16 the LEST was handed the WHOLE stream
+-- from the arming, so a reparation performed before the deadline was
+-- missed, even before anyone had acted, discharged it (spec §11.0.1,
+-- "Stacking B on C" round 1, R1-5); the join's own residual — what followed
+-- the LAST completion — is wrong the other way, since that completion is
+-- what landed after the deadline.
 --
 -- P2b logs the 'JoinExpired' step here, in each arm beside the routing it
 -- records, so the log cannot classify the routing differently from the
@@ -3088,18 +3180,27 @@ barrierStateMissed ctx joinTime deadline = case ctx.deonton.lest of
   Just lestExpr -> do
     tellDeonticStep $ plainStep (Just joinTime) Nothing NoEvent ctx.norm (JoinExpired ToLest deadline)
     tRef <- allocateValue (ValNumber deadline)
-    mOriginal <- getCurrentParty
-    putCurrentParty Nothing
-    pushFrame (RestoreCurrentParty mOriginal)
-    pushFrame (App1 [tRef, ctx.events] Nothing)
-    let lifecycle = MkLifecycle {join = Nothing, deadline = Just tRef, armed = ctx.time}
-    pushFrame (ContractFrame (Handoff lifecycle))
-    continueExpr (bindLifecycle lifecycle ctx.env) lestExpr
+    pushFrame (ContractFrame (BarrierTrim BarrierTrimFrame
+      {ctx, lestExpr, cutoff = deadline, cutoffRef = tRef, cell = ctx.events}))
+    continueRef ctx.events
   Nothing -> do
     tellDeonticStep $ plainStep (Just joinTime) Nothing NoEvent ctx.norm (JoinExpired ToBreach deadline)
     reason <- allocateValue (ValString
       "every member acted, but the last of them acted after the ONCE line's WITHIN deadline")
     continueBackward (ValBreached (ExplicitBreach (singleBlame (DeclaredBreach Nothing (Just reason)))))
+
+-- | The state-layer LEST, applied to the trimmed stream ('BarrierTrim'):
+-- @cellRef@ is the first cell of the barrier's stream whose event is
+-- stamped after the state deadline (or the empty list).
+barrierStateLest :: QuantCtx -> RExpr -> Reference -> Reference -> Machine Config
+barrierStateLest ctx lestExpr tRef cellRef = do
+  mOriginal <- getCurrentParty
+  putCurrentParty Nothing
+  pushFrame (RestoreCurrentParty mOriginal)
+  pushFrame (App1 [tRef, cellRef] Nothing)
+  let lifecycle = MkLifecycle {join = Nothing, deadline = Just tRef, armed = ctx.time}
+  pushFrame (ContractFrame (Handoff lifecycle))
+  continueExpr (bindLifecycle lifecycle ctx.env) lestExpr
 
 -- * The lifecycle bindings an anchored WITHIN reads
 --

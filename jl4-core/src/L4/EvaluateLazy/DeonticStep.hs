@@ -29,7 +29,16 @@
 --   @EVERY@ the members share a site and differ in bearer and ordinal.
 -- * An event can appear twice, once as 'WitnessedOnly' by an expiring
 --   obligation and once as 'Reoffered' to the continuation (§4.4). The
---   animator must not draw that as two events.
+--   animator must not draw that as two events. A barrier's STATE-layer
+--   @LEST@ (@ONCE ALL HAVE WITHIN d@ missed, 'JoinExpired') is handed the
+--   members' own stream from the first event past the state deadline on
+--   (@BarrierTrim@, 2026-09-16), UNMARKED: an event a member 'Consumed' —
+--   the completion that landed after the deadline — appears again under
+--   the @LEST@'s obligation as a fresh look ('WitnessedOnly' on a
+--   mismatch, 'Consumed' on a match), not as 'Reoffered'. The re-offer
+--   mark is the act layer's (@Contract5@); nothing marks the state layer's
+--   hand-off. A consumer counting events must pair those looks by stamp,
+--   party and action, not by the mark (pinned by DeonticStepSpec case 18).
 --
 -- == Loud and silent
 --

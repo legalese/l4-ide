@@ -5,7 +5,11 @@
 --       one operand (RAND the earliest, ROR the latest; untimestamped pairs
 --       tie-break RAND left, ROR right), naming BOTH failures with their detail.
 --   (c) the event whose timestamp reveals deadline expiry is re-offered to
---       the HENCE/LEST continuation instead of being silently consumed.
+--       the HENCE/LEST continuation instead of being silently consumed;
+--       a LEST continuation's clock starts at the MISSED DEADLINE
+--       (EVERY-EACH-QUANTIFIER-SPEC §5.2, since 2026-09-16), so the
+--       re-offered event may already lie past the continuation's own
+--       deadline.
 --   (d) the deadline boundary is strict: arriving exactly AT the deadline is
 --       timely; a violated prohibition reuses the event stamp as its
 --       "deadline" sentinel.
@@ -107,16 +111,20 @@ GIVETH A DEONTIC Person Action
 #TRACE `prohibition hence sees the revealer` AT 0 WITH
   PARTY Bob DOES deliver AT 7
 
-`anchor at reveal` MEANS
+`anchor at the deadline` MEANS
   PARTY Alice
   MUST pay 1
   WITHIN 2
   LEST (PARTY Alice MUST pay 2 WITHIN 3)
 
--- The continuation's clock anchors at the revealing event's stamp: the
--- re-offered event (Bob at 7, wrong party) decrements the LEST WITHIN by
--- zero, so the residual still shows WITHIN 3.
-#TRACE `anchor at reveal` AT 0 WITH
+-- The continuation's clock anchors at the missed deadline (2), so its own
+-- deadline is 5. The re-offered event (Bob at 7, wrong party) is already
+-- past it: it reveals a second expiry, is consumed rather than re-offered
+-- again, and — the LEST having no LEST of its own — the answer is a breach
+-- dated 7 with deadline 5. (Until 2026-09-16 the clock anchored at the
+-- revealing stamp, 7, the re-offered event decremented the WITHIN by zero
+-- and the residual read WITHIN 3.)
+#TRACE `anchor at the deadline` AT 0 WITH
   PARTY Bob DOES deliver AT 7
 
 `nested peel` MEANS
@@ -125,10 +133,14 @@ GIVETH A DEONTIC Person Action
   WITHIN 2
   LEST (PARTY Alice MUST pay 2 WITHIN 3 LEST (PARTY Bob MUST deliver WITHIN 10))
 
--- Each re-offer peels exactly one HENCE/LEST layer (termination), and WAIT
--- sentinels re-offered to a continuation merely advance its clock:
--- WAIT@20 expires layer 1, WAIT@30 expires layer 2 (deadline 20+3),
--- Bob's delivery at 35 discharges layer 3 (deadline 30+10) => FULFILLED.
+-- Each re-offer peels exactly one HENCE/LEST layer (termination). WAIT@20
+-- expires layer 1 (deadline 2) and is re-offered to layer 2, which counts
+-- from 2 and is due at 5 — so the same WAIT@20, now marked, reveals a
+-- second expiry and is CONSUMED; layer 3 counts from 5 and is due at 15.
+-- WAIT@30 expires it: no LEST, so a breach dated 30 with deadline 15, and
+-- Bob's delivery at 35 is never reached. (Until 2026-09-16 each layer
+-- counted from the revealing stamp — deadlines 2, 23, 40 — and the
+-- delivery at 35 discharged layer 3: FULFILLED.)
 #TRACE `nested peel` AT 0 WITH
   (`WAIT UNTIL` 20)
   (`WAIT UNTIL` 30)
@@ -239,8 +251,9 @@ GIVETH A DEONTIC Person Action
 
 -- The LEST recursively re-invokes the same obligation, whose computed WITHIN
 -- is negative, so each incarnation's deadline is already past at its own
--- anchor. The revealing event (Bob's delivery — wrong party, wrong action)
--- is re-offered ONCE to the first LEST incarnation; when it reveals a second
+-- anchor (the previous incarnation's missed deadline: -1, then -2). The
+-- revealing event (Bob's delivery — wrong party, wrong action) is
+-- re-offered ONCE to the first LEST incarnation; when it reveals a second
 -- expiry there, it is consumed instead of being re-offered again, so
 -- evaluation terminates with the recursive obligation as the residual
 -- (before the at-most-once rule this trace looped forever).

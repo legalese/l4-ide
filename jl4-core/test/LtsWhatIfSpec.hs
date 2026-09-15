@@ -257,8 +257,13 @@ spec = describe "LTS-VISUALISER §2.4 / P2c: the enabled set by replay" $ do
     map row es.esOutcomes `shouldBe`
       [ Row (CouldNot "B" "payment price") Untriable
       -- the source writes EXACTLY, so the deontic printer keeps it, in its own
-      -- bracketed form — the same form `l4 run`'s DEONTIC print uses
-      , Row (TickAt 6 ["B"]) (Advances ["in effect: B MUST (EXACTLY (payment OF fine)) WITHIN 3"]) ]
+      -- bracketed form — the same form `l4 run`'s DEONTIC print uses. The
+      -- LEST's WITHIN 3 counts from the missed deadline (5), not from the
+      -- tick that revealed the miss (6): EVERY-EACH-QUANTIFIER-SPEC §5.2,
+      -- 2026-09-16, so one unit has run by the time it is listed. Pinned
+      -- from the runtime on 2026-09-17, when that change was rebased over
+      -- this module; it read WITHIN 3 before it.
+      , Row (TickAt 6 ["B"]) (Advances ["in effect: B MUST (EXACTLY (payment OF fine)) WITHIN 2"]) ]
     -- and the reason names the binder
     case es.esOutcomes of
       (o : _) -> o.ocCandidate.cdHypothetical `shouldBe` Left "the action binds `price`, which the what-if cannot choose"

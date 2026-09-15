@@ -65,7 +65,7 @@ saleContract — after 1 event, the clock stands at 2 (the #TRACE on line 27)
 
   What would move things along (neither ends nor breaches it):
     - nothing happens by 9 (the clock reaches 10) → then:
-          · Buyer MUST payment (EXACTLY 120) — due by 24 (14 from now)
+          · Buyer MUST payment (EXACTLY 120) — due by 23 (13 from now)
 
   Next deadline: 9 (Buyer: payment OF 100)
 ```
@@ -76,7 +76,7 @@ Reading it from the top:
 - **Standing** is the one-word answer: _in progress_, _FULFILLED_, or _BREACHED_ with who and why — or, if the contract could not be run, _could not be worked out_ with the reason.
 - **Owed now** is the list of obligations in force. There is one: the buyer must pay 100, due by day 9 — that is 7 from now, because the seven days started when the seller delivered on day 2. The act is written out as it would be done (`payment OF 100`): where the rule says `EXACTLY n` and `n` is defined elsewhere, the list looks `n` up and prints the number, so you do not have to.
 - **What would discharge it** lists the acts that, done now, end the contract fulfilled. Paying 100 does.
-- **What would move things along** lists what changes the position without ending it. Here, if nothing happens by day 9, the buyer is not yet in breach: the late-price clause takes over, and the buyer owes 120 by day 24. The list prints what would be owed after that ("then:").
+- **What would move things along** lists what changes the position without ending it. Here, if nothing happens by day 9, the buyer is not yet in breach: the late-price clause takes over, and the buyer owes 120 by day 23 — its `WITHIN 14` counts from the deadline that was missed (day 9), not from the day the miss was seen (see [LEST](README.md#lest-breach-consequence)). The list prints what would be owed after that ("then:").
 - There is no **What would put someone in breach** section, because in this position nothing does — the late-price clause catches the missed deadline. In the tenancy example below, whose rule ends in `LEST BREACH`, the deadline passing does breach, and the section appears.
 - **Next deadline** is the soonest date anything is due, and whose it is — counting only the deadlines the list could confirm by running the contract past them. If an obligation has a deadline the list could not work out, the line says so and names it, rather than quietly leaving it out: `Next deadline: 9 (Buyer: payment OF 100) — not counting Seller: delivery, whose deadline is not known here`.
 
@@ -161,7 +161,7 @@ Each line reads: the clock; the event looked at; whose obligation looked at it; 
 Two things about this history are worth knowing:
 
 - A party or an act shown as `Tenant OF …` is one the contract had not fully looked at when the step was recorded: the log writes down only what the contract had in hand at that moment, and does not go and fetch the rest. The **member number** (`member 2 of 3`) is what tells the members apart; the events are listed in full under the heading.
-- `at —` marks a step with no clock. Four steps have none: a look before any event has arrived; the moment two parallel parts of a contract are combined — a `RAND`/`ROR`, or the members of an `UPON EACH` fork, which the contract runs as parallel parts; a `BREACH` the rule declares outright (`LEST BREACH`), which is a verdict, not a look at an event; and a group with no `LEST` of its own whose member ended without a time — a member's permission lapsed, or a member's own `LEST BREACH` fired. (A group whose member missed a deadline is clocked at the moment the miss was seen.)
+- `at —` marks a step with no clock. Four steps have none: a look before any event has arrived; the moment two parallel parts of a contract are combined — a `RAND`/`ROR`, or the members of an `UPON EACH` fork, which the contract runs as parallel parts; a `BREACH` the rule declares outright (`LEST BREACH`), which is a verdict, not a look at an event; and a group with no `LEST` of its own whose member ended without a time — a member's permission lapsed, or a member's own `LEST BREACH` fired. (A group whose member missed a deadline is clocked at the moment the miss was seen when the group has no `LEST`; a group with a `LEST` of its own is clocked at the deadline the member missed, which is when its `LEST` starts — so the second trace of `every-run-example.l4`, where Carol never signs and the landlord's event on day 20 reveals it, reads `at 14: the group — a member did not come through; on to the fallback` — the golden `jl4/examples/lts/expected/every-run-example.txt` has it.)
 
 ## `--json`
 

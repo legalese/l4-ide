@@ -80,7 +80,7 @@ MUST action
 WITHIN duration [OF anchor]
 ```
 
-The duration is a `NUMBER` of clock units — the same units the trace's timestamps use (days, if the trace is stamped in days). Written alone, it counts from where the language puts it: an obligation at the top level counts from when it was entered; an obligation under a `HENCE` counts from the moment the previous obligation was completed; an obligation under a `LEST` counts, today, from the event that revealed the miss.
+The duration is a `NUMBER` of clock units — the same units the trace's timestamps use (days, if the trace is stamped in days). Written alone, it counts from where the language puts it: an obligation at the top level counts from when it was entered; an obligation under a `HENCE` counts from the moment the previous obligation was completed; an obligation under a `LEST` counts from the moment the previous obligation _failed_ — its missed deadline for a `MUST`, `DO` or `MAY`, the forbidden act itself for a `SHANT` (the [LEST](#lest-breach-consequence) section has the rule in full).
 
 The duration can be anchored with `OF`, and then the deadline is **absolute**: the anchor's instant plus the duration, whatever the clock read when the obligation was entered. The anchor is one of:
 
@@ -239,6 +239,16 @@ The meaning of "failure" depends on the deontic modal:
 | `SHANT` | action is taken (prohibition violated)     | `BREACH`           |
 
 Note that SHANT flips the polarity: for prohibitions, the action happening is the failure case (LEST), while the deadline passing without action is the success case (HENCE).
+
+**When the next clock starts.** An obligation written under a `LEST` with a plain `WITHIN d` counts its `d` from the moment the failure happened, not from the later event that brought it to light:
+
+| The obligation that failed                                | Its `LEST` counts from                                                    |
+| --------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `MUST`, `DO` or `MAY` whose deadline passed               | that deadline                                                             |
+| `SHANT` whose forbidden act was done                      | the act's own timestamp                                                   |
+| `EVERY … ONCE ALL HAVE WITHIN d` where the group was late | the group's deadline (`d` after the `EVERY` was entered, unless anchored) |
+
+So in the penalty clause below, Alice's 60 days to pay the larger sum run from day 30, whether the miss came to light on day 31 or on day 90 — a party who misses a deadline and then goes quiet does not push back the start of its own cure period. The same instant can be named outright as `WITHIN 60 OF THE DEADLINE` (see [WITHIN](#within-temporal-deadline)); for a missed `MUST`, `DO` or `MAY` the two spellings mean the same thing. They differ for a `SHANT`: there `THE DEADLINE` is the end of the prohibition's window, while the plain `WITHIN` counts from the violation. L4 still only _learns_ of a missed deadline when a later event arrives, and that event is offered to the `LEST` obligation, so a late payment that is the first thing recorded can still discharge the reparation it was written for — if it falls within the reparation's own window, counted from the deadline. A breach, when one is finally reported, is dated at the event that revealed it and carries the deadline that was missed. (Before 2026-09-16 the `LEST` clock started at the revealing event instead. The tutorial [What Follows](../../tutorials/obligations/what-follows.md) works the rule through a late fee and a guarantor.)
 
 ### Syntax
 

@@ -86,6 +86,19 @@ data ContractFrame
   | Barrier4 BarrierArmingFrame
   -- ^ EVERY, the barrier: the arming time, forced, to compare against the
   -- state deadline computed by 'Barrier3'.
+  | BarrierTrim BarrierTrimFrame
+  -- ^ EVERY, the barrier, the state layer's @LEST@: one cons cell of the
+  -- barrier's stream, forced, on the walk to the first event stamped after
+  -- the @ONCE@ line's deadline ('L4.EvaluateLazy.Machine.barrierStateMissed',
+  -- spec §5.2 / R-Q5's state layer, built 2026-09-16). @ValNil@ ends the walk
+  -- with the empty stream; @ValCons@ goes on to the event.
+  | BarrierTrimEvent BarrierTrimCellFrame
+  -- ^ EVERY, the barrier, the same walk: the cell's event, forced, so its
+  -- stamp can be read.
+  | BarrierTrimStamp BarrierTrimCellFrame
+  -- ^ EVERY, the barrier, the same walk: the event's stamp, forced. Past the
+  -- deadline, the @LEST@ is applied to the stream from THIS cell on; not
+  -- yet, the walk moves to the next cell.
   | Barrier5 BarrierFailStampFrame
   -- ^ EVERY, the barrier: a FAILING member's anchor, forced, so the earliest
   -- failure can be picked out once every member has run (R-T3, spec §6.1).
@@ -472,17 +485,20 @@ data BarrierFailure
     -- ^ reported through the failpoint sentinel — a barrier WITH a @LEST@.
     -- 'failAt' is the sentinel's anchor forced, and 'failTimeRef' the same
     -- value as the reference the @LEST@ is handed, so the ordering key IS the
-    -- anchor. Today it reads the revealing event's stamp (spec §5.2's
-    -- deadline anchor is not built). For @MUST@\/@DO@\/@MAY@ that orders by
-    -- the missed deadline up to ties, and a tie is the same revealing event;
-    -- for @SHANT@ the stamp is the violating event's own, and two members
-    -- violated at one stamp by two events are two failures with two
-    -- residuals. So a tie on 'failAt' is broken first by 'failPos' — the
-    -- stream position, which only the same event ties — then by 'failDue',
-    -- the deadline actually missed (the same event can reveal two deadlines,
-    -- and @THE DEADLINE@ in the @LEST@ reads the chosen member's, R-Q7B), and
-    -- only then by roll order, which by then names the same anchor, residual
-    -- and deadline either way (see 'barrierFinish', 'earliestFailure').
+    -- anchor — and the anchor is R-Q5's failure time (spec §5.2, built
+    -- 2026-09-16): the member's missed deadline for @MUST@\/@DO@\/@MAY@
+    -- (so 'failAt' equals 'failDue' there, and 'failTimeRef' and
+    -- 'failDueRef' are one reference), its violating event's stamp for
+    -- @SHANT@. For @MUST@\/@DO@\/@MAY@ a tie is two members with one
+    -- deadline, which the same event reveals; for @SHANT@ the stamp is the
+    -- violating event's own, and two members violated at one stamp by two
+    -- events are two failures with two residuals. So a tie on 'failAt' is
+    -- broken first by 'failPos' — the stream position, which only the same
+    -- event ties — then by 'failDue' (a key that mattered while the anchor
+    -- was the revealing stamp and one event could reveal two deadlines;
+    -- redundant now, kept whole), and only then by roll order, which by then
+    -- names the same anchor, residual and deadline either way (see
+    -- 'barrierFinish', 'earliestFailure').
   | BarrierBreached
       { failReason :: ReasonForBreach Reference }
     -- ^ the member's own breach — a barrier WITHOUT a @LEST@ mints no
@@ -564,11 +580,37 @@ data BarrierArmingFrame = BarrierArmingFrame
   }
   deriving stock Show
 
+-- | The walk that trims the barrier's stream to the events after its state
+-- deadline, before the state-layer @LEST@ is applied ('BarrierTrim').
+data BarrierTrimFrame = BarrierTrimFrame
+  { ctx       :: QuantCtx
+  , lestExpr  :: RExpr          -- ^ the barrier's @LEST@, run once the walk ends
+  , cutoff    :: Rational       -- ^ the state deadline: events stamped at or before it are dropped
+  , cutoffRef :: Reference      -- ^ …and as the reference the @LEST@ is anchored at
+  , cell      :: Reference      -- ^ the cons cell under scrutiny (handed on whole when it is the first past the deadline)
+  }
+  deriving stock Show
+
+-- | The same walk, one cell opened: its event and then its stamp are being
+-- forced ('BarrierTrimEvent', 'BarrierTrimStamp').
+data BarrierTrimCellFrame = BarrierTrimCellFrame
+  { ctx       :: QuantCtx
+  , lestExpr  :: RExpr
+  , cutoff    :: Rational
+  , cutoffRef :: Reference
+  , cell      :: Reference      -- ^ the cell whose event is under scrutiny
+  , rest      :: Reference      -- ^ the cells after it
+  }
+  deriving stock Show
+
 data ResolvePartyFrame = ResolvePartyFrame
   { followup :: RExpr        -- ^ the HENCE / LEST followup to run once the party is keyed
   , env :: Environment       -- ^ environment in which to run the followup
   , events :: Reference      -- ^ remaining event stream (passed on to 'continueWithFollowup')
-  , time :: Reference        -- ^ the (already-allocated) event time
+  , time :: Reference
+    -- ^ the continuation's clock, already allocated: under @LEST@ the missed
+    -- deadline (spec §5.2, the same reference as 'lifecycle''s @deadline@),
+    -- under @HENCE@ the revealing event's stamp
   , pending :: Maybe DeonticStep
     -- ^ P2b: the 'Expired' step this expiry owes the log, logged HERE rather
     -- than at @Contract5@ because this frame is where the party gets forced,
@@ -596,7 +638,14 @@ data Lifecycle = MkLifecycle
     -- under @LEST@: the join did not fire (the checker refuses @THE JOIN@
     -- there).
   , deadline :: Maybe Reference
-    -- ^ the obligation's ABSOLUTE deadline, when it had one to hand off:
+    -- ^ the obligation's ABSOLUTE deadline, when it had one to hand off.
+    -- Under @LEST@ it is also the continuation's clock for a missed
+    -- @MUST@\/@DO@\/@MAY@ and for the state layer (spec §5.2, 2026-09-16):
+    -- the hand-off passes this very reference as the @time@ the
+    -- continuation is applied to, so @WITHIN d@ and @WITHIN d OF THE
+    -- DEADLINE@ agree there by construction. Under a @SHANT@'s @LEST@ the
+    -- clock is the violating stamp and this is the window's end; under
+    -- @HENCE@ the clock is 'join'.
     --
     --   * a @PARTY@ obligation's act @WITHIN@;
     --   * a barrier's @HENCE@: the @ONCE@ line's @WITHIN@ when written (the

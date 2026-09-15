@@ -541,8 +541,10 @@ data Threshold n
 -- spellings RULED 2026-09-07, R-Q7A\/B\/C, §5.1.1; built 2026-09-15).
 --
 -- Unanchored, a deadline counts from where the language puts it — the join's
--- firing under @HENCE@, and today the revealing event under @LEST@ (§5.2 owes
--- the missed deadline). Anchored, it is ABSOLUTE: the deadline is the
+-- firing under @HENCE@, and under @LEST@ the failure time (§5.2, built
+-- 2026-09-16): the missed deadline for a @MUST@\/@DO@\/@MAY@ and for a
+-- barrier's state layer, the violating event's stamp for a @SHANT@.
+-- Anchored, it is ABSOLUTE: the deadline is the
 -- anchor's instant plus @d@, whatever the clock read when the obligation was
 -- entered; a deadline already past at arming is then revealed by the first
 -- event, which is correct and not an error.
@@ -575,8 +577,10 @@ data Deadline n
 --     and the checker refuses it.
 --   * @THE DEADLINE@ — its deadline: the act's @WITHIN@, or under a barrier
 --     the @ONCE@ line's when one is written. Under @HENCE@ this is /the cure
---     period runs from when performance fell due/; under @LEST@ it is what
---     §5.2 will make the default.
+--     period runs from when performance fell due/; under @LEST@ it is the
+--     default said out loud for every failure but a @SHANT@ violation
+--     (§5.2, 2026-09-16), where the default is the violation's stamp and
+--     this is the window's end.
 --   * @THE ARMING@ — the instant it was entered: /within 30 days of this
 --     agreement/. On an obligation with no enclosing one (the top level) it
 --     is the obligation's own arming, i.e. the default.

@@ -202,6 +202,14 @@ record the unit once in a comment or in the name of the constant.
 PARTY Alice  MUST pay 100 WITHIN 30          -- days, by this file's convention
 ```
 
+A plain `WITHIN d` counts from where the obligation sits: at the top level,
+from when it was entered; under `HENCE`, from the act that completed the
+previous obligation; under `LEST`, from the previous obligation's FAILURE —
+its missed deadline for `MUST`/`DO`/`MAY`, the forbidden act's own stamp for
+`SHANT`, the group deadline for a late `ONCE … WITHIN` barrier — not from the
+later event that revealed it (built 2026-09-16, `run-lest.l4`; a party who
+misses a deadline and goes quiet does not postpone its own cure period).
+
 `WITHIN d OF anchor` anchors the deadline (built 2026-09-15): `OF THE JOIN`,
 `OF THE DEADLINE` or `OF THE ARMING` name the enclosing obligation's completion,
 deadline or entry, and `OF e` an instant — a `NUMBER` on the trace's clock or a
@@ -211,7 +219,10 @@ branch, an operand or a `WHERE` there — so an applied duration is bracketed,
 `WITHIN (f OF x) OF THE JOIN`, or juxtaposed, `WITHIN f x OF THE JOIN`. In a
 barrier's `LEST`, `THE DEADLINE` is the deadline of the member who failed
 EARLIEST — the same member the `LEST`'s clock is anchored at — not the first
-non-actor on the roll (built 2026-09-16, `run-stack.l4`).
+non-actor on the roll (built 2026-09-16, `run-stack.l4`). Under a `LEST`,
+`WITHIN d OF THE DEADLINE` and the plain `WITHIN d` name the same instant for
+every failure but a `SHANT` violation, where the plain form counts from the
+act and `THE DEADLINE` is the window's end.
 
 `WITHIN 5 days` does not check unless `days` is defined; one line,
 `GIVEN n IS A NUMBER GIVETH A NUMBER DECIDE n days IS n`, makes it check. HOW it
