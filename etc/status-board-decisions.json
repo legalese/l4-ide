@@ -258,6 +258,20 @@
         "file": "specs/todo/lexipedia-superset/LTS-VISUALISER.md",
         "anchor": "7.3"
       }
+    },
+    {
+      "id": "EXACTLY retirement",
+      "owner": "GM workflow wf_8a91a677-de7 (running)",
+      "kind": "in build",
+      "quick": false,
+      "raised": "2026-09-16",
+      "ask": "RULED 2026-09-16 (Meng): a bare name in a deontic action argument refers to what it names — a lexical local, or any other in-scope non-selector term (with an Info notice) — and is a fresh wildcard only when it names nothing or only a field selector; expressions admitted in pattern position; EXACTLY deprecated with a warning giving the replacement, not removed; the EVERY rebind error retired; corpus swept and goldens reset in the same PR; CONSIDER measured first and extended only if its survey shows no deliberate wildcard collision. Principle: \"if we know enough to call it an error, we know enough to correct the error.\" LAUNCHED ~04:10Z as a 15-agent workflow (sonnet build/survey/sweep/record, opus checker/bless/verify/fix) on branch lang/action-binder-reference, worktree ~/src/legalese/l4wt/exactly-lexical, base 11b7534b. After merge Meng rules: keyword removal date, R5 notice severity, the opened-field-spelled-like-a-slot interaction with R5 field opening.",
+      "unblocks": "smucclaw#955; the 33 corpus sites where an obligation silently accepts anyone/any amount (incl. the reference manual's own example); a simpler EVERY page",
+      "source": {
+        "file": "specs/todo/PATTERN-REFERENCE-RULE-SPEC.md",
+        "anchor": "## 1. The ruling",
+        "ref": "lang/action-binder-reference"
+      }
     }
   ]
 }
