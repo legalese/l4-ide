@@ -54,12 +54,61 @@
 #                      that would satisfy jBPM stays an option, not built.
 #   regcf-resale       as regcf-advertising: (b) narrowed to the boundary event,
 #                      (c) new on the wired guard.
+#
+# ADDED 2026-09-15 — two goldens for the quantified obligation (EVERY), one
+# per join, as the witness that a barrier and a fork no longer export
+# byte-identically (RESULT 4 -> 6 for that reason and no other; the six
+# earlier rows did not move):
+#
+#   tenancy-barrier    class (d) NEW: REJECTED on the multi-instance activity —
+#   tenancy-fork       "ForEach has no variable name" / "has no collection
+#                      expression". The exporter draws an EVERY as a parallel
+#                      <multiInstanceLoopCharacteristics> with neither a
+#                      loopCardinality nor a loopDataInputRef, because the cast
+#                      is a run-time fact (R-T6) and inventing either would be a
+#                      claim the source does not make; P-CAST says exactly this,
+#                      and names the roll an engine would need. jBPM asking for
+#                      the collection is the gap the note predicts, measured.
+#                      Our own token-play gate (check-bpmn-soundness.mjs) and
+#                      bpmn-moddle both accept both files. Execution is a
+#                      NON-GOAL; a future data-object emission would close (d).
+#
+# ADDED 2026-09-15, later the same day, after the concurrency review — six
+# goldens for the other modal x join cells (jl4/examples/bpmn/modals.l4),
+# RESULT 6 -> 12 for the class-(d) reason above and one other:
+#
+#   modals-shant-barrier   class (d), as tenancy-*. (The completionCondition
+#   modals-shant-fork      on a prohibition is not what jBPM objects to; it
+#   modals-must-barrier-   never gets past the missing collection.)
+#     both-deadlines
+#   modals-must-fork-
+#     join-deadline
+#   modals-may-barrier     class (d), as above.
+#   modals-may-fork        class (d), as above — SINCE 2026-09-16. For one day
+#                          it sat on class (a') ("cannot have more than one
+#                          incoming connection"): the fork's lapse timer flowed
+#                          into the chair's task beside the activity's own
+#                          completion. That routing was wrong against the
+#                          runtime (a lapsed member spawns no continuation;
+#                          measured, run-modals.golden), the lapse now lands on
+#                          Fulfilled, Task_1 has one incoming flow, and jBPM
+#                          gets as far as the collection objection like its
+#                          siblings. errors 1 -> 2 on that row for that reason;
+#                          RESULT unchanged at 12.
 
-consultation.bpmn       errors=0 warnings=0 verdict=COMPLETED
-handover.bpmn           errors=4 warnings=0 verdict=REJECTED
-offering.bpmn           errors=0 warnings=0 verdict=ABORTED
-regcf-advertising.bpmn  errors=4 warnings=0 verdict=REJECTED
-regcf-reporting.bpmn    errors=1 warnings=0 verdict=REJECTED
-regcf-resale.bpmn       errors=6 warnings=0 verdict=REJECTED
+consultation.bpmn                        errors=0 warnings=0 verdict=COMPLETED
+handover.bpmn                            errors=4 warnings=0 verdict=REJECTED
+modals-may-barrier.bpmn                  errors=2 warnings=0 verdict=REJECTED
+modals-may-fork.bpmn                     errors=2 warnings=0 verdict=REJECTED
+modals-must-barrier-both-deadlines.bpmn  errors=2 warnings=0 verdict=REJECTED
+modals-must-fork-join-deadline.bpmn      errors=2 warnings=0 verdict=REJECTED
+modals-shant-barrier.bpmn                errors=2 warnings=0 verdict=REJECTED
+modals-shant-fork.bpmn                   errors=2 warnings=0 verdict=REJECTED
+offering.bpmn                            errors=0 warnings=0 verdict=ABORTED
+regcf-advertising.bpmn                   errors=4 warnings=0 verdict=REJECTED
+regcf-reporting.bpmn                     errors=1 warnings=0 verdict=REJECTED
+regcf-resale.bpmn                        errors=6 warnings=0 verdict=REJECTED
+tenancy-barrier.bpmn                     errors=2 warnings=0 verdict=REJECTED
+tenancy-fork.bpmn                        errors=2 warnings=0 verdict=REJECTED
 
-RESULT 4
+RESULT 12

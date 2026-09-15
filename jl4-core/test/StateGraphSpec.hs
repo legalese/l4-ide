@@ -167,6 +167,77 @@ shantChainSrc =
   , "    WITHIN 10"
   ]
 
+-- | A quantified obligation under each join. They differ in exactly one line
+-- — the join line — which is the point: until 2026-09-15 'extractDeonton'
+-- never read @Deonton.join@, so the two extracted to the same graph and the
+-- BPMN lowered from them was byte-identical.
+barrierSrc, forkSrc :: [Text]
+barrierSrc = quantifiedSrc "ONCE ALL HAVE"
+forkSrc    = quantifiedSrc "UPON EACH"
+
+quantifiedSrc :: Text -> [Text]
+quantifiedSrc joinLine =
+  [ "GIVETH DEONTIC Person Action"
+  , "`group` MEANS"
+  , "  EVERY p"
+  , "    MUST pay"
+  , "    WITHIN 3"
+  , "    " <> joinLine
+  , "    HENCE FULFILLED"
+  , "    LEST BREACH"
+  ]
+
+-- | The join line carries a @WITHIN@ of its own, beside the act's.
+bothDeadlinesSrc :: [Text]
+bothDeadlinesSrc = quantifiedSrc "ONCE ALL HAVE WITHIN 30"
+
+-- | The ONLY deadline in the rule is on the join line. The evaluator expires
+-- each member on it (@memberDue@ in L4.EvaluateLazy.Machine), so the @LEST@
+-- arm is reachable and must not be captioned as though nothing could take it.
+joinOnlyDeadlineSrc :: [Text]
+joinOnlyDeadlineSrc =
+  [ "GIVETH DEONTIC Person Action"
+  , "`group` MEANS"
+  , "  EVERY p"
+  , "    MUST pay"
+  , "    ONCE ALL HAVE WITHIN 30"
+  , "    HENCE FULFILLED"
+  , "    LEST BREACH"
+  ]
+
+-- | A permission under each join, with a continuation that is a real
+-- obligation. Under EITHER join a lapsed member's arm goes to Fulfilled: for
+-- the barrier because the join never fires (Machine.hs, Barrier1's last arm),
+-- for the fork because the continuation arises only from a member's act.
+-- The graph has to say so, or the BPMN lowered from it draws the chair's duty
+-- to publish a resolution that did not pass — measured 2026-09-15 for the
+-- barrier, and 2026-09-16 for the fork after a first version of this test
+-- had pinned the opposite on the reviewer's word.
+mayBarrierSrc, mayForkSrc :: [Text]
+mayBarrierSrc = maySrc "ONCE ALL HAVE"
+mayForkSrc    = maySrc "UPON EACH"
+
+maySrc :: Text -> [Text]
+maySrc joinLine =
+  [ "GIVETH DEONTIC Person Action"
+  , "`group` MEANS"
+  , "  EVERY p"
+  , "    MAY pay"
+  , "    WITHIN 3"
+  , "    " <> joinLine
+  , "    HENCE (PARTY Bob MUST deliver WITHIN 5)"
+  ]
+
+-- | A quantified obligation with no continuation, and so no join line.
+noJoinSrc :: [Text]
+noJoinSrc =
+  [ "GIVETH DEONTIC Person Action"
+  , "`group` MEANS"
+  , "  EVERY p"
+  , "    MUST pay"
+  , "    WITHIN 3"
+  ]
+
 --------------------------------------------------------------------------------
 -- Helpers
 --------------------------------------------------------------------------------
@@ -206,12 +277,87 @@ lestModals src =
 lestEdges :: StateGraph -> [Transition]
 lestEdges sg = [ t | t <- sg.sgTransitions, t.transType == LestTransition ]
 
+henceEdges :: StateGraph -> [Transition]
+henceEdges sg = [ t | t <- sg.sgTransitions, t.transType == HenceTransition ]
+
+-- | The quantifier carried by each HENCE edge, in source order.
+quantifiers :: [Text] -> Either [Text] [Maybe Quantifier]
+quantifiers src =
+  fmap (map (.transLabel.labelQuantifier) . henceEdges) (graphFor src)
+
+-- | The single HENCE edge of a one-obligation rule, or a failure naming why.
+theHenceEdge :: [Text] -> (Transition -> Expectation) -> Expectation
+theHenceEdge src k = case graphFor src of
+  Left errs -> expectationFailure (show errs)
+  Right sg -> case henceEdges sg of
+    [t] -> k t
+    ts  -> expectationFailure ("expected one HENCE edge, got " <> show (length ts))
+
 --------------------------------------------------------------------------------
 -- Spec
 --------------------------------------------------------------------------------
 
 spec :: Spec
 spec = do
+  describe "the join line of an EVERY" $ do
+    it "carries the barrier on the HENCE edge, structurally" $
+      quantifiers barrierSrc
+        `shouldBe` Right [Just (MkQuantifier "p" Nothing (Just (MkJoinLabel (Barrier "ALL HAVE") Nothing)))]
+
+    it "carries the fork on the HENCE edge, structurally" $
+      quantifiers forkSrc
+        `shouldBe` Right [Just (MkQuantifier "p" Nothing (Just (MkJoinLabel Fork Nothing)))]
+
+    it "gives the barrier and the fork different graphs" $ do
+      length (filter id (zipWith (/=) barrierSrc forkSrc)) `shouldBe` 1
+      graphFor barrierSrc `shouldNotBe` graphFor forkSrc
+
+    it "leaves a PARTY rule's edges without a quantifier" $
+      quantifiers linearSrc `shouldBe` Right [Nothing, Nothing]
+
+    it "records an EVERY with no continuation as quantified but unjoined" $
+      quantifiers noJoinSrc `shouldBe` Right [Just (MkQuantifier "p" Nothing Nothing)]
+
+    it "keeps the join line's WITHIN apart from the act's" $
+      theHenceEdge bothDeadlinesSrc \t -> do
+        t.transLabel.labelDeadline `shouldBe` Just "3"
+        (t.transLabel.labelQuantifier >>= (.quantJoin) >>= (.joinDeadline)) `shouldBe` Just "30"
+        memberDeadline t.transLabel `shouldBe` Just "3"
+
+    it "expires a member on the join line's WITHIN when the act has none" $
+      theHenceEdge joinOnlyDeadlineSrc \t -> do
+        t.transLabel.labelDeadline `shouldBe` Nothing
+        memberDeadline t.transLabel `shouldBe` Just "30"
+
+    it "sends a quantified permission's lapse to Fulfilled under either join" $ do
+      -- A LEST edge to the Fulfilled terminal, captioned as a lapse, out of
+      -- the initial state — for the barrier and for the fork alike. A PARTY
+      -- MAY still draws none here (the pre-existing single-party gap).
+      let lapseOf src = case graphFor src of
+            Left errs -> Left (show errs)
+            Right sg -> Right [ (t.transLabel.labelAction, nameOf sg t.transTo)
+                              | t <- lestEdges sg, t.transFrom == sg.sgInitialState ]
+      lapseOf mayBarrierSrc `shouldBe` Right [("lapses", "Fulfilled")]
+      lapseOf mayForkSrc `shouldBe` Right [("lapses", "Fulfilled")]
+      lapseOf (defaultLestSrc "MAY") `shouldBe` Right []
+
+    -- 'noDeadlineLestSrc', below, is the control: with no WITHIN anywhere the
+    -- caption IS 'noTriggerWording'. Here there is one, on the join line, and
+    -- reading only the act's used to say the arm could not be taken.
+    it "captions that rule's LEST arm as a timeout, not as unreachable" $
+      lestCaptions joinOnlyDeadlineSrc `shouldBe` Right ["timeout"]
+
+    describe "in the DOT a reader looks at" $ do
+      let dotOf src = either (const "") dotFor (graphFor src)
+      it "writes the barrier's join line under the obligation" $
+        dotOf barrierSrc `shouldSatisfy` Text.isInfixOf "ONCE ALL HAVE"
+      it "writes the fork's" $
+        dotOf forkSrc `shouldSatisfy` Text.isInfixOf "UPON EACH"
+      it "and the join line's own WITHIN" $
+        dotOf bothDeadlinesSrc `shouldSatisfy` Text.isInfixOf "ONCE ALL HAVE WITHIN 30"
+      it "renders the barrier and the fork to different DOT" $
+        dotOf barrierSrc `shouldNotBe` dotOf forkSrc
+
   describe "junction extraction" $ do
     it "marks the fan point of a RAND as AllOf" $ do
       fmap junctions (graphFor randSrc) `shouldBe` Right [("initial", AllOf)]
