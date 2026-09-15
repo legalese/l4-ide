@@ -273,7 +273,7 @@ Two kinds of picture, and they answer different questions. The first two are **w
 
 ![State graph of `receipts`: one EVERY edge captioned UPON EACH, then the landlord's receipt — compiler output](figures/every-fork.svg)
 
-The second two are **what a run does**, and they are drawn by hand from the first `#TRACE` of each rule in [every-run-example.l4](every-run-example.l4) — the compiler does not emit this picture yet (the token-game view is designed, not built: `specs/todo/lexipedia-superset/LTS-VISUALISER.md`). Read them against the trace output, which is the thing that was measured.
+The second two are **what a run does**, and they are drawn by hand from the first `#TRACE` of each rule in [every-run-example.l4](every-run-example.l4) — the compiler does not emit this picture yet (the token-game view is designed, not built: `specs/todo/lexipedia-superset/LTS-VISUALISER.md`; what it does emit, since 2026-09-15, is the same position as a **list** — `l4 lts every-run-example.l4 --steps`, see [What is owed now](lts-list.md)). Read them against the trace output, which is the thing that was measured.
 
 ![Run of the barrier: three signatures on days 1, 2 and 9; ONCE ALL HAVE fires once on day 9; one delivery follows, due day 14, done day 13 — hand-drawn from the trace](figures/every-barrier-run.svg)
 

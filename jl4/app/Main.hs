@@ -36,6 +36,7 @@ import L4.Cli.Check (CheckOptions, checkCmd, checkOptionsParser)
 import L4.Cli.Docassemble (DocassembleOptions, docassembleCmd, docassembleOptionsParser)
 import L4.Cli.Export (ExportOptions, exportCmd, exportOptionsParser)
 import L4.Cli.Format (FormatOptions, formatCmd, formatOptionsParser)
+import L4.Cli.Lts (LtsOptions, ltsCmd, ltsOptionsParser)
 import L4.Cli.Nlg (NlgOptions, nlgCmd, nlgOptionsParser)
 import L4.Cli.OpenFisca (OpenFiscaOptions, openFiscaCmd, openFiscaOptionsParser)
 import L4.Cli.Render (RenderOptions, renderCmd, renderOptionsParser)
@@ -63,6 +64,7 @@ data Command
   | CmdCatala     CatalaOptions
   | CmdDocassemble DocassembleOptions
   | CmdNlg        NlgOptions
+  | CmdLts        LtsOptions
   | CmdVerify     VerifyOptions
 
 commandParser :: Parser Command
@@ -119,6 +121,9 @@ commandParser =
       <> command "nlg"
            (info (helper <*> (CmdNlg <$> nlgOptionsParser))
              (progDesc "Linearize a module's directives to natural-language prose (the .nlg golden payload)"))
+      <> command "lts"
+           (info (helper <*> (CmdLts <$> ltsOptionsParser))
+             (progDesc "List, for every #TRACE, what is owed now, what would discharge it, what would breach it, and the next deadline"))
       -- `helper` here, and not on the older subcommands, is deliberate rather
       -- than inconsistent-by-accident: `l4 <cmd> --help` answers
       -- `Invalid option '--help'` for every subcommand that predates these two,
@@ -189,6 +194,7 @@ main = do
     CmdCatala     opts -> catalaCmd     opts
     CmdDocassemble opts -> docassembleCmd opts
     CmdNlg        opts -> nlgCmd        opts
+    CmdLts        opts -> ltsCmd        opts
     CmdVerify     opts -> verifyCmd     opts
 
 -- Silence unused-imports warning when we only import Options for types

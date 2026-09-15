@@ -1,0 +1,57 @@
+`the tenancy` — before anything has happened, the clock stands at 0
+  Standing: in progress.
+
+  Owed now:
+    - Tenant OF "Alice" MUST Sign (EXACTLY t) — due by 14 (14 from now) (one of 3 who must all act before the next step)
+    - Tenant OF "Bob" MUST Sign (EXACTLY t) — due by 14 (14 from now) (one of 3 who must all act before the next step)
+    - Tenant OF "Carol" MUST Sign (EXACTLY t) — due by 14 (14 from now) (one of 3 who must all act before the next step)
+    - the next step is held back until all have acted: 0 of 3 have
+
+  What would put someone in breach:
+    - nothing happens by 14 (the clock reaches 15) → the contract is in breach (no party is named)
+
+  What would move things along (neither ends nor breaches it):
+    - Tenant OF "Alice" does Sign OF (Tenant OF "Alice") now (at 0) → then:
+          · Tenant OF "Bob" MUST Sign (EXACTLY t) — due by 14 (14 from now) (one of 3 who must all act before the next step)
+          · Tenant OF "Carol" MUST Sign (EXACTLY t) — due by 14 (14 from now) (one of 3 who must all act before the next step)
+          · the next step is held back until all have acted: 1 of 3 have
+    - Tenant OF "Bob" does Sign OF (Tenant OF "Bob") now (at 0) → then:
+          · Tenant OF "Alice" MUST Sign (EXACTLY t) — due by 14 (14 from now) (one of 3 who must all act before the next step)
+          · Tenant OF "Carol" MUST Sign (EXACTLY t) — due by 14 (14 from now) (one of 3 who must all act before the next step)
+          · the next step is held back until all have acted: 1 of 3 have
+    - Tenant OF "Carol" does Sign OF (Tenant OF "Carol") now (at 0) → then:
+          · Tenant OF "Alice" MUST Sign (EXACTLY t) — due by 14 (14 from now) (one of 3 who must all act before the next step)
+          · Tenant OF "Bob" MUST Sign (EXACTLY t) — due by 14 (14 from now) (one of 3 who must all act before the next step)
+          · the next step is held back until all have acted: 1 of 3 have
+
+  Next deadline: 14 (Tenant OF "Alice": Sign (EXACTLY t); Tenant OF "Bob": Sign (EXACTLY t); Tenant OF "Carol": Sign (EXACTLY t))
+
+  Steps, in order:
+    at —: Tenant OF … MUST (member 1 of 3) — no more events; still waiting
+    at —: Tenant OF … MUST (member 2 of 3) — no more events; still waiting
+    at —: Tenant OF … MUST (member 3 of 3) — no more events; still waiting
+
+receipts — before anything has happened, the clock stands at 0
+  Standing: in progress.
+
+  Owed now:
+    - Tenant OF "Alice" MUST Pay (EXACTLY t) (EXACTLY theLandlord) amount — due by 7 (7 from now) (one of 3, each with a next step of their own)
+    - Tenant OF "Bob" MUST Pay (EXACTLY t) (EXACTLY theLandlord) amount — due by 7 (7 from now) (one of 3, each with a next step of their own)
+    - Tenant OF "Carol" MUST Pay (EXACTLY t) (EXACTLY theLandlord) amount — due by 7 (7 from now) (one of 3, each with a next step of their own)
+
+  What would put someone in breach:
+    - nothing happens by 7 (the clock reaches 8) → Tenant OF "Alice" is in breach
+
+  What could not be tried:
+    - Tenant OF "Alice" does Pay (EXACTLY t) (EXACTLY theLandlord) amount — the action binds `amount`, which the what-if cannot choose
+    - Tenant OF "Bob" does Pay (EXACTLY t) (EXACTLY theLandlord) amount — the action binds `amount`, which the what-if cannot choose
+    - Tenant OF "Carol" does Pay (EXACTLY t) (EXACTLY theLandlord) amount — the action binds `amount`, which the what-if cannot choose
+
+  Next deadline: 7 (Tenant OF "Alice": Pay (EXACTLY t) (EXACTLY theLandlord) amount; Tenant OF "Bob": Pay (EXACTLY t) (EXACTLY theLandlord) amount; Tenant OF "Carol": Pay (EXACTLY t) (EXACTLY theLandlord) amount)
+
+  Steps, in order:
+    at —: Tenant OF … MUST (member 1 of 3) — no more events; still waiting
+    at —: Tenant OF … MUST (member 2 of 3) — no more events; still waiting
+    at —: Tenant OF … MUST (member 3 of 3) — no more events; still waiting
+    at —: both parts together: still open
+    at —: both parts together: still open

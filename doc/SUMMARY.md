@@ -14,6 +14,7 @@
 - [Operators](reference/operators/README.md)
 - [Syntax](reference/syntax/README.md)
 - [Regulative](reference/regulative/README.md)
+  - [What is owed now: `l4 lts`](reference/regulative/lts-list.md)
 - [Built-ins](reference/builtins/README.md)
 - [Libraries](reference/libraries/README.md)
 - [Patterns](reference/patterns/README.md)

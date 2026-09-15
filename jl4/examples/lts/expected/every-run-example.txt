@@ -1,0 +1,81 @@
+`the tenancy` — after 4 events, the clock stands at 13 (the #TRACE on line 41)
+    PARTY alice DOES Sign OF alice AT 1
+    PARTY bob DOES Sign OF bob AT 2
+    PARTY carol DOES Sign OF carol AT 9
+    PARTY theLandlord DOES Deliver OF theLandlord AT 13
+  Standing: FULFILLED — nothing more is owed.
+
+  Steps, in order:
+    at 1: Tenant OF … does Sign OF … at 1; Tenant OF … MUST (member 1 of 3) — done; on to what follows (1 of 3 have acted; the shared next step waits for the rest)
+    at 1: Tenant OF … does Sign OF … at 1; Tenant OF … MUST (member 2 of 3) — not this party's event; passed over
+    at 2: Tenant OF … does Sign OF … at 2; Tenant OF … MUST (member 2 of 3) — done; on to what follows (2 of 3 have acted; the shared next step waits for the rest)
+    at 1: Tenant OF … does Sign OF … at 1; Tenant OF … MUST (member 3 of 3) — not this party's event; passed over
+    at 2: Tenant OF … does Sign OF … at 2; Tenant OF … MUST (member 3 of 3) — not this party's event; passed over
+    at 9: Tenant OF … does Sign OF … at 9; Tenant OF … MUST (member 3 of 3) — done; on to what follows (3 of 3 have acted; the shared next step waits for the rest)
+    at 9: (party not yet known) MUST — everyone has acted; the shared next step begins
+    at 13: Landlord OF … does Deliver OF … at 13; Landlord OF … MUST — done; on to what follows
+
+`the tenancy` — after 3 events, the clock stands at 20 (the #TRACE on line 48)
+    PARTY alice DOES Sign OF alice AT 1
+    PARTY bob DOES Sign OF bob AT 2
+    PARTY theLandlord DOES Deliver OF theLandlord AT 20
+  Standing: BREACHED — the contract is in breach (no party is named).
+
+  Steps, in order:
+    at 1: Tenant OF … does Sign OF … at 1; Tenant OF … MUST (member 1 of 3) — done; on to what follows (1 of 3 have acted; the shared next step waits for the rest)
+    at 1: Tenant OF … does Sign OF … at 1; Tenant OF … MUST (member 2 of 3) — not this party's event; passed over
+    at 2: Tenant OF … does Sign OF … at 2; Tenant OF … MUST (member 2 of 3) — done; on to what follows (2 of 3 have acted; the shared next step waits for the rest)
+    at 1: Tenant OF … does Sign OF … at 1; Tenant OF … MUST (member 3 of 3) — not this party's event; passed over
+    at 2: Tenant OF … does Sign OF … at 2; Tenant OF … MUST (member 3 of 3) — not this party's event; passed over
+    at 2: the event at 20; Tenant OF … MUST (member 3 of 3) — deadline 14 passed without the act; on to the fallback
+    at 20: (party not yet known) MUST — a member did not come through; on to the fallback
+    at —: BREACH declared
+
+receipts — after 6 events, the clock stands at 6 (the #TRACE on line 66)
+    PARTY alice DOES Pay OF alice, theLandlord, 100 AT 1
+    PARTY theLandlord DOES Receipt OF theLandlord, alice, 100 AT 2
+    PARTY bob DOES Pay OF bob, theLandlord, 200 AT 3
+    PARTY theLandlord DOES Receipt OF theLandlord, bob, 200 AT 4
+    PARTY carol DOES Pay OF carol, theLandlord, 300 AT 5
+    PARTY theLandlord DOES Receipt OF theLandlord, carol, 300 AT 6
+  Standing: FULFILLED — nothing more is owed.
+
+  Steps, in order:
+    at 1: Tenant OF … does Pay OF …, …, … at 1; Tenant OF … MUST (member 1 of 3) — done; on to what follows (member 1 of 3: their own next step begins)
+    at 2: Landlord OF … does Receipt OF …, …, … at 2; Landlord OF … MUST — done; on to what follows
+    at 1: Tenant OF … does Pay OF …, …, … at 1; Tenant OF … MUST (member 2 of 3) — not this party's event; passed over
+    at 2: Landlord OF … does Receipt OF …, …, … at 2; Tenant OF … MUST (member 2 of 3) — not this party's event; passed over
+    at 3: Tenant OF … does Pay OF …, …, … at 3; Tenant OF … MUST (member 2 of 3) — done; on to what follows (member 2 of 3: their own next step begins)
+    at 4: Landlord OF … does Receipt OF …, …, … at 4; Landlord OF … MUST — done; on to what follows
+    at 1: Tenant OF … does Pay OF …, …, … at 1; Tenant OF … MUST (member 3 of 3) — not this party's event; passed over
+    at 2: Landlord OF … does Receipt OF …, …, … at 2; Tenant OF … MUST (member 3 of 3) — not this party's event; passed over
+    at 3: Tenant OF … does Pay OF …, …, … at 3; Tenant OF … MUST (member 3 of 3) — not this party's event; passed over
+    at 4: Landlord OF … does Receipt OF …, …, … at 4; Tenant OF … MUST (member 3 of 3) — not this party's event; passed over
+    at 5: Tenant OF … does Pay OF …, …, … at 5; Tenant OF … MUST (member 3 of 3) — done; on to what follows (member 3 of 3: their own next step begins)
+    at 6: Landlord OF … does Receipt OF …, …, … at 6; Landlord OF … MUST — done; on to what follows
+    at —: both parts together: fulfilled
+    at —: both parts together: fulfilled
+
+receipts — after 5 events, the clock stands at 20 (the #TRACE on line 75)
+    PARTY alice DOES Pay OF alice, theLandlord, 100 AT 1
+    PARTY theLandlord DOES Receipt OF theLandlord, alice, 100 AT 2
+    PARTY carol DOES Pay OF carol, theLandlord, 300 AT 5
+    PARTY theLandlord DOES Receipt OF theLandlord, carol, 300 AT 6
+    PARTY theLandlord DOES Receipt OF theLandlord, bob, 200 AT 20
+  Standing: BREACHED — Tenant OF "Bob" is in breach.
+
+  Steps, in order:
+    at 1: Tenant OF … does Pay OF …, …, … at 1; Tenant OF … MUST (member 1 of 3) — done; on to what follows (member 1 of 3: their own next step begins)
+    at 2: Landlord OF … does Receipt OF …, …, … at 2; Landlord OF … MUST — done; on to what follows
+    at 1: Tenant OF … does Pay OF …, …, … at 1; Tenant OF … MUST (member 2 of 3) — not this party's event; passed over
+    at 2: Landlord OF … does Receipt OF …, …, … at 2; Tenant OF … MUST (member 2 of 3) — not this party's event; passed over
+    at 5: Tenant OF … does something at 5; Tenant OF … MUST (member 2 of 3) — not this party's event; passed over
+    at 6: Landlord OF … does something at 6; Tenant OF … MUST (member 2 of 3) — not this party's event; passed over
+    at 6: Landlord OF … does something at 20; Tenant OF … MUST (member 2 of 3) — deadline 7 passed without the act; on to the fallback (member 2 of 3: their own next step begins)
+    at —: BREACH declared by Tenant OF …
+    at 1: Tenant OF … does Pay OF …, …, … at 1; Tenant OF … MUST (member 3 of 3) — not this party's event; passed over
+    at 2: Landlord OF … does Receipt OF …, …, … at 2; Tenant OF … MUST (member 3 of 3) — not this party's event; passed over
+    at 5: Tenant OF … does Pay OF …, …, … at 5; Tenant OF … MUST (member 3 of 3) — done; on to what follows (member 3 of 3: their own next step begins)
+    at 6: Landlord OF … does Receipt OF …, …, … at 6; Landlord OF … MUST — done; on to what follows
+    at —: both parts together: breached by Tenant OF … (decided by the first part)
+    at —: both parts together: breached by Tenant OF … (decided by the second part)

@@ -127,6 +127,11 @@ What the list plainly cannot do is show **where** in the contract you are, or **
 after** what you are about to do. Whether a reader wants that badly enough to fund a graph is an
 empirical question, and this document declines to answer it from the armchair.
 
+**LANDED 2026-09-15 (P2a′), on `lts/p2b-step-log` (not merged): the list exists.** `l4 lts FILE`
+prints it for every `#TRACE` in the file; §7.6 has the command, one contract's exact output, and
+what it can and cannot answer. The reader experiment §7.3 gates on has **not** been run and this
+document still does not know whether the picture beats the list.
+
 ### 1.1b Reachability: what P2 can honestly claim, which is less than revision 1 claimed
 
 The ladder work poses a question at its seam and hands off:
@@ -1449,6 +1454,136 @@ is now done. P2a merely _consumes_ P1's output; P2b adds an optional log to the 
 should default off, mirroring `TracePolicy.hs:97-101 cliDefaultPolicy`. B1/B2 touch P1's goldens
 and so must land **after** M4 ships or be scheduled with it deliberately. P2 is M6 and stays
 there.
+
+### 7.6 P2a′ as built — LANDED 2026-09-15, on `lts/p2b-step-log` (not merged)
+
+**The command.** `l4 lts FILE [--steps] [--json] [--contract NAME]...`, registered in
+`jl4/app/Main.hs` beside `state-graph`, implemented in `jl4/app/L4/Cli/Lts.hs` (`ltsCmd`, `:72`)
+over a new library module `jl4-core/src/L4/Lts/List.hs`. The verb is named for the view it is
+the first rendering of — §2.3's LTS — so that a picture, if §7.3 ever admits one, lands on the
+same verb as a format flag and not as a second command a reader has to know to look for.
+`status`/`position` were considered and declined: `STATEFUL-CONTRACT-DEPLOYMENT` already uses
+those words for the deployed actor's persisted state, which this is not.
+
+**What it renders, and from where.** Nothing new is computed. `reportOf` (`List.hs:110`) is
+`enabledSet` (P2c) plus a reading of the result: the marking is `posMarking` (§4.2a), the four
+sections are the `discharging`/`breaching`/`advancing`/`untried` partition (endpoints 19/20 and
+the rest of 18), the next deadline (endpoint 17) is the least `TickPast` deadline, and the
+`--steps` log is `posSteps` (P2b). Two things the renderer adds on top of P2c, both read from
+the machine's own steps rather than decided here:
+
+- **A fifth section, "what the contract would pass over"** (`passedOver`, `List.hs:241`). The
+  candidate set is read off the residual before the guard is asked, so an act whose `PROVIDED`
+  comes out false is a candidate, and the replay reports it as `Advancing` to a marking that is
+  the position's own. Listing that under "moves things along" would be a lie. The renderer
+  therefore classifies an `Advancing` outcome whose steps contain no `Matched`, `Expired`,
+  `Breached` or join terminal as passed over, with the first pass-over's reason. Measured:
+  `PARTY B MUST payment EXACTLY 5 PROVIDED FALSE WITHIN 3` at its outset lists "B does payment OF
+  5 now (at 0) — its condition (PROVIDED) does not hold" and no "move things along" section
+  (`jl4-core/test/LtsListSpec.hs`, case 1). This is G9 (§1.1b) showing up in the built thing:
+  the shapes are an over-approximation of what the contract takes, and the replay is where the
+  over-approximation is corrected, one candidate at a time.
+- **An unforced `WITHIN` is dated through the confirmed tick.** A fresh obligation's residual
+  still holds its `WITHIN` expression, so the marking alone can say only "due within 7 from
+  now". The tick candidate for the same obligation computed the absolute deadline
+  (`deadlineOf`) and the machine confirmed it (`confirmTick`: the tick revealed an expiry), so
+  the "Owed now" line reads "due by 9 (7 from now)" — from `rpDeadlines`, populated only from
+  ticks whose verdict is not `Untried`. An obligation whose tick was refused stays "due within".
+
+**`--contract NAME`** (`freshTrace`, `List.hs:156`) appends a `#TRACE NAME AT 0 WITH` — no
+events — to the checked module for a top-level nullary rule of that name, so a file with no
+trace (`jl4/examples/bpmn/tenancy.l4`, which is the P2h pair with the traces left out) can be
+listed at its outset. It is exactly the authored empty directive: `LtsListSpec.hs` case 3 pins
+that the two renderings are byte-identical up to the line number. A rule with inputs, or an
+unknown name, is refused with a message, not an empty list.
+
+**The exact output for one contract** — `jl4/examples/ok/contracts.l4`, first `#TRACE`
+(`aContract`, three events, the last a `WAIT UNTIL 10`), as `l4 lts jl4/examples/ok/contracts.l4
+--steps` prints it and as `jl4/examples/lts/expected/contracts.txt:1-22` pins it:
+
+```
+aContract — after 3 events, the clock stands at 10 (the #TRACE on line 23)
+    PARTY S DOES delivery AT 2
+    PARTY B DOES payment OF 21 AT 4
+    `WAIT UNTIL` OF 10
+  Standing: in progress.
+
+  Owed now:
+    - B MUST return — due by 14 (4 from now)
+
+  What would put someone in breach:
+    - nothing happens by 14 (the clock reaches 15) → B is in breach: MUST return was due by 14; the clock reached 15 without it
+
+  What could not be tried:
+    - B does return — the action binds `return`, which the what-if cannot choose
+
+  Next deadline: 14 (B: return)
+
+  Steps, in order:
+    at 2: S does delivery at 2; S MUST — done; on to what follows
+    at 4: B does payment OF … at 4; B MUST — done; on to what follows
+    at 10: the clock runs to 10 with nothing happening; B MUST — not this party's event; passed over
+    at 10: B MUST — no more events; still waiting
+```
+
+(`return` is a variable pattern in that corpus file — there is no `return` constructor — which
+is why the act cannot be tried; the list says so rather than dropping it.)
+
+**Vocabulary.** The default output names no constructor, and `jl4/tests/LtsList.hs`
+(`constructorNames`, `:111`) asserts it over all three corpus outputs: `Matched ToHence` is "done;
+on to what follows", `Expired _ d ToLest` is "deadline d passed without the act; on to the
+fallback", `Awaiting` is "the next step is held back until all have acted: n of m have",
+`MemberSatisfied n m` is "(n of m have acted; the shared next step waits for the rest)",
+`ForkContinued i m` is "(member i of m: their own next step begins)". The machine's `WAIT
+UNTIL` sentinels (`neverMatchesParty`/`neverMatchesAct`, which the ledger key upper-cases) are
+rendered as "the clock runs to t with nothing happening" and never printed.
+
+**Measured.** `cabal test jl4-test -m "lts list"`: 12 examples, 0 failures — six goldens
+(text and JSON, with steps, for `ok/contracts.l4`, `doc/reference/regulative/every-run-example.l4`
+and `bpmn/tenancy.l4` at its outset), the no-constructor property over the three, and the
+barrier/fork wording assertions: the tenancy barrier says "one of 3 who must all act before the
+next step" and "held back … 0 of 3 have", and one act takes it to "1 of 3"; the fork says "one of
+3, each with a next step of their own" and has no "held back" line; the barrier's tick breaches
+naming nobody (`LEST BREACH`), the fork's names Alice (`LEST BREACH BY t`). `cabal test
+jl4-core-test -m P2a`: 3 examples, 0 failures. `doc/test-docs.sh` with the worktree's `l4` first on
+`PATH`: 1499 links, 101 `.l4` files, 251 linked, 0 orphans. Wall clock, warm binary:
+`contracts.l4` (13 traces) 0.03 s, `every-run-example.l4` (4 traces, imports prelude) 0.26 s,
+`tenancy.l4` at its outset 0.02 s. The CLI's text output for all three is byte-identical to the
+goldens the test suite writes through the library (`diff`, 2026-09-15), so the verb and the test
+render the same thing.
+
+**What the list can answer** (§1.1a's three clauses, and 17): what is owed, by whom, by when;
+which listed act discharges; which listed act or tick breaches; the next deadline. And, from the
+steps, what the contract did with each event so far.
+
+**What it cannot, stated on the page** (`doc/reference/regulative/lts-list.md`, "Limits"):
+
+- **The enabled set is an over-approximation, and also incomplete.** The shapes tried are the
+  live obligations' own `(party, action)` at the current clock plus one tick per distinct
+  deadline. A listed verdict is the machine's and exact; a shape the guard rejects is listed
+  and then reported as passed over; an event nobody's obligation names — a wrong-amount
+  payment, a third party's act — is not listed at all, though it would advance the clock. "No
+  listed act breaches" is sound; "nothing else could happen" is not something the list says.
+- **Some shapes cannot be tried** (a binding pattern, an unevaluated non-literal `WITHIN`) and
+  are listed with the reason. The reason text is P2c's and still says "binds".
+- **Replay is per candidate**, so the cost is _k + d_ full runs per trace (§2.4); measured
+  above on small casts, and stated on the page as proportional to the live obligations.
+- **Nothing about where in the contract you are, or what happens after** the one step "move
+  things along" shows (§1.1a).
+- **The step log's party keys are partly-evaluated layouts.** `nkBearer` is `partyKeyWHNF`
+  (`DeonticStep.hs:114-117`, `Machine.hs:2624`): for a constructor party with unforced fields
+  that is `Tenant OF &229@file.l4`, a heap reference. The renderer elides the reference to `…`
+  (`elide`, `List.hs:425`) and the member ordinal is what tells the members apart; the page says
+  so. **Not built:** a key that carries the party's forced form once the machine has it. That is
+  P2b's business (the log peeks and never forces), and the fix would be to record the bearer at
+  the match, where the party has been forced, rather than at arming.
+
+**Not run, and not claimed.** §7.3's gate is a **reader** experiment — put this list in front of
+readers against the same contract drawn by `stateGraphToDot` and P1's BPMN, and see whether they
+can answer the three questions from the list. That cannot be run from a build session, and it
+has not been. This section records that the list exists and what it says; it records **no
+verdict** on whether the picture beats it, and nothing below P2d should be read as unblocked by
+it.
 
 ---
 
