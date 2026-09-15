@@ -1755,7 +1755,11 @@ That is a **library** requirement, not a language one, and it is now on §2.5's 
 it lands here rather than in the grammar is the one measurement that retired what had been a fourth
 card: **unit words need no ruling and no grammar change**. Measured 2026-09-07 on a binary built from
 this branch, `WITHIN 5 days` **parses**; it fails only the check, with _could not find a definition
-for the identifier_, because `days` names nothing. Add one line of ordinary L4 —
+for the identifier_, because `days` names nothing. (Re-measured 2026-09-15 by the adversarial pass:
+that is the behaviour of a file with no mixfix operator in scope — no import, no local mixfix
+`DECIDE`. With one in scope, `IMPORT prelude` being enough, `L4.Parser.mixfixPostfixOp` accepts only
+the operator words it knows and the same line stops in the parser with _unexpected days_. Either
+way `days` names nothing until it is defined, which is the point.) Add one line of ordinary L4 —
 `GIVEN n IS A NUMBER GIVETH A NUMBER DECIDE n days IS n` — and the same file reports **Check
 succeeded**. So `days`, `` `business days` ``, `` `weeks not containing a public holiday in
 Singapore` `` are all already expressible through mixfix and backticked names; what is missing is a
@@ -1771,10 +1775,11 @@ the last one as a build decision, not a ruling; see "refusals".)
 ##### 5.1.1.1 BUILT 2026-09-15 — the mechanism, and the decisions the ruling left to the build
 
 Built on `every/anchors`, cut from `unstable` `e578654c`. Witness:
-`jl4/examples/ok/every/run-anchors.l4` (27 directives, each pinning one anchor to the deadline it
-produces, or what a residual prints); refusals witnessed by `jl4/examples/not-ok/tc/anchor-{top-level-join,lest-join,not-an-instant,no-deadline,on-join-line}.l4`;
+`jl4/examples/ok/every/run-anchors.l4` (41 directives, each pinning one anchor to the deadline it
+produces, or what a residual prints; 27 at the first commit, 14 added by the adversarial pass —
+see the list at the end of §11.0.1's ledger entry); refusals witnessed by `jl4/examples/not-ok/tc/anchor-{top-level-join,lest-join,not-an-instant,no-deadline,on-join-line}.l4`;
 highlighting by `jl4/examples/lsp/semantic-tokens/anchors.l4`. Line numbers below are on the
-branch at the commit that carries this section.
+branch at the commit that carries this section (re-cited after the adversarial pass).
 
 **Syntax.** `Deonton.due` and the join line's deadline both become `Maybe (Deadline n)`
 (`Syntax.hs:420`, `:491`, `:493`), where `Deadline n = MkDeadline Anno (Expr n) (Maybe (Anchor n))`
@@ -1782,8 +1787,9 @@ branch at the commit that carries this section.
 (`Syntax.hs:585`). The parent's hole count is unchanged — one hole for the deadline — so exactprint
 and the semantic tokens zip as before; inside the node the holes are `[duration, anchor]` in source
 order and `WITHIN` is a token of the node's own `Anno`. Measured: `exactprint identity` and the
-`prettyLayout round-trip` hold over the whole corpus with the witness included, and no existing
-`.ep.golden` moved.
+`prettyLayout round-trip` hold over the whole corpus with the witness included, and no `.ep.golden`
+of a parseable corpus file moved (the two parse-error goldens that did, by one token, are listed
+under R-Q7B above and in §11.0.1's ledger entry).
 
 **The one thing the grammar had to decide: `OF` is also application.** `name OF args` is a
 function call inside an expression (`Parser.hs:2176`, `app`), so with the duration parsed as an
@@ -1794,41 +1800,80 @@ ordinary expression `WITHIN period OF closingDate` would silently have been `per
 the duration slot of a `WITHIN`, `OF` is the anchor**, by a flag in the parser's reader
 environment (`Env.ofIsAnchor`, `Parser.hs:67`) that `deadline` sets and that parentheses and the
 anchor itself reset (`inExprSlot`, `Parser.hs:1260`); `app` takes juxtaposed arguments only while
-it is set. An applied duration is written `WITHIN (f OF x) OF …` or `WITHIN f x OF …`, which is
-also what `prettyLayout` prints (`parensIfNeeded` brackets an application), so the round trip
-holds. The three nouns are matched by spelling in one production (`anchor`, `Parser.hs:2745`); no
-expression begins with `THE`, so the alternatives are disjoint on their first token, and `THE FOO`
-reports `expecting ARMING, DEADLINE, JOIN`.
+it is set. The flag is set for the WHOLE unbracketed duration, not for its head application only:
+an `OF` inside an `IF` branch, an operator's operand or a `WHERE` in the duration is the anchor
+too (measured by the adversarial pass: `WITHIN IF TRUE THEN twice OF 3 ELSE 1` is a parse error at
+`OF`, `WITHIN 1 PLUS twice OF 3` an overload error, `WITHIN d WHERE d MEANS twice OF 3` re-associates
+to `(d WHERE …) OF 3` and fails the check on `d` — each of which parsed as an application on
+`e578654c`; none of the shapes occurs in the goldened corpus, and the one pre-existing
+`WITHIN f OF x` anywhere in the tree, `jl4/experiments/jerseyCharities2-annual-returns.l4:214`,
+sits in a file that did not parse before either, its first error being at line 244). An applied
+duration is written `WITHIN (f OF x) OF …` or `WITHIN f x OF …`, which is also what `prettyLayout`
+prints (`parensIfNeeded` brackets an application), so the round trip holds; and when a duration
+next to an anchor fails to be a `NUMBER`, the checker's mismatch message says so in those words
+(`ExpectAnchoredDurationContext`, `TypeCheck.hs:2004`, `checkDeadline`) — the unanchored wording is kept
+for the unanchored form, whose golden did not move. The three nouns are matched by spelling in one
+production (`anchor`, `Parser.hs:2745`); no expression begins with `THE`, so the alternatives are
+disjoint on their first token, and `THE FOO` reports `expecting ARMING, DEADLINE, JOIN, or space
+token` (verbatim; the trailing alternative is megaparsec naming the whitespace consumer).
 
 **The enclosing-obligation rule.** The three lifecycle anchors name positions in the life of the
 obligation whose `HENCE` or `LEST` the anchored obligation is the continuation of — the
-**nearest** enclosing one. Under a fork that is the member; under a barrier it is the `EVERY`.
-At the top level there is none: `THE JOIN` and `THE DEADLINE` are refused there and `THE ARMING`
-is the obligation's own arming, i.e. the default, allowed and pointless (witness: `own arming`).
-A top-level rule referenced by name inside a `HENCE` is checked where it is written and cannot use
-`THE JOIN`/`THE DEADLINE`; the run time agrees by construction, because the mechanism is lexical
-(next paragraph). `THE ARMING` two levels down names the MIDDLE obligation's arming, not the
-outermost rule's (witness: `of the arming`, deadline 5 + 40 = 45) — "within 30 days of this
-agreement" therefore reaches the agreement from ONE level down, which is where the phrase is
-written; whether a deeper continuation should be able to reach the outermost arming is open, and
-would need a way to name a non-nearest obligation (R-Q7B's note; §5.1.3's direction).
+**nearest** enclosing one, and **the one it is attached to when it runs**. For a continuation
+written inline the two coincide. For one that arrives as a VALUE — a `GIVEN k IS A DEONTIC …`
+parameter (`after k MEANS PARTY bob MUST … HENCE k`, the idiom `jl4/experiments/housing-act-*`
+write as `onwards`), a `WHERE` local, a top-level rule named in a `HENCE` — the anchors name the
+obligation whose hand-off applies it, not the one it was written under (witness: `handed on, the
+join`, 50 + 5 = 55, the same instant the unanchored form counts from; `handed on, the deadline`,
+103 + 5 = 108; `factored out`, a `WHERE` local reading its attaching obligation's arming, 0 + 5 = 5,
+exactly as inline). The first commit's mechanism was lexical, so `OF THE JOIN` in a handed-on
+value read the obligation it was WRITTEN under (3 + 5 = 8 where the unanchored default gave 55) —
+which falsified the doc's "the default, said out loud" and the brief's own definition of
+"enclosing"; the adversarial pass made it dynamic at the hand-off (next paragraph). Under a fork
+the enclosing obligation is the member; under a barrier it is the `EVERY`. At the top level there
+is none: `THE JOIN` and `THE DEADLINE` are refused there and `THE ARMING` is the obligation's own
+arming, i.e. the default, allowed and pointless (witness: `own arming`). The checker sees only
+where an anchor is WRITTEN, so a top-level rule and a `WHERE` local are refused `THE JOIN`/`THE
+DEADLINE` (the refusal message says so) and allowed `THE ARMING`; what the checker cannot see, the
+run time refuses when it happens (refusals 6 and 7 below). `THE ARMING` two levels down names the
+MIDDLE obligation's arming, not the outermost rule's (witness: `of the arming`, deadline
+5 + 40 = 45) — "within 30 days of this agreement" therefore reaches the agreement from ONE level
+down, which is where the phrase is written, and the doc page now says so; whether a deeper
+continuation should be able to reach the outermost arming is open, and would need a way to name a
+non-nearest obligation (R-Q7B's note; §5.1.3's direction). For a kept `SHANT` the join is the
+event that revealed the deadline had passed — the hand-off clock, `Machine.hs` `reofferResolve` —
+not the deadline itself, so `OF THE JOIN` there is today's unanchored clock said out loud and `OF
+THE DEADLINE` is the way to count from the discharge (witness: `kept, the join`, 30 + 3 = 33;
+`kept, the deadline`, 10 + 3 = 13; the doc page states it). Binding `join` to the deadline on that
+path instead was not done: it would part `OF THE JOIN` from the unanchored default, which §5.2's
+track is the one to move, for the single-party path and the barrier together.
 
-**Threading, chosen: bindings in the continuation's environment.** At every hand-off the machine
-builds a `Lifecycle` (`ContractFrame.hs:363`: the join instant under `HENCE` only, the absolute
-deadline when there is one, the arming) and binds it into the continuation's environment under
-three fixed uniques of a sort no name table uses (`Machine.hs:2497-2506`, `bindLifecycle`), so no
-program can spell, shadow or capture them, and a nested obligation's own hand-off overwrites them
-— which is the nearest-enclosing rule for free. `continueWithFollowup` (`Machine.hs:1996`),
-`fireBarrierHence` (`:2414`), `barrierFail` (`:2443`) and `barrierStateMissed` (`:2460`) all bind
-it; the `RBinOp` paths need nothing, because `ValROp` captures the environment for both operands.
-The arming had to be **kept**: the act frames overwrite `time` on every event, so each of the
-eleven now carries `armed` as well (`ContractFrame.hs:91` and siblings), set at `App1`
-(`Machine.hs:1117`). A register (dynamic scope) was considered and rejected: a top-level rule used
-as `HENCE rule` would then have worked at run time while the lexical checker refused it.
+**Threading, chosen: bindings in the continuation's environment, rebound into its value.** At
+every hand-off the machine builds a `Lifecycle` (`ContractFrame.hs:400`: the join instant under
+`HENCE` only, the absolute deadline when there is one, the arming) and binds it into the
+continuation's environment under three fixed uniques of a sort no name table uses
+(`Machine.hs:2557-2575`, `bindLifecycle`), so no program can spell, shadow or capture them.
+`continueWithFollowup` (`Machine.hs:2030`), `fireBarrierHence` (`:2466`), `barrierFail` (`:2496`)
+and `barrierStateMissed` (`:2514`) all bind it; the `RBinOp` paths need nothing, because `ValROp`
+captures the environment for both operands. Two things the adversarial pass changed about the
+binding. (1) It REPLACES all three: a position the hand-off does not have is deleted, where the
+first commit left an outer binding in place — measured: an empty-cast barrier nested under an
+obligation `WITHIN 10`, with `OF THE DEADLINE` in its `HENCE`, silently read 10 + 5 = 15, exit 0.
+(2) It is made twice — into the environment the `HENCE`/`LEST` expression is evaluated in, and
+again into the VALUE that expression produced, by a `Handoff` frame pushed under the `App1`
+(`ContractFrame.hs:93` `Handoff`; `Machine.hs:2584` `rebindLifecycle`, which reaches a `ValObligation`, a
+`ValQuantified` and both operands of a `ValROp`). That is what makes the enclosing-obligation rule
+dynamic for a continuation that arrives as a value, and it is not the register the first commit
+rejected: nothing is global, the bindings live in the one value being applied, and a top-level
+rule named in a `HENCE` still cannot use `THE JOIN`/`THE DEADLINE` because the checker refuses it
+where it is written — the run time is now MORE permissive than the checker, never less, which is
+the safe direction. The arming had to be **kept**: the act frames overwrite `time` on every event,
+so each of the eleven carries `armed` as well (`ContractFrame.hs:107` and siblings), set at `App1`
+(`Machine.hs:1117`).
 
 **Resolution and arithmetic.** The deadline is resolved ONCE, at the first event, when the frame's
 `time` is still the arming time (`Contract4`, `Machine.hs:1539`): a lifecycle anchor is the
-environment binding (`lifecycleRef`, `:2516`, with the obligation's own `armed` as `THE ARMING`'s
+environment binding (`lifecycleRef`, `:2598`, with the obligation's own `armed` as `THE ARMING`'s
 fallback), an expression is evaluated in the obligation's environment, and a `DATE` value is
 lowered by its serial (`Contract4b`, `:1569` — the same arithmetic as `DATE_SERIAL`, not a call
 through it: an `App` inserted into the AST would have no tokens and would break exactprint). Then
@@ -1837,31 +1882,60 @@ due is relative again; the anchor is spent. So a deadline already past at arming
 first event (witness: `already expired`), and a residual that has met no event prints the source
 form, anchor and all, while one that has prints the days remaining (witness: the last section).
 
-**`THE DEADLINE` under a barrier, and the `RAND` question.** THE DEADLINE in a barrier's
-continuation is the `ONCE` line's `WITHIN` when written (the deadline on the whole, R-T2; `Barrier4`,
-`:1852`), and otherwise the act deadline of the member whose completion fired the join (`HENCE`)
-or whose expiry failed it (`LEST`, R-Q5's act layer) — witnessed by `the tenancy` (14 + 5 = 19 both
-ways) and `the tenancy, bounded as a whole` (30 + 5 = 35). To carry a member's deadline to the
-barrier without running the member twice (§11.0.1's second-pass defect), the barrier's two
-sentinels are minted with a unique of their own sort (`defSentinel`, `:2329`) and the member's
+**`THE DEADLINE` under a barrier, and the `RAND` question.** By slot. Under `HENCE`, THE DEADLINE
+is the `ONCE` line's `WITHIN` when written (the deadline on the whole, R-T2; `Barrier4`, `:1875`),
+and otherwise the **latest of the members' act deadlines** — the instant by which all performance
+fell due, which is what §5.1.1's own motivation ("the cure period runs from the date performance
+fell due") asks for — kept as a running maximum (`BarrierStepFrame.dueLatest`, `ContractFrame.hs:335`, forced per
+completion by `Barrier2b`, `Machine.hs:1851`), so neither who completed last nor the roll's order can move it
+(witnesses: `the tenancy`, 14 + 5 = 19; `the tenancy, bounded as a whole`, 30 + 5 = 35;
+`per member`, Alice due 20 and Bob due 10, 20 + 5 = 25 from either roll and on a tie). The first
+commit took "the act deadline of the member whose completion fired the join", which on a tie was
+whichever member the roll named first (measured: `LIST alice, bob` FULFILLED, `LIST bob, alice`
+BREACHED, same events) and on no tie was the last completer's rather than the group's; the
+adversarial pass replaced it. Under `LEST`, THE DEADLINE is the deadline that was actually missed:
+the failing member's act deadline when a member expired (`barrierFail`, carried by the sentinel),
+the `ONCE` line's when everyone acted but the last act landed after it (`barrierStateMissed`) —
+witnesses `the tenancy` (LEST, 14 + 5 = 19), `the tenancy, a member late` (act 14 and `ONCE`
+30 both written, Bob late: 14 + 5 = 19, not 35), `the tenancy, the group late` (30 + 5 = 35), `by
+instant 105`. The first commit's prose said "the `ONCE` line's when written" for both slots, which
+the code never did under `LEST`; corrected here, on the doc page and in the `Lifecycle` haddock.
+An EMPTY cast is joined at its arming (`BarrierEmpty`, `Machine.hs:1858`; `barrierJoined`, `:2442`) and goes through the same
+`Barrier3`/`Barrier4` path, so THE DEADLINE is the `ONCE` line's `WITHIN` when written (witness:
+`nobody, bounded as a whole`, 0 + 30 + 5 = 35 — the first commit bypassed that path and refused
+with a message that blamed the wrong things); with only an act `WITHIN` there is no member deadline
+and no `dueLatest`, so the run refuses, naming the empty cast (refusal 6; witness: `nobody, act
+deadline only`, which is also the nested case that once leaked 15). To carry a member's deadline
+to the barrier without running the member twice (§11.0.1's second-pass defect), the barrier's two
+sentinels are minted with a unique of their own sort (`defSentinel`, `:2364`) and the member's
 hand-off passes them a THIRD argument, the member's absolute deadline (`continueWithFollowup`,
-`:2002`; `sentinelArgs`, `:2321`); every other continuation is applied to `[time, events]` exactly
+`:2036`; `sentinelArgs`, `:2356`); every other continuation is applied to `[time, events]` exactly
 as before, and the sentinels still print as `` `the join` `` / `` `the join fails` ``. A first
 attempt applied the sentinel to the deadline as an expression, which made the residual print
 ``HENCE (`the join` OF `the deadline`)`` and moved `run-barrier.golden`; withdrawn. A `RAND`
 continuation has ONE enclosing obligation — the one whose `HENCE`/`LEST` the `RAND` sits in — and
-both operands see its bindings, because `ValROp` captures the hand-off environment; that is the
-brief's "the one whose completion or failure fired it", by construction.
+both operands see its bindings, because `ValROp` captures the hand-off environment (and
+`rebindLifecycle` reaches both operands); that is the brief's "the one whose completion or failure
+fired it", by construction.
 
 **The join line's own `WITHIN`.** `OF THE ARMING` there is the `EVERY`'s arming, which is also what
-it counts from unanchored (`Barrier3`, `:1840`); `OF e` is an instant (witness: `by instant 105`).
-When the join-line deadline is demoted to the members (R-T2, no act `WITHIN`), each member's
-environment binds `THE ARMING` to the `EVERY`'s arming (`memberEnv`, `:2228`) so a nested `EVERY`
-does not read its enclosing obligation's arming there (witness: `after delivery`, 5 + 14 = 19).
+it counts from unanchored (`Barrier3`, `:1863`); `OF e` is an instant (witness: `by instant 105`).
+A join-line `OF e` is evaluated when the join fires — at `barrierFinish`, after the last member has
+acted — not at the `EVERY`'s arming, unlike an act-line anchor (`Contract4`, once, at the first
+event); and when the join-line deadline is demoted to the members (R-T2, no act `WITHIN`), each
+member evaluates it again at its own first event, so a ledger-reading `e` is read once per member
+and once more at the join. Stated as a limit; no witness reads the ledger in an anchor. In the
+demoted case each member's environment binds `THE ARMING` to the `EVERY`'s arming (`memberEnv`,
+`:2263`) so a nested `EVERY` does not read its enclosing obligation's arming there (witness:
+`after delivery`, 5 + 14 = 19). On the ACT line of a nested `EVERY`, by contrast, `OF THE ARMING`
+is the enclosing obligation's arming, as on a `PARTY` rule in the same place — so the same words
+name an earlier instant on the act line than on the join line, and naming the anchor on the act
+line moves the deadline EARLIER than leaving it off. The adversarial pass raised this as a trap and
+the refuters upheld the semantics (they are this rule); the doc page now contrasts the two lines.
 
-**Refusals — build decisions, each open to Meng's ruling** (`checkAnchor`, `TypeCheck.hs:2023`;
-`AnchorRefusal`, `Types.hs:404`; the enclosing obligation is a `CheckEnv` field set with `local`
-around each continuation, `Types.hs:774`, `TypeCheck.hs:2072`):
+**Refusals — build decisions, each open to Meng's ruling** (`checkAnchor`, `TypeCheck.hs:2029`;
+`AnchorRefusal`, `Types.hs:405`; the enclosing obligation is a `CheckEnv` field set with `local`
+around each continuation, `Types.hs:775`, `TypeCheck.hs:2078`):
 
 1. `THE JOIN` and `THE DEADLINE` with no enclosing obligation (top level) — refused.
 2. `THE JOIN` under `LEST` — refused: the join did not fire. This is the conservative reading of
@@ -1875,6 +1949,18 @@ around each continuation, `Types.hs:774`, `TypeCheck.hs:2072`):
 5. An `OF` expression that is neither `NUMBER` nor `DATE` — refused naming both
    (`AnchorNotAnInstant`, `Types.hs:217`). The choice is biased: an inference variable is taken as
    `NUMBER`.
+
+Two more are RUN-TIME refusals (`lifecycleRefusal`, `Machine.hs:2611`), because only a run can see them
+— added by the adversarial pass, which also made the message name each cause instead of asserting
+"not inside any HENCE or LEST" for a value that is:
+
+6. `THE DEADLINE` in the `HENCE` of a barrier whose cast was EMPTY and whose `ONCE` line has no
+   `WITHIN` — nobody had a deadline to meet. The alternative, arming + the act's `WITHIN` evaluated
+   in the `EVERY`'s environment, was not taken: the act `WITHIN` may mention the member
+   (`WITHIN grace t`), and inventing a value is what refusal 4 declines to do.
+7. A continuation that arrived as a value and is attached where the position does not exist —
+   `THE JOIN` under a `LEST`, `THE DEADLINE` under an obligation with no `WITHIN`. The checker
+   accepted the anchor where it was written; the run refuses it where it is used.
 
 **Printers and exporters.** `prettyLayout` prints `d [OF anchor]` with the duration bracketed
 exactly as before (`Print.hs:959`, `:968`), so every unanchored deadline prints byte-for-byte as it
@@ -2995,15 +3081,18 @@ are in §5.1.1.1; this is the ledger entry):
 - the grammar `WITHIN d [OF anchor]` in both positions, the act's and the join line's, with `OF`
   read as the anchor in the duration slot and as application everywhere else;
 - the three lifecycle anchors `OF THE JOIN`, `OF THE DEADLINE`, `OF THE ARMING`, matched by
-  spelling, naming the nearest enclosing obligation's join, deadline and arming — through the
-  single-party hand-offs, the barrier's `HENCE` (state deadline when the `ONCE` line has one, else
-  the last completer's), the barrier's `LEST` (the failing member's deadline, or the state
-  deadline when that is what was missed), the fork (each member's own), and the demoted join-line
-  deadline;
+  spelling, naming the nearest enclosing obligation's join, deadline and arming — the obligation
+  the continuation is attached to when it runs — through the single-party hand-offs, the
+  barrier's `HENCE` (state deadline when the `ONCE` line has one, else the latest of the members'
+  act deadlines; an empty cast joined at its arming), the barrier's `LEST` (the failing member's
+  deadline, or the state deadline when that is what was missed), the fork (each member's own),
+  the demoted join-line deadline, and a continuation handed on as a value;
 - the expression anchor, `NUMBER` or `DATE`, the latter lowered by its serial; a deadline already
   past at arming is revealed by the first event;
-- five check-time refusals, each with a `not-ok/tc/` witness; the `Lifecycle` bindings under
-  unspellable uniques; the arming kept on every act frame; the sentinels' third argument;
+- five check-time refusals, each with a `not-ok/tc/` witness, and two run-time refusals with
+  witnesses in `run-anchors.l4`; the `Lifecycle` bindings under unspellable uniques, replaced
+  whole at every hand-off and rebound into the continuation's value; the arming kept on every act
+  frame; the sentinels' third argument; the barrier's running maximum of member deadlines;
 - all four printers (exactprint byte-identical, `prettyLayout` round-tripping, NLG, document
   export), the MLIR schema failing closed, LSP highlighting, the service's residual string;
 - `doc/reference/regulative/README.md`'s `WITHIN` section rewritten with examples that check
@@ -3028,7 +3117,54 @@ of them. That is the parser telling the truth about the new grammar; hiding the 
 A reviewer who reads rule 6 more strictly can reverse it with one `hidden` in
 `L4.Parser.anchor`.
 
-**What the adversarial pass of 2026-09-15 changed** — pending, filled after the refute stage.
+**What the adversarial pass of 2026-09-15 changed.** Eighteen findings were raised (seven on
+semantics, five on golden/spec drift, six on completeness; two pairs of them duplicates), each
+put to two independent refuters; none was refuted by both, so every one was applied or answered.
+In §5.1.1.1's terms:
+
+- Made the enclosing obligation dynamic at the hand-off: the `Handoff` frame rebinds the
+  `Lifecycle` into the continuation's value, so a continuation passed as a `DEONTIC` parameter or
+  factored into a `WHERE` anchors to the obligation it is attached to (`OF THE JOIN` ≡ the
+  unanchored default again; witnesses `handed on, the join` / `the deadline`, `factored out`).
+- Made `bindLifecycle` delete a position the hand-off lacks instead of leaving the outer binding
+  in place (an empty-cast barrier's `HENCE` nested under a `WITHIN 10` read 15, exit 0; witness
+  `nobody, act deadline only`, now a named refusal).
+- Routed an empty cast through the `ONCE` line's `WITHIN` (`BarrierEmpty`, `barrierJoined`; witness
+  `nobody, bounded as a whole`, 35) and rewrote `lifecycleRefusal` so it names the empty cast and
+  the handed-on-value cases instead of asserting the rule is "not inside any HENCE or LEST".
+- Replaced the barrier `HENCE`'s "last completer's act deadline" with the latest of the members'
+  act deadlines (`dueLatest`, `Barrier2b`), so a same-stamp tie no longer flips the verdict with
+  the roll's order (witness `per member`, three traces).
+- Corrected the barrier `LEST` sentence in `EVERY.md`, in this section and in the `Lifecycle`
+  haddock to "the deadline actually missed" (witnesses `the tenancy, a member late`, 19, and
+  `the tenancy, the group late`, 35).
+- Widened the "`OF` is the anchor" statement to the whole unbracketed duration (README, this
+  section, the skill), named `jl4/experiments/jerseyCharities2-annual-returns.l4:214` as the one
+  pre-existing `WITHIN f OF x` in the tree (a file that never parsed), and gave the checker an
+  anchored-duration mismatch wording (`ExpectAnchoredDurationContext`) that says how to bracket.
+- Reworded the `NoEnclosingObligation` refusal to say "not WRITTEN inside any HENCE or LEST — at
+  the top level, or in a WHERE" (golden `anchor-top-level-join` re-blessed).
+- README: `THE` is a keyword, not matched by spelling; the undefined-`days` failure mode stated
+  for both branches (checker error with no mixfix in scope, parser error with one — the finding's
+  unconditional "parse error" was refuted by one refuter and the sentence now says what selects);
+  the nearest-reach limit of `THE ARMING` on the `of this agreement` example; the kept-`SHANT`
+  join; the two run-time refusals. `EVERY.md`: the act-line/join-line `OF THE ARMING` contrast on a
+  nested `EVERY`, the join-line `OF e` evaluation time, the empty cast, the tie bullet.
+- This section: the `.ep.golden` sentence qualified (two parse-error goldens did move); the `THE
+FOO` message quoted verbatim, `…, or space token`; the unit-word measurement qualified by what is
+  in scope.
+- `jl4/examples/lsp/semantic-tokens/anchors.l4`: the barrier `HENCE` no longer names the member
+  `t` (a shape the run refuses); golden re-blessed.
+
+Raised and NOT changed, with the reason: binding `THE ARMING` on a nested `EVERY`'s act line to
+the `EVERY`'s own arming (both refuters: it contradicts the nearest-enclosing rule and
+`EVERY.md`'s "as on a `PARTY` rule in the same place"; a doc sentence was added instead);
+binding a kept `SHANT`'s join to its deadline (it would part `OF THE JOIN` from the unanchored
+clock, which §5.2's track owns; documented instead); resetting the `OF`-is-anchor flag inside
+`IF`/`WHERE`/operand positions of the duration (the whole-slot rule is the simpler statement and
+the bracketing fix is one keystroke; documented, and the checker now names it); making the
+`unexpected OF` parse error inside an unclosed `IF` list `OF` (megaparsec reports what the open
+production expects; not attempted). Raised and refuted by both refuters: none.
 
 ### 11.0.2 The roll, said outright: `EVERY Cast v IN xs` — RULED 2026-09-08 (Meng), BUILT
 

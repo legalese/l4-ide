@@ -207,8 +207,9 @@ the result is the **residual obligation**, not a breach. **Not** a `#TRACE` with
 altogether — that is a parse error, `unexpected end of input / expecting %, WITH, or space token`.
 
 **Not** a unit written into the deadline. There is no unit keyword to append: `WITHIN 14 days` does
-**not** parse as "fourteen days" — `days` is an ordinary identifier, so the line is read as applying
-a function to `14`, and the file fails to check with
+**not** parse as "fourteen days" — `days` is an ordinary identifier. In a file with no imports and no
+other mixfix definition, the line is read as applying a function to `14`, and the file fails to
+check with
 
 ```
 I could not find a definition for the identifier
@@ -220,7 +221,10 @@ which I have inferred to be of type:
   FUNCTION FROM NUMBER TO NUMBER
 ```
 
-Measured on the section-`GIVEN` binary, exit 1. The anchored form
+Measured on the section-`GIVEN` binary, exit 1, on a file that imported nothing. With any mixfix
+operator in scope — `IMPORT prelude` is enough — the parser accepts only operator words it knows,
+and the same line stops earlier, in the parser, with `unexpected days` (re-measured 2026-09-15).
+Either way the fix is the same. The anchored form
 [regulative.md](../regulative.md) shows under "`WITHIN` — deadlines" —
 `` WITHIN 5 days OF `order confirmation` `` — was a parse error (`unexpected OF`, exit 1) on that
 binary; since 2026-09-15 the `OF` parses as the deadline's anchor, and the line fails the same

@@ -522,6 +522,7 @@ data ExpectationContext =
   | ExpectQuantifierFilterContext -- the WHO clause of an EVERY is a predicate on the bound variable
   | ExpectQuantifierRollContext -- the IN clause of an EVERY is the LIST the cast is drawn from
   | ExpectJoinDeadlineContext -- a join line's WITHIN bounds the joined state
+  | ExpectAnchoredDurationContext -- the duration of an anchored WITHIN: everything before OF, where OF is not application
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
