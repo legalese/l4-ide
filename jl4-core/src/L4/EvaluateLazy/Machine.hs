@@ -2102,11 +2102,11 @@ backwardContractFrame val = \ case
     -- when the compound is applied ('operandHandoff').
     --
     -- A barrier's SENTINEL ('barrierMember') is the one continuation that
-    -- takes a third argument: the member's absolute deadline, when it has
-    -- one, so that the barrier learns the deadline the member met or missed
-    -- without a second pass ('Barrier1', 'sentinelArgs'). A sentinel is
-    -- recognised by its unique ('isSentinel'); every other continuation is
-    -- applied to @[time, events]@ exactly as before.
+    -- takes two further arguments — the stream position of the hand-off and,
+    -- when the member has one, its absolute deadline (see the paragraph below
+    -- and 'sentinelArgs') — so that the barrier learns both without a second
+    -- pass ('Barrier1'). A sentinel is recognised by its unique ('isSentinel');
+    -- every other continuation is applied to @[time, events]@ exactly as before.
     --
     -- The binding is made twice, on purpose. Into the environment the
     -- followup EXPRESSION is evaluated in, so an obligation written inline

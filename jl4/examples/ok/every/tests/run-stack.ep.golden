@@ -16,7 +16,8 @@ IMPORT prelude
 -- of the one the stream reached first), then by the deadline missed (two
 -- misses the same event revealed), and only then by roll position, which by
 -- then names the same anchor, residual and deadline either way. Every trace
--- below pins the number that rule produces; the comment says what a
+-- below pins the number that rule produces, for each of the four modals
+-- (MUST §1-3, MAY §3b, DO §3c, SHANT §4-4b); the comment says what a
 -- different rule would have produced instead.
 
 DECLARE Actor IS ONE OF
@@ -28,6 +29,7 @@ DECLARE Action IS ONE OF
     Deliver HAS who    IS AN Actor
     Refund  HAS who    IS AN Actor
     Smoke   HAS who    IS AN Actor
+    Approve HAS who    IS AN Actor
 
 theLandlord MEANS Landlord OF "Ms Ng"
 alice       MEANS Tenant OF "Alice"
@@ -110,6 +112,99 @@ GIVETH A DEONTIC Actor Action
   PARTY alice DOES Sign alice AT 1
   (`WAIT UNTIL` 20)
   PARTY theLandlord DOES Refund theLandlord AT 21
+
+
+§ `3b. MAY: the permission that expires first anchors the LEST, and THE DEADLINE is its window's end`
+
+-- The three shapes above, with MAY members. A permission its holder does
+-- not exercise expires at its deadline (R-Q5's act layer: MUST, DO and MAY
+-- all fail at the deadline), and under a barrier that has a LEST the
+-- expiry is a failure the LEST is anchored at, exactly as a MUST member's
+-- miss is. Alice approves at 1. Carol's permission (window 5) expires
+-- unexercised, revealed by WAIT UNTIL 8; Bob's (14) by WAIT UNTIL 20. THE
+-- DEADLINE under the LEST is Carol's 5, so the refund is due 10: at 10
+-- FULFILLED, at 11 BREACHED reporting 10, on both rolls. The tie — WAIT
+-- UNTIL 20 reveals both expiries at once — is broken by the deadline,
+-- 5 < 14: the refund at 21 reports 10 on both rolls. When everybody
+-- approves in time the join fires: FULFILLED.
+GIVEN roll IS A LIST OF Actor
+GIVETH A DEONTIC Actor Action
+`may approve` roll MEANS
+    EVERY Tenant t IN roll
+        MAY    Approve (EXACTLY t)
+        WITHIN `days allowed to` t
+        ONCE   ALL HAVE
+        HENCE  FULFILLED
+        LEST   (PARTY theLandlord MUST Refund (EXACTLY theLandlord) WITHIN 5 OF THE DEADLINE)
+
+#TRACE `may approve` tenants AT 0 WITH
+  PARTY alice DOES Approve alice AT 1
+  (`WAIT UNTIL` 8)
+  PARTY theLandlord DOES Refund theLandlord AT 10
+  (`WAIT UNTIL` 20)
+
+#TRACE `may approve` tenants AT 0 WITH
+  PARTY alice DOES Approve alice AT 1
+  (`WAIT UNTIL` 8)
+  PARTY theLandlord DOES Refund theLandlord AT 11
+  (`WAIT UNTIL` 20)
+
+#TRACE `may approve` `tenants, reversed` AT 0 WITH
+  PARTY alice DOES Approve alice AT 1
+  (`WAIT UNTIL` 8)
+  PARTY theLandlord DOES Refund theLandlord AT 11
+  (`WAIT UNTIL` 20)
+
+#TRACE `may approve` tenants AT 0 WITH
+  PARTY alice DOES Approve alice AT 1
+  (`WAIT UNTIL` 20)
+  PARTY theLandlord DOES Refund theLandlord AT 21
+
+#TRACE `may approve` `tenants, reversed` AT 0 WITH
+  PARTY alice DOES Approve alice AT 1
+  (`WAIT UNTIL` 20)
+  PARTY theLandlord DOES Refund theLandlord AT 21
+
+#TRACE `may approve` tenants AT 0 WITH
+  PARTY alice DOES Approve alice AT 1
+  PARTY carol DOES Approve carol AT 2
+  PARTY bob   DOES Approve bob   AT 3
+
+
+§ `3c. DO: as MUST`
+
+-- DO is the bare form, and behaves as MUST does: a DO member's miss is
+-- revealed and ordered exactly as a MUST member's. Carol misses 5,
+-- revealed by WAIT UNTIL 8; THE DEADLINE under the LEST is hers, so the
+-- refund is due 10: at 10 FULFILLED, at 11 BREACHED reporting 10, on both
+-- rolls.
+GIVEN roll IS A LIST OF Actor
+GIVETH A DEONTIC Actor Action
+`do staggered` roll MEANS
+    EVERY Tenant t IN roll
+        DO     Sign (EXACTLY t)
+        WITHIN `days allowed to` t
+        ONCE   ALL HAVE
+        HENCE  FULFILLED
+        LEST   (PARTY theLandlord MUST Refund (EXACTLY theLandlord) WITHIN 5 OF THE DEADLINE)
+
+#TRACE `do staggered` tenants AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+  (`WAIT UNTIL` 8)
+  PARTY theLandlord DOES Refund theLandlord AT 10
+  (`WAIT UNTIL` 20)
+
+#TRACE `do staggered` tenants AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+  (`WAIT UNTIL` 8)
+  PARTY theLandlord DOES Refund theLandlord AT 11
+  (`WAIT UNTIL` 20)
+
+#TRACE `do staggered` `tenants, reversed` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+  (`WAIT UNTIL` 8)
+  PARTY theLandlord DOES Refund theLandlord AT 11
+  (`WAIT UNTIL` 20)
 
 
 § `4. SHANT: the violating stamp orders, the window's end is THE DEADLINE`

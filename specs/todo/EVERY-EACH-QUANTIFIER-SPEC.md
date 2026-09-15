@@ -1494,7 +1494,14 @@ attaches to, then by the modal**:
   state's deadline, whatever the acts' modals; the `LEST` fires once, at that deadline, and the blame
   is the set (§6.1; a set-valued `BY` under R-T3 — the set is built as of 2026-09-15, the state-layer
   `LEST`'s own naming of it is not, see §6.1). §2.2.7.6's `rent owed jointly` is the case: `MAY`
-  acts inside, one `LEST` at `due`.
+  acts inside, one `LEST` at `due`. _As built (§5.1.1.1, 2026-09-15; re-read 2026-09-16):_ when
+  BOTH an act `WITHIN` and the `ONCE` line's `WITHIN` are written and a member's act deadline
+  passes first, the `LEST` attaches to the act layer — the deadline actually missed, the member's
+  — and this state-layer sentence applies only when every member completed and the last act
+  landed after the state deadline (`barrierStateMissed`); the machine compares the state deadline
+  only after the join (`Barrier3`/`Barrier4`, reached from `barrierJoined` alone). The exemplar
+  here has no act `WITHIN`, so the ruling's words did not reach that case; witness
+  `run-anchors.l4`'s `the tenancy, a member late` (act 14, `ONCE` 30, Bob late: 14 + 5 = 19, not 35) and §11.0.1 "Stacking B on C", whose "earliest by R-Q5" is the act-layer reading.
 - On the **act layer** — a `LEST` under the fork join, or a barrier with no state `WITHIN` — the modal
   fixes it: **`SHANT` fails at the act** (the violating event's own stamp; today's single-party
   behaviour at `Machine.hs:1648-1651`); **`MUST`, `DO` and `MAY` fail at the deadline**.
@@ -1782,10 +1789,14 @@ see the list at the end of §11.0.1's ledger entry); refusals witnessed by `jl4/
 highlighting by `jl4/examples/lsp/semantic-tokens/anchors.l4`. **Line numbers below are on
 `every/anchors` at `82c61419`** — its tip before the stack onto `every/blame-set`, where they were
 re-cited after the adversarial pass — and are NOT current on `every/anchors-on-blame`, where C's
-insertions shift every `Machine.hs`, `ContractFrame.hs`, `TypeCheck.hs`, `Types.hs`, `Syntax.hs`,
-`ValueLazy.hs`, `Print.hs` and `Backend/Jl4.hs` number (the `Parser.hs` cites still hold there).
-Read them with `git show 82c61419:<file>`; §11.0.1 "Stacking B on C" carries the live cites for
-the stacked tree.
+insertions shift every `Machine.hs`, `ContractFrame.hs`, `TypeCheck.hs`, `Types.hs` and
+`Syntax.hs` number cited below (measured: each file's first C hunk lies above its smallest cite).
+The `Parser.hs`, `Print.hs` (`:959`, `:968` sit above C's first `Print.hs` hunk at `:1250`),
+`Nlg.hs`, `Document.hs`, `Schema.hs` and `SemanticTokens.hs` cites still hold there; this section
+cites no `ValueLazy.hs` or `Backend/Jl4.hs` line. Read the shifted ones with
+`git show 82c61419:<file>`; §11.0.1 "Stacking B on C" carries live cites for `Machine.hs` and
+`ContractFrame.hs` only — it does not re-cite the `TypeCheck.hs`, `Types.hs` or `Syntax.hs`
+items.
 
 **Syntax.** `Deonton.due` and the join line's deadline both become `Maybe (Deadline n)`
 (`Syntax.hs:420`, `:491`, `:493`), where `Deadline n = MkDeadline Anno (Expr n) (Maybe (Anchor n))`
@@ -1933,6 +1944,10 @@ witnesses `the tenancy` (LEST, 14 + 5 = 19), `the tenancy, a member late` (act 1
 30 both written, Bob late: 14 + 5 = 19, not 35), `the tenancy, the group late` (30 + 5 = 35), `by
 instant 105`. The first commit's prose said "the `ONCE` line's when written" for both slots, which
 the code never did under `LEST`; corrected here, on the doc page and in the `Lifecycle` haddock.
+Note that R-Q5's state-layer bullet, read by its words alone ("a `LEST` after an `ONCE … WITHIN`
+line"), would put `the tenancy, a member late` on the state layer and its failure time at 30; the
+build attaches the `LEST` to the layer whose deadline was actually missed, and R-Q5 now carries an
+as-built note saying so (2026-09-16, the stack's round 2).
 An EMPTY cast is joined at its arming (`BarrierEmpty`, `Machine.hs:1863`; `barrierJoined`, `:2452`) and goes through the same
 `Barrier3`/`Barrier4` path, so THE DEADLINE is the `ONCE` line's `WITHIN` when written (witness:
 `nobody, bounded as a whole`, 0 + 30 + 5 = 35 — the first commit bypassed that path and refused
@@ -3156,7 +3171,9 @@ under a LEST`, `handed under a LEST, in a compound`, `handed to no WITHIN` — t
   added these three; round 1's ledger claimed both were witnessed when only 6 was); the
   `Lifecycle` bindings under unspellable uniques, replaced
   whole at every hand-off and rebound into the continuation's value; the arming kept on every act
-  frame; the sentinels' third argument; the barrier's running maximum of member deadlines;
+  frame; the sentinels' extra argument, the member's deadline (their third here; the fourth since
+  the stack's round 1 put the stream position before it — §11.0.1 "Stacking B on C"); the
+  barrier's running maximum of member deadlines;
 - all four printers (exactprint byte-identical, `prettyLayout` round-tripping, NLG, document
   export), the MLIR schema failing closed, LSP highlighting, the service's residual string;
 - `doc/reference/regulative/README.md`'s `WITHIN` section rewritten with examples that check
@@ -3280,9 +3297,11 @@ Raised and refuted by both checkers in round 2: none.
 
 Witness `jl4/examples/ok/every/run-stack.l4`. Line numbers in this block are on the branch at the
 commit that applies round 1 of its adversarial pass (subject `lang(every): apply round 1 of the
-stack's adversarial pass …`; its ledger is the last paragraph of this block), which is the last
-commit to touch `Machine.hs` and `ContractFrame.hs`; the earlier stacking commit's numbers were
-superseded by that round and are not repeated. B is the anchored `WITHIN` (three commits, this
+stack's adversarial pass …`, `b8a14d39`; its ledger is the second-to-last paragraph of this
+block); round 2's commit (the last paragraph) touched `Machine.hs` and `ContractFrame.hs` by two
+haddock edits with the same line count as the text they replaced, so every cite here reads the
+same on either commit; the earlier stacking commit's numbers were superseded by round 1 and are
+not repeated. B is the anchored `WITHIN` (three commits, this
 section's block above); C is the blame set (§6.1.1, three commits). Both were cut from the same
 `origin/unstable` (`0b640727`) and both rewrote the barrier's failure path, so `git rebase --onto
 <C's HEAD> origin/unstable` conflicted in three files: `Machine.hs` (the `Barrier1` failpoint
@@ -3321,8 +3340,11 @@ and the clock bullet with B's `OF THE DEADLINE` workaround sentence appended.
 
 **The interaction, as measured** (probe `probes/interaction.l4` in the session scratch, then the
 witness; binary built from this tree, `JL4_LIBRARY_PATH` pinned to its own libraries). C decides
-WHICH failure a barrier's `LEST` is anchored at — the earliest by R-Q5, `earliestFailure`
-(`Machine.hs:2619-2641`) — and B decides what `THE DEADLINE` reads inside that `LEST`. Stacked,
+WHICH failure a barrier's `LEST` is anchored at — the earliest by R-Q5's act layer (a member's
+expiry lands there even when the `ONCE` line also has a `WITHIN`: R-Q5's state-layer sentence
+applies, as built, only when the group completes late — see the note under R-Q5 and §5.1.1.1's
+`LEST` paragraph), `earliestFailure` (`Machine.hs:2619-2641`) — and B decides what `THE DEADLINE`
+reads inside that `LEST`. Stacked,
 the rule is: **`THE DEADLINE` under a barrier's `LEST` is the act deadline of the member whose
 failure the `LEST` is anchored at — the earliest failure — and it is order-independent.** Measured,
 with Carol last on the roll and due at 5, Bob due at 14, Alice signing at 1:
@@ -3352,10 +3374,11 @@ with Carol last on the roll and due at 5, Bob due at 14, Alice signing at 1:
   one barrier, since a barrier's members share one modal.
 - a `RAND` of two anchored continuations both breached (`WITHIN 5 OF THE DEADLINE` → 15, `WITHIN 3
 OF THE JOIN` → 7, both revealed at 20): C's compound anchors at the left operand and names both
-  entries, each with the deadline B's `Contract5` computed (`Machine.hs:1605`): **15, then 7**.
+  entries, each with the deadline B's `Contract5` computed (`Machine.hs:1608`): **15, then 7**.
 
 **Goldens.** New: `ok/every/tests/run-stack.{golden,ep.golden,nlg.golden,schema.golden}` (read;
-the `.golden` carries exactly the ten numbers above, and since round 1 the five of §4b below).
+the `.golden` carries exactly the ten numbers above, since round 1 the five of §4b below, and
+since round 2 the nine of §3b/§3c — the same shapes for `MAY` and `DO`).
 Moved, and NOT a resolution error:
 `ok/every/tests/run-anchors.golden`, one block — B's fork witness `receipts` (both landlord
 deliveries breach at 17) now prints `and the breach names, in order` with two entries at 16, which
@@ -3387,10 +3410,11 @@ none.
   10 on BOTH rolls — Carol chosen by her window end (5 < 14) although Bob's violation was first in
   the stream, and the refund that followed it dropped from her residual; with Alice and Bob (both
   window 14) and the refund between them, `FULFILLED` on `tenants` and `BREACHED` at 19 reversed —
-  the roll deciding, on a branch that claimed order-independence. On C's own binary the second
-  shape (`H-shant-C.l4`, unanchored `WITHIN 5`) was already `FULFILLED` / `BREACHED` by roll, so
-  "harmless for C" was false as measured, and the stack's deadline key had turned C's `tenants`
-  verdict from `FULFILLED` to `BREACHED`. **The fix:** the scan counts the events it takes
+  the roll deciding, on a branch that claimed order-independence. On C's own binary the Bob/Carol
+  shape (`H-shant-C.l4`: Bob 3, refund 3, Carol 3, with an unanchored `WITHIN 5` — the only shape
+  run on C's binary; the Alice/Bob shape was run on the stack's binary only) was already `FULFILLED` /
+  `BREACHED` by roll, so "harmless for C" was false as measured, and the stack's deadline key had
+  turned C's `tenants` verdict from `FULFILLED` to `BREACHED`. **The fix:** the scan counts the events it takes
   (`ScrutinizeEvents.seen` and the eleven records it is threaded through, `ContractFrame.hs:134`
   … `:302`; `seen = 0` at the arming, `Machine.hs:1129`; `seen + 1` at `Contract1`,
   `Machine.hs:1540-1545`; carried through `ResolvePartyFrame.seen`, `ContractFrame.hs:551`), the
@@ -3435,9 +3459,12 @@ none.
   `leftAnchored` (`Machine.hs:2018-2021`) keys only on `breachTime` (`Machine.hs:2079-2080`), tie
   → left for `RAND`, right for `ROR`, and never reads a deadline. The barrier's extra keys exist
   because the `LEST` reads `THE DEADLINE` and the residual from the chosen member; nothing reads
-  either from a compound's anchor — `MkLifecycle` is built at five sites (`Machine.hs:1747`,
-  `:1773`, `:2682`, `:2720`, `:2737`: the single-party `LEST` and `HENCE`, the barrier's `HENCE`,
-  `LEST` and state-missed `LEST`) and none is a compound, and `rebindLifecycle`
+  either from a compound's anchor — `MkLifecycle` is built at six sites (`Machine.hs:1666` —
+  the expiry path's `lifecycleAt`, which is `MUST`/`DO` → `LEST`, `SHANT` → `HENCE`, `MAY` →
+  `LEST` — `:1747`, `:1773`, `:2682`, `:2720`, `:2737`: the single-party expiry, `SHANT`
+  violation and completion hand-offs, then the barrier's `HENCE`, `LEST` and state-missed
+  `LEST`; round 1's ledger said five, missing `:1666` — round 2) and none is a compound, and
+  `rebindLifecycle`
   (`Machine.hs:2807-2813`) rebinds a `ValROp`'s environment from the ENCLOSING hand-off, not from
   the compound's own breach. Operand side is also fixed in the source text where a roll is a
   runtime list (`tenants` vs `tenants, reversed` for one rule), so the compound's tie is not
@@ -3466,6 +3493,66 @@ none.
   fell through `Barrier1`'s catch-all and returned the barrier at once, never reaching the join
   tail — `0b640727` `Machine.hs:1764-1766`, `82c61419` `Machine.hs:1836-1838`). Minor, both
   applied in place above, and the whole block re-cited on the round-1 tree.
+
+**Round 2 of the adversarial pass (2026-09-16) — what it found, what was applied.** Eleven
+findings CONFIRMED by both refuters (one major, ten minor; two of the ten are the same
+`Machine.hs:1605` cite, raised on both tracks), every one applied; one raised and refuted by both,
+not applied. No behaviour changed: the two source edits are haddocks, and every `MUST`,
+`SHANT` and `RAND` block of `run-stack.golden` is byte-identical before and after.
+
+- **The rule was witnessed for `MUST` and `SHANT` only, while `EVERY.md` said `run-stack.l4`
+  pinned it for `MUST`, `DO` and `MAY`.** Major, applied: `run-stack.l4` §3b (`MAY Approve`, six
+  traces: Carol's permission expires unexercised at 5, revealed at 8 → refund due 10, `FULFILLED`
+  at 10, `BREACHED` reporting 10 at 11 on both rolls; the tie revealed at 20 → 10 on both rolls;
+  the all-approve control → `FULFILLED`) and §3c (`DO Sign`, three traces: 10 / 10 / 10). The
+  numbers were hand-computed in the source comments before the run and match the refuter's
+  probes `A-may-lest.l4` and `L-chained.l4` §L5; a `MAY` member's expiry under a barrier WITH a
+  `LEST` is routed to the failure sentinel (`Contract5`'s `DMay` arm, `Machine.hs:1689-1693`, `lest`
+  present), which is why it orders and anchors exactly as a `MUST` miss does — only a `LEST`-less
+  barrier records it as `lapsed`. `EVERY.md`'s `LEST` paragraph now names the section per modal.
+- **R-Q5's state-layer sentence, read by its words, contradicts §5.1.1.1's built rule when both
+  `WITHIN`s are written and a member expires first** (witness `the tenancy, a member late`: 14 + 5
+  = 19, not 30 + 5). Minor, pre-existing on B; applied as an _as built_ note under R-Q5's
+  state-layer bullet, a pointer back from §5.1.1.1's `LEST` paragraph, and "the earliest by R-Q5"
+  above now says "R-Q5's act layer" with the reason (`Barrier3`/`Barrier4` are reached from
+  `barrierJoined` alone, `Machine.hs:2652-2661`, so the state deadline is compared only after the
+  join). The ruling is not changed; its exemplar has no act `WITHIN`, so its words never reached
+  the both-written case.
+- **`Machine.hs:1605` for the `Contract5` deadline was the stacking commit's number** (raised
+  twice); on `b8a14d39` the binding is `:1608` (round 1's `seen` threading added three lines above
+  it). Minor, applied above.
+- **"`MkLifecycle` is built at five sites" — it is six**: the expiry path's `lifecycleAt`
+  (`Machine.hs:1666`) was missed; the conclusion (no site is a compound) stands. Minor, applied
+  above.
+- **`EVERY.md` sent every case of "Anchored deadlines under a join" to `run-anchors.l4`,** which
+  has no barrier-`LEST` tie case. Minor, applied: the sentence names `run-stack.l4` for those.
+- **Two haddocks still called the member's deadline the sentinel's THIRD argument** —
+  `continueWithFollowup`'s first paragraph (`Machine.hs:2104-2109`, contradicting its own
+  `:2122-2127`) and `failDueRef` (`ContractFrame.hs:446-447`). Minor ×2, applied, each rewritten in
+  the same number of lines so no cite moves.
+- **§11.0.1's round-1 bullet called `H-shant-C.l4` "the second shape" (Alice/Bob)**; the probe is
+  the Bob/Carol shape, and no Alice/Bob run on C's binary exists. Minor, applied above.
+- **§5.1.1.1's header over-generalised which files' cites shift** (`Print.hs:959`/`:968` hold —
+  they sit above C's first `Print.hs` hunk at `:1250`; the section cites no `ValueLazy.hs` or
+  `Backend/Jl4.hs` line; this block re-cites only `Machine.hs` and `ContractFrame.hs`). Minor,
+  applied: the header now lists what holds and what this block covers. One refuter corrected the
+  finding's own evidence — `Syntax.hs:197` is a §5.1.2 cite, and every `Syntax.hs` cite inside
+  §5.1.1.1 does shift — and the header follows the correction.
+- **B's "Built" ledger (§11.0.1) still said "the sentinels' third argument"** with no pointer to
+  this block. Minor, applied in place.
+- **Raised and refuted by both: "`BUILD-NOTES.md` cites the extended `run-anchors.l4` comment at
+  `:410`; it is at `:400`."** The `:410` cite is attached to the fork witness `receipts` — its
+  `#TRACE` directive is at `:410` on both `82c61419` and this branch — and the comment edit is
+  described in a separate sentence with no line number; changing it would have pointed the cite
+  at a comment instead of the witness. Not applied.
+
+Gate on the round-2 tree, as run: `cabal build all` EXIT 0 under `-Werror`; `jl4-test` run 1 =
+3182 examples, 3 failures — the three `run-stack` goldens (`.golden`, `.ep.golden`,
+`.nlg.golden`; `.schema.golden` unchanged), read before promotion: the fifteen prior result
+blocks byte-identical and in order, nine new blocks (§3b, §3c) between the tie and the `SHANT`
+section, the later blocks' source ranges renumbered; run 2 = 3182 examples, 0 failures;
+`etc/verify-branch.sh --quick` EXIT 0; `doc/test-docs.sh` with the worktree `l4` on `PATH`:
+1479 links, 102 L4 files, 0 orphans.
 
 ### 11.0.2 The roll, said outright: `EVERY Cast v IN xs` — RULED 2026-09-08 (Meng), BUILT
 

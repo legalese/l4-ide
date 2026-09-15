@@ -444,7 +444,7 @@ data BarrierFailure
       , failEvsRef  :: Reference   -- ^ the residual stream that followed the miss
       , failDueRef  :: Maybe Reference
         -- ^ the member's absolute act deadline, when it had one (the
-        -- sentinel's third argument): what @OF THE DEADLINE@ in the @LEST@
+        -- sentinel's fourth argument): what @OF THE DEADLINE@ in the @LEST@
         -- names when THIS member's failure is the one the @LEST@ is
         -- anchored at (R-Q7B).
       }
