@@ -1,0 +1,196 @@
+{
+  "fixture": "jl4/examples/bpmn/expected/modals-shant-fork.bpmn",
+  "importWarnings": [],
+  "elements": [
+    {
+      "id": "Start_0",
+      "type": "bpmn:StartEvent",
+      "name": null,
+      "eventDefinitions": [],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_Start_0__Task_0"
+      ],
+      "incoming": []
+    },
+    {
+      "id": "Task_0",
+      "type": "bpmn:Task",
+      "name": "SHANT Sublet ...",
+      "eventDefinitions": [],
+      "multiInstance": {
+        "type": "bpmn:MultiInstanceLoopCharacteristics",
+        "isSequential": false,
+        "loopCardinality": false,
+        "loopDataInputRef": false,
+        "completionCondition": "nrOfCompletedInstances >= 1"
+      },
+      "cancelActivity": null,
+      "attachedTo": null,
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_Task_0__End_2"
+      ],
+      "incoming": [
+        "Flow_Start_0__Task_0"
+      ]
+    },
+    {
+      "id": "End_1",
+      "type": "bpmn:EndEvent",
+      "name": "Fulfilled",
+      "eventDefinitions": [],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "gatewayDirection": null,
+      "outgoing": [],
+      "incoming": [
+        "Flow_Boundary_0__End_1"
+      ]
+    },
+    {
+      "id": "End_2",
+      "type": "bpmn:EndEvent",
+      "name": "Breach",
+      "eventDefinitions": [
+        "bpmn:ErrorEventDefinition"
+      ],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "gatewayDirection": null,
+      "outgoing": [],
+      "incoming": [
+        "Flow_Task_0__End_2"
+      ]
+    },
+    {
+      "id": "Boundary_0",
+      "type": "bpmn:BoundaryEvent",
+      "name": "after P30D, not performed",
+      "eventDefinitions": [
+        "bpmn:TimerEventDefinition"
+      ],
+      "multiInstance": null,
+      "cancelActivity": true,
+      "attachedTo": "Task_0",
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_Boundary_0__End_1"
+      ],
+      "incoming": []
+    }
+  ],
+  "unsupportedElements": [],
+  "pausePoints": [
+    "Task_0"
+  ],
+  "exclusiveGateways": [],
+  "started": {
+    "tokensOn": [
+      "Task_0"
+    ],
+    "boundarySubscriptions": [
+      "Boundary_0"
+    ],
+    "triggers": [
+      "Start_0",
+      "Task_0",
+      "Boundary_0"
+    ],
+    "history": [
+      "Start_0",
+      "Flow_Start_0__Task_0",
+      "Task_0"
+    ],
+    "endEventsReached": [],
+    "log": [
+      "Process started 0blper8",
+      "Start Event 0blper8"
+    ],
+    "afterWaiting3s": {
+      "tokensOn": [
+        "Task_0"
+      ],
+      "triggers": [
+        "Start_0",
+        "Task_0",
+        "Boundary_0"
+      ],
+      "endEventsReached": []
+    }
+  },
+  "breach": {
+    "arm": null,
+    "continuedFirst": [],
+    "fired": "Boundary_0",
+    "tokensOn": [],
+    "boundarySubscriptions": [],
+    "triggers": [
+      "Start_0"
+    ],
+    "history": [
+      "Start_0",
+      "Flow_Start_0__Task_0",
+      "Task_0",
+      "Boundary_0",
+      "Flow_Boundary_0__End_1",
+      "End_1"
+    ],
+    "endEventsReached": [
+      "End_1"
+    ],
+    "log": [
+      "Process started 0js3rcg",
+      "Start Event 0js3rcg",
+      "SHANT Sublet ... 0js3rcg",
+      "after P30D, not performed 0js3rcg",
+      "Fulfilled 0js3rcg",
+      "Process finished 0js3rcg"
+    ]
+  },
+  "happy": [
+    {
+      "arm": null,
+      "continued": [
+        "Task_0"
+      ],
+      "steps": [
+        {
+          "tokensOn": [
+            "Task_0"
+          ],
+          "continued": "Task_0"
+        }
+      ],
+      "hitStepLimit": false,
+      "tokensOn": [],
+      "boundarySubscriptions": [],
+      "triggers": [
+        "Start_0"
+      ],
+      "history": [
+        "Start_0",
+        "Flow_Start_0__Task_0",
+        "Task_0",
+        "Flow_Task_0__End_2",
+        "End_2"
+      ],
+      "endEventsReached": [
+        "End_2"
+      ],
+      "log": [
+        "Process started 0j0kern",
+        "Start Event 0j0kern",
+        "SHANT Sublet ... 0j0kern",
+        "Breach 0j0kern",
+        "Process finished 0j0kern"
+      ]
+    }
+  ],
+  "pageErrors": []
+}

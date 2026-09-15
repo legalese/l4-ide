@@ -1653,7 +1653,8 @@ now independent of the gate entirely; the gate is P2a′, which tests the questi
 leads with.
 
 > **RESULT — P2a, MEASURED 2026-09-15.** `bpmn-js-token-simulation` 0.40.0 over `bpmn-js` 18.28.0,
-> driven headlessly by `etc/bpmn-token-sim/` over all eight goldens in `jl4/examples/bpmn/expected/`;
+> driven headlessly by `etc/bpmn-token-sim/` over the eight goldens then in `jl4/examples/bpmn/expected/`
+> (**re-measured 2026-09-16 over all fourteen** — the `RE-MEASURED` block after this one);
 > report with per-fixture tables, screenshots and the simulator's own JSON in
 > [P2A-TOKEN-SIM-BASELINE.md](./P2A-TOKEN-SIM-BASELINE.md). In five lines:
 >
@@ -1694,6 +1695,43 @@ leads with.
 > clicks, six round trips; point 5 said "four lanes" — `offering.bpmn` has three; and the closing
 > paragraph called §7.3's second conjunct "satisfied" when no reader was measured. Each is now
 > stated as measured.
+
+> **RE-MEASURED 2026-09-16 — the six `modals-*` goldens** (`6daf1d9d`, legalese/l4-ide#395:
+> `modals-{may,shant}-{barrier,fork}`, `modals-must-barrier-both-deadlines`,
+> `modals-must-fork-join-deadline`). Same harness, same versions, one run over all fourteen at
+> 2026-09-15 17:19:57 UTC (`etc/bpmn-token-sim/out/run-meta.json`); the committed `out/` is that
+> run in full, the first run's files replaced — six of its eight JSONs matched the new ones apart
+> from instance ids, `consultation` and `offering` also differed in the arrival order of concurrent
+> tokens after a parallel split, and the census gained a `completionCondition` field, so nothing
+> was byte-comparable and nothing was kept. Report §3.7 has the per-fixture table. The three
+> questions the re-run was asked:
+>
+> 1. **The `SHANT`'s `completionCondition` changes nothing on "continue".** bpmn-moddle imports it
+>    (`elements[Task_0].multiInstance.completionCondition: "nrOfCompletedInstances >= 1"` on both
+>    `modals-shant-*`, `null` elsewhere), the simulator's `lib/` never mentions it (0 grep hits),
+>    and the run is one scope, one token, one click to Breach — the same as `tenancy-*` without
+>    the condition. The engine case it guards against, waiting for every member to offend, cannot
+>    arise with one instance.
+> 2. **The `MAY`'s lapse arm animates, and lands in different places on the barrier and the
+>    fork.** On `modals-may-barrier` firing `Boundary_0` reaches `End_2` Fulfilled, the process
+>    finishes and no token is left. On `modals-may-fork` firing `Lapse_0` leaves a token on the
+>    chair's `MUST Publish` with its `P5D` timer offered — the routing that `L4/Bpmn/Lower.hs:553`
+>    marks "KNOWN WRONG in one shape, and not fixed here", animated faithfully. It is the first
+>    barrier/fork pair in fourteen whose animation differs, and it differs the wrong way round. A
+>    P1 question, recorded, not decided here.
+> 3. **`modals-must-barrier-both-deadlines` shows one timer, not two.** The census has one
+>    `bpmn:BoundaryEvent` (`P30D`, the member's); the join line's `WITHIN 10` is not in the file
+>    (`P-JOIN-DEADLINE`, lossy) and survives only in `<documentation>`, which the simulator does
+>    not display. Its fork twin also has one timer (`P10D`), and the two JSONs differ in that
+>    label and the path alone — so the tighter deadline, the one `run-modals.golden` breaches on,
+>    is the one the picture cannot show.
+>
+> Points 1, 3, 4 and 5 above stand on the new files: no timer fired unaided on any of the six
+> (offered at 1.5 s, unchanged at 4.5 s); `modals-shant-*` are byte-identical modulo ids and
+> path; `modals-must-*` differ by one label. Point 2 now holds for three of the four barrier/fork
+> pairs, the exception being the `modals-may-*` lapse in question 2. Still unmeasured: everything the previous paragraph lists
+> as unmeasured. **This block does not decide the gate either.** The staging table row for P2a
+> still reads "unmeasured" for the `modals-*` goldens; that row is the integrator's to update.
 
 ### 7.3 The gate
 
