@@ -26,22 +26,6 @@
       }
     },
     {
-      "id": "A5",
-      "owner": "Meng",
-      "kind": "ruling ×1 remaining",
-      "quick": true,
-      "raised": "2026-09-11",
-      "ask": "Four of five marked 2026-09-15 (in the bench store, applies-rulings/A1..A4): A1 ACCEPT (derived `applies` includes inForce; TRUE by default when unpinned); A2 MODIFY — verdict vocabulary in a canon common-types library, and sharper: types that belong to one subject live under that subject, only cross-subject vocabulary in the common library, jl4-core/libraries only for types the compiler computes over; A3 ACCEPT (MAYBE BOOLEAN, no primitive); A4 MODIFY — reading (i), the label IS the read: `s 27` p, no keyword, no reification (one measurement owed: can a section heading's name double as a function name). STILL OPEN: A5 — are selector reads the same construct as the Boolean read? GM recommends SEPARATE (5 of 559 sites, two of them prose; once per-node projections exist a selector is `filter` over them). Once A5 is marked GM rebases mengwong/applies-corpus-survey (its §11 becomes §12 — unstable gained a §11 from #318), records all five in what is now §12.3, and PRs it.",
-      "unblocks": "any further subject that reads applicability — each one currently picks an answer by accident",
-      "source": {
-        "file": "specs/todo/SUBJECT-TO-NOTWITHSTANDING-SPEC.md",
-        "anchor": "**A1. Does the derived `applies` include conjunct 1 (`inForce`)?**",
-        "ref": "origin/mengwong/applies-corpus-survey"
-      },
-      "next": "GM rebases the branch (3 docs commits, 594 behind), records the marks in §11.3, PRs it.",
-      "bench": "https://claude.ai/artifact/UTykRduqWbvkR7tqaK7X69 — collection applies-rulings, docs A1…A5; GM reads marks back with read_db"
-    },
-    {
       "id": "WHOSE",
       "owner": "Meng",
       "kind": "go / no-go",
@@ -180,6 +164,33 @@
       "verify": {
         "cmd": "gh pr view 398 --repo legalese/l4-ide --json state --jq .state",
         "pendingWhen": "^OPEN$"
+      }
+    },
+    {
+      "id": "APPLIES I1",
+      "owner": "UNASSIGNED — a build session (ultracode)",
+      "kind": "queued build",
+      "quick": false,
+      "raised": "2026-09-16",
+      "ask": "Unblocked by A1–A5 (PR #400). Brief: /Users/Shared/claude-collab-legalese-gm/inbox/2026-09-16T0130Z-BRIEF-applies-i1.md. Phase 0 measures the two things §12.3.3 A4 says are owed (can a § heading's name double as a function name; spellings for the four conjunct projections — proposed, Meng rules) and where each conjunct comes from in the AST today; Phase 1 derives the read `` `<label>` p `` for every §-labelled node as names in scope after typechecking, MAYBE BOOLEAN, inForce TRUE when unpinned; the pilots (Wills Act s 5(9)/s 27, Jersey Art 10(4)/27(1)) diff generated against hand-rolled. Claim it in the outbox before starting.",
+      "unblocks": "the APPLIES read side moving from spec to compiler; §9.6's stratification check gets something to attach to",
+      "source": {
+        "file": "specs/todo/SUBJECT-TO-NOTWITHSTANDING-SPEC.md",
+        "anchor": "#### 12.3.4 Proposed sequencing, for whoever picks this up",
+        "ref": "origin/mengwong/applies-corpus-survey"
+      }
+    },
+    {
+      "id": "R5 opening",
+      "owner": "UNASSIGNED — a build session (ultracode)",
+      "kind": "queued build",
+      "quick": false,
+      "raised": "2026-09-16",
+      "ask": "Ruled 2026-09-04 (IMPLICIT-PROPS-DESIGN §11.7), sequenced after discharge, which has landed — nothing blocks it. Brief: /Users/Shared/claude-collab-legalese-gm/inbox/2026-09-16T0130Z-BRIEF-r5-field-opening.md. Fields of a record-typed GIVEN (function or section) in bare scope inside the body; rank as ruled; collision error naming both records at two sites; elaborates to Proj (App r []) field; computed-field opening already exists and is the mechanism to extend, not duplicate. Phase 0 measures the overlap with #386's 28 held-back names. Claim it in the outbox before starting.",
+      "unblocks": "rule bodies reading `bankrupt` instead of p's `bankrupt` — the reading Meng wanted on 2026-09-13",
+      "source": {
+        "file": "specs/todo/IMPLICIT-PROPS-DESIGN.md",
+        "anchor": "### 11.7 R5 — Field-opening is lexical only. RULED 2026-09-04 (marked accept)."
       }
     }
   ]
