@@ -63,7 +63,7 @@ import L4.Syntax
   , Section(..), TopDecl(..), LocalDecl(..)
   , TypeSig(..), GivenSig(..), GivethSig(..), OptionallyTypedName(..)
   , Pattern(..), BranchLhs(..)
-  , Deonton(..), Subject(..), RAction(..), DeonticModal(..)
+  , Deonton(..), Deadline(..), Subject(..), RAction(..), DeonticModal(..)
   , Lit(..)
   , rawName, rawNameToText, getActual, getUnique
   )
@@ -919,10 +919,12 @@ deontonToContract deonton = do
     Nothing -> Just ()
   -- Only a literal numeric deadline round-trips through Number();
   -- anything computed pretty-prints to a non-numeric string → NaN.
+  -- An anchored deadline (@WITHIN d OF …@, EVERY-EACH-QUANTIFIER-SPEC
+  -- §5.1.1) has no WASM counterpart either, so it fails closed with the rest.
   dcDeadline_ <- case deonton.due of
-    Nothing                       -> Just Nothing
-    Just e@(Lit _ (NumericLit{})) -> Just (Just (Print.prettyLayout e))
-    Just _                        -> Nothing
+    Nothing                                             -> Just Nothing
+    Just (MkDeadline _ e@(Lit _ (NumericLit{})) Nothing) -> Just (Just (Print.prettyLayout e))
+    Just _                                              -> Nothing
   -- Fail closed on a present-but-unextractable HENCE / LEST branch.
   dcHence_ <- traverse exprToContract deonton.hence
   dcLest_  <- traverse exprToContract deonton.lest

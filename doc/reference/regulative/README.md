@@ -70,31 +70,84 @@ paymentObligation MEANS
 
 ## WITHIN (Temporal Deadline)
 
-Specifies a relative time duration within which an action must/may be performed.
+Specifies a time duration within which an action must/may be performed.
 
 ### Syntax
 
 ```l4
 PARTY ...
 MUST action
-WITHIN duration
+WITHIN duration [OF anchor]
 ```
 
-The duration can optionally be anchored to an event with `OF`:
+The duration is a `NUMBER` of clock units — the same units the trace's timestamps use (days, if the trace is stamped in days). Written alone, it counts from where the language puts it: an obligation at the top level counts from when it was entered; an obligation under a `HENCE` counts from the moment the previous obligation was completed; an obligation under a `LEST` counts, today, from the event that revealed the miss.
 
-```l4
-WITHIN 5 days OF notice
-```
+The duration can be anchored with `OF`, and then the deadline is **absolute**: the anchor's instant plus the duration, whatever the clock read when the obligation was entered. The anchor is one of:
+
+| Anchor            | Names                                                                                         |
+| ----------------- | --------------------------------------------------------------------------------------------- |
+| `OF THE JOIN`     | the instant the enclosing obligation was completed (under `HENCE` this is the default, named) |
+| `OF THE DEADLINE` | the enclosing obligation's deadline (its `WITHIN`)                                            |
+| `OF THE ARMING`   | the instant the enclosing obligation was entered                                              |
+| `OF expression`   | an instant: a `NUMBER` on the trace's clock, or a `DATE`                                      |
+
+"The enclosing obligation" is the one whose `HENCE` or `LEST` this obligation is the continuation of. `THE`, `JOIN`, `DEADLINE` and `ARMING` are matched by spelling in this one position; none of the three nouns is reserved, so a program may still name a value `DEADLINE`.
 
 ### Examples
 
-```l4
--- Simple deadline
-PARTY Alice MUST pay 100 WITHIN 30
+**Example file:** [within-example.l4](within-example.l4) — these rules, each with a trace showing the deadline its anchor produces.
 
--- Anchored to an event
-PARTY Seller MUST deliver WITHIN 5 days OF `order confirmation`
+```l4
+DECLARE Person IS ONE OF Buyer, Seller
+DECLARE Action IS ONE OF pay HAS amount IS A NUMBER
+                         deliver
+closingDate MEANS 20
+
+-- Simple deadline: 30 units from when the obligation is entered
+GIVETH A DEONTIC Person Action
+simple MEANS PARTY Buyer MUST pay 100 WITHIN 30
+
+-- The cure period runs from when payment fell due, not from the day the
+-- buyer finally paid
+GIVETH A DEONTIC Person Action
+cure MEANS
+  PARTY Buyer MUST pay 100 WITHIN 30
+  HENCE (PARTY Seller MUST deliver WITHIN 5 OF THE DEADLINE)
+  LEST  BREACH
+
+-- "Within 10 days of this agreement": counts from when the outer obligation
+-- was entered, however long the buyer took to pay
+GIVETH A DEONTIC Person Action
+`of this agreement` MEANS
+  PARTY Buyer MUST pay 100 WITHIN 30
+  HENCE (PARTY Seller MUST deliver WITHIN 10 OF THE ARMING)
+  LEST  BREACH
+
+-- An absolute deadline on the trace's own clock: due at 20 + 5 = 25
+GIVETH A DEONTIC Person Action
+absolute MEANS PARTY Seller MUST deliver WITHIN 5 OF closingDate
 ```
+
+A unit word is ordinary L4, not syntax: `WITHIN 5 days OF THE DEADLINE` checks once `days` is defined (`GIVEN n IS A NUMBER GIVETH A NUMBER DECIDE n days IS n`), and fails with _could not find a definition for the identifier `days`_ until it is.
+
+An anchored deadline may already be in the past when the obligation is entered — `WITHIN 5 OF closingDate` on a contract that begins after `closingDate + 5`. That is not an error: the first event reveals the expiry, exactly as if the deadline had been missed by waiting.
+
+### Dates as anchors
+
+A `DATE` anchor is lowered to its serial (what `DATE_SERIAL` computes), so `WITHIN 0 OF (YMD 2026 6 30)` means _by 30 June 2026_ on a trace whose timestamps are date serials — start it `AT (DATE_SERIAL (YMD 2026 6 1))` and stamp its events the same way (`IMPORT daydate` for `YMD`). Nothing checks that the trace _is_ on that scale: a `DATE` anchor on a trace that starts `AT 0` counts from a serial in the hundreds of thousands, silently.
+
+### Where an anchor is refused
+
+The type checker refuses a lifecycle anchor where the position it names does not exist, and says so:
+
+- `THE JOIN` and `THE DEADLINE` on an obligation that is not inside any `HENCE` or `LEST` — there is no enclosing obligation. `THE ARMING` is allowed there: it is the obligation's own arming, which is the default.
+- `THE JOIN` under `LEST` — the enclosing obligation was not completed, so its join never fired.
+- `THE DEADLINE` where the enclosing obligation has no `WITHIN` at all.
+- An `OF` expression that is neither a `NUMBER` nor a `DATE`.
+
+A top-level rule referenced by name inside a `HENCE` (`HENCE cure`) is checked where it is written, at the top level, and so cannot use `THE JOIN` or `THE DEADLINE`: write the anchored obligation inline under the `HENCE`.
+
+Under `EVERY` the same anchors work on the act's `WITHIN`, and a join line's own `WITHIN` may be anchored to `THE ARMING` or to an instant; see [EVERY](EVERY.md#anchored-deadlines-under-a-join).
 
 ### Boundary
 
@@ -102,7 +155,7 @@ The deadline boundary is inclusive: an action arriving _exactly at_ the deadline
 
 ### See Also
 
-- **BEFORE** (planned, not yet implemented -- will support absolute deadlines)
+- **BEFORE** and **AFTER** (planned, not yet implemented -- the window's absolute closing edge and its opening edge)
 
 ## HENCE (Fulfillment Consequence)
 

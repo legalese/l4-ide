@@ -1,0 +1,20 @@
+-- A join line's WITHIN is the deadline on the whole group (R-T2), so it IS
+-- what OF THE DEADLINE names, and the group's join has not fired when it is
+-- read: neither THE JOIN nor THE DEADLINE can anchor it
+-- (EVERY-EACH-QUANTIFIER-SPEC §5.1.1, a build decision of 2026-09-15). THE
+-- ARMING — the EVERY's own arming — and an instant are the two anchors a join
+-- line takes; run-anchors.l4 pins both.
+
+DECLARE Actor IS ONE OF
+    Tenant HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Sign HAS signer IS AN Actor
+
+GIVETH A DEONTIC Actor Action
+bad MEANS
+    EVERY Tenant t MUST Sign (EXACTLY t) ONCE ALL HAVE WITHIN 14 OF THE JOIN HENCE FULFILLED
+
+GIVETH A DEONTIC Actor Action
+`also bad` MEANS
+    EVERY Tenant t MUST Sign (EXACTLY t) UPON EACH WITHIN 14 OF THE DEADLINE HENCE FULFILLED

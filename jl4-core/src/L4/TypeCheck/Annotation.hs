@@ -147,10 +147,15 @@ nlgExpr = \ case
           Every sann mCast v <$> traverse nlgExpr mRoll <*> traverse nlgExpr mFilter
       rule' <- nlgPattern rule
       provided' <- traverse nlgExpr provided
-      deadline' <- traverse nlgExpr deadline
+      let nlgAnchor = \ case
+            AnchorAt aann e -> AnchorAt aann <$> nlgExpr e
+            a               -> pure a
+          nlgDeadline (MkDeadline dann d ma) =
+            MkDeadline dann <$> nlgExpr d <*> traverse nlgAnchor ma
+      deadline' <- traverse nlgDeadline deadline
       let nlgJoin = \ case
-            JoinOnce jann th d -> JoinOnce jann th <$> traverse nlgExpr d
-            JoinUpon jann ue d -> JoinUpon jann ue <$> traverse nlgExpr d
+            JoinOnce jann th d -> JoinOnce jann th <$> traverse nlgDeadline d
+            JoinUpon jann ue d -> JoinUpon jann ue <$> traverse nlgDeadline d
       join' <- traverse nlgJoin mjoin
       followup' <- traverse nlgExpr followup
       lest' <- traverse nlgExpr lest

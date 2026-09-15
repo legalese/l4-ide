@@ -680,6 +680,9 @@ extractDeonton mFromState MkDeonton{subject, action, due, hence, lest} = do
   let partyText = Just (subjectText subject)
       modalVal  = Just (action.modal)
       actionText = prettyPattern action.action
+      -- An anchored deadline (R-Q7, §5.1.1) prints as its source form,
+      -- @5 OF THE JOIN@; 'L4.Bpmn.Lower.parseDuration' cannot read that and
+      -- reports it as unparsed, which is the stated limit.
       deadlineText = fmap prettyLayout due
       guardText = fmap prettyLayout action.provided
 

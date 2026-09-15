@@ -18,6 +18,10 @@ data ContractFrame
   -- ^ checks if there's a due time, if that's the case, continue by checking
   -- timing constraints, if not, then skip the timing and go straight to checking
   -- the party
+  | Contract4b ScrutinizeAnchor
+  -- ^ the deadline is anchored (@WITHIN d OF …@, R-Q7): the anchor's instant
+  -- has just been forced; lower it to the trace's clock (a DATE via its
+  -- serial), then evaluate the duration for 'Contract5'
   | Contract5 CheckTiming
   -- ^ scrutinizes the current time, the timestamp of the event and the due time
   -- We check if the event happens within the due time, if that's the case, we continue
@@ -81,9 +85,11 @@ data ContractFrame
   deriving stock Show
 
 data ScrutinizeEvents = ScrutinizeEvents
-  { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
+  { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , time :: Reference
   , env :: Environment
+  , armed :: Reference
+    -- ^ when this obligation was entered: what @THE ARMING@ names in its continuation (R-Q7B)
   }
   deriving stock Show
 
@@ -96,81 +102,118 @@ data ScrutinizeEvents = ScrutinizeEvents
 -- which keeps evaluation terminating for recursive HENCE/LEST continuations
 -- with non-positive deadlines. See the Contract5 NOTE in Machine.hs.
 data ScrutinizeEvent = ScrutinizeEvent
-  { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
+  { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , events :: Reference, time :: Reference, ev'reoffered :: Bool
   , env :: Environment
+  , armed :: Reference
+    -- ^ when this obligation was entered: what @THE ARMING@ names in its continuation (R-Q7B)
   }
   deriving stock Show
 
 data CurrentTimeWHNF = CurrentTimeWHNF
-  { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
+  { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: Reference, ev'act :: Reference, ev'time :: Reference
   , events :: Reference, time :: Reference, ev'reoffered :: Bool
   , env :: Environment
+  , armed :: Reference
+    -- ^ when this obligation was entered: what @THE ARMING@ names in its continuation (R-Q7B)
   }
   deriving stock Show
 
 data ScrutinizeDue = ScrutinizeDue
-  { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
+  { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: Reference, ev'act :: Reference, ev'time :: WHNF
   , events :: Reference, time :: Reference, ev'reoffered :: Bool
   , env :: Environment
+  , armed :: Reference
+    -- ^ when this obligation was entered: what @THE ARMING@ names in its continuation (R-Q7B)
+  }
+  deriving stock Show
+
+-- | The anchor of an anchored deadline has been forced ('Contract4b' is what
+-- receives it); the duration is still to evaluate.
+data ScrutinizeAnchor = ScrutinizeAnchor
+  { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
+  , ev'party :: Reference, ev'act :: Reference, ev'time :: WHNF
+  , events :: Reference, time :: WHNF, ev'reoffered :: Bool
+  , env :: Environment
+  , armed :: Reference
+  , duration :: RExpr        -- ^ the @d@ of @WITHIN d OF …@, evaluated once the anchor is known
   }
   deriving stock Show
 
 data CheckTiming = CheckTiming
-  { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
+  { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: Reference, ev'act :: Reference, ev'time :: WHNF
   , events :: Reference, time :: WHNF, ev'reoffered :: Bool
   , env :: Environment
+  , armed :: Reference
+    -- ^ when this obligation was entered: what @THE ARMING@ names in its continuation (R-Q7B)
+  , anchorT :: Maybe Rational
+    -- ^ the anchor's instant on the trace's clock, when the deadline is
+    -- anchored (@WITHIN d OF …@): the deadline is then @anchorT + d@,
+    -- absolute, rather than @time + d@. Set once, at the first event, when
+    -- @time@ is still the arming time; after this frame the remaining due
+    -- is relative again ('Right (ValNumber newDue)') and the anchor is spent.
   }
   deriving stock Show
 
 data PartyWHNF = PartyWHNF
-  { act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
+  { act :: RAction Resolved, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: Reference, ev'act :: Reference
   , events :: Reference, time :: WHNF
   , env :: Environment
+  , armed :: Reference
+    -- ^ when this obligation was entered: what @THE ARMING@ names in its continuation (R-Q7B)
   }
   deriving stock Show
 
 data PartyEqual = PartyEqual
-  { party :: WHNF, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
+  { party :: WHNF, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: Reference, ev'act :: Reference
   , events :: Reference, time :: WHNF
   , env :: Environment
+  , armed :: Reference
+    -- ^ when this obligation was entered: what @THE ARMING@ names in its continuation (R-Q7B)
   }
   deriving stock Show
 
 data ScrutinizeParty = ScrutinizeParty
-  { party :: WHNF, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
+  { party :: WHNF, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: WHNF, ev'act :: Reference
   , events :: Reference, time :: WHNF
   , env :: Environment
+  , armed :: Reference
+    -- ^ when this obligation was entered: what @THE ARMING@ names in its continuation (R-Q7B)
   }
   deriving stock Show
 
 data ScrutinizeEnvironment = ScrutinizeEnvironment
-  { party :: WHNF, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
+  { party :: WHNF, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: WHNF, ev'act :: Reference
   , events :: Reference, time :: WHNF
   , env :: Environment
+  , armed :: Reference
+    -- ^ when this obligation was entered: what @THE ARMING@ names in its continuation (R-Q7B)
   }
   deriving stock Show
 
 data ScrutinizeActions = ScrutinizeActions
-  { party :: WHNF, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
+  { party :: WHNF, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: WHNF, ev'act :: Reference
   , events :: Reference, time :: WHNF
   , env :: Environment, henceEnv :: Environment -- ^ the environment to extend by when evaluating the hence clause
+  , armed :: Reference
   }
   deriving stock Show
 
 data ActionDoesn'tmatch = ActionDoesn'tmatch
-  { party :: WHNF, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
+  { party :: WHNF, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: WHNF, ev'act :: Reference
   , events :: Reference, time :: WHNF
   , env :: Environment
+  , armed :: Reference
+    -- ^ when this obligation was entered: what @THE ARMING@ names in its continuation (R-Q7B)
   }
   deriving stock Show
 
@@ -260,9 +303,12 @@ data BarrierStepFrame = BarrierStepFrame
     -- when a deadline expression wrote to the ledger.
   , current :: WHNF                -- ^ the member obligation just applied
   , queue   :: [WHNF]              -- ^ members not yet run
-  , tLast   :: Maybe (Rational, Reference)
-    -- ^ the latest completion so far, and the event stream that followed it:
-    -- the anchor and residual the @HENCE@ is handed (spec §3.4, §5.1).
+  , tLast   :: Maybe (Rational, Reference, Maybe Reference)
+    -- ^ the latest completion so far, the event stream that followed it, and
+    -- that member's absolute deadline when it had one: the anchor and
+    -- residual the @HENCE@ is handed (spec §3.4, §5.1), and what @OF THE
+    -- DEADLINE@ in the @HENCE@ names when the @ONCE@ line has no @WITHIN@
+    -- of its own (R-Q7B).
     --
     -- The TIE is decided by roll order — the first member to reach a given
     -- stamp keeps its stream. That is deterministic but not exact: when two
@@ -278,6 +324,7 @@ data BarrierStepFrame = BarrierStepFrame
 data BarrierStampFrame = BarrierStampFrame
   { step   :: BarrierStepFrame
   , evsRef :: Reference            -- ^ the stream after the completing event
+  , dueRef :: Maybe Reference      -- ^ the completing member's absolute deadline, if it had one
   }
   deriving stock Show
 
@@ -301,5 +348,29 @@ data ResolvePartyFrame = ResolvePartyFrame
   , env :: Environment       -- ^ environment in which to run the followup
   , events :: Reference      -- ^ remaining event stream (passed on to 'continueWithFollowup')
   , time :: Reference        -- ^ the (already-allocated) event time
+  , lifecycle :: Lifecycle   -- ^ what the followup may anchor to (R-Q7B)
+  }
+  deriving stock Show
+
+-- | The positions in the life of an obligation that its continuation may
+-- anchor a @WITHIN@ to (EVERY-EACH-QUANTIFIER-SPEC §5.1.1, R-Q7B: @OF THE
+-- JOIN@, @OF THE DEADLINE@, @OF THE ARMING@). Built by the obligation at the
+-- moment it hands off to its @HENCE@ or @LEST@, and bound into the
+-- continuation's environment under machine-minted names no program can
+-- spell ('L4.EvaluateLazy.Machine.bindLifecycle'), so a nested obligation's
+-- own hand-off shadows it: the NEAREST enclosing obligation is the one an
+-- anchor names, which is also what the type checker assumes.
+data Lifecycle = MkLifecycle
+  { join     :: Maybe Reference
+    -- ^ the instant the join fired — the hand-off clock under @HENCE@. Absent
+    -- under @LEST@: the join did not fire (the checker refuses @THE JOIN@
+    -- there).
+  , deadline :: Maybe Reference
+    -- ^ the obligation's ABSOLUTE deadline, when it had a @WITHIN@: the
+    -- act's, or under a barrier the @ONCE@ line's when written and otherwise
+    -- the act deadline of the member whose completion fired the join or
+    -- whose expiry failed it.
+  , armed    :: Reference
+    -- ^ when the obligation was entered.
   }
   deriving stock Show

@@ -417,8 +417,8 @@ data Deonton n
   , subject :: Subject n
     -- ^ who is bound: one @PARTY@, or @EVERY@ member of a cast (see 'Subject')
   , action :: RAction n
-  , due :: Maybe (Expr n)
-    -- ^ @WITHIN d@ on the act: bounds each performance
+  , due :: Maybe (Deadline n)
+    -- ^ @WITHIN d [OF anchor]@ on the act: bounds each performance
   , join :: Maybe (Join n)
     -- ^ the @ONCE …@ line: when a quantified obligation's continuation fires
     -- (see 'Join'). Mandatory under an 'Every' that has a @HENCE@ or @LEST@;
@@ -488,9 +488,9 @@ data Subject n
 -- @WITHIN@ on either form bounds the /state/ — one deadline on the whole —
 -- where the deonton's own @WITHIN@ bounds each act (R-T2).
 data Join n
-  = JoinOnce Anno (Threshold n) (Maybe (Expr n))
+  = JoinOnce Anno (Threshold n) (Maybe (Deadline n))
     -- ^ @ONCE Threshold [WITHIN d]@ — level-triggered.
-  | JoinUpon Anno UponEach (Maybe (Expr n))
+  | JoinUpon Anno UponEach (Maybe (Deadline n))
     -- ^ @UPON EACH [WITHIN d]@ — edge-triggered. The words live in their own
     -- node so the LSP can highlight @EACH@ (an identifier token, not a
     -- keyword) as the marker word it is, without that override reaching the
@@ -521,6 +521,76 @@ data UponEach = MkUponEach Anno
 data Threshold n
   = AllHave Anno
     -- ^ @ALL HAVE@ — count = cast: the barrier.
+  deriving stock (GHC.Generic, Eq, Ord, Show, Functor, Foldable, Traversable)
+  deriving anyclass (SOP.Generic, ToExpr, NFData)
+
+-- | A deadline: @WITHIN d [OF anchor]@, in either of its two positions — on
+-- the act (bounding each performance) or on the join line (bounding the
+-- whole, R-T2). The duration @d@ is a NUMBER of clock units; the optional
+-- anchor says what it counts from (EVERY-EACH-QUANTIFIER-SPEC §5.1, R-Q7;
+-- spellings RULED 2026-09-07, R-Q7A\/B\/C, §5.1.1; built 2026-09-15).
+--
+-- Unanchored, a deadline counts from where the language puts it — the join's
+-- firing under @HENCE@, and today the revealing event under @LEST@ (§5.2 owes
+-- the missed deadline). Anchored, it is ABSOLUTE: the deadline is the
+-- anchor's instant plus @d@, whatever the clock read when the obligation was
+-- entered; a deadline already past at arming is then revealed by the first
+-- event, which is correct and not an error.
+--
+-- The fields, in source and hole order: the duration, then the anchor. The
+-- @WITHIN@ keyword is a token of this node's own 'Anno', so the exactprint
+-- and semantic-token traversals place it without a hand-written arm.
+data Deadline n
+  = MkDeadline
+  { anno :: Anno
+  , duration :: Expr n
+    -- ^ @d@: a NUMBER
+  , anchor :: Maybe (Anchor n)
+    -- ^ @OF …@, when written (see 'Anchor')
+  }
+  deriving stock (GHC.Generic, Eq, Ord, Show, Functor, Foldable, Traversable)
+  deriving anyclass (SOP.Generic, ToExpr, NFData)
+
+-- | What an anchored deadline counts from: @WITHIN d OF anchor@ (R-Q7B and
+-- R-Q7C, §5.1.1). The connective is @OF@ and only @OF@ (R-Q7A); @AFTER@ is
+-- held for the window's opening edge (§5.1.2) and is not built.
+--
+-- The three lifecycle anchors name positions in the life of the ENCLOSING
+-- obligation — the one whose @HENCE@ or @LEST@ the anchored obligation is
+-- the continuation of:
+--
+--   * @THE JOIN@ — the instant its join fired: a plain @PARTY@ obligation's
+--     completion, a barrier's last completion. Under @HENCE@ this is the
+--     default, so naming it is emphasis; under @LEST@ the join did not fire,
+--     and the checker refuses it.
+--   * @THE DEADLINE@ — its deadline: the act's @WITHIN@, or under a barrier
+--     the @ONCE@ line's when one is written. Under @HENCE@ this is /the cure
+--     period runs from when performance fell due/; under @LEST@ it is what
+--     §5.2 will make the default.
+--   * @THE ARMING@ — the instant it was entered: /within 30 days of this
+--     agreement/. On an obligation with no enclosing one (the top level) it
+--     is the obligation's own arming, i.e. the default.
+--
+-- @THE@ is a keyword; @JOIN@, @DEADLINE@ and @ARMING@ are matched by
+-- SPELLING in this one position and are not reserved — the move @UPON EACH@
+-- makes for @EACH@ — so each constructor's 'Anno' carries its own words and
+-- a program may still name a value @DEADLINE@.
+--
+-- The fourth form is an expression whose value is an instant: a NUMBER on the
+-- trace's own scale (@WITHIN 5 OF closingDate@, a ledger read), or a DATE,
+-- which the machine lowers with @DATE_SERIAL@ so that it lands on a
+-- date-serial trace's scale. Nothing checks that the trace IS on that scale
+-- (§5.1.2.1's T1 epoch is not built): a DATE anchor on a floating-origin
+-- trace counts from a serial in the hundreds of thousands.
+data Anchor n
+  = AnchorJoin Anno
+    -- ^ @OF THE JOIN@
+  | AnchorDeadline Anno
+    -- ^ @OF THE DEADLINE@
+  | AnchorArming Anno
+    -- ^ @OF THE ARMING@
+  | AnchorAt Anno (Expr n)
+    -- ^ @OF e@ — @e@ a NUMBER (an instant on the trace's scale) or a DATE
   deriving stock (GHC.Generic, Eq, Ord, Show, Functor, Foldable, Traversable)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
@@ -863,6 +933,10 @@ deriving via L4Syntax UponEach
   instance HasAnno UponEach
 deriving via L4Syntax (Threshold n)
   instance HasAnno (Threshold n)
+deriving via L4Syntax (Deadline n)
+  instance HasAnno (Deadline n)
+deriving via L4Syntax (Anchor n)
+  instance HasAnno (Anchor n)
 deriving via L4Syntax (RAction n)
   instance HasAnno (RAction n)
 deriving via L4Syntax (Event n)
@@ -911,6 +985,8 @@ deriving anyclass instance ToConcreteNodes PosToken (Subject Name)
 deriving anyclass instance ToConcreteNodes PosToken (Join Name)
 deriving anyclass instance ToConcreteNodes PosToken UponEach
 deriving anyclass instance ToConcreteNodes PosToken (Threshold Name)
+deriving anyclass instance ToConcreteNodes PosToken (Deadline Name)
+deriving anyclass instance ToConcreteNodes PosToken (Anchor Name)
 -- DeonticModal has no source tokens, so return empty list
 instance ToConcreteNodes PosToken DeonticModal where
   toNodes _ = pure []
@@ -967,6 +1043,8 @@ deriving anyclass instance ToConcreteNodes PosToken (Deonton Resolved)
 deriving anyclass instance ToConcreteNodes PosToken (Subject Resolved)
 deriving anyclass instance ToConcreteNodes PosToken (Join Resolved)
 deriving anyclass instance ToConcreteNodes PosToken (Threshold Resolved)
+deriving anyclass instance ToConcreteNodes PosToken (Deadline Resolved)
+deriving anyclass instance ToConcreteNodes PosToken (Anchor Resolved)
 -- Manual instance for RAction to skip the modal field (which has no source tokens)
 instance ToConcreteNodes PosToken (RAction Resolved) where
   toNodes (MkAction ann _modal action provided) =
@@ -1172,6 +1250,8 @@ deriving anyclass instance HasSrcRange (Subject a)
 deriving anyclass instance HasSrcRange (Join a)
 deriving anyclass instance HasSrcRange UponEach
 deriving anyclass instance HasSrcRange (Threshold a)
+deriving anyclass instance HasSrcRange (Deadline a)
+deriving anyclass instance HasSrcRange (Anchor a)
 deriving anyclass instance HasSrcRange (LocalDecl a)
 deriving anyclass instance HasSrcRange (NamedExpr a)
 deriving anyclass instance HasSrcRange (Branch a)
@@ -1254,6 +1334,8 @@ deriving anyclass instance Serialise n => Serialise (Subject n)
 deriving anyclass instance Serialise n => Serialise (Join n)
 deriving anyclass instance Serialise UponEach
 deriving anyclass instance Serialise n => Serialise (Threshold n)
+deriving anyclass instance Serialise n => Serialise (Deadline n)
+deriving anyclass instance Serialise n => Serialise (Anchor n)
 deriving anyclass instance Serialise DeonticModal
 deriving anyclass instance Serialise n => Serialise (RAction n)
 deriving anyclass instance Serialise n => Serialise (NamedExpr n)

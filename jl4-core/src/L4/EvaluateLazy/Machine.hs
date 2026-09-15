@@ -1111,7 +1111,10 @@ backward val = withPoppedFrame $ \ case
           [t, r] -> pure (t, r)
           rs' -> internalException $ RuntimeTypeError $
             "expected a time stamp, and a list of events but found: " <> foldMap prettyLayout rs'
-        pushFrame (ContractFrame (Contract1 ScrutinizeEvents {..}))
+        -- this is the arming point: the clock now is what THE ARMING will
+        -- name in this obligation's continuation (R-Q7B), so keep it —
+        -- 'time' itself advances with every scrutinised event
+        pushFrame (ContractFrame (Contract1 ScrutinizeEvents {armed = time, ..}))
         continueRef events
       ValQuantified env deonton -> do
         -- EVERY meets its event stream: this is the arming point, so the roll
@@ -1536,29 +1539,63 @@ backwardContractFrame val = \ case
   Contract4 ScrutinizeDue {..} -> do
     case due of
        Right due' -> do
-         pushCFrame (Contract5 CheckTiming {time = val, ..})
+         pushCFrame (Contract5 CheckTiming {time = val, anchorT = Nothing, ..})
          continueBackward due'
-       Left (Just due') -> do
-         pushCFrame (Contract5 CheckTiming {time = val,..})
-         continueExpr env due'
+       -- The source deadline, met for the first time. This is the arming
+       -- point as far as the deadline is concerned: no event has advanced
+       -- 'time' yet, so an anchor is resolved ONCE, here, in the
+       -- obligation's own environment and at its arming clock (R-Q7C:
+       -- "evaluated once at arming"). After 'Contract5' the due is a
+       -- relative number and the anchor is spent.
+       Left (Just (MkDeadline _ duration Nothing)) -> do
+         pushCFrame (Contract5 CheckTiming {time = val, anchorT = Nothing, ..})
+         continueExpr env duration
+       Left (Just (MkDeadline _ duration (Just anchor))) -> do
+         pushCFrame (Contract4b ScrutinizeAnchor {time = val, ..})
+         case anchor of
+           -- an expression: a NUMBER on the trace's clock, or a DATE
+           AnchorAt _ e     -> continueExpr env e
+           -- the lifecycle positions of the ENCLOSING obligation, bound into
+           -- this environment at its hand-off ('bindLifecycle'); THE ARMING
+           -- with no enclosing obligation is this obligation's own arming
+           AnchorJoin _     -> continueRef =<< lifecycleRef env anchor lifecycleJoinUnique Nothing
+           AnchorDeadline _ -> continueRef =<< lifecycleRef env anchor lifecycleDeadlineUnique Nothing
+           AnchorArming _   -> continueRef =<< lifecycleRef env anchor lifecycleArmingUnique (Just armed)
        Left Nothing -> do
          -- NOTE: we skip the timing step, hence we need to immediately update the current time to the event time
          -- because normally the timing check does that.
          pushCFrame (Contract6 PartyWHNF {time = ev'time, ..})
          maybeEvaluate env party
+  Contract4b ScrutinizeAnchor {..} -> do
+    -- the anchor's instant, lowered to the trace's clock: a DATE by its
+    -- serial (what DATE_SERIAL computes), a NUMBER as it is
+    instant <- case val of
+      ValNumber t -> pure t
+      ValDate d   -> pure (fromIntegral (dayNumberFromDay d))
+      v -> internalException $ RuntimeTypeError $
+        "expected a NUMBER or a DATE as the anchor of a WITHIN but got: " <> prettyLayout v
+    pushCFrame (Contract5 CheckTiming {anchorT = Just instant, ..})
+    continueExpr env duration
   Contract5 CheckTiming {..} -> do
     stamp <- assertTime ev'time
     due' <- assertTime val
     time' <- assertTime time
     let
-      deadline = time' + due'
+      -- Unanchored, the deadline counts from the obligation's clock — its
+      -- arming, on this first evaluation. Anchored (@WITHIN d OF …@, R-Q7),
+      -- it is ABSOLUTE: the anchor's instant plus @d@, which may already be
+      -- in the past at arming; then this very event reveals the expiry,
+      -- which is right and not an error.
+      deadline = fromMaybe time' anchorT + due'
       -- NOTE: the new due is the current due minus the time that has passed
       -- by observing the current event e.g. if the thing
       -- was due within 3, then if the last current time
       -- is 2, and we are looking at an event at 3, then
       -- the current time is advances to 3 but the due is
-      -- now earlier, it is  due within 2, i.e. 3 - (3 - 2)
-      newDue = due' - (stamp - time')
+      -- now earlier, it is  due within 2, i.e. 3 - (3 - 2).
+      -- For an anchored deadline the same invariant — the absolute deadline
+      -- is @time + due@ — is what makes the remaining due @deadline - stamp@.
+      newDue = deadline - stamp
     -- NOTE: the deadline comparison is strict: an event arriving EXACTLY at
     -- the deadline instant is timely; expiry requires stamp strictly greater.
     -- The spec (doc/reference/regulative/README.md) speaks of the deadline
@@ -1602,37 +1639,46 @@ backwardContractFrame val = \ case
       -- re-offered) event stream and anchored time are carried in the frame and
       -- handed to 'continueWithFollowup' once the party has been keyed.
       then do
-        let reofferResolve followup'
+        -- What the continuation may anchor to (R-Q7B): the deadline that
+        -- just passed, this obligation's arming, and — only when the
+        -- continuation is the HENCE, i.e. the join fired — the hand-off
+        -- clock as THE JOIN.
+        deadlineR <- allocateValue (ValNumber deadline)
+        let lifecycleAt isHence t = MkLifecycle
+              { join = if isHence then Just t else Nothing
+              , deadline = Just deadlineR
+              , armed }
+            reofferResolve isHence followup'
               | ev'reoffered = do
                   -- this event was already re-offered once and has now
                   -- revealed a second expiry: consume it (see NOTE above)
                   t <- allocateValue ev'time
-                  pushCFrame (ResolveParty ResolvePartyFrame {followup = followup', env, events, time = t})
+                  pushCFrame (ResolveParty ResolvePartyFrame {followup = followup', env, events, time = t, lifecycle = lifecycleAt isHence t})
                   maybeEvaluate env party
               | otherwise = do
                   ev'timeR <- allocateValue ev'time
                   evR <- allocateValue (ValEvent ev'party ev'act ev'timeR)
                   markReoffered evR
                   eventsR <- allocateValue (ValCons evR events)
-                  pushCFrame (ResolveParty ResolvePartyFrame {followup = followup', env, events = eventsR, time = ev'timeR})
+                  pushCFrame (ResolveParty ResolvePartyFrame {followup = followup', env, events = eventsR, time = ev'timeR, lifecycle = lifecycleAt isHence ev'timeR})
                   maybeEvaluate env party
         case act.modal of
           DMustNot ->
             -- Prohibition was RESPECTED: the prohibited action didn't occur before deadline
             -- Continue with HENCE (followup), which defaults to FULFILLED
-            reofferResolve followup
+            reofferResolve True followup
           DMay ->
             -- Permission was NOT EXERCISED: per the README default-consequence
             -- matrix, expiry of a MAY routes to LEST (default FULFILLED);
             -- HENCE fires only when the permitted action is taken.
-            reofferResolve (fromMaybe fulfilExpr lest)
+            reofferResolve False (fromMaybe fulfilExpr lest)
           _ -> -- DMust, DDo: deadline passed = failure
             case lest of
               Nothing -> do
                 -- NOTE: this is not too nice, but not wanting this would require to change `App1` to take MaybeEvaluated's
                 partyR <- either (`allocate_` env) allocateValue party
                 continueBackward (ValBreached (DeadlineMissed ev'party ev'act stamp partyR act deadline))
-              Just lestFollowup -> reofferResolve lestFollowup
+              Just lestFollowup -> reofferResolve False lestFollowup
       else do
         -- NOTE: we have observed the event and do not branch, either, the
         -- only thing that may now happen is that we try a new event. Hence we
@@ -1675,8 +1721,12 @@ backwardContractFrame val = \ case
         case act.modal of
           DMustNot -> case lest of
             -- Prohibition violated: action was done, trigger LEST clause
-            Just lestFollowup -> allocateValue time
-              >>= continueWithFollowup (Just (partyKeyWHNF party)) (env `Map.union` henceEnv) lestFollowup events
+            Just lestFollowup -> do
+              timeR <- allocateValue time
+              deadlineR <- absoluteDeadline time due
+              -- LEST: the join did not fire, so no THE JOIN (R-Q7B)
+              let lifecycle = MkLifecycle {join = Nothing, deadline = deadlineR, armed}
+              continueWithFollowup (Just (partyKeyWHNF party)) lifecycle (env `Map.union` henceEnv) lestFollowup events timeR
             -- No LEST clause: immediate breach
             Nothing -> do
               -- Extract timestamp from time (which has been updated to event time)
@@ -1695,8 +1745,14 @@ backwardContractFrame val = \ case
               -- not contradict the spec.
               continueBackward (ValBreached (DeadlineMissed ev'partyRef ev'act stamp partyRef act stamp))
           -- MUST, MAY, DO: action done = success
-          _ -> allocateValue time
-            >>= continueWithFollowup (Just (partyKeyWHNF party)) (env `Map.union` henceEnv) followup events
+          _ -> do
+            timeR <- allocateValue time
+            deadlineR <- absoluteDeadline time due
+            -- HENCE: the join is this completion (R-Q7, §5.1: an unanchored
+            -- continuation counts from here, so OF THE JOIN is the default
+            -- said out loud)
+            let lifecycle = MkLifecycle {join = Just timeR, deadline = deadlineR, armed}
+            continueWithFollowup (Just (partyKeyWHNF party)) lifecycle (env `Map.union` henceEnv) followup events timeR
       ValBool False -> do
         newTime <- allocateValue time
         tryNextEvent ScrutinizeEvents {party = Right party, time = newTime, ..} events
@@ -1706,7 +1762,7 @@ backwardContractFrame val = \ case
     -- 'val' is the obligation party, now forced to WHNF by 'maybeEvaluate env party'
     -- on the deadline-passed / LEST path. Key it exactly as the matched HENCE path
     -- does, so a RECORD in the followup/reparation attributes to the real party.
-    continueWithFollowup (Just (partyKeyWHNF val)) env followup events time
+    continueWithFollowup (Just (partyKeyWHNF val)) lifecycle env followup events time
   -- EVERY, the roll call. One cons cell of the roll per step.
   QuantRoll QuantRollFrame {..} ->
     case val of
@@ -1747,15 +1803,21 @@ backwardContractFrame val = \ case
   -- reparation and a pending member are both 'ValObligation'.
   Barrier1 BarrierStepFrame {..} ->
     case val of
-      ValConstructor n [tRef, evRef] | n `sameResolved` checkpoint -> do
-        pushCFrame (Barrier2 BarrierStampFrame {step = BarrierStepFrame {..}, evsRef = evRef})
+      ValConstructor n args
+        | n `sameResolved` checkpoint
+        , Just (dRef, tRef, evRef) <- sentinelArgs args -> do
+        pushCFrame (Barrier2 BarrierStampFrame {step = BarrierStepFrame {..}, evsRef = evRef, dueRef = dRef})
         continueRef tRef
       -- The failure sentinel carries the anchor and the residual stream the
       -- machine computed for this member's miss, which is exactly what the
       -- barrier's LEST needs — so it runs ONCE, here, and the member is never
-      -- applied to the stream a second time.
-      ValConstructor n [tRef, evRef] | Just fp <- failpoint, n `sameResolved` fp ->
-        barrierFail ctx tRef evRef
+      -- applied to the stream a second time. It also carries the member's
+      -- missed deadline, which is what OF THE DEADLINE in the LEST names
+      -- (R-Q5's act layer, R-Q7B).
+      ValConstructor n args
+        | Just fp <- failpoint, n `sameResolved` fp
+        , Just (dRef, tRef, evRef) <- sentinelArgs args ->
+        barrierFail ctx dRef tRef evRef
       -- Still waiting. Keep the RESIDUAL ('val'), not the obligation as it
       -- stood before the scan ('current'): the residual is the one whose
       -- deadline has been decremented by the time that has passed.
@@ -1770,22 +1832,38 @@ backwardContractFrame val = \ case
   Barrier2 BarrierStampFrame {..} -> do
     stamp <- assertTime val
     let better = case step.tLast of
-          Just (t, _) | t >= stamp -> step.tLast
-          _                        -> Just (stamp, evsRef)
+          Just (t, _, _) | t >= stamp -> step.tLast
+          _                           -> Just (stamp, evsRef, dueRef)
     barrierNext step {tLast = better}
   -- EVERY, the barrier: the WITHIN on the ONCE line (R-T2), which bounds the
   -- WHOLE (spec §2.2.7.5 point 3) rather than any one act.
   Barrier3 BarrierStateDueFrame {..} -> do
     stateDue <- assertTime val
     pushCFrame (Barrier4 BarrierArmingFrame {..})
-    continueRef ctx.time
+    -- what the state deadline counts from: the EVERY's arming (unanchored,
+    -- and OF THE ARMING says the same thing on a join line), or the
+    -- instant an OF-expression names. OF THE JOIN and OF THE DEADLINE are
+    -- refused on a join line by the checker ('L4.TypeCheck.checkAnchor').
+    case joinStateDue ctx of
+      Just (MkDeadline _ _ (Just (AnchorAt _ e))) -> continueExpr ctx.env e
+      Just (MkDeadline _ _ (Just a@AnchorJoin{}))     -> unreachableAnchor a
+      Just (MkDeadline _ _ (Just a@AnchorDeadline{})) -> unreachableAnchor a
+      _ -> continueRef ctx.time
   Barrier4 BarrierArmingFrame {..} -> do
-    armed <- assertTime val
-    if joinTime > armed + stateDue
-      then barrierStateMissed ctx (armed + stateDue)
+    -- the state deadline's origin, forced (see 'Barrier3'): a NUMBER, or a
+    -- DATE lowered to its serial
+    origin <- case val of
+      ValNumber t -> pure t
+      ValDate d   -> pure (fromIntegral (dayNumberFromDay d))
+      v -> internalException $ RuntimeTypeError $
+        "expected a NUMBER or a DATE as the anchor of a WITHIN but got: " <> prettyLayout v
+    let stateDeadline = origin + stateDue
+    if joinTime > stateDeadline
+      then barrierStateMissed ctx stateDeadline
       else do
         tRef <- allocateValue (ValNumber joinTime)
-        fireBarrierHence ctx tRef joinEvents
+        dRef <- allocateValue (ValNumber stateDeadline)
+        fireBarrierHence ctx (Just dRef) tRef joinEvents
   RBinOp1 MkRBinOp1 {..}
     -- NOTE: this is weirdly asymmetric because
     -- in case of AND we can never abort earlier but have to instead
@@ -1902,13 +1980,39 @@ backwardContractFrame val = \ case
     -- unevaluated/unkeyable party yields 'Nothing' (the RECORD then falls back to
     -- the anonymous own ledger), and a nested obligation's own followup re-sets
     -- and re-restores the party around its body.
-    continueWithFollowup :: Maybe Text -> Environment -> RExpr -> Reference -> Reference -> Machine Config
-    continueWithFollowup mParty env followup events time = do
+    --
+    -- The obligation's 'Lifecycle' is bound into the continuation's
+    -- environment here ('bindLifecycle'), which is what an anchored
+    -- @WITHIN … OF THE JOIN \/ THE DEADLINE \/ THE ARMING@ inside it reads
+    -- (R-Q7B). An @A AND B@ continuation captures this environment for
+    -- both operands, so both see the one obligation whose hand-off this is.
+    --
+    -- A barrier's SENTINEL ('barrierMember') is the one continuation that
+    -- takes a third argument: the member's absolute deadline, when it has
+    -- one, so that the barrier learns the deadline the member met or missed
+    -- without a second pass ('Barrier1', 'sentinelArgs'). A sentinel is
+    -- recognised by its unique ('isSentinel'); every other continuation is
+    -- applied to @[time, events]@ exactly as before.
+    continueWithFollowup :: Maybe Text -> Lifecycle -> Environment -> RExpr -> Reference -> Reference -> Machine Config
+    continueWithFollowup mParty lifecycle env followup events time = do
       mOriginal <- getCurrentParty
       putCurrentParty mParty
       pushFrame (RestoreCurrentParty mOriginal)
-      pushFrame (App1 [time, events] Nothing)
-      continueExpr env followup
+      let args = case followup of
+            App _ r [] | isSentinel r -> [time, events] <> maybeToList lifecycle.deadline
+            _                         -> [time, events]
+      pushFrame (App1 args Nothing)
+      continueExpr (bindLifecycle lifecycle env) followup
+
+    -- the obligation's absolute deadline at hand-off, if it has one: after
+    -- 'Contract5' the due is the REMAINING due relative to 'time', so the
+    -- absolute deadline is their sum (the invariant 'Contract5' keeps)
+    absoluteDeadline :: WHNF -> MaybeEvaluated' (Maybe (Deadline Resolved)) -> Machine (Maybe Reference)
+    absoluteDeadline time due = case due of
+      Right (ValNumber remaining) -> do
+        t <- assertTime time
+        Just <$> allocateValue (ValNumber (t + remaining))
+      _ -> pure Nothing
 
     assertTime = \ case
       ValNumber i -> pure i
@@ -2096,9 +2200,38 @@ assembleQuantified ctx members =
     -- ('Barrier3'); a fork has no join event to check, so there the act's
     -- deadline is the only one enforced — a phase-2 limit, on the doc page
     -- and in the spec.
+    --
+    -- A demoted join-line deadline keeps its join-line meaning: OF THE
+    -- ARMING on it is the EVERY's arming ('memberObligation' binds it), not
+    -- the arming of whatever obligation the EVERY is nested in.
     memberDue = case ctx.deonton.due of
-      Just d  -> Just d
-      Nothing -> joinDue ctx
+      Just d  -> MemberDue d
+      Nothing -> maybe NoMemberDue DemotedJoinDue (joinDue ctx)
+
+-- | Where a member's deadline comes from ('assembleQuantified').
+data MemberDue
+  = NoMemberDue
+  | MemberDue (Deadline Resolved)         -- ^ the act's own WITHIN
+  | DemotedJoinDue (Deadline Resolved)    -- ^ the join line's WITHIN, bounding each act because the act has none
+
+-- | The deadline a member obligation is built with.
+memberDueExpr :: MemberDue -> Maybe (Deadline Resolved)
+memberDueExpr = \ case
+  NoMemberDue      -> Nothing
+  MemberDue d      -> Just d
+  DemotedJoinDue d -> Just d
+
+-- | A member's environment: the EVERY's, with the member variable bound —
+-- and, when the member's deadline is the join line's demoted one, with THE
+-- ARMING bound to the EVERY's arming, which is what that anchor means on a
+-- join line whatever the EVERY is nested in.
+memberEnv :: QuantCtx -> MemberDue -> Reference -> Environment
+memberEnv ctx mdue mref =
+  demoted (Map.insert (getUnique ctx.var) mref ctx.env)
+  where
+    demoted = case mdue of
+      DemotedJoinDue _ -> Map.insert lifecycleArmingUnique ctx.time
+      _                -> id
 
 -- | Does this expression name the quantifier's member variable anywhere?
 mentionsVar :: Resolved -> Expr Resolved -> Bool
@@ -2117,7 +2250,7 @@ sharedContinuationRefusal v = Text.unwords
   ]
 
 -- | The @WITHIN@ on EITHER join line, if there is one.
-joinDue :: QuantCtx -> Maybe RExpr
+joinDue :: QuantCtx -> Maybe (Deadline Resolved)
 joinDue ctx = case ctx.deonton.join of
   Just (JoinOnce _ _ d) -> d
   Just (JoinUpon _ _ d) -> d
@@ -2125,7 +2258,7 @@ joinDue ctx = case ctx.deonton.join of
 
 -- | The @WITHIN@ on a @ONCE@ line specifically: the deadline on the joined
 -- STATE (R-T2), which only the barrier has an event to check against.
-joinStateDue :: QuantCtx -> Maybe RExpr
+joinStateDue :: QuantCtx -> Maybe (Deadline Resolved)
 joinStateDue ctx = case ctx.deonton.join of
   Just (JoinOnce _ _ d) -> d
   _                     -> Nothing
@@ -2133,11 +2266,11 @@ joinStateDue ctx = case ctx.deonton.join of
 -- | One member's obligation: the member variable bound to it, the member
 -- itself as the obligation's party (already forced by the roll call, so
 -- 'Contract6' has nothing to evaluate).
-memberObligation :: QuantCtx -> RExpr -> Maybe RExpr -> Maybe RExpr -> CastMember -> WHNF
+memberObligation :: QuantCtx -> RExpr -> Maybe RExpr -> MemberDue -> CastMember -> WHNF
 memberObligation ctx hence lest mdue (mref, mval) =
   ValObligation
-    (Map.insert (getUnique ctx.var) mref ctx.env)
-    (Right mval) ctx.deonton.action (Left mdue) hence lest
+    (memberEnv ctx mdue mref)
+    (Right mval) ctx.deonton.action (Left (memberDueExpr mdue)) hence lest
 
 -- | @A AND B AND C@, right-nested, as the source-level 'RAnd' would build it.
 randFoldWHNF :: Environment -> WHNF -> [WHNF] -> WHNF
@@ -2150,7 +2283,7 @@ randFoldWHNF env o (x : xs) = ValROp env ValRAnd (Right o) (Right (randFoldWHNF 
 --
 -- An EMPTY cast is fulfilled: nobody is bound, so nothing is owed. (§10.3
 -- would have this warn; a warning is not built.)
-runQuantifiedFold :: QuantCtx -> [CastMember] -> Maybe RExpr -> Machine Config
+runQuantifiedFold :: QuantCtx -> [CastMember] -> MemberDue -> Machine Config
 runQuantifiedFold ctx members mdue =
   case map (memberObligation ctx (fromMaybe fulfilExpr ctx.deonton.hence) ctx.deonton.lest mdue) members of
     []       -> continueBackward ValFulfilled
@@ -2164,18 +2297,43 @@ runQuantifiedFold ctx members mdue =
 -- failpoint in the LEST. Each reports back to the barrier, carrying the
 -- anchor and the residual stream the machine computed. See the 'Barrier1'
 -- NOTE for why the real LEST is never handed to a member.
+--
+-- Each sentinel is a constructor minted with 'defSentinel', which is what
+-- lets the member's hand-off recognise it and pass it the member's absolute
+-- deadline as a third argument (see 'continueWithFollowup') — how the
+-- barrier learns the deadline a member met or missed without a second pass.
 barrierMember
   :: QuantCtx -> Resolved -> Reference -> Maybe (Resolved, Reference)
-  -> Maybe RExpr -> CastMember -> WHNF
+  -> MemberDue -> CastMember -> WHNF
 barrierMember ctx cp cpRef mfail mdue (mref, mval) =
-  ValObligation env' (Right mval) ctx.deonton.action (Left mdue)
+  ValObligation env' (Right mval) ctx.deonton.action (Left (memberDueExpr mdue))
     (Var emptyAnno cp)
     (fmap (\ (fp, _) -> Var emptyAnno fp) mfail)
   where
     env' =
       Map.insert (getUnique cp) cpRef
       $ maybe id (\ (fp, fpRef) -> Map.insert (getUnique fp) fpRef) mfail
-      $ Map.insert (getUnique ctx.var) mref ctx.env
+      $ memberEnv ctx mdue mref
+
+-- | The arguments a barrier sentinel reports: the anchor and the residual
+-- stream every continuation receives, then the member's absolute deadline
+-- when it had one. See 'barrierMember' and 'continueWithFollowup'.
+sentinelArgs :: [Reference] -> Maybe (Maybe Reference, Reference, Reference)
+sentinelArgs = \ case
+  [tRef, evRef]       -> Just (Nothing, tRef, evRef)
+  [tRef, evRef, dRef] -> Just (Just dRef, tRef, evRef)
+  _                   -> Nothing
+
+-- | Mint a barrier sentinel: a fresh constructor whose unique is of sort
+-- @s@, used nowhere else, so 'isSentinel' can tell it from every other name.
+defSentinel :: Name -> Machine Resolved
+defSentinel n = do
+  u <- newUnique
+  pure (Def u { sort = 's' } n)
+
+-- | Is this a barrier sentinel ('defSentinel')?
+isSentinel :: Resolved -> Bool
+isSentinel r = (getUnique r).sort == 's'
 
 -- | Arm the barrier. The checkpoint is a FRESH constructor, minted here and
 -- bound into each member's environment: applied to the @[time, events]@ that
@@ -2184,19 +2342,21 @@ barrierMember ctx cp cpRef mfail mdue (mref, mval) =
 --
 -- An empty cast fires the HENCE at once: "all zero of them have acted" is
 -- vacuously true.
-startBarrier :: QuantCtx -> [CastMember] -> Maybe RExpr -> Machine Config
+startBarrier :: QuantCtx -> [CastMember] -> MemberDue -> Machine Config
 startBarrier ctx members mdue = do
   -- Both names are user-visible: a member that has not yet acted when the
   -- event stream runs out is printed as a residual obligation carrying these
   -- sentinels in its HENCE and LEST, so they have to read as English there.
-  cp <- def (MkName emptyAnno (NormalName "the join"))
+  cp <- defSentinel (MkName emptyAnno (NormalName "the join"))
   cpRef <- allocateValue (ValUnappliedConstructor cp)
   mfail <- for ctx.deonton.lest \ _ -> do
-    fp <- def (MkName emptyAnno (NormalName "the join fails"))
+    fp <- defSentinel (MkName emptyAnno (NormalName "the join fails"))
     fpRef <- allocateValue (ValUnappliedConstructor fp)
     pure (fp, fpRef)
   case map (barrierMember ctx cp cpRef mfail mdue) members of
-    []       -> fireBarrierHence ctx ctx.time ctx.events
+    -- an empty cast fires at once; with nobody to have met or missed a
+    -- deadline there is none for the HENCE to anchor to
+    []       -> fireBarrierHence ctx Nothing ctx.time ctx.events
     (o : os) -> barrierRun BarrierStepFrame
       { ctx, checkpoint = cp, failpoint = fmap fst mfail
       , current = o, queue = os, tLast = Nothing, pending = [] }
@@ -2226,15 +2386,17 @@ barrierFinish step = case reverse step.pending of
   -- members and not the join.
   (o : os) -> continueBackward (randFoldWHNF step.ctx.env o os)
   [] -> case step.tLast of
-    Nothing       -> fireBarrierHence step.ctx step.ctx.time step.ctx.events
-    Just (t, evs) -> case joinStateDue step.ctx of
+    Nothing       -> fireBarrierHence step.ctx Nothing step.ctx.time step.ctx.events
+    Just (t, evs, mdue) -> case joinStateDue step.ctx of
+      -- no ONCE-line WITHIN: THE DEADLINE in the HENCE is the act deadline
+      -- of the member whose completion fired the join (R-Q7B)
       Nothing  -> do
         tRef <- allocateValue (ValNumber t)
-        fireBarrierHence step.ctx tRef evs
-      Just due -> do
+        fireBarrierHence step.ctx mdue tRef evs
+      Just (MkDeadline _ duration _) -> do
         pushFrame (ContractFrame
           (Barrier3 BarrierStateDueFrame {ctx = step.ctx, joinTime = t, joinEvents = evs}))
-        continueExpr step.ctx.env due
+        continueExpr step.ctx.env duration
 
 -- | The join fires. The HENCE is anchored at the last completion and sees the
 -- stream that followed it (R-Q7, §5.1: unanchored, a HENCE counts from the
@@ -2244,13 +2406,19 @@ barrierFinish step = case reverse step.pending of
 -- inside it goes to the anonymous ledger rather than to whichever member
 -- happened to act last. Set explicitly, so the answer cannot depend on the
 -- order events arrived in.
-fireBarrierHence :: QuantCtx -> Reference -> Reference -> Machine Config
-fireBarrierHence ctx timeRef eventsRef = do
+--
+-- What the HENCE may anchor to (R-Q7B): THE JOIN is this firing; THE
+-- DEADLINE is the @ONCE@ line's when it has one, else the deadline of the
+-- member whose completion fired the join ('barrierFinish' decides which);
+-- THE ARMING is the EVERY's.
+fireBarrierHence :: QuantCtx -> Maybe Reference -> Reference -> Reference -> Machine Config
+fireBarrierHence ctx deadlineRef timeRef eventsRef = do
   mOriginal <- getCurrentParty
   putCurrentParty Nothing
   pushFrame (RestoreCurrentParty mOriginal)
   pushFrame (App1 [timeRef, eventsRef] Nothing)
-  continueExpr ctx.env (fromMaybe fulfilExpr ctx.deonton.hence)
+  let lifecycle = MkLifecycle {join = Just timeRef, deadline = deadlineRef, armed = ctx.time}
+  continueExpr (bindLifecycle lifecycle ctx.env) (fromMaybe fulfilExpr ctx.deonton.hence)
 
 -- | A member did not complete, so the barrier cannot: run the barrier's LEST,
 -- once, with the anchor and the residual stream the FAILING MEMBER'S OWN
@@ -2268,8 +2436,12 @@ fireBarrierHence ctx timeRef eventsRef = do
 -- 'ValFulfilled' for a lapsed @MAY@) is returned as the barrier's, one
 -- non-completer named, first in roll order — spec §6.1 wants the SET, and
 -- 'ReasonForBreach' holds one party (R-T3, unbuilt).
-barrierFail :: QuantCtx -> Reference -> Reference -> Machine Config
-barrierFail ctx timeRef eventsRef = case ctx.deonton.lest of
+--
+-- What the LEST may anchor to (R-Q7B): THE DEADLINE is the failing member's
+-- own — the act-layer deadline that was missed (R-Q5) — carried here by the
+-- sentinel; THE ARMING is the EVERY's; there is no THE JOIN.
+barrierFail :: QuantCtx -> Maybe Reference -> Reference -> Reference -> Machine Config
+barrierFail ctx deadlineRef timeRef eventsRef = case ctx.deonton.lest of
   Nothing -> internalException $ RuntimeTypeError
     "the barrier's LEST sentinel fired for a barrier that has no LEST"
   Just lestExpr -> do
@@ -2277,10 +2449,14 @@ barrierFail ctx timeRef eventsRef = case ctx.deonton.lest of
     putCurrentParty Nothing
     pushFrame (RestoreCurrentParty mOriginal)
     pushFrame (App1 [timeRef, eventsRef] Nothing)
-    continueExpr ctx.env lestExpr
+    let lifecycle = MkLifecycle {join = Nothing, deadline = deadlineRef, armed = ctx.time}
+    continueExpr (bindLifecycle lifecycle ctx.env) lestExpr
 
 -- | Everyone acted, but the last of them acted after the @ONCE … WITHIN@
 -- deadline, which bounds the whole (R-T2).
+--
+-- The LEST is anchored at the state deadline, which is also what THE
+-- DEADLINE names in it (R-Q5's state layer, R-Q7B).
 barrierStateMissed :: QuantCtx -> Rational -> Machine Config
 barrierStateMissed ctx deadline = case ctx.deonton.lest of
   Just lestExpr -> do
@@ -2289,11 +2465,75 @@ barrierStateMissed ctx deadline = case ctx.deonton.lest of
     putCurrentParty Nothing
     pushFrame (RestoreCurrentParty mOriginal)
     pushFrame (App1 [tRef, ctx.events] Nothing)
-    continueExpr ctx.env lestExpr
+    let lifecycle = MkLifecycle {join = Nothing, deadline = Just tRef, armed = ctx.time}
+    continueExpr (bindLifecycle lifecycle ctx.env) lestExpr
   Nothing -> do
     reason <- allocateValue (ValString
       "every member acted, but the last of them acted after the ONCE line's WITHIN deadline")
     continueBackward (ValBreached (ExplicitBreach Nothing (Just reason)))
+
+-- * The lifecycle bindings an anchored WITHIN reads
+--
+-- $lifecycle
+--
+-- EVERY-EACH-QUANTIFIER-SPEC §5.1.1 (R-Q7B, built 2026-09-15). @WITHIN d OF
+-- THE JOIN@, @OF THE DEADLINE@ and @OF THE ARMING@ name positions in the
+-- life of the ENCLOSING obligation — the one whose HENCE or LEST the
+-- anchored obligation is the continuation of. The machine already knows all
+-- three at the moment it hands off; what was missing was a way for the
+-- continuation to read them. It reads them from its ENVIRONMENT: the
+-- hand-off ('continueWithFollowup', 'fireBarrierHence', 'barrierFail',
+-- 'barrierStateMissed') binds them under three fixed uniques that live in
+-- no name table, so no program can spell, shadow or capture them, and a
+-- nested obligation's own hand-off overwrites them, which gives the
+-- nearest-enclosing meaning the type checker assumes
+-- ('L4.TypeCheck.checkAnchor'). An environment is lexical, so a top-level
+-- rule referenced as @HENCE rule@ does NOT see its caller's bindings — and
+-- the checker refuses THE JOIN \/ THE DEADLINE at the top level for exactly
+-- that reason.
+
+-- | The three uniques. Sort @l@ is used nowhere else (@b@ builtins, @c@
+-- checker, @d@ discharge, @e@ evaluator, @s@ the barrier's sentinels).
+lifecycleJoinUnique, lifecycleDeadlineUnique, lifecycleArmingUnique :: Unique
+lifecycleJoinUnique     = MkUnique 'l' 1 lifecycleUri
+lifecycleDeadlineUnique = MkUnique 'l' 2 lifecycleUri
+lifecycleArmingUnique   = MkUnique 'l' 3 lifecycleUri
+
+lifecycleUri :: NormalizedUri
+lifecycleUri = toNormalizedUri (Uri "jl4:lifecycle")
+
+-- | Bind an obligation's lifecycle into its continuation's environment.
+bindLifecycle :: Lifecycle -> Environment -> Environment
+bindLifecycle lc =
+  Map.insert lifecycleArmingUnique lc.armed
+  . maybe id (Map.insert lifecycleDeadlineUnique) lc.deadline
+  . maybe id (Map.insert lifecycleJoinUnique) lc.join
+
+-- | Resolve a lifecycle anchor: the binding, or the fallback (THE ARMING with
+-- no enclosing obligation is the obligation's own arming), or — for an
+-- anchor the checker should have refused — a named refusal rather than a
+-- scope error.
+lifecycleRef :: Environment -> Anchor Resolved -> Unique -> Maybe Reference -> Machine Reference
+lifecycleRef env a u fallback =
+  case Map.lookup u env of
+    Just r  -> pure r
+    Nothing -> maybe (userException (UserError (lifecycleRefusal a))) pure fallback
+
+-- | What the machine says when an anchor names a position that does not
+-- exist here. The checker refuses these ('L4.TypeCheck.checkAnchor'); this
+-- is the run-time's own answer for a value that reached it another way.
+lifecycleRefusal :: Anchor Resolved -> Text
+lifecycleRefusal a = Text.unwords
+  [ "WITHIN … OF " <> Text.strip (prettyLayout a) <> " names a position in the life of the"
+  , "obligation this one is the continuation of, and here there is none:"
+  , "this obligation is not inside any HENCE or LEST, or the position was"
+  , "never reached (the join of a LEST, the deadline of an obligation with no"
+  , "WITHIN)."
+  ]
+
+-- | A join-line anchor the checker refuses ('OnJoinLine'), met at run time.
+unreachableAnchor :: Anchor Resolved -> Machine Config
+unreachableAnchor a = userException (UserError (lifecycleRefusal a))
 
 -- | STATE-AS-LEDGER: render a forced party WHNF to the 'Text' key that names its
 -- own ledger. A 'ValString' is its own key; anything else falls back to its

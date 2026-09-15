@@ -566,6 +566,14 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Join n) where
     JoinOnce ann th due -> JoinOnce ann th <$> traverse addNlg due
     JoinUpon ann ue due -> JoinUpon ann ue <$> traverse addNlg due
 
+instance (HasSrcRange n, HasNlg n) => HasNlg (Deadline n) where
+  addNlg (MkDeadline ann d ma) = MkDeadline ann <$> addNlg d <*> traverse addNlg ma
+
+instance (HasSrcRange n, HasNlg n) => HasNlg (Anchor n) where
+  addNlg = \ case
+    AnchorAt ann e -> AnchorAt ann <$> addNlg e
+    a              -> pure a
+
 instance (HasSrcRange n, HasNlg n) => HasNlg (Subject n) where
   addNlg = \ case
     Party ann party -> Party ann <$> addNlg party
@@ -848,6 +856,14 @@ instance HasDesc (Join n) where
   addDesc = \ case
     JoinOnce ann th due -> JoinOnce ann th <$> traverse addDesc due
     JoinUpon ann ue due -> JoinUpon ann ue <$> traverse addDesc due
+
+instance HasDesc (Deadline n) where
+  addDesc (MkDeadline ann d ma) = MkDeadline ann <$> addDesc d <*> traverse addDesc ma
+
+instance HasDesc (Anchor n) where
+  addDesc = \ case
+    AnchorAt ann e -> AnchorAt ann <$> addDesc e
+    a              -> pure a
 
 instance HasDesc (Subject n) where
   addDesc = \ case
@@ -1517,6 +1533,14 @@ instance (HasSrcRange n, HasRef n) => HasRef (Join n) where
   addRef = \ case
     JoinOnce ann th due -> JoinOnce ann th <$> traverse addRef due
     JoinUpon ann ue due -> JoinUpon ann ue <$> traverse addRef due
+
+instance (HasSrcRange n, HasRef n) => HasRef (Deadline n) where
+  addRef (MkDeadline ann d ma) = MkDeadline ann <$> addRef d <*> traverse addRef ma
+
+instance (HasSrcRange n, HasRef n) => HasRef (Anchor n) where
+  addRef = \ case
+    AnchorAt ann e -> AnchorAt ann <$> addRef e
+    a              -> pure a
 
 instance (HasSrcRange n, HasRef n) => HasRef (Subject n) where
   addRef = \ case

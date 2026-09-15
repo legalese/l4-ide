@@ -55,6 +55,27 @@ GIVETH A DEONTIC Actor Action
         HENCE  FULFILLED
         LEST   BREACH
 
+-- an anchored deadline (WITHIN d OF anchor): the landlord's five days run
+-- from day 14, when the signatures fell due, not from the last signature
+GIVETH A DEONTIC Actor Action
+`cure from the deadline` MEANS
+    EVERY Tenant t IN tenants
+        MUST   Sign (EXACTLY t)
+        WITHIN 14
+        ONCE   ALL HAVE
+        HENCE  (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) what WITHIN 5 OF THE DEADLINE)
+        LEST   BREACH
+
+-- a join line's WITHIN anchored to an instant: everyone has signed by 105,
+-- whatever day the rule was entered
+GIVETH A DEONTIC Actor Action
+`everyone by instant 105` MEANS
+    EVERY Tenant t IN tenants
+        MUST   Sign (EXACTLY t)
+        ONCE   ALL HAVE WITHIN 5 OF 100
+        HENCE  FULFILLED
+        LEST   BREACH
+
 -- composed with RAND: the tenants' signatures AND the landlord's delivery
 GIVETH A DEONTIC Actor Action
 `sign and deliver` MEANS

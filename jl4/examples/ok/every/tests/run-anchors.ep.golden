@@ -1,0 +1,322 @@
+IMPORT prelude
+IMPORT daydate
+-- EVERY-EACH-QUANTIFIER-SPEC §5.1.1 (R-Q7A/B/C, RULED 2026-09-07, BUILT
+-- 2026-09-15): the ANCHORED deadline, `WITHIN d OF anchor`.
+--
+-- Unanchored, a WITHIN counts from where the language puts it: under HENCE,
+-- the join's firing (§5.1); under LEST, today, the event that revealed the
+-- miss (§5.2 owes the missed deadline). Anchored, it is ABSOLUTE — the
+-- anchor's instant plus d — and the anchor is one of
+--
+--   OF THE JOIN        the instant the ENCLOSING obligation's join fired
+--   OF THE DEADLINE    the enclosing obligation's deadline
+--   OF THE ARMING      the instant the enclosing obligation was entered
+--   OF e               an instant: a NUMBER on the trace's clock, or a DATE
+--
+-- where "enclosing" means the obligation whose HENCE or LEST this one is the
+-- continuation of. Every trace below pins one anchor to a number, and the
+-- number the breach reports is the deadline the anchor produced.
+
+DECLARE Actor IS ONE OF
+    Landlord HAS name IS A STRING
+    Tenant   HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Sign    HAS signer IS AN Actor
+    Deliver HAS who    IS AN Actor
+    Refund  HAS who    IS AN Actor
+
+theLandlord MEANS Landlord OF "Ms Ng"
+alice       MEANS Tenant OF "Alice"
+bob         MEANS Tenant OF "Bob"
+tenants     MEANS LIST alice, bob
+
+
+§ `OF THE JOIN is the HENCE default, said out loud`
+
+-- The landlord's five days run from Alice's signature — exactly as they would
+-- with no anchor at all (run-barrier.l4 pins the unanchored form to the same
+-- arithmetic). A delivery at day 13 is timely; the breach at 14 reports the
+-- deadline 8 + 5 = 13.
+GIVETH A DEONTIC Actor Action
+`of the join` MEANS
+    PARTY alice MUST Sign (EXACTLY alice) WITHIN 30
+    HENCE (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5 OF THE JOIN)
+    LEST  BREACH
+
+#TRACE `of the join` AT 0 WITH
+  PARTY alice DOES Sign alice AT 8
+  PARTY theLandlord DOES Deliver theLandlord AT 13
+
+#TRACE `of the join` AT 0 WITH
+  PARTY alice DOES Sign alice AT 8
+  PARTY theLandlord DOES Deliver theLandlord AT 14
+
+
+§ `OF THE DEADLINE under HENCE: the cure period runs from when performance fell due`
+
+-- Alice signs early, at day 8, but the landlord's five days count from day
+-- 30, when her signature fell due — not from day 8. Delivery at 35 is timely;
+-- the breach at 36 reports 30 + 5 = 35.
+GIVETH A DEONTIC Actor Action
+`of the deadline` MEANS
+    PARTY alice MUST Sign (EXACTLY alice) WITHIN 30
+    HENCE (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5 OF THE DEADLINE)
+    LEST  BREACH
+
+#TRACE `of the deadline` AT 0 WITH
+  PARTY alice DOES Sign alice AT 8
+  PARTY theLandlord DOES Deliver theLandlord AT 35
+
+#TRACE `of the deadline` AT 0 WITH
+  PARTY alice DOES Sign alice AT 8
+  PARTY theLandlord DOES Deliver theLandlord AT 36
+
+
+§ `OF THE DEADLINE under LEST: the cure period runs from the missed deadline`
+
+-- Alice misses day 10. The miss is revealed by her late signature at day 14,
+-- and today's UNANCHORED rule would start her cure period there (§5.2 records
+-- that as the change still owed). Anchored, the cure period runs from the
+-- deadline she missed: 10 + 5 = 15, whatever day the miss came to light. Her
+-- signature at 14 is re-offered to the LEST and discharges it; a signature at
+-- 16 does not, and the breach reports 15.
+GIVETH A DEONTIC Actor Action
+`cure from the deadline` MEANS
+    PARTY alice MUST Sign (EXACTLY alice) WITHIN 10
+    HENCE FULFILLED
+    LEST  (PARTY alice MUST Sign (EXACTLY alice) WITHIN 5 OF THE DEADLINE)
+
+#TRACE `cure from the deadline` AT 0 WITH
+  PARTY alice DOES Sign alice AT 14
+
+#TRACE `cure from the deadline` AT 0 WITH
+  PARTY alice DOES Sign alice AT 16
+
+
+§ `OF THE ARMING: within so many days of the agreement, two levels down`
+
+-- Three obligations in a chain. The landlord delivers (armed at 0); then Bob
+-- signs (armed at the delivery); then Alice signs WITHIN 40 OF THE ARMING.
+-- THE ARMING is the arming of the ENCLOSING obligation — Bob's, which was
+-- entered when the landlord delivered, at day 5 — so Alice's deadline is
+-- 5 + 40 = 45, not 20 + 40 = 60 (her own arming) and not 0 + 40 (the
+-- outermost rule's). The nearest enclosing obligation is the one an anchor
+-- names.
+GIVETH A DEONTIC Actor Action
+`of the arming` MEANS
+    PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 10
+    HENCE (PARTY bob MUST Sign (EXACTLY bob) WITHIN 30
+           HENCE (PARTY alice MUST Sign (EXACTLY alice) WITHIN 40 OF THE ARMING))
+    LEST  BREACH
+
+#TRACE `of the arming` AT 0 WITH
+  PARTY theLandlord DOES Deliver theLandlord AT 5
+  PARTY bob   DOES Sign bob   AT 20
+  PARTY alice DOES Sign alice AT 45
+
+#TRACE `of the arming` AT 0 WITH
+  PARTY theLandlord DOES Deliver theLandlord AT 5
+  PARTY bob   DOES Sign bob   AT 20
+  PARTY alice DOES Sign alice AT 46
+
+-- At the top level there is no enclosing obligation, and THE ARMING is the
+-- obligation's own arming: the default, allowed and pointless. Armed at 3,
+-- due 3 + 7 = 10.
+GIVETH A DEONTIC Actor Action
+`own arming` MEANS
+    PARTY alice MUST Sign (EXACTLY alice) WITHIN 7 OF THE ARMING
+
+#TRACE `own arming` AT 3 WITH
+  PARTY alice DOES Sign alice AT 11
+
+
+§ `OF an instant: a NUMBER on the trace's clock, or a DATE`
+
+closingDate MEANS 20
+
+-- A NUMBER is an instant on the trace's own scale, whatever the obligation's
+-- clock read when it was entered: armed at 3, due 20 + 5 = 25.
+GIVETH A DEONTIC Actor Action
+`of a number` MEANS
+    PARTY alice MUST Sign (EXACTLY alice) WITHIN 5 OF closingDate
+
+#TRACE `of a number` AT 3 WITH
+  PARTY alice DOES Sign alice AT 26
+
+-- A DATE is lowered to its serial (DATE_SERIAL), so on a trace whose clock is
+-- date serials it means the calendar date: WITHIN 0 OF 30 June 2026 is
+-- "by 30 June". A signature on 1 July reports the deadline as the serial of
+-- 30 June 2026.
+GIVETH A DEONTIC Actor Action
+`by thirty june` MEANS
+    PARTY alice MUST Sign (EXACTLY alice) WITHIN 0 OF (YMD 2026 6 30)
+
+#TRACE `by thirty june` AT (DATE_SERIAL (YMD 2026 6 1)) WITH
+  PARTY alice DOES Sign alice AT (DATE_SERIAL (YMD 2026 6 30))
+
+#TRACE `by thirty june` AT (DATE_SERIAL (YMD 2026 6 1)) WITH
+  PARTY alice DOES Sign alice AT (DATE_SERIAL (YMD 2026 7 1))
+
+-- Already expired at arming: the contract begins on 1 July and the deadline
+-- was five days after 20 June. That is not an error; the first event reveals
+-- the expiry, and the breach reports the deadline that had already passed.
+GIVETH A DEONTIC Actor Action
+`already expired` MEANS
+    PARTY alice MUST Sign (EXACTLY alice) WITHIN 5 OF (YMD 2026 6 20)
+
+#TRACE `already expired` AT (DATE_SERIAL (YMD 2026 7 1)) WITH
+  PARTY alice DOES Sign alice AT (DATE_SERIAL (YMD 2026 7 2))
+
+-- The duration is any NUMBER expression; in the WITHIN slot OF is the anchor,
+-- so an applied duration is bracketed (or written with juxtaposed arguments,
+-- `twice 3`). Due 0 + 6 = 6.
+GIVEN n IS A NUMBER GIVETH A NUMBER DECIDE twice n IS n TIMES 2
+
+GIVETH A DEONTIC Actor Action
+`applied duration` MEANS
+    PARTY alice MUST Sign (EXACTLY alice) WITHIN (twice OF 3) OF THE ARMING
+
+#TRACE `applied duration` AT 0 WITH
+  PARTY alice DOES Sign alice AT 7
+
+
+§ `Under a barrier`
+
+-- THE DEADLINE in a barrier's HENCE is the ONCE line's WITHIN when one is
+-- written — the deadline on the whole (R-T2) — and otherwise the act deadline
+-- of the member whose completion fired the join. Here there is no ONCE-line
+-- WITHIN: every member was due at 14, so the landlord's five days run from
+-- 14, not from Bob's signature at 9. Delivery at 19 is timely; at 20 the
+-- breach reports 14 + 5 = 19.
+--
+-- Under the barrier's LEST, THE DEADLINE is the deadline the failing member
+-- missed: Bob's, at 14. The refund is due 14 + 5 = 19 whether the miss came
+-- to light at day 15 or day 20.
+GIVETH A DEONTIC Actor Action
+`the tenancy` MEANS
+    EVERY Tenant t IN tenants
+        MUST   Sign (EXACTLY t)
+        WITHIN 14
+        ONCE   ALL HAVE
+        HENCE  (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5 OF THE DEADLINE)
+        LEST   (PARTY theLandlord MUST Refund  (EXACTLY theLandlord) WITHIN 5 OF THE DEADLINE)
+
+#TRACE `the tenancy` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+  PARTY bob   DOES Sign bob   AT 9
+  PARTY theLandlord DOES Deliver theLandlord AT 19
+
+#TRACE `the tenancy` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+  PARTY bob   DOES Sign bob   AT 9
+  PARTY theLandlord DOES Deliver theLandlord AT 20
+
+#TRACE `the tenancy` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+  PARTY theLandlord DOES Refund theLandlord AT 20
+
+-- With a WITHIN on the ONCE line, THE DEADLINE in the HENCE is that one:
+-- the group's deadline, 30, so delivery is due 30 + 5 = 35.
+GIVETH A DEONTIC Actor Action
+`the tenancy, bounded as a whole` MEANS
+    EVERY Tenant t IN tenants
+        MUST   Sign (EXACTLY t)
+        WITHIN 14
+        ONCE   ALL HAVE WITHIN 30
+        HENCE  (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5 OF THE DEADLINE)
+        LEST   BREACH
+
+#TRACE `the tenancy, bounded as a whole` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+  PARTY bob   DOES Sign bob   AT 9
+  PARTY theLandlord DOES Deliver theLandlord AT 36
+
+-- A join line's own WITHIN may be anchored too — to THE ARMING (the EVERY's
+-- own arming, which is also what it counts from unanchored) or to an
+-- instant; not to THE JOIN or THE DEADLINE, which it is what defines. Here
+-- the EVERY is nested under the landlord's delivery, so it is armed at day 5,
+-- and its members are due 5 + 14 = 19: Bob's signature at 20 breaches.
+GIVETH A DEONTIC Actor Action
+`after delivery` MEANS
+    PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 10
+    HENCE (EVERY Tenant t IN tenants
+              MUST   Sign (EXACTLY t)
+              ONCE   ALL HAVE WITHIN 14 OF THE ARMING
+              HENCE  FULFILLED
+              LEST   BREACH)
+    LEST  BREACH
+
+#TRACE `after delivery` AT 0 WITH
+  PARTY theLandlord DOES Deliver theLandlord AT 5
+  PARTY alice DOES Sign alice AT 6
+  PARTY bob   DOES Sign bob   AT 19
+
+#TRACE `after delivery` AT 0 WITH
+  PARTY theLandlord DOES Deliver theLandlord AT 5
+  PARTY alice DOES Sign alice AT 6
+  PARTY bob   DOES Sign bob   AT 20
+
+-- The whole group must have signed by instant 105 (100 + 5), whatever day
+-- the EVERY was armed. That is the state deadline, and — as a join-line
+-- WITHIN written alone always does (R-T2) — it also bounds each act, so it
+-- is what the LEST's THE DEADLINE names: the refund is due 105 + 1 = 106.
+GIVETH A DEONTIC Actor Action
+`by instant 105` MEANS
+    EVERY Tenant t IN tenants
+        MUST   Sign (EXACTLY t)
+        ONCE   ALL HAVE WITHIN 5 OF 100
+        HENCE  FULFILLED
+        LEST   (PARTY theLandlord MUST Refund (EXACTLY theLandlord) WITHIN 1 OF THE DEADLINE)
+
+#TRACE `by instant 105` AT 3 WITH
+  PARTY alice DOES Sign alice AT 4
+  PARTY bob   DOES Sign bob   AT 105
+
+#TRACE `by instant 105` AT 3 WITH
+  PARTY alice DOES Sign alice AT 4
+  PARTY bob   DOES Sign bob   AT 106
+  PARTY theLandlord DOES Refund theLandlord AT 107
+
+
+§ `Under a fork`
+
+-- Each member's HENCE is its own continuation, and THE DEADLINE in it is
+-- that member's deadline. Both tenants were due at 14, so both deliveries
+-- are due 14 + 2 = 16 — the one Alice's signature at 1 spawned no earlier
+-- than the one Bob's at 9 did. A delivery at 17 breaches both; the compound
+-- reports the first, and the deadline it reports is 16.
+GIVETH A DEONTIC Actor Action
+`receipts` MEANS
+    EVERY Tenant t IN tenants
+        MUST   Sign (EXACTLY t)
+        WITHIN 14
+        UPON   EACH
+        HENCE  (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 2 OF THE DEADLINE)
+        LEST   BREACH BY t
+
+#TRACE `receipts` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+  PARTY bob   DOES Sign bob   AT 9
+  PARTY theLandlord DOES Deliver theLandlord AT 17
+
+
+§ `What a residual prints`
+
+-- An obligation that has not met an event prints its deadline as written,
+-- anchor and all. One that has prints the days remaining: the landlord's
+-- deadline was fixed at 30 + 5 = 35 when Bob's (irrelevant) signature at day
+-- 20 was scrutinised, and 15 days remain. The anchor was resolved once, at
+-- that first event, and is spent.
+#EVAL `of the join`
+
+#TRACE `of the deadline` AT 0 WITH
+  PARTY alice DOES Sign alice AT 8
+
+#TRACE `of the deadline` AT 0 WITH
+  PARTY alice DOES Sign alice AT 8
+  PARTY bob   DOES Sign bob   AT 20
+
+-- An inline rule, so the natural-language linearisation of an anchor
+-- ("within 7 of the arming") is in this file's .nlg golden too.
+#EVAL PARTY alice MUST Sign (EXACTLY alice) WITHIN 7 OF THE ARMING

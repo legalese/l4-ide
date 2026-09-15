@@ -36,7 +36,8 @@
 >   the tree.
 > - **Rulings so far:** R-T1–R-T6 (§2.2.7.8, 2026-09-06); the pattern spelling (§2.4, 2026-09-07);
 >   **R-Q1–R-Q7 (§2.5, 2026-09-07)**; **R-Q7A–R-Q7C, the anchor's spelling (§5.1.1, 2026-09-07;
->   ruled, not built)**; **R-X5 (the window's edges, modified) and R-X6 (the early act, ruled),
+>   BUILT 2026-09-15 on `every/anchors`, witness `jl4/examples/ok/every/run-anchors.l4`; the
+>   mechanism and the build decisions are recorded under §5.1.1 and §11.0.1)**; **R-X5 (the window's edges, modified) and R-X6 (the early act, ruled),
 >   §5.1.2, 2026-09-07, not built**; and three on 2026-09-08 — **W3, `THE OPENING` declined and
 >   the anchor slot ruled to become a trace expression (§5.1.3, direction only, not built)**, and
 >   **the roll call, how a run gets its cast (§11.0, ANSWERED and BUILT)**, and
@@ -1034,18 +1035,25 @@ DeonticModal ::= ('MUST' ['NOT'] | 'MAY' | 'SHANT' | 'DO') ['DO']
 Action ::= Pattern ['PROVIDED' Expr]  -- the PROVIDED guard, measured working under EVERY 2026-09-07
 
 TemporalConstraint ::= 'WITHIN' Duration ['OF' Anchor]   -- 'OF' Anchor: the named anchor of R-Q7 (§5.1).
-                                      -- The connective is 'OF' and only 'OF' (R-Q7A, §5.1.1). Unbuilt.
+                                      -- The connective is 'OF' and only 'OF' (R-Q7A, §5.1.1). BUILT 2026-09-15
+                                      -- ('L4.Parser.deadline', Parser.hs:2724): in the Duration slot OF is the
+                                      -- anchor, so an application there is written '(f OF x)' or 'f x'.
                      | 'BEFORE' Expr                      -- R-X5: an absolute DATE, the closing edge; 'BEFORE' Duration is refused. Unbuilt
                      | 'AFTER' (Duration ['OF' Anchor] | Expr)   -- R-X5: the opening edge, duration or DATE; never re-anchors. Unbuilt
                      | 'BY' Deadline                      -- unruled and unbuilt; TKBy serves FOLLOWED BY, DIVIDED BY, BREACH BY
 
-Anchor ::= 'THE' ('JOIN' | 'DEADLINE' | 'ARMING' | 'OPENING')   -- 'OPENING' proposed by R-X5 (§5.1.2), residue   -- R-Q7B: the three lifecycle positions. THE is already
-                                      -- a keyword (Lexer.hs:273); JOIN, DEADLINE and ARMING are matched by
+Anchor ::= 'THE' ('JOIN' | 'DEADLINE' | 'ARMING' | 'OPENING')   -- 'OPENING' proposed by R-X5 (§5.1.2), DECLINED (§5.1.3), unbuilt   -- R-Q7B: the three lifecycle positions. THE is already
+                                      -- a keyword (Lexer.hs:283 at e578654c); JOIN, DEADLINE and ARMING are matched by
                                       -- SPELLING and not reserved, exactly as EACH is in UPON EACH.
-         | Event                      -- R-Q7: any recorded event, which the drafter has already named
-         | Expr                       -- R-Q7C: anything of type DATE. The slot is a three-way union the
-                                      -- checker discriminates; no new keyword. Spellings RULED 2026-09-07
-                                      -- (R-Q7A/B/C, §5.1.1); unbuilt.
+                                      -- The three are BUILT 2026-09-15 ('L4.Parser.anchor', Parser.hs:2745).
+         | Event                      -- R-Q7: any recorded event, which the drafter has already named —
+                                      -- served by the Expr form below: an expression whose value is
+                                      -- that event's time (a ledger read, a recorded instant). BUILT.
+         | Expr                       -- R-Q7C: a NUMBER (an instant on the trace's clock) or a DATE
+                                      -- (lowered by its serial). The slot is a union the checker
+                                      -- discriminates ('L4.TypeCheck.checkAnchor', TypeCheck.hs:2023);
+                                      -- no new keyword. Spellings RULED 2026-09-07 (R-Q7A/B/C, §5.1.1);
+                                      -- BUILT 2026-09-15.
 
 HenceClause ::= 'HENCE' Continuation
 
@@ -1324,10 +1332,15 @@ branch was in the merge queue at the time):
   `EvaluateLazy.Machine`) and in **no** `L4/Bpmn/*.hs` and **not** in `StateGraph.hs`. The fix is
   scoped as **P2h** in `specs/todo/lexipedia-superset/LTS-VISUALISER.md` §4.9 and §7.2, which also
   records what it does to that track's `DeonticStep` and correlation key. It moves P1's goldens.
-- `doc/reference/regulative/README.md:82-95` documents `WITHIN 5 days OF notice` as an anchored form.
+- ~~`doc/reference/regulative/README.md:82-95` documents `WITHIN 5 days OF notice` as an anchored form.
   **Probed 2026-09-07:** it is a parse error (`unexpected OF` at the `OF`) on the installed binary of
   27 August and on the 4 September probe binary, with or without `days`. The page is owed a correction
-  in the PR that builds the anchor of R-Q7 (§5.1), or sooner.
+  in the PR that builds the anchor of R-Q7 (§5.1), or sooner.~~ **DISCHARGED 2026-09-15** by the
+  build of R-Q7A/B/C (§5.1.1): the `OF` form parses and runs, and the page now shows examples
+  that check (`doc/reference/regulative/within-example.l4`, type-checked by `doc/test-docs.sh`),
+  states the three lifecycle anchors, the date form and the refusals, and says in one sentence
+  that nothing separates a date-serial trace from a floating-origin one (§5.1.2.1 point 2, T1
+  not built).
 - `doc/tutorials/obligations/what-follows.md:153` and `:470` teach today's `LEST` anchor (the first
   event after the deadline) and a `WITHIN 13` workaround built on it. When R-Q7's `LEST` default is
   built (§5.2) that page changes and the trace goldens re-bless.
@@ -1335,7 +1348,7 @@ branch was in the merge queue at the time):
   (R-Q6, §13.4). The fork's words (R-Q1) were ruled 2026-09-07 and are recorded above; **the anchor
   spellings (R-Q7) were ruled the same day and are recorded at §5.1.1** — `OF` alone as the connective,
   `OF THE JOIN`/`OF THE DEADLINE`/`OF THE ARMING` for the lifecycle positions, and a date-valued
-  expression admitted in the slot. Ruled, not built.
+  expression admitted in the slot. Ruled 2026-09-07; **BUILT 2026-09-15** (§5.1.1's build block).
 - Opened by those rulings, and owed to nobody yet: **the `AFTER` window** (§5.1.2, sketched on Meng's
   request and not ruled — it owes the early-act semantics, the empty-window check, and its meaning
   under `LEST`); **an anchor picked by an expression** rather than named, which R-Q7B's note flags as
@@ -1607,13 +1620,15 @@ makes the other clause writable. The card's earlier escape hatch, "write an abso
 struck: R-T2 ruled nothing about `BY` (its subject is `WITHIN` in two positions), and a deadline `BY`
 is unruled and unbuilt (§2.4).
 
-**The manual's `OF` form does not run.** `doc/reference/regulative/README.md:82-95` documents
-`WITHIN 5 days OF notice` and `` WITHIN 5 days OF `order confirmation` `` as an anchored form.
-Probed 2026-09-07 on the installed binary of 27 August and on the 4 September probe binary,
-`JL4_LIBRARY_PATH` unset: both report `unexpected OF` at the `OF`, with or without `days`. The
-`deadline` production is `WITHIN` followed by one expression (`Parser.hs:2534-2536`), and `OF` is not
-an operator inside an expression. The page is owed a correction (§2.5's owed list, not made in the
-change that recorded this section); this ruling is the design that would make its sentence true.
+**The manual's `OF` form did not run until 2026-09-15.** `doc/reference/regulative/README.md:82-95`
+documented `WITHIN 5 days OF notice` and `` WITHIN 5 days OF `order confirmation` `` as an anchored
+form. Probed 2026-09-07 on the installed binary of 27 August and on the 4 September probe binary,
+`JL4_LIBRARY_PATH` unset: both reported `unexpected OF` at the `OF`, with or without `days`. The
+`deadline` production was `WITHIN` followed by one expression (`Parser.hs:2693-2695` at `e578654c`;
+`:2534-2536` when this paragraph was first written), and `OF` was not an operator inside an
+expression. The page was owed a correction (§2.5's owed list); **the build of §5.1.1 on 2026-09-15
+made the sentence true** — `WITHIN 5 days OF notice` now parses, and checks once `days` and
+`notice` are defined — and the page was corrected in the same change.
 
 When `HENCE` fires, an unanchored continuation deadline is relative to the join's firing — for a
 barrier, the **last completion time**:
@@ -1635,22 +1650,24 @@ t=25: HENCE spawns with reference time = 25
       escrow_agent's deadline = 25 + 5 = 30
 ```
 
-#### 5.1.1 The anchor's spelling — RULED 2026-09-07 (R-Q7A, R-Q7B, R-Q7C)
+#### 5.1.1 The anchor's spelling — RULED 2026-09-07 (R-Q7A, R-Q7B, R-Q7C); BUILT 2026-09-15
 
 §5.1 above ruled the anchor's **mechanism** and its **defaults** and left its **spelling** open.
 Three cards — the Anchor Bench, an artifact of 2026-09-07, **not in the tree**
 (<https://claude.ai/code/artifact/0e3b1279-79c2-4616-ada7-bad7473e9630>) — closed it. All three were
 marked **accept**, on the recommended option in each case, between 03:37 and 03:41 UTC on
 7 September 2026. Meng's notes are quoted verbatim, and each one opens a follow-up rather than
-qualifying the ruling; the follow-ups are listed at the end of this section and in §2.5's owed list. **None of this
-is built**: the grammar in §2.4 carries it, and no parser production exists.
+qualifying the ruling; the follow-ups are listed at the end of this section and in §2.5's owed list. **All three
+are built** as of 2026-09-15 (the block at the end of this section); when this paragraph was written
+none was, and the grammar in §2.4 carried the production with no parser behind it.
 
 **R-Q7A — the connective is `OF`, and only `OF`.** Not `AFTER`, and not the two as synonyms. `OF` is
-already a keyword (`Lexer.hs:268`, `TKOf`), so the slot reserves no new word, and it is the form
+already a keyword (`Lexer.hs:278` at `e578654c`; `:268` when this was written, `TKOf`), so the slot reserves no new word, and it is the form
 `doc/reference/regulative/README.md:82-95` already documents. This is a grammar addition either way:
-measured 2026-09-07 on a binary built from this branch, `WITHIN 5 OF notice` is a **parse error at
-the `OF`**, because `WITHIN` takes exactly one expression (`Parser.hs:2534-2536`) and `OF` is not an
-operator inside one.
+measured 2026-09-07 on a binary built from this branch, `WITHIN 5 OF notice` was a **parse error at
+the `OF`**, because `WITHIN` took exactly one expression (`Parser.hs:2534-2536` then) and `OF` is not an
+operator inside one. Built 2026-09-15: see the block at the end of this section for what the
+addition had to decide about `OF`, which is ALSO application inside an expression.
 
 > _"Forecasting the future here: a triggerable interval may not activate immediately upon the
 > previous event; for instance, we might say: 'after the current order is delivered, the customer may
@@ -1664,10 +1681,16 @@ earliest-permitted edge of a window — sketched at §5.1.2, which answers the q
 **R-Q7B — the three lifecycle anchors are `OF THE JOIN`, `OF THE DEADLINE`, `OF THE ARMING`.** Three
 of the four anchors §5.1 requires are positions in the obligation's own life, not values a drafter
 can point at; the fourth, a recorded event, already has a name the drafter chose. `THE` is already a
-keyword (`Lexer.hs:273`, `TKThe`), and `JOIN`, `DEADLINE` and `ARMING` are matched by **spelling**
+keyword (`Lexer.hs:283` at `e578654c`; `:273` when this was written, `TKThe`), and `JOIN`, `DEADLINE` and `ARMING` are matched by **spelling**
 rather than reserved — the same move `UPON EACH` makes for `EACH`, ruled the same morning (R-Q1,
 §2.5). So the whole of R-Q7B costs zero new reserved words. Measured 2026-09-07: none of the three
-nouns appears as an identifier anywhere in the goldened corpus.
+nouns appears as an identifier anywhere in the goldened corpus. **Re-measured 2026-09-15 on
+`e578654c`** before building: `grep -rnw "JOIN\|DEADLINE\|ARMING" --include=*.l4 jl4/examples
+jl4-core/libraries doc` → 47 hits, every one inside a `--` comment; and `grep -rn "WITHIN.*\bOF\b"
+--include=*.l4` over the goldened globs → 0 hits. No corpus file could re-parse differently, and
+the goldens confirm it: no eval, exactprint, NLG or schema golden of a parseable corpus file
+moved. (Two parse-error goldens did, by one token: `not-ok/tc/every-join-misindented{,-barrier}`
+list what may follow `WITHIN 14`, and `OF` now may — see §11.0.1's ledger entry.)
 
 Why each is wanted. **The join's firing** is the `HENCE` default, so naming it is only ever emphasis.
 **The missed deadline** is the `LEST` default, but a drafter may want it under `HENCE` — _the cure
@@ -1714,7 +1737,135 @@ already writes `` WITHIN `five business days` `` 11 times, which is exactly this
 **What these three do not settle.** The `AFTER` window (§5.1.2, sketched and not ruled); an anchor
 picked by an expression rather than named (R-Q7B's note); the date library (R-Q7C's note); and
 whether an anchored `WITHIN` under `LEST` may name `THE JOIN` at all, which is a well-formedness
-question — under `LEST` the join did not fire.
+question — under `LEST` the join did not fire. (The build below takes the conservative reading of
+the last one as a build decision, not a ruling; see "refusals".)
+
+##### 5.1.1.1 BUILT 2026-09-15 — the mechanism, and the decisions the ruling left to the build
+
+Built on `every/anchors`, cut from `unstable` `e578654c`. Witness:
+`jl4/examples/ok/every/run-anchors.l4` (27 directives, each pinning one anchor to the deadline it
+produces, or what a residual prints); refusals witnessed by `jl4/examples/not-ok/tc/anchor-{top-level-join,lest-join,not-an-instant,no-deadline,on-join-line}.l4`;
+highlighting by `jl4/examples/lsp/semantic-tokens/anchors.l4`. Line numbers below are on the
+branch at the commit that carries this section.
+
+**Syntax.** `Deonton.due` and the join line's deadline both become `Maybe (Deadline n)`
+(`Syntax.hs:420`, `:491`, `:493`), where `Deadline n = MkDeadline Anno (Expr n) (Maybe (Anchor n))`
+(`Syntax.hs:543`) and `Anchor n` is `AnchorJoin | AnchorDeadline | AnchorArming | AnchorAt (Expr n)`
+(`Syntax.hs:585`). The parent's hole count is unchanged — one hole for the deadline — so exactprint
+and the semantic tokens zip as before; inside the node the holes are `[duration, anchor]` in source
+order and `WITHIN` is a token of the node's own `Anno`. Measured: `exactprint identity` and the
+`prettyLayout round-trip` hold over the whole corpus with the witness included, and no existing
+`.ep.golden` moved.
+
+**The one thing the grammar had to decide: `OF` is also application.** `name OF args` is a
+function call inside an expression (`Parser.hs:2176`, `app`), so with the duration parsed as an
+ordinary expression `WITHIN period OF closingDate` would silently have been `period` applied to
+`closingDate` (a check error for a nullary `period`; a wrong answer with exit 0 for a
+`NUMBER → NUMBER` one), and `WITHIN period OF THE JOIN` a parse error at `THE`. Measured on
+`e578654c` before building: `WITHIN period OF notice` parsed as the application. Decision: **in
+the duration slot of a `WITHIN`, `OF` is the anchor**, by a flag in the parser's reader
+environment (`Env.ofIsAnchor`, `Parser.hs:67`) that `deadline` sets and that parentheses and the
+anchor itself reset (`inExprSlot`, `Parser.hs:1260`); `app` takes juxtaposed arguments only while
+it is set. An applied duration is written `WITHIN (f OF x) OF …` or `WITHIN f x OF …`, which is
+also what `prettyLayout` prints (`parensIfNeeded` brackets an application), so the round trip
+holds. The three nouns are matched by spelling in one production (`anchor`, `Parser.hs:2745`); no
+expression begins with `THE`, so the alternatives are disjoint on their first token, and `THE FOO`
+reports `expecting ARMING, DEADLINE, JOIN`.
+
+**The enclosing-obligation rule.** The three lifecycle anchors name positions in the life of the
+obligation whose `HENCE` or `LEST` the anchored obligation is the continuation of — the
+**nearest** enclosing one. Under a fork that is the member; under a barrier it is the `EVERY`.
+At the top level there is none: `THE JOIN` and `THE DEADLINE` are refused there and `THE ARMING`
+is the obligation's own arming, i.e. the default, allowed and pointless (witness: `own arming`).
+A top-level rule referenced by name inside a `HENCE` is checked where it is written and cannot use
+`THE JOIN`/`THE DEADLINE`; the run time agrees by construction, because the mechanism is lexical
+(next paragraph). `THE ARMING` two levels down names the MIDDLE obligation's arming, not the
+outermost rule's (witness: `of the arming`, deadline 5 + 40 = 45) — "within 30 days of this
+agreement" therefore reaches the agreement from ONE level down, which is where the phrase is
+written; whether a deeper continuation should be able to reach the outermost arming is open, and
+would need a way to name a non-nearest obligation (R-Q7B's note; §5.1.3's direction).
+
+**Threading, chosen: bindings in the continuation's environment.** At every hand-off the machine
+builds a `Lifecycle` (`ContractFrame.hs:363`: the join instant under `HENCE` only, the absolute
+deadline when there is one, the arming) and binds it into the continuation's environment under
+three fixed uniques of a sort no name table uses (`Machine.hs:2497-2506`, `bindLifecycle`), so no
+program can spell, shadow or capture them, and a nested obligation's own hand-off overwrites them
+— which is the nearest-enclosing rule for free. `continueWithFollowup` (`Machine.hs:1996`),
+`fireBarrierHence` (`:2414`), `barrierFail` (`:2443`) and `barrierStateMissed` (`:2460`) all bind
+it; the `RBinOp` paths need nothing, because `ValROp` captures the environment for both operands.
+The arming had to be **kept**: the act frames overwrite `time` on every event, so each of the
+eleven now carries `armed` as well (`ContractFrame.hs:91` and siblings), set at `App1`
+(`Machine.hs:1117`). A register (dynamic scope) was considered and rejected: a top-level rule used
+as `HENCE rule` would then have worked at run time while the lexical checker refused it.
+
+**Resolution and arithmetic.** The deadline is resolved ONCE, at the first event, when the frame's
+`time` is still the arming time (`Contract4`, `Machine.hs:1539`): a lifecycle anchor is the
+environment binding (`lifecycleRef`, `:2516`, with the obligation's own `armed` as `THE ARMING`'s
+fallback), an expression is evaluated in the obligation's environment, and a `DATE` value is
+lowered by its serial (`Contract4b`, `:1569` — the same arithmetic as `DATE_SERIAL`, not a call
+through it: an `App` inserted into the AST would have no tokens and would break exactprint). Then
+`Contract5` computes `deadline = anchor + d` instead of `time + d` (`:1589`) and the remaining
+due is relative again; the anchor is spent. So a deadline already past at arming is revealed by the
+first event (witness: `already expired`), and a residual that has met no event prints the source
+form, anchor and all, while one that has prints the days remaining (witness: the last section).
+
+**`THE DEADLINE` under a barrier, and the `RAND` question.** THE DEADLINE in a barrier's
+continuation is the `ONCE` line's `WITHIN` when written (the deadline on the whole, R-T2; `Barrier4`,
+`:1852`), and otherwise the act deadline of the member whose completion fired the join (`HENCE`)
+or whose expiry failed it (`LEST`, R-Q5's act layer) — witnessed by `the tenancy` (14 + 5 = 19 both
+ways) and `the tenancy, bounded as a whole` (30 + 5 = 35). To carry a member's deadline to the
+barrier without running the member twice (§11.0.1's second-pass defect), the barrier's two
+sentinels are minted with a unique of their own sort (`defSentinel`, `:2329`) and the member's
+hand-off passes them a THIRD argument, the member's absolute deadline (`continueWithFollowup`,
+`:2002`; `sentinelArgs`, `:2321`); every other continuation is applied to `[time, events]` exactly
+as before, and the sentinels still print as `` `the join` `` / `` `the join fails` ``. A first
+attempt applied the sentinel to the deadline as an expression, which made the residual print
+``HENCE (`the join` OF `the deadline`)`` and moved `run-barrier.golden`; withdrawn. A `RAND`
+continuation has ONE enclosing obligation — the one whose `HENCE`/`LEST` the `RAND` sits in — and
+both operands see its bindings, because `ValROp` captures the hand-off environment; that is the
+brief's "the one whose completion or failure fired it", by construction.
+
+**The join line's own `WITHIN`.** `OF THE ARMING` there is the `EVERY`'s arming, which is also what
+it counts from unanchored (`Barrier3`, `:1840`); `OF e` is an instant (witness: `by instant 105`).
+When the join-line deadline is demoted to the members (R-T2, no act `WITHIN`), each member's
+environment binds `THE ARMING` to the `EVERY`'s arming (`memberEnv`, `:2228`) so a nested `EVERY`
+does not read its enclosing obligation's arming there (witness: `after delivery`, 5 + 14 = 19).
+
+**Refusals — build decisions, each open to Meng's ruling** (`checkAnchor`, `TypeCheck.hs:2023`;
+`AnchorRefusal`, `Types.hs:404`; the enclosing obligation is a `CheckEnv` field set with `local`
+around each continuation, `Types.hs:774`, `TypeCheck.hs:2072`):
+
+1. `THE JOIN` and `THE DEADLINE` with no enclosing obligation (top level) — refused.
+2. `THE JOIN` under `LEST` — refused: the join did not fire. This is the conservative reading of
+   the question this section left open; the alternative (bind it to the revealing stamp, today's
+   unanchored `LEST` clock) was not taken because it would give the name a meaning §5.2 is about to
+   take away from the default.
+3. `THE JOIN` and `THE DEADLINE` on a join line — refused: that `WITHIN` is what defines both.
+4. `THE DEADLINE` where the enclosing obligation has no `WITHIN` on its act or its join line —
+   refused. Not in the brief; the checker can see it, and the run time would otherwise have had to
+   invent a value.
+5. An `OF` expression that is neither `NUMBER` nor `DATE` — refused naming both
+   (`AnchorNotAnInstant`, `Types.hs:217`). The choice is biased: an inference variable is taken as
+   `NUMBER`.
+
+**Printers and exporters.** `prettyLayout` prints `d [OF anchor]` with the duration bracketed
+exactly as before (`Print.hs:959`, `:968`), so every unanchored deadline prints byte-for-byte as it
+did; NLG says `within d of the join` (`Nlg.hs:246`); the document export renders "5 of the
+deadline" and, unlike a bare `WITHIN 0`, does not drop `WITHIN 0 OF date` (`Document.hs:1113`); the
+state graph's `labelDeadline` carries the source text, which the BPMN lowering reports as unparsed
+(stated limit); the MLIR schema fails closed on any anchored deadline (`Schema.hs:926`); the LSP
+highlights `JOIN`/`DEADLINE`/`ARMING` as keywords by the `UponEach` device
+(`SemanticTokens.hs:224`); the service serialises an unevaluated anchored deadline as its source
+text.
+
+**Not built here.** `AFTER` (held, §5.1.2 — the next track, stacked on this branch); §5.2's `LEST`
+default (a different stack — `OF THE DEADLINE` on a `LEST` is that clock said explicitly, witness
+`cure from the deadline`, and is the workaround until §5.2 lands); T1's `COMMENCING`/sort
+separation (§5.1.2.1) — so nothing separates a floating-origin trace from a date-serial one, and a
+`DATE` anchor on a trace that starts `AT 0` counts from a serial in the hundreds of thousands,
+silently, which the doc page says in one sentence; §5.1.3's expression-over-trace slot; `THE
+OPENING` (declined); `SOME m OF`. Also not done: a residual re-armed on a SECOND `App1` (nothing in
+`l4 run` does this) would resolve an unevaluated anchor at its second arming, not its first.
 
 #### 5.1.2 `AFTER` and `BEFORE`: the window's two edges — MODIFIED 2026-09-07 (R-X5); the early act RULED (R-X6); the origin the absolute forms needed RULED 2026-09-09 (T1, §5.1.2.1); not built
 
@@ -2440,6 +2591,49 @@ predates every line of this branch. It blocks any RUN of §2.2.7.6's own rent ex
 shape `fork.l4` writes (`Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount)`) — `fork.l4`
 itself carries no directive at `6e9b57bb`, so it was never red, which is how the defect survived.
 Witness: `jl4/examples/ok/regulative-exactly-later-argument.l4`.
+
+#### Built 2026-09-15 — the anchored `WITHIN` (R-Q7A/B/C, §5.1.1), on `every/anchors`
+
+**Built**, witnessed by `jl4/examples/ok/every/run-anchors.l4` (the mechanism and every decision
+are in §5.1.1.1; this is the ledger entry):
+
+- the grammar `WITHIN d [OF anchor]` in both positions, the act's and the join line's, with `OF`
+  read as the anchor in the duration slot and as application everywhere else;
+- the three lifecycle anchors `OF THE JOIN`, `OF THE DEADLINE`, `OF THE ARMING`, matched by
+  spelling, naming the nearest enclosing obligation's join, deadline and arming — through the
+  single-party hand-offs, the barrier's `HENCE` (state deadline when the `ONCE` line has one, else
+  the last completer's), the barrier's `LEST` (the failing member's deadline, or the state
+  deadline when that is what was missed), the fork (each member's own), and the demoted join-line
+  deadline;
+- the expression anchor, `NUMBER` or `DATE`, the latter lowered by its serial; a deadline already
+  past at arming is revealed by the first event;
+- five check-time refusals, each with a `not-ok/tc/` witness; the `Lifecycle` bindings under
+  unspellable uniques; the arming kept on every act frame; the sentinels' third argument;
+- all four printers (exactprint byte-identical, `prettyLayout` round-tripping, NLG, document
+  export), the MLIR schema failing closed, LSP highlighting, the service's residual string;
+- `doc/reference/regulative/README.md`'s `WITHIN` section rewritten with examples that check
+  (`within-example.l4`), `EVERY.md`'s "Anchored deadlines under a join", and the
+  `writing-l4-rules` skill's three copies of the "does not parse" claim corrected.
+
+**Not built**, each named in §5.1.1.1's last paragraph: `AFTER`; §5.2's `LEST` default; T1's epoch
+and sorts (so the floating-origin/date-serial confusion is a stated limit, not a check); §5.1.3's
+expression-over-trace slot; `THE OPENING`; `SOME m OF`; a way for a deep continuation to name a
+non-nearest obligation's arming.
+
+**Existing goldens.** No eval, exactprint, NLG or schema golden of a parseable corpus file moved:
+the track adds syntax and touches no default. Two candidate regressions found on the way were
+withdrawn before commit — a partial-constructor arm in `App1`, which turned `FULFILLED` applied to
+`[time, events]` into `FULFILLED OF 4, EMPTY` in seventeen eval goldens, together with the
+sentinel-as-application it served; and a `Deadline` printer that bracketed the duration in the
+state graph's label, which moved the `regcf-resale` BPMN goldens. Two parse-error goldens were
+re-blessed by one token each: `not-ok/tc/every-join-misindented.{golden,ep.golden}` and
+`…-barrier.{golden,ep.golden}` list the tokens that may follow `WITHIN 14`, and `OF` is now one
+of them. That is the parser telling the truth about the new grammar; hiding the alternative
+(megaparsec's `hidden`) would have kept the goldens and made the message lie, and was not done.
+A reviewer who reads rule 6 more strictly can reverse it with one `hidden` in
+`L4.Parser.anchor`.
+
+**What the adversarial pass of 2026-09-15 changed** — pending, filled after the refute stage.
 
 ### 11.0.2 The roll, said outright: `EVERY Cast v IN xs` — RULED 2026-09-08 (Meng), BUILT
 

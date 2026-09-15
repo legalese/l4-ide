@@ -10,4 +10,4 @@ File: every-join-misindented-barrier.l4
     37 |         ONCE   ALL HAVE
        |         ^^^^
     unexpected ONCE
-    expecting %, &&, *, +, -, .., ..., /, ;, <, <=, =, =>, >, >=, ABOVE, AND, AT, BELOW, DIVIDED, EQUALS, FOLLOWED, GREATER, HENCE, IMPLIES, LESS, LEST, MINUS, MODULO, OR, PLUS, RAND, ROR, TIMES, UNLESS, WHERE, end of input, space token, or ||
+    expecting %, &&, *, +, -, .., ..., /, ;, <, <=, =, =>, >, >=, ABOVE, AND, AT, BELOW, DIVIDED, EQUALS, FOLLOWED, GREATER, HENCE, IMPLIES, LESS, LEST, MINUS, MODULO, OF, OR, PLUS, RAND, ROR, TIMES, UNLESS, WHERE, end of input, space token, or ||

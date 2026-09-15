@@ -64,6 +64,14 @@ type Parser = ReaderT Env (StateT PState (Parsec Void TokenStream))
 data Env = Env
   { moduleUri :: NormalizedUri
   , mixfixHints :: MixfixHintRegistry
+  , ofIsAnchor :: Bool
+    -- ^ Are we parsing the DURATION of a @WITHIN@? There @OF@ introduces the
+    -- deadline's anchor — @WITHIN 5 OF THE JOIN@, @WITHIN d OF closingDate@
+    -- (EVERY-EACH-QUANTIFIER-SPEC §5.1.1, R-Q7A) — and not a function's
+    -- arguments, so 'app' does not take @OF@-arguments while this is set and
+    -- an application spelled @f OF x@ in that slot must be parenthesised.
+    -- Set by 'deadline'; reset by 'paren' and inside the anchor itself
+    -- ('inExprSlot'). Everywhere else it is 'False'.
   }
   deriving stock (Show, Eq, Generic)
   deriving anyclass (SOP.Generic)
@@ -1243,8 +1251,14 @@ paren p =
   inlineAnnoHole $
     id
     <$  annoLexeme (spacedSymbol_ TPOpen)
-    <*> annoHole p
+    <*> annoHole (inExprSlot p)
     <*  annoLexeme (spacedSymbol_ TPClose)
+
+-- | Parse @p@ as an ordinary expression: inside parentheses (and inside a
+-- deadline's anchor) @OF@ is application again, whatever the enclosing
+-- @WITHIN@ slot says. See 'Env'.
+inExprSlot :: Parser a -> Parser a
+inExprSlot = local \ e -> e { ofIsAnchor = False }
 
 -- We don't actually currently allow parsing an optional name
 optionallyNamedType :: Parser (OptionallyNamedType Name)
@@ -2162,10 +2176,15 @@ stringLit =
 app :: Parser (Expr Name)
 app = do
   current <- Lexer.indentLevel
+  -- In the duration slot of a WITHIN, @OF@ is the deadline's anchor (see
+  -- 'Env' and 'deadline'), so a bare name there takes juxtaposed arguments
+  -- only: @WITHIN period OF THE JOIN@ is the nullary @period@ anchored at
+  -- the join, not @period@ applied to @THE@.
+  anchorSlot <- asks (.ofIsAnchor)
   attachAnno do
     fname <- annoHole name
     args <-
-      ( annoLexeme (spacedKeyword_ TKOf)
+      ( (if anchorSlot then empty else annoLexeme (spacedKeyword_ TKOf))
           *> annoHole (lsepBy1 (const (indentedExpr current)) (spacedSymbol_ TComma))
       )
         <|> annoHole (parseAppArgs current fname)
@@ -2690,9 +2709,51 @@ must current = attachAnno $
       annoLexeme (spacedKeyword_ TKProvided)
         *> annoHole (indentedExpr current)
 
-deadline :: Pos -> AnnoParser (Expr Name)
-deadline current =
-  annoLexeme (spacedKeyword_ TKWithin) *> annoHole (indentedExpr current)
+-- | @WITHIN d [OF anchor]@, in either position — the act's deadline
+-- ('obligation') or the join line's ('joinLine'). One hole for the
+-- duration, one for the optional anchor, in that order ('L4.Syntax.Deadline');
+-- the @WITHIN@ keyword is a token of the 'Deadline' node's own 'Anno'.
+--
+-- The duration is parsed with 'ofIsAnchor' set, so that @OF@ after it is the
+-- anchor and not an application's argument list (see 'Env'): otherwise
+-- @WITHIN period OF closingDate@ would silently be @period@ applied to
+-- @closingDate@, and @WITHIN period OF THE JOIN@ a parse error at @THE@.
+-- An application in the duration is written @WITHIN (f OF x) OF …@ or with
+-- juxtaposed arguments, @WITHIN f x OF …@ — which is also how
+-- 'L4.Print.prettyLayout' prints it back, so the round trip holds.
+deadline :: Pos -> AnnoParser (Deadline Name)
+deadline current = annoHole $ attachAnno $
+  MkDeadline emptyAnno
+    <$  annoLexeme (spacedKeyword_ TKWithin)
+    <*> annoHole (local (\ e -> e { ofIsAnchor = True }) (indentedExpr current))
+    <*> optionalWithHole (anchor current)
+
+-- | The anchor of a deadline, @OF …@ (EVERY-EACH-QUANTIFIER-SPEC §5.1.1,
+-- RULED 2026-09-07):
+--
+-- > OF THE JOIN | OF THE DEADLINE | OF THE ARMING     -- R-Q7B, the lifecycle anchors
+-- > OF e                                              -- R-Q7C, a NUMBER or DATE expression
+--
+-- @THE@ is a keyword ('TKThe', otherwise used only in type position); the
+-- three nouns are NOT keywords and are matched as the identifier tokens so
+-- spelled — the device 'uponEach' uses for @EACH@ — so a program may still
+-- name a value @DEADLINE@. The alternatives are disjoint on their first
+-- token, because no expression begins with @THE@.
+--
+-- The expression form is parsed as an ordinary expression ('inExprSlot'):
+-- inside the anchor @OF@ is application again.
+anchor :: Pos -> AnnoParser (Anchor Name)
+anchor current = annoHole $ attachAnno $
+  annoLexeme (spacedKeyword_ TKOf) *>
+    (   annoLexeme (spacedKeyword_ TKThe) *>
+          (   AnchorJoin emptyAnno     <$ annoLexeme (spelled "JOIN")
+          <|> AnchorDeadline emptyAnno <$ annoLexeme (spelled "DEADLINE")
+          <|> AnchorArming emptyAnno   <$ annoLexeme (spelled "ARMING")
+          )
+    <|> AnchorAt emptyAnno <$> annoHole (inExprSlot (indentedExpr current))
+    )
+  where
+    spelled = spacedToken_ . TIdentifiers . TIdentifier
 
 hence :: Pos -> AnnoParser (Expr Name)
 hence current =
@@ -3047,6 +3108,7 @@ execNlgParserForTokens p uri input ts =
     env = Env
       { moduleUri = uri
       , mixfixHints = emptyMixfixHintRegistry
+      , ofIsAnchor = False
       }
     st = PState
       { nlgs = []
@@ -3091,6 +3153,7 @@ execParserForTokensWithHints hints p file input ts =
     env = Env
       { moduleUri = file
       , mixfixHints = hints
+      , ofIsAnchor = False
       }
     st = PState
       { nlgs = []

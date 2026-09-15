@@ -135,7 +135,7 @@ carameliseDeonton = \ case
       { anno
       , subject = carameliseSubject subject
       , action = carameliseRAction action
-      , due = fmap carameliseExpr due
+      , due = fmap carameliseDeadline due
       , join = fmap carameliseJoin mjoin
       , hence = fmap carameliseExpr hence
       , lest = fmap carameliseExpr lest
@@ -143,8 +143,17 @@ carameliseDeonton = \ case
 
 carameliseJoin :: HasName n => Join n -> Join n
 carameliseJoin = \ case
-  JoinOnce anno th due -> JoinOnce anno th (fmap carameliseExpr due)
-  JoinUpon anno ue due -> JoinUpon anno ue (fmap carameliseExpr due)
+  JoinOnce anno th due -> JoinOnce anno th (fmap carameliseDeadline due)
+  JoinUpon anno ue due -> JoinUpon anno ue (fmap carameliseDeadline due)
+
+carameliseDeadline :: HasName n => Deadline n -> Deadline n
+carameliseDeadline (MkDeadline anno d ma) =
+  MkDeadline anno (carameliseExpr d) (fmap carameliseAnchor ma)
+
+carameliseAnchor :: HasName n => Anchor n -> Anchor n
+carameliseAnchor = \ case
+  AnchorAt anno e -> AnchorAt anno (carameliseExpr e)
+  a               -> a
 
 carameliseSubject :: HasName n => Subject n -> Subject n
 carameliseSubject = \ case

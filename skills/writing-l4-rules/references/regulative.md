@@ -168,9 +168,18 @@ record the unit once in a comment or in the name of the constant.
 PARTY Alice  MUST pay 100 WITHIN 30          -- days, by this file's convention
 ```
 
-Neither `WITHIN 5 days` nor ``WITHIN 5 days OF `order confirmation` `` parses
-in this release (measured 2026-09-04: the first reads `days` as a function
-applied to `5`; the second stops at `OF`). See
+`WITHIN d OF anchor` anchors the deadline (built 2026-09-15): `OF THE JOIN`,
+`OF THE DEADLINE` or `OF THE ARMING` name the enclosing obligation's completion,
+deadline or entry, and `OF e` an instant — a `NUMBER` on the trace's clock or a
+`DATE`; the deadline is then the anchor plus `d`, absolute. In this slot `OF` is
+the anchor, so an applied duration is bracketed: `WITHIN (f OF x) OF THE JOIN`.
+
+`WITHIN 5 days` does not check unless `days` is defined (measured 2026-09-04:
+`days` is read as a function applied to `5`; one line,
+`GIVEN n IS A NUMBER GIVETH A NUMBER DECIDE n days IS n`, makes it check). The
+same is true of ``WITHIN 5 days OF `order confirmation` ``, which since
+2026-09-15 parses — the `OF` is the anchor — and then checks only if both
+`days` and `` `order confirmation` `` are defined. See
 [source-patterns/04-dates-and-periods.md](source-patterns/04-dates-and-periods.md#e4-3),
 entry 4.3, for the measured forms.
 

@@ -1106,8 +1106,19 @@ deonticClause (MkDeonton _ subj (MkAction _ modal actPat mprov) mdue _join mhenc
     (mhence >>= henceClause)
     (fmap consequence mlest)
  where
-  dueText (Just d) | not (isZeroLit d) = Just (inlineProse d)
+  -- The duration as prose, then the anchor when there is one (R-Q7,
+  -- §5.1.1): "5 of the join", "5 of the deadline", "5 of closingDate". A
+  -- zero duration with no anchor is not a deadline worth stating; with an
+  -- anchor it is ("0 of 30 June" is /by 30 June/).
+  dueText (Just (MkDeadline _ d ma))
+    | not (isZeroLit d) || isJust ma =
+        Just (inlineProse d <> maybe "" (\ a -> " of " <> anchorProse a) ma)
   dueText _ = Nothing
+  anchorProse = \ case
+    AnchorJoin _     -> "the join"
+    AnchorDeadline _ -> "the deadline"
+    AnchorArming _   -> "the arming"
+    AnchorAt _ e     -> inlineProse e
   henceClause h
     | isFulfilled h = Nothing
     | otherwise     = Just (consequence h)
