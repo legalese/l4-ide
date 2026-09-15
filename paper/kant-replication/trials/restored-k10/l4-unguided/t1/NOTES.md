@@ -61,7 +61,7 @@ effective date (per the task brief), so no `DATE`/`daydate` arithmetic is used a
    was voluntary. I modelled this as a fact ("injury was self-inflicted and intentional") that
    gates the §2.1 threshold rather than as a §3.1 exclusion, and set it `TRUE` only for Q5. This
    is the single most contestable call in this encoding: a reading that "accidental" refers only
-   to the *result* being unintended (not the *act*), and that an insurer confined to five stated
+   to the _result_ being unintended (not the _act_), and that an insurer confined to five stated
    exclusions cannot add a sixth by inference, would instead treat Q5 as covered. I judged the
    stricter reading more likely intended, partly because the query goes out of its way to negate
    fraud/misrepresentation specifically (a §1.2 cancellation ground) without addressing whether

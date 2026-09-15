@@ -22,7 +22,7 @@
 
 2. **`causes` is about causation, not status.** Section 2.1 excludes
    sickness/injury "arising directly or indirectly out of" the four listed
-   activities. I read this as requiring the activity to be the *cause* of
+   activities. I read this as requiring the activity to be the _cause_ of
    the sickness/injury, not merely a fact about the claimant (e.g. holding a
    job as a police officer does not itself exclude an injury that arose from
    an unrelated cause).

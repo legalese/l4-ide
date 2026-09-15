@@ -10,7 +10,7 @@ swipl -q -g halt policy.pl queries.pl
 
 First attempt printed ~30 `Warning: ... Clauses of <pred>/2 are not together in the
 source-file` warnings (harmless, but not silent): `:- dynamic` in `policy.pl` only
-suppresses the *cross-file* "already defined elsewhere" warning, not SWI's within-file
+suppresses the _cross-file_ "already defined elsewhere" warning, not SWI's within-file
 discontiguous-clause check, and `queries.pl` groups facts by claim/question (for
 readability) rather than by predicate, so each fact predicate's clauses are genuinely
 scattered through the file. Fix: added explicit `:- discontiguous` directives for the six
@@ -27,7 +27,7 @@ I did not run q1..q9 and did not otherwise test the encoding against the nine qu
    as independent facts (`wellness_visit_occurred/2`, `wellness_confirmation_submitted/2`)
    checked against their own fixed threshold. But every question that mentions this
    condition (Q4, Q6, Q9) gives only a single date ("confirmation ... provided N months
-   after..."). I read that single date as fixing *both* facts at N — i.e., that the
+   after..."). I read that single date as fixing _both_ facts at N — i.e., that the
    sentence describes one bundled event (visit-and-its-confirmation), not a confirmation
    trailing some unstated earlier visit. Under this reading the binding constraint always
    ends up being the earlier 6-month threshold. This didn't end up being outcome-determinative
@@ -36,11 +36,11 @@ I did not run q1..q9 and did not otherwise test the encoding against the nine qu
    once. Still, it is a real interpretive choice and a different question set could turn on it.
 
 2. **Dropped hospitalization-time-relative "still pending" reasoning.** Sec. 1.1(3)/1.2 read
-   literally ask whether, *as of the time of hospitalization*, the Sec. 1.3 condition was
+   literally ask whether, _as of the time of hospitalization_, the Sec. 1.3 condition was
    "still pending" (deadline not yet due) or "satisfied in a timely fashion" — a genuinely
    time-indexed disjunction that would require comparing the hospitalization date against
    the confirmation date. TASK.md instead says no query will ever require calculating
-   elapsed time *between two dates*. I took that as a deliberate signal to simplify: treat
+   elapsed time _between two dates_. I took that as a deliberate signal to simplify: treat
    the Sec. 1.3 condition as resolved by the single wellness-visit fact if the query
    supplies one (checked only against the contract's own fixed thresholds), and as simply
    not in issue (`condition_1_3_ok/1`'s first clause) if the query is silent on it — never
@@ -52,22 +52,22 @@ I did not run q1..q9 and did not otherwise test the encoding against the nine qu
    exclusion.** Sec. 1.1 only ever pays for hospitalization "for sickness or accidental
    injury." Nothing in the General Exclusions (Sec. 2.1) mentions self-inflicted or
    intentional acts, but a deliberate act done to show off for friends is not, in ordinary
-   sense, an *accident*. I encoded `hospitalization_cause(claim_5,
-   intentional_self_inflicted_act)`, an atom that matches neither `sickness` nor
+   sense, an _accident_. I encoded `hospitalization_cause(claim_5,
+intentional_self_inflicted_act)`, an atom that matches neither `sickness` nor
    `accidental_injury` in `qualifying_hospitalization/1`, so the claim fails Sec. 1.1
    itself rather than being caught by Sec. 2. The question's express denial of "fraud or
-   misrepresentation" reads as forestalling the *other* plausible objection (Sec. 1.2
+   misrepresentation" reads as forestalling the _other_ plausible objection (Sec. 1.2
    cancellation-for-fraud); I did not need to encode that denial as a fact either way, since
    `fraud_or_misrepresentation/1` is only ever asserted where a claim actually alleges it.
 
 4. **Q9 (police officer bitten by own son) — causal nexus, not occupational status.**
    Sec. 2.1's chapeau excludes sickness/injury "arising directly or indirectly out of" the
    five listed items; items 1-4 are activities, and the text requires the injury to arise
-   *from* the activity, not merely to coincide with the claimant's occupation. Q1
+   _from_ the activity, not merely to coincide with the claimant's occupation. Q1
    ("burns ... while doing my duty as a firefighter") and Q8 ("injured in a military
    training exercise") both supply that causal link explicitly. Q9 does not: the ankle bite
    has no connection to police duties, so I did not assert `activity(claim_9,
-   police_service)`, and the claim is not excluded on that ground. This is the crux of Q9
+police_service)`, and the claim is not excluded on that ground. This is the crux of Q9
    and the one place I'd flag as most likely to be argued the other way.
 
 5. **Scope of what got executable rules.** Sec. 3.1 (worldwide/24-hour cover) is encoded by
@@ -83,8 +83,7 @@ I did not run q1..q9 and did not otherwise test the encoding against the nine qu
 
 6. **Defaults for facts a question doesn't mention.** Per TASK.md Step 2 (6)-(7), for any
    condition or exclusion a question doesn't reference, I set facts so the condition is met
-   / the exclusion doesn't fire: age defaults to 30 (well under the Sec. 2.1.5 threshold of
-   80) wherever a question omits age; `hospitalization_cause(claim_2, sickness)` is a
+   / the exclusion doesn't fire: age defaults to 30 (well under the Sec. 2.1.5 threshold of 80) wherever a question omits age; `hospitalization_cause(claim_2, sickness)` is a
    default stand-in cause for Q2, which asks only about age. No `activity/2` fact is
    asserted unless the question ties the injury to one of the four listed activities, and
    no `fraud_or_misrepresentation/1` or `dispute_exists/1` fact is ever asserted, since no

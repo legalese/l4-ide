@@ -12,7 +12,7 @@ otherwise query the encoding, per the task rules).
   other predicates. I had assumed declaring these predicates `dynamic` in `policy.pl` would
   suppress this warning in `queries.pl` too, since dynamic predicates are normally allowed to
   gain clauses at arbitrary points; that assumption was wrong for facts loaded from a
-  *different* file — `dynamic` and `discontiguous` are evidently tracked separately by the
+  _different_ file — `dynamic` and `discontiguous` are evidently tracked separately by the
   loader.
 - **Fix**: added explicit `:- discontiguous hospitalized_due_to/2.` (and the same for
   `age_at_hospitalization/2`, `injury_caused_by/2`, `wellness_confirmation_month/2`) at the top
@@ -53,9 +53,9 @@ otherwise query the encoding, per the task rules).
    excludes injury/sickness "arising directly or indirectly out of" skydiving, military service,
    firefighter service, or police service. Q1 (burns "suffered while doing my duty as a
    firefighter") states a direct causal link, so I encoded `injury_caused_by(claim_1,
-   firefighter_service)` and the exclusion fires. Q9 (bitten by the claimant's own son, with the
+firefighter_service)` and the exclusion fires. Q9 (bitten by the claimant's own son, with the
    claimant separately noted as "serving as a police officer at the time of hospitalization")
-   gives status only — the bite has no stated connection to police duties — so I did *not*
+   gives status only — the bite has no stated connection to police duties — so I did _not_
    assert `injury_caused_by(claim_9, police_service)`, and the exclusion does not fire. This
    contrast is deliberate and is the main structural reason `general_exclusion/1` is keyed on a
    causal fact (`injury_caused_by/2`) rather than a status fact.
@@ -83,7 +83,7 @@ otherwise query the encoding, per the task rules).
    was filed.
 
 6. **Arbitration and the 60-day waiting period (Section 4.2) not modeled.** These govern the
-   mechanics and timing of *recovering on* the policy once there is "a dispute or disagreement",
+   mechanics and timing of _recovering on_ the policy once there is "a dispute or disagreement",
    not whether the risk itself is covered. None of the nine questions posit a dispute with the
    insurer, so this section is out of scope for a "will my policy apply" determination and was
    left unencoded (no predicate references it).
@@ -95,11 +95,11 @@ otherwise query the encoding, per the task rules).
 
 ## Design pattern used throughout
 
-Every predicate that queries.pl can assert is a *triggering* fact for an outcome unfavourable
+Every predicate that queries.pl can assert is a _triggering_ fact for an outcome unfavourable
 to the claim (an exclusion, a cancelation ground, a bar on the benefit). An unasserted fact
 therefore always defaults to the reading favourable to coverage, which lines up directly with
 the task brief's instruction, for each question, to set facts so that every condition/exclusion
-*not* the subject of that question is satisfied / not triggered — each `queries.pl` block only
+_not_ the subject of that question is satisfied / not triggered — each `queries.pl` block only
 needs to assert what the question's own wording actually states. The one exception is
 `hospitalized_due_to/2`, which is required positively for every claim since every question
 presupposes some hospitalizing medical cause and there is no sensible favourable default for it.

@@ -5,11 +5,11 @@
 Ran `swipl -q -g halt policy.pl queries.pl` from the trial directory.
 
 - First attempt printed 20 `Warning: ... Clauses of claim_*/N are not together in the
-  source-file` warnings (SWI groups clauses by predicate name/arity and warns when a
+source-file` warnings (SWI groups clauses by predicate name/arity and warns when a
   predicate's clauses are interleaved with other predicates' clauses across the file).
   Declaring the predicate `dynamic` did **not** suppress this warning by itself.
 - Fixed by adding explicit `:- discontiguous claim_cause/2, claim_activity/2, claim_age/2,
-  claim_confirmation_month/2.` declarations at the top of `queries.pl` (these are the four
+claim_confirmation_month/2.` declarations at the top of `queries.pl` (these are the four
   claim-fact predicates that are asserted once per claim, grouped by claim rather than by
   predicate, across the file).
 - Second run: **silent**, exit code 0. No warnings or errors.

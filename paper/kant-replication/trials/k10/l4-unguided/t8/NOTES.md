@@ -31,13 +31,12 @@ instruction that there is never a need to compute elapsed time between two dates
    show off). I modeled this as a fact on the Claim (`accidental injury`) rather than as an
    exclusion, and set it FALSE for the punching scenario, so the claim fails the base
    coverage-trigger rather than tripping any of the five enumerated exclusions. This is
-   genuinely debatable — a reading that "accidental" only requires the *harm* to be
+   genuinely debatable — a reading that "accidental" only requires the _harm_ to be
    unintended (not the act) would set this TRUE instead — and it is the single most
    consequential interpretive call in this encoding.
 
 2. **Exclusions (1)-(4) of Section 2.1 require causal nexus, not mere status (drives Q9).**
-   The chapeau reads "any event ... arising directly or indirectly out of: 1. Skydiving; ...
-   4. Service in the police." I modeled each as "the hospitalization arose from X," not "the
+   The chapeau reads "any event ... arising directly or indirectly out of: 1. Skydiving; ... 4. Service in the police." I modeled each as "the hospitalization arose from X," not "the
    claimant does/was doing X at the time." For Q9 (a claimant who is a police officer,
    hospitalized because her son bit her ankle), I set `arose from service in the police` to
    FALSE: the bite has no stated connection to police duties, only to her occupation at the
@@ -53,7 +52,7 @@ instruction that there is never a need to compute elapsed time between two dates
    unconditional fact once a supplied confirmation month exceeds 7 — this always defeats
    Section 1.1(3) regardless of the (unstated) hospitalization time, which sidesteps needing
    to compare two claimant-supplied relative times against each other. I set the underlying
-   wellness *visit* itself to on-time (month 5) so that the isolated, tested fact is purely
+   wellness _visit_ itself to on-time (month 5) so that the isolated, tested fact is purely
    the late confirmation, per the instruction to satisfy unrelated conditions.
 
 4. **"Confirmation implies a prior visit" was used to fill in an unstated visit time (Q6,

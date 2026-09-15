@@ -80,17 +80,17 @@ bearing on substantive coverage (3.2-3.5); only 3.6 (the one-year term) feeds in
    call in the whole encoding: the given text contains no explicit exclusion for
    intentional self-inflicted injury or horseplay anywhere in Section 2.1 (which is
    the policy's only enumerated exclusions list), so a reader who takes "accidental"
-   to describe the unintended *result* (an unplanned trip to the hospital) rather
-   than requiring an unintended *act* would instead call this covered. I do not think
+   to describe the unintended _result_ (an unplanned trip to the hospital) rather
+   than requiring an unintended _act_ would instead call this covered. I do not think
    the text as given resolves this cleanly either way; I went with the narrower,
    more literal sense of "accidental."
 
 5. **Boundary convention.** "No later than" is read inclusively throughout (`AT
-   MOST`, not strictly `LESS THAN`) — e.g. a wellness-visit confirmation given
+MOST`, not strictly `LESS THAN`) — e.g. a wellness-visit confirmation given
    exactly at the 6- or 7-month mark counts as timely (relevant to Q9).
 
 6. **Hospitalization time for Q4 and Q6.** Neither question states the
-   hospitalization's own month-offset directly. Q4 says "I *had given* confirmation
+   hospitalization's own month-offset directly. Q4 says "I _had given_ confirmation
    ... 8 months after the effective date," which I read as placing the confirmation
    (and so the hospitalization, which prompted the claim) at or after month 8. Q6
    similarly reports the wellness-visit proof at 6.5 months with no separate

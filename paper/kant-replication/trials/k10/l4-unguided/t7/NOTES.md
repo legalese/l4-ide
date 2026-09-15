@@ -24,7 +24,7 @@
 2. **Harmonizing §1.1(3) and §1.2 on the wellness-visit condition.** §1.1(3) keeps the policy in
    effect if §1.3 "is still pending **or** has been satisfied in a timely fashion"; §1.2 cancels
    the policy if §1.3 "has **not** been satisfied in a timely fashion." Read completely literally,
-   these two clauses conflict: if confirmation merely hasn't been supplied *yet* (well within the
+   these two clauses conflict: if confirmation merely hasn't been supplied _yet_ (well within the
    grace period), it is arguably also true that it "has not been satisfied" in the present-perfect
    sense, which would trigger cancellation from day one and make the 7-month grace period
    meaningless. I resolved this by treating §1.2's trigger as the logical negation of §1.1(3)'s
@@ -64,7 +64,7 @@
 
 6. **Q8's "hospitalization occurred within the policy term" is encoded via the month field, not a
    separate boolean.** `policy.l4` tests term membership as
-   `` claim's `hospitalization month` GREATER THAN 12 `` (§3.6: one year from the effective date).
+   ``claim's `hospitalization month` GREATER THAN 12`` (§3.6: one year from the effective date).
    Since Q8 states term-membership as a bare fact rather than a number, I set
    `` `hospitalization month` `` to `0`, which trivially satisfies it, rather than adding a second,
    independent "within term" primitive to the schema.

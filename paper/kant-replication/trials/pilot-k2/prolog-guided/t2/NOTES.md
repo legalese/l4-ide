@@ -30,13 +30,14 @@ shows) or blanket-disabling the warning class.
 
 - **"Still pending" (§1.1.3, read against §1.3 and the cancelation trigger in §1.2).** This is
   the least textually determinate part of the policy. I modeled §1.3 as satisfied-or-pending:
-  - *Satisfied*: a wellness visit at a qualified provider no later than month 6, **and** written
+
+  - _Satisfied_: a wellness visit at a qualified provider no later than month 6, **and** written
     confirmation supplied no later than month 7 (`section_1_3_satisfied/1`).
-  - *Pending*: no written confirmation has been supplied yet (`claim_written_confirmation_month`
+  - _Pending_: no written confirmation has been supplied yet (`claim_written_confirmation_month`
     is `none`) **and** the hospitalization occurs at or before month 7 — i.e. the deadline by
     which §1.3 must be resolved hasn't passed yet (`section_1_3_pending/1`).
 
-  I deliberately did *not* make "pending" a function of hospitalization month alone (i.e. "early
+  I deliberately did _not_ make "pending" a function of hospitalization month alone (i.e. "early
   hospitalization ⇒ pending regardless of the confirmation fact"), because that would make the
   confirmation-month fact irrelevant whenever a query is silent about hospitalization month —
   which is the case for 8 of the 9 questions here, including the one (a confirmation given at
@@ -51,13 +52,13 @@ shows) or blanket-disabling the warning class.
   schema's own vocabulary (there is no separate "withholding" fact to encode).
 
 - **Policy term (§1.2, §3.6).** Modeled as `claim_hospitalization_month =< claim_policy_term_months`
-  (inclusive), reading "canceled at midnight on the *last day* of the term" as meaning the term
+  (inclusive), reading "canceled at midnight on the _last day_ of the term" as meaning the term
   covers that whole last day.
 
 - **Age exclusion (§2.1.5).** Encoded literally as `Age >= 80` ("equal to or greater than 80").
 
 - **Arbitration and the proof-of-claim waiting period (§3.2.1).** `claim_dispute_arisen(C,
-  false)` short-circuits the whole clause. When a dispute has arisen, I require arbitration
+false)` short-circuits the whole clause. When a dispute has arisen, I require arbitration
   commenced within 3 months of the unable-to-settle date **and** a valid arbitration award, per
   the text's two stated preconditions to liability. Separately, "no case shall you seek to
   recover... before the expiration of sixty (60) days after written proof of claim" is modeled

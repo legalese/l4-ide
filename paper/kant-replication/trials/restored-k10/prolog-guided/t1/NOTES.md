@@ -25,7 +25,7 @@ either directly or via a helper predicate.
 - **Fraud / misrepresentation timing (Sec. 1.2).** Section 1.3's deadlines are explicit
   (6-month / 7-month anniversaries), but the fraud/misrepresentation prong of 1.2 carries no
   stated deadline. I did not gate `fraud_occurred`/`misrepresentation_occurred` on having
-  happened by the hospitalization month — occurrence at *any* time voids the policy. This
+  happened by the hospitalization month — occurrence at _any_ time voids the policy. This
   also seems necessary on the merits: fraud committed in the course of making the claim
   itself (necessarily after the hospitalization) must still be able to void the claim, so
   gating on "before the hospitalization" would be wrong.
@@ -92,7 +92,7 @@ either directly or via a helper predicate.
   `claim_causes(c9, [other])`, not `[police_service]`: the exclusion requires the injury to
   arise "directly or indirectly out of" police service, and a family member's bite has no
   causal connection to the claimant's job — it is incidental that they happened to be on
-  duty. I read the query's phrasing ("serving as a police officer *at the time of*
+  duty. I read the query's phrasing ("serving as a police officer _at the time of_
   hospitalization" — a status, contemporaneous but not causal) as deliberately distinct from
   Q1's and Q8's causal phrasing ("while doing my duty as a firefighter," "injured in a
   military training exercise").

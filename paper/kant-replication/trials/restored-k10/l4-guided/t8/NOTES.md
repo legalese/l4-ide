@@ -15,7 +15,7 @@
 
 1. **"Still pending" (§1.1(3)).** Read as a disjunct anchored to the same "at the time of the
    hospitalization" reference point §1.1 itself uses: the §1.3 condition keeps the policy in
-   effect either because it has already been satisfied on time, *or* because, as of the
+   effect either because it has already been satisfied on time, _or_ because, as of the
    hospitalization being assessed, the 7-month confirmation deadline has not yet arrived (so
    nothing has failed yet). Encoded as `wellness confirmation timely or pending` in `policy.l4`.
    This is what makes Q3 (hospitalized at month 5, nothing yet submitted) come out as pending
@@ -39,13 +39,13 @@
 
 5. **§2.2's "confinement in a hospital in the United States."** Read literally as a real
    condition on `confined in us hospital` (used as a hard requirement in `hospital benefit
-   payable`), read alongside — not overridden by — §4.1.1's "insures you ... anywhere in the
-   world" (taken to describe where the insured *event* may occur, not where the paid confinement
+payable`), read alongside — not overridden by — §4.1.1's "insures you ... anywhere in the
+   world" (taken to describe where the insured _event_ may occur, not where the paid confinement
    itself must be). For Q4 ("traveling abroad"), I nonetheless set `confined in us hospital` to
    `TRUE`: none of the nine questions is best read as turning on this field, §4.1.1's worldwide
    promise is the more prominent and specific textual signal about geography, and Q4's answer
    already turns cleanly on the late wellness confirmation (see point 6). `confined in us
-   hospital` is set to `TRUE` in all nine constructed claims.
+hospital` is set to `TRUE` in all nine constructed claims.
 
 6. **Hospitalization month for Q4 is unstated** ("I had given confirmation of my wellness visit 8
    months after the policy's effective date" — no month is given for the hospitalization itself).
@@ -68,3 +68,21 @@
 
 `covered` and its helpers use all 21 `Claim` fields at least once; none were left unused, and no
 fields beyond the schema's were added to `Claim`.
+
+## Post-restoration correction (2026-09-15)
+
+`policy.l4`'s `NOT x OR y` line above was ambiguous under L4's own precedence
+rules — `NOT` reaches to the end of its line, so it parsed as `NOT (x OR y)`,
+not the intended `(NOT x) OR y`. This trial's own "Check succeeded" note
+above was true when it was written: the checker started refusing this
+specific ambiguity only in commit 1d061009 (2026-09-07), six days after this
+trial's `inputs/` were prepared (2026-09-01). Restoring the trial under the
+current toolchain therefore failed `l4 check`.
+
+Repaired by parenthesizing to the reading the surrounding comment and field
+usage make unambiguous (see the rule immediately above this note). Verified
+by running the file's #EVAL cases under both parses side by side: all nine
+results are identical between the old (ambiguous-as-parsed) and new
+(explicit) parenthesization, so this correction changes zero recorded
+outcomes for this trial — it repairs a syntax/toolchain mismatch, not the
+model's answer.

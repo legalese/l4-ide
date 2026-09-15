@@ -24,7 +24,7 @@ somewhere in `covered`'s logic.
 1. **SS1.1(3) "still pending" reading.** SS1.3 sets two nested deadlines: the wellness visit
    itself by month 6, written confirmation of it by month 7. SS1.1(3) says the whole condition is
    fine if it "is still pending or has been satisfied in a timely fashion." I read "still pending"
-   as available only up to the *earlier* of the two sub-deadlines (month 6) — before that point
+   as available only up to the _earlier_ of the two sub-deadlines (month 6) — before that point
    neither sub-obligation is even due, so nothing can yet have failed. At or after month 6, I
    require the full conjunction (visit on time, provider qualified, confirmation on time). This
    is a genuine simplification of a compound clause; the alternative reading (pending until month
@@ -35,7 +35,7 @@ somewhere in `covered`'s logic.
 
 2. **"Wellness visit" vs "written confirmation" field mapping in the questions.** The questions
    (Q4, Q6, Q7, Q9) all speak of "confirmation of my wellness visit" or "proof of my wellness
-   visit" being *given/provided/submitted* N months after the effective date. I mapped this
+   visit" being _given/provided/submitted_ N months after the effective date. I mapped this
    phrase to the schema's `written confirmation month` (the SS1.3 submission-to-the-company
    deadline, month 7), not to `wellness visit month` (the underlying visit's own occurrence,
    month 6 deadline), since "provided/given/submitted ... to us" is naturally the act of
@@ -48,7 +48,7 @@ somewhere in `covered`'s logic.
    fact inert: if hospitalization were set to an early, safe month (e.g. 1), the SS1.1(3)
    "still-pending" shortcut would make the late (month-8) confirmation irrelevant to the result,
    which seemed to defeat the evident point of the question. I instead set `hospitalization
-   month` to 9 (after the stated month-8 confirmation), so the policy's in-force status is being
+month` to 9 (after the stated month-8 confirmation), so the policy's in-force status is being
    assessed at a point where SS1.3's timeliness is actually at issue. This is an inference beyond
    what the question states, flagged here rather than treated as settled.
 
@@ -74,7 +74,7 @@ somewhere in `covered`'s logic.
    "premium paid" as simply `isJust` (some month recorded), consistent with the standing
    assumption that it was paid on time, and treats `continuous confinement days` as needing to be
    a positive number at most 365 (using SS2.2's cap as a range check rather than as a
-   claim-voiding condition, since the text caps how many days are *paid*, not whether the claim
+   claim-voiding condition, since the text caps how many days are _paid_, not whether the claim
    is covered at all).
 
 7. **The 60-day proof-of-claim wait (SS4.2.1) is expressed in months** (as `p PLUS 2`, i.e. 60

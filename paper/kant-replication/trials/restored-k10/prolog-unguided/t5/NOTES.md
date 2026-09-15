@@ -22,7 +22,7 @@ nine questions, per the rules.
    initial coverage grant, not as an exclusion.** Section 2.1 only covers
    hospitalization "as a result of sickness or accidental Injury." I
    judged that deliberately punching oneself in the face is neither a
-   sickness nor an *accidental* injury -- it's an intentional
+   sickness nor an _accidental_ injury -- it's an intentional
    self-inflicted act, distinct from the "no fraud or misrepresentation"
    fact the question separately (and truthfully) volunteers. So `claim_5`
    gets neither `sickness/1` nor `accidental_injury/1` asserted, and
@@ -35,15 +35,15 @@ nine questions, per the rules.
 2. **Q9 ("serving as a police officer at the time of hospitalization")
    does not by itself trigger the police-service exclusion.** Section
    3.1 excludes an event "arising directly or indirectly out of ...
-   Service in the police" -- i.e. it requires the injury to be *caused
-   by* police duties, not merely contemporaneous with the claimant's
+   Service in the police" -- i.e. it requires the injury to be _caused
+   by_ police duties, not merely contemporaneous with the claimant's
    occupation. Being bitten by one's own son is a domestic incident with
    no causal connection to police work, so I did not assert
    `cause_of_injury(claim_9, police_service)`. (By contrast, Q1's
    firefighter burns and Q8's military training injury are explicitly
    caused by the excluded service, so those do get a `cause_of_injury/2`
    fact.) This is a deliberate design choice in `cause_of_injury/2`
-   itself: it records the *cause* of the injury, never the claimant's
+   itself: it records the _cause_ of the injury, never the claimant's
    status or occupation, precisely so a fact like "was serving as a
    police officer at the time" cannot be mistaken for grounds to assert
    it.
@@ -51,12 +51,12 @@ nine questions, per the rules.
 3. **Section 2.2's "hospital in the United States" and Section 4.1.1's
    worldwide-coverage clause are read as compatible, not contradictory.**
    I read 4.1.1 ("insures You twenty-four hours a day anywhere in the
-   world") as describing where the insured *peril* (the sickness or
+   world") as describing where the insured _peril_ (the sickness or
    injury) may occur without losing cover, and 2.2's "confinement in a
    hospital in the United States" as a separate, specific condition on
    which days of confinement actually generate the payable Daily
    Hospital Income Benefit. Under this reading a claim is not defeated
-   merely because the underlying accident happened abroad, but *is*
+   merely because the underlying accident happened abroad, but _is_
    defeated if none of the confinement itself was in a US hospital. I
    applied this to Q4 ("hospitalized due to a fall while traveling
    abroad"), reading that phrase as describing a hospitalization -- not
@@ -110,7 +110,7 @@ nine questions, per the rules.
    US-currency requirement (4.4), the lump-sum premium timing (4.5, and
    items 1-2 of 1.1 generally, per the task brief), and the 365-day cap /
    per-diem mechanics of 2.2. None of the nine questions turn on these,
-   and they concern claim recovery procedure or benefit *quantum* rather
+   and they concern claim recovery procedure or benefit _quantum_ rather
    than the coverage threshold the questions ask about, so no predicates
    were written for them.
 
@@ -118,7 +118,7 @@ nine questions, per the rules.
 
 Every "bad" fact in `policy.pl` (an exclusion cause, a cancelation
 trigger, an out-of-country confinement, a failed wellness-visit deadline)
-is written so that its *absence* is the safe/covered default, and every
+is written so that its _absence_ is the safe/covered default, and every
 "good" fact required by the initial coverage grant (`sickness/1` or
 `accidental_injury/1`) is asserted explicitly per claim. This lines up
 with the task's instruction to set any fact "unrelated to the query" so

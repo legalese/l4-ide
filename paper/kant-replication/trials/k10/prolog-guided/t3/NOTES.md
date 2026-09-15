@@ -25,7 +25,7 @@ otherwise query `covered/1` against the nine claims.
 - **Q4's hospitalization month (not stated in the question).** Q4 only gives the confirmation
   month (8, i.e. already late). To test the late-confirmation failure mode itself, rather than
   have it mooted by the "still pending" arm above, I set `claim_hospitalization_month(c4, 9)`
-  — reading "I *had given* confirmation... 8 months after" as describing something already
+  — reading "I _had given_ confirmation... 8 months after" as describing something already
   completed by the time of hospitalization. This is a real judgement call: had I instead put
   the hospitalization at, say, month 3, `section_1_3_pending/1` would hold regardless of the
   (future, as of month 3) late confirmation, and the claim would come out covered.

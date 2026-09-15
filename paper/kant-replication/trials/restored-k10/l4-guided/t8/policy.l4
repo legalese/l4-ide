@@ -168,7 +168,7 @@ GIVETH A BOOLEAN
 GIVEN claim IS A Claim
 GIVETH A BOOLEAN
 `arbitration precondition met` claim MEANS
-  NOT (claim's `dispute arisen`) OR `arbitration resolved` claim
+  (NOT claim's `dispute arisen`) OR `arbitration resolved` claim
 
 -- §4.2.1: recovery may not be sought until 60 days after written proof of
 -- claim was submitted. The schema's clocks are all in months, so the

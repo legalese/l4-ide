@@ -6,14 +6,14 @@ deleted the operative benefits machinery from Goodenough & Carlson's original. A
 
 ## Recipe
 
-| part | provenance |
-| --- | --- |
-| header, §1 POLICY IN EFFECT AND CONDITIONS | `chubb-policy.txt` (the as-published arXiv variant), byte-identical |
-| §2 BENEFITS (2.1–2.3) | Goodenough & Carlson 2024, PMC10894687, Appendix A, transcribed verbatim 2026-09-01 |
-| §3 GENERAL EXCLUSIONS | `chubb-policy.txt` §2.1, renumbered 2.1→3.1; text and items otherwise byte-identical |
-| §4 GENERAL CONDITIONS | `chubb-policy.txt` §3.x, renumbered 3.x→4.x; text otherwise byte-identical |
-| §5 BENEFIT AND PREMIUM AMOUNTS (5.1–5.2) | PMC10894687 Appendix A, transcribed verbatim |
-| §6 SIGNATURE | PMC10894687 Appendix A, transcribed; rendered as the heading, the one sentence, and a plain signature line |
+| part                                       | provenance                                                                                                 |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| header, §1 POLICY IN EFFECT AND CONDITIONS | `chubb-policy.txt` (the as-published arXiv variant), byte-identical                                        |
+| §2 BENEFITS (2.1–2.3)                      | Goodenough & Carlson 2024, PMC10894687, Appendix A, transcribed verbatim 2026-09-01                        |
+| §3 GENERAL EXCLUSIONS                      | `chubb-policy.txt` §2.1, renumbered 2.1→3.1; text and items otherwise byte-identical                       |
+| §4 GENERAL CONDITIONS                      | `chubb-policy.txt` §3.x, renumbered 3.x→4.x; text otherwise byte-identical                                 |
+| §5 BENEFIT AND PREMIUM AMOUNTS (5.1–5.2)   | PMC10894687 Appendix A, transcribed verbatim                                                               |
+| §6 SIGNATURE                               | PMC10894687 Appendix A, transcribed; rendered as the heading, the one sentence, and a plain signature line |
 
 The renumbering restores Goodenough & Carlson's original section layout, which is what makes the two
 previously dangling cross-references resolve: §1.2's "the policy term described in Section 5 below"
@@ -43,12 +43,13 @@ encoders on the restored fixture spotted it unprompted.
 ## What this fixture is NOT
 
 It is not the true G&C original (age 75, lettered exclusions, original pagination). Anyone wanting
-the original should take it from PMC10894687 directly. This file answers a narrower question: *the
-benchmark's own text, minus exactly the deletion.*
+the original should take it from PMC10894687 directly. This file answers a narrower question: _the
+benchmark's own text, minus exactly the deletion._
 
 ## Verification
 
 `fixtures/` carries no checker, but the assembly was verified in-session on 2026-09-01:
+
 - lines 1–21 (header + §1) byte-identical to `chubb-policy.txt`;
 - §3 + §4 byte-identical to the as-published §2.1 + §3.x after stripping the form feed and
   normalising the clause numbers on both sides;

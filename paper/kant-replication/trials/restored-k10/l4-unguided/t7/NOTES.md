@@ -15,7 +15,7 @@ look for), to confirm the encoding was internally self-consistent.
 
 1. **Exclusions require a causal link, not just status.** Sec. 3.1 excludes injury/sickness
    "arising directly or indirectly out of" skydiving, military service, firefighting, or police
-   service. I modeled each of these as a fact about the *event's causation*
+   service. I modeled each of these as a fact about the _event's causation_
    (`` `event arose from service in the police` ``, etc.), not about the claimant's occupation in
    general. This matters for Q9 (hospitalized after being bitten by the claimant's own son, while
    "serving as a police officer at the time"): holding the job at the time of injury is not the
@@ -31,11 +31,11 @@ look for), to confirm the encoding was internally self-consistent.
    interpretive call: the policy has no explicit "self-inflicted injury" exclusion, so the result
    turns entirely on how "accidental" is read.
 
-3. **The wellness-visit numbers in the queries describe the *confirmation* event, not the visit
+3. **The wellness-visit numbers in the queries describe the _confirmation_ event, not the visit
    itself.** Sec. 1.3 actually sets two deadlines: the visit must occur by the 6th month
    anniversary, and written confirmation of it must reach the Company by the 7th month
    anniversary. Every query that gives a number here phrases it as confirmation/proof being
-   "given," "provided," or "submitted" (Q4, Q6, Q7, Q9) -- language that tracks the *supply*
+   "given," "provided," or "submitted" (Q4, Q6, Q7, Q9) -- language that tracks the _supply_
    half of Sec. 1.3, not the visit's own date, which none of the queries state. I therefore fed
    that number into `` `wellness visit confirmation month` `` (tested against the 7-month
    deadline) and left `` `wellness visit month` `` as NOTHING, i.e. assumed the visit itself
@@ -46,7 +46,7 @@ look for), to confirm the encoding was internally self-consistent.
 
 4. **"Still pending" is a real third state, not a synonym for "satisfied."** Sec. 1.1(3) keeps the
    policy in effect if Sec. 1.3 "is still pending or has been satisfied" -- i.e. an unfulfilled
-   wellness-visit condition should *not* cancel the policy before its deadlines have actually
+   wellness-visit condition should _not_ cancel the policy before its deadlines have actually
    passed. I modeled this with `` `hospitalization month` `` as the fallback clock: if a
    claim gives no concrete wellness-visit/confirmation fact, the corresponding deadline is only
    treated as "missed" once the hospitalization itself is already past month 6 / month 7. This is

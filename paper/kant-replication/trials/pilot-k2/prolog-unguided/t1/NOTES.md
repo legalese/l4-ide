@@ -14,8 +14,8 @@ encoding, per the task's rules.
 ## Judgement calls
 
 - **Section 1.3 has two deadlines, but the questions only ever give one number.** The text
-  sets a 6-month anniversary deadline for the wellness *visit* itself and a separate 7-month
-  anniversary deadline for *supplying written confirmation* of that visit. Every question that
+  sets a 6-month anniversary deadline for the wellness _visit_ itself and a separate 7-month
+  anniversary deadline for _supplying written confirmation_ of that visit. Every question that
   mentions this condition phrases it as "proof/confirmation ... provided/submitted N months
   after the effective date," which reads as the confirmation-submission date, not the
   underlying visit date -- no question ever states when the visit itself took place. Since the

@@ -65,7 +65,7 @@ exit code 0. Did not run `q1`–`q9` or any other query at any point.
 - **Q4 — hospitalization month not stated.** The question gives only
   `claim_written_confirmation_month(c4, 8)` (one month past the §1.3 deadline) and says
   nothing about when the hospitalization occurred. I deliberately set
-  `claim_hospitalization_month(c4, 8)` — i.e., *after* the 7-month deadline — rather
+  `claim_hospitalization_month(c4, 8)` — i.e., _after_ the 7-month deadline — rather
   than defaulting to an early month that would trigger the "still pending" branch above
   and make the stated late confirmation irrelevant to the outcome. I judged that
   letting an unstated fact silently moot the one fact the question does state would be

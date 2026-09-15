@@ -19,13 +19,13 @@ directory, in my own scratchpad) with dummy data unrelated to this policy, purel
 confirm generic L4 syntax mechanics before relying on them here:
 
 - that a genitive expression (`claim's `field``) passed as one of several arguments to
-  a prefix function must be parenthesized (`f (claim's `field`) x`), or it silently
-  mis-parses as `(f claim)'s field` and then fails to typecheck. This bit even for a
-  single-argument call like `isJust claim's `field``, which needed
+a prefix function must be parenthesized (`f (claim's `field`) x`), or it silently
+mis-parses as `(f claim)'s field` and then fails to typecheck. This bit even for a
+single-argument call like `isJust claim's `field``, which needed
   `isJust (claim's `field`)`.
 - that `NOT` and infix comparisons (`AT MOST`, `GREATER THAN`, ...) applied directly to
-  a genitive expression do *not* have this problem (`NOT claim's `flag`` and
-  `claim's `a` GREATER THAN claim's `b`` both parse and evaluate as intended).
+  a genitive expression do _not_ have this problem (`NOT claim's `flag`` and
+`claim's `a` GREATER THAN claim's `b`` both parse and evaluate as intended).
 - that a `CONSIDER` nested inside a `WHEN` branch of an outer `CONSIDER` (used in the
   arbitration and 60-day-window helpers) lays out and evaluates correctly.
 
@@ -35,12 +35,12 @@ None of this touched the Chubb policy text, the schema, or the nine questions.
 
 1. **"Still pending" (1.1(3)), not just "satisfied" (1.2).** 1.1 conditions the benefit
    on the policy being in effect "at the time of the hospitalization," and explicitly
-   allows condition 1.3 to be either satisfied *or still pending* at that moment.
+   allows condition 1.3 to be either satisfied _or still pending_ at that moment.
    I modelled each of 1.3's two deadlines (wellness visit by month 6, confirmation by
    month 7) as "timely, OR the deadline hasn't arrived yet as of the hospitalization
    month" — not simply "was it eventually done on time," which would ignore the
    "pending" alternative the text explicitly grants. `condition 1.3 satisfied or still
-   pending` in `policy.l4` is the compositional AND of the two per-deadline checks.
+pending` in `policy.l4` is the compositional AND of the two per-deadline checks.
 
 2. **Fraud/misrepresentation timing.** By the same "at the time of hospitalization"
    logic, I treat fraud/misrepresentation as disqualifying only if it occurred at or
@@ -51,7 +51,7 @@ None of this touched the Chubb policy text, the schema, or the nine questions.
    it seemed the more defensible reading of 1.2 given 1.1's framing.
 
 3. **"Material withholding of information" folded into `misrepresentation month`.**
-   1.2's cancelation trigger lists three things — fraud, misrepresentation, *and*
+   1.2's cancelation trigger lists three things — fraud, misrepresentation, _and_
    material withholding of information — but the schema provides only two fields
    (`fraud month`, `misrepresentation month`). Since I may use only the given fields, I
    read `misrepresentation month` as standing in for both misrepresentation and
@@ -67,7 +67,7 @@ None of this touched the Chubb policy text, the schema, or the nine questions.
    §3.2 in every claim.
 
 5. **Q5 — Ground = `Neither`, not `Accidental injury`.** "Punching my own face to show
-   off for my friends" is a deliberate, self-inflicted act, not an *accident*. Since the
+   off for my friends" is a deliberate, self-inflicted act, not an _accident_. Since the
    schema gives three grounds (`Sickness`, `Accidental injury`, `Neither`) rather than
    two, and 1.1 only pays benefits for "hospitalization for sickness or accidental
    injury," I classified this claim's ground as `Neither` — the claim is disqualified by
@@ -88,7 +88,7 @@ None of this touched the Chubb policy text, the schema, or the nine questions.
 7. **Q4 — `hospitalization month` chosen as 9.** The query gives the written-
    confirmation month (8, which is after the 7-month deadline) but not the
    hospitalization month itself. I placed the hospitalization after month 8 (the query's
-   "I *had given* confirmation ... 8 months after" reads as already-completed by the
+   "I _had given_ confirmation ... 8 months after" reads as already-completed by the
    time of the events described), which makes the outcome the same under either a
    strict or a generous reading of judgement call #1: by month 9 the confirmation
    deadline has passed and confirmation was in fact late, so condition 1.3 has

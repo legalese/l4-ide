@@ -13,8 +13,8 @@ and both prior preregistrations.
 
 ## 1. The question
 
-The prior experiments measured *single-shot encoders* under three guidance levels. This one
-measures *the pipeline*: can an autonomous, unguided, multi-agent encoding pipeline do in
+The prior experiments measured _single-shot encoders_ under three guidance levels. This one
+measures _the pipeline_: can an autonomous, unguided, multi-agent encoding pipeline do in
 silico what Kant et al. did in vivo — both the schema authorship (their hand-written per-policy
 fact vocabulary, Fig. 2b) and the adjudication (their manual SWISH pass, fn. 3) — with no human
 anywhere in the loop?
@@ -28,10 +28,10 @@ Escalation here is computed, not felt — see §3.
 
 ## 2. Two sub-arms
 
-| arm | fixture | scored on |
-| --- | --- | --- |
+| arm             | fixture                                                                       | scored on                                             |
+| --------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------- |
 | A — performance | `chubb-policy-restored.txt`, staged under the neutral name `chubb-policy.txt` | Key-A accuracy on answered items + escalation quality |
-| B — diagnosis | `chubb-policy.txt` as published | source-defect detection, before any encoding |
+| B — diagnosis   | `chubb-policy.txt` as published                                               | source-defect detection, before any encoding          |
 
 Arm A is primary because the as-published text pollutes the escalation set: Q5 is unanswerable
 there by editing accident, not open texture, so a flag on it is right for the wrong reason.
@@ -48,8 +48,8 @@ leak-checked setup script in the style of `setup-restored.sh`. Model: the same e
 family as all prior cells, verified at run time and recorded in PROVENANCE.md.
 
 0. **Integrity reader** (its own agent, runs first, sees only the staged policy text — not the
-   questions): writes `integrity.md` answering one question: *does this document contain the
-   operative machinery its own text references?* Citing quoted text only.
+   questions): writes `integrity.md` answering one question: _does this document contain the
+   operative machinery its own text references?_ Citing quoted text only.
 1. **Encoder E1** and **Encoder E2** (independent agents, no shared sandbox subdirectory,
    neither sees the other's work): each produces `policy.l4` + `apply.l4` from the staged text
    and the nine questions, unguided — no schema. E1 is mandated the INERT house style, E2 the
@@ -103,7 +103,7 @@ in between weaken without refuting; all six are stated before any run exists.
 - **P3 (Q4 escalation, arm A).** Q4 flagged in ≥5/10 runs. Refuted if ≤2/10.
 - **P4 (Q3 escalation, arm A).** Q3 flagged in ≥3/10 runs. Refuted if 0/10. (The pending /
   retroactivity fork is subtler than the Q5 bog; the twenty-encoder boundary split says the
-  fork gets *taken* silently more often than *registered*.)
+  fork gets _taken_ silently more often than _registered_.)
 - **P5 (defect detection, arm B).** T-ben found in ≥7/10 integrity reports (refuted ≤4/10);
   T-§5 found in ≥5/10 (refuted ≤2/10).
 - **P6 (headline, arm A).** Pooled Key-A accuracy over answered items ≥0.945 — the measured

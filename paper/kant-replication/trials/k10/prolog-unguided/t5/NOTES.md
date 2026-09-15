@@ -5,7 +5,7 @@
 Ran `swipl -q -g halt policy.pl queries.pl` from the trial directory.
 
 - **First attempt**: silent except for a run of `Warning: ... Clauses of
-  <predicate> are not together in the source-file` for `age_at_hospitalization/2`,
+<predicate> are not together in the source-file` for `age_at_hospitalization/2`,
   `hospitalization_month/2`, `wellness_visit_month/2`, `wellness_confirmation_month/2`
   and `cause_activity/2`. These predicates are declared `dynamic` in `policy.pl`
   (so an absent fact fails cleanly instead of raising `existence_error`), but
@@ -40,7 +40,7 @@ the nine questions, per the rules.
    naturally as "cancel once the 1.3 deadline passes without timely
    compliance," which in principle could matter if a hospitalization
    preceded such a cancelation. None of the nine questions state both a
-   hospitalization month *and* a wellness-confirmation month, so this
+   hospitalization month _and_ a wellness-confirmation month, so this
    ordering is never actually in issue; I treated a late confirmation (or
    late visit) as defeating coverage outright rather than modeling a
    pending/failed state machine against the hospitalization clock. Worth
@@ -99,7 +99,7 @@ This session's standard project memory (auto-loaded into context before
 this task began, not something I searched for or opened) contains a
 one-line index entry for a "Kant/Chubb replication" project referencing
 arXiv 2502.17638, noting that "the benchmark fixture has §2 DELETED, so
-Q5's gold is underivable," and a separate entry noting that an *unguided*
+Q5's gold is underivable," and a separate entry noting that an _unguided_
 NL-to-Prolog encoding is measured to perform worse than a no-logic
 baseline in this same experimental family. I did not open any of the
 forbidden files (`keys.json`, `queries.json`, `FOUNDATION.md`,
@@ -121,4 +121,4 @@ approach.
   predicates), all per-claim facts left undefined (dynamic-declared only).
 - `queries.pl` — `q1`..`q9`, each `qN :- covered(claim_N).`, with the
   per-claim facts for that question plus every background condition
-  needed to make everything *not* tested by that question hold.
+  needed to make everything _not_ tested by that question hold.

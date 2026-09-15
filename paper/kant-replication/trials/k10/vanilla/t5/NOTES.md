@@ -61,7 +61,7 @@ Judgement calls:
    conditions are satisfied.
 
 5. **Causally-linked service exclusions (Q1, Q6, Q8) vs. status-only (Q9).** Where the
-   query states the injury arose *while* performing the excluded activity (firefighting
+   query states the injury arose _while_ performing the excluded activity (firefighting
    duty, skydiving, a military training exercise), applied the 2.1 exclusion directly
    regardless of other favorable facts recited in the same query (e.g., "did not commit
    fraud," "within the policy term") — those facts don't cure an exclusion that has

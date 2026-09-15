@@ -32,8 +32,8 @@ called with any claim data.
   per §1.1's framing) as `claim_premium_paid_month =< claim_hospitalization_month`, via
   `no_later_than/2`. All nine claims set this to month 0, which trivially satisfies it.
 
-- **365-day confinement cap (§2.2).** Read as a cap on how many days are *paid*, not a gate on
-  whether *any* benefit is payable, so `covered/1` only requires continuous confinement to be a
+- **365-day confinement cap (§2.2).** Read as a cap on how many days are _paid_, not a gate on
+  whether _any_ benefit is payable, so `covered/1` only requires continuous confinement to be a
   positive number of days, not that it be under 365.
 
 - **60-day recovery-timing bar (§4.2.1, final sentence).** Read as a general condition on all
@@ -74,7 +74,7 @@ called with any claim data.
   of it by month 7. Q4 ("I had given confirmation of my wellness visit 8 months after..."), Q6
   ("proof of my wellness visit was provided 6.5 months after..."), Q7 ("proof of the wellness
   visit was submitted 2 months after..."), and Q9 ("proof of my wellness visit was provided 6
-  months after...") were all read as stating the *confirmation* month (the act of giving/
+  months after...") were all read as stating the _confirmation_ month (the act of giving/
   providing/submitting proof), not the underlying visit's own month, by analogy to Q7's
   unambiguous "submitted." None of the four questions state the visit's own month, so I set it to
   a value comfortably inside the 6-month deadline and at or before the stated confirmation month.

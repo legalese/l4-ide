@@ -101,7 +101,7 @@ different mechanisms are used, matching the character of each condition:
 - For exclusion-triggering facts (activity_cause, claimant_age,
   self_inflicted_intentional, fraud_or_misrepresentation), the exclusion
   rules are written as positive triggers (e.g. `excluded(C) :-
-  activity_cause(C, skydiving)`), so a claim for which the fact is simply
+activity_cause(C, skydiving)`), so a claim for which the fact is simply
   never asserted automatically fails to trigger the exclusion — again with
   no need for queries.pl to assert an explicit negative fact per claim.
 - For facts central to every claim regardless of what the question asks

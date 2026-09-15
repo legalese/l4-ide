@@ -37,8 +37,8 @@ this also re-confirms `policy.l4`'s types and the `Claim` field names line up wi
   matters is **Q9**: the claimant "was serving as a police officer at the time of
   hospitalization," but the actual cause of the hospitalization was being bitten by their own
   son. I set `arose out of service in the police` to `FALSE` for `q9`, because merely holding
-  that occupation at the moment of hospitalization is not the same as the injury *arising out
-  of* that service -- there is no causal link between a domestic dog/child-bite-style incident
+  that occupation at the moment of hospitalization is not the same as the injury _arising out
+  of_ that service -- there is no causal link between a domestic dog/child-bite-style incident
   and police duties. This is the central interpretive judgement call in the whole exercise; an
   encoder that conflates "is a police officer" with "arose out of police service" would wrongly
   exclude this claim.
@@ -47,10 +47,10 @@ this also re-confirms `policy.l4`'s types and the `Claim` field names line up wi
   deadlines -- the wellness visit itself must occur "no later than the 6th month anniversary,"
   and written confirmation of it must be supplied "no later than the 7th month anniversary."
   `policy.l4` keeps both as separate named constants and separate comparisons (`wellness visit
-  deadline in months` = 6, `wellness visit confirmation deadline in months` = 7), applied to
+deadline in months` = 6, `wellness visit confirmation deadline in months` = 7), applied to
   two separate `Claim` fields. None of the nine queries, however, report the wellness visit's
   own date separately from when its confirmation was "provided" / "submitted" / "given" --
-  they report only one figure. In `apply.l4` I feed that one reported figure into *both*
+  they report only one figure. In `apply.l4` I feed that one reported figure into _both_
   `wellness visit time` and `wellness visit confirmation time` for q4, q6, and q9 (the queries
   that mention it), which effectively binds the two deadlines to their stricter, 6-month
   reading for those claims. I checked by hand that this choice does not change the final
@@ -61,7 +61,7 @@ this also re-confirms `policy.l4`'s types and the `Claim` field names line up wi
   because a different set of queries could make the choice outcome-determinative.
 
 - **"Still pending" (S.1.1(3)) is modeled but not exercised**: `condition 1.3 is still
-  pending` captures the case where confirmation has not yet been supplied but the 7-month
+pending` captures the case where confirmation has not yet been supplied but the 7-month
   deadline hasn't passed either. Every claim in `apply.l4` supplies a definite (`JUST`, never
   `NOTHING`) wellness figure, so this branch is never the reason any of the nine answers comes
   out the way it does; it is included in `policy.l4` for faithfulness to the text's explicit
@@ -94,7 +94,7 @@ this also re-confirms `policy.l4`'s types and the `Claim` field names line up wi
   any clause in the given text, so I did not encode it as an implicit exclusion.
 
 - **Age exclusion (S.2.1(5))** is computed directly from `claimant age at hospitalization
-  AT LEAST 80`, rather than as an independently-set boolean, since it is a directly observable
+AT LEAST 80`, rather than as an independently-set boolean, since it is a directly observable
   numeric fact rather than a causal finding about the origin of the injury.
 
 - **Section 3 clauses are documented, not gated on**: 3.1 (worldwide, 24-hour coverage), 3.2

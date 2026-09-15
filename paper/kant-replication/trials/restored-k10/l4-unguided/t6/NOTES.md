@@ -28,7 +28,7 @@ questions, and I have not seen the answer key.
 
 - **"Still pending" is independent of the hospitalization date.** I define
   §1.1(3) ("still pending or satisfied in a timely fashion") as: no confirmation
-  has been given yet *and* the 7-month deadline has not yet passed as of the
+  has been given yet _and_ the 7-month deadline has not yet passed as of the
   hospitalization, OR a confirmation was given and it was on time. This makes Q3
   (hospitalized at month 5, nothing said about the wellness visit) covered via
   the "still pending" branch, and Q4 (confirmation given at month 8, i.e. late)
@@ -48,7 +48,7 @@ questions, and I have not seen the answer key.
   so it simply never satisfies §2.1 in the first place. I considered the
   contrary reading — that because §3's exclusions are enumerated and
   self-infliction is not among them, the claim should be covered — but concluded
-  the exclusions canon governs carve-outs *from* an established coverage grant,
+  the exclusions canon governs carve-outs _from_ an established coverage grant,
   not the threshold question of what counts as a covered peril at all. This is
   a genuine, close textual call; a different, defensible encoding would set
   `` `the injury was self-inflicted intentionally` `` to not gate
@@ -72,7 +72,7 @@ questions, and I have not seen the answer key.
   says the Daily Hospital Income Benefit "will only be payable for ... continuous
   confinement in a hospital in the United States". I read these as two different
   things: §4.1 is about where the insured peril may occur; §2.2 is an additional,
-  independent situs requirement on the qualifying *confinement*. For Q4
+  independent situs requirement on the qualifying _confinement_. For Q4
   ("hospitalized ... while traveling abroad"), I read the confinement itself as
   having occurred abroad and set
   `` `confined in a hospital in the United States` `` to `FALSE`, which fails
@@ -81,7 +81,7 @@ questions, and I have not seen the answer key.
   are individually sufficient; they are not meant to be read as alternatives I
   was choosing between.
 
-- **Non-operative clauses.** §4.1 (worldwide personal coverage, reflected by *not*
+- **Non-operative clauses.** §4.1 (worldwide personal coverage, reflected by _not_
   requiring the sickness/injury itself to occur in the US), §4.3 (New York law),
   §4.4 (US currency) and §4.5 (lump-sum premium timing) add no independent
   condition on whether a given claim is covered, so they are recorded only as

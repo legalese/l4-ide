@@ -20,22 +20,22 @@ I also diffed the `DECLARE` block and the two supporting-helper definitions in
 ## Judgement calls
 
 - **"Still pending" reading of Section 1.3.** Section 1.1 conditions the policy
-  being in effect *at the time of hospitalization* on Section 1.3 being "still
+  being in effect _at the time of hospitalization_ on Section 1.3 being "still
   pending or ... satisfied in a timely fashion." I read this as: if the
   7-month deadline for supplying written confirmation hadn't arrived yet as of
   the hospitalization month, the condition is simply not yet due (`still
-  pending`), regardless of what happens to it afterwards — so a hospitalization
+pending`), regardless of what happens to it afterwards — so a hospitalization
   early in the policy year can't be defeated by a later failure to comply with
   1.3. Only once the hospitalization occurs after month 7 do I require Section
   1.3 to have actually been satisfied (confirmation ≤ month 7, the underlying
   visit ≤ month 6, with a qualified provider). This is `` `section 1.3 pending
-  or satisfied` `` in `policy.l4`. This affects Q4, where I placed the
+or satisfied` `` in `policy.l4`. This affects Q4, where I placed the
   hospitalization at month 9 (after the month-8 confirmation) specifically so
   the lateness the question describes is actually operative — see below.
 
 - **Mapping "proof of the wellness visit was provided/given confirmation ...
   N months after the effective date" (Q4, Q6, Q9) to `written confirmation
-  month`, not `wellness visit month`.** The policy text's own vocabulary is
+month`, not `wellness visit month`.** The policy text's own vocabulary is
   "written confirmation ... of a wellness visit," so I treat all three
   questions' stated month as the confirmation date, and set the (unstated)
   underlying visit date favorably (≤ 6). For Q6 in particular this matters:
@@ -48,8 +48,7 @@ I also diffed the `DECLARE` block and the two supporting-helper definitions in
   states a month and doesn't state a hospitalization month itself (Q4).**
   The claimant narrates "I had given confirmation ... 8 months after the
   effective date" in the past tense, as an already-completed fact — which
-  presupposes the point of evaluation (hospitalization) is at or after month
-  8. I set `hospitalization month = 9` for Q4 so the lateness described is
+  presupposes the point of evaluation (hospitalization) is at or after month 8. I set `hospitalization month = 9` for Q4 so the lateness described is
   the thing actually being tested, rather than being mooted by the "still
   pending" escape above. For Q3, Q6, Q7, Q9, where the confirmation/visit
   month described is comfortably inside both deadlines, this choice doesn't
@@ -70,7 +69,7 @@ I also diffed the `DECLARE` block and the two supporting-helper definitions in
   officer while getting bitten by your own child is not the injury arising
   out of police service. I set `causes` to `LIST Other`, deliberately
   omitting `` `Police service` ``, since `causes` per the schema represents
-  what the hospitalization *arose out of*, not the claimant's occupation.
+  what the hospitalization _arose out of_, not the claimant's occupation.
 
 - **Q5 — no self-inflicted-injury exclusion exists in the given text.** Q5
   describes punching one's own face for show, with no fraud or
@@ -83,7 +82,7 @@ I also diffed the `DECLARE` block and the two supporting-helper definitions in
   that the source text doesn't state.
 
 - **Fraud/misrepresentation timing.** `fraud month` and `misrepresentation
-  month` are `MAYBE NUMBER`, not plain booleans, so I read the schema as
+month` are `MAYBE NUMBER`, not plain booleans, so I read the schema as
   wanting a timing comparison rather than a bare presence check: fraud (or
   misrepresentation) cancels the policy from the moment it occurs onward, so
   it only defeats a claim whose hospitalization is at or after that month.

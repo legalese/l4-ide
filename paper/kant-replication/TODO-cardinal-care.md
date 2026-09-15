@@ -1,7 +1,7 @@
 # TODO — the natural second target: Cardinal Care (Aetna)
 
 **Status: backlog, written 2026-09-01. Nothing below has been started.** "The natural second
-target" is the phrase from the *Cited Works* reading companion: Kant et al.'s harder benchmark —
+target" is the phrase from the _Cited Works_ reading companion: Kant et al.'s harder benchmark —
 the **Advanced Reproductive Technology (ART)** and **Comprehensive Infertility (CI)** coverage
 rules of the Stanford Cardinal Care Aetna Student Health Insurance Plan (Aetna Life Insurance,
 2023), via the Stanford CodeX **Insurance Analyst** (their refs: CodeX 2025a = the Insurance

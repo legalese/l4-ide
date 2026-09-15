@@ -32,7 +32,7 @@ given "8 months after the policy's effective date"):
    §1.1, the policy is not "in effect" at the time of hospitalization.
 2. Independently, §2.2 limits the Daily Hospital Income Benefit to confinement "in a hospital in
    the United States," whereas §4.1.1's 24-hour/worldwide language governs where the insured is
-   *insured against risk*, not where the benefit-triggering confinement must occur. A fall while
+   _insured against risk_, not where the benefit-triggering confinement must occur. A fall while
    "traveling abroad" reads as hospitalization abroad, which §2.2 does not cover.
 
 Both readings independently yield "No," so I treated this as a reasonably determinate answer

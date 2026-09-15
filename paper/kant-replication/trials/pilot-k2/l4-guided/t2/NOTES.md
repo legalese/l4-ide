@@ -41,8 +41,7 @@ because two of the fixes are substantive enough to flag for review.
    "is `c` a member of `cs`" meaning -- only the internal expression that makes it compile is
    different. I did not touch the `` `no later than` `` helper; it typechecks as given.
 
-3. **`DECIDE \`name\` claim MEANS ...` (a backtick multi-word name, a repeated parameter, and
-   `MEANS`) does not parse**, even though `DECIDE factorial n MEANS ...` (a plain identifier)
+3. **`DECIDE \`name\` claim MEANS ...`(a backtick multi-word name, a repeated parameter, and`MEANS`) does not parse**, even though `DECIDE factorial n MEANS ...` (a plain identifier)
    is a documented form. The parser error pointed at the `MEANS` token itself. I could not
    find a documented reason for the discrepancy within the permitted references; empirically,
    dropping `DECIDE` and keeping `` `name` claim MEANS ... `` (matching the style already used
@@ -54,7 +53,7 @@ because two of the fixes are substantive enough to flag for review.
    shows `_` used as a wildcard after the mixfix pattern `head FOLLOWED BY _`. Applying `_`
    directly as a constructor argument (`JUST _`) was rejected by the lexer ("unexpected `_`").
    Fixed by naming the bound variable instead (`WHEN JUST v THEN TRUE`) in the `` `has
-   occurred` `` helper, since I don't need the payload there.
+occurred` `` helper, since I don't need the payload there.
 
 None of these four are changes of legal substance -- they are what it took to get the given
 material and my own additions to actually compile.
@@ -115,13 +114,13 @@ material and my own additions to actually compile.
   done on purpose is not, in ordinary insurance usage, an "accident", even though the
   resulting injury's severity may not have been intended. This is the crux judgement call for
   Q5; the "did not commit fraud or misrepresentation" clause in the question reads as a
-  distractor ruling out the *other* possible route to non-coverage.
+  distractor ruling out the _other_ possible route to non-coverage.
 
 - **Q9** ("I was serving as a police officer at the time of hospitalization"): this is read as
   an occupational-status fact, not a causation fact, and so `causes` is left `EMPTY` rather
   than `LIST \`Police service\``. Section 2.1 excludes an event "arising directly or
-  indirectly out of ... service in the police" -- i.e. it requires the injury to be *caused
-  by* that service. A son biting his parent's ankle has nothing to do with the parent's job;
+  indirectly out of ... service in the police" -- i.e. it requires the injury to be _caused
+  by_ that service. A son biting his parent's ankle has nothing to do with the parent's job;
   the parent merely happens to hold that job at the time. This is the crux judgement call for
   Q9, and is the one place across all nine queries where "a fact is mentioned" and "a fact is
   relevant to an exclusion" deliberately come apart.
@@ -129,7 +128,7 @@ material and my own additions to actually compile.
 - **Q6/Q8**: age 79 (Q6) and "did not commit fraud" (Q8) are included as stated but are not
   dispositive under my reading (skydiving and military-service are each independently
   sufficient exclusions) -- they are left in the `Claim` as given, not neutralised, since the
-  task asks only that *unrelated* fields be set to non-triggering baselines, and both facts
+  task asks only that _unrelated_ fields be set to non-triggering baselines, and both facts
   are facts the question itself supplies.
 
 ## Baseline values used for fields a given question does not mention

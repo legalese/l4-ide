@@ -21,7 +21,7 @@ questions.
   external event, so I read it as outside "accidental injury" under Sec. 1.1 (which
   requires the claim be premised on hospitalization "for sickness or accidental
   injury"). I used `neither` rather than `accidental_injury`. This is a genuine
-  interpretive fork — a fortuity-focused reading (harm to the *face* was unintended even
+  interpretive fork — a fortuity-focused reading (harm to the _face_ was unintended even
   though the punch was voluntary) could instead call it `accidental_injury` — and the
   policy has no explicit self-inflicted-injury exclusion to fall back on, so the outcome
   turns entirely on this one classification. I made the call independently, from the
@@ -45,7 +45,7 @@ questions.
   hospitalization, rather than already failed. This isolates the question to the one
   fact it actually states (the late confirmation) rather than letting my own choice of
   an unstated fact manufacture a failure. `claim_wellness_visit_month` is likewise not
-  stated in Q4 (only when confirmation was *given* is); I set it to `1`, well inside its
+  stated in Q4 (only when confirmation was _given_ is); I set it to `1`, well inside its
   own 6-month deadline, so that only the confirmation-timing fact drives the outcome.
   The same "confirmation-month stated, visit-month not" pattern, and the same
   `wellness_visit_month = 1` default, is used for Q6, Q7 and Q9.
@@ -70,7 +70,7 @@ questions.
   satisfying the bar regardless of the exact day/month conversion chosen).
 
 - **Fraud/misrepresentation timing.** I read Sec. 1.2's cancelation trigger as biting
-  only when the fraud or misrepresentation occurred *at or before* the hospitalization
+  only when the fraud or misrepresentation occurred _at or before_ the hospitalization
   being claimed on (`no_later_than(FraudMonth, HospMonth)`), consistent with Sec. 1.1's
   "in effect at the time of the hospitalization" framing — a later fraud (e.g. during
   claims handling) would not retroactively un-cover an earlier, already-covered

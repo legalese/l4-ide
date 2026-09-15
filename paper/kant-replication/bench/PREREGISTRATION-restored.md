@@ -31,7 +31,7 @@ contains a key), same conformance rules, same scorer (`bench.mjs` with
 `--keys keys-restored.json`). Guided cells receive the `schema-restored-*` vocabulary —
 `schema.md`'s 18 fields plus exactly the three fields restored §2.2/§2.3 require, derived
 under the same clause-by-clause discipline and parity-checked (`check-schema-parity.mjs`).
-"Guided" means *schema derived from the text being encoded* in both arms.
+"Guided" means _schema derived from the text being encoded_ in both arms.
 
 One declared cross-arm difference besides the fixture: the as-published arm (pilot and k = 10)
 ran with the memory-index contamination channel of `FOUNDATION.md` T9 present and constant —
@@ -76,9 +76,9 @@ the binding constraint and our defect register over-weighted it; `source-defects
 correction, not a defence. If P4 fails, the mechanical/interpretive frame itself is wrong
 and the write-up must lead with that. If P3 fails while P1 holds, quotable text helps
 formalisers more than free readers, which is itself a finding about where formalisation
-earns its keep. Support for P1+P2+P3 with P4+P5 holding licenses exactly one sentence: *the
+earns its keep. Support for P1+P2+P3 with P4+P5 holding licenses exactly one sentence: _the
 residual error the original attributes to its models on this item was manufactured by its
-own edit* — and nothing stronger.
+own edit_ — and nothing stronger.
 
 ## 5. Fixed before data
 

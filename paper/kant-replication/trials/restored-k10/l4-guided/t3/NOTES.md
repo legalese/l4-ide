@@ -26,27 +26,27 @@ any meaning:
 ## Judgement calls on what the policy means
 
 - **"the condition set out in Section 1.3 is still pending or has been satisfied in a timely
-  fashion" (§1.1(3), §1.2).** Modeled as: *satisfied* = written confirmation given by month 7 AND
+  fashion" (§1.1(3), §1.2).** Modeled as: _satisfied_ = written confirmation given by month 7 AND
   the wellness visit itself occurred by month 6 with a qualified provider (all three conjuncts, via
-  the given `no later than` helper twice); *pending* = confirmation not yet given
+  the given `no later than` helper twice); _pending_ = confirmation not yet given
   (`written confirmation month` is `NOTHING`) and the hospitalization being assessed occurs at or
   before month 7. I did not additionally require, in the "pending" branch, that the visit's own
   month-6 sub-deadline has not already lapsed — i.e. I treat the month-7 confirmation deadline as
   the operative clock for "pending", not the earlier visit deadline. This is a simplification; the
   text does not fully spell out what "pending" means once the visit window has closed but the
   confirmation window has not.
-- **Fraud / misrepresentation (§1.2)** is treated as cancelling the policy regardless of *when* it
+- **Fraud / misrepresentation (§1.2)** is treated as cancelling the policy regardless of _when_ it
   occurred (`fraud month` or `misrepresentation month` present at all), since §1.2 attaches no
   deadline to this trigger the way §1.3 does to the wellness-visit condition.
 - **§2.2's 365-day cap** ("not exceeding three hundred and sixty-five (365) days") is treated as a
-  limit on how many days are *paid*, not a coverage gate: `covered` only requires
+  limit on how many days are _paid_, not a coverage gate: `covered` only requires
   `continuous confinement days` to be present and positive. A claim with, say, 400 days of
   confinement is still "covered" under this boolean predicate; the cap would only bite in a
   payout-amount calculation, which is out of scope for `covered`.
 - **§4.2.1's "sixty (60) days after written proof of claim"** is checked against
   `recovery sought month` and `written proof of claim month`, both of which are in whole months.
   Sixty days was approximated as **2 months** (`recovery sought month AT LEAST written proof of
-  claim month PLUS 2`) since the fact schema does not carry day-level granularity. This is an
+claim month PLUS 2`) since the fact schema does not carry day-level granularity. This is an
   approximation, not an exact translation.
 - **Arbitration (§4.2) and the recovery-timing rule** are read as applying only when relevant
   facts are present: no dispute (`dispute arisen = FALSE`) makes the arbitration clause vacuously
@@ -55,7 +55,7 @@ any meaning:
   (`written proof of claim month = NOTHING`) is treated as a violation (the 60-day clock never
   started).
 - **§3.1's "arising directly or indirectly out of ... service"** is read as being about the
-  *cause* of the injury, not the claimant's occupation. Question 9 states the claimant "was serving
+  _cause_ of the injury, not the claimant's occupation. Question 9 states the claimant "was serving
   as a police officer at the time of hospitalization," but the hospitalization itself was caused by
   the claimant's own son biting them — unrelated to police duty. I did **not** put
   `` `Police service` `` in that claim's `causes` list; the claimant's occupational status and the

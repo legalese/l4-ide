@@ -14,7 +14,7 @@
 
 - **Q5 (punching own face to show off, no fraud).** This was the closest call. The contract's
   §2.1 exclusion list does not mention self-inflicted or intentionally-caused injury at all, and
-  the query explicitly negates the one condition that *is* textually tied to conduct-based
+  the query explicitly negates the one condition that _is_ textually tied to conduct-based
   cancelation (fraud/misrepresentation, §1.2). Rather than infer an unstated "self-harm" exclusion
   that real-world policies often carry but this one does not textually contain, I treated the
   enumerated exclusions in §2.1 as exhaustive per the standing preamble ("no other exclusions

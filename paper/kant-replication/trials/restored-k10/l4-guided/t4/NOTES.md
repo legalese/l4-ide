@@ -48,7 +48,7 @@
   `d AT LEAST 1`) plus `confined in us hospital`, per section 2.2's explicit
   "in a hospital in the United States" language (read as a real, separate
   condition from section 4.1's worldwide-24/7 language, which I read as
-  going to where the *triggering event* may occur, not where the benefit-
+  going to where the _triggering event_ may occur, not where the benefit-
   paying confinement itself must be).
 
 - **Q4** ("hospitalized due to a fall while traveling abroad and I had given
@@ -64,17 +64,17 @@
 
 - **Q5** ("hospitalized for punching my own face to show off for my friends
   and I did not commit fraud or misrepresentation"): I classified this as
-  `hospitalization ground = \`Accidental injury\`` rather than `Neither`.
-  Reasoning: the punching motion was voluntary, but the resulting injury
-  (serious enough to require hospitalization) was not the intended or
-  expected outcome, and conventional accident & health insurance doctrine
-  treats "accidental" as asking whether the *harm* was intended, not
-  whether the antecedent *act* was voluntary (the classic "horseplay" case).
-  The explicit disclaimer of fraud/misrepresentation in the question reads
-  as ruling out the wrong objection, pointing at this Ground classification
-  as the intended question. This is genuinely arguable — a reading that
-  treats a deliberate, voluntary act as taking the injury out of "accidental"
-  entirely (making it `Neither`) is also defensible on the plain word
+  `hospitalization ground = \`Accidental injury\``rather than`Neither`.
+Reasoning: the punching motion was voluntary, but the resulting injury
+(serious enough to require hospitalization) was not the intended or
+expected outcome, and conventional accident & health insurance doctrine
+treats "accidental" as asking whether the *harm* was intended, not
+whether the antecedent *act* was voluntary (the classic "horseplay" case).
+The explicit disclaimer of fraud/misrepresentation in the question reads
+as ruling out the wrong objection, pointing at this Ground classification
+as the intended question. This is genuinely arguable — a reading that
+treats a deliberate, voluntary act as taking the injury out of "accidental"
+entirely (making it `Neither`) is also defensible on the plain word
   "accidental," and would flip this claim to not-covered on that ground
   alone. I went with the coverage-favorable reading above.
 
@@ -92,12 +92,12 @@
 - **Q9** ("I was serving as a police officer at the time of
   hospitalization," hospitalized because "my son bit me in the ankle"):
   `causes` does **not** include `\`Police service\``. Section 3.1 excludes
-  an injury "arising directly or indirectly out of ... service in the
-  police" — a causal test — and merely being employed as a police officer
-  at the moment of an unrelated domestic incident does not satisfy it. This
-  is the one place in the schema where "unrelated to the question" and
-  "mentioned in the question" pull in different directions: the fact *is*
-  mentioned, but on my reading it does not populate `causes`, precisely
+an injury "arising directly or indirectly out of ... service in the
+police" — a causal test — and merely being employed as a police officer
+at the moment of an unrelated domestic incident does not satisfy it. This
+is the one place in the schema where "unrelated to the question" and
+"mentioned in the question" pull in different directions: the fact *is*
+mentioned, but on my reading it does not populate `causes`, precisely
   because the question is testing whether contemporaneous employment gets
   mistaken for a causal exclusion.
 
@@ -108,3 +108,21 @@ paid at month 0, no fraud/misrepresentation, wellness visit and
 confirmation both early/on time unless a question states otherwise, no
 dispute, a 12-month policy term, confinement in a US hospital for 3 days,
 proof of claim and recovery sought in order, and a properly made claim).
+
+## Post-restoration correction (2026-09-15)
+
+`policy.l4`'s `NOT x OR y` line above was ambiguous under L4's own precedence
+rules — `NOT` reaches to the end of its line, so it parsed as `NOT (x OR y)`,
+not the intended `(NOT x) OR y`. This trial's own "Check succeeded" note
+above was true when it was written: the checker started refusing this
+specific ambiguity only in commit 1d061009 (2026-09-07), six days after this
+trial's `inputs/` were prepared (2026-09-01). Restoring the trial under the
+current toolchain therefore failed `l4 check`.
+
+Repaired by parenthesizing to the reading the surrounding comment and field
+usage make unambiguous (see the rule immediately above this note). Verified
+by running the file's #EVAL cases under both parses side by side: all nine
+results are identical between the old (ambiguous-as-parsed) and new
+(explicit) parenthesization, so this correction changes zero recorded
+outcomes for this trial — it repairs a syntax/toolchain mismatch, not the
+model's answer.

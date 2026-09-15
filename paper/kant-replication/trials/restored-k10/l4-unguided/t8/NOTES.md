@@ -28,12 +28,12 @@ evaluation, or anything else that would evaluate the nine claims against `covere
    months). `policy.l4` models both as separate `Claim` fields. Every query that
    mentions this condition gives only a single number ("confirmation ... 8 months
    after", "proof ... provided 6.5 months after", etc.); I used that one number for
-   *both* fields, since the query does not distinguish visit-time from
+   _both_ fields, since the query does not distinguish visit-time from
    confirmation-time and this is the most natural reading of a single reported
    milestone.
 
 3. **Dropped the "still pending" limb of S1.1(3) as never independently operative
-   here.** Section 1.1(3) requires the S1.3 condition to be "still pending or ... 
+   here.** Section 1.1(3) requires the S1.3 condition to be "still pending or ...
    satisfied in a timely fashion." I modelled only the "satisfied" branch. Reasoning:
    every one of the nine questions reports the wellness-visit facts (when relevant) as
    completed, historical events relative to the effective date, never as an open or
@@ -56,7 +56,7 @@ evaluation, or anything else that would evaluate the nine claims against `covere
    independent condition on payment**, alongside (not overridden by) Section 4.1.1's
    "insures You ... anywhere in the world." I read 4.1 as defining the
    temporal/geographic scope of being insured (an accident or sickness abroad is not
-   itself outside the policy), while 2.2 separately conditions the *benefit payment*
+   itself outside the policy), while 2.2 separately conditions the _benefit payment_
    on the confinement being in a U.S. hospital. For Q4 ("hospitalized due to a fall
    while traveling abroad"), I read the hospitalization itself as having occurred
    abroad and set `hospital located in the United States` = FALSE. This is the more
@@ -67,7 +67,7 @@ evaluation, or anything else that would evaluate the nine claims against `covere
 
 6. **Section 3.1 items 1-4 require a causal nexus ("arising directly or indirectly out
    of"), not mere status/profession.** Modelled each as a Boolean fact about
-   *causation* (`sickness or injury arose from service in the police`, etc.), not
+   _causation_ (`sickness or injury arose from service in the police`, etc.), not
    "claimant is a police officer / firefighter / etc." This is the reason Q1 ("burns
    ... while doing my duty as a firefighter") and Q8 ("injured in a military training
    exercise") set their respective causal flags TRUE, while Q9 (claimant "serving as a

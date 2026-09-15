@@ -56,17 +56,17 @@ warnings and the load would not be silent.
 
 - **Q4** ("fall while traveling abroad," confirmation given at month 8): read "traveling abroad"
   as meaning the confining hospital was not a US hospital (`claim_confined_in_us_hospital(c4,
-  false)`), since that is the one fact the scenario most directly speaks to. Also placed the
+false)`), since that is the one fact the scenario most directly speaks to. Also placed the
   hospitalization at month 9 (after the stated month-8 confirmation and after both Section 1.3
   deadlines), on the reading that a claimant reporting an already-late confirmation is describing
   a claim being assessed after that lateness occurred, not one being assessed from some earlier,
   unstated vantage point where the confirmation might still have come in on time. Set
-  `claim_wellness_visit_month(c4, 5)` (on-time) so the scenario isolates late *confirmation*
+  `claim_wellness_visit_month(c4, 5)` (on-time) so the scenario isolates late _confirmation_
   specifically, rather than compounding it with a late visit.
 - **Q5** ("punching my own face to show off," no fraud/misrepresentation): classified the ground
   as `accidental_injury` rather than `neither`. The general exclusions (Section 3) list specific
   activities but nothing for self-inflicted or foolish conduct, and ordinary insurance usage
-  treats "accidental" as turning on whether the *result* (injury requiring hospitalization) was
+  treats "accidental" as turning on whether the _result_ (injury requiring hospitalization) was
   unintended, not on whether the underlying act was voluntary. Causes recorded as `[other]`.
 - **Q6 / Q9** ("proof of my wellness visit was provided N months after..."): read this as
   describing the written-confirmation event specifically (`claim_written_confirmation_month`),
@@ -81,7 +81,7 @@ warnings and the load would not be silent.
   `military_service`, reading a training exercise as part of "service in the military" rather
   than requiring active combat or deployment.
 - **Q9** ("serving as a police officer at the time of hospitalization," injury from a son's bite):
-  did *not* include `police_service` in `claim_causes`. The exclusion requires the sickness or
+  did _not_ include `police_service` in `claim_causes`. The exclusion requires the sickness or
   injury to arise "directly or indirectly out of" the listed service, not merely that the
   claimant held that occupation or was on duty when it happened; a domestic bite injury has no
   causal connection to police duties. Recorded as `claim_causes(c9, [other])`.

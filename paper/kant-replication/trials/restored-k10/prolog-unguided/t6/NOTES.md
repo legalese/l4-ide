@@ -60,8 +60,8 @@ run).
   for confinement "in a hospital in the United States," while 4.1.1 ("Where does Your
   Policy apply?") says the policy "insures You twenty-four (24) hours a day anywhere in
   the world." I resolved this by reading them as governing different things rather than
-  as a straight contradiction: the insured *peril* (the sickness- or injury-causing
-  event) is covered worldwide per 4.1.1, but the *daily indemnity* specifically requires
+  as a straight contradiction: the insured _peril_ (the sickness- or injury-causing
+  event) is covered worldwide per 4.1.1, but the _daily indemnity_ specifically requires
   the qualifying hospital confinement itself to be in a U.S. hospital, per the literal,
   more specific language of 2.2. I encoded `hospital_in_us/1` as a real, separate gating
   fact rather than collapsing it into a no-op. This did not end up being outcome-
@@ -71,7 +71,7 @@ run).
 
 - **Section 2.2's 365-day cap is a payment cap, not a coverage gate.** "payable ... for a
   period not exceeding three hundred and sixty-five (365) days" reads naturally as
-  capping how many days are *compensated*, not as voiding the entire claim if
+  capping how many days are _compensated_, not as voiding the entire claim if
   confinement happens to run past a year. `hospitalized/1` only requires
   `confinement_days > 0`; a non-gating `payable_days/2` helper (`min(Days, 365)`) is
   provided for completeness but does not affect the `covered/1` boolean.
@@ -79,7 +79,7 @@ run).
 - **Signature, premium, and claim-notice.** Per the task brief, "the agreement has been
   signed and the premium has been paid" is assumed throughout and is not encoded at all
   (no predicate references either condition). Section 2.3's separate requirement that "a
-  claim must be made to the Company" *is* encoded (`claim_made/1`), since the task brief
+  claim must be made to the Company" _is_ encoded (`claim_made/1`), since the task brief
   does not exempt it the way it exempts signature/premium, but every query in
   `queries.pl` asserts it true, since none of the nine questions turn on a failure to
   give notice.

@@ -27,7 +27,7 @@
 1. **"Arose out of" is causal, not occupational.** The exclusions in Section 2.1 (skydiving,
    military, fire fighter, police, age >= 80) require the sickness or injury to arise "directly or
    indirectly out of" the named activity. I modelled the four activity exclusions as facts about
-   the *cause* of the hospitalization (`` `hospitalization arose out of ...` ``), not as facts about
+   the _cause_ of the hospitalization (`` `hospitalization arose out of ...` ``), not as facts about
    the claimant's occupation or status. This matters most for Q9 ("my son biting me in the ankle
    ... I was serving as a police officer at the time of hospitalization"): the cause is a domestic
    incident wholly unconnected to police duties, so I set

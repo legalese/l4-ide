@@ -12,16 +12,16 @@ trial-for-trial.
 
 ## 1. What determines a trial encoding, and where each factor is recorded
 
-| factor | value | recorded where |
-| --- | --- | --- |
-| sandbox contents | fixture + blind queries + cell prompt (+ schema in guided cells) | committed: `fixtures/`, `prompts/cell-*.md`, `bench/schema*.md`, staged by `bench/setup-{pilot,k10,restored}.sh` (leak-checked) |
-| wrapper prompt (the agent's launch instruction) | §2 below, verbatim | **this file only** — it was never a repo artifact |
-| encoder model | alias `sonnet` on every launch; resolved model string **`claude-sonnet-5`**, verified 2026-09-01 by inspecting a sampled encoder agent's own task record (17 request entries, all `"model":"claude-sonnet-5"`) | this file |
-| sampling parameters | never set by us; the agent harness's defaults applied; temperature/seed **not captured** | disclosed gap, §6 |
-| harness | Claude Code's Agent tool, `subagent_type: general-purpose`, concurrency ≤ 20; orchestrating session `papers-kant (c1881847-0452-4e2d-bab9-49cb2315f002)`; harness version not captured | this file; gap in §6 |
-| dates | pilot t1–t2: 2026-08-31 · top-up t3–t10 and the entire restored arm: 2026-09-01 (SGT) | commit history |
-| relaunches | 3 agents died on API timeouts with **zero bytes written** and were relaunched with identical wrappers into pristine sandboxes: as-published `prolog-guided/t3`, `prolog-guided/t6`, restored `prolog-guided/t2` | `README.md` §5, §5.3 |
-| toolchain at run time | `l4` built from this branch (provenance commit `ccff478a`; runs spanned `8a240121`–`5cb93bb5`) · SWI-Prolog 9.2.9 · node v26.4.0 · GHC 9.10.3 | this file + lockfiles |
+| factor                                          | value                                                                                                                                                                                                           | recorded where                                                                                                                  |
+| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| sandbox contents                                | fixture + blind queries + cell prompt (+ schema in guided cells)                                                                                                                                                | committed: `fixtures/`, `prompts/cell-*.md`, `bench/schema*.md`, staged by `bench/setup-{pilot,k10,restored}.sh` (leak-checked) |
+| wrapper prompt (the agent's launch instruction) | §2 below, verbatim                                                                                                                                                                                              | **this file only** — it was never a repo artifact                                                                               |
+| encoder model                                   | alias `sonnet` on every launch; resolved model string **`claude-sonnet-5`**, verified 2026-09-01 by inspecting a sampled encoder agent's own task record (17 request entries, all `"model":"claude-sonnet-5"`)  | this file                                                                                                                       |
+| sampling parameters                             | never set by us; the agent harness's defaults applied; temperature/seed **not captured**                                                                                                                        | disclosed gap, §6                                                                                                               |
+| harness                                         | Claude Code's Agent tool, `subagent_type: general-purpose`, concurrency ≤ 20; orchestrating session `papers-kant (c1881847-0452-4e2d-bab9-49cb2315f002)`; harness version not captured                          | this file; gap in §6                                                                                                            |
+| dates                                           | pilot t1–t2: 2026-08-31 · top-up t3–t10 and the entire restored arm: 2026-09-01 (SGT)                                                                                                                           | commit history                                                                                                                  |
+| relaunches                                      | 3 agents died on API timeouts with **zero bytes written** and were relaunched with identical wrappers into pristine sandboxes: as-published `prolog-guided/t3`, `prolog-guided/t6`, restored `prolog-guided/t2` | `README.md` §5, §5.3                                                                                                            |
+| toolchain at run time                           | `l4` built from this branch (provenance commit `ccff478a`; runs spanned `8a240121`–`5cb93bb5`) · SWI-Prolog 9.2.9 · node v26.4.0 · GHC 9.10.3                                                                   | this file + lockfiles                                                                                                           |
 
 One wrapper existed per cell; **the only text that varied between trials of a cell was the
 `TRIAL DIRECTORY` path.** The restored arm reused the as-published wrappers with two changes,
@@ -125,12 +125,12 @@ prompt bytes were not preserved as artifacts. Disclosed gap; see §6.
 ## 4. The de novo oracle encoding: `jl4/examples/legal/chubb/denovo/chubb-denovo.l4`
 
 Produced **2026-08-31** under the go-pipeline cleanroom discipline for subject `chubb`
-(`etc/go/subjects/chubb/`): the encoder was given the hash-pinned source deposit — 
+(`etc/go/subjects/chubb/`): the encoder was given the hash-pinned source deposit —
 `denovo/source-policy.txt`, whose assembly from the arXiv PDF is specified byte-for-byte in
 `denovo/source-bundle.json` (PDF sha256, extraction rule, whitespace-normalised diff check) —
 and **not** `chubb.l4`. Its interpretive choices are recorded in `denovo/fork-register.json`
 (28 entries, each with both readings and the one taken) and its input pins in
-`denovo/surface-map.json`. The phase *instructions* are split: the pipeline contract is
+`denovo/surface-map.json`. The phase _instructions_ are split: the pipeline contract is
 committed (`etc/go/go.sh`, `subject.json`), but the phase-executing agents' session prompts are,
 again, transcript material. The independence claim a reviewer can check without any transcript:
 the fork register documents readings the corpus encoding did not take, and the §8 oracle's 107
@@ -156,7 +156,7 @@ measurable difference between the two texts.
    distributional by necessity.
 2. **The oracle encodings' production prompts** (§3, §4) were session-level and are preserved
    only in transcripts; this file records the protocol and every on-disk input they were given,
-   which is sufficient to run a *new* independent encoding — the scientifically meaningful
+   which is sufficient to run a _new_ independent encoding — the scientifically meaningful
    replication — but not to re-issue the identical prompt bytes.
 3. **Harness identity**: Claude Code, version not captured at run time; run dates given above.
 4. **T9** (`FOUNDATION.md`): the harness's memory index leaked result-adjacent content into

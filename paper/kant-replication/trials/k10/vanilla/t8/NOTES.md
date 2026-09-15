@@ -26,7 +26,7 @@ only.
 3. **Q5 — "accidental injury" and self-inflicted, non-fraudulent harm.** The contract has no
    exclusion for self-inflicted or intentional acts (only skydiving, military, firefighting,
    police service, and age ≥ 80 are listed), and the query affirmatively states no fraud or
-   misrepresentation occurred. I read "accidental injury" as turning on whether the *result*
+   misrepresentation occurred. I read "accidental injury" as turning on whether the _result_
    (hospitalization) was unintended, not on whether the underlying voluntary act (punching one's
    own face) was intentional — i.e., an unintended, unexpectedly serious outcome of a voluntary
    act still counts as an accidental injury absent a specific exclusion. This is a judgement call;

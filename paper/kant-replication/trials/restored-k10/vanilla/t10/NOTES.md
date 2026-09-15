@@ -15,7 +15,7 @@ no exclusion not referenced was assumed to apply.
    police, age ≥ 80) and conspicuously does **not** include a general "intentionally
    self-inflicted injury" exclusion, even though such a clause is extremely common in real
    accident/health policies. I read that omission as deliberate rather than an oversight, and
-   read "accidental Injury" in §2.1 as turning on whether the *harm* (hospitalization) was
+   read "accidental Injury" in §2.1 as turning on whether the _harm_ (hospitalization) was
    intended, not whether the underlying voluntary act was intended — i.e., the "accidental
    result" reading rather than the stricter "accidental means" reading. Under that reading the
    claimant intended to show off, not to injure himself badly enough to be hospitalized, so the

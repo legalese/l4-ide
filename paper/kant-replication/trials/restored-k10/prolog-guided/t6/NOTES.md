@@ -16,7 +16,7 @@ encoding.
 To keep `queries.pl` silent despite grouping each claim's 21 facts together (rather than
 grouping by predicate across all nine claims), I added explicit `:- discontiguous
 claim_*/2.` directives for all 21 predicates at the top of the file. Without them, SWI
-prints a warning for every claim_* predicate the first time its clauses turn out to be
+prints a warning for every claim\_\* predicate the first time its clauses turn out to be
 non-adjacent.
 
 ## Judgement calls in `policy.pl`
@@ -63,7 +63,7 @@ non-adjacent.
   consistent with the schema giving `claim_written_proof_of_claim_month` and
   `claim_recovery_sought_month` as ordinary, always-present claim facts rather than
   dispute-only ones. I applied it universally: `RecoverySoughtMonth >= WrittenProofMonth +
-  2`, translating 60 days as two 30-day months to stay on the same monthly axis as every
+2`, translating 60 days as two 30-day months to stay on the same monthly axis as every
   other date in the schema.
 
 ## Judgement calls in `queries.pl`
@@ -73,15 +73,15 @@ all conditions and triggers no exclusion (agreement signed, premium paid at mont
 fraud/misrepresentation, wellness-visit and confirmation both timely, no dispute, proof of
 claim and recovery timed two months apart, one year policy term, confined in a US hospital
 for 3 continuous days, claim made setting out its basis). Notable choices for the facts a
-question *does* put in issue:
+question _does_ put in issue:
 
 - **Mapping "proof/confirmation of my wellness visit was provided/submitted at month X"**
   (Q4, Q6, Q7, Q9) to `claim_written_confirmation_month`, not `claim_wellness_visit_month`
   - Section 1.3 distinguishes the visit itself from the written confirmation of it that
-  you supply to the insurer, and it is the latter ("provided"/"submitted" to whom the
-  policy speaks of "supplying") that these questions describe. `claim_wellness_visit_month`
-  is left at a baseline value on or before the given confirmation month, since no question
-  separately puts the underlying visit's own date in issue.
+    you supply to the insurer, and it is the latter ("provided"/"submitted" to whom the
+    policy speaks of "supplying") that these questions describe. `claim_wellness_visit_month`
+    is left at a baseline value on or before the given confirmation month, since no question
+    separately puts the underlying visit's own date in issue.
 - **Hospitalization month when not stated (Q4, Q6, Q9).** These questions describe the
   confirmation as already having happened ("I had given confirmation ...", "was provided
   ...", "was submitted ...") in the past relative to the hospitalization/claim, so I placed

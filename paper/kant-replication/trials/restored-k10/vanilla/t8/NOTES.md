@@ -5,19 +5,21 @@ mechanical lookup. No answer key or external source was consulted; this is reaso
 from `inputs/chubb-policy.txt` and `inputs/queries-blind.md` alone.
 
 ## Q1 — firefighter burns
+
 Straightforward: §3.1.3 excludes any injury "arising directly or indirectly out of ...
 Service as a fire fighter." Burns sustained on duty as a firefighter fall squarely
 within this. No judgment call needed.
 
 ## Q4 — fall while traveling abroad + late wellness confirmation
+
 Two independent readings both point the same way, which is why I answered `No` with
 confidence despite each reading individually requiring some interpretation:
 
 1. **Geography.** §2.2 says the Daily Hospital Income Benefit "will only be payable for
    each (24 hour) day of continuous confinement in a hospital **in the United States**."
    §4.1.1 separately says the policy "insures You twenty-four (24) hours a day anywhere
-   in the world" — but that clause is about where a covered *event* can occur, not where
-   the *confinement* that triggers payment must be. I read "hospitalized ... while
+   in the world" — but that clause is about where a covered _event_ can occur, not where
+   the _confinement_ that triggers payment must be. I read "hospitalized ... while
    traveling abroad" as meaning the hospitalization itself took place abroad, which
    would fail §2.2's situs requirement.
 2. **Timing.** §1.3 requires written confirmation of the wellness visit "no later than
@@ -29,6 +31,7 @@ confidence despite each reading individually requiring some interpretation:
    the instructions say not to assume away facts the query itself supplies.
 
 ## Q5 — punching own face to "show off," no fraud/misrepresentation
+
 The hardest call in the set. The contract never defines "accidental Injury" and has no
 express exclusion for self-inflicted or intentional acts (unlike the closed, enumerated
 list in §3.1). Two legitimate readings compete:
@@ -39,8 +42,8 @@ list in §3.1). Two legitimate readings compete:
   sense of §2.1.
 - **Competing reading (would give `Yes` or `I do not know`):** some insurance doctrine
   distinguishes "accidental means" from "accidental results" — under the latter, an
-  injury can be "accidental" if the *outcome* (hospitalization) was unintended even
-  though the *act* (the punch) was voluntary. The query's explicit statement that no
+  injury can be "accidental" if the _outcome_ (hospitalization) was unintended even
+  though the _act_ (the punch) was voluntary. The query's explicit statement that no
   fraud/misrepresentation occurred seems designed to take §1.2's fraud-cancelation
   clause off the table and isolate exactly this "was it an accident" question — which
   suggests the drafters intended it to be answerable, not a dead end.
@@ -51,6 +54,7 @@ ordinary person would read it, and an ordinary person would not call deliberatel
 punching your own face "an accident." This is a genuine judgment call, not a certainty.
 
 ## Q9 — son biting ankle while serving as a police officer
+
 §3.1.4 excludes injury "arising directly or indirectly out of ... Service in the
 police." I read this as requiring a causal link between the injury and police duties,
 not merely that the claimant happens to be a police officer. Being bitten by one's own
@@ -60,6 +64,7 @@ satisfies both the "no later than 6th month anniversary" visit deadline and the 
 later than 7th month anniversary" confirmation deadline in §1.3).
 
 ## General approach to unmentioned facts
+
 Per the standing preamble ("assuming all other conditions are met and no other
 exclusions apply ... anything not referenced in the query"), for any condition not
 mentioned in a given query (e.g., hospital location in Q3/Q7/Q9, fraud in Q1-7/Q9) I

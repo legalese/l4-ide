@@ -38,7 +38,7 @@ Did not run q1..q9 or otherwise test the encoding against the nine questions, pe
   fashion").** Encoded as: satisfied-on-time (written confirmation <= month 7 AND the
   underlying wellness visit <= month 6 AND a qualified provider), OR still pending, meaning
   no confirmation is yet on record (`claim_written_confirmation_month(C, none)`) and the
-  hospitalization itself falls at or before month 7. A confirmation that *is* on record but
+  hospitalization itself falls at or before month 7. A confirmation that _is_ on record but
   late (a number that fails the month-7 check) is a completed breach and cannot fall back to
   "pending" regardless of when the hospitalization occurred — otherwise the fact that a
   question states a specific late confirmation month (as Q4's "8 months" does) could never
@@ -49,7 +49,7 @@ Did not run q1..q9 or otherwise test the encoding against the nine questions, pe
 
 - **Fraud/misrepresentation timing.** Section 1.2 cancels the policy "if there is fraud, or
   any misrepresentation..." with no stated timing qualifier, so `policy.pl` treats fraud or
-  misrepresentation at *any* recorded month as cancelling the policy outright, rather than
+  misrepresentation at _any_ recorded month as cancelling the policy outright, rather than
   only counting occurrences before the hospitalization.
 
 - **The 60-day recovery bar (Section 4.2.1) is read in months.** The schema only offers
@@ -64,7 +64,7 @@ Did not run q1..q9 or otherwise test the encoding against the nine questions, pe
 
 - **Q4 ("hospitalized due to a fall while traveling abroad")** was read as the claimant being
   hospitalized abroad too (not just injured abroad), i.e. `claim_confined_in_us_hospital(c4,
-  false)`, since one would ordinarily be hospitalized wherever a disabling fall occurs while
+false)`, since one would ordinarily be hospitalized wherever a disabling fall occurs while
   traveling. This is the fact pattern that exercises the Section 2.2 US-hospital requirement
   above.
 
@@ -79,7 +79,7 @@ Did not run q1..q9 or otherwise test the encoding against the nine questions, pe
   indirectly out of that service.
 
 - **Q9 (bitten by claimant's own son while serving as a police officer)** was read as the
-  police-service exclusion (Section 3.1.4) *not* being triggered: being a police officer at
+  police-service exclusion (Section 3.1.4) _not_ being triggered: being a police officer at
   the time of hospitalization is background status, not itself a cause the injury "arose
   directly or indirectly out of" — the cause is the bite. `claim_causes(c9, [other])`, not
   `[police_service]`.

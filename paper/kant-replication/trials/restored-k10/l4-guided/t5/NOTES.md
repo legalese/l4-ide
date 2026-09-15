@@ -45,7 +45,7 @@
 - **Exclusions require causation, not mere status.** §3.1 excludes sickness/injury "arising
   directly or indirectly **out of**" the five listed activities. I read this as requiring the
   excluded activity to be in the claim's `causes` list (checked via the schema's `` `arose out
-  of` `` / `elem` helper), not merely that the claimant held some status (e.g. being a police
+of` `` / `elem` helper), not merely that the claimant held some status (e.g. being a police
   officer) at the time of hospitalization.
 
 ## Judgement calls in `apply.l4` (building each Claim)
@@ -66,7 +66,7 @@
   requires the injury to have arisen out of the excluded activity — being a police officer at the
   time of an unrelated domestic injury is occupational status, not causation.
 - All other "unrelated" fields (dispute/arbitration/recovery fields, `claim made setting out
-  basis`, `confined in us hospital`, `continuous confinement days`, `wellness visit provider
-  qualified`, `agreement signed`, `premium paid month`) were set to the same favorable baseline in
+basis`, `confined in us hospital`, `continuous confinement days`, `wellness visit provider
+qualified`, `agreement signed`, `premium paid month`) were set to the same favorable baseline in
   every query (no dispute, claim properly made, confined in a US hospital for 3 days, qualified
   provider, signed, premium paid at month 0), since none of the nine questions turn on them.

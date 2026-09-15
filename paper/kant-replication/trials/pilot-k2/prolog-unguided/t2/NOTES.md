@@ -18,8 +18,8 @@ I did not run `q1`..`q9` or otherwise query the encoding, per the task rules.
 
 1. **Causal-nexus reading of the Section 2.1 occupation exclusions.** Items 2–4 of the
    general exclusions ("Service in the military", "Service as a fire fighter", "Service in
-   the police") are worded as exclusions of an *event* "arising directly or indirectly out
-   of" that activity — not exclusions of a *person* who holds that occupation. I modeled
+   the police") are worded as exclusions of an _event_ "arising directly or indirectly out
+   of" that activity — not exclusions of a _person_ who holds that occupation. I modeled
    this with a single `hospitalization_cause/2` fact per claim representing the operative
    cause of the sickness or injury, and matched the exclusion against that cause, not
    against the claimant's job title or on-duty status at the time. This is the load-bearing
@@ -47,7 +47,7 @@ I did not run `q1`..`q9` or otherwise query the encoding, per the task rules.
    simply fails (rather than raising an existence error), which is the same outcome as
    "condition still pending, not yet violated". In `queries.pl` I nonetheless assert an
    explicit, comfortably-compliant value for every such fact on every claim (rather than
-   leaving any of them unstated), per the task's instruction to *set* facts that satisfy
+   leaving any of them unstated), per the task's instruction to _set_ facts that satisfy
    conditions unrelated to the question, rather than leave them merely undefined.
 
 4. **Worldwide coverage (Section 3.1.1) is modeled by omission.** Since the policy

@@ -33,12 +33,11 @@ intended behaviour:
    `jl4-core/libraries/prelude.l4` (`elem x list MEANS ...`) and was never given a mixfix/infix
    definition, so backtick-wrapping it at a call site does not make it infix — L4 does not offer
    Haskell-style ad hoc backtick-infix for arbitrary prefix functions. (Contrast prelude's own
-   `` x `is in` s MEANS elem x (s's elements) `` — there, `` `is in` `` is a name that was *defined*
+   ``x `is in` s MEANS elem x (s's elements)`` — there, `` `is in` `` is a name that was _defined_
    with `x`/`s` flanking it; `elem` itself is always called prefix, including inside that
    definition.) Confirmed empirically: `l4 check` on the verbatim line reports `I could not find a
-   definition for the identifier elem`, and parses `c \`elem\` cs` as `c` applied to two arguments.
-   Fixed by writing the body as plain prefix `elem c cs`. The helper's name, `GIVEN`/`GIVETH`
-   signature, and behaviour (true iff `c` occurs in `cs`) are unchanged; only this one internal
+definition for the identifier elem`, and parses `c \`elem\` cs`as`c`applied to two arguments.
+Fixed by writing the body as plain prefix`elem c cs`. The helper's name, `GIVEN`/`GIVETH`signature, and behaviour (true iff`c`occurs in`cs`) are unchanged; only this one internal
    expression was rewritten to something that actually resolves to the same thing the schema
    evidently intended.
 
@@ -81,7 +80,7 @@ SomeCause ``.
   `hospitalization ground IS Neither`, i.e. neither sickness nor accidental injury, because the act
   causing the harm was voluntary rather than unintended. This is genuinely contestable: some
   accident-insurance case law (notably New York's own "accidental result" line, and the policy is
-  New York-governed per §3.3.1) treats an unintended *result* of a voluntary act as still
+  New York-governed per §3.3.1) treats an unintended _result_ of a voluntary act as still
   "accidental," which would instead put this claim inside the covered-ground disjunct. I went with
   the narrower "the act itself must be unintended" reading, partly because it is the more natural
   reading of the bare word "accidental" applied to these facts, and partly because the question's
@@ -93,8 +92,8 @@ SomeCause ``.
   actual causal link between the service and the injury, not mere contemporaneous employment
   status. A son's bite has no causal connection to police duties, so `causes IS LIST Other`, not
   `` LIST `Police service` ``. This is deliberately the mirror image of q1 (burns while on duty as
-  a firefighter — the duty itself caused the injury) and q8 (injured in a military *training
-  exercise* — still service-caused): both of those get the matching excluded `Cause`, because
+  a firefighter — the duty itself caused the injury) and q8 (injured in a military _training
+  exercise_ — still service-caused): both of those get the matching excluded `Cause`, because
   there the causal nexus is real.
 - **`causes IS LIST Other`** (rather than `EMPTY`) is used whenever no excluded cause is
   implicated, reading `Other` as existing precisely to name "some non-excluded cause" for a claim

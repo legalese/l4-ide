@@ -8,7 +8,7 @@ interpretive choice rather than a mechanical lookup.
 Section 2.1 excludes events "causing sickness or accidental injury arising directly or
 indirectly out of" (among others) service as a fire fighter, service in the military, and
 service in the police. Q1 ("burns suffered while doing my duty as a firefighter") and Q8
-("injured in a military training exercise") both state the excluded service *as the cause*
+("injured in a military training exercise") both state the excluded service _as the cause_
 of the injury, so the exclusion applies to both (answered No).
 
 Q9 is worded differently: the stated cause of injury is "my son biting me in the ankle,"
@@ -31,6 +31,7 @@ not the underlying visit date directly.
 
 I treated submission time as an upper bound on visit time (you cannot submit confirmation
 of a visit that hasn't happened yet), so:
+
 - Q4: confirmation given at month 8 — this alone breaches the 7-month submission deadline,
   regardless of when the underlying visit occurred, so 1.3 is "not satisfied in a timely
   fashion" and cancelation is deemed under 1.2. Answered No. (Section 3.1's worldwide
@@ -53,7 +54,7 @@ stipulation of no fraud or misrepresentation. Two things drove the answer:
    intentional, or reckless acts — a category many real accident policies exclude by name,
    but this one does not.
 2. "Accidental injury" is not defined in the contract. Reading it by ordinary meaning, the
-   *act* (punching oneself) was deliberate, but a hospitalization-grade outcome from a
+   _act_ (punching oneself) was deliberate, but a hospitalization-grade outcome from a
    stunt intended to impress friends is not what the actor presumably intended or expected;
    I treated the unintended severity of the result as enough to keep this within
    "accidental injury" absent a contrary definition.

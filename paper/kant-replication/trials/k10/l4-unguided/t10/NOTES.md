@@ -13,7 +13,7 @@ typechecking was performed.
 
 1. **Time representation.** All times other than age are encoded as a plain `NUMBER` of months
    elapsed since the policy's effective date (e.g. `hospitalization month`, `wellness visit
-   month`, `wellness confirmation month`), per the task's instruction that every query gives
+month`, `wellness confirmation month`), per the task's instruction that every query gives
    times relative to the effective date. No `DATE`/`DATETIME` type or arithmetic is used anywhere.
 
 2. **Splitting Section 1.3 into two sub-deadlines.** The clause requires both (a) the wellness
@@ -65,7 +65,7 @@ typechecking was performed.
    (skydiving, military service, firefighting, police service, age >= 80); it does not mention
    self-inflicted injury or recklessness generally, so I did not add such an exclusion. The
    question's own "I did not commit fraud or misrepresentation" clause is encoded via `fraud or
-   misrepresentation IS FALSE`.
+misrepresentation IS FALSE`.
 
 9. **Sections not modelled as coverage rules.** Section 1.1 items 1-2 (signed; premium paid) are
    assumed true per the task instructions and have no field. Section 3.1 (worldwide, 24-hour
@@ -77,6 +77,6 @@ typechecking was performed.
 
 10. **End of policy term.** Section 3.6 / 1.2's "last day of the policy term" (one year from the
     effective date) is encoded as `hospitalization month GREATER THAN 12` inside `` `policy
-    canceled` ``. None of the nine questions approach this boundary (the largest relative time
+canceled` ``. None of the nine questions approach this boundary (the largest relative time
     figure used anywhere is 8 months), so this rule is not exercised in a way that would be
     sensitive to exactly where the boundary is drawn.

@@ -21,12 +21,12 @@ against the nine questions, per the task rules.
 2. **Section 1.3 has two separate deadlines, kept separate.** The clause reads: "No
    later than the 7th month anniversary ... you will supply us with written
    confirmation ... of a wellness visit ... occurring no later than the 6th month
-   anniversary." That is two facts -- (a) the confirmation must be *submitted* by
-   month 7, and (b) the underlying visit must have *occurred* by month 6 -- so
+   anniversary." That is two facts -- (a) the confirmation must be _submitted_ by
+   month 7, and (b) the underlying visit must have _occurred_ by month 6 -- so
    `Hospitalization` carries two independent `MAYBE NUMBER` fields rather than one.
    Every question that mentions this condition (Q4, Q6, Q7, Q9) phrases it as
    "confirmation/proof of my wellness visit was provided/submitted N months after the
-   effective date" -- grammatically about the act of *submitting*, matching clause
+   effective date" -- grammatically about the act of _submitting_, matching clause
    (a). None of the nine questions separately states when the underlying visit itself
    took place, so I bound the given figure only to the submission field and left the
    visit-occurrence field `NOTHING` (read as "not known to be late", which is

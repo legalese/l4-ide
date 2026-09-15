@@ -21,7 +21,7 @@ binder, `WHEN JUST t THEN ...`, which typechecks cleanly.
 ## Judgement calls
 
 - **Causation, not status, drives § 2.1.** `Claim`'s `cause of the hospitalization` is a single
-  closed enum describing what the sickness/injury arose *out of*, not a checklist of the
+  closed enum describing what the sickness/injury arose _out of_, not a checklist of the
   claimant's occupations or activities in general. This is the crux of Q9: the claimant is a
   serving police officer, but the ankle bite came from their son, not from police duty, so no
   exclusion applies. By contrast Q1's burns arose directly from firefighting duty, and Q8's
@@ -38,7 +38,7 @@ binder, `WHEN JUST t THEN ...`, which typechecks cleanly.
   `wellness visit occurred at` is `NOTHING` (defaults to satisfied) in every one of the nine
   claims -- that field is fully operative in `policy.l4` but inert across this fixture set.
 - **"Still pending" (§ 1.1(3)) is resolved this way:** if a confirmation has been supplied at all,
-  its own timeliness is dispositive, independent of when the hospitalization falls. Only when *no*
+  its own timeliness is dispositive, independent of when the hospitalization falls. Only when _no_
   confirmation has been supplied does the code fall back to asking whether the hospitalization
   itself is being assessed at or before month 7 -- i.e. the deadline simply hasn't arrived yet, so
   nothing has failed. This is what makes Q3 (pneumonia at month 5, no confirmation mentioned)

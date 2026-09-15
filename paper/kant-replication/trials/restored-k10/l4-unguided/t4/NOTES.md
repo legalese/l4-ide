@@ -28,12 +28,12 @@ encoding or the nine questions in any way.
    visit to be supplied no later than the 7-month anniversary. Every query
    that mentions this at all phrases it as "confirmation of my wellness
    visit" or "proof of the wellness visit was provided/submitted" N months
-   after the effective date — i.e. it always gives the *confirmation*
+   after the effective date — i.e. it always gives the _confirmation_
    deadline (b), never the visit's own date (a) separately. I modelled both
    as distinct fields (`wellness visit confirmation month`, a `MAYBE
-   NUMBER`, and `wellness visit occurred in time`, a `BOOLEAN`), but since
+NUMBER`, and `wellness visit occurred in time`, a `BOOLEAN`), but since
    no query ever supplies (a) independently, `wellness visit occurred in
-   time` is set to `TRUE` in all nine queries, per the instruction to treat
+time` is set to `TRUE` in all nine queries, per the instruction to treat
    facts a query doesn't mention as satisfied.
 
 2. **"Still pending" (§1.1(3)) needs a notion of time-of-hospitalization
@@ -66,9 +66,9 @@ encoding or the nine questions in any way.
    does not contain one.
 
 5. **Q4's "traveling abroad" is about where the accident happened, not
-   where the claimant was hospitalized.** §2.2 restricts the *benefit* to
+   where the claimant was hospitalized.** §2.2 restricts the _benefit_ to
    confinement "in a hospital in the United States," while §4.1 confirms
-   the *risk* itself is covered "twenty-four (24) hours a day anywhere in
+   the _risk_ itself is covered "twenty-four (24) hours a day anywhere in
    the world." Since Q4 states only that the fall occurred while traveling
    abroad and says nothing about the hospital's location, I treated
    `hospital in United States` as unrelated to the query and set it to

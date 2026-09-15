@@ -27,12 +27,12 @@ domain judgement call.
   (`Sickness` or `` `Accidental injury` `` only).
 
 - **Q5 (punching own face): classified as an accidental injury, not "Neither."** This was the
-  hardest call. Deliberately punching yourself is an intentional *act*, but the resulting
+  hardest call. Deliberately punching yourself is an intentional _act_, but the resulting
   hospitalization-worthy harm was (per the question) not itself sought, and this policy — unlike
   many real accident policies — has no clause excluding intentional or self-inflicted injury. Given
   that absence, and that the question explicitly disclaims fraud/misrepresentation (suggesting that
   clause is the only live issue), I treated the outcome as an "accidental injury" rather than
-  "Neither." A stricter accidental-*means* reading (the act, not just the result, must be
+  "Neither." A stricter accidental-_means_ reading (the act, not just the result, must be
   unintended) would instead put this at `Neither`/uninsured peril, which is a live alternative
   reading. `covered` itself does not encode a self-harm exclusion either way — that would require a
   policy clause that isn't in the text — so this call lives entirely in `apply.l4`'s construction
@@ -62,7 +62,7 @@ domain judgement call.
 
 - **"Proof/confirmation of my wellness visit was provided/given/submitted _N_ months after the
   effective date"** (the phrasing used in Q4, Q6, Q7, Q9) is mapped to `written confirmation
-  month`, not `wellness visit month` — i.e. it describes the act of supplying written confirmation
+month`, not `wellness visit month` — i.e. it describes the act of supplying written confirmation
   to the insurer under §1.3, not the date of the underlying visit. The underlying visit's own date
   is never stated by any of the nine questions, so in every claim I set `wellness visit month` to
   an early, compliant value (`JUST 1`) and `wellness visit provider qualified` to `TRUE`, isolating
@@ -74,7 +74,7 @@ domain judgement call.
   every other date fact in this schema is month-denominated. None of the nine questions touch
   arbitration, disputes, or recovery timing at all, so every claim sets those fields to inert
   defaults (`dispute arisen IS FALSE`, both settle/arbitration months `NOTHING`, `valid arbitration
-  award issued IS FALSE`, `recovery sought month IS NOTHING`) — the standing preamble's "assume all
+award issued IS FALSE`, `recovery sought month IS NOTHING`) — the standing preamble's "assume all
   other conditions are met."
 
 - **Q4's unstated `hospitalization month` is deliberately placed after the confirmation deadline.**

@@ -12,9 +12,9 @@ One intermediate failure, fixed before the above: my first draft of `policy canc
 and `excluded event` used the citation idiom from the `writing-l4-rules` skill's
 drafting-patterns reference — pairing a verbatim statutory-text string with the real
 condition via `...`, chained across disjuncts with `..`/`OR` (e.g.
-`` "5. age >= 80" ... claim's `age at hospitalization` AT LEAST 80 ``). `l4 check`
+``"5. age >= 80" ... claim's `age at hospitalization` AT LEAST 80``). `l4 check`
 reported an ambiguous-overload error on `AT LEAST` (`__GEQ__` had four candidate
-overloads and "insufficient information to choose") specifically on the *last* rung of
+overloads and "insufficient information to choose") specifically on the _last_ rung of
 each chain, the one using the spelled `OR` keyword next to a numeric comparison. I did
 not chase down why that combination confuses overload resolution; I just replaced the
 inline citation strings with plain `--` comments and plain `OR` chains, which
@@ -43,7 +43,7 @@ headers and comments instead.
    `references/drafting-patterns.md`'s "optional record field" bucket for `MAYBE`), and
    defined "still pending" (§1.1 item 3) as: nothing supplied yet, but the hospitalization
    itself occurs before the 7-month mark. Several questions (Q4, Q6, Q7, Q9) give only
-   the *confirmation* timing and never separately mention the underlying visit's own
+   the _confirmation_ timing and never separately mention the underlying visit's own
    date; per the task's Step-2 Rule 6 ("set parameters unrelated to the query so that
    conditions are satisfied"), I treated the visit date as the unrelated one and set it
    to a value that independently satisfies its own <=6 threshold (and is <= the given
@@ -80,7 +80,7 @@ headers and comments instead.
    hospitalization event covered or not covered under the policy (§3.1 only expands
    scope with nothing to gate; the rest govern dispute/payment mechanics). §3.6 (one-year
    term) is not inert, and is folded into `policy canceled` as
-   `` claim's `month of hospitalization` AT LEAST 12 `` — read as: the term runs
+   ``claim's `month of hospitalization` AT LEAST 12`` — read as: the term runs
    `[0, 12)` months from the effective date, since cancelation occurs "at midnight...on
    the last day," i.e. exactly at the month-12 boundary.
 

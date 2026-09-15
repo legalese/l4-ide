@@ -10,7 +10,7 @@
 Both are typecheck-only (`l4 check`, not `l4 run`); the nine `#EVAL`s in `apply.l4` were never
 evaluated and I did not look at their results.
 
-Before writing the real files, I unit-tested the *mechanics* of the two given helpers
+Before writing the real files, I unit-tested the _mechanics_ of the two given helpers
 (`` `no later than` ``, `` `arose out of` ``) and of my own `covered` logic against small,
 synthetic scenarios that do **not** reuse any fact pattern from `inputs/queries-blind.md` (e.g.
 age 95, a generic "skydiving" cause claim, a generic dispute/arbitration claim) — purely to
@@ -21,9 +21,8 @@ recording because they aren't obvious from the skill docs:
 - `` `no later than` `` and `` `arose out of` `` are called **prefix**, in the order their `GIVEN`
   parameters are declared: `` `no later than` eventMonth limitMonth `` and
   `` `arose out of` causesList cause ``.
-- A bare `claim's `field`` used **as a function argument** must be parenthesized —
-  `` isJust claim's `fraud month` `` mis-parses as `` (isJust claim)'s `fraud month` `` (a parse
-  error), so every such call site in `policy.l4` is written `` isJust (claim's `fraud month`) ``.
+- A bare `claim's `field`used **as a function argument** must be parenthesized —` isJust claim's `fraud month` `mis-parses as` (isJust claim)'s `fraud month` ``(a parse
+error), so every such call site in `policy.l4` is written`` isJust (claim's `fraud month`) ``.
 - L4 has no record-update syntax: every `Claim` in `apply.l4` is built from scratch with
   `Claim WITH` listing all eighteen fields — you cannot start from a "baseline" claim and
   override a couple of fields.
@@ -42,7 +41,7 @@ recording because they aren't obvious from the skill docs:
   "fraud, or any misrepresentation or material withholding of any information." The schema
   gives only `fraud month` and `misrepresentation month` — no separate withholding field — so
   `misrepresentation month` is read as standing for that whole disjunct (misrepresentation
-  *or* withholding) rather than narrowly for misrepresentation alone.
+  _or_ withholding) rather than narrowly for misrepresentation alone.
 - **Premium payment has no numeric deadline.** §1.1(2) just says the premium "has been paid";
   §3.5 describes payment mechanics (lump sum at signing) but sets no separate coverage-defeating
   deadline. I encode this as `isJust (claim's `premium paid month`)` — paid at all — rather than
@@ -55,7 +54,7 @@ recording because they aren't obvious from the skill docs:
   queries exercise this clause, so the approximation doesn't affect any answer here, but it's a
   genuine unit mismatch rather than an exact reading.
 - **Age exclusion is standalone.** §2.1's five sub-items are worded as one list ("arising ...
-  out of: 1. Skydiving; ... 5. If your age ... is ... 80"), but item 5 isn't a *cause* — it's an
+  out of: 1. Skydiving; ... 5. If your age ... is ... 80"), but item 5 isn't a _cause_ — it's an
   unconditional age cutoff. I modeled it as its own top-level exclusion (`excluded by age`),
   independent of the `causes` list, rather than trying to fit it through `` `arose out of` ``.
 - **Status vs. causation for the occupation-based exclusions.** §2.1 excludes an event

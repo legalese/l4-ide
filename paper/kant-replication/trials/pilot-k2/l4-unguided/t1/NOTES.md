@@ -23,7 +23,7 @@ typecheck, per the task rules.
 
 2. **Two wellness-visit deadlines collapsed to one reported figure.** Section 1.3
    actually imposes two distinct deadlines: the visit itself must occur by month 6, and
-   *written confirmation* of it must be supplied by month 7. Every question that
+   _written confirmation_ of it must be supplied by month 7. Every question that
    touches this, though, only ever reports a single number — "confirmation/proof ...
    provided/submitted N months after the effective date" — and never a separate
    visit-occurrence date. I mapped that single reported number onto the
@@ -53,7 +53,7 @@ typecheck, per the task rules.
 4. **Causation, not occupation, for the four service-related exclusions.** Section
    2.1 excludes sickness/injury "arising directly or indirectly out of" skydiving,
    military service, firefighter service, or police service. I modelled each as a fact
-   about what *caused* the hospitalization (`caused by police service`, etc.), not
+   about what _caused_ the hospitalization (`caused by police service`, etc.), not
    about the claimant's job or status at the time. This is the deciding move on Q9: the
    claimant is "serving as a police officer at the time of hospitalization," but the
    hospitalization was caused by their son biting their ankle, which has nothing to do

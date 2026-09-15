@@ -25,7 +25,7 @@ directive, and did not otherwise test `covered` against the nine questions, per 
   `apply.l4` claims do for every question that isn't itself about that condition.
 
 - **2.2's 365-day cap.** "for a period not exceeding three hundred and sixty-five (365) days"
-  reads as a cap on how many days are *payable*, not a condition that voids the whole claim for a
+  reads as a cap on how many days are _payable_, not a condition that voids the whole claim for a
   longer stay. `covered` therefore only requires `continuous confinement days` to be present and
   positive; it does not additionally require `<= 365`. A stay of, say, 400 days would still leave
   a benefit payable for the first 365, so it stays "covered" under this reading.
@@ -33,7 +33,7 @@ directive, and did not otherwise test `covered` against the nine questions, per 
 - **Territorial scope, 2.2 vs 4.1.** 4.1 says the policy insures the person "anywhere in the
   world," but 2.2 says the Daily Hospital Income Benefit is payable only for confinement "in a
   hospital in the United States." I read these as compatible rather than contradictory: 4.1
-  fixes where the *insured event* may occur (you can be hurt anywhere and still be within the
+  fixes where the _insured event_ may occur (you can be hurt anywhere and still be within the
   policy's scope), while 2.2 is a narrower, benefit-specific condition that the confining hospital
   itself be in the US. `covered` enforces `confined in us hospital` as a hard requirement. This is
   a real tension in the source text and a different reading (territorial scope overrides the
@@ -57,7 +57,7 @@ directive, and did not otherwise test `covered` against the nine questions, per 
 - **The 60-day no-action clause (4.2.1), unit mismatch.** The clause is stated in days ("sixty
   (60) days"), but the schema's fields are month-granularity (`written proof of claim month`,
   `recovery sought month`). I approximated 60 days as 2 months (`recovery sought month AT LEAST
-  written proof of claim month PLUS 2`). This is a coarser test than the contract's own wording;
+written proof of claim month PLUS 2`). This is a coarser test than the contract's own wording;
   I did not see a way to do better without a day-granularity field.
 
 ## Judgement calls in `apply.l4`

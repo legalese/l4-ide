@@ -34,15 +34,15 @@ nine claims against `covered`.
 
 2. **Fraud / misrepresentation treated as simple "did it ever happen" checks**, not compared
    against `hospitalization month`. §1.1's "at the time of the hospitalization" framing could
-   support a timing-relative reading (fraud committed *after* a hospitalization shouldn't
+   support a timing-relative reading (fraud committed _after_ a hospitalization shouldn't
    retroactively un-cover it), but none of the nine questions test that nuance — they only ever
    assert "no fraud/misrepresentation" outright — so I chose the simpler reading for consistency
    with judgment call 1, rather than adding an interpretive mechanism nothing here exercises.
 
 3. **§2.2's "hospital in the United States" is a hard, independent requirement for the daily
    benefit**, distinct from §4.1's "Your Policy insures You ... anywhere in the world." I read
-   §4.1 as describing where the insured *risk* is covered, and §2.2 as separately conditioning the
-   *daily hospital income benefit* specifically on US-hospital confinement. This is a genuine
+   §4.1 as describing where the insured _risk_ is covered, and §2.2 as separately conditioning the
+   _daily hospital income benefit_ specifically on US-hospital confinement. This is a genuine
    tension in the source text (Q4's hospitalization "while traveling abroad" sits squarely in the
    gap between the two clauses); I flag it rather than silently resolve it away, and encode
    `confined in us hospital` as required.
@@ -55,16 +55,15 @@ nine claims against `covered`.
    fighting fires), Q6 (injury while skydiving), or Q8 (injury in a military training exercise),
    each of which has an obvious direct causal link between the named activity and the injury
    mechanism. I therefore set Q9's `causes` to `LIST Other`, not `LIST \`Police service\``, so the
-   §3.1 exclusion does not fire on mere contemporaneity. `covered` itself is agnostic to this
-   choice — it just checks list membership via the supplied `arose out of` helper — so a reviewer
-   who disagrees with this reading can flip that one field in `apply.l4` without touching
-   `policy.l4`.
+§3.1 exclusion does not fire on mere contemporaneity. `covered`itself is agnostic to this
+choice — it just checks list membership via the supplied`arose out of`helper — so a reviewer
+who disagrees with this reading can flip that one field in`apply.l4`without touching`policy.l4`.
 
 5. **"Confirmation/proof of my wellness visit was provided/submitted/given X months after the
    effective date"** (Q4, Q6, Q7, Q9) is mapped to `written confirmation month` — the act of
    supplying written confirmation to the insurer — not `wellness visit month`, which is the date
    of the underlying medical visit itself and which no question ever states. `wellness visit
-   month` is defaulted (month 2, well inside the 6-month deadline) in every claim.
+month` is defaulted (month 2, well inside the 6-month deadline) in every claim.
 
 6. **§4.2's "sixty (60) days"** is translated to 2 months (60 / 30) when comparing
    `written proof of claim month` against `recovery sought month`, since those two fields are
@@ -73,13 +72,13 @@ nine claims against `covered`.
 
 7. **Arbitration/dispute fields** (`dispute arisen`, `unable to settle month`,
    `arbitration commenced month`, `valid arbitration award issued`, `written proof of claim
-   month`, `recovery sought month`) are not mentioned by any of the nine questions. Every claim
+month`, `recovery sought month`) are not mentioned by any of the nine questions. Every claim
    sets `dispute arisen` to `FALSE` and the remaining fields to values consistent with "no dispute
    ever arose," which trivially satisfies §4.2 regardless of how its sub-clauses are read.
 
 8. **Unstated `hospitalization month`, `age at hospitalization`, `hospitalization ground`, and
    `causes`** (wherever a question doesn't speak to them) are set to values that plainly satisfy
-   coverage and trigger no exclusion (e.g. age 40, ground `Sickness` or `\`Accidental injury\`` as
-   fits the stated mechanism of injury, `causes` = `LIST Other`), per the task's instruction to
+   coverage and trigger no exclusion (e.g. age 40, ground `Sickness` or `\`Accidental injury\``as
+fits the stated mechanism of injury,`causes`=`LIST Other`), per the task's instruction to
    set unrelated fields so "all conditions for coverage are satisfied and no exclusions are
    triggered."

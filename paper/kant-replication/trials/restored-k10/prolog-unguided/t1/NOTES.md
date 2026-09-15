@@ -33,7 +33,7 @@ Output: none (stdout and stderr both empty), exit code 0. Silent, as required. I
    read "accidental Injury" in Section 2.1 as requiring that the injury be unintended, so that an
    injury which is the direct, intended physical consequence of the claimant's own deliberate act
    against themselves (Q5: punching one's own face on purpose) fails the basic peril definition
-   before any exclusion is even reached. I distinguished this from an injury sustained *while*
+   before any exclusion is even reached. I distinguished this from an injury sustained _while_
    engaged in a voluntary but legal activity such as skydiving (Q6): there the activity is
    intentional but the injury is not, so it remains "accidental" and is instead handled by the
    named Section 3.1(1) exclusion. An opposing, more literal reading is available: since Section 3

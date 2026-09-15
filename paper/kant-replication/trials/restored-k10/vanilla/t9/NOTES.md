@@ -15,8 +15,8 @@ than a mechanical read:
    of" fire-fighter service / military service respectively — i.e. an activity-based causal nexus
    to the excluded service, not merely incidental. Both excluded -> No.
 
-3. **Q9 (son bit my ankle, currently serving as a police officer):** distinguished *status* from
-   *causal nexus*. §3.1.4 excludes events "arising directly or indirectly out of ... Service in
+3. **Q9 (son bit my ankle, currently serving as a police officer):** distinguished _status_ from
+   _causal nexus_. §3.1.4 excludes events "arising directly or indirectly out of ... Service in
    the police." Being employed as a police officer at the time of an unrelated domestic injury
    (a dog/child-bite-style incident from one's own son) does not, on this text, mean the injury
    arose out of police service. Treated as not excluded -> Yes. This is the same nexus-vs-status
@@ -31,15 +31,16 @@ than a mechanical read:
 
 5. **Q4 (fall while traveling abroad; confirmation given at 8 months):** two independent readings
    both point the same direction, so the ambiguity did not change the answer:
+
    - 8 months is past the 7-month confirmation deadline in §1.3, so the condition was not
      satisfied in a timely fashion, triggering deemed cancellation under §1.2.
    - Separately, §2.2 limits the payable Daily Hospital Income Benefit to confinement "in a
      hospital in the United States." "Hospitalized ... while traveling abroad" was read as the
      hospitalization itself occurring outside the US (not merely the fall), which — independent
-     of §4.1.1's broad 24/7/worldwide *insuring* language — would make the benefit non-payable
+     of §4.1.1's broad 24/7/worldwide _insuring_ language — would make the benefit non-payable
      under §2.2's narrower payment condition for location.
-   Both point to No; the exact temporal ordering of the fall vs. the 8-month confirmation was not
-   spelled out in the query, but it did not matter given the second, independent ground.
+     Both point to No; the exact temporal ordering of the fall vs. the 8-month confirmation was not
+     spelled out in the query, but it did not matter given the second, independent ground.
 
 6. **Q5 (punched own face to show off; no fraud/misrepresentation) — the least certain call.**
    The contract has no exclusion for intentional self-infliction or recklessness. Read "accidental

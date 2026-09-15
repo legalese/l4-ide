@@ -22,7 +22,7 @@ questions.
 - **"Still pending or has been satisfied" (SS1.1 item 3 / SS1.3).** Modeled as: the
   SS1.3 condition is satisfied if the wellness visit happened by month 6 (with a
   qualified provider) and confirmation was given by month 7; otherwise it is only
-  "pending" (not yet failed) if the relevant fact is `none` *and* the hospitalization
+  "pending" (not yet failed) if the relevant fact is `none` _and_ the hospitalization
   month itself is not yet past that fact's deadline. A visit or confirmation that
   already happened, but late, is treated as a completed failure, not something
   "pending" can rescue. This directly drives claim `c3` (Q3): hospitalization at
@@ -36,8 +36,8 @@ questions.
 - **US-hospital requirement (SS2.2).** Read SS2.2's "only be payable for ...
   confinement in a hospital in the United States" as a real, independent gate on
   the benefit, distinct from SS4.1.1's "insures You ... anywhere in the world" (which
-  I read as: the *insured event* can happen anywhere, but the *daily hospital
-  income benefit* specifically requires the confinement itself to be in a US
+  I read as: the _insured event_ can happen anywhere, but the _daily hospital
+  income benefit_ specifically requires the confinement itself to be in a US
   hospital). Applied to claim `c4` (Q4, "traveling abroad"), which I read as meaning
   the confinement was outside the US, so `claim_confined_in_us_hospital(c4, false)`.
 - **Self-inflicted intentional acts (SS2.1's "sickness or accidental injury").**
@@ -49,7 +49,7 @@ questions.
 - **Status vs. cause (SS3.1's "arising directly or indirectly out of ... service in
   the police").** Claim `c9` (Q9, bitten by claimant's son while claimant "was
   serving as a police officer at the time") is modeled with `claim_causes(c9,
-  [other])`, not `[police_service]` — being a police officer at the time of
+[other])`, not `[police_service]` — being a police officer at the time of
   hospitalization is a status, not a causal link between the injury and police
   service, and the exclusion is written in causal ("arising out of") terms, matching
   the `arose_out_of/2` helper's own doc comment.
@@ -77,6 +77,6 @@ questions.
   on time.
 - **Continuous confinement (SS2.2's 365-day cap).** Modeled as requiring some
   positive number of continuous confinement days, without treating a value over 365
-  as a disqualifier (SS2.2 caps how many days are *paid*, not whether the claim
+  as a disqualifier (SS2.2 caps how many days are _paid_, not whether the claim
   "applies" at all). Not exercised by any of the nine questions; all nine claims use
   a small placeholder value (3).

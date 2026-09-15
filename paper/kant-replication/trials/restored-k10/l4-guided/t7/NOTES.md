@@ -22,23 +22,24 @@ encoding, per the task rules.
   punching one's own face is a voluntary act whose resulting injury is an expected, not
   unintended, consequence, so I classified it as neither a sickness nor an accidental injury.
   This is the single most consequential judgement call in the file -- an equally defensible
-  reading treats the *result* as unintended (the "accidental means vs. accidental result"
+  reading treats the _result_ as unintended (the "accidental means vs. accidental result"
   split in real accident-insurance doctrine) and would classify it as `Accidental injury`,
   which §3.1 does not otherwise exclude.
 
 - **Q9 (son biting my ankle while I was serving as a police officer) -- `causes IS LIST
-  Other`, not `` `Police service` ``.** §3.1 excludes injury "arising directly or indirectly
+Other`, not `` `Police service` ``.** §3.1 excludes injury "arising directly or indirectly
   out of ... service in the police" -- a causal test, not a status test. Being on duty as a
   police officer at the moment of an unrelated domestic injury does not mean the injury arose
   out of that service, so I did not add `` `Police service` `` to `causes`.
 
 - **Q4 (fall while traveling abroad; confirmation given 8 months after the effective date).**
-  Two fields not literally stated were set to track the one fact that *is* stated, rather than
+  Two fields not literally stated were set to track the one fact that _is_ stated, rather than
   to whatever would most favour coverage:
+
   - `confined in us hospital IS FALSE`, reading "hospitalized ... while traveling abroad" as
     hospitalization at the foreign location, not a US hospital. (§4.1's "insures You ...
     anywhere in the world" is the territorial scope of the risk, not a substitute for §2.2's
-    separate requirement that the *confinement* be in a US hospital -- the two clauses do
+    separate requirement that the _confinement_ be in a US hospital -- the two clauses do
     different jobs, and I kept them distinct.)
   - `hospitalization month IS 8`, matching the one date given in the query. TASK.md directs
     setting unrelated fields so that "all conditions for coverage are satisfied" -- but

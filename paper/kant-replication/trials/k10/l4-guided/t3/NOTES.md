@@ -29,7 +29,7 @@ the task's rule 4.
    catch-all `Other`, deliberately **not** including `` `Police service` ``. §2.1 excludes an event
    "arising directly or indirectly **out of**" the listed activities — a causal requirement, matching
    the pre-defined `` `arose out of` `` helper's own name. Being bitten by one's own son in the ankle
-   has no causal connection to police duty; the claimant merely *held the status* of police officer
+   has no causal connection to police duty; the claimant merely _held the status_ of police officer
    at that moment. This is the deliberate contrast with Q1 ("burns suffered **while doing my duty as**
    a firefighter") and Q8 ("injured **in** a military training exercise"), both of which state an
    actual causal nexus between the excluded activity and the injury and so are encoded with the
@@ -38,21 +38,21 @@ the task's rule 4.
 3. **§1.1(3)/§1.3 — "still pending or has been satisfied in a timely fashion."** Modelled as: if no
    written confirmation has been supplied at all, the condition is satisfied while the 7-month
    deadline (measured against `hospitalization month`, since that is the only "as of" instant §1.1
-   gives us to test) has not yet passed; if a confirmation *has* been supplied, it is checked on its
+   gives us to test) has not yet passed; if a confirmation _has_ been supplied, it is checked on its
    own terms — was it supplied by month 7, was the underlying visit itself by month 6, was the
    provider qualified — independent of `hospitalization month`. This is why `hospitalization month`
    for Q4 is immaterial to the result even though Q4 never states it directly: the stated fact ("I
    had given confirmation ... 8 months after") already puts the claim in the "confirmation supplied,
    but late" branch, which does not consult `hospitalization month` at all. I set
    `hospitalization month` IS 8 there only for narrative consistency with the past-perfect phrasing
-   ("I *had* given confirmation ... 8 months after", read as preceding the hospitalization), not
+   ("I _had_ given confirmation ... 8 months after", read as preceding the hospitalization), not
    because the formula needs it.
 
 4. **§3.2.1's 60-day waiting period is unconditional.** "In no case shall You seek to recover on this
    Policy before the expiration of sixty (60) days after written proof of claim has been submitted"
    is written as its own sentence, not inside the "where there is a dispute" sentence that precedes
    it (which explicitly says "**where there is a dispute or disagreement**, the issuance of a valid
-   arbitration award shall *also* be a condition precedent"). So `covered` applies the 60-day check
+   arbitration award shall _also_ be a condition precedent"). So `covered` applies the 60-day check
    regardless of `dispute arisen`, while the arbitration-commencement and valid-award checks are
    gated on it. None of the nine queries state arbitration or proof-of-claim facts, so this is inert
    for all of them (every claim sets `dispute arisen` IS FALSE, `written proof of claim month` IS
@@ -91,8 +91,7 @@ the task's rule 4.
 Neither `` `no later than` `` nor `` `arose out of` `` repeats its GIVEN parameters on the left of
 `MEANS` in `inputs/schema.md`; both are called here as ordinary prefix functions in GIVEN-declared
 argument order (`` `no later than` (claim's `field`) (limit) ``, `` `arose out of` (claim's `causes`)
-Skydiving ``), with the genitive `claim's \`field\`` always parenthesized when it is itself an
-argument to a further function call — L4 parses `f r's foo` as `(f r)'s foo`, not `f (r's foo)`
-(a documented gotcha), so an unparenthesized `` `no later than` claim's `x` claim's `y` `` would
+Skydiving ``), with the genitive `claim's \`field\``always parenthesized when it is itself an
+argument to a further function call — L4 parses`f r's foo`as`(f r)'s foo`, not `f (r's foo)` (a documented gotcha), so an unparenthesized `` `no later than`claim's`x`claim's`y` `` would
 parse wrong. `l4 check` raised no complaint about either the verbatim helper definitions or these
 call sites.

@@ -26,7 +26,7 @@ as: the 7-month deadline for supplying written confirmation has not yet arrived,
 the hospitalization month. So `section_1_3_ok/2` succeeds unconditionally when
 `hospitalization_month =< 7`, and only checks the confirmation-by-month-7 /
 visit-by-month-6 / qualified-provider facts when the hospitalization occurs after month 7. This
-also means confirmation month, visit month and provider-qualified are *only* load-bearing when
+also means confirmation month, visit month and provider-qualified are _only_ load-bearing when
 the hospitalization happens after the 7-month mark — I set them to compliant values in every
 `queries.pl` claim regardless, so the encoding behaves the same whichever branch actually fires.
 
@@ -54,7 +54,7 @@ the 2-month gap either way.
 **Arbitration as a condition precedent.** Read S4.2.1 as: if a dispute has arisen but the
 parties are not yet "unable to settle" (`claim_unable_to_settle_month = none`), the arbitration
 clock has not started and coverage is not yet blocked (same "still pending" shape as S1.3). Once
-the parties are unable to settle, arbitration must have been *commenced* within 3 months of that
+the parties are unable to settle, arbitration must have been _commenced_ within 3 months of that
 date, **and** a valid arbitration award must have been issued, before the insurer is liable
 ("the issuance of a valid arbitration award shall also be a condition precedent to our
 liability" — read as an additional requirement on top of, not a substitute for, timely
@@ -62,8 +62,8 @@ commencement). None of the nine questions mention a dispute, so every `queries.p
 `claim_dispute_arisen` to `false`, which trivially satisfies this clause.
 
 **S2.2's "hospital in the United States" is read as a real, literal requirement**, not
-superseded by S4.1's "insures You twenty-four (24) hours a day anywhere in the world."  I read
-S4.1 as being about when/where the *insured risk* (sickness or injury) is covered, and S2.2 as a
+superseded by S4.1's "insures You twenty-four (24) hours a day anywhere in the world." I read
+S4.1 as being about when/where the _insured risk_ (sickness or injury) is covered, and S2.2 as a
 narrower, specific condition on the Daily Hospital Income Benefit itself: it is "only... payable
 for each... day of continuous confinement in a hospital in the United States." Q4 (fall while
 traveling abroad) is written to test exactly this: `claim_confined_in_us_hospital(c4, false)`,
@@ -85,7 +85,7 @@ excluded under S3.1(1).
 
 **Q5's hospitalization_ground: `neither`, not `accidental_injury`.** "Punching my own face to
 show off for my friends" is a deliberate, voluntary act, not an unintended/unforeseen event —
-I read "accidental injury" as requiring the *event* causing the injury to be accidental, not
+I read "accidental injury" as requiring the _event_ causing the injury to be accidental, not
 merely the resulting hospitalization to be unwanted. The policy's S3.1 exclusion list does not
 mention self-inflicted or intentional acts at all, so this can't be handled as an exclusion;
 instead I encoded it as not qualifying as a hospitalization "as a result of sickness or

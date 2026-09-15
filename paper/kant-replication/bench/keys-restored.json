@@ -1,73 +1,73 @@
 {
- "note": "Dual key for the RESTORED fixture (fixtures/chubb-policy-restored.txt), same discipline as keys.json per FOUNDATION.md R2: Key A gold values for comparability, Key B classification of how much of each item is mechanical clause application versus annotator judgement. NEVER report either alone. The headline fact of this key: restoration changes NO gold value — all nine golds equal keys.json's — it changes their DERIVABILITY. Q5's 'No' moves from resting on a deleted clause to resting on an operative one. Clause numbers below cite the RESTORED document (exclusions live at 3.1, conditions at 4.x).",
- "source": "Golds: Kant et al. 2025 arXiv 2502.17638 Appendix A.2, unchanged. Text: Goodenough & Carlson 2024 (PMC10894687) Appendix A restored per fixtures/chubb-policy-restored-NOTE.md.",
- "derived": "2026-09-01, committed BEFORE any restored-arm trial ran (see bench/PREREGISTRATION-restored.md)",
- "items": [
-  {
-   "id": 1,
-   "gold": "No",
-   "class": "mechanical",
-   "clause": "3.1(3)",
-   "note": "service as a fire fighter; named exclusion"
-  },
-  {
-   "id": 2,
-   "gold": "Yes",
-   "class": "mechanical",
-   "clause": "3.1(5)",
-   "note": "age 78 < 80; the restored text deliberately keeps the arXiv variant's threshold, a designed moving part per Goodenough & Carlson"
-  },
-  {
-   "id": 3,
-   "gold": "Yes",
-   "class": "mechanical",
-   "clause": "1.1(3)",
-   "disputed": true,
-   "dispute": "FOUNDATION T8, carried over verbatim: restoration does not touch clauses 1.1-1.3, so the still-pending dispute survives unchanged. The fixture auditor says the gold rests on defect D3 and a faithful reading of 1.2 answers No; the gold auditor says the harmonising reading is the only sane one, since the literal reading cancels every policy on day one. Unresolved. Record WHY a trial answers No."
-  },
-  {
-   "id": 4,
-   "gold": "No",
-   "class": "interpretive",
-   "clause": "1.1 / 1.3 / 2.2",
-   "defensible": "under-determined",
-   "why": "Carried over: the query never says WHEN the hospitalization occurred, and clause 1.1 makes that the operative moment; the benchmark's own preamble (set unreferenced facts favourably) yields Yes; the counter-argument is the question's pluperfect, i.e. grammar, not policy. Restoration ADDS a second route to No without resolving that: under a benefit-payability reading, restored 2.2 confines the Daily Hospital Income Benefit to hospitals in the United States and the query says 'traveling abroad'. But the query asks whether the policy will APPLY, and 4.1.1 insures You anywhere in the world, so on the applicability reading the timing question remains dispositive. Two independent contested routes now reach the same gold."
-  },
-  {
-   "id": 5,
-   "gold": "No",
-   "class": "interpretive",
-   "clause": "2.1 (RESTORED)",
-   "defensible": "defensible on the restored text",
-   "why": "The operative insuring clause exists again: benefits are paid for confinement 'as a result of sickness or accidental Injury' (2.1), echoed by 2.2's 'due to sickness or accidental Injury'. A deliberate self-punch fails the trigger on the accidental-means reading, which is what the published gold needs. The accidental-results reading (the Landress v. Phoenix Mutual line) remains available, so the item stays interpretive - open texture in 'accidental' does not disappear - but the gold is now derivable from operative text instead of resting on a clause the benchmark's authors deleted. Contrast keys.json item 5: 'not defensible on the modified text'."
-  },
-  {
-   "id": 6,
-   "gold": "No",
-   "class": "mechanical",
-   "clause": "3.1(1)",
-   "note": "skydiving; named exclusion"
-  },
-  {
-   "id": 7,
-   "gold": "Yes",
-   "class": "mechanical",
-   "clause": "none",
-   "note": "no exclusion fires; age 75 < 80. Under the TRUE original threshold of 75 this gold would flip to No, which is exactly why the restored fixture keeps the variant's 80: it preserves every query's fact pattern relative to every threshold, so the deletion is the single treatment difference between the two fixtures."
-  },
-  {
-   "id": 8,
-   "gold": "No",
-   "class": "mechanical",
-   "clause": "3.1(2)",
-   "note": "service in the military"
-  },
-  {
-   "id": 9,
-   "gold": "Yes",
-   "class": "mechanical",
-   "clause": "3.1(4)",
-   "note": "requires the injury to ARISE OUT OF police service; a son's bite does not"
-  }
- ]
+  "note": "Dual key for the RESTORED fixture (fixtures/chubb-policy-restored.txt), same discipline as keys.json per FOUNDATION.md R2: Key A gold values for comparability, Key B classification of how much of each item is mechanical clause application versus annotator judgement. NEVER report either alone. The headline fact of this key: restoration changes NO gold value — all nine golds equal keys.json's — it changes their DERIVABILITY. Q5's 'No' moves from resting on a deleted clause to resting on an operative one. Clause numbers below cite the RESTORED document (exclusions live at 3.1, conditions at 4.x).",
+  "source": "Golds: Kant et al. 2025 arXiv 2502.17638 Appendix A.2, unchanged. Text: Goodenough & Carlson 2024 (PMC10894687) Appendix A restored per fixtures/chubb-policy-restored-NOTE.md.",
+  "derived": "2026-09-01, committed BEFORE any restored-arm trial ran (see bench/PREREGISTRATION-restored.md)",
+  "items": [
+    {
+      "id": 1,
+      "gold": "No",
+      "class": "mechanical",
+      "clause": "3.1(3)",
+      "note": "service as a fire fighter; named exclusion"
+    },
+    {
+      "id": 2,
+      "gold": "Yes",
+      "class": "mechanical",
+      "clause": "3.1(5)",
+      "note": "age 78 < 80; the restored text deliberately keeps the arXiv variant's threshold, a designed moving part per Goodenough & Carlson"
+    },
+    {
+      "id": 3,
+      "gold": "Yes",
+      "class": "mechanical",
+      "clause": "1.1(3)",
+      "disputed": true,
+      "dispute": "FOUNDATION T8, carried over verbatim: restoration does not touch clauses 1.1-1.3, so the still-pending dispute survives unchanged. The fixture auditor says the gold rests on defect D3 and a faithful reading of 1.2 answers No; the gold auditor says the harmonising reading is the only sane one, since the literal reading cancels every policy on day one. Unresolved. Record WHY a trial answers No."
+    },
+    {
+      "id": 4,
+      "gold": "No",
+      "class": "interpretive",
+      "clause": "1.1 / 1.3 / 2.2",
+      "defensible": "under-determined",
+      "why": "Carried over: the query never says WHEN the hospitalization occurred, and clause 1.1 makes that the operative moment; the benchmark's own preamble (set unreferenced facts favourably) yields Yes; the counter-argument is the question's pluperfect, i.e. grammar, not policy. Restoration ADDS a second route to No without resolving that: under a benefit-payability reading, restored 2.2 confines the Daily Hospital Income Benefit to hospitals in the United States and the query says 'traveling abroad'. But the query asks whether the policy will APPLY, and 4.1.1 insures You anywhere in the world, so on the applicability reading the timing question remains dispositive. Two independent contested routes now reach the same gold."
+    },
+    {
+      "id": 5,
+      "gold": "No",
+      "class": "interpretive",
+      "clause": "2.1 (RESTORED)",
+      "defensible": "defensible on the restored text",
+      "why": "The operative insuring clause exists again: benefits are paid for confinement 'as a result of sickness or accidental Injury' (2.1), echoed by 2.2's 'due to sickness or accidental Injury'. A deliberate self-punch fails the trigger on the accidental-means reading, which is what the published gold needs. The accidental-results reading (the Landress v. Phoenix Mutual line) remains available, so the item stays interpretive - open texture in 'accidental' does not disappear - but the gold is now derivable from operative text instead of resting on a clause the benchmark's authors deleted. Contrast keys.json item 5: 'not defensible on the modified text'."
+    },
+    {
+      "id": 6,
+      "gold": "No",
+      "class": "mechanical",
+      "clause": "3.1(1)",
+      "note": "skydiving; named exclusion"
+    },
+    {
+      "id": 7,
+      "gold": "Yes",
+      "class": "mechanical",
+      "clause": "none",
+      "note": "no exclusion fires; age 75 < 80. Under the TRUE original threshold of 75 this gold would flip to No, which is exactly why the restored fixture keeps the variant's 80: it preserves every query's fact pattern relative to every threshold, so the deletion is the single treatment difference between the two fixtures."
+    },
+    {
+      "id": 8,
+      "gold": "No",
+      "class": "mechanical",
+      "clause": "3.1(2)",
+      "note": "service in the military"
+    },
+    {
+      "id": 9,
+      "gold": "Yes",
+      "class": "mechanical",
+      "clause": "3.1(4)",
+      "note": "requires the injury to ARISE OUT OF police service; a son's bite does not"
+    }
+  ]
 }

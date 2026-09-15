@@ -5,6 +5,7 @@ Reasoning was done privately per the task instructions (no explanations go into
 than a mechanical lookup.
 
 ## Q1, Q6, Q8 — straightforward exclusion hits
+
 Firefighter burns-on-duty (Q1), skydiving injury (Q6), and military-training-exercise injury
 (Q8) each fall squarely inside one of the five enumerated §2.1 exclusions ("arising directly or
 indirectly out of" that activity). Answered No regardless of the other facts recited in the
@@ -12,6 +13,7 @@ query (age, wellness-visit timing, absence of fraud) — a single applicable exc
 sufficient on its own.
 
 ## Q9 — occupation is not the trigger, causation is
+
 §2.1.4 excludes injury "arising directly or indirectly out of ... Service in the police," not
 injury suffered by a person who merely happens to serve in the police. Being bitten on the
 ankle by one's own son has no causal connection to police duties, so the exclusion does not
@@ -21,10 +23,12 @@ the analogous "I did not commit fraud" detail is also true but irrelevant, since
 still hits an exclusion by a different route — military service, causally).
 
 ## §1.3 wellness-visit condition (Q3, Q4, Q6, Q7, Q9)
-§1.3 bundles two deadlines: the wellness visit must *occur* no later than the 6-month
-anniversary, and written *confirmation* of it must be *supplied* no later than the 7-month
+
+§1.3 bundles two deadlines: the wellness visit must _occur_ no later than the 6-month
+anniversary, and written _confirmation_ of it must be _supplied_ no later than the 7-month
 anniversary. §1.1(3)/§1.2 keep the policy in force if this condition is "still pending or has
 been satisfied in a timely fashion"; late satisfaction is deemed a cancelation.
+
 - Q3 (hospitalized at 5 months, no wellness fact stated): at 5 months neither deadline has
   passed yet, so the condition is necessarily "still pending" — policy stays in effect
   independent of whether the visit has happened. Yes (no exclusion applies either).
@@ -42,6 +46,7 @@ been satisfied in a timely fashion"; late satisfaction is deemed a cancelation.
   inclusive). No cancelation triggered.
 
 ## Q5 — the genuinely hard call: self-inflicted injury
+
 "Hospitalized for punching my own face to show off for my friends," with an explicit denial of
 fraud or misrepresentation. This scenario matches none of the five §2.1 exclusions, and the
 query forecloses the §1.2 fraud/misrepresentation cancelation route explicitly. The open
@@ -49,7 +54,7 @@ question is whether a deliberately self-administered punch counts as an "acciden
 all under §1.1's coverage description, since the contract never defines "accidental" or
 addresses self-inflicted harm.
 
-I read "accidental" as turning on whether the *injury/result* was unintended, not on whether
+I read "accidental" as turning on whether the _injury/result_ was unintended, not on whether
 the antecedent conduct was voluntary — the claimant did not intend to injure himself badly
 enough to need hospitalization; he intended to show off. This reading is reinforced structurally
 by §2.1 itself: skydiving, military service, firefighting and police service are all voluntary,
@@ -66,5 +71,6 @@ enough to call this indeterminate ("I do not know"), so I committed to the bette
 reading above rather than declining to answer.
 
 ## Q2 — no special reasoning
+
 Age 78 is under the §2.1.5 threshold (≥80); nothing else in the query implicates any other
 exclusion. Yes, per the standing "assume all other conditions are met" preamble.

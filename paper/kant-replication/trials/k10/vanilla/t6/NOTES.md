@@ -13,13 +13,13 @@ otherwise excluded) was taken as given.
   rather than the literal ≥80 cutoff.
 
 - **Q3** — pneumonia and age 65 trigger no exclusion. The "5 months after effective date"
-  detail doesn't touch §1.3 (which is about *when confirmation of the wellness visit is
-  supplied*, not about when a claim arises), and the query doesn't mention the wellness
+  detail doesn't touch §1.3 (which is about _when confirmation of the wellness visit is
+  supplied_, not about when a claim arises), and the query doesn't mention the wellness
   visit at all, so I treated §1.3 as satisfied per the standing assumption. Treated as a
   distractor.
 
 - **Q4** — §1.3 sets two deadlines: the wellness visit itself must occur by the 6-month
-  anniversary, and *written confirmation* of it must be supplied by the 7-month
+  anniversary, and _written confirmation_ of it must be supplied by the 7-month
   anniversary. The query states confirmation was given at 8 months — past the 7-month
   deadline — regardless of when the underlying visit happened. Under §1.2 this makes the
   condition "not satisfied in a timely fashion," which is an automatic cancelation
@@ -32,7 +32,7 @@ otherwise excluded) was taken as given.
 - **Q5** — This was the hardest call. The contract's §2.1 exclusion list is short and
   specific (skydiving, military, firefighting, police, age ≥80); it does **not** contain
   an "intentionally self-inflicted injury" exclusion, which is common in real-world
-  accident policies but is conspicuously absent from *this* text. The query explicitly
+  accident policies but is conspicuously absent from _this_ text. The query explicitly
   stipulates "I did not commit fraud or misrepresentation," which forecloses the other
   plausible route to "No" (the §1.2 cancelation-for-fraud/misrepresentation ground).
   Judgement call: I answered strictly from the text as given rather than importing an
@@ -41,7 +41,7 @@ otherwise excluded) was taken as given.
   because the underlying act (punching oneself) was voluntary — there being no textual
   hook to exclude it. Concluded **Yes**. I considered "I do not know" here since
   "accidental" is undefined, but decided the absence of any on-point exclusion plus the
-  explicit fraud disclaimer left no textual basis in *this* contract for a "No."
+  explicit fraud disclaimer left no textual basis in _this_ contract for a "No."
 
 - **Q6** — Skydiving (§2.1.1) is independently dispositive ("No"), so I did not need to
   resolve whether "proof provided at 6.5 months" also satisfies the separate sub-deadline
@@ -57,8 +57,8 @@ otherwise excluded) was taken as given.
 
 - **Q9** — Key distinction from Q1/Q8: §2.1.4 excludes injury "arising directly or
   indirectly out of ... service in the police," which requires a causal link between the
-  police service and the injury. Here the claimant merely *was* a police officer *at the
-  time* of an unrelated domestic incident (son biting his ankle) — occupation/status, not
+  police service and the injury. Here the claimant merely _was_ a police officer _at the
+  time_ of an unrelated domestic incident (son biting his ankle) — occupation/status, not
   cause. Read the exclusion as not reaching incidental status where the police role did
   not cause the injury. Confirmation "provided 6 months after" effective date is inside
   the 7-month supply deadline, and necessarily means the underlying visit occurred at or

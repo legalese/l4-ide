@@ -66,7 +66,7 @@ test the encoding against the nine questions, per the rules.
   instruction to satisfy every condition not referenced in the question — I set the visit
   month to a compliant, unstated value (on or before month 6, qualified provider).
   - This matters most in **Q6**: confirmation at 6.5 months is inside the 7-month confirmation
-    deadline, but if I had instead read "provided 6.5 months after" as the *visit's own* month,
+    deadline, but if I had instead read "provided 6.5 months after" as the _visit's own_ month,
     that visit would itself be too late (> 6 months) and would independently break condition
     1.3, on top of the skydiving exclusion. I did not adopt that reading.
 - **Q4** ("I had given confirmation... 8 months after..."): the past perfect ("had given")
@@ -80,7 +80,7 @@ test the encoding against the nine questions, per the rules.
   as an unintended-harm outcome even though the underlying act (throwing the punch) was
   voluntary. The policy text has no separate exclusion for intentional acts or self-inflicted
   injury, so I did not invent one or route this to `neither`. This is a genuine judgment call;
-  a stricter reading ("the act was deliberate, so this isn't an *accident*") would classify it
+  a stricter reading ("the act was deliberate, so this isn't an _accident_") would classify it
   as `neither` and remove it from the policy's scope entirely via
   `qualifying_hospitalization/1`, with the same practical result of no benefit only if that
   reading is right — the two readings actually diverge in outcome here, which is why I'm
@@ -103,4 +103,4 @@ test the encoding against the nine questions, per the rules.
   question so that all other conditions for coverage are satisfied and no other exclusion is
   triggered.
 - I did not compute or check what any `q1`..`q9` actually evaluates to — the above records my
-  reasoning for *why* I chose each fact value, not a claim about the resulting truth value.
+  reasoning for _why_ I chose each fact value, not a claim about the resulting truth value.

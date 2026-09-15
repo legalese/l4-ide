@@ -16,29 +16,29 @@ was not reverse-engineered from the key.
 Times are **months relative to the policy's effective date**; `none` means the event never
 occurred.
 
-| #   | field                               | type             | values                                                                     | clause          | required by                                                    |
-| --- | ----------------------------------- | ---------------- | -------------------------------------------------------------------------- | --------------- | -------------------------------------------------------------- |
-| 1   | `agreement_signed`                  | boolean          |                                                                            | 1.1(1)          | policy in effect                                               |
-| 2   | `premium_paid_month`                | number or `none` |                                                                            | 1.1(2), 4.5.1   | policy in effect                                               |
-| 3   | `hospitalization_month`             | number           |                                                                            | 1.1             | the operative moment for every test                            |
-| 4   | `hospitalization_ground`            | enum             | `sickness`, `accidental_injury`, `neither`                                 | 1.1, 2.1, 2.2   | the insuring clause's trigger                                  |
-| 5   | `age_at_hospitalization`            | number           | years                                                                      | 3.1(5)          | exclusion                                                      |
-| 6   | `causes`                            | list of enum     | `skydiving`, `military_service`, `firefighting`, `police_service`, `other` | 3.1(1)–(4)      | exclusions; what the event arose directly or indirectly out of |
-| 7   | `fraud_month`                       | number or `none` |                                                                            | 1.2             | deemed cancellation                                            |
-| 8   | `misrepresentation_month`           | number or `none` |                                                                            | 1.2             | deemed cancellation; covers material withholding too           |
-| 9   | `wellness_visit_month`              | number or `none` |                                                                            | 1.3             | the visit must occur by month 6                                |
-| 10  | `wellness_visit_provider_qualified` | boolean          |                                                                            | 1.3             | "a qualified medical provider"                                 |
-| 11  | `written_confirmation_month`        | number or `none` |                                                                            | 1.3             | confirmation due by month 7                                    |
-| 12  | `dispute_arisen`                    | boolean          |                                                                            | 4.2.1           | arbitration gate                                               |
-| 13  | `unable_to_settle_month`            | number or `none` |                                                                            | 4.2.1           | starts the 3-month arbitration clock                           |
-| 14  | `arbitration_commenced_month`       | number or `none` |                                                                            | 4.2.1           | failure extinguishes the cause of action                       |
-| 15  | `valid_arbitration_award_issued`    | boolean          |                                                                            | 4.2.1           | condition precedent to liability                               |
-| 16  | `written_proof_of_claim_month`      | number or `none` |                                                                            | 4.2.1           | starts the 60-day bar                                          |
-| 17  | `recovery_sought_month`             | number or `none` |                                                                            | 4.2.1           | the 60-day bar                                                 |
-| 18  | `policy_term_months`                | number           | 12                                                                         | 4.6             | automatic cancellation at end of term                          |
-| 19  | `confined_in_us_hospital`           | boolean          |                                                                            | 2.2             | the Daily Benefit is payable only for confinement in a hospital in the United States |
-| 20  | `continuous_confinement_days`       | number or `none` |                                                                            | 2.2             | per-day benefit; capped at 365 days                            |
-| 21  | `claim_made_setting_out_basis`      | boolean          |                                                                            | 2.3             | a claim must be made to trigger any benefit                    |
+| #   | field                               | type             | values                                                                     | clause        | required by                                                                          |
+| --- | ----------------------------------- | ---------------- | -------------------------------------------------------------------------- | ------------- | ------------------------------------------------------------------------------------ |
+| 1   | `agreement_signed`                  | boolean          |                                                                            | 1.1(1)        | policy in effect                                                                     |
+| 2   | `premium_paid_month`                | number or `none` |                                                                            | 1.1(2), 4.5.1 | policy in effect                                                                     |
+| 3   | `hospitalization_month`             | number           |                                                                            | 1.1           | the operative moment for every test                                                  |
+| 4   | `hospitalization_ground`            | enum             | `sickness`, `accidental_injury`, `neither`                                 | 1.1, 2.1, 2.2 | the insuring clause's trigger                                                        |
+| 5   | `age_at_hospitalization`            | number           | years                                                                      | 3.1(5)        | exclusion                                                                            |
+| 6   | `causes`                            | list of enum     | `skydiving`, `military_service`, `firefighting`, `police_service`, `other` | 3.1(1)–(4)    | exclusions; what the event arose directly or indirectly out of                       |
+| 7   | `fraud_month`                       | number or `none` |                                                                            | 1.2           | deemed cancellation                                                                  |
+| 8   | `misrepresentation_month`           | number or `none` |                                                                            | 1.2           | deemed cancellation; covers material withholding too                                 |
+| 9   | `wellness_visit_month`              | number or `none` |                                                                            | 1.3           | the visit must occur by month 6                                                      |
+| 10  | `wellness_visit_provider_qualified` | boolean          |                                                                            | 1.3           | "a qualified medical provider"                                                       |
+| 11  | `written_confirmation_month`        | number or `none` |                                                                            | 1.3           | confirmation due by month 7                                                          |
+| 12  | `dispute_arisen`                    | boolean          |                                                                            | 4.2.1         | arbitration gate                                                                     |
+| 13  | `unable_to_settle_month`            | number or `none` |                                                                            | 4.2.1         | starts the 3-month arbitration clock                                                 |
+| 14  | `arbitration_commenced_month`       | number or `none` |                                                                            | 4.2.1         | failure extinguishes the cause of action                                             |
+| 15  | `valid_arbitration_award_issued`    | boolean          |                                                                            | 4.2.1         | condition precedent to liability                                                     |
+| 16  | `written_proof_of_claim_month`      | number or `none` |                                                                            | 4.2.1         | starts the 60-day bar                                                                |
+| 17  | `recovery_sought_month`             | number or `none` |                                                                            | 4.2.1         | the 60-day bar                                                                       |
+| 18  | `policy_term_months`                | number           | 12                                                                         | 4.6           | automatic cancellation at end of term                                                |
+| 19  | `confined_in_us_hospital`           | boolean          |                                                                            | 2.2           | the Daily Benefit is payable only for confinement in a hospital in the United States |
+| 20  | `continuous_confinement_days`       | number or `none` |                                                                            | 2.2           | per-day benefit; capped at 365 days                                                  |
+| 21  | `claim_made_setting_out_basis`      | boolean          |                                                                            | 2.3           | a claim must be made to trigger any benefit                                          |
 
 ## Supporting helpers
 
@@ -57,10 +57,10 @@ It supplies **facts, not conclusions**. There is no `policy_in_effect` field, no
 It also does not resolve the interpretive knots, and must not. The T8 knot (whether 1.2's
 "has not been satisfied in a timely fashion" cancels a policy whose 1.3 condition is merely
 **still pending**) survives restoration untouched. The Q5 knot changes shape but does not
-close: the insuring clause now exists, so the question is no longer *what follows when the
-ground is `neither`* but *whether a deliberate self-inflicted injury is "accidental"* — the
+close: the insuring clause now exists, so the question is no longer _what follows when the
+ground is `neither`_ but _whether a deliberate self-inflicted injury is "accidental"_ — the
 classification of the ground is still the encoder's (or fact-marshaller's) judgement. And
 restoration opens one new fork the modified text could not express: whether "will my policy
-apply" means *applicability* (4.1.1 insures worldwide) or *benefit payability* (2.2 pays only
+apply" means _applicability_ (4.1.1 insures worldwide) or _benefit payability_ (2.2 pays only
 for US confinement). All of these are left to the encoder; disagreement about them is a
 result, not a fault.

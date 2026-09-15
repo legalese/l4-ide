@@ -54,9 +54,9 @@ are met and no other exclusions apply") calls for.
    precondition (`hospital_in_us/1`) alongside Sec 2.1's sickness/injury trigger**, in tension
    with Sec 4.1's "insures You ... anywhere in the world." I encoded both clauses as written
    rather than treating one as silently overriding the other: Sec 4.1 (general conditions,
-   "where does your policy apply") I read as going to the territorial scope of the *risk*
+   "where does your policy apply") I read as going to the territorial scope of the _risk_
    insured against, while Sec 2.2 (benefits) I read as an additional, more specific mechanical
-   precondition on when the Daily Hospital Income Benefit is actually *payable*. This
+   precondition on when the Daily Hospital Income Benefit is actually _payable_. This
    surfaces only in claim_4 (hospitalized "while traveling abroad"), where I leave
    `hospital_in_us(claim_4)` unasserted; it turns out not to be outcome-determinative there
    either way, because that claim already fails Sec 1.3 timeliness (see below) before
@@ -72,8 +72,8 @@ are met and no other exclusions apply") calls for.
    ("you will supply us with written confirmation ... no later than the 7th month
    anniversary"). I deliberately did not fabricate a value for
    `wellness_visit_occurred_month/2` in any of the four claims that mention this timing
-   (claim_4, claim_6, claim_7, claim_9), since the question never gives that date; the rule
-   in `policy.pl` still checks it (so a hypothetical future claim that *did* supply both
+   (claim*4, claim_6, claim_7, claim_9), since the question never gives that date; the rule
+   in `policy.pl` still checks it (so a hypothetical future claim that \_did* supply both
    dates would be handled correctly), but for these nine claims that half of the rule is
    simply never in a position to fire. I checked by hand that this choice does not change the
    answer for any of the nine claims relative to the alternative of assuming the visit

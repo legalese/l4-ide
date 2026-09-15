@@ -34,7 +34,8 @@ const KEYS_PATH =
     ? resolve(process.argv[keysIdx + 1])
     : new URL("./keys.json", import.meta.url);
 const KEYS = JSON.parse(readFileSync(KEYS_PATH, "utf8"));
-const KEYS_NAME = keysIdx > -1 ? basename(process.argv[keysIdx + 1]) : "keys.json";
+const KEYS_NAME =
+  keysIdx > -1 ? basename(process.argv[keysIdx + 1]) : "keys.json";
 const IDS = KEYS.items.map((i) => i.id);
 const N = IDS.length;
 

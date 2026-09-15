@@ -9,6 +9,7 @@ Section 1.3 reads: "No later than the 7th month anniversary ... you will supply 
 confirmation ... of a wellness visit ... occurring no later than the 6th month anniversary."
 
 I read this as two distinct temporal facts bundled into one sentence:
+
 - the wellness **visit** itself must occur by month 6;
 - **written confirmation** of it must be supplied by month 7.
 

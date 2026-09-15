@@ -36,7 +36,7 @@ redefined-system-predicate warnings, no singleton-variable warnings).
    `accidental_injury`), independent of the Section 2.1 exclusion list
    (which does not mention self-inflicted or intentional acts at all).
    This is the "accidental means" reading of accident-insurance law
-   (the causing *act* must be unintended, not just the *result*); the
+   (the causing _act_ must be unintended, not just the _result_); the
    competing "accidental results" reading would treat this as covered
    since no exclusion clause names it. I judged the first reading more
    textually grounded, given that "accidental" is doing real work in
@@ -94,7 +94,7 @@ redefined-system-predicate warnings, no singleton-variable warnings).
    payment currency, or premium timing (the last is also covered by the
    task's blanket assumption that the premium was paid on time), so
    encoding them would not affect any `covered/1` result. Section 3.6
-   (one-year term) and Section 3.1.1 (worldwide, 24-hour coverage) *are*
+   (one-year term) and Section 3.1.1 (worldwide, 24-hour coverage) _are_
    used: the former sets the 12-month bound in `term_not_expired/1`, and
    the latter is why Q4's "traveling abroad" detail was not turned into
    an exclusion fact of its own (there is no geography-based exclusion

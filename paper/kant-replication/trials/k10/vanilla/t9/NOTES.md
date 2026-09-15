@@ -6,8 +6,8 @@ mechanical lookup. No files outside the trial directory were consulted; no web s
 ## Relevant contract structure (as given)
 
 - §1.1: benefit payment requires the policy to be "in effect" at the time of hospitalization.
-  Policy is in effect if: (1) signed, (2) premium paid, (3) the §1.3 condition is *still pending
-  or has been satisfied in a timely fashion*, and (4) not canceled.
+  Policy is in effect if: (1) signed, (2) premium paid, (3) the §1.3 condition is _still pending
+  or has been satisfied in a timely fashion_, and (4) not canceled.
 - §1.2: cancelation is deemed to occur on fraud/misrepresentation/material withholding, OR on
   failure to satisfy §1.3 in a timely fashion, OR automatically at the end of the one-year term.
 - §1.3: two nested deadlines measured from the effective date — the wellness visit itself must
@@ -22,7 +22,7 @@ mechanical lookup. No files outside the trial directory were consulted; no web s
 
 1. **§1.3 "timely" checks, where only the confirmation date is given (Q4, Q6, Q7, Q9).** The
    text gives two deadlines (visit by month 6, confirmation by month 7), but the queries only
-   ever state when confirmation was *provided*, not when the underlying visit occurred. I treated
+   ever state when confirmation was _provided_, not when the underlying visit occurred. I treated
    the confirmation date against the 7-month anniversary as the operative test: ≤ 7 months →
    condition satisfied/timely; > 7 months → not timely, triggering §1.2 cancelation. This is a
    reading-in, since the queries don't give us the visit date separately to check against the

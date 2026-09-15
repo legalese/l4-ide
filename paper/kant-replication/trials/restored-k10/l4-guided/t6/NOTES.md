@@ -28,7 +28,7 @@
    Unlike the wellness-visit fields, §1.2 cancels the policy "if there is fraud, or any
    misrepresentation," with no stated timing. I wrote a small `has occurred` helper
    (MAYBE NUMBER → BOOLEAN, true iff `JUST`) for these two fields plus `premium paid
-   month`, rather than stretching the given `no later than` helper (which is a deadline
+month`, rather than stretching the given `no later than` helper (which is a deadline
    comparison, not a presence test) to do a job it isn't shaped for.
 3. **`continuous confinement days` and the 365-day cap (§2.2).** I treat presence of
    `continuous confinement days` (any `JUST` value) plus `confined in us hospital` as

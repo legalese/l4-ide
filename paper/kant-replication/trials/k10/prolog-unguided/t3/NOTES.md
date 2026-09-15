@@ -32,7 +32,7 @@ encoding against the nine questions.
   the effective date.
 - Sections 3.2-3.5 (arbitration procedure, governing law, currency,
   premium-payment mechanics) are not encoded as callable predicates. None
-  of them bear on whether a hospitalization event is *covered*, and none of
+  of them bear on whether a hospitalization event is _covered_, and none of
   the nine questions exercise them; encoding them would add predicates the
   benchmark never calls, and rule 4 of the task ("all predicates used ...
   fully defined") is more easily kept if I don't invent unused surface
@@ -49,9 +49,9 @@ encoding against the nine questions.
 ## Judgment calls
 
 1. **Section 1.3's two nested deadlines, collapsed to one tracked value.**
-   Section 1.3 actually states two deadlines: the wellness *visit* itself
-   must occur by the 6-month anniversary, and *written confirmation* of it
-   must be *supplied* to the Company by the 7-month anniversary. Every
+   Section 1.3 actually states two deadlines: the wellness _visit_ itself
+   must occur by the 6-month anniversary, and _written confirmation_ of it
+   must be _supplied_ to the Company by the 7-month anniversary. Every
    question that mentions this ("confirmation ... given", "proof ...
    provided/submitted") describes only the supply/provision event, never
    the underlying visit date. I modeled both deadlines faithfully in
@@ -77,7 +77,7 @@ encoding against the nine questions.
    late, but a reader who assumes the hospitalization definitely preceded
    month 7 would model it differently.
 3. **The Section 2.1 occupation exclusions (skydiving/military/firefighter/
-   police) are keyed to the *cause* of the hospitalization, not to the
+   police) are keyed to the _cause_ of the hospitalization, not to the
    claimant's job or activity in general.** The clause excludes sickness or
    injury "arising directly or indirectly out of" the five listed things,
    which I read as a causation requirement. This matters for the question
@@ -99,7 +99,7 @@ encoding against the nine questions.
    injury" or carve out intentional/self-inflicted acts anywhere. I
    modeled the resulting hospitalization as an ordinary
    `hospitalization_event`, i.e. as within the "sickness or accidental
-   injury" gate in Section 1.1, on the reasoning that the *harm* (a
+   injury" gate in Section 1.1, on the reasoning that the _harm_ (a
    hospitalization-worthy injury) was not the thing intended, even though
    the underlying act (the punch) was voluntary. A stricter reading — that
    a self-inflicted, voluntary blow is never "accidental" regardless of

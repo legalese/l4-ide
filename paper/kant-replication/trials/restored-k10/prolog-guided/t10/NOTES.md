@@ -68,7 +68,7 @@ not redefined anywhere; confirmed `policy.pl` defines no `claim_*` facts; confir
   Section 3.1 excludes an event "arising directly or indirectly out of ... service in the
   police," which I read as requiring a causal link between the service and the injury, not
   merely that the claimant holds that occupation. This reading is reinforced by the
-  `arose_out_of/2` supporting predicate, which tests membership in the *causes* of the event,
+  `arose_out_of/2` supporting predicate, which tests membership in the _causes_ of the event,
   not the claimant's general status. I therefore set `claim_causes(c9, [other])`, omitting
   `police_service`.
 
@@ -92,8 +92,9 @@ not redefined anywhere; confirmed `policy.pl` defines no `claim_*` facts; confir
   `claim_recovery_sought_month` are given in.
 
 - **Term-expiry cancelation (S1.2 last sentence / S4.6)** uses a strict `HospitalizationMonth
+
   > PolicyTermMonths` test: cancelation takes effect "at midnight ... on the last day of the
-  policy term," so hospitalization occurring on that last day itself is still within the term.
+  > policy term," so hospitalization occurring on that last day itself is still within the term.
 
 - **Heart attack (Q7) and pneumonia (Q3) encoded as `sickness`, not `accidental_injury`**;
   falls, bites, burns and skydiving/military-exercise injuries (Q1, Q4, Q6, Q8, Q9) encoded as

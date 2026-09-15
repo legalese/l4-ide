@@ -18,10 +18,10 @@ results were never inspected.
 ## Judgement calls in `covered` (policy.l4)
 
 1. **Premium payment has no separate deadline.** `1.1(2)` only requires the premium "has been
-   paid" (no month comparison), and `4.5.1` describes *how* it is paid (lump sum, at signing)
+   paid" (no month comparison), and `4.5.1` describes _how_ it is paid (lump sum, at signing)
    rather than stating a consequence for lateness. Section `1.2`'s cancellation triggers are an
    enumerated list (fraud, misrepresentation, the §1.3 condition failing, end of term) and do
-   *not* include late premium payment. So `premium paid month` is checked only for presence
+   _not_ include late premium payment. So `premium paid month` is checked only for presence
    (`isJust`), not against any numeric limit.
 
 2. **"Still pending" (§1.1(3)) is read relative to the hospitalization month.** §1.1 assesses
@@ -39,12 +39,12 @@ results were never inspected.
 
 4. **`unable to settle month = NOTHING` is read as "the arbitration clock has not started,"** i.e.
    not yet a failure, mirroring the "still pending" treatment elsewhere. `arbitration commenced
-   month = NOTHING` once the clock *has* started is a failure (via the given `no later than`
+month = NOTHING` once the clock _has_ started is a failure (via the given `no later than`
    helper's own `NOTHING -> FALSE` branch), matching "any cause of action... shall be
    extinguished."
 
 5. **`valid arbitration award issued` and the 3-month arbitration deadline are gated on `dispute
-   arisen`** — irrelevant unless a dispute actually arose, per the text's own conditioning
+arisen`** — irrelevant unless a dispute actually arose, per the text's own conditioning
    ("Where there is a dispute or disagreement...").
 
 6. **`continuous confinement days` is checked against the 365-day cap** by reusing the given
@@ -82,13 +82,13 @@ results were never inspected.
   month figure in each such query (Q4: 8, Q6: 6.5, Q7: 2, Q9: 6), so the stated fact stays
   operative and no field is temporally impossible (confirmation cannot postdate the claim).
 
-- All fields not discussed above are set to values chosen to keep every *other* condition
+- All fields not discussed above are set to values chosen to keep every _other_ condition
   satisfied for that query, per the task's instruction and the standing preamble ("assuming all
   other conditions are met... where by 'other' I mean anything not referenced in the query").
   Uniform defaults used throughout: `agreement signed = TRUE`, `premium paid month = JUST 0`,
   `fraud month`/`misrepresentation month = NOTHING`, `dispute arisen = FALSE` (with the
   arbitration-chain fields set to their vacuous defaults), `written proof of claim
-  month`/`recovery sought month = NOTHING`, `policy term months = 12`, `confined in us hospital =
-  TRUE`, `continuous confinement days = JUST 1`, `claim made setting out basis = TRUE`, and (where
+month`/`recovery sought month = NOTHING`, `policy term months = 12`, `confined in us hospital =
+TRUE`, `continuous confinement days = JUST 1`, `claim made setting out basis = TRUE`, and (where
   not the tested fact) `wellness visit month = JUST 1`/`wellness visit provider qualified =
-  TRUE`/`written confirmation month = JUST 1`.
+TRUE`/`written confirmation month = JUST 1`.

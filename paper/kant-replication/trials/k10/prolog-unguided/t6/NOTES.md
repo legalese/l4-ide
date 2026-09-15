@@ -32,12 +32,12 @@ when actually queried":
 
 **Q5 (punching my own face to show off for my friends).** The base coverage grant in s.1.1
 is for hospitalization "for sickness or accidental injury." I read a deliberate,
-self-inflicted act performed for show as neither a sickness nor an *accidental* injury — the
+self-inflicted act performed for show as neither a sickness nor an _accidental_ injury — the
 injury may not have been the point, but the act that caused it was intentional, not
 accidental, in the ordinary insurance sense of that word. On that reading the claim never
 gets as far as the s.2 exclusion list at all (which, notably, has no self-inflicted-injury
 item of its own) and I encoded `q5` to fail. This is genuinely arguable: someone reading
-"accidental" as qualifying the *injury* rather than the *act* (i.e. you meant to punch
+"accidental" as qualifying the _injury_ rather than the _act_ (i.e. you meant to punch
 yourself but didn't mean to end up hospitalized) would encode this the other way, and the
 absence of any explicit self-inflicted-injury exclusion in s.2 is some evidence for that
 reading. I also take "I did not commit fraud or misrepresentation" in the question at face
@@ -62,7 +62,7 @@ disagree and exclude this claim.
 hospitalization date and the two s.1.3 deadlines (i.e., whether the hospitalization fell
 before or after a deadline breach became final). The task brief says dates in a query are
 always relative to the effective date and that there is never a need to compute elapsed
-time *between two dates*, which I read as ruling out exactly that kind of cross-comparison.
+time _between two dates_, which I read as ruling out exactly that kind of cross-comparison.
 Instead each s.1.3 sub-deadline is checked only against its own fixed threshold (visit by
 month 6, confirmation by month 7), independent of when the hospitalization occurred. In
 practice this only matters for Q3, where the hospitalization occurs at month 5 with no
@@ -72,7 +72,7 @@ is "early enough."
 
 **s.1.3's two sub-deadlines, when a question gives only one number.** s.1.3 actually
 imposes two dates: the wellness visit itself must occur by month 6, and written
-confirmation of it must be *supplied* by month 7. Every question that mentions this
+confirmation of it must be _supplied_ by month 7. Every question that mentions this
 (Q4, Q6, Q7, Q9) gives a single figure phrased as the visit being "provided," "submitted,"
 or (Q4) "confirm[ed]" at month N. I read all of these as describing the **supply/confirm**
 act (the language tracks "you will supply us with written confirmation ... of a wellness
@@ -98,8 +98,8 @@ to trigger. `territorial_scope_ok/1` is included in `covered/1` as a documented 
 rather than silently dropping s.3.1 from the encoding.
 
 **s.3.2 (arbitration) defined but not wired into `covered/1`.** I read the arbitration/
-time-bar/60-day-moratorium provisions as conditions on a policyholder's right to *litigate
-or recover on* a claim that is actually in dispute — a procedural layer on top of, and
+time-bar/60-day-moratorium provisions as conditions on a policyholder's right to _litigate
+or recover on_ a claim that is actually in dispute — a procedural layer on top of, and
 analytically separate from, the substantive "is this event covered" question the nine
 benchmark questions all ask. I fully defined the relevant predicates
 (`claim_extinguished_for_late_arbitration/1`, `arbitration_condition_precedent_met/1`) for

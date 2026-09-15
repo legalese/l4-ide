@@ -28,7 +28,7 @@ encoding was not otherwise tested against the queries, per the task rules.
    query that speaks to Sec.1.3 gives only one number ("confirmation/proof
    given/provided/submitted N months after the effective date") -- never a separate visit
    date -- so this encoding uses that single figure for both `wellness visit occurred in
-   time` (<=6) and `wellness visit confirmation supplied in time` (<=7). This is
+time` (<=6) and `wellness visit confirmation supplied in time` (<=7). This is
    equivalent, for this benchmark, to requiring the figure be <=6, since a number in
    (6,7] would only arise in Q6, and Q6 is independently excluded by the skydiving
    exclusion regardless of how the Sec.1.3 timing is resolved. I did not find a query
@@ -38,7 +38,7 @@ encoding was not otherwise tested against the queries, per the task rules.
    hospitalization "as a result of sickness or accidental Injury." Punching one's own
    face on purpose to show off is a deliberate act, not an accident, so I modelled it as
    `hospitalization caused by accidental injury = TRUE` together with `injury was
-   self-inflicted = TRUE`, and the policy's insured-event gate requires accidental injury
+self-inflicted = TRUE`, and the policy's insured-event gate requires accidental injury
    to NOT be self-inflicted. This is an interpretive call -- the contract text never
    defines "accidental" and never lists self-inflicted injury as a Sec.3.1 exclusion --
    but "accidental" ordinarily requires the causing act to be unintended, and the

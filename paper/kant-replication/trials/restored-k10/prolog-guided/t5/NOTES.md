@@ -25,7 +25,7 @@ Note: `TASK.md`'s inline example comment says "all 18 facts", but `schema.md` �
 ## Judgment calls in reading the policy (`policy.pl`)
 
 - **§1.3 "still pending" vs. "satisfied in a timely fashion."** §1.1(3) requires, as of the
-  hospitalization, that §1.3 be *either* still pending *or* already satisfied. I read "pending" as
+  hospitalization, that §1.3 be _either_ still pending _or_ already satisfied. I read "pending" as
   "the 7-month written-confirmation deadline has not yet arrived" (`hospitalization_month < 7`),
   which is true regardless of whether the wellness visit/confirmation have actually happened yet —
   they still have time. At `hospitalization_month >= 7` the deadline has arrived, so the claim must
@@ -42,9 +42,9 @@ Note: `TASK.md`'s inline example comment says "all 18 facts", but `schema.md` �
   term" reads as the last day itself being within the term).
 - **§2.2 "in the United States" vs. §4.1.1 "anywhere in the world."** Read these as complementary
   rather than contradictory: the insured event (sickness/injury) can arise anywhere in the world
-  (§4.1.1), but §2.2's Daily Hospital Income Benefit is explicitly conditioned on the *confinement*
+  (§4.1.1), but §2.2's Daily Hospital Income Benefit is explicitly conditioned on the _confinement_
   itself being in a US hospital. `benefit_triggered/1` requires `claim_confined_in_us_hospital(C,
-  true)` as a hard condition. This is the most consequential reading in the whole encoding — see
+true)` as a hard condition. This is the most consequential reading in the whole encoding — see
   the Q4 note below.
 - **§2.2 "not exceeding 365 days."** Modeled as a hard cap via `no_later_than(Days, 365)` on
   `claim_continuous_confinement_days` for the purposes of a boolean `covered/1` (rather than as a
@@ -81,8 +81,8 @@ within any deadline) so only the mentioned facts are load-bearing. Choices worth
   `claim_confined_in_us_hospital(c4, false)` — the only claim where this fact is not the favorable
   default. This is a direct, explicit fact in the question's text, not an "unrelated" one.
 - **Q5 — "punching my own face to show off for my friends."** Classified
-  `claim_hospitalization_ground(c5, accidental_injury)`, on the reading that the *harm* was
-  unintended (a stunt that went wrong) even though the *act* was voluntary — the standard
+  `claim_hospitalization_ground(c5, accidental_injury)`, on the reading that the _harm_ was
+  unintended (a stunt that went wrong) even though the _act_ was voluntary — the standard
   insurance-law sense of "accident." This is the most debatable ground classification of the nine;
   a reading that treats deliberate self-inflicted acts as `neither` would go the other way.
 - **Q9 — "serving as a police officer at the time of hospitalization."** The bite came from "my

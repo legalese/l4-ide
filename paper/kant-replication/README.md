@@ -140,13 +140,13 @@ the top-up wave) died on API timeouts having written **zero bytes**, and were re
 their pristine sandboxes under identical conditions. An agent crash with no partial output is an
 infrastructure failure, not a measurement, so this is a repair, not a resample.
 
-| cell            | n   | Key A mean | sd    | min   | max   | Q5    | Q4    | mechanical  |
-| --------------- | --- | ---------- | ----- | ----- | ----- | ----- | ----- | ----------- |
-| vanilla         | 10  | 0.900      | 0.035 | 0.889 | 1.000 | 1/10  | 10/10 | 70/70       |
-| prolog-unguided | 10  | 0.922      | 0.054 | 0.889 | 1.000 | 3/10  | 10/10 | 70/70       |
-| prolog-guided   | 10  | 0.945      | 0.059 | 0.889 | 1.000 | 6/10  | 9/10  | 70/70       |
-| l4-unguided     | 10  | 0.911      | 0.047 | 0.889 | 1.000 | 2/10  | 10/10 | 70/70       |
-| l4-guided       | 10  | **0.967**  | 0.054 | 0.889 | 1.000 | 7/10  | 10/10 | 70/70       |
+| cell            | n   | Key A mean | sd    | min   | max   | Q5   | Q4    | mechanical |
+| --------------- | --- | ---------- | ----- | ----- | ----- | ---- | ----- | ---------- |
+| vanilla         | 10  | 0.900      | 0.035 | 0.889 | 1.000 | 1/10 | 10/10 | 70/70      |
+| prolog-unguided | 10  | 0.922      | 0.054 | 0.889 | 1.000 | 3/10 | 10/10 | 70/70      |
+| prolog-guided   | 10  | 0.945      | 0.059 | 0.889 | 1.000 | 6/10 | 9/10  | 70/70      |
+| l4-unguided     | 10  | 0.911      | 0.047 | 0.889 | 1.000 | 2/10 | 10/10 | 70/70      |
+| l4-guided       | 10  | **0.967**  | 0.054 | 0.889 | 1.000 | 7/10 | 10/10 | 70/70      |
 
 **350 of 350 mechanical items correct, across all fifty trials** (7 mechanical items × 50 trials — an earlier revision of this line said 450/450, conflating all nine items with the mechanical seven; corrected 2026-09-01, and the same slip survives uncorrectably in two commit titles). Every point of variance in the
 whole arm sits on the two pre-registered interpretive items: Q5 (49 of the 50 trials' misses) and
@@ -342,7 +342,7 @@ derivability, not answers). Two harness repairs of the same kind as §5's: the r
   treatment of putting the insuring clause back. This is the deletion's measured cost, and it is
   the licensed core claim: **on this item, the original's residual "model error" is largely an
   artifact of its own edit.**
-- **P2 — half supported.** l4-guided rose 7/10 → 9/10; prolog-guided *fell* 6/10 → 5/10, one flip
+- **P2 — half supported.** l4-guided rose 7/10 → 9/10; prolog-guided _fell_ 6/10 → 5/10, one flip
   below its as-published rate, so P2 fails as stated for that cell. The mechanism is visible in
   the artifacts: restored guided rules do test the ground, but the marshalling step still assigns
   it, and prolog-guided encoders split ~evenly on classifying the self-punch.
@@ -361,8 +361,8 @@ derivability, not answers). Two harness repairs of the same kind as §5's: the r
   reading reaches the gold.
 
 **What no amount of restoration bought: Q5 at ceiling.** With the operative clause in the text
-*and* a typed `Ground` field in the schema, the best cell still missed Q5 once. The
-accidental-means/accidental-results fork (*Landress*) survives the clause, the schema, and both
+_and_ a typed `Ground` field in the schema, the best cell still missed Q5 once. The
+accidental-means/accidental-results fork (_Landress_) survives the clause, the schema, and both
 languages together. Formalisation localises the judgement to one field of one record; it does not
 make it. That floor — not any language comparison — is the finding.
 

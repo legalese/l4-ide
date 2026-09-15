@@ -48,17 +48,17 @@ never needed.
    confirmation practically irrelevant to the result (§1.1 condition 3 would already be
    satisfied via "still pending"), which seemed contrary to the evident point of including
    that fact in the question. I instead set `hospitalization months after the effective
-   date` to 8, i.e. treated the hospitalization as contemporaneous with the narrated
+date` to 8, i.e. treated the hospitalization as contemporaneous with the narrated
    confirmation event, so that the stated lateness (8 > 7) is the operative fact. This is a
    genuine judgement call, not a reading forced by the contract text.
 
 4. **Q4's "traveling abroad."** §2.2 says the Daily Hospital Income Benefit "will only be
    payable for ... confinement in a hospital in the United States," which sits in tension
    with §4.1's "Your Policy insures You ... anywhere in the world." I read §2.2 as the more
-   specific, controlling provision on *payability* (§4.1 speaks to when the insured risk is
+   specific, controlling provision on _payability_ (§4.1 speaks to when the insured risk is
    "on cover," not to where a hospital stay must occur to be paid), and read "traveling
    abroad" as implying the hospitalization occurred at a non-US hospital. I set `hospital
-   located in the United States` to `FALSE` for Q4 accordingly. This is a real interpretive
+located in the United States` to `FALSE` for Q4 accordingly. This is a real interpretive
    choice, not a mechanical reading, and a different, equally defensible cell could set it
    `TRUE` on the theory that "abroad" describes only where the fall happened.
 
@@ -72,13 +72,12 @@ never needed.
    set `excluded activity` to `NOTHING` for Q9 — i.e., I did not apply the police exclusion
    merely because the claimant's occupation is stated. This is the judgement call I am least
    sure about; a cell that reads "at the time of" as sufficient by itself would set this
-   claim's `excluded activity` to `JUST \`Police Service\`` instead, and get the opposite
-   `covered` result.
+   claim's `excluded activity` to `JUST \`Police Service\``instead, and get the opposite`covered` result.
 
 6. **Q5's self-inflicted injury.** §2.1 pays only for hospitalization "as a result of
    sickness or accidental Injury." §3 lists no explicit "self-inflicted injury" exclusion.
    I treated "punching my own face to show off for my friends" as a deliberate act, and
-   therefore neither a sickness nor an *accidental* injury, so it fails at the §2.1
+   therefore neither a sickness nor an _accidental_ injury, so it fails at the §2.1
    definitional threshold rather than via any §3 exclusion. This is encoded via a third
    `Cause Of Hospitalization` constructor, `Intentional Self Inflicted Injury`, distinct
    from `Sickness` and `Accidental Injury`. This is a substantive judgement call about what
@@ -94,7 +93,7 @@ never needed.
 ## Defaults used for facts a query does not mention
 
 Per the task's Step 2 instructions (§6/§7), for anything a query does not reference I chose
-values that keep every *other* condition satisfied and every *other* exclusion inapplicable,
+values that keep every _other_ condition satisfied and every _other_ exclusion inapplicable,
 so only the stated facts drive the `covered` result:
 
 - `cause of hospitalization`: `Sickness` when the query gives no medical cause at all (Q2);

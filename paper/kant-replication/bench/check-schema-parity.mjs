@@ -101,9 +101,9 @@ function checkTriple(label, srcFile, plFile, l4File) {
     );
 
   // Only the helper block is code; the claim-fact block documents what a query supplies.
-  const plBlocks = [
-    ...read(plFile).matchAll(/```prolog\n([\s\S]*?)```/g),
-  ].map((m) => m[1]);
+  const plBlocks = [...read(plFile).matchAll(/```prolog\n([\s\S]*?)```/g)].map(
+    (m) => m[1],
+  );
   const plc = compiles(plBlocks.at(-1), ".pl", (dir, f) =>
     execFileSync("swipl", ["-q", "-g", "halt", f], { encoding: "utf8" }),
   );
@@ -130,4 +130,6 @@ if (problems.length) {
   problems.forEach((p) => console.error("  " + p));
   process.exit(1);
 }
-console.log("R4 parity OK — both triples agree on field set and order, and compile.");
+console.log(
+  "R4 parity OK — both triples agree on field set and order, and compile.",
+);

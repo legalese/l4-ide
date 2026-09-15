@@ -19,11 +19,11 @@ I also cross-checked, by grepping rather than running anything, that the set of
 ## Judgement calls
 
 **1.1(3) "still pending or ... satisfied in a timely fashion" (condition 1.3).** I read
-this disjunction as evaluated *as of the hospitalization month*: the policy counts as
+this disjunction as evaluated _as of the hospitalization month_: the policy counts as
 "in effect" for a given hospitalization if, by that month, either (a) the 7-month
 wellness-confirmation deadline has not yet arrived (`hospitalization_month < 7` —
 "still pending"), or (b) the confirmation and visit were in fact each supplied on time
-by then. I did not treat a *later* failure of condition 1.3 as retroactively voiding
+by then. I did not treat a _later_ failure of condition 1.3 as retroactively voiding
 coverage for a hospitalization that had already occurred while the condition was still
 pending — the "in effect" test is a snapshot at the time of hospitalization, not a
 final settling-up at month 7. This affects Q3 (hospitalization at month 5, before the
@@ -44,7 +44,7 @@ reading of 1.1(3)/1.3, it does not, so `covered(c4)` fails on this encoding.
 **Q5 — "punching my own face to show off for my friends."** The schema's
 `claim_hospitalization_ground` has three values: `sickness`, `accidental_injury`,
 `neither`. I treated a deliberate, self-inflicted act as neither a sickness nor an
-*accidental* injury (accidental implying unintended), so I set the ground fact to
+_accidental_ injury (accidental implying unintended), so I set the ground fact to
 `neither` for this claim. Under `covered/1`'s top-level gate (1.1: the hospitalization
 must be for sickness or accidental injury), this fails regardless of the claim's
 stated absence of fraud or misrepresentation — which read to me as confirming that
@@ -64,7 +64,7 @@ skydiving (2.1.1) applies independently of the 1.3 timeline.
 
 **Q9 — "serving as a police officer at the time of hospitalization."** Exclusion 2.1
 excludes events "arising directly or indirectly out of ... service in the police." I
-read this as requiring the injury to arise *from* that service, not merely that the
+read this as requiring the injury to arise _from_ that service, not merely that the
 claimant happened to hold that job when hospitalized. Being bitten by one's own son
 does not arise out of police duty on any reading I could construct, so I did not
 include `police_service` in `claim_causes` for this claim — unlike Q1 (firefighter
@@ -75,7 +75,7 @@ so that condition 1.3 is tested on its "satisfied" branch (confirmation and visi
 on time) rather than trivially by the "still pending" branch.
 
 **Fraud / misrepresentation timing (1.2).** The policy does not say whether fraud or
-misrepresentation occurring *after* a hospitalization retroactively voids coverage for
+misrepresentation occurring _after_ a hospitalization retroactively voids coverage for
 that earlier event. I applied the same "as of the hospitalization" reasoning as for
 condition 1.3: only fraud/misrepresentation at or before the hospitalization month
 cancels the policy for that claim (`no_later_than(claim_fraud_month, hospitalization_

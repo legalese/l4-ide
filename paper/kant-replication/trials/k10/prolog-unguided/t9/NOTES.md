@@ -22,8 +22,8 @@ nine questions, per the rules.
 ## Judgment calls
 
 1. **The two Section 1.3 deadlines collapse to one check.** Section 1.3 actually names two
-   dates: the wellness *visit* must occur no later than the 6-month anniversary, and
-   *written confirmation* of it must be supplied no later than the 7-month anniversary.
+   dates: the wellness _visit_ must occur no later than the 6-month anniversary, and
+   _written confirmation_ of it must be supplied no later than the 7-month anniversary.
    None of the nine questions ever gives two separate figures for this — each gives a
    single "proof/confirmation provided/submitted at N months" figure (Q4: 8, Q6: 6.5, Q7:
    2, Q9: 6). Since there is no separate "visit occurred at" fact available anywhere, I
@@ -68,7 +68,7 @@ nine questions, per the rules.
 
 5. **Q2 has no stated cause of hospitalization at all** ("will my policy apply if I am 78
    years old at the time of hospitalization?"). Since Section 1.1 only pays for
-   hospitalization "for sickness or accidental injury", *some* such fact has to be true
+   hospitalization "for sickness or accidental injury", _some_ such fact has to be true
    for coverage to be possible in principle. I asserted `sickness(claim_2)` as a neutral
    placeholder standing in for "some unspecified, non-excluded sickness", since the
    question is entirely about the age exclusion and gives no other detail to encode.

@@ -35,11 +35,11 @@ pattern-match fine in `CONSIDER`/`WHEN`; (d) nested `CONSIDER` inside a `WHEN JU
    field in question is genuinely unrecorded (`NOTHING`) **and** its own deadline (month 7 for
    confirmation, month 6 for the visit) has not yet arrived as of `hospitalization month`. Once an
    actual month value is on record, only that value against the fixed deadline matters — a known
-   *late* value (e.g. confirmation at month 8) is an unconditional failure regardless of when the
+   _late_ value (e.g. confirmation at month 8) is an unconditional failure regardless of when the
    hospitalization occurred, which is what makes the Q4-style fact pattern (a late confirmation,
    with no stated hospitalization month) decidable without gaming the "unrelated field" freedom on
    `hospitalization month`. This is implemented in `` `confirmation limb met` `` / `` `wellness
-   visit limb met` `` in `policy.l4`.
+visit limb met` `` in `policy.l4`.
 
 2. **"Material withholding of information" (§1.2) has no field of its own.** The `Claim` schema
    gives fields for `fraud month` and `misrepresentation month` but nothing for withholding. I did
@@ -50,8 +50,8 @@ pattern-match fine in `CONSIDER`/`WHEN`; (d) nested `CONSIDER` inside a `WHEN JU
 3. **60-day pre-recovery bar (§3.2.1) vs. a month-grained schema.** "You shall not seek to recover
    ... before the expiration of sixty (60) days after written proof of claim" is a day-denominated
    deadline, but `written proof of claim month` / `recovery sought month` are both in months. I
-   approximated 60 days as 2 months (`` r AT LEAST (p PLUS 2) `` in `` `recovery timing condition
-   satisfied` ``). This never affects any of the nine answers: none of the nine questions mention
+   approximated 60 days as 2 months (`r AT LEAST (p PLUS 2)` in `` `recovery timing condition
+satisfied` ``). This never affects any of the nine answers: none of the nine questions mention
    seeking recovery, so every query sets `recovery sought month` to `NOTHING`, which is vacuously
    fine under this helper regardless of the day/month approximation.
 
@@ -68,14 +68,14 @@ pattern-match fine in `CONSIDER`/`WHEN`; (d) nested `CONSIDER` inside a `WHEN JU
    of ... service in the police") as requiring a causal nexus between the excluded activity and the
    injury, not mere temporal coincidence with employment status. A domestic bite has no causal
    connection to police duties, so `causes` is set to `LIST Other` rather than including `` `Police
-   service` ``, and the police-service exclusion does not fire for this claim. This is the one
+service` ``, and the police-service exclusion does not fire for this claim. This is the one
    query where I think a less careful reading could plausibly go the other way (treating "at the
    time of hospitalization" as sufficient on its own), so it is flagged here explicitly rather than
    silently baked into the fact pattern.
 
 6. **`causes` is `EMPTY` for a bare sickness (pneumonia, heart attack) but `LIST Other` for a
    described non-excluded mechanism (a fall, a bite, punching one's own face).** The `Cause` type
-   is about external causing *activities* (skydiving, military/police/firefighting service,
+   is about external causing _activities_ (skydiving, military/police/firefighting service,
    `Other`), not about medical diagnoses. Pneumonia and a heart attack are illnesses with no
    described external activity, so I left `causes` `EMPTY` for those; a fall, a bite, and a
    self-inflicted punch are all described mechanisms/events that are not any of the four excluded
@@ -86,7 +86,7 @@ pattern-match fine in `CONSIDER`/`WHEN`; (d) nested `CONSIDER` inside a `WHEN JU
 7. **Premium-payment timing.** §1.1 condition 2 just says the premium "has been paid," with no
    explicit deadline. Since the field is `MAYBE NUMBER` (not `BOOLEAN`), I chose to require it was
    paid no later than the hospitalization month itself (`` `no later than` (claim's `premium paid
-   month`) (claim's `hospitalization month`) ``), on the theory that a premium paid *after* the
+month`) (claim's `hospitalization month`) ``), on the theory that a premium paid _after_ the
    hospitalization it is meant to cover cannot support "the policy being in effect ... at the time
    of the hospitalization." All nine queries set `premium paid month` to `JUST 0`, so this choice
    does not affect any of the nine answers.

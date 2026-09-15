@@ -26,7 +26,7 @@ questions.
    non-satisfaction of Section 1.3, because the deadline hasn't arrived. A
    hospitalization at or after month 7 requires the condition to have actually been
    satisfied by then. Encoded as `section_1_3_pending(C) :- claim_hospitalization_month(C,
-   H), H < 7.` — strict `<`, treating month 7 itself as "the deadline has arrived."
+H), H < 7.` — strict `<`, treating month 7 itself as "the deadline has arrived."
 
 3. **Fraud and misrepresentation (1.2) void the policy unconditionally**, i.e. without
    checking whether the fraud/misrepresentation month falls before or after the
@@ -41,7 +41,7 @@ questions.
    is being tested, i.e. the hospitalization.
 
 5. **Policy term end (3.6) is inclusive**: `claim_hospitalization_month =<
-   claim_policy_term_months` counts as within the term, consistent with the `=<`
+claim_policy_term_months` counts as within the term, consistent with the `=<`
    convention already used by the given `no_later_than/2`.
 
 6. **60 days (3.2.1) is read as 2 months**, since every claim fact in the schema is
@@ -75,7 +75,7 @@ questions.
   a hospitalization month. I set it to 8 rather than the usual default of 3, because at
   month 3 my own `section_1_3_pending` clause (`H < 7`) would swallow the late
   confirmation entirely and the one fact the question actually turns on would never be
-  exercised. I treated the confirmation month as *not* "unrelated to the question" in
+  exercised. I treated the confirmation month as _not_ "unrelated to the question" in
   the sense TASK.md means, even though the hospitalization month itself is literally
   unstated, and picked a value that lets the stated fact operate.
 

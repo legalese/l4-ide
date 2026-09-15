@@ -15,7 +15,7 @@ Judgement calls, roughly in order of difficulty:
    serving as a police officer at the time of hospitalization," but the injury (son biting his
    ankle) has no connection to police duties, so I did not apply the police exclusion. I treated
    Q1 (firefighter burns from "doing my duty as a firefighter") and Q8 (injury "in a military
-   training exercise") as the mirror-image cases where the causal link *is* present, so those
+   training exercise") as the mirror-image cases where the causal link _is_ present, so those
    exclusions do apply.
 
 2. **Q4 — late wellness-visit confirmation and retroactivity.** §1.3 requires written
@@ -40,7 +40,7 @@ Judgement calls, roughly in order of difficulty:
 
 4. **Q5 — hardest call: is a deliberate self-punch an "accidental injury"?** §2.1's five
    exclusions do not mention self-inflicted or intentional acts at all, so if that list were the
-   *only* gate, punching one's own face would be covered (it's excluded from neither list, and
+   _only_ gate, punching one's own face would be covered (it's excluded from neither list, and
    the query stipulates no fraud/misrepresentation, closing off the other cancelation route in
    §1.2). But §1.1 only ever promises payment for hospitalization "for sickness or accidental
    injury" — a threshold description of what the policy covers at all, separate from the §2.1

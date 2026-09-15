@@ -63,9 +63,9 @@ I did **not** run `l4 run` or evaluate any `#EVAL` directive, per the rules.
    conditions the daily benefit's payability on confinement being "in a
    hospital in the United States," which is narrower than Section 4.1.1's
    "insures You ... anywhere in the world." I read 4.1.1 as worldwide scope
-   for the underlying insured *risk* (no territorial exclusion on the event),
-   and 2.2 as a separate, narrower condition specifically on when the *daily
-   benefit* is payable -- so both are encoded, and q4 fails coverage on two
+   for the underlying insured _risk_ (no territorial exclusion on the event),
+   and 2.2 as a separate, narrower condition specifically on when the _daily
+   benefit_ is payable -- so both are encoded, and q4 fails coverage on two
    independent grounds: the late wellness-visit confirmation (8 months, past
    the Section 1.3 seven-month deadline) and the non-US hospital location.
    Flagging this because it's the one place I changed my model mid-encoding

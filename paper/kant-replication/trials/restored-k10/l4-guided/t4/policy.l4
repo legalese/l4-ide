@@ -163,7 +163,7 @@ GIVETH A BOOLEAN
 GIVEN claim IS A Claim
 GIVETH A BOOLEAN
 `arbitration condition met` claim MEANS
-    NOT claim's `dispute arisen` OR `arbitration timely and awarded` claim
+    (NOT claim's `dispute arisen`) OR `arbitration timely and awarded` claim
 
 -- §4.2.1: recovery may not be sought before the expiration of sixty (60)
 -- days -- approximated here as 2 months, since this schema only tracks
