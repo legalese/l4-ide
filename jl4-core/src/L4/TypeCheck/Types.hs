@@ -241,6 +241,15 @@ data CheckError =
     -- literal is decidable here; a COMPUTED list that turns out empty is
     -- refused when the rule runs instead (R-T3, EVERY-EACH-QUANTIFIER-SPEC
     -- §6.1). Carries the expression for its source range.
+  | BreachByListNeedsPartyType (Expr Name)
+    -- ^ @BREACH BY@ given a LIST while the rule's party type is still an
+    -- inference variable — a top-level @MEANS@ with no @GIVETH@, or the left
+    -- operand of a @RAND@\/@ROR@ that has none. Whether the list names several
+    -- parties or one list-valued party is decided by the party type
+    -- ('checkBreachParty'), so it cannot be decided here; guessing the
+    -- element reading pinned the party type and failed at the use site
+    -- (EVERY-EACH-QUANTIFIER-SPEC §6.1.1, adversarial pass round 2,
+    -- R2-TC-1). Carries the expression for its source range.
   | ContinuationWithoutJoin (Expr Name)
     -- ^ A @HENCE@ or @LEST@ directly under an @EVERY@ with no @ONCE@ line.
     -- The join is mandatory there (R-Q1, RULED 2026-09-07): a default would
@@ -609,6 +618,7 @@ instance HasSrcRange CheckError where
   rangeOf (RegulativeActorMismatch p _ _)   = rangeOf p
   rangeOf (JoinWithoutEvery j)              = rangeOf j
   rangeOf (EmptyBreachBy e)                 = rangeOf e
+  rangeOf (BreachByListNeedsPartyType e)    = rangeOf e
   rangeOf (ContinuationWithoutJoin e)       = rangeOf e
   rangeOf (ActionPatternReference n _)      = rangeOf n
   rangeOf (ActionPatternNotComparable e _)  = rangeOf e

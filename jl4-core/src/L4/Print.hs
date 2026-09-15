@@ -1290,9 +1290,17 @@ instance LayoutPrinter BinOp where
 -- always did. TWO OR MORE — both operands of a @RAND@\/@ROR@ lost, several
 -- members of a barrier, or @BY LIST p, q@ — print one entry per failure, in
 -- operand \/ roll order, each with its own action and deadline or its own
--- @BECAUSE@, so a reader can see the two ways: under a missed-deadline anchor
--- as @revealed the breach of@ followed by the entries, under a declared
--- anchor as @BREACH@ followed by one @BY …@ line per entry.
+-- @BECAUSE@, so a reader can see the two ways.
+--
+-- Under a missed-deadline anchor the revealing event's three lines vouch for
+-- the ANCHOR only — the event at that stamp surpassed that one deadline —
+-- so the anchor prints first in the singleton's own words, and the full
+-- list follows under @and the breach names, in order@, a header that claims
+-- nothing about when each entry was revealed (a barrier's later failures
+-- are revealed by later events; the pass of 2026-09-15, round 2, found the
+-- earlier @revealed the breach of@ header listing a deadline the event
+-- could not have passed). Under a declared anchor there is no stamp to
+-- vouch for anything: @BREACH@ followed by one @BY …@ line per entry.
 instance LayoutPrinter a => LayoutPrinter (ReasonForBreach a) where
   printWithLayout = \ case
     DeadlineMissed ev'party ev'action ev'time blame -> vcat $
@@ -1303,17 +1311,26 @@ instance LayoutPrinter a => LayoutPrinter (ReasonForBreach a) where
       , "at"
       , i2 $ pretty (prettyRatio ev'time)
       ]
+      <> anchorLines blame.anchor
       <> case blameList blame of
-        MissedDeadline p action deadline :| [] ->
-          [ "surpassed the deadline of party"
-          , i2 $ printWithLayout p
-          , "who had to do obligatory action"
-          , i2 $ printWithLayout action
-          , "before their deadline, which was at"
-          , i2 $ pretty (prettyRatio deadline)
-          ]
-        fs -> "revealed the breach of" : map (i2 . printFailure "") (NE.toList fs)
-      where i2 = indent 2
+        _ :| [] -> []
+        fs -> "and the breach names, in order" : map (i2 . printFailure "") (NE.toList fs)
+      where
+        i2 = indent 2
+        -- the singleton's six lines for a missed deadline; an anchor that is
+        -- a declared breach under a missed-deadline stamp is not built by any
+        -- constructor site (spec §6.1.1) but prints rather than crashes
+        anchorLines = \ case
+          MissedDeadline p action deadline ->
+            [ "surpassed the deadline of party"
+            , i2 $ printWithLayout p
+            , "who had to do obligatory action"
+            , i2 $ printWithLayout action
+            , "before their deadline, which was at"
+            , i2 $ pretty (prettyRatio deadline)
+            ]
+          f@DeclaredBreach {} ->
+            [ "revealed the breach of", i2 $ printFailure "" f ]
     ExplicitBreach blame -> vcat $
       "BREACH" : case blameList blame of
         DeclaredBreach mParty mReason :| [] ->

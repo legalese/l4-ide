@@ -8,3 +8,4 @@ executing contract `joint and several` at 0 with the following events:  `WAIT UN
 executing contract `blame nobody` at 0 with the following events:  `WAIT UNTIL` with 20
 executing contract `one misses` at 0 with the following events:  party `alice` did `Sign` with `alice` at 1 party `bob` did `Sign` with `bob` at 2 `WAIT UNTIL` with 20
 executing contract `the pair delivers` at 0 with the following events:  `WAIT UNTIL` with 20
+executing contract `the pair, breach first` at 0 with the following events:  `WAIT UNTIL` with 20

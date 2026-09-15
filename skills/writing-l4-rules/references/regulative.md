@@ -219,8 +219,9 @@ check fails with `You are giving 2 inputs to pay … but it is not a function, s
 
 `RAND` and `ROR` compose obligations in parallel.
 
-- **`RAND`** — parallel AND. All components must be fulfilled; if any side breaches, the compound breaches. When both sides are lost the breach names both sides' failures, left first, one line each with that side's own action-and-deadline or `BECAUSE` (`BY seller BECAUSE "…"` / `BY buyer BECAUSE "…"`); the breach is dated at the side lost first.
-- **`ROR`** — parallel OR. Fulfilling any one side fulfills the compound; it breaches only when every side is lost, and then names every side's failure the same way; the breach is dated at the side lost last. (When both sides wrote a `LEST BREACH`, neither carries a time, so "first"/"last" falls to the left side for `RAND` and the right for `ROR` — only the date is affected; every side's own reason is printed either way.)
+- **`RAND`** — parallel AND. All components must be fulfilled; if any side breaches, the compound breaches. When both sides are lost the breach names both sides' failures, left first, one line each with that side's own action-and-deadline or `BECAUSE` (`BY seller BECAUSE "…"` / `BY buyer BECAUSE "…"`).
+- **`ROR`** — parallel OR. Fulfilling any one side fulfills the compound; it breaches only when every side is lost, and then names every side's failure the same way.
+- **Which side dates a compound breach.** Only a missed deadline carries a time (the stamp of the event that revealed it); a declared `LEST BREACH` carries none. When both sides carry a time, the breach is dated at the earlier stamp for `RAND` and the later for `ROR`. When **either** side is a declared `LEST BREACH`, the pair counts as simultaneous and the date falls to the left side for `RAND` and the right for `ROR` — regardless of which side was actually lost first — which may mean no date at all. Only the date is affected; every side's own reason or deadline is printed either way.
 - **Precedence:** `RAND` binds tighter than `ROR`, so `A ROR B RAND C` means `A ROR (B RAND C)`.
 
 ```l4

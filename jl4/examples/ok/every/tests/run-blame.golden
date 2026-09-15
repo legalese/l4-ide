@@ -9,7 +9,13 @@ run-blame.l4:49:1-51:20:
       NEVERMATCHESACT
     at
       20
-    revealed the breach of
+    surpassed the deadline of party
+      Tenant OF "Bob"
+    who had to do obligatory action
+      MUST Sign (EXACTLY t)
+    before their deadline, which was at
+      14
+    and the breach names, in order
       Tenant OF "Bob"
         who had to do obligatory action
           MUST Sign (EXACTLY t)
@@ -28,7 +34,13 @@ run-blame.l4:63:1-65:20:
       NEVERMATCHESACT
     at
       20
-    revealed the breach of
+    surpassed the deadline of party
+      Tenant OF "Carol"
+    who had to do obligatory action
+      MUST Sign (EXACTLY t)
+    before their deadline, which was at
+      14
+    and the breach names, in order
       Tenant OF "Carol"
         who had to do obligatory action
           MUST Sign (EXACTLY t)
@@ -61,7 +73,13 @@ run-blame.l4:104:1-107:20:
       NEVERMATCHESACT
     at
       8
-    revealed the breach of
+    surpassed the deadline of party
+      Tenant OF "Carol"
+    who had to do obligatory action
+      MUST Sign (EXACTLY t)
+    before their deadline, which was at
+      5
+    and the breach names, in order
       Tenant OF "Bob"
         who had to do obligatory action
           MUST Sign (EXACTLY t)
@@ -80,7 +98,13 @@ run-blame.l4:118:1-119:20:
       NEVERMATCHESACT
     at
       20
-    revealed the breach of
+    surpassed the deadline of party
+      Tenant OF "Alice"
+    who had to do obligatory action
+      MUST Sign (EXACTLY alice)
+    before their deadline, which was at
+      14
+    and the breach names, in order
       Tenant OF "Alice"
         who had to do obligatory action
           MUST Sign (EXACTLY alice)
@@ -99,7 +123,13 @@ run-blame.l4:131:1-132:20:
       NEVERMATCHESACT
     at
       20
-    revealed the breach of
+    surpassed the deadline of party
+      Tenant OF "Alice"
+    who had to do obligatory action
+      MUST Sign (EXACTLY alice)
+    before their deadline, which was at
+      14
+    and the breach names, in order
       Tenant OF "Alice"
         who had to do obligatory action
           MUST Sign (EXACTLY alice)
@@ -137,3 +167,12 @@ run-blame.l4:191:1-192:20:
     BREACH
     BY LIST "a", "b"
     BECAUSE "the pair did not deliver"
+run-blame.l4:206:1-207:20:
+  DEONTIC BREACHED:
+    BREACH
+    BY LIST "a", "b" BECAUSE "declared against the pair"
+    BY LIST "a", "b"
+      who had to do obligatory action
+        MUST deliver
+      before their deadline, which was at
+        5
