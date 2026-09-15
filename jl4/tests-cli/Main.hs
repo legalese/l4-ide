@@ -1526,6 +1526,14 @@ spec bin = do
       sout `shouldSatisfy` ("digraph" `isPrefixOf`)
       sout `shouldSatisfy` ("Every path" `notInfixOf`)
 
+    -- The flag has no meaning for the DOT; taking it silently would print
+    -- the graph as if it had been read.
+    it "--all-states without --dominators is refused, not ignored" $ do
+      Output code sout serr <- runL4 bin ["state-graph", "--all-states", "examples/ok/contracts.l4"]
+      code `shouldSatisfy` (/= ExitSuccess)
+      serr `shouldSatisfy` ("requires --dominators" `isInfixOf`)
+      sout `shouldSatisfy` ("digraph" `notInfixOf`)
+
   describe "l4 batch" $ do
     it "serializes a #TRACE breach with correctly-labeled fields" $ do
       -- exit 0 proves the #TRACE AT/WITH pretty-printer round-trip: batch

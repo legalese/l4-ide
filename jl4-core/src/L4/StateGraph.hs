@@ -42,7 +42,7 @@ module L4.StateGraph
   , renderBranchGuard
   , Quantifier(..)
   , JoinLabel(..)
-  , JoinKind(..)
+  , JoinLabelKind(..)
   , memberDeadline
   , thresholdText
     -- * Options
@@ -179,7 +179,7 @@ data TransitionLabel = TransitionLabel
     -- ^ Set on the @HENCE@ edge of an @EVERY@ obligation and nowhere else: a
     -- @PARTY@ rule, a @LEST@ caption and a junction's branch edge all leave it
     -- 'Nothing'. It is what makes a barrier and a fork different graphs; see
-    -- 'JoinKind'.
+    -- 'JoinLabelKind'.
   } deriving (Eq, Show)
 
 -- | One conjunct of a 'BranchGuard': the condition as the reader sees it, plus
@@ -238,7 +238,7 @@ data Quantifier = MkQuantifier
 
 -- | The join line of an @EVERY@: its kind, and its own @WITHIN@ if any.
 data JoinLabel = MkJoinLabel
-  { joinKind     :: JoinKind
+  { joinKind     :: JoinLabelKind
   , joinDeadline :: Maybe Text
     -- ^ The @WITHIN@ on the join line. It bounds the joined /state/ — one
     -- deadline on the whole, not re-armed by each performance (R-T2) — where
@@ -257,7 +257,12 @@ data JoinLabel = MkJoinLabel
 -- an export dropped — was silent about it. See
 -- @specs\/todo\/EVERY-EACH-QUANTIFIER-SPEC.md@ §2.5 and
 -- @specs\/todo\/lexipedia-superset\/LTS-VISUALISER.md@ §4.9.
-data JoinKind
+--
+-- Named for the label it sits on, not @JoinKind@: that name belongs to
+-- 'L4.EvaluateLazy.DeonticStep.JoinKind', the machine's own join (which
+-- carries the resolved 'L4.Syntax.Threshold' and a third, 'Distributive',
+-- case), and a module drawing the norm plane over this graph imports both.
+data JoinLabelKind
   = Barrier Text
     -- ^ @ONCE threshold@, level-triggered. The text is the threshold as the
     -- source spells it — see 'thresholdText'.

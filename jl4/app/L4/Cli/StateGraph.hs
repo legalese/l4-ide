@@ -17,7 +17,7 @@ module L4.Cli.StateGraph
   , stateGraphCmd
   ) where
 
-import Base (for_)
+import Base (for_, when)
 import qualified Base.Text as Text
 import qualified Data.Text.IO as TIO
 import Options.Applicative
@@ -61,6 +61,11 @@ stateGraphOptionsParser = StateGraphOptions
 
 stateGraphCmd :: StateGraphOptions -> IO ()
 stateGraphCmd opts = do
+  -- @--all-states@ only means something to the dominators listing. Accepting
+  -- it alone would print the DOT as if the flag had been read, and exit 0.
+  when (opts.stateGraphAllStates && not opts.stateGraphDominators) do
+    hPutStrLn stderr "l4 state-graph: --all-states requires --dominators"
+    exitFailure
   evalConfig <- makeEvalConfig (FixedNowOpt Nothing)
   (errs, mTc) <- runOneshot evalConfig opts.stateGraphFile \nfp -> do
     let uri = normalizedFilePathToUri nfp
