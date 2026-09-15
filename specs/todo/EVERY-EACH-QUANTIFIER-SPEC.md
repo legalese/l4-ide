@@ -2061,7 +2061,8 @@ deduplication** — one entry per failed obligation, the same party as many time
 **per-entry detail** — an entry says what was failed, not just who, because `[alice, alice]` cannot
 say the two ways. The first build had done the opposite on both counts (a `NonEmpty` of bare
 parties, deduplicated by ledger key, beside ONE anchoring action and deadline); the adversarial
-pass found it (eight blockers from three checkers, all the same defect) and replaced it.
+pass found it (eleven blockers from three checkers, eight of them this one defect and three the
+written claims that went with it) and replaced it.
 
 **The representation is a non-empty list of failures, not `Set`.** Meng, 2026-09-15: _"did we
 consider a NonEmpty list?"_ The sketch said `Set Party`, and a non-empty list had not been
@@ -2167,19 +2168,24 @@ only insofar as both operands were always run; it is new for the barrier.
   it is a language decision, not an implementation detail.
 - The two REFUSALS of §11.0.1 and the same-instant tie imprecision are unchanged.
 
-**`BREACH BY <list>`.** The checker (`checkBreachParty`, `TypeCheck.hs:1899`) infers the `BY`
+**`BREACH BY <list>`.** The checker (`checkBreachParty`, `TypeCheck.hs:1975`) infers the `BY`
 expression and reads its type: a `LIST OF t` unifies `t` with the party type, anything else is the
 party. Deterministic rather than a `choose` between the two readings, because an unresolved party
 type would otherwise leave both branches viable and report an ambiguity where today there is none.
-A `BREACH` checked against a known `DEONTIC` type — a `LEST`, a `RAND` operand, a top-level
-`x MEANS BREACH BY …` under a `GIVETH` — now unifies with it FIRST (`checkExpr`, `TypeCheck.hs:1859`),
-so the `BY` is read against the rule's party type rather than a fresh one; the first build inferred
-it fresh and unified afterwards, which is why a mismatch there was reported against "the HENCE
-clause" of the rule rather than the `BY`. A mismatch now says `BREACH BY`
-(`ExpectBreachPartyContext`). The syntax node is unchanged and carries no mark, so the machine
-decides by the value's shape (`BreachBy`, `Machine.hs:1809`): a `ValCons` is walked, one declared
-failure per element in list order, duplicates kept, the head the (nominal) anchor; anything else is
-the one party. Three things the pass changed here:
+A `BREACH` checked against a known `DEONTIC` type — a `LEST`, a `RAND`/`ROR` operand under a
+`GIVETH`, a top-level `x MEANS BREACH BY …` under a `GIVETH` — unifies with it FIRST (`checkExpr`,
+`TypeCheck.hs:1899`), so the `BY` is read against the rule's party type rather than a fresh one;
+the first build inferred it fresh and unified afterwards, which is why a mismatch there was reported
+against "the HENCE clause" of the rule rather than the `BY`. A mismatch now says `BREACH BY`
+(`ExpectBreachPartyContext`). Since round 2 of the pass a `RAND`/`ROR` checked against a known
+`DEONTIC` type does the same — unifies first, then checks both operands at it
+(`checkRegulativeBinOp`, `TypeCheck.hs:601`) — so under a `GIVETH` the party type reaches a
+`BREACH` in EITHER operand; before that the compound was always inferred with a fresh party type
+and a `GIVETH` never reached its left operand. The syntax node is unchanged and carries no mark, so
+the machine decides by the value's shape (`BreachBy`, `Machine.hs:1809`): a `ValCons` is walked,
+one declared failure per element in list order, duplicates kept, the head the (nominal) anchor;
+anything else is the one party. Four things the pass changed here, three in round 1 and one in
+round 2:
 
 - **A party type that is itself a `LIST`** — `DEONTIC (LIST OF STRING) Action` with
   `BREACH BY (LIST "a", "b")` — type-checked and ran before this branch and the first build gave it
@@ -2187,10 +2193,34 @@ the one party. Three things the pass changed here:
   both fully known and are the SAME list type (a structural comparison on `typeKey`, not a
   unification), the drafter named one party whose value is a list, and the checker rewrites the
   expression as the one-element list `LIST e`, which the machine walks into exactly that one party
-  (`TypeCheck.hs:1899-1925`). The wrap is idempotent under re-check — `l4 batch` re-prints the
+  (`TypeCheck.hs:1975-2002`). The wrap is idempotent under re-check — `l4 batch` re-prints the
   module and the printed `LIST (LIST "a", "b")` takes the element reading, whose element type is the
   party type — and invisible to exactprint, which prints the parsed tree. Witness: `run-blame.l4`,
-  `the pair delivers`; a list of such lists still names several.
+  `the pair delivers`; a list of such lists still names several. **The limit, found in round 2
+  (R2-TC-1) and stated here because round 1's "restored" was unqualified:** the decision needs the
+  party type, and a `BREACH BY <list>` that is reached by INFERENCE arrives with a fresh one — a
+  top-level `x MEANS BREACH BY (LIST …)` with no `GIVETH`, or the LEFT operand of a `RAND`/`ROR`
+  that has none. Round 1 took the element reading there, which pinned the party type to the
+  element type and failed later, at the use site, with a `HENCE` or `AND` mismatch naming the wrong
+  place; the same `RAND` passed with its operands swapped (`probes/round2/a4-rand-order.l4` vs
+  `a5-rand-order-swapped.l4`, scratch), and a shape that type-checked at `e578654c`
+  (`a-nogiveth-listparty.l4`, the list-typed party with no `GIVETH`) was rejected. Round 2 made it
+  loud: a LIST after `BY` under a party type that is not yet ground is **refused at the `BREACH`**
+  (`BreachByListNeedsPartyType`, `TypeCheck/Types.hs:212`; `checkBreachParty`,
+  `TypeCheck.hs:1975-2002`), naming the two ways out — a `GIVETH A DEONTIC …` on the
+  definition, or the `PARTY` operand first — and leaving the party type for the use site, so one
+  cause is one error. Witness `jl4/examples/not-ok/tc/breach-by-list-needs-party-type.l4` (both
+  shapes). So the shape that passed at `e578654c` and was rejected on round 1's HEAD is now
+  rejected with a message that says why, not accepted: **that is a regression against `e578654c`
+  for the no-`GIVETH` list-typed party, chosen over silence.** The fuller fix — defer the reading
+  until the module's substitution is final and rewrite the tree then — would accept those shapes;
+  it needs a post-check rewrite pass the checker does not have, and is NOT built.
+- **A mismatch under the element reading names the list's own type** (round 2, R2-TC-2):
+  `LEST BREACH BY LIST 1, 2` against a party type `Actor` reported `NUMBER` (the element type)
+  against the range of the whole `LIST 1, 2`; it now reports `LIST OF NUMBER`, the type of the
+  expression at that range, under the prefix that already says a list's elements must be the party
+  type (`TypeCheck.hs:1998`). Narrowing the range to "the offending element" is undefined for a
+  computed list, which decided it.
 - **A list literal with nobody in it is refused at check time** (`EmptyBreachBy`,
   `TypeCheck/Types.hs:206`): `BY EMPTY` and `BY (LIST)` both, one error each, named at the
   expression. The first build refused only at run time and only when the `LEST` fired, so a rule
@@ -2201,16 +2231,25 @@ the one party. Three things the pass changed here:
 - Dedup of the list's elements is gone (above).
 
 **Printing.** Singletons print as before. A compound prints one entry per failure, in order, each
-with its own detail (`Print.hs:1231-1274`): under a missed-deadline anchor, the revealing event's
-three lines and then `revealed the breach of` followed by the entries — a party and, indented, `who
-had to do obligatory action … before their deadline, which was at …`, or a party and its `BECAUSE`;
-under a declared anchor, `BREACH` followed by one `BY p BECAUSE r` line per entry (a missed-deadline
-entry there is `BY p` with its action and deadline indented under it; an entry naming nobody is
-`BY (nobody named)`). The first build's `surpassed the deadline of parties` header, which listed
-bare parties under ONE action and deadline, printed Bob as having missed a deadline of 5 when his
-was 14 (`run-blame.golden`, `staggered signing, no reparation`) and Alice as having had to
-`deliver` when she owed `pay 1` and was blamed by declaration (`deontic-breach-semantics.golden`,
-`explicit or deadline`) — false statements, blessed; both goldens re-blessed and read.
+with its own detail (`Print.hs:1239-1291`). Under a missed-deadline anchor: the revealing event's
+three lines (`party … who did action … at …`), then the ANCHOR in the singleton's own six lines
+(`surpassed the deadline of party … who had to do obligatory action … before their deadline, which
+was at …`) — so a compound's first nine lines are exactly what that one failure would print alone —
+and then `and the breach names, in order` followed by every entry, the anchor among them, each a
+party and, indented, its action and deadline, or a party and its `BECAUSE`. Under a declared
+anchor, `BREACH` followed by one `BY p BECAUSE r` line per entry (a missed-deadline entry there is
+`BY p` with its action and deadline indented under it; an entry naming nobody is `BY (nobody
+named)`). Two headers were retired on the way, each for saying something false about the entries
+under it. The first build's `surpassed the deadline of parties` listed bare parties under ONE
+action and deadline, and printed Bob as having missed a deadline of 5 when his was 14
+(`run-blame.golden`, `staggered signing, no reparation`) and Alice as having had to `deliver` when
+she owed `pay 1` and was blamed by declaration (`deontic-breach-semantics.golden`, `explicit or
+deadline`) — false statements, blessed. Round 1 replaced it with `revealed the breach of` over the
+whole list, under the revealing event's stamp; round 2 (r2-blame-4) found that the stamp vouches
+for the anchor only — an event at 8 cannot have revealed a deadline-10 miss, which a later event
+did — so the list header now claims nothing about when each entry was revealed, and the anchor,
+which the stamp does vouch for, is printed in the singleton's words. Both goldens re-blessed and
+read twice.
 
 **The wire** (`ValueLazyJSON.hs:108-168`; jl4-service `Backend/Jl4.hs:1260`; the jl4-mlir runtime
 mirror `jl4-runtime.mjs:981`, its pure unit tests updated, the parity harness NOT run on this
@@ -2234,6 +2273,25 @@ branch). Additive over the one-party form:
   `detail` for the text, matching its scalar vocabulary).
 - `anchor`: the anchor's index into `failures`.
 
+**Two invariants a downstream projection depends on, stated here because it re-pins against this
+sentence** (cross-track notes of 2026-09-15 from the lts-diagrams sessions; the BPMN shape — one
+interrupting timer on the multi-instance task, routed to ONE error end — and the `lts/p2-stack`
+deontic step log both rest on them). (1) **A barrier's `LEST` fires ONCE, for the group.** The
+blame LIST grows; the number of `LEST` firings does not (`barrierFinish`, `Machine.hs:2306`, runs
+the `LEST` once with the earliest failure's anchor and residual). (2) **The anchor is the earliest
+failure by R-Q5's failure time, and its VALUE is the revealing event's stamp** — the deadline
+anchor of §5.2 is not built on this branch.
+
+**Owed downstream, not done here.** The BPMN export's barrier `LEST` arm is a bare
+`<endEvent errorRef="Error_breach">` (`L4.Bpmn.Emit`'s `sharedErrorId`, wired from
+`L4.Bpmn.Lower`). Its concurrency review of 2026-09-15 called that acceptable BECAUSE R-T3 was
+unbuilt; now that the runtime names the set of failed members, that error end drops something the
+source says, and BPMN has no shape for a set of parties on an error event. Owed the day this
+branch merges, by whoever holds the BPMN track (the lts-diagrams session has offered): a fidelity
+note in `L4.Bpmn.Lower` and a dated line in `specs/todo/lexipedia-superset/LTS-VISUALISER.md` §4.9
+(the note that raised this named the file and a `quantifierNotes` list by other names; neither is
+in this tree at this HEAD — check before citing). `L4.Bpmn.Lower` is not touched on this branch.
+
 **Measured on the branch's HEAD.** Goldens that moved against `e578654c`: one existing golden set
 — `ok/tests/deontic-breach-semantics.golden` (its four both-breached traces, now one entry each with
 its own detail) and its `.ep.golden` twin (comment lines only, 246 lines before and after) — plus
@@ -2245,9 +2303,12 @@ the new `ok/every/run-blame.{golden,ep.golden,nlg.golden,schema.golden}` and
 nine on this HEAD counting the new `run-blame.golden` (`grep -rl 'DEONTIC BREACHED' jl4 jl4-core
 --include='*.golden'`; without the include the same grep also hits `Print.hs`, `StateGraph.hs` and
 a README, which is how the first build's "nine, measured with `grep -rl … jl4 jl4-core`" came to
-name a command that returns twelve). Ten `run-blame.l4` traces pin the six behaviours the brief
+name a command that returns twelve). Eleven `run-blame.l4` traces pin the six behaviours the brief
 listed, the no-`LEST` staggered anchor, the un-deduplicated `alice RAND alice` and
-`BY LIST alice, bob, alice`, the run-time empty-list refusal, and the list-typed party.
+`BY LIST alice, bob, alice`, the run-time empty-list refusal, the list-typed party, and (round 2)
+the list-typed party as the LEFT operand of a `RAND` under a `GIVETH`. Round 2 moved
+`run-blame.golden` and `deontic-breach-semantics.golden` once more (the print header) and added
+`not-ok/tc/breach-by-list-needs-party-type.{golden,ep.golden,nlg.golden,schema.golden}`.
 
 ### 6.2 Causal Blame Analysis
 
@@ -2663,11 +2724,14 @@ suffix, or the whole stream trimmed to events strictly after the join) needs a t
 its own frames. A `SHANT` barrier ties by construction, but harmlessly: every member completes at
 the same revealing event and their residual streams are identical.
 
-**What the adversarial pass of 2026-09-15 changed** (the blame-set build, R-T3). Eighteen findings
-were raised by three checkers and each refuted by two more; none was refuted by both, so all
-eighteen were applied. The eight blockers were one defect seen from six angles — the first build
-implemented the paragraph of the brief that Meng's ruling had struck through — and one type change
-discharged them; the rest are listed by what actually changed:
+**What the adversarial pass of 2026-09-15 changed, round 1** (the blame-set build, R-T3).
+Eighteen findings were raised by three checkers and each put to two refuters; sixteen were
+confirmed by both, two were split (SEM-7, G7), none was refuted by both, so all eighteen were
+applied. Eleven were graded blocker: eight of them were one defect seen from six angles — the first
+build implemented the paragraph of the brief that Meng's ruling had struck through — and one type
+change discharged those eight (SEM-1, SEM-2, SEM-3, G1, G2, G3, F1, F2); the other three blockers
+(SEM-4, G4, F3) were the written claims that went with it, fixed by wording. The rest are listed by
+what actually changed:
 
 - Replaced the deduplicated `NonEmpty` of bare parties beside one anchoring action/deadline with a
   non-empty list of sum-typed failures, each carrying its own detail, anchored by position; removed
@@ -2710,6 +2774,45 @@ discharged them; the rest are listed by what actually changed:
 - Added `LEST BREACH BY LIST …` to the regulative README's BREACH syntax and examples (F4).
 
 Raised and refuted by both checkers: none.
+
+**What the adversarial pass of 2026-09-15 changed, round 2** (on round 1's HEAD `879a27ed`).
+Eight findings were raised by two checkers — six against the landed fix, two fresh — and each put
+to two refuters; all eight were confirmed by both, none refuted by both, all eight applied. Two
+were graded blocker (the skill's date sentence, and the checker's order-dependent `BREACH BY`
+reading), the rest minor:
+
+- Refused a LIST after `BREACH BY` whose party type is not yet ground — a definition with no
+  `GIVETH`, or the left operand of a `RAND`/`ROR` in one — at the `BREACH`, naming the two fixes
+  (`BreachByListNeedsPartyType`), instead of pinning the party type to the element type and failing
+  at the use site; the same `RAND` had passed with its operands swapped, and the no-`GIVETH`
+  list-typed party that type-checked at `e578654c` had been rejected with a `HENCE` mismatch. Made
+  `RAND`/`ROR` push a known `DEONTIC` type into both operands (`checkRegulativeBinOp`), so under a
+  `GIVETH` the party type reaches either operand and the refusal's advice is true. Witnesses
+  `not-ok/tc/breach-by-list-needs-party-type.l4` (both refused shapes) and `run-blame.l4`
+  `the pair, breach first` (the `GIVETH` + `RAND` shape, accepted). Corrected `TypeCheck.hs`'s
+  "falls to the scalar reading" comment, §6.1.1's unqualified "restored", BECAUSE.md and the
+  build notes; the deferral that would accept the no-`GIVETH` shapes is recorded in §6.1.1 as not
+  built (R2-TC-1).
+- Reported a `BREACH BY <list>` mismatch with the list's own type as the given type, matching the
+  whole-list range the error carries (R2-TC-2).
+- Replaced the plural print header `revealed the breach of` — which put every entry under the
+  revealing event's stamp although that event revealed only the anchor — with the anchor in the
+  singleton's own six lines followed by `and the breach names, in order` over every entry; re-blessed
+  and read `run-blame.golden` and `deontic-breach-semantics.golden`, re-pasted EVERY.md's example
+  and this section's "Printing" (r2-blame-4).
+- Reworded the skill's "dated at the side lost first/last" to the machine's rule: earlier/later
+  stamp when both sides carry one, else simultaneous with the CSL tie-break — false before for a
+  mixed missed-deadline/declared pair, in both orientations (r2-blame-1).
+- Reworded EVERY.md's "dated at the earliest missed deadline" to "anchored at the member whose
+  deadline was missed first, and dated at the event that revealed it" — the golden prints `at 8`
+  against Carol's deadline of 5 (r2-blame-6).
+- Corrected the round-1 count above from "eight blockers" to eleven, eight of them one defect, and
+  "each refuted by two more" to "each put to two refuters" (r2-blame-2, r2-blame-5).
+- Re-ran the golden suite on a binary newer than every source: round 1's second run had started
+  before the last `Machine.hs` edit, so its 0 failures measured the tree one edit early
+  (r2-blame-3; the build notes say so).
+
+Raised and refuted by both checkers, round 2: none.
 
 **A defect found on the way, and fixed here because the fork's own example needs it.** `EXACTLY e`
 in the **second or later** argument of an action pattern raised `is not in scope` at run time.

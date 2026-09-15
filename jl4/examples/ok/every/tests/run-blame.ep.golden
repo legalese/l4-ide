@@ -190,3 +190,18 @@ GIVETH A DEONTIC (LIST OF STRING) Step
 
 #TRACE `the pair delivers` AT 0 WITH
   (`WAIT UNTIL` 20)
+
+-- 8. The same list-typed party, but the BREACH is the LEFT operand of a RAND
+--    and the definition has a GIVETH. The GIVETH's DEONTIC type is pushed
+--    into both operands before either is checked, so the BY is read against
+--    the party type (LIST OF STRING → one party) whichever operand comes
+--    first. Without the GIVETH this shape is refused at the BREACH: see
+--    not-ok/tc/breach-by-list-needs-party-type.l4.
+GIVETH A DEONTIC (LIST OF STRING) Step
+`the pair, breach first` MEANS
+    (BREACH BY (LIST "a", "b") BECAUSE "declared against the pair")
+    RAND
+    (PARTY (LIST "a", "b") MUST deliver WITHIN 5)
+
+#TRACE `the pair, breach first` AT 0 WITH
+  (`WAIT UNTIL` 20)

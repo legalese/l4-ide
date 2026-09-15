@@ -19,7 +19,13 @@ deontic-breach-semantics.l4:65:1-66:22:
       NEVERMATCHESACT
     at
       20
-    revealed the breach of
+    surpassed the deadline of party
+      Bob
+    who had to do obligatory action
+      MUST deliver
+    before their deadline, which was at
+      10
+    and the breach names, in order
       Alice BECAUSE "missed payment"
       Bob
         who had to do obligatory action
