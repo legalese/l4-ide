@@ -11,8 +11,11 @@
 -- The log is OPTIONAL and off by default (ruling R5, §8): it rides an
 -- @IORef@ in the reader environment exactly as 'traceEval' does, and every
 -- call site checks that @Maybe@ before it computes anything. With the log
--- off, the only work the machine does for it is threading a lazy 'NormKey'
--- through the contract frames, which is never forced.
+-- off, the work the machine does for it is carrying state it never reads:
+-- a lazy 'NormKey' through the contract frames (never forced), the
+-- @ev'reoffered :: Bool@ the machine already computed at @Contract2@ through
+-- six more frames past the one that consults it, and a @pending :: Maybe
+-- DeonticStep@ (always 'Nothing' when off) on the @ResolveParty@ frame.
 --
 -- == What a consumer can rely on
 --
@@ -171,14 +174,15 @@ data EventKey = MkEventKey
 -- decided. A consumer counting events counts a 'Reoffered' step as zero.
 data Scrutiny
   = Consumed
-    -- ^ the event was taken off the stream: it matched, or it revealed a
-    -- second expiry and the at-most-once rule consumed it
+    -- ^ the event was taken off the stream by a match
   | WitnessedOnly
     -- ^ the event was looked at and passed over: it advanced the clock
     -- (a mismatch, a failed guard) or revealed an expiry and was re-offered
     -- to the continuation
   | Reoffered
-    -- ^ this is the continuation's look at a re-offered event
+    -- ^ this is the continuation's look at a re-offered event — including
+    -- the second look that revealed a second expiry, which the at-most-once
+    -- rule consumed rather than re-offering again
   | NoEvent
     -- ^ the step had no event: the stream ran out, or a join reduced
   deriving stock (Eq, Show, Generic)
@@ -203,10 +207,17 @@ data StepOutcome
     -- ^ @Contract5@, the event's stamp is past the deadline (carried);
     -- routed per modal: @MUST@\/@DO@ to @LEST@ or a breach, @SHANT@ to
     -- @HENCE@, @MAY@ to @LEST@ (defaulting to @FULFILLED@)
+  | Breached !BreachSummary
+    -- ^ the @BREACH@ expression (@LEST BREACH@, @BREACH BY p@, a bare
+    -- @BREACH@): the machine constructed an explicit breach value here. It
+    -- is a terminal, not an obligation, so the step has no norm; the
+    -- expression arm holds no clock and no event either. A @DeadlineMissed@
+    -- breach is NOT logged this way — it is the 'Expired' \/ 'Matched'
+    -- @ToBreach@ step of the obligation that missed
   | Joined !RBinOp !JoinNote
-    -- ^ @RBinOp2@: both operands of an @AND@\/@OR@ are values; what the
-    -- compound reduced to, which side decided it, and whether CSL's
-    -- tie-break was what decided
+    -- ^ @RBinOp1@ (the @OR@ short-circuit on a fulfilled left operand) or
+    -- @RBinOp2@ (both operands are values): what the compound reduced to,
+    -- which side decided it, and whether CSL's tie-break was what decided
   | JoinReleased
     -- ^ the @EVERY@ barrier: every arm satisfied and the @ONCE … WITHIN@
     -- (if any) met; the shared @HENCE@ runs. Also logged for an empty cast,

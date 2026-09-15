@@ -22,7 +22,20 @@
 --   6. a barrier where member 1 satisfies its arm and is NOT released, and
 --      member 2 releases the join;
 --   7. a fork where each member's continuation runs on its own;
---   8. a barrier whose last completion comes after the ONCE … WITHIN;
+--   8. a barrier whose last completion comes after the ONCE … WITHIN, and
+--      whose LEST is an explicit BREACH;
+--   9. an OR whose LEFT side fulfils — the RBinOp1 short-circuit;
+--  10. an obligation still pending when the events run out — Waiting;
+--  11. a barrier with one member still pending when the events run out —
+--      the member logs Waiting, the join logs nothing;
+--  12. a prohibition violated, with a LEST and without one;
+--  13. a PROVIDED that comes out false;
+--  14. an action that does not match the pattern;
+--  15. a barrier with a LEST whose member misses its own WITHIN — the
+--      barrier's LEST runs once, via JoinFailed ToLest;
+--  16. a barrier with no LEST whose MAY member lets its permission lapse —
+--      JoinStalled;
+--  17. a barrier with no LEST whose MUST member misses — JoinFailed ToBreach;
 --
 -- plus: the log-off path returns the same results as the log-on path, and
 -- a directive with no regulative content logs nothing.
@@ -272,11 +285,156 @@ joinDeadlineSrc = Text.unlines $ everyPrologue <>
   , "  PARTY bob   DOES Sign bob   AT 9"
   ]
 
+-- 9. an OR whose LEFT side fulfils: the RBinOp1 short-circuit, the right
+--    side never runs
+orLeftSrc :: Text.Text
+orLeftSrc = Text.unlines $ prologue <>
+  [ "GIVETH DEONTIC Person Action"
+  , "c MEANS"
+  , "  (PARTY Alice MUST deliver WITHIN 3)"
+  , "  ROR (PARTY Bob MUST pay 50 WITHIN 3)"
+  , ""
+  , "#TRACE c AT 0 WITH"
+  , "  PARTY Alice DOES deliver AT 1"
+  ]
+
+-- 10. the events run out with the obligation still pending
+waitingSrc :: Text.Text
+waitingSrc = Text.unlines $ prologue <>
+  [ "GIVETH DEONTIC Person Action"
+  , "c MEANS"
+  , "  PARTY Alice MUST deliver WITHIN 10"
+  , ""
+  , "#TRACE c AT 0 WITH"
+  , "  PARTY Bob DOES deliver AT 1"
+  ]
+
+-- 11. a barrier with one member still pending when the events run out
+barrierWaitingSrc :: Text.Text
+barrierWaitingSrc = Text.unlines $ everyPrologue <>
+  [ "GIVETH A DEONTIC Actor Action"
+  , "`the tenancy` MEANS"
+  , "    EVERY Tenant t IN tenants"
+  , "        MUST   Sign (EXACTLY t)"
+  , "        WITHIN 14"
+  , "        ONCE   ALL HAVE"
+  , "        HENCE  FULFILLED"
+  , "        LEST   BREACH"
+  , ""
+  , "#TRACE `the tenancy` AT 0 WITH"
+  , "  PARTY alice DOES Sign alice AT 1"
+  ]
+
+-- 12. a prohibition violated: routed to LEST when there is one, else a breach
+prohibitionSrc :: Text.Text
+prohibitionSrc = Text.unlines $ prologue <>
+  [ "GIVETH DEONTIC Person Action"
+  , "c MEANS"
+  , "  PARTY Alice MUST NOT deliver WITHIN 10"
+  , "  LEST PARTY Alice MUST pay 100 WITHIN 10"
+  , ""
+  , "GIVETH DEONTIC Person Action"
+  , "d MEANS"
+  , "  PARTY Alice MUST NOT deliver WITHIN 10"
+  , ""
+  , "#TRACE c AT 0 WITH"
+  , "  PARTY Alice DOES deliver AT 2"
+  , "  PARTY Alice DOES pay 100 AT 3"
+  , ""
+  , "#TRACE d AT 0 WITH"
+  , "  PARTY Alice DOES deliver AT 2"
+  ]
+
+-- 13. a PROVIDED that comes out false: the event is witnessed, the next matches
+guardSrc :: Text.Text
+guardSrc = Text.unlines $ prologue <>
+  [ "GIVETH DEONTIC Person Action"
+  , "c MEANS"
+  , "  PARTY Alice MUST pay n PROVIDED n >= 50 WITHIN 10"
+  , ""
+  , "#TRACE c AT 0 WITH"
+  , "  PARTY Alice DOES pay 10 AT 1"
+  , "  PARTY Alice DOES pay 60 AT 2"
+  ]
+
+-- 14. the right party, the wrong action
+actionMismatchSrc :: Text.Text
+actionMismatchSrc = Text.unlines $ prologue <>
+  [ "GIVETH DEONTIC Person Action"
+  , "c MEANS"
+  , "  PARTY Alice MUST deliver WITHIN 10"
+  , ""
+  , "#TRACE c AT 0 WITH"
+  , "  PARTY Alice DOES pay 5 AT 1"
+  , "  PARTY Alice DOES deliver AT 2"
+  ]
+
+-- 15. a barrier with a LEST: bob never signs, the landlord's event at 20
+--     reveals his expiry; the barrier's LEST (an explicit BREACH) runs once
+barrierFailSrc :: Text.Text
+barrierFailSrc = Text.unlines $ everyPrologue <>
+  [ "GIVETH A DEONTIC Actor Action"
+  , "`the tenancy` MEANS"
+  , "    EVERY Tenant t IN tenants"
+  , "        MUST   Sign (EXACTLY t)"
+  , "        WITHIN 14"
+  , "        ONCE   ALL HAVE"
+  , "        HENCE  FULFILLED"
+  , "        LEST   BREACH"
+  , ""
+  , "#TRACE `the tenancy` AT 0 WITH"
+  , "  PARTY alice DOES Sign alice AT 1"
+  , "  PARTY theLandlord DOES Deliver theLandlord AT 20"
+  ]
+
+-- 16. a barrier with no LEST whose MAY member lets its permission lapse:
+--     nothing was owed, the join can never fire
+barrierStallSrc :: Text.Text
+barrierStallSrc = Text.unlines $ everyPrologue <>
+  [ "GIVETH A DEONTIC Actor Action"
+  , "`the resolution` MEANS"
+  , "    EVERY Tenant t IN tenants"
+  , "        MAY    Sign (EXACTLY t)"
+  , "        WITHIN 14"
+  , "        ONCE   ALL HAVE"
+  , "        HENCE  FULFILLED"
+  , ""
+  , "#TRACE `the resolution` AT 0 WITH"
+  , "  PARTY alice DOES Sign alice AT 1"
+  , "  PARTY theLandlord DOES Deliver theLandlord AT 20"
+  ]
+
+-- 17. a barrier with no LEST whose MUST member misses: the member's own
+--     breach stands as the barrier's
+barrierBreachSrc :: Text.Text
+barrierBreachSrc = Text.unlines $ everyPrologue <>
+  [ "GIVETH A DEONTIC Actor Action"
+  , "`the tenancy` MEANS"
+  , "    EVERY Tenant t IN tenants"
+  , "        MUST   Sign (EXACTLY t)"
+  , "        WITHIN 14"
+  , "        ONCE   ALL HAVE"
+  , "        HENCE  FULFILLED"
+  , ""
+  , "#TRACE `the tenancy` AT 0 WITH"
+  , "  PARTY alice DOES Sign alice AT 1"
+  , "  PARTY theLandlord DOES Deliver theLandlord AT 20"
+  ]
+
 -- Off-path proof: every fixture, both ways, same rendered result.
 allSrcs :: [(String, Text.Text)]
 allSrcs =
   [ ("match", matchSrc), ("expiry", expirySrc), ("may", maySrc), ("mismatch", mismatchSrc)
-  , ("or", orSrc), ("barrier", barrierSrc), ("fork", forkSrc), ("join-deadline", joinDeadlineSrc) ]
+  , ("or", orSrc), ("barrier", barrierSrc), ("fork", forkSrc), ("join-deadline", joinDeadlineSrc)
+  , ("or-left", orLeftSrc), ("waiting", waitingSrc), ("barrier-waiting", barrierWaitingSrc)
+  , ("prohibition", prohibitionSrc), ("guard", guardSrc), ("action-mismatch", actionMismatchSrc)
+  , ("barrier-fail", barrierFailSrc), ("barrier-stall", barrierStallSrc), ("barrier-breach", barrierBreachSrc) ]
+
+-- | The 'Breached' step an explicit @BREACH@ with no @BY@ logs.
+bareBreach :: Row
+bareBreach = Row Nothing 0 Nothing
+  (Breached MkBreachSummary {bsBlame = Nothing, bsStamp = Nothing, bsDeadline = Nothing})
+  NoEvent Nothing Nothing Nothing
 
 spec :: Spec
 spec = describe "the deontic step log (LTS-VISUALISER §4.3, P2b)" $ do
@@ -335,8 +493,8 @@ spec = describe "the deontic step log (LTS-VISUALISER §4.3, P2b)" $ do
     rs <- runLogged barrierSrc
     let ss = stepsOf 0 rs
     -- A member's match hands control to the join's checkpoint sentinel, so
-    -- a member never logs a Waiting step of its own: the join, not the
-    -- member, is what waits.
+    -- a member that COMPLETES never logs a Waiting step of its own. (A
+    -- member still pending when the stream runs out does — see 11.)
     map row ss `shouldBe`
       [ Row (Just "Tenant OF ") 1 (Just DMust) (Matched ToHence) Consumed (Just 1) (Just 1) (Just (MemberSatisfied 1 2))
       , Row (Just "Tenant OF ") 2 (Just DMust) PartyMismatch WitnessedOnly (Just 1) (Just 1) Nothing
@@ -373,16 +531,101 @@ spec = describe "the deontic step log (LTS-VISUALISER §4.3, P2b)" $ do
     -- a fork has no join step: nothing carries the join's site
     [ s | s <- ss, s.dsOutcome `elem` [JoinReleased, JoinFailed ToLest, JoinStalled] ] `shouldBe` []
 
-  it "8. a join-line deadline: every arm satisfied, the last too late; JoinExpired to LEST" $ do
+  it "8. a join-line deadline: every arm satisfied, the last too late; JoinExpired to LEST, whose BREACH is logged" $ do
     rs <- runLogged joinDeadlineSrc
     let ss = stepsOf 0 rs
     -- Bob's step says MemberSatisfied 2 2 and NOT released: the release is
-    -- the join's decision, and here the join decides the other way.
+    -- the join's decision, and here the join decides the other way. The
+    -- LEST is an explicit BREACH, and the log says so: without the last
+    -- row, "JoinExpired ToLest" could as well have been a reparation.
     map row ss `shouldBe`
       [ Row (Just "Tenant OF ") 1 (Just DMust) (Matched ToHence) Consumed (Just 1) (Just 1) (Just (MemberSatisfied 1 2))
       , Row (Just "Tenant OF ") 2 (Just DMust) PartyMismatch WitnessedOnly (Just 1) (Just 1) Nothing
       , Row (Just "Tenant OF ") 2 (Just DMust) (Matched ToHence) Consumed (Just 9) (Just 9) (Just (MemberSatisfied 2 2))
       , Row Nothing 1 (Just DMust) (JoinExpired ToLest 5) NoEvent Nothing (Just 9) Nothing
+      , bareBreach
+      ]
+
+  it "9. an OR whose LEFT side fulfils is Joined at the RBinOp1 short-circuit; the right side never runs" $ do
+    rs <- runLogged orLeftSrc
+    map row (stepsOf 0 rs) `shouldBe`
+      [ Row (Just "Alice") 1 (Just DMust) (Matched ToHence) Consumed (Just 1) (Just 1) Nothing
+      , Row Nothing 0 Nothing (Joined ValROr MkJoinNote {jnResult = JoinFulfilled, jnWinner = Just LeftSide, jnTieBreak = False}) NoEvent Nothing Nothing Nothing
+      ]
+
+  it "10. the events run out with the obligation pending: Waiting, at the clock the last event advanced it to" $ do
+    rs <- runLogged waitingSrc
+    map row (stepsOf 0 rs) `shouldBe`
+      [ Row (Just "Alice") 1 (Just DMust) PartyMismatch WitnessedOnly (Just 1) (Just 1) Nothing
+      , Row (Just "Alice") 1 (Just DMust) Waiting NoEvent Nothing (Just 1) Nothing
+      ]
+
+  it "11. a barrier with a member still pending when the events run out: the member logs Waiting, the join logs nothing" $ do
+    rs <- runLogged barrierWaitingSrc
+    let ss = stepsOf 0 rs
+    map row ss `shouldBe`
+      [ Row (Just "Tenant OF ") 1 (Just DMust) (Matched ToHence) Consumed (Just 1) (Just 1) (Just (MemberSatisfied 1 2))
+      , Row (Just "Tenant OF ") 2 (Just DMust) PartyMismatch WitnessedOnly (Just 1) (Just 1) Nothing
+      , Row (Just "Tenant OF ") 2 (Just DMust) Waiting NoEvent Nothing (Just 1) Nothing
+      ]
+    -- the Waiting step is the member's, and says so
+    fmap (.moJoin) (member (ss !! 2)) `shouldBe` Just Barrier
+
+  it "12. a prohibition violated is Consumed and routed to LEST, or to a breach when it has none" $ do
+    rs <- runLogged prohibitionSrc
+    map row (stepsOf 0 rs) `shouldBe`
+      [ Row (Just "Alice") 1 (Just DMustNot) (Matched ToLest)  Consumed (Just 2) (Just 2) Nothing
+      , Row (Just "Alice") 1 (Just DMust)    (Matched ToHence) Consumed (Just 3) (Just 3) Nothing
+      ]
+    map row (stepsOf 1 rs) `shouldBe`
+      [ Row (Just "Alice") 1 (Just DMustNot) (Matched ToBreach) Consumed (Just 2) (Just 2) Nothing ]
+
+  it "13. a PROVIDED that comes out false is WitnessedOnly and advances the clock; then the match" $ do
+    rs <- runLogged guardSrc
+    map row (stepsOf 0 rs) `shouldBe`
+      [ Row (Just "Alice") 1 (Just DMust) GuardFailed       WitnessedOnly (Just 1) (Just 1) Nothing
+      , Row (Just "Alice") 1 (Just DMust) (Matched ToHence) Consumed      (Just 2) (Just 2) Nothing
+      ]
+
+  it "14. an action that does not match the pattern is WitnessedOnly and advances the clock; then the match" $ do
+    rs <- runLogged actionMismatchSrc
+    map row (stepsOf 0 rs) `shouldBe`
+      [ Row (Just "Alice") 1 (Just DMust) ActionMismatch    WitnessedOnly (Just 1) (Just 1) Nothing
+      , Row (Just "Alice") 1 (Just DMust) (Matched ToHence) Consumed      (Just 2) (Just 2) Nothing
+      ]
+    -- the mismatching action is reported; its unforced field prints as a
+    -- heap address, pinned by prefix as the bearer is
+    map (\s -> keyPrefix <$> ((.ekAction) =<< s.dsEvent)) (stepsOf 0 rs) `shouldBe` [Just "pay OF ", Just "deliver"]
+
+  it "15. a barrier with a LEST whose member misses: Expired ToLest reports the failure, JoinFailed ToLest runs the LEST once, and its BREACH is logged" $ do
+    rs <- runLogged barrierFailSrc
+    let ss = stepsOf 0 rs
+    map row ss `shouldBe`
+      [ Row (Just "Tenant OF ") 1 (Just DMust) (Matched ToHence) Consumed (Just 1) (Just 1) (Just (MemberSatisfied 1 2))
+      , Row (Just "Tenant OF ") 2 (Just DMust) PartyMismatch WitnessedOnly (Just 1) (Just 1) Nothing
+      , Row (Just "Tenant OF ") 2 (Just DMust) (Expired ToLest 14) WitnessedOnly (Just 20) (Just 1) Nothing
+      , Row Nothing 1 (Just DMust) (JoinFailed ToLest) NoEvent Nothing (Just 20) Nothing
+      , bareBreach
+      ]
+
+  it "16. a barrier with no LEST whose MAY member lapses: Expired ToLest (defaulting to FULFILLED), then JoinStalled" $ do
+    rs <- runLogged barrierStallSrc
+    let ss = stepsOf 0 rs
+    map row ss `shouldBe`
+      [ Row (Just "Tenant OF ") 1 (Just DMay) (Matched ToHence) Consumed (Just 1) (Just 1) (Just (MemberSatisfied 1 2))
+      , Row (Just "Tenant OF ") 2 (Just DMay) PartyMismatch WitnessedOnly (Just 1) (Just 1) Nothing
+      , Row (Just "Tenant OF ") 2 (Just DMay) (Expired ToLest 14) WitnessedOnly (Just 20) (Just 1) Nothing
+      , Row Nothing 1 (Just DMay) JoinStalled NoEvent Nothing Nothing Nothing
+      ]
+
+  it "17. a barrier with no LEST whose MUST member misses: Expired ToBreach, then JoinFailed ToBreach" $ do
+    rs <- runLogged barrierBreachSrc
+    let ss = stepsOf 0 rs
+    map row ss `shouldBe`
+      [ Row (Just "Tenant OF ") 1 (Just DMust) (Matched ToHence) Consumed (Just 1) (Just 1) (Just (MemberSatisfied 1 2))
+      , Row (Just "Tenant OF ") 2 (Just DMust) PartyMismatch WitnessedOnly (Just 1) (Just 1) Nothing
+      , Row (Just "Tenant OF ") 2 (Just DMust) (Expired ToBreach 14) WitnessedOnly (Just 20) (Just 1) Nothing
+      , Row Nothing 1 (Just DMust) (JoinFailed ToBreach) NoEvent Nothing Nothing Nothing
       ]
 
   it "the log-off path is unchanged: every fixture renders the same result both ways" $

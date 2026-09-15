@@ -342,8 +342,11 @@ traceEval ta = do
 --
 -- Modelled on 'traceEval': an optional IORef in the reader env, newest-last.
 -- Every call site goes through 'whenDeonticLog', so with the log off the
--- machine does no work for it beyond threading a lazy 'NormKey' through the
--- contract frames. The types are in "L4.EvaluateLazy.DeonticStep".
+-- machine computes nothing for it; what it does do is carry state it never
+-- reads — a lazy 'NormKey' through the contract frames, @ev'reoffered@ past
+-- @Contract5@ (the only frame that consults it), and a @pending@ step
+-- (always 'Nothing' when off) on 'ResolvePartyFrame'. The types are in
+-- "L4.EvaluateLazy.DeonticStep".
 -----------------------------------------------------------------------------
 
 -- | Run a log-side action only when the log is on. The action receives the
@@ -472,6 +475,16 @@ registerCast ctx kind members = whenDeonticLog \ l -> liftIO do
         | (i, (_, mval)) <- zip [1 ..] members ]
   modifyIORef' l.dlMembers (\ m -> foldl' (\ acc (k, v) -> Map.insert k v acc) m entries)
   modifyIORef' l.dlJoinDone (Map.insert jsite 0)
+
+-- | The blame a breach value carries, as far as it has been forced.
+breachSummary :: ReasonForBreach Reference -> Eval BreachSummary
+breachSummary = \ case
+  DeadlineMissed _ _ stamp partyR _ deadline -> do
+    blame <- peekParty partyR
+    pure MkBreachSummary {bsBlame = blame, bsStamp = Just stamp, bsDeadline = Just deadline}
+  ExplicitBreach mParty _ -> do
+    blame <- maybe (pure Nothing) peekParty mParty
+    pure MkBreachSummary {bsBlame = blame, bsStamp = Nothing, bsDeadline = Nothing}
 
 -- | A step with no event and no join progress, for the sites that have
 -- neither.
@@ -1162,7 +1175,16 @@ forwardExpr env = \ case
     -- Explicit breach terminal clause - immediately produces a breach value
     mPartyRef <- traverse (\p -> allocate_ p env) mParty
     mReasonRef <- traverse (\r -> allocate_ r env) mReason
-    continueBackward (ValBreached (ExplicitBreach mPartyRef mReasonRef))
+    let reason = ExplicitBreach mPartyRef mReasonRef
+    -- P2b: the one place an explicit breach is constructed. No norm (a
+    -- terminal is not an obligation), no clock (the expression arm has
+    -- none in hand), and the blame is peeked, never forced.
+    whenDeonticLog \ l -> do
+      summary <- breachSummary reason
+      logStep l MkDeonticStep
+        { dsClock = Nothing, dsEvent = Nothing, dsScrutiny = NoEvent, dsNorm = Nothing
+        , dsOutcome = Breached summary, dsJoin = Nothing }
+    continueBackward (ValBreached reason)
   -- REFUSE only ever reaches 'forwardExpr' when the machine actually REDUCES
   -- it, so a refusal inside an unforced thunk is never entered. That is what
   -- makes @FALSE AND <refusing>@ answer FALSE while @<refusing> AND FALSE@
@@ -1975,15 +1997,21 @@ backwardContractFrame val = \ case
       -- deadline has been decremented by the time that has passed.
       ValObligation{} -> barrierNext BarrierStepFrame {pending = val : pending, ..}
       ValROp{}        -> barrierNext BarrierStepFrame {pending = val : pending, ..}
+      -- A MUST member's own breach, under a barrier with no LEST: no failure
+      -- sentinel was minted, so the member's breach stands as the barrier's.
+      ValBreached{} -> do
+        -- P2b: no time is in hand here — the member's value is all there is.
+        tellDeonticStep $ plainStep Nothing Nothing NoEvent ctx.norm (JoinFailed ToBreach)
+        continueBackward val
       -- A MAY member whose permission expired under a barrier with no LEST:
       -- nothing was owed, so nothing is breached, but the join cannot fire.
-      -- (A MUST member's own breach lands here too, and stands.)
-      _               -> do
-        -- P2b: no time is in hand here — the member's value is all there is.
-        tellDeonticStep $ plainStep Nothing Nothing NoEvent ctx.norm $ case val of
-          ValBreached{} -> JoinFailed ToBreach
-          _             -> JoinStalled
+      ValFulfilled -> do
+        tellDeonticStep $ plainStep Nothing Nothing NoEvent ctx.norm JoinStalled
         continueBackward val
+      -- Every terminal a member can reach is named above; anything else is a
+      -- machine bug, and is loud rather than logged as one of the two.
+      other -> internalException $ RuntimeTypeError $
+        "unexpected barrier member value: " <> prettyLayout other
   -- EVERY, the barrier: a completion's timestamp. The LATEST one is the
   -- join's firing time, and the stream that followed it is what the HENCE
   -- scrutinizes (spec §3.4, §5.1).
@@ -2002,11 +2030,7 @@ backwardContractFrame val = \ case
   Barrier4 BarrierArmingFrame {..} -> do
     armed <- assertTime val
     if joinTime > armed + stateDue
-      then do
-        -- P2b: every arm satisfied, the last of them too late.
-        tellDeonticStep $ plainStep (Just joinTime) Nothing NoEvent ctx.norm $
-          JoinExpired (maybe ToBreach (const ToLest) ctx.deonton.lest) (armed + stateDue)
-        barrierStateMissed ctx (armed + stateDue)
+      then barrierStateMissed ctx joinTime (armed + stateDue)
       else do
         tRef <- allocateValue (ValNumber joinTime)
         fireBarrierHence ctx tRef joinEvents
@@ -2016,7 +2040,12 @@ backwardContractFrame val = \ case
     -- wait for the left hand side expression to run to observe
     -- how we'll have to do the blame assignment
     | ValROr <- op
-    , ValFulfilled <- val -> continueBackward ValFulfilled
+    , ValFulfilled <- val -> do
+      -- P2b: the OR's commonest success path. The RBinOp2 arm for a
+      -- fulfilled LEFT operand is unreachable because of this short-circuit,
+      -- so the step is logged here.
+      joinedStep op JoinFulfilled (Just LeftSide) False
+      continueBackward ValFulfilled
 
   RBinOp1 MkRBinOp1 {..} -> do
 
@@ -2108,6 +2137,9 @@ backwardContractFrame val = \ case
     -> do
       joinedStep op JoinFulfilled (Just RightSide) False
       continueBackward ValFulfilled
+  -- NOTE: unreachable — a fulfilled LEFT operand of an OR never gets past
+  -- the RBinOp1 short-circuit above, which is where that step is logged.
+  -- Kept so the arms read as the full table.
   RBinOp2 MkRBinOp2 {..}
     | ValROr <- op
     , ValFulfilled <- rval1
@@ -2140,16 +2172,6 @@ backwardContractFrame val = \ case
     expiredBranch :: StepOutcome -> Maybe DS.Branch
     expiredBranch (Expired b _) = Just b
     expiredBranch _             = Nothing
-
-    -- P2b: the blame a breach value carries, as far as it has been forced.
-    breachSummary :: ReasonForBreach Reference -> Eval BreachSummary
-    breachSummary = \ case
-      DeadlineMissed _ _ stamp partyR _ deadline -> do
-        blame <- peekParty partyR
-        pure MkBreachSummary {bsBlame = blame, bsStamp = Just stamp, bsDeadline = Just deadline}
-      ExplicitBreach mParty _ -> do
-        blame <- maybe (pure Nothing) peekParty mParty
-        pure MkBreachSummary {bsBlame = blame, bsStamp = Nothing, bsDeadline = Nothing}
 
     -- P2b: an 'RBinOp2' reduction, logged as a 'Joined' step. The compound
     -- is not a norm instance, so the step carries no key (see 'dsNorm').
@@ -2561,9 +2583,14 @@ barrierFail ctx timeRef eventsRef = case ctx.deonton.lest of
 
 -- | Everyone acted, but the last of them acted after the @ONCE … WITHIN@
 -- deadline, which bounds the whole (R-T2).
-barrierStateMissed :: QuantCtx -> Rational -> Machine Config
-barrierStateMissed ctx deadline = case ctx.deonton.lest of
+--
+-- P2b logs the 'JoinExpired' step here, in each arm beside the routing it
+-- records, so the log cannot classify the routing differently from the
+-- machine. @joinTime@ is the last completion, the step's clock.
+barrierStateMissed :: QuantCtx -> Rational -> Rational -> Machine Config
+barrierStateMissed ctx joinTime deadline = case ctx.deonton.lest of
   Just lestExpr -> do
+    tellDeonticStep $ plainStep (Just joinTime) Nothing NoEvent ctx.norm (JoinExpired ToLest deadline)
     tRef <- allocateValue (ValNumber deadline)
     mOriginal <- getCurrentParty
     putCurrentParty Nothing
@@ -2571,6 +2598,7 @@ barrierStateMissed ctx deadline = case ctx.deonton.lest of
     pushFrame (App1 [tRef, ctx.events] Nothing)
     continueExpr ctx.env lestExpr
   Nothing -> do
+    tellDeonticStep $ plainStep (Just joinTime) Nothing NoEvent ctx.norm (JoinExpired ToBreach deadline)
     reason <- allocateValue (ValString
       "every member acted, but the last of them acted after the ONCE line's WITHIN deadline")
     continueBackward (ValBreached (ExplicitBreach Nothing (Just reason)))
