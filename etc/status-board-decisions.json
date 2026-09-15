@@ -26,22 +26,6 @@
       }
     },
     {
-      "id": "A1–A5",
-      "owner": "Meng",
-      "kind": "ruling ×5",
-      "quick": true,
-      "raised": "2026-09-11",
-      "ask": "The five APPLIES read-side rulings the corpus survey forces — posed in §11.3 on branch mengwong/applies-corpus-survey @ 682b7eaa, which was committed after #315 merged and never PR'd, so they are not even on unstable. A1 first (does derived `applies` include conjunct 1, inForce? yes/no — the two answers are not interconvertible after the fact); A2 verdict vocabulary lives in userland Booleans / a library enum / a language primitive (the spec argues against the primitive); A3 uncertainty as MAYBE BOOLEAN / three-valued primitive / verdict member; A4 how the read is spelled (spec recommends DEFER); A5 are selector reads the same construct (family, or separate — separate is cheaper, family lets them be generated).",
-      "unblocks": "any further subject that reads applicability — each one currently picks an answer by accident",
-      "source": {
-        "file": "specs/todo/SUBJECT-TO-NOTWITHSTANDING-SPEC.md",
-        "anchor": "**A1. Does the derived `applies` include conjunct 1 (`inForce`)?**",
-        "ref": "origin/mengwong/applies-corpus-survey"
-      },
-      "next": "GM rebases the branch (3 docs commits, 594 behind), records the marks in §11.3, PRs it.",
-      "bench": "https://claude.ai/artifact/UTykRduqWbvkR7tqaK7X69 — collection applies-rulings, docs A1…A5; GM reads marks back with read_db"
-    },
-    {
       "id": "WHOSE",
       "owner": "Meng",
       "kind": "go / no-go",
