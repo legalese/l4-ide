@@ -33,6 +33,25 @@ import io,re,sys
 s=io.open(sys.argv[1],encoding='utf-8').read()
 s=re.sub(r'^\[\^(\d+)\]:[ \t]*', r'**\1.** ', s, flags=re.M)   # definitions -> numbered paras
 s=re.sub(r'\[\^(\d+)\]', r'^\1^', s)                            # references  -> superscripts
+
+# A path or command in inline code is one unbreakable box to TeX, so a long
+# one juts through the right margin (e.g. post 4's
+# `git show 40a87269^:jl4/.../regcf.l4`). Insert a zero-width space after the
+# separators; the header maps it to \allowbreak, which costs nothing when the
+# span already fits. Fenced blocks are left alone -- fvextra wraps those.
+def breakable(m):
+    span = m.group(1)
+    # Leave URLs alone: pandoc renders a zero-width space as \hspace{0pt},
+    # which recurses fatally inside \url{} (post 3's knuthweb.pdf link).
+    # Short spans do not need help either.
+    if '://' in span or len(span) < 28:
+        return m.group(0)
+    return '`' + re.sub(r'([/:_])(?=.{6})', lambda g: g.group(1) + '\u200b', span) + '`'
+out, infence = [], False
+for line in s.split('\n'):
+    if line.lstrip().startswith('```'): infence = not infence
+    out.append(line if infence else re.sub(r'`([^`\n]+)`', breakable, line))
+s='\n'.join(out)
 io.open(sys.argv[2],'w',encoding='utf-8').write(s)
 PY
   # blog index number for the footer: the filename prefix (01, 09, S1 ...)
@@ -41,7 +60,11 @@ cat > "$TMP/$n-head.tex" <<'TEX'
 \usepackage{microtype}
 \usepackage[htt]{hyphenat}
 \usepackage{newunicodechar}
+% Glyphs Palatino lacks. A missing one prints as NOTHING, with only a
+% [WARNING] in the log, so each is mapped rather than left to chance and
+% the build below refuses to ship a PDF with any unmapped one left.
 \newunicodechar{→}{\ensuremath{\rightarrow}}
+\newunicodechar{⊛}{\ensuremath{\circledast}}
 \usepackage{fvextra}
 % L4 samples run to 144 characters; wrap them inside the text block
 % rather than letting them bleed through the right margin.
@@ -67,7 +90,18 @@ TEX
       -V geometry:a4paper,left=0.75in,right=2.5in,top=1in,bottom=1in \
       -V mainfont="Palatino" -V fontsize=11pt -V linestretch=1.15 \
       -V colorlinks=true -V linkcolor=black -V urlcolor=black \
-      -H "$TMP/$n-head.tex" ) 2>&1 | grep -v '^\[WARNING\] \[makeStrict\]' || true
+      -H "$TMP/$n-head.tex" ) >"$TMP/$n.log" 2>&1 || { cat "$TMP/$n.log"; exit 1; }
+
+  # A glyph the font lacks is dropped from the page in silence — the only
+  # sign is this warning, and the PDF still builds. Refuse to ship one.
+  if grep -q 'Missing character' "$TMP/$n.log"; then
+    echo "ERROR: $n has characters no font in the document can print;" >&2
+    echo "they would come out BLANK on the page. Add a \\newunicodechar" >&2
+    echo "mapping for each to the header above, then rebuild:" >&2
+    grep 'Missing character' "$TMP/$n.log" | sed 's/.*is no /  /; s/ in font.*//' | sort -u >&2
+    rm -f "$OUT/$n.pdf"; exit 1
+  fi
+  grep -v '^\[WARNING\] \[makeStrict\]' "$TMP/$n.log" | grep '^\[WARNING\]' || true
   printf '%-34s %3s pages  %s\n' "$n" \
     "$(pdfinfo "$OUT/$n.pdf" | awk '/^Pages/{print $2}')" "$OUT/$n.pdf"
 done
