@@ -143,16 +143,16 @@
       }
     },
     {
-      "id": "Build go",
+      "id": "EVERY residue",
       "owner": "Meng",
       "kind": "scope",
       "quick": false,
-      "raised": "2026-09-07",
-      "ask": "Everything on the EVERY/EACH arc is RULED, NOT BUILT: R-Q1–R-Q7 (§2.5), R-Q7A–C anchors (§5.1.1), R-X5/R-X6 window edges (§5.1.2), T1 origin (§5.1.2.1), R-T1–R-T6 threshold joins (§2.2.7.8), UPON EACH. Likewise R5 field opening for rule bodies (2026-09-04). No parser production exists for any of it. Is there a build wave, and which construct first? This is a sequencing call, not a few-minutes ruling.",
-      "unblocks": "the whole quantifier / threshold / anchor programme moving from spec to compiler",
+      "raised": "2026-09-08",
+      "ask": "CORRECTED 2026-09-15 — an earlier version of this card said the EVERY/EACH arc was ruled-not-built; that was a stale memory note and was false of the tree. BUILT AND MERGED: the front end (#360, 2026-09-07), evaluation (#370, 2026-09-08) and `EVERY Cast v IN xs` (#374, 2026-09-08) — EVERY + WHO filter, ONCE ALL HAVE barrier, UPON EACH fork, the distributive form, all four modals, the join deadline, nesting; 14 witnesses under jl4/examples/ok/every/ with goldens. NOT BUILT, each verified against Lexer.hs/Parser.hs on unstable e578654c: (1) R-T3 blame set §6.1 — a failed barrier names ONE non-completer, roll order, because ReasonForBreach carries one party; (2) §5.2 deadline anchor — LEST anchored at the revealing event, not the missed deadline, deliberately matching the single-party path so it is one change in one place; (3) §11.1 BarrierRuntime — an unfinished barrier's residual lacks the join line (only a resuming service cares); (4) per-member performer/actor check; (5) §13.2 partial-completion visibility and §2.2.7.4 count/measure joins (RT4 `Aggregate OF`, RT5 `SOME m OF` — TKSome is lexed, zero parser uses); (6) R-Q7A–C anchors `OF THE JOIN/DEADLINE/ARMING` + date expression §5.1.1 — zero parser mentions; (7) R-X5 AFTER/BEFORE edges, R-X6 early-act nullity, T1 origin §5.1.2 — AFTER/BEFORE not lexed; (8) §5.1.3 anchor as trace expression — direction only; (9) WHOSE §13.6 — endorsed as a direction, not ruled, not lexed (lang/whose-opening is S2/S3 section work, not this). Also owed: doc/reference/regulative/README.md:86,96 still teach `WITHIN 5 days OF notice`, a parse error (§2.5). Separate arc, also not built: R5 field opening for rule bodies (IMPLICIT-PROPS-DESIGN.md §11.7, :2193). The question for Meng is sequencing: which of (1)–(9) first.",
+      "unblocks": "the next EVERY build session starting from the true residue rather than re-deriving it",
       "source": {
         "file": "specs/todo/EVERY-EACH-QUANTIFIER-SPEC.md",
-        "anchor": "ruled, not built"
+        "anchor": "### 11.0.1 What phase 2 built, and what it did not"
       }
     },
     {
