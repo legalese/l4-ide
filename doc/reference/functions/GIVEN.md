@@ -104,6 +104,8 @@ the indentation is the whole difference.
   it
 - [What a section needs to know](../../tutorials/section-given/what-a-section-needs-to-know.md)
   — the tutorial, working through one statute
+- [Field opening](../syntax/field-opening.md) — inside a rule whose input is a
+  record, the record's fields can be read by their bare names
 
 ## Related Keywords
 

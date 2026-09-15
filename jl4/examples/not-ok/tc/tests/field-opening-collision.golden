@@ -1,0 +1,39 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: field-opening-collision.l4
+  Hidden: no
+  Range: 14:7-14:13
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    This input has a field name that an earlier input of the rule also has:
+
+      seller IS A Seller
+
+    has a field named `name`, and so does buyer (a Buyer, declared at field-opening-collision.l4:13:7-12).
+    Neither one can be read by its bare name in this rule. Write
+
+      buyer's name
+      seller's name
+
+    wherever the body means one of them. (The bare read is at field-opening-collision.l4:16:19-23.)
+
+File: field-opening-collision.l4
+  Hidden: no
+  Range: 16:19-16:23
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    Two inputs of this rule have a field named
+
+      `name`
+
+    so on its own the name could belong to either:
+
+      buyer's name      (buyer IS A Buyer, declared at field-opening-collision.l4:13:7-12)
+      seller's name     (seller IS A Seller, declared at field-opening-collision.l4:14:7-13)
+
+    Write the one you mean with its input in front, as shown.

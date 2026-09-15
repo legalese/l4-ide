@@ -1,0 +1,15 @@
+`is eligible` with `alice`
+`is eligible` with `bob`
+`is eligible` with `carol`
+`is eligible` with `alice` is equal to `is eligible (spelled out)` with `alice`
+`is eligible` with `bob` is equal to `is eligible (spelled out)` with `bob`
+`is eligible` with `carol` is equal to `is eligible (spelled out)` with `carol`
+`age with a local` with `carol`
+`doubled` with `Money` where `amount` is 21
+`age via selector` with `carol`
+`eligible adult` with `alice`
+`eligible adult` with `carol`
+`applicant is solvent` where `applicant` is `alice`
+`applicant is solvent` where `applicant` is `bob`
+`own age` with `carol`
+`entries` with `Dictionary` where `contents` is list of `PAIR` with 1 and one and `PAIR` with 2 and two

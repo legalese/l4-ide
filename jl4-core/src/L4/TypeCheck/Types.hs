@@ -16,7 +16,7 @@ import L4.Syntax
 import L4.TypeCheck.With
 import qualified L4.Utils.IntervalMap as IV
 import L4.Mixfix (MixfixInfo(..))
-import L4.Names (SectionBinderDecl)
+import L4.Names (OpenedBinderDecl (..), OpenedFieldCollision (..), SectionBinderDecl)
 import qualified Base.Set as Set
 
 import Control.Applicative
@@ -282,6 +282,16 @@ data CheckError =
     -- on the @NOT@'s own line: @NOT a AND b@, or @NOT (a) AND b@. Both read
     -- as @NOT (a AND b)@, which is silently not what most readers take them
     -- to say (SET-OPERATORS-SPEC §18.1, R-NOT-1). See 'L4.Lint.NotReach'.
+  | OpenedFieldCollisionAtRead OpenedFieldCollision
+    -- ^ R5 (IMPLICIT-PROPS-DESIGN §11.7): a bare read of a field name that
+    -- two or more record-typed binders of the same signature open. Anchored
+    -- at the read; names every binder. See 'L4.Desugar.openFields'.
+  | OpenedFieldCollisionAtOpening OpenedFieldCollision OpenedBinderDecl
+    -- ^ The same collision, anchored at a binder after the first that opens
+    -- the name: the "declaration that opens the second" of the ruling. The
+    -- second argument is that binder; it is one of the collision's binders.
+    -- Emitted only alongside an 'OpenedFieldCollisionAtRead' — two binders
+    -- that merely share a field name and read it as @r's f@ are fine.
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
@@ -601,6 +611,8 @@ instance HasSrcRange CheckError where
   rangeOf (ImplicitCrossesImport r _)       = rangeOf r
   rangeOf (RestatedSectionBinder n)         = rangeOf n
   rangeOf (NotReachesConnective site)       = Just site.range
+  rangeOf (OpenedFieldCollisionAtRead c)    = rangeOf c.fieldRead
+  rangeOf (OpenedFieldCollisionAtOpening _ b) = rangeOf b.binderName
   rangeOf _                                 = Nothing
 
 -- | A token in a mixfix pattern, representing either a keyword (part of the function name)

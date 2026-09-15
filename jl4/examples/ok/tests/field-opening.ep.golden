@@ -1,0 +1,113 @@
+-- R5, field opening (IMPLICIT-PROPS-DESIGN.md §11.7): the fields of a
+-- record-typed GIVEN are in scope by bare name inside the body that declares
+-- or sees the binder. `person's `bankrupt`` still works; `bankrupt` on its own
+-- now means the same thing.
+--
+-- The record is the one every course example uses (doc/courses/advanced,
+-- module-a4-production.md): a Person with an age and a bankruptcy flag, and a
+-- rule that reads both.
+
+IMPORT prelude
+
+DECLARE Person HAS
+    `the age`    IS A NUMBER
+    `bankrupt`   IS A BOOLEAN
+
+-- == 1. A rule's own GIVEN opens ==
+
+-- Written today as `person's `the age` >= 21 AND NOT person's `bankrupt``.
+GIVEN person IS A Person
+GIVETH A BOOLEAN
+DECIDE `is eligible` IF
+        `the age` >= 21
+    AND NOT `bankrupt`
+
+-- The explicit spelling is unchanged and always available.
+GIVEN person IS A Person
+GIVETH A BOOLEAN
+DECIDE `is eligible (spelled out)` IF
+        person's `the age` >= 21
+    AND NOT person's `bankrupt`
+
+alice MEANS Person WITH `the age` IS 30, `bankrupt` IS FALSE
+bob   MEANS Person WITH `the age` IS 30, `bankrupt` IS TRUE
+carol MEANS Person WITH `the age` IS 17, `bankrupt` IS FALSE
+
+#EVAL `is eligible` alice
+#EVAL `is eligible` bob
+#EVAL `is eligible` carol
+#ASSERT `is eligible` alice EQUALS `is eligible (spelled out)` alice
+#ASSERT `is eligible` bob   EQUALS `is eligible (spelled out)` bob
+#ASSERT `is eligible` carol EQUALS `is eligible (spelled out)` carol
+
+-- == 2. Rank ==
+
+-- A WHERE local beats an opened field.
+GIVEN person IS A Person
+GIVETH A NUMBER
+`age with a local` MEANS `the age`
+    WHERE `the age` MEANS 1000
+
+#EVAL `age with a local` carol
+
+-- A rule's own binder named like one of its own fields is the binder.
+DECLARE Money HAS amount IS A NUMBER
+
+GIVEN amount IS A Money
+GIVETH A NUMBER
+`doubled` MEANS amount's amount TIMES 2
+
+#EVAL doubled (Money WITH amount IS 21)
+
+-- An applied head is not a bare read: `the age` here is still the selector.
+GIVEN person IS A Person
+GIVETH A NUMBER
+`age via selector` MEANS `the age` OF person
+
+#EVAL `age via selector` carol
+
+-- == 3. A callee never sees the caller's fields ==
+
+-- `over 18` declares its own binder and opens it; it cannot read `is eligible`'s.
+GIVEN p IS A Person
+GIVETH A BOOLEAN
+DECIDE `over 18` IF `the age` > 18
+
+GIVEN person IS A Person
+GIVETH A BOOLEAN
+DECIDE `eligible adult` IF `is eligible` person AND `over 18` person
+
+#EVAL `eligible adult` alice
+#EVAL `eligible adult` carol
+
+-- == 4. A section GIVEN opens too ==
+
+§ `Applicant checks`
+    GIVEN applicant IS A Person
+
+-- Reads `bankrupt` of the section's binder. Discharge makes `applicant` an
+-- input of this rule, supplied at WITH, exactly as if the rule had written
+-- `applicant's `bankrupt``.
+GIVETH A BOOLEAN
+DECIDE `applicant is solvent` IF NOT `bankrupt`
+
+-- A rule's own opened field beats a section GIVEN's opened field of the same
+-- name: `the age` here is `person`'s, not `applicant`'s.
+GIVEN person IS A Person
+GIVETH A NUMBER
+`own age` MEANS `the age`
+
+#EVAL `applicant is solvent` WITH applicant IS alice
+#EVAL `applicant is solvent` WITH applicant IS bob
+#EVAL `own age` carol
+
+-- == 5. An imported record opens ==
+
+§ `Imported records`
+
+-- Dictionary is declared in the prelude; its `contents` field opens here.
+GIVEN d IS A Dictionary NUMBER STRING
+GIVETH A NUMBER
+`entries` MEANS count contents
+
+#EVAL entries (Dictionary WITH contents IS LIST (PAIR OF 1, "one"), (PAIR OF 2, "two"))

@@ -528,5 +528,6 @@ repair — refusal first, wider search second — is ruled in
 
 - [`ASSUME` (deprecated)](../types/ASSUME.md) — the older spelling of the same idea, at module level, and where each of its jobs went
 - [`GIVEN`](../functions/GIVEN.md) — the inputs of one rule
+- [Field opening](field-opening.md) — a record-typed section `GIVEN` puts its fields in scope by bare name for every rule under the heading
 - [Section markers (§)](README.md#section-markers-)
 - [Sections](sections.md) — the full visibility rule for nested and sibling sections, qualified names, and the ambiguity error

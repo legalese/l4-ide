@@ -1,0 +1,33 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+field-opening.l4:36:1-26:
+  TRUE
+field-opening.l4:37:1-24:
+  FALSE
+field-opening.l4:38:1-26:
+  FALSE
+field-opening.l4:39:1-69:
+  assertion satisfied
+field-opening.l4:40:1-67:
+  assertion satisfied
+field-opening.l4:41:1-69:
+  assertion satisfied
+field-opening.l4:51:1-31:
+  1000
+field-opening.l4:60:1-40:
+  42
+field-opening.l4:67:1-31:
+  17
+field-opening.l4:80:1-29:
+  TRUE
+field-opening.l4:81:1-29:
+  FALSE
+field-opening.l4:100:1-53:
+  TRUE
+field-opening.l4:101:1-51:
+  FALSE
+field-opening.l4:102:1-22:
+  17
+field-opening.l4:113:1-88:
+  2

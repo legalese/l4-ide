@@ -117,7 +117,7 @@ import qualified Base.Set as Set
 import Data.Function (on)
 import Control.Exception (assert)
 import Text.Read (readMaybe)
-import L4.Desugar (collectSectionBinderDecls, collectSectionBinderNames, desugarComputedFields, desugarSectionGivens, detectComputedFieldCycles, detectMisattachedSectionGivens, detectRestatedSectionBinders, detectTypeSynonymCycles, extractComputedFieldNames)
+import L4.Desugar (collectSectionBinderDecls, collectSectionBinderNames, desugarComputedFields, desugarSectionGivens, detectComputedFieldCycles, detectMisattachedSectionGivens, detectRestatedSectionBinders, detectTypeSynonymCycles, extractComputedFieldNames, openFields, recordFieldTable)
 import L4.Lint.NotReach (NotReachSite (..), detectSameLineNotReach)
 
 mkInitialCheckState :: Substitution -> CheckState
@@ -211,18 +211,43 @@ doCheckProgramWithDependencies checkState checkEnv program =
         [ MkCheckErrorWithContext (NotReachesConnective site) None
         | site <- detectSameLineNotReach program
         ]
+        ++
+        -- R5 (IMPLICIT-PROPS-DESIGN §11.7): a field name two binders of one
+        -- signature both open, read bare. Once at the read, naming every
+        -- binder; and once at each binder after the first, so that the
+        -- declaration that made the name ambiguous is marked too. The
+        -- opening-site errors are deduplicated per (field, binders): a body
+        -- that reads the name three times gets three read errors and one
+        -- per later binder.
+        [ MkCheckErrorWithContext (OpenedFieldCollisionAtRead c) None
+        | c <- fieldCollisions
+        ]
+        ++
+        [ MkCheckErrorWithContext (OpenedFieldCollisionAtOpening c b) None
+        | c <- nubBy (\ a b -> collisionKey a == collisionKey b) fieldCollisions
+        , b <- drop 1 c.binders
+        ]
+      collisionKey c = (rawName c.fieldRead, c.binders)
       synonymCycles = detectTypeSynonymCycles program
+      -- Section binders are elaborated LAST, so that the ASSUME each one becomes
+      -- sits at the very head of its section's declaration list. Computed-field
+      -- desugaring only ever inserts DECIDEs after a DECLARE, so the two passes
+      -- do not interfere. Field opening runs over the result of both: it needs
+      -- the computed-field DECIDEs to exist (their @_self@ binder opens like
+      -- any other) and it reads the section GIVENs off the 'Section' node,
+      -- which the elaboration leaves in place. Its record table is read off
+      -- the ORIGINAL module and the import environment, so computed fields —
+      -- which the first pass strips from their DECLARE — are still in it.
+      (desugaredProgram, fieldCollisions) =
+        openFields (recordFieldTable checkEnv.entityInfo program)
+          (desugarSectionGivens (desugarComputedFields program))
       checkEnv' = checkEnv
         { computedFields = extractComputedFieldNames program
         , cyclicSynonyms = Set.fromList (rawName <$> concat synonymCycles)
         , sectionBinderNames = collectSectionBinderNames program
         , sectionBinderDecls = collectSectionBinderDecls program
         }
-  in -- Section binders are elaborated LAST, so that the ASSUME each one becomes
-     -- sits at the very head of its section's declaration list. Computed-field
-     -- desugaring only ever inserts DECIDEs after a DECLARE, so the two passes
-     -- do not interfere.
-     case runCheckUnique (checkProgram (desugarSectionGivens (desugarComputedFields program))) checkEnv' checkState of
+  in case runCheckUnique (checkProgram desugaredProgram) checkEnv' checkState of
     (w, s) ->
       let
         (errs, (rprog, topEnv, localMixfixRegistry)) = runWith w
@@ -6074,6 +6099,47 @@ prettyCheckError (NotReachesConnective site)               =
   , "or move the " <> site.connective <> " to a line of its own, starting in the same"
   , "column as the NOT or further left."
   ]
+prettyCheckError (OpenedFieldCollisionAtRead c)              =
+  [ headline <> " of this " <> siteWord c.site <> " have a field named"
+  , ""
+  , "  " <> quotedName c.fieldRead
+  , ""
+  , "so on its own the name could belong to " <> either' <> ":"
+  , ""
+  ] ++ map row c.binders ++
+  [ ""
+  , "Write the one you mean with its input in front, as shown."
+  ]
+  where
+    two = length c.binders == 2
+    headline = if two then "Two inputs" else "Several inputs"
+    either' = if two then "either" else "any of them"
+    projections = [ openedProjection c.fieldRead b | b <- c.binders ]
+    width = maximum (0 : map Text.length projections)
+    row b =
+      let proj = openedProjection c.fieldRead b
+      in "  " <> proj <> Text.replicate (width - Text.length proj + 5) " "
+           <> "(" <> openedBinderDecl b <> ", declared at " <> openedBinderAt b <> ")"
+prettyCheckError (OpenedFieldCollisionAtOpening c b)         =
+  [ "This input has a field name that an earlier input of the " <> siteWord c.site <> " also has:"
+  , ""
+  , "  " <> openedBinderDecl b
+  , ""
+  , "has a field named " <> quotedName c.fieldRead <> ", and so " <> does <> " "
+      <> Text.intercalate ", " (map earlier earliers) <> "."
+  , "Neither one can be read by its bare name in this " <> siteWord c.site <> ". Write"
+  , ""
+  ] ++ [ "  " <> openedProjection c.fieldRead b' | b' <- c.binders ] ++
+  [ ""
+  , "wherever the body means one of them. (The bare read is at "
+      <> prettySrcRangeM (rangeOf c.fieldRead) <> ".)"
+  ]
+  where
+    earliers = takeWhile (/= b) c.binders
+    does = if length earliers == 1 then "does" else "do"
+    earlier b' =
+      prettyLayout b'.binderName <> " (" <> typeArticle b'.declaredType <> " "
+        <> prettyLayout b'.declaredType <> ", declared at " <> openedBinderAt b' <> ")"
 prettyCheckError (OutOfScopeError n t)                     =
   [ "I could not find a definition for the identifier"
   , ""
@@ -6848,6 +6914,33 @@ prettyOptionallyNamedType (MkOptionallyNamedType _ Nothing  t) =
   "an unnamed input of type " <> prettyLayout t <> " (this is most likely an internal error)"
 prettyOptionallyNamedType (MkOptionallyNamedType _ (Just r) t) =
   prettyLayout r <> " of type " <> prettyLayout t
+
+-- | @r's f@, as the R5 collision diagnostics ask the author to write it.
+openedProjection :: Name -> OpenedBinderDecl -> Text
+openedProjection field b = prettyLayout b.binderName <> "'s " <> prettyLayout field
+
+-- | @buyer IS A Buyer@ — the binder as its GIVEN line declared it.
+openedBinderDecl :: OpenedBinderDecl -> Text
+openedBinderDecl b =
+  prettyLayout b.binderName <> " IS " <> Text.toUpper (typeArticle b.declaredType)
+    <> " " <> prettyLayout b.declaredType
+
+-- | @a@ or @an@, by the type's spelling, as the surface syntax spells it.
+typeArticle :: Type' Name -> Text
+typeArticle ty =
+  case Text.uncons (Text.dropWhile (== '`') (prettyLayout ty)) of
+    Just (ch, _) | Text.toLower (Text.singleton ch) `elem` ["a", "e", "i", "o", "u"] -> "an"
+    _ -> "a"
+
+-- | Where the binder was declared. Read off the GIVEN-line occurrence, which
+-- carries a range even for the @GIVEN x IS A T@ + @DECIDE f IS ...@ form whose
+-- 'Resolved' does not ('L4.Names.OpenedBinderDecl').
+openedBinderAt :: OpenedBinderDecl -> Text
+openedBinderAt b = prettySrcRangeM (rangeOf b.binderName)
+
+siteWord :: OpeningSite -> Text
+siteWord DeclarationOpening = "rule"
+siteWord SectionOpening     = "section"
 
 -- | Show the name with its original / definition source range.
 prettyResolvedWithRange :: Resolved -> Text

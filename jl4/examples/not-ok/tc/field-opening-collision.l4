@@ -1,0 +1,27 @@
+-- R5, field opening (IMPLICIT-PROPS-DESIGN.md §11.7): two record-typed
+-- binders of one rule that share a field name make a bare read of that name
+-- ambiguous. The error names both binders, at the read and at the declaration
+-- that opened the second; `buyer's name` and `seller's name` both still work.
+--
+-- Merely sharing the name is fine: `who pays` below opens the same two records
+-- and reads them spelled out, and draws no error.
+
+DECLARE Buyer  HAS name IS A STRING
+                   pays IS A NUMBER
+DECLARE Seller HAS name IS A STRING
+
+GIVEN buyer  IS A Buyer
+      seller IS A Seller
+GIVETH A STRING
+`who signs` MEANS name
+
+GIVEN buyer  IS A Buyer
+      seller IS A Seller
+GIVETH A STRING
+`who pays` MEANS buyer's name
+
+-- A field only one of them has is not a collision.
+GIVEN buyer  IS A Buyer
+      seller IS A Seller
+GIVETH A NUMBER
+`how much` MEANS pays

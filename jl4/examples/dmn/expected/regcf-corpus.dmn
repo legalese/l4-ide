@@ -1712,13 +1712,13 @@
       <contextEntry id="hydration_investor_ce6">
         <variable id="hydration_investor_ce6_var" name="greater_of_annual_income_or_net_worth" label="greater of annual income or net worth" typeRef="number"/>
         <literalExpression id="hydration_investor_ce6_lit">
-          <text>(if annual_income &gt;= net_worth then annual_income else net_worth)</text>
+          <text>max(annual_income, net_worth)</text>
         </literalExpression>
       </contextEntry>
       <contextEntry id="hydration_investor_ce7">
         <variable id="hydration_investor_ce7_var" name="lesser_of_annual_income_or_net_worth" label="lesser of annual income or net worth" typeRef="number"/>
         <literalExpression id="hydration_investor_ce7_lit">
-          <text>(if annual_income &lt;= net_worth then annual_income else net_worth)</text>
+          <text>min(annual_income, net_worth)</text>
         </literalExpression>
       </contextEntry>
     </context>
