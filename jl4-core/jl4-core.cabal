@@ -155,6 +155,7 @@ library
     L4.Lts.WhatIf
     L4.StateGraph
     L4.StateGraph.Dominators
+    L4.StateGraph.Dot
     L4.StateGraph.Lens
     L4.ExactPrint
     L4.Discharge

@@ -345,6 +345,7 @@ edge src dst ty act =
           , labelGuard = Nothing
           , labelBranch = Nothing
           , labelQuantifier = Nothing
+          , labelSite = Nothing
           }
     , transType = ty
     }
@@ -802,8 +803,8 @@ graphWithDeadline due =
         , ContractState 2 "Breach" TerminalBreach Linear
         ]
     , sgTransitions =
-        [ Transition 0 1 (TransitionLabel (Just "Alice") (Just DMust) "pay" (Just due) Nothing Nothing Nothing) HenceTransition
-        , Transition 0 2 (TransitionLabel Nothing Nothing "timeout" Nothing Nothing Nothing Nothing) LestTransition
+        [ Transition 0 1 (TransitionLabel (Just "Alice") (Just DMust) "pay" (Just due) Nothing Nothing Nothing Nothing) HenceTransition
+        , Transition 0 2 (TransitionLabel Nothing Nothing "timeout" Nothing Nothing Nothing Nothing Nothing) LestTransition
         ]
     , sgInitialState = 0
     }

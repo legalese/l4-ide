@@ -74,9 +74,10 @@ import qualified L4.Utils.IntervalMap as IV
 import L4.Export (ExportedFunction(..), ExportedParam(..), getExportedFunctions, enrichReturnTypes, enrichParamTypes)
 import qualified L4.Print as Print
 import L4.StateGraph
-  ( extractStateGraphs, stateGraphToDot, defaultStateGraphOptions
+  ( extractStateGraphs
   , StateGraph(..)
   )
+import L4.StateGraph.Dot (stateGraphToDot, defaultStateGraphOptions)
 import L4.FunctionSchema
   ( Parameters(..), Parameter(..), declaresFromModule, typeToParameter
   )

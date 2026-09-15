@@ -230,9 +230,28 @@ longer gates on, or is gated by, the new picture.
 > `jl4/examples/ok/contracts.l4`, `jl4/examples/bpmn/offering.l4` and
 > `doc/reference/regulative/state-graph-example.l4` (measured by `diff`, 2026-09-15);
 > `l4-cli-test` asserts only that the DOT path still prints DOT and no dominator text. The DOT
-> annotation ("bold the dominating edges") is **not built**: it needs an option on
-> `StateGraphOptions`, which is an edit to `StateGraph.hs` this branch was told to avoid while
-> a fix to that file is in flight.
+> annotation ("bold the dominating edges") was **not built** on that branch: it needs an option
+> on `StateGraphOptions`, which was an edit to `StateGraph.hs` the branch was told to avoid while
+> a fix to that file was in flight.
+>
+> **Annotation LANDED 2026-09-16** (`lts/b1-b2-loops`). `l4 state-graph --dominators --dot FILE`
+> keeps the DOT and, for each terminal, draws every dominating edge with `penwidth=3` and a
+> caption line `on every path to FULFILLED` / `… to BREACH` / `… to FULFILLED and to BREACH`
+> (`StateGraphOptions.showDominators`, default `False`). `--dot` without `--dominators` and
+> `--dot` with `--all-states` are refused (exit 1), as `--all-states` alone already was. **The
+> option forced a module split**: `StateGraphOptions` and the renderer now live in
+> `jl4-core/src/L4/StateGraph/Dot.hs`, because a Bool on the options record can only be honoured
+> by a renderer that can call `dominators`, and `L4.StateGraph.Dominators` imports
+> `L4.StateGraph` — so the renderer had to move below both. The IR and extraction stay in
+> `L4.StateGraph`; four importers (`Lens.hs`, `jl4-service/DataPlane.hs`, `jl4-mlir/Schema.hs`,
+> `Cli/StateGraph.hs`) changed one import line. **Default output byte-identical, pinned three
+> ways**: the 71-file corpus DOT diff under B1 alone (none changed), `StateGraphSpec` "changes
+> nothing when off" and "does not change the unmarked edges' attributes" (the marked edge's
+> attribute list is the plain one with `penwidth` _appended_, so an unmarked edge's lines cannot
+> drift), and `l4-cli-test` "without --dominators the DOT output is unchanged". Matching is by
+> transition value, not index — `dominators` answers in transitions — which marks both of two
+> byte-identical parallel edges if either dominates; neither can (each is one of two routes), so
+> the ambiguity is not reachable.
 >
 > **Measured**, `l4 state-graph --dominators jl4/examples/ok/contracts.l4`:
 >
@@ -640,6 +659,10 @@ own §3.2 row contradicted four paragraphs earlier. The sinks are shared. The su
 no AND-join barrier — survives, and P1's `P-NOJOIN` fidelity note reaches the same conclusion by
 a different route: `jl4/examples/bpmn/README.md`, "What can be joined, and why so little of it".)_
 
+_(2026-09-16: gap 1 is closed for the edge — `labelSite` — and gap 3 is closed for named targets;
+both by §3.4's B1/B2 blocks. A `RECORD` continuation is still a dead end, and the state still has
+no range of its own. Gaps 2, 4, 5, 7 stand.)_
+
 Also positional and worth fixing regardless: `sgInitialState = 0` is hardcoded on "first created
 state is initial" (`:265`), true today only because both entry paths happen to create it first.
 
@@ -692,6 +715,91 @@ discharged.
 Note that moving modality off the transition (R1) is corroborated by two independent published
 formalisms — contract automata annotate states, LPPN marks places — and possibly a third
 (Lomuscio & Sergot, unverified). Our IR is the odd one out.
+
+> **B1 LANDED 2026-09-16** (`lts/b1-b2-loops`). `TransitionLabel.labelSite :: Maybe SrcRange`
+> (`jl4-core/src/L4/StateGraph.hs`, the field's own comment), set in `extractDeonton` to
+> `rangeOf action` — the same expression `armNormKey` (`Machine.hs`) evaluates to stamp
+> `NormKey.nkSite`, so the two halves of the key agree by construction and not by convention.
+> Both arms of an obligation carry it (the `HENCE` edge and the `LEST` edge are two outcomes of
+> one obligation; `transType` says which); a junction's branch edge and a hand-built fixture
+> leave it `Nothing`. `ContractState` was **not** changed: B2's memo did not need a site (see
+> below), and click-to-source on a _state_ is answered by the edge that enters it.
+>
+> **Measured.** `StateGraphSpec.hs`, "B1: the correlation key": a two-obligation fixture with a
+> `#TRACE` is run through `execEvalModuleWithDeonticLog` and `extractStateGraph`, and the
+> `nkSite` of each logged step equals the `labelSite` of the corresponding `HENCE` edge, in
+> order, both `Just` — the test would pass vacuously if either side were `Nothing`, so it also
+> asserts they are not. The cost prediction in the table above was **wrong in fact**: "regenerate
+> three `.bpmn` goldens" turned out to be zero goldens. `L4.Bpmn.Lower` reads label fields by
+> name and never serialises the label, the DOT does not draw the site, and `l4 lts` does not read
+> the graph; all 14 BPMN goldens, all 6 `l4 lts` goldens and all 71 corpus DOTs are byte-identical
+> under B1 alone (`cabal test`'s "bpmn export" and "lts list" groups, 340 and 12 examples, and
+> the DOT diff below). What B1 _did_ cost was the positional `TransitionLabel` constructions in
+> two test files (eight-field now), and one module split forced by the annotation, §1.1c.
+>
+> **B2 LANDED 2026-09-16** (same branch). `extractStateGraphs` now builds a `Rules` map — every
+> regulative `DECIDE` of the module, by `Unique`, with its drawn name and peeled body — and
+> hands it to every extraction; `classifyTarget` returns `TargetNamed` for an `App` of one, and
+> the new `wireTarget` (the one function all three arm sites — `HENCE`, `LEST`, junction branch —
+> now go through) consults `ExtractState.esMemo :: Map Unique StateId`: an entry there is reused,
+> else a state named after the rule is created, **memoised before its body is extracted**, and
+> the body extracted from it. The memo is seeded with the rule being extracted at
+> `initialStateId`, which retires `TargetSelf` as a special case — a self-`HENCE` is now the
+> memo's first hit — and turns two rules that hand over to each other into a real cycle.
+>
+> **Keyed by `Unique`, not by B1's range.** The table above offered both. The memo answers "has
+> this _rule_ been given a state?", and a rule's identity is its `DECIDE`; two arms written at two
+> different ranges that both name it must land on one state, or the loop does not close. The
+> range identifies the _arm_ — that is what `labelSite` carries — not what the arm points at.
+> Arguments are ignored exactly as a renewing rule's were (the termination argument is the loss,
+> as before; `P-CYCLE`). Not in the map, and so still `TargetOther` → `next`/`failure`: a rule
+> from an `IMPORT` (measured with a two-file scratch pair: `next`), a `RECORD` continuation, a
+> `Refuse`, an `AppNamed`, and any `DECIDE` whose body is not regulative.
+>
+> **Measured, (a) DOT over the corpus.** `l4 state-graph` over every `.l4` under `jl4/examples`
+> and `doc` that accepts it: **71 files produce graphs, 9 changed** —
+> `doc/concepts/legal-modeling/regulative-layer-whole-example.l4`,
+> `doc/courses/{advanced/module-a1-regulatory,advanced/module-a2-cross-cutting,advanced/module-a3-contracts,foundation/module-7}-examples.l4`,
+> `doc/reference/regulative/every-example.l4`, `doc/tutorials/obligations/what-follows.l4`,
+> `jl4/examples/ok/contracts.l4`, `jl4/examples/ok/every/barrier.l4`. Files carrying a `next` or
+> `failure` state went from 16 to 10; the 10 that remain are `IF` junctions (drawn as `next` with
+> the arms below it — not dead ends) and the `ok/ledger/record-*` `RECORD` continuations (dead
+> ends still). In `ok/contracts.l4`, `a MEANS z RAND z` now draws one `z` junction with two
+> parallel edges into it where it drew two dead-end `z` states. The `LEST`-into-own-name arm lost
+> its literal `"timeout"`/no-modal caption and goes through `lestArmWording` like its siblings:
+> the two corpus rules with that shape (`ok/deontic-breach-semantics.l4`,
+> `doc/courses/advanced/module-a3-contracts-examples.l4`) are `MUST … WITHIN`, so their caption
+> is unchanged; a `SHANT` self-`LEST` now says `violation` (`StateGraphSpec`, "captions a LEST
+> back into the rule's own name").
+>
+> **(b) BPMN.** All 14 goldens byte-identical — none of the golden sources hands over by name
+> (Reg CF's self-loop already closed under `TargetSelf`, and `regcf-reporting.fidelity.txt` has
+> carried `P-CYCLE` since `a9caf2f6`, 2026-07-27). `etc/bpmn-kie-baseline.txt` therefore did not move:
+> `etc/check-bpmn-kie.sh jl4/examples/bpmn/expected/*.bpmn | node etc/check-bpmn-kie-baseline.mjs`
+> → "14 file(s) checked, RESULT 12 with findings, all as baselined" (JDK 17.0.20 via
+> `/opt/homebrew/opt/openjdk@17`). The new shapes were exported by hand instead: a scratch
+> `ping`/`pong` pair, `what-follows.l4`'s `rent, receipt for the amount paid`, and `contracts.l4`'s
+> `a` and `goesOn`. `etc/validate-bpmn.mjs`: 4/4 OK, all drawn. `etc/check-bpmn-soundness.mjs`:
+> `ping` SOUND (the back-flow `Task_1 → Task_0` is a real loop; 8 markings, peak 1 token),
+> `rent, receipt …` SOUND, `goesOn` SOUND, **`a` UNSOUND on S4 only** — two `RAND` branches into
+> one `z` place is 2-bounded, which is what the L4 says and what a safe workflow net forbids; no
+> fidelity note names it yet (owed to P1, noted on `doc/exports/dmn-bpmn.md`). jBPM: `rent …` and
+> `goesOn` COMPLETED; `ping` REJECTED with class (a′) "cannot have more than one incoming
+> connection" and `a` with class (a) "Unknown gateway direction: Mixed" — both dialect limits
+> already on record in the baseline's hand-maintained block, relocated to the new shapes, not new.
+> `P-CYCLE` fired on `ping` with the text §4.7 quotes: "The state graph has a cycle (initial,
+> pong)".
+>
+> **(c) Dominators.** `DominatorsSpec.hs`, "a loop through another rule (B2)": the greatest
+> fixpoint terminates on `ping`/`pong`, nothing dominates its `Breach` (two timeouts, two
+> routes), and Alice's act dominates the `pong` state. `jl4-core-test`: 662 examples, 0 failures.
+> **(d) Figures.** `l4 state-graph doc/reference/regulative/every-run-example.l4` is byte-identical
+> before and after, and `etc/go/lib/split-digraphs.mjs` of it matches
+> `doc/reference/regulative/figures/every-{barrier,fork}.dot` exactly; nothing regenerated.
+> **(e) `l4 lts`.** 6 goldens byte-identical (the list reads the runtime, not the graph).
+>
+> **B3 stays not built.** What B2 handed it is the input §4.7 asked for — a graph with real
+> cycles — and nothing else; no feedback-edge set is computed anywhere yet.
 
 ---
 
@@ -1112,6 +1220,8 @@ twice without the viewer concluding it happened twice.
 **And this is precisely where §3.4's B2 bites.** The motivating contract is recursive; the board
 `StateGraph` draws for it does not close its loop; so the animator has nowhere to put the token
 on the second scrutiny. The gotcha and the missing loop are the same problem seen from two sides.
+_(B2 landed 2026-09-16: the board now closes it, for a self-reference and for a reference through
+another rule alike; see §3.4.)_
 
 ### 4.5 Two modes
 
@@ -1163,6 +1273,21 @@ Today that note never fires, because gap 3 means extraction never produces a cyc
 loop (B2) is exactly what makes it fire.** So P2's own precondition breaks the only layout
 algorithm we have shipped evidence for. That coupling was invisible in revision 1 and is the
 single most under-costed item in this document.
+
+> **MEASURED 2026-09-16, with B2 landed.** "Never fires" was already false when written: the
+> self-`HENCE` closed under `TargetSelf` on 2026-07-27, and `regcf-reporting.fidelity.txt` has
+> carried `P-CYCLE` since `a9caf2f6` the same day. What B2 added is the cycle _through another rule_, and here is what
+> P1's layout did with one (`ping` → `pong` → `ping`, exported and read back): it emitted a real
+> back-flow (`Flow_Task_1__Task_0`); the relaxation ran its `length nodes` steps of fuel and
+> stopped with **both** tasks in the same, rightmost column (`x="1280"` for `Task_0` and
+> `Task_1` in the DI) and the `Breach` end event to their _left_ (`x="1132"`), since every node
+> on the loop climbs one rank per step until the fuel is gone; `P-CYCLE` fired naming
+> `(initial, pong)`; Camunda's validator accepted the file; the token game found it SOUND (8
+> markings, peak 1 token); and jBPM refused it on its "more than one incoming connection" dialect
+> limit before executing anything. So the layout does not break; it draws a picture in which the
+> horizontal axis is not time inside the loop — nor, here, outside it — and says so, which is
+> exactly the loss the note promised. Nothing here changes the B3 ruling below: the
+> feedback-edge set is still the honest answer, and still not built.
 
 **Ruling (B3).** Layout splits along K6, as everything else does:
 
@@ -1531,7 +1656,8 @@ target with a second faithfulness obligation, and that is a new decision.
 
 One thing P1 shipping **does** change: B1 and B2 are edits to a type P1 now depends on, so P2's
 preconditions are no longer free of P1 — they cost golden regeneration and a re-run of
-`etc/validate-bpmn.mjs`. Cheap, but no longer zero. §7.1.
+`etc/validate-bpmn.mjs`. Cheap, but no longer zero. §7.1. _(Measured 2026-09-16: zero goldens
+moved under either; the re-run was done on hand exports instead. §3.4.)_
 
 ### 5.2 It does not draw guards
 

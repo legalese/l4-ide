@@ -19,10 +19,18 @@ import Test.Hspec
 import Data.Text (Text)
 import qualified Data.Text as Text
 
+import Data.Time (UTCTime (..), fromGregorian, secondsToDiffTime)
+
 import L4.API.VirtualFS (checkWithImports, emptyVFS)
+import L4.EvaluateLazy (execEvalModuleWithDeonticLog, resolveEvalConfig)
+import L4.EvaluateLazy.DeonticStep (DeonticStep (..), NormKey (..))
+import L4.EvaluateLazy.Machine (emptyEnvironment)
 import L4.Import.Resolution (TypeCheckWithDepsResult(..))
+import L4.Parser.SrcSpan (SrcRange)
 import L4.StateGraph
+import L4.StateGraph.Dot (StateGraphOptions (..), defaultStateGraphOptions, stateGraphToDot)
 import L4.Syntax (DeonticModal(..))
+import L4.TracePolicy (apiDefaultPolicy)
 
 --------------------------------------------------------------------------------
 -- Fixtures
@@ -237,9 +245,117 @@ noJoinSrc =
   , "    WITHIN 3"
   ]
 
+-- | Two obligations and a @#TRACE@ that discharges both, so the evaluator
+-- logs a step for each. The chain's shape is @DeonticStepSpec@'s first
+-- fixture; what is tested here is the join between that log and this graph.
+keyedSrc :: [Text]
+keyedSrc =
+  [ "GIVETH DEONTIC Person Action"
+  , "c MEANS"
+  , "  PARTY Alice MUST deliver WITHIN 10"
+  , "  HENCE PARTY Bob MUST pay WITHIN 10"
+  , ""
+  , "#TRACE c AT 0 WITH"
+  , "  PARTY Alice DOES deliver AT 2"
+  , "  PARTY Bob DOES pay AT 4"
+  ]
+
+-- | A rule whose @HENCE@ names another rule of the module. Until 2026-09-16
+-- this drew an arrow into a dead-end state called @next@; the named rule's
+-- own graph existed, but nothing connected the two.
+namedHenceSrc :: [Text]
+namedHenceSrc =
+  [ "GIVETH DEONTIC Person Action"
+  , "`the receipt` MEANS"
+  , "  PARTY Bob MUST notify WITHIN 5"
+  , ""
+  , "GIVETH DEONTIC Person Action"
+  , "`the rent` MEANS"
+  , "  PARTY Alice MUST pay WITHIN 7"
+  , "  HENCE `the receipt`"
+  ]
+
+-- | Two arms into the same named rule — the @HENCE@ and the @LEST@ of two
+-- different obligations. One state, two arrows in.
+sharedTargetSrc :: [Text]
+sharedTargetSrc =
+  [ "GIVETH DEONTIC Person Action"
+  , "`the receipt` MEANS"
+  , "  PARTY Bob MUST notify WITHIN 5"
+  , ""
+  , "GIVETH DEONTIC Person Action"
+  , "`the rent` MEANS"
+  , "  PARTY Alice MUST pay WITHIN 7"
+  , "  HENCE `the receipt`"
+  , "  LEST (PARTY Carol MUST deliver WITHIN 3 HENCE `the receipt`)"
+  ]
+
+-- | Two rules that continue into each other: a loop through a named rule,
+-- which no single rule's self-reference could produce.
+mutualSrc :: [Text]
+mutualSrc =
+  [ "GIVETH DEONTIC Person Action"
+  , "`ping` MEANS"
+  , "  PARTY Alice MUST pay WITHIN 3"
+  , "  HENCE `pong`"
+  , ""
+  , "GIVETH DEONTIC Person Action"
+  , "`pong` MEANS"
+  , "  PARTY Bob MUST deliver WITHIN 5"
+  , "  HENCE `ping`"
+  ]
+
+-- | A rule whose only outcome is its own renewal, by @LEST@. Before
+-- 2026-09-16 that arm was captioned with a literal @\"timeout\"@ carrying
+-- no modal, the one caption the #927 fix did not reach.
+lestSelfSrc :: [Text]
+lestSelfSrc =
+  [ "GIVETH DEONTIC Person Action"
+  , "`nag` MEANS"
+  , "  PARTY Alice SHANT notify WITHIN 3"
+  , "  LEST `nag`"
+  ]
+
 --------------------------------------------------------------------------------
 -- Helpers
 --------------------------------------------------------------------------------
+
+-- | Every regulative rule's graph, not only the first.
+graphsFor :: [Text] -> Either [Text] [StateGraph]
+graphsFor body =
+  case checkWithImports emptyVFS (Text.unlines (preamble <> body)) of
+    Left errs -> Left errs
+    Right r   -> Right (extractStateGraphs r.tcdModule)
+
+-- | The named graph.
+graphNamed :: Text -> [Text] -> Either [Text] StateGraph
+graphNamed nm body = do
+  gs <- graphsFor body
+  case [ g | g <- gs, g.sgName == nm ] of
+    (g:_) -> Right g
+    []    -> Left ["no state graph named " <> nm]
+
+withGraph :: Either [Text] StateGraph -> (StateGraph -> Expectation) -> Expectation
+withGraph eg k = case eg of
+  Left errs -> expectationFailure ("fixture failed to check: " <> show errs)
+  Right sg  -> k sg
+
+-- | The sites the evaluator logs for a fixture's first directive, in step
+-- order, and the sites the extractor puts on that fixture's obligation
+-- edges.
+loggedSites :: [Text] -> IO [Maybe SrcRange]
+loggedSites body = do
+  cfg <- resolveEvalConfig (Just fixedNow) apiDefaultPolicy
+  case checkWithImports emptyVFS (Text.unlines (preamble <> body)) of
+    Left errs -> do
+      expectationFailure ("fixture failed to check: " <> show errs)
+      pure []
+    Right r -> do
+      (_, results) <- execEvalModuleWithDeonticLog cfg r.tcdEntityInfo emptyEnvironment r.tcdModule
+      pure [ k.nkSite | (_, steps) <- take 1 results, s <- steps, Just k <- [s.dsNorm] ]
+ where
+  fixedNow = UTCTime (fromGregorian 2026 1 1) (secondsToDiffTime 0)
+
 
 -- | Every state that is a junction, as (name, kind).
 junctions :: StateGraph -> [(Text, FanKind)]
@@ -608,6 +724,123 @@ spec = do
           dot `shouldNotSatisfy` Text.isInfixOf "SHANT violation"
           -- and the obligation's own edge still says the whole rule
           dot `shouldSatisfy` Text.isInfixOf "Alice SHANT notify [30]"
+
+  describe "B1: the correlation key (LTS-VISUALISER §3.4)" $ do
+    it "puts the RAction's range on both arms of an obligation, and none on a branch edge" $
+      withGraph (graphFor keyedSrc) \sg -> do
+        let obligations = [ t | t <- sg.sgTransitions, t.transType /= DefaultTransition ]
+        length obligations `shouldBe` 4
+        mapM_ (\t -> t.transLabel.labelSite `shouldSatisfy` isJust') obligations
+        -- The HENCE and LEST edges leaving one state share the site.
+        let arms sid = [ t.transLabel.labelSite | t <- outOf sg sid ]
+        arms sg.sgInitialState `shouldSatisfy` allSame
+        -- and the two obligations have different sites
+        [ t.transLabel.labelSite | t <- henceEdges sg ] `shouldSatisfy` distinct
+      -- A junction's branch edge has no obligation behind it.
+    it "leaves a junction's branch edges without a site" $
+      withGraph (graphFor randSrc) \sg ->
+        [ t.transLabel.labelSite | t <- outOf sg sg.sgInitialState ] `shouldBe` [Nothing, Nothing]
+
+    it "is the SAME range the evaluator logs for the obligation (nkSite)" $ do
+      -- The log's first directive is the #TRACE; its steps are Alice's
+      -- delivery then Bob's payment, and each step's key carries the range
+      -- of the RAction it was armed from. The graph's HENCE edges, in
+      -- extraction order, are the same two obligations.
+      sites <- loggedSites keyedSrc
+      withGraph (graphFor keyedSrc) \sg -> do
+        let drawn = [ t.transLabel.labelSite | t <- henceEdges sg ]
+        length sites `shouldBe` 2
+        sites `shouldBe` drawn
+        -- and not by accident of both being Nothing
+        mapM_ (`shouldSatisfy` isJust') sites
+
+  describe "B2: an arm into a named rule (LTS-VISUALISER §3.4)" $ do
+    it "draws the named rule's states inside the caller's graph" $
+      withGraph (graphNamed "the rent" namedHenceSrc) \sg -> do
+        map (.stateName) sg.sgStates `shouldBe` ["initial", "the receipt", "Fulfilled", "Breach"]
+        -- Alice's HENCE lands on the receipt's state, and Bob's obligation
+        -- leaves it.
+        [ nameOf sg t.transTo | t <- henceEdges sg ] `shouldBe` ["the receipt", "Fulfilled"]
+        map (.transLabel.labelParty) (henceEdges sg) `shouldBe` [Just "Alice", Just "Bob"]
+
+    it "no longer mints a state called next" $
+      withGraph (graphNamed "the rent" namedHenceSrc) \sg ->
+        map (.stateName) sg.sgStates `shouldNotSatisfy` elem "next"
+
+    it "gives the named rule a graph of its own as well" $
+      fmap (map (.sgName)) (graphsFor namedHenceSrc) `shouldBe` Right ["the receipt", "the rent"]
+
+    it "reuses the state when a second arm names the same rule" $
+      withGraph (graphNamed "the rent" sharedTargetSrc) \sg -> do
+        let receipts = [ s.stateId | s <- sg.sgStates, s.stateName == "the receipt" ]
+        length receipts `shouldBe` 1
+        length [ t | t <- sg.sgTransitions, t.transTo `elem` receipts ] `shouldBe` 2
+        -- and Bob's obligation is extracted once, not once per arm
+        length [ t | t <- henceEdges sg, t.transLabel.labelParty == Just "Bob" ] `shouldBe` 1
+
+    it "closes a loop through another rule as a back-edge to the start" $
+      withGraph (graphNamed "ping" mutualSrc) \sg -> do
+        map (.stateName) sg.sgStates `shouldBe` ["initial", "pong", "Breach"]
+        [ (nameOf sg t.transFrom, nameOf sg t.transTo) | t <- henceEdges sg ]
+          `shouldBe` [("initial", "pong"), ("pong", "initial")]
+        -- No Fulfilled at all: neither rule ever ends well, and the graph
+        -- says so rather than inventing a sink.
+        [ s | s <- sg.sgStates, s.stateType == TerminalFulfilled ] `shouldBe` []
+
+    it "captions a LEST back into the rule's own name like any other LEST arm" $
+      -- The old special case said "timeout" of a prohibition.
+      lestCaptions lestSelfSrc `shouldBe` Right ["violation"]
+
+  describe "the dominators annotation on the DOT (LTS-VISUALISER §1.1c)" $ do
+    it "changes nothing when off" $
+      withGraph (graphFor linearSrc) \sg ->
+        stateGraphToDot defaultStateGraphOptions { showDominators = False } sg
+          `shouldBe` dotFor sg
+
+    it "draws the acts on every path to a terminal heavy, and says which" $
+      withGraph (graphFor linearSrc) \sg -> do
+        let dot = stateGraphToDot defaultStateGraphOptions { showDominators = True } sg
+        dotFor sg `shouldNotSatisfy` Text.isInfixOf "penwidth"
+        dot `shouldSatisfy` Text.isInfixOf "on every path to FULFILLED"
+        -- Both obligations of the chain are needed to fulfil; neither
+        -- timeout is needed to breach (two routes), so no edge says BREACH.
+        Text.count "penwidth=3" dot `shouldBe` 2
+        dot `shouldNotSatisfy` Text.isInfixOf "on every path to BREACH"
+
+    it "names both terminals on one line when an act is on every path to both" $
+      -- A permission with no LEST draws only its HENCE (the lapse route is
+      -- the extractor's known gap), so Alice's edge is the only way out of
+      -- the start: on every path to both endings.
+      withGraph (graphFor bothWaysSrc) \sg -> do
+        let dot = stateGraphToDot defaultStateGraphOptions { showDominators = True } sg
+        dot `shouldSatisfy` Text.isInfixOf "on every path to FULFILLED and to BREACH"
+        Text.count "penwidth=3" dot `shouldBe` 3
+
+    it "does not change the unmarked edges' attributes" $
+      withGraph (graphFor linearSrc) \sg -> do
+        let marked = stateGraphToDot defaultStateGraphOptions { showDominators = True } sg
+            timeoutEdge from =
+              from <> " -> 3 [label=timeout\n           ,color=\"#dc3545\"\n           ,style=dashed];"
+        -- The two timeouts dominate nothing, and their three lines are
+        -- exactly the default output's: the annotation only ADDS, to the
+        -- edges it marks.
+        dotFor sg `shouldSatisfy` Text.isInfixOf (timeoutEdge "0")
+        marked `shouldSatisfy` Text.isInfixOf (timeoutEdge "0")
+        marked `shouldSatisfy` Text.isInfixOf (timeoutEdge "1")
+ where
+  isJust' = maybe False (const True)
+  allSame xs = case xs of
+    [] -> True
+    (x:rest) -> all (== x) rest
+  distinct xs = length xs == length (dedupe xs)
+  dedupe = foldr (\x acc -> if x `elem` acc then acc else x : acc) []
+  -- A chain whose first edge is the only way out of the start.
+  bothWaysSrc =
+    [ "GIVETH DEONTIC Person Action"
+    , "`both ways` MEANS"
+    , "  PARTY Alice MAY pay"
+    , "  HENCE (PARTY Bob MUST deliver WITHIN 5)"
+    ]
 
 isRight :: Either a b -> Bool
 isRight = either (const False) (const True)

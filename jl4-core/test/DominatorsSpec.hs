@@ -56,6 +56,13 @@ withGraph body k = case graphFor body of
   Left errs -> expectationFailure ("fixture failed to check: " <> show errs)
   Right sg  -> k sg
 
+-- | Every graph of a fixture, for the shapes that span two rules.
+withGraphs :: [Text] -> ([StateGraph] -> Expectation) -> Expectation
+withGraphs body k =
+  case checkWithImports emptyVFS (Text.unlines (preamble <> body)) of
+    Left errs -> expectationFailure ("fixture failed to check: " <> show errs)
+    Right r   -> k (extractStateGraphs r.tcdModule)
+
 -- | The action text of each dominating transition a reader would see, in
 -- order. Which transitions count is decided by 'renderTransition' itself —
 -- the production path — so a bare @RAND@ \/ @ROR@ branch edge is dropped
@@ -139,6 +146,20 @@ renewSrc =
   , "  HENCE `renew`"
   ]
 
+-- | Two rules that continue into each other. Only extractable as a loop
+-- since B2 (2026-09-16); before that `pong` was a dead-end state.
+mutualSrc :: [Text]
+mutualSrc =
+  [ "`ping` MEANS"
+  , "  PARTY Alice MUST pay WITHIN 3"
+  , "  HENCE `pong`"
+  , ""
+  , "GIVETH DEONTIC Person Action"
+  , "`pong` MEANS"
+  , "  PARTY Bob MUST deliver WITHIN 5"
+  , "  HENCE `ping`"
+  ]
+
 -- | A graph built by hand: @0 -a-> 1 -b-> 2 (Fulfilled)@, @0 -t-> 3 (Breach)@,
 -- and a state 4 that nothing points at, with its own edge to Fulfilled.
 -- Extraction never produces an unreachable state, so the case has to be
@@ -163,8 +184,8 @@ orphanGraph = StateGraph
   , sgInitialState = 0
   }
  where
-  act p a = TransitionLabel (Just p) (Just DMust) a Nothing Nothing Nothing Nothing
-  timeout = TransitionLabel Nothing (Just DMust) "timeout" Nothing Nothing Nothing Nothing
+  act p a = TransitionLabel (Just p) (Just DMust) a Nothing Nothing Nothing Nothing Nothing
+  timeout = TransitionLabel Nothing (Just DMust) "timeout" Nothing Nothing Nothing Nothing Nothing
 
 --------------------------------------------------------------------------------
 -- Tests
@@ -255,6 +276,22 @@ spec = do
         -- HENCE back to the start draws no Fulfilled state at all.
         [ s.stateType | s <- sg.sgStates ] `shouldNotContain` [TerminalFulfilled]
         acts sg (dominators sg (breach sg)) `shouldBe` Just ["timeout"]
+
+    it "a loop through another rule (B2): the fixpoint terminates, and the acts on the way in dominate" $
+      -- `ping` continues into `pong`, which continues back into `ping`; the
+      -- only exit is a timeout. Every path to Breach goes through the loop
+      -- some number of times, so no act dominates it — a cycle is exactly
+      -- where "greatest fixpoint" and "every path" have to agree, and this
+      -- is the graph that would loop the solver if they did not. `pong`'s
+      -- state, by contrast, is reached only through Alice's act.
+      withGraphs mutualSrc \gs -> case [ g | g <- gs, g.sgName == "ping" ] of
+        [sg] -> do
+          [ s.stateType | s <- sg.sgStates ] `shouldNotContain` [TerminalFulfilled]
+          acts sg (dominators sg (breach sg)) `shouldBe` Just []
+          case [ s.stateId | s <- sg.sgStates, s.stateName == "pong" ] of
+            [pong] -> acts sg (dominators sg pong) `shouldBe` Just ["pay"]
+            other  -> expectationFailure ("expected one pong state, got " <> show other)
+        other -> expectationFailure ("expected one ping graph, got " <> show (length other))
 
     it "an unreachable state has no dominators, and says so" $ do
       dominators orphanGraph 4 `shouldBe` Unreachable

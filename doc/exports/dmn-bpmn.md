@@ -116,6 +116,21 @@ declines to say how many. Three notes go with it, and the last two are the ones 
 Until 2026-09-15 the export could not tell the two join lines apart at all, and said nothing
 about it. If you have a `.bpmn` of a quantified rule from before that date, re-export it.
 
+A rule that hands over to another rule by name — ``HENCE `the receipt` `` — is drawn through into
+that rule since 2026-09-16 (before, the flow stopped at a dangling end, and the report said
+`P-DANGLING`). Two consequences to know about:
+
+- `P-CYCLE` (lossy): a rule that renews itself, or two rules that hand over to each other, is a
+  loop, and BPMN draws loops. What this export's layout cannot do is place a node on a loop by
+  "how far along it is", so inside the loop left-to-right no longer means later. The diagram is
+  still valid and still sound; only the reading of the horizontal axis is lost.
+- Two branches of one `RAND` that both hand over to the **same** rule land on the same node, so
+  two tokens arrive at one place. That is what the L4 says — two instances of the rule, running
+  concurrently — but it is not a "safe" (1-bounded) workflow net, and `etc/check-bpmn-soundness.mjs`
+  reports it as such. No fidelity note names this yet.
+
+If you have a `.bpmn` of a rule that hands over by name from before 2026-09-16, re-export it.
+
 ## When a decision can refuse
 
 [`REFUSE`](../reference/control-flow/REFUSE.md) is how an L4 rule says **"the model does not cover

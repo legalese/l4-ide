@@ -1534,6 +1534,34 @@ spec bin = do
       serr `shouldSatisfy` ("requires --dominators" `isInfixOf`)
       sout `shouldSatisfy` ("digraph" `notInfixOf`)
 
+    -- The same answer, drawn: the DOT with the dominating edges heavy and
+    -- captioned. S's delivery dominates aContract's FULFILLED (above), so
+    -- its edge says so and nothing else about the drawing moves.
+    it "--dominators --dot keeps the DOT and marks the acts on every path to a terminal" $ do
+      Output code sout _ <- runL4 bin
+        ["state-graph", "--dominators", "--dot", "examples/ok/contracts.l4"]
+      Output _ plain _ <- runL4 bin ["state-graph", "examples/ok/contracts.l4"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("digraph" `isPrefixOf`)
+      sout `shouldSatisfy` ("Every path" `notInfixOf`)
+      sout `shouldSatisfy` ("S MUST delivery [3]\\non every path to FULFILLED" `isInfixOf`)
+      sout `shouldSatisfy` ("penwidth=3" `isInfixOf`)
+      plain `shouldSatisfy` ("penwidth" `notInfixOf`)
+      -- Same graphs, same order: only the marked edges' lines differ.
+      length (lines sout) `shouldSatisfy` (> length (lines plain))
+      filter ("digraph" `isPrefixOf`) (lines sout) `shouldBe` filter ("digraph" `isPrefixOf`) (lines plain)
+
+    it "--dot without --dominators is refused, and so is --dot with --all-states" $ do
+      Output code1 sout1 serr1 <- runL4 bin ["state-graph", "--dot", "examples/ok/contracts.l4"]
+      code1 `shouldSatisfy` (/= ExitSuccess)
+      serr1 `shouldSatisfy` ("requires --dominators" `isInfixOf`)
+      sout1 `shouldSatisfy` ("digraph" `notInfixOf`)
+      Output code2 sout2 serr2 <- runL4 bin
+        ["state-graph", "--dominators", "--dot", "--all-states", "examples/ok/contracts.l4"]
+      code2 `shouldSatisfy` (/= ExitSuccess)
+      serr2 `shouldSatisfy` ("cannot be combined" `isInfixOf`)
+      sout2 `shouldSatisfy` ("digraph" `notInfixOf`)
+
   describe "l4 batch" $ do
     it "serializes a #TRACE breach with correctly-labeled fields" $ do
       -- exit 0 proves the #TRACE AT/WITH pretty-printer round-trip: batch

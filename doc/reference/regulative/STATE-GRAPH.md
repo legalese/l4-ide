@@ -90,6 +90,9 @@ So the conventions are:
 | `[14]` on an arrow            | the `WITHIN` deadline                                                                                                                                                                        |
 | `ONCE ALL HAVE` / `UPON EACH` | for an `EVERY` rule, whether the next step waits for the whole group or fires for each member                                                                                                |
 | a diamond                     | a fork, captioned `ALL OF` for a `RAND` (every branch runs) or `ONE OF` for an `ROR` (exactly one does) or an `IF` choosing between rules                                                    |
+| a circle named after a rule   | a `HENCE` or `LEST` handed over to another rule in the same file; that rule's own places and arrows follow, drawn once, however many arrows lead into it                                     |
+| an arrow back to `initial`    | the rule renews itself, or hands over to a rule that hands back: a loop                                                                                                                      |
+| a heavy arrow                 | only with `--dominators --dot`: an act on every path to `FULFILLED` or to `BREACH`, and its caption says which — see [the picture, marked](#the-picture-marked---dominators---dot)           |
 
 ## Asking what has to happen: `--dominators`
 
@@ -165,6 +168,22 @@ named rules has no `FULFILLED` or `BREACH` state of its own, and the answer says
 has no FULFILLED or BREACH state to reach)`. (The answer "No path reaches …" exists for a state
 nothing points at; a drawing made from an `.l4` file never contains one.)
 
+### The picture, marked: `--dominators --dot`
+
+```bash
+l4 state-graph --dominators --dot state-graph-example.l4 | dot -Tsvg -o sale.svg
+```
+
+is the same answer drawn onto the map instead of printed as a list. Every arrow the list would
+name is drawn heavy, and its caption gains a line — `on every path to FULFILLED`, `on every path
+to BREACH`, or `on every path to FULFILLED and to BREACH` for an act neither ending can avoid.
+Nothing else about the drawing changes: an arrow the list would not name is drawn exactly as it
+is without the flag, so a diagram you already have can be regenerated with the marks and compared.
+
+`--dot` needs `--dominators` (on its own the ordinary output is already DOT, and the flag would
+have nothing to add), and it does not combine with `--all-states`: the map marks the two endings
+only, because a mark for every intermediate place would put several captions on most arrows.
+
 ### How the acts are worded
 
 - An obligation is written as its party, its act, and in brackets the modal, the `WITHIN`
@@ -216,9 +235,17 @@ running the rule with `#TRACE` (see [the regulative reference](README.md#testing
 read out as a list, by `l4 lts` (see [What is owed now](lts-list.md)), not by the map. A map with
 every road on it is not a map with a "you are here" dot, and this one has no dot.
 
-**It shows one rule at a time.** A `HENCE` or `LEST` that hands over to another named rule is drawn
-as an arrow into a place labelled `next` (for `HENCE`) or `failure` (for `LEST`), and stops there.
-To see where that rule goes, open its own map.
+**It follows a hand-over to another rule in the same file, and stops at the file's edge.** A
+`HENCE` or `LEST` that names another regulative rule — ``HENCE `a receipt to` Alice amount`` —
+draws an arrow into a place named after that rule, and that rule's own places and arrows follow
+from there, so the map of `rent, receipt for the amount paid` shows the receipt being issued. The
+named rule is drawn once: a second arrow into the same rule lands on the same place, which is how
+two rules that hand over to each other come out as a loop rather than as an endless chain. (The
+named rule still has a map of its own, printed separately.) What the arrow carries is only the
+hand-over, not the arguments: a rule called with `amount` and the same rule called with
+`amount - 1` are the same place. A hand-over the map cannot follow — a rule from an `IMPORT`ed
+file, a `RECORD` step, or anything else that is not a rule of this file — is drawn as an arrow
+into a place labelled `next` (for `HENCE`) or `failure` (for `LEST`), and stops there.
 
 **A `MAY` with no `LEST` has no red arrow.** A permission nobody exercises simply ends, so the
 default there is `FULFILLED`, and the map draws only the green arrow. If such a `MAY` has a
@@ -240,7 +267,11 @@ rules, appears as text on an arrow. The map does not work out when the condition
 refers to another rule by name — is not drawn, and the editor offers nothing above it.
 
 **A rule that renews itself is a loop.** `HENCE` back into the rule's own name draws an arrow back
-to the start, so a renewing duty is drawn as a cycle rather than a dead end.
+to the start, so a renewing duty is drawn as a cycle rather than a dead end; so is a rule that
+hands over to a second rule which hands back. A loop has no `Fulfilled` of its own if nothing in
+it ever ends well — the map then shows only the ways out to `Breach`. (The BPMN export of a loop
+is still a diagram, but its fidelity report will say `P-CYCLE`: its left-to-right layout means
+"later" only off the loop. See [DMN and BPMN](../../exports/dmn-bpmn.md).)
 
 **The branches of an `RAND` wait for each other, and the map does not show it.** Each branch's
 arrow simply lands on the shared `Fulfilled` circle, and each `ROR` alternative's failure on the
