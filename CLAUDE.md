@@ -208,11 +208,7 @@ run on your PR, and the failure surfaces on the next person's branch instead.
 
 **Which globs, exactly** (`jl4/tests/Main.hs:78-90`, kept in step by `etc/check-corpus-goldens.mjs:32-43`):
 `ok/**`, `legal/**`, `canon/**`, `not-ok/tc/**`, `not-ok/nlg/**`, `not-ok/export-*.l4`,
-`lsp/semantic-tokens/**`, `lsp/hover/**`, and `jl4-core/libraries/*.l4`. The `canon/**` entry is
-the VENDORED MIRROR of blessed directories in `legalese/canon`, at the SHA in
-`etc/canon-pin.json` — do not edit it or bless its goldens by hand; edit in canon and
-`node etc/sync-canon.mjs --bump <sha>`. The `Canon Mirror` CI job fails when the mirror and
-canon at the pin disagree. **`jl4/examples/docassemble/` and
+`lsp/semantic-tokens/**`, `lsp/hover/**`, and `jl4-core/libraries/*.l4`. **`jl4/examples/docassemble/` and
 `jl4/examples/openfisca/` are in NO glob**, which is why their `.l4` files carry no `tests/`
 directory and adding one there needs no goldens. State this rule with its scope: an earlier
 unqualified reading of this paragraph sent a session hunting a golden trap in `docassemble/` that
@@ -221,12 +217,24 @@ jl4-test` once (it creates them and fails), then again to prove they hold, then 
 `.golden` files — `.actual` is gitignored. Read them before committing: blessing output you have not
 looked at is how a wrong answer becomes the expected answer.
 
+**The canon glob is the one exception to that procedure, and it is a prohibition.**
+`jl4/examples/canon/` is a VENDORED MIRROR of blessed directories in `legalese/canon`, at the SHA
+in `etc/canon-pin.json`. Do not edit it, and do not bless its goldens with `--accept` — the
+paragraph above is how you bless everywhere else and is exactly the wrong move here. Edit the file
+in canon, re-bless it there, then `node etc/sync-canon.mjs --bump <sha> --ref <branch>`. The
+`Canon Mirror` CI job fails when the mirror and canon at the pin disagree.
+
 > **Do not wrap a code span in bold when the span itself ends in two asterisks.** Doing that
 > unbalances markdown emphasis for the rest of the paragraph, and `prettier --write` then
 > silently rewrites two LATER, untouched globs: the asterisk in the export-placement glob and
 > the one in the libraries glob each become an underscore. Measured 2026-09-15 — it reached a
 > commit, in the one paragraph whose whole job is to state the globs exactly, and nothing
 > complained. Plain backticks with no bold are inert; use those.
+>
+> **The same applies inside a bold lead-in, where it fails worse.** Measured: a lead-in
+> containing such a code span corrupts the two later globs AND eats the spaces around three
+> code spans. That is the shape the obvious fix invites, so name the glob in prose there —
+> "the canon glob" — rather than in a code span.
 
 > **Why.** This went off twice in one day. The BNA corpus landed without goldens in PR #195 and was
 > repaired by #202; eleven hours later the Jersey charities cleanroom did the same in #201 and was
