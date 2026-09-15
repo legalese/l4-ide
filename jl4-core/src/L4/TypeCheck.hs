@@ -1873,6 +1873,31 @@ checkExpr ec e t = softprune $ errorContext (WhileCheckingExpression e) do
   -- Store the expected type in the annotation so it's available during evaluation
   setAnnResolvedType t Nothing re
 
+-- | @BREACH BY e@ takes a party or a LIST of parties (R-T3,
+-- EVERY-EACH-QUANTIFIER-SPEC §6.1, built 2026-09-15). The expression is
+-- inferred first and its type read back: a @LIST OF t@ unifies its ELEMENT
+-- type with the breach's party type, anything else is the party itself. This
+-- is deliberately not a nondeterministic 'choose' between the two readings:
+-- a party whose type is still an inference variable (a bare @MEANS@ with no
+-- @GIVETH@) would then leave both branches viable and report an ambiguity
+-- where there was none; read this way, it falls to the scalar reading the
+-- checker always had. The machine cannot see which reading was taken — no
+-- mark is left on the syntax — and decides by the value's shape at run time.
+--
+-- The one thing this gives up: a contract whose party type is ITSELF a list
+-- (@DEONTIC (LIST OF Person) Action@) can no longer write @BREACH BY ps@ with
+-- @ps@ that whole list — the list reading wins. No corpus file has such a
+-- party type (measured 2026-09-15).
+checkBreachParty :: Type' Resolved -> Expr Name -> Check (Expr Resolved)
+checkBreachParty partyT p = errorContext (WhileCheckingExpression p) do
+  (rp, pt) <- inferExpr p
+  pt' <- applySubst pt
+  case pt' of
+    TyApp _ n [elemT] | getUnique n == getUnique listRef ->
+      expect ExpectRegulativePartyContext partyT elemT
+    _ -> expect ExpectRegulativePartyContext partyT pt'
+  setAnnResolvedType pt' Nothing rp
+
 checkIfThenElse :: ExpectationContext -> Anno -> Expr Name -> Expr Name -> Expr Name -> Type' Resolved -> Check (Expr Resolved)
 checkIfThenElse ec ann e1 e2 e3 t = do
   e1' <- checkExpr ExpectIfConditionContext e1 boolean
@@ -3340,7 +3365,7 @@ inferExpr' g =
       -- Breach is a terminal clause that represents a contract breach
       partyT <- fresh (NormalName "party")
       actionT <- fresh (NormalName "action")
-      mParty' <- traverse (\p -> checkExpr ExpectRegulativePartyContext p partyT) mParty
+      mParty' <- traverse (checkBreachParty partyT) mParty
       mReason' <- traverse (\r -> checkExpr ExpectBreachReasonContext r string) mReason
       pure (Breach ann mParty' mReason', contract partyT actionT)
     Refuse ann msg -> do

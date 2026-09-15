@@ -804,9 +804,12 @@ document until 2026-09-07, when both were ruled out of it: `ALL` is not a quanti
    total is not expressible without threading the clock by hand (cf. §5.1).
 4. **Blame is a set.** `LEST BREACH BY EVERY t` (joint: the shortfall is everyone's) and
    `LEST BREACH BY EACH t WHO owes` (divided) both need the compound breach to carry a **set of
-   parties**. Today `RAND`/`ROR` breach carries **one operand** — the machine picks left for `RAND`
-   and right for `ROR` by timestamp tie-break (`jl4-core/src/L4/EvaluateLazy/Machine.hs:1698-1730`,
-   "consistently with CSL"). That is the same gap the six-ways page recorded for the any-join.
+   parties**. Until 2026-09-15 a `RAND`/`ROR` breach carried **one operand** — the machine picked
+   left for `RAND` and right for `ROR` by timestamp tie-break ("consistently with CSL"), the same
+   gap the six-ways page recorded for the any-join. **BUILT 2026-09-15 (R-T3), see §6.1:** the
+   breach carries a non-empty list of parties, `RAND`/`ROR` union both operands', a barrier names
+   every non-completer, and `BY` takes a list. The quantified `BY EVERY t` spelling itself is not
+   ruled and not built.
 5. **The domain is the cast, filtered.** `EVERY Tenant t` over a constructor with a payload
    (`Tenant HAS name IS A STRING`) ranges over an open type and needs §2.1's `WHO member_of …`
    filter, exactly as the existing `EVERY` does. **This point is the one the run time turned into
@@ -899,7 +902,7 @@ reader need not open the artifact, and so that the measurements can be re-run.
 | -------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
 | R-T1 — the keyword is `ONCE`, for the barrier and the threshold alike                                                                        | **RULED 2026-09-06**, accept            |
 | R-T2 — `WITHIN` in both positions: on a deonton it bounds the act; after `ONCE` it bounds the state                                          | **RULED 2026-09-06**, accept            |
-| R-T3 — `BY` takes a party or a list of parties; a compound breach collects the set of unfulfilled operands                                   | **RULED 2026-09-06**, accept            |
+| R-T3 — `BY` takes a party or a list of parties; a compound breach collects the set of unfulfilled operands                                   | **BUILT 2026-09-15**, see §6.1          |
 | R-T4 — `Aggregate OF Binder` is sugar over a general Boolean condition; `AND` of thresholds is Boolean `AND`                                 | **RULED 2026-09-06**, accept            |
 | R-T5 — the prefix `SOME m OF Cast …` is sugar only without a per-act continuation; the pattern spelling it needs was ruled 2026-09-07 (§2.4) | **RULED 2026-09-06**, accept, with note |
 | R-T6 — the cast is fixed at arming; a change of cast is an explicit event; extended to `EVERY` and given its event shape by R-Q6 (§13.4)     | **RULED 2026-09-06**, accept, with note |
@@ -920,12 +923,18 @@ reader need not open the artifact, and so that the measurements can be re-run.
   both a per-act deadline (the receipt within five days) and one deadline on the total, and the law
   draws exactly that distinction. The grammar cost is the optional `TemporalConstraint` §2.2.7.4
   already carries.
-- **R-T3.** `Breach Anno (Maybe (Expr n)) (Maybe (Expr n))` (`Syntax.hs:342`) holds one optional
-  party; the compound case at `jl4-core/src/L4/EvaluateLazy/Machine.hs:1698-1730` picks one operand
-  by operator and timestamp under a comment that the assignment "may be wrong if the events are
-  passed out of order wrt time". A set is what a wizard or an export needs to answer "who is in
-  breach". 34 golden files print a breach; those with compound failure will re-bless with the fuller
-  answer when this is built.
+- **R-T3.** `Breach Anno (Maybe (Expr n)) (Maybe (Expr n))` (cited as `Syntax.hs:342`; measured
+  2026-09-15 it is `:360` at `cdc11501` and on the build's HEAD alike, so that number was never
+  right) holds one optional party expression; the compound case in
+  `jl4-core/src/L4/EvaluateLazy/Machine.hs` (`:1698-1730` at `cdc11501`, verified) picked one operand by
+  operator and timestamp under a comment that the assignment "may be wrong if the events are passed
+  out of order wrt time". A set is what a wizard or an export needs to answer "who is in breach". 34
+  golden files print a breach; those with compound failure will re-bless with the fuller answer when
+  this is built. _Since built (2026-09-15): the syntax node is unchanged — the list reading is a
+  typing rule, not a constructor — and the run-time `ReasonForBreach` carries `NonEmpty`; one
+  golden with compound failure re-blessed (`ok/tests/deontic-breach-semantics.golden`, four
+  traces), and the count of goldens printing a breach on that HEAD was nine, not 34 (measured
+  with `grep -rl 'DEONTIC BREACHED' jl4 jl4-core`). §6.1 has the build record._
 - **R-T4.** The prelude already has `count`, `sum`, `product`, `maximum`, `minimum`, `all`, `any`,
   `elem` (`jl4-core/libraries/prelude.l4`); `OF`, `AT` and `LEAST` are keywords. The sugar desugars
   to the prelude call over the projected list of matching performances; the general Boolean form
@@ -952,8 +961,9 @@ reader need not open the artifact, and so that the measurements can be re-run.
 
 A parser for the `ONCE` line and the `SOME`/`AT LEAST` count; a desugaring to a residual contract
 carrying the accumulator (the recursion-on-balance form, with the clock threaded so that R-T2
-holds) or to a ledger cell read at the join; a set-valued breach (R-T3); goldens under `ok/` for
-the two rent forms and the s 177 quorum; and a page under `doc/` before the work is closed (repo
+holds) or to a ledger cell read at the join; a set-valued breach (R-T3 — **built 2026-09-15**, §6.1,
+so this clause of the list is discharged independently of the rest); goldens under `ok/` for the
+two rent forms and the s 177 quorum; and a page under `doc/` before the work is closed (repo
 `CLAUDE.md` §6). Until then this section is a design record and the six-ways page is its
 illustration.
 
@@ -1054,7 +1064,7 @@ LestClause ::= 'LEST' Continuation
 Continuation ::= Deonton
                | QuantifiedDeonton
                | 'FULFILLED'
-               | 'BREACH' ['BY' PartyOrList]   -- R-T3: a party or a list of parties
+               | 'BREACH' ['BY' PartyOrList]   -- R-T3: a party or a list of parties (BUILT 2026-09-15, §6.1)
 ```
 
 The fork's words were RULED `UPON EACH` on 2026-09-07 (§2.5, R-Q1), so `'EACH' 'HAS'` has left
@@ -1178,7 +1188,9 @@ HENCE` fires when the permission is exercised (`Machine.hs:1669-1671`), so a dra
   endpoint (§2.2.7.4). Meng's note is a documentation requirement, not a re-decision: §8.3 now carries
   a worked example of a quantified obligation as an operand of `RAND` and of `ROR`, and of a barrier
   whose `HENCE` is itself a `RAND`, with the breach naming under R-T3; **the build's `doc/` page owes
-  the same example** (owed list below).
+  the same example** (owed list below). _Discharged in part 2026-09-15: the breach naming is on the
+  page (`doc/reference/regulative/EVERY.md`, "What runs today", and `BECAUSE.md`, "Several
+  parties"); the `RAND`/`ROR`-of-`EVERY` shapes themselves still wait on §8.3's other blocker._
 - **R-Q3.** `NO` is free — not a keyword, 0 bare identifier uses in the corpus (the refuters' count:
   62 non-comment lines in 5 files, all inside strings or backticked `§` headings; canon 0) — and the
   prohibition already exists twice (`MUST NOT` → `DMustNot`, `SHANT` → `DMustNot`,
@@ -1353,7 +1365,8 @@ branch was in the merge queue at the time):
 > synchronisation (the joint/several memo's §7.5 asked for the citation here).
 
 **BUILT 2026-09-08** on `lang/every-runtime`; witness `jl4/examples/ok/every/run-barrier.l4`.
-What the build does NOT do is §6.1's blame set — see §11.0.1.
+What that build did NOT do was §6.1's blame set — **built 2026-09-15** on `every/blame-set`, witness
+`jl4/examples/ok/every/run-blame.l4`; see §6.1 and §11.0.1.
 
 `EVERY` with a `ONCE ALL HAVE` join has **barrier semantics**:
 
@@ -1452,7 +1465,8 @@ attaches to, then by the modal**:
 
 - On the **state layer** — a `LEST` after an `ONCE … WITHIN` line (R-T2) — the failure time is the
   state's deadline, whatever the acts' modals; the `LEST` fires once, at that deadline, and the blame
-  is the set (§6.1; a set-valued `BY` under R-T3). §2.2.7.6's `rent owed jointly` is the case: `MAY`
+  is the set (§6.1; a set-valued `BY` under R-T3 — the set is built as of 2026-09-15, the state-layer
+  `LEST`'s own naming of it is not, see §6.1). §2.2.7.6's `rent owed jointly` is the case: `MAY`
   acts inside, one `LEST` at `due`.
 - On the **act layer** — a `LEST` under the fork join, or a barrier with no state `WITHIN` — the modal
   fixes it: **`SHANT` fails at the act** (the violating event's own stamp; today's single-party
@@ -2028,6 +2042,119 @@ computeBlame bo tr =
 - A and B complete; C doesn't
 - Blame: {C}, not {A, B, C}
 
+#### 6.1.1 BUILT 2026-09-15 (R-T3) — on `every/blame-set`; witness `jl4/examples/ok/every/run-blame.l4`
+
+The sketch above is a design record and is left as it was written: `BarrierObligation`,
+`computeBlame` and `Set Party` do not exist in the tree. What the tree has, and what each decision
+below rests on, is recorded here against the build's own HEAD.
+
+**The representation is `NonEmpty`, not `Set`.** Meng, 2026-09-15: _"did we consider a NonEmpty
+list?"_ The sketch said `Set Party`, and a non-empty list had not been considered. It was built as
+`NonEmpty`, for three reasons. (1) A failed barrier has at least one non-completer and a failed
+`RAND` at least one failed operand, so the invariant belongs in the type: `ExplicitBreach (Maybe a)`
+becomes `Maybe (NonEmpty a)` cleanly, where a plain list would make `Just []` a second spelling of
+`Nothing`. (2) Roll order is already the determinism the goldens rely on (§11.0.1: "reversing the
+roll reverses which member is named"), and the party is a heap `Reference` — a `Set` would need every
+party forced and keyed by `partyKeyWHNF` just to have an `Ord`, and would then print in key order
+rather than the drafter's. (3) The singleton prints byte-identically to the one-party form, so only
+goldens with a compound failure move.
+
+```haskell
+-- jl4-core/src/L4/Evaluate/ValueLazy.hs:113-117
+data ReasonForBreach a
+  = DeadlineMissed a a Rational (NonEmpty a) (RAction Resolved) Rational
+  | ExplicitBreach (Maybe (NonEmpty a)) (Maybe a)
+```
+
+**Order and deduplication.** Operand order for `RAND`/`ROR` (left operand's parties first), roll
+order for a barrier; deduplicated by party key — `partyKeyWHNF`, the same key that names a party's
+ledger (`Machine.hs:2417`) — keeping the first occurrence. Keying needs each party forced, and a
+party inside a breach is usually still a thunk (the `BY` expression; an obligation's party no event
+ever reached), so the set is settled by a frame that forces one party per step (`BreachParties`,
+`ContractFrame.hs:341`, `Machine.hs:1816`; entered through `blameParties`, `Machine.hs:2440`). One
+consequence: a compound breach now forces the parties of BOTH operands, where before the discarded
+operand's party was never evaluated.
+
+**`RAND`/`ROR`: the union, anchored as before.** When both operands are breached, the result keeps
+today's anchor — the earlier breach for `RAND`, the later for `ROR`, by the revealing stamp, tie to
+the left for `RAND` and the right for `ROR`, an untimestamped `ExplicitBreach` treated as
+simultaneous — and blames the union of both operands' parties (`Machine.hs:1862-1894`). The anchor's
+revealing event, action, deadline and `BECAUSE` are carried; only WHO changes, not WHEN and not WHY.
+Two bare `BREACH`es still name nobody.
+
+**The shape of `DeadlineMissed`: one anchor, a set of parties.** The brief left open whether
+`DeadlineMissed` should carry one `(party, action, deadline)` per failed obligation or one
+`NonEmpty party` beside the anchoring failure's action and deadline. Built as the latter. A
+per-obligation triple is the more informative shape when every failure is a missed deadline — a
+barrier with per-member `WITHIN`s would print each member's own deadline — but a party contributed by
+an `ExplicitBreach` operand has neither an action nor a deadline, so the union across breach kinds
+(`explicit or deadline` in `ok/deontic-breach-semantics.l4`) would have to invent one or make both
+optional; and the wire would stop being the scalar-plus-array the brief required. The cost of the
+shape chosen is visible in `run-blame.l4`'s `staggered signing, no reparation`: the breach is anchored
+at Carol's failure (deadline 5) and names Bob, Carol in roll order, so the head of the list is not
+the anchor's party and "their deadline, which was at 5" is the anchor's, not Bob's. The printer says
+`parties`, plural, for exactly this reason (`Print.hs:1228`). A reviewer who wants the per-party
+shape reverses one constructor, one printer arm and one JSON object.
+
+**The barrier runs every member before deciding.** `Barrier1` no longer ends the scan at the first
+failure; each failure is recorded (`BarrierStepFrame.failures`, `ContractFrame.hs:286`) and
+`barrierFinish` (`Machine.hs:2300`) decides once the queue is empty:
+
+- **no `LEST`:** one `DeadlineMissed`, anchored at the earliest failure by R-Q5's failure time —
+  the smallest missed deadline for `MUST`/`DO`, the violating event's stamp for `SHANT`, both of which
+  are the `deadline` field the member's own breach carries — and naming every failed member in roll
+  order. Ties keep the first in roll order (`earliestFailure`, `Machine.hs:2337`).
+- **with a `LEST`:** the `LEST` runs once, with the anchor and residual stream of the earliest
+  failure. The failpoint sentinel carries only the revealing event's stamp (§5.2's deadline anchor is
+  NOT built here; the anchor's VALUE is untouched, one change in one place for the §5.2 track), and
+  the failures are ordered by that stamp. That orders by the missed deadline, because every member
+  scans the same stream: an earlier deadline is revealed by an earlier-or-equal event, and a tie is
+  the same event, hence the same anchor and the same residual — so the answer cannot differ from
+  ordering by deadline. `run-blame.l4`'s `staggered signing` pins it: Carol, last on the roll with
+  five days, fails first, and the landlord's reparation is anchored at her failure (deadline 11),
+  not at Bob's (23).
+- **`MAY` under a barrier with no `LEST`:** a lapsed permission is recorded as `lapsed`, and the
+  verdict stays `FULFILLED` — the join cannot fire and nothing was owed — exactly as when the lapse
+  ended the scan; `run-modals.l4`'s `the resolution` is unchanged.
+- **What the `LEST` names.** A barrier's `LEST` is the drafter's expression, run as written: a bare
+  `LEST BREACH` names nobody (`run-barrier.golden` unchanged), and `LEST BREACH BY LIST a, b` names
+  whom the drafter named. The failed members are NOT injected into it. This section's first sentence
+  — "when LEST fires, blame is attributed to exactly those who didn't complete" — is therefore
+  delivered by the barrier WITHOUT a `LEST`, and not by one with a `LEST`; a `BY` that names the
+  failing members from inside a barrier's `LEST` (`BY EVERY t`, §2.2.7.5 point 4) is not ruled, and
+  the brief put it out of scope. Injecting the set into a bare `BREACH` was considered and not done:
+  it is a language decision, not an implementation detail.
+- The two REFUSALS of §11.0.1 and the same-instant tie imprecision are unchanged.
+
+**`BREACH BY <list>`.** The checker (`checkBreachParty`, `TypeCheck.hs:1874`) infers the `BY`
+expression and reads its type: a `LIST OF t` unifies `t` with the party type, anything else is the
+party. Deterministic rather than a `choose` between the two readings, because an unresolved party
+type would otherwise leave both branches viable and report an ambiguity where today there is none.
+The syntax node is unchanged and carries no mark, so the machine decides by the value's shape
+(`BreachBy`, `Machine.hs:1803`): a `ValCons` is walked and its elements deduplicated, anything else
+is the one party, and `ValNil` is a user-facing error naming the clause (`emptyBreachByRefusal`,
+`Machine.hs:2449`) — a breach blames at least one party; write no `BY` to blame nobody. Given up: a
+contract whose party type is itself a `LIST` cannot write `BREACH BY` with that whole list; no corpus
+file has such a party type.
+
+**Printing and the wire.** Singletons print as before. A plural `DeadlineMissed` prints
+`surpassed the deadline of parties` with one party per line; a plural `ExplicitBreach` prints the
+source form, `BY LIST p, q` (`Print.hs:1228`). `l4 batch --json` keeps `obligatedParty` / `party` as
+the HEAD of the set and adds `obligatedParties` / `parties` (`ValueLazyJSON.hs:101-115`); the
+jl4-service wire does the same, which also closes the divergence its notes recorded — it used to drop
+the obligated party altogether (`jl4-service/src/Backend/Jl4.hs:1257`); the jl4-mlir runtime mirrors
+both keys as the singleton of its scalar (`jl4-mlir/runtime/jl4-runtime.mjs:981`, `:915`), its pure
+unit tests updated, the full parity harness NOT run on this branch (it runs only on `jl4-mlir/**`
+changes in CI and is advisory). For a right-anchored compound (`ROR`, or a `RAND` whose right operand
+failed first) the scalar is now the LEFT operand's party rather than the anchor's — a value change
+confined to compound breaches, which the old wire named by tie-break anyway.
+
+**Measured on the build's HEAD.** One existing golden moved, `ok/tests/deontic-breach-semantics.golden`:
+its four both-breached traces name both parties. `run-barrier.golden` and `run-modals.golden` are
+unchanged (their failures are singletons, a bare `LEST BREACH`, or a lapsed `MAY`). Nine
+`run-blame.l4` traces pin the six behaviours the brief listed, the no-`LEST` staggered anchor, the
+dedup of `alice RAND alice`, and the empty-list refusal.
+
 ### 6.2 Causal Blame Analysis
 
 When a party's failure is caused by another:
@@ -2144,7 +2271,9 @@ shapes, in the value-actor style of §2.2.7.6, with the breach naming under R-T3
         HENCE FULFILLED
         LEST  BREACH BY secretary)
 -- Two directors miss the date and the secretary files: the compound breach names the two
--- directors. Today's fold would name ONE operand by timestamp tie-break (Machine.hs:1699-1730).
+-- directors. Before 2026-09-15 the fold named ONE operand by timestamp tie-break; since then
+-- (§6.1) a RAND names both operands' parties -- but the barrier's own `LEST BREACH` names
+-- nobody, so as written this shape still needs the LEST left off to name the non-signers.
 
 -- (2) a quantified obligation as one operand of ROR: unanimous written consent OR a chair's decision
 `consent or decision` MEANS
@@ -2154,8 +2283,8 @@ shapes, in the value-actor style of §2.2.7.6, with the breach naming under R-T3
     ROR
     (PARTY chair MUST decide WITHIN 14
         HENCE `resolution passes`)
--- Either branch fulfils the compound (Machine.hs:1757-1764); it is breached only when BOTH are
--- lost (:1699-1706), and then names both operands' non-performers under R-T3.
+-- Either branch fulfils the compound (the ROR arms of RBinOp2 in Machine.hs); it is breached only
+-- when BOTH are lost, and then names both operands' non-performers under R-T3 (built 2026-09-15).
 
 -- (3) a barrier whose HENCE is itself a RAND: after the last signature, two things follow in parallel
 `sign then close` MEANS
@@ -2168,7 +2297,8 @@ shapes, in the value-actor style of §2.2.7.6, with the breach naming under R-T3
 -- Both continuation clocks start at the join's firing, the last signature (R-Q7, §5.1).
 ```
 
-What this needs before it can be a golden: the `ONCE` line (R-Q1); the set-valued `BY` (R-T3); and,
+What this needs before it can be a golden: the `ONCE` line (R-Q1, built); the set-valued `BY` (R-T3,
+**built 2026-09-15**, §6.1); and,
 for shapes (1) and (2) with a continuation on the compound, a `HENCE` slot that compounds do not have
 — `HENCE` is parsed only inside `obligation` (`Parser.hs:2538-2540`), so `(A RAND B) HENCE k` is a
 parse error (`unexpected HENCE`; probed 2026-09-07 on the installed binary). Shape (3) puts the `RAND`
@@ -2362,17 +2492,25 @@ put to Meng as an open question, not decided by the build.
   the doc page says in terms that `FULFILLED` is not evidence the `HENCE` fired.
 - nesting: a quantified obligation inside another's `HENCE`, armed at the outer join.
 
+**Built 2026-09-15**, on `every/blame-set`, witnessed by `jl4/examples/ok/every/run-blame.l4` —
+**§6.1's blame set (R-T3).** Until then a failed barrier named ONE non-completer, the first in roll
+order, because `ReasonForBreach` carried one party (measured 2026-09-08: reversing the roll reversed
+which member was named, so the choice was deterministic and it was roll order). Now `ReasonForBreach`
+carries a `NonEmpty` of parties; a barrier runs every member before deciding and, with no `LEST`,
+names every non-completer in roll order, anchored at the earliest failure; with a `LEST`, runs it
+once, anchored at the earliest failure rather than the first in roll order; `RAND`/`ROR` blame the
+union of both operands' parties; and `BREACH BY` takes a list. §6.1.1 has the decisions, including
+the two this build did not make: a barrier's own `LEST BREACH` still names whom the drafter names,
+and the anchor's VALUE is still the revealing stamp (next bullet).
+
 **Not built, and each one is a place a run gives a coarser answer than this document specifies:**
 
-- **§6.1's blame set.** A failed barrier names ONE non-completer — the first in roll order —
-  because `ReasonForBreach` carries one party. This is R-T3 (§2.2.7.5 point 4), unbuilt, exactly as
-  that point predicted. Measured 2026-09-08: reversing the roll reverses which member is named,
-  so the choice is deterministic and it is roll order.
 - **§5.2's deadline anchor.** A `LEST` continuation is anchored at the revealing event's stamp, not
   at the missed deadline. §5.2 records that changing this changes the **single-party** path and
   every trace golden that prints a reparation deadline; the build deliberately made `EVERY` match
   the single-party path rather than diverge from it, so that §5.2 remains one change to make in one
-  place. It is still owed.
+  place. It is still owed. (Since 2026-09-15 a barrier's `LEST` is anchored at the EARLIEST failure,
+  which is R-Q5's ordering; what the anchor reads at that failure is still the stamp.)
 - **The residual of an unfinished barrier** is the outstanding members' obligations — with their
   deadlines correctly decremented, and carrying the machine's two sentinels in their `HENCE` and
   `LEST` slots (they print as `` `the join` `` and `` `the join fails` ``) — but WITHOUT the join
@@ -2428,6 +2566,10 @@ tied member's own act, which then does double duty. Computing the correct stream
 suffix, or the whole stream trimmed to events strictly after the join) needs a trimming walk with
 its own frames. A `SHANT` barrier ties by construction, but harmlessly: every member completes at
 the same revealing event and their residual streams are identical.
+
+**What the adversarial pass of 2026-09-15 changed** (the blame-set build, R-T3):
+
+_pending, filled after the refute stage._
 
 **A defect found on the way, and fixed here because the fork's own example needs it.** `EXACTLY e`
 in the **second or later** argument of an action pattern raised `is not in scope` at run time.
@@ -2760,7 +2902,8 @@ disqualified the re-arm-on-any-change option — and a re-arming `WITHIN` is the
 ruled to remove (§2.2.7.5 point 3). Doctrine's release rule (Restatement (Second) of Contracts § 294,
 as the memo records it at `:99`) is what the edit event models at the `ANY OF` end of the family,
 where leaving a released obligor in the blame set would contradict a release the creditor has signed
-— visible now that R-T3's breach carries a set.
+— visible now that R-T3's breach carries a set (written 2026-09-07 in the present tense ahead of the
+build; true since 2026-09-15, §6.1).
 
 **Why not a live re-read.** Who is blamed would change silently with the cast expression; a cast that
 depends on the ledger would be re-evaluated after every event; and a member could escape blame by

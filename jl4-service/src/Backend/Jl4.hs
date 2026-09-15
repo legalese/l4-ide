@@ -30,6 +30,7 @@ import Optics ((^.), (%))
 
 import Language.LSP.Protocol.Types (normalizedFilePathToUri, toNormalizedFilePath)
 import System.FilePath ((<.>), takeFileName)
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as StrictMap
 import qualified Data.Set as Set
 import qualified L4.API.EmbeddedLibraries as EmbeddedLibraries
@@ -1243,31 +1244,42 @@ serializeDue _  (Left Nothing)     = pure FnUnknown
 serializeDue _  (Left (Just expr)) = pure $ FnLitString (Print.prettyLayout expr)
 serializeDue ei (Right val)        = valueToFnLiteral ei val
 
--- | Serialize a breach reason to FnLiteral
+-- | Serialize a breach reason to FnLiteral.
+--
+-- The blame set (R-T3, EVERY-EACH-QUANTIFIER-SPEC §6.1, built 2026-09-15): a
+-- compound breach names every party that failed. On this wire the scalar
+-- @obligatedParty@ \/ @party@ is the HEAD of the set and the array
+-- @obligatedParties@ \/ @parties@ is the whole set, in operand \/ roll order;
+-- for a single obligation's breach the array is the one-element list. The
+-- jl4-mlir runtime mirrors this object byte-for-byte
+-- (@jl4-mlir/runtime/jl4-runtime.mjs@, 'deonticBreachToWire'), so a key added
+-- here is added there in the same change.
 serializeBreachReason :: (Monad m) => EntityInfo -> Eval.ReasonForBreach Eval.NF -> ExceptT EvaluatorError m FnLiteral
 serializeBreachReason ei = \case
-  Eval.DeadlineMissed evParty evAction evTimestamp _oblParty oblAction oblDeadline -> do
+  Eval.DeadlineMissed evParty evAction evTimestamp oblParties oblAction oblDeadline -> do
     evPartyLit <- nfToFnLiteral ei evParty
     evActionLit <- nfToFnLiteral ei evAction
+    oblPartyLits <- traverse (nfToFnLiteral ei) oblParties
     let oblActionLit = serializeRAction oblAction
     pure $ FnObject
       [ ("reason", FnLitString "deadline_missed")
       , ("eventParty", evPartyLit)
       , ("eventAction", evActionLit)
       , ("timestamp", FnLitDouble $ fromRational evTimestamp)
+      , ("obligatedParty", NE.head oblPartyLits)
+      , ("obligatedParties", FnArray (NE.toList oblPartyLits))
       , ("obligationAction", oblActionLit.actionPat)
       , ("deadline", FnLitDouble $ fromRational oblDeadline)
       ]
-  Eval.ExplicitBreach mParty mReason -> do
-    partyLit <- case mParty of
-      Just nf -> nfToFnLiteral ei nf
-      Nothing -> pure FnUnknown
+  Eval.ExplicitBreach mParties mReason -> do
+    partyLits <- traverse (traverse (nfToFnLiteral ei)) mParties
     reasonLit <- case mReason of
       Just nf -> nfToFnLiteral ei nf
       Nothing -> pure FnUnknown
     pure $ FnObject
       [ ("reason", FnLitString "explicit")
-      , ("party", partyLit)
+      , ("party", maybe FnUnknown NE.head partyLits)
+      , ("parties", maybe FnUnknown (FnArray . NE.toList) partyLits)
       , ("detail", reasonLit)
       ]
 

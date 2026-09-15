@@ -1,0 +1,169 @@
+IMPORT prelude
+-- EVERY-EACH-QUANTIFIER-SPEC §6.1, R-T3 (built 2026-09-15): the BLAME SET.
+--
+-- A breach names every party that failed, not one of them. Three places
+-- produce a compound breach, and the traces below pin each:
+--
+--   * a BARRIER (`ONCE ALL HAVE`) with no LEST: every member that did not
+--     complete is named, in ROLL order, and the breach is anchored at the
+--     EARLIEST failure;
+--   * a barrier WITH a LEST: the LEST runs once, anchored at the earliest
+--     failure — not at the first failure in roll order — which shows up as
+--     the reparation's deadline;
+--   * `RAND`: when both sides are lost, both sides' parties are named, left
+--     operand first.
+--
+-- And `BREACH BY` takes a LIST of parties as well as a party. A single
+-- obligation's breach prints exactly as it always did.
+
+DECLARE Actor IS ONE OF
+    Landlord HAS name IS A STRING
+    Tenant   HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Sign   HAS signer IS AN Actor
+    Refund HAS who    IS AN Actor
+
+theLandlord MEANS Landlord OF "Ms Ng"
+alice       MEANS Tenant OF "Alice"
+bob         MEANS Tenant OF "Bob"
+carol       MEANS Tenant OF "Carol"
+tenants     MEANS LIST alice, bob, carol
+`tenants, reversed` MEANS LIST carol, bob, alice
+
+-- 1. Two members fail: both are named, in roll order. Alice signs; Bob and
+--    Carol never do. The breach is one record: the deadline it reports is the
+--    earliest one missed (both are 14 here), and the parties are everyone who
+--    missed.
+GIVETH A DEONTIC Actor Action
+`all sign` MEANS
+    EVERY Tenant t IN tenants
+        MUST   Sign (EXACTLY t)
+        WITHIN 14
+        ONCE   ALL HAVE
+        HENCE  FULFILLED
+
+#TRACE `all sign` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+  (`WAIT UNTIL` 20)
+
+-- 2. The same failure over the reversed roll: the same two parties, in the
+--    reversed order. The order is the roll's, nothing else.
+GIVETH A DEONTIC Actor Action
+`all sign, reversed` MEANS
+    EVERY Tenant t IN `tenants, reversed`
+        MUST   Sign (EXACTLY t)
+        WITHIN 14
+        ONCE   ALL HAVE
+        HENCE  FULFILLED
+
+#TRACE `all sign, reversed` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+  (`WAIT UNTIL` 20)
+
+-- 3. A later-in-roll member fails EARLIER in time. Carol, last on the roll,
+--    has five days; Bob, before her, has fourteen. Neither signs. The
+--    barrier's LEST is anchored at Carol's failure — revealed at day 8 — so
+--    the landlord's three days to refund run out at day 11, and a refund at
+--    day 12 is late. Anchored at the first failure in roll order (Bob's,
+--    revealed at day 20) the refund would have been on time.
+GIVEN t IS AN Actor
+GIVETH A NUMBER
+`days allowed to` t MEANS IF t EQUALS carol THEN 5 ELSE 14
+
+GIVETH A DEONTIC Actor Action
+`staggered signing` MEANS
+    EVERY Tenant t IN tenants
+        MUST   Sign (EXACTLY t)
+        WITHIN `days allowed to` t
+        ONCE   ALL HAVE
+        HENCE  FULFILLED
+        LEST   (PARTY theLandlord MUST Refund (EXACTLY theLandlord) WITHIN 3)
+
+#TRACE `staggered signing` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+  (`WAIT UNTIL` 8)
+  PARTY theLandlord DOES Refund theLandlord AT 12
+  (`WAIT UNTIL` 20)
+
+-- The same staggered deadlines with no LEST: the breach is anchored at the
+-- earliest failure (Carol's deadline, day 5, revealed at day 8) and names
+-- both non-completers in roll order — Bob before Carol, although Carol failed
+-- first. The deadline printed is the anchor's; the parties are everyone's.
+GIVETH A DEONTIC Actor Action
+`staggered signing, no reparation` MEANS
+    EVERY Tenant t IN tenants
+        MUST   Sign (EXACTLY t)
+        WITHIN `days allowed to` t
+        ONCE   ALL HAVE
+        HENCE  FULFILLED
+
+#TRACE `staggered signing, no reparation` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+  (`WAIT UNTIL` 8)
+  (`WAIT UNTIL` 20)
+
+-- 4. RAND of two single-party obligations, both missed: both parties are
+--    named, left operand first. The anchor is the earliest breach as before
+--    (here a tie, revealed by the same event, so the left one).
+GIVETH A DEONTIC Actor Action
+`both sign` MEANS
+    (PARTY alice MUST Sign (EXACTLY alice) WITHIN 14)
+    RAND
+    (PARTY bob   MUST Sign (EXACTLY bob)   WITHIN 14)
+
+#TRACE `both sign` AT 0 WITH
+  (`WAIT UNTIL` 20)
+
+-- The same party on both sides of a RAND is named once.
+GIVETH A DEONTIC Actor Action
+`alice twice` MEANS
+    (PARTY alice MUST Sign (EXACTLY alice) WITHIN 14)
+    RAND
+    (PARTY alice MUST Refund (EXACTLY alice) WITHIN 14)
+
+#TRACE `alice twice` AT 0 WITH
+  (`WAIT UNTIL` 20)
+
+-- 5. BREACH BY a LIST of parties: the drafter names several. Duplicates are
+--    dropped, first occurrence kept.
+GIVETH A DEONTIC Actor Action
+`joint and several` MEANS
+    PARTY theLandlord
+        MUST   Refund (EXACTLY theLandlord)
+        WITHIN 3
+        LEST   BREACH BY LIST alice, bob, alice BECAUSE "the tenants carry it"
+
+#TRACE `joint and several` AT 0 WITH
+  (`WAIT UNTIL` 20)
+
+-- A LIST with nobody in it is refused at run time, by name: a breach blames
+-- at least one party.
+GIVEN t IS AN Actor
+GIVETH A BOOLEAN
+nobody t MEANS FALSE
+
+GIVETH A DEONTIC Actor Action
+`blame nobody` MEANS
+    PARTY theLandlord
+        MUST   Refund (EXACTLY theLandlord)
+        WITHIN 3
+        LEST   BREACH BY filter nobody tenants
+
+#TRACE `blame nobody` AT 0 WITH
+  (`WAIT UNTIL` 20)
+
+-- 6. One member fails: the text is unchanged from before the blame set —
+--    "party", singular, and one name.
+GIVETH A DEONTIC Actor Action
+`one misses` MEANS
+    EVERY Tenant t IN tenants
+        MUST   Sign (EXACTLY t)
+        WITHIN 14
+        ONCE   ALL HAVE
+        HENCE  FULFILLED
+
+#TRACE `one misses` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+  PARTY bob   DOES Sign bob   AT 2
+  (`WAIT UNTIL` 20)

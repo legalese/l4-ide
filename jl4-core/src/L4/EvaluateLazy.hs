@@ -581,15 +581,15 @@ nfAux _d (ValAssumed n)              = pure (MkNF (ValAssumed n))
 nfAux _d (ValEnvironment env)        = pure (MkNF (ValEnvironment env))
 nfAux d (ValBreached r')             = do
   r <- case r' of
-    DeadlineMissed ev'party ev'act ev'timestamp party act deadline -> do
+    DeadlineMissed ev'party ev'act ev'timestamp parties act deadline -> do
       ev'party' <- evalAndNF d ev'party
       act' <- evalAndNF d ev'act
-      party' <- evalAndNF d party
-      pure (DeadlineMissed ev'party' act' ev'timestamp party' act deadline)
-    ExplicitBreach mParty mReason -> do
-      mParty' <- traverse (evalAndNF d) mParty
+      parties' <- traverse (evalAndNF d) parties
+      pure (DeadlineMissed ev'party' act' ev'timestamp parties' act deadline)
+    ExplicitBreach mParties mReason -> do
+      mParties' <- traverse (traverse (evalAndNF d)) mParties
       mReason' <- traverse (evalAndNF d) mReason
-      pure (ExplicitBreach mParty' mReason')
+      pure (ExplicitBreach mParties' mReason')
   pure (MkNF (ValBreached r))
 nfAux d (ValROp env op l r) = do
   l' <- traverseAndNF d l

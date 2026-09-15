@@ -1496,6 +1496,9 @@ spec bin = do
             , "\"eventAction\":\"ping\""
             , "\"timestamp\":15"
             , "\"obligatedParty\":\"Alice\""
+            -- the blame set (R-T3): the scalar is the head of the array, and
+            -- a single obligation's breach names one party
+            , "\"obligatedParties\":[\"Alice\"]"
             , "\"obligationAction\":\"MUST pay 100\""
             , "\"deadline\":10"
             ]

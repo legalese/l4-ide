@@ -1,0 +1,112 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+run-blame.l4:46:1-48:20:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      20
+    surpassed the deadline of parties
+      Tenant OF "Bob"
+      Tenant OF "Carol"
+    who had to do obligatory action
+      MUST Sign (EXACTLY t)
+    before their deadline, which was at
+      14
+run-blame.l4:60:1-62:20:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      20
+    surpassed the deadline of parties
+      Tenant OF "Carol"
+      Tenant OF "Bob"
+    who had to do obligatory action
+      MUST Sign (EXACTLY t)
+    before their deadline, which was at
+      14
+run-blame.l4:83:1-87:20:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Refund OF (Landlord OF "Ms Ng")
+    at
+      12
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund (EXACTLY theLandlord)
+    before their deadline, which was at
+      11
+run-blame.l4:101:1-104:20:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      8
+    surpassed the deadline of parties
+      Tenant OF "Bob"
+      Tenant OF "Carol"
+    who had to do obligatory action
+      MUST Sign (EXACTLY t)
+    before their deadline, which was at
+      5
+run-blame.l4:115:1-116:20:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      20
+    surpassed the deadline of parties
+      Tenant OF "Alice"
+      Tenant OF "Bob"
+    who had to do obligatory action
+      MUST Sign (EXACTLY alice)
+    before their deadline, which was at
+      14
+run-blame.l4:125:1-126:20:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      20
+    surpassed the deadline of party
+      Tenant OF "Alice"
+    who had to do obligatory action
+      MUST Sign (EXACTLY alice)
+    before their deadline, which was at
+      14
+run-blame.l4:137:1-138:20:
+  DEONTIC BREACHED:
+    BREACH
+    BY LIST Tenant OF "Alice", Tenant OF "Bob"
+    BECAUSE "the tenants carry it"
+run-blame.l4:153:1-154:20:
+  BREACH BY names an empty list, at run-blame.l4:151:16-47. A breach blames at least one party: give BY a party, or a LIST with someone in it, or leave BY out to blame nobody. (EVERY-EACH-QUANTIFIER-SPEC section 6.1, R-T3.)
+run-blame.l4:166:1-169:20:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      20
+    surpassed the deadline of party
+      Tenant OF "Carol"
+    who had to do obligatory action
+      MUST Sign (EXACTLY t)
+    before their deadline, which was at
+      14

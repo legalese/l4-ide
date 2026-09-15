@@ -1,5 +1,6 @@
 module L4.EvaluateLazy.ContractFrame where
 
+import Base (Text)
 import L4.Evaluate.ValueLazy
 import L4.Syntax
 
@@ -72,6 +73,16 @@ data ContractFrame
   | Barrier4 BarrierArmingFrame
   -- ^ EVERY, the barrier: the arming time, forced, to compare against the
   -- state deadline computed by 'Barrier3'.
+  | Barrier5 BarrierFailStampFrame
+  -- ^ EVERY, the barrier: a FAILING member's anchor, forced, so the earliest
+  -- failure can be picked out once every member has run (R-T3, spec §6.1).
+  | BreachBy BreachByFrame
+  -- ^ @BREACH BY e@: the party expression, forced. A LIST is walked one cons
+  -- cell per step (R-T3: @BY@ takes a party or a list of parties); anything
+  -- else is the one party.
+  | BreachParties BreachPartiesFrame
+  -- ^ The blame set of a breach: each party forced in turn so the set can be
+  -- deduplicated by party key, keeping the first occurrence.
   | ResolveParty ResolvePartyFrame
   -- ^ STATE-AS-LEDGER: on the deadline-passed / LEST path the obligation party is
   --   still an unevaluated expression; this frame forces it to a WHNF (via
@@ -272,12 +283,66 @@ data BarrierStepFrame = BarrierStepFrame
     -- events strictly after the join, which needs frames of its own; the
     -- limit is written into spec §11.0.1 and onto the doc page.
   , pending :: [WHNF]              -- ^ members still awaiting an event, reversed
+  , failures :: [BarrierFailure]
+    -- ^ members that definitively did not complete, reversed (so roll order
+    -- once reversed back). EVERY member runs before the barrier decides —
+    -- the first failure does not end the scan — so that the verdict can name
+    -- all of them (R-T3, spec §6.1) and the @LEST@ can be anchored at the
+    -- EARLIEST failure rather than the first in roll order.
+  , lapsed :: Bool
+    -- ^ some @MAY@ member's permission expired under a barrier with no
+    -- @LEST@: nothing was owed, so nothing is breached, but the join cannot
+    -- fire — the verdict is @FULFILLED@, as it was when this ended the scan.
   }
+  deriving stock Show
+
+-- | One member's definitive failure, as the barrier records it.
+data BarrierFailure
+  = BarrierFailedAt
+      { failAt      :: Rational    -- ^ the anchor the machine computed for the miss, forced
+      , failTimeRef :: Reference   -- ^ …and as the reference the @LEST@ is handed
+      , failEvsRef  :: Reference   -- ^ the residual stream that followed the miss
+      }
+    -- ^ reported through the failpoint sentinel — a barrier WITH a @LEST@.
+    -- The anchor is the revealing event's stamp (spec §5.2's deadline anchor
+    -- is not built); ordering by it orders by the missed deadline, because
+    -- every member scans the same stream.
+  | BarrierBreached
+      { failReason :: ReasonForBreach Reference }
+    -- ^ the member's own breach — a barrier WITHOUT a @LEST@ mints no
+    -- sentinel, so a missed @MUST@ comes back as the 'ValBreached' the
+    -- single-party path builds, naming the member.
   deriving stock Show
 
 data BarrierStampFrame = BarrierStampFrame
   { step   :: BarrierStepFrame
   , evsRef :: Reference            -- ^ the stream after the completing event
+  }
+  deriving stock Show
+
+data BarrierFailStampFrame = BarrierFailStampFrame
+  { step    :: BarrierStepFrame
+  , timeRef :: Reference           -- ^ the failure's anchor, being forced
+  , evsRef  :: Reference           -- ^ the stream the failing member handed back
+  }
+  deriving stock Show
+
+-- | @BREACH BY e@, with @e@ under evaluation.
+data BreachByFrame = BreachByFrame
+  { partyRef :: Reference          -- ^ the whole @BY@ expression, allocated (forced on return)
+  , acc      :: [Reference]        -- ^ list elements collected so far, reversed
+  , mReason  :: Maybe Reference    -- ^ the @BECAUSE@, allocated
+  , clause   :: Text               -- ^ where the @BREACH@ was written, for the empty-list error
+  }
+  deriving stock Show
+
+-- | The blame set under construction: 'anchor' is the reason whose party slot
+-- the deduplicated set replaces once every party has been forced.
+data BreachPartiesFrame = BreachPartiesFrame
+  { anchor  :: ReasonForBreach Reference
+  , seen    :: [(Text, Reference)] -- ^ parties kept so far, keyed, most recent first
+  , current :: Reference           -- ^ the party being forced
+  , rest    :: [Reference]         -- ^ parties still to force, in order
   }
   deriving stock Show
 

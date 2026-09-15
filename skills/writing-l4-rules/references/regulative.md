@@ -185,8 +185,8 @@ check fails with `You are giving 2 inputs to pay … but it is not a function, s
 
 `RAND` and `ROR` compose obligations in parallel.
 
-- **`RAND`** — parallel AND. All components must be fulfilled; if any side breaches, the compound breaches.
-- **`ROR`** — parallel OR. Fulfilling any one side fulfills the compound.
+- **`RAND`** — parallel AND. All components must be fulfilled; if any side breaches, the compound breaches. When both sides are lost the breach names both sides' parties (`BY LIST seller, buyer`), left first, with the reason from the side lost first.
+- **`ROR`** — parallel OR. Fulfilling any one side fulfills the compound; it breaches only when every side is lost, and then names every side's party, with the reason from the side lost last.
 - **Precedence:** `RAND` binds tighter than `ROR`, so `A ROR B RAND C` means `A ROR (B RAND C)`.
 
 ```l4
@@ -306,7 +306,7 @@ An `elem` condition **beside** an `IN` roll is an ordinary narrowing condition a
 
 Say these plainly to a user rather than letting them discover them:
 
-- **A failed barrier's breach names NOBODY.** A barrier's `LEST` belongs to the join, not to any member, so it may not name `t` — the checker refuses `LEST BREACH BY t` — and a bare `LEST BREACH` yields a bare `BREACH` with no party. A constant works (`LEST BREACH BY theLandlord BECAUSE "…"`) but is a party you chose, not the one who failed. Who is outstanding shows up in the **residual**, not the breach. Use the fork if the failure has to name the member.
+- **A barrier's own `LEST BREACH` names NOBODY.** A barrier's `LEST` belongs to the join, not to any member, so it may not name `t` — the run refuses `LEST BREACH BY t` — and a bare `LEST BREACH` yields a bare `BREACH` with no party. A constant works, one party or a list (`LEST BREACH BY LIST theLandlord, theAgent BECAUSE "…"`), but is a party you chose, not the one who failed. Leave the `LEST` off and the breach names **every** member who failed, in roll order (built 2026-09-15); with a `LEST` that has to stay, who is outstanding shows up in the **residual**, not the breach. Use the fork if the failure has to name the member.
 - **The count and measure joins are not built.** `ONCE SOME 2 OF … HAVE` and `ONCE sum OF amount AT LEAST rent` do not parse. Only `ONCE ALL HAVE` and `UPON EACH` do.
 - **`NO Tenant t MAY …`** is designed but not built; write the `SHANT` form.
 - **A residual barrier loses its join line**, so feeding a residual more events runs the members and not the join. Run the whole stream at once.
