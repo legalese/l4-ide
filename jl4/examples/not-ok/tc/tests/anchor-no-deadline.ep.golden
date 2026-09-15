@@ -1,0 +1,17 @@
+-- WITHIN d OF THE DEADLINE names the ENCLOSING obligation's deadline
+-- (EVERY-EACH-QUANTIFIER-SPEC §5.1.1, R-Q7B). Here the enclosing obligation
+-- has no WITHIN at all — not on its act, and (it is not an EVERY) not on a
+-- join line — so there is no deadline to name.
+
+DECLARE Actor IS ONE OF
+    Buyer
+    Seller
+
+DECLARE Action IS ONE OF
+    Pay
+    Deliver
+
+GIVETH A DEONTIC Actor Action
+bad MEANS
+    PARTY Buyer MUST Pay
+    HENCE (PARTY Seller MUST Deliver WITHIN 5 OF THE DEADLINE)

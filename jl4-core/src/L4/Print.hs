@@ -945,6 +945,36 @@ instance LayoutPrinter (Threshold n) where
   printWithLayout = \ case
     AllHave _ -> "ALL HAVE"
 
+-- | @d [OF anchor]@ — the body of a @WITHIN@ in either position; the keyword
+-- is printed by the caller ('mprint').
+--
+-- Two renderings, so that the deadline prints byte-for-byte as the bare
+-- expression did in each of its two uses. 'parensIfNeeded' — what 'mprint'
+-- applies to a clause body — brackets the duration exactly as it bracketed
+-- the bare expression, which also keeps an applied duration re-parseable:
+-- in the WITHIN slot @OF@ introduces the anchor, so @(f OF x) OF THE JOIN@ is
+-- what 'L4.Parser.deadline' wants. 'printWithLayout' — what the service's
+-- residual string calls directly — leaves the duration unbracketed, as
+-- @prettyLayout@ of the bare expression was. The state graph's
+-- @labelDeadline@ goes through 'parensIfNeeded' ('L4.StateGraph.edgeText'):
+-- its label is the source form, and an applied duration is only that when
+-- bracketed.
+instance LayoutPrinterWithName n => LayoutPrinter (Deadline n) where
+  printWithLayout (MkDeadline _ d ma) = hsep $ [ printWithLayout d ] <> anchorDoc ma
+  parensIfNeeded  (MkDeadline _ d ma) = hsep $ [ parensIfNeeded d ]  <> anchorDoc ma
+
+anchorDoc :: LayoutPrinterWithName n => Maybe (Anchor n) -> [Doc ann]
+anchorDoc = foldMap (\ a -> [ "OF", printWithLayout a ])
+
+-- | The anchor's words (R-Q7B), or the expression (R-Q7C) bracketed like any
+-- other clause body. 'L4.TypeCheck.anchorWords' is the diagnostics' copy.
+instance LayoutPrinterWithName n => LayoutPrinter (Anchor n) where
+  printWithLayout = \ case
+    AnchorJoin _     -> "THE JOIN"
+    AnchorDeadline _ -> "THE DEADLINE"
+    AnchorArming _   -> "THE ARMING"
+    AnchorAt _ e     -> parensIfNeeded e
+
 instance LayoutPrinter UponEach where
   printWithLayout (MkUponEach _) = uponEachWords
 

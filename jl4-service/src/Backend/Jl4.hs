@@ -1238,10 +1238,14 @@ serializeEitherValue _  (Left expr)  = pure $ FnLitString (Print.prettyLayout ex
 serializeEitherValue ei (Right val)  = valueToFnLiteral ei val
 
 -- | Serialize the deadline/due field of an obligation
-serializeDue :: (Monad m) => EntityInfo -> Either (Maybe (Expr Resolved)) (Eval.Value Eval.NF) -> ExceptT EvaluatorError m FnLiteral
-serializeDue _  (Left Nothing)     = pure FnUnknown
-serializeDue _  (Left (Just expr)) = pure $ FnLitString (Print.prettyLayout expr)
-serializeDue ei (Right val)        = valueToFnLiteral ei val
+--
+-- An unevaluated deadline is its source form, @5@ or — anchored (R-Q7,
+-- EVERY-EACH-QUANTIFIER-SPEC §5.1.1) — @5 OF THE JOIN@; an evaluated one is
+-- the remaining due, a number.
+serializeDue :: (Monad m) => EntityInfo -> Either (Maybe (Deadline Resolved)) (Eval.Value Eval.NF) -> ExceptT EvaluatorError m FnLiteral
+serializeDue _  (Left Nothing)   = pure FnUnknown
+serializeDue _  (Left (Just dl)) = pure $ FnLitString (Print.prettyLayout dl)
+serializeDue ei (Right val)      = valueToFnLiteral ei val
 
 -- | Serialize a breach reason to FnLiteral.
 --

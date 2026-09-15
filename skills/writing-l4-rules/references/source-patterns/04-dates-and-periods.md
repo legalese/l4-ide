@@ -222,10 +222,11 @@ which I have inferred to be of type:
 
 Measured on the section-`GIVEN` binary, exit 1. The anchored form
 [regulative.md](../regulative.md) shows under "`WITHIN` — deadlines" —
-`` WITHIN 5 days OF `order confirmation` `` — does not parse either: `unexpected OF`, exit 1,
-measured on the same binary. **Write the bare number.** A `currency` library ships, but no unit
-library does. The discipline is: one unit per file, stated once at the top, and every `WITHIN` and
-every `AT` on it.
+`` WITHIN 5 days OF `order confirmation` `` — was a parse error (`unexpected OF`, exit 1) on that
+binary; since 2026-09-15 the `OF` parses as the deadline's anchor, and the line fails the same
+way `WITHIN 14 days` does, on `days`, until `days` is defined. **Write the bare number.** A
+`currency` library ships, but no unit library does. The discipline is: one unit per file, stated
+once at the top, and every `WITHIN` and every `AT` on it.
 
 **See** [regulative.md](../regulative.md), "`WITHIN` — deadlines", and
 [entry 3.2](03-quantities-and-calculation.md#e3-2) for the same problem in money.

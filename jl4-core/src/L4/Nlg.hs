@@ -228,7 +228,7 @@ instance Linearize (Expr Resolved) where
          , lin rule
          ]
       <> maybe [] (\ provided -> [ text "provided that", lin provided ]) mprovided
-      <> maybe [] (\ deadline -> [ text "within", lin deadline ]) mdeadline
+      <> maybe [] linDeadline mdeadline
       <> maybe [] linJoin mjoin
       <> maybe [] (\ followup -> [ text "hence",  lin followup ]) mfollowup
       <> maybe [] (\ lest -> [ text "lest",  lin lest ]) mlest
@@ -240,7 +240,17 @@ instance Linearize (Expr Resolved) where
             <> (case th of AllHave _ -> [ text "all", text "have" ])
             <> linJoinDue mdue
           JoinUpon _ _ mdue -> [ text "upon", text "each" ] <> linJoinDue mdue
-        linJoinDue = maybe [] (\ d -> [ text "within", lin d ])
+        linJoinDue = maybe [] linDeadline
+        -- @within d@, then the anchor: the lifecycle words as prose, or the
+        -- expression (R-Q7, §5.1.1)
+        linDeadline (MkDeadline _ d ma) =
+          [ text "within", lin d ]
+          <> maybe [] (\ a -> [ text "of" ] <> linAnchor a) ma
+        linAnchor = \ case
+          AnchorJoin _     -> [ text "the", text "join" ]
+          AnchorDeadline _ -> [ text "the", text "deadline" ]
+          AnchorArming _   -> [ text "the", text "arming" ]
+          AnchorAt _ e     -> [ lin e ]
         linSubject = \ case
           Party _ party -> [ text "party", lin party ]
           Every _ mCast v mRoll mFilter ->

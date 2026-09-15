@@ -84,7 +84,7 @@ import L4.Syntax
   , getOriginal
   , getUnique
   )
-import L4.Print (prettyLayout)
+import L4.Print (LayoutPrinter (..), docText, prettyLayout)
 
 -- GraphViz imports
 import qualified Data.GraphViz as GV
@@ -291,6 +291,24 @@ memberDeadline l =
 thresholdText :: Threshold Resolved -> Text
 thresholdText = \case
   AllHave _ -> "ALL HAVE"
+
+-- | A deadline's body as re-parseable source: the duration bracketed when it
+-- is an application or an operator expression — @(period OF 2) OF THE
+-- ARMING@, @(2 TIMES 7) OF THE JOIN@ — exactly as the layout printer prints
+-- a @WITHIN@ body ('L4.Print.parensIfNeeded' on the 'Deadline' instance, which
+-- is what @mprint "WITHIN"@ applies), and a bare number or name as itself.
+--
+-- Unbracketed, @period OF 2 OF THE ARMING@ is not the source form at all: in
+-- the @WITHIN@ slot the first @OF@ is the anchor ('L4.Parser.deadline'), so
+-- it re-parses as @period@ anchored at @2@ and fails on the second @OF@ —
+-- loudly, but the label and the BPMN @\<documentation\>@ that restates it
+-- claimed to be the source (adversarial pass of 2026-09-16, R1-6). It also
+-- left the anchor unreadable off the text: @f OF x@ could be an application
+-- or a duration @f@ anchored at @x@, and 'L4.Bpmn.Lower.deadlineAnchor' has
+-- only the text to go on. Bracketed, an @OF@ outside every bracket is the
+-- anchor and nothing else is.
+edgeText :: LayoutPrinter a => a -> Text
+edgeText = docText . parensIfNeeded
 
 -- | Classification of transitions for rendering
 data TransitionType
@@ -776,7 +794,11 @@ extractDeonton mFromState (MkDeonton _anno subject action due mJoin hence lest) 
   let partyText = Just (subjectText subject)
       modalVal  = Just (action.modal)
       actionText = prettyPattern action.action
-      deadlineText = fmap prettyLayout due
+      -- An anchored deadline (R-Q7, §5.1.1) prints as its source form,
+      -- @5 OF THE JOIN@, the duration bracketed where the source needs it
+      -- ('edgeText'); 'L4.Bpmn.Lower.parseDuration' cannot read an anchor and
+      -- the lowering reports it as anchored, which is the stated limit.
+      deadlineText = fmap edgeText due
       guardText = fmap prettyLayout action.provided
 
       -- Exhaustive on the join and on the threshold, with no wildcard arm, so
@@ -791,9 +813,9 @@ extractDeonton mFromState (MkDeonton _anno subject action due mJoin hence lest) 
             }
       joinLabel = \case
         JoinOnce _ th d ->
-          MkJoinLabel { joinKind = Barrier (thresholdText th), joinDeadline = prettyLayout <$> d }
+          MkJoinLabel { joinKind = Barrier (thresholdText th), joinDeadline = edgeText <$> d }
         JoinUpon _ _ d ->
-          MkJoinLabel { joinKind = Fork, joinDeadline = prettyLayout <$> d }
+          MkJoinLabel { joinKind = Fork, joinDeadline = edgeText <$> d }
 
       label = TransitionLabel
         { labelParty    = partyText

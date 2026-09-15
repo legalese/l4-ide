@@ -1,0 +1,27 @@
+executing contract `of the join` at 0 with the following events:  party `alice` did `Sign` with `alice` at 8 party `theLandlord` did `Deliver` with `theLandlord` at 13
+executing contract `of the join` at 0 with the following events:  party `alice` did `Sign` with `alice` at 8 party `theLandlord` did `Deliver` with `theLandlord` at 14
+executing contract `of the deadline` at 0 with the following events:  party `alice` did `Sign` with `alice` at 8 party `theLandlord` did `Deliver` with `theLandlord` at 35
+executing contract `of the deadline` at 0 with the following events:  party `alice` did `Sign` with `alice` at 8 party `theLandlord` did `Deliver` with `theLandlord` at 36
+executing contract `cure from the deadline` at 0 with the following events:  party `alice` did `Sign` with `alice` at 14
+executing contract `cure from the deadline` at 0 with the following events:  party `alice` did `Sign` with `alice` at 16
+executing contract `of the arming` at 0 with the following events:  party `theLandlord` did `Deliver` with `theLandlord` at 5 party `bob` did `Sign` with `bob` at 20 party `alice` did `Sign` with `alice` at 45
+executing contract `of the arming` at 0 with the following events:  party `theLandlord` did `Deliver` with `theLandlord` at 5 party `bob` did `Sign` with `bob` at 20 party `alice` did `Sign` with `alice` at 46
+executing contract `own arming` at 3 with the following events:  party `alice` did `Sign` with `alice` at 11
+executing contract `of a number` at 3 with the following events:  party `alice` did `Sign` with `alice` at 26
+executing contract `by thirty june` at `DATE_SERIAL` with `YMD` with 2026, 6 and 1 with the following events:  party `alice` did `Sign` with `alice` at `DATE_SERIAL` with `YMD` with 2026, 6 and 30
+executing contract `by thirty june` at `DATE_SERIAL` with `YMD` with 2026, 6 and 1 with the following events:  party `alice` did `Sign` with `alice` at `DATE_SERIAL` with `YMD` with 2026, 7 and 1
+executing contract `already expired` at `DATE_SERIAL` with `YMD` with 2026, 7 and 1 with the following events:  party `alice` did `Sign` with `alice` at `DATE_SERIAL` with `YMD` with 2026, 7 and 2
+executing contract `applied duration` at 0 with the following events:  party `alice` did `Sign` with `alice` at 7
+executing contract `the tenancy` at 0 with the following events:  party `alice` did `Sign` with `alice` at 1 party `bob` did `Sign` with `bob` at 9 party `theLandlord` did `Deliver` with `theLandlord` at 19
+executing contract `the tenancy` at 0 with the following events:  party `alice` did `Sign` with `alice` at 1 party `bob` did `Sign` with `bob` at 9 party `theLandlord` did `Deliver` with `theLandlord` at 20
+executing contract `the tenancy` at 0 with the following events:  party `alice` did `Sign` with `alice` at 1 party `theLandlord` did `Refund` with `theLandlord` at 20
+executing contract `the tenancy, bounded as a whole` at 0 with the following events:  party `alice` did `Sign` with `alice` at 1 party `bob` did `Sign` with `bob` at 9 party `theLandlord` did `Deliver` with `theLandlord` at 36
+executing contract `after delivery` at 0 with the following events:  party `theLandlord` did `Deliver` with `theLandlord` at 5 party `alice` did `Sign` with `alice` at 6 party `bob` did `Sign` with `bob` at 19
+executing contract `after delivery` at 0 with the following events:  party `theLandlord` did `Deliver` with `theLandlord` at 5 party `alice` did `Sign` with `alice` at 6 party `bob` did `Sign` with `bob` at 20
+executing contract `by instant 105` at 3 with the following events:  party `alice` did `Sign` with `alice` at 4 party `bob` did `Sign` with `bob` at 105
+executing contract `by instant 105` at 3 with the following events:  party `alice` did `Sign` with `alice` at 4 party `bob` did `Sign` with `bob` at 106 party `theLandlord` did `Refund` with `theLandlord` at 107
+executing contract `receipts` at 0 with the following events:  party `alice` did `Sign` with `alice` at 1 party `bob` did `Sign` with `bob` at 9 party `theLandlord` did `Deliver` with `theLandlord` at 17
+`of the join`
+executing contract `of the deadline` at 0 with the following events:  party `alice` did `Sign` with `alice` at 8
+executing contract `of the deadline` at 0 with the following events:  party `alice` did `Sign` with `alice` at 8 party `bob` did `Sign` with `bob` at 20
+party `alice` must `Sign` has is exactly `alice` within 7 of the arming

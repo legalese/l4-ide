@@ -256,6 +256,15 @@ data CheckError =
     -- silently decide barrier-or-fork, and the barrier reading reverses what a
     -- single-party @MAY … HENCE@ means today. Carries the first continuation
     -- present, for its source range.
+  | AnchorUnavailable (Anchor Name) AnchorRefusal
+    -- ^ A lifecycle anchor (@WITHIN d OF THE JOIN@ \/ @THE DEADLINE@ \/
+    -- @THE ARMING@, EVERY-EACH-QUANTIFIER-SPEC §5.1.1, R-Q7B) written where
+    -- the position it names does not exist. Carries the anchor for its
+    -- source range and the reason (see 'AnchorRefusal').
+  | AnchorNotAnInstant (Expr Name) (Type' Resolved)
+    -- ^ The expression after @OF@ in a @WITHIN@ (R-Q7C) is neither a NUMBER
+    -- (an instant on the trace's own clock) nor a DATE. Carries the
+    -- expression, for its range, and the type it was found to have.
   | RegulativeActorMismatch Resolved Resolved Resolved
     -- ^ A regulative @PARTY p MUST a@ (or a @PARTY p DOES a@ event) binds a
     -- party to an action belonging to a different actor. In a value-actor
@@ -516,6 +525,54 @@ data ExpectationContext =
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
+-- | Why a lifecycle anchor was refused ('AnchorUnavailable'). Each names a
+-- position in the life of the ENCLOSING obligation — the one whose @HENCE@
+-- or @LEST@ the anchored obligation is the continuation of — and each reason
+-- is a way for that position not to exist. Build decisions of 2026-09-15,
+-- recorded in spec §5.1.1 and open to review there.
+data AnchorRefusal
+  = NoEnclosingObligation
+    -- ^ @THE JOIN@ or @THE DEADLINE@ on an obligation that is not inside any
+    -- @HENCE@ or @LEST@: there is nothing whose join or deadline it could be.
+    -- (@THE ARMING@ is allowed there: it is the obligation's own arming,
+    -- which is the default.)
+  | OnJoinLine
+    -- ^ @THE JOIN@ or @THE DEADLINE@ on a join line's own @WITHIN@: that
+    -- @WITHIN@ IS the group's deadline, and its join has not fired when it
+    -- is read. Only @THE ARMING@ (the EVERY's own arming) and an expression
+    -- make sense there.
+  | JoinUnderLest
+    -- ^ @THE JOIN@ under @LEST@: the join did not fire, so there is no
+    -- instant to count from. The conservative reading of §5.1.1's open
+    -- question; a build decision, not a ruling.
+  | EnclosingHasNoDeadline
+    -- ^ @THE DEADLINE@ where the enclosing obligation has no @WITHIN@ at
+    -- all, on its act or on its join line.
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass NFData
+
+-- | Which continuation slot of an obligation a deonton sits in, for the
+-- anchored @WITHIN@ (R-Q7B): a lifecycle anchor names a position in the
+-- life of the ENCLOSING obligation, and two of them exist only in one slot.
+data ContinuationSlot = InHence | InLest
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass NFData
+
+-- | What the checker knows about the obligation enclosing the one it is
+-- checking: the slot it is in, and whether the enclosing obligation has a
+-- deadline to name (an act @WITHIN@ or a join-line @WITHIN@). @Nothing@ in
+-- 'CheckEnv' means the top level. Set with 'local' around a @HENCE@ or
+-- @LEST@ body ('L4.TypeCheck.checkDeontonBody'), so a nested obligation —
+-- however deep inside a @LET@, @IF@ or @AND@ — sees its nearest enclosing
+-- one, which is also what the machine binds at run time.
+data EnclosingObligation =
+  MkEnclosingObligation
+    { slot        :: !ContinuationSlot
+    , hasDeadline :: !Bool
+    }
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass NFData
+
 data NonDistinctContext =
     NonDistinctConstructors
   | NonDistinctSelectors
@@ -622,6 +679,8 @@ instance HasSrcRange CheckError where
   rangeOf (ContinuationWithoutJoin e)       = rangeOf e
   rangeOf (ActionPatternReference n _)      = rangeOf n
   rangeOf (ActionPatternNotComparable e _)  = rangeOf e
+  rangeOf (AnchorUnavailable a _)           = rangeOf a
+  rangeOf (AnchorNotAnInstant e _)          = rangeOf e
   rangeOf (FixityAnnotationMalformed mr _)  = mr
   rangeOf (FixityReassociationClash mr _ _) = mr
   rangeOf (CheckWarning (FixityIgnoredNonBinary _ mr)) = mr
@@ -850,6 +909,11 @@ data CheckEnv =
     -- @\@nonexhaustive@ (deliberately not defined for all inputs)? If so, the
     -- non-exhaustive-CONSIDER warning is suppressed; redundancy warnings
     -- stay active. Set via 'local' in @inferDecide@.
+    , enclosingObligation  :: !(Maybe EnclosingObligation)
+    -- ^ The obligation whose @HENCE@ or @LEST@ we are inside, if any — what
+    -- the lifecycle anchors of an anchored @WITHIN@ refer to (R-Q7B). Set
+    -- via 'local' in 'L4.TypeCheck.checkDeontonBody'; @Nothing@ at the top
+    -- level and, like 'inNonexhaustiveDecide', never carried across imports.
     , errorContext         :: !CheckErrorContext
     , sectionStack         :: ![NonEmpty Text]
     , localBindings        :: !(Set Unique)
@@ -944,6 +1008,7 @@ unionImportedCheckEnv accEnv depEnvironment depEntityInfo depMixfixRegistry depI
     , importedImplicitReaders =
         Set.union accEnv.importedImplicitReaders depImplicitReaders
     , inNonexhaustiveDecide = False
+    , enclosingObligation = Nothing
     , errorContext = None
     , sectionStack = []
     , localBindings = Set.empty
@@ -2185,6 +2250,7 @@ extendEnv cis env =
     , sectionBinderDecls = e.sectionBinderDecls
     , importedImplicitReaders = e.importedImplicitReaders
     , inNonexhaustiveDecide = e.inNonexhaustiveDecide
+    , enclosingObligation = e.enclosingObligation
     , sectionStack = e.sectionStack
     , localBindings = e.localBindings
     , actionPatternPos = e.actionPatternPos

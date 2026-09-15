@@ -409,7 +409,8 @@ GIVETH A NUMBER
 without it and the file does not check: `I could not find a definition for the identifier` /
 `` `five business days` ``, once per `WITHIN`, exit 1 (measured 2026-09-05, probe
 `v-fbd-undefined.l4`). Entry [4.3](04-dates-and-periods.md#e4-3) has the bare-number form and the
-reason neither `WITHIN 5 days` nor `WITHIN 5 days OF …` parses.
+reason `WITHIN 5 days` — and, since the `OF` anchor was built on 2026-09-15, `WITHIN 5 days OF …`
+too — checks only once `days` is defined.
 
 The snippet is the corpus chain with one rung dropped for length — the corpus interposes a duty to
 notify the investor of the cancellation before the refund duty, and guards the reconfirmation with

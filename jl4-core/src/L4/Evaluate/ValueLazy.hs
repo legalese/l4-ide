@@ -57,7 +57,11 @@ data Value a =
   | ValNil
   | ValCons a a
   | ValClosure (GivenSig Resolved) (Expr Resolved) Environment
-  | ValObligation Environment (Either RExpr (Value a)) (RAction Resolved) (Either (Maybe RExpr) (Value a)) RExpr (Maybe RExpr)
+  | ValObligation Environment (Either RExpr (Value a)) (RAction Resolved) (Either (Maybe (Deadline Resolved)) (Value a)) RExpr (Maybe RExpr)
+    -- ^ The fourth field is the deadline: before the first event, the source
+    -- @WITHIN d [OF anchor]@ (or nothing); after it, the REMAINING due as a
+    -- number relative to the obligation's current clock. An anchor is spent
+    -- by that first evaluation ('L4.EvaluateLazy.Machine', @Contract4@).
   | ValROp Environment RBinOp (Either RExpr (Value a)) (Either RExpr (Value a))
   | ValQuantified Environment (Deonton Resolved)
     -- ^ An ARMED but not yet run quantified obligation: @EVERY [Cast] v [WHO …]

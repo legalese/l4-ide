@@ -231,7 +231,7 @@ When the source text says "must", "may", "shall not", or mentions a deadline, us
 ```
 PARTY   actor
 MUST    action                 -- or MAY / SHANT / DO
-WITHIN  deadline               -- NUMBER (often derived from a DATE/TIME/DATETIME)
+WITHIN  deadline [OF anchor]   -- NUMBER (often derived from a DATE/TIME/DATETIME); anchor: THE JOIN | THE DEADLINE | THE ARMING | a NUMBER/DATE instant
 HENCE   nextState              -- optional; consequence on success
 LEST    penaltyState           -- optional; consequence on failure
 ```
