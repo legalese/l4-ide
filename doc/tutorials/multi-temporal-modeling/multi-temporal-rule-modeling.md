@@ -355,33 +355,48 @@ Three things worth knowing before you reach for it:
 
 ### Both axes at once
 
-Rules move and facts move, and a provision can pin both to the same day. The
+Rules move and facts move, and a provision can involve both at once. The
 companion file [`bna-adoption-two-axes.l4`](./bna-adoption-two-axes.l4) works
 this through on British Nationality Act 1981 s 1(5A), which says the
 requirements must be met "on the date on which the order is made or the
-Convention adoption is effected". That one date answers two questions — which
-facts, and which text — because s 1(5A) was itself substituted in 2003 and
-amended on 30 December 2005, when "or in a designated territory" was inserted
-into limb (b).
+Convention adoption is effected" — and which was itself substituted in 2003
+and amended on 30 December 2005, when "or in a designated territory" was
+inserted into limb (b).
 
-The file binds both axes to the one date the section names:
+**The section fixes one axis and not the other, and the difference matters.**
+"On the date on which the order is made" is an instruction about *facts*: read
+them as they stood that day. It says nothing about which version of the *text*
+to apply. That second choice is governed by commencement and by the
+presumption against retrospectivity, and it is made outside the section.
+
+So the general form leaves the text's date free, and the readings are named:
 
 ```l4
-GIVEN d IS A DATE
+GIVEN `the day of the order` IS A DATE
+      `the version of the text` IS A DATE
 GIVETH A BOOLEAN
-`the requirements are met, judged as at` d MEANS
-    `EVAL UNDER VALID TIME` d (`EVAL UNDER RULES EFFECTIVE AT` d `1(5A) — the requirements are met`)
+`the requirements are met, on the facts at` `the day of the order` `under the text at` `the version of the text` MEANS
+    `EVAL UNDER VALID TIME` `the day of the order`
+        (`EVAL UNDER RULES EFFECTIVE AT` `the version of the text` `1(5A) — the requirements are met`)
 ```
 
-They are still two axes, and keeping them apart buys a question the statute
-cannot ask: *these* facts, on *that* day, under a **different** version of the
-text. That is how the file isolates what the 2005 amendment did — one case
-runs the same adoption under the 2004 words and the 2006 words and gets
-different answers.
+Pin the text to the day of the order and you have the **prospective** reading:
+the status crystallises then, under the text then in force. Pin it to the day
+the question is asked and you have the **retrospective** reading: s 1(5) is a
+standing provision, so today's text applied to the historic facts would make
+the child a citizen "as from the date on which the order is made" — backdated.
 
-Its eight cases are the reason to read it: an adopter naturalised two years
-*after* the order (not met, though a plain Boolean field would say met), one
-naturalised *on* the day (met — the interval start is inclusive), citizenship
-held and then renounced before the order (not met, which a single Boolean
-cannot express at all), and the joint-adoption limbs, where (a) wants one of
-the adopters and (b) wants both.
+Case 9 is the scenario where they disagree: a Convention adoption in 2004 by
+adopters habitually resident in a designated territory. Prospective, it fails
+forever. Retrospective, the 2005 amendment makes the child a citizen from
+2004, two years before anyone could have known. **The axes do not decide
+which is right.** They make the disagreement visible and force the choice to
+be stated, which is the argument for keeping them apart — a single "as at"
+date hides it.
+
+Its other eight cases are worth reading for the valid-time axis alone: an
+adopter naturalised two years *after* the order (not met, though a plain
+Boolean field would say met), one naturalised *on* the day (met — the interval
+start is inclusive), citizenship held and then renounced before the order (not
+met, which a single Boolean cannot express at all), and the joint-adoption
+limbs, where (a) wants one of the adopters and (b) wants both.

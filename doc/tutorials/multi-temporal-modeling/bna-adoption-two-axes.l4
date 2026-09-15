@@ -6,30 +6,59 @@
 -- in the corpus.
 --
 -- THE TWO IDEAS. An adoption is effected on a day. The law that governs it
--- was itself enacted, substituted and amended on days of its own. Section
--- 1(5A) ties both to the same instant -- "on the date on which the order is
--- made or the Convention adoption is effected" -- so a single date has to
--- answer two different questions:
+-- was itself substituted and amended on days of its own. Both dates bear on
+-- one evaluation, and they are NOT the same idea:
 --
 --   * WHICH FACTS?  Was the adopter a British citizen THEN? Habitually
---     resident THEN? Facts change; a Boolean that says "is a British
---     citizen" answers about today, not about the date of the order. This
---     is the VALID-TIME axis, and the facts live in the ledger.
+--     resident THEN? Section 1(5A) says this outright -- the requirements
+--     must be met "on the date on which the order is made or the Convention
+--     adoption is effected". That is the VALID-TIME axis, and the facts live
+--     in the ledger.
 --
 --   * WHICH TEXT?   Section 1(5) and (5A) in their present form were
 --     SUBSTITUTED with effect from 1 June 2003, and limb (b) was AMENDED
 --     with effect from 30 December 2005, when the words "or in a designated
---     territory" were inserted. An adoption effected in 2004 is judged by
---     the text in force in 2004. This is the RULE-EFFECTIVE axis.
+--     territory" were inserted. That is the RULE-EFFECTIVE axis.
 --
--- Both are pinned to the same day, by `judged as at` below. They are still
--- two axes, which is what lets the last case ask a counterfactual the
--- statute cannot: these facts, under today's text.
+-- THE SECTION FIXES THE FIRST AND SAYS NOTHING ABOUT THE SECOND. An earlier
+-- version of this file tied both axes to the day of the order and called
+-- that what s 1(5A) says. It is not. "On the date on which the order is
+-- made" is an instruction about facts. Which version of the TEXT to apply is
+-- a separate question, governed by commencement and by the presumption
+-- against retrospectivity, and it is decided outside this section.
 --
--- Amendment dates are from the Textual Amendments block of
--- jl4/examples/legal/bna/source-s1.txt (F13, F16) -- F13 substituted
--- s 1(5)/(5A) in force 1.6.2003; F16 inserted the words in s 1(5A)(b) in
--- force 30.12.2005. The quoted words are that file's, verbatim.
+-- The question is live, and Meng put it (2026-09-15): a child adopted before
+-- 30 December 2005 by adopters habitually resident in a designated territory
+-- fails limb (b) on the text then in force. After the amendment, does the
+-- same adoption now satisfy limb (b) -- making the child a citizen "as from
+-- the date on which the order is made", which is to say retrospectively?
+--
+--   PROSPECTIVE READING: the status crystallises at the order, under the
+--   text then in force. The 2004 adoption fails, permanently.
+--
+--   RETROSPECTIVE READING: s 1(5) is a standing provision. Ask today whether
+--   "the requirements of subsection (5A) are met" on the historic facts,
+--   using today's text; if they are, the child "shall ... be a British
+--   citizen as from the date on which the order is made" -- backdated.
+--
+-- Both readings are encoded below as separate functions, and Case 9 is the
+-- scenario on which they disagree. This file does NOT decide between them.
+-- What is on record, and what is not:
+--
+--   * F16's savings, "(with Sch. 4 paras. 6-8)", do not settle it: those
+--     paragraphs are transitional provisions about pending applications for
+--     freeing orders, freeing orders, and pending applications for adoption
+--     orders, not about the temporal reach of s 1(5A).
+--   * The best argument for the prospective reading is a pattern rather than
+--     an authority on this section. Where Parliament has wanted a historic
+--     nationality exclusion fixed, it has legislated an express registration
+--     route -- s 4C, inserted in 2003 for those born before 1983 to British
+--     mothers, requires an application and registers the person going
+--     forward. If an amendment backdated status by itself, that machinery
+--     would be unnecessary.
+--   * That is an argument from the shape of the Act, not a decision on this
+--     provision, and no case on the point was read. It is exactly the call
+--     the project's review gate reserves to a lawyer.
 --
 -- SCOPE. An illustration of the axes, not a replacement for the corpus
 -- encoding at jl4/examples/legal/bna/bna.l4, which models all of section 1
@@ -125,24 +154,31 @@ GIVETH A BOOLEAN
     ... `1(5A)(a) — the adopter, or one of the adopters, a British citizen`
     AND `1(5A)(b) — habitual residence, in a Convention case`
 
-§ `Both axes, pinned to the one day the section names`
+§ `The two readings`
 
--- This is the whole point of the file. "On the date on which the order is
--- made" fixes the facts AND the text, so the same date goes to both axes.
-GIVEN d IS A DATE
-GIVETH A BOOLEAN
-`the requirements are met, judged as at` d MEANS
-    `EVAL UNDER VALID TIME` d (`EVAL UNDER RULES EFFECTIVE AT` d `1(5A) — the requirements are met`)
-
--- The counterfactual the statute cannot ask, and the axes can: these facts,
--- as they stood on the day of the order, under a DIFFERENT version of the
--- text. Used by case 6 to isolate the amendment's effect.
+-- The general form. The facts are always read at the day of the order --
+-- that much s 1(5A) settles. The version of the TEXT is a second, free
+-- parameter, and choosing it is the interpretive act.
 GIVEN `the day of the order` IS A DATE
       `the version of the text` IS A DATE
 GIVETH A BOOLEAN
 `the requirements are met, on the facts at` `the day of the order` `under the text at` `the version of the text` MEANS
     `EVAL UNDER VALID TIME` `the day of the order`
         (`EVAL UNDER RULES EFFECTIVE AT` `the version of the text` `1(5A) — the requirements are met`)
+
+-- PROSPECTIVE READING: the text in force on the day of the order.
+GIVEN d IS A DATE
+GIVETH A BOOLEAN
+`the requirements are met, on the text in force on the day of the order` d MEANS
+    `the requirements are met, on the facts at` d `under the text at` d
+
+-- RETROSPECTIVE READING: the facts of the day of the order, against the text
+-- in force when the question is asked.
+GIVEN `the day of the question` IS A DATE
+      `the day of the order` IS A DATE
+GIVETH A BOOLEAN
+`the requirements are met, asked on` `the day of the question` `about an order of` `the day of the order` MEANS
+    `the requirements are met, on the facts at` `the day of the order` `under the text at` `the day of the question`
 
 § `Cases`
 
@@ -160,7 +196,7 @@ GIVETH A BOOLEAN
     ( `EVAL UNDER VALID TIME` (Date 12 3 1995) (RECORD `the adopter is a British citizen` IS TRUE) ),
     ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adoption is a joint adoption` IS FALSE) ),
     ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adoption is a Convention adoption effected under the law of a country or territory outside the United Kingdom` IS FALSE) ),
-    ( `the requirements are met, judged as at` (Date 1 6 2004) )
+    ( `the requirements are met, on the text in force on the day of the order` (Date 1 6 2004) )
 
 -- CASE 2. The order came FIRST. The adopter naturalised on 1 September 2006,
 -- two years AFTER the 2004 order. Section 1(5A) asks about the date of the
@@ -173,7 +209,7 @@ GIVETH A BOOLEAN
     ( `EVAL UNDER VALID TIME` (Date 1 9 2006) (RECORD `the adopter is a British citizen` IS TRUE) ),
     ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adoption is a joint adoption` IS FALSE) ),
     ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adoption is a Convention adoption effected under the law of a country or territory outside the United Kingdom` IS FALSE) ),
-    ( `the requirements are met, judged as at` (Date 1 6 2004) ),
+    ( `the requirements are met, on the text in force on the day of the order` (Date 1 6 2004) ),
     ( `the adopter a British citizen` )
 
 -- CASE 3. Naturalised ON the day of the order. "On the date on which the
@@ -184,7 +220,7 @@ GIVETH A BOOLEAN
     ( `EVAL UNDER VALID TIME` (Date 1 6 2004) (RECORD `the adopter is a British citizen` IS TRUE) ),
     ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adoption is a joint adoption` IS FALSE) ),
     ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adoption is a Convention adoption effected under the law of a country or territory outside the United Kingdom` IS FALSE) ),
-    ( `the requirements are met, judged as at` (Date 1 6 2004) )
+    ( `the requirements are met, on the text in force on the day of the order` (Date 1 6 2004) )
 
 -- CASE 4. Joint adoption; the first adopter is not a British citizen, the
 -- second is. Limb (a) wants "one of the adopters", so it is satisfied.
@@ -194,7 +230,7 @@ GIVETH A BOOLEAN
     ( `EVAL UNDER VALID TIME` (Date 4 7 1999) (RECORD `the second adopter is a British citizen` IS TRUE) ),
     ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adoption is a joint adoption` IS TRUE) ),
     ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adoption is a Convention adoption effected under the law of a country or territory outside the United Kingdom` IS FALSE) ),
-    ( `the requirements are met, judged as at` (Date 1 6 2004) )
+    ( `the requirements are met, on the text in force on the day of the order` (Date 1 6 2004) )
 
 -- CASE 5. Convention adoption effected 1 June 2004. Sole adopter, a British
 -- citizen, habitually resident in a designated territory and NOT in the
@@ -208,7 +244,7 @@ GIVETH A BOOLEAN
     ( `EVAL UNDER VALID TIME` (Date 1 1 1990) (RECORD `the adopter is habitually resident in a designated territory` IS TRUE) ),
     ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adoption is a joint adoption` IS FALSE) ),
     ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adoption is a Convention adoption effected under the law of a country or territory outside the United Kingdom` IS TRUE) ),
-    ( `the requirements are met, judged as at` (Date 1 6 2004) )
+    ( `the requirements are met, on the text in force on the day of the order` (Date 1 6 2004) )
 
 -- CASE 6. Case 5's facts, on Case 5's day, read against the text as it stood
 -- on 1 June 2006. Nothing about the adoption has changed; only the words
@@ -235,7 +271,7 @@ GIVETH A BOOLEAN
     ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the second adopter is habitually resident in a designated territory` IS FALSE) ),
     ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adoption is a joint adoption` IS TRUE) ),
     ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adoption is a Convention adoption effected under the law of a country or territory outside the United Kingdom` IS TRUE) ),
-    ( `the requirements are met, judged as at` (Date 1 6 2006) )
+    ( `the requirements are met, on the text in force on the day of the order` (Date 1 6 2006) )
 
 -- CASE 8. Citizenship held and then lost. The adopter was a British citizen
 -- from 1995 and renounced in 2002; the order is 2004. The later interval
@@ -247,5 +283,42 @@ GIVETH A BOOLEAN
     ( `EVAL UNDER VALID TIME` (Date 30 9 2002) (RECORD `the adopter is a British citizen` IS FALSE) ),
     ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adoption is a joint adoption` IS FALSE) ),
     ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adoption is a Convention adoption effected under the law of a country or territory outside the United Kingdom` IS FALSE) ),
-    ( `the requirements are met, judged as at` (Date 1 6 2004) ),
-    ( `the requirements are met, judged as at` (Date 1 6 1999) )
+    ( `the requirements are met, on the text in force on the day of the order` (Date 1 6 2004) ),
+    ( `the requirements are met, on the text in force on the day of the order` (Date 1 6 1999) )
+
+-- CASE 9. THE CASE THE TWO READINGS DECIDE DIFFERENTLY (Meng, 2026-09-15).
+--
+-- A Convention adoption effected 1 June 2004. Both adopters are habitually
+-- resident in a designated territory and in no part of the United Kingdom.
+-- On the text in force that day, limb (b) required residence in the United
+-- Kingdom and stopped there, so the requirements were not met and the child
+-- did not become a British citizen.
+--
+-- Then on 30 December 2005 the words "or in a designated territory" are
+-- inserted. Nothing about the adoption changes. Ask the question again in
+-- 2006:
+--
+--   element 8  -- prospective: the 2004 text still governs the 2004 order.
+--                 Not met. The child never became a citizen.
+--   element 9  -- asked in 2005, before the amendment. Not met on any
+--                 reading; this is the control.
+--   element 10 -- retrospective: the 2004 facts against the 2006 text. Met
+--                 -- and s 1(5) then says the child is a citizen "as from
+--                 the date on which the order is made", i.e. from 2004,
+--                 two years before anyone could have known it.
+--
+-- The axes do not decide which is right. They make the disagreement visible
+-- and force the choice to be stated, which is the argument for keeping them
+-- apart. See the header for what is and is not on record.
+-- expected: LIST TRUE, FALSE, TRUE, FALSE, TRUE, TRUE, TRUE, FALSE, FALSE, TRUE
+#EVAL LIST
+    ( `EVAL UNDER VALID TIME` (Date 12 3 1995) (RECORD `the adopter is a British citizen` IS TRUE) ),
+    ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adopter is habitually resident in the United Kingdom` IS FALSE) ),
+    ( `EVAL UNDER VALID TIME` (Date 1 1 1990) (RECORD `the adopter is habitually resident in a designated territory` IS TRUE) ),
+    ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the second adopter is habitually resident in the United Kingdom` IS FALSE) ),
+    ( `EVAL UNDER VALID TIME` (Date 1 1 1990) (RECORD `the second adopter is habitually resident in a designated territory` IS TRUE) ),
+    ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adoption is a joint adoption` IS TRUE) ),
+    ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adoption is a Convention adoption effected under the law of a country or territory outside the United Kingdom` IS TRUE) ),
+    ( `the requirements are met, on the text in force on the day of the order` (Date 1 6 2004) ),
+    ( `the requirements are met, asked on` (Date 1 6 2005) `about an order of` (Date 1 6 2004) ),
+    ( `the requirements are met, asked on` (Date 1 6 2006) `about an order of` (Date 1 6 2004) )
