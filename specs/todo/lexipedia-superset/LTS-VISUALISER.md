@@ -253,6 +253,20 @@ longer gates on, or is gated by, the new picture.
 > byte-identical parallel edges if either dominates; neither can (each is one of two routes), so
 > the ambiguity is not reachable.
 >
+> **Corrected 2026-09-16 (review).** The annotation marked edges the list never names. The list
+> goes through `renderTransition`, which returns `Nothing` for a bare `RAND`/`ROR` branch edge (no
+> party, no guard: a party does not _do_ a branch edge); `dominatorEmphasis` applied no such
+> filter, so on `doc/reference/regulative/state-graph-example.l4`'s `delivery and payment` the
+> FIRST branch edge came out `0 -> 1 [label="on every path to FULFILLED", penwidth=3]` while its
+> sibling `0 -> 4` did not — an artefact of the sequential view, in which branch 1's fan edge is
+> the only one kept. `STATE-GRAPH.md`'s "an arrow the list would not name is drawn exactly as it
+> is without the flag" was false on the doc's own example. Fixed by one shared predicate,
+> `Dominators.namesAnAct = isJust . renderTransition`, applied in `dominatorEmphasis`; pinned by
+> `StateGraphSpec` "leaves a RAND's branch edges unmarked" (on `randSrc`: two `penwidth=3`, two
+> captions, no caption on a `label=""` edge) and by the `l4-cli-test` `--dominators --dot` case.
+> Corpus: after the fix no `label="on every path` / `label="\non every path` remains in any of the
+> 71 DOTs.
+>
 > **Measured**, `l4 state-graph --dominators jl4/examples/ok/contracts.l4`:
 >
 > ```
@@ -270,8 +284,15 @@ longer gates on, or is gated by, the new picture.
 > fulfils with `c` alone; `(a RAND b) ROR c` breaches with `c`'s timeout alone; an `IF` arm
 > dominates the state inside it and is not sequentialised; a renewing duty (`HENCE` to self)
 > terminates and only its timeout reaches breach; a hand-built unreachable state answers
-> `Unreachable` (extraction never draws one — a rule whose arms are other named rules has no
-> sink at all, and prints "this graph has no FULFILLED or BREACH state to reach").
+> `Unreachable` (as of this block extraction never drew one — a rule whose arms were other named
+> rules had no sink at all, and printed "this graph has no FULFILLED or BREACH state to reach".
+> **Superseded by B2, 2026-09-16:** such a rule now draws the named rules' sinks and is answered
+> like any other; "no FULFILLED or BREACH state" remains for a rule none of whose arms reaches a
+> sink — permissions leading on to permissions, or a hand-over the map cannot follow; and
+> `Unreachable` IS now reachable from a real file, truthfully, when the join cuts every route to a
+> drawn sink — `(PARTY Alice MUST foo HENCE v) RAND (PARTY Bob MUST bar)` as `v`'s body, whose
+> first branch can only renew, answers "No path reaches FULFILLED". See §3.4's B2 correction for
+> the case where the same words were a false answer).
 >
 > **What the answer inherits** is §1.1b's three blind spots unchanged — it is sound in the
 > direction "this act is on every drawn route" and says nothing about whether each drawn
@@ -797,6 +818,54 @@ formalisms — contract automata annotate states, LPPN marks places — and poss
 > before and after, and `etc/go/lib/split-digraphs.mjs` of it matches
 > `doc/reference/regulative/figures/every-{barrier,fork}.dot` exactly; nothing regenerated.
 > **(e) `l4 lts`.** 6 goldens byte-identical (the list reads the runtime, not the graph).
+>
+> **B2 corrected 2026-09-16 (review): the memo is scoped to the path, not the graph.** The
+> "one `z` junction with two parallel edges into it" of (a) was the wrong drawing, and (c) had
+> not looked at it: `l4 state-graph --dominators jl4/examples/ok/contracts.l4` answered `a`
+> (`a MEANS z RAND z`) with **"No path reaches FULFILLED from the start state."**, exit 0 — a
+> confident false answer where the base binary gave the honest non-answer "(this graph has no
+> FULFILLED or BREACH state to reach)", for a rule whose own `#TRACE z` fixtures reach
+> `FULFILLED`. Cause: `wireTarget` landed both `RAND` branches on the one memoised `z`;
+> `Dominators.joinEdges`' fulfilment view walked branch 1, re-pointed `z`'s arrivals at
+> `Fulfilled` at branch 2's entry — the same `z`, a self-loop — dropped branch 2's fan edge, and
+> the `seen` guard never walked it, so `Fulfilled` had no incoming edge in the view. The module
+> header's premise "an intermediate state lies inside one branch" was false for shared states.
+> The BPMN measurement in (b) had already seen the same defect from the other side — `a` UNSOUND
+> on S4, "two `RAND` branches into one `z` place is 2-bounded" — and read it as what the L4 says.
+> It is not: `RBinOp1`/`RBinOp2` run _both_ operands, so `z RAND z` is two instances of `z`.
+>
+> **Ruling.** `extractFan` now runs each `RAND`/`ROR` branch under `perBranch`, which restores
+> `esMemo` to what the branch found on entry: a rule that two branches both name is drawn once
+> per branch. The memo a branch _inherits_ is intact, so a loop still closes — an arm back into a
+> rule above the junction is a back-edge, and a back-edge never arrives at a sink, so the views
+> never redirect it. An `IF`'s arms (`extractIfFan`) and an obligation's `HENCE`/`LEST` keep
+> sharing: exactly one of them occurs, so they are one continuation, and the views never sequence
+> them. The alternative — unrolling shared regions inside the views — would have had to duplicate
+> states and then answer "every path passes through _some copy_ of e", which the per-edge
+> definition (module header) does not express; instantiating at extraction makes the copies real
+> edges, which the definition already handles (`z RAND z` to `BREACH`: two routes with disjoint
+> edge sets, nothing dominates — where the shared drawing said both of one `z`'s timeouts did).
+> The "must land on one state, or the loop does not close" argument above was right about loops
+> and over-general about siblings.
+>
+> **Measured.** `DominatorsSpec` "a rule RANDed with itself (B2)": `a` draws two `z` states,
+> `FULFILLED` and `BREACH` both "nothing in particular"; `z` itself still `[]` / both timeouts.
+> `StateGraphSpec` "draws a rule once per RAND branch that names it, and shares it with an
+> exclusive arm": ``HENCE (`the receipt` RAND `the receipt`) LEST `the receipt` `` draws three
+> receipt states and Bob's obligation three times. `l4-cli-test` "--dominators answers for a rule
+> RANDed with itself, and never says No path reaches" pins the `z` and `a` blocks of
+> `contracts.l4` verbatim. Corpus, same 71 files as (a): against the pre-fix binary exactly one
+> DOT and one `--dominators` output moved, `ok/contracts.l4`; against the base binary the
+> `--dominators` output differs on **8 files** — the 9 of (a) less
+> `doc/courses/advanced/module-a2-cross-cutting-examples.l4`, whose graphs changed shape but not
+> answer — every one of them the hand-over now being followed: a "this graph has no FULFILLED or
+> BREACH state to reach" or an answer over a dead-end `next` replaced by an answer over the named
+> rule's region, and none saying "No path reaches". That answer is now reachable only
+> truthfully; see the §1.1c note. `jl4-core-test`: 665 examples, 0 failures (662 + 3). The "13
+> new" in the B1/B2 commit message was 14: `git diff lts/p2-followups...HEAD` on
+> `StateGraphSpec.hs` and `DominatorsSpec.hs` adds fourteen `it` blocks (13 + 1) and removes
+> none, and the `lts/p2-followups` test binary (`0139c6c5`) reports 648, so 648 + 14 = 662.
+> `cabal test l4-cli-test --test-options='-m "l4 state-graph"'`: 8 examples (7 + 1).
 >
 > **B3 stays not built.** What B2 handed it is the input §4.7 asked for — a graph with real
 > cycles — and nothing else; no feedback-edge set is computed anywhere yet.
@@ -1738,7 +1807,9 @@ over.
   - **P2a needs P1**, and P1 is there. The experiment is unblocked today.
   - **P2's preconditions now cost P1 something.** B1 and B2 change `StateGraph`'s public type and
     its shape, which regenerates the BPMN goldens. That is a real, small, stated dependency in
-    the other direction, and it did not exist when revision 1 claimed independence.
+    the other direction, and it did not exist when revision 1 claimed independence. (Measured
+    2026-09-16: zero goldens moved under B1 or B2 — none of the 14 golden sources hands over by
+    name; §3.4's B1 and B2 blocks. The dependency is real in principle and was zero in fact.)
 - **Nothing in Track D, the ladder, `ts-shared/`, or `VizExpr`** — PROCESS-TRACK §6 holds.
 - **Live mode only** depends on `STATEFUL-CONTRACT-DEPLOYMENT` §3.1, which is somebody else's
   blocker. §4.5.
@@ -1759,6 +1830,8 @@ over.
 | **P2h**  | **Carry the join (§4.9).** Teach `extractDeonton` to bind `Deonton.join` and put it on the graph, so a barrier and a fork stop producing byte-identical output; then the drawing rule, and `Threshold`-shaped `markingOf`. Answers R2 and closes the one export gap `EVERY-EACH-QUANTIFIER-SPEC` §2.5 says a reader cannot discover from the export. Same class and cost as B1 — it moves P1's goldens. **Do the first half before P2b**, which is specified against a pre-join `Deonton`. **First half LANDED 2026-09-15** (`fix/join-on-state-graph`): `extractDeonton` binds the join by positional pattern, `TransitionLabel.labelQuantifier` carries it (`Quantifier`/`JoinLabel`/`JoinLabelKind` — renamed from `JoinKind` 2026-09-16, which `DeonticStep` also exports), the DOT draws it on the edge, and BPMN lowers an `EVERY` to a parallel multi-instance task with `P-CAST`/`P-FORK`/`P-JOIN-DEADLINE`. Measured against the prediction here that it "moves P1's goldens": it moved **none** of the six — no golden source contained an `EVERY` — and added two (`tenancy-barrier`, `tenancy-fork`). Second half (the norm-plane drawing rule, `Threshold`-shaped `markingOf`) still open. **Second half, 2026-09-15:** `markingOf` against `Threshold` LANDED with P2c (§4.2a); the norm-plane drawing rule remains P2d's and is gated with it. | shipped `EVERY` (PRs #360/#370/#374)                         | **first half** |
 | **P2d**  | The P2 IR and the **static** two-plane picture. No animation. **Gated: build only if §7.3's condition is met.**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | P2c, B1-B3                                                   | no             |
 | **P2e**  | The animator: scrubber, token, marking, enabled-set highlight. TypeScript, per K6.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | P2d                                                          | no             |
+
+_Note, 2026-09-16 (not a row edit — the table is the integrator's): the P2f row's "DOT annotation not built" was made false the same day by `lts/b1-b2-loops` — **DOT annotation LANDED 2026-09-16** (`--dominators --dot`, §1.1c's Annotation LANDED block and its correction)._
 
 **Ordering is now explicit**, which revision 1's table was not (it said "P2a first" in prose while
 giving P2b no dependency): **P2h(first half) → P2b → P2c → P2a′, with P2a, P2f and P2g runnable
@@ -1868,8 +1941,9 @@ picture beats the list, and it is not evidence for our two-plane picture in part
 **Nothing here gates M4.** M4 is DMN + BPMN out with fidelity reports (D1, P1, S0) — of which P1
 is now done. P2a merely _consumes_ P1's output; P2b adds an optional log to the evaluator and
 should default off, mirroring `TracePolicy.hs:97-101 cliDefaultPolicy`. B1/B2 touch P1's goldens
-and so must land **after** M4 ships or be scheduled with it deliberately. P2 is M6 and stays
-there.
+and so must land **after** M4 ships or be scheduled with it deliberately. (Measured 2026-09-16:
+zero goldens moved under B1 or B2, so this sequencing constraint is moot; §3.4.) P2 is M6 and
+stays there.
 
 ### 7.6 P2a′ as built — LANDED 2026-09-15, on `lts/p2b-step-log` (merged into `lts/p2-stack` 2026-09-15, not yet in `unstable`)
 

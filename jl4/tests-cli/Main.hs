@@ -1508,6 +1508,27 @@ spec bin = do
         , "    - the deadline passing on PARTY S delivery (MUST, WITHIN 3)"
         ] `isInfixOf`)
 
+    -- `z MEANS x ROR y` and `a MEANS z RAND z`: two instances of `z`, each
+    -- fulfilled by either arm and breached by both timeouts, so `a` has more
+    -- than one route to each ending. Until 2026-09-16 both branches were
+    -- drawn onto one `z`, the fulfilment view sequenced it with itself, and
+    -- the CLI answered "No path reaches FULFILLED" — exit 0, for a rule
+    -- whose own #TRACE fixtures reach it.
+    it "--dominators answers for a rule RANDed with itself, and never says No path reaches" $ do
+      Output code sout _ <- runL4 bin ["state-graph", "--dominators", "examples/ok/contracts.l4"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("No path reaches" `notInfixOf`)
+      sout `shouldSatisfy` (unlines
+        [ "z"
+        , "  Every path to FULFILLED passes through: nothing in particular (there is more than one route)."
+        , "  Every path to BREACH passes through:"
+        , "    - the deadline passing on PARTY S delivery (MUST, WITHIN 3)"
+        , "    - the deadline passing on PARTY B payment ... (MUST, WITHIN 5)"
+        , "a"
+        , "  Every path to FULFILLED passes through: nothing in particular (there is more than one route)."
+        , "  Every path to BREACH passes through: nothing in particular (there is more than one route)."
+        ] `isInfixOf`)
+
     it "--dominators --all-states answers for the intermediate states too" $ do
       Output code sout _ <- runL4 bin
         ["state-graph", "--dominators", "--all-states", "examples/ok/contracts.l4"]
@@ -1547,6 +1568,11 @@ spec bin = do
       sout `shouldSatisfy` ("S MUST delivery [3]\\non every path to FULFILLED" `isInfixOf`)
       sout `shouldSatisfy` ("penwidth=3" `isInfixOf`)
       plain `shouldSatisfy` ("penwidth" `notInfixOf`)
+      -- A bare RAND / ROR branch edge (label "") is never marked: the list
+      -- does not name it, so the picture does not either (the `z` and `a`
+      -- graphs of this file have four such edges).
+      sout `shouldSatisfy` ("[label=\"on every path" `notInfixOf`)
+      sout `shouldSatisfy` ("[label=\"\\non every path" `notInfixOf`)
       -- Same graphs, same order: only the marked edges' lines differ.
       length (lines sout) `shouldSatisfy` (> length (lines plain))
       filter ("digraph" `isPrefixOf`) (lines sout) `shouldBe` filter ("digraph" `isPrefixOf`) (lines plain)

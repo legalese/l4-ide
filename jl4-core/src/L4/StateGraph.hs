@@ -420,12 +420,15 @@ data ExtractState = ExtractState
     -- ^ Every regulative rule of the module, so that an arm naming one can
     -- be followed into it rather than stopping at a state called @next@.
   , esMemo        :: Map Unique StateId
-    -- ^ The entry state of each named rule this graph has already drawn.
-    -- Seeded with the rule being extracted at 'initialStateId', so a
-    -- @HENCE@ back into it is a back-edge to the start, and a second arm
-    -- into any rule reuses the first arm's state: this is what closes the
-    -- loop (LTS-VISUALISER §3.4, B2), and it is what makes the graph a
-    -- transition system rather than a tree.
+    -- ^ The entry state of each named rule drawn on the path being
+    -- extracted. Seeded with the rule being extracted at 'initialStateId',
+    -- so a @HENCE@ back into it is a back-edge to the start, and a second
+    -- arm into a rule already on the path reuses its state: this is what
+    -- closes the loop (LTS-VISUALISER §3.4, B2), and it is what makes the
+    -- graph a transition system rather than a tree. The scope is the path,
+    -- not the graph: a @RAND@ \/ @ROR@ branch inherits the memo and gives
+    -- back what it added ('perBranch'), so a rule that two branches both
+    -- name is two states, one per instance the evaluator runs.
     --
     -- Keyed by the rule's 'Unique', not by a source range. The memo answers
     -- "has this /rule/ been given a state?", and a rule's identity is its
@@ -687,9 +690,32 @@ flattenROr = \case
 -- splitting is one event, not two — and each branch gets its own entry state
 -- hanging off it. That keeps the branch set recoverable: the junction's
 -- out-edges are exactly the branches, one apiece, and nothing else.
+--
+-- Each branch is extracted with the memo ('esMemo') it found on entry, and
+-- what a branch adds to the memo is forgotten when it ends: a named rule
+-- that two branches of one @RAND@ \/ @ROR@ both reach is drawn once per
+-- branch, not shared. That is the evaluator's shape — @RBinOp1@ \/ @RBinOp2@
+-- in @L4.EvaluateLazy.Machine@ run /both/ operands, so @z RAND z@ is two
+-- instances of @z@ — and it is what the dominator views need: they run a
+-- junction's branches in sequence, and a state shared between two branches
+-- would be sequenced with itself (a self-loop in place of the edge to the
+-- sink, and \"No path reaches FULFILLED\" for a rule that plainly does;
+-- @ok/contracts.l4@'s @a@, until 2026-09-16). A loop still closes: a rule
+-- on the path /above/ the junction is in the memo each branch inherits, so
+-- an arm back into it is a back-edge. An @IF@'s arms are exclusive — the
+-- facts run one — and keep sharing ('extractIfFan'), as do an obligation's
+-- @HENCE@ and @LEST@, which are two outcomes of which exactly one occurs.
 extractFan :: FanKind -> Maybe StateId -> [Expr Resolved] -> ExtractM ()
 extractFan kind mFromState branches =
-  extractGuardedFan kind mFromState [(Nothing, b) | b <- branches]
+  extractGuardedFanWith perBranch kind mFromState [(Nothing, b) | b <- branches]
+
+-- | Run one branch's extraction and restore the memo afterwards, so what the
+-- branch memoised is visible below it and nowhere else.
+perBranch :: ExtractM () -> ExtractM ()
+perBranch act = do
+  memo <- St.gets (.esMemo)
+  act
+  St.modify $ \st -> st { esMemo = memo }
 
 -- | 'extractGuardedFan' over @IF@ arms, whose guards are structured.
 extractIfFan :: Maybe StateId -> [(BranchGuard, Expr Resolved)] -> ExtractM ()
@@ -711,12 +737,20 @@ extractIf mFromState expr
 -- | As 'extractFan', with a guard attached to each branch edge.
 extractGuardedFan
   :: FanKind -> Maybe StateId -> [(Maybe BranchGuard, Expr Resolved)] -> ExtractM ()
-extractGuardedFan kind mFromState branches = do
+extractGuardedFan = extractGuardedFanWith id
+
+-- | 'extractGuardedFan' with each branch's extraction wrapped: 'perBranch'
+-- for a @RAND@ \/ @ROR@, whose branches all run, and 'id' for an @IF@, whose
+-- arms are exclusive (see 'extractFan').
+extractGuardedFanWith
+  :: (ExtractM () -> ExtractM ())
+  -> FanKind -> Maybe StateId -> [(Maybe BranchGuard, Expr Resolved)] -> ExtractM ()
+extractGuardedFanWith wrap kind mFromState branches = do
   junction <- case mFromState of
     Just sid -> pure sid
     Nothing  -> newState "initial" InitialState
   markFan junction kind
-  traverse_ (uncurry (extractBranch junction)) branches
+  traverse_ (wrap . uncurry (extractBranch junction)) branches
 
 -- | Extract one branch of a junction, wiring the junction to its entry state.
 -- A branch that is just @FULFILLED@ or @BREACH@ has no work in it, so it
@@ -737,11 +771,14 @@ extractBranch junction mGuard branch =
 -- * a __named rule__ (this one included): its entry state from 'esMemo' if
 --   it has one, else a fresh state named after the rule, memoised, with the
 --   rule's body extracted from it. So the second arm into a rule lands on
---   the first arm's state, and an arm back into the rule being extracted
---   lands on the start — a loop, closed. Until 2026-09-16 only the second of
---   those was done, and by a special case; an arm into any /other/ rule
---   made a dead-end state called @next@ or @failure@, which is why every
---   graph was a tree (LTS-VISUALISER §3.3, gap 3).
+--   the first arm's state when both arms are on one path (an obligation's
+--   @HENCE@ and @LEST@, an @IF@'s arms) — but not when they are sibling
+--   branches of a @RAND@ \/ @ROR@, see 'extractFan' — and an arm back into
+--   the rule being extracted lands on the start — a loop, closed. Until
+--   2026-09-16 only the last of those was done, and by a special case; an
+--   arm into any /other/ rule made a dead-end state called @next@ or
+--   @failure@, which is why every graph was a tree (LTS-VISUALISER §3.3,
+--   gap 3).
 -- * anything else: a fresh state under the caller's fallback name, with
 --   whatever structure 'extractExpr' can find in the expression below it.
 --

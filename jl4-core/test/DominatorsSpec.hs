@@ -16,6 +16,7 @@
 module DominatorsSpec (spec) where
 
 import Test.Hspec
+import Data.Bifunctor (bimap)
 import Data.Maybe (mapMaybe)
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -160,6 +161,28 @@ mutualSrc =
   , "  HENCE `ping`"
   ]
 
+-- | @ok/contracts.l4@'s shape: a @ROR@ of two named rules, and a @RAND@ of
+-- that rule with itself. The evaluator runs two instances of @z@; until
+-- 2026-09-16 the extractor drew one, and the fulfilment view sequenced it
+-- with itself.
+twiceSrc :: [Text]
+twiceSrc =
+  [ "`x` MEANS"
+  , "  PARTY Alice MUST pay WITHIN 3"
+  , ""
+  , "GIVETH DEONTIC Person Action"
+  , "`y` MEANS"
+  , "  PARTY Bob MUST deliver WITHIN 5"
+  , ""
+  , "GIVETH DEONTIC Person Action"
+  , "`z` MEANS"
+  , "  `x` ROR `y`"
+  , ""
+  , "GIVETH DEONTIC Person Action"
+  , "`a` MEANS"
+  , "  `z` RAND `z`"
+  ]
+
 -- | A graph built by hand: @0 -a-> 1 -b-> 2 (Fulfilled)@, @0 -t-> 3 (Breach)@,
 -- and a state 4 that nothing points at, with its own edge to Fulfilled.
 -- Extraction never produces an unreachable state, so the case has to be
@@ -292,6 +315,25 @@ spec = do
             [pong] -> acts sg (dominators sg pong) `shouldBe` Just ["pay"]
             other  -> expectationFailure ("expected one pong state, got " <> show other)
         other -> expectationFailure ("expected one ping graph, got " <> show (length other))
+
+    it "a rule RANDed with itself (B2): both instances fulfil, so nothing dominates FULFILLED" $
+      -- `a MEANS z RAND z` with `z MEANS x ROR y`. Each instance of `z`
+      -- fulfils by either of its arms, so no act is on every path to
+      -- FULFILLED — and there IS a path, which is what the sequential view
+      -- lost when both branches landed on one `z`: branch 1's arrival at
+      -- FULFILLED was re-pointed at branch 2's entry, which was itself. To
+      -- BREACH either instance suffices, and each needs both its arms
+      -- lost: two routes, disjoint edge sets, and the answer is per edge
+      -- (module header), so nothing dominates BREACH either. Within one
+      -- instance both timeouts do — the `z` graph of the same file.
+      withGraphs twiceSrc \gs -> case ([ g | g <- gs, g.sgName == "a" ], [ g | g <- gs, g.sgName == "z" ]) of
+        ([sg], [zg]) -> do
+          length [ s | s <- sg.sgStates, s.stateName == "z" ] `shouldBe` 2
+          acts sg (dominators sg (fulfilled sg)) `shouldBe` Just []
+          acts sg (dominators sg (breach sg)) `shouldBe` Just []
+          acts zg (dominators zg (fulfilled zg)) `shouldBe` Just []
+          acts zg (dominators zg (breach zg)) `shouldBe` Just ["timeout", "timeout"]
+        other -> expectationFailure ("expected one graph each for a and z, got " <> show (bimap length length other))
 
     it "an unreachable state has no dominators, and says so" $ do
       dominators orphanGraph 4 `shouldBe` Unreachable

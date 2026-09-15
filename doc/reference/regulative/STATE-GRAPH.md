@@ -163,10 +163,21 @@ _there_. For the sale:
     - the deadline passing on PARTY The Buyer pay the price (MUST, WITHIN 30)
 ```
 
-The start state answers "nothing has to happen to be there". A rule whose arms are only other
-named rules has no `FULFILLED` or `BREACH` state of its own, and the answer says so: `(this graph
-has no FULFILLED or BREACH state to reach)`. (The answer "No path reaches …" exists for a state
-nothing points at; a drawing made from an `.l4` file never contains one.)
+The start state answers "nothing has to happen to be there". A rule whose arms hand over to other
+rules of the same file draws those rules' endings as its own (see
+[What the map does not say](#what-the-map-does-not-say)), so it is answered like any other. A rule
+that never reaches an ending at all — every arm is a permission that leads on to another
+permission, or hands over to something the map cannot follow, such as a rule from an `IMPORT`ed
+file — has no `FULFILLED` or `BREACH` state, and the answer says so: `(this graph has no FULFILLED
+or BREACH state to reach)`.
+
+One more answer exists: `No path reaches FULFILLED from the start state.` It appears when an ending
+is drawn but every route to it is cut off by the rule's own structure — for instance
+`(PARTY Alice MUST foo HENCE v) RAND (PARTY Bob MUST bar)` as the body of `v`, whose first branch
+can only renew, so the pair as a whole can never fulfil. That is a true statement about the rule,
+and worth a second look at the source. (Until 2026-09-16 it could also appear falsely, for a rule
+such as `z RAND z` that names one rule from two branches; that was a defect in the drawing, and
+`ok/contracts.l4`'s `a` now answers "nothing in particular" for both endings.)
 
 ### The picture, marked: `--dominators --dot`
 
@@ -238,10 +249,13 @@ every road on it is not a map with a "you are here" dot, and this one has no dot
 **It follows a hand-over to another rule in the same file, and stops at the file's edge.** A
 `HENCE` or `LEST` that names another regulative rule — ``HENCE `a receipt to` Alice amount`` —
 draws an arrow into a place named after that rule, and that rule's own places and arrows follow
-from there, so the map of `rent, receipt for the amount paid` shows the receipt being issued. The
-named rule is drawn once: a second arrow into the same rule lands on the same place, which is how
-two rules that hand over to each other come out as a loop rather than as an endless chain. (The
-named rule still has a map of its own, printed separately.) What the arrow carries is only the
+from there, so the map of `rent, receipt for the amount paid` shows the receipt being issued. A
+second arrow into the same rule from the same path — the `HENCE` and the `LEST` of one obligation,
+or a rule reached again from further down — lands on the same place, which is how two rules that
+hand over to each other come out as a loop rather than as an endless chain. The two branches of a
+`RAND` or `ROR` are the exception: they run side by side, so a rule both of them name is drawn once
+per branch (`z RAND z` is two places called `z`, just as it is two copies of `z` when the contract
+runs). (The named rule still has a map of its own, printed separately.) What the arrow carries is only the
 hand-over, not the arguments: a rule called with `amount` and the same rule called with
 `amount - 1` are the same place. A hand-over the map cannot follow — a rule from an `IMPORT`ed
 file, a `RECORD` step, or anything else that is not a rule of this file — is drawn as an arrow

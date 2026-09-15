@@ -54,8 +54,9 @@ Three things the extractor learned in the process, all visible in the goldens:
 - **A `HENCE` back into the rule being extracted is a loop.** It is an `App` with
   arguments, which used to fall through to "unknown target" and produce a dead-end
   state named `next`; `P-CYCLE` could not fire because there was no cycle in the
-  graph to detect. `TargetSelf` now edges back to the initial state, and `P-CYCLE`
-  fires.
+  graph to detect. A `HENCE` into any named rule of the module, the rule itself
+  included, now lands on that rule's memoised state (`wireTarget`, since
+  2026-09-16), and `P-CYCLE` fires.
 - **A junction's branch edges carry their guards.** `Lower.hs`'s `branches` passed
   `Nothing`, so an exclusive gateway drew a free choice and the condition landed on
   the flow *out of the task* — the diagram read "pick an arm, do the work, then test

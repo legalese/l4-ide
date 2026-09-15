@@ -30,7 +30,7 @@ import qualified Base.Text as Text
 import qualified Data.Text.Lazy as Text.Lazy
 
 import L4.StateGraph
-import L4.StateGraph.Dominators (Dominance (..), dominators, targetName)
+import L4.StateGraph.Dominators (Dominance (..), dominators, namesAnAct, targetName)
 import L4.Syntax (DeonticModal (..))
 
 -- GraphViz imports
@@ -111,13 +111,22 @@ buildFGLGraph opts sg@StateGraph{..} =
 
 -- | For each transition (by its index into 'sgTransitions') on every path to
 -- a terminal state, the terminals it is on every path to, named as
--- @--dominators@ names them. Absent for an edge that dominates nothing.
+-- @--dominators@ names them. Absent for an edge that dominates nothing, and
+-- absent for an edge the list would not name either: a bare @RAND@ \/ @ROR@
+-- branch edge is on every path to whatever lies below it, but a party does
+-- not /do/ a branch edge, so 'renderTransition' leaves it out of the list —
+-- and the same predicate ('namesAnAct') leaves it unmarked here, so that the
+-- picture is the list drawn and nothing more. Until 2026-09-16 the first
+-- branch edge of every sequenced @RAND@ was drawn heavy with the caption
+-- \"on every path to FULFILLED\" while its siblings were not, an artefact of
+-- the sequential view that the list never showed.
 --
 -- Matched by value: 'dominators' answers in transitions, not indices, so two
--- byte-identical edges — say two @RAND@ branches that are both bare
--- @FULFILLED@ — would both be marked if either were. Neither can be, since
--- each is one of two routes, and if the IR ever let them the two are
--- indistinguishable to a reader anyway.
+-- byte-identical edges would both be marked if either were. The one shape
+-- that drew such a pair — @z RAND z@, two blank branch edges from the
+-- junction to one memoised @z@, until 2026-09-16 — now draws two @z@
+-- states, and a branch edge is filtered out above regardless; should
+-- another pair arise, the two are indistinguishable to a reader anyway.
 dominatorEmphasis :: StateGraph -> Map Int [Text]
 dominatorEmphasis sg =
   Map.fromListWith (flip (<>))
@@ -127,6 +136,7 @@ dominatorEmphasis sg =
     , Dominated ts <- [dominators sg s.stateId]
     , (i, t) <- zip [0 ..] sg.sgTransitions
     , t `elem` ts
+    , namesAnAct sg t
     ]
 
 -- | Convert a ContractState to an FGL node

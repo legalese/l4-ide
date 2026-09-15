@@ -290,6 +290,23 @@ sharedTargetSrc =
   , "  LEST (PARTY Carol MUST deliver WITHIN 3 HENCE `the receipt`)"
   ]
 
+-- | The same named rule from two branches of one @RAND@, and once more from
+-- the @LEST@ of an obligation above the junction. The branches are two
+-- instances; the @LEST@ is an exclusive outcome of one obligation and
+-- shares with its @HENCE@, which is the junction.
+twiceSrc :: [Text]
+twiceSrc =
+  [ "GIVETH DEONTIC Person Action"
+  , "`the receipt` MEANS"
+  , "  PARTY Bob MUST notify WITHIN 5"
+  , ""
+  , "GIVETH DEONTIC Person Action"
+  , "`the rent` MEANS"
+  , "  PARTY Alice MUST pay WITHIN 7"
+  , "  HENCE (`the receipt` RAND `the receipt`)"
+  , "  LEST `the receipt`"
+  ]
+
 -- | Two rules that continue into each other: a loop through a named rule,
 -- which no single rule's self-reference could produce.
 mutualSrc :: [Text]
@@ -778,6 +795,15 @@ spec = do
         -- and Bob's obligation is extracted once, not once per arm
         length [ t | t <- henceEdges sg, t.transLabel.labelParty == Just "Bob" ] `shouldBe` 1
 
+    it "draws a rule once per RAND branch that names it, and shares it with an exclusive arm" $
+      -- The memo is scoped to the path: what a branch adds it gives back, so
+      -- the second branch draws its own `the receipt`; the LEST, extracted
+      -- after the HENCE and outside both branches, finds neither and draws a
+      -- third. Three instances, three states; Bob's obligation three times.
+      withGraph (graphNamed "the rent" twiceSrc) \sg -> do
+        length [ s | s <- sg.sgStates, s.stateName == "the receipt" ] `shouldBe` 3
+        length [ t | t <- henceEdges sg, t.transLabel.labelParty == Just "Bob" ] `shouldBe` 3
+
     it "closes a loop through another rule as a back-edge to the start" $
       withGraph (graphNamed "ping" mutualSrc) \sg -> do
         map (.stateName) sg.sgStates `shouldBe` ["initial", "pong", "Breach"]
@@ -815,6 +841,20 @@ spec = do
         let dot = stateGraphToDot defaultStateGraphOptions { showDominators = True } sg
         dot `shouldSatisfy` Text.isInfixOf "on every path to FULFILLED and to BREACH"
         Text.count "penwidth=3" dot `shouldBe` 3
+
+    it "leaves a RAND's branch edges unmarked, as the list leaves them unnamed" $
+      -- Both obligations are on every path to FULFILLED and the list names
+      -- exactly those two. The junction's two branch edges are on every
+      -- path too, in the sequential view, but a party does not do a branch
+      -- edge: the list drops them and so must the picture. Until 2026-09-16
+      -- the first branch edge was drawn heavy and captioned, and the second
+      -- was not.
+      withGraph (graphFor randSrc) \sg -> do
+        let dot = stateGraphToDot defaultStateGraphOptions { showDominators = True } sg
+        Text.count "penwidth=3" dot `shouldBe` 2
+        Text.count "on every path to FULFILLED" dot `shouldBe` 2
+        dot `shouldNotSatisfy` Text.isInfixOf "[label=\"on every path"
+        dot `shouldNotSatisfy` Text.isInfixOf "[label=\"\\non every path"
 
     it "does not change the unmarked edges' attributes" $
       withGraph (graphFor linearSrc) \sg -> do

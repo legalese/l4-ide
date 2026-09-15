@@ -457,8 +457,9 @@ stateGraphToBpmn opts sg =
   -- 'chainFor' already put after it, and which is where the loop belongs
   -- anyway: the renewal re-tests the guards, it does not re-start the process.
   --
-  -- This is not a stylistic preference. @HENCE \<this rule\>@ (see
-  -- 'L4.StateGraph.TargetSelf') is the shape that first pointed an edge back at
+  -- This is not a stylistic preference. @HENCE \<this rule\>@ (a
+  -- @TargetNamed@ landing on the memoised start state — @wireTarget@ in
+  -- "L4.StateGraph") is the shape that first pointed an edge back at
   -- the initial state, and drawing it at @Start_0@ produced a file that
   -- @etc\/check-bpmn-soundness.mjs@ refuses to play ("no start event to put a
   -- token on") and that jBPM refuses to parse outright: /A start node

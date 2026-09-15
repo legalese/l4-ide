@@ -63,7 +63,12 @@
 --    edges carry a 'labelBranch') is genuinely exclusive — the facts pick
 --    one arm and the others never run — and is left alone by both views.
 --    An intermediate state lies inside one branch, so for it the literal
---    graph is already right.
+--    graph is already right. That premise is the extractor's to keep: a
+--    named rule reached from two branches of one @RAND@ \/ @ROR@ is drawn
+--    once per branch (@L4.StateGraph.extractFan@, since 2026-09-16), so no
+--    state below a sequenced junction is shared between its branches. The
+--    states a branch /can/ share are its ancestors, reached by a back-edge,
+--    and a back-edge never arrives at a sink, so it is never redirected.
 --
 -- == What the answer means, and what it does not
 --
@@ -97,6 +102,7 @@ module L4.StateGraph.Dominators
   , renderDominance
   , renderGraphDominators
   , renderTransition
+  , namesAnAct
   , targetName
   ) where
 
@@ -347,6 +353,13 @@ renderGraphDominators everyState sg =
   sg.sgName : case (if everyState then allDominators else terminalDominators) sg of
     []      -> [ "  (this graph has no FULFILLED or BREACH state to reach)" ]
     answers -> [ "  " <> line | (s, d) <- answers, line <- renderDominance sg s d ]
+
+-- | Whether the list would name this transition at all: the one predicate
+-- the printed answer ('renderDominance') and the DOT annotation
+-- (@L4.StateGraph.Dot.dominatorEmphasis@) share, so that an edge is marked
+-- on the picture exactly when it is a line of the list.
+namesAnAct :: StateGraph -> Transition -> Bool
+namesAnAct sg = isJust . renderTransition sg
 
 -- | A transition as a reader would name it, or 'Nothing' for one that names
 -- no act — a bare @RAND@ \/ @ROR@ branch edge, which a party does not do.
