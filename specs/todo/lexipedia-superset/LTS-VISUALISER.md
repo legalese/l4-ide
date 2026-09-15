@@ -393,25 +393,25 @@ step log, the marking, the enabled set **and the rank/lane assignment** (§4.7) 
 `jl4-core/src/L4/Lts/WhatIf.hs`. It contains no modal routing: grep it for `DMustNot`, `DMay`,
 `ToLest` — none. What it contains:
 
-- **A candidate is** (`candidatesOf`, `WhatIf.hs:216`) one of three things read off the
+- **A candidate is** (`candidatesOf`, `WhatIf.hs:219`) one of three things read off the
   position's residual, which is data the evaluator already computed (endpoint 18): for every
   obligation in force, the act that is its own `(party, action)` shape, stamped at the position's
   clock — the party as the machine forced it (`reifyNF`) or its expression, the action pattern
-  instantiated (`patternExpr`, `:417`: `PatApp`/`PatLit`/`PatExpr`, with an `EXACTLY e` read
-  through the residual's heap by `reifyExpr`, `:433`, so `Sign (EXACTLY t)` under an `EVERY`
+  instantiated (`patternExpr`, `:508`: `PatApp`/`PatLit`/`PatExpr`, with an `EXACTLY e` read
+  through the residual's heap by `reifyExpr`, `:524`, so `Sign (EXACTLY t)` under an `EVERY`
   names the member); for every distinct live deadline, a tick to just past it (endpoint 24) — a
-  `WAIT UNTIL`, the machine's own no-party event, stamped by `tickPast` (`:274`: one unit past, or
+  `WAIT UNTIL`, the machine's own no-party event, stamped by `tickPast` (`:277`: one unit past, or
   half-way to the next live deadline when nearer, because the machine expires on `stamp >
 deadline` and a tick AT the deadline reveals nothing); and a listed refusal, when the shape
   cannot be instantiated — an action pattern that BINDS (`payment price`: "the action binds
   `price`, which the what-if cannot choose"), a `WITHIN` that was never evaluated and is not a
-  literal (`deadlineOf`, `:261`). Refusals are listed, not dropped: an enabled set that omitted
+  literal (`deadlineOf`, `:264`). Refusals are listed, not dropped: an enabled set that omitted
   them would say "nothing else can happen". Each candidate's `LiveNorm` is rendered by
   `renderLive` (`Marking.hs:345`) from the very `RawObligation` its act is built from — the
   first cut paired `liveObligations` with the marking's `InEffect` list by `zip`, on the
   unguarded assumption that two walks agree in order; review 2026-09-15 replaced that with one
   walk.
-- **The tick is held to the machine's word** (`tryCandidate`, `:315`; `confirmTick`, `:324`).
+- **The tick is held to the machine's word** (`tryCandidate`, `:335`; `confirmTick`, `:408`).
   A tick's stamp is derived here from the machine's timing rule (`deadlineOf`: anchor plus
   `WITHIN`; `tickPast`: expiry on `stamp > deadline`), which §2.4 forbids trusting unconfirmed.
   So a `TickPast` outcome must carry an `Expired` or `JoinExpired` step; if it does not, the
@@ -422,13 +422,13 @@ deadline` and a tick AT the deadline reveals nothing); and a listed refusal, whe
   computed, at 11, breaches (`LtsWhatIfSpec.hs`, case 8). Before the guard, the forced tick came
   back `Advancing ["in effect: Alice MUST deliver WITHIN 0"]`, which the same test pins as what
   the bare `whatIf` still says.
-- **The replay** (`replay`, `:398`) rewrites the checked module so that every directive is dropped
+- **The replay** (`replay`, `:489`) rewrites the checked module so that every directive is dropped
   except the `#TRACE` in question, which gets the hypothetical appended, and runs
   `execEvalModuleWithDeonticLog` on it. The verdict (`classify`, `:354`) reads only the machine's
   own terminals: `ValFulfilled` → `Discharging`, `ValBreached` → `Breaching blame`, anything else
   → `Advancing marking` with the marking from the replay's own steps. An error or a refusal is
   `Untried` with the text. The steps an outcome carries are those past the longest prefix the
-  replay's log shares with the position's (`afterCommonPrefix`, `:351`): a `Waiting` in the
+  replay's log shares with the position's (`afterCommonPrefix`, `:435`): a `Waiting` in the
   position becomes a match in the replay, so a fixed-length drop would be wrong, and was.
 - **Cost per candidate** is one full replay: the module's top-level heap rebuilt, every prior
   event re-scrutinised, then the hypothetical. For a trace of _n_ events and _k_ live obligations
@@ -438,9 +438,28 @@ deadline` and a tick AT the deadline reveals nothing); and a listed refusal, whe
   member acts 184 µs and 313 µs; the tick 83 µs. `ok/contracts.l4` trace 1 (three events):
   position 38 µs; the tick 93 µs. The first `position` call on a fresh module costs ~40 ms, which
   is the type-check being forced, not the replay. See R11.
-- **The partition** is `discharging`/`breaching`/`advancing`/`untried` over an `EnabledSet`
-  (`enabledSet`, `:371`), i.e. endpoints 19 and 20 are a classification of 22's result and not a
-  projection of their own.
+- **The act is held to the machine's word too** (`confirmAct`, `:372`; **REVIEWED 2026-09-15**,
+  moved here from the list renderer). The candidate set is read off the residual before the guard
+  is asked (G9), so an act whose `PROVIDED` comes out false is a candidate and the replay reports
+  it as `Advancing` to the position's own marking. P2a′ first corrected that in the renderer
+  alone, which left the library's `advancing` returning a verdict §7.6 calls a lie to any other
+  consumer. Review moved the reading into the verdict: an `ActBy` outcome none of whose steps is a
+  `Matched`, `Expired`, `Breached` or join terminal is `PassedOver reason` (`Verdict`, `:284`;
+  `PassOver`, `:299`: `GuardFalse`/`WrongAct`/`WrongParty`/`NoTaker`), so `advancing` and the
+  list agree by construction. The reason is the candidate's OWN obligation's — the step at the
+  candidate's site (`lnSite` against `nkSite`), most specific first — because under an
+  `RAND`/`ROR` the other side scrutinises the event first and logs its wrong-party first, which
+  the first cut reported. Measured, on
+  `(PARTY S MUST payment EXACTLY 1 WITHIN 3) RAND (PARTY B MUST payment EXACTLY 5 PROVIDED FALSE WITHIN 3)`
+  at its outset, B's act, before the fix: "it is not this party's to do" (the CLI, 2026-09-15);
+  after: "its condition (PROVIDED) does not hold", and the same under `ROR` (`LtsListSpec.hs`,
+  case 4). A `Joined` step deliberately does
+  not count as the act being taken — under an `ROR` with nothing matched it says "still open",
+  which is the pass-over case — and an outcome with no reason at all is `NoTaker`, never a
+  silent advance.
+- **The partition** is `discharging`/`breaching`/`advancing`/`passedOver`/`untried` over an
+  `EnabledSet` (`enabledSet`, `:455`), i.e. endpoints 19 and 20 are a classification of 22's
+  result and not a projection of their own.
 
 **Measured** (`jl4-core/test/LtsWhatIfSpec.hs`, 13 examples): a `MUST` at the start — the act
 advances into the `HENCE`, the tick past 10 breaches; one event in — the clock is the last stamp,
@@ -1465,32 +1484,54 @@ same verb as a format flag and not as a second command a reader has to know to l
 `status`/`position` were considered and declined: `STATEFUL-CONTRACT-DEPLOYMENT` already uses
 those words for the deployed actor's persisted state, which this is not.
 
-**What it renders, and from where.** Nothing new is computed. `reportOf` (`List.hs:110`) is
-`enabledSet` (P2c) plus a reading of the result: the marking is `posMarking` (§4.2a), the four
-sections are the `discharging`/`breaching`/`advancing`/`untried` partition (endpoints 19/20 and
-the rest of 18), the next deadline (endpoint 17) is the least `TickPast` deadline, and the
-`--steps` log is `posSteps` (P2b). Two things the renderer adds on top of P2c, both read from
-the machine's own steps rather than decided here:
+**What it renders, and from where.** Nothing new is computed. `reportOf` (`List.hs:130`;
+`reportFrom`, `:135`, is the pure half, so a test can hand it an outcome) is `enabledSet` (P2c)
+plus a reading of the result: the marking is `posMarking` (§4.2a), the five sections are the
+`discharging`/`breaching`/`advancing`/`passedOver`/`untried` partition (endpoints 19/20 and the
+rest of 18), the next deadline (endpoint 17) is the least **confirmed** `TickPast` deadline (see
+the review block below), and the `--steps` log is `posSteps` (P2b). Two things the list adds on
+top of P2c's verdicts, both read from the machine's own steps rather than decided here:
 
-- **A fifth section, "what the contract would pass over"** (`passedOver`, `List.hs:241`). The
-  candidate set is read off the residual before the guard is asked, so an act whose `PROVIDED`
-  comes out false is a candidate, and the replay reports it as `Advancing` to a marking that is
-  the position's own. Listing that under "moves things along" would be a lie. The renderer
-  therefore classifies an `Advancing` outcome whose steps contain no `Matched`, `Expired`,
-  `Breached` or join terminal as passed over, with the first pass-over's reason. Measured:
-  `PARTY B MUST payment EXACTLY 5 PROVIDED FALSE WITHIN 3` at its outset lists "B does payment OF
-  5 now (at 0) — its condition (PROVIDED) does not hold" and no "move things along" section
-  (`jl4-core/test/LtsListSpec.hs`, case 1). This is G9 (§1.1b) showing up in the built thing:
-  the shapes are an over-approximation of what the contract takes, and the replay is where the
-  over-approximation is corrected, one candidate at a time.
+- **A fifth section, "what the contract would pass over"** (`passOverWords`, `List.hs:278`,
+  wording a `PassedOver` verdict). The candidate set is read off the residual before the guard is
+  asked, so an act whose `PROVIDED` comes out false is a candidate, and the replay reports it as
+  `Advancing` to a marking that is the position's own. Listing that under "moves things along"
+  would be a lie. Measured: `PARTY B MUST payment EXACTLY 5 PROVIDED FALSE WITHIN 3` at its
+  outset lists "B does payment OF 5 now (at 0) — its condition (PROVIDED) does not hold" and no
+  "move things along" section (`jl4-core/test/LtsListSpec.hs`, case 1). This is G9 (§1.1b)
+  showing up in the built thing: the shapes are an over-approximation of what the contract takes,
+  and the replay is where the over-approximation is corrected, one candidate at a time. **As
+  first built the classification lived in the renderer and took the first pass-over's reason in
+  the machine's order; review 2026-09-15 moved it into the verdict (`confirmAct`, §2.4's P2c
+  block) and made the reason the candidate's own obligation's.**
 - **An unforced `WITHIN` is dated through the confirmed tick.** A fresh obligation's residual
   still holds its `WITHIN` expression, so the marking alone can say only "due within 7 from
   now". The tick candidate for the same obligation computed the absolute deadline
   (`deadlineOf`) and the machine confirmed it (`confirmTick`: the tick revealed an expiry), so
   the "Owed now" line reads "due by 9 (7 from now)" — from `rpDeadlines`, populated only from
   ticks whose verdict is not `Untried`. An obligation whose tick was refused stays "due within".
+  **The "Next deadline" line is held to the same rule** (review 2026-09-15: as first built it was
+  the least of ALL `TickPast` deadlines, refused ones included — the one number §2.4 says not to
+  print, printed on the one line that names a date). `rpNext` (`List.hs:97`) is now the least
+  confirmed tick, and `rpUnknown` (`:102`) names every live obligation whose deadline the list
+  could not confirm — a refused tick, or a `NoTick` with a `WITHIN` — on the same line: "Next
+  deadline: 3 (B: payment OF 5)"; with an unknown, "… — not counting S: delivery, whose deadline
+  is not known here"; with nothing confirmed, "Next deadline: not known here — B: payment OF 5
+  has a deadline this list could not work out". Measured: the guarded fixture's tick forced to
+  land ON the deadline (as `LtsWhatIfSpec` case 8 forces it) is `Untried`, `rpNext` is `Nothing`,
+  the line reads "not known here", and the owed line falls back to "due within 3 from now"
+  (`LtsListSpec.hs`, case 5). `NoDeadline` obligations are not "unknown": they have no deadline.
+- **The act is written as it would be done, when it can be.** "Owed now" and "Next deadline"
+  print the reified act of the `ActBy` candidate for the same `LiveNorm` (`rpActions`,
+  `List.hs:112`; `actionText`, `:322`) — `payment OF 2`, the `EXACTLY n` read through the heap —
+  rather than the pattern `payment (EXACTLY n)`, which named a variable the reader could not
+  resolve without the discharge line three lines down (review 2026-09-15). A pattern that binds
+  (`Pay … amount`) has no reified act and prints as the pattern; the "then:" markings under
+  "move things along" have no candidates and always print the pattern. This moved
+  `contracts.txt:83,91` and `tenancy.txt:5-7,27` and the `action` fields of the JSON goldens;
+  nothing else in the six goldens moved.
 
-**`--contract NAME`** (`freshTrace`, `List.hs:156`) appends a `#TRACE NAME AT 0 WITH` — no
+**`--contract NAME`** (`freshTrace`, `List.hs:190`) appends a `#TRACE NAME AT 0 WITH` — no
 events — to the checked module for a top-level nullary rule of that name, so a file with no
 trace (`jl4/examples/bpmn/tenancy.l4`, which is the P2h pair with the traces left out) can be
 listed at its outset. It is exactly the authored empty directive: `LtsListSpec.hs` case 3 pins
@@ -1535,10 +1576,15 @@ on to what follows", `Expired _ d ToLest` is "deadline d passed without the act;
 fallback", `Awaiting` is "the next step is held back until all have acted: n of m have",
 `MemberSatisfied n m` is "(n of m have acted; the shared next step waits for the rest)",
 `ForkContinued i m` is "(member i of m: their own next step begins)". The machine's `WAIT
-UNTIL` sentinels (`neverMatchesParty`/`neverMatchesAct`, which the ledger key upper-cases) are
-rendered as "the clock runs to t with nothing happening" and never printed.
+UNTIL` sentinels — the builtins `neverMatchesParty`/`neverMatchesAct`, whose surface names are
+`NEVERMATCHESPARTY`/`NEVERMATCHESACT` because the builtin environment upper-cases every builtin
+not given a `rename` (`jl4-core/src/L4/TypeCheck/Environment/TH.hs:66`, `mkBuiltin`; the two are
+listed without one at `Environment.hs:101`) — are rendered as "the clock runs to t with nothing
+happening" and never printed. (The first write-up credited the upper-casing to "the ledger key";
+`partyKeyWHNF`, `Machine.hs:2624`, does no casing. Corrected on review 2026-09-15.)
 
-**Measured.** `cabal test jl4-test -m "lts list"`: 12 examples, 0 failures — six goldens
+**Measured** (as first landed; the review block below re-measures what it changed). `cabal test
+jl4-test -m "lts list"`: 12 examples, 0 failures — six goldens
 (text and JSON, with steps, for `ok/contracts.l4`, `doc/reference/regulative/every-run-example.l4`
 and `bpmn/tenancy.l4` at its outset), the no-constructor property over the three, and the
 barrier/fork wording assertions: the tenancy barrier says "one of 3 who must all act before the
@@ -1571,12 +1617,36 @@ steps, what the contract did with each event so far.
 - **Nothing about where in the contract you are, or what happens after** the one step "move
   things along" shows (§1.1a).
 - **The step log's party keys are partly-evaluated layouts.** `nkBearer` is `partyKeyWHNF`
-  (`DeonticStep.hs:114-117`, `Machine.hs:2624`): for a constructor party with unforced fields
+  (`DeonticStep.hs:117-127`, `Machine.hs:2624`): for a constructor party with unforced fields
   that is `Tenant OF &229@file.l4`, a heap reference. The renderer elides the reference to `…`
-  (`elide`, `List.hs:425`) and the member ordinal is what tells the members apart; the page says
+  (`elide`, `List.hs:455`) and the member ordinal is what tells the members apart; the page says
   so. **Not built:** a key that carries the party's forced form once the machine has it. That is
   P2b's business (the log peeks and never forces), and the fix would be to record the bearer at
   the match, where the party has been forced, rather than at arming.
+
+**REVIEWED 2026-09-15 — what two read-only reviews changed, on the same branch.** Ten findings;
+eight acted on, one rejected, one moot. (1) **Next deadline from refused ticks** — fixed as above
+(`rpNext` confirmed-only, `rpUnknown` named). (2) **Pass-over reason from the wrong norm** under
+`RAND`/`ROR` — fixed in `confirmAct`, §2.4. (3) **"the ledger key upper-cases"** — a mechanism
+misattributed; corrected at both sites (`List.hs:379`, above). (4) **`at —` has three causes, not
+two** — the explicit `BREACH` (`Machine.hs:1189`, `every-run-example.txt:32,75`) added to the
+page and to `DeonticStep.hs`'s header. (5) **"in the order it happened"** over-described the
+step log — the page now says the order is the contract's (member by member, branch by branch) and
+that `at t:` is the obligation's clock, not the event's. (6) **`advancing` disagreed with the
+list** — fixed by the verdict move, §2.4. (7) **Owed line printed `payment (EXACTLY n)`** — fixed
+as above (`rpActions`). (8) **`l4-cli.md`'s closing list and help listing omitted `lts`** — both
+refreshed from the worktree binary. (9) **`Joined _ _ -> False` contradicted the docstring's "or
+joined"** — the docstring was wrong, the arm is deliberate (an `ROR`'s "still open" is the
+pass-over case); `confirmAct`'s comment now says so, and a reason-less outcome is `NoTaker`, not
+a silent advance. (10) **`SrcPos (..)`/`SrcRange (..)` a plausible unused-import hazard** —
+rejected: the build is `-Wall -Werror` and passes; under `NoFieldSelectors` the `(..)` is what
+brings the `start`/`line` fields into scope for `HasField`, so the import is load-bearing, and a
+comment now says so (`List.hs:76`). Re-measured after the fixes: `cabal test jl4-core-test
+--test-options='-m P2a -m P2c'` 18 examples, 0 failures (5 list, 13 what-if; cases 4 and 5 are
+new); `JL4_LIBRARY_PATH=$PWD/jl4-core/libraries cabal test jl4-test --test-options='-m "lts
+list"'` 12 examples, 0 failures after blessing the six goldens, whose diff was exactly the
+reified `action` texts and one new always-present JSON key, `deadlineNotKnown`;
+`doc/test-docs.sh` and the full `jl4-test` as recorded in the commit message.
 
 **Not run, and not claimed.** §7.3's gate is a **reader** experiment — put this list in front of
 readers against the same contract drawn by `stateGraphToDot` and P1's BPMN, and see whether they

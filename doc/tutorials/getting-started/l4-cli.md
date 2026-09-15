@@ -51,13 +51,31 @@ Available commands:
   format                   Reformat an L4 file and print to stdout
   ast                      Dump the parsed AST of an L4 file
   batch                    Evaluate an @export function against many input rows
-                           (NDJSON streaming)
+                           (json|yaml|csv in, NDJSON streaming out)
   trace                    Render #EVALTRACE evaluation traces as GraphViz
                            (dot|png|svg)
   state-graph              Extract regulative-rule state transition graphs as
                            GraphViz DOT
   render                   Render an L4 file to a formatted document
                            (html|text|json|plan)
+  export                   Export an L4 file to a foreign interchange notation
+                           (dmn|dmn-md|bpmn) with a fidelity report
+  openfisca                Compile the decision-rule subset of an L4 file to a
+                           runnable OpenFisca Python module
+  blawx                    Compile the decision-rule subset of an L4 file to a
+                           Blawx project (.blawx YAML + s(CASP) dump)
+  catala                   Compile the constitutive subset of an L4 file to a
+                           literate Catala module
+  docassemble              Compile the decision-rule subset of an L4 file to a
+                           docassemble interview (YAML), with a fidelity report
+  nlg                      Linearize a module's directives to natural-language
+                           prose (the .nlg golden payload)
+  lts                      List, for every #TRACE, what is owed now, what would
+                           discharge it, what would breach it, and the next
+                           deadline
+  verify                   Look for unsatisfiable rules, dead branches, vacuous
+                           guards and unreachable outcomes in the boolean
+                           decision skeleton
 ```
 
 Run `l4 <command> --help` for the options of any subcommand.
@@ -332,7 +350,7 @@ Useful REPL commands: `:help`, `:load <file>` / `:reload`, `:type <expr>`, `:inf
 - `l4 run` evaluates `#EVAL` directives; `l4 check` typechecks fast for CI
 - `--json` gives machine-readable output; `--fixed-now` pins the clock
 - `JL4_LIBRARY_PATH` controls where `IMPORT`ed libraries come from
-- `format`, `render`, `batch`, `trace`, `state-graph`, and `ast` round out the toolset
+- `format`, `render`, `batch`, `trace`, `state-graph`, `lts`, and `ast` round out the toolset; the transpilers (`export`, `openfisca`, `blawx`, `catala`, `docassemble`) are covered under [Exports](../../exports/README.md)
 - `cabal run jl4-repl` starts an interactive session
 
 ---

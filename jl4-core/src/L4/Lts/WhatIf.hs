@@ -58,13 +58,16 @@ module L4.Lts.WhatIf
   , whatIf
   , tryCandidate
   , confirmTick
+  , confirmAct
   , Verdict (..)
+  , PassOver (..)
   , Outcome (..)
   , EnabledSet (..)
   , enabledSet
   , discharging
   , breaching
   , advancing
+  , passedOver
   , untried
     -- * Instantiating a shape
   , patternExpr
@@ -88,7 +91,7 @@ import L4.EvaluateLazy
   , prettyEvalException
   , prettyRefusal
   )
-import L4.EvaluateLazy.DeonticStep (DeonticStep (..), StepOutcome (..))
+import L4.EvaluateLazy.DeonticStep (DeonticStep (..), NormKey (..), StepOutcome (..))
 import L4.EvaluateLazy.Machine (pattern ValFulfilled)
 import L4.Lts.Marking
 import L4.Syntax
@@ -276,14 +279,31 @@ tickPast deadlines d = d + minimum (1 : [ (d' - d) / 2 | d' <- deadlines, d' > d
 
 -- | What the evaluator said the hypothetical does. Only the machine's own
 -- terminals are read: @FULFILLED@ discharges, @BREACHED@ breaches, and
--- anything else is the next position, with its marking.
+-- anything else is the next position, with its marking — unless the
+-- machine's own steps say no obligation took the act ('PassedOver').
 data Verdict
   = Discharging
   | Breaching !Blame
   | Advancing ![NormPlacement]
+  | PassedOver !PassOver
+    -- ^ the replay reduced to a position, but the steps it caused are all
+    -- pass-overs: nothing matched, expired or concluded a join. The
+    -- position is the one we started from. See 'confirmAct'.
   | Untried !Text
     -- ^ the candidate could not be instantiated, or the replay errored or
     -- refused; the text says which
+  deriving stock (Eq, Show)
+
+-- | Why an act was passed over, as the machine's step for the candidate's
+-- own obligation recorded it ('StepOutcome').
+data PassOver
+  = GuardFalse     -- ^ the act matched but its @PROVIDED@ came out false
+  | WrongAct       -- ^ not the act awaited
+  | WrongParty     -- ^ not this party's to do
+  | NoTaker
+    -- ^ no step carried a pass-over reason at all: the log records no
+    -- obligation matching, expiring or passing over this act. Listed, so
+    -- that an act nobody took never reads as moving things along.
   deriving stock (Eq, Show)
 
 data Outcome = MkOutcome
@@ -317,7 +337,71 @@ tryCandidate rig tr pos cand = case cand.cdHypothetical of
   Left why -> pure MkOutcome {ocCandidate = cand, ocVerdict = Untried why, ocSteps = []}
   Right hyp -> do
     (verdict, steps) <- whatIf rig tr pos hyp
-    pure MkOutcome {ocCandidate = cand, ocVerdict = confirmTick cand.cdKind hyp steps verdict, ocSteps = steps}
+    let verdict' = confirmAct cand.cdKind steps (confirmTick cand.cdKind hyp steps verdict)
+    pure MkOutcome {ocCandidate = cand, ocVerdict = verdict', ocSteps = steps}
+
+-- | The act's self-check; see 'tryCandidate'. The candidate set is read off
+-- the residual before the guard is asked (spec §1.1b, G9: the shapes are an
+-- over-approximation of what the contract accepts), so an act whose
+-- @PROVIDED@ comes out false is a candidate, and the replay reports it as
+-- 'Advancing' to a marking that is the position's own. That would read as
+-- moving things along. So an 'ActBy' outcome is held to the steps it
+-- caused: if none of them is a match, an expiry, a breach or a join
+-- terminal — if every one is a pass-over — the verdict is 'PassedOver'
+-- with the reason, read from the machine's steps rather than decided here.
+--
+-- Which step's reason: the candidate's own obligation is the one at the
+-- candidate's site ('LiveNorm.lnSite' against 'NormKey.nkSite'). Under an
+-- @RAND@\/@ROR@ the other side's obligation scrutinises the same event and
+-- logs its own pass-over first, in the machine's order, so the first reason
+-- in the log is the wrong norm's. Under an @EVERY@ the members share a
+-- site and differ in bearer, and the bearer keys are not comparable
+-- ('nkBearer' is the ledger key, 'lnBearer' a pretty layout), so among the
+-- site's steps the most specific reason wins: a guard that came out false
+-- can only be the candidate's own obligation's (the others do not get as
+-- far as the guard), a wrong act likewise, a wrong party is what the other
+-- members log. No step at the site at all falls back to the first reason
+-- in the log; no reason anywhere is 'NoTaker'.
+--
+-- A 'Joined' step does not count as the act being taken: it is the
+-- compound reporting where it stands after both sides looked, and under an
+-- @ROR@ with nothing matched it says "still open" — which is exactly the
+-- pass-over case. The join terminals ('JoinReleased', 'JoinExpired',
+-- 'JoinFailed', 'JoinStalled') do count: they are the @EVERY@ join
+-- concluding.
+confirmAct :: CandidateKind -> [DeonticStep] -> Verdict -> Verdict
+confirmAct kind steps verdict = case (kind, verdict) of
+  (ActBy n, Advancing _) | not (any took steps) -> PassedOver (reasonFor n)
+  _ -> verdict
+  where
+    took s = case s.dsOutcome of
+      Matched _       -> True
+      Expired _ _     -> True
+      Breached _      -> True
+      JoinReleased    -> True
+      JoinExpired _ _ -> True
+      JoinFailed _    -> True
+      JoinStalled     -> True
+      Joined _ _      -> False
+      Waiting         -> False
+      PartyMismatch   -> False
+      ActionMismatch  -> False
+      GuardFailed     -> False
+    reasonFor n =
+      let own = [ s | s <- steps, Just k <- [s.dsNorm], k.nkSite == n.lnSite ]
+          ranked = sortOn rank (mapMaybe reason own)
+      in fromMaybe NoTaker (listToMaybe (ranked <> mapMaybe reason steps))
+    reason s = case s.dsOutcome of
+      GuardFailed    -> Just GuardFalse
+      ActionMismatch -> Just WrongAct
+      PartyMismatch  -> Just WrongParty
+      _              -> Nothing
+    rank :: PassOver -> Int
+    rank = \ case
+      GuardFalse -> 0
+      WrongAct   -> 1
+      WrongParty -> 2
+      NoTaker    -> 3
 
 -- | The tick's self-check; see 'tryCandidate'. Only a 'TickPast' is held to
 -- it; an act is the machine's to route however it likes.
@@ -385,8 +469,15 @@ breaching :: EnabledSet -> [Outcome]
 breaching es = [ o | o <- es.esOutcomes, Breaching _ <- [o.ocVerdict] ]
 
 -- | The rest of endpoint 18: the candidates that lead to another position.
+-- An act the steps say nobody took is not among them ('confirmAct'); it is
+-- 'passedOver'.
 advancing :: EnabledSet -> [Outcome]
 advancing es = [ o | o <- es.esOutcomes, Advancing _ <- [o.ocVerdict] ]
+
+-- | The acts the contract would not take: listed, tried, and passed over by
+-- every obligation in force. The position does not change.
+passedOver :: EnabledSet -> [Outcome]
+passedOver es = [ o | o <- es.esOutcomes, PassedOver _ <- [o.ocVerdict] ]
 
 -- | The shapes that were listed but could not be run.
 untried :: EnabledSet -> [Outcome]

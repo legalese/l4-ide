@@ -26,6 +26,7 @@
     ],
     "clock": 10,
     "contract": "aContract",
+    "deadlineNotKnown": [],
     "discharging": [],
     "events": [
       "PARTY S DOES delivery AT 2",
@@ -139,6 +140,7 @@
     "breaching": [],
     "clock": 4,
     "contract": "aContract",
+    "deadlineNotKnown": [],
     "discharging": [],
     "events": [
       "PARTY S DOES delivery AT 2",
@@ -196,6 +198,7 @@
     "breaching": [],
     "clock": 9,
     "contract": "aContract",
+    "deadlineNotKnown": [],
     "discharging": [],
     "events": [
       "PARTY S DOES delivery AT 2",
@@ -290,6 +293,7 @@
     "breaching": [],
     "clock": 20,
     "contract": "y",
+    "deadlineNotKnown": [],
     "discharging": [],
     "events": [
       "PARTY B DOES payment OF 2 AT 5",
@@ -329,6 +333,7 @@
     "breaching": [],
     "clock": 1,
     "contract": "quux",
+    "deadlineNotKnown": [],
     "discharging": [],
     "events": [
       "PARTY B DOES quuux AT 1",
@@ -403,6 +408,7 @@
     "breaching": [],
     "clock": 2,
     "contract": "(PARTY B MUST payment) ROR FULFILLED",
+    "deadlineNotKnown": [],
     "discharging": [],
     "events": [],
     "line": 81,
@@ -442,6 +448,7 @@
     "breaching": [],
     "clock": 4,
     "contract": "x",
+    "deadlineNotKnown": [],
     "discharging": [],
     "events": [
       "PARTY S DOES delivery AT 4"
@@ -502,6 +509,7 @@
     ],
     "clock": 4,
     "contract": "y",
+    "deadlineNotKnown": [],
     "discharging": [
       {
         "action": "payment OF 2",
@@ -518,7 +526,7 @@
       "at": 9,
       "whose": [
         {
-          "action": "payment (EXACTLY n)",
+          "action": "payment OF 2",
           "modal": "MUST",
           "party": "B"
         }
@@ -526,7 +534,7 @@
     },
     "owed": [
       {
-        "action": "payment (EXACTLY n)",
+        "action": "payment OF 2",
         "dueBy": 9,
         "kind": "owed",
         "modal": "MUST",
@@ -576,6 +584,7 @@
     "breaching": [],
     "clock": 26,
     "contract": "z",
+    "deadlineNotKnown": [],
     "discharging": [],
     "events": [
       "PARTY S DOES delivery AT 4",
@@ -624,6 +633,7 @@
     "breaching": [],
     "clock": 26,
     "contract": "z",
+    "deadlineNotKnown": [],
     "discharging": [],
     "events": [
       "PARTY S DOES delivery AT 4",
@@ -672,6 +682,7 @@
     "breaching": [],
     "clock": 3,
     "contract": "goesOn",
+    "deadlineNotKnown": [],
     "discharging": [],
     "events": [
       "PARTY S DOES delivery AT 2",
@@ -736,6 +747,7 @@
     "breaching": [],
     "clock": 3,
     "contract": "goesOn",
+    "deadlineNotKnown": [],
     "discharging": [],
     "events": [
       "PARTY S DOES delivery AT 2",

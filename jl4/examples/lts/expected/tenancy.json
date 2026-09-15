@@ -151,6 +151,7 @@
     ],
     "clock": 0,
     "contract": "`the tenancy`",
+    "deadlineNotKnown": [],
     "discharging": [],
     "events": [],
     "line": null,
@@ -158,17 +159,17 @@
       "at": 14,
       "whose": [
         {
-          "action": "Sign (EXACTLY t)",
+          "action": "Sign OF (Tenant OF \"Alice\")",
           "modal": "MUST",
           "party": "Tenant OF \"Alice\""
         },
         {
-          "action": "Sign (EXACTLY t)",
+          "action": "Sign OF (Tenant OF \"Bob\")",
           "modal": "MUST",
           "party": "Tenant OF \"Bob\""
         },
         {
-          "action": "Sign (EXACTLY t)",
+          "action": "Sign OF (Tenant OF \"Carol\")",
           "modal": "MUST",
           "party": "Tenant OF \"Carol\""
         }
@@ -176,7 +177,7 @@
     },
     "owed": [
       {
-        "action": "Sign (EXACTLY t)",
+        "action": "Sign OF (Tenant OF \"Alice\")",
         "dueBy": 14,
         "dueWithin": "14",
         "group": {
@@ -188,7 +189,7 @@
         "party": "Tenant OF \"Alice\""
       },
       {
-        "action": "Sign (EXACTLY t)",
+        "action": "Sign OF (Tenant OF \"Bob\")",
         "dueBy": 14,
         "dueWithin": "14",
         "group": {
@@ -200,7 +201,7 @@
         "party": "Tenant OF \"Bob\""
       },
       {
-        "action": "Sign (EXACTLY t)",
+        "action": "Sign OF (Tenant OF \"Carol\")",
         "dueBy": 14,
         "dueWithin": "14",
         "group": {
@@ -301,6 +302,7 @@
     ],
     "clock": 0,
     "contract": "receipts",
+    "deadlineNotKnown": [],
     "discharging": [],
     "events": [],
     "line": null,

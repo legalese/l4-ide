@@ -2,9 +2,9 @@
   Standing: in progress.
 
   Owed now:
-    - Tenant OF "Alice" MUST Sign (EXACTLY t) — due by 14 (14 from now) (one of 3 who must all act before the next step)
-    - Tenant OF "Bob" MUST Sign (EXACTLY t) — due by 14 (14 from now) (one of 3 who must all act before the next step)
-    - Tenant OF "Carol" MUST Sign (EXACTLY t) — due by 14 (14 from now) (one of 3 who must all act before the next step)
+    - Tenant OF "Alice" MUST Sign OF (Tenant OF "Alice") — due by 14 (14 from now) (one of 3 who must all act before the next step)
+    - Tenant OF "Bob" MUST Sign OF (Tenant OF "Bob") — due by 14 (14 from now) (one of 3 who must all act before the next step)
+    - Tenant OF "Carol" MUST Sign OF (Tenant OF "Carol") — due by 14 (14 from now) (one of 3 who must all act before the next step)
     - the next step is held back until all have acted: 0 of 3 have
 
   What would put someone in breach:
@@ -24,7 +24,7 @@
           · Tenant OF "Bob" MUST Sign (EXACTLY t) — due by 14 (14 from now) (one of 3 who must all act before the next step)
           · the next step is held back until all have acted: 1 of 3 have
 
-  Next deadline: 14 (Tenant OF "Alice": Sign (EXACTLY t); Tenant OF "Bob": Sign (EXACTLY t); Tenant OF "Carol": Sign (EXACTLY t))
+  Next deadline: 14 (Tenant OF "Alice": Sign OF (Tenant OF "Alice"); Tenant OF "Bob": Sign OF (Tenant OF "Bob"); Tenant OF "Carol": Sign OF (Tenant OF "Carol"))
 
   Steps, in order:
     at —: Tenant OF … MUST (member 1 of 3) — no more events; still waiting

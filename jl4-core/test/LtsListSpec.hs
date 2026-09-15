@@ -10,9 +10,19 @@
 --   2. 'freshTrace' refuses a name the module does not define at the top
 --      level with no inputs, loudly, and finds one it does;
 --   3. a fresh position lists the same things as an authored empty
---      @#TRACE@ — it IS that directive, appended.
+--      @#TRACE@ — it IS that directive, appended;
+--   4. under an @RAND@\/@ROR@ the pass-over reason is the candidate's own
+--      obligation's, not the other side's (which scrutinises the event
+--      first and logs a wrong-party first); and the compound's own
+--      "still open" step does not promote the act to an advance;
+--   5. a tick the machine refused ('confirmTick') is not the next
+--      deadline: the number 'deadlineOf' computed and the machine did not
+--      bear out is exactly the one §2.4 forbids printing, and the
+--      obligation is named as one whose deadline is not known.
 module LtsListSpec (spec) where
 
+import Data.Foldable (for_)
+import Data.Traversable (for)
 import qualified Data.Text as Text
 
 import L4.API.VirtualFS (vfsFromList, checkWithImports)
@@ -20,6 +30,7 @@ import L4.Import.Resolution (TypeCheckWithDepsResult (..))
 import L4.EvaluateLazy (resolveEvalConfig)
 import L4.EvaluateLazy.Machine (emptyEnvironment)
 import L4.Lts.List
+import L4.Lts.Marking (LiveNorm (..))
 import L4.Lts.WhatIf
 import L4.TracePolicy (apiDefaultPolicy)
 
@@ -66,6 +77,16 @@ untracedSrc = Text.unlines $ prologue <>
   , "#TRACE `the sale` AT 0 WITH"
   ]
 
+-- 4. the guard-rejected act beside a live obligation of the other side
+compoundSrc :: Text.Text -> Text.Text
+compoundSrc op = Text.unlines $ prologue <>
+  [ "DECLARE Delivery IS ONE OF delivery"
+  , "GIVETH A DEONTIC Person Action"
+  , "both MEANS (PARTY S MUST payment EXACTLY 1 WITHIN 3) " <> op <> " (PARTY B MUST payment EXACTLY 5 PROVIDED FALSE WITHIN 3)"
+  , ""
+  , "#TRACE both AT 0 WITH"
+  ]
+
 spec :: Spec
 spec = describe "LTS-VISUALISER §1.1a / P2a′: the list" $ do
 
@@ -105,3 +126,46 @@ spec = describe "LTS-VISUALISER §1.1a / P2a′: the list" $ do
     renderReport True fresh `shouldBe` Text.replace " (the #TRACE on line 12)" "" (renderReport True authored)
     fresh.rpLine `shouldBe` Nothing
     authored.rpLine `shouldBe` Just 12
+
+  it "4. under RAND and ROR the pass-over reason is the candidate's own obligation's" $
+    for_ ["RAND", "ROR"] \ op -> do
+      rig <- rigOf (compoundSrc op)
+      tr <- case tracesOf rig.rigModule of
+        (t : _) -> pure t
+        []      -> fail "no trace"
+      es <- enabledSet rig tr >>= maybe (fail "no enabled set") pure
+      -- S's own act is the left side's; B's act meets S's obligation first
+      -- (PartyMismatch, in the machine's order) and then its own (GuardFailed)
+      [ o.ocVerdict | o <- passedOver es ] `shouldBe` [PassedOver GuardFalse]
+      [ o.ocVerdict | o <- advancing es ] `shouldSatisfy` all (\ case Advancing _ -> True; _ -> False)
+      length (advancing es) `shouldBe` (if op == "RAND" then 1 else 0)   -- under ROR, S's act discharges
+      let txt = renderReport False (reportFrom tr es)
+      txt `shouldSatisfy` Text.isInfixOf "B does payment OF 5 now (at 0) — its condition (PROVIDED) does not hold"
+      txt `shouldNotSatisfy` Text.isInfixOf "it is not this party's to do"
+
+  it "5. a tick the machine refused is not the next deadline, and the obligation is named as unknown" $ do
+    rig <- rigOf guardedSrc
+    tr <- case tracesOf rig.rigModule of
+      (t : _) -> pure t
+      []      -> fail "no trace"
+    es <- enabledSet rig tr >>= maybe (fail "no enabled set") pure
+    -- as computed, the tick is confirmed and dates the obligation
+    let asIs = reportFrom tr es
+    fmap fst asIs.rpNext `shouldBe` Just 3
+    asIs.rpUnknown `shouldBe` []
+    renderReport False asIs `shouldSatisfy` Text.isInfixOf "Next deadline: 3 (B: payment OF 5)"
+    renderReport False asIs `shouldSatisfy` Text.isInfixOf "B MUST payment OF 5 — due by 3 (3 from now)"
+    -- the same tick forced to land ON the deadline (LtsWhatIfSpec case 8):
+    -- the machine reveals no expiry, confirmTick refuses it
+    forced <- for es.esOutcomes \ o -> case o.ocCandidate.cdKind of
+      TickPast d _ -> tryCandidate rig tr es.esPosition o.ocCandidate {cdHypothetical = Right (Tick d)}
+      _            -> pure o
+    let refused = reportFrom tr es {esOutcomes = forced}
+        txt = renderReport False refused
+    [ () | o <- forced, Untried _ <- [o.ocVerdict] ] `shouldBe` [()]
+    refused.rpNext `shouldBe` Nothing
+    map (.lnAction) refused.rpUnknown `shouldBe` ["payment (EXACTLY 5)" :: Text.Text]
+    txt `shouldSatisfy` Text.isInfixOf "Next deadline: not known here — B: payment OF 5 has a deadline this list could not work out"
+    txt `shouldNotSatisfy` Text.isInfixOf "Next deadline: 3"
+    -- and the owed line falls back to "due within", not the refuted number
+    txt `shouldSatisfy` Text.isInfixOf "B MUST payment OF 5 — due within 3 from now"

@@ -35,11 +35,17 @@
 -- * A fresh position ('freshTrace') is the contract at its @AT 0@ with no
 --   events, exactly as @#TRACE c AT 0 WITH@ would give. It is not "the
 --   contract in general".
+-- * "Next deadline" is the soonest deadline the machine CONFIRMED. A tick
+--   the replay refused ('confirmTick') is a number the machine did not
+--   bear out, and it is never printed as a date; the obligation is named
+--   on the line as one whose deadline is not known here, so the soonest
+--   confirmed date is never read as the soonest date.
 module L4.Lts.List
   ( -- * The report
     TraceReport (..)
   , Standing (..)
   , reportOf
+  , reportFrom
     -- * A trace that is not in the file
   , freshTrace
     -- * Rendering
@@ -67,6 +73,7 @@ import L4.EvaluateLazy.DeonticStep
 import L4.EvaluateLazy.Machine (pattern ValFulfilled)
 import L4.Lts.Marking
 import L4.Lts.WhatIf
+-- the fields are what @rangeOf …@'s @.start.line@ resolves through
 import L4.Parser.SrcSpan (SrcPos (..), SrcRange (..))
 import L4.Print (prettyLayout)
 import L4.Syntax
@@ -88,12 +95,25 @@ data TraceReport = MkTraceReport
   , rpEnabled  :: ![Outcome]
     -- ^ every candidate, tried, in the what-if's order
   , rpNext     :: !(Maybe (Rational, [LiveNorm]))
-    -- ^ endpoint 17: the soonest live deadline and whose it is
+    -- ^ endpoint 17: the soonest live deadline the machine CONFIRMED (a
+    -- 'TickPast' whose verdict is not 'Untried'), and whose it is. A
+    -- deadline 'deadlineOf' computed and the machine refused is not a
+    -- deadline this reports (§2.4); it is in 'rpUnknown' instead
+  , rpUnknown  :: ![LiveNorm]
+    -- ^ the live obligations that have a deadline the list could not
+    -- confirm: a 'NoTick' with a @WITHIN@, or a 'TickPast' the replay
+    -- refused. Named on the "Next deadline" line, so that the soonest
+    -- confirmed date is never read as the soonest date
   , rpDeadlines :: ![(LiveNorm, Rational)]
     -- ^ every live obligation whose absolute deadline the what-if computed
     -- AND the machine confirmed (the tick past it revealed an expiry, see
     -- 'confirmTick'); an obligation whose @WITHIN@ the residual still
     -- holds unevaluated is dated through this, not guessed
+  , rpActions  :: ![(LiveNorm, Text)]
+    -- ^ every live obligation whose act the what-if could instantiate, with
+    -- that act as it would be written (@payment OF 2@, the @EXACTLY n@
+    -- read through the heap); the "Owed now" line names this rather than
+    -- the pattern (@payment (EXACTLY n)@) when it is known
   , rpSteps    :: ![DeonticStep]
     -- ^ the step log of the trace as written
   }
@@ -108,30 +128,44 @@ data Standing
 
 -- | Replay the trace, try every candidate, and gather the answers.
 reportOf :: Rig -> Trace -> IO (Maybe TraceReport)
-reportOf rig tr = enabledSet rig tr >>= \ case
-  Nothing -> pure Nothing
-  Just es -> do
-    let pos = es.esPosition
-        deadlines = [ (d, ns) | o <- es.esOutcomes, TickPast d ns <- [o.ocCandidate.cdKind] ]
-        confirmed = [ (n, d) | o <- es.esOutcomes, TickPast d ns <- [o.ocCandidate.cdKind], notUntried o.ocVerdict, n <- ns ]
-        notUntried = \ case
-          Untried _ -> False
-          _         -> True
-        standing = standingOf pos.posResult
-    pure $ Just MkTraceReport
-      { rpContract = prettyLayout tr.trContract
-      , rpLine     = (.start.line) <$> rangeOf tr.trDirective
-      , rpEvents   = map (Text.unwords . Text.words . prettyLayout) tr.trEvents
-      , rpClock    = pos.posClock
-      , rpStanding = standing
-      , rpOwed     = case standing of
-          InProgress -> pos.posMarking
-          _          -> []   -- a breach is the standing, not a place owed
-      , rpEnabled  = es.esOutcomes
-      , rpNext     = listToMaybe (sortOn fst deadlines)
-      , rpDeadlines = confirmed
-      , rpSteps    = pos.posSteps
-      }
+reportOf rig tr = fmap (reportFrom tr) <$> enabledSet rig tr
+
+-- | The answers, read off an enabled set already tried. Pure, so that a
+-- test can hand it an outcome the replay would not produce on its own.
+reportFrom :: Trace -> EnabledSet -> TraceReport
+reportFrom tr es =
+  MkTraceReport
+    { rpContract = prettyLayout tr.trContract
+    , rpLine     = (.start.line) <$> rangeOf tr.trDirective
+    , rpEvents   = map (Text.unwords . Text.words . prettyLayout) tr.trEvents
+    , rpClock    = pos.posClock
+    , rpStanding = standing
+    , rpOwed     = case standing of
+        InProgress -> pos.posMarking
+        _          -> []   -- a breach is the standing, not a place owed
+    , rpEnabled  = es.esOutcomes
+    , rpNext     = listToMaybe (sortOn fst confirmedTicks)
+    , rpUnknown  = unknown
+    , rpDeadlines = [ (n, d) | (d, ns) <- confirmedTicks, n <- ns ]
+    , rpActions  = [ (n, prettyLayout h.hyAction) | o <- es.esOutcomes, (ActBy n, Right h) <- [(o.ocCandidate.cdKind, o.ocCandidate.cdHypothetical)] ]
+    , rpSteps    = pos.posSteps
+    }
+  where
+    pos = es.esPosition
+    standing = standingOf pos.posResult
+    -- only a tick the machine confirmed dates anything (§2.4): 'confirmTick'
+    -- turns a tick whose arithmetic the machine did not bear out into an
+    -- 'Untried', and that number is exactly the one not to print
+    confirmedTicks = [ (d, ns) | o <- es.esOutcomes, TickPast d ns <- [o.ocCandidate.cdKind], notUntried o.ocVerdict ]
+    unknown =
+      [ n | o <- es.esOutcomes, TickPast _ ns <- [o.ocCandidate.cdKind], not (notUntried o.ocVerdict), n <- ns ]
+      <> [ n | o <- es.esOutcomes, NoTick n <- [o.ocCandidate.cdKind], hasDeadline n ]
+    notUntried = \ case
+      Untried _ -> False
+      _         -> True
+    hasDeadline n = case n.lnDue of
+      NoDeadline -> False
+      _          -> True
 
 standingOf :: EvalDirectiveResult -> Standing
 standingOf res = case res.result of
@@ -199,16 +233,16 @@ renderReport withSteps rp = Text.unlines $
 
     owedBlock = case rp.rpStanding of
       InProgress | null rp.rpOwed -> ["", "  Owed now: nothing."]
-      InProgress -> "" : "  Owed now:" : map (("    - " <>) . placementLine rp.rpDeadlines rp.rpClock) rp.rpOwed
+      InProgress -> "" : "  Owed now:" : map (("    - " <>) . placementLine rp.rpDeadlines rp.rpActions rp.rpClock) rp.rpOwed
       _ -> []
 
     -- an item is one or more lines; only its first gets the bullet
     discharges = [ [candidateLine o <> " → fulfilled"] | o <- rp.rpEnabled, Discharging <- [o.ocVerdict] ]
     breaches   = [ [candidateLine o <> " → " <> blameLine b] | o <- rp.rpEnabled, Breaching b <- [o.ocVerdict] ]
     advances   =
-      [ (candidateLine o <> " → then:") : map (("    · " <>) . placementLine [] (stampOf o)) m
-      | o <- rp.rpEnabled, Advancing m <- [o.ocVerdict], isNothing (passedOver o) ]
-    ignored    = [ [candidateLine o <> " — " <> why] | o <- rp.rpEnabled, Just why <- [passedOver o] ]
+      [ (candidateLine o <> " → then:") : map (("    · " <>) . placementLine [] [] (stampOf o)) m
+      | o <- rp.rpEnabled, Advancing m <- [o.ocVerdict] ]
+    ignored    = [ [candidateLine o <> " — " <> passOverWords why] | o <- rp.rpEnabled, PassedOver why <- [o.ocVerdict] ]
     untriable  = [ [candidateLine o <> " — " <> Text.strip why] | o <- rp.rpEnabled, Untried why <- [o.ocVerdict] ]
 
     block _ [] = []
@@ -217,11 +251,18 @@ renderReport withSteps rp = Text.unlines $
       []       -> []
       (l : ls) -> ("    - " <> l) : map ("      " <>) ls
 
-    nextLine = case rp.rpNext of
-      Nothing -> []
-      Just (d, ns) ->
-        [ ""
-        , "  Next deadline: " <> prettyRatio d <> " (" <> Text.intercalate "; " (map whoseNorm ns) <> ")" ]
+    -- endpoint 17, from confirmed ticks only; an obligation whose deadline
+    -- the list could not confirm is named, never silently left out
+    nextLine = case (rp.rpNext, rp.rpUnknown) of
+      (Nothing, []) -> []
+      (Just (d, ns), []) -> [ "", "  Next deadline: " <> soonest d ns ]
+      (Just (d, ns), us) -> [ "", "  Next deadline: " <> soonest d ns <> " — not counting " <> whose us <> ", whose deadline is not known here" ]
+      (Nothing, us) -> [ "", "  Next deadline: not known here — " <> whose us <> " " <> hasHave us <> " a deadline this list could not work out" ]
+    soonest d ns = prettyRatio d <> " (" <> whose ns <> ")"
+    whose = Text.intercalate "; " . map (whoseNorm rp.rpActions)
+    hasHave = \ case
+      [_] -> "has"
+      _   -> "have"
 
     stepsBlock
       | not withSteps = []
@@ -231,44 +272,25 @@ renderReport withSteps rp = Text.unlines $
     -- the clock a candidate's outcome is relative to: the hypothetical's stamp
     stampOf o = either (const rp.rpClock) (.hyAt) o.ocCandidate.cdHypothetical
 
--- | An act the replay reports as advancing but which no obligation took:
--- every step it caused was a pass-over (wrong party, wrong act, or a
--- @PROVIDED@ that came out false) and nothing matched, expired or joined.
--- The candidate set is read off the residual before the guard is asked
--- (spec §1.1b, G9: the shapes are an over-approximation of what the
--- contract accepts), and this is where the replay corrects it. The reason
--- is the first pass-over's, in the machine's order.
-passedOver :: Outcome -> Maybe Text
-passedOver o = case o.ocVerdict of
-  Advancing _ | not (any took o.ocSteps) -> listToMaybe (mapMaybe reason o.ocSteps)
-  _ -> Nothing
-  where
-    took s = case s.dsOutcome of
-      Matched _       -> True
-      Expired _ _     -> True
-      Breached _      -> True
-      JoinReleased    -> True
-      JoinExpired _ _ -> True
-      JoinFailed _    -> True
-      JoinStalled     -> True
-      Joined _ _      -> False
-      Waiting         -> False
-      PartyMismatch   -> False
-      ActionMismatch  -> False
-      GuardFailed     -> False
-    reason s = case s.dsOutcome of
-      GuardFailed    -> Just "its condition (PROVIDED) does not hold"
-      ActionMismatch -> Just "it is not the act awaited"
-      PartyMismatch  -> Just "it is not this party's to do"
-      _              -> Nothing
+-- | Why the contract passed an act over, in words. The classification is
+-- the what-if's ('confirmAct', read from the machine's steps); this only
+-- puts words to it.
+passOverWords :: PassOver -> Text
+passOverWords = \ case
+  GuardFalse -> "its condition (PROVIDED) does not hold"
+  WrongAct   -> "it is not the act awaited"
+  WrongParty -> "it is not this party's to do"
+  NoTaker    -> "no obligation in force took it"
 
 -- | One place on the norm plane, in words. The clock is what a residual
 -- countdown counts from, so the due date can be given absolutely; an
 -- obligation whose countdown has not started is dated from the confirmed
--- deadlines when it is among them.
-placementLine :: [(LiveNorm, Rational)] -> Rational -> NormPlacement -> Text
-placementLine confirmed clock = \ case
-  InEffect n -> Text.unwords $ [ normLine n ] <> dueWords n (lookup n confirmed) <> familyWords n.lnMember
+-- deadlines when it is among them. The act is named as it would be written
+-- when the what-if could instantiate it ('TraceReport.rpActions'), else as
+-- the pattern.
+placementLine :: [(LiveNorm, Rational)] -> [(LiveNorm, Text)] -> Rational -> NormPlacement -> Text
+placementLine confirmed actions clock = \ case
+  InEffect n -> Text.unwords $ [ normLine actions n ] <> dueWords n (lookup n confirmed) <> familyWords n.lnMember
   Awaiting {awProgress} -> case awProgress of
     Nothing -> "the next step is held back until the group has acted (how many have is not known here)"
     Just p ->
@@ -290,11 +312,15 @@ placementLine confirmed clock = \ case
       AllHave _ -> "all have acted"
 
 -- | @who MUST what@, as the contract says it.
-normLine :: LiveNorm -> Text
-normLine n = Text.unwords [ bearerText n.lnBearer, modalWord n.lnModal, n.lnAction ]
+normLine :: [(LiveNorm, Text)] -> LiveNorm -> Text
+normLine actions n = Text.unwords [ bearerText n.lnBearer, modalWord n.lnModal, actionText actions n ]
 
-whoseNorm :: LiveNorm -> Text
-whoseNorm n = bearerText n.lnBearer <> ": " <> n.lnAction
+whoseNorm :: [(LiveNorm, Text)] -> LiveNorm -> Text
+whoseNorm actions n = bearerText n.lnBearer <> ": " <> actionText actions n
+
+-- | The act as it would be written, when known; else the pattern.
+actionText :: [(LiveNorm, Text)] -> LiveNorm -> Text
+actionText actions n = fromMaybe n.lnAction (lookup n actions)
 
 bearerText :: Bearer -> Text
 bearerText = \ case
@@ -321,7 +347,7 @@ candidateLine o = case (o.ocCandidate.cdKind, o.ocCandidate.cdHypothetical) of
   (ActBy n, Left _)        -> bearerText n.lnBearer <> " does " <> n.lnAction
   (TickPast d _, Right h)  -> "nothing happens by " <> prettyRatio d <> " (the clock reaches " <> prettyRatio h.hyAt <> ")"
   (TickPast d _, Left _)   -> "nothing happens by " <> prettyRatio d
-  (NoTick n, _)            -> "time runs out on " <> normLine n
+  (NoTick n, _)            -> "time runs out on " <> normLine [] n
 
 -- | A breach, in words. The machine's own no-party clock event is the
 -- "revealing" act when a deadline is missed on a tick; it has no name a
@@ -344,8 +370,12 @@ blameLine b = Text.concat $ catMaybes
       _ -> Nothing
 
 -- | Is this the machine's own no-party clock event (a @WAIT UNTIL@)? Its
--- party and action are sentinels named @neverMatchesParty@ \/
--- @neverMatchesAct@, which the ledger key upper-cases.
+-- party and action are the builtins @neverMatchesParty@ \/
+-- @neverMatchesAct@, whose surface names are @NEVERMATCHESPARTY@ \/
+-- @NEVERMATCHESACT@ because the builtin environment upper-cases every
+-- builtin that is not given a @rename@ (@TypeCheck/Environment/TH.hs@,
+-- @mkBuiltin@; the two are listed without one in @Environment.hs@). The
+-- ledger key ('partyKeyWHNF') does no casing of its own.
 isClockSentinel :: Text -> Bool
 isClockSentinel a = "nevermatches" `Text.isPrefixOf` Text.toLower a
 
@@ -450,13 +480,14 @@ reportJson withSteps rp = Aeson.object $
   , "events"     .= rp.rpEvents
   , "clock"      .= ratio rp.rpClock
   , "standing"   .= standingJson rp.rpStanding
-  , "owed"       .= map (placementJson rp.rpDeadlines rp.rpClock) rp.rpOwed
+  , "owed"       .= map (placementJson rp.rpDeadlines rp.rpActions rp.rpClock) rp.rpOwed
   , "discharging" .= [ candidateJson o | o <- rp.rpEnabled, Discharging <- [o.ocVerdict] ]
   , "breaching"  .= [ Aeson.object ["event" .= candidateJson o, "breach" .= blameJson b] | o <- rp.rpEnabled, Breaching b <- [o.ocVerdict] ]
-  , "advancing"  .= [ Aeson.object ["event" .= candidateJson o, "then" .= map (placementJson [] (stampOf o)) m] | o <- rp.rpEnabled, Advancing m <- [o.ocVerdict], isNothing (passedOver o) ]
-  , "passedOver" .= [ Aeson.object ["event" .= candidateJson o, "why" .= why] | o <- rp.rpEnabled, Just why <- [passedOver o] ]
+  , "advancing"  .= [ Aeson.object ["event" .= candidateJson o, "then" .= map (placementJson [] [] (stampOf o)) m] | o <- rp.rpEnabled, Advancing m <- [o.ocVerdict] ]
+  , "passedOver" .= [ Aeson.object ["event" .= candidateJson o, "why" .= passOverWords why] | o <- rp.rpEnabled, PassedOver why <- [o.ocVerdict] ]
   , "untried"    .= [ Aeson.object ["event" .= candidateJson o, "why" .= Text.strip why] | o <- rp.rpEnabled, Untried why <- [o.ocVerdict] ]
-  , "nextDeadline" .= fmap (\ (d, ns) -> Aeson.object ["at" .= ratio d, "whose" .= map normJson ns]) rp.rpNext
+  , "nextDeadline" .= fmap (\ (d, ns) -> Aeson.object ["at" .= ratio d, "whose" .= map (normJson rp.rpActions) ns]) rp.rpNext
+  , "deadlineNotKnown" .= map (normJson rp.rpActions) rp.rpUnknown
   ]
   <> [ "steps" .= map stepJson rp.rpSteps | withSteps ]
   where
@@ -472,8 +503,8 @@ standingJson = \ case
   InBreach b     -> Aeson.object ["status" .= ("breached" :: Text), "breach" .= blameJson b]
   NotEvaluated t -> Aeson.object ["status" .= ("not evaluated" :: Text), "why" .= Text.strip t]
 
-placementJson :: [(LiveNorm, Rational)] -> Rational -> NormPlacement -> Aeson.Value
-placementJson confirmed clock = \ case
+placementJson :: [(LiveNorm, Rational)] -> [(LiveNorm, Text)] -> Rational -> NormPlacement -> Aeson.Value
+placementJson confirmed actions clock = \ case
   InEffect n -> Aeson.object $ ["kind" .= ("owed" :: Text)] <> normFields n
   Awaiting {awProgress} -> Aeson.object $
     ["kind" .= ("held back" :: Text)]
@@ -485,7 +516,7 @@ placementJson confirmed clock = \ case
     normFields n =
       [ "party"  .= bearerText n.lnBearer
       , "modal"  .= modalWord n.lnModal
-      , "action" .= n.lnAction
+      , "action" .= actionText actions n
       ] <> dueFields n <> maybe [] (\ f -> ["group" .= familyJson f]) n.lnMember
     dueFields n = case (n.lnDue, lookup n confirmed) of
       (NoDeadline, _)               -> []
@@ -495,8 +526,8 @@ placementJson confirmed clock = \ case
     thresholdText = \ case
       AllHave _ -> "all have acted" :: Text
 
-normJson :: LiveNorm -> Aeson.Value
-normJson n = Aeson.object ["party" .= bearerText n.lnBearer, "modal" .= modalWord n.lnModal, "action" .= n.lnAction]
+normJson :: [(LiveNorm, Text)] -> LiveNorm -> Aeson.Value
+normJson actions n = Aeson.object ["party" .= bearerText n.lnBearer, "modal" .= modalWord n.lnModal, "action" .= actionText actions n]
 
 familyJson :: Family -> Aeson.Value
 familyJson f = Aeson.object
@@ -519,9 +550,9 @@ candidateJson :: Outcome -> Aeson.Value
 candidateJson o = case (o.ocCandidate.cdKind, o.ocCandidate.cdHypothetical) of
   (ActBy n, Right h) -> Aeson.object ["kind" .= ("act" :: Text), "party" .= bearerText n.lnBearer, "action" .= prettyLayout h.hyAction, "at" .= ratio h.hyAt]
   (ActBy n, Left _) -> Aeson.object ["kind" .= ("act" :: Text), "party" .= bearerText n.lnBearer, "action" .= n.lnAction]
-  (TickPast d ns, Right h) -> Aeson.object ["kind" .= ("tick" :: Text), "deadline" .= ratio d, "at" .= ratio h.hyAt, "whose" .= map normJson ns]
-  (TickPast d ns, Left _) -> Aeson.object ["kind" .= ("tick" :: Text), "deadline" .= ratio d, "whose" .= map normJson ns]
-  (NoTick n, _) -> Aeson.object ["kind" .= ("tick" :: Text), "whose" .= [normJson n]]
+  (TickPast d ns, Right h) -> Aeson.object ["kind" .= ("tick" :: Text), "deadline" .= ratio d, "at" .= ratio h.hyAt, "whose" .= map (normJson []) ns]
+  (TickPast d ns, Left _) -> Aeson.object ["kind" .= ("tick" :: Text), "deadline" .= ratio d, "whose" .= map (normJson []) ns]
+  (NoTick n, _) -> Aeson.object ["kind" .= ("tick" :: Text), "whose" .= [normJson [] n]]
 
 stepJson :: DeonticStep -> Aeson.Value
 stepJson s = Aeson.object $ catMaybes

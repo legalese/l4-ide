@@ -58,7 +58,7 @@ saleContract — after 1 event, the clock stands at 2 (the #TRACE on line 27)
   Standing: in progress.
 
   Owed now:
-    - Buyer MUST payment (EXACTLY 100) — due by 9 (7 from now)
+    - Buyer MUST payment OF 100 — due by 9 (7 from now)
 
   What would discharge it (the contract ends fulfilled):
     - Buyer does payment OF 100 now (at 2) → fulfilled
@@ -67,32 +67,32 @@ saleContract — after 1 event, the clock stands at 2 (the #TRACE on line 27)
     - nothing happens by 9 (the clock reaches 10) → then:
           · Buyer MUST payment (EXACTLY 120) — due by 24 (14 from now)
 
-  Next deadline: 9 (Buyer: payment (EXACTLY 100))
+  Next deadline: 9 (Buyer: payment OF 100)
 ```
 
 Reading it from the top:
 
 - **The heading** names the contract, counts the events, and says where the **contract clock** stands — the time of the last event, here day 2. Every "due by" below is on that clock. The events themselves are listed under it, as written in the file.
 - **Standing** is the one-word answer: _in progress_, _FULFILLED_, or _BREACHED_ with who and why.
-- **Owed now** is the list of obligations in force. There is one: the buyer must pay exactly 100, due by day 9 — that is 7 from now, because the seven days started when the seller delivered on day 2.
+- **Owed now** is the list of obligations in force. There is one: the buyer must pay 100, due by day 9 — that is 7 from now, because the seven days started when the seller delivered on day 2. The act is written out as it would be done (`payment OF 100`): where the rule says `EXACTLY n` and `n` is defined elsewhere, the list looks `n` up and prints the number, so you do not have to.
 - **What would discharge it** lists the acts that, done now, end the contract fulfilled. Paying 100 does.
 - **What would move things along** lists what changes the position without ending it. Here, if nothing happens by day 9, the buyer is not yet in breach: the late-price clause takes over, and the buyer owes 120 by day 24. The list prints what would be owed after that ("then:").
 - There is no **What would put someone in breach** section, because in this position nothing does — the late-price clause catches the missed deadline. In the tenancy example below, whose rule ends in `LEST BREACH`, the deadline passing does breach, and the section appears.
-- **Next deadline** is the soonest date anything is due, and whose it is.
+- **Next deadline** is the soonest date anything is due, and whose it is — counting only the deadlines the list could confirm by running the contract past them. If an obligation has a deadline the list could not work out, the line says so and names it, rather than quietly leaving it out: `Next deadline: 9 (Buyer: payment OF 100) — not counting Seller: delivery, whose deadline is not known here`.
 
 ## The sections, and when each appears
 
 A section is printed only when it has something in it. The full set:
 
-| Section                               | What it lists                                                                                                                                                                    |
-| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Owed now**                          | every obligation, permission and prohibition in force: who, `MUST`/`MAY`/`MUST NOT`, the act, and the due date. Under an `EVERY`, which group the member belongs to (see below). |
-| **What would discharge it**           | an act that, done now, ends the contract fulfilled                                                                                                                               |
-| **What would put someone in breach**  | an act, or a deadline passing, that ends the contract breached — with who is blamed and what they missed                                                                         |
-| **What would move things along**      | an act, or a deadline passing, that leads to a new position — and what would be owed there                                                                                       |
-| **What the contract would pass over** | an act the contract does not take: it is not the awaited act, not this party's to do, or its `PROVIDED` condition does not hold. Nothing changes.                                |
-| **What could not be tried**           | a shape the list can name but cannot run — see [Limits](#limits)                                                                                                                 |
-| **Next deadline**                     | the soonest due date among everything owed, and whose it is                                                                                                                      |
+| Section                               | What it lists                                                                                                                                                                                                                                                                    |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Owed now**                          | every obligation, permission and prohibition in force: who, `MUST`/`MAY`/`MUST NOT`, the act, and the due date. Under an `EVERY`, which group the member belongs to (see below).                                                                                                 |
+| **What would discharge it**           | an act that, done now, ends the contract fulfilled                                                                                                                                                                                                                               |
+| **What would put someone in breach**  | an act, or a deadline passing, that ends the contract breached — with who is blamed and what they missed                                                                                                                                                                         |
+| **What would move things along**      | an act, or a deadline passing, that leads to a new position — and what would be owed there                                                                                                                                                                                       |
+| **What the contract would pass over** | an act the contract does not take: it is not the awaited act, not this party's to do, or its `PROVIDED` condition does not hold. Nothing changes. The reason is the one the contract gave for that party's own obligation, even when another obligation looked at the act first. |
+| **What could not be tried**           | a shape the list can name but cannot run — see [Limits](#limits)                                                                                                                                                                                                                 |
+| **Next deadline**                     | the soonest due date among everything owed, and whose it is; any obligation whose deadline could not be confirmed is named on the same line                                                                                                                                      |
 
 The things the list tries are exactly the obligations' own acts (each one, done now by the party who owes it) and, for each distinct deadline, the clock running just past it with nothing happening. That is what "what could happen" means here; it is not every conceivable event.
 
@@ -108,9 +108,9 @@ For the barrier, the group is announced on each member's line, and one extra lin
 
 ```
   Owed now:
-    - Tenant OF "Alice" MUST Sign (EXACTLY t) — due by 14 (14 from now) (one of 3 who must all act before the next step)
-    - Tenant OF "Bob" MUST Sign (EXACTLY t) — due by 14 (14 from now) (one of 3 who must all act before the next step)
-    - Tenant OF "Carol" MUST Sign (EXACTLY t) — due by 14 (14 from now) (one of 3 who must all act before the next step)
+    - Tenant OF "Alice" MUST Sign OF (Tenant OF "Alice") — due by 14 (14 from now) (one of 3 who must all act before the next step)
+    - Tenant OF "Bob" MUST Sign OF (Tenant OF "Bob") — due by 14 (14 from now) (one of 3 who must all act before the next step)
+    - Tenant OF "Carol" MUST Sign OF (Tenant OF "Carol") — due by 14 (14 from now) (one of 3 who must all act before the next step)
     - the next step is held back until all have acted: 0 of 3 have
 ```
 
@@ -131,7 +131,7 @@ while one tenant signing does not end anything — it moves the count to 1 of 3:
           · the next step is held back until all have acted: 1 of 3 have
 ```
 
-For the fork there is no "held back" line, because nothing waits: each member's line says so, and each member's act would start that member's own next step.
+For the fork there is no "held back" line, because nothing waits: each member's line says so, and each member's act would start that member's own next step. (Here the act is printed as the rule's pattern, `Pay (EXACTLY t) (EXACTLY theLandlord) amount`, because `amount` is left for the tenant to choose — see [Limits](#limits) — so there is no single act to write out.)
 
 ```
   Owed now:
@@ -142,7 +142,7 @@ The full output for both is the golden `jl4/examples/lts/expected/tenancy.txt`.
 
 ## `--steps`: what the contract did with each event
 
-The list is about **now**. Add `--steps` and it also prints the history: one line per look the contract took at an event, contract clock first, in the order it happened. From the first trace of [every-run-example.l4](every-run-example.l4), where three tenants sign on days 1, 2 and 9 and the landlord delivers on day 13:
+The list is about **now**. Add `--steps` and it also prints the history: one line per look the contract took at an event, contract clock first, in the order the contract took them. That order is the contract's, not the calendar's: under an `EVERY` the contract works through the events member by member, and under `RAND`/`ROR` side by side, so the clock does not run steadily down the page — `at 1, at 1, at 2, at 1, at 2, at 9` below is member 1's look, then member 2's two looks, then member 3's three. From the first trace of [every-run-example.l4](every-run-example.l4), where three tenants sign on days 1, 2 and 9 and the landlord delivers on day 13:
 
 ```
   Steps, in order:
@@ -155,16 +155,16 @@ The list is about **now**. Add `--steps` and it also prints the history: one lin
     at 13: Landlord OF … does Deliver OF … at 13; Landlord OF … MUST — done; on to what follows
 ```
 
-Each line reads: the clock; the event looked at; whose obligation looked at it; what it decided. The same event appears once per obligation that looked at it — Alice's signature on day 1 is "done" for Alice and "passed over" for Bob and Carol — so the count of lines is not the count of events.
+Each line reads: the clock; the event looked at; whose obligation looked at it; what it decided. The same event appears once per obligation that looked at it — Alice's signature on day 1 is "done" for Alice and "passed over" for Bob and Carol — so the count of lines is not the count of events. The clock at the start of the line (`at 2:`) is the time the obligation had in hand when it looked — the last event it had seen — and the event's own time follows it, so a line can read `at 2: the event at 20; … deadline 14 passed without the act`: the obligation, last updated on day 2, looked at an event from day 20 and found its deadline gone.
 
 Two things about this history are worth knowing:
 
 - A party or an act shown as `Tenant OF …` is one the contract had not fully looked at when the step was recorded: the log writes down only what the contract had in hand at that moment, and does not go and fetch the rest. The **member number** (`member 2 of 3`) is what tells the members apart; the events are listed in full under the heading.
-- `at —` marks a step with no clock: a look before any event has arrived, or the moment two parallel parts of a contract (`RAND`/`ROR`) are combined.
+- `at —` marks a step with no clock. Three steps have none: a look before any event has arrived; the moment two parallel parts of a contract (`RAND`/`ROR`) are combined; and a `BREACH` the rule declares outright (`LEST BREACH`), which is a verdict, not a look at an event.
 
 ## `--json`
 
-`--json` prints the same answers as JSON, one object per trace, for a program to read. The keys are the section names: `standing`, `owed`, `discharging`, `breaching`, `advancing`, `passedOver`, `untried`, `nextDeadline`, plus `contract`, `line`, `events`, `clock`, and, with `--steps`, `steps`. Times are numbers on the contract clock. The golden `jl4/examples/lts/expected/contracts.json` is a complete specimen.
+`--json` prints the same answers as JSON, one object per trace, for a program to read. The keys are the section names: `standing`, `owed`, `discharging`, `breaching`, `advancing`, `passedOver`, `untried`, `nextDeadline`, `deadlineNotKnown` (the obligations the "not counting" clause names; usually empty), plus `contract`, `line`, `events`, `clock`, and, with `--steps`, `steps`. Times are numbers on the contract clock. The golden `jl4/examples/lts/expected/contracts.json` is a complete specimen.
 
 ## `--contract NAME`
 
@@ -179,6 +179,8 @@ State plainly, because a reader will find them anyway:
 - **Each answer is a full re-run.** For every shape tried, the whole trace is run again from the start with that event appended. On a contract with many obligations in force, or a long trace, that is many runs; the three corpus files list in under a third of a second each, but a large cast will be slower, in proportion to the number of obligations live at once.
 - **It says nothing about _where_ in the contract you are, or about what happens _after_ the next step.** "Move things along" shows the position one event ahead, and no further. The shape of the whole contract is `l4 state-graph`'s job, and the picture that would put the position on that shape is designed, not built (the design is the same document, §1.1a; whether it is built depends on whether this list turns out to be enough).
 - **Dates are on the contract clock**, a plain number that counts whatever unit the contract's `WITHIN`s count — days, in every example here. There are no calendar dates.
+- **A due date is printed only when the contract confirmed it.** For an obligation that has not yet seen an event, the list works out the deadline itself and then checks its arithmetic by running the clock past it; only if the contract agrees (the deadline actually expires) is the date printed under "Owed now" and counted in "Next deadline". If the contract disagrees, the obligation reads "due within 7 from now" instead of "due by 9", and the "Next deadline" line names it as one whose deadline is not known here. An obligation with no `WITHIN` at all reads "no deadline" and is not counted either way.
+- **An act is written out only when the list can.** "Owed now" prints the act as it would be done (`payment OF 100`) when every part of it is fixed by the rule; an act that leaves something to the party (`Pay … amount`) is printed as the rule's pattern. The "then:" lines under "move things along" always print the pattern.
 
 ## Related pages
 

@@ -79,6 +79,7 @@ data Said
   = Discharges
   | Breaches (Maybe Text.Text)
   | Advances [Text.Text]                  -- ^ the next marking, as placementText
+  | Passed PassOver                       -- ^ nobody took it; why
   | Untriable
   deriving stock (Eq, Show)
 
@@ -95,6 +96,7 @@ row o = Row tried said
       Discharging  -> Discharges
       Breaching b  -> Breaches b.blParty
       Advancing m  -> Advances (map placementText m)
+      PassedOver p -> Passed p
       Untried _    -> Untriable
     bearer n = case n.lnBearer of
       KnownParty t    -> t

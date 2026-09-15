@@ -80,7 +80,7 @@ y — after 1 event, the clock stands at 4 (the #TRACE on line 86)
   Standing: in progress.
 
   Owed now:
-    - B MUST payment (EXACTLY n) — due by 9 (5 from now)
+    - B MUST payment OF 2 — due by 9 (5 from now)
 
   What would discharge it (the contract ends fulfilled):
     - B does payment OF 2 now (at 4) → fulfilled
@@ -88,7 +88,7 @@ y — after 1 event, the clock stands at 4 (the #TRACE on line 86)
   What would put someone in breach:
     - nothing happens by 9 (the clock reaches 10) → B is in breach: MUST payment (EXACTLY n) was due by 9; the clock reached 10 without it
 
-  Next deadline: 9 (B: payment (EXACTLY n))
+  Next deadline: 9 (B: payment OF 2)
 
   Steps, in order:
     at 4: B does payment OF … at 4; B MUST — not the act awaited; passed over
