@@ -80,10 +80,11 @@ main = do
   librariesFiles <- sort <$> globDir1 (compile "*.l4") (dataDirCore </> "libraries")
   legalFiles <- sort <$> globDir1 (compile "legal/**/*.l4") examplesRoot
   -- The VENDORED canon mirror (etc/canon-pin.json, etc/sync-canon.mjs). Same
-  -- semantics as legal/**: four goldens per file, failFirstTime, --accept to
-  -- bless. It is a copy of blessed directories in legalese/canon at a pinned
-  -- SHA -- do not edit it here; edit in canon and bump the pin. The `Canon
-  -- Mirror` CI job fails when this tree and canon@pin disagree.
+  -- semantics as legal/**: four goldens per file, failFirstTime. It is a copy
+  -- of blessed directories in legalese/canon at a pinned SHA -- do not edit it
+  -- here and do not re-bless it here; edit in canon, re-bless there, and bump
+  -- the pin. The `Canon Mirror` CI job fails when this tree and canon@pin
+  -- disagree.
   canonFiles <- sort <$> globDir1 (compile "canon/**/*.l4") examplesRoot
   tcFailsFiles <- sort <$> globDir1 (compile "not-ok/tc/**/*.l4") examplesRoot
   nlgFailsFiles <- sort <$> globDir1 (compile "not-ok/nlg/**/*.l4") examplesRoot
