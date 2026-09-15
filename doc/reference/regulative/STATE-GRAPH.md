@@ -113,7 +113,7 @@ one route to a good ending, not the only one. Breach, on the other hand, can be 
 very first deadline, so there is no single act that every path to breach shares.
 
 An act that appears in the answer is one the contract **cannot do without** for that ending — with
-one exception, a lapsing `MAY`, described under [What the answer does not know](#what-the-answer-does-not-know).
+one exception, a single party's lapsing `MAY`, described under [What the answer does not know](#what-the-answer-does-not-know).
 This is what a planner would call a landmark, and what graph theory calls a **"dominator"**: a
 point every route from the start to a destination has to pass. The flag is named for it.
 
@@ -191,12 +191,15 @@ that can actually be taken. The fourth runs the other way.
    though the running contract tells them apart.
 3. **Deadlines are labels.** Whether a deadline can be met given the ones before it is not worked
    out; the picture shows `WITHIN 30` as text.
-4. **A lapsing `MAY` is not drawn.** When a bare `MAY` (no `LEST`) has a `HENCE` that leads on to
-   another obligation, the running contract ends `FULFILLED` if the permission simply expires — but
-   the drawing shows only the `HENCE` route, so the acts beyond it are listed as required when they
-   can in fact be bypassed. This is the one case where an act on the list is not truly necessary;
-   it is a gap in the drawing (noted in the extractor's source, `StateGraph.hs`, at the `DMay` case
-   of `extractDeonton`) rather than in the question.
+4. **A single party's lapsing `MAY` is not drawn.** When a bare `PARTY … MAY` (no `LEST`) has a
+   `HENCE` that leads on to another obligation, the running contract ends `FULFILLED` if the
+   permission simply expires — but the drawing shows only the `HENCE` route, so the acts beyond
+   it are listed as required when they can in fact be bypassed. This is the one case where an act
+   on the list is not truly necessary; it is a gap in the drawing (noted in the extractor's source,
+   `StateGraph.hs`, at the `DMay` case of `extractDeonton`) rather than in the question. An
+   `EVERY … MAY` does not have this gap: under `ONCE ALL HAVE` and under `UPON EACH` alike, the
+   lapse is drawn as a red `lapses` arrow to `FULFILLED`, and the answer for `FULFILLED` is then
+   "nothing in particular", which is right — the continuation can be bypassed.
 
 So "nothing in particular" means the drawing shows more than one route, not that every route is
 live. To know what a particular sequence of events actually does, run it: a `#TRACE` directive
@@ -220,11 +223,14 @@ every road on it is not a map with a "you are here" dot, and this one has no dot
 as an arrow into a place labelled `next` (for `HENCE`) or `failure` (for `LEST`), and stops there.
 To see where that rule goes, open its own map.
 
-**A `MAY` with no `LEST` has no red arrow.** A permission nobody exercises simply ends, so the
-default there is `FULFILLED`, and the map draws only the green arrow. If such a `MAY` has a
-`HENCE` that leads on to another obligation, the lapse route to `FULFILLED` is not drawn at all —
-the map shows only the `HENCE` path, and a rule that can in fact end quietly looks as if it cannot.
-A `MAY` with an explicit `LEST` gets a red arrow captioned `lapses`.
+**A single party's `MAY` with no `LEST` has no red arrow.** A permission nobody exercises simply
+ends, so the default there is `FULFILLED`, and for a `PARTY … MAY` the map draws only the green
+arrow. If such a `MAY` has a `HENCE` that leads on to another obligation, the lapse route to
+`FULFILLED` is not drawn at all — the map shows only the `HENCE` path, and a rule that can in fact
+end quietly looks as if it cannot. An `EVERY … MAY` is drawn correctly: under either join line its
+lapse gets a red arrow captioned `lapses` straight to `FULFILLED`, because an expired permission
+spawns no continuation for any member. A `MAY` with an explicit `LEST` gets a red arrow captioned
+`lapses` too.
 
 **An `EVERY` is one arrow, not one per member.** `EVERY Tenant t IN tenants MUST Sign` is drawn as
 a single arrow labelled with the quantifier, because who the tenants are is only known when the

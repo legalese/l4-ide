@@ -256,14 +256,19 @@ longer gates on, or is gated by, the new picture.
 >
 > **What the answer inherits** is §1.1b's three blind spots unchanged — it is sound in the
 > direction "this act is on every drawn route" and says nothing about whether each drawn
-> route is live — **plus one in the opposite direction**: a bare `MAY` whose `HENCE` leads on
-> to another obligation lapses straight to `FULFILLED` in the evaluator, and the graph does not
-> draw that route (`StateGraph.hs`, the `DMay` NOTE in `extractDeonton`). Measured:
-> `PARTY Alice MAY pay WITHIN 5 HENCE (PARTY Bob MUST deliver WITHIN 10)` with a stray event
-> AT 6 evaluates to `FULFILLED`, while `--dominators` lists both `pay` and `deliver` as on every
-> path to `FULFILLED`. So "listed ⇒ necessary" fails below a lapsing `MAY`. The user page
-> (`doc/reference/regulative/state-graph.md`, "What the answer does not know", item 4) says
-> so; fixing the drawing is a separate change and would retire the caveat.
+> route is live — **plus one in the opposite direction**: a bare single-party `PARTY … MAY`
+> whose `HENCE` leads on to another obligation lapses straight to `FULFILLED` in the evaluator,
+> and the graph does not draw that route (`StateGraph.hs`, the `DMay` NOTE in `extractDeonton`).
+> Measured: `PARTY Alice MAY pay WITHIN 5 HENCE (PARTY Bob MUST deliver WITHIN 10)` with a
+> stray event AT 6 evaluates to `FULFILLED`, while `--dominators` lists both `pay` and `deliver`
+> as on every path to `FULFILLED`. So "listed ⇒ necessary" fails below a single party's lapsing
+> `MAY`. The user page (`doc/reference/regulative/STATE-GRAPH.md`, "What the answer does not
+> know", item 4) says so; fixing the drawing for `PARTY MAY` is a separate change and would
+> retire the caveat. **Narrowed 2026-09-16:** the quantified form no longer has the gap. After
+> `6daf1d9d` (barrier) and `d544ed22` (fork) the `DMay` arm draws an `EVERY … MAY`'s lapse as a
+> `LEST` edge to `Fulfilled` under either join, and re-measured on `jl4/examples/bpmn/modals.l4` > `--dominators` answers "nothing in particular" for `FULFILLED` on both `the resolution` (`ONCE
+ALL HAVE`) and `each approval is published` (`UPON EACH`), which is right — the chair's
+> publication can be bypassed. The `PARTY MAY` fixture above still lists both acts.
 
 ### 1.1d So what is left of the existence argument
 
