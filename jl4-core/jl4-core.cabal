@@ -145,6 +145,7 @@ library
     L4.EvaluateLazy
     L4.EvaluateLazy.Machine
     L4.EvaluateLazy.ContractFrame
+    L4.EvaluateLazy.DeonticStep
     L4.EvaluateLazy.Exceptions
     L4.EvaluateLazy.GraphViz2
     L4.EvaluateLazy.GraphVizOptions
@@ -247,6 +248,7 @@ test-suite jl4-core-test
     BitemporalRecallSpec
     TraceOrderingSpec
     StateGraphSpec
+    DeonticStepSpec
     RelationalSpec
     BlawxAssumeSpec
     BlawxNlgSpec

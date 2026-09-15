@@ -664,6 +664,100 @@ Roughly six call sites, no post-processing, and the log carries the contract clo
 wall time. **This is the whole of P2's back end**, it is independent of every precondition in
 §3.4, and it is the one deliverable this document recommends unconditionally.
 
+**LANDED 2026-09-15 (P2b), on `lts/p2b-step-log`.** The types live in
+`jl4-core/src/L4/EvaluateLazy/DeonticStep.hs`; the sketch above is superseded by that module and
+this block records where the built types depart from it, and why.
+
+- `dsClock :: Maybe Rational`, not `Rational`. Two step shapes have no clock in hand: a `Waiting`
+  logged before the obligation has forced its time (a `#TRACE` with no events — forcing the thunk
+  for the log's sake would change what the machine evaluates), and a `Joined`, whose `RBinOp2`
+  frame holds two values and no time. The log **peeks and never forces** (`peekWHNF`,
+  `Machine.hs:386`); that rule decides every `Maybe` below.
+- `dsNorm :: Maybe NormKey`, not `NormKey`. A `Joined` step belongs to an `AND`/`OR` compound,
+  which is not a norm instance (§2.3 gives places to obligations, not connectives) and, because
+  `ValROp` carries no annotation, has no site. Every other step has a key.
+- `dsEvent :: Maybe EventKey` with `EventKey = {ekStamp, ekParty :: Maybe Text, ekAction :: Maybe
+Text}` — the sketch left `EventKey` undefined. Party and action are peeked.
+- `Scrutiny` gains `NoEvent` for the steps no event caused (`Waiting`, `Joined`, the join's own).
+  `Reoffered` takes precedence over the other two: it marks the continuation's second look at a
+  re-offered event, whatever that look decided; a consumer counting events counts it as zero.
+- `NormKey` gains `nkMember :: Maybe MemberOf` — §4.9's per-member identity, see below. `nkBearer`
+  is a `Maybe`: a `PARTY p` obligation forces `p` lazily (at `Contract6` on the match path, at
+  `ResolveParty` on the expiry path), so the bearer is refreshed at `Contract6`
+  (`Machine.hs:1831`) and an `Expired` step is built at `Contract5` but **logged at
+  `ResolveParty`** (`:1914`), where the party is known. Measured: an expiry with no `LEST` never
+  forces the party; the breach's own party cell is peeked instead, so `PARTY Alice` (a nullary
+  constructor, allocated as a value) is known and a computed party would not be.
+- `StepOutcome`: the sketch's `Breached !BreachSummary` collapsed into `Expired ToBreach` /
+  `Matched ToBreach` at the single-obligation sites (the key already names the party and
+  `Expired` now carries the deadline) and into `Joined _ (JoinBreached summary)` at `RBinOp2`,
+  where the blame is a choice between two and must be named. A `JoinNote` carries `jnResult`
+  (`JoinFulfilled | JoinBreached BreachSummary | JoinPending`), `jnWinner :: Maybe Side` and
+  `jnTieBreak :: Bool` — "which side won and whether by the CSL tie-break" is one step, not two.
+  Three join-level outcomes were added for the `EVERY` machinery, which the sketch predates: `JoinReleased`,
+  `JoinExpired !Branch !Rational`, `JoinFailed !Branch`, plus `JoinStalled` for the one arm of
+  `Barrier1` that is neither (a `MAY` member lapsed under a barrier with no `LEST`).
+- `Branch` is `ToHence | ToLest | ToBreach` as sketched. Under a barrier the member's slots hold the
+  join's sentinels, so for a norm whose `nkMember` is `Barrier`, `ToHence` reads "reported
+  satisfied to the join" and `ToLest` "reported failed"; the join's own step follows.
+
+The write is `tellDeonticStep :: DeonticStep -> Eval ()` (`Machine.hs:356`), modelled on
+`traceEval`: an optional `IORef (DList DeonticStep)` in the reader env (`EvalState.deonticLog`,
+`:281`), off by default (R5). `DeonticLog` carries two counters beside the steps — per-site
+activations for `nkActivation`, and an `EVERY` cast register `(action site, bearer) ↦ MemberOf`,
+written when a family is assembled (`registerCast`, `:465`) and read when a member's obligation
+meets the stream (`armNormKey`, `:422`) — because the `ValObligation` a member becomes has no slot
+for its membership and adding one is a value-type change P2b declined. With the log off the
+machine's only extra work is threading a lazy `norm :: NormKey` through the eleven `Contract*`
+frame records (`ContractFrame.hs:88` onward), which nothing forces.
+
+**Call sites, as committed** (fresh line numbers; the July table above is stale):
+
+| Site                      | `Machine.hs` | Step                                                                                           |
+| ------------------------- | ------------ | ---------------------------------------------------------------------------------------------- |
+| `App1` on `ValObligation` | 1270         | `armNormKey`: the entry into the site; bumps `nkActivation`                                    |
+| `Contract1` / `ValNil`    | 1686         | `Waiting`, clock peeked                                                                        |
+| `Contract5` expiry        | 1774–1820    | `Expired branch deadline`, built here; routed cases logged at `ResolveParty`, breach case here |
+| `Contract6`               | 1831         | bearer refreshed                                                                               |
+| `Contract8` / `False`     | 1846         | `PartyMismatch`, `WitnessedOnly`                                                               |
+| `Contract10`              | 1866–1909    | `Matched ToHence/ToLest/ToBreach`, `Consumed`; `GuardFailed`                                   |
+| `ResolveParty`            | 1914         | the pending `Expired`, bearer filled, join progress worked out                                 |
+| `Barrier1` verdict arm    | 1985         | `JoinFailed ToBreach` / `JoinStalled`                                                          |
+| `Barrier4`                | 2008         | `JoinExpired`, with the `ONCE … WITHIN` deadline                                               |
+| `RBinOp2` (five arms)     | 2067–2123    | `Joined op note`                                                                               |
+| `startRollCall`           | 2312         | `armJoinKey`: the join's own entry                                                             |
+| `assembleQuantified`      | 2347–2358    | `registerCast` (distributive 2347, fork 2348, barrier 2358)                                    |
+| `fireBarrierHence`        | 2524         | `JoinReleased`                                                                                 |
+| `barrierFail`             | 2555         | `JoinFailed ToLest`                                                                            |
+| `patternMatchFailure`     | 2880         | `ActionMismatch`, `WitnessedOnly`                                                              |
+
+The library seam is `execEvalModuleWithDeonticLog` (`jl4-core/src/L4/EvaluateLazy.hs:662`):
+`execEvalModuleWithEnv` with the log on for every directive, returning each directive's steps
+beside its unchanged result, via `captureDeonticSteps` (`:192`, modelled on `captureTrace`; a
+nested capture gets a fresh log and does not merge, because the counters would collide). The
+existing signatures are untouched — `EvalDirectiveResult` is matched positionally at seventeen
+sites (and by record syntax at seven more) across five packages, and was not widened. No CLI, no `doc/` page: nothing a user can invoke changed.
+
+**Measured.** `jl4-core/test/DeonticStepSpec.hs` pins the exact sequence for eight shapes (match →
+`HENCE`; expiry → `LEST` with the event `Reoffered` to the reparation; `MAY` expiry; party mismatch
+then match; an `ROR` whose sides breach at the same instant, tie-break `RightSide`; a barrier of two
+where member 1 logs `MemberSatisfied 1 2` and is not released, member 2 `MemberSatisfied 2 2`, then
+`JoinReleased` at clock 3, then the landlord's obligation; a fork where Alice's continuation runs to
+completion before Bob's scan begins; a join-line deadline, `JoinExpired ToLest 5` at clock 9), and
+proves the off path unchanged by rendering every fixture both ways. `JL4_LIBRARY_PATH=$PWD/jl4-core/libraries
+cabal test jl4-core-test`: 569 examples, 0 failures (10 of them new); the same variable and
+`cabal test jl4-test`: 3143 examples, 0 failures, no golden moved. Two things the fixtures
+found that the design did not predict: a barrier member never logs `Waiting` of its own, because
+its match hands control to the checkpoint sentinel — the join is what waits; and `partyKeyWHNF`
+renders a constructor party with its unforced fields as heap addresses (`Tenant OF &161@main.l4`),
+which is the ledger's existing key and is pinned by prefix, not by value.
+
+**Not built.** `dsClock` for `Joined` (no time in the frame); a site for the compound (needs
+`ValROp` to carry its annotation); the residual's `NormKey` — a `ValObligation` returned as the
+value of a directive carries no key, so a residual re-applied by a later milestone (live mode,
+§4.5) starts a fresh activation count. Nothing in `L4.StateGraph` was touched: B1's static half of
+the key is still owed there.
+
 ### 4.4 The gotcha the animator must model: an event can be scrutinised twice
 
 Expiry re-offers the revealing event to the continuation, at most once, marked by store address
@@ -904,6 +998,21 @@ Consequences, stated so they are not rediscovered:
   Whether that is a new field or a derived predicate over the marking is an implementation
   question; that it must be sayable is not. **This is the concrete edit P2b needs before it is
   built** — cheap now, a migration later.
+
+  **TAKEN 2026-09-15, as a field, with one deliberate refusal.** `dsJoin :: Maybe JoinProgress`
+  on the member's own step, `JoinProgress = MemberSatisfied {done, total} | ForkContinued {member,
+total}`, filled from the key's `nkMember` at the routing sites (`tellRoutedStep`,
+  `Machine.hs:367`). A "released" value was considered and **declined**: the last member's step
+  cannot honestly say the continuation is released, because that is decided _after_ it by the
+  `ONCE … WITHIN` check — `JoinExpired` is the other answer. So the release is the join's own
+  step, `JoinReleased`, keyed by the join line's range, and a barrier's log reads `MemberSatisfied
+1 2`, `MemberSatisfied 2 2`, then either `JoinReleased` or `JoinExpired`. The eighth fixture in
+  `DeonticStepSpec.hs` is exactly the case that would have made a member-side "released" a lie:
+  both arms satisfied, `JoinExpired ToLest 5` at clock 9. A fork has no join step; each member's
+  routed step carries `ForkContinued`. The **sequencing** bullet below is discharged by the same
+  change: `nkBearer` is the member's key, `nkSite` the shared `RAction` range, `nkActivation` the
+  member's own entry (roll order), and `nkMember` says which family it belongs to.
+
 - **Sequencing.** The B1 correlation key wants a per-member identity under an `EVERY`, not just a
   per-rule one, since the whole point of the cast is that there are _n_ outstanding obligations
   sharing one source range. B1 as §3.4 specifies it — an `RAction`'s `SrcRange` — is therefore
@@ -1127,7 +1236,7 @@ rather than assumed benign. R11 and R12 are new in revision 2; R13 was added on 
 | **R2**  | **Is `AllOf` a fork, or a fork with a join?** The shipped IR makes it a **fork with no join**: branches fan out and converge on a **shared** `Fulfilled` sink (`getTerminalState`, `:204-209`) that nothing waits at. `EVERY-EACH-QUANTIFIER-SPEC` §3.1 commits `EVERY` to **barrier semantics**, an AND-join firing HENCE once. The evaluator has a real join (`Machine.hs:1635-1707`, with blame assignment and the CSL tie-break). So the IR is the outlier. P1 reached the same place independently and reports it as `P-NOJOIN`. **UPDATED 2026-09-14 — the mitigation has expired.** Revision 2 wrote _"mitigating: `EVERY`/`EACH` are **unimplemented**"_; true when written, false now. The front end merged as PR #360 (`734b8015`, 2026-09-07), evaluation as PR #370 (`6247ba69`, 2026-09-08), `EVERY Cast v IN xs` as PR #374 (`28c48e3f`, same day). The join is **first-class in the AST**: `Deonton.join :: Maybe (Join n)` (`Syntax.hs:422-426`), with `JoinOnce` (`ONCE …`, level-triggered — the barrier) and `JoinUpon` (`UPON EACH`, edge-triggered — the fork) at `Syntax.hs:491-497`; the type checker makes it **mandatory** under an `EVERY` carrying `HENCE`/`LEST`, and an error under a `PARTY`. R2 is therefore no longer a question about a hypothetical: the language now draws the distinction and P2's input throws it away. §4.9. **LANDED 2026-09-15:** P2's input no longer throws it away — `labelQuantifier` carries `Barrier`/`Fork` structurally (P2h first half, §4.9). What remains of R2 is the drawing rule for the norm plane. |
 | **R3**  | **Under what condition does §2.4 re-open?** P2 declines a Petri-net _semantics_. If a TAPAAL lowering is later built, does P2 re-base onto it (gaining a checkable picture and **sound reachability**, inheriting the faithfulness obligation and the cross-validation harness) or stay a rendering of the evaluator? G9 raises the stakes: today P2 has no sound answer to the litigator's question at all. Deciding now is premature; deciding never is how two notions of "obligation" get shipped.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | **R4**  | **What crosses the §25.5 seam?** The handle is ladder-side, and PROCESS-TRACK §6 forbids P2 from depending on the ladder — so P2 can only define the state it _accepts_: obligation identity, valuation, rule version, and what else? Someone has to own the interface, and neither track may unilaterally.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| **R5**  | **Is the deontic step log optional or non-optional?** `traceEval` is optional and off by default; `tellEventRouted` is deliberately non-optional. Optional keeps the evaluator's hot path untouched and keeps P2b off M4's critical path. Non-optional means the residual can always explain itself, which is what an audit-grade tool-calling story wants.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| **R5**  | **Is the deontic step log optional or non-optional?** `traceEval` is optional and off by default; `tellEventRouted` is deliberately non-optional. Optional keeps the evaluator's hot path untouched and keeps P2b off M4's critical path. Non-optional means the residual can always explain itself, which is what an audit-grade tool-calling story wants. **ANSWERED 2026-09-15: OPTIONAL, off by default**, mirroring `cliDefaultPolicy` (`jl4-core/src/L4/TracePolicy.hs:97-101`), because §7.5 requires the evaluator's hot path untouched for M4 and P2b landed as `EvalState.deonticLog :: Maybe DeonticLog` with every call site behind that `Maybe` (`Machine.hs:281,351`). What non-optional would have bought — a residual that always explains itself — is available to any caller through `execEvalModuleWithDeonticLog` at the cost of asking; the audit-grade story can turn it on per request the way `#EVALTRACE` turns the trace on.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | **R6**  | **How is a re-offered event drawn?** §4.4. `dsScrutiny` records the distinction; it does not decide the rendering. One frame with a "witnessed" mark, or two frames with the second marked "re-offered"? Getting this wrong makes the animation lie about how many things happened.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | **R7**  | **Was `logic-not-flowcharts.md`'s state-transitions row intended as unranked?** It reads as unranked and PROCESS-TRACK §1 reads it that way, but it was written before P2 was contemplated, so it may simply never have been asked the question. **Ask Meng** rather than infer; §1.2's whole framing depends on it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | **R8**  | **Verify Lomuscio & Sergot before print.** The green/red state-partition characterisation in §2.2 is from secondary sources; the primary PDF would not extract. It carries architectural weight (per-party colouring is the F2 shape). Symboleo's exact lifecycle state names are likewise search-verified rather than read — there is probably an `Expired`/`Terminated` and a `Suspended`→`Resumed` pair we have not recorded. §7.4's citation failure is the reason this caveat is now load-bearing rather than decorative.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
