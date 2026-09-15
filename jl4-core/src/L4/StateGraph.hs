@@ -932,7 +932,23 @@ extractDeonton mFromState (MkDeonton _anno subject action due mJoin hence lest) 
         -- is the wrong place. Fixing it means emitting a real lapse edge here
         -- and retiring that synthesis, which moves BPMN output for every
         -- permission; it is a separate change from smucclaw/l4-ide#927.
-        DMay -> pure ()
+        DMay -> case quantifier >>= (.quantJoin) of
+          -- Under a BARRIER a lapsed member means the join can never fire:
+          -- the HENCE is skipped and the member's own FULFILLED is returned as
+          -- the barrier's (Machine.hs, Barrier1's last arm and the note on
+          -- 'barrierFail'). So the lapse arm goes to Fulfilled, and drawing it
+          -- here is what stops L4.Bpmn.Lower's synthesised lapse timer from
+          -- routing "wherever HENCE lands" — which for a corporate resolution
+          -- (spec §2.2.1 Pattern B) manufactured the chair's duty to publish a
+          -- resolution that did not pass. Measured 2026-09-15 by the
+          -- concurrency review: `l4 run` FULFILLED, the diagram Breach.
+          --
+          -- Under a FORK each member carries the real HENCE, so a lapsed
+          -- member does route there, and the synthesis stays right.
+          Just MkJoinLabel { joinKind = Barrier _ } -> do
+            fulfilledId <- getTerminalState "Fulfilled" TerminalFulfilled
+            addTransition fromState fulfilledId lestLabel LestTransition
+          _ -> pure ()
         -- MUST/SHANT without LEST default to Breach; only the way in differs,
         -- and 'lestArmWording' is where that difference is spelled.
         DMust -> defaultToBreach

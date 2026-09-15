@@ -4,9 +4,11 @@ digraph fork_run {
   subgraph cluster_members { label="three member obligations, all live from day 0, each WITHIN 7"; style=dashed; color="#e8850c";
     a [label="Alice MUST Pay\ndone: day 1"]; b [label="Bob MUST Pay\ndone: day 3"]; c [label="Carol MUST Pay\ndone: day 5"];
   }
-  ja [label="UPON EACH\nfires — day 1", shape=diamond, fillcolor="#fde8cc"]; jb [label="UPON EACH\nfires — day 3", shape=diamond, fillcolor="#fde8cc"]; jc [label="UPON EACH\nfires — day 5", shape=diamond, fillcolor="#fde8cc"];
+  ja [label="UPON EACH\n(1 in, 1 out) fires — day 1", shape=box, style="filled", fillcolor="#fde8cc"]; jb [label="UPON EACH\n(1 in, 1 out) fires — day 3", shape=box, style="filled", fillcolor="#fde8cc"]; jc [label="UPON EACH\n(1 in, 1 out) fires — day 5", shape=box, style="filled", fillcolor="#fde8cc"];
   ha [label="theLandlord MUST Receipt (to Alice)\nWITHIN 5 — due day 6; done day 2"]; hb [label="theLandlord MUST Receipt (to Bob)\nWITHIN 5 — due day 8; done day 4"]; hc [label="theLandlord MUST Receipt (to Carol)\nWITHIN 5 — due day 10; done day 6"];
   f [label="FULFILLED", shape=doublecircle, fillcolor="#d4edda"];
+  note [label="all three branches end fulfilled in this trace;\na mixed outcome (one breached, two fulfilled) has no single terminal", shape=plaintext, fontsize=10, fontcolor="#6c757d"];
+  { rank=same; f; note; }
   a -> ja [color="#28a745"]; b -> jb [color="#28a745"]; c -> jc [color="#28a745"];
   ja -> ha [label="its own continuation", color="#28a745"]; jb -> hb [color="#28a745"]; jc -> hc [color="#28a745"];
   ha -> f [color="#28a745"]; hb -> f [color="#28a745"]; hc -> f [color="#28a745"];

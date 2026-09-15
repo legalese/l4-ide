@@ -158,13 +158,21 @@ nodeLines depth node = case node.nodeKind of
 -- @\<documentation\>@, which is the order the schema gives an activity's
 -- children.
 multiInstanceLines :: Int -> FlowNode -> [Text]
-multiInstanceLines depth node =
-  [ selfClose
-      depth
-      "bpmn:multiInstanceLoopCharacteristics"
-      [("id", "MultiInstance_" <> node.nodeId), ("isSequential", "false")]
-  | Just ParallelMultiInstance <- [node.nodeMultiInstance]
-  ]
+multiInstanceLines depth node = case node.nodeMultiInstance of
+  Nothing -> []
+  Just CompleteWhenAll ->
+    [selfClose depth "bpmn:multiInstanceLoopCharacteristics" attrs]
+  Just CompleteOnFirst ->
+    [ openTag depth "bpmn:multiInstanceLoopCharacteristics" attrs
+    , textEl
+        (depth + 1)
+        "bpmn:completionCondition"
+        [("xsi:type", "bpmn:tFormalExpression")]
+        "nrOfCompletedInstances >= 1"
+    , closeTag depth "bpmn:multiInstanceLoopCharacteristics"
+    ]
+ where
+  attrs = [("id", "MultiInstance_" <> node.nodeId), ("isSequential", "false")]
 
 gatewayTag :: GatewayKind -> Text
 gatewayTag = \case

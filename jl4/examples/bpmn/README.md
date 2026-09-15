@@ -16,6 +16,7 @@ did not. Predicates are a different matter, and belong to the ladder; see
 | `consultation.l4` | The only one that draws a converging parallel gateway: a `RAND` of deadline-free permissions, one branch of which is a chain                  |
 | `../legal/regcf/regcf.l4` | The real 992-line Reg CF corpus — **three** rules, so three golden pairs (`regcf-reporting`, `regcf-advertising`, `regcf-resale`): a renewing obligation drawn as a loop, `IF`-headed duties with guarded gateway arms, named deadlines, two prohibitions. Read from `examples/legal/`, not copied here — see below |
 | `tenancy.l4`      | A quantified obligation (`EVERY`) under each join — **two** rules, so two golden pairs (`tenancy-barrier`, `tenancy-fork`): a parallel multi-instance task, `P-CAST` on both, `P-FORK` on the fork alone. The witness that a barrier and a fork export differently; see below |
+| `modals.l4`       | The other modal × join cells — **six** rules, six golden pairs (`modals-*`): a `SHANT` barrier completing on the first act, a `MAY` barrier whose lapse goes to fulfilled, their fork twins, and the two-deadline shapes. Cut after the 2026-09-15 review found the marker inverted two of these and nothing exercised them |
 
 ## The Reg CF goldens are cut from the corpus itself
 
@@ -92,13 +93,22 @@ byte-identical fidelity report, because `L4.StateGraph.extractDeonton` never rea
   gap — it rejects both files with _ForEach has no collection expression_ — which is why both sit
   in `etc/bpmn-kie-baseline.txt` as class (d), REJECTED, while our own token-play gate and
   bpmn-moddle accept them.
-- **The barrier (`ONCE ALL HAVE`) needs nothing more.** A parallel multi-instance activity fires
-  its outgoing flow once, when the last instance completes — that _is_ the barrier, and the
-  documentation on the task says so.
-- **The fork (`UPON EACH`) is the one BPMN cannot draw this way.** The source fires the
-  continuation once per member as that member completes; the activity fires once, after all of
-  them. `P-FORK` (lossy) reports it. Saying once-per-member in BPMN means a multi-instance
-  subProcess enclosing the continuation, which this exporter does not emit.
+- **A `MUST` barrier (`ONCE ALL HAVE`) needs nothing more.** A parallel multi-instance activity
+  fires its outgoing flow once, when the last instance completes — that _is_ the barrier, and the
+  documentation on the task says so. **Not so for the other modals**, which the review of
+  2026-09-15 caught: a `SHANT` completes on the _first_ instance (`completionCondition
+  nrOfCompletedInstances >= 1`, read off R-Q5 — one act is the breach; `P-PROHIBITION-FIRST`), and
+  a `MAY` barrier's lapse is a LEST arm to Fulfilled in the state graph, so the exporter's
+  synthesised "lapse routes where HENCE routes" never fires for it — a resolution that did not
+  pass creates no duty to publish it. `modals.l4` pins every cell.
+- **The fork (`UPON EACH`) is the one this exporter does not draw faithfully.** The source fires
+  the continuation once per member as that member completes; the activity fires once, after all of
+  them (`P-FORK`, lossy), and its interrupting timer cancels every instance, so a continuation a
+  member already earned is never drawn as arising (`P-FORK-CANCEL`, lossy — the fork's largest
+  loss). BPMN has shapes for once-per-member — a multi-instance subProcess around the continuation,
+  or the `None` completion behaviour caught by a non-interrupting boundary — and this exporter
+  emits neither. Both notes are written "the diagram says…; the rule says…", because the reader
+  has to disbelieve the drawing rather than fill it in.
 - **A deadline written only on the join line arms the boundary timer** (`memberDeadline` in
   `L4.StateGraph`, mirroring the evaluator). When the act has a deadline of its own, that one is
   on the timer and the join line's is reported undrawn as `P-JOIN-DEADLINE` (lossy).

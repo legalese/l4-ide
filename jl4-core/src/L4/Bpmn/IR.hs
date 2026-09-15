@@ -238,9 +238,20 @@ data GatewayKind = ExclusiveGateway | ParallelGateway
 --
 -- The completion rule of a parallel multi-instance activity — the outgoing
 -- flow fires once, when the last instance has completed — is exactly the
--- barrier (@ONCE ALL HAVE@), which is why the barrier needs no further shape.
--- The fork (@UPON EACH@) is the one BPMN cannot draw this way; see @P-FORK@.
-data MultiInstance = ParallelMultiInstance
+-- barrier (@ONCE ALL HAVE@) for an obligation, which is why a @MUST@ barrier
+-- needs no further shape. It is the WRONG rule for a prohibition: under
+-- @SHANT@ one member's act is the breach (EVERY-EACH-QUANTIFIER-SPEC R-Q5,
+-- §3.4), and "completes when every director has sublet" would exonerate the
+-- first one — measured 2026-09-15 on @ok\/every\/run-modals.l4@'s
+-- @no subletting@, whose golden says BREACH with one act. So a prohibition's
+-- activity completes on the FIRST instance to complete, via a
+-- @\<completionCondition\>@ that is derived from the source, not invented.
+-- The fork (@UPON EACH@) is the shape BPMN cannot draw this way; see @P-FORK@.
+data MultiInstance
+  = -- | completes when every instance has: the barrier, for @MUST@\/@MAY@\/@DO@
+    CompleteWhenAll
+  | -- | completes on the first instance to: a prohibition, where one act breaches
+    CompleteOnFirst
   deriving stock (Eq, Show)
 
 -- | BPMN 2.0 §10.5.1 Table 10.100 makes @gatewayDirection@ a /claim about the

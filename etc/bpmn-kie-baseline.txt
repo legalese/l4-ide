@@ -72,14 +72,39 @@
 #                      Our own token-play gate (check-bpmn-soundness.mjs) and
 #                      bpmn-moddle both accept both files. Execution is a
 #                      NON-GOAL; a future data-object emission would close (d).
+#
+# ADDED 2026-09-15, later the same day, after the concurrency review — six
+# goldens for the other modal x join cells (jl4/examples/bpmn/modals.l4),
+# RESULT 6 -> 12 for the class-(d) reason above and one other:
+#
+#   modals-shant-barrier   class (d), as tenancy-*. (The completionCondition
+#   modals-shant-fork      on a prohibition is not what jBPM objects to; it
+#   modals-must-barrier-   never gets past the missing collection.)
+#     both-deadlines
+#   modals-must-fork-
+#     join-deadline
+#   modals-may-barrier     class (d), as above.
+#   modals-may-fork        class (a') — "This type of node [Task_1] cannot have
+#                          more than one incoming connection": the lapse timer
+#                          and the activity's own completion both flow into the
+#                          chair's task, a spec-legal uncontrolled merge that
+#                          jBPM's dialect rejects at parse time, before it
+#                          reaches the class-(d) objection. Same limit as
+#                          regcf-reporting, relocated; not a defect.
 
-consultation.bpmn       errors=0 warnings=0 verdict=COMPLETED
-handover.bpmn           errors=4 warnings=0 verdict=REJECTED
-offering.bpmn           errors=0 warnings=0 verdict=ABORTED
-regcf-advertising.bpmn  errors=4 warnings=0 verdict=REJECTED
-regcf-reporting.bpmn    errors=1 warnings=0 verdict=REJECTED
-regcf-resale.bpmn       errors=6 warnings=0 verdict=REJECTED
-tenancy-barrier.bpmn    errors=2 warnings=0 verdict=REJECTED
-tenancy-fork.bpmn       errors=2 warnings=0 verdict=REJECTED
+consultation.bpmn                        errors=0 warnings=0 verdict=COMPLETED
+handover.bpmn                            errors=4 warnings=0 verdict=REJECTED
+modals-may-barrier.bpmn                  errors=2 warnings=0 verdict=REJECTED
+modals-may-fork.bpmn                     errors=1 warnings=0 verdict=REJECTED
+modals-must-barrier-both-deadlines.bpmn  errors=2 warnings=0 verdict=REJECTED
+modals-must-fork-join-deadline.bpmn      errors=2 warnings=0 verdict=REJECTED
+modals-shant-barrier.bpmn                errors=2 warnings=0 verdict=REJECTED
+modals-shant-fork.bpmn                   errors=2 warnings=0 verdict=REJECTED
+offering.bpmn                            errors=0 warnings=0 verdict=ABORTED
+regcf-advertising.bpmn                   errors=4 warnings=0 verdict=REJECTED
+regcf-reporting.bpmn                     errors=1 warnings=0 verdict=REJECTED
+regcf-resale.bpmn                        errors=6 warnings=0 verdict=REJECTED
+tenancy-barrier.bpmn                     errors=2 warnings=0 verdict=REJECTED
+tenancy-fork.bpmn                        errors=2 warnings=0 verdict=REJECTED
 
-RESULT 6
+RESULT 12

@@ -205,6 +205,28 @@ joinOnlyDeadlineSrc =
   , "    LEST BREACH"
   ]
 
+-- | A permission under each join, with a continuation that is a real
+-- obligation. Under the barrier a lapsed member means the join never fires
+-- and the rule ends FULFILLED with nothing following (Machine.hs, Barrier1's
+-- last arm); under the fork each member carries the continuation, so a
+-- lapsed member's arm goes where HENCE goes. The graph has to say so, or the
+-- BPMN lowered from it draws the chair's duty to publish a resolution that
+-- did not pass — measured 2026-09-15.
+mayBarrierSrc, mayForkSrc :: [Text]
+mayBarrierSrc = maySrc "ONCE ALL HAVE"
+mayForkSrc    = maySrc "UPON EACH"
+
+maySrc :: Text -> [Text]
+maySrc joinLine =
+  [ "GIVETH DEONTIC Person Action"
+  , "`group` MEANS"
+  , "  EVERY p"
+  , "    MAY pay"
+  , "    WITHIN 3"
+  , "    " <> joinLine
+  , "    HENCE (PARTY Bob MUST deliver WITHIN 5)"
+  ]
+
 -- | A quantified obligation with no continuation, and so no join line.
 noJoinSrc :: [Text]
 noJoinSrc =
@@ -305,6 +327,22 @@ spec = do
       theHenceEdge joinOnlyDeadlineSrc \t -> do
         t.transLabel.labelDeadline `shouldBe` Nothing
         memberDeadline t.transLabel `shouldBe` Just "30"
+
+    it "sends a permission's lapse to Fulfilled under a barrier, and draws none under a fork" $ do
+      -- The barrier's lapse arm is a LEST edge to the Fulfilled terminal,
+      -- captioned as a lapse; the fork keeps the single-party shape, where
+      -- the lapse is not drawn here and L4.Bpmn.Lower routes it where HENCE
+      -- goes.
+      case graphFor mayBarrierSrc of
+        Left errs -> expectationFailure (show errs)
+        Right sg -> case [ t | t <- lestEdges sg, t.transFrom == sg.sgInitialState ] of
+          [t] -> do
+            t.transLabel.labelAction `shouldBe` "lapses"
+            nameOf sg t.transTo `shouldBe` "Fulfilled"
+          ts -> expectationFailure ("expected one LEST edge out of the initial state, got " <> show (length ts))
+      case graphFor mayForkSrc of
+        Left errs -> expectationFailure (show errs)
+        Right sg -> [ t | t <- lestEdges sg, t.transFrom == sg.sgInitialState ] `shouldBe` []
 
     -- 'noDeadlineLestSrc', below, is the control: with no WITHIN anywhere the
     -- caption IS 'noTriggerWording'. Here there is one, on the join line, and

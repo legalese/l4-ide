@@ -4,7 +4,7 @@ digraph barrier_run {
   subgraph cluster_members { label="three member obligations, all live from day 0, each WITHIN 14"; style=dashed; color="#6f42c1";
     a [label="Alice MUST Sign\ndone: day 1"]; b [label="Bob MUST Sign\ndone: day 2"]; c [label="Carol MUST Sign\ndone: day 9"];
   }
-  join [label="ONCE ALL HAVE\nfires ONCE — day 9\n(the last act)", shape=diamond, fillcolor="#e6dcf5"];
+  join [label="ONCE ALL HAVE — an AND-join\n(n in, 1 out)\nfires ONCE — day 9, the last act", shape=box, style="filled", fillcolor="#e6dcf5", penwidth=2];
   h [label="theLandlord MUST Deliver\nWITHIN 5 — clock starts day 9\ndue day 14; done day 13"];
   f [label="FULFILLED", shape=doublecircle, fillcolor="#d4edda"];
   a -> join [label="day 1", color="#28a745"]; b -> join [label="day 2", color="#28a745"]; c -> join [label="day 9", color="#28a745", penwidth=2];

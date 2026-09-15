@@ -30,7 +30,7 @@
     </bpmn:laneSet>
     <bpmn:startEvent id="Start_0" />
     <bpmn:task id="Task_0" name="MUST Pay ...">
-      <bpmn:documentation>EVERY Tenant t IN tenants MUST Pay ... WITHIN 7 UPON EACH — one instance per member of the cast, each bound to ‘t’; the cast is fixed only when the rule runs, so the activity carries no cardinality (P-CAST). UPON EACH: in the source, what follows fires once per member as that member completes. A multi-instance activity fires its outgoing flow once, after the last instance, so what follows is drawn once (P-FORK).</bpmn:documentation>
+      <bpmn:documentation>EVERY Tenant t IN tenants MUST Pay ... WITHIN 7 UPON EACH — one instance per member of the cast, each bound to ‘t’; the cast is fixed only when the rule runs, so the activity carries no cardinality (P-CAST). UPON EACH: in the source, what follows fires once per member as that member completes. A multi-instance activity fires its outgoing flow once, after the last instance, so what follows is drawn once (P-FORK), and the timer on this activity cancels every instance (P-FORK-CANCEL).</bpmn:documentation>
       <bpmn:multiInstanceLoopCharacteristics id="MultiInstance_Task_0" isSequential="false" />
     </bpmn:task>
     <bpmn:boundaryEvent id="Boundary_0" name="after P7D" attachedToRef="Task_0" cancelActivity="true">

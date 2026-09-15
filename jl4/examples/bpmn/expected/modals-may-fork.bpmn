@@ -4,21 +4,21 @@
                   xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
                   xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                  id="Definitions_the_tenancy"
+                  id="Definitions_each_approval_is_published"
                   targetNamespace="https://l4.legalese.com/bpmn"
                   exporter="jl4 (L4.Bpmn)"
                   exporterVersion="1">
   <bpmn:error id="Error_breach" name="Breach" errorCode="BREACH" />
-  <bpmn:collaboration id="Collaboration_the_tenancy">
-    <bpmn:participant id="Participant_the_tenancy" name="the tenancy" processRef="Process_the_tenancy" />
+  <bpmn:collaboration id="Collaboration_each_approval_is_published">
+    <bpmn:participant id="Participant_each_approval_is_published" name="each approval is published" processRef="Process_each_approval_is_published" />
   </bpmn:collaboration>
-  <bpmn:process id="Process_the_tenancy" name="the tenancy" isExecutable="false">
+  <bpmn:process id="Process_each_approval_is_published" name="each approval is published" isExecutable="false">
     <bpmn:laneSet id="LaneSet_1">
-      <bpmn:lane id="Lane_1_EVERY_Tenant_t_IN_tenants" name="EVERY Tenant t IN tenants">
+      <bpmn:lane id="Lane_1_EVERY_Director_d_IN_board" name="EVERY Director d IN board">
         <bpmn:flowNodeRef>Task_0</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>Boundary_0</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Lapse_0</bpmn:flowNodeRef>
       </bpmn:lane>
-      <bpmn:lane id="Lane_2_theLandlord" name="theLandlord">
+      <bpmn:lane id="Lane_2_theChair" name="theChair">
         <bpmn:flowNodeRef>Task_1</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Boundary_1</bpmn:flowNodeRef>
       </bpmn:lane>
@@ -29,18 +29,18 @@
       </bpmn:lane>
     </bpmn:laneSet>
     <bpmn:startEvent id="Start_0" />
-    <bpmn:task id="Task_0" name="MUST Sign ...">
-      <bpmn:documentation>EVERY Tenant t IN tenants MUST Sign ... WITHIN 14 ONCE ALL HAVE — one instance per member of the cast, each bound to ‘t’; the cast is fixed only when the rule runs, so the activity carries no cardinality (P-CAST). ONCE ALL HAVE: the outgoing flow fires once, when every instance has completed — which is what a parallel multi-instance activity&apos;s completion means, so this barrier is drawn faithfully.</bpmn:documentation>
+    <bpmn:task id="Task_0" name="MAY Approve ...">
+      <bpmn:documentation>EVERY Director d IN board MAY Approve ... WITHIN 30 UPON EACH — one instance per member of the cast, each bound to ‘d’; the cast is fixed only when the rule runs, so the activity carries no cardinality (P-CAST). UPON EACH: in the source, what follows fires once per member as that member completes. A multi-instance activity fires its outgoing flow once, after the last instance, so what follows is drawn once (P-FORK), and the timer on this activity cancels every instance (P-FORK-CANCEL).</bpmn:documentation>
       <bpmn:multiInstanceLoopCharacteristics id="MultiInstance_Task_0" isSequential="false" />
     </bpmn:task>
-    <bpmn:boundaryEvent id="Boundary_0" name="after P14D" attachedToRef="Task_0" cancelActivity="true">
-      <bpmn:documentation>LEST: the obligation is not discharged within 14</bpmn:documentation>
-      <bpmn:timerEventDefinition id="Timer_Boundary_0">
-        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P14D</bpmn:timeDuration>
+    <bpmn:boundaryEvent id="Lapse_0" name="after P30D" attachedToRef="Task_0" cancelActivity="true">
+      <bpmn:documentation>the permission lapses: the deadline passes without it being exercised, which routes where HENCE routes</bpmn:documentation>
+      <bpmn:timerEventDefinition id="Timer_Lapse_0">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P30D</bpmn:timeDuration>
       </bpmn:timerEventDefinition>
     </bpmn:boundaryEvent>
-    <bpmn:task id="Task_1" name="MUST Deliver ...">
-      <bpmn:documentation>PARTY theLandlord MUST Deliver ... WITHIN 5</bpmn:documentation>
+    <bpmn:task id="Task_1" name="MUST Publish ...">
+      <bpmn:documentation>PARTY theChair MUST Publish ... WITHIN 5</bpmn:documentation>
     </bpmn:task>
     <bpmn:boundaryEvent id="Boundary_1" name="after P5D" attachedToRef="Task_1" cancelActivity="true">
       <bpmn:documentation>LEST: the obligation is not discharged within 5</bpmn:documentation>
@@ -54,19 +54,19 @@
     </bpmn:endEvent>
     <bpmn:sequenceFlow id="Flow_Start_0__Task_0" sourceRef="Start_0" targetRef="Task_0" />
     <bpmn:sequenceFlow id="Flow_Task_0__Task_1" sourceRef="Task_0" targetRef="Task_1" />
-    <bpmn:sequenceFlow id="Flow_Boundary_0__End_3" sourceRef="Boundary_0" targetRef="End_3" />
+    <bpmn:sequenceFlow id="Flow_Lapse_0__Task_1" sourceRef="Lapse_0" targetRef="Task_1" />
     <bpmn:sequenceFlow id="Flow_Task_1__End_2" sourceRef="Task_1" targetRef="End_2" />
     <bpmn:sequenceFlow id="Flow_Boundary_1__End_3" sourceRef="Boundary_1" targetRef="End_3" />
   </bpmn:process>
   <bpmndi:BPMNDiagram id="BPMNDiagram_1">
-    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_the_tenancy">
-      <bpmndi:BPMNShape id="Shape_Participant_the_tenancy" bpmnElement="Participant_the_tenancy" isHorizontal="true">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_each_approval_is_published">
+      <bpmndi:BPMNShape id="Shape_Participant_each_approval_is_published" bpmnElement="Participant_each_approval_is_published" isHorizontal="true">
         <dc:Bounds x="130" y="80" width="770" height="600" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Shape_Lane_1_EVERY_Tenant_t_IN_tenants" bpmnElement="Lane_1_EVERY_Tenant_t_IN_tenants" isHorizontal="true">
+      <bpmndi:BPMNShape id="Shape_Lane_1_EVERY_Director_d_IN_board" bpmnElement="Lane_1_EVERY_Director_d_IN_board" isHorizontal="true">
         <dc:Bounds x="160" y="80" width="740" height="160" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Shape_Lane_2_theLandlord" bpmnElement="Lane_2_theLandlord" isHorizontal="true">
+      <bpmndi:BPMNShape id="Shape_Lane_2_theChair" bpmnElement="Lane_2_theChair" isHorizontal="true">
         <dc:Bounds x="160" y="240" width="740" height="160" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_Lane_unassigned" bpmnElement="Lane_unassigned" isHorizontal="true">
@@ -78,7 +78,7 @@
       <bpmndi:BPMNShape id="Shape_Task_0" bpmnElement="Task_0">
         <dc:Bounds x="380" y="100" width="100" height="80" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Shape_Boundary_0" bpmnElement="Boundary_0">
+      <bpmndi:BPMNShape id="Shape_Lapse_0" bpmnElement="Lapse_0">
         <dc:Bounds x="434" y="162" width="36" height="36" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_Task_1" bpmnElement="Task_1">
@@ -105,13 +105,11 @@
         <di:waypoint x="494" y="300" />
         <di:waypoint x="560" y="300" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Edge_Flow_Boundary_0__End_3" bpmnElement="Flow_Boundary_0__End_3">
+      <bpmndi:BPMNEdge id="Edge_Flow_Lapse_0__Task_1" bpmnElement="Flow_Lapse_0__Task_1">
         <di:waypoint x="452" y="198" />
-        <di:waypoint x="520" y="198" />
-        <di:waypoint x="520" y="200" />
-        <di:waypoint x="700" y="200" />
-        <di:waypoint x="700" y="580" />
-        <di:waypoint x="772" y="580" />
+        <di:waypoint x="546" y="198" />
+        <di:waypoint x="546" y="300" />
+        <di:waypoint x="560" y="300" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Edge_Flow_Task_1__End_2" bpmnElement="Flow_Task_1__End_2">
         <di:waypoint x="660" y="300" />

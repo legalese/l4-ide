@@ -876,6 +876,32 @@ collection on the multi-instance activity (`ForEach has no collection expression
 class (d). What P2 still owes is the second half: the norm-plane drawing rule for "marked but not
 enabled", and `markingOf` against `Threshold`.
 
+**Reviewed the same day by the concurrency persona; verdict RESERVATIONS, all confirmed by
+re-execution, all fixed in the same branch.** (1) The multi-instance marker, exact for `MUST`,
+inverted a `SHANT` barrier (drawn as breaching only when _every_ member had offended; golden says
+one act) and a `MAY` barrier with a continuation (the lapse timer routed _into_ the chair's duty to
+publish a resolution that did not pass; `l4 run` says FULFILLED). Fixed: `completionCondition
+nrOfCompletedInstances >= 1` on a prohibition, read off R-Q5; and the state graph now draws a
+barrier-joined `MAY`'s lapse as a LEST arm to Fulfilled. (2) The fork's interrupting timer cancels
+every instance, so a continuation a member had already spawned is never drawn — an obligation L4
+says arose is absent and its breacher exonerated; new `P-FORK-CANCEL`. (3) `P-JOIN-DEADLINE` on a
+fork reported a loss that is not one: `joinStateDue` is `Nothing` for `JoinUpon`, so the runtime
+ignores it too; now Advisory, worded "dead in both". (4) The `<documentation>` asserted "drawn
+faithfully" unconditionally; now gated on the modal. One golden per modal × join cell
+(`jl4/examples/bpmn/modals.l4`) is what would have caught (1). **Two findings for P2 proper.**
+First, on E: the graphs are now _isomorphic automata with different labels_, not different
+automata — the join moved from dropped to carried as an edge annotation, which the exporter reads
+structurally (sound) and which nothing reasoning over structure can see. The recommended second-half
+rule, as an invariant: a barrier's continuation region is **1-safe**, a fork's **n-bounded** — draw
+arc multiplicity on the HENCE edge (1 out of a barrier's join, symbolic _n_ out of a fork's) and give
+the target place capacity 1 under a barrier, unbounded under a fork; the barrier's join place is a
+third norm-plane placement beside `InEffect`/`Violated`, marked with _k_ of _n_ completions and not
+enabled while _k < n_. Second, **a blocker on that second half: it is gated on a runtime change,
+not only a drawing rule.** `barrierFinish` (`Machine.hs`) records that the residual does not carry
+the join line — its members' HENCE/LEST slots hold the `` `the join` `` / `` `the join fails` ``
+sentinels — so `markingOf` cannot produce the join place from what the runtime hands it without
+sniffing user-visible strings. P2b's `DeonticStep` has to carry the join, or the residual has to.
+
 #### What follows for P2
 
 **This is P2's problem before it is P1's.** §5.1's division of labour gives P1 the shape and P2 the
