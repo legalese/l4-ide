@@ -41,7 +41,8 @@
 >   clock — R-Q7's unanchored default and R-Q5's failure time — BUILT 2026-09-16 on
 >   `every/lest-anchor`, witness `jl4/examples/ok/every/run-lest.l4`, mechanism and decisions
 >   under §5.2.1**; **R-X5 (the window's edges, modified) and R-X6 (the early act, ruled),
->   §5.1.2, 2026-09-07, not built**; and three on 2026-09-08 — **W3, `THE OPENING` declined and
+>   §5.1.2, 2026-09-07, not built; R-X5 AMENDED 2026-09-16 — bare `AFTER d1 WITHIN d2` re-anchors,
+>   two-offset is `WITHIN d2 OF THE JOIN` (§5.1.2.2)**; and three on 2026-09-08 — **W3, `THE OPENING` declined and
 >   the anchor slot ruled to become a trace expression (§5.1.3, direction only, not built)**, and
 >   **the roll call, how a run gets its cast (§11.0, ANSWERED and BUILT)**, and
 >   **the roll said outright, `EVERY Cast v IN xs` (§11.0.2, RULED by Meng and BUILT)**.
@@ -1056,7 +1057,7 @@ TemporalConstraint ::= 'WITHIN' Duration ['OF' Anchor]   -- 'OF' Anchor: the nam
                                       -- ('L4.Parser.deadline', Parser.hs:2724): in the Duration slot OF is the
                                       -- anchor, so an application there is written '(f OF x)' or 'f x'.
                      | 'BEFORE' Expr                      -- R-X5: an absolute DATE, the closing edge; 'BEFORE' Duration is refused. Unbuilt
-                     | 'AFTER' (Duration ['OF' Anchor] | Expr)   -- R-X5: the opening edge, duration or DATE; never re-anchors. Unbuilt
+                     | 'AFTER' (Duration ['OF' Anchor] | Expr)   -- R-X5: the opening edge, duration or DATE. RE-ANCHORS (RULED 2026-09-16, §5.1.2.2): the WITHIN beside it counts from this edge; two-offset is 'WITHIN d OF THE JOIN'. Unbuilt
                      | 'BY' Deadline                      -- unruled and unbuilt; TKBy serves FOLLOWED BY, DIVIDED BY, BREACH BY
 
 Anchor ::= 'THE' ('JOIN' | 'DEADLINE' | 'ARMING' | 'OPENING')   -- 'OPENING' proposed by R-X5 (§5.1.2), DECLINED (§5.1.3), unbuilt   -- R-Q7B: the three lifecycle positions. THE is already
@@ -2054,7 +2055,7 @@ silently, which the doc page says in one sentence; §5.1.3's expression-over-tra
 OPENING` (declined); `SOME m OF`. Also not done: a residual re-armed on a SECOND `App1` (nothing in
 `l4 run` does this) would resolve an unevaluated anchor at its second arming, not its first.
 
-#### 5.1.2 `AFTER` and `BEFORE`: the window's two edges — MODIFIED 2026-09-07 (R-X5); the early act RULED (R-X6); the origin the absolute forms needed RULED 2026-09-09 (T1, §5.1.2.1); not built
+#### 5.1.2 `AFTER` and `BEFORE`: the window's two edges — MODIFIED 2026-09-07 (R-X5); the early act RULED (R-X6); the origin the absolute forms needed RULED 2026-09-09 (T1, §5.1.2.1); **`AFTER … WITHIN` RE-ANCHORS, RULED 2026-09-16 (R-X5 amended, §5.1.2.2)**; not built
 
 This section answers the question in R-Q7A's note ("Shall we try to sketch a design for that now?").
 R-X6 is ruled and R-X5 is a design Meng modified and asked to have worked through; both are
@@ -2101,8 +2102,10 @@ does the corpus: measured 2026-09-07, every `WITHIN` argument in the tree is a n
 duration, none date-shaped. `AFTER` needs no second word because _after 5 days_ and _after 1 January_
 both read.
 
-**`AFTER` does not re-anchor.** Both edges measure from the same anchor, so the statutory two-offset
-window is the default and is written as the statute says it:
+~~**`AFTER` does not re-anchor.** Both edges measure from the same anchor, so the statutory two-offset
+window is the default and is written as the statute says it:~~ **STRUCK 2026-09-16 — see §5.1.2.2.**
+The paragraph and the block below are kept as the record of what this section said between
+2026-09-07 and 2026-09-16; the block's comment is what it USED to mean:
 
 ```
 AFTER  3 OF `delivery`
@@ -2241,6 +2244,81 @@ compile-time one will be surprised by the floating case.
 **Not built.** No `COMMENCING` keyword exists, the sorts are not separated, and R-X5 itself remains
 unbuilt. What has changed is that R-X5 is no longer blocked on an unanswered question, and that the
 two things to build are named.
+
+##### 5.1.2.2 `AFTER d1 WITHIN d2` re-anchors — RULED 2026-09-16 (Meng; R-X5 amended)
+
+**The ruling, in Meng's words (2026-09-16, in session):** _"Ok let's rule in favour of re-anchor.
+Two-offset explicitly `WITHIN … OF THE JOIN`."_ So:
+
+- **Bare `AFTER d1 WITHIN d2` is the re-anchored window, `[a+d1, a+d1+d2]`**: the `WITHIN` counts
+  from the instant the `AFTER` edge is reached, not from the anchor both edges would otherwise
+  share. On the worked trace (delivery at 10, `AFTER 3 WITHIN 30`): opens 13, closes **43**.
+- **The two-offset window is written with an explicit anchor on the closing edge**:
+  `AFTER 3 WITHIN 30 OF THE JOIN` — `[a+3, a+30]`, opens 13, closes 40. `OF THE JOIN` is R-Q7B's
+  spelling (§5.1.1), built on `every/anchors` (2026-09-15).
+- **The sentence "`AFTER` does not re-anchor" above is struck.** It was never a ruling. The
+  2026-09-07 morning sketch (`734b8015`) read `AFTER d OF a` as _re-anchoring_ — "it moves the
+  reference time to `a + d`, and everything downstream measures from the moved anchor" — and spelled
+  the two-offset window with `BEFORE`. Meng's R-X5 mark that afternoon reassigned `BEFORE` to
+  absolute dates, which removed the second duration word that told the two readings apart; the spec
+  then picked two-offset as the bare meaning with one sentence of reasoning and pushed the
+  re-anchored reading onto a fourth noun, `THE OPENING`, which W3 declined on measurement
+  (§5.1.3). The re-anchored default was thus lost as a side-effect, twice removed from any mark.
+- **What stands unchanged:** the type-directed table above (`AFTER d` / `AFTER <date>`, `WITHIN d` /
+  `BEFORE <date>`); R-X6 (an early act is a nullity, with a diagnostic); T1 (§5.1.2.1); W3 —
+  `THE OPENING` stays declined and is now unnecessary under either reading; §2.4's grammar, which
+  is unchanged (the comment on its `'AFTER'` line is corrected in this change).
+- **What changes downstream:** the empty-window check this section owed ("`AFTER 30 BEFORE 5` is an
+  empty window and should be an error") now applies only to the explicitly anchored form — bare
+  `AFTER 30 WITHIN 5` is `[a+30, a+35]` and can never be empty. `doc/reference/regulative/README.md`
+  and the `AFTER` page owed by track 7 teach the re-anchored reading first.
+
+**What decided it — three measurements, none of them the L4 corpus.**
+
+1. **History**, above: the re-anchored reading was the original and was dropped by accident.
+2. **Formalisms.** CSL, the contract calculus whose residuation rules this evaluator follows,
+   re-anchors: `after e1 within e2 ⇓τ (τ+n1, τ+n1+n2)` (Hvitved 2012, Fig. 2.6). A BPMN boundary
+   timer starts when the token reaches the task, so the re-anchored shape is what a process
+   modeller draws by default. MTL, TPTL and timed automata measure both edges from one clock — but
+   nobody drafts in them.
+3. **The wild text.** A 7.66-million-phrase extraction over the drafting-register subsets of the
+   Pile of Law (legislation: uscode, cfr, state*code, eurlex, us_bills, federal_register, frcp, fre,
+   constitutions; contracts: atticus_contracts, edgar, resource_contracts, cfpb_cc, tos), a
+   stratified sample of 3,040 phrases classified by agents and blind-audited (20 of 80 per stratum),
+   population estimates with Wilson intervals, recorded in
+   `specs/todo/EVERY-EACH-WINDOW-CORPUS-EVIDENCE-2026-09-16.md` beside this file. Re-anchored
+   windows edge out two-offset windows in both registers — contracts ≈ 89 k two-offset against
+   ≈ 137 k re-anchored (0.65 : 1), legislation ≈ 30 k against ≈ 37 k (0.80 : 1); the direct
+   measurement, phrases carrying both an opening and a closing edge, is 0 : 4 in legislation and
+   1 : 3 in contracts. Both shapes together are 1–3 % of deadline phrases; the single closing edge
+   is 97 %. **The decisive finding is qualitative: English never writes two bare offsets.** The
+   two-offset shape is always *"not less than X nor more than Y before/after E"_ — paired
+   comparators, and in contracts mostly \_backward_ from a future event — and the re-anchored shape
+   is always _"within d2 after the end of the ⟨named⟩ period"_. Neither wild form is
+   `AFTER d1 WITHIN d2`, so isomorphism cannot pick the bare reading; the cost argument does: under
+   re-anchor the other shape needs an anchor that exists (`OF THE JOIN`); under two-offset it needs a
+   noun that was declined or arithmetic on lifecycle values that is not built (§5.1.3 bench, B1).
+
+**Footnote 1 — misgivings about the word `JOIN`, recorded at Meng's request.** Meng, 2026-09-16:
+_"I have been racking my brains to find a better phrasing. 'Of the event'? 'Of the trigger'? Let's
+go with 'OF THE JOIN' for now but footnote this as misgivings."_ `JOIN` is a term of art from the
+barrier's mechanics (the point at which `ONCE ALL HAVE` fires); for a single-party obligation it
+names the completing event, and for the drafter of a cooling-off clause it names nothing they
+would say. The two alternatives weighed — `OF THE EVENT`, `OF THE TRIGGER` — are closer to a
+drafter's vocabulary but each collides with something: `EVENT` is what a trace is made of and would
+invite _which_ event; `TRIGGER` reads as the arming, which is a different anchor (`THE ARMING`).
+The spelling is R-Q7B's (§5.1.1, ruled 2026-09-07, built 2026-09-15); changing it later is a rename of
+one spelling-matched noun, not a grammar change, so the cost of deferring is low. **Open.**
+
+**Footnote 2 — why the word matters.** Guzdial, _"Dijkstra Was Wrong About 'Radical Novelty':
+Metaphors in CS Education"_, BLOG@CACM, 30 November 2020
+(<https://cacm.acm.org/blogcacm/dijkstra-was-wrong-about-radical-novelty-metaphors-in-cs-education/>):
+Dijkstra's _On the Cruelty of Really Teaching Computing Science_ (EWD 1036, 1988) held that computing
+is a "radical novelty" to be learned without metaphor; the learning-sciences record since says the
+opposite — _"I'm not aware of any evidence of anyone teaching or learning CS without metaphor."_
+The anchor noun is the drafter's metaphor for a time point they already have a word for in their
+own practice; a machine term in that slot asks them to learn ours. That is the reason the misgiving
+above is recorded rather than waved off.
 
 #### 5.1.3 `THE OPENING` declined; the anchor slot becomes an expression over the trace. RULED 2026-09-08 (W3)
 
