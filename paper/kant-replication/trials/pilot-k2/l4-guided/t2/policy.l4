@@ -1,0 +1,221 @@
+IMPORT prelude
+
+§ `Codex Insurance Policy -- fact schema, helpers, and coverage rule`
+
+§§ `Fact schema`
+
+-- Verbatim from bench/schema-l4.md, EXCEPT that the multi-word field names inside
+-- `DECLARE Claim HAS ...` have been backtick-quoted. schema-l4.md's own header says it is
+-- "mechanically derived", and its two supporting-helper GIVEN blocks correctly backtick-quote
+-- their multi-word parameters (`` `event month` ``, `` `limit month` ``) -- but the `HAS`
+-- block below them left its multi-word field names bare (`agreement signed IS A BOOLEAN`,
+-- etc.). An unquoted multi-word span is not a legal L4 identifier -- see
+-- doc/reference/syntax/identifier-example.l4, and every multi-word record field anywhere in
+-- jl4-core/libraries (e.g. `` `Contract Event` ``'s fields), which are either single
+-- camelCase words or backtick-quoted. Quoting here is a pure syntax fix: no field is renamed,
+-- added, removed, or retyped. See NOTES.md.
+
+DECLARE Ground IS ONE OF Sickness, `Accidental injury`, Neither
+
+DECLARE Cause IS ONE OF
+  Skydiving, `Military service`, Firefighting, `Police service`, Other
+
+DECLARE Claim
+  HAS `agreement signed`                        IS A BOOLEAN
+      `premium paid month`                      IS A MAYBE NUMBER
+      `hospitalization month`                   IS A NUMBER
+      `hospitalization ground`                  IS A Ground
+      `age at hospitalization`                  IS A NUMBER
+      causes                                    IS A LIST OF Cause
+      `fraud month`                             IS A MAYBE NUMBER
+      `misrepresentation month`                 IS A MAYBE NUMBER
+      `wellness visit month`                    IS A MAYBE NUMBER
+      `wellness visit provider qualified`       IS A BOOLEAN
+      `written confirmation month`              IS A MAYBE NUMBER
+      `dispute arisen`                          IS A BOOLEAN
+      `unable to settle month`                  IS A MAYBE NUMBER
+      `arbitration commenced month`             IS A MAYBE NUMBER
+      `valid arbitration award issued`          IS A BOOLEAN
+      `written proof of claim month`            IS A MAYBE NUMBER
+      `recovery sought month`                   IS A MAYBE NUMBER
+      `policy term months`                      IS A NUMBER
+
+§§ `Supporting helpers (verbatim, pre-defined by bench/schema-l4.md -- do not redefine)`
+
+GIVEN  `event month` IS A MAYBE NUMBER
+       `limit month` IS A NUMBER
+GIVETH A BOOLEAN
+`no later than` MEANS
+  CONSIDER `event month`
+    WHEN NOTHING THEN FALSE
+    WHEN JUST m  THEN m AT MOST `limit month`
+
+GIVEN  cs IS A LIST OF Cause
+       c  IS A Cause
+GIVETH A BOOLEAN
+`arose out of` MEANS elem c cs
+
+§§ `Additional low-level helpers used by covered`
+-- Not equivalents of the two helpers above -- these test presence and relative-gap facts,
+-- not no-later-than-a-fixed-limit facts.
+
+GIVEN `event month` IS A MAYBE NUMBER
+GIVETH A BOOLEAN
+`has occurred` MEANS
+  CONSIDER `event month`
+    WHEN NOTHING THEN FALSE
+    WHEN JUST v  THEN TRUE
+
+GIVEN `earlier event month` IS A MAYBE NUMBER
+      `later event month`   IS A MAYBE NUMBER
+      `allowed gap`         IS A NUMBER
+GIVETH A BOOLEAN
+`commenced within period after` MEANS
+  CONSIDER `earlier event month`
+    WHEN NOTHING THEN FALSE
+    WHEN JUST e  THEN
+      CONSIDER `later event month`
+        WHEN NOTHING THEN FALSE
+        WHEN JUST l THEN (l MINUS e) AT MOST `allowed gap`
+
+§ `1. Policy in effect and conditions`
+
+§§ `1.1 (preamble) -- hospitalization must be for sickness or accidental injury`
+-- A benefit is premised only on hospitalization for sickness or accidental injury;
+-- hospitalization for some other reason is not a covered event type at all.
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`hospitalization is for sickness or accidental injury` claim MEANS
+    CONSIDER claim's `hospitalization ground`
+      WHEN Neither THEN FALSE
+      OTHERWISE    TRUE
+
+§§ `1.1(2) -- the premium has been paid`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `premium has been paid` claim IF
+    `has occurred` (claim's `premium paid month`)
+
+§§ `1.1(3) / 1.3 -- the wellness-visit condition`
+-- Still pending, or satisfied in a timely fashion.
+--
+-- "No later than the 7th month anniversary ... you will supply ... written confirmation
+-- ... of a wellness visit ... occurring no later than the 6th month anniversary." Read
+-- together with 1.1(3) ("still pending or has been satisfied in a timely fashion") and
+-- 1.2's mirroring cancellation trigger ("has not been satisfied in a timely fashion"), this
+-- is a single compound obligation that falls due, as a whole, at the month-7 mark: before
+-- month 7 nothing has come due yet ("still pending"), so it cannot yet have failed; at or
+-- after month 7 it must actually have been satisfied. See NOTES.md.
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `wellness visit condition still pending` claim IF
+    (claim's `hospitalization month`) LESS THAN 7
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `wellness visit condition satisfied in a timely fashion` claim IF
+        `no later than` (claim's `written confirmation month`) 7
+    AND `no later than` (claim's `wellness visit month`) 6
+    AND claim's `wellness visit provider qualified`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `wellness visit condition met` claim IF
+        `wellness visit condition still pending` claim
+    OR  `wellness visit condition satisfied in a timely fashion` claim
+
+§§ `1.2 -- cancellation`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `fraud has occurred` claim IF
+    `has occurred` (claim's `fraud month`)
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `misrepresentation has occurred` claim IF
+    `has occurred` (claim's `misrepresentation month`)
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `hospitalization within the policy term` claim IF
+    (claim's `hospitalization month`) AT MOST (claim's `policy term months`)
+
+-- Item 3 above (the wellness-visit condition) and this "not canceled" item overlap: 1.2's
+-- third cancellation trigger ("the condition in 1.3 has not been satisfied in a timely
+-- fashion") is the same fact as `wellness visit condition met` above, just double-negated.
+-- Both citations are kept, matching the contract's own restatement, rather than deduplicated
+-- away.
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `policy has not been canceled` claim IF
+    NOT (   `fraud has occurred` claim
+        OR  `misrepresentation has occurred` claim
+        OR  NOT (`wellness visit condition met` claim)
+        OR  NOT (`hospitalization within the policy term` claim)
+        )
+
+§ `2. General exclusions`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `excluded under the general exclusions` claim IF
+        `arose out of` (claim's causes) Skydiving
+    OR  `arose out of` (claim's causes) `Military service`
+    OR  `arose out of` (claim's causes) Firefighting
+    OR  `arose out of` (claim's causes) `Police service`
+    OR  (claim's `age at hospitalization`) AT LEAST 80
+
+§ `3. General conditions`
+
+§§ `3.1 -- worldwide, 24-hour coverage`
+-- Purely expansive; imposes no additional condition on `covered`.
+
+§§ `3.2 -- arbitration, and the 60-day pre-suit waiting period`
+
+-- The "unable to settle / arbitration commenced / valid arbitration award" sub-clause is
+-- conditional on a dispute having arisen at all.
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `dispute has been properly arbitrated` claim IF
+    NOT (claim's `dispute arisen`)
+    OR  (    `commenced within period after` (claim's `unable to settle month`) (claim's `arbitration commenced month`) 3
+         AND claim's `valid arbitration award issued`
+        )
+
+-- "In no case shall You seek to recover on this Policy before the expiration of sixty (60)
+-- days after written proof of claim has been submitted." This sentence is phrased
+-- unconditionally ("in no case"), unlike the dispute/arbitration sentences before it, so it
+-- is treated as applying regardless of whether a dispute arose. Every other month-valued
+-- fact in this schema is in whole (or half) MONTHS; 60 days is taken as 2 months (60 / 30)
+-- for unit consistency -- see NOTES.md. If recovery has not been sought at all, the clause
+-- is not yet violated.
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`recovery not sought before the waiting period expired` claim MEANS
+    CONSIDER claim's `recovery sought month`
+      WHEN NOTHING THEN TRUE
+      WHEN JUST r  THEN
+        CONSIDER claim's `written proof of claim month`
+          WHEN NOTHING THEN FALSE
+          WHEN JUST w  THEN r AT LEAST (w PLUS 2)
+
+§ `covered`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE covered claim IF
+        `hospitalization is for sickness or accidental injury` claim
+    AND claim's `agreement signed`
+    AND `premium has been paid` claim
+    AND `wellness visit condition met` claim
+    AND `policy has not been canceled` claim
+    AND NOT (`excluded under the general exclusions` claim)
+    AND `dispute has been properly arbitrated` claim
+    AND `recovery not sought before the waiting period expired` claim

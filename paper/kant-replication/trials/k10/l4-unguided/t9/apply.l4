@@ -1,0 +1,171 @@
+IMPORT policy
+
+-- Standing preamble applied to every question below (per fixtures/queries-blind.md):
+-- assume all conditions for the policy to apply that are unrelated to the query are
+-- met, and that no exclusion unrelated to the query applies. Also assume the
+-- agreement has been signed and the premium paid on time (policy.l4 does not model
+-- those conditions at all, per the encoding brief).
+--
+-- Every field not mentioned by a given question is therefore set to a "safe" value:
+-- no excluded cause, no fraud, age comfortably under 80, and the wellness-visit
+-- condition satisfied early (occurred and confirmed at month 1). The one exception
+-- is the hospitalization's own timing, which is set to an arbitrary month within the
+-- one-year policy term whenever the question does not state it, since some timing
+-- value is always required by the type.
+
+§ `Q1 -- burns suffered while on duty as a fire fighter`
+
+q1 MEANS Claim WITH
+    `hospitalization is for sickness or accidental injury`                        IS TRUE
+    `age at hospitalization`                                                      IS 40
+    `hospitalization arose out of skydiving`                                      IS FALSE
+    `hospitalization arose out of military service`                               IS FALSE
+    `hospitalization arose out of fire fighter service`                           IS TRUE
+    `hospitalization arose out of police service`                                 IS FALSE
+    `committed fraud misrepresentation or material withholding`                   IS FALSE
+    `months after the effective date that the wellness visit occurred`           IS JUST 1
+    `months after the effective date that wellness visit confirmation was given` IS JUST 1
+    `months after the effective date of the hospitalization`                     IS 1
+
+#EVAL covered q1
+
+
+§ `Q2 -- age 78 at the time of hospitalization`
+
+q2 MEANS Claim WITH
+    `hospitalization is for sickness or accidental injury`                        IS TRUE
+    `age at hospitalization`                                                      IS 78
+    `hospitalization arose out of skydiving`                                      IS FALSE
+    `hospitalization arose out of military service`                               IS FALSE
+    `hospitalization arose out of fire fighter service`                           IS FALSE
+    `hospitalization arose out of police service`                                 IS FALSE
+    `committed fraud misrepresentation or material withholding`                   IS FALSE
+    `months after the effective date that the wellness visit occurred`           IS JUST 1
+    `months after the effective date that wellness visit confirmation was given` IS JUST 1
+    `months after the effective date of the hospitalization`                     IS 1
+
+#EVAL covered q2
+
+
+§ `Q3 -- pneumonia, 5 months after the effective date, age 65`
+
+q3 MEANS Claim WITH
+    `hospitalization is for sickness or accidental injury`                        IS TRUE
+    `age at hospitalization`                                                      IS 65
+    `hospitalization arose out of skydiving`                                      IS FALSE
+    `hospitalization arose out of military service`                               IS FALSE
+    `hospitalization arose out of fire fighter service`                           IS FALSE
+    `hospitalization arose out of police service`                                 IS FALSE
+    `committed fraud misrepresentation or material withholding`                   IS FALSE
+    `months after the effective date that the wellness visit occurred`           IS JUST 1
+    `months after the effective date that wellness visit confirmation was given` IS JUST 1
+    `months after the effective date of the hospitalization`                     IS 5
+
+#EVAL covered q3
+
+
+§ `Q4 -- fall while traveling abroad; wellness confirmation given 8 months after the effective date`
+
+q4 MEANS Claim WITH
+    `hospitalization is for sickness or accidental injury`                        IS TRUE
+    `age at hospitalization`                                                      IS 40
+    `hospitalization arose out of skydiving`                                      IS FALSE
+    `hospitalization arose out of military service`                               IS FALSE
+    `hospitalization arose out of fire fighter service`                           IS FALSE
+    `hospitalization arose out of police service`                                 IS FALSE
+    `committed fraud misrepresentation or material withholding`                   IS FALSE
+    `months after the effective date that the wellness visit occurred`           IS JUST 1
+    `months after the effective date that wellness visit confirmation was given` IS JUST 8
+    `months after the effective date of the hospitalization`                     IS 8
+
+#EVAL covered q4
+
+
+§ `Q5 -- punched own face to show off; no fraud or misrepresentation`
+
+q5 MEANS Claim WITH
+    `hospitalization is for sickness or accidental injury`                        IS TRUE
+    `age at hospitalization`                                                      IS 30
+    `hospitalization arose out of skydiving`                                      IS FALSE
+    `hospitalization arose out of military service`                               IS FALSE
+    `hospitalization arose out of fire fighter service`                           IS FALSE
+    `hospitalization arose out of police service`                                 IS FALSE
+    `committed fraud misrepresentation or material withholding`                   IS FALSE
+    `months after the effective date that the wellness visit occurred`           IS JUST 1
+    `months after the effective date that wellness visit confirmation was given` IS JUST 1
+    `months after the effective date of the hospitalization`                     IS 1
+
+#EVAL covered q5
+
+
+§ `Q6 -- skydiving injury, age 79, wellness proof provided 6.5 months after the effective date`
+
+q6 MEANS Claim WITH
+    `hospitalization is for sickness or accidental injury`                        IS TRUE
+    `age at hospitalization`                                                      IS 79
+    `hospitalization arose out of skydiving`                                      IS TRUE
+    `hospitalization arose out of military service`                               IS FALSE
+    `hospitalization arose out of fire fighter service`                           IS FALSE
+    `hospitalization arose out of police service`                                 IS FALSE
+    `committed fraud misrepresentation or material withholding`                   IS FALSE
+    `months after the effective date that the wellness visit occurred`           IS JUST 1
+    `months after the effective date that wellness visit confirmation was given` IS JUST 6.5
+    `months after the effective date of the hospitalization`                     IS 5
+
+#EVAL covered q6
+
+
+§ `Q7 -- heart attack, wellness proof submitted 2 months after the effective date, age 75`
+
+q7 MEANS Claim WITH
+    `hospitalization is for sickness or accidental injury`                        IS TRUE
+    `age at hospitalization`                                                      IS 75
+    `hospitalization arose out of skydiving`                                      IS FALSE
+    `hospitalization arose out of military service`                               IS FALSE
+    `hospitalization arose out of fire fighter service`                           IS FALSE
+    `hospitalization arose out of police service`                                 IS FALSE
+    `committed fraud misrepresentation or material withholding`                   IS FALSE
+    `months after the effective date that the wellness visit occurred`           IS JUST 1
+    `months after the effective date that wellness visit confirmation was given` IS JUST 2
+    `months after the effective date of the hospitalization`                     IS 3
+
+#EVAL covered q7
+
+
+§ `Q8 -- injured in a military training exercise, within the policy term, no fraud`
+
+q8 MEANS Claim WITH
+    `hospitalization is for sickness or accidental injury`                        IS TRUE
+    `age at hospitalization`                                                      IS 30
+    `hospitalization arose out of skydiving`                                      IS FALSE
+    `hospitalization arose out of military service`                               IS TRUE
+    `hospitalization arose out of fire fighter service`                           IS FALSE
+    `hospitalization arose out of police service`                                 IS FALSE
+    `committed fraud misrepresentation or material withholding`                   IS FALSE
+    `months after the effective date that the wellness visit occurred`           IS JUST 1
+    `months after the effective date that wellness visit confirmation was given` IS JUST 1
+    `months after the effective date of the hospitalization`                     IS 3
+
+#EVAL covered q8
+
+
+§ `Q9 -- son bit claimant's ankle; wellness proof provided 6 months after the effective date; claimant was serving as a police officer at the time`
+
+-- Judgement call: the cause of the hospitalization (a child biting his parent's
+-- ankle) does not arise out of police service, even though the claimant happened
+-- to be serving as a police officer at the time. Section 2.1(4) excludes events
+-- that arise "directly or indirectly out of" service in the police, not every
+-- event that happens to a person who is a police officer. See NOTES.md.
+q9 MEANS Claim WITH
+    `hospitalization is for sickness or accidental injury`                        IS TRUE
+    `age at hospitalization`                                                      IS 35
+    `hospitalization arose out of skydiving`                                      IS FALSE
+    `hospitalization arose out of military service`                               IS FALSE
+    `hospitalization arose out of fire fighter service`                           IS FALSE
+    `hospitalization arose out of police service`                                 IS FALSE
+    `committed fraud misrepresentation or material withholding`                   IS FALSE
+    `months after the effective date that the wellness visit occurred`           IS JUST 1
+    `months after the effective date that wellness visit confirmation was given` IS JUST 6
+    `months after the effective date of the hospitalization`                     IS 6
+
+#EVAL covered q9

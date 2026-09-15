@@ -1,0 +1,25 @@
+The following is the prompt used in the Vanilla LLM approach described in §3.1.
+
+– Below, you are provided
+1. The full text of an insurance contract
+2. A specific question about whether a claim in the given scenario is covered under the terms of
+this insurance contract
+
+13
+  – Assume that the policy agreement has been signed, and the premium has been paid on time.
+
+– Assume that all other conditions are satisfied, and no exclusions apply unless explicitly referenced in
+the query.
+
+– Your task:
+1. Evaluate whether the claim described in the question is covered under the insurance contract.
+2. Respond with **only** one of the following: “Yes”, “No”, or “I do not know”.
+3. Do not provide any explanations or reasoning.
+
+– Insurance contract: {text_content}
+
+– Question: {query}
+
+A.3.2 Prompt for Unguided Prolog Generation
+The following is the prompt used in §3.2 to generate Chubb insurance policy encoding.
+

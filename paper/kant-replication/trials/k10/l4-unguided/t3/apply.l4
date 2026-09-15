@@ -1,0 +1,179 @@
+IMPORT prelude
+IMPORT policy
+
+-- Per-claim data for the nine benchmark questions. Standing preamble applied
+-- to every question (per fixtures/queries-blind.md): "Assuming all other
+-- conditions are met and no other exclusions apply (where by 'other,' I mean
+-- anything not referenced in the query that follows)", and the agreement is
+-- signed with the premium paid on time. So every field not mentioned by a
+-- given question is set to a value that keeps it out of the way: no fraud,
+-- no misrepresentation, no withheld information, no excluded activity, an
+-- age well under 80, an early hospitalization date well inside the one-year
+-- term, and NOTHING (not yet due/known) for the wellness-visit fields.
+--
+-- Judgement call (see NOTES.md for the full discussion): a question that
+-- says only "confirmation/proof of my wellness visit was provided/submitted
+-- N months after the effective date" is read as fixing the SUBMISSION time
+-- (Section 1.3's 7-month deadline) only. The underlying visit's own
+-- occurrence date is a distinct fact that none of the nine questions states,
+-- so it is left as NOTHING (not known to be late) rather than assumed equal
+-- to the submission date.
+
+§ `Q1 -- burns suffered while on firefighting duty`
+
+q1 MEANS Hospitalization WITH
+    `age at hospitalization`                                            IS 40
+    `hospitalization months after effective date`                       IS 1
+    `wellness visit confirmation submitted months after effective date` IS NOTHING
+    `wellness visit occurred months after effective date`               IS NOTHING
+    `fraud committed`                                                   IS FALSE
+    `misrepresentation committed`                                       IS FALSE
+    `material information withheld`                                     IS FALSE
+    `caused by skydiving`                                               IS FALSE
+    `caused by military service`                                        IS FALSE
+    `caused by firefighting service`                                    IS TRUE
+    `caused by police service`                                          IS FALSE
+
+#EVAL `covered` q1
+
+§ `Q2 -- age 78 at time of hospitalization`
+
+q2 MEANS Hospitalization WITH
+    `age at hospitalization`                                            IS 78
+    `hospitalization months after effective date`                       IS 1
+    `wellness visit confirmation submitted months after effective date` IS NOTHING
+    `wellness visit occurred months after effective date`               IS NOTHING
+    `fraud committed`                                                   IS FALSE
+    `misrepresentation committed`                                       IS FALSE
+    `material information withheld`                                     IS FALSE
+    `caused by skydiving`                                               IS FALSE
+    `caused by military service`                                        IS FALSE
+    `caused by firefighting service`                                    IS FALSE
+    `caused by police service`                                          IS FALSE
+
+#EVAL `covered` q2
+
+§ `Q3 -- pneumonia, 5 months after effective date, age 65`
+
+q3 MEANS Hospitalization WITH
+    `age at hospitalization`                                            IS 65
+    `hospitalization months after effective date`                       IS 5
+    `wellness visit confirmation submitted months after effective date` IS NOTHING
+    `wellness visit occurred months after effective date`               IS NOTHING
+    `fraud committed`                                                   IS FALSE
+    `misrepresentation committed`                                       IS FALSE
+    `material information withheld`                                     IS FALSE
+    `caused by skydiving`                                               IS FALSE
+    `caused by military service`                                        IS FALSE
+    `caused by firefighting service`                                    IS FALSE
+    `caused by police service`                                          IS FALSE
+
+#EVAL `covered` q3
+
+§ `Q4 -- fall while traveling abroad, confirmation given 8 months after effective date`
+
+q4 MEANS Hospitalization WITH
+    `age at hospitalization`                                            IS 40
+    `hospitalization months after effective date`                       IS 1
+    `wellness visit confirmation submitted months after effective date` IS JUST 8
+    `wellness visit occurred months after effective date`               IS NOTHING
+    `fraud committed`                                                   IS FALSE
+    `misrepresentation committed`                                       IS FALSE
+    `material information withheld`                                     IS FALSE
+    `caused by skydiving`                                               IS FALSE
+    `caused by military service`                                        IS FALSE
+    `caused by firefighting service`                                    IS FALSE
+    `caused by police service`                                          IS FALSE
+
+#EVAL `covered` q4
+
+§ `Q5 -- punched own face to show off for friends, no fraud or misrepresentation`
+
+q5 MEANS Hospitalization WITH
+    `age at hospitalization`                                            IS 40
+    `hospitalization months after effective date`                       IS 1
+    `wellness visit confirmation submitted months after effective date` IS NOTHING
+    `wellness visit occurred months after effective date`               IS NOTHING
+    `fraud committed`                                                   IS FALSE
+    `misrepresentation committed`                                       IS FALSE
+    `material information withheld`                                     IS FALSE
+    `caused by skydiving`                                               IS FALSE
+    `caused by military service`                                        IS FALSE
+    `caused by firefighting service`                                    IS FALSE
+    `caused by police service`                                          IS FALSE
+
+#EVAL `covered` q5
+
+§ `Q6 -- skydiving injury, age 79, wellness proof provided 6.5 months after effective date`
+
+q6 MEANS Hospitalization WITH
+    `age at hospitalization`                                            IS 79
+    `hospitalization months after effective date`                       IS 1
+    `wellness visit confirmation submitted months after effective date` IS JUST 6.5
+    `wellness visit occurred months after effective date`               IS NOTHING
+    `fraud committed`                                                   IS FALSE
+    `misrepresentation committed`                                       IS FALSE
+    `material information withheld`                                     IS FALSE
+    `caused by skydiving`                                               IS TRUE
+    `caused by military service`                                        IS FALSE
+    `caused by firefighting service`                                    IS FALSE
+    `caused by police service`                                          IS FALSE
+
+#EVAL `covered` q6
+
+§ `Q7 -- heart attack, wellness proof submitted 2 months after effective date, age 75`
+
+q7 MEANS Hospitalization WITH
+    `age at hospitalization`                                            IS 75
+    `hospitalization months after effective date`                       IS 1
+    `wellness visit confirmation submitted months after effective date` IS JUST 2
+    `wellness visit occurred months after effective date`               IS NOTHING
+    `fraud committed`                                                   IS FALSE
+    `misrepresentation committed`                                       IS FALSE
+    `material information withheld`                                     IS FALSE
+    `caused by skydiving`                                               IS FALSE
+    `caused by military service`                                        IS FALSE
+    `caused by firefighting service`                                    IS FALSE
+    `caused by police service`                                          IS FALSE
+
+#EVAL `covered` q7
+
+§ `Q8 -- injured in a military training exercise, within the policy term, no fraud`
+
+q8 MEANS Hospitalization WITH
+    `age at hospitalization`                                            IS 40
+    `hospitalization months after effective date`                       IS 3
+    `wellness visit confirmation submitted months after effective date` IS NOTHING
+    `wellness visit occurred months after effective date`               IS NOTHING
+    `fraud committed`                                                   IS FALSE
+    `misrepresentation committed`                                       IS FALSE
+    `material information withheld`                                     IS FALSE
+    `caused by skydiving`                                               IS FALSE
+    `caused by military service`                                        IS TRUE
+    `caused by firefighting service`                                    IS FALSE
+    `caused by police service`                                          IS FALSE
+
+#EVAL `covered` q8
+
+§ `Q9 -- son bit claimant's ankle, wellness proof provided 6 months after effective date, serving as police at the time`
+
+-- The stated cause of the hospitalization is the son's bite, not the
+-- claimant's police service; merely being on duty at the time an unrelated
+-- domestic injury occurs does not mean the injury "arises directly or
+-- indirectly out of" police service (Section 2.1). So `caused by police
+-- service` is FALSE here -- see NOTES.md.
+
+q9 MEANS Hospitalization WITH
+    `age at hospitalization`                                            IS 40
+    `hospitalization months after effective date`                       IS 1
+    `wellness visit confirmation submitted months after effective date` IS JUST 6
+    `wellness visit occurred months after effective date`               IS NOTHING
+    `fraud committed`                                                   IS FALSE
+    `misrepresentation committed`                                       IS FALSE
+    `material information withheld`                                     IS FALSE
+    `caused by skydiving`                                               IS FALSE
+    `caused by military service`                                        IS FALSE
+    `caused by firefighting service`                                    IS FALSE
+    `caused by police service`                                          IS FALSE
+
+#EVAL `covered` q9

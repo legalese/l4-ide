@@ -1,0 +1,552 @@
+{
+ "kind": "hitl-witness-triage",
+ "subject": "chubb",
+ "adjudicator": "Meng Wong (domain expert, HITL)",
+ "date": "2026-09-01",
+ "instrument": "the '107 Witnesses' triage page, artifact 15efa834-30cb-4b81-b068-cd0108f51368, final version 1788270039-c0f7",
+ "note": "Verdict values: corpus = the corpus encoding reads the clause correctly; denovo = the de novo does; both = both readings defensible; unsure = adjudication reserved. Verdicts recorded verbatim from the page's #verdict-state; notes are the adjudicator's own words. 'bulk-applied across group' marks a verdict spread by the page's bulk control after a ruling on a representative card.",
+ "counts": {
+  "total": 107,
+  "corpus": 28,
+  "denovo": 17,
+  "both": 9,
+  "unsure": 53
+ },
+ "verdicts": {
+  "cancel-ground-1-3/s10m1": {
+   "v": "corpus",
+   "note": "",
+   "at": 1788222632715
+  },
+  "cancel-ground-1-3/s1m31": {
+   "v": "corpus",
+   "note": "",
+   "at": 1788222728073
+  },
+  "cancel-ground-1-3/s6": {
+   "v": "corpus",
+   "note": "bulk-applied across group",
+   "at": 1788222760463
+  },
+  "cancel-ground-1-3/s6m0": {
+   "v": "corpus",
+   "note": "bulk-applied across group",
+   "at": 1788222755698
+  },
+  "cancel-ground-1-3/s6m14": {
+   "v": "corpus",
+   "note": "bulk-applied across group",
+   "at": 1788222755698
+  },
+  "cancel-ground-1-3/s6m23": {
+   "v": "corpus",
+   "note": "bulk-applied across group",
+   "at": 1788222755698
+  },
+  "cancel-ground-1-3/s6m32": {
+   "v": "corpus",
+   "note": "bulk-applied across group",
+   "at": 1788222755698
+  },
+  "cancel-ground-1-3/s6m40": {
+   "v": "corpus",
+   "note": "bulk-applied across group",
+   "at": 1788222755698
+  },
+  "cancel-ground-1-3/s6m41": {
+   "v": "corpus",
+   "note": "bulk-applied across group",
+   "at": 1788222755698
+  },
+  "clause-1-3-pending/s0m30": {
+   "v": "corpus",
+   "note": "bulk-applied across group",
+   "at": 1788222755698
+  },
+  "clause-1-3-pending/s10m1": {
+   "v": "corpus",
+   "note": "bulk-applied across group",
+   "at": 1788222755698
+  },
+  "clause-1-3-pending/s11": {
+   "v": "corpus",
+   "note": "bulk-applied across group",
+   "at": 1788222755698
+  },
+  "clause-1-3-pending/s11m0": {
+   "v": "corpus",
+   "note": "bulk-applied across group",
+   "at": 1788222755698
+  },
+  "clause-1-3-pending/s11m1": {
+   "v": "corpus",
+   "note": "bulk-applied across group",
+   "at": 1788222755698
+  },
+  "clause-1-3-pending/s11m14": {
+   "v": "corpus",
+   "note": "bulk-applied across group",
+   "at": 1788222755698
+  },
+  "clause-1-3-pending/s11m23": {
+   "v": "corpus",
+   "note": "bulk-applied across group",
+   "at": 1788222755698
+  },
+  "clause-1-3-pending/s11m31": {
+   "v": "corpus",
+   "note": "bulk-applied across group",
+   "at": 1788222755698
+  },
+  "clause-1-3-pending/s11m39": {
+   "v": "corpus",
+   "note": "bulk-applied across group",
+   "at": 1788222755698
+  },
+  "clause-1-3-pending/s11m40": {
+   "v": "corpus",
+   "note": "bulk-applied across group",
+   "at": 1788222755698
+  },
+  "clause-1-3-pending/s6": {
+   "v": "corpus",
+   "note": "bulk-applied across group",
+   "at": 1788222755698
+  },
+  "clause-1-3-pending/s6m0": {
+   "v": "corpus",
+   "note": "bulk-applied across group",
+   "at": 1788222755698
+  },
+  "clause-1-3-pending/s6m14": {
+   "v": "corpus",
+   "note": "bulk-applied across group",
+   "at": 1788222755698
+  },
+  "clause-1-3-pending/s6m23": {
+   "v": "corpus",
+   "note": "bulk-applied across group",
+   "at": 1788222755698
+  },
+  "clause-1-3-pending/s6m30": {
+   "v": "corpus",
+   "note": "bulk-applied across group",
+   "at": 1788222755698
+  },
+  "clause-1-3-pending/s6m32": {
+   "v": "corpus",
+   "note": "bulk-applied across group",
+   "at": 1788222755698
+  },
+  "clause-1-3-pending/s6m40": {
+   "v": "corpus",
+   "note": "bulk-applied across group",
+   "at": 1788222755698
+  },
+  "clause-1-3-pending/s6m41": {
+   "v": "corpus",
+   "note": "bulk-applied across group",
+   "at": 1788222755698
+  },
+  "cancelation/s16": {
+   "v": "corpus",
+   "note": "",
+   "at": 1788222761294
+  },
+  "cancelation/s16m0": {
+   "v": "denovo",
+   "note": "",
+   "at": 1788222950873
+  },
+  "cancelation/s16m1": {
+   "v": "denovo",
+   "note": "",
+   "at": 1788222941271
+  },
+  "cancelation/s16m14": {
+   "v": "denovo",
+   "note": "",
+   "at": 1788226051353
+  },
+  "cancelation/s16m23": {
+   "v": "denovo",
+   "note": "",
+   "at": 1788226056501
+  },
+  "cancelation/s16m30": {
+   "v": "denovo",
+   "note": "bulk-applied across group",
+   "at": 1788226061640
+  },
+  "cancelation/s16m31": {
+   "v": "denovo",
+   "note": "bulk-applied across group",
+   "at": 1788226061640
+  },
+  "cancelation/s16m39": {
+   "v": "denovo",
+   "note": "bulk-applied across group",
+   "at": 1788226061640
+  },
+  "cancelation/s16m40": {
+   "v": "denovo",
+   "note": "bulk-applied across group",
+   "at": 1788226061640
+  },
+  "cancelation/s1m2": {
+   "v": "denovo",
+   "note": "bulk-applied across group",
+   "at": 1788226061640
+  },
+  "cancelation/s1m31": {
+   "v": "denovo",
+   "note": "bulk-applied across group",
+   "at": 1788226061640
+  },
+  "cancelation/s2": {
+   "v": "denovo",
+   "note": "bulk-applied across group",
+   "at": 1788226061640
+  },
+  "cancelation/s2m0": {
+   "v": "denovo",
+   "note": "bulk-applied across group",
+   "at": 1788226061640
+  },
+  "cancelation/s2m15": {
+   "v": "denovo",
+   "note": "bulk-applied across group",
+   "at": 1788226061640
+  },
+  "cancelation/s2m24": {
+   "v": "denovo",
+   "note": "bulk-applied across group",
+   "at": 1788226061640
+  },
+  "cancelation/s2m32": {
+   "v": "denovo",
+   "note": "bulk-applied across group",
+   "at": 1788226061640
+  },
+  "cancelation/s2m40": {
+   "v": "denovo",
+   "note": "bulk-applied across group",
+   "at": 1788226061640
+  },
+  "cancelation/s2m41": {
+   "v": "denovo",
+   "note": "bulk-applied across group",
+   "at": 1788226061640
+  },
+  "clause-1-3-satisfied/s0m30": {
+   "v": "unsure",
+   "note": "",
+   "at": 1788231560317
+  },
+  "clause-1-3-satisfied/s11": {
+   "v": "unsure",
+   "note": "not sure i agree with either encoding -- i thought the wellness visit was supposed to happen as a follow-up after the primary treatment had completed, and the patient has a month to get that follow-up done. The risk here is different: if the medical provider does not schedule the follow up visit with the patient within 1 month, due to no fault of the patient, the claim could be rejeceted. let's move this matter, and the rest of this section, to discussion within the claude code chat.",
+   "at": 1788231657960
+  },
+  "clause-1-3-satisfied/s11m0": {
+   "v": "unsure",
+   "note": "not sure i agree with either encoding -- i thought the wellness visit was supposed to happen as a follow-up after the primary treatment had completed, and the patient has a month to get that follow-up done. The risk here is different: if the medical provider does not schedule the follow up visit with the patient within 1 month, due to no fault of the patient, the claim could be rejeceted. let's move this matter, and the rest of this section, to discussion within the claude code chat.",
+   "at": 1788231664359
+  },
+  "clause-1-3-satisfied/s11m1": {
+   "v": "unsure",
+   "note": "bulk-applied across group",
+   "at": 1788231675773
+  },
+  "clause-1-3-satisfied/s11m14": {
+   "v": "unsure",
+   "note": "bulk-applied across group",
+   "at": 1788231675773
+  },
+  "clause-1-3-satisfied/s11m23": {
+   "v": "unsure",
+   "note": "bulk-applied across group",
+   "at": 1788231675773
+  },
+  "clause-1-3-satisfied/s11m31": {
+   "v": "unsure",
+   "note": "bulk-applied across group",
+   "at": 1788231675773
+  },
+  "clause-1-3-satisfied/s11m39": {
+   "v": "unsure",
+   "note": "bulk-applied across group",
+   "at": 1788231675773
+  },
+  "clause-1-3-satisfied/s11m40": {
+   "v": "unsure",
+   "note": "bulk-applied across group",
+   "at": 1788231675773
+  },
+  "clause-1-3-satisfied/s12": {
+   "v": "unsure",
+   "note": "bulk-applied across group",
+   "at": 1788231675773
+  },
+  "clause-1-3-satisfied/s12m0": {
+   "v": "unsure",
+   "note": "bulk-applied across group",
+   "at": 1788231675773
+  },
+  "clause-1-3-satisfied/s12m1": {
+   "v": "unsure",
+   "note": "bulk-applied across group",
+   "at": 1788231675773
+  },
+  "clause-1-3-satisfied/s12m14": {
+   "v": "unsure",
+   "note": "bulk-applied across group",
+   "at": 1788231675773
+  },
+  "clause-1-3-satisfied/s12m24": {
+   "v": "unsure",
+   "note": "bulk-applied across group",
+   "at": 1788231675773
+  },
+  "clause-1-3-satisfied/s12m32": {
+   "v": "unsure",
+   "note": "bulk-applied across group",
+   "at": 1788231675773
+  },
+  "clause-1-3-satisfied/s12m40": {
+   "v": "unsure",
+   "note": "bulk-applied across group",
+   "at": 1788231675773
+  },
+  "clause-1-3-satisfied/s12m41": {
+   "v": "unsure",
+   "note": "bulk-applied across group",
+   "at": 1788231675773
+  },
+  "policy-in-effect/s16m1": {
+   "v": "unsure",
+   "note": "",
+   "at": 1788231800672
+  },
+  "policy-in-effect/s1m2": {
+   "v": "unsure",
+   "note": "",
+   "at": 1788231863387
+  },
+  "policy-in-effect/s1m31": {
+   "v": "unsure",
+   "note": "",
+   "at": 1788231994112
+  },
+  "policy-in-effect/s2": {
+   "v": "unsure",
+   "note": "let's deal with this using deontic chains and trace. also, in the real world, overlaps between hospitalizations and coverage term start/end dates are dealt with explicitly in policies, either on a billed-per-day or group-charge basis, so this problem dissolves under a more throrough input setup.",
+   "at": 1788269416474
+  },
+  "policy-in-effect/s2m15": {
+   "v": "unsure",
+   "note": "bulk-applied across group",
+   "at": 1788269421141
+  },
+  "policy-in-effect/s2m24": {
+   "v": "unsure",
+   "note": "bulk-applied across group",
+   "at": 1788269421141
+  },
+  "policy-in-effect/s2m32": {
+   "v": "unsure",
+   "note": "bulk-applied across group",
+   "at": 1788269421141
+  },
+  "policy-in-effect/s2m40": {
+   "v": "unsure",
+   "note": "bulk-applied across group",
+   "at": 1788269421141
+  },
+  "policy-in-effect/s2m41": {
+   "v": "unsure",
+   "note": "bulk-applied across group",
+   "at": 1788269421141
+  },
+  "policy-in-effect/s4": {
+   "v": "unsure",
+   "note": "bulk-applied across group",
+   "at": 1788269421141
+  },
+  "policy-in-effect/s4m15": {
+   "v": "unsure",
+   "note": "bulk-applied across group",
+   "at": 1788269421141
+  },
+  "policy-in-effect/s4m24": {
+   "v": "unsure",
+   "note": "bulk-applied across group",
+   "at": 1788269421141
+  },
+  "policy-in-effect/s4m31": {
+   "v": "unsure",
+   "note": "bulk-applied across group",
+   "at": 1788269421141
+  },
+  "policy-in-effect/s4m32": {
+   "v": "unsure",
+   "note": "bulk-applied across group",
+   "at": 1788269421141
+  },
+  "policy-in-effect/s4m40": {
+   "v": "unsure",
+   "note": "bulk-applied across group",
+   "at": 1788269421141
+  },
+  "policy-in-effect/s4m41": {
+   "v": "unsure",
+   "note": "bulk-applied across group",
+   "at": 1788269421141
+  },
+  "sixty-day-bar/s30m41": {
+   "v": "unsure",
+   "note": "this calls for deontics",
+   "at": 1788269531174
+  },
+  "sixty-day-bar/s30m44": {
+   "v": "unsure",
+   "note": "let's use deontic chains.",
+   "at": 1788269544307
+  },
+  "sixty-day-bar/s31": {
+   "v": "unsure",
+   "note": "bulk-applied across group",
+   "at": 1788269544307
+  },
+  "sixty-day-bar/s31m0": {
+   "v": "unsure",
+   "note": "bulk-applied across group",
+   "at": 1788269544307
+  },
+  "sixty-day-bar/s31m1": {
+   "v": "unsure",
+   "note": "bulk-applied across group",
+   "at": 1788269544307
+  },
+  "sixty-day-bar/s31m14": {
+   "v": "unsure",
+   "note": "bulk-applied across group",
+   "at": 1788269544307
+  },
+  "sixty-day-bar/s31m23": {
+   "v": "unsure",
+   "note": "bulk-applied across group",
+   "at": 1788269544307
+  },
+  "sixty-day-bar/s31m30": {
+   "v": "unsure",
+   "note": "bulk-applied across group",
+   "at": 1788269544307
+  },
+  "sixty-day-bar/s31m31": {
+   "v": "unsure",
+   "note": "bulk-applied across group",
+   "at": 1788269544307
+  },
+  "sixty-day-bar/s31m39": {
+   "v": "unsure",
+   "note": "bulk-applied across group",
+   "at": 1788269544307
+  },
+  "sixty-day-bar/s31m40": {
+   "v": "unsure",
+   "note": "bulk-applied across group",
+   "at": 1788269544307
+  },
+  "term-expired/s1m2": {
+   "v": "both",
+   "note": "",
+   "at": 1788269671342
+  },
+  "term-expired/s2": {
+   "v": "both",
+   "note": "bulk-applied across group",
+   "at": 1788269674275
+  },
+  "term-expired/s2m0": {
+   "v": "both",
+   "note": "bulk-applied across group",
+   "at": 1788269674275
+  },
+  "term-expired/s2m15": {
+   "v": "both",
+   "note": "bulk-applied across group",
+   "at": 1788269674275
+  },
+  "term-expired/s2m24": {
+   "v": "both",
+   "note": "bulk-applied across group",
+   "at": 1788269674275
+  },
+  "term-expired/s2m31": {
+   "v": "both",
+   "note": "bulk-applied across group",
+   "at": 1788269674275
+  },
+  "term-expired/s2m32": {
+   "v": "both",
+   "note": "bulk-applied across group",
+   "at": 1788269674275
+  },
+  "term-expired/s2m40": {
+   "v": "both",
+   "note": "bulk-applied across group",
+   "at": 1788269674275
+  },
+  "term-expired/s2m41": {
+   "v": "both",
+   "note": "we should use deontic chains for things involving deadlines",
+   "at": 1788270016052
+  },
+  "clause-1-1-limb-3/s10m1": {
+   "v": "unsure",
+   "note": "",
+   "at": 1788269837309
+  },
+  "clause-1-1-limb-3/s6": {
+   "v": "unsure",
+   "note": "",
+   "at": 1788269942276
+  },
+  "clause-1-1-limb-3/s6m0": {
+   "v": "unsure",
+   "note": "not sure how these differ.",
+   "at": 1788269965760
+  },
+  "clause-1-1-limb-3/s6m14": {
+   "v": "unsure",
+   "note": "not sure how these differ.",
+   "at": 1788269972077
+  },
+  "clause-1-1-limb-3/s6m23": {
+   "v": "unsure",
+   "note": "not sure how these differ.",
+   "at": 1788269975860
+  },
+  "clause-1-1-limb-3/s6m32": {
+   "v": "unsure",
+   "note": "not sure how these differ.",
+   "at": 1788269985777
+  },
+  "clause-1-1-limb-3/s6m40": {
+   "v": "unsure",
+   "note": "not sure how these differ.",
+   "at": 1788269990243
+  },
+  "clause-1-1-limb-3/s6m41": {
+   "v": "unsure",
+   "note": "not sure how these differ.",
+   "at": 1788269994845
+  },
+  "clause-1-1-limb-3/s1m31": {
+   "v": "unsure",
+   "note": "not sure how these differ",
+   "at": 1788270034196
+  }
+ }
+}

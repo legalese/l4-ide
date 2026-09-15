@@ -1,0 +1,177 @@
+IMPORT prelude
+
+§ `Codex Insurance Limited -- Hospital Income Policy`
+
+-- Faithful encoding of the fixture contract (fixtures/chubb-policy.txt).
+-- This file defines ONLY rules: the shape of a claim (`Claim`) and the
+-- predicates needed to decide whether a given claim is covered. No claim
+-- data is defined here -- see apply.l4 for the nine benchmark claims.
+--
+-- Per the encoding brief:
+--   * the agreement is assumed signed (Sec.1.1(1)) and the premium is
+--     assumed paid on time (Sec.1.1(2), Sec.4.5), so no Claim field
+--     represents either fact;
+--   * every date/time in a Claim other than the claimant's age is
+--     expressed as a NUMBER of months relative to the policy's effective
+--     date, never as an absolute calendar date, and no two such relative
+--     times are ever compared against each other.
+
+§§ `The shape of a claim`
+
+DECLARE Claim HAS
+    -- Sec.2.1 -- what kind of event caused the hospitalization
+    `hospitalization caused by sickness`                      IS A BOOLEAN
+    `hospitalization caused by accidental injury`             IS A BOOLEAN
+    `injury was self-inflicted`                               IS A BOOLEAN
+
+    -- Sec.3.1 -- the five general exclusions
+    `hospitalization arose out of skydiving`                  IS A BOOLEAN
+    `hospitalization arose out of service in the military`    IS A BOOLEAN
+    `hospitalization arose out of service as a fire fighter`  IS A BOOLEAN
+    `hospitalization arose out of service in the police`      IS A BOOLEAN
+    `age at hospitalization`                                  IS A NUMBER
+
+    -- Sec.1.3 (wellness-visit condition) and Sec.4.6 (one-year term),
+    -- both measured in months relative to the policy's effective date
+    `months from effective date to hospitalization`                     IS A NUMBER
+    `months from effective date to wellness visit confirmation`         IS A NUMBER
+
+    -- Sec.1.2 -- the other trigger for deemed cancellation
+    `fraud or misrepresentation or material withholding`      IS A BOOLEAN
+
+
+§ `Policy in effect and conditions (Sec.1)`
+
+§§ `Sec.1.3 -- the wellness-visit condition`
+
+-- "No later than the 7th month anniversary of the effective date...you
+-- will supply us with written confirmation...of a wellness visit...
+-- occurring no later than the 6th month anniversary of the effective
+-- date." Two sub-deadlines: the visit itself (<= 6 months) and the
+-- supply of written confirmation of it (<= 7 months). Every benchmark
+-- query that speaks to Sec.1.3 reports a single "confirmation
+-- given/provided/submitted at N months" fact, with no separate figure
+-- for the visit itself, so this encoding uses that one figure for both
+-- sub-checks (recorded as a judgement call in NOTES.md).
+
+`wellness visit deadline in months` MEANS 6
+`wellness visit confirmation deadline in months` MEANS 7
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`wellness visit occurred in time` claim MEANS
+    claim's `months from effective date to wellness visit confirmation`
+        AT MOST `wellness visit deadline in months`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`wellness visit confirmation supplied in time` claim MEANS
+    claim's `months from effective date to wellness visit confirmation`
+        AT MOST `wellness visit confirmation deadline in months`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`condition 1.3 satisfied in a timely fashion` claim MEANS
+        `wellness visit occurred in time` claim
+    AND `wellness visit confirmation supplied in time` claim
+
+§§ `Sec.4.6 -- the one-year policy term`
+
+`policy term in months` MEANS 12
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`hospitalization occurred within the policy term` claim MEANS
+    claim's `months from effective date to hospitalization`
+        AT MOST `policy term in months`
+
+§§ `Sec.1.2 -- deemed cancellation`
+
+-- Cancelation is deemed to have occurred on: fraud/misrepresentation/
+-- material withholding, OR the Sec.1.3 condition not being satisfied in
+-- a timely fashion, OR the policy term having run out.
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`policy canceled` claim MEANS
+        claim's `fraud or misrepresentation or material withholding`
+    OR  NOT (`condition 1.3 satisfied in a timely fashion` claim)
+    OR  NOT (`hospitalization occurred within the policy term` claim)
+
+§§ `Sec.1.1 -- is the policy in effect?`
+
+-- Sec.1.1(1) the agreement is signed, and Sec.1.1(2) the premium has
+-- been paid, are both assumed TRUE per the encoding brief and are not
+-- modelled as Claim fields. Sec.1.1(3)'s "still pending" branch is not
+-- separately modelled either: every claim in this benchmark supplies a
+-- concrete wellness-visit-confirmation time, so "condition 1.3 satisfied
+-- in a timely fashion" is always the operative branch, never "pending".
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`policy in effect` claim MEANS
+        `condition 1.3 satisfied in a timely fashion` claim
+    AND NOT (`policy canceled` claim)
+
+
+§ `Benefits (Sec.2)`
+
+`daily hospital income benefit amount` MEANS 500
+`maximum benefit days` MEANS 365
+
+-- Sec.2.3 -- "a claim must be made to the Company setting out the basis
+-- for making the claim and for there being no exclusion or
+-- cancellation." Evaluating `covered` below on a claim already
+-- presupposes that a claim has been made; no separate Claim field
+-- represents this procedural step.
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`hospitalization caused by a covered accidental injury` claim MEANS
+        claim's `hospitalization caused by accidental injury`
+    AND NOT (claim's `injury was self-inflicted`)
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`insured event occurred` claim MEANS
+        claim's `hospitalization caused by sickness`
+    OR  `hospitalization caused by a covered accidental injury` claim
+
+
+§ `General exclusions (Sec.3)`
+
+`age exclusion threshold` MEANS 80
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`excluded cause of hospitalization` claim MEANS
+        claim's `hospitalization arose out of skydiving`
+    OR  claim's `hospitalization arose out of service in the military`
+    OR  claim's `hospitalization arose out of service as a fire fighter`
+    OR  claim's `hospitalization arose out of service in the police`
+    OR  claim's `age at hospitalization` AT LEAST `age exclusion threshold`
+
+
+§ `General conditions (Sec.4)`
+
+-- Sec.4.1 -- the policy insures the claimant twenty-four hours a day,
+-- anywhere in the world; there is accordingly no territorial exclusion
+-- to encode.
+-- Sec.4.2 -- arbitration is a dispute-resolution mechanic, not a
+-- coverage gate.
+-- Sec.4.3 -- governing law (New York) does not affect whether a claim
+-- is covered.
+-- Sec.4.4 -- currency of payment does not affect coverage.
+-- Sec.4.5 -- the premium is assumed already paid in one lump sum (see
+-- Sec.1.1(2) above).
+-- None of Sec.4.1-Sec.4.5 needs a Claim field or a predicate.
+
+
+§ `Master rule -- does the policy cover this claim?`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`covered` claim MEANS
+        `policy in effect` claim
+    AND `insured event occurred` claim
+    AND NOT (`excluded cause of hospitalization` claim)

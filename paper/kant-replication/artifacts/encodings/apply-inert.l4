@@ -1,0 +1,101 @@
+-- Driver: the nine benchmark coverage questions, asked of ref-inert.l4.
+--
+-- STANDING PREAMBLE, applied mechanically: every fact a query does NOT
+-- reference is set to the value that makes the policy apply. Those favourable
+-- defaults are baked into `mkclaim` below; each query then overrides only the
+-- facts it actually mentions.
+
+IMPORT prelude
+IMPORT `ref-inert`
+
+-- Favourable-default claim constructor.
+--   hm = the month of the hospitalization
+--   gr = the ground of hospitalization
+--   ag = age in years at the hospitalization
+--   cs = the causes the event arose directly or indirectly out of
+--   vm = the month the wellness visit occurred
+--   cm = the month written confirmation was supplied to us
+--   fm = the month in which there was fraud
+--   mm = the month in which there was misrepresentation / withholding
+GIVEN hm IS A NUMBER
+      gr IS A `Ground of hospitalization`
+      ag IS A NUMBER
+      cs IS A LIST OF Cause
+      vm IS A MAYBE NUMBER
+      cm IS A MAYBE NUMBER
+      fm IS A MAYBE NUMBER
+      mm IS A MAYBE NUMBER
+GIVETH A Claim
+mkclaim hm gr ag cs vm cm fm mm MEANS
+  Claim WITH
+    `this agreement is signed`                                                          IS TRUE
+    `the month the applicable premium for the policy period was paid`                   IS JUST 0
+    `the month of the hospitalization on which the claim is premised`                   IS hm
+    `the hospitalization on which the claim is premised was for`                        IS gr
+    `your age in years at the time of the hospitalization`                              IS ag
+    `the event causing the sickness or accidental injury arose directly or indirectly out of` IS cs
+    `the month in which there was fraud`                                                IS fm
+    `the month in which there was a misrepresentation or material withholding of information provided by you to the Company` IS mm
+    `the month in which a wellness visit for yourself occurred`                         IS vm
+    `that wellness visit was with a qualified medical provider`                         IS TRUE
+    `the month in which written confirmation from that medical provider was supplied to us` IS cm
+    `a dispute or disagreement has arisen regarding a matter pertaining to or concerning this Policy` IS FALSE
+    `the month on which the parties were unable to settle the dispute or difference`    IS NOTHING
+    `the month in which arbitration was commenced`                                      IS NOTHING
+    `a valid arbitration award has been issued`                                         IS TRUE
+    `the month in which written proof of claim was submitted to us`                     IS JUST 0
+    `the month in which you seek to recover on this Policy`                             IS NOTHING
+
+-- The all-favourable baseline: nothing referenced at all. Sanity check that the
+-- defaults really do let a benefit be payable.
+baseline MEANS mkclaim 3 Sickness 40 (LIST `A cause not named in Section 2.1`) (JUST 1) (JUST 2) NOTHING NOTHING
+#EVAL `a benefit is payable on this claim` baseline
+
+-- Q1: hospitalized by burns suffered while doing my duty as a firefighter.
+--     ground = accidental injury (burns); cause = service as a fire fighter.
+q1 MEANS mkclaim 3 `Accidental injury` 40 (LIST `Service as a fire fighter`) (JUST 1) (JUST 2) NOTHING NOTHING
+#EVAL `a benefit is payable on this claim` q1
+
+-- Q2: I am 78 years old at the time of hospitalization.
+q2 MEANS mkclaim 3 Sickness 78 (LIST `A cause not named in Section 2.1`) (JUST 1) (JUST 2) NOTHING NOTHING
+#EVAL `a benefit is payable on this claim` q2
+
+-- Q3: pneumonia (sickness), hospitalization at month 5, age 65.
+q3 MEANS mkclaim 5 Sickness 65 (LIST `A cause not named in Section 2.1`) (JUST 1) (JUST 2) NOTHING NOTHING
+#EVAL `a benefit is payable on this claim` q3
+
+-- Q4: a fall while traveling abroad (accidental injury, cause not named in 2.1);
+--     confirmation of the wellness visit supplied at month 8.
+--     The month of the hospitalization is not referenced, so it takes the
+--     favourable default (month 3): before month 7 the 1.3 condition is still
+--     pending, so the late confirmation has not yet caused a cancelation.
+q4 MEANS mkclaim 3 `Accidental injury` 40 (LIST `A cause not named in Section 2.1`) (JUST 1) (JUST 8) NOTHING NOTHING
+#EVAL `a benefit is payable on this claim` q4
+
+-- Q5: punching my own face to show off; no fraud, no misrepresentation.
+--     A deliberately self-inflicted blow is neither a sickness nor an
+--     ACCIDENTAL injury, so the ground is the policy's third possibility.
+q5 MEANS mkclaim 3 `Neither sickness nor accidental injury` 40 (LIST `A cause not named in Section 2.1`) (JUST 1) (JUST 2) NOTHING NOTHING
+#EVAL `a benefit is payable on this claim` q5
+
+-- Q6: injury sustained while skydiving; age 79; proof of the wellness visit
+--     provided at month 6.5.
+q6 MEANS mkclaim 3 `Accidental injury` 79 (LIST Skydiving) (JUST 1) (JUST 6.5) NOTHING NOTHING
+#EVAL `a benefit is payable on this claim` q6
+
+-- Q7: heart attack (sickness); proof of the wellness visit submitted at month 2;
+--     age 75.
+q7 MEANS mkclaim 3 Sickness 75 (LIST `A cause not named in Section 2.1`) (JUST 1) (JUST 2) NOTHING NOTHING
+#EVAL `a benefit is payable on this claim` q7
+
+-- Q8: injured in a military training exercise; hospitalization within the
+--     policy term; no fraud.
+q8 MEANS mkclaim 3 `Accidental injury` 40 (LIST `Service in the military`) (JUST 1) (JUST 2) NOTHING NOTHING
+#EVAL `a benefit is payable on this claim` q8
+
+-- Q9: my son bit me in the ankle; proof of the wellness visit provided at
+--     month 6; I was serving as a police officer at the time.
+--     2.1 asks what the EVENT arose out of, not what I was. A son's bite does
+--     not arise, directly or indirectly, out of service in the police.
+q9 MEANS mkclaim 3 `Accidental injury` 40 (LIST `A cause not named in Section 2.1`) (JUST 1) (JUST 6) NOTHING NOTHING
+#EVAL `a benefit is payable on this claim` q9

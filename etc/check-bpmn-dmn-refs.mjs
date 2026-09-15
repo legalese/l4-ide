@@ -208,7 +208,7 @@ if (dmnFiles.length === 0) {
   process.exit(2);
 }
 
-const models = new Map(); // `${namespace} ${model}` -> { file, decisions }
+const models = new Map(); // `${namespace}\0${model}` -> { file, decisions }
 let failed = false;
 
 for (const file of dmnFiles) {
@@ -217,7 +217,7 @@ for (const file of dmnFiles) {
     console.error(d.error);
     process.exit(2);
   }
-  models.set(`${d.namespace} ${d.model}`, d);
+  models.set(`${d.namespace}\0${d.model}`, d);
   console.log(
     `${file}: model "${d.model}" @ ${d.namespace} — ${d.decisions.size} decision(s)`,
   );
@@ -247,7 +247,7 @@ for (const file of bpmnFiles) {
     const ns = t.values.get("namespace");
     const model = t.values.get("model");
     const decision = t.values.get("decision");
-    const target = models.get(`${ns} ${model}`);
+    const target = models.get(`${ns}\0${model}`);
     if (!target) {
       problems.push(
         `${where}: no supplied DMN declares model "${model}" at namespace ${ns}`,

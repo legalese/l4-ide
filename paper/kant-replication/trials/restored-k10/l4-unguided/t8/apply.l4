@@ -1,0 +1,214 @@
+IMPORT policy
+
+-- Standing preamble applied to every question below: all other conditions for the
+-- policy to apply (unrelated to the specific question) are set so that they are met,
+-- and no exclusion unrelated to the specific question is triggered. Concretely, unless
+-- a question's own facts say otherwise:
+--   * the wellness-visit condition (S1.3) is set comfortably within both deadlines
+--     (occurred/confirmed at month 0),
+--   * there is no fraud or misrepresentation,
+--   * the hospitalization is well within the one-year policy term,
+--   * the hospitalization is treated as confinement due to sickness or injury, in a
+--     hospital in the United States, with a claim properly made to the Company, and
+--   * none of the four causal exclusion grounds are triggered, and the claimant's age
+--     is set under 80.
+
+
+-- Q1: "will my policy apply if I was hospitalized by burns suffered while doing my duty
+-- as a firefighter?"
+-- Burns suffered while on duty as a firefighter is a textbook case of an "event ...
+-- arising directly or indirectly out of ... service as a fire fighter" (S3.1, item 3).
+q1 MEANS Claim WITH
+    `wellness visit occurred by month`                IS 0
+    `wellness visit confirmation supplied by month`   IS 0
+    `fraud or misrepresentation`                      IS FALSE
+    `hospitalization occurs by month`                 IS 1
+    `confined due to sickness or injury`              IS TRUE
+    `hospital located in the United States`           IS TRUE
+    `claim made to the Company`                       IS TRUE
+    `sickness or injury arose from skydiving`                  IS FALSE
+    `sickness or injury arose from service in the military`    IS FALSE
+    `sickness or injury arose from service as a fire fighter`  IS TRUE
+    `sickness or injury arose from service in the police`      IS FALSE
+    `age at the time of hospitalization`              IS 40
+
+#EVAL covered q1
+
+
+-- Q2: "will my policy apply if I am 78 years old at the time of hospitalization?"
+-- 78 is below the S3.1(5) threshold ("equal to or greater than 80 years of age").
+q2 MEANS Claim WITH
+    `wellness visit occurred by month`                IS 0
+    `wellness visit confirmation supplied by month`   IS 0
+    `fraud or misrepresentation`                      IS FALSE
+    `hospitalization occurs by month`                 IS 1
+    `confined due to sickness or injury`              IS TRUE
+    `hospital located in the United States`           IS TRUE
+    `claim made to the Company`                       IS TRUE
+    `sickness or injury arose from skydiving`                  IS FALSE
+    `sickness or injury arose from service in the military`    IS FALSE
+    `sickness or injury arose from service as a fire fighter`  IS FALSE
+    `sickness or injury arose from service in the police`      IS FALSE
+    `age at the time of hospitalization`              IS 78
+
+#EVAL covered q2
+
+
+-- Q3: "will my policy apply if I was hospitalized for pneumonia 5 months after the
+-- policy's effective date, and my age at the time of hospitalization is 65?"
+-- Pneumonia is a sickness within S2.1; 5 months is within the one-year term (S4.6);
+-- 65 is below the age-80 exclusion.
+q3 MEANS Claim WITH
+    `wellness visit occurred by month`                IS 0
+    `wellness visit confirmation supplied by month`   IS 0
+    `fraud or misrepresentation`                      IS FALSE
+    `hospitalization occurs by month`                 IS 5
+    `confined due to sickness or injury`              IS TRUE
+    `hospital located in the United States`           IS TRUE
+    `claim made to the Company`                       IS TRUE
+    `sickness or injury arose from skydiving`                  IS FALSE
+    `sickness or injury arose from service in the military`    IS FALSE
+    `sickness or injury arose from service as a fire fighter`  IS FALSE
+    `sickness or injury arose from service in the police`      IS FALSE
+    `age at the time of hospitalization`              IS 65
+
+#EVAL covered q3
+
+
+-- Q4: "will my policy apply if I was hospitalized due to a fall while traveling abroad
+-- and I had given confirmation of my wellness visit 8 months after the policy's
+-- effective date?"
+-- Two judgement calls (see NOTES.md): (a) confirmation given at month 8 is used for
+-- both the visit-occurrence and the confirmation-supply facts of S1.3, both of which
+-- miss their respective 6-/7-month deadlines; (b) "traveling abroad" is read as the
+-- hospitalization itself having occurred outside the United States, engaging S2.2's
+-- "hospital in the United States" limitation.
+q4 MEANS Claim WITH
+    `wellness visit occurred by month`                IS 8
+    `wellness visit confirmation supplied by month`   IS 8
+    `fraud or misrepresentation`                      IS FALSE
+    `hospitalization occurs by month`                 IS 8
+    `confined due to sickness or injury`              IS TRUE
+    `hospital located in the United States`           IS FALSE
+    `claim made to the Company`                       IS TRUE
+    `sickness or injury arose from skydiving`                  IS FALSE
+    `sickness or injury arose from service in the military`    IS FALSE
+    `sickness or injury arose from service as a fire fighter`  IS FALSE
+    `sickness or injury arose from service in the police`      IS FALSE
+    `age at the time of hospitalization`              IS 40
+
+#EVAL covered q4
+
+
+-- Q5: "will my policy apply if I was hospitalized for punching my own face to show off
+-- for my friends and I did not commit fraud or misrepresentation?"
+-- Not one of the five S3.1 exclusions, and fraud/misrepresentation is expressly
+-- negated. See NOTES.md for why this encoding does not read an unstated
+-- self-inflicted-injury exclusion into S2.1.
+q5 MEANS Claim WITH
+    `wellness visit occurred by month`                IS 0
+    `wellness visit confirmation supplied by month`   IS 0
+    `fraud or misrepresentation`                      IS FALSE
+    `hospitalization occurs by month`                 IS 1
+    `confined due to sickness or injury`              IS TRUE
+    `hospital located in the United States`           IS TRUE
+    `claim made to the Company`                       IS TRUE
+    `sickness or injury arose from skydiving`                  IS FALSE
+    `sickness or injury arose from service in the military`    IS FALSE
+    `sickness or injury arose from service as a fire fighter`  IS FALSE
+    `sickness or injury arose from service in the police`      IS FALSE
+    `age at the time of hospitalization`              IS 40
+
+#EVAL covered q5
+
+
+-- Q6: "will my policy apply if I was hospitalized due to an injury sustained while
+-- skydiving, my age at the time of hospitalization was 79, and proof of my wellness
+-- visit was provided 6.5 months after the policy's effective date?"
+-- Skydiving triggers S3.1, item 1, directly. (79 is under 80, so the age exclusion is
+-- not independently triggered; 6.5 months also misses the S1.3 6-month visit deadline,
+-- though it meets the 7-month confirmation deadline -- see NOTES.md on using the same
+-- figure for both S1.3 sub-facts.)
+q6 MEANS Claim WITH
+    `wellness visit occurred by month`                IS 6.5
+    `wellness visit confirmation supplied by month`   IS 6.5
+    `fraud or misrepresentation`                      IS FALSE
+    `hospitalization occurs by month`                 IS 1
+    `confined due to sickness or injury`              IS TRUE
+    `hospital located in the United States`           IS TRUE
+    `claim made to the Company`                       IS TRUE
+    `sickness or injury arose from skydiving`                  IS TRUE
+    `sickness or injury arose from service in the military`    IS FALSE
+    `sickness or injury arose from service as a fire fighter`  IS FALSE
+    `sickness or injury arose from service in the police`      IS FALSE
+    `age at the time of hospitalization`              IS 79
+
+#EVAL covered q6
+
+
+-- Q7: "will my policy apply if I was hospitalized for a heart attack, proof of the
+-- wellness visit was submitted 2 months after the policy's effective date, and my age
+-- at the time of hospitalization was 75?"
+-- A heart attack is a sickness under S2.1; 2 months comfortably satisfies both S1.3
+-- deadlines; 75 is under the age-80 exclusion.
+q7 MEANS Claim WITH
+    `wellness visit occurred by month`                IS 2
+    `wellness visit confirmation supplied by month`   IS 2
+    `fraud or misrepresentation`                      IS FALSE
+    `hospitalization occurs by month`                 IS 1
+    `confined due to sickness or injury`              IS TRUE
+    `hospital located in the United States`           IS TRUE
+    `claim made to the Company`                       IS TRUE
+    `sickness or injury arose from skydiving`                  IS FALSE
+    `sickness or injury arose from service in the military`    IS FALSE
+    `sickness or injury arose from service as a fire fighter`  IS FALSE
+    `sickness or injury arose from service in the police`      IS FALSE
+    `age at the time of hospitalization`              IS 75
+
+#EVAL covered q7
+
+
+-- Q8: "will my policy apply if I was hospitalized after being injured in a military
+-- training exercise, the hospitalization occurred within the policy term, and I did
+-- not commit fraud?"
+-- A military training exercise is "service in the military" under S3.1, item 2. The
+-- query's own facts place the hospitalization within the policy term and negate fraud.
+q8 MEANS Claim WITH
+    `wellness visit occurred by month`                IS 0
+    `wellness visit confirmation supplied by month`   IS 0
+    `fraud or misrepresentation`                      IS FALSE
+    `hospitalization occurs by month`                 IS 6
+    `confined due to sickness or injury`              IS TRUE
+    `hospital located in the United States`           IS TRUE
+    `claim made to the Company`                       IS TRUE
+    `sickness or injury arose from skydiving`                  IS FALSE
+    `sickness or injury arose from service in the military`    IS TRUE
+    `sickness or injury arose from service as a fire fighter`  IS FALSE
+    `sickness or injury arose from service in the police`      IS FALSE
+    `age at the time of hospitalization`              IS 40
+
+#EVAL covered q8
+
+
+-- Q9: "will my policy apply if I was hospitalized due to my son biting me in the ankle,
+-- proof of my wellness visit was provided 6 months after the effective date, and I was
+-- serving as a police officer at the time of hospitalization?"
+-- Judgement call (see NOTES.md): being a police officer "at the time" is a status, not
+-- a cause; the injury (a son's bite) has no causal nexus to police service, so S3.1's
+-- "arising directly or indirectly out of ... service in the police" is not triggered.
+-- 6 months satisfies both S1.3 deadlines (<= 6 and <= 7).
+q9 MEANS Claim WITH
+    `wellness visit occurred by month`                IS 6
+    `wellness visit confirmation supplied by month`   IS 6
+    `fraud or misrepresentation`                      IS FALSE
+    `hospitalization occurs by month`                 IS 1
+    `confined due to sickness or injury`              IS TRUE
+    `hospital located in the United States`           IS TRUE
+    `claim made to the Company`                       IS TRUE
+    `sickness or injury arose from skydiving`                  IS FALSE
+    `sickness or injury arose from service in the military`    IS FALSE
+    `sickness or injury arose from service as a fire fighter`  IS FALSE
+    `sickness or injury arose from service in the police`      IS FALSE
+    `age at the time of hospitalization`              IS 40
+
+#EVAL covered q9

@@ -1,0 +1,158 @@
+IMPORT prelude
+
+§ `Codex Insurance Limited -- Hospital Income Policy`
+
+-- Rules only. No claim data is defined in this file -- see apply.l4 for the
+-- nine benchmark claims that get run against these rules.
+--
+-- Two simplifications, both required by the task brief:
+--   * Section 1.1's conditions 1 (agreement signed) and 2 (premium paid) are
+--     assumed always satisfied, so no fields or rules encode them.
+--   * Every date/time fact in a claim, other than the claimant's age, is
+--     expressed as a NUMBER OF MONTHS AFTER THE POLICY'S EFFECTIVE DATE, so
+--     no DATE type or date arithmetic is needed anywhere in this file.
+
+§§ `The shape of a claim`
+
+DECLARE Claim HAS
+    `age at hospitalization`                                                      IS A NUMBER
+    -- how long after the effective date the hospitalization happened; used both
+    -- for the Section 1.3 "still pending" test and the Section 4.6 term test.
+    `months after the effective date the hospitalization occurred`                IS A NUMBER
+    `due to sickness`                                                             IS A BOOLEAN
+    `due to accidental injury`                                                    IS A BOOLEAN
+    -- Section 2.2: the daily benefit is only payable for confinement in a
+    -- hospital in the United States. This is narrower than Section 4.1.1's
+    -- worldwide insuring scope -- see the note at `confined in hospital as a
+    -- result of sickness or accidental injury` below.
+    `hospital located in the United States`                                       IS A BOOLEAN
+    -- Section 3.1(1)-(4): each flag means the sickness/injury arose directly or
+    -- indirectly out of that activity -- not merely that the claimant held that
+    -- occupation or status at the time. Being a firefighter, soldier, or police
+    -- officer WHEN hospitalized, for an unrelated cause, does not set the
+    -- matching flag; see apply.l4's q9 for a worked example of the distinction.
+    `caused by skydiving`                                                         IS A BOOLEAN
+    `caused by service in the military`                                          IS A BOOLEAN
+    `caused by service as a fire fighter`                                         IS A BOOLEAN
+    `caused by service in the police`                                             IS A BOOLEAN
+    `fraud or misrepresentation or material withholding`                          IS A BOOLEAN
+    -- NOTHING means no confirmation has been supplied (yet). JUST n means
+    -- confirmation was supplied n months after the effective date.
+    `months after the effective date the wellness visit confirmation was supplied` IS A MAYBE NUMBER
+    `claim made to the company with the basis for the claim stated`               IS A BOOLEAN
+
+§§ `1. Policy in effect and conditions`
+
+-- Section 1.3, first disjunct of 1.1(3): written confirmation of the wellness
+-- visit was supplied no later than the 7th month anniversary of the effective
+-- date. (This encoding tests only the confirmation's own submission date
+-- against the 7-month deadline; see NOTES.md for why the separate 6-month
+-- "visit itself" deadline is not modelled as an independent fact.)
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `wellness visit confirmation supplied in a timely fashion` IF
+    CONSIDER claim's `months after the effective date the wellness visit confirmation was supplied`
+    WHEN NOTHING THEN FALSE
+    WHEN JUST n  THEN n AT MOST 7
+
+-- Section 1.3, second disjunct of 1.1(3): no confirmation has been supplied
+-- yet, but the 7-month deadline (measured as of the hospitalization) has not
+-- passed either, so the condition is still open rather than failed.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `section 1.3 condition still pending` IF
+    CONSIDER claim's `months after the effective date the wellness visit confirmation was supplied`
+    WHEN NOTHING THEN claim's `months after the effective date the hospitalization occurred` AT MOST 7
+    WHEN JUST n  THEN FALSE
+
+-- Section 1.1(3): "is still pending or has been satisfied in a timely fashion".
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `section 1.3 condition satisfied` IF
+        `wellness visit confirmation supplied in a timely fashion` claim
+    OR  `section 1.3 condition still pending` claim
+
+-- Section 4.6: the policy term is one year from the effective date. (Section
+-- 1.2 cross-references "Section 5" for the term, but Section 5 is the benefit
+-- and premium amounts, not the term -- Section 4.6 is where the term is
+-- actually defined, so that is what this rule uses.)
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `policy term has expired` IF
+    claim's `months after the effective date the hospitalization occurred` GREATER THAN 12
+
+-- Section 1.2: cancelation is deemed to have occurred on any of these grounds.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `policy has been canceled` IF
+        claim's `fraud or misrepresentation or material withholding`
+    OR  NOT `section 1.3 condition satisfied` claim
+    OR  `policy term has expired` claim
+
+-- Section 1.1: the policy is in effect at the time of the hospitalization.
+-- (Conditions 1 and 2 are assumed satisfied; see the file header.)
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `policy in effect at the time of the hospitalization` IF
+        `section 1.3 condition satisfied` claim
+    AND NOT `policy has been canceled` claim
+
+§§ `2. Benefits`
+
+-- Section 2.1 (the triggering event) combined with Section 2.2's express
+-- payability condition (confinement in a hospital in the United States).
+-- Section 4.1.1 ("insures You ... anywhere in the world") is reflected
+-- elsewhere by the ABSENCE of any territorial exclusion on the underlying
+-- risk -- it does not override Section 2.2's narrower condition on when the
+-- daily benefit is actually payable. The Section 2.2 365-day cap on the
+-- number of payable days is a limit on how much is paid, not on whether the
+-- policy applies at all, and no benchmark question turns on confinement
+-- length, so it is not modelled as a gate here.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `confined in hospital as a result of sickness or accidental injury` IF
+        claim's `hospital located in the United States`
+    AND (claim's `due to sickness` OR claim's `due to accidental injury`)
+
+-- Section 2.3: a claim must be made to the Company, setting out the basis for
+-- the claim (and for there being no exclusion or cancellation).
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `claim properly made to the company` IF
+    claim's `claim made to the company with the basis for the claim stated`
+
+§§ `3. General exclusions`
+
+-- Section 3.1(1)-(4): the sickness or accidental injury arises directly or
+-- indirectly out of one of these four activities.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `an excluded activity caused the hospitalization` IF
+        claim's `caused by skydiving`
+    OR  claim's `caused by service in the military`
+    OR  claim's `caused by service as a fire fighter`
+    OR  claim's `caused by service in the police`
+
+-- Section 3.1(5): age at the time of the hospitalization.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `excluded because of age at hospitalization` IF
+    claim's `age at hospitalization` AT LEAST 80
+
+-- Section 3.1 overall: either kind of exclusion bars the claim.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `a general exclusion applies` IF
+        `an excluded activity caused the hospitalization` claim
+    OR  `excluded because of age at hospitalization` claim
+
+§§ `Top-level coverage decision`
+
+@export Determine whether the Codex Insurance hospital income policy covers a given hospitalization claim
+GIVEN claim IS A Claim @desc The hospitalization claim being assessed for coverage under this policy
+GIVETH A BOOLEAN
+DECIDE `covered` IF
+        `policy in effect at the time of the hospitalization` claim
+    AND `confined in hospital as a result of sickness or accidental injury` claim
+    AND `claim properly made to the company` claim
+    AND NOT `a general exclusion applies` claim

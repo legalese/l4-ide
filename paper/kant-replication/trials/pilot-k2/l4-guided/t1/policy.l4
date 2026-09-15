@@ -1,0 +1,165 @@
+IMPORT prelude
+
+-- ============================================================
+-- Fact schema (copied from inputs/schema.md, with two minimal,
+-- necessary corrections — see NOTES.md):
+--   1. multi-word Claim field names backtick-quoted (bare multi-word
+--      names are a parse error in a DECLARE ... HAS block)
+--   2. `arose out of` calls `elem` in plain prefix form, not
+--      backtick-infix (elem is defined prefix in prelude.l4 and was
+--      never registered as a mixfix/infix operator, so backtick-infix
+--      does not resolve)
+-- ============================================================
+
+DECLARE Ground IS ONE OF Sickness, `Accidental injury`, Neither
+
+DECLARE Cause IS ONE OF
+  Skydiving, `Military service`, Firefighting, `Police service`, Other
+
+DECLARE Claim
+  HAS `agreement signed`                        IS A BOOLEAN
+      `premium paid month`                      IS A MAYBE NUMBER
+      `hospitalization month`                   IS A NUMBER
+      `hospitalization ground`                  IS A Ground
+      `age at hospitalization`                  IS A NUMBER
+      causes                                    IS A LIST OF Cause
+      `fraud month`                             IS A MAYBE NUMBER
+      `misrepresentation month`                 IS A MAYBE NUMBER
+      `wellness visit month`                    IS A MAYBE NUMBER
+      `wellness visit provider qualified`       IS A BOOLEAN
+      `written confirmation month`              IS A MAYBE NUMBER
+      `dispute arisen`                          IS A BOOLEAN
+      `unable to settle month`                  IS A MAYBE NUMBER
+      `arbitration commenced month`             IS A MAYBE NUMBER
+      `valid arbitration award issued`          IS A BOOLEAN
+      `written proof of claim month`            IS A MAYBE NUMBER
+      `recovery sought month`                   IS A MAYBE NUMBER
+      `policy term months`                      IS A NUMBER
+
+GIVEN  `event month` IS A MAYBE NUMBER
+       `limit month` IS A NUMBER
+GIVETH A BOOLEAN
+`no later than` MEANS
+  CONSIDER `event month`
+    WHEN NOTHING THEN FALSE
+    WHEN JUST m  THEN m AT MOST `limit month`
+
+GIVEN  cs IS A LIST OF Cause
+       c  IS A Cause
+GIVETH A BOOLEAN
+`arose out of` MEANS elem c cs
+
+-- ============================================================
+-- covered
+-- ============================================================
+
+§ `Coverage determination`
+
+§§ `1.1 / 1.2 / 1.3 — policy in effect at the time of hospitalization`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`premium has been paid` claim MEANS
+  CONSIDER claim's `premium paid month`
+    WHEN NOTHING THEN FALSE
+    WHEN JUST m  THEN TRUE
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`condition 1.3 satisfied or still pending` claim MEANS
+        (       `no later than` (claim's `written confirmation month`) 7
+            AND `no later than` (claim's `wellness visit month`) 6
+            AND (claim's `wellness visit provider qualified`)
+        )
+    OR  NOT ((claim's `hospitalization month`) GREATER THAN 7)
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`not cancelled for fraud or misrepresentation as of hospitalization` claim MEANS
+        (CONSIDER claim's `fraud month`
+           WHEN NOTHING THEN TRUE
+           WHEN JUST fm THEN (claim's `hospitalization month`) LESS THAN fm)
+    AND (CONSIDER claim's `misrepresentation month`
+           WHEN NOTHING THEN TRUE
+           WHEN JUST mm THEN (claim's `hospitalization month`) LESS THAN mm)
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`hospitalization within the policy term` claim MEANS
+    (claim's `hospitalization month`) AT MOST (claim's `policy term months`)
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`hospitalization ground is covered` claim MEANS
+    CONSIDER claim's `hospitalization ground`
+      WHEN Sickness             THEN TRUE
+      WHEN `Accidental injury`  THEN TRUE
+      WHEN Neither              THEN FALSE
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`policy in effect at hospitalization` claim MEANS
+        (claim's `agreement signed`)
+    AND `premium has been paid` claim
+    AND `condition 1.3 satisfied or still pending` claim
+    AND `not cancelled for fraud or misrepresentation as of hospitalization` claim
+    AND `hospitalization within the policy term` claim
+    AND `hospitalization ground is covered` claim
+
+§§ `2.1 — general exclusions`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`excluded by cause` claim MEANS
+        `arose out of` (claim's causes) Skydiving
+    OR  `arose out of` (claim's causes) `Military service`
+    OR  `arose out of` (claim's causes) Firefighting
+    OR  `arose out of` (claim's causes) `Police service`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`excluded by age` claim MEANS
+    (claim's `age at hospitalization`) AT LEAST 80
+
+§§ `3.2 — arbitration and the proof-of-claim waiting period`
+
+`waiting period after proof of claim in months` MEANS 2
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`arbitration commenced within 3 months of impasse` claim MEANS
+    CONSIDER claim's `arbitration commenced month`
+      WHEN NOTHING THEN FALSE
+      WHEN JUST acm THEN
+        CONSIDER claim's `unable to settle month`
+          WHEN NOTHING THEN FALSE
+          WHEN JUST usm THEN (acm MINUS usm) AT MOST 3
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`arbitration precondition satisfied` claim MEANS
+    (claim's `dispute arisen`) IMPLIES
+        (    (claim's `valid arbitration award issued`)
+         AND `arbitration commenced within 3 months of impasse` claim
+        )
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`recovery not sought prematurely` claim MEANS
+    CONSIDER claim's `recovery sought month`
+      WHEN NOTHING THEN TRUE
+      WHEN JUST rsm THEN
+        CONSIDER claim's `written proof of claim month`
+          WHEN NOTHING THEN FALSE
+          WHEN JUST wpcm THEN (rsm MINUS wpcm) AT LEAST `waiting period after proof of claim in months`
+
+§§ `covered`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+covered claim MEANS
+        `policy in effect at hospitalization` claim
+    AND NOT (`excluded by cause` claim)
+    AND NOT (`excluded by age` claim)
+    AND `arbitration precondition satisfied` claim
+    AND `recovery not sought prematurely` claim

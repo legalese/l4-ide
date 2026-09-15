@@ -1,0 +1,170 @@
+IMPORT prelude
+
+§ `Fact schema (verbatim from inputs/schema.md, so this file is self-contained)`
+
+DECLARE Ground IS ONE OF Sickness, `Accidental injury`, Neither
+
+DECLARE Cause IS ONE OF
+  Skydiving, `Military service`, Firefighting, `Police service`, Other
+
+DECLARE Claim
+  HAS `agreement signed`                           IS A BOOLEAN
+      `premium paid month`                         IS A MAYBE NUMBER
+      `hospitalization month`                      IS A NUMBER
+      `hospitalization ground`                     IS A Ground
+      `age at hospitalization`                     IS A NUMBER
+      `causes`                                     IS A LIST OF Cause
+      `fraud month`                                IS A MAYBE NUMBER
+      `misrepresentation month`                    IS A MAYBE NUMBER
+      `wellness visit month`                       IS A MAYBE NUMBER
+      `wellness visit provider qualified`          IS A BOOLEAN
+      `written confirmation month`                 IS A MAYBE NUMBER
+      `dispute arisen`                             IS A BOOLEAN
+      `unable to settle month`                     IS A MAYBE NUMBER
+      `arbitration commenced month`                IS A MAYBE NUMBER
+      `valid arbitration award issued`             IS A BOOLEAN
+      `written proof of claim month`               IS A MAYBE NUMBER
+      `recovery sought month`                      IS A MAYBE NUMBER
+      `policy term months`                         IS A NUMBER
+
+§§ `Supporting helpers (verbatim from inputs/schema.md — called, never redefined)`
+
+GIVEN  `event month` IS A MAYBE NUMBER
+       `limit month` IS A NUMBER
+GIVETH A BOOLEAN
+`no later than` MEANS
+  CONSIDER `event month`
+    WHEN NOTHING THEN FALSE
+    WHEN JUST m  THEN m AT MOST `limit month`
+
+GIVEN  cs IS A LIST OF Cause
+       c  IS A Cause
+GIVETH A BOOLEAN
+`arose out of` MEANS elem c cs
+
+§ `covered — one helper per policy clause, combined at the bottom`
+
+§§ `Section 1.1(2) — the premium has been paid`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`premium paid` MEANS isJust (claim's `premium paid month`)
+
+§§ `Section 1.3 — wellness-visit condition: satisfied on time, or still pending`
+
+-- Satisfied: written confirmation supplied no later than month 7, of a wellness
+-- visit, with a qualified provider, that itself occurred no later than month 6.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`wellness visit condition satisfied` MEANS
+       `no later than` (claim's `written confirmation month`) 7
+   AND `no later than` (claim's `wellness visit month`)      6
+   AND (claim's `wellness visit provider qualified`)
+
+-- Still pending: no written confirmation has been supplied yet, and the
+-- 7-month deadline for supplying it has not yet passed as of the
+-- hospitalization. A confirmation that HAS been supplied is no longer
+-- "pending" -- it is judged directly against the deadline above, whether
+-- timely or not.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`wellness visit condition still pending` MEANS
+       isNothing (claim's `written confirmation month`)
+   AND (claim's `hospitalization month`) AT MOST 7
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`wellness visit condition met or pending` MEANS
+       `wellness visit condition still pending`  claim
+   OR  `wellness visit condition satisfied`      claim
+
+§§ `Section 1.2 — cancelation`
+
+-- Cancelation occurs on fraud, on misrepresentation (the schema has no
+-- separate field for "material withholding of information", so the
+-- `misrepresentation month` field is read as standing for that whole
+-- disjunct too), on a definitive (no-longer-pending) failure of the
+-- Section 1.3 condition, or on the term simply running out.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`policy canceled` MEANS
+       isJust (claim's `fraud month`)
+   OR  isJust (claim's `misrepresentation month`)
+   OR  NOT (`wellness visit condition met or pending` claim)
+   OR  (claim's `hospitalization month`) GREATER THAN (claim's `policy term months`)
+
+§§ `Section 1.1 — the policy is in effect at the time of the hospitalization`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`policy in effect` MEANS
+       (claim's `agreement signed`)
+   AND `premium paid` claim
+   AND `wellness visit condition met or pending` claim
+   AND NOT (`policy canceled` claim)
+
+§§ `Section 1.1 — only a hospitalization for sickness or accidental injury is within scope`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`covered peril` MEANS
+  CONSIDER (claim's `hospitalization ground`)
+    WHEN Sickness             THEN TRUE
+    WHEN `Accidental injury`  THEN TRUE
+    WHEN Neither              THEN FALSE
+
+§§ `Section 2.1(1)-(4) — activity exclusions`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`hospitalization arose from an excluded activity` MEANS
+       `arose out of` (claim's `causes`) Skydiving
+   OR  `arose out of` (claim's `causes`) `Military service`
+   OR  `arose out of` (claim's `causes`) Firefighting
+   OR  `arose out of` (claim's `causes`) `Police service`
+
+§§ `Section 2.1(5) — age exclusion`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`age exclusion applies` MEANS (claim's `age at hospitalization`) AT LEAST 80
+
+§§ `Section 3.2.1 — arbitration as a condition precedent to liability, where a dispute has arisen`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`arbitration commenced timely` MEANS
+  CONSIDER (claim's `unable to settle month`)
+    WHEN NOTHING THEN FALSE
+    WHEN JUST u  THEN `no later than` (claim's `arbitration commenced month`) (u PLUS 3)
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`dispute condition satisfied` MEANS
+       NOT (claim's `dispute arisen`)
+   OR  (    `arbitration commenced timely` claim
+        AND (claim's `valid arbitration award issued`))
+
+§§ `Section 3.2.1 — no recovery until 60 days (approximated as 2 months) after written proof of claim is submitted`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`recovery not premature` MEANS
+  CONSIDER (claim's `recovery sought month`)
+    WHEN NOTHING THEN TRUE
+    WHEN JUST r  THEN
+      CONSIDER (claim's `written proof of claim month`)
+        WHEN NOTHING THEN FALSE
+        WHEN JUST p  THEN r AT LEAST (p PLUS 2)
+
+§ `covered`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE covered IF
+       `policy in effect` claim
+   AND `covered peril` claim
+   AND NOT (`hospitalization arose from an excluded activity` claim)
+   AND NOT (`age exclusion applies` claim)
+   AND `dispute condition satisfied` claim
+   AND `recovery not premature` claim

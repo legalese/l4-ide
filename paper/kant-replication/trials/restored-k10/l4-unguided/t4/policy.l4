@@ -1,0 +1,160 @@
+-- CODEX INSURANCE LIMITED — Hospital Income Policy
+--
+-- Encoding of the policy's substantive coverage logic: given the facts of a
+-- hospitalization, is the Daily Hospital Income Benefit payable for it (i.e.
+-- "does the policy apply")?
+--
+-- Scoping decisions made when translating the contract into rules:
+--
+--   - §1.1 conditions (1) "this agreement is signed" and (2) "the applicable
+--     premium ... has been paid" are, per the task brief, always taken to be
+--     true, so they are not modelled as facts here.
+--   - Every date/time fact about a hospitalization (other than the
+--     claimant's age) is expressed as a NUMBER of months after the policy's
+--     effective date. Per the task brief there is never a need to compute
+--     the time elapsed between two dates, so no DATE/date arithmetic is used
+--     anywhere in this file.
+--   - Clauses that are purely procedural/administrative and do not bear on
+--     whether a given hospitalization is one for which the benefit is
+--     payable — §2.3 (mechanics of making a claim), §4.2 (arbitration),
+--     §4.3 (governing law), §4.4 (currency of payment), §4.5 (premium
+--     mechanics), §4.6 sentence 1 (how the effective date is set) — are
+--     outside the scope of a "will my policy apply" yes/no determination
+--     and are not modelled as separate facts. §4.6's one substantive
+--     consequence (the policy runs for one year from the effective date) is
+--     folded into `policy has been cancelled` below, because §1.2 itself
+--     frames "end of term" as a form of cancellation.
+--   - §4.1 ("Your Policy insures You twenty-four (24) hours a day anywhere
+--     in the world") establishes that there is no general territorial
+--     exclusion. That is reflected here by the *absence* of any "occurred
+--     abroad" exclusion field — the only place geography re-enters the
+--     analysis is §2.2's requirement that the confinement itself be in a
+--     United States hospital, which is a condition on the benefit, not an
+--     exclusion on the risk.
+
+§ `CODEX Hospital Income Policy`
+
+§§ `Ontology — the facts a hospitalization claim turns on`
+
+DECLARE Hospitalization HAS
+    -- §3.1(1)-(4) — the four activity-based exclusions. Each field is TRUE
+    -- only when the sickness or accidental injury arose *directly or
+    -- indirectly out of* that activity or service — not merely because the
+    -- claimant happens to hold that job, role, or hobby at the time of
+    -- hospitalization. A police officer bitten by their child, for example,
+    -- leaves `caused by police service` FALSE: the injury has no causal
+    -- connection to police service at all.
+    `caused by skydiving`            IS A BOOLEAN
+    `caused by military service`     IS A BOOLEAN
+    `caused by firefighting service` IS A BOOLEAN
+    `caused by police service`       IS A BOOLEAN
+
+    -- §3.1(5) — the age-based exclusion.
+    `age at hospitalization` IS A NUMBER
+
+    -- Months after the policy's effective date at which the hospitalization
+    -- occurred. Used only to test whether §1.3's confirmation deadline has
+    -- even come due yet, for the "is still pending" branch of §1.1(3) —
+    -- see `condition 1-3 pending or satisfied` below.
+    `hospitalization month` IS A NUMBER
+
+    -- §1.2 — fraud, misrepresentation, or material withholding of
+    -- information cancels the policy outright. The contract text treats
+    -- these as three alternative triggers for the same cancellation
+    -- consequence, so they are combined into one fact here.
+    `fraud or misrepresentation or material withholding` IS A BOOLEAN
+
+    -- §1.3 sets two independent deadlines, both measured from the
+    -- effective date: the wellness visit itself must occur no later than
+    -- the 6-month anniversary, and written confirmation of that visit must
+    -- be supplied to the Company no later than the 7-month anniversary.
+    --
+    -- `wellness visit confirmation month` is NOTHING when, as of the time
+    -- of the hospitalization being assessed, confirmation has not yet been
+    -- supplied — which lets §1.1(3)'s "is still pending" wording apply
+    -- rather than treating an as-yet-unmet deadline as an automatic
+    -- failure. It is JUST m when confirmation was in fact supplied, m
+    -- months after the effective date.
+    `wellness visit confirmation month` IS A MAYBE NUMBER
+    -- Whether the wellness visit itself occurred no later than its own
+    -- 6-month deadline. Only examined once confirmation has been supplied
+    -- (see above); tracked separately because the two deadlines in §1.3 are
+    -- independent of one another.
+    `wellness visit occurred in time` IS A BOOLEAN
+
+    -- §2.2 — the Daily Hospital Income Benefit is payable only for
+    -- continuous confinement in a hospital in the United States, and only
+    -- for up to 365 days of such confinement.
+    `hospital in United States`          IS A BOOLEAN
+    `within the 365 day confinement cap` IS A BOOLEAN
+
+§§ `§1.3 — the wellness-visit condition`
+
+GIVEN h IS A Hospitalization
+GIVETH A BOOLEAN
+DECIDE `condition 1-3 pending or satisfied` IF
+    CONSIDER h's `wellness visit confirmation month`
+    WHEN JUST `confirmation month` THEN
+             `confirmation month` AT MOST 7
+         AND h's `wellness visit occurred in time`
+    WHEN NOTHING THEN
+        -- confirmation has not yet been supplied as of the hospitalization
+        -- date; §1.1(3) is only violated once the 7-month deadline has
+        -- actually passed without it — until then the condition is simply
+        -- "still pending"
+        h's `hospitalization month` AT MOST 7
+
+§§ `§1.2 — cancellation`
+
+GIVEN h IS A Hospitalization
+GIVETH A BOOLEAN
+DECIDE `policy has been cancelled` IF
+       h's `fraud or misrepresentation or material withholding`
+   OR  NOT (`condition 1-3 pending or satisfied` h)
+   OR  h's `hospitalization month` GREATER THAN 12
+       -- §4.6: the policy runs for one year (12 months) from the effective
+       -- date, and §1.2 treats running past the end of that term as an
+       -- automatic cancellation
+
+§§ `§1.1 — policy in effect`
+
+GIVEN h IS A Hospitalization
+GIVETH A BOOLEAN
+DECIDE `policy in effect at hospitalization` IF
+    -- §1.1(1)-(2) (signature, premium paid) are assumed satisfied
+    -- throughout, per the task brief
+    NOT (`policy has been cancelled` h)
+
+§§ `§3.1 — general exclusions`
+
+GIVEN h IS A Hospitalization
+GIVETH A BOOLEAN
+DECIDE `subject to a general exclusion` IF
+       h's `caused by skydiving`
+   OR  h's `caused by military service`
+   OR  h's `caused by firefighting service`
+   OR  h's `caused by police service`
+   OR  h's `age at hospitalization` AT LEAST 80
+
+§§ `§2.2 — conditions on the benefit itself`
+
+GIVEN h IS A Hospitalization
+GIVETH A BOOLEAN
+DECIDE `benefit payable for this confinement` IF
+       h's `hospital in United States`
+   AND h's `within the 365 day confinement cap`
+
+§§ `Top-level determination`
+
+@export Determine whether CODEX's hospital income policy applies to (i.e. whether the Daily Hospital Income Benefit is payable for) a given hospitalization.
+GIVEN h IS A Hospitalization @desc the hospitalization event being assessed for coverage
+GIVETH A BOOLEAN
+DECIDE covered IF
+       `policy in effect at hospitalization` h
+   AND NOT (`subject to a general exclusion` h)
+   AND `benefit payable for this confinement` h
+
+§§ `§5 — benefit and premium amounts (informational; not used in the coverage decision above)`
+
+`Daily Hospital Income Benefit` MEANS 500
+`premium amount` MEANS 2000

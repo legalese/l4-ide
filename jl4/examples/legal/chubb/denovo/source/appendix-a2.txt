@@ -1,0 +1,11 @@
+A.2 Queries and Correct Answers for Empirical Evaluation on Chubb Contract
+All queries are preceded by the disclaimer: “Assuming all other conditions are met and no other exclusions apply (where by ’other,’ I mean anything not referenced in the query that follows),. . . ”
+Query 1: “will my policy apply if I was hospitalized by burns suffered while doing my duty as a firefighter?” Answer: “No.”
+Query 2: “will my policy apply if I am 78 years old at the time of hospitalization?” Answer: “Yes.”
+Query 3: “will my policy apply if I was hospitalized for pneumonia 5 months after the policy’s effective date, and my age at the time of hospitalization is 65?” Answer: “Yes.”
+Query 4: “will my policy apply if I was hospitalized due to a fall while traveling abroad and I had given confirmation of my wellness visit 8 months after the policy’s effective date?” Answer: “No.”
+Query 5: “will my policy apply if I was hospitalized for punching my own face to show off for my friends and I did not commit fraud or misrepresentation?” Answer: “No.”
+Query 6: “will my policy apply if I was hospitalized due to an injury sustained while skydiving, my age at the time of hospitalization was 79, and proof of my wellness visit was provided 6.5 months after the policy’s effective date?” Answer: “No.”
+Query 7: “will my policy apply if I was hospitalized for a heart attack, proof of the wellness visit was submitted 2 months after the policy’s effective date, and my age at the time of hospitalization was 75?” Answer: “Yes.”
+Query 8: “will my policy apply if I was hospitalized after being injured in a military training exercise, the hospitalization occurred within the policy term, and I did not commit fraud?” Answer: “No.”
+Query 9: “will my policy apply if I was hospitalized due to my son biting me in the ankle, proof of my wellness visit was provided 6 months after the effective date, and I was serving as a police officer at the time of hospitalization?” Answer: “Yes.”
