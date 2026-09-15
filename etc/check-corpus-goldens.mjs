@@ -32,6 +32,15 @@ const ROOTS = [
   { label: "ok", dir: join(examples, "ok"), recursive: true },
   { label: "legal", dir: join(examples, "legal"), recursive: true },
   {
+    // The vendored canon mirror. Kept in step with Main.hs's canon/** glob;
+    // CLAUDE.md §3.1 requires the two lists to match. The mirror is a copy of
+    // legalese/canon at etc/canon-pin.json's SHA — a missing golden here is
+    // fixed in canon and pulled, not written by hand.
+    label: "canon",
+    dir: join(examples, "canon"),
+    recursive: true,
+  },
+  {
     label: "libraries",
     dir: join(repoRoot, "jl4-core", "libraries"),
     recursive: false,

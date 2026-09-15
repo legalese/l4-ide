@@ -1,0 +1,18 @@
+{
+  "encoder": "legalese",
+  "display_name": "What a Singapore family gets under the SG Child Support Package — and which lines go down",
+  "status": "draft",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "maintainer": { "name": "Legalese Pte. Ltd.", "github": "legalese" },
+  "modules": [
+    "sg-child-support-domain.l4",
+    "sg-csp.l4",
+    "sg-childcare-leave.l4",
+    "sg-csp-openfisca.l4",
+    "sg-child-support.l4",
+    "cases/sg-child-support-cases.l4"
+  ],
+  "scope": "The five money lines of the SG Child Support Package (Baby Gift, Child Credits, CDA First Step Grant, CDA co-matching cap, PSEA top-up) across all six birth cohorts life.gov.sg publishes, together with the Baby Bonus Scheme and Large Families Scheme they replace and the transition arithmetic between them; and childcare leave under Child Development Co-Savings Act 2001 ss 12B, 12C and 12CA in the shape those sections are written, with the announced 8/10/12-day merger as a dated arm. 79 assertions, all passing. NOT COVERED, on the record: maternity, paternity, adoption and shared parental leave (which makes the employer-cost finding a lower bound); the preschool fee reductions and BTO changes announced at the same Rally; Edusave; and Baby Bonus rates for a birth before 2015-01-01, where the comparison functions REFUSE rather than quote a rate nobody measured. Nine forks in registers/fork-register.json; two are materialised and execute both ways.",
+  "assertions": 79
+}
