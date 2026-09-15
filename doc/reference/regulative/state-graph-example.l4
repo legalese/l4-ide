@@ -1,5 +1,5 @@
 -- A small sale, drawn and questioned by `l4 state-graph`.
--- See state-graph.md, which walks through the pictures and the answers.
+-- See STATE-GRAPH.md, which walks through the pictures and the answers.
 
 DECLARE Person IS ONE OF `The Seller`, `The Buyer`, `The Courier`
 DECLARE Action IS ONE OF
