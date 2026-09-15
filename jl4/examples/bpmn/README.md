@@ -100,9 +100,11 @@ byte-identical fidelity report, because `L4.StateGraph.extractDeonton` never rea
   documentation on the task says so. **Not so for the other modals**, which the review of
   2026-09-15 caught: a `SHANT` completes on the _first_ instance (`completionCondition
   nrOfCompletedInstances >= 1`, read off R-Q5 — one act is the breach; `P-PROHIBITION-FIRST`), and
-  a `MAY` barrier's lapse is a LEST arm to Fulfilled in the state graph, so the exporter's
-  synthesised "lapse routes where HENCE routes" never fires for it — a resolution that did not
-  pass creates no duty to publish it. `modals.l4` pins every cell.
+  a quantified `MAY`'s lapse — under either join — is a LEST arm to Fulfilled in the state graph,
+  so the exporter's synthesised "lapse routes where HENCE routes" never fires for it: a resolution
+  that did not pass creates no duty to publish it, and under a fork the continuation arises only
+  from a member's act, never from a lapse (measured 2026-09-16; a first cut drew the fork the
+  other way on the review's word). `modals.l4` pins every cell.
 - **The fork (`UPON EACH`) is the one this exporter does not draw faithfully.** The source fires
   the continuation once per member as that member completes; the activity fires once, after all of
   them (`P-FORK`, lossy), and its interrupting timer cancels every instance, so a continuation a
@@ -110,13 +112,14 @@ byte-identical fidelity report, because `L4.StateGraph.extractDeonton` never rea
   loss). BPMN has shapes for once-per-member — a multi-instance subProcess around the continuation,
   or the `None` completion behaviour caught by a non-interrupting boundary — and this exporter
   emits neither. Both notes are written "the diagram says…; the rule says…", because the reader
-  has to disbelieve the drawing rather than fill it in. Two gaps in that reporting, measured
-  2026-09-16 and not yet fixed: a `MAY` fork with a continuation (`modals-may-fork`) has its lapse
-  timer drawn into the continuation — the chair's `MUST Publish` — which the runtime never does
-  (`ok/every/run-modals.l4` §7: nobody approves, the chair publishes late, FULFILLED; the barrier's
-  LEST-to-Fulfilled edge of 2026-09-15 was not extended to the fork), and no tag says so; and
-  `P-FORK-CANCEL` is emitted on the `MUST` forks only, though the `MAY` fork's timer is interrupting
-  too (`modals-may-fork.bpmn:36`).
+  has to disbelieve the drawing rather than fill it in. Two gaps in that reporting were measured
+  2026-09-16 and fixed the same day (`d544ed22`): a `MAY` fork with a continuation
+  (`modals-may-fork`) had its lapse timer drawn into the continuation — the chair's `MUST Publish`
+  — which the runtime never does (`ok/every/run-modals.l4` §7: nobody approves, the chair publishes
+  late, FULFILLED); the state graph now draws the fork's lapse as a LEST arm to Fulfilled, as the
+  barrier's has been since 2026-09-15, and the golden reads `Boundary_0 → End_2`. And
+  `P-FORK-CANCEL` is now emitted on the `MAY` fork too (`modals-may-fork.fidelity.txt`), whose
+  timer is interrupting like the `MUST` forks' (`modals-may-fork.bpmn:36`).
 - **A deadline written only on the join line arms the boundary timer** (`memberDeadline` in
   `L4.StateGraph`, mirroring the evaluator). When the act has a deadline of its own, that one is
   on the timer and the join line's is reported undrawn as `P-JOIN-DEADLINE` (lossy).

@@ -78,11 +78,13 @@
 -- deadlines are text. So \"every path passes through @K@\" is sound —
 -- there is no drawn route around @K@ — while \"nothing dominates\" means
 -- only that the graph shows more than one route, not that each is live.
--- One gap runs the other way: a bare @MAY@ whose @HENCE@ leads on to
--- another obligation can lapse straight to @FULFILLED@, and the graph does
--- not draw that route (see the note on @DMay@ in 'extractDeonton'), so an
--- act listed for @FULFILLED@ below such a permission can in fact be
--- bypassed.
+-- One gap runs the other way: a bare single-party @PARTY … MAY@ whose
+-- @HENCE@ leads on to another obligation can lapse straight to
+-- @FULFILLED@, and the graph does not draw that route (see the note on
+-- @DMay@ in 'extractDeonton'), so an act listed for @FULFILLED@ below such
+-- a permission can in fact be bypassed. A quantified @EVERY … MAY@ under
+-- either join line does draw its lapse, as a @LEST@ edge to @FULFILLED@,
+-- so the answer below it is right ("nothing in particular").
 --
 -- Two narrowings of the paper's definition are deliberate: the question is
 -- asked from the start state only (the paper's @dom_s(J)@ ranges over every

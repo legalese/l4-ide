@@ -297,14 +297,20 @@ longer gates on, or is gated by, the new picture.
 >
 > **What the answer inherits** is §1.1b's three blind spots unchanged — it is sound in the
 > direction "this act is on every drawn route" and says nothing about whether each drawn
-> route is live — **plus one in the opposite direction**: a bare `MAY` whose `HENCE` leads on
-> to another obligation lapses straight to `FULFILLED` in the evaluator, and the graph does not
-> draw that route (`StateGraph.hs`, the `DMay` NOTE in `extractDeonton`). Measured:
-> `PARTY Alice MAY pay WITHIN 5 HENCE (PARTY Bob MUST deliver WITHIN 10)` with a stray event
-> AT 6 evaluates to `FULFILLED`, while `--dominators` lists both `pay` and `deliver` as on every
-> path to `FULFILLED`. So "listed ⇒ necessary" fails below a lapsing `MAY`. The user page
-> (`doc/reference/regulative/STATE-GRAPH.md`, "What the answer does not know", item 4) says
-> so; fixing the drawing is a separate change and would retire the caveat.
+> route is live — **plus one in the opposite direction**: a bare single-party `PARTY … MAY`
+> whose `HENCE` leads on to another obligation lapses straight to `FULFILLED` in the evaluator,
+> and the graph does not draw that route (`StateGraph.hs`, the `DMay` NOTE in `extractDeonton`).
+> Measured: `PARTY Alice MAY pay WITHIN 5 HENCE (PARTY Bob MUST deliver WITHIN 10)` with a
+> stray event AT 6 evaluates to `FULFILLED`, while `--dominators` lists both `pay` and `deliver`
+> as on every path to `FULFILLED`. So "listed ⇒ necessary" fails below a single party's lapsing
+> `MAY`. The user page (`doc/reference/regulative/STATE-GRAPH.md`, "What the answer does not
+> know", item 4) says so; fixing the drawing for `PARTY MAY` is a separate change and would
+> retire the caveat. **Narrowed 2026-09-16:** the quantified form no longer has the gap. After
+> `6daf1d9d` (barrier) and `d544ed22` (fork) the `DMay` arm draws an `EVERY … MAY`'s lapse as a
+> `LEST` edge to `Fulfilled` under either join. Re-measured on `jl4/examples/bpmn/modals.l4`,
+> `--dominators` answers "nothing in particular" for `FULFILLED` on both `the resolution`
+> (barrier) and `each approval is published` (fork), which is right — the chair's publication
+> can be bypassed. The `PARTY MAY` fixture above still lists both acts.
 
 ### 1.1d So what is left of the existence argument
 
@@ -2086,7 +2092,13 @@ inverted a `SHANT` barrier (drawn as breaching only when _every_ member had offe
 one act) and a `MAY` barrier with a continuation (the lapse timer routed _into_ the chair's duty to
 publish a resolution that did not pass; `l4 run` says FULFILLED). Fixed: `completionCondition
 nrOfCompletedInstances >= 1` on a prohibition, read off R-Q5; and the state graph now draws a
-barrier-joined `MAY`'s lapse as a LEST arm to Fulfilled. (2) The fork's interrupting timer cancels
+barrier-joined `MAY`'s lapse as a LEST arm to Fulfilled. **Corrected 2026-09-16:** the review's
+§A also said a fork's `MAY` "carries the real HENCE per member, so a lapsed member does route
+there", and the first cut drew it so. Re-measured by `lts-diagrams-2` and reproduced: nobody
+approves, chair publishes anyway → FULFILLED under the fork as under the barrier; the continuation
+arises only from an act. The lapse arm now goes to Fulfilled under either join, the two tests that
+had pinned the reviewer's reading were flipped, and `modals-may-fork` re-goldened. A reviewer's
+sentence is a claim like any other; the pin that caught nothing was the pin written from it. (2) The fork's interrupting timer cancels
 every instance, so a continuation a member had already spawned is never drawn — an obligation L4
 says arose is absent and its breacher exonerated; new `P-FORK-CANCEL`. (3) `P-JOIN-DEADLINE` on a
 fork reported a loss that is not one: `joinStateDue` is `Nothing` for `JoinUpon`, so the runtime
@@ -2106,44 +2118,7 @@ the join line — its members' HENCE/LEST slots hold the `` `the join` `` / `` `
 sentinels — so `markingOf` cannot produce the join place from what the runtime hands it without
 sniffing user-visible strings. P2b's `DeonticStep` has to carry the join, or the residual has to.
 
-**MEASURED 2026-09-16 — the fork half of finding (1) was wrong, and the tree said so in two
-places.** `6daf1d9d` drew the barrier-joined `MAY`'s lapse as a LEST arm to Fulfilled and left the
-fork alone, on the stated belief that _"under a FORK each member carries the real HENCE, so a
-lapsed member does route there, and the synthesis stays right"_ (`jl4-core/src/L4/StateGraph.hs:951-952`
-as it stood at `0139c6c5`; its commit message: _"A fork's MAY keeps the single-party routing, which is right
-there"_). No trace exercised that belief. P2a's re-run (`P2A-TOKEN-SIM-BASELINE.md` §3.7, second
-question) found `modals-may-fork`'s lapse timer landing on the chair's `MUST Publish`, and the
-review of that report ran the check. Recorded now as two `#TRACE`s on
-`jl4/examples/ok/every/run-modals.l4` §7 (`each approval is published`, the fixture's own rule),
-goldened at `ok/every/tests/run-modals.golden:57-72`: nobody approves and the chair publishes at
-day 40 ⇒ **FULFILLED**, the duty never arose; one director approves at day 3 and nobody publishes
-⇒ **BREACHED**, the chair's, at day 8. The runtime routes a `MAY`'s expiry to `LEST` (default
-`FULFILLED`) whatever the join (`Machine.hs:1877-1881`, re-anchored 2026-09-16); the fork differs from the barrier only in
-that an _exercised_ member arms the continuation on its own. So the fork's drawn lapse arm is wrong
-in the same way the barrier's was before `6daf1d9d`. What this branch changes: the traces, their
-goldens and the report. What it does not change: **any Haskell** — not the exporter, and not the
-two comments either. `StateGraph.hs:951-952` still read the overturned sentence, and
-`Lower.hs:553`'s `KNOWN WRONG in one shape` still named only the bare-`MAY` shape, in the tree
-this block was committed to. (A first cut of this block corrected both comments in place; the
-P2a-remeasure gate — no `.hs` or `.cabal` in the diff, because this stage measures and documents
-and a Haskell edit, even comment-only, rebuilds `jl4-core` for the whole stack and lands inside
-`extractDeonton` (then `StateGraph.hs:773`; `:872` after B1/B2), the function that binds
-`Deonton.due` (then `:774`; now `:873`), the field
-the `every-each` session is retyping on a branch that lands first — rejected it, and the two files
-were restored to `lts/p2-followups` byte-for-byte, `git diff --quiet lts/p2-followups -- <both>`
-exit 0.) **Reconciled 2026-09-16:** once the six follow-up tracks were merged — B1/B2 had already
-edited `extractDeonton` (four hunks: `labelSite`, and every arm through `wireTarget`), so a
-comment edit there no longer adds a conflict the merge did not already carry — the two comment
-hunks of `11199a16` were re-applied, comment-only, at the merge: `StateGraph.hs:1009-1023` now
-states the measured routing and names the candidate fix, and `Lower.hs:554-574` reads `KNOWN
-WRONG in two shapes` and names the fork as the second. The tree's
-comments are no longer wrong; the code still is. **P1 follow-up, not built:** draw the fork-joined `MAY`'s lapse as a LEST arm
-to Fulfilled too (the `Barrier _` arm of the `DMay` case at `StateGraph.hs:998-1027`, widened to
-`Just MkJoinLabel {}`), which retires `Lower.hs`'s `lapses` synthesis (`Lower.hs:575-581`) for that
-shape, retires the "not done here" the two comments now end on, and moves
-`modals-may-fork`'s two goldens (`.bpmn`, `.fidelity.txt`); and, second, `P-FORK-CANCEL` is not emitted on a `MAY` fork
-(`modals-may-fork.fidelity.txt` has no such tag; `modals-may-fork.bpmn:36` has the interrupting
-timer it names), so the fidelity report under-reports that cell — the same fix or a sibling.
+The measurement behind that correction originated on `lts/p2a-remeasure` as `11199a16` (the two `#TRACE`s on `jl4/examples/ok/every/run-modals.l4` §7, goldened in `ok/every/tests/run-modals.golden`, and P2A-TOKEN-SIM-BASELINE.md §3.7) and was folded into legalese/l4-ide#395 as `d544ed22`, which also emits `P-FORK-CANCEL` on the `MAY` fork.
 
 #### What follows for P2
 
