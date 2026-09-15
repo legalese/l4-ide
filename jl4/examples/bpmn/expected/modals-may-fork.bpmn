@@ -16,7 +16,7 @@
     <bpmn:laneSet id="LaneSet_1">
       <bpmn:lane id="Lane_1_EVERY_Director_d_IN_board" name="EVERY Director d IN board">
         <bpmn:flowNodeRef>Task_0</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>Lapse_0</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Boundary_0</bpmn:flowNodeRef>
       </bpmn:lane>
       <bpmn:lane id="Lane_2_theChair" name="theChair">
         <bpmn:flowNodeRef>Task_1</bpmn:flowNodeRef>
@@ -33,9 +33,9 @@
       <bpmn:documentation>EVERY Director d IN board MAY Approve ... WITHIN 30 UPON EACH — one instance per member of the cast, each bound to ‘d’; the cast is fixed only when the rule runs, so the activity carries no cardinality (P-CAST). UPON EACH: in the source, what follows fires once per member as that member completes. A multi-instance activity fires its outgoing flow once, after the last instance, so what follows is drawn once (P-FORK), and the timer on this activity cancels every instance (P-FORK-CANCEL).</bpmn:documentation>
       <bpmn:multiInstanceLoopCharacteristics id="MultiInstance_Task_0" isSequential="false" />
     </bpmn:task>
-    <bpmn:boundaryEvent id="Lapse_0" name="after P30D" attachedToRef="Task_0" cancelActivity="true">
-      <bpmn:documentation>the permission lapses: the deadline passes without it being exercised, which routes where HENCE routes</bpmn:documentation>
-      <bpmn:timerEventDefinition id="Timer_Lapse_0">
+    <bpmn:boundaryEvent id="Boundary_0" name="after P30D" attachedToRef="Task_0" cancelActivity="true">
+      <bpmn:documentation>LEST: the obligation is not discharged within 30</bpmn:documentation>
+      <bpmn:timerEventDefinition id="Timer_Boundary_0">
         <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P30D</bpmn:timeDuration>
       </bpmn:timerEventDefinition>
     </bpmn:boundaryEvent>
@@ -54,7 +54,7 @@
     </bpmn:endEvent>
     <bpmn:sequenceFlow id="Flow_Start_0__Task_0" sourceRef="Start_0" targetRef="Task_0" />
     <bpmn:sequenceFlow id="Flow_Task_0__Task_1" sourceRef="Task_0" targetRef="Task_1" />
-    <bpmn:sequenceFlow id="Flow_Lapse_0__Task_1" sourceRef="Lapse_0" targetRef="Task_1" />
+    <bpmn:sequenceFlow id="Flow_Boundary_0__End_2" sourceRef="Boundary_0" targetRef="End_2" />
     <bpmn:sequenceFlow id="Flow_Task_1__End_2" sourceRef="Task_1" targetRef="End_2" />
     <bpmn:sequenceFlow id="Flow_Boundary_1__End_3" sourceRef="Boundary_1" targetRef="End_3" />
   </bpmn:process>
@@ -78,7 +78,7 @@
       <bpmndi:BPMNShape id="Shape_Task_0" bpmnElement="Task_0">
         <dc:Bounds x="380" y="100" width="100" height="80" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Shape_Lapse_0" bpmnElement="Lapse_0">
+      <bpmndi:BPMNShape id="Shape_Boundary_0" bpmnElement="Boundary_0">
         <dc:Bounds x="434" y="162" width="36" height="36" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_Task_1" bpmnElement="Task_1">
@@ -105,11 +105,13 @@
         <di:waypoint x="494" y="300" />
         <di:waypoint x="560" y="300" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Edge_Flow_Lapse_0__Task_1" bpmnElement="Flow_Lapse_0__Task_1">
+      <bpmndi:BPMNEdge id="Edge_Flow_Boundary_0__End_2" bpmnElement="Flow_Boundary_0__End_2">
         <di:waypoint x="452" y="198" />
-        <di:waypoint x="546" y="198" />
-        <di:waypoint x="546" y="300" />
-        <di:waypoint x="560" y="300" />
+        <di:waypoint x="520" y="198" />
+        <di:waypoint x="520" y="200" />
+        <di:waypoint x="700" y="200" />
+        <di:waypoint x="700" y="460" />
+        <di:waypoint x="772" y="460" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Edge_Flow_Task_1__End_2" bpmnElement="Flow_Task_1__End_2">
         <di:waypoint x="660" y="300" />

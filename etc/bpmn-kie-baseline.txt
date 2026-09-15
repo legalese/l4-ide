@@ -84,18 +84,22 @@
 #   modals-must-fork-
 #     join-deadline
 #   modals-may-barrier     class (d), as above.
-#   modals-may-fork        class (a') — "This type of node [Task_1] cannot have
-#                          more than one incoming connection": the lapse timer
-#                          and the activity's own completion both flow into the
-#                          chair's task, a spec-legal uncontrolled merge that
-#                          jBPM's dialect rejects at parse time, before it
-#                          reaches the class-(d) objection. Same limit as
-#                          regcf-reporting, relocated; not a defect.
+#   modals-may-fork        class (d), as above — SINCE 2026-09-16. For one day
+#                          it sat on class (a') ("cannot have more than one
+#                          incoming connection"): the fork's lapse timer flowed
+#                          into the chair's task beside the activity's own
+#                          completion. That routing was wrong against the
+#                          runtime (a lapsed member spawns no continuation;
+#                          measured, run-modals.golden), the lapse now lands on
+#                          Fulfilled, Task_1 has one incoming flow, and jBPM
+#                          gets as far as the collection objection like its
+#                          siblings. errors 1 -> 2 on that row for that reason;
+#                          RESULT unchanged at 12.
 
 consultation.bpmn                        errors=0 warnings=0 verdict=COMPLETED
 handover.bpmn                            errors=4 warnings=0 verdict=REJECTED
 modals-may-barrier.bpmn                  errors=2 warnings=0 verdict=REJECTED
-modals-may-fork.bpmn                     errors=1 warnings=0 verdict=REJECTED
+modals-may-fork.bpmn                     errors=2 warnings=0 verdict=REJECTED
 modals-must-barrier-both-deadlines.bpmn  errors=2 warnings=0 verdict=REJECTED
 modals-must-fork-join-deadline.bpmn      errors=2 warnings=0 verdict=REJECTED
 modals-shant-barrier.bpmn                errors=2 warnings=0 verdict=REJECTED

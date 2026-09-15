@@ -1680,9 +1680,11 @@ spec = do
     it "names the cancelled continuations on a fork that has a timer, and only there" $ do
       length (findingsFor "P-FORK-CANCEL" fork) `shouldBe` 1
       findingsFor "P-FORK-CANCEL" barrier `shouldBe` []
-      -- a MAY fork has a lapse timer, not a LEST boundary: no cancellation of
-      -- a breach arm to report
-      findingsFor "P-FORK-CANCEL" (exportOf defaultBpmnOptions "group" mayForkSrc) `shouldBe` []
+      -- a MAY fork's timer is its lapse, drawn as a LEST arm to Fulfilled, and
+      -- it cancels every instance too: a member who approved has already
+      -- spawned the continuation, which the timer deletes (measured: one
+      -- approval, no publication → the chair BREACHED)
+      length (findingsFor "P-FORK-CANCEL" (exportOf defaultBpmnOptions "group" mayForkSrc)) `shouldBe` 1
 
     -- The modal × join cells the marker inverted. Both assertions are on
     -- MEANING: where a token ends up, not which element is present.
@@ -1716,19 +1718,20 @@ spec = do
             | b <- boundaries bx
             , Boundary "Task_0" _ <- [b.nodeKind]
             ]
-      it "under a barrier, a lapse ends the rule fulfilled with nothing following" $ do
-        -- the state graph draws the lapse as a LEST arm to Fulfilled, so it is
-        -- the exporter's ordinary boundary event — not its synthesised lapse
-        -- timer — that carries it, and it lands on the Fulfilled end event,
-        -- never on Bob's obligation
-        case lapses mayBarrier of
-          [("Boundary_0", [tgt])] -> do
-            maybe Nothing (\n -> Just n.nodeKind) (nodeNamed mayBarrier tgt) `shouldBe` Just (EndEvent False)
-          other -> expectationFailure ("expected one boundary on Task_0 with one flow, got " <> show other)
-      it "under a fork, a lapse routes where HENCE routes, as for one party" $
-        -- each member carries the real continuation, so a lapsed member's arm
-        -- goes to Bob's obligation, exactly as a PARTY MAY's does
-        lapses mayFork `shouldBe` [("Lapse_0", ["Task_1"])]
+      -- Under either join the state graph draws the lapse as a LEST arm to
+      -- Fulfilled, so it is the exporter's ordinary boundary event — not its
+      -- synthesised lapse timer — that carries it, and it lands on the
+      -- Fulfilled end event, never on Bob's obligation. A first version of
+      -- the fork case pinned the opposite ("routes where HENCE routes"),
+      -- on the review's reading rather than a run; the run says FULFILLED.
+      let lapseEndsFulfilled bx = case lapses bx of
+            [("Boundary_0", [tgt])] ->
+              maybe Nothing (\n -> Just n.nodeKind) (nodeNamed bx tgt) `shouldBe` Just (EndEvent False)
+            other -> expectationFailure ("expected one boundary on Task_0 with one flow, got " <> show other)
+      it "under a barrier, a lapse ends the rule fulfilled with nothing following" $
+        lapseEndsFulfilled mayBarrier
+      it "under a fork too: the continuation arises only from an act, never from a lapse" $
+        lapseEndsFulfilled mayFork
 
     -- The evaluator expires each member on a deadline written only on the
     -- join line, so the LEST arm is reachable; drawing it as untriggered

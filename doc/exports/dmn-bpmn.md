@@ -104,8 +104,9 @@ declines to say how many. Three notes go with it, and the last two are the ones 
   subprocess this export does not draw. A `MUST` whose join line is `ONCE ALL HAVE` gets no such
   note, because "once, after all of them" is exactly what it means. A `SHANT` gets
   `P-PROHIBITION-FIRST` instead: its activity completes on the _first_ member's act, since one
-  act is the breach. A `MAY` barrier's lapse timer routes to the fulfilled end, not into what
-  follows — a resolution that did not pass creates no duty to publish it.
+  act is the breach. A `MAY`'s lapse timer, under either join, routes to the fulfilled end, not
+  into what follows — a resolution that did not pass creates no duty to publish it, and under
+  `UPON EACH` what follows arises only from a member's act.
 - `P-FORK-CANCEL` (lossy): the timer on a fork's activity cancels every member at once, so a
   follow-on that a member had already earned is not drawn as arising at all. This is the fork's
   largest loss, and the note is written as "the diagram says…; the rule says…" because you have

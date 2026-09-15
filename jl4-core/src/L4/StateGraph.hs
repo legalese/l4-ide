@@ -938,22 +938,31 @@ extractDeonton mFromState (MkDeonton _anno subject action due mJoin hence lest) 
         -- and retiring that synthesis, which moves BPMN output for every
         -- permission; it is a separate change from smucclaw/l4-ide#927.
         DMay -> case quantifier >>= (.quantJoin) of
-          -- Under a BARRIER a lapsed member means the join can never fire:
-          -- the HENCE is skipped and the member's own FULFILLED is returned as
-          -- the barrier's (Machine.hs, Barrier1's last arm and the note on
-          -- 'barrierFail'). So the lapse arm goes to Fulfilled, and drawing it
-          -- here is what stops L4.Bpmn.Lower's synthesised lapse timer from
-          -- routing "wherever HENCE lands" — which for a corporate resolution
-          -- (spec §2.2.1 Pattern B) manufactured the chair's duty to publish a
-          -- resolution that did not pass. Measured 2026-09-15 by the
-          -- concurrency review: `l4 run` FULFILLED, the diagram Breach.
+          -- Under EITHER join a lapsed member's arm goes to Fulfilled, never
+          -- to where HENCE goes. Barrier: a lapsed member means the join can
+          -- never fire, the HENCE is skipped and the member's own FULFILLED is
+          -- returned as the barrier's (Machine.hs, Barrier1's last arm and the
+          -- note on 'barrierFail'). Fork: the HENCE arises only from a
+          -- member's ACT; a member whose permission expires unexercised
+          -- spawns nothing. Both measured, 2026-09-15/16, on the corporate
+          -- resolution (spec §2.2.1 Pattern B): nobody approves and the chair
+          -- publishes anyway → FULFILLED under both joins; one approval with
+          -- no publication → BREACHED (the chair), fork and barrier alike
+          -- (ok/every/tests/run-modals.golden). Drawing the arm here is what
+          -- stops L4.Bpmn.Lower's synthesised lapse timer from routing
+          -- "wherever HENCE lands", which manufactured the chair's duty to
+          -- publish a resolution that did not pass.
           --
-          -- Under a FORK each member carries the real HENCE, so a lapsed
-          -- member does route there, and the synthesis stays right.
-          Just MkJoinLabel { joinKind = Barrier _ } -> do
+          -- A first version of this arm drew it for the barrier only, on the
+          -- concurrency review's reading that a fork "carries the real HENCE"
+          -- per member. That reading was wrong at runtime and was caught by
+          -- re-measurement the next day. The single-party PARTY MAY keeps the
+          -- pre-existing gap noted above; it is the same defect and the same
+          -- fix, and moves the handover goldens, so it is its own change.
+          Just _ -> do
             fulfilledId <- getTerminalState "Fulfilled" TerminalFulfilled
             addTransition fromState fulfilledId lestLabel LestTransition
-          _ -> pure ()
+          Nothing -> pure ()
         -- MUST/SHANT without LEST default to Breach; only the way in differs,
         -- and 'lestArmWording' is where that difference is spelled.
         DMust -> defaultToBreach
