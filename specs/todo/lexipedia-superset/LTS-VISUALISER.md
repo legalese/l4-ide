@@ -266,9 +266,10 @@ longer gates on, or is gated by, the new picture.
 > know", item 4) says so; fixing the drawing for `PARTY MAY` is a separate change and would
 > retire the caveat. **Narrowed 2026-09-16:** the quantified form no longer has the gap. After
 > `6daf1d9d` (barrier) and `d544ed22` (fork) the `DMay` arm draws an `EVERY … MAY`'s lapse as a
-> `LEST` edge to `Fulfilled` under either join, and re-measured on `jl4/examples/bpmn/modals.l4` > `--dominators` answers "nothing in particular" for `FULFILLED` on both `the resolution` (`ONCE
-ALL HAVE`) and `each approval is published` (`UPON EACH`), which is right — the chair's
-> publication can be bypassed. The `PARTY MAY` fixture above still lists both acts.
+> `LEST` edge to `Fulfilled` under either join. Re-measured on `jl4/examples/bpmn/modals.l4`,
+> `--dominators` answers "nothing in particular" for `FULFILLED` on both `the resolution`
+> (barrier) and `each approval is published` (fork), which is right — the chair's publication
+> can be bypassed. The `PARTY MAY` fixture above still lists both acts.
 
 ### 1.1d So what is left of the existence argument
 
