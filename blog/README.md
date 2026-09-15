@@ -41,18 +41,18 @@ papers' positions in front of a general technical reader before the academic ver
 Nine posts and one standalone. The facet column names the `paper/` directory each post
 prefigures. The arc has already changed once (7 posts → 8) as material arrived; treat it as live.
 
-| #  | Working title                       | Facet                                                       |
-| -- | ----------------------------------- | ----------------------------------------------------------- |
-| 1  | We found a race condition in a law  | `icail/` (motivation)                                       |
-| 2  | Three bets on legal AI              | `icail/` + Kant et al. replication                          |
-| 3  | Specs are code                      | `cnl-affordances/`                                          |
-| 4  | What the compiler checks            | `cnl-affordances/` + `icail/` §5; absorbs `bounded-deontics/` |
-| 5  | The white-hat Bad Man               | `formal-methods-in-law/`                                    |
-| 6  | The missing test suite              | `formal-methods-in-law/` §6 + backend portfolio             |
-| 7  | When the code is the law            | tax-as-code; bitemporal substrate (added 2026-09-13)        |
-| 8  | What formalization can't do         | `cls-determinacy-frontier/`                                 |
-| 9  | One statute at a time _(working title)_ | the call to action — no facet of its own (added 2026-09-14) |
-| S1 | Seeing like a citizen               | `political-economy/` — standalone, runs any time            |
+| #   | Working title                           | Facet                                                         |
+| --- | --------------------------------------- | ------------------------------------------------------------- |
+| 1   | We found a race condition in a law      | `icail/` (motivation)                                         |
+| 2   | Three bets on legal AI                  | `icail/` + Kant et al. replication                            |
+| 3   | Specs are code                          | `cnl-affordances/`                                            |
+| 4   | What the compiler checks                | `cnl-affordances/` + `icail/` §5; absorbs `bounded-deontics/` |
+| 5   | The white-hat Bad Man                   | `formal-methods-in-law/`                                      |
+| 6   | The missing test suite                  | `formal-methods-in-law/` §6 + backend portfolio               |
+| 7   | When the code is the law                | tax-as-code; bitemporal substrate (added 2026-09-13)          |
+| 8   | What formalization can't do             | `cls-determinacy-frontier/`                                   |
+| 9   | One statute at a time _(working title)_ | the call to action — no facet of its own (added 2026-09-14)   |
+| S1  | Seeing like a citizen                   | `political-economy/` — standalone, runs any time              |
 
 ## Framing constraints
 
@@ -156,7 +156,7 @@ does not have to rediscover them.
   Fig. 2** — "It comes about because the organization has no clue at which point the commission's
   interdiction to inform the individual could intervene, and is therefore entitled to inform the
   individual as soon as a data breach is identified"; and `E<> O.breachDeterminedNotifiable and
-  deadlock` holds — "no action is possible when the notification deadline of 3 days has been
+deadlock` holds — "no action is possible when the notification deadline of 3 days has been
   exceeded." The trace's last state is `(notifIndivProhibited, informed, individualNotified)`.
   Note the paper's own framing is "the individual is informed in spite of the commission having
   prohibited it" plus a deadlock past the 3-day deadline; Meng's "must notify and must not notify"
@@ -177,14 +177,14 @@ does not have to rediscover them.
   response was about the liability an ambiguous consumer term carries, not about which reading
   to pay in future; the fix was to the wording, at the level of the logic, not to the payout
   algorithm. The CJEU citation checks out (searched 2026-09-14; EUR-Lex CELEX 62022CJ0263,
-  summary at CELEX 62022CJ0263_SUM): Judgment of the Court (Ninth Chamber), 20 April 2023, on a
+  summary at CELEX 62022CJ0263*SUM): Judgment of the Court (Ninth Chamber), 20 April 2023, on a
   reference from Portugal's Supremo Tribunal de Justiça — Directive 93/13/EEC on unfair terms in
   consumer contracts, Articles 3–6; the transparency requirement; a group payment-protection
   insurance contract; a term limiting or excluding cover that the consumer had not been informed
   of. It is a transparency-and-disclosure case about a limiting term, not a case about an
   ambiguous formula, so the post reports management's remark as their reading of their exposure
   and describes the judgment as what it is. Open the judgment before quoting it.
-  **A second case, from Meng (2026-09-14): _Tay Eng Chuan v Ace Insurance Ltd_ [2008] SGCA 26**
+  \*\*A second case, from Meng (2026-09-14): \_Tay Eng Chuan v Ace Insurance Ltd* [2008] SGCA 26**
   (Singapore Court of Appeal, CA 95/2007, decided 27 June 2008; read on eLitigation 2026-09-14).
   This one is on point for the sentence the post already carries — "an ambiguity in a policy the
   insurer wrote is, by the usual rule of construction, read against the insurer" — and can be its
@@ -199,7 +199,7 @@ does not have to rediscover them.
   have only a vague memory that it was this class of suit that we mentioned as representative of
   'yes, insurers have some discretion — that's what adjusters do — but policies need to avoid
   certain classes of unpredictability, and courts have agreed.'" So: the earlier note's "management
-  observed … a liability risk" is withdrawn as to attribution. The post says that *our*
+  observed … a liability risk" is withdrawn as to attribution. The post says that _our_
   presentation put the two cases in front of management as the class of risk an ambiguous term
   carries, that the presentation is lost and this is Meng's recollection, hedged as he hedges it;
   that management's response was about liability rather than about which reading to pay; and it
@@ -216,14 +216,13 @@ does not have to rediscover them.
   insurance paper — "Deontics and time in contracts: An executable semantics for the L4 DSL"
   (Watt, Goodenough, Wong, JURIX 2023) is about the Flood & Goodenough loan agreement. The
   insurance pilot's public reference, if any, is still to be supplied.) **The year, found in the
-  tree 2026-09-14: 2023.** `smucclaw/usecases` (private working repo; cite only as "the
+  tree 2026-09-14: 2023.\*\* `smucclaw/usecases` (private working repo; cite only as "the
   project's working repository") carries the insurance work: 752 commits in 2023, from an
   insurance lexicon (2023-03-31) through Maude and s(CASP) experiments (April–July), a DMN
   representation (2023-07-23), the `insurance_wiki` (Aug–Oct), `joe/insurance` (506 commits from
   2023-04-10) and `ym/insurance` (195, Sep–Nov), to "L4 insurance policy encoding documentation"
   dated 24 November 2023 (`smu/L4_insurance_policy_encoding_documentation.pdf`, added by Joe
-  Watt). There is also `Presentations/Presentation_2023_07_25_Eval_and_UI` (commits 25–26 July
-  2023) — whether that is the management presentation Meng remembers as lost is for him to say.
+  Watt). There is also `Presentations/Presentation_2023_07_25_Eval_and_UI` (commits 25–26 July 2023) — whether that is the management presentation Meng remembers as lost is for him to say.
   So the Ocidental date check passes: the judgment (20 April 2023) predates the pilot's
   presentations, and both cases could have been cited. The post says the insurance pilot was in
   2023; it does not name the insurer.
@@ -238,7 +237,7 @@ does not have to rediscover them.
   named `SoMuchOf`, `Inxs` ("in excess of") and `IntDiv`; the bug was **the semantics of
   "excess"** — "the amount by which a exceeds b" had been coded as `a − b` where the Act means
   `max(0, a − b)`, so once combined income passed the threshold the "excess income" went negative
-  and the rebate went *up*, into negative rebates; it was found by **charting the rebate over a
+  and the rebate went _up_, into negative rebates; it was found by **charting the rebate over a
   grid** — combined income $12,000–$30,000 in $1,000 steps against rates of $100 upward in $100
   steps, dependants 0 — and reading the sign ("this looks wrong"; after the fix, "this now
   reflects legislative intent"); the deck credits the upstream fix to two OpenFisca-Aotearoa
@@ -305,10 +304,10 @@ does not have to rediscover them.
   to run anything. What it standardized well is the metadata layer: `LegalSource`/`LegalReference`
   (Akoma Ntoso naming), `TemporalCharacteristic` (in-force/efficacy intervals), `Alternatives`
   (competing interpretations) — and those three map onto L4's `@ref` provenance, `EVAL … UNDER RULES
-  EFFECTIVE AT`, and the ambiguity register closely enough that the memo calls it "independent
+EFFECTIVE AT`, and the ambiguity register closely enough that the memo calls it "independent
   confirmation that L4's annotation layer is designed correctly." So the heir claim is: L4 takes up
   the hub role LegalRuleML was built for and adds the thing it never had, an execution semantics
-  and working compilers out — and the debt is owed back, because a LegalRuleML *exporter* is on the
+  and working compilers out — and the debt is owed back, because a LegalRuleML _exporter_ is on the
   backlog (memo verdict: viable as a publication-and-provenance artifact, not an interoperability
   bridge; ~60% mechanical XML; `WITHIN`, `HENCE`, `RAND`/`ROR`, `#TRACE` have no representation and
   would be dropped with a diagnostic). Say "spiritual heir" as Meng's positioning, in his voice, and
@@ -323,27 +322,27 @@ does not have to rediscover them.
   census refreshed 2026-08-28; the specs named). Re-verify any row you print by the pointer given;
   the post's table may be shorter than this, but it must not be truer than this.
 
-  | target | family | status 2026-09-14 | pointer |
-  | --- | --- | --- | --- |
-  | OpenFisca (Python module) | execution | shipped: `l4 openfisca` | `doc/exports/openfisca.md`, `jl4-core/src/L4/OpenFisca/Emit.hs` |
-  | Catala (literate module + equivalence check) | execution | shipped: `l4 catala` | `doc/exports/catala.md`, `specs/todo/CATALA-EXPORT-SPEC.md` |
-  | MLIR → WebAssembly | execution | shipped in-tree, parity ledger | `jl4-mlir/README.md`, `FEATURE-PARITY-PLAN.md` |
-  | docassemble (interview YAML + fidelity report) | interaction | shipped: `l4 docassemble` | `doc/exports/docassemble.md` |
-  | Blawx / s(CASP) (project YAML, raw s(CASP); reads back with `--import`) | interaction/reasoning | shipped both directions: `l4 blawx` | `doc/exports/blawx.md`, `specs/todo/BLAWX-EXPORT-SPEC.md` |
-  | DMN, DMN-as-Markdown, BPMN (+ fidelity report) | interchange | shipped: `l4 export --to dmn\|dmn-md\|bpmn`; DMN BKM phases 4/5 and a new program model are planned | `doc/exports/dmn-bpmn.md`, `specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md` |
-  | Akoma Ntoso / LegalDocML 3.0 | interchange | shipped, undocumented: `l4 render --format akn` | `etc/go/phases/p7-akn.sh` |
-  | JSON Schema; HTML/text/JSON render; NLG prose (`l4 nlg`); GraphViz trace; state-graph DOT | documentation/interchange | shipped | `l4 --help` |
-  | Decision service API, MCP server, WebMCP page | deployment | shipped in `jl4-service` | `jl4-service/src/McpServer.hs`, `WebMCPPage.hs`, `jl4-service/README.md` §MCP |
-  | SWI-Prolog, Logical English, PROLEG, ErgoAI | reasoning | **in progress**: the shared relational middle-end landed 2026-08-18 (#272); s(CASP) shipped on it; the four emitters are unbuilt; `jl4-proleg` is a reader/printer, not a transpiler | `specs/proposals/LOGIC-PROGRAMMING-BACKENDS-SPEC.md` |
-  | Z3, Alloy, TLA+, NuSMV/nuXmv, UPPAAL, TAPAAL, SPIN, Maude | verification | **in progress**: proposal; Phase 1 rulings answered by Meng 2026-09-07; no prover in the tree; `l4 prove` is a thing to write | `specs/proposals/VERIFICATION-BACKEND-LOWERING-SPEC.md` |
-  | LegalRuleML | interchange | **backlog**: researched 2026-08-16; publication-and-provenance artifact | `specs/research/LEGALRULEML-RESEARCH.md` |
-  | NLG / TNR round-trip | documentation | **in progress**: on branch `nlg-roundtrip` | `jl4-core/src/L4/Nlg.hs` |
-  | TypeScript/JS library, Go | execution | **backlog**: named 2026-09-07, no spec; driver is on-prem deployment | portfolio spec §2.1 |
-  | Solidity / EVM | execution | **backlog**: plan document only | `jl4-mlir/SOLIDITY-BACKEND-PLAN.md` |
-  | RuleSpec (Axiom Foundation) | execution | **backlog**: researched 2026-09-09; "closest structural match to L4's design values" | `specs/research/AXIOM-RULESPEC-POLICYENGINE-RESEARCH.md` |
-  | DataLex / yscript (AustLII) | interaction | **backlog**: researched 2026-09-08 | `specs/research/DATALEX-YSCRIPT-RESEARCH.md` |
-  | RUML (Rulemapping) | interchange | **backlog, blocked**: the format is unpublished | `specs/research/RULEMAPPING-RUML-RESEARCH.md` |
-  | Lean, F\* | verification | **backlog**: named, no spec | portfolio spec §2.5 |
+  | target                                                                                    | family                    | status 2026-09-14                                                                                                                                                                    | pointer                                                                       |
+  | ----------------------------------------------------------------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------- |
+  | OpenFisca (Python module)                                                                 | execution                 | shipped: `l4 openfisca`                                                                                                                                                              | `doc/exports/openfisca.md`, `jl4-core/src/L4/OpenFisca/Emit.hs`               |
+  | Catala (literate module + equivalence check)                                              | execution                 | shipped: `l4 catala`                                                                                                                                                                 | `doc/exports/catala.md`, `specs/todo/CATALA-EXPORT-SPEC.md`                   |
+  | MLIR → WebAssembly                                                                        | execution                 | shipped in-tree, parity ledger                                                                                                                                                       | `jl4-mlir/README.md`, `FEATURE-PARITY-PLAN.md`                                |
+  | docassemble (interview YAML + fidelity report)                                            | interaction               | shipped: `l4 docassemble`                                                                                                                                                            | `doc/exports/docassemble.md`                                                  |
+  | Blawx / s(CASP) (project YAML, raw s(CASP); reads back with `--import`)                   | interaction/reasoning     | shipped both directions: `l4 blawx`                                                                                                                                                  | `doc/exports/blawx.md`, `specs/todo/BLAWX-EXPORT-SPEC.md`                     |
+  | DMN, DMN-as-Markdown, BPMN (+ fidelity report)                                            | interchange               | shipped: `l4 export --to dmn\|dmn-md\|bpmn`; DMN BKM phases 4/5 and a new program model are planned                                                                                  | `doc/exports/dmn-bpmn.md`, `specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md`      |
+  | Akoma Ntoso / LegalDocML 3.0                                                              | interchange               | shipped, undocumented: `l4 render --format akn`                                                                                                                                      | `etc/go/phases/p7-akn.sh`                                                     |
+  | JSON Schema; HTML/text/JSON render; NLG prose (`l4 nlg`); GraphViz trace; state-graph DOT | documentation/interchange | shipped                                                                                                                                                                              | `l4 --help`                                                                   |
+  | Decision service API, MCP server, WebMCP page                                             | deployment                | shipped in `jl4-service`                                                                                                                                                             | `jl4-service/src/McpServer.hs`, `WebMCPPage.hs`, `jl4-service/README.md` §MCP |
+  | SWI-Prolog, Logical English, PROLEG, ErgoAI                                               | reasoning                 | **in progress**: the shared relational middle-end landed 2026-08-18 (#272); s(CASP) shipped on it; the four emitters are unbuilt; `jl4-proleg` is a reader/printer, not a transpiler | `specs/proposals/LOGIC-PROGRAMMING-BACKENDS-SPEC.md`                          |
+  | Z3, Alloy, TLA+, NuSMV/nuXmv, UPPAAL, TAPAAL, SPIN, Maude                                 | verification              | **in progress**: proposal; Phase 1 rulings answered by Meng 2026-09-07; no prover in the tree; `l4 prove` is a thing to write                                                        | `specs/proposals/VERIFICATION-BACKEND-LOWERING-SPEC.md`                       |
+  | LegalRuleML                                                                               | interchange               | **backlog**: researched 2026-08-16; publication-and-provenance artifact                                                                                                              | `specs/research/LEGALRULEML-RESEARCH.md`                                      |
+  | NLG / TNR round-trip                                                                      | documentation             | **in progress**: on branch `nlg-roundtrip`                                                                                                                                           | `jl4-core/src/L4/Nlg.hs`                                                      |
+  | TypeScript/JS library, Go                                                                 | execution                 | **backlog**: named 2026-09-07, no spec; driver is on-prem deployment                                                                                                                 | portfolio spec §2.1                                                           |
+  | Solidity / EVM                                                                            | execution                 | **backlog**: plan document only                                                                                                                                                      | `jl4-mlir/SOLIDITY-BACKEND-PLAN.md`                                           |
+  | RuleSpec (Axiom Foundation)                                                               | execution                 | **backlog**: researched 2026-09-09; "closest structural match to L4's design values"                                                                                                 | `specs/research/AXIOM-RULESPEC-POLICYENGINE-RESEARCH.md`                      |
+  | DataLex / yscript (AustLII)                                                               | interaction               | **backlog**: researched 2026-09-08                                                                                                                                                   | `specs/research/DATALEX-YSCRIPT-RESEARCH.md`                                  |
+  | RUML (Rulemapping)                                                                        | interchange               | **backlog, blocked**: the format is unpublished                                                                                                                                      | `specs/research/RULEMAPPING-RUML-RESEARCH.md`                                 |
+  | Lean, F\*                                                                                 | verification              | **backlog**: named, no spec                                                                                                                                                          | portfolio spec §2.5                                                           |
 
   Rules for the table in the post: statuses are "shipped", "in progress", "backlog" — nothing
   softer, nothing that reads as a promise; give the date the statuses were read; the pointer column
@@ -375,7 +374,6 @@ does not have to rediscover them.
   Name it as the shape of the test L4 has not yet sat, not as evidence about L4. Meng's own
   hesitation, verbatim: "Not sure if this is the approach we want to take or if we should save
   this angle for something more academic" — so keep it to one paragraph and one note.
-
 
 - **Bench marks, 2026-09-14 ~17:35–17:55** (artifact "Author queries, posts 1–5", collection
   `blog-rulings`; Meng's words verbatim where quoted). **Q1** show — the WAICOM PDF supplied; see

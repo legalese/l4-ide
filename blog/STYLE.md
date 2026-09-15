@@ -46,13 +46,13 @@ and they were already in the first draft of this file and are already in this re
 Five pieces were read and measured on 2026-09-13 (texts in the session scratchpad; counts are
 from a script over the extracted text, so treat them as ±10%):
 
-| Piece | Words | Median sentence | Questions | First-person sentences | Opens on |
-| --- | --- | --- | --- | --- | --- |
-| Gibson, "Disneyland with the Death Penalty", _Wired_ 1.04, 1993 | 4,970 | 21 (p90 39, max 127) | 14, mostly dialogue | 46 of 228 | a Hollywood producer's one-liner, in an office off Rodeo Drive |
-| Asimov, "The Relativity of Wrong", _F&SF_ 1988 | ~2,500 | 19 (p90 38) | 19, Socratic ("How much is 2 + 2?") | 19 of 205 | a reader's letter "in crabbed penmanship" |
-| Doctorow, "Tiktok's enshittification", _Pluralistic_, 21 Jan 2023 | — | short-to-long, "Then, they die." | many | "I", "we", "you" | the thesis as a four-beat sequence |
-| Somers, "The Coming Software Apocalypse", _The Atlantic_, 2017 | 9,447 | 17 (p90 37) | 5 | 36 of 467 | a 911 outage, 37 calls, a kitchen knife, "The man fled." |
-| Somers, "A Coder Considers the Waning Days of the Craft", _New Yorker_, 2023 | 4,780 | 15 (p90 27) | 12 | 157 of 296 | his wife three weeks from giving birth |
+| Piece                                                                        | Words  | Median sentence                  | Questions                           | First-person sentences | Opens on                                                       |
+| ---------------------------------------------------------------------------- | ------ | -------------------------------- | ----------------------------------- | ---------------------- | -------------------------------------------------------------- |
+| Gibson, "Disneyland with the Death Penalty", _Wired_ 1.04, 1993              | 4,970  | 21 (p90 39, max 127)             | 14, mostly dialogue                 | 46 of 228              | a Hollywood producer's one-liner, in an office off Rodeo Drive |
+| Asimov, "The Relativity of Wrong", _F&SF_ 1988                               | ~2,500 | 19 (p90 38)                      | 19, Socratic ("How much is 2 + 2?") | 19 of 205              | a reader's letter "in crabbed penmanship"                      |
+| Doctorow, "Tiktok's enshittification", _Pluralistic_, 21 Jan 2023            | —      | short-to-long, "Then, they die." | many                                | "I", "we", "you"       | the thesis as a four-beat sequence                             |
+| Somers, "The Coming Software Apocalypse", _The Atlantic_, 2017               | 9,447  | 17 (p90 37)                      | 5                                   | 36 of 467              | a 911 outage, 37 calls, a kitchen knife, "The man fled."       |
+| Somers, "A Coder Considers the Waning Days of the Craft", _New Yorker_, 2023 | 4,780  | 15 (p90 27)                      | 12                                  | 157 of 296             | his wife three weeks from giving birth                         |
 
 **Meng's pick as the primary exemplar (2026-09-13): Somers, _The Coming Software Apocalypse_** —
 "good writing on formal verification; thumbs up from me for style." It is also the piece post 5
@@ -217,7 +217,7 @@ post:
 - **Take the sounding when the claim becomes durable.** A citation is verified _at the moment
   it enters the post_, not when it entered the plan. Post 5's list was checked live on
   2026-09-13; that check expires when the draft starts. Items marked `UNVERIFIED` or `NOT
-  READ` in the plan have not been checked even once — a post cannot go out carrying one.
+READ` in the plan have not been checked even once — a post cannot go out carrying one.
 - **Never sharpen a borrowed claim.** If the source says "at least 16 critical issues", the
   post does not say "dozens". If the settlement figure is reported inconsistently ($548.5m vs
   ~$1.8bn for Robodebt), the post says so or omits the number; it does not pick the larger one.
@@ -243,13 +243,13 @@ post:
 **Where the review time goes: the silent failures** (§2.3's lint catches the loud ones). A broken link fails loudly — a checker
 catches it, a reader notices. The failures worth a reviewer's attention return exit code 0:
 
-| Silent failure                                         | What catches it                                     |
-| ------------------------------------------------------ | --------------------------------------------------- |
-| A wrong number that reads confidently                  | Re-derive it from the cited source before publishing |
-| A quote attributed to the wrong author or paper        | Open the source; find the sentence                  |
-| A planned thing described in the present tense         | Grep the post for "we have", "L4 supports"; verify each against the tree |
-| An analogy that was true of the source but not of law  | Beat three                                          |
-| A claim the paper will not be able to back             | Read the facet's `DESIGN.md` / outline first        |
+| Silent failure                                        | What catches it                                                          |
+| ----------------------------------------------------- | ------------------------------------------------------------------------ |
+| A wrong number that reads confidently                 | Re-derive it from the cited source before publishing                     |
+| A quote attributed to the wrong author or paper       | Open the source; find the sentence                                       |
+| A planned thing described in the present tense        | Grep the post for "we have", "L4 supports"; verify each against the tree |
+| An analogy that was true of the source but not of law | Beat three                                                               |
+| A claim the paper will not be able to back            | Read the facet's `DESIGN.md` / outline first                             |
 
 ## 5. L4 in a post
 
@@ -287,6 +287,7 @@ Act, the Jersey instruments — over new examples. One corpus, not two.
   > Foundation, Singapore.
 
   `blog/check-post.sh` fails a post that lacks it or alters it.
+
 - **No images that carry the argument.** A ladder diagram or a table may illustrate; the text
   must stand without it (second reader: the model).
 - **Titles are sentences,** as in the arc table. Title case is not used.

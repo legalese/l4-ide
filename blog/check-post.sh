@@ -34,7 +34,7 @@ for f in "$@"; do
   [ -n "$brit" ] && { echo "$brit" | sed "s|^|warn $f: British spelling? line |"; }
   # acronym spelled out: any ALLCAPS token of 3-6 letters in the PROSE (not footnotes/Sources, not code spans,
   # not house markers, not citation identifiers) must appear as '… (ABC)' somewhere in the post, or be allowlisted
-  prose=$(printf '%s\n' "$body" | awk '/^#+ *Sources/{exit} /^\[\^[0-9]+\]:/{next} {print}' | perl -pe 's/`[^`\n]*`//g; s/\[(?:NEEDS MENG|UNVERIFIED)[^\]]*\]//g; s/\*\*STATUS[^*]*\*\*//g')
+  prose=$(printf '%s\n' "$body" | awk '/^#+ *Sources/{exit} /^```/{fence=!fence; next} fence{next} /^\[\^[0-9]+\]:/{next} {print}' | perl -pe 's/`[^`\n]*`//g; s/\[(?:NEEDS MENG|UNVERIFIED)[^\]]*\]//g; s/\*\*STATUS[^*]*\*\*//g')
   printf '%s\n' "$prose" | grep -oE '\b[A-Z]{3,6}\b' | sort -u | while read -r a; do case "$a" in NRF|SMU|USA|AWS|PDF|URL|API|SQL|HTML|CSS|JSON|YAML|DOI|MIT|IBM|GPT|LLM|LLMs|TLA|NZ|UK|US|EU|OECD|ICAIL|JURIX|DEON|CACM|SOSP|ACM|CC|BY|NC|MUST|MAY|SHANT|GIVEN|DECIDE|ASSERT|IF|AND|OR|SHOULD|NOT|IS|A|THE|OF|FOR|EVAL|UNDER|RULES|EFFECTIVE|AT|DECLARE|HAS|ONE|TRUE|FALSE|STATUS|DRAFT|SC|EC|NEEDS|MENG|README|STYLE|SPEC|NOTES|CODEX|PROLEG|PROLOG|SWI|SWISH|LNCS|SGCA|SGHC|CELEX|EUR|EEC|CJEU|UPPAAL|NUSMV|SPIN|ATVA|ICTAC|ICFP|OPA|HSPEC|ZFS|SMR|CPU|ISO|IEEE|CXO|CEO|CTO|FCA|ABC|LSJ|NZLII|VUB|QUB|OUP|ENS|ICT|NUS|LTS|IR|CTD|FCL|ATL|LTL|CTL|TCTL|SMT|BMC|IC|WASM|NLG|DMN|BPMN|TCK|DVA|DHS|RR|YC|SAFE|OSM|LII|FTC|UPL|WJP|LSC|NUPEDIA) continue;; esac; printf '%s\n' "$body" | grep -qE "\($a\)" || echo "warn $f: acronym $a never spelled out as '… ($a)'"; done
   "$HERE/lint-tics.sh" "$f" || rc=1
   [ $rc -eq 0 ] && echo "ok   $f (structure clean)"

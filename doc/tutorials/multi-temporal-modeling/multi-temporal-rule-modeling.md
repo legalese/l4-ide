@@ -364,8 +364,8 @@ and amended on 30 December 2005, when "or in a designated territory" was
 inserted into limb (b).
 
 **The section fixes one axis and not the other, and the difference matters.**
-"On the date on which the order is made" is an instruction about *facts*: read
-them as they stood that day. It says nothing about which version of the *text*
+"On the date on which the order is made" is an instruction about _facts_: read
+them as they stood that day. It says nothing about which version of the _text_
 to apply. That second choice is governed by commencement and by the
 presumption against retrospectivity, and it is made outside the section.
 
@@ -396,8 +396,8 @@ date hides it.
 
 One more turn, and it is the one that makes the example concrete. "Designated
 territory" is not "any British overseas territory". Section 50(1) defines it as
-a qualifying territory (or the Sovereign Base Areas) *"which is designated by
-Her Majesty by Order in Council under subsection (14)"*, and s 50(14) permits
+a qualifying territory (or the Sovereign Base Areas) _"which is designated by
+Her Majesty by Order in Council under subsection (14)"_, and s 50(14) permits
 designation only where the 1993 Hague Intercountry Adoption Convention is in
 force there. The HCCH status table records exactly one United Kingdom
 territorial extension of that Convention — the Isle of Man, which s 50(1)
@@ -406,16 +406,16 @@ British overseas territory appears. So on the record reached, the set of
 designated territories in December 2005 was **empty**, and the words F16
 inserted had no territory to bite on.
 
-The file therefore splits what one Boolean would fuse — *where* the adopters
-are habitually resident, and *whether that place was designated*. Case 10 runs
+The file therefore splits what one Boolean would fuse — _where_ the adopters
+are habitually resident, and _whether that place was designated_. Case 10 runs
 the world as the record has it and every answer is `FALSE`, on both readings,
 at every date. The retrospectivity question stays real and becomes moot, and
 would stop being moot the day a designation is made. That is a conclusion the
 encoding produces rather than asserts, which is the point.
 
 Its other eight cases are worth reading for the valid-time axis alone: an
-adopter naturalised two years *after* the order (not met, though a plain
-Boolean field would say met), one naturalised *on* the day (met — the interval
+adopter naturalised two years _after_ the order (not met, though a plain
+Boolean field would say met), one naturalised _on_ the day (met — the interval
 start is inclusive), citizenship held and then renounced before the order (not
 met, which a single Boolean cannot express at all), and the joint-adoption
 limbs, where (a) wants one of the adopters and (b) wants both.
