@@ -21,7 +21,7 @@
   "sides": {
     "left": {
       "label": "corpus",
-      "module": "jl4/examples/legal/chubb/chubb.l4",
+      "module": "jl4/examples/canon/us/chubb-hospital-cash/blind-inert/chubb.l4",
       "timezone": "America/New_York",
       "provenance": {
         "source": "arXiv:2502.17638 Appendix A.1 (Kant, Chakraborty, Srivastava et al. 2025), an anonymised and abridged Chubb form",
@@ -32,7 +32,7 @@
     },
     "right": {
       "label": "de novo",
-      "module": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+      "module": "jl4/examples/canon/us/chubb-hospital-cash/blind-guarded/chubb-denovo.l4",
       "timezone": "America/New_York",
       "provenance": {
         "source": "arXiv:2502.17638 Appendix A.1 (Kant, Chakraborty, Srivastava et al. 2025), an anonymised and abridged Chubb form",

@@ -12,7 +12,7 @@
   "sides": {
     "left": {
       "label": "corpus",
-      "module": "jl4/examples/legal/sg-succession/sg-isa.l4",
+      "module": "jl4/examples/canon/sg/succession/sg-isa.l4",
       "timezone": "Asia/Singapore",
       "provenance": {
         "source": "https://sso.agc.gov.sg/Act/ISA1967",

@@ -23,7 +23,13 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const CORPUS = join(HERE, "..");
+// The committed encoding moved to the vendored canon mirror (2026-09-16). The
+// generated scratch module IMPORTS those files, and L4 resolves an import
+// importer-relative -- so it has to be written BESIDE them, in the mirror. That
+// is the one write into the mirror anything does, it is transient, and
+// `.scenarios-generated.l4` is gitignored so a crashed run cannot leave a file
+// that makes `sync-canon --check` fatal (--check filters gitignored paths).
+const CORPUS = join(HERE, "..", "..", "..", "canon", "sg", "succession");
 const L4 = process.env.L4;
 if (!L4) {
   console.error("build-scenarios: set L4 to a built l4 binary");

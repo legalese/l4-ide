@@ -458,10 +458,12 @@ Two uses, in order of cheapness:
    s 23. That is a finding a drafting office can act on, which is Matt's
    interest and PLUS's own stated aim, met from the outside.
 
-A pilot is already half-built: `jl4/examples/canon/sg/succession/` encodes the
-Wills Act 1838, the Intestate Succession Act 1967, the Probate and
-Administration Act 1934 and the Guardianship of Infants Act 1934 from the
-2020 text, with batteries and asserts. The pre-revision text of the same
+A pilot is already half-built, and since the canon migration it spans two
+directories: `jl4/examples/canon/sg/succession/` encodes the Wills Act 1838,
+the Intestate Succession Act 1967 and the Probate and Administration Act 1934,
+while the Guardianship of Infants Act 1934 is encoded only in
+`jl4/examples/legal/sg-succession/cleanroom-2026-08/`, which stayed. Both from
+the 2020 text, with batteries and asserts. The pre-revision text of the same
 sections is the second dialect.
 
 **Retrieval, verified 2026-09-02.** The lawplain corpus does not carry the
