@@ -50,7 +50,22 @@ ep.golden,nlg.golden,schema.golden}`) — `sg/child-support/encodings/legalese` 
 - **Most of canon's content is on a per-person shelf**, `mengwong/drafts` (3572 files, 59 `.l4`),
   not `main` (3319 / 55). A dir blessed at a SHA on a shelf is a dir that can be rebased away.
 
-## 3. The mechanism — proposed, not built
+## 3. The mechanism — two shapes, one chosen
+
+Meng, later the same evening, on the CI cost of the cross-repo shape:
+
+> if it is really unpleasant to have regression CI split across to the canon repo then i'm okay
+> with vendoring in
+
+**Chosen: vendoring (§3B), under that conditional.** The GM's assessment of "really unpleasant":
+the checkout is one step, but the split makes every output-changing compiler PR re-bless goldens
+in a second repo before it can merge (§5), makes every local developer and the go pipeline carry
+`L4_CANON_DIR`, and leaves `etc/go` unable to address a subject until it learns `canon:` paths.
+Vendoring removes all three at the price of a checked-in mirror — and a mirror with a pin and a
+CI equality check is _detected_ duplication, not the silent kind the rest of this document is
+about. Meng to confirm on return; recorded here so the two shapes are not re-derived.
+
+### 3A. Cross-repo at a pin (not chosen)
 
 1. **A pin, not a tracking ref.** `etc/canon-pin.json` in l4-ide:
    `{ "repo": "legalese/canon", "sha": "<40 hex>", "blessed": ["subjects/sg/child-support/encodings/legalese", ...] }`.
@@ -79,20 +94,46 @@ ep.golden,nlg.golden,schema.golden}`) — `sg/child-support/encodings/legalese` 
    driver resolves it against the checkout. Until then a canon-hosted subject cannot be run by the
    pipeline, which is the open question the programme board carries under "Branches".
 
-## 4. The migration, once §3 is green in CI
+### 3B. Vendored at a pin (chosen)
 
-- `legal/chubb` → deleted (identical to canon). `etc/go/subjects/chubb` → `canon:` path.
+1. **The same pin.** `etc/canon-pin.json`: `{ "repo": "legalese/canon", "sha": "<40 hex>",
+"blessed": [ { "from": "subjects/sg/child-support/encodings/legalese", "to": "sg/child-support" }, ... ] }`.
+2. **A mirror in the tree.** `jl4/examples/canon/<to>/` holds a verbatim copy of each blessed dir
+   at the pin — `.l4`, `tests/` goldens, `encoding.json`, `SOURCE-LICENSE.md`; not `source/raw`,
+   not `report/`, not `app/`. `jl4/examples/canon/README.md` says: **do not edit here; edit in
+   canon and bump the pin.** The `legal/**` golden glob gains a sibling `canon/**`
+   (`jl4/tests/Main.hs`, `etc/check-corpus-goldens.mjs`), with today's semantics unchanged.
+3. **`etc/sync-canon.mjs`** does the copying: `--pull` fetches canon at the pin (public repo,
+   `git archive` or a shallow clone into a temp dir) and rewrites the mirror; `--check` diffs the
+   mirror against the pin and exits non-zero on any difference, naming the files; `--bump <sha>`
+   updates the pin and pulls. Goldens are the one exception to "verbatim": the mirror's goldens
+   are re-blessed in l4-ide when the compiler's output changes, and `--push-goldens` writes them
+   back to a canon branch so canon's copy can catch up by its own PR. Canon's goldens being stale
+   is then visible (`--check` reports it) rather than fatal.
+4. **One CI job, `Canon Mirror`,** runs `etc/sync-canon.mjs --check` on every PR (no build
+   needed — it is a tree diff against a public repo at a SHA) and fails when the mirror has been
+   hand-edited or the pin moved without a pull. The regression itself runs in the existing
+   Haskell job, because `canon/**` is just another golden glob. Nothing in CI reaches across a
+   repo boundary except this one equality check.
+5. **`etc/go` is unchanged.** A vendored subject is at an l4-ide path; `subject.json` points at
+   `jl4/examples/canon/<to>/...`. The open question about `canon:` addressing closes.
+6. **Blessed is explicit and lives on canon `main`** — §3A.4 applies unchanged, and so does the
+   first list.
+
+## 4. The migration, once §3B is green in CI
+
+- `legal/chubb` → deleted; its mirror is `canon/us/chubb-hospital-cash/blind-inert-2026-08/`. `etc/go/subjects/chubb` → that path.
 - `legal/sg-succession` → `sg-succession-cases.l4` and `sg-succession-wizard.l4` land in canon's
   `sg/succession/encodings/legalese/` first (with goldens, same commit); then the dir is deleted;
-  `etc/go/subjects/sg-succession` → `canon:` path; the three spec citations retarget to canon
-  paths at the pin.
+  `etc/go/subjects/sg-succession` → the mirror path; the three spec citations retarget to the
+  mirror paths.
 - `jl4/examples/legal/README.md` states the split: what is here and why, what is in canon and
   where the pin is. `CLAUDE.md` §3.1's "which globs, exactly" gains the canon block. The memory
   note `canon-is-the-home-for-encodings` gains the same sentence.
 - Nothing else moves. `regcf`, `bna`, `charities-cleanroom` and the single-file subjects stay in
   l4-ide until they are in canon, and that is fine — the ruling says so.
 
-## 5. The CI challenge, stated plainly
+## 5. The CI challenge the cross-repo shape has, stated plainly (why §3B was chosen)
 
 Two repos means two blessing cadences, and a required cross-repo check can deadlock: the compiler
 PR needs canon goldens re-blessed by the new binary, and canon cannot bless with a binary that has
