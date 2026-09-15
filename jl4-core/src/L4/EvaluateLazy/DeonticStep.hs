@@ -67,15 +67,19 @@ import L4.Syntax (DeonticModal (..), Resolved, Threshold (..))
 
 -- | One scrutiny of one event by one obligation, on the contract clock.
 --
--- Spec §4.3 wrote @dsClock :: Rational@. It is a @Maybe@ here because three
+-- Spec §4.3 wrote @dsClock :: Rational@. It is a @Maybe@ here because four
 -- step shapes genuinely have no clock in hand: a 'Waiting' step logged
 -- before the obligation has forced its time (a @#TRACE@ with no events at
 -- all — the time is still a thunk, and forcing it for the log would change
 -- what the machine evaluates); a 'Joined' step, whose frame holds two
--- values and no time; and a 'Breached' step for an explicit @BREACH@
+-- values and no time; a 'Breached' step for an explicit @BREACH@
 -- terminal, which the expression arm constructs with no time in hand (the
--- 'ExplicitBreach' reason carries none either). Every other step carries
--- the clock the machine had.
+-- 'ExplicitBreach' reason carries none either); and a barrier with no
+-- @LEST@ whose member ends in a value that carries no time — a 'JoinStalled'
+-- (the member's 'ValFulfilled'), or a 'JoinFailed' whose member's breach was
+-- itself an explicit @BREACH@ (a missed deadline carries its stamp, and that
+-- 'JoinFailed' is clocked). Every other step carries the clock the machine
+-- had.
 data DeonticStep = MkDeonticStep
   { dsClock    :: !(Maybe Rational)
     -- ^ the contract clock at this step

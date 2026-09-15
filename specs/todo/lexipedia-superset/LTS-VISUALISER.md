@@ -949,10 +949,16 @@ wall time. **This is the whole of P2's back end**, it is independent of every pr
 `jl4-core/src/L4/EvaluateLazy/DeonticStep.hs`; the sketch above is superseded by that module and
 this block records where the built types depart from it, and why.
 
-- `dsClock :: Maybe Rational`, not `Rational`. Two step shapes have no clock in hand: a `Waiting`
+- `dsClock :: Maybe Rational`, not `Rational`. Four step shapes have no clock in hand: a `Waiting`
   logged before the obligation has forced its time (a `#TRACE` with no events — forcing the thunk
-  for the log's sake would change what the machine evaluates), and a `Joined`, whose `RBinOp2`
-  frame holds two values and no time. The log **peeks and never forces** (`peekWHNF`,
+  for the log's sake would change what the machine evaluates); a `Joined`, whose `RBinOp2`
+  frame holds two values and no time; a `Breached` for an explicit `BREACH` terminal, which the
+  expression arm builds with no time in hand; and a barrier with no `LEST` whose member ends in a
+  value carrying no time — `JoinStalled` (the member's `ValFulfilled`), or `JoinFailed` when the
+  member's own breach was an explicit `BREACH`. (Written as "two" until 2026-09-16, when review
+  found the barrier-without-`LEST` steps logged `Nothing` unconditionally at `Machine.hs`'s
+  `Barrier1` frame although a `DeadlineMissed` member carries its stamp; that `JoinFailed` is now
+  clocked with the stamp, matching what `barrierFail` peeks for the `LEST` case.) The log **peeks and never forces** (`peekWHNF`,
   `Machine.hs:394`); that rule decides every `Maybe` below.
 - `dsNorm :: Maybe NormKey`, not `NormKey`. A `Joined` step belongs to an `AND`/`OR` compound,
   which is not a norm instance (§2.3 gives places to obligations, not connectives) and, because
@@ -1912,6 +1918,35 @@ new); `JL4_LIBRARY_PATH=$PWD/jl4-core/libraries cabal test jl4-test --test-optio
 list"'` 12 examples, 0 failures after blessing the six goldens, whose diff was exactly the
 reified `action` texts and one new always-present JSON key, `deadlineNotKnown`;
 `doc/test-docs.sh` and the full `jl4-test` as recorded in the commit message.
+
+**REVIEWED 2026-09-16 — a third review, of the JSON and the join's own steps.** Seven findings;
+six acted on, one rejected. (1) **`--json` used prose as discriminators** — `"what": "passed
+over: not this party"`, `"kind": "held back"`, two keys with spaces (`"shared next step":
+"waits"`), and `TickPast`/`NoTick` both `"kind": "tick"` — on a shape the page advertises "for a
+program to read", and about to be goldened on `unstable`. Every discriminator is now a camelCase
+token (`heldBack`, `notStarted`, `inBreach`, `partyMismatch`, `joinReleased`, `noTick`, join
+`barrier`/`fork`, scrutiny `witnessedOnly`, …), `passedOver[]` carries a `reason` token beside
+its `why` sentence, every step event carries `kind: act|clock`, and a top-level `format: 1` is
+the shape's version; the page's `--json` section now lists the tokens by key and states the
+`Rational`→double rounding. Three `.json` goldens re-blessed; the diff was exactly the tokens.
+(2) **The pin on `doc/reference/regulative/every-run-example.l4` is dark in CI** — **rejected**:
+`pr-checks.yml`'s Haskell job runs on `needs.changes.outputs.docs == 'true'` and the `docs`
+filter is `doc/**`, so a docs-only edit to that file runs `cabal test all`; the pin under `doc/`
+is _better_ guarded than the two under `jl4/examples/`, which match no filter (CLAUDE.md §3.1).
+(3) **The join's own steps read `(party not yet known) MUST —`** — `renderStep` now prints
+`the group —` for the four join outcomes; `every-run-example.txt:15,31` and the page's pasted
+block re-blessed. (4) **`at —` has four causes, not three** — the barrier-without-`LEST` steps;
+fixed as recorded in the P2b block above (the `DeadlineMissed` stamp is used; `JoinStalled` and
+an explicit-`BREACH` member remain unclocked), and all three texts now agree on four. (5)
+**`JoinKind` exported twice** — `L4.StateGraph`'s is now `JoinLabelKind`; the constructors
+`Barrier`/`Fork` still collide, so a module drawing the norm plane over the graph (P2d) imports
+one of them qualified. `DMustNot` is spelled `SHANT` by all three P2 renderers (it was `MUST
+NOT` in `l4 lts` alone; the lexer token and the state-graph goldens say `SHANT`). (6) **A
+committed evidence file carried an absolute path** — `run.mjs` makes `npm ls`'s heading
+repo-relative; `run-meta.json` hand-edited to the same string. (7) **`l4 state-graph
+--all-states` without `--dominators` printed DOT and exited 0** — refused with `requires
+--dominators`, one `l4-cli-test` case. Not done: deriving `Marking.Blame` from `BreachSummary`
+(a refactor, not a defect).
 
 **Not run, and not claimed.** §7.3's gate is a **reader** experiment — put this list in front of
 readers against the same contract drawn by `stateGraphToDot` and P1's BPMN, and see whether they

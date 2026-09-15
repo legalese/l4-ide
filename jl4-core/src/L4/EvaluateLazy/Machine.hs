@@ -2004,13 +2004,20 @@ backwardContractFrame val = \ case
       ValROp{}        -> barrierNext BarrierStepFrame {pending = val : pending, ..}
       -- A MUST member's own breach, under a barrier with no LEST: no failure
       -- sentinel was minted, so the member's breach stands as the barrier's.
-      ValBreached{} -> do
-        -- P2b: no time is in hand here — the member's value is all there is.
-        tellDeonticStep $ plainStep Nothing Nothing NoEvent ctx.norm (JoinFailed ToBreach)
+      ValBreached reason -> do
+        -- P2b: the member's value is all there is, and the clock the machine
+        -- had is the stamp its miss was seen at — in hand for a missed
+        -- deadline (it is what 'barrierFail' peeks for the LEST case), and
+        -- absent only when the member's own breach was an explicit BREACH.
+        let clock = case reason of
+              DeadlineMissed _ _ stamp _ _ _ -> Just stamp
+              ExplicitBreach {}              -> Nothing
+        tellDeonticStep $ plainStep clock Nothing NoEvent ctx.norm (JoinFailed ToBreach)
         continueBackward val
       -- A MAY member whose permission expired under a barrier with no LEST:
       -- nothing was owed, so nothing is breached, but the join cannot fire.
       ValFulfilled -> do
+        -- 'ValFulfilled' carries no time, so this step has no clock.
         tellDeonticStep $ plainStep Nothing Nothing NoEvent ctx.norm JoinStalled
         continueBackward val
       -- Every terminal a member can reach is named above; anything else is a

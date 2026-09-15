@@ -13,7 +13,7 @@
             "action": "Sign (EXACTLY t)",
             "dueBy": 14,
             "group": {
-              "join": "all must act before the next step",
+              "join": "barrier",
               "total": 3
             },
             "kind": "owed",
@@ -25,7 +25,7 @@
             "action": "Sign (EXACTLY t)",
             "dueBy": 14,
             "group": {
-              "join": "all must act before the next step",
+              "join": "barrier",
               "total": 3
             },
             "kind": "owed",
@@ -35,9 +35,9 @@
           },
           {
             "done": 1,
-            "kind": "held back",
+            "kind": "heldBack",
             "total": 3,
-            "until": "all have acted"
+            "until": "allHave"
           }
         ]
       },
@@ -53,7 +53,7 @@
             "action": "Sign (EXACTLY t)",
             "dueBy": 14,
             "group": {
-              "join": "all must act before the next step",
+              "join": "barrier",
               "total": 3
             },
             "kind": "owed",
@@ -65,7 +65,7 @@
             "action": "Sign (EXACTLY t)",
             "dueBy": 14,
             "group": {
-              "join": "all must act before the next step",
+              "join": "barrier",
               "total": 3
             },
             "kind": "owed",
@@ -75,9 +75,9 @@
           },
           {
             "done": 1,
-            "kind": "held back",
+            "kind": "heldBack",
             "total": 3,
-            "until": "all have acted"
+            "until": "allHave"
           }
         ]
       },
@@ -93,7 +93,7 @@
             "action": "Sign (EXACTLY t)",
             "dueBy": 14,
             "group": {
-              "join": "all must act before the next step",
+              "join": "barrier",
               "total": 3
             },
             "kind": "owed",
@@ -105,7 +105,7 @@
             "action": "Sign (EXACTLY t)",
             "dueBy": 14,
             "group": {
-              "join": "all must act before the next step",
+              "join": "barrier",
               "total": 3
             },
             "kind": "owed",
@@ -115,9 +115,9 @@
           },
           {
             "done": 1,
-            "kind": "held back",
+            "kind": "heldBack",
             "total": 3,
-            "until": "all have acted"
+            "until": "allHave"
           }
         ]
       }
@@ -154,6 +154,7 @@
     "deadlineNotKnown": [],
     "discharging": [],
     "events": [],
+    "format": 1,
     "line": null,
     "nextDeadline": {
       "at": 14,
@@ -181,7 +182,7 @@
         "dueBy": 14,
         "dueWithin": "14",
         "group": {
-          "join": "all must act before the next step",
+          "join": "barrier",
           "total": 3
         },
         "kind": "owed",
@@ -193,7 +194,7 @@
         "dueBy": 14,
         "dueWithin": "14",
         "group": {
-          "join": "all must act before the next step",
+          "join": "barrier",
           "total": 3
         },
         "kind": "owed",
@@ -205,7 +206,7 @@
         "dueBy": 14,
         "dueWithin": "14",
         "group": {
-          "join": "all must act before the next step",
+          "join": "barrier",
           "total": 3
         },
         "kind": "owed",
@@ -214,14 +215,14 @@
       },
       {
         "done": 0,
-        "kind": "held back",
+        "kind": "heldBack",
         "total": 3,
-        "until": "all have acted"
+        "until": "allHave"
       }
     ],
     "passedOver": [],
     "standing": {
-      "status": "in progress"
+      "status": "inProgress"
     },
     "steps": [
       {
@@ -236,7 +237,7 @@
         "outcome": {
           "what": "waiting"
         },
-        "scrutiny": "no event"
+        "scrutiny": "noEvent"
       },
       {
         "clock": null,
@@ -250,7 +251,7 @@
         "outcome": {
           "what": "waiting"
         },
-        "scrutiny": "no event"
+        "scrutiny": "noEvent"
       },
       {
         "clock": null,
@@ -264,7 +265,7 @@
         "outcome": {
           "what": "waiting"
         },
-        "scrutiny": "no event"
+        "scrutiny": "noEvent"
       }
     ],
     "untried": []
@@ -305,6 +306,7 @@
     "deadlineNotKnown": [],
     "discharging": [],
     "events": [],
+    "format": 1,
     "line": null,
     "nextDeadline": {
       "at": 7,
@@ -332,7 +334,7 @@
         "dueBy": 7,
         "dueWithin": "7",
         "group": {
-          "join": "each has a next step of their own",
+          "join": "fork",
           "total": 3
         },
         "kind": "owed",
@@ -344,7 +346,7 @@
         "dueBy": 7,
         "dueWithin": "7",
         "group": {
-          "join": "each has a next step of their own",
+          "join": "fork",
           "total": 3
         },
         "kind": "owed",
@@ -356,7 +358,7 @@
         "dueBy": 7,
         "dueWithin": "7",
         "group": {
-          "join": "each has a next step of their own",
+          "join": "fork",
           "total": 3
         },
         "kind": "owed",
@@ -366,7 +368,7 @@
     ],
     "passedOver": [],
     "standing": {
-      "status": "in progress"
+      "status": "inProgress"
     },
     "steps": [
       {
@@ -381,7 +383,7 @@
         "outcome": {
           "what": "waiting"
         },
-        "scrutiny": "no event"
+        "scrutiny": "noEvent"
       },
       {
         "clock": null,
@@ -395,7 +397,7 @@
         "outcome": {
           "what": "waiting"
         },
-        "scrutiny": "no event"
+        "scrutiny": "noEvent"
       },
       {
         "clock": null,
@@ -409,25 +411,25 @@
         "outcome": {
           "what": "waiting"
         },
-        "scrutiny": "no event"
+        "scrutiny": "noEvent"
       },
       {
         "clock": null,
         "outcome": {
           "operator": "and",
-          "result": "still open",
-          "what": "compound resolved"
+          "result": "pending",
+          "what": "joined"
         },
-        "scrutiny": "no event"
+        "scrutiny": "noEvent"
       },
       {
         "clock": null,
         "outcome": {
           "operator": "and",
-          "result": "still open",
-          "what": "compound resolved"
+          "result": "pending",
+          "what": "joined"
         },
-        "scrutiny": "no event"
+        "scrutiny": "noEvent"
       }
     ],
     "untried": [

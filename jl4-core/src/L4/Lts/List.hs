@@ -331,7 +331,7 @@ modalWord :: DeonticModal -> Text
 modalWord = \ case
   DMust    -> "MUST"
   DMay     -> "MAY"
-  DMustNot -> "MUST NOT"
+  DMustNot -> "SHANT"
   DDo      -> "DO"
 
 familyLine :: Family -> Text
@@ -398,12 +398,21 @@ renderStep :: DeonticStep -> Text
 renderStep s = Text.unwords $ catMaybes
   [ Just (maybe "at —:" (\ c -> "at " <> prettyRatio c <> ":") s.dsClock)
   , eventWords <$> s.dsEvent
-  , normWords <$> s.dsNorm
+  , if isJoinStep then Just "the group —" else normWords <$> s.dsNorm
   , Just (outcomeWords s.dsOutcome)
   , joinWords <$> s.dsJoin
   , scrutinyWords s.dsScrutiny
   ]
   where
+    -- The barrier's own steps carry the join's key ('armJoinKey'): no
+    -- bearer, and a modal that is the members', not the group's. "(party not
+    -- yet known) MUST" is what that key says; "the group" is what it means.
+    isJoinStep = case s.dsOutcome of
+      JoinReleased   -> True
+      JoinExpired {} -> True
+      JoinFailed {}  -> True
+      JoinStalled    -> True
+      _              -> False
     eventWords e = (<> ";") case (e.ekParty, e.ekAction) of
       (Nothing, Nothing) -> "the event at " <> prettyRatio e.ekStamp
       (_, Just a) | isClockSentinel a -> "the clock runs to " <> prettyRatio e.ekStamp <> " with nothing happening"
@@ -471,11 +480,20 @@ count n noun = textShow n <> " " <> noun <> "s"
 -- JSON
 ----------------------------------------------------------------------------
 
--- | The same list, as JSON. Numbers on the contract clock are rendered as
--- JSON numbers; source ranges are dropped.
+-- | The same list, as JSON, for a program to read. Every discriminator is
+-- a stable camelCase token, never prose: prose is for 'renderReport', and
+-- a consumer that switches on @"kind"@ must not break when the wording
+-- does. Numbers on the contract clock are rendered as JSON numbers (a
+-- 'Rational' that is not a terminating decimal, such as @1/3@, is rounded
+-- to a 'Double'); source ranges are dropped. @format@ is the shape's
+-- version, bumped whenever a key or token changes meaning.
+jsonFormat :: Int
+jsonFormat = 1
+
 reportJson :: Bool -> TraceReport -> Aeson.Value
 reportJson withSteps rp = Aeson.object $
-  [ "contract"   .= rp.rpContract
+  [ "format"     .= jsonFormat
+  , "contract"   .= rp.rpContract
   , "line"       .= rp.rpLine
   , "events"     .= rp.rpEvents
   , "clock"      .= ratio rp.rpClock
@@ -484,7 +502,7 @@ reportJson withSteps rp = Aeson.object $
   , "discharging" .= [ candidateJson o | o <- rp.rpEnabled, Discharging <- [o.ocVerdict] ]
   , "breaching"  .= [ Aeson.object ["event" .= candidateJson o, "breach" .= blameJson b] | o <- rp.rpEnabled, Breaching b <- [o.ocVerdict] ]
   , "advancing"  .= [ Aeson.object ["event" .= candidateJson o, "then" .= map (placementJson [] [] (stampOf o)) m] | o <- rp.rpEnabled, Advancing m <- [o.ocVerdict] ]
-  , "passedOver" .= [ Aeson.object ["event" .= candidateJson o, "why" .= passOverWords why] | o <- rp.rpEnabled, PassedOver why <- [o.ocVerdict] ]
+  , "passedOver" .= [ Aeson.object ["event" .= candidateJson o, "reason" .= passOverToken why, "why" .= passOverWords why] | o <- rp.rpEnabled, PassedOver why <- [o.ocVerdict] ]
   , "untried"    .= [ Aeson.object ["event" .= candidateJson o, "why" .= Text.strip why] | o <- rp.rpEnabled, Untried why <- [o.ocVerdict] ]
   , "nextDeadline" .= fmap (\ (d, ns) -> Aeson.object ["at" .= ratio d, "whose" .= map (normJson rp.rpActions) ns]) rp.rpNext
   , "deadlineNotKnown" .= map (normJson rp.rpActions) rp.rpUnknown
@@ -496,21 +514,29 @@ reportJson withSteps rp = Aeson.object $
 ratio :: Rational -> Aeson.Value
 ratio r = Aeson.toJSON (fromRational r :: Double)
 
+-- | The token a pass-over is filed under; 'passOverWords' is the sentence.
+passOverToken :: PassOver -> Text
+passOverToken = \ case
+  GuardFalse -> "guardFalse"
+  WrongAct   -> "wrongAct"
+  WrongParty -> "wrongParty"
+  NoTaker    -> "noTaker"
+
 standingJson :: Standing -> Aeson.Value
 standingJson = \ case
-  InProgress     -> Aeson.object ["status" .= ("in progress" :: Text)]
+  InProgress     -> Aeson.object ["status" .= ("inProgress" :: Text)]
   Fulfilled      -> Aeson.object ["status" .= ("fulfilled" :: Text)]
   InBreach b     -> Aeson.object ["status" .= ("breached" :: Text), "breach" .= blameJson b]
-  NotEvaluated t -> Aeson.object ["status" .= ("not evaluated" :: Text), "why" .= Text.strip t]
+  NotEvaluated t -> Aeson.object ["status" .= ("notEvaluated" :: Text), "why" .= Text.strip t]
 
 placementJson :: [(LiveNorm, Rational)] -> [(LiveNorm, Text)] -> Rational -> NormPlacement -> Aeson.Value
 placementJson confirmed actions clock = \ case
   InEffect n -> Aeson.object $ ["kind" .= ("owed" :: Text)] <> normFields n
   Awaiting {awProgress} -> Aeson.object $
-    ["kind" .= ("held back" :: Text)]
-    <> maybe [] (\ p -> ["done" .= p.prDone, "total" .= p.prTotal, "until" .= thresholdText p.prThreshold]) awProgress
-  Created {crSource} -> Aeson.object ["kind" .= ("not yet started" :: Text), "source" .= crSource]
-  Violated b -> Aeson.object ["kind" .= ("in breach" :: Text), "breach" .= blameJson b]
+    ["kind" .= ("heldBack" :: Text)]
+    <> maybe [] (\ p -> ["done" .= p.prDone, "total" .= p.prTotal, "until" .= thresholdToken p.prThreshold]) awProgress
+  Created {crSource} -> Aeson.object ["kind" .= ("notStarted" :: Text), "source" .= crSource]
+  Violated b -> Aeson.object ["kind" .= ("inBreach" :: Text), "breach" .= blameJson b]
   Lapsed b -> Aeson.object ["kind" .= ("lapsed" :: Text), "breach" .= blameJson b]
   where
     normFields n =
@@ -523,8 +549,8 @@ placementJson confirmed actions clock = \ case
       (UnforcedDeadline t, Just d)  -> ["dueBy" .= ratio d, "dueWithin" .= t]
       (UnforcedDeadline t, Nothing) -> ["dueWithin" .= t]
       (Remaining r, _)              -> ["dueBy" .= ratio (clock + r), "remaining" .= ratio r]
-    thresholdText = \ case
-      AllHave _ -> "all have acted" :: Text
+    thresholdToken = \ case
+      AllHave _ -> "allHave" :: Text
 
 normJson :: [(LiveNorm, Text)] -> LiveNorm -> Aeson.Value
 normJson actions n = Aeson.object ["party" .= bearerText n.lnBearer, "modal" .= modalWord n.lnModal, "action" .= actionText actions n]
@@ -532,8 +558,8 @@ normJson actions n = Aeson.object ["party" .= bearerText n.lnBearer, "modal" .= 
 familyJson :: Family -> Aeson.Value
 familyJson f = Aeson.object
   [ "join" .= (case f.faJoin of
-                 Barrier _    -> "all must act before the next step"
-                 Fork         -> "each has a next step of their own"
+                 Barrier _    -> "barrier"
+                 Fork         -> "fork"
                  Distributive -> "none" :: Text)
   , "total" .= f.faTotal ]
 
@@ -552,7 +578,7 @@ candidateJson o = case (o.ocCandidate.cdKind, o.ocCandidate.cdHypothetical) of
   (ActBy n, Left _) -> Aeson.object ["kind" .= ("act" :: Text), "party" .= bearerText n.lnBearer, "action" .= n.lnAction]
   (TickPast d ns, Right h) -> Aeson.object ["kind" .= ("tick" :: Text), "deadline" .= ratio d, "at" .= ratio h.hyAt, "whose" .= map (normJson []) ns]
   (TickPast d ns, Left _) -> Aeson.object ["kind" .= ("tick" :: Text), "deadline" .= ratio d, "whose" .= map (normJson []) ns]
-  (NoTick n, _) -> Aeson.object ["kind" .= ("tick" :: Text), "whose" .= [normJson [] n]]
+  (NoTick n, _) -> Aeson.object ["kind" .= ("noTick" :: Text), "whose" .= [normJson [] n]]
 
 stepJson :: DeonticStep -> Aeson.Value
 stepJson s = Aeson.object $ catMaybes
@@ -565,37 +591,39 @@ stepJson s = Aeson.object $ catMaybes
   ]
   where
     eventJson e
-      | Just a <- e.ekAction, isClockSentinel a = Aeson.object ["at" .= ratio e.ekStamp, "kind" .= ("the clock runs on" :: Text)]
-      | otherwise = Aeson.object ["at" .= ratio e.ekStamp, "party" .= fmap elide e.ekParty, "action" .= fmap elide e.ekAction]
+      | Just a <- e.ekAction, isClockSentinel a = Aeson.object ["at" .= ratio e.ekStamp, "kind" .= ("clock" :: Text)]
+      | otherwise = Aeson.object ["at" .= ratio e.ekStamp, "kind" .= ("act" :: Text), "party" .= fmap elide e.ekParty, "action" .= fmap elide e.ekAction]
     normKeyJson k = Aeson.object $
       [ "party" .= fmap elide k.nkBearer, "modal" .= modalWord k.nkModal, "activation" .= k.nkActivation ]
       <> maybe [] (\ m -> ["member" .= m.moIndex, "of" .= m.moTotal]) k.nkMember
+    -- one token per 'StepOutcome' constructor; the sentence is 'outcomeWords'
     outcomeJson = \ case
       Waiting          -> Aeson.object ["what" .= ("waiting" :: Text)]
-      PartyMismatch    -> Aeson.object ["what" .= ("passed over: not this party" :: Text)]
-      ActionMismatch   -> Aeson.object ["what" .= ("passed over: not this act" :: Text)]
-      GuardFailed      -> Aeson.object ["what" .= ("passed over: condition not met" :: Text)]
-      Matched br       -> Aeson.object ["what" .= ("done" :: Text), "then" .= branchText br]
-      Expired br d     -> Aeson.object ["what" .= ("deadline passed" :: Text), "deadline" .= ratio d, "then" .= branchText br]
-      Breached b       -> Aeson.object ["what" .= ("breach declared" :: Text), "by" .= fmap elide b.bsBlame]
-      Joined op note   -> Aeson.object ["what" .= ("compound resolved" :: Text), "operator" .= (case op of ValRAnd -> "and"; ValROr -> "or" :: Text), "result" .= joinResultText note]
-      JoinReleased     -> Aeson.object ["what" .= ("group complete: shared next step begins" :: Text)]
-      JoinExpired br d -> Aeson.object ["what" .= ("group complete, but late" :: Text), "deadline" .= ratio d, "then" .= branchText br]
-      JoinFailed br    -> Aeson.object ["what" .= ("a member failed" :: Text), "then" .= branchText br]
-      JoinStalled      -> Aeson.object ["what" .= ("a member's permission lapsed; the group can never complete" :: Text)]
-    branchText = \ case
-      ToHence  -> "what follows" :: Text
-      ToLest   -> "the fallback"
+      PartyMismatch    -> Aeson.object ["what" .= ("partyMismatch" :: Text)]
+      ActionMismatch   -> Aeson.object ["what" .= ("actionMismatch" :: Text)]
+      GuardFailed      -> Aeson.object ["what" .= ("guardFailed" :: Text)]
+      Matched br       -> Aeson.object ["what" .= ("matched" :: Text), "then" .= branchToken br]
+      Expired br d     -> Aeson.object ["what" .= ("expired" :: Text), "deadline" .= ratio d, "then" .= branchToken br]
+      Breached b       -> Aeson.object ["what" .= ("breached" :: Text), "by" .= fmap elide b.bsBlame]
+      Joined op note   -> Aeson.object ["what" .= ("joined" :: Text), "operator" .= (case op of ValRAnd -> "and"; ValROr -> "or" :: Text), "result" .= joinResultToken note]
+      JoinReleased     -> Aeson.object ["what" .= ("joinReleased" :: Text)]
+      JoinExpired br d -> Aeson.object ["what" .= ("joinExpired" :: Text), "deadline" .= ratio d, "then" .= branchToken br]
+      JoinFailed br    -> Aeson.object ["what" .= ("joinFailed" :: Text), "then" .= branchToken br]
+      JoinStalled      -> Aeson.object ["what" .= ("joinStalled" :: Text)]
+    branchToken = \ case
+      ToHence  -> "hence" :: Text
+      ToLest   -> "lest"
       ToBreach -> "breach"
-    joinResultText note = case note.jnResult of
+    joinResultToken note = case note.jnResult of
       JoinFulfilled  -> "fulfilled" :: Text
       JoinBreached _ -> "breached"
-      JoinPending    -> "still open"
+      JoinPending    -> "pending"
+    -- the join's kind is the discriminator; the counts are the progress
     joinJson = \ case
-      MemberSatisfied n m -> Aeson.object ["done" .= n, "total" .= m, "shared next step" .= ("waits" :: Text)]
-      ForkContinued i m   -> Aeson.object ["member" .= i, "total" .= m, "own next step" .= ("begins" :: Text)]
+      MemberSatisfied n m -> Aeson.object ["kind" .= ("barrier" :: Text), "done" .= n, "total" .= m]
+      ForkContinued i m   -> Aeson.object ["kind" .= ("fork" :: Text), "member" .= i, "total" .= m]
     scrutinyText = \ case
       Consumed      -> "consumed" :: Text
-      WitnessedOnly -> "witnessed only"
-      Reoffered     -> "re-offered"
-      NoEvent       -> "no event"
+      WitnessedOnly -> "witnessedOnly"
+      Reoffered     -> "reoffered"
+      NoEvent       -> "noEvent"

@@ -625,7 +625,9 @@ spec = describe "the deontic step log (LTS-VISUALISER §4.3, P2b)" $ do
       [ Row (Just "Tenant OF ") 1 (Just DMust) (Matched ToHence) Consumed (Just 1) (Just 1) (Just (MemberSatisfied 1 2))
       , Row (Just "Tenant OF ") 2 (Just DMust) PartyMismatch WitnessedOnly (Just 1) (Just 1) Nothing
       , Row (Just "Tenant OF ") 2 (Just DMust) (Expired ToBreach 14) WitnessedOnly (Just 20) (Just 1) Nothing
-      , Row Nothing 1 (Just DMust) (JoinFailed ToBreach) NoEvent Nothing Nothing Nothing
+        -- clocked at the stamp the member's miss was seen at, as case 15's
+        -- JoinFailed ToLest is: the member's DeadlineMissed carries it
+      , Row Nothing 1 (Just DMust) (JoinFailed ToBreach) NoEvent Nothing (Just 20) Nothing
       ]
 
   it "the log-off path is unchanged: every fixture renders the same result both ways" $

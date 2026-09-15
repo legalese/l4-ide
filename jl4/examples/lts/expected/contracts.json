@@ -33,6 +33,7 @@
       "PARTY B DOES payment OF 21 AT 4",
       "`WAIT UNTIL` OF 10"
     ],
+    "format": 1,
     "line": 23,
     "nextDeadline": {
       "at": 14,
@@ -56,7 +57,7 @@
     ],
     "passedOver": [],
     "standing": {
-      "status": "in progress"
+      "status": "inProgress"
     },
     "steps": [
       {
@@ -64,6 +65,7 @@
         "event": {
           "action": "delivery",
           "at": 2,
+          "kind": "act",
           "party": "S"
         },
         "norm": {
@@ -72,8 +74,8 @@
           "party": "S"
         },
         "outcome": {
-          "then": "what follows",
-          "what": "done"
+          "then": "hence",
+          "what": "matched"
         },
         "scrutiny": "consumed"
       },
@@ -82,6 +84,7 @@
         "event": {
           "action": "payment OF …",
           "at": 4,
+          "kind": "act",
           "party": "B"
         },
         "norm": {
@@ -90,8 +93,8 @@
           "party": "B"
         },
         "outcome": {
-          "then": "what follows",
-          "what": "done"
+          "then": "hence",
+          "what": "matched"
         },
         "scrutiny": "consumed"
       },
@@ -99,7 +102,7 @@
         "clock": 10,
         "event": {
           "at": 10,
-          "kind": "the clock runs on"
+          "kind": "clock"
         },
         "norm": {
           "activation": 1,
@@ -107,9 +110,9 @@
           "party": "B"
         },
         "outcome": {
-          "what": "passed over: not this party"
+          "what": "partyMismatch"
         },
-        "scrutiny": "witnessed only"
+        "scrutiny": "witnessedOnly"
       },
       {
         "clock": 10,
@@ -121,7 +124,7 @@
         "outcome": {
           "what": "waiting"
         },
-        "scrutiny": "no event"
+        "scrutiny": "noEvent"
       }
     ],
     "untried": [
@@ -146,6 +149,7 @@
       "PARTY S DOES delivery AT 2",
       "PARTY B DOES payment OF 20 AT 4"
     ],
+    "format": 1,
     "line": 29,
     "nextDeadline": null,
     "owed": [],
@@ -159,6 +163,7 @@
         "event": {
           "action": "delivery",
           "at": 2,
+          "kind": "act",
           "party": "S"
         },
         "norm": {
@@ -167,8 +172,8 @@
           "party": "S"
         },
         "outcome": {
-          "then": "what follows",
-          "what": "done"
+          "then": "hence",
+          "what": "matched"
         },
         "scrutiny": "consumed"
       },
@@ -177,6 +182,7 @@
         "event": {
           "action": "payment OF …",
           "at": 4,
+          "kind": "act",
           "party": "B"
         },
         "norm": {
@@ -185,8 +191,8 @@
           "party": "B"
         },
         "outcome": {
-          "then": "what follows",
-          "what": "done"
+          "then": "hence",
+          "what": "matched"
         },
         "scrutiny": "consumed"
       }
@@ -205,6 +211,7 @@
       "PARTY B DOES payment OF 30 AT 6",
       "PARTY B DOES payment OF 10 AT 9"
     ],
+    "format": 1,
     "line": 33,
     "nextDeadline": null,
     "owed": [],
@@ -218,6 +225,7 @@
         "event": {
           "action": "delivery",
           "at": 2,
+          "kind": "act",
           "party": "S"
         },
         "norm": {
@@ -226,8 +234,8 @@
           "party": "S"
         },
         "outcome": {
-          "then": "what follows",
-          "what": "done"
+          "then": "hence",
+          "what": "matched"
         },
         "scrutiny": "consumed"
       },
@@ -236,6 +244,7 @@
         "event": {
           "action": null,
           "at": 6,
+          "kind": "act",
           "party": "B"
         },
         "norm": {
@@ -245,16 +254,17 @@
         },
         "outcome": {
           "deadline": 5,
-          "then": "the fallback",
-          "what": "deadline passed"
+          "then": "lest",
+          "what": "expired"
         },
-        "scrutiny": "witnessed only"
+        "scrutiny": "witnessedOnly"
       },
       {
         "clock": 6,
         "event": {
           "action": "payment OF …",
           "at": 6,
+          "kind": "act",
           "party": "B"
         },
         "norm": {
@@ -263,15 +273,16 @@
           "party": "B"
         },
         "outcome": {
-          "what": "passed over: not this act"
+          "what": "actionMismatch"
         },
-        "scrutiny": "re-offered"
+        "scrutiny": "reoffered"
       },
       {
         "clock": 9,
         "event": {
           "action": "payment OF …",
           "at": 9,
+          "kind": "act",
           "party": "B"
         },
         "norm": {
@@ -280,8 +291,8 @@
           "party": "B"
         },
         "outcome": {
-          "then": "what follows",
-          "what": "done"
+          "then": "hence",
+          "what": "matched"
         },
         "scrutiny": "consumed"
       }
@@ -299,6 +310,7 @@
       "PARTY B DOES payment OF 2 AT 5",
       "PARTY S DOES delivery AT 20"
     ],
+    "format": 1,
     "line": 58,
     "nextDeadline": null,
     "owed": [],
@@ -312,6 +324,7 @@
         "event": {
           "action": "payment OF …",
           "at": 5,
+          "kind": "act",
           "party": "B"
         },
         "norm": {
@@ -320,8 +333,8 @@
           "party": "B"
         },
         "outcome": {
-          "then": "what follows",
-          "what": "done"
+          "then": "hence",
+          "what": "matched"
         },
         "scrutiny": "consumed"
       }
@@ -340,6 +353,7 @@
       "PARTY B DOES baz OF qux AT 1",
       "PARTY B DOES baz OF bar AT 1"
     ],
+    "format": 1,
     "line": 69,
     "nextDeadline": null,
     "owed": [],
@@ -353,6 +367,7 @@
         "event": {
           "action": "quuux",
           "at": 1,
+          "kind": "act",
           "party": "B"
         },
         "norm": {
@@ -361,15 +376,16 @@
           "party": "B"
         },
         "outcome": {
-          "what": "passed over: not this act"
+          "what": "actionMismatch"
         },
-        "scrutiny": "witnessed only"
+        "scrutiny": "witnessedOnly"
       },
       {
         "clock": 1,
         "event": {
           "action": "baz OF …",
           "at": 1,
+          "kind": "act",
           "party": "B"
         },
         "norm": {
@@ -378,15 +394,16 @@
           "party": "B"
         },
         "outcome": {
-          "what": "passed over: not this act"
+          "what": "actionMismatch"
         },
-        "scrutiny": "witnessed only"
+        "scrutiny": "witnessedOnly"
       },
       {
         "clock": 1,
         "event": {
           "action": "baz OF …",
           "at": 1,
+          "kind": "act",
           "party": "B"
         },
         "norm": {
@@ -395,8 +412,8 @@
           "party": "B"
         },
         "outcome": {
-          "then": "what follows",
-          "what": "done"
+          "then": "hence",
+          "what": "matched"
         },
         "scrutiny": "consumed"
       }
@@ -411,6 +428,7 @@
     "deadlineNotKnown": [],
     "discharging": [],
     "events": [],
+    "format": 1,
     "line": 81,
     "nextDeadline": null,
     "owed": [],
@@ -429,16 +447,16 @@
         "outcome": {
           "what": "waiting"
         },
-        "scrutiny": "no event"
+        "scrutiny": "noEvent"
       },
       {
         "clock": null,
         "outcome": {
           "operator": "or",
           "result": "fulfilled",
-          "what": "compound resolved"
+          "what": "joined"
         },
-        "scrutiny": "no event"
+        "scrutiny": "noEvent"
       }
     ],
     "untried": []
@@ -453,6 +471,7 @@
     "events": [
       "PARTY S DOES delivery AT 4"
     ],
+    "format": 1,
     "line": 83,
     "nextDeadline": null,
     "owed": [],
@@ -466,6 +485,7 @@
         "event": {
           "action": "delivery",
           "at": 4,
+          "kind": "act",
           "party": "S"
         },
         "norm": {
@@ -474,8 +494,8 @@
           "party": "S"
         },
         "outcome": {
-          "then": "what follows",
-          "what": "done"
+          "then": "hence",
+          "what": "matched"
         },
         "scrutiny": "consumed"
       }
@@ -521,6 +541,7 @@
     "events": [
       "PARTY B DOES payment OF 4 AT 4"
     ],
+    "format": 1,
     "line": 86,
     "nextDeadline": {
       "at": 9,
@@ -544,7 +565,7 @@
     ],
     "passedOver": [],
     "standing": {
-      "status": "in progress"
+      "status": "inProgress"
     },
     "steps": [
       {
@@ -552,6 +573,7 @@
         "event": {
           "action": "payment OF …",
           "at": 4,
+          "kind": "act",
           "party": "B"
         },
         "norm": {
@@ -560,9 +582,9 @@
           "party": "B"
         },
         "outcome": {
-          "what": "passed over: not this act"
+          "what": "actionMismatch"
         },
-        "scrutiny": "witnessed only"
+        "scrutiny": "witnessedOnly"
       },
       {
         "clock": 4,
@@ -574,7 +596,7 @@
         "outcome": {
           "what": "waiting"
         },
-        "scrutiny": "no event"
+        "scrutiny": "noEvent"
       }
     ],
     "untried": []
@@ -590,6 +612,7 @@
       "PARTY S DOES delivery AT 4",
       "PARTY B DOES payment OF 4 AT 26"
     ],
+    "format": 1,
     "line": 89,
     "nextDeadline": null,
     "owed": [],
@@ -603,6 +626,7 @@
         "event": {
           "action": "delivery",
           "at": 4,
+          "kind": "act",
           "party": "S"
         },
         "norm": {
@@ -611,8 +635,8 @@
           "party": "S"
         },
         "outcome": {
-          "then": "what follows",
-          "what": "done"
+          "then": "hence",
+          "what": "matched"
         },
         "scrutiny": "consumed"
       },
@@ -621,9 +645,9 @@
         "outcome": {
           "operator": "or",
           "result": "fulfilled",
-          "what": "compound resolved"
+          "what": "joined"
         },
-        "scrutiny": "no event"
+        "scrutiny": "noEvent"
       }
     ],
     "untried": []
@@ -639,6 +663,7 @@
       "PARTY S DOES delivery AT 4",
       "PARTY B DOES payment OF 5 AT 26"
     ],
+    "format": 1,
     "line": 93,
     "nextDeadline": null,
     "owed": [],
@@ -652,6 +677,7 @@
         "event": {
           "action": "delivery",
           "at": 4,
+          "kind": "act",
           "party": "S"
         },
         "norm": {
@@ -660,8 +686,8 @@
           "party": "S"
         },
         "outcome": {
-          "then": "what follows",
-          "what": "done"
+          "then": "hence",
+          "what": "matched"
         },
         "scrutiny": "consumed"
       },
@@ -670,9 +696,9 @@
         "outcome": {
           "operator": "or",
           "result": "fulfilled",
-          "what": "compound resolved"
+          "what": "joined"
         },
-        "scrutiny": "no event"
+        "scrutiny": "noEvent"
       }
     ],
     "untried": []
@@ -688,6 +714,7 @@
       "PARTY S DOES delivery AT 2",
       "PARTY B DOES payment OF 6 AT 3"
     ],
+    "format": 1,
     "line": 102,
     "nextDeadline": null,
     "owed": [],
@@ -708,6 +735,7 @@
         "event": {
           "action": "delivery",
           "at": 2,
+          "kind": "act",
           "party": "S"
         },
         "norm": {
@@ -716,15 +744,16 @@
           "party": "S"
         },
         "outcome": {
-          "what": "passed over: not this act"
+          "what": "actionMismatch"
         },
-        "scrutiny": "witnessed only"
+        "scrutiny": "witnessedOnly"
       },
       {
         "clock": 2,
         "event": {
           "action": null,
           "at": 3,
+          "kind": "act",
           "party": "B"
         },
         "norm": {
@@ -735,9 +764,9 @@
         "outcome": {
           "deadline": 2,
           "then": "breach",
-          "what": "deadline passed"
+          "what": "expired"
         },
-        "scrutiny": "witnessed only"
+        "scrutiny": "witnessedOnly"
       }
     ],
     "untried": []
@@ -753,6 +782,7 @@
       "PARTY S DOES delivery AT 2",
       "PARTY S DOES payment OF 7 AT 3"
     ],
+    "format": 1,
     "line": 106,
     "nextDeadline": null,
     "owed": [],
@@ -773,6 +803,7 @@
         "event": {
           "action": "delivery",
           "at": 2,
+          "kind": "act",
           "party": "S"
         },
         "norm": {
@@ -781,15 +812,16 @@
           "party": "S"
         },
         "outcome": {
-          "what": "passed over: not this act"
+          "what": "actionMismatch"
         },
-        "scrutiny": "witnessed only"
+        "scrutiny": "witnessedOnly"
       },
       {
         "clock": 2,
         "event": {
           "action": null,
           "at": 3,
+          "kind": "act",
           "party": "S"
         },
         "norm": {
@@ -800,9 +832,9 @@
         "outcome": {
           "deadline": 2,
           "then": "breach",
-          "what": "deadline passed"
+          "what": "expired"
         },
-        "scrutiny": "witnessed only"
+        "scrutiny": "witnessedOnly"
       }
     ],
     "untried": []

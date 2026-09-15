@@ -12,6 +12,7 @@
       "PARTY carol DOES Sign OF carol AT 9",
       "PARTY theLandlord DOES Deliver OF theLandlord AT 13"
     ],
+    "format": 1,
     "line": 41,
     "nextDeadline": null,
     "owed": [],
@@ -25,11 +26,12 @@
         "event": {
           "action": "Sign OF …",
           "at": 1,
+          "kind": "act",
           "party": "Tenant OF …"
         },
         "join": {
           "done": 1,
-          "shared next step": "waits",
+          "kind": "barrier",
           "total": 3
         },
         "norm": {
@@ -40,8 +42,8 @@
           "party": "Tenant OF …"
         },
         "outcome": {
-          "then": "what follows",
-          "what": "done"
+          "then": "hence",
+          "what": "matched"
         },
         "scrutiny": "consumed"
       },
@@ -50,6 +52,7 @@
         "event": {
           "action": "Sign OF …",
           "at": 1,
+          "kind": "act",
           "party": "Tenant OF …"
         },
         "norm": {
@@ -60,20 +63,21 @@
           "party": "Tenant OF …"
         },
         "outcome": {
-          "what": "passed over: not this party"
+          "what": "partyMismatch"
         },
-        "scrutiny": "witnessed only"
+        "scrutiny": "witnessedOnly"
       },
       {
         "clock": 2,
         "event": {
           "action": "Sign OF …",
           "at": 2,
+          "kind": "act",
           "party": "Tenant OF …"
         },
         "join": {
           "done": 2,
-          "shared next step": "waits",
+          "kind": "barrier",
           "total": 3
         },
         "norm": {
@@ -84,8 +88,8 @@
           "party": "Tenant OF …"
         },
         "outcome": {
-          "then": "what follows",
-          "what": "done"
+          "then": "hence",
+          "what": "matched"
         },
         "scrutiny": "consumed"
       },
@@ -94,6 +98,7 @@
         "event": {
           "action": "Sign OF …",
           "at": 1,
+          "kind": "act",
           "party": "Tenant OF …"
         },
         "norm": {
@@ -104,15 +109,16 @@
           "party": "Tenant OF …"
         },
         "outcome": {
-          "what": "passed over: not this party"
+          "what": "partyMismatch"
         },
-        "scrutiny": "witnessed only"
+        "scrutiny": "witnessedOnly"
       },
       {
         "clock": 2,
         "event": {
           "action": "Sign OF …",
           "at": 2,
+          "kind": "act",
           "party": "Tenant OF …"
         },
         "norm": {
@@ -123,20 +129,21 @@
           "party": "Tenant OF …"
         },
         "outcome": {
-          "what": "passed over: not this party"
+          "what": "partyMismatch"
         },
-        "scrutiny": "witnessed only"
+        "scrutiny": "witnessedOnly"
       },
       {
         "clock": 9,
         "event": {
           "action": "Sign OF …",
           "at": 9,
+          "kind": "act",
           "party": "Tenant OF …"
         },
         "join": {
           "done": 3,
-          "shared next step": "waits",
+          "kind": "barrier",
           "total": 3
         },
         "norm": {
@@ -147,8 +154,8 @@
           "party": "Tenant OF …"
         },
         "outcome": {
-          "then": "what follows",
-          "what": "done"
+          "then": "hence",
+          "what": "matched"
         },
         "scrutiny": "consumed"
       },
@@ -160,15 +167,16 @@
           "party": null
         },
         "outcome": {
-          "what": "group complete: shared next step begins"
+          "what": "joinReleased"
         },
-        "scrutiny": "no event"
+        "scrutiny": "noEvent"
       },
       {
         "clock": 13,
         "event": {
           "action": "Deliver OF …",
           "at": 13,
+          "kind": "act",
           "party": "Landlord OF …"
         },
         "norm": {
@@ -177,8 +185,8 @@
           "party": "Landlord OF …"
         },
         "outcome": {
-          "then": "what follows",
-          "what": "done"
+          "then": "hence",
+          "what": "matched"
         },
         "scrutiny": "consumed"
       }
@@ -197,6 +205,7 @@
       "PARTY bob DOES Sign OF bob AT 2",
       "PARTY theLandlord DOES Deliver OF theLandlord AT 20"
     ],
+    "format": 1,
     "line": 48,
     "nextDeadline": null,
     "owed": [],
@@ -211,11 +220,12 @@
         "event": {
           "action": "Sign OF …",
           "at": 1,
+          "kind": "act",
           "party": "Tenant OF …"
         },
         "join": {
           "done": 1,
-          "shared next step": "waits",
+          "kind": "barrier",
           "total": 3
         },
         "norm": {
@@ -226,8 +236,8 @@
           "party": "Tenant OF …"
         },
         "outcome": {
-          "then": "what follows",
-          "what": "done"
+          "then": "hence",
+          "what": "matched"
         },
         "scrutiny": "consumed"
       },
@@ -236,6 +246,7 @@
         "event": {
           "action": "Sign OF …",
           "at": 1,
+          "kind": "act",
           "party": "Tenant OF …"
         },
         "norm": {
@@ -246,20 +257,21 @@
           "party": "Tenant OF …"
         },
         "outcome": {
-          "what": "passed over: not this party"
+          "what": "partyMismatch"
         },
-        "scrutiny": "witnessed only"
+        "scrutiny": "witnessedOnly"
       },
       {
         "clock": 2,
         "event": {
           "action": "Sign OF …",
           "at": 2,
+          "kind": "act",
           "party": "Tenant OF …"
         },
         "join": {
           "done": 2,
-          "shared next step": "waits",
+          "kind": "barrier",
           "total": 3
         },
         "norm": {
@@ -270,8 +282,8 @@
           "party": "Tenant OF …"
         },
         "outcome": {
-          "then": "what follows",
-          "what": "done"
+          "then": "hence",
+          "what": "matched"
         },
         "scrutiny": "consumed"
       },
@@ -280,6 +292,7 @@
         "event": {
           "action": "Sign OF …",
           "at": 1,
+          "kind": "act",
           "party": "Tenant OF …"
         },
         "norm": {
@@ -290,15 +303,16 @@
           "party": "Tenant OF …"
         },
         "outcome": {
-          "what": "passed over: not this party"
+          "what": "partyMismatch"
         },
-        "scrutiny": "witnessed only"
+        "scrutiny": "witnessedOnly"
       },
       {
         "clock": 2,
         "event": {
           "action": "Sign OF …",
           "at": 2,
+          "kind": "act",
           "party": "Tenant OF …"
         },
         "norm": {
@@ -309,15 +323,16 @@
           "party": "Tenant OF …"
         },
         "outcome": {
-          "what": "passed over: not this party"
+          "what": "partyMismatch"
         },
-        "scrutiny": "witnessed only"
+        "scrutiny": "witnessedOnly"
       },
       {
         "clock": 2,
         "event": {
           "action": null,
           "at": 20,
+          "kind": "act",
           "party": null
         },
         "norm": {
@@ -329,10 +344,10 @@
         },
         "outcome": {
           "deadline": 14,
-          "then": "the fallback",
-          "what": "deadline passed"
+          "then": "lest",
+          "what": "expired"
         },
-        "scrutiny": "witnessed only"
+        "scrutiny": "witnessedOnly"
       },
       {
         "clock": 20,
@@ -342,18 +357,18 @@
           "party": null
         },
         "outcome": {
-          "then": "the fallback",
-          "what": "a member failed"
+          "then": "lest",
+          "what": "joinFailed"
         },
-        "scrutiny": "no event"
+        "scrutiny": "noEvent"
       },
       {
         "clock": null,
         "outcome": {
           "by": null,
-          "what": "breach declared"
+          "what": "breached"
         },
-        "scrutiny": "no event"
+        "scrutiny": "noEvent"
       }
     ],
     "untried": []
@@ -373,6 +388,7 @@
       "PARTY carol DOES Pay OF carol, theLandlord, 300 AT 5",
       "PARTY theLandlord DOES Receipt OF theLandlord, carol, 300 AT 6"
     ],
+    "format": 1,
     "line": 66,
     "nextDeadline": null,
     "owed": [],
@@ -386,11 +402,12 @@
         "event": {
           "action": "Pay OF …, …, …",
           "at": 1,
+          "kind": "act",
           "party": "Tenant OF …"
         },
         "join": {
+          "kind": "fork",
           "member": 1,
-          "own next step": "begins",
           "total": 3
         },
         "norm": {
@@ -401,8 +418,8 @@
           "party": "Tenant OF …"
         },
         "outcome": {
-          "then": "what follows",
-          "what": "done"
+          "then": "hence",
+          "what": "matched"
         },
         "scrutiny": "consumed"
       },
@@ -411,6 +428,7 @@
         "event": {
           "action": "Receipt OF …, …, …",
           "at": 2,
+          "kind": "act",
           "party": "Landlord OF …"
         },
         "norm": {
@@ -419,8 +437,8 @@
           "party": "Landlord OF …"
         },
         "outcome": {
-          "then": "what follows",
-          "what": "done"
+          "then": "hence",
+          "what": "matched"
         },
         "scrutiny": "consumed"
       },
@@ -429,6 +447,7 @@
         "event": {
           "action": "Pay OF …, …, …",
           "at": 1,
+          "kind": "act",
           "party": "Tenant OF …"
         },
         "norm": {
@@ -439,15 +458,16 @@
           "party": "Tenant OF …"
         },
         "outcome": {
-          "what": "passed over: not this party"
+          "what": "partyMismatch"
         },
-        "scrutiny": "witnessed only"
+        "scrutiny": "witnessedOnly"
       },
       {
         "clock": 2,
         "event": {
           "action": "Receipt OF …, …, …",
           "at": 2,
+          "kind": "act",
           "party": "Landlord OF …"
         },
         "norm": {
@@ -458,20 +478,21 @@
           "party": "Tenant OF …"
         },
         "outcome": {
-          "what": "passed over: not this party"
+          "what": "partyMismatch"
         },
-        "scrutiny": "witnessed only"
+        "scrutiny": "witnessedOnly"
       },
       {
         "clock": 3,
         "event": {
           "action": "Pay OF …, …, …",
           "at": 3,
+          "kind": "act",
           "party": "Tenant OF …"
         },
         "join": {
+          "kind": "fork",
           "member": 2,
-          "own next step": "begins",
           "total": 3
         },
         "norm": {
@@ -482,8 +503,8 @@
           "party": "Tenant OF …"
         },
         "outcome": {
-          "then": "what follows",
-          "what": "done"
+          "then": "hence",
+          "what": "matched"
         },
         "scrutiny": "consumed"
       },
@@ -492,6 +513,7 @@
         "event": {
           "action": "Receipt OF …, …, …",
           "at": 4,
+          "kind": "act",
           "party": "Landlord OF …"
         },
         "norm": {
@@ -500,8 +522,8 @@
           "party": "Landlord OF …"
         },
         "outcome": {
-          "then": "what follows",
-          "what": "done"
+          "then": "hence",
+          "what": "matched"
         },
         "scrutiny": "consumed"
       },
@@ -510,6 +532,7 @@
         "event": {
           "action": "Pay OF …, …, …",
           "at": 1,
+          "kind": "act",
           "party": "Tenant OF …"
         },
         "norm": {
@@ -520,15 +543,16 @@
           "party": "Tenant OF …"
         },
         "outcome": {
-          "what": "passed over: not this party"
+          "what": "partyMismatch"
         },
-        "scrutiny": "witnessed only"
+        "scrutiny": "witnessedOnly"
       },
       {
         "clock": 2,
         "event": {
           "action": "Receipt OF …, …, …",
           "at": 2,
+          "kind": "act",
           "party": "Landlord OF …"
         },
         "norm": {
@@ -539,15 +563,16 @@
           "party": "Tenant OF …"
         },
         "outcome": {
-          "what": "passed over: not this party"
+          "what": "partyMismatch"
         },
-        "scrutiny": "witnessed only"
+        "scrutiny": "witnessedOnly"
       },
       {
         "clock": 3,
         "event": {
           "action": "Pay OF …, …, …",
           "at": 3,
+          "kind": "act",
           "party": "Tenant OF …"
         },
         "norm": {
@@ -558,15 +583,16 @@
           "party": "Tenant OF …"
         },
         "outcome": {
-          "what": "passed over: not this party"
+          "what": "partyMismatch"
         },
-        "scrutiny": "witnessed only"
+        "scrutiny": "witnessedOnly"
       },
       {
         "clock": 4,
         "event": {
           "action": "Receipt OF …, …, …",
           "at": 4,
+          "kind": "act",
           "party": "Landlord OF …"
         },
         "norm": {
@@ -577,20 +603,21 @@
           "party": "Tenant OF …"
         },
         "outcome": {
-          "what": "passed over: not this party"
+          "what": "partyMismatch"
         },
-        "scrutiny": "witnessed only"
+        "scrutiny": "witnessedOnly"
       },
       {
         "clock": 5,
         "event": {
           "action": "Pay OF …, …, …",
           "at": 5,
+          "kind": "act",
           "party": "Tenant OF …"
         },
         "join": {
+          "kind": "fork",
           "member": 3,
-          "own next step": "begins",
           "total": 3
         },
         "norm": {
@@ -601,8 +628,8 @@
           "party": "Tenant OF …"
         },
         "outcome": {
-          "then": "what follows",
-          "what": "done"
+          "then": "hence",
+          "what": "matched"
         },
         "scrutiny": "consumed"
       },
@@ -611,6 +638,7 @@
         "event": {
           "action": "Receipt OF …, …, …",
           "at": 6,
+          "kind": "act",
           "party": "Landlord OF …"
         },
         "norm": {
@@ -619,8 +647,8 @@
           "party": "Landlord OF …"
         },
         "outcome": {
-          "then": "what follows",
-          "what": "done"
+          "then": "hence",
+          "what": "matched"
         },
         "scrutiny": "consumed"
       },
@@ -629,18 +657,18 @@
         "outcome": {
           "operator": "and",
           "result": "fulfilled",
-          "what": "compound resolved"
+          "what": "joined"
         },
-        "scrutiny": "no event"
+        "scrutiny": "noEvent"
       },
       {
         "clock": null,
         "outcome": {
           "operator": "and",
           "result": "fulfilled",
-          "what": "compound resolved"
+          "what": "joined"
         },
-        "scrutiny": "no event"
+        "scrutiny": "noEvent"
       }
     ],
     "untried": []
@@ -659,6 +687,7 @@
       "PARTY theLandlord DOES Receipt OF theLandlord, carol, 300 AT 6",
       "PARTY theLandlord DOES Receipt OF theLandlord, bob, 200 AT 20"
     ],
+    "format": 1,
     "line": 75,
     "nextDeadline": null,
     "owed": [],
@@ -675,11 +704,12 @@
         "event": {
           "action": "Pay OF …, …, …",
           "at": 1,
+          "kind": "act",
           "party": "Tenant OF …"
         },
         "join": {
+          "kind": "fork",
           "member": 1,
-          "own next step": "begins",
           "total": 3
         },
         "norm": {
@@ -690,8 +720,8 @@
           "party": "Tenant OF …"
         },
         "outcome": {
-          "then": "what follows",
-          "what": "done"
+          "then": "hence",
+          "what": "matched"
         },
         "scrutiny": "consumed"
       },
@@ -700,6 +730,7 @@
         "event": {
           "action": "Receipt OF …, …, …",
           "at": 2,
+          "kind": "act",
           "party": "Landlord OF …"
         },
         "norm": {
@@ -708,8 +739,8 @@
           "party": "Landlord OF …"
         },
         "outcome": {
-          "then": "what follows",
-          "what": "done"
+          "then": "hence",
+          "what": "matched"
         },
         "scrutiny": "consumed"
       },
@@ -718,6 +749,7 @@
         "event": {
           "action": "Pay OF …, …, …",
           "at": 1,
+          "kind": "act",
           "party": "Tenant OF …"
         },
         "norm": {
@@ -728,15 +760,16 @@
           "party": "Tenant OF …"
         },
         "outcome": {
-          "what": "passed over: not this party"
+          "what": "partyMismatch"
         },
-        "scrutiny": "witnessed only"
+        "scrutiny": "witnessedOnly"
       },
       {
         "clock": 2,
         "event": {
           "action": "Receipt OF …, …, …",
           "at": 2,
+          "kind": "act",
           "party": "Landlord OF …"
         },
         "norm": {
@@ -747,15 +780,16 @@
           "party": "Tenant OF …"
         },
         "outcome": {
-          "what": "passed over: not this party"
+          "what": "partyMismatch"
         },
-        "scrutiny": "witnessed only"
+        "scrutiny": "witnessedOnly"
       },
       {
         "clock": 5,
         "event": {
           "action": null,
           "at": 5,
+          "kind": "act",
           "party": "Tenant OF …"
         },
         "norm": {
@@ -766,15 +800,16 @@
           "party": "Tenant OF …"
         },
         "outcome": {
-          "what": "passed over: not this party"
+          "what": "partyMismatch"
         },
-        "scrutiny": "witnessed only"
+        "scrutiny": "witnessedOnly"
       },
       {
         "clock": 6,
         "event": {
           "action": null,
           "at": 6,
+          "kind": "act",
           "party": "Landlord OF …"
         },
         "norm": {
@@ -785,20 +820,21 @@
           "party": "Tenant OF …"
         },
         "outcome": {
-          "what": "passed over: not this party"
+          "what": "partyMismatch"
         },
-        "scrutiny": "witnessed only"
+        "scrutiny": "witnessedOnly"
       },
       {
         "clock": 6,
         "event": {
           "action": null,
           "at": 20,
+          "kind": "act",
           "party": "Landlord OF …"
         },
         "join": {
+          "kind": "fork",
           "member": 2,
-          "own next step": "begins",
           "total": 3
         },
         "norm": {
@@ -810,24 +846,25 @@
         },
         "outcome": {
           "deadline": 7,
-          "then": "the fallback",
-          "what": "deadline passed"
+          "then": "lest",
+          "what": "expired"
         },
-        "scrutiny": "witnessed only"
+        "scrutiny": "witnessedOnly"
       },
       {
         "clock": null,
         "outcome": {
           "by": "Tenant OF …",
-          "what": "breach declared"
+          "what": "breached"
         },
-        "scrutiny": "no event"
+        "scrutiny": "noEvent"
       },
       {
         "clock": 1,
         "event": {
           "action": "Pay OF …, …, …",
           "at": 1,
+          "kind": "act",
           "party": "Tenant OF …"
         },
         "norm": {
@@ -838,15 +875,16 @@
           "party": "Tenant OF …"
         },
         "outcome": {
-          "what": "passed over: not this party"
+          "what": "partyMismatch"
         },
-        "scrutiny": "witnessed only"
+        "scrutiny": "witnessedOnly"
       },
       {
         "clock": 2,
         "event": {
           "action": "Receipt OF …, …, …",
           "at": 2,
+          "kind": "act",
           "party": "Landlord OF …"
         },
         "norm": {
@@ -857,20 +895,21 @@
           "party": "Tenant OF …"
         },
         "outcome": {
-          "what": "passed over: not this party"
+          "what": "partyMismatch"
         },
-        "scrutiny": "witnessed only"
+        "scrutiny": "witnessedOnly"
       },
       {
         "clock": 5,
         "event": {
           "action": "Pay OF …, …, …",
           "at": 5,
+          "kind": "act",
           "party": "Tenant OF …"
         },
         "join": {
+          "kind": "fork",
           "member": 3,
-          "own next step": "begins",
           "total": 3
         },
         "norm": {
@@ -881,8 +920,8 @@
           "party": "Tenant OF …"
         },
         "outcome": {
-          "then": "what follows",
-          "what": "done"
+          "then": "hence",
+          "what": "matched"
         },
         "scrutiny": "consumed"
       },
@@ -891,6 +930,7 @@
         "event": {
           "action": "Receipt OF …, …, …",
           "at": 6,
+          "kind": "act",
           "party": "Landlord OF …"
         },
         "norm": {
@@ -899,8 +939,8 @@
           "party": "Landlord OF …"
         },
         "outcome": {
-          "then": "what follows",
-          "what": "done"
+          "then": "hence",
+          "what": "matched"
         },
         "scrutiny": "consumed"
       },
@@ -909,18 +949,18 @@
         "outcome": {
           "operator": "and",
           "result": "breached",
-          "what": "compound resolved"
+          "what": "joined"
         },
-        "scrutiny": "no event"
+        "scrutiny": "noEvent"
       },
       {
         "clock": null,
         "outcome": {
           "operator": "and",
           "result": "breached",
-          "what": "compound resolved"
+          "what": "joined"
         },
-        "scrutiny": "no event"
+        "scrutiny": "noEvent"
       }
     ],
     "untried": []
