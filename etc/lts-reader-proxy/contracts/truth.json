@@ -1,0 +1,26 @@
+{
+  "contract": "aContract (jl4/examples/ok/contracts.l4)",
+  "position": "the file's own first #TRACE (line 23): S delivers at 2, B pays 21 at 4, WAIT UNTIL 10; clock 10",
+  "questions": [
+    "Q1. What is owed right now, and by whom?",
+    "Q2. Which event(s) would discharge what is owed?",
+    "Q3. Which event(s) or deadline(s) would put someone in breach?",
+    "Q4. Where in the contract are we — which rule, branch or state is live?",
+    "Q5. What happens after the next discharging event?"
+  ],
+  "truth": [
+    "B owes one thing: B MUST `return`, due by day 14 (4 days from now). S owes nothing.",
+    "Any act by B on or before day 14 discharges it, because `return` is a pattern variable that matches whatever action B does (B doing `foo` at 12 → FULFILLED; B doing `delivery` at 14 → FULFILLED). An act by S does not count (S doing `foo` at 12 leaves B's obligation standing).",
+    "Only one thing: the clock passing day 14 without any act by B. If nothing happens by 14 (the clock reaches 15) B is in breach; equally, B acting at 15 is a breach ('MUST return was due by 14; seen at 15, when foo happened instead').",
+    "In the third obligation of the chain: S's delivery (due within 3) was done at 2, B's payment (due within 3, price ≥ 20) was done at 4 with price 21, and because the price was not exactly 20 the contract took the `ELSE` branch of `IF price = 20 THEN FULFILLED ELSE PARTY B MUST return WITHIN 10` — the state the graph labels 'B must return'. The LEST branch (B MUST pay the fine of 10) was never entered.",
+    "The contract ends: after B's `return` (any act by B by day 14) the standing is FULFILLED and nothing more is owed by anyone."
+  ],
+  "evidence": [
+    "lts.json: owed = [{party: B, modal: MUST, action: return, dueBy: 14, remaining: 4}]; nextDeadline.at = 14",
+    "probes.out, the #TRACEs on probes.l4 lines 29, 36, 43 (B foo at 12 → FULFILLED; B delivery at 14 → FULFILLED; S foo at 12 → in progress). lts.json lists the act under untried ('the action binds `return`') — the list itself cannot try it.",
+    "lts.json: breaching = [{event: tick at 15 past deadline 14, breach: {party: B, missed: 'MUST return', due: 14, seenAt: 15}}]; probes.out, the #TRACEs on probes.l4 lines 50 (WAIT UNTIL 15 → BREACHED) and 57 (B foo at 15 → BREACHED)",
+    "B.dot: node 4 'B must return' reached by 2 -> 4 [IF NOT (price EQUALS 20)]; the golden's step log, jl4/examples/lts/expected/contracts.txt:19-20 ('at 2: … S MUST — done; on to what follows', 'at 4: … B MUST — done; on to what follows')",
+    "probes.out, the #TRACE on probes.l4 line 29: Standing FULFILLED after B foo at 12; B.dot: 4 -> 3 Fulfilled"
+  ],
+  "notes": "Position is the file's own trace, so A.txt is jl4/examples/lts/expected/contracts.txt lines 1-16 (the golden without its steps)."
+}

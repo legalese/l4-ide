@@ -1,0 +1,6 @@
+-- THE PROXY POSITION (etc/lts-reader-proxy): Alice and Bob have signed, Carol
+-- has not, and the clock stands at 2. Appended to the source file by
+-- prepare.sh; this trace is not in doc/reference/regulative/every-run-example.l4.
+#TRACE `the tenancy` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+  PARTY bob   DOES Sign bob   AT 2

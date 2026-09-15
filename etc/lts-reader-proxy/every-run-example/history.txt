@@ -1,0 +1,6 @@
+The contract is `the tenancy` from doc/reference/regulative/every-run-example.l4. Three tenants (Alice, Bob and Carol) must each sign; when the last of them has signed, the landlord (Ms Ng) must deliver. Time is counted in whole days from day 0.
+
+What has happened so far, in order:
+  1. On day 1, Alice signed (Alice did `Sign`).
+  2. On day 2, Bob signed (Bob did `Sign`).
+  3. Carol has not signed. Nothing else has happened; the clock now stands at day 2.

@@ -1,0 +1,52 @@
+fidelity report — BPMN 2.0
+  [P-BRANCHGUARD] lossy — Split_0
+      The gateway's arms are selected by ‘(`Outstanding Payment Amount`'s Value) GREATER THAN 0’, ‘NOT ((`Outstanding Payment Amount`'s Value) GREATER THAN 0)’, written into each outgoing flow as an opaque conditionExpression: BPMN has no way to say that these exhaust the cases and cannot overlap, which is what the L4 IF/ELSE chain they came from does say.
+      lost: exhaustiveness and mutual exclusion as properties of the gateway — and whatever decision structure backed each condition, for which DMN, not BPMN, is the right home
+  [P-NODMN] lossy — Split_0
+      This gateway's guards were NOT delegated to the emitted DMN: `Payment Obligations` has 1 rule(s) against the gateway's 2 arm(s); and the guard's DECIDE is not an emitted DMN decision. The conditionExpressions above stay opaque L4 text.
+      lost: the BPMN→DMN linkage for this gateway; the decision structure behind these guards is somewhere in the DMN artifact, but nothing in this file says where
+  [F1] blocking — Task_1
+      MUST, MAY and SHANT all draw as a task, so nothing here makes skipping this one a breach and skipping another one fine.
+      lost: the deontic modality, which survives in the label and the <documentation> but has no notational force
+  [F4] lossy — Task_1
+      The PROVIDED condition ‘`is money at least equal within error` OF `Amount Transferred`, (`Next Payment Due`'s Amount)’ becomes an opaque conditionExpression on the task's outgoing flow, because BPMN has no activity precondition.
+      lost: whatever decision structure backed the guard — DMN would be its right home, and the DMN/BPMN link is an association, not a semantics
+  [F3] blocking — Task_1
+      This obligation can fail to become applicable at all, and BPMN has only one kind of ‘did not happen’.
+      lost: the difference between an obligation that was never reached and one that was discharged
+  [P-DEADLINE] blocking — Boundary_1
+      Deadline ‘`Next Payment Due Date`’ is not an ISO 8601 duration and no unit could be read from it, so the boundary event carries the text verbatim as a condition rather than a timer carrying a duration we invented.
+      lost: the deadline as a machine-checkable timer
+  [F1] blocking — Task_2
+      MUST, MAY and SHANT all draw as a task, so nothing here makes skipping this one a breach and skipping another one fine.
+      lost: the deontic modality, which survives in the label and the <documentation> but has no notational force
+  [F4] lossy — Task_2
+      The PROVIDED condition ‘`is money at least equal within error` OF `Amount Transferred`, `Next Payment Due Amount With Penalty`’ becomes an opaque conditionExpression on the task's outgoing flow, because BPMN has no activity precondition.
+      lost: whatever decision structure backed the guard — DMN would be its right home, and the DMN/BPMN link is an association, not a semantics
+  [F3] blocking — Task_2
+      This obligation can fail to become applicable at all, and BPMN has only one kind of ‘did not happen’.
+      lost: the difference between an obligation that was never reached and one that was discharged
+  [P-DEADLINE] blocking — Boundary_2
+      Deadline ‘`Default After Days Beyond Commencement`’ is not an ISO 8601 duration and no unit could be read from it, so the boundary event carries the text verbatim as a condition rather than a timer carrying a duration we invented.
+      lost: the deadline as a machine-checkable timer
+  [F1] blocking — Task_4
+      MUST, MAY and SHANT all draw as a task, so nothing here makes skipping this one a breach and skipping another one fine.
+      lost: the deontic modality, which survives in the label and the <documentation> but has no notational force
+  [F4] lossy — Task_4
+      The PROVIDED condition ‘`is money at least equal within error` OF `Amount Transferred`, `All Outstanding Debts`’ becomes an opaque conditionExpression on the task's outgoing flow, because BPMN has no activity precondition.
+      lost: whatever decision structure backed the guard — DMN would be its right home, and the DMN/BPMN link is an association, not a semantics
+  [F3] blocking — Task_4
+      This obligation can fail to become applicable at all, and BPMN has only one kind of ‘did not happen’.
+      lost: the difference between an obligation that was never reached and one that was discharged
+  [P-DEADLINE] blocking — Boundary_4
+      This LEST has no deadline, and BPMN has no untriggered boundary event, so it is drawn as a conditional boundary event rather than a timer. Nothing can fire it: for every modal but SHANT this arm is reached only by the deadline passing, and for SHANT this node is the compliance arm, which is likewise reached only by the deadline passing.
+      lost: the trigger as something an engine could evaluate
+  [P-CYCLE] lossy — Process_Payment_Obligations
+      The state graph has a cycle (initial, `The Borrower` must pay monthly installment to ...). BPMN can draw a loop, but this layout places a node by its longest path from the start and a node on a cycle has none, so inside the loop a node further right no longer means a moment further on: the positions are wherever the relaxation ran out of fuel.
+      lost: the reading that left-to-right is time, which is the only thing the horizontal axis was carrying
+  [F2] lossy — Process_Payment_Obligations
+      A lane says who performs the work, where L4's PARTY says who owes the obligation, and this diagram can only show the first (lanes here: `The Borrower`).
+      lost: the bearer, as distinct from the performer — the two come apart whenever an agent acts for a principal
+  [F5] advisory — Process_Payment_Obligations
+      BPMN has no as-of date, so any threshold or deadline that does appear in this diagram is a value someone must remember to edit when the rule changes.
+      lost: asking the same question as of a different rule date, which the L4 source can still answer

@@ -1,0 +1,3 @@
+The contract is `receipts` from jl4/examples/bpmn/tenancy.l4. Three tenants (Alice, Bob and Carol) must each pay the landlord (Ms Ng); each tenant who pays is then owed a receipt for that payment by the landlord. Time is counted in whole days from day 0.
+
+What has happened so far: nothing. The contract has just begun and the clock stands at day 0.

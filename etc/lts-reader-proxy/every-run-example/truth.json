@@ -1,0 +1,26 @@
+{
+  "contract": "`the tenancy` (doc/reference/regulative/every-run-example.l4), the barrier",
+  "position": "a trace the file does not carry (position.trace, appended by prepare.sh): Alice signs at 1, Bob signs at 2; clock 2",
+  "questions": [
+    "Q1. What is owed right now, and by whom?",
+    "Q2. Which event(s) would discharge what is owed?",
+    "Q3. Which event(s) or deadline(s) would put someone in breach?",
+    "Q4. Where in the contract are we — which rule, branch or state is live?",
+    "Q5. What happens after the next discharging event?"
+  ],
+  "truth": [
+    "Carol owes a signature: Tenant Carol MUST Sign, due by day 14 (12 days from now). Alice and Bob have already signed (2 of 3). The landlord owes nothing yet — his delivery is held back until all three have signed.",
+    "Carol signing on or before day 14 (Carol does `Sign`, at any clock ≤ 14). That completes the group; it does not end the contract, it starts the landlord's obligation. Alice or Bob signing again does not count for Carol.",
+    "The clock passing day 14 without Carol's signature: if nothing happens by 14 (the clock reaches 15) the contract is in breach, and the breach names no party (the rule's LEST is a bare BREACH).",
+    "Inside the EVERY barrier (`ONCE ALL HAVE`): the signing stage, 2 of 3 members done, the shared next step held back. The landlord's delivery stage has not begun.",
+    "The landlord (Ms Ng) MUST Deliver within 5 days of Carol's signature (if Carol signs at 9, delivery is due by 14; if she signs on day 14, by 19); delivery in time ends the contract FULFILLED, and missing it puts the landlord in breach."
+  ],
+  "evidence": [
+    "lts.json: owed = [{party: Tenant Carol, MUST Sign, dueBy 14, remaining 12, group: barrier of 3}, {kind: heldBack, done 2, total 3, until allHave}]",
+    "lts.json: advancing = [{Carol does Sign at 2 → then: [Landlord MUST Deliver, dueBy 7]}]; probes.out, the #TRACEs on probes.l4 lines 45 (Carol at 9 → landlord owes Deliver by 14), 51 (Carol at 14 → by 19), 77 (Alice again at 3 → Carol still owes)",
+    "lts.json: breaching = [{tick at 15 past deadline 14, breach: {} (no party)}]; probes.out, the #TRACE on probes.l4 line 57: Standing BREACHED — the contract is in breach (no party is named)",
+    "lts.json owed[1].kind = heldBack (2 of 3); B.dot: edge 0 -> 1 'EVERY Tenant t IN tenants MUST Sign ... [14] ONCE ALL HAVE' not yet taken",
+    "probes.out, the #TRACEs on probes.l4 lines 63 (Carol at 9, landlord at 14 → FULFILLED) and 70 (landlord at 15 → BREACHED, Landlord is in breach); B.dot: 1 -> 2 Fulfilled, 1 -> 3 timeout"
+  ],
+  "notes": "The file's own two barrier traces both end (FULFILLED / BREACHED), which leaves nothing owed; the proxy needs a mid-contract position, so one was appended. C.bpmn is the P1 golden tenancy-barrier.bpmn (cut from jl4/examples/bpmn/tenancy.l4, whose `the tenancy` is the same rule); prepare.sh asserts the doc file's rule exports byte-identically."
+}

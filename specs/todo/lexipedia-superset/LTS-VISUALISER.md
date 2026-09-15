@@ -1706,6 +1706,53 @@ Both experiments together cost about three days. B1-B3 plus P2d plus P2e cost co
 and §4.7 says the layout half is under-costed even now. Spending the three days first is the
 whole of revision 2's staging argument.
 
+**PREPARED 2026-09-16 — materials for an LLM-reader _proxy_ of this gate, on `lts/p2a-prime-proxy`.
+Not run; no verdict.** The gate is a reader experiment and no human has been shown anything. What
+exists is `etc/lts-reader-proxy/` (its `README.md` is the authoritative description): for four
+contracts, at one fixed position each, the three artifacts a reader would be given — **A** the
+`l4 lts` list at default flags, **B** the `l4 state-graph` DOT for the rule, **C** the P1 BPMN
+(the `jl4/examples/bpmn/expected/` golden where one exists, else `l4 export --to bpmn --rule`) —
+plus, for B and C, the position in plain words, and a `truth.json` per contract: five questions
+(Q1–Q3 are §1.1a's three clauses; Q4 _where are we_, Q5 _what happens after_, the two things
+§1.1a says a list cannot do) with answers read off `l4 lts --json` for Q1–Q3 and off `probes.l4`
+`#TRACE` runs and the DOT for Q4–Q5, each answer citing the field or trace line it came from.
+`manifest.json` carries the full text of all twelve artifacts, because a reader sees only that.
+
+- **Positions.** `ok/contracts.l4` `aContract` at its own first `#TRACE` (line 23; the §7.6
+  block); `every-run-example.l4` `the tenancy` at an **appended** trace (Alice at 1, Bob at 2,
+  Carol not yet — the file's own barrier traces both end, so a mid-contract position had to be
+  added; `position.trace`); `bpmn/tenancy.l4` `receipts` at its outset (`--contract receipts`);
+  and `legal/promissory-note.l4` `Payment Obligations` at its own second `#TRACE` (line 192), one
+  late payment sitting in the first LEST arm.
+- **Why the fourth is not Reg CF.** Measured by `grep -n 'LEST' jl4/examples/legal/regcf/regcf.l4`:
+  no hits in any of its three regulative rules — the advertising and resale restrictions are bare
+  `SHANT`s, the ongoing reporting obligation is a `HENCE` cycle — and `regcf-denovo.l4` has
+  `LEST BREACH … BECAUSE` arms and no `#TRACE`. The promissory note is a real chain
+  (reparation, then a deadline-free reparation of the reparation) and its evaluator answers are
+  the least obvious of the four: at the position **nothing can breach** (`lts.json`:
+  `breaching: []`; the tick past 3 June 2025 takes the `2 -> 4` timeout edge in `B.dot`, and the
+  only breach edge out of node 4 is `4 -> 5 "unreachable: no WITHIN"`), and
+  paying the penalty amount in time ends the **whole twelve-installment note** FULFILLED, because
+  the reparation arm has no `HENCE` (`probes.out`, the trace on `probes.l4:294`).
+- **What this proxy cannot measure, stated in the README so the result is not over-read**: it is
+  not the gate (§7.3 is about people); §7.4's warrant is about novice modellers' cognitive load,
+  which an LLM reader cannot stand in for; B and C readers get DOT and XML **as text**, so the
+  proxy measures whether the graph's content carries the answer, not whether a drawing helps;
+  and the note's list prints day serials, which A readers get unconverted.
+- **The binary.** All artifacts cut with the `lts/p2-stack` build at `0139c6c5` (the same commit
+  this branch is on); its `l4 lts` output diffed byte-identical against all three committed
+  goldens under `jl4/examples/lts/expected/` before anything was cut, and
+  `every-run-example.l4`'s `the tenancy` exports byte-identical to `tenancy-barrier.bpmn`
+  (`prepare.sh` asserts this on every run).
+- **Two things seen one step past the `tenancy` position, not fixed, not in any reader
+  artifact** (`etc/lts-reader-proxy/tenancy/probes.out:15` and `:11`): with Alice paid at 3, the
+  what-if for the landlord's `Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount)` is
+  refused with the replay's own `Internal error: amount is not in scope` as its reason —
+  `reifyExpr` (`jl4-core/src/L4/Lts/WhatIf.hs:524`) cannot read a member's open pattern
+  variable through the `HENCE`; the verdict (untried) is right, the wording is not the list's.
+  And the tick past 7 prints as `the clock reaches 7.5` — `tickPast` (`WhatIf.hs:278`) going
+  half-way to the next live deadline, as §2.4 says, which a reader is not told.
+
 ### 7.4 The empirical warrant, corrected
 
 Revision 1 attached two DOIs to this claim. **Both were wrong**, and each resolved to an

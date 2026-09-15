@@ -1,0 +1,80 @@
+IMPORT prelude
+-- Running a rule that uses EVERY. The companion to every-example.l4, which
+-- shows the shapes; this one shows the shapes working.
+--
+-- Every rule here names its group with `IN tenants` — the roll. That is what
+-- makes it runnable: see "Where the group comes from" on EVERY.md. (An older
+-- spelling put the same list in the WHO condition, as `WHO elem t tenants`.
+-- That spelling is DEPRECATED as of 2026-09-08: it still runs and nothing
+-- warns you, but `IN` is the one to write. every-example.l4 keeps one
+-- labelled specimen of it so the shape stays recognisable.)
+
+DECLARE Actor IS ONE OF
+    Landlord HAS name IS A STRING
+    Tenant   HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Sign    HAS signer IS AN Actor
+    Deliver HAS who    IS AN Actor
+    Pay     HAS payer  IS AN Actor, payee IS AN Actor, amount IS A NUMBER
+    Receipt HAS issuer IS AN Actor, to    IS AN Actor, amount IS A NUMBER
+
+theLandlord MEANS Landlord OF "Ms Ng"
+alice       MEANS Tenant OF "Alice"
+bob         MEANS Tenant OF "Bob"
+carol       MEANS Tenant OF "Carol"
+tenants     MEANS LIST alice, bob, carol
+
+-- THE BARRIER. Every tenant signs; when the last of them has, the landlord
+-- owes a delivery, and his five days run from that moment.
+GIVETH A DEONTIC Actor Action
+`the tenancy` MEANS
+    EVERY Tenant t IN tenants
+        MUST   Sign (EXACTLY t)
+        WITHIN 14
+        ONCE   ALL HAVE
+        HENCE  (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5)
+        LEST   BREACH
+
+-- PROBES for the ground truth of etc/lts-reader-proxy/every-run-example.
+-- Lines 1-38 are doc/reference/regulative/every-run-example.l4:1-38 verbatim
+-- (the barrier rule and its declarations). Each #TRACE is the proxy position
+-- (Alice signs at 1, Bob at 2, clock at 2) plus further events.
+
+-- Q2/Q5: Carol signs at 9 -> the landlord's delivery is due 5 later (14).
+#TRACE `the tenancy` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+  PARTY bob   DOES Sign bob   AT 2
+  PARTY carol DOES Sign carol AT 9
+
+-- Q2: Carol signs on the deadline day (14) -> delivery due by 19.
+#TRACE `the tenancy` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+  PARTY bob   DOES Sign bob   AT 2
+  PARTY carol DOES Sign carol AT 14
+
+-- Q3: nothing by 14; the next event is at 15.
+#TRACE `the tenancy` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+  PARTY bob   DOES Sign bob   AT 2
+  PARTY theLandlord DOES Deliver theLandlord AT 15
+
+-- Q5: Carol signs at 9, the landlord delivers at 14 -> fulfilled.
+#TRACE `the tenancy` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+  PARTY bob   DOES Sign bob   AT 2
+  PARTY carol DOES Sign carol AT 9
+  PARTY theLandlord DOES Deliver theLandlord AT 14
+
+-- Q5: ... and at 15 -> the landlord is in breach.
+#TRACE `the tenancy` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+  PARTY bob   DOES Sign bob   AT 2
+  PARTY carol DOES Sign carol AT 9
+  PARTY theLandlord DOES Deliver theLandlord AT 15
+
+-- Q2: Alice signing again does not count for Carol.
+#TRACE `the tenancy` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+  PARTY bob   DOES Sign bob   AT 2
+  PARTY alice DOES Sign alice AT 3

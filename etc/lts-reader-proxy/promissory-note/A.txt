@@ -1,0 +1,15 @@
+`Payment Obligations` OF `Total Repayment Amount` — after 1 event, the clock stands at 739708 (the #TRACE on line 192)
+    PARTY `The Borrower` DOES `pay monthly installment to` OF `The Lender`, (USD OF 2256.46) AT Day OF (April OF 3, 2025)
+  Standing: in progress.
+
+  Owed now:
+    - `Commercial Borrower` OF (Company OF "Jane Dough Pte Ltd", "42 Jane Doe Rd #04-20, Singapore 420000", "Singapore", "UEN 200424242N", (`Bank Account` OF "DBS Bank Ltd", "Jane Dough Pte Ltd", "242-242424-9", "DBSSSGSG")) MUST `pay monthly installment to` (EXACTLY `The Lender`) `Amount Transferred` — due by 739769 (61 from now)
+
+  What would move things along (neither ends nor breaches it):
+    - nothing happens by 739769 (the clock reaches 739770) → then:
+          · `Commercial Borrower` OF (Company OF "Jane Dough Pte Ltd", "42 Jane Doe Rd #04-20, Singapore 420000", "Singapore", "UEN 200424242N", (`Bank Account` OF "DBS Bank Ltd", "Jane Dough Pte Ltd", "242-242424-9", "DBSSSGSG")) MUST `pay monthly installment to` (EXACTLY `The Lender`) `Amount Transferred` — no deadline
+
+  What could not be tried:
+    - `Commercial Borrower` OF (Company OF "Jane Dough Pte Ltd", "42 Jane Doe Rd #04-20, Singapore 420000", "Singapore", "UEN 200424242N", (`Bank Account` OF "DBS Bank Ltd", "Jane Dough Pte Ltd", "242-242424-9", "DBSSSGSG")) does `pay monthly installment to` (EXACTLY `The Lender`) `Amount Transferred` — the action binds `Amount Transferred`, which the what-if cannot choose
+
+  Next deadline: 739769 (`Commercial Borrower` OF (Company OF "Jane Dough Pte Ltd", "42 Jane Doe Rd #04-20, Singapore 420000", "Singapore", "UEN 200424242N", (`Bank Account` OF "DBS Bank Ltd", "Jane Dough Pte Ltd", "242-242424-9", "DBSSSGSG")): `pay monthly installment to` (EXACTLY `The Lender`) `Amount Transferred`)
