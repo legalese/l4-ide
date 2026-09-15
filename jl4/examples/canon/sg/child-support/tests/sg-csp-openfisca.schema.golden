@@ -1,0 +1,64 @@
+{
+    "$defs": {
+        "Period": {
+            "properties": {
+                "year": {
+                    "type": "number"
+                }
+            },
+            "required": [
+                "year"
+            ],
+            "type": "object"
+        },
+        "Person": {
+            "properties": {
+                "birth order": {
+                    "type": "number"
+                },
+                "birth year": {
+                    "type": "number"
+                },
+                "born on or after the Cash Gift enhancement": {
+                    "type": "boolean"
+                },
+                "born on or after the Package commences": {
+                    "type": "boolean"
+                },
+                "has a Child Development Account": {
+                    "type": "boolean"
+                },
+                "is a Singapore citizen": {
+                    "type": "boolean"
+                }
+            },
+            "required": [
+                "birth year",
+                "born on or after the Package commences",
+                "born on or after the Cash Gift enhancement",
+                "has a Child Development Account",
+                "birth order",
+                "is a Singapore citizen"
+            ],
+            "type": "object"
+        }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "The five lines of the SG Child Support Package added together, for one Singapore Citizen child, birth to 17. The co-matching line is a cap; at full take-up this is the \"up to $62,000\" of the announcement.",
+    "properties": {
+        "p": {
+            "$ref": "#/$defs/Person",
+            "description": "The child."
+        },
+        "period": {
+            "$ref": "#/$defs/Period",
+            "description": "The simulation period."
+        }
+    },
+    "required": [
+        "p",
+        "period"
+    ],
+    "title": "package total",
+    "type": "object"
+}

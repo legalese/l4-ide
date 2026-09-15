@@ -1,0 +1,21 @@
+{
+  "encoder": "legalese",
+  "display_name": "What happens after a death in Singapore \u2014 intestate distribution, wills, and the grant timetable",
+  "status": "draft",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "maintainer": {
+    "name": "Legalese Pte. Ltd.",
+    "github": "legalese"
+  },
+  "modules": [
+    "sg-succession-domain.l4",
+    "sg-wills.l4",
+    "sg-isa.l4",
+    "sg-paa.l4",
+    "sg-succession.l4",
+    "cases/sg-succession-cases.l4"
+  ],
+  "scope": "The Intestate Succession Act 1967 in FULL (all ten sections, s 7 rules 1-9). The Wills Act 1838 and the Probate and Administration Act 1934 in the part that bears on the question 'what happens after somebody dies' \u2014 formal validity and revocation of a will; which grant, to whom, and the statutory timetable; what comes off the estate before the beneficiaries. NOT the whole of either. No rule-version axis: the law is stated as at 18 August 2026 and the corpus cannot answer about an earlier version. 178 scenario assertions, all passing, with the four goldens per module committed beside them. Known gaps are in registers/fork-register.json \u2014 F6 (ISA s 6(b) half-blood ranking) is NOT implemented and is the first thing to fix.",
+  "assertions": 178
+}

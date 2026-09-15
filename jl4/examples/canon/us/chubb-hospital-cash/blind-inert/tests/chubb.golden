@@ -1,0 +1,29 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+chubb.l4:600:1-54:
+  assertion satisfied
+chubb.l4:610:1-54:
+  assertion satisfied
+chubb.l4:622:1-48:
+  assertion satisfied
+chubb.l4:636:1-48:
+  assertion satisfied
+chubb.l4:671:1-48:
+  assertion satisfied
+chubb.l4:678:1-92:
+  assertion satisfied
+chubb.l4:699:1-54:
+  assertion satisfied
+chubb.l4:704:1-79:
+  assertion satisfied
+chubb.l4:717:1-54:
+  assertion satisfied
+chubb.l4:728:1-48:
+  assertion satisfied
+chubb.l4:739:1-54:
+  assertion satisfied
+chubb.l4:757:1-48:
+  assertion satisfied
+chubb.l4:763:1-93:
+  assertion satisfied

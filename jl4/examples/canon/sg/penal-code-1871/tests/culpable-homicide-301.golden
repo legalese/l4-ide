@@ -1,0 +1,37 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+culpable-homicide-301.l4:232:1-82:
+  TRUE
+culpable-homicide-301.l4:233:1-103:
+  JUST OF `murder within the meaning of section 300(a)`
+culpable-homicide-301.l4:234:1-101:
+  FALSE
+culpable-homicide-301.l4:236:1-117:
+  TRUE
+culpable-homicide-301.l4:237:1-120:
+  TRUE
+culpable-homicide-301.l4:239:1-110:
+  FALSE
+culpable-homicide-301.l4:240:1-129:
+  FALSE
+culpable-homicide-301.l4:242:1-85:
+  FALSE
+culpable-homicide-301.l4:243:1-106:
+  JUST OF `murder within the meaning of section 300(d)`
+culpable-homicide-301.l4:246:1-84:
+  assertion satisfied
+culpable-homicide-301.l4:247:1-163:
+  assertion satisfied
+culpable-homicide-301.l4:250:1-109:
+  assertion satisfied
+culpable-homicide-301.l4:253:1-122:
+  assertion satisfied
+culpable-homicide-301.l4:257:1-93:
+  assertion satisfied
+culpable-homicide-301.l4:258:1-166:
+  assertion satisfied
+culpable-homicide-301.l4:263:1-118:
+  assertion satisfied
+culpable-homicide-301.l4:264:1-137:
+  assertion satisfied
