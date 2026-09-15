@@ -1449,6 +1449,29 @@ the join line — its members' HENCE/LEST slots hold the `` `the join` `` / `` `
 sentinels — so `markingOf` cannot produce the join place from what the runtime hands it without
 sniffing user-visible strings. P2b's `DeonticStep` has to carry the join, or the residual has to.
 
+**MEASURED 2026-09-16 — the fork half of finding (1) was wrong, and the tree said so in two
+places.** `6daf1d9d` drew the barrier-joined `MAY`'s lapse as a LEST arm to Fulfilled and left the
+fork alone, on the stated belief that _"under a FORK each member carries the real HENCE, so a
+lapsed member does route there, and the synthesis stays right"_ (`jl4-core/src/L4/StateGraph.hs:951-952`
+as it stood; its commit message: _"A fork's MAY keeps the single-party routing, which is right
+there"_). No trace exercised that belief. P2a's re-run (`P2A-TOKEN-SIM-BASELINE.md` §3.7, second
+question) found `modals-may-fork`'s lapse timer landing on the chair's `MUST Publish`, and the
+review of that report ran the check. Recorded now as two `#TRACE`s on
+`jl4/examples/ok/every/run-modals.l4` §7 (`each approval is published`, the fixture's own rule),
+goldened at `ok/every/tests/run-modals.golden:57-72`: nobody approves and the chair publishes at
+day 40 ⇒ **FULFILLED**, the duty never arose; one director approves at day 3 and nobody publishes
+⇒ **BREACHED**, the chair's, at day 8. The runtime routes a `MAY`'s expiry to `LEST` (default
+`FULFILLED`) whatever the join (`Machine.hs:1831-1835`); the fork differs from the barrier only in
+that an _exercised_ member arms the continuation on its own. So the fork's drawn lapse arm is wrong
+in the same way the barrier's was before `6daf1d9d`. What this commit changes: the two comments
+(`StateGraph.hs`, `Lower.hs:553`'s "one shape" is now two) and the report. What it does not
+change: the exporter. **P1 follow-up, not built:** draw the fork-joined `MAY`'s lapse as a LEST arm
+to Fulfilled too (the `Barrier _` arm of the `DMay` case at `StateGraph.hs:940-968`, widened to
+`Just MkJoinLabel {}`), which retires `Lower.hs`'s `lapses` synthesis for that shape and moves
+`modals-may-fork`'s two goldens (`.bpmn`, `.fidelity.txt`); and, second, `P-FORK-CANCEL` is not emitted on a `MAY` fork
+(`modals-may-fork.fidelity.txt` has no such tag; `modals-may-fork.bpmn:36` has the interrupting
+timer it names), so the fidelity report under-reports that cell — the same fix or a sibling.
+
 #### What follows for P2
 
 **This is P2's problem before it is P1's.** §5.1's division of labour gives P1 the shape and P2 the
@@ -1654,7 +1677,7 @@ leads with.
 
 > **RESULT — P2a, MEASURED 2026-09-15.** `bpmn-js-token-simulation` 0.40.0 over `bpmn-js` 18.28.0,
 > driven headlessly by `etc/bpmn-token-sim/` over the eight goldens then in `jl4/examples/bpmn/expected/`
-> (**re-measured 2026-09-16 over all fourteen** — the `RE-MEASURED` block after this one);
+> (**re-measured 2026-09-15 17:19 UTC over all fourteen**, 2026-09-16 SGT — the `RE-MEASURED` block after this one);
 > report with per-fixture tables, screenshots and the simulator's own JSON in
 > [P2A-TOKEN-SIM-BASELINE.md](./P2A-TOKEN-SIM-BASELINE.md). In five lines:
 >
@@ -1696,7 +1719,7 @@ leads with.
 > paragraph called §7.3's second conjunct "satisfied" when no reader was measured. Each is now
 > stated as measured.
 
-> **RE-MEASURED 2026-09-16 — the six `modals-*` goldens** (`6daf1d9d`, legalese/l4-ide#395:
+> **RE-MEASURED 2026-09-15 17:19 UTC (2026-09-16 SGT) — the six `modals-*` goldens** (`6daf1d9d`, legalese/l4-ide#395:
 > `modals-{may,shant}-{barrier,fork}`, `modals-must-barrier-both-deadlines`,
 > `modals-must-fork-join-deadline`). Same harness, same versions, one run over all fourteen at
 > 2026-09-15 17:19:57 UTC (`etc/bpmn-token-sim/out/run-meta.json`); the committed `out/` is that
@@ -1715,10 +1738,12 @@ leads with.
 > 2. **The `MAY`'s lapse arm animates, and lands in different places on the barrier and the
 >    fork.** On `modals-may-barrier` firing `Boundary_0` reaches `End_2` Fulfilled, the process
 >    finishes and no token is left. On `modals-may-fork` firing `Lapse_0` leaves a token on the
->    chair's `MUST Publish` with its `P5D` timer offered — the routing that `L4/Bpmn/Lower.hs:553`
->    marks "KNOWN WRONG in one shape, and not fixed here", animated faithfully. It is the first
->    barrier/fork pair in fourteen whose animation differs, and it differs the wrong way round. A
->    P1 question, recorded, not decided here.
+>    chair's `MUST Publish` with its `P5D` timer offered — animated faithfully, and contradicting
+>    the runtime, which routes an unexercised `MAY`'s expiry to `LEST`/`FULFILLED` under a fork
+>    as under a barrier (measured 2026-09-16, `ok/every/run-modals.l4` §7 and its golden; the
+>    §4.9 MEASURED block of that date has the traces and the two in-tree claims it overturned).
+>    It is the first barrier/fork pair in fourteen whose animation differs. The exporter fix is a
+>    P1 follow-up, recorded in §4.9, not built.
 > 3. **`modals-must-barrier-both-deadlines` shows one timer, not two.** The census has one
 >    `bpmn:BoundaryEvent` (`P30D`, the member's); the join line's `WITHIN 10` is not in the file
 >    (`P-JOIN-DEADLINE`, lossy) and survives only in `<documentation>`, which the simulator does
@@ -1726,10 +1751,13 @@ leads with.
 >    label and the path alone — so the tighter deadline, the one `run-modals.golden` breaches on,
 >    is the one the picture cannot show.
 >
-> Points 1, 3, 4 and 5 above stand on the new files: no timer fired unaided on any of the six
-> (offered at 1.5 s, unchanged at 4.5 s); `modals-shant-*` are byte-identical modulo ids and
-> path; `modals-must-*` differ by one label. Point 2 now holds for three of the four barrier/fork
-> pairs, the exception being the `modals-may-*` lapse in question 2. Still unmeasured: everything the previous paragraph lists
+> Points 1 and 3 above stand on the new files: "continue" on both `modals-shant-*` tasks is the
+> Breach and their timer the Fulfilled exit (point 1); no timer fired unaided on any of the six
+> (offered at 1.5 s, unchanged at 4.5 s; point 3). Points 4 and 5 are not exercised by them — every
+> `modals-*` file is a single branch with one multi-instance task, so no sibling survives a breach
+> and no two tokens are ever live — and stand on the original eight alone. `modals-shant-*` are
+> byte-identical modulo ids and path; `modals-must-*` differ by one label. Point 2 now holds for
+> three of the four barrier/fork pairs, the exception being the `modals-may-*` lapse in question 2. Still unmeasured: everything the previous paragraph lists
 > as unmeasured. **This block does not decide the gate either.** The staging table row for P2a
 > still reads "unmeasured" for the `modals-*` goldens; that row is the integrator's to update.
 

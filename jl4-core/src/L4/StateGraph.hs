@@ -948,8 +948,20 @@ extractDeonton mFromState (MkDeonton _anno subject action due mJoin hence lest) 
           -- resolution that did not pass. Measured 2026-09-15 by the
           -- concurrency review: `l4 run` FULFILLED, the diagram Breach.
           --
-          -- Under a FORK each member carries the real HENCE, so a lapsed
-          -- member does route there, and the synthesis stays right.
+          -- Under a FORK the runtime does the same to a lapsed member: MAY
+          -- expiry routes to LEST (default FULFILLED), never to HENCE
+          -- (Machine.hs, the DMay arm of the expiry case), so a member who
+          -- did nothing never arms the continuation. No lapse edge is drawn
+          -- for the fork here, so L4.Bpmn.Lower's synthesis still sends the
+          -- fork's lapse "wherever HENCE lands" — on bpmn/modals.l4
+          -- `each approval is published`, into the chair's MUST Publish.
+          -- Measured 2026-09-16 (ok/every/run-modals.l4 §7): nobody approves,
+          -- the chair publishes late ==> FULFILLED; the duty never arose.
+          -- This comment read "a lapsed member does route there, and the
+          -- synthesis stays right" until then, and 6daf1d9d's message says
+          -- the same; both were wrong. Drawing the fork's lapse as a LEST
+          -- arm to Fulfilled, as the barrier arm above does, is the candidate
+          -- fix; it moves modals-may-fork's goldens and is not done here.
           Just MkJoinLabel { joinKind = Barrier _ } -> do
             fulfilledId <- getTerminalState "Fulfilled" TerminalFulfilled
             addTransition fromState fulfilledId lestLabel LestTransition

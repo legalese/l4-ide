@@ -14,6 +14,7 @@ DECLARE Actor IS ONE OF
 DECLARE Action IS ONE OF
     Approve HAS who IS AN Actor
     Sublet  HAS who IS AN Actor
+    Publish HAS who IS AN Actor
 
 theChair MEANS Chair OF "Ms Ng"
 a MEANS Director OF "A"
@@ -120,3 +121,26 @@ GIVETH A DEONTIC Actor Action
   PARTY b DOES Approve b AT 2
   PARTY a DOES Sublet a AT 3
   PARTY b DOES Sublet b AT 9
+
+-- 7. MAY under a FORK, with a continuation. The HENCE is armed once per
+--    member, by that member's act, and by nothing else: a permission that
+--    lapses unexercised routes to its LEST (default FULFILLED), the same as
+--    under the barrier, so the chair's duty never arises for a director who
+--    did nothing. The first trace has nobody approve and the chair publish
+--    late anyway: FULFILLED, because no duty to publish was ever created. The
+--    second has one director approve, which arms the chair's five days from
+--    that act; nobody publishes, and the breach is the chair's, at day 8.
+--    (This pair is the runtime's answer to the BPMN exporter's fork-MAY lapse
+--    routing, jl4/examples/bpmn/modals.l4 `each approval is published`.)
+GIVETH A DEONTIC Actor Action
+`each approval is published` MEANS
+    EVERY Director d IN board MAY Approve (EXACTLY d) WITHIN 30
+        UPON EACH
+        HENCE (PARTY theChair MUST Publish (EXACTLY theChair) WITHIN 5)
+
+#TRACE `each approval is published` AT 0 WITH
+  PARTY theChair DOES Publish theChair AT 40
+
+#TRACE `each approval is published` AT 0 WITH
+  PARTY a DOES Approve a AT 3
+  PARTY theChair DOES Approve theChair AT 100
