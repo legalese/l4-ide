@@ -1078,24 +1078,34 @@ leads with.
 >    multi-instance task is one token and one click, never `n`, so `ONCE ALL HAVE` waits for nothing
 >    and `UPON EACH` fires once.
 > 3. **No clock, no guards, no unreachability.** No timer fired on its own in 4.5 s; every boundary
->    was clickable at t = 0; `conditionExpression`s were never read (the arm is a gateway setting,
->    default first flow); `regcf-advertising`'s _"unreachable: no WITHIN"_ boundary fired on request,
->    to Fulfilled; `regcf-reporting`'s `P-CYCLE` looped twelve times to the step limit.
+>    that was offered was offered from the moment its host held a token, whatever its duration;
+>    `conditionExpression`s were never read (the arm is a gateway setting, default first flow);
+>    `regcf-advertising`'s _"unreachable: no WITHIN"_ boundary fired on request, to Fulfilled;
+>    `regcf-reporting`'s `P-CYCLE` looped six times (twelve clicks) to the step limit.
 > 4. **Breach does not end the process.** On `offering` the error end consumed its own token and the
 >    siblings ran on to _"Process finished"_ with two Fulfilled and two Breach exits; `handover` has
 >    no breach node at all, so the tenant's timeout ends in _"Fulfilled"_. `BREACH BY … BECAUSE …`
 >    appears nowhere.
-> 5. **What it does well:** four concurrent tokens in four lanes on `offering`'s `RAND`, and
+> 5. **What it does well:** four concurrent tokens in three lanes on `offering`'s `RAND`, and
 >    `consultation`'s one drawn join animating as a barrier.
 >
-> On this evidence the second conjunct of §7.3 — _the off-the-shelf simulator cannot answer "what do
-> I owe, what discharges it, what breaches it"_ — looks satisfied, and every gap is one P1's fidelity
-> report already names, shown in motion. **Unmeasured, and this block does not decide the gate:**
-> the first conjunct (P2a′, no reader has been shown a list or the animation); what a human, as
-> opposed to a script clicking what the tool offers, understands from the animation — the quantity
-> §7.4's studies are about; and whether a differently drawn BPMN (a multi-instance subProcess for the
-> fork, which `P-FORK` says the exporter does not emit) would animate better. Staging table above
-> left for the integrator.
+> The measured fact: the simulator's picture carries no modality, bearer, deadline, cardinality or
+> breach attribution, and every one of those gaps is one P1's fidelity report already names, shown in
+> motion. Whether a reader can nonetheless answer §7.3's question — _what do I owe, what discharges
+> it, what breaches it_ — from that picture is **unmeasured**: §7.3 phrases both conjuncts in terms
+> of readers, and the only reader here was a script clicking what the tool offered. **This block
+> does not decide the gate.** Also unmeasured: the first conjunct (P2a′, no reader has been shown a
+> list or the animation); what a human understands from the animation — the quantity §7.4's studies
+> are about; and whether a differently drawn BPMN (a multi-instance subProcess for the fork, which
+> `P-FORK` says the exporter does not emit) would animate better. Staging table above left for the
+> integrator.
+>
+> _What review changed (2026-09-15, same day):_ point 3 said "every boundary was clickable at
+> t = 0" — the data records `triggers` only at start, where exactly one boundary is offered
+> (`out/offering.json`: `["Start_0","Task_0","Boundary_0"]`); "looped twelve times" was twelve
+> clicks, six round trips; point 5 said "four lanes" — `offering.bpmn` has three; and the closing
+> paragraph called §7.3's second conjunct "satisfied" when no reader was measured. Each is now
+> stated as measured.
 
 ### 7.3 The gate
 

@@ -15,8 +15,9 @@ fixtures are committed.
 
 ```sh
 cd etc/bpmn-token-sim
-npm install                 # bpmn-js 18.28.0, bpmn-js-token-simulation 0.40.0,
-                            # esbuild 0.25.9, playwright 1.63.0 — all pinned
+npm ci                      # bpmn-js 18.28.0, bpmn-js-token-simulation 0.40.0,
+                            # esbuild 0.25.9, playwright 1.63.0 — direct deps pinned in
+                            # package.json, the transitive tree in package-lock.json
 npm run build               # bundles src/app.js + CSS + fonts into dist/
 npm run run                 # every fixture; ~5 minutes, mostly animation waits
 node run.mjs ../../jl4/examples/bpmn/expected/tenancy-fork.bpmn   # just one
@@ -61,6 +62,12 @@ gate and `etc/check-bpmn-kie.sh` the engine second opinion; this harness asks a
 different question — what a reader looking at the animation can and cannot tell
 about the rule — and the answer is prose, in the report.
 
-`node_modules/`, `dist/` and `package-lock.json` are ignored by the local
-`.gitignore`; `out/` is un-ignored there, because the root `.gitignore` ignores
-every `out/` and these screenshots are the evidence the report cites.
+`node_modules/` and `dist/` are ignored by the local `.gitignore`;
+`package-lock.json` is committed, so `npm ci` reproduces the transitive tree
+(`diagram-js` and the rest) that `run-meta.json`'s `npm ls --depth=0` does not
+record; `out/` is un-ignored there, because the root `.gitignore` ignores every
+`out/` and these screenshots are the evidence the report cites. `out/` is also
+listed in the root `.prettierignore` explicitly — the JSONs are generated
+evidence, and `prettier --check` would otherwise reformat them when given the
+path directly (the root `.gitignore`'s `out/` line hides them only from a
+bare `prettier --check .`).
