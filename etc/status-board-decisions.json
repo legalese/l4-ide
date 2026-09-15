@@ -182,11 +182,11 @@
     },
     {
       "id": "R5 opening",
-      "owner": "UNASSIGNED — a build session (ultracode)",
-      "kind": "queued build",
+      "owner": "GM workflow wf_686ecb24-22e (running)",
+      "kind": "in build",
       "quick": false,
       "raised": "2026-09-16",
-      "ask": "Ruled 2026-09-04 (IMPLICIT-PROPS-DESIGN §11.7), sequenced after discharge, which has landed — nothing blocks it. Brief: /Users/Shared/claude-collab-legalese-gm/inbox/2026-09-16T0130Z-BRIEF-r5-field-opening.md. Fields of a record-typed GIVEN (function or section) in bare scope inside the body; rank as ruled; collision error naming both records at two sites; elaborates to Proj (App r []) field; computed-field opening already exists and is the mechanism to extend, not duplicate. Phase 0 measures the overlap with #386's 28 held-back names. Claim it in the outbox before starting.",
+      "ask": "Ruled 2026-09-04 (IMPLICIT-PROPS-DESIGN §11.7), sequenced after discharge, which has landed — nothing blocks it. Brief: /Users/Shared/claude-collab-legalese-gm/inbox/2026-09-16T0130Z-BRIEF-r5-field-opening.md. Fields of a record-typed GIVEN (function or section) in bare scope inside the body; rank as ruled; collision error naming both records at two sites; elaborates to Proj (App r []) field; computed-field opening already exists and is the mechanism to extend, not duplicate. Phase 0 measures the overlap with #386's 28 held-back names. LAUNCHED 2026-09-16 ~01:00Z by GM as a workflow on Meng's instruction: measure ×3 → refute ×2 → build → skeptics ×2 → fix → gate (≤3 rounds). Worktree ~/src/legalese/l4wt/r5-opening, branch lang/r5-field-opening, base 0b640727.",
       "unblocks": "rule bodies reading `bankrupt` instead of p's `bankrupt` — the reading Meng wanted on 2026-09-13",
       "source": {
         "file": "specs/todo/IMPLICIT-PROPS-DESIGN.md",
