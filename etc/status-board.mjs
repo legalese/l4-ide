@@ -39,13 +39,21 @@ import { execSync } from "node:child_process";
 import { readdirSync, statSync, readFileSync, existsSync } from "node:fs";
 import { join, extname } from "node:path";
 
+// maxBuffer: execSync's default is 1 MiB, and a recursive tree listing of a
+// canon branch with 5,000+ entries is bigger than that. The throw was being
+// swallowed below and rendered as "0 files" on two of five branches -- a
+// tool error dressed as a confident zero, the same failure class as the R1
+// verify. 64 MiB; and a caught failure is reported, not silently emptied.
 const sh = (c) => {
   try {
     return execSync(c, {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
+      maxBuffer: 64 * 1024 * 1024,
     }).trim();
-  } catch {
+  } catch (e) {
+    if (process.env.BOARD_DEBUG)
+      console.error("sh failed:", c.slice(0, 80), e?.message?.slice(0, 120));
     return "";
   }
 };
@@ -210,6 +218,8 @@ const canonBranches = (
   const blobs = (tree?.tree ?? []).filter((x) => x.type === "blob");
   return {
     name: b.name,
+    unread: !tree,
+    truncated: !!tree?.truncated,
     sha: b.commit.sha.slice(0, 8),
     files: blobs.length,
     l4: blobs.filter((x) => x.path.endsWith(".l4")).length,
@@ -360,7 +370,7 @@ ${d.canonBranches
   .sort((a, b) => b.l4 - a.l4)
   .map(
     (b) =>
-      `<tr><td>${esc(b.name)}${b.name === d.canonMeta?.default_branch ? ' <span class="pill ok">default</span>' : ""}</td><td>${esc(b.sha)}</td><td class="n">${b.l4}</td><td class="n">${b.md}</td><td class="n">${b.files}</td><td class="n">${b.mb}</td></tr>`,
+      `<tr><td>${esc(b.name)}${b.name === d.canonMeta?.default_branch ? ' <span class="pill ok">default</span>' : ""}${b.unread ? ' <span class="pill bad">tree not read</span>' : b.truncated ? ' <span class="pill warn">truncated</span>' : ""}</td><td>${esc(b.sha)}</td><td class="n">${b.unread ? "—" : b.l4}</td><td class="n">${b.md}</td><td class="n">${b.files}</td><td class="n">${b.mb}</td></tr>`,
   )
   .join("")}
 </table></div>

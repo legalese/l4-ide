@@ -44,18 +44,18 @@
     {
       "id": "#392",
       "owner": "Meng",
-      "kind": "in the queue",
+      "kind": "merged; issue close pending",
       "quick": true,
       "raised": "2026-09-15",
-      "ask": "PR #392 (smucclaw#960 fix) narrows the accepted language: a WITH supply checked against one section binder and delivered to another same-spelled binder of a different type is now refused. Rebased to 95dcd92d (0 behind); full verify-branch.sh gate PASS on all eight stages; sweep of all 1051 tracked .l4 with the branch binary fires the new diagnostic on its fixture only. Meng said \"enqueue 392\" 2026-09-15 10:40Z; auto-merge is armed. After merge, smucclaw/l4-ide#960 is closed by hand — merge-manager was asked (Meng's instruction), with GM's watch as fallback.",
-      "unblocks": "closing smucclaw/l4-ide#960 by hand (CLAUDE.md §1.1)",
+      "ask": "PR #392 (smucclaw#960 fix) narrows the accepted language: a WITH supply checked against one section binder and delivered to another same-spelled binder of a different type is now refused. Rebased to 95dcd92d (0 behind); full verify-branch.sh gate PASS on all eight stages; sweep of all 1051 tracked .l4 with the branch binary fires the new diagnostic on its fixture only. MERGED 2026-09-15 11:15Z as 388f8605. smucclaw/l4-ide#960 still OPEN — merge-manager was asked to close it (Meng's instruction) but is offline with the message queued; GM awaits Meng's word to do it instead.",
+      "unblocks": "the tracker agreeing with the code (CLAUDE.md §1.1)",
       "source": {
         "file": "doc/reference/functions/WITH.md",
         "anchor": "**Two same-spelled section inputs at _different_ types is an error too**",
         "ref": "origin/fix/with-supply-two-binders"
       },
       "verify": {
-        "cmd": "gh pr view 392 --repo legalese/l4-ide --json state --jq .state",
+        "cmd": "gh issue view 960 --repo smucclaw/l4-ide --json state --jq .state",
         "pendingWhen": "^OPEN$"
       }
     },
@@ -121,7 +121,7 @@
       "kind": "triage",
       "quick": true,
       "raised": "2026-09-15",
-      "ask": "Rebase pass 2026-09-15 (Meng's suggestion), pre-rebase SHAs kept as local tags pre-rebase/*. PUSHED clean: lang/whose-opening (30), sg-family-gia (7), sg-child-support (7), docs/prerelease-status-correction (1), ci/unstable-prerelease-main (1). COLLAPSED TO ZERO on rebase — pure merge-commit residue, nothing to push, DELETE on Meng's word: mengwong/r4-readsets, r2-vocab, r9-milestone, go-cost-accounting, backend-portfolio. SUPERSEDED, delete candidate: mengwong/corpus-style (175096b8, the doubled-copula fix #386 did repo-wide). CONFLICTS, held: applies-corpus-survey (GM takes it with A1–A5 — unstable gained its own §11 from #318, so the branch's §11 must be renumbered), ci/skills-layout (GM's; waits on Thomas's Q1), ladder-false-vs-unknown (Aug 2, +1, goldens conflict; #191 merged from a different branch — needs a look before deleting). FINDING: sg-child-support's seven commits — a whole subject encoding plus its go registration and a prettyLayout fix — were merged by #303 into the stacked branch sg-family-gia and never reached unstable; none is on unstable by patch-id. PR it (or route to canon) and delete the twin — Meng's call which. SKIPPED on purpose: backup/refuse-pre-drop (a backup), webchat-mobile-ui and `origin` (Thomas's), claude/computational-law-intro-k2n1zu (a live cloud session's), claude/unstable-branch-reorganization-6cle91 (release-train tooling, deferred).",
+      "ask": "Rebase pass 2026-09-15 (Meng's suggestion), pre-rebase SHAs kept as local tags pre-rebase/*. PUSHED clean: lang/whose-opening (30), sg-family-gia (7), sg-child-support (7), docs/prerelease-status-correction (1), ci/unstable-prerelease-main (1). COLLAPSED TO ZERO on rebase — pure merge-commit residue, nothing to push, DELETE on Meng's word: mengwong/r4-readsets, r2-vocab, r9-milestone, go-cost-accounting, backend-portfolio. SUPERSEDED, delete candidate: mengwong/corpus-style (175096b8, the doubled-copula fix #386 did repo-wide). CONFLICTS, held: applies-corpus-survey (GM takes it with A1–A5 — unstable gained its own §11 from #318, so the branch's §11 must be renumbered), ci/skills-layout (GM's; waits on Thomas's Q1), ladder-false-vs-unknown (Aug 2, +1, goldens conflict; #191 merged from a different branch — needs a look before deleting). CORRECTED: sg-child-support is NOT stranded — the subject has lived in canon at subjects/sg/child-support/encodings/legalese since 2026-08-26 (session ndr2026); 42 of 42 encoding files byte-identical, canon a strict superset. Both l4-ide twins (mengwong/sg-child-support, mengwong/sg-family-gia) are stale copies — delete on Meng's word. The only thing not in canon is etc/go/subjects/sg-child-support/, the go-pipeline registration, and it points at jl4/examples/legal paths that do not exist on unstable — every registered subject (chubb, regcf, sg-succession) points at l4-ide paths, so 'how does go address a canon-hosted subject' is a pipeline design question, not a copy. SKIPPED on purpose: backup/refuse-pre-drop (a backup), webchat-mobile-ui and `origin` (Thomas's), claude/computational-law-intro-k2n1zu (a live cloud session's), claude/unstable-branch-reorganization-6cle91 (release-train tooling, deferred).",
       "unblocks": "a 'committed, not PR'd' pane short enough to read",
       "source": {
         "file": "etc/status-board.mjs",
