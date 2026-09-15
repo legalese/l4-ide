@@ -92,6 +92,23 @@ The recurring case for BPMN is the unitless deadline: L4 permits a `WITHIN` with
 timers require one. `--deadline-unit days` assumes days and records a note saying it did; `refuse`
 emits no timer and records that instead. Neither silently invents a unit.
 
+A rule written for a group — [`EVERY`](../reference/regulative/EVERY.md) — becomes **one task
+marked multi-instance** (the three parallel bars, in most modelers), not one task per member: who
+is in the group is only known when the rule runs, so the file says "many, in parallel" and
+declines to say how many. Three notes go with it, and the last two are the ones to read:
+
+- `P-CAST` (advisory): the activity carries no cardinality and no collection. An engine cannot run
+  it until you supply one; the note names the list the L4 draws the group from.
+- `P-FORK` (lossy): the rule's join line is `UPON EACH`, so what follows fires **once per member**
+  in L4 — and once, after all of them, in the diagram. BPMN can only say once-per-member with a
+  subprocess this export does not draw. A rule whose join line is `ONCE ALL HAVE` gets no such
+  note, because "once, after all of them" is exactly what it means.
+- `P-JOIN-DEADLINE` (lossy): the join line had a `WITHIN` of its own beside the act's, and only the
+  act's is drawn as a timer.
+
+Until 2026-09-15 the export could not tell the two join lines apart at all, and said nothing
+about it. If you have a `.bpmn` of a quantified rule from before that date, re-export it.
+
 ## When a decision can refuse
 
 [`REFUSE`](../reference/control-flow/REFUSE.md) is how an L4 rule says **"the model does not cover

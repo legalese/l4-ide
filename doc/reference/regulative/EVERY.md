@@ -2,7 +2,7 @@
 
 Binds an obligation, permission or prohibition to **every member of a group at once**, instead of to one named party. `EVERY Tenant t MUST sign` reads "every tenant, call them t, must sign": one obligation per tenant, all live at the same time, and one place to say what happens when they have acted.
 
-**Status (2026-09-08): `EVERY` runs, and the group is written with `IN`.** A rule written with `EVERY` is parsed, its names and types are checked, it is printed back, it appears in the state graph, and — new on this date — it can be **run** against a stream of events with `#TRACE`, exactly as a `PARTY` rule can. The barrier fires once at the last act, the fork fires once per act, and a failure produces a breach. Also new on this date: `IN` says which group the rule is about — `EVERY Tenant t IN tenants` — replacing an older spelling that had to smuggle the same list into the `WHO` condition. **That older spelling is deprecated** as of the same date: it still runs, nothing already written stops working, and nothing warns you — but `IN` is the one to write, and everything we ship has been moved across. See [The older spelling, now deprecated](#the-older-spelling-now-deprecated-a-roll-read-out-of-the-who-condition) for the two-line rewrite.
+**Status (2026-09-08): `EVERY` runs, and the group is written with `IN`.** A rule written with `EVERY` is parsed, its names and types are checked, it is printed back, it appears in the state graph, and — new on this date — it can be **run** against a stream of events with `#TRACE`, exactly as a `PARTY` rule can. The barrier fires once at the last act, the fork fires once per act, and a failure produces a breach. **Since 2026-09-15 the state graph and the BPMN export can tell the two joins apart** — `l4 state-graph` writes the join line on the edge, and `l4 export --to bpmn` draws a multi-instance task and reports what it cannot draw; see [Seen as a diagram](#seen-as-a-diagram) and [What runs today](#what-runs-today-and-what-does-not). Also new on this date: `IN` says which group the rule is about — `EVERY Tenant t IN tenants` — replacing an older spelling that had to smuggle the same list into the `WHO` condition. **That older spelling is deprecated** as of the same date: it still runs, nothing already written stops working, and nothing warns you — but `IN` is the one to write, and everything we ship has been moved across. See [The older spelling, now deprecated](#the-older-spelling-now-deprecated-a-roll-read-out-of-the-who-condition) for the two-line rewrite.
 
 Two things about running it are worth knowing before you write one, and both have sections of their own below: the group has to be given as a **list**, which is what `IN` is for — `EVERY Tenant t IN tenants` ([Where the group comes from](#where-the-group-comes-from-the-roll)) — and a few parts of the design are still not built
 ([What runs today, and what does not](#what-runs-today-and-what-does-not)). The design, its rulings and the parts still open are in `specs/todo/EVERY-EACH-QUANTIFIER-SPEC.md`.
@@ -265,6 +265,24 @@ GIVETH A DEONTIC Actor Action
 
 The inner obligation is in parentheses, as every nested obligation is: it has no closing token, so its own optional `HENCE`/`LEST` would otherwise swallow the outer `LEST`. This is the same rule as for a `PARTY` rule nested in a `HENCE` (see [HENCE](README.md#hence-fulfillment-consequence)).
 
+### Seen as a diagram
+
+Two kinds of picture, and they answer different questions. The first two are **what the compiler draws**: `l4 state-graph every-run-example.l4`, rendered with Graphviz, one per rule. A state graph is the rule's shape — its states, and the obligation on each edge — and since 2026-09-15 the join line is written on the edge under the obligation, so the two rules are no longer the same picture. What a state graph does **not** show is the cast: the `EVERY` is one edge, because who is in the group is only known when the rule runs.
+
+![State graph of `the tenancy`: one EVERY edge captioned ONCE ALL HAVE, then the landlord's delivery — compiler output](figures/every-barrier.svg)
+
+![State graph of `receipts`: one EVERY edge captioned UPON EACH, then the landlord's receipt — compiler output](figures/every-fork.svg)
+
+The second two are **what a run does**, and they are drawn by hand from the first `#TRACE` of each rule in [every-run-example.l4](every-run-example.l4) — the compiler does not emit this picture yet (the token-game view is designed, not built: `specs/todo/lexipedia-superset/LTS-VISUALISER.md`). Read them against the trace output, which is the thing that was measured.
+
+![Run of the barrier: three signatures on days 1, 2 and 9; ONCE ALL HAVE fires once on day 9; one delivery follows, due day 14, done day 13 — hand-drawn from the trace](figures/every-barrier-run.svg)
+
+Under the barrier the landlord's five days run from **day 9**, the last signature, and from nothing earlier; the second trace in the example file, where the delivery lands on day 15, breaches for exactly that reason.
+
+![Run of the fork: three payments on days 1, 3 and 5; UPON EACH fires three times; three receipts follow, each with its own five days — hand-drawn from the trace](figures/every-fork-run.svg)
+
+Under the fork there is no single moment: each payment starts its own five days, and a receipt to Alice on day 2 discharges Alice's branch while Bob's is still waiting. The `.dot` sources sit beside the `.svg`s in `figures/` — [every-barrier.dot](figures/every-barrier.dot) is the emitted one for the barrier; regenerate the first two with `l4 state-graph` and `dot -Tsvg` after any change to the example.
+
 **There is no default.** An `EVERY` with a `HENCE` or a `LEST` and no join line is a type error, and the message names both spellings. The two readings differ, and picking one silently would change a rule's meaning; in particular, a barrier default would reverse what a single party's `MAY … HENCE` means today. An `EVERY` with no `HENCE` and no `LEST` needs no join line: it is one obligation per member and nothing waiting at the end, and the barrier and the fork are then the same thing.
 
 A join line under a `PARTY` rule is a type error: one party is not a group. `EACH` on its own is not a keyword, so a program may still use it as a name — including as the quantifier's own variable, which type-checks and is very confusing to read. `UPON` **is** a reserved word everywhere, not only here; the join line is simply the only place the language uses it today. `UPON <event>` as a rule head is a separate, unbuilt design.
@@ -367,7 +385,7 @@ Verified 2026-09-08 against the compiler at the head of this branch.
 - Type checking: the variable has the party type; the cast must be a constructor of that type; the condition must be a `BOOLEAN`; both deadlines must be `NUMBER`s; a `HENCE` or `LEST` under `EVERY` without a join line is rejected, naming the two spellings; a join line under `PARTY` is rejected; an action that rebinds the variable is rejected.
 - Printing: `l4 format` reproduces the source; the layout printer used by `l4 batch` re-emits a parseable, re-checkable rule.
 - **Running**, as described above: the roll call, the barrier, the fork, the plain distributive form with no join line, all four modals, the deadline on the act and the deadline on the join line, and nesting one quantified rule inside another's `HENCE`.
-- The state graph and the BPMN lowered from it show the quantified obligation as **one** element labelled with the quantifier — a single transition in the state graph, a single task in the BPMN. They do not draw one element per member, and they do not draw the join line.
+- The state graph shows the quantified obligation as **one** transition labelled with the quantifier, with the join line written under it (`ONCE ALL HAVE`, `UPON EACH`, and the join line's own `WITHIN` if any). The BPMN lowered from it draws **one task marked multi-instance**, with three notes of its own: `P-CAST` (the cardinality is a run-time fact; the note names the roll an engine would need), `P-FORK` (a fork's once-per-member continuation is drawn once, after all of them), and `P-JOIN-DEADLINE` (the join line's own `WITHIN` beside the act's is not drawn). Neither draws one element per member. See [DMN and BPMN](../../exports/dmn-bpmn.md). _(Before 2026-09-15 the join line reached neither; the bullet under "Runs, but not yet as the design says" records what that looked like.)_
 
 **Does not run, and says so:**
 
@@ -389,15 +407,14 @@ Verified 2026-09-08 against the compiler at the head of this branch.
 - **Nothing checks that the action names the member.** `MUST Sign (EXACTLY t)` ties the act to the member; `MUST Sign someoneElse` does not, and is accepted. What the run does check is that the **event's** party is the member. Write `EXACTLY t`.
 - **The count and measure joins are not built at all** — `ONCE SOME 2 OF … HAVE`, `ONCE sum OF amount AT LEAST rent`. Only `ONCE ALL HAVE` and `UPON EACH` parse.
 - The WASM export refuses a rule containing `EVERY` rather than compile it wrongly.
-- **The BPMN export draws a barrier and a fork identically, and its fidelity report does not say so.**
-  Measured 2026-09-07: the same rule with `ONCE ALL HAVE` and with `UPON EACH` produces
-  **byte-identical** BPMN, and a **byte-identical** fidelity report — which lists the deontic
-  modality, the bearer-versus-performer gap and the missing deadline units, and never mentions the
-  join at all. The quantifier goes the same way: the whole family draws as one task, and the only
-  trace of `EVERY` in the output is the lane's label. A fidelity report exists to say what the
-  notation could not carry, so this is the one export gap you cannot discover from the export.
-  Until it is fixed, do not read a BPMN diagram of a quantified rule as evidence of which join it
-  has; read the `.l4`.
+- **FIXED 2026-09-15 — the BPMN export used to draw a barrier and a fork identically, and its fidelity report did not say so.**
+  Measured 2026-09-07: the same rule with `ONCE ALL HAVE` and with `UPON EACH` produced
+  **byte-identical** BPMN and a **byte-identical** fidelity report, which never mentioned the join;
+  the only trace of `EVERY` in the output was the lane's label. The cause was in the state graph,
+  not the exporter: the extractor never read the join line, so nothing downstream could. It now
+  does, and the two rules export differently — a multi-instance task, with `P-FORK` on the fork
+  alone — with `jl4/examples/bpmn/tenancy.l4` and its two goldens as the witness. A `.bpmn` of a
+  quantified rule exported before that date carries no join; re-export it.
 
 **Sharp edges, all measured 2026-09-07.** Each of these is a case where the compiler does something defensible but says it badly, or accepts something it arguably should not. They are listed so you recognise them rather than debug them.
 
