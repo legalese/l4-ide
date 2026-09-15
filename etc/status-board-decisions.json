@@ -42,24 +42,6 @@
       "bench": "https://claude.ai/artifact/UTykRduqWbvkR7tqaK7X69 — collection applies-rulings, docs A1…A5; GM reads marks back with read_db"
     },
     {
-      "id": "#392",
-      "owner": "Meng",
-      "kind": "merged; issue close pending",
-      "quick": true,
-      "raised": "2026-09-15",
-      "ask": "PR #392 (smucclaw#960 fix) narrows the accepted language: a WITH supply checked against one section binder and delivered to another same-spelled binder of a different type is now refused. Rebased to 95dcd92d (0 behind); full verify-branch.sh gate PASS on all eight stages; sweep of all 1051 tracked .l4 with the branch binary fires the new diagnostic on its fixture only. MERGED 2026-09-15 11:15Z as 388f8605. smucclaw/l4-ide#960 still OPEN — merge-manager was asked to close it (Meng's instruction) but is offline with the message queued; GM awaits Meng's word to do it instead.",
-      "unblocks": "the tracker agreeing with the code (CLAUDE.md §1.1)",
-      "source": {
-        "file": "doc/reference/functions/WITH.md",
-        "anchor": "**Two same-spelled section inputs at _different_ types is an error too**",
-        "ref": "origin/fix/with-supply-two-binders"
-      },
-      "verify": {
-        "cmd": "gh issue view 960 --repo smucclaw/l4-ide --json state --jq .state",
-        "pendingWhen": "^OPEN$"
-      }
-    },
-    {
       "id": "WHOSE",
       "owner": "Meng",
       "kind": "go / no-go",
