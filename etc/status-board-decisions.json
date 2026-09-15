@@ -10,11 +10,11 @@
   "decisions": [
     {
       "id": "R1",
-      "owner": "Meng",
+      "owner": "Thomas (serrynaimo) or wabisabiyo",
       "kind": "admin action",
       "quick": true,
       "raised": "2026-09-13",
-      "ask": "Add `Corpus Goldens Present` and `Repo-Wide Invariants` to ruleset 18543507's required status checks. Ruleset-only; needs repo-admin, which only Meng has. Marked ACCEPT on the housekeeping bench 2026-09-13 — the action itself has not happened.",
+      "ask": "Add `Corpus Goldens Present` and `Repo-Wide Invariants` to ruleset 18543507's required status checks (Settings → Rules → Rulesets → \"Merge queue for unstable\" → Require status checks). Marked ACCEPT by Meng on the housekeeping bench 2026-09-13; both check names are exactly as GitHub reports them on every PR. Verified 2026-09-15: `mengwong` is an org MEMBER (permissions: push, not admin) — a PUT to the ruleset via `gh api` returned 404 — and the only admins on legalese/l4-ide are the two org owners, serrynaimo and wabisabiyo. So the click is Thomas's, not Meng's; Meng said \"do it\" on 2026-09-15 and the ask is now relayed.",
       "unblocks": "R2 (drop the TypeScript job's duplicate format:check) — the xpile-docassemble session is idle on it",
       "source": {
         "file": ".github/workflows/pr-checks.yml",
@@ -38,7 +38,8 @@
         "anchor": "**A1. Does the derived `applies` include conjunct 1 (`inForce`)?**",
         "ref": "origin/mengwong/applies-corpus-survey"
       },
-      "next": "GM rebases the branch (3 docs commits, 594 behind), records the marks in §11.3, PRs it."
+      "next": "GM rebases the branch (3 docs commits, 594 behind), records the marks in §11.3, PRs it.",
+      "bench": "https://claude.ai/artifact/UTykRduqWbvkR7tqaK7X69 — collection applies-rulings, docs A1…A5; GM reads marks back with read_db"
     },
     {
       "id": "#392",

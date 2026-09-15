@@ -266,6 +266,7 @@ function render(d) {
     `<div class="dec${e.resolved ? " done" : ""}${e.deferred ? " parked" : ""}">
 <div class="dec-h"><span class="dec-id">${esc(e.id)}</span><span class="dec-kind">${esc(e.kind)}</span><span class="dec-owner">${esc(e.owner)}</span>${e.quick && !e.resolved && !e.deferred ? '<span class="pill ok">minutes</span>' : ""}${e.resolved ? '<span class="pill ok">resolved — delete this entry</span>' : ""}${e.deferred ? `<span class="pill warn">deferred ${esc(e.deferred)}</span>` : ""}${e.anchored ? "" : '<span class="pill bad">STALE — anchor not found</span>'}${e.unverified ? '<span class="pill warn">verify cmd failed</span>' : ""}<span class="dec-raised">raised ${esc(e.raised)}</span></div>
 <div class="dec-ask">${esc(e.ask)}</div>
+${e.bench ? `<div class="dec-meta"><b>bench:</b> ${esc(e.bench)}</div>` : ""}
 ${e.next ? `<div class="dec-meta"><b>then:</b> ${esc(e.next)}</div>` : ""}
 <div class="dec-meta"><b>unblocks:</b> ${esc(e.unblocks)} · <b>owned by:</b> <span style="font-family:var(--mono)">${esc(e.source?.file)}${e.source?.ref ? ` @ ${esc(e.source.ref)}` : ""}</span></div>
 </div>`;
