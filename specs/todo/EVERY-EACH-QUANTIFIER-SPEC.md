@@ -2330,8 +2330,8 @@ Built on `every/lest-anchor`, cut from `every/anchors-on-blame` at `6a8295bf` (n
 `jl4/examples/ok/every/run-lest.l4` (33 directives, nine sections: the spec's own probe with its
 anchored twin, silence, the barrier unanchored beside `run-stack.l4`'s anchored form, the fork,
 `SHANT`, the state layer, `MAY` and `DO`, a chain, a `LEST` that names itself). Line numbers below
-are on the build commit of this section, as its subject line names; they are NOT re-cited by later
-commits, which say so in their own ledger entries.
+are on `546965be`, the build commit of this section (subject `lang: a LEST counts from the failure
+time …`); they are NOT re-cited by later commits, which say so in their own ledger entries.
 
 **The mechanism: one place, one reference.** `Contract5`'s expiry branch already computed the
 absolute deadline (`Machine.hs:1608`) and allocated it as `deadlineR` for `THE DEADLINE` (`:1691`).
