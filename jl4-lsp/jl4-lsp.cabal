@@ -161,13 +161,16 @@ test-suite jl4-lsp-test
     HoverDisplaySpec
     LibraryResolutionSpec
     OutOfScopeGivenFixSpec
+    StateGraphLensSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:
+    aeson,
     directory,
     filepath,
     hspec,
     jl4-core,
     jl4-lsp,
     lsp-types,
+    mtl,
     text

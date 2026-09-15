@@ -17,6 +17,10 @@ import qualified Text.Fuzzy as Fuzzy
 
 import L4.Annotation
 import L4.FindDefinition
+import qualified L4.StateGraph.Lens as SGLens
+import LSP.L4.SemanticTokens (srcPosToPosition)
+import Data.Either (isRight)
+import GHC.Generics (Generically (..))
 import L4.Lexer (annotations, directives, keywords)
 import L4.Parser.SrcSpan
 import L4.Print
@@ -163,6 +167,79 @@ evalApp evalConfig entityInfo contextModule evalParams recentViz =
 
     toUBoolValue :: Bool -> Ladder.UBoolValue
     toUBoolValue b = if b then Ladder.TrueV else Ladder.FalseV
+
+-- ----------------------------------------------------------------------------
+-- Code lenses above DECIDEs
+-- ----------------------------------------------------------------------------
+
+-- | The ladder's lens: "Show decision graph" above every top-level @DECIDE@
+-- the visualiser can draw. The gate is speculative — each candidate is
+-- actually visualised and kept only if that succeeds — because there are
+-- many @DECIDE@/@MEANS@ shapes the visualiser does not handle yet, and a lens
+-- that fails when clicked is worse than none. If this is ever too slow the
+-- fix is to cache, or better, to make the visualiser accept more.
+decisionGraphCodeLenses :: VersionedTextDocumentIdentifier -> TypeCheckResult -> [CodeLens]
+decisionGraphCodeLenses verTextDocId typeCheck =
+  foldTopLevelDecides decideToCodeLens typeCheck.module'
+  where
+    mkDecisionGraphCodeLens srcPos = CodeLens
+      { _command = Just Command
+        { _title = "Show decision graph"
+        , _command = "l4.visualize"
+        , _arguments = Just [Aeson.toJSON verTextDocId, Aeson.toJSON (Generically srcPos), Aeson.toJSON False]
+        }
+      , _range = pointRange $ srcPosToPosition srcPos
+      , _data_ = Nothing
+      }
+
+    -- Without simplification — simplification is a toggle inside the panel.
+    canVisualize decide =
+      let cfg = Ladder.mkVizConfig verTextDocId typeCheck.module' typeCheck.substitution False
+      in isRight (Ladder.doVisualize decide cfg)
+
+    decideToCodeLens decide =
+      case rangeOfNode decide of
+        Just node
+          | canVisualize decide -> [mkDecisionGraphCodeLens node.start]
+        _ -> []
+
+-- | The state graph's lens: "Show state graph" above every top-level
+-- @DECIDE@ whose body is regulative, i.e. for which 'L4.StateGraph' extracts
+-- a graph. Same anchor and same argument shape as the ladder's lens (minus
+-- the simplify flag), so a host that already routes @l4.visualize@ can route
+-- @l4.stateGraph@ the same way. The two lenses never share a line: the
+-- ladder refuses a non-@BOOLEAN@ body, and a regulative body is @DEONTIC@
+-- (R13, LTS-VISUALISER.md §8).
+stateGraphCodeLenses :: VersionedTextDocumentIdentifier -> TypeCheckResult -> [CodeLens]
+stateGraphCodeLenses verTextDocId typeCheck =
+  map toLens (SGLens.stateGraphTargets typeCheck.module')
+  where
+    toLens t = CodeLens
+      { _command = Just Command
+        { _title = "Show state graph"
+        , _command = "l4.stateGraph"
+        , _arguments = Just [Aeson.toJSON verTextDocId, Aeson.toJSON (Generically t.targetStart)]
+        }
+      , _range = pointRange $ srcPosToPosition t.targetStart
+      , _data_ = Nothing
+      }
+
+-- | Serve a click on the state-graph lens: the DOT for the @DECIDE@ starting
+-- at the given position, as @{ "name": …, "dot": … }@.
+stateGraphAtPos
+  :: Monad m
+  => Maybe TypeCheckResult
+  -> VersionedTextDocumentIdentifier
+  -> SrcPos
+  -> ExceptT (TResponseError method) m (Aeson.Value |? Null)
+stateGraphAtPos mtcRes verTextDocId srcPos = do
+  tcRes <- case mtcRes of
+    Nothing -> defaultResponseError $ "Could not check " <> Text.pack (show verTextDocId._uri.getUri) <> "."
+    Just tcRes -> pure tcRes
+  case SGLens.stateGraphAtPos tcRes.module' srcPos of
+    Just target -> pure $ InL $ SGLens.stateGraphResponse target.targetGraph
+    Nothing -> defaultResponseError
+      "No regulative rule starts at that position (the program may have changed between pressing the code lens and rendering it)"
 
 -- ----------------------------------------------------------------------------
 -- Ladder visualisation

@@ -275,6 +275,10 @@
         "title": "Show decision graph"
       },
       {
+        "command": "l4.stateGraph",
+        "title": "Show state graph"
+      },
+      {
         "command": "l4.renderResult",
         "title": "Track result"
       },

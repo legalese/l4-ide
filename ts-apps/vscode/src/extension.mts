@@ -33,7 +33,8 @@ import {
   type DirectiveResult,
   type SrcPos,
 } from 'jl4-client-rpc'
-import { cmdRenderResult } from './commands.js'
+import { cmdRenderResult, cmdStateGraph } from './commands.js'
+import { StateGraphPanel } from './state-graph-panel.js'
 import {
   SidebarProvider,
   SIDEBAR_WEBVIEW_TYPE,
@@ -256,6 +257,8 @@ export async function activate(context: ExtensionContext) {
 
   // Initialize panelManager and webviewMessenger (for ladder visualization)
   const panelManager = new PanelManager(PANEL_CONFIG)
+  // The pane the "Show state graph" lens opens (DOT source; see state-graph-panel.ts)
+  const stateGraphPanel = new StateGraphPanel(outputChannel)
   const webviewMessenger = initializeWebviewMessenger(
     outputChannel,
     panelManager
@@ -318,6 +321,26 @@ export async function activate(context: ExtensionContext) {
           if (responseFromLangServer === null) {
             outputChannel.appendLine(
               'language server returned null, doing nothing'
+            )
+            return
+          }
+
+          // "Show state graph": the server answered { name, dot }. It is not
+          // a ladder payload, so it must not reach the decoder below.
+          if (command === cmdStateGraph) {
+            const { name, dot } = responseFromLangServer as {
+              name?: string
+              dot?: string
+            }
+            if (typeof dot === 'string') {
+              stateGraphPanel.show(name ?? '', dot)
+            } else {
+              outputChannel.appendLine(
+                `l4.stateGraph returned no dot: ${JSON.stringify(responseFromLangServer)}`
+              )
+            }
+            outputChannel.appendLine(
+              '--------------------------------------------------</executeCommand>'
             )
             return
           }

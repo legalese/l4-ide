@@ -478,6 +478,7 @@ saleContract MEANS
 - **[SHANT](SHANT.md)** - Prohibitions (also written MUST NOT)
 - **[DEONTIC](DEONTIC.md)** - The regulative rule type
 - **[EVENT](EVENT.md)** - The event type consumed by traces
+- **[State graph](STATE-GRAPH.md)** - The map of a rule's `HENCE`/`LEST` paths: **Show state graph** in the editor, `l4 state-graph` on the command line, and what the map does not say
 
 ## See Also
 

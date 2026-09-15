@@ -150,6 +150,7 @@ library
     L4.EvaluateLazy.GraphVizOptions
     L4.EvaluateLazy.Trace
     L4.StateGraph
+    L4.StateGraph.Lens
     L4.ExactPrint
     L4.Discharge
     L4.Export
@@ -253,9 +254,11 @@ test-suite jl4-core-test
     BlawxImportImageSpec
     BlawxLiftSpec
     BlawxParseSpec
+    ApiStateGraphLensSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:
+    aeson,
     base,
     bytestring,
     containers,
@@ -263,4 +266,5 @@ test-suite jl4-core-test
     hspec,
     jl4-core,
     text,
-    time
+    time,
+    vector
