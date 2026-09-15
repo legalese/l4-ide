@@ -94,7 +94,7 @@ A section is printed only when it has something in it (**Owed now** is the excep
 | **What could not be tried**           | a shape the list can name but cannot run — see [Limits](#limits)                                                                                                                                                                                                                                                                                                                       |
 | **Next deadline**                     | the soonest due date among everything owed, and whose it is; any obligation whose deadline could not be confirmed is named on the same line                                                                                                                                                                                                                                            |
 
-The things the list tries are exactly the obligations' own acts (each one, done now by the party who owes it) and, for each distinct deadline, the clock running just past it with nothing happening. That is what "what could happen" means here; it is not every conceivable event.
+The things the list tries are exactly the obligations' own acts (each one, done now by the party who owes it) and, for each distinct deadline, the clock running just past it with nothing happening — one unit past, or half-way to the next deadline when that is nearer, which is why a line can read `the clock reaches 7.5`. That is what "what could happen" means here; it is not every conceivable event.
 
 ## Groups: the barrier and the fork
 

@@ -37,16 +37,16 @@ P2e should not be built**, and that is a good outcome, cheaply obtained.
 
 ### 0.1 Rulings
 
-| #      | Ruling                                                                                                                                                                                                                                                                                                                                       |
-| ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Q1** | **REVISED.** P2 answers **position**. Reachability it can only over-approximate (G9); dominance it can answer without a new picture (P2f). A P2 that only draws a prettier static graph still should not be built. §1                                                                                                                        |
-| **Q2** | The formalism is a **two-plane marked transition system** — an action plane and a norm plane — with the drawing vocabulary borrowed from Petri markings, Symboleo lifecycles and Meyer's violation atom. §2                                                                                                                                  |
-| **Q3** | **SCOPED.** The evaluator is the semantics **for the marking and the step log**. Anything counterfactual — the enabled set, the discharging/breaching partition — must be computed **by running the evaluator**, not by walking a residual. §2.4                                                                                             |
-| **Q4** | The animated data is a new **deontic step log**, modelled on `traceEval`. It does not exist today; it is ~6 call sites in `Machine.hs`. The type is now defined, in §4.3. **BUILT 2026-09-15** (`lts/p2b-step-log`, merged into `lts/p2-stack` 2026-09-15, not yet in `unstable`): seventeen call sites, not six — see the §4.3 BUILT block. |
-| **Q5** | **The bare Petri net is not better than BPMN at F1.** What closes F1 is reifying the norm as a marked place, which a net permits and BPMN has no vocabulary for. That is encodability, not expressiveness. §2.1                                                                                                                              |
-| **Q6** | P1 emits a **file**; P2 renders a **view**. Two pictures, one stated division of labour. §5.1                                                                                                                                                                                                                                                |
-| **Q7** | **REVISED.** The smallest useful first deliverable is **P2a′ — render the projections as a plain list and see whether anyone still wants a picture.** It is cheaper than the BPMN-simulator baseline, and it tests the question P2 actually leads with. §7                                                                                   |
-| **Q8** | **NEW.** `StateGraph` as shipped **cannot** be P2's layout scaffold. It carries no key a runtime obligation can be correlated to, and it does not close loops. Both are P2 preconditions, and both are now cheaper than they were. §3.4                                                                                                      |
+| #      | Ruling                                                                                                                                                                                                                                                                                                                                                                        |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Q1** | **REVISED.** P2 answers **position**. Reachability it can only over-approximate (G9); dominance it can answer without a new picture (P2f). A P2 that only draws a prettier static graph still should not be built. §1                                                                                                                                                         |
+| **Q2** | The formalism is a **two-plane marked transition system** — an action plane and a norm plane — with the drawing vocabulary borrowed from Petri markings, Symboleo lifecycles and Meyer's violation atom. §2                                                                                                                                                                   |
+| **Q3** | **SCOPED.** The evaluator is the semantics **for the marking and the step log**. Anything counterfactual — the enabled set, the discharging/breaching partition — must be computed **by running the evaluator**, not by walking a residual. §2.4                                                                                                                              |
+| **Q4** | The animated data is a new **deontic step log**, modelled on `traceEval`. It does not exist today; it is ~6 call sites in `Machine.hs`. The type is now defined, in §4.3. **BUILT 2026-09-15** (`lts/p2b-step-log`, merged into `lts/p2-stack` 2026-09-15, not yet in `unstable`): seventeen call sites, not six — see the §4.3 BUILT block.                                  |
+| **Q5** | **The bare Petri net is not better than BPMN at F1.** What closes F1 is reifying the norm as a marked place, which a net permits and BPMN has no vocabulary for. That is encodability, not expressiveness. §2.1                                                                                                                                                               |
+| **Q6** | P1 emits a **file**; P2 renders a **view**. Two pictures, one stated division of labour. §5.1                                                                                                                                                                                                                                                                                 |
+| **Q7** | **REVISED.** The smallest useful first deliverable is **P2a′ — render the projections as a plain list and see whether anyone still wants a picture.** It is cheaper than the BPMN-simulator baseline, and it tests the question P2 actually leads with. §7                                                                                                                    |
+| **Q8** | **NEW.** `StateGraph` as shipped **cannot** be P2's layout scaffold. It carries no key a runtime obligation can be correlated to, and it does not close loops. Both are P2 preconditions, and both are now cheaper than they were. §3.4 **B1 and B2 LANDED 2026-09-16** (`lts/b1-b2-loops`): the key is carried (`labelSite`) and the loop closes; B3 (layout) is still open. |
 
 ### 0.2 Disposition of every review finding
 
@@ -303,7 +303,7 @@ longer gates on, or is gated by, the new picture.
 > `PARTY Alice MAY pay WITHIN 5 HENCE (PARTY Bob MUST deliver WITHIN 10)` with a stray event
 > AT 6 evaluates to `FULFILLED`, while `--dominators` lists both `pay` and `deliver` as on every
 > path to `FULFILLED`. So "listed ⇒ necessary" fails below a lapsing `MAY`. The user page
-> (`doc/reference/regulative/state-graph.md`, "What the answer does not know", item 4) says
+> (`doc/reference/regulative/STATE-GRAPH.md`, "What the answer does not know", item 4) says
 > so; fixing the drawing is a separate change and would retire the caveat.
 
 ### 1.1d So what is left of the existence argument
@@ -558,8 +558,8 @@ step log, the marking, the enabled set **and the rank/lane assignment** (§4.7) 
   position's residual, which is data the evaluator already computed (endpoint 18): for every
   obligation in force, the act that is its own `(party, action)` shape, stamped at the position's
   clock — the party as the machine forced it (`reifyNF`) or its expression, the action pattern
-  instantiated (`patternExpr`, `:508`: `PatApp`/`PatLit`/`PatExpr`, with an `EXACTLY e` read
-  through the residual's heap by `reifyExpr`, `:524`, so `Sign (EXACTLY t)` under an `EVERY`
+  instantiated (`patternExpr`, `:523`: `PatApp`/`PatLit`/`PatExpr`, with an `EXACTLY e` read
+  through the residual's heap by `reifyExpr`, `:539`, so `Sign (EXACTLY t)` under an `EVERY`
   names the member); for every distinct live deadline, a tick to just past it (endpoint 24) — a
   `WAIT UNTIL`, the machine's own no-party event, stamped by `tickPast` (`:277`: one unit past, or
   half-way to the next live deadline when nearer, because the machine expires on `stamp >
@@ -572,7 +572,7 @@ deadline` and a tick AT the deadline reveals nothing); and a listed refusal, whe
   first cut paired `liveObligations` with the marking's `InEffect` list by `zip`, on the
   unguarded assumption that two walks agree in order; review 2026-09-15 replaced that with one
   walk.
-- **The tick is held to the machine's word** (`tryCandidate`, `:335`; `confirmTick`, `:408`).
+- **The tick is held to the machine's word** (`tryCandidate`, `:335`; `confirmTick`, `:423`).
   A tick's stamp is derived here from the machine's timing rule (`deadlineOf`: anchor plus
   `WITHIN`; `tickPast`: expiry on `stamp > deadline`), which §2.4 forbids trusting unconfirmed.
   So a `TickPast` outcome must carry an `Expired` or `JoinExpired` step; if it does not, the
@@ -583,13 +583,13 @@ deadline` and a tick AT the deadline reveals nothing); and a listed refusal, whe
   computed, at 11, breaches (`LtsWhatIfSpec.hs`, case 8). Before the guard, the forced tick came
   back `Advancing ["in effect: Alice MUST deliver WITHIN 0"]`, which the same test pins as what
   the bare `whatIf` still says.
-- **The replay** (`replay`, `:489`) rewrites the checked module so that every directive is dropped
+- **The replay** (`replay`, `:504`) rewrites the checked module so that every directive is dropped
   except the `#TRACE` in question, which gets the hypothetical appended, and runs
-  `execEvalModuleWithDeonticLog` on it. The verdict (`classify`, `:438`) reads only the machine's
+  `execEvalModuleWithDeonticLog` on it. The verdict (`classify`, `:453`) reads only the machine's
   own terminals: `ValFulfilled` → `Discharging`, `ValBreached` → `Breaching blame`, anything else
   → `Advancing marking` with the marking from the replay's own steps. An error or a refusal is
   `Untried` with the text. The steps an outcome carries are those past the longest prefix the
-  replay's log shares with the position's (`afterCommonPrefix`, `:435`): a `Waiting` in the
+  replay's log shares with the position's (`afterCommonPrefix`, `:450`): a `Waiting` in the
   position becomes a match in the replay, so a fixed-length drop would be wrong, and was.
 - **Cost per candidate** is one full replay: the module's top-level heap rebuilt, every prior
   event re-scrutinised, then the hypothetical. For a trace of _n_ events and _k_ live obligations
@@ -621,7 +621,7 @@ deadline` and a tick AT the deadline reveals nothing); and a listed refusal, whe
   which is the pass-over case — and an outcome with no reason at all is `NoTaker`, never a
   silent advance.
 - **The partition** is `discharging`/`breaching`/`advancing`/`passedOver`/`untried` over an
-  `EnabledSet` (`enabledSet`, `:455`), i.e. endpoints 19 and 20 are a classification of 22's
+  `EnabledSet` (`enabledSet`, `:470`), i.e. endpoints 19 and 20 are a classification of 22's
   result and not a projection of their own.
 
 **Measured** (`jl4-core/test/LtsWhatIfSpec.hs`, 13 examples): a `MUST` at the start — the act
@@ -638,7 +638,8 @@ continuation and leaves the others at `WITHIN 7`. Corpus goldens: `cabal test jl
 commit message — no `.l4` file and no printer changed, so none moves.
 
 **Not built.** No CLI verb, no service endpoint, no `doc/` page: nothing a user can invoke
-changed, and P2a′ (the list) is the deliverable that will need the page. A `PatCons` action is
+changed, and P2a′ (the list) is the deliverable that will need the page _(P2a′ landed the same
+day — `l4 lts` and `doc/reference/regulative/lts-list.md`, §7.6; no service endpoint still)_. A `PatCons` action is
 not instantiated. A party the machine never forced and whose expression names a local it cannot
 read fails at replay time and surfaces as `Untried` with the evaluator's message — loud, but late.
 `what_if_sequence` (endpoint 23) is `replay` with a longer list and no separate entry.
@@ -755,11 +756,11 @@ side that throws it away. Therefore:
 
 Which gives P2's three preconditions, none of which is a renderer:
 
-| ID     | Precondition                                                                                                                                                 | Cost                                                                   |
-| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------- |
-| **B1** | **Carry the key.** `TransitionLabel` (or `ContractState`) gains the `RAction`'s `SrcRange`. Closes gap 1 for the click-to-source case too.                   | Small. Changes `StateGraph`'s public type and the BPMN goldens.        |
-| **B2** | **Close the loop.** `TargetOther` pointing at a named contract already extracted must reuse that state, not mint `"next"`. Needs a memo keyed by B1's range. | Medium, and it **makes layout harder** — see §4.7.                     |
-| **B3** | **Layout.** §4.7. Undefined in revision 1; still not solved here, but now stated, costed and assigned.                                                       | Medium-large, and the two-plane form is strictly harder than P1's DAG. |
+| ID     | Precondition                                                                                                                                                                                                                                | Cost                                                                                           |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| **B1** | **Carry the key.** `TransitionLabel` (or `ContractState`) gains the `RAction`'s `SrcRange`. Closes gap 1 for the click-to-source case too. **LANDED 2026-09-16**, below.                                                                    | Small. Changes `StateGraph`'s public type; predicted to move the BPMN goldens, and moved none. |
+| **B2** | **Close the loop.** `TargetOther` pointing at a named contract already extracted must reuse that state, not mint `"next"`. Needs a memo — keyed, as built, by the rule's `Unique`, not by B1's range (below). **LANDED 2026-09-16**, below. | Medium, and it **makes layout harder** — see §4.7.                                             |
+| **B3** | **Layout.** §4.7. Undefined in revision 1; still not solved here, but now stated, costed and assigned. **Still not built** as of 2026-09-16 (the in-pane picture is viz.js over the DOT, §4.8, not this).                                   | Medium-large, and the two-plane form is strictly harder than P1's DAG.                         |
 
 **What changed to make B1 tractable.** Revision 1 declined the `StateGraph` type change because
 "P1 is mid-flight". P1 is no longer mid-flight — it shipped at `cfeaea5d` with goldens and a
@@ -948,6 +949,13 @@ so in as many words. §6 G6.
 | next deadline                                  | `STATEFUL` §6.4, endpoint **17**                                                                                                    | **Unbuilt**                                                                          |
 | resumable residual (live mode)                 | `STATEFUL` §3.1                                                                                                                     | **Unbuilt, and flagged a blocker in its own spec**                                   |
 
+_(The status column is revision 2's, 2026-07-27, and is left as the record. As of 2026-09-15 the
+residual after each event and the step that produced it are P2b's log (§4.3), the marking is
+`L4.Lts.Marking` (§4.2a), and the enabled set, the discharging/breaching partition and the next
+deadline are `L4.Lts.WhatIf` and `l4 lts` (§2.4, §7.6) — library functions and a CLI verb, none of
+them an HTTP endpoint. `expected-events` is still nowhere in the tree, and live mode is still
+blocked where it was.)_
+
 Two important negatives, so nobody plans against them:
 
 - **`EvalTrace` is not a deontic trace.** `EvalTraceAction = Enter | Exit | SetRef | Alloc |
@@ -1057,7 +1065,7 @@ False)`; R′ pins the step sequence the reading depends on. Without a context (
   `Awaiting` is still emitted — the member is recognised by the checkpoint sentinel in its
   `HENCE`: its NAME, `joinCheckpointName` (`Machine.hs:2541`, now a named constant and exported),
   AND the absence of a source range, since the machine mints it under `emptyAnno`
-  (`Machine.hs:2522`, `:2550`) and a drafter's own `the join` written as a `HENCE` carries
+  (`Machine.hs:2529-2530`, `:2557-2560`) and a drafter's own `the join` written as a `HENCE` carries
   one (fixture S: no `Awaiting` for the homonym, with or without a context; the first cut matched
   by name alone) — but its `awProgress` is `Nothing`. The rule for a reader: no `Awaiting` means
   no barrier; an `Awaiting` with no progress means the residual was read without its run's log.
@@ -1101,7 +1109,8 @@ and in §4.9; that was a re-staging done in a LANDED block, not a decision, and 
 it should move to P2d, that is an open question for the integrator: proposed 2026-09-15, not
 decided.) `Lapsed` is ours, not Symboleo's — R12, answered below.
 `awProgress` from the residual alone, for the reason above. B1's static half of the key: nothing
-in `L4.StateGraph` was touched.
+in `L4.StateGraph` was touched by P2c _(B1 LANDED 2026-09-16, §3.4 — `labelSite` is that half,
+and `StateGraphSpec` proves it equal to `nkSite`)_.
 
 **ANSWERED 2026-09-16 (R8 half, R12) — the lifecycle provenance, read from the primary text.**
 Two Symboleo sources were read, not searched: the RE 2020 paper (Sharifi, Parvizimosaed, Amyot,
@@ -1327,27 +1336,28 @@ whether the tie-break chose it. Checked by hand: `vt == vt'` now falls through t
 picks the same operand the old `<=` branch did for both operators; the strict cases are
 unchanged. The equality case is pinned by fixture 5; the strict cases rest on the golden suite.
 
-**Call sites, as committed** (fresh line numbers; the July table above is stale):
+**Call sites, as committed** (line numbers re-anchored 2026-09-16 at reconciliation, after
+`lts/p2b-bearer` moved every site below `Contract5`; the July table above is stale):
 
 | Site                                  | `Machine.hs` | Step                                                                                           |
 | ------------------------------------- | ------------ | ---------------------------------------------------------------------------------------------- |
-| `Breach` expression (`forwardExpr`)   | 1187–1191    | `Breached summary`: the explicit `BREACH`; no norm, no clock                                   |
-| `App1` on `ValObligation`             | 1297         | `armNormKey`: the entry into the site; bumps `nkActivation`                                    |
-| `Contract1` / `ValNil`                | 1708–1713    | `Waiting`, clock peeked                                                                        |
-| `Contract5` expiry                    | 1801–1849    | `Expired branch deadline`, built here; routed cases logged at `ResolveParty`, breach case here |
-| `Contract6`                           | 1858         | bearer refreshed                                                                               |
-| `Contract8` / `False`                 | 1873         | `PartyMismatch`, `WitnessedOnly`                                                               |
-| `Contract10`                          | 1893–1936    | `Matched ToHence/ToLest/ToBreach`, `Consumed`; `GuardFailed`                                   |
-| `ResolveParty`                        | 1941         | the pending `Expired`, bearer filled, join progress worked out                                 |
-| `Barrier1` verdict arms               | 2007–2019    | `JoinFailed ToBreach` on `ValBreached`, `JoinStalled` on `ValFulfilled`, throw otherwise       |
-| `RBinOp1` (the `ROR` short-circuit)   | 2052         | `Joined ValROr JoinFulfilled LeftSide` — the OR's commonest success path                       |
-| `RBinOp2` (six arms, one unreachable) | 2101–2160    | `Joined op note`; the fulfilled-LEFT `ROR` arm at `:2152` is unreachable past `RBinOp1`        |
-| `startRollCall`                       | 2339         | `armJoinKey`: the join's own entry                                                             |
-| `assembleQuantified`                  | 2374–2385    | `registerCast` (distributive 2374, fork 2375, barrier 2385)                                    |
-| `fireBarrierHence`                    | 2559         | `JoinReleased`                                                                                 |
-| `barrierFail`                         | 2590         | `JoinFailed ToLest`                                                                            |
-| `barrierStateMissed`                  | 2606, 2614   | `JoinExpired ToLest` beside the `LEST` push, `JoinExpired ToBreach` beside the breach          |
-| `patternMatchFailure`                 | 2921         | `ActionMismatch`, `WitnessedOnly`                                                              |
+| `Breach` expression (`forwardExpr`)   | 1225–1237    | `Breached summary`: the explicit `BREACH`; no norm, no clock                                   |
+| `App1` on `ValObligation`             | 1343         | `armNormKey`: the entry into the site; bumps `nkActivation`                                    |
+| `Contract1` / `ValNil`                | 1754–1759    | `Waiting`, clock peeked                                                                        |
+| `Contract5` expiry                    | 1847–1895    | `Expired branch deadline`, built here; routed cases logged at `ResolveParty`, breach case here |
+| `Contract6`                           | 1904         | bearer refreshed                                                                               |
+| `Contract8` / `False`                 | 1924         | `PartyMismatch`, `WitnessedOnly`                                                               |
+| `Contract10`                          | 1939–1987    | `Matched ToHence/ToLest/ToBreach`, `Consumed`; `GuardFailed`                                   |
+| `ResolveParty`                        | 1992–1998    | the pending `Expired`, bearer filled, join progress worked out                                 |
+| `Barrier1` verdict arms               | 2059–2073    | `JoinFailed ToBreach` on `ValBreached`, `JoinStalled` on `ValFulfilled`, throw otherwise       |
+| `RBinOp1` (the `ROR` short-circuit)   | 2101–2111    | `Joined ValROr JoinFulfilled LeftSide` — the OR's commonest success path                       |
+| `RBinOp2` (six arms, one unreachable) | 2123–2219    | `Joined op note`; the fulfilled-LEFT `ROR` arm at `:2207` is unreachable past `RBinOp1`        |
+| `startRollCall`                       | 2398         | `armJoinKey`: the join's own entry                                                             |
+| `assembleQuantified`                  | 2433–2444    | `registerCast` (distributive 2433, fork 2434, barrier 2444)                                    |
+| `fireBarrierHence`                    | 2618         | `JoinReleased`                                                                                 |
+| `barrierFail`                         | 2649         | `JoinFailed ToLest`                                                                            |
+| `barrierStateMissed`                  | 2665, 2673   | `JoinExpired ToLest` beside the `LEST` push, `JoinExpired ToBreach` beside the breach          |
+| `patternMatchFailure`                 | 2980         | `ActionMismatch`, `WitnessedOnly`                                                              |
 
 Seventeen sites. `JoinExpired` is logged inside `barrierStateMissed`'s two arms rather than at
 `Barrier4`, so the log's `ToLest`/`ToBreach` is the machine's own routing and not a second copy of
@@ -1399,8 +1409,9 @@ the outer's later members are armed, and those members would then report the inn
 `moIndex`/`moTotal` — silently, exit 0. No fixture exhibits it (fixture 7 measures that a fork
 member's continuation runs to completion before the next member is armed, which is the
 precondition); the fix is the value-type change declined above, a membership slot on
-`ValObligation`. Nothing in `L4.StateGraph` was touched: B1's static half of the key is still
-owed there.
+`ValObligation`. Nothing in `L4.StateGraph` was touched by P2b: B1's static half of the key was
+still owed there _(and was paid 2026-09-16 — `labelSite`, §3.4's B1 block; the bearer follow-up
+below did not touch `L4.StateGraph` either)_.
 
 **What review changed (2026-09-15, same branch, second commit).** Two read-only reviewers found:
 the `ROR` short-circuit at `RBinOp1` logged nothing, so the OR's commonest success path was silent
@@ -1611,8 +1622,8 @@ single most under-costed item in this document.
 
 **Ruling (B3).** Layout splits along K6, as everything else does:
 
-- **Haskell serves structure**: rank, lane/band, junction kind, plane assignment, and — once B2
-  lands — a **feedback-edge set** so the ranking can run on the DAG that remains after cycle
+- **Haskell serves structure**: rank, lane/band, junction kind, plane assignment, and — now that
+  B2 has landed (2026-09-16) — a **feedback-edge set** so the ranking can run on the DAG that remains after cycle
   edges are set aside, with cycle edges drawn as explicit back-arcs. This is the standard
   Sugiyama first phase and it is the honest answer to `P-CYCLE`; it is also the piece P1 declined
   to build and reported instead.
@@ -1714,6 +1725,14 @@ of the tree this block was committed in. "Landed" here means committed on the br
 of writing the branch is unpushed and has no PR, and what would make it more than that is a PR
 into `unstable` with the `wasm-build` job green (see the last "not built" item).
 
+_(Reconciled 2026-09-16, after `lts/p2g-render` and `lts/b1-b2-loops` merged beside this: the
+`+page.svelte` and `extension.mts` anchors in this block are of the tree before the render track
+rewrote both files, and some of the code they point at — the unconditional `rightPaneView =
+'ladder'`, the `<pre>`-only pane — no longer exists; they are left as the record of what the
+render track changed. The `StateGraph.hs` anchors below are re-anchored in place. Of the four
+"not built" items at the end, the first two — the picture and live refresh — landed the same
+day; the next LANDED block is their record.)_
+
 **The shared piece: `jl4-core/src/L4/StateGraph/Lens.hs` (new).** Both producers need the same
 three things — which `Decide`s earn a lens, how to find one again from a click, and what a click
 returns — so they live once. `stateGraphTargets` (`:76`) runs `extractStateGraphs` over the module
@@ -1745,8 +1764,8 @@ for it — and `L4.StateGraph` itself is untouched.
    `src/commands.ts:3` names it, and `extension.mts` branches on it in the `executeCommand`
    middleware (`:330`) _before_ the ladder decoder, since the payload is not a ladder. The pane is
    `src/state-graph-panel.ts` (new): one reusable webview beside the editor showing the DOT text
-   with a **Copy DOT** button (the copy goes through `vscode.env.clipboard`). **No renderer.**
-   Measured 2026-09-15: `grep -i "graphviz\|viz\.js\|d3-graphviz\|hpcc-js\|@viz-js"` over
+   with a **Copy DOT** button (the copy goes through `vscode.env.clipboard`). **No renderer**
+   _(until 2026-09-16, next block)_. Measured 2026-09-15: `grep -i "graphviz\|viz\.js\|d3-graphviz\|hpcc-js\|@viz-js"` over
    `package-lock.json` and every `ts-apps/*/package.json` and `ts-shared/*/package.json` finds
    nothing, so drawing the picture in-pane means a new dependency and a lockfile change, which this
    branch does not make. The pane says so to the reader.
@@ -1776,10 +1795,12 @@ files, 250 linked, 0 errors. _Review 2026-09-15 changed:_ the page had said the 
 same way … in the web editor at jl4.legalese.com" in the present tense; the web path was never
 built for wasm here (previous bullet), and that host is deployed by hand with `nixos-rebuild`
 from a checkout (`nix/README.md:22-29`) that cannot contain an unpushed branch. It now says the web editor gets it "from the release that carries this change" and names no URL.
-Same pass: `next`/`failure` for the two hand-over arms (`StateGraph.hs:861`, `:909`), the bare-MAY
-gap from the extractor's own NOTE (`:917-935`), and the web-host pane eviction above.
+Same pass: `next`/`failure` for the two hand-over arms (`StateGraph.hs:945`, `:974`, as of
+2026-09-16 — the arms go through `wireTarget` since B2), the bare-MAY gap from the extractor's own
+NOTE (`:983-997`), and the web-host pane eviction above.
 
-**Not built, and what would make it true.**
+**Not built, and what would make it true** _(as of 2026-09-15; the first two items landed
+2026-09-16 — the next LANDED block)_.
 
 - _The picture._ The pane shows DOT source. An in-pane rendering needs a DOT renderer in
   `ts-shared/` (a `@viz-js/viz` or `@hpcc-js/wasm` dependency, hence a lockfile change reviewed on
@@ -2067,7 +2088,7 @@ sniffing user-visible strings. P2b's `DeonticStep` has to carry the join, or the
 places.** `6daf1d9d` drew the barrier-joined `MAY`'s lapse as a LEST arm to Fulfilled and left the
 fork alone, on the stated belief that _"under a FORK each member carries the real HENCE, so a
 lapsed member does route there, and the synthesis stays right"_ (`jl4-core/src/L4/StateGraph.hs:951-952`
-as it stood; its commit message: _"A fork's MAY keeps the single-party routing, which is right
+as it stood at `0139c6c5`; its commit message: _"A fork's MAY keeps the single-party routing, which is right
 there"_). No trace exercised that belief. P2a's re-run (`P2A-TOKEN-SIM-BASELINE.md` §3.7, second
 question) found `modals-may-fork`'s lapse timer landing on the chair's `MUST Publish`, and the
 review of that report ran the check. Recorded now as two `#TRACE`s on
@@ -2075,24 +2096,29 @@ review of that report ran the check. Recorded now as two `#TRACE`s on
 goldened at `ok/every/tests/run-modals.golden:57-72`: nobody approves and the chair publishes at
 day 40 ⇒ **FULFILLED**, the duty never arose; one director approves at day 3 and nobody publishes
 ⇒ **BREACHED**, the chair's, at day 8. The runtime routes a `MAY`'s expiry to `LEST` (default
-`FULFILLED`) whatever the join (`Machine.hs:1831-1835`); the fork differs from the barrier only in
+`FULFILLED`) whatever the join (`Machine.hs:1877-1881`, re-anchored 2026-09-16); the fork differs from the barrier only in
 that an _exercised_ member arms the continuation on its own. So the fork's drawn lapse arm is wrong
 in the same way the barrier's was before `6daf1d9d`. What this branch changes: the traces, their
 goldens and the report. What it does not change: **any Haskell** — not the exporter, and not the
-two comments either. `StateGraph.hs:951-952` still reads the overturned sentence, and
-`Lower.hs:553`'s `KNOWN WRONG in one shape` still names only the bare-`MAY` shape, in the tree
-this block is committed to. (A first cut of this block corrected both comments in place; the
+two comments either. `StateGraph.hs:951-952` still read the overturned sentence, and
+`Lower.hs:553`'s `KNOWN WRONG in one shape` still named only the bare-`MAY` shape, in the tree
+this block was committed to. (A first cut of this block corrected both comments in place; the
 P2a-remeasure gate — no `.hs` or `.cabal` in the diff, because this stage measures and documents
 and a Haskell edit, even comment-only, rebuilds `jl4-core` for the whole stack and lands inside
-`extractDeonton` (`StateGraph.hs:773`), the function that binds `Deonton.due` at `:774`, the field
+`extractDeonton` (then `StateGraph.hs:773`; `:872` after B1/B2), the function that binds
+`Deonton.due` (then `:774`; now `:873`), the field
 the `every-each` session is retyping on a branch that lands first — rejected it, and the two files
 were restored to `lts/p2-followups` byte-for-byte, `git diff --quiet lts/p2-followups -- <both>`
-exit 0.) The comment corrections travel with the P1 follow-up below, which is the one change that
-has to touch those lines anyway; until it lands, this block is the record and the comments are
-wrong. **P1 follow-up, not built:** draw the fork-joined `MAY`'s lapse as a LEST arm
-to Fulfilled too (the `Barrier _` arm of the `DMay` case at `StateGraph.hs:940-956`, widened to
-`Just MkJoinLabel {}`), which retires `Lower.hs`'s `lapses` synthesis (`Lower.hs:568-574`) for that
-shape, rewrites the two comments to state the measured routing, and moves
+exit 0.) **Reconciled 2026-09-16:** once the six follow-up tracks were merged — B1/B2 had already
+edited `extractDeonton` (four hunks: `labelSite`, and every arm through `wireTarget`), so a
+comment edit there no longer adds a conflict the merge did not already carry — the two comment
+hunks of `11199a16` were re-applied, comment-only, at the merge: `StateGraph.hs:1009-1023` now
+states the measured routing and names the candidate fix, and `Lower.hs:554-574` reads `KNOWN
+WRONG in two shapes` and names the fork as the second. The tree's
+comments are no longer wrong; the code still is. **P1 follow-up, not built:** draw the fork-joined `MAY`'s lapse as a LEST arm
+to Fulfilled too (the `Barrier _` arm of the `DMay` case at `StateGraph.hs:998-1027`, widened to
+`Just MkJoinLabel {}`), which retires `Lower.hs`'s `lapses` synthesis (`Lower.hs:575-581`) for that
+shape, retires the "not done here" the two comments now end on, and moves
 `modals-may-fork`'s two goldens (`.bpmn`, `.fidelity.txt`); and, second, `P-FORK-CANCEL` is not emitted on a `MAY` fork
 (`modals-may-fork.fidelity.txt` has no such tag; `modals-may-fork.bpmn:36` has the interrupting
 timer it names), so the fidelity report under-reports that cell — the same fix or a sibling.
@@ -2275,9 +2301,9 @@ over.
 | **P2b**  | `tellDeonticStep` + the `DeonticStep` type of §4.3. ~6 call sites in `Machine.hs`. **No renderer.** Tested in Haskell alone against `contracts.golden`. **Recommended unconditionally.** **BUILT 2026-09-15** (`lts/p2-stack`, not yet in `unstable`): `L4.EvaluateLazy.DeonticStep`, `tellDeonticStep` optional and off by default (R5 answered), seventeen call sites, `DeonticStepSpec`; §4.3's BUILT block. **Follow-up 2026-09-16** (`lts/p2-followups`): the bearer is recorded where the machine forces it (`nkBearerName`, `ekPartyName`) and the list matches by it; `--steps` prints real party names.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | —                                                            | no             |
 | **P2c**  | The enabled set and the discharging/breaching partition, in the **replay** form (`STATEFUL` §6.5 endpoints 22/23/24), per §2.4. Plus `markingOf` (§4.2a) as a library function. **BUILT 2026-09-15** (`lts/p2-stack`): `L4.Lts.Marking` (`markingOf` against `Threshold`, with `Awaiting` for the join — the `markingOf` half of P2h's second half) and `L4.Lts.WhatIf` (the replay form, per candidate); §4.2a and §2.4 LANDED blocks.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | P2b                                                          | no             |
 | **P2a′** | **The list baseline, and the primary gate.** Render §4.2a's marking + endpoints 17/19/20 as plain text — CLI first. Put it in front of readers against the same contract drawn by `stateGraphToDot` and P1. **BUILT 2026-09-15** (`lts/p2-stack`): `l4 lts FILE [--steps] [--json] [--contract NAME]`, goldens under `jl4/examples/lts/expected/`, page `doc/reference/regulative/lts-list.md`; §7.6. **The reader experiment itself has not been run** — the list exists, the gate is still open. **Proxy run 2026-09-16** (`lts/p2-followups`, §7.7): 48 LLM readers, one artifact each — list 50/80, DOT-as-text 71/80, BPMN-as-text 66/80; on the gate's Q1–Q3 the list is 39/48 vs 41/48 and 42/48. Not the gate; the human experiment is still unrun.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | P2c                                                          | no             |
-| **P2a**  | **The picture baseline.** Point `bpmn-io/bpmn-js-token-simulation` (MIT) at P1's shipped output and write down, case by case, what it cannot say. **MEASURED 2026-09-15** (`lts/p2-stack`): harness `etc/bpmn-token-sim/`, report `P2A-TOKEN-SIM-BASELINE.md`, RESULT block below. Measured over the eight goldens that existed that afternoon; the six `modals-*` goldens `6daf1d9d` added later the same day are **unmeasured**. **RE-MEASURED 2026-09-16** over all fourteen goldens (`lts/p2-followups`): the six `modals-*` are now measured (RE-MEASURED block below); the fork-MAY lapse animation contradicts the runtime — a P1 follow-up filed in §4.9.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | P1 (shipped)                                                 | no             |
-| **P2f**  | **Unbundled.** `dom_s(J)` by Lengauer–Tarjan over `StateGraph`, answered as a **set of acts** — printable as a list or as an annotation on P1's BPMN. **No new picture required.** **BUILT 2026-09-15** (`lts/p2-stack`): `L4.StateGraph.Dominators`, `l4 state-graph --dominators [--all-states]`, `DominatorsSpec`; §1.1c LANDED block (iterated dominance equations, not Lengauer–Tarjan; same answer by definition). DOT annotation not built. DOT annotation **BUILT 2026-09-16** with B1/B2 (`--dominators --dot`).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | P0 (shipped)                                                 | no             |
-| **B1**   | Carry the correlation key (§3.4). Regenerates BPMN goldens. **LANDED 2026-09-16** (`lts/p2-followups`): `TransitionLabel.labelSite` = `rangeOf` the RAction, proved equal to P2b's `nkSite` by test; default DOT and all 14 BPMN goldens byte-identical. §3.4 block.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | P1                                                           | no             |
+| **P2a**  | **The picture baseline.** Point `bpmn-io/bpmn-js-token-simulation` (MIT) at P1's shipped output and write down, case by case, what it cannot say. **MEASURED 2026-09-15** (`lts/p2-stack`): harness `etc/bpmn-token-sim/`, report `P2A-TOKEN-SIM-BASELINE.md`, RESULT block below. Measured over the eight goldens that existed that afternoon; the six `modals-*` goldens `6daf1d9d` added later the same day were unmeasured until the **RE-MEASURED** run of 2026-09-15 17:19 UTC (2026-09-16 SGT) over all fourteen goldens (`lts/p2-followups`; the RE-MEASURED block below): the fork-MAY lapse animation contradicts the runtime — a P1 follow-up filed in §4.9, not built.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | P1 (shipped)                                                 | no             |
+| **P2f**  | **Unbundled.** `dom_s(J)` by Lengauer–Tarjan over `StateGraph`, answered as a **set of acts** — printable as a list or as an annotation on P1's BPMN. **No new picture required.** **BUILT 2026-09-15** (`lts/p2-stack`): `L4.StateGraph.Dominators`, `l4 state-graph --dominators [--all-states]`, `DominatorsSpec`; §1.1c LANDED block (iterated dominance equations, not Lengauer–Tarjan; same answer by definition). The DOT annotation was not built on that branch; it was **BUILT 2026-09-16** with B1/B2 (`--dominators --dot`, §1.1c's Annotation LANDED block and its correction).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | P0 (shipped)                                                 | no             |
+| **B1**   | Carry the correlation key (§3.4). Predicted to regenerate the BPMN goldens; in fact none moved. **LANDED 2026-09-16** (`lts/p2-followups`): `TransitionLabel.labelSite` = `rangeOf` the RAction, proved equal to P2b's `nkSite` by test; default DOT and all 14 BPMN goldens byte-identical. §3.4 block.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | P1                                                           | no             |
 | **B2**   | Close the loop (§3.4). Makes `P-CYCLE` reachable; see §4.7. **LANDED 2026-09-16** (`lts/p2-followups`): a named rule already extracted is reused (memo keyed by the rule's `Unique`, not the range — §3.4 says why); 9 of 71 corpus graphs changed, `next`/`failure` dead ends 16 → 10; BPMN goldens unchanged (no golden source hands over by name). RECORD continuations still dead-end.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | B1                                                           | no             |
 | **B3**   | Layout: Haskell ranks with a feedback-edge set, TS draws (§4.7).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | B2                                                           | no             |
 | **P2g**  | **The entry point (§4.8).** A CodeLens above every `Decide` whose body is regulative, in **both** lens producers, opening the view in a pane in VS Code and in the web IDE. Independent of which renderer sits behind the pane — wire it to the shipped `stateGraphToDot` first, which is how P2a′/P2a get run where readers actually are. Four edits, not one; see the table in §4.8. **BUILT 2026-09-15** (`lts/p2-stack`): the lens in both producers and both hosts, `l4_state_graph_by_name`; the pane shows DOT source with Copy (no renderer in the tree); R13 answered — the lenses never stack; §4.8 LANDED block. Not yet clicked by a human in either host. **In-pane rendering LANDED 2026-09-16** (`lts/p2-followups`): `@viz-js/viz@3.30.0` in `ts-shared/state-graph-render`, both hosts draw the picture and redraw on edit (web pane survives the ladder's refresh); extension bundle +1.5 MB (+495 KB gzip), one lazy web chunk; still no human click.                                                                                                                                                                                                                                                                                                                                                                                      | shipped `StateGraph` (DOT), or P2d for the two-plane picture | no             |
@@ -2285,7 +2311,7 @@ over.
 | **P2d**  | The P2 IR and the **static** two-plane picture. No animation. **Gated: build only if §7.3's condition is met.**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | P2c, B1-B3                                                   | no             |
 | **P2e**  | The animator: scrubber, token, marking, enabled-set highlight. TypeScript, per K6.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | P2d                                                          | no             |
 
-_Note, 2026-09-16 (not a row edit — the table is the integrator's): the P2f row's "DOT annotation not built" was made false the same day by `lts/b1-b2-loops` — **DOT annotation LANDED 2026-09-16** (`--dominators --dot`, §1.1c's Annotation LANDED block and its correction)._
+_Reconciled 2026-09-16: the P2f row read "DOT annotation not built" beside "BUILT 2026-09-16" after the six tracks merged (the B1/B2 track had left a note here rather than edit the integrator's table); the row now states the sequence. The RE-MEASURED and PROXY RUN blocks below deferred their rows to the integrator in the same way; those rows were written at integration (`af263553`)._
 
 **Ordering is now explicit**, which revision 1's table was not (it said "P2a first" in prose while
 giving P2b no dependency): **P2h(first half) → P2b → P2c → P2a′, with P2a, P2f and P2g runnable
@@ -2389,15 +2415,15 @@ leads with.
 > byte-identical modulo ids and path; `modals-must-*` differ by one label. Point 2 now holds for
 > three of the four barrier/fork pairs, the exception being the `modals-may-*` lapse in question 2. Still unmeasured: everything the previous paragraph lists
 > as unmeasured. **This block does not decide the gate either.** The staging table row for P2a
-> still reads "unmeasured" for the `modals-*` goldens; that row is the integrator's to update.
+> read "unmeasured" for the `modals-*` goldens when this was written; it was updated at integration.
 
 **PROXY RUN 2026-09-16, for P2a′.** An LLM-reader _proxy_ of the P2a′ reader experiment was run
 over four contracts — the list, the DOT source and the BPMN XML, each read as text by fresh LLM
 readers with no tools — and is written up in §7.7 and `etc/lts-reader-proxy/RESULTS.md`. Pooled:
 list 50/80, DOT 71/80, BPMN 66/80; on Q1–Q3 the list is 39/48 against 41/48 and 42/48, on Q4–Q5
 11/32 against 30/32 and 24/32. It is **not** the gate — no person, no picture, no cognitive-load
-measure — and §7.7 says what it can and cannot support. The staging table above is left for the
-integrator.
+measure — and §7.7 says what it can and cannot support. The P2a′ row above carries these numbers
+as of integration; it decides nothing either.
 
 ### 7.3 The gate
 
@@ -2453,7 +2479,7 @@ plus, for B and C, the position in plain words, and a `truth.json` per contract:
   artifact** (`etc/lts-reader-proxy/tenancy/probes.out:15` and `:11`): with Alice paid at 3, the
   what-if for the landlord's `Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount)` is
   refused with the replay's own `Internal error: amount is not in scope` as its reason —
-  `reifyExpr` (`jl4-core/src/L4/Lts/WhatIf.hs:524`) cannot read a member's open pattern
+  `reifyExpr` (`jl4-core/src/L4/Lts/WhatIf.hs:539`) cannot read a member's open pattern
   variable through the `HENCE`; the verdict (untried) is right, the wording is not the list's.
   And the tick past 7 prints as `the clock reaches 7.5` — `tickPast` (`WhatIf.hs:278`) going
   half-way to the next live deadline, as §2.4 says, which a reader is not told.
@@ -2770,7 +2796,7 @@ loud failure was invited and its size is partly the prompt's (RESULTS.md §3).
 2. **The list's Q2 loss (8/16) is entirely `WhatIf`'s refusal of open pattern variables.** All
    eight misses are on the three contracts whose `A.txt` prints _"the action binds `return` /
    `amount` / `Amount Transferred`, which the what-if cannot choose"_
-   (`jl4-core/src/L4/Lts/WhatIf.hs:510`, printed by `L4/Lts/List.hs:216` under _What could not
+   (`jl4-core/src/L4/Lts/WhatIf.hs:525`, printed by `L4/Lts/List.hs:216` under _What could not
    be tried_); on `every-run-example`, the one contract where the act could be tried, the list
    is 4/4. The readers who scored 1 inferred what the list did not print. This points at a
    list-side repair, re-measurable with the same materials, before any picture.
@@ -2805,7 +2831,7 @@ that costs the list 25 of its 30 misses and the pictures almost nothing; it is t
 _can the reader answer_ and the wrong rule for _does the artifact mislead_, and those two
 questions have opposite answers on this data. (vi) Four contracts, two models, two repeats, no
 intervals: a one- or two-answer difference in a column of sixteen is within what a rerun could
-reverse. **Nothing here passes or fails §7.3.** The staging table in §7.2 is the integrator's.
+reverse. **Nothing here passes or fails §7.3.** The §7.2 P2a′ row records this run and says the same.
 
 _What would move it, in cost order, none decided here:_ repair the open-binder what-if and rerun
 the same 48 readings; equalise the note's calendar conversion across A/B/C; rerun outside the

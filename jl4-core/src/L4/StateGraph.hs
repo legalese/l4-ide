@@ -24,9 +24,11 @@
 --   - IF/THEN/ELSE over regulative arms → a @OneOf@ junction whose branch
 --     edges carry the guard that selects them (see 'guardedIfBranches')
 --   - a @HENCE@ \/ @LEST@ into a named rule → an edge into that rule's own
---     entry state, drawn once per graph however many arms point at it; back
---     into the rule being extracted, that is the initial state, so a renewing
---     duty is a cycle rather than a dangling stub (see 'wireTarget')
+--     entry state, drawn once per path however many arms on that path point
+--     at it (the sibling branches of a @RAND@ \/ @ROR@ each draw their own
+--     copy, see 'extractFan'); back into the rule being extracted, that is
+--     the initial state, so a renewing duty is a cycle rather than a
+--     dangling stub (see 'wireTarget')
 --   - every obligation edge carries the source range of its @RAction@
 --     ('labelSite'): the static half of the correlation key that lines a
 --     drawn edge up with the step the evaluator logs for it
@@ -1004,8 +1006,21 @@ extractDeonton mFromState (MkDeonton _anno subject action due mJoin hence lest) 
           -- resolution that did not pass. Measured 2026-09-15 by the
           -- concurrency review: `l4 run` FULFILLED, the diagram Breach.
           --
-          -- Under a FORK each member carries the real HENCE, so a lapsed
-          -- member does route there, and the synthesis stays right.
+          -- Under a FORK the runtime does the same to a lapsed member: MAY
+          -- expiry routes to LEST (default FULFILLED), never to HENCE
+          -- (Machine.hs, the DMay arm of the expiry case), so a member who
+          -- did nothing never arms the continuation. No lapse edge is drawn
+          -- for the fork here, so L4.Bpmn.Lower's synthesis still sends the
+          -- fork's lapse "wherever HENCE lands" — on bpmn/modals.l4
+          -- `each approval is published`, into the chair's MUST Publish.
+          -- Measured 2026-09-16 (ok/every/run-modals.l4 §7): nobody approves,
+          -- the chair publishes late ==> FULFILLED; the duty never arose.
+          -- This comment read "a lapsed member does route there, and the
+          -- synthesis stays right" until then, and 6daf1d9d's message says
+          -- the same; both were wrong. Drawing the fork's lapse as a LEST
+          -- arm to Fulfilled, as the barrier arm below does, is the candidate
+          -- fix; it moves modals-may-fork's goldens and is not done here
+          -- (LTS-VISUALISER.md §4.9, "P1 follow-up, not built").
           Just MkJoinLabel { joinKind = Barrier _ } -> do
             fulfilledId <- getTerminalState "Fulfilled" TerminalFulfilled
             addTransition fromState fulfilledId lestLabel LestTransition

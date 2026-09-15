@@ -56,7 +56,8 @@ Three things the extractor learned in the process, all visible in the goldens:
   state named `next`; `P-CYCLE` could not fire because there was no cycle in the
   graph to detect. A `HENCE` into any named rule of the module, the rule itself
   included, now lands on that rule's memoised state (`wireTarget`, since
-  2026-09-16), and `P-CYCLE` fires.
+  2026-09-16; the memo is per path, so the two branches of a `RAND`/`ROR` each
+  draw their own copy of a rule both name), and `P-CYCLE` fires.
 - **A junction's branch edges carry their guards.** `Lower.hs`'s `branches` passed
   `Nothing`, so an exclusive gateway drew a free choice and the condition landed on
   the flow *out of the task* — the diagram read "pick an arm, do the work, then test
@@ -355,8 +356,8 @@ the fork's lapse timer lands on the chair's `MUST Publish` and the barrier's
 lands on Fulfilled. The runtime does what the barrier draws in both cases: a
 permission nobody exercised creates no duty (`ok/every/run-modals.l4` §7,
 measured 2026-09-16), so the fork's drawing is wrong there and not yet fixed; `Lower.hs`'s
-`KNOWN WRONG` note measures a different shape (a bare `PARTY … MAY`) and does
-not yet name this one — LTS-VISUALISER.md §4.9 does.
+`KNOWN WRONG` note names both shapes (the bare `PARTY … MAY` it was written for,
+and this one), and LTS-VISUALISER.md §4.9 has the traces.
 
 ## Asking an actual engine: the jBPM/KIE second opinion
 
