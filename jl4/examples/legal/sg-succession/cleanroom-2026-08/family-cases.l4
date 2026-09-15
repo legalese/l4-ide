@@ -496,15 +496,15 @@ GIVETH A Guardian
     `removed from his guardianship by the court` IS `he has been removed by the court`
     `has given security`                 IS TRUE
     `the court has otherwise ordered as to security` IS FALSE
-    `has sold, mortgaged, exchanged, or otherwise parted with the possession of any of the movable or immovable property of the infant` IS FALSE
-    `has leased land belonging to the infant` IS FALSE
+    `sold, mortgaged, exchanged, or otherwise parted with the possession of any of the movable or immovable property of the infant` IS FALSE
+    `leased land belonging to the infant` IS FALSE
     `the term of the lease, in years`    IS NOTHING
-    `has the permission of the court to deal with the property of the infant` IS FALSE
-    `has given a good discharge for a legacy or other capital moneys payable to or receivable by the infant` IS `he purported to give a discharge`
+    `the permission of the court to deal with the property of the infant` IS FALSE
+    `given a good discharge for a legacy or other capital moneys payable to or receivable by the infant` IS `he purported to give a discharge`
     `the court has otherwise ordered as to giving a good discharge` IS `the court has otherwise ordered as to the discharge`
     `the provision made out of the income of the property of the infant for his maintenance and education`
         IS (`A periodical sum` WITH `the sum` IS 0, `the period` IS `monthly`)
-    `has the permission of the court to apply a sum exceeding $100 per month` IS FALSE
+    `the permission of the court to apply a sum exceeding $100 per month` IS FALSE
 
 GIVEN `the appointee`                     IS A Person
       `the reference for the infant`      IS A STRING
@@ -533,15 +533,15 @@ GIVETH A Guardian
     `removed from his guardianship by the court` IS FALSE
     `has given security`                 IS TRUE
     `the court has otherwise ordered as to security` IS FALSE
-    `has sold, mortgaged, exchanged, or otherwise parted with the possession of any of the movable or immovable property of the infant` IS FALSE
-    `has leased land belonging to the infant` IS FALSE
+    `sold, mortgaged, exchanged, or otherwise parted with the possession of any of the movable or immovable property of the infant` IS FALSE
+    `leased land belonging to the infant` IS FALSE
     `the term of the lease, in years`    IS NOTHING
-    `has the permission of the court to deal with the property of the infant` IS FALSE
-    `has given a good discharge for a legacy or other capital moneys payable to or receivable by the infant` IS FALSE
+    `the permission of the court to deal with the property of the infant` IS FALSE
+    `given a good discharge for a legacy or other capital moneys payable to or receivable by the infant` IS FALSE
     `the court has otherwise ordered as to giving a good discharge` IS FALSE
     `the provision made out of the income of the property of the infant for his maintenance and education`
         IS (`A periodical sum` WITH `the sum` IS 0, `the period` IS `monthly`)
-    `has the permission of the court to apply a sum exceeding $100 per month` IS FALSE
+    `the permission of the court to apply a sum exceeding $100 per month` IS FALSE
 
 GIVEN `the child`                     IS A Person
       `the father, if in evidence`    IS A MAYBE Person
@@ -583,7 +583,7 @@ GIVETH A Grant
     `expired by effluxion of time or by the happening of the event or contingency on which it was limited` IS FALSE
     `revoked`                       IS FALSE
     `has given such security as is lawfully required to be furnished` IS TRUE
-    `has been extracted`            IS TRUE
+    `been extracted`            IS TRUE
     `sealed under section 47(1) of the Probate and Administration Act 1934` IS FALSE
     `the date of the sealing`       IS NOTHING
 

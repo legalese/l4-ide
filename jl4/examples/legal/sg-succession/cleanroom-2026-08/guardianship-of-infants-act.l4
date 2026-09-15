@@ -2013,7 +2013,7 @@ DECIDE `the guardian has not given the security section 15(1) requires` IF
 GIVEN guardian IS A Guardian
 GIVETH A BOOLEAN
 DECIDE `the guardian has leased land belonging to the infant for a term exceeding one year` IF
-        guardian's `has leased land belonging to the infant`
+        guardian's `leased land belonging to the infant`
     AND `the term of the lease exceeds one year`
     WHERE
         `the term of the lease exceeds one year` MEANS
@@ -2026,14 +2026,14 @@ GIVEN guardian IS A Guardian
 GIVETH A BOOLEAN
 DECIDE `the guardian has done a thing section 16(1) forbids` IF
         "(a) sell, mortgage, exchange, or otherwise part with the possession of any of the movable or immovable property of the infant; or"
-    ..  guardian's `has sold, mortgaged, exchanged, or otherwise parted with the possession of any of the movable or immovable property of the infant`
+    ..  guardian's `sold, mortgaged, exchanged, or otherwise parted with the possession of any of the movable or immovable property of the infant`
     ..  "(b) lease any land belonging to the infant for a term exceeding one year."
     OR  `the guardian has leased land belonging to the infant for a term exceeding one year` guardian
 
 @ref Guardianship of Infants Act 1934 s 16(1) -- "A guardian of the property of an infant shall not, without the permission of the court"
 -- ONE PERMISSION FLAG COVERS BOTH LIMBS, AND THAT IS A SIMPLIFICATION.
 -- `family-domain`'s `Guardian` carries a single
--- `has the permission of the court to deal with the property of the infant`,
+-- `the permission of the court to deal with the property of the infant`,
 -- so a guardian permitted to grant a long lease under limb (b) reads as
 -- permitted to sell under limb (a) as well. s 16(3) tells against that --
 -- the court "shall not make any order under subsection (1) unless it is
@@ -2052,7 +2052,7 @@ DECIDE `the guardian has contravened section 16(1)` IF
     ... `a guardian of the property of the infant` guardian
     ... `the guardian has done a thing section 16(1) forbids` guardian
     ... "shall not, without the permission of the court"
-    AND NOT guardian's `has the permission of the court to deal with the property of the infant`
+    AND NOT guardian's `the permission of the court to deal with the property of the infant`
 
 @ref Guardianship of Infants Act 1934 s 16(2) -- "Any disposal of an infant’s property in contravention of this section may be declared void"
 -- THE ANTECEDENT ONLY. Whether the disposal IS declared void is a discretion
@@ -2152,7 +2152,7 @@ GIVEN guardian IS A Guardian
 GIVETH A BOOLEAN
 DECIDE `the discharge the guardian purported to give is not a good discharge` IF
         `section 17 denies the guardian power to give a good discharge` guardian
-    AND guardian's `has given a good discharge for a legacy or other capital moneys payable to or receivable by the infant`
+    AND guardian's `given a good discharge for a legacy or other capital moneys payable to or receivable by the infant`
 
 
 §§ `18. Guardian may support infant out of income`
@@ -2221,7 +2221,7 @@ GIVETH A BOOLEAN
 DECIDE `the guardian has applied a sum exceeding $100 per month without the permission of the court` IF
         `a guardian of the property of the infant` guardian
     AND `the sum applied exceeds the cap`
-    AND NOT guardian's `has the permission of the court to apply a sum exceeding $100 per month`
+    AND NOT guardian's `the permission of the court to apply a sum exceeding $100 per month`
     WHERE
         `the sum applied exceeds the cap` MEANS
             CONSIDER `whether the provision exceeds the sum applicable without the permission of the court`
@@ -2530,14 +2530,14 @@ DECIDE `a GIA guardian, in the ordinary case` IS Guardian WITH
     `removed from his guardianship by the court` IS `removed by the court`
     `has given security`                 IS FALSE
     `the court has otherwise ordered as to security` IS FALSE
-    `has sold, mortgaged, exchanged, or otherwise parted with the possession of any of the movable or immovable property of the infant` IS FALSE
-    `has leased land belonging to the infant`        IS FALSE
+    `sold, mortgaged, exchanged, or otherwise parted with the possession of any of the movable or immovable property of the infant` IS FALSE
+    `leased land belonging to the infant`        IS FALSE
     `the term of the lease, in years`                IS NOTHING
-    `has the permission of the court to deal with the property of the infant` IS FALSE
-    `has given a good discharge for a legacy or other capital moneys payable to or receivable by the infant` IS FALSE
+    `the permission of the court to deal with the property of the infant` IS FALSE
+    `given a good discharge for a legacy or other capital moneys payable to or receivable by the infant` IS FALSE
     `the court has otherwise ordered as to giving a good discharge` IS FALSE
     `the provision made out of the income of the property of the infant for his maintenance and education` IS `no GIA provision`
-    `has the permission of the court to apply a sum exceeding $100 per month` IS FALSE
+    `the permission of the court to apply a sum exceeding $100 per month` IS FALSE
 
 -- s 7(4) HAS TWO LIMBS AND THE CONSTRUCTOR ABOVE FIXES THE SECOND AT FALSE.
 -- This one varies both, so that "if the guardian so appointed as aforesaid
@@ -2562,14 +2562,14 @@ DECIDE `a GIA guardian, on the two limbs of section 7(4)` IS Guardian WITH
     `removed from his guardianship by the court` IS FALSE
     `has given security`                 IS FALSE
     `the court has otherwise ordered as to security` IS FALSE
-    `has sold, mortgaged, exchanged, or otherwise parted with the possession of any of the movable or immovable property of the infant` IS FALSE
-    `has leased land belonging to the infant`        IS FALSE
+    `sold, mortgaged, exchanged, or otherwise parted with the possession of any of the movable or immovable property of the infant` IS FALSE
+    `leased land belonging to the infant`        IS FALSE
     `the term of the lease, in years`                IS NOTHING
-    `has the permission of the court to deal with the property of the infant` IS FALSE
-    `has given a good discharge for a legacy or other capital moneys payable to or receivable by the infant` IS FALSE
+    `the permission of the court to deal with the property of the infant` IS FALSE
+    `given a good discharge for a legacy or other capital moneys payable to or receivable by the infant` IS FALSE
     `the court has otherwise ordered as to giving a good discharge` IS FALSE
     `the provision made out of the income of the property of the infant for his maintenance and education` IS `no GIA provision`
-    `has the permission of the court to apply a sum exceeding $100 per month` IS FALSE
+    `the permission of the court to apply a sum exceeding $100 per month` IS FALSE
 
 GIVEN `the appointee`               IS A Person
       `the infant referred to`      IS A STRING
@@ -2597,14 +2597,14 @@ DECIDE `a GIA guardian of the property of the infant, in a property case` IS Gua
     `removed from his guardianship by the court` IS FALSE
     `has given security`                 IS `security given`
     `the court has otherwise ordered as to security` IS `security dispensed with`
-    `has sold, mortgaged, exchanged, or otherwise parted with the possession of any of the movable or immovable property of the infant` IS `parted with possession`
-    `has leased land belonging to the infant`        IS `land leased`
+    `sold, mortgaged, exchanged, or otherwise parted with the possession of any of the movable or immovable property of the infant` IS `parted with possession`
+    `leased land belonging to the infant`        IS `land leased`
     `the term of the lease, in years`                IS `the term in years`
-    `has the permission of the court to deal with the property of the infant` IS `permission to deal`
-    `has given a good discharge for a legacy or other capital moneys payable to or receivable by the infant` IS `discharge purportedly given`
+    `the permission of the court to deal with the property of the infant` IS `permission to deal`
+    `given a good discharge for a legacy or other capital moneys payable to or receivable by the infant` IS `discharge purportedly given`
     `the court has otherwise ordered as to giving a good discharge` IS `discharge otherwise ordered`
     `the provision made out of the income of the property of the infant for his maintenance and education` IS `the provision applied`
-    `has the permission of the court to apply a sum exceeding $100 per month` IS `permission to exceed the cap`
+    `the permission of the court to apply a sum exceeding $100 per month` IS `permission to exceed the cap`
 
 GIVEN `the child`                 IS A Person
       `the father, if in evidence` IS A MAYBE Person
@@ -3294,14 +3294,14 @@ DECIDE `a GIA infant` IS Infant WITH
     `removed from his guardianship by the court` IS FALSE
     `has given security`                 IS TRUE
     `the court has otherwise ordered as to security` IS FALSE
-    `has sold, mortgaged, exchanged, or otherwise parted with the possession of any of the movable or immovable property of the infant` IS TRUE
-    `has leased land belonging to the infant`        IS FALSE
+    `sold, mortgaged, exchanged, or otherwise parted with the possession of any of the movable or immovable property of the infant` IS TRUE
+    `leased land belonging to the infant`        IS FALSE
     `the term of the lease, in years`                IS NOTHING
-    `has the permission of the court to deal with the property of the infant` IS FALSE
-    `has given a good discharge for a legacy or other capital moneys payable to or receivable by the infant` IS TRUE
+    `the permission of the court to deal with the property of the infant` IS FALSE
+    `given a good discharge for a legacy or other capital moneys payable to or receivable by the infant` IS TRUE
     `the court has otherwise ordered as to giving a good discharge` IS FALSE
     `the provision made out of the income of the property of the infant for his maintenance and education` IS `a GIA monthly provision of $150`
-    `has the permission of the court to apply a sum exceeding $100 per month` IS FALSE
+    `the permission of the court to apply a sum exceeding $100 per month` IS FALSE
 
 
 §§ `Exercising the rules on the facts`

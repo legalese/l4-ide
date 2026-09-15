@@ -60,7 +60,7 @@ GIVEN p1 IS A BOOLEAN
       `omit to do`              IS A BOOLEAN
       `anything`                IS A BOOLEAN
       `causes`                  IS A BOOLEAN
-      `is likely to cause`      IS A BOOLEAN
+      `likely to cause`      IS A BOOLEAN
       `damage`                  IS A BOOLEAN
       `harm`                    IS A BOOLEAN
       `body`                    IS A BOOLEAN
@@ -88,7 +88,7 @@ DECIDE `commits cheating` IF
                                   .. "if he were not so deceived"
              AND         "which act or omission"
                      ..  `causes`
-                     OR  `is likely to cause`
+                     OR  `likely to cause`
                  ...     `damage`
                      OR  `harm`
                      ..  "to any person"

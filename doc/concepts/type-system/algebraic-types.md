@@ -159,8 +159,8 @@ Compare the flattened alternative — a record of booleans:
 ```l4
 -- ❌ Admits impossible states
 DECLARE ContractFlags
-    HAS `is draft` IS A BOOLEAN
-        `is executed` IS A BOOLEAN
+    HAS `draft` IS A BOOLEAN
+        `executed` IS A BOOLEAN
         `is terminated` IS A BOOLEAN
 ```
 

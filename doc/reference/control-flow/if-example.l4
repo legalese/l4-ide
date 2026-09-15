@@ -41,10 +41,10 @@ GIVEN score IS A NUMBER
 -- Complex Conditions
 
 GIVEN age IS A NUMBER
-      `has valid ID` IS A BOOLEAN
+      `valid ID` IS A BOOLEAN
       `is member` IS A BOOLEAN
-`can enter venue` age `has valid ID` `is member` MEANS
-  IF (age >= 21 AND `has valid ID`) OR `is member`
+`can enter venue` age `valid ID` `is member` MEANS
+  IF (age >= 21 AND `valid ID`) OR `is member`
   THEN "Welcome"
   ELSE "Access denied"
 

@@ -1,0 +1,215 @@
+IMPORT policy
+
+-- Standing preamble applied to every query below (per fixtures/queries-blind.md):
+-- "Assuming all other conditions are met and no other exclusions apply
+-- (where by 'other' I mean anything not referenced in the query that
+-- follows)", and the agreement has been signed and the premium has been
+-- paid on time. Accordingly every field of Claim not mentioned by a given
+-- question is set to a value that satisfies that condition / avoids that
+-- exclusion.
+
+§ `Q1 - firefighter burns`
+
+-- "will my policy apply if I was hospitalized by burns suffered while doing
+-- my duty as a firefighter?"
+-- Burns are an accidental injury; they arose directly out of the claimant's
+-- service as a fire fighter, so §3.1(3) excludes the claim.
+q1 MEANS Claim WITH
+    `age at hospitalization`                             IS 30
+    `nature of medical event`                            IS `Accidental Injury`
+    `injury was self-inflicted and intentional`          IS FALSE
+    `arose from skydiving`                               IS FALSE
+    `arose from service in the military`                 IS FALSE
+    `arose from service as a fire fighter`               IS TRUE
+    `arose from service in the police`                   IS FALSE
+    `hospitalized in a hospital in the United States`    IS TRUE
+    `months after effective date of hospitalization`     IS 1
+    `wellness confirmation month`                        IS JUST 0
+    `fraud or misrepresentation or material withholding` IS FALSE
+
+#EVAL `covered` q1
+
+§ `Q2 - age 78`
+
+-- "will my policy apply if I am 78 years old at the time of hospitalization?"
+-- 78 is below the §3.1(5) threshold of 80; nothing else is referenced, so
+-- the event is an ordinary, non-excluded qualifying event.
+q2 MEANS Claim WITH
+    `age at hospitalization`                             IS 78
+    `nature of medical event`                            IS Sickness
+    `injury was self-inflicted and intentional`          IS FALSE
+    `arose from skydiving`                               IS FALSE
+    `arose from service in the military`                 IS FALSE
+    `arose from service as a fire fighter`               IS FALSE
+    `arose from service in the police`                   IS FALSE
+    `hospitalized in a hospital in the United States`    IS TRUE
+    `months after effective date of hospitalization`     IS 1
+    `wellness confirmation month`                        IS JUST 0
+    `fraud or misrepresentation or material withholding` IS FALSE
+
+#EVAL `covered` q2
+
+§ `Q3 - pneumonia at 5 months, age 65`
+
+-- "will my policy apply if I was hospitalized for pneumonia 5 months after
+-- the policy's effective date, and my age at the time of hospitalization is
+-- 65?"
+-- Pneumonia is a sickness; 65 is below the age exclusion; 5 months is well
+-- inside the one-year term and the §1.3 deadline, and the wellness visit is
+-- not referenced by this query so it is taken as timely.
+q3 MEANS Claim WITH
+    `age at hospitalization`                             IS 65
+    `nature of medical event`                            IS Sickness
+    `injury was self-inflicted and intentional`          IS FALSE
+    `arose from skydiving`                               IS FALSE
+    `arose from service in the military`                 IS FALSE
+    `arose from service as a fire fighter`               IS FALSE
+    `arose from service in the police`                   IS FALSE
+    `hospitalized in a hospital in the United States`    IS TRUE
+    `months after effective date of hospitalization`     IS 5
+    `wellness confirmation month`                        IS JUST 0
+    `fraud or misrepresentation or material withholding` IS FALSE
+
+#EVAL `covered` q3
+
+§ `Q4 - fall abroad, late wellness confirmation`
+
+-- "will my policy apply if I was hospitalized due to a fall while traveling
+-- abroad and I had given confirmation of my wellness visit 8 months after
+-- the policy's effective date?"
+-- Confirmation at month 8 is later than the §1.3 deadline of month 7, so the
+-- condition was not satisfied in a timely fashion and the policy is
+-- cancelled under §1.2 regardless of where the hospitalization occurred.
+-- Hospitalizing abroad also fails the separate §2.2 "hospital in the United
+-- States" requirement on these facts (see NOTES.md for the judgement call).
+q4 MEANS Claim WITH
+    `age at hospitalization`                             IS 30
+    `nature of medical event`                            IS `Accidental Injury`
+    `injury was self-inflicted and intentional`          IS FALSE
+    `arose from skydiving`                               IS FALSE
+    `arose from service in the military`                 IS FALSE
+    `arose from service as a fire fighter`               IS FALSE
+    `arose from service in the police`                   IS FALSE
+    `hospitalized in a hospital in the United States`    IS FALSE
+    `months after effective date of hospitalization`     IS 8
+    `wellness confirmation month`                        IS JUST 8
+    `fraud or misrepresentation or material withholding` IS FALSE
+
+#EVAL `covered` q4
+
+§ `Q5 - self-inflicted punch`
+
+-- "will my policy apply if I was hospitalized for punching my own face to
+-- show off for my friends and I did not commit fraud or misrepresentation?"
+-- No fraud/misrepresentation, so §1.2 does not cancel the policy on that
+-- ground. But a deliberate punch thrown at oneself is not an "accidental"
+-- injury (see NOTES.md), so the claim does not meet the basic §2.1 coverage
+-- grant in the first place.
+q5 MEANS Claim WITH
+    `age at hospitalization`                             IS 30
+    `nature of medical event`                            IS `Accidental Injury`
+    `injury was self-inflicted and intentional`          IS TRUE
+    `arose from skydiving`                               IS FALSE
+    `arose from service in the military`                 IS FALSE
+    `arose from service as a fire fighter`               IS FALSE
+    `arose from service in the police`                   IS FALSE
+    `hospitalized in a hospital in the United States`    IS TRUE
+    `months after effective date of hospitalization`     IS 1
+    `wellness confirmation month`                        IS JUST 0
+    `fraud or misrepresentation or material withholding` IS FALSE
+
+#EVAL `covered` q5
+
+§ `Q6 - skydiving injury, age 79`
+
+-- "will my policy apply if I was hospitalized due to an injury sustained
+-- while skydiving, my age at the time of hospitalization was 79, and proof
+-- of my wellness visit was provided 6.5 months after the policy's effective
+-- date?"
+-- The injury arose directly out of skydiving, so §3.1(1) excludes the claim
+-- outright -- independent of age (79 is under 80) and of the wellness-visit
+-- timing (6.5 months is inside the deadline either way).
+q6 MEANS Claim WITH
+    `age at hospitalization`                             IS 79
+    `nature of medical event`                            IS `Accidental Injury`
+    `injury was self-inflicted and intentional`          IS FALSE
+    `arose from skydiving`                               IS TRUE
+    `arose from service in the military`                 IS FALSE
+    `arose from service as a fire fighter`               IS FALSE
+    `arose from service in the police`                   IS FALSE
+    `hospitalized in a hospital in the United States`    IS TRUE
+    `months after effective date of hospitalization`     IS 6.5
+    `wellness confirmation month`                        IS JUST 6.5
+    `fraud or misrepresentation or material withholding` IS FALSE
+
+#EVAL `covered` q6
+
+§ `Q7 - heart attack, age 75`
+
+-- "will my policy apply if I was hospitalized for a heart attack, proof of
+-- the wellness visit was submitted 2 months after the policy's effective
+-- date, and my age at the time of hospitalization was 75?"
+-- A heart attack is a sickness; 75 is under the age threshold; wellness
+-- confirmation at month 2 is well inside the §1.3 deadline.
+q7 MEANS Claim WITH
+    `age at hospitalization`                             IS 75
+    `nature of medical event`                            IS Sickness
+    `injury was self-inflicted and intentional`          IS FALSE
+    `arose from skydiving`                               IS FALSE
+    `arose from service in the military`                 IS FALSE
+    `arose from service as a fire fighter`               IS FALSE
+    `arose from service in the police`                   IS FALSE
+    `hospitalized in a hospital in the United States`    IS TRUE
+    `months after effective date of hospitalization`     IS 2
+    `wellness confirmation month`                        IS JUST 2
+    `fraud or misrepresentation or material withholding` IS FALSE
+
+#EVAL `covered` q7
+
+§ `Q8 - military training injury`
+
+-- "will my policy apply if I was hospitalized after being injured in a
+-- military training exercise, the hospitalization occurred within the
+-- policy term, and I did not commit fraud?"
+-- The injury arose directly out of service in the military (a training
+-- exercise is part of that service), so §3.1(2) excludes the claim, even
+-- though the hospitalization is timely and there is no fraud.
+q8 MEANS Claim WITH
+    `age at hospitalization`                             IS 30
+    `nature of medical event`                            IS `Accidental Injury`
+    `injury was self-inflicted and intentional`          IS FALSE
+    `arose from skydiving`                               IS FALSE
+    `arose from service in the military`                 IS TRUE
+    `arose from service as a fire fighter`               IS FALSE
+    `arose from service in the police`                   IS FALSE
+    `hospitalized in a hospital in the United States`    IS TRUE
+    `months after effective date of hospitalization`     IS 6
+    `wellness confirmation month`                        IS JUST 0
+    `fraud or misrepresentation or material withholding` IS FALSE
+
+#EVAL `covered` q8
+
+§ `Q9 - son's bite, serving as a police officer`
+
+-- "will my policy apply if I was hospitalized due to my son biting me in
+-- the ankle, proof of my wellness visit was provided 6 months after the
+-- effective date, and I was serving as a police officer at the time of
+-- hospitalization?"
+-- Being on duty as a police officer AT THE TIME of the injury is not the
+-- same as the injury ARISING OUT OF that service (see NOTES.md): a bite
+-- from the claimant's own son has no causal connection to police work, so
+-- §3.1(4) does not apply. Wellness confirmation at month 6 is timely.
+q9 MEANS Claim WITH
+    `age at hospitalization`                             IS 30
+    `nature of medical event`                            IS `Accidental Injury`
+    `injury was self-inflicted and intentional`          IS FALSE
+    `arose from skydiving`                               IS FALSE
+    `arose from service in the military`                 IS FALSE
+    `arose from service as a fire fighter`               IS FALSE
+    `arose from service in the police`                   IS FALSE
+    `hospitalized in a hospital in the United States`    IS TRUE
+    `months after effective date of hospitalization`     IS 1
+    `wellness confirmation month`                        IS JUST 6
+    `fraud or misrepresentation or material withholding` IS FALSE
+
+#EVAL `covered` q9

@@ -1,0 +1,232 @@
+IMPORT policy
+
+-- The nine benchmark queries (Kant et al. 2025, Appendix A.2).
+--
+-- Standing preamble applied to every query below: assume all other
+-- conditions are met and no other exclusions apply, i.e. every fact not
+-- mentioned by a given query is set here to whichever value keeps that
+-- unrelated condition satisfied / that unrelated exclusion untriggered.
+-- Also assumed throughout: the agreement has been signed and the premium
+-- has been paid on time (policy.l4 encodes no rule for either, per the
+-- task instructions, so there is no field for them here).
+
+§ `The nine benchmark queries`
+
+-- Q1: will my policy apply if I was hospitalized by burns suffered while
+-- doing my duty as a firefighter?
+q1 MEANS Claim WITH
+    `age at hospitalization`                                IS 40
+    `hospitalization month`                                 IS 0
+    `hospitalization is for sickness or accidental injury`  IS TRUE
+    `event arose out of skydiving`                          IS FALSE
+    `event arose out of service in the military`            IS FALSE
+    `event arose out of service as a fire fighter`          IS TRUE
+    `event arose out of service in the police`              IS FALSE
+    `wellness visit confirmation month`                     IS NOTHING
+    `wellness visit occurred no later than the 6th month`   IS TRUE
+    `claimant committed fraud`                              IS FALSE
+    `claimant made a misrepresentation`                     IS FALSE
+    `claimant materially withheld information`              IS FALSE
+    `dispute exists between the parties`                    IS FALSE
+    `valid arbitration award has been issued`               IS FALSE
+
+#EVAL `covered` q1
+
+
+-- Q2: will my policy apply if I am 78 years old at the time of
+-- hospitalization?
+q2 MEANS Claim WITH
+    `age at hospitalization`                                IS 78
+    `hospitalization month`                                 IS 0
+    `hospitalization is for sickness or accidental injury`  IS TRUE
+    `event arose out of skydiving`                          IS FALSE
+    `event arose out of service in the military`            IS FALSE
+    `event arose out of service as a fire fighter`          IS FALSE
+    `event arose out of service in the police`              IS FALSE
+    `wellness visit confirmation month`                     IS NOTHING
+    `wellness visit occurred no later than the 6th month`   IS TRUE
+    `claimant committed fraud`                              IS FALSE
+    `claimant made a misrepresentation`                     IS FALSE
+    `claimant materially withheld information`              IS FALSE
+    `dispute exists between the parties`                    IS FALSE
+    `valid arbitration award has been issued`               IS FALSE
+
+#EVAL `covered` q2
+
+
+-- Q3: will my policy apply if I was hospitalized for pneumonia 5 months
+-- after the policy's effective date, and my age at the time of
+-- hospitalization is 65?
+q3 MEANS Claim WITH
+    `age at hospitalization`                                IS 65
+    `hospitalization month`                                 IS 5
+    `hospitalization is for sickness or accidental injury`  IS TRUE
+    `event arose out of skydiving`                          IS FALSE
+    `event arose out of service in the military`            IS FALSE
+    `event arose out of service as a fire fighter`          IS FALSE
+    `event arose out of service in the police`              IS FALSE
+    `wellness visit confirmation month`                     IS NOTHING
+    `wellness visit occurred no later than the 6th month`   IS TRUE
+    `claimant committed fraud`                              IS FALSE
+    `claimant made a misrepresentation`                     IS FALSE
+    `claimant materially withheld information`              IS FALSE
+    `dispute exists between the parties`                    IS FALSE
+    `valid arbitration award has been issued`               IS FALSE
+
+#EVAL `covered` q3
+
+
+-- Q4: will my policy apply if I was hospitalized due to a fall while
+-- traveling abroad and I had given confirmation of my wellness visit 8
+-- months after the policy's effective date?
+q4 MEANS Claim WITH
+    `age at hospitalization`                                IS 40
+    `hospitalization month`                                 IS 0
+    `hospitalization is for sickness or accidental injury`  IS TRUE
+    `event arose out of skydiving`                          IS FALSE
+    `event arose out of service in the military`            IS FALSE
+    `event arose out of service as a fire fighter`          IS FALSE
+    `event arose out of service in the police`              IS FALSE
+    `wellness visit confirmation month`                     IS JUST 8
+    `wellness visit occurred no later than the 6th month`   IS TRUE
+    `claimant committed fraud`                              IS FALSE
+    `claimant made a misrepresentation`                     IS FALSE
+    `claimant materially withheld information`              IS FALSE
+    `dispute exists between the parties`                    IS FALSE
+    `valid arbitration award has been issued`               IS FALSE
+
+#EVAL `covered` q4
+
+
+-- Q5: will my policy apply if I was hospitalized for punching my own face
+-- to show off for my friends and I did not commit fraud or
+-- misrepresentation?
+--
+-- Judgment call: the injury here results from a deliberate act (throwing
+-- the punch) but not from a deliberate intent to injure oneself -- the
+-- claimant meant to show off, not to hospitalize themselves. Under the
+-- ordinary "accidental result" reading of accident insurance (the
+-- unintended consequence of a voluntary act still counts as accidental),
+-- and given the contract's §2.1 exclusions do not list self-inflicted or
+-- intentional injury at all, this is encoded as an accidental injury.
+q5 MEANS Claim WITH
+    `age at hospitalization`                                IS 40
+    `hospitalization month`                                 IS 0
+    `hospitalization is for sickness or accidental injury`  IS TRUE
+    `event arose out of skydiving`                          IS FALSE
+    `event arose out of service in the military`            IS FALSE
+    `event arose out of service as a fire fighter`          IS FALSE
+    `event arose out of service in the police`              IS FALSE
+    `wellness visit confirmation month`                     IS NOTHING
+    `wellness visit occurred no later than the 6th month`   IS TRUE
+    `claimant committed fraud`                              IS FALSE
+    `claimant made a misrepresentation`                     IS FALSE
+    `claimant materially withheld information`              IS FALSE
+    `dispute exists between the parties`                    IS FALSE
+    `valid arbitration award has been issued`               IS FALSE
+
+#EVAL `covered` q5
+
+
+-- Q6: will my policy apply if I was hospitalized due to an injury
+-- sustained while skydiving, my age at the time of hospitalization was 79,
+-- and proof of my wellness visit was provided 6.5 months after the
+-- policy's effective date?
+q6 MEANS Claim WITH
+    `age at hospitalization`                                IS 79
+    `hospitalization month`                                 IS 0
+    `hospitalization is for sickness or accidental injury`  IS TRUE
+    `event arose out of skydiving`                          IS TRUE
+    `event arose out of service in the military`            IS FALSE
+    `event arose out of service as a fire fighter`          IS FALSE
+    `event arose out of service in the police`              IS FALSE
+    `wellness visit confirmation month`                     IS JUST 6.5
+    `wellness visit occurred no later than the 6th month`   IS TRUE
+    `claimant committed fraud`                              IS FALSE
+    `claimant made a misrepresentation`                     IS FALSE
+    `claimant materially withheld information`              IS FALSE
+    `dispute exists between the parties`                    IS FALSE
+    `valid arbitration award has been issued`               IS FALSE
+
+#EVAL `covered` q6
+
+
+-- Q7: will my policy apply if I was hospitalized for a heart attack, proof
+-- of the wellness visit was submitted 2 months after the policy's
+-- effective date, and my age at the time of hospitalization was 75?
+q7 MEANS Claim WITH
+    `age at hospitalization`                                IS 75
+    `hospitalization month`                                 IS 0
+    `hospitalization is for sickness or accidental injury`  IS TRUE
+    `event arose out of skydiving`                          IS FALSE
+    `event arose out of service in the military`            IS FALSE
+    `event arose out of service as a fire fighter`          IS FALSE
+    `event arose out of service in the police`              IS FALSE
+    `wellness visit confirmation month`                     IS JUST 2
+    `wellness visit occurred no later than the 6th month`   IS TRUE
+    `claimant committed fraud`                              IS FALSE
+    `claimant made a misrepresentation`                     IS FALSE
+    `claimant materially withheld information`              IS FALSE
+    `dispute exists between the parties`                    IS FALSE
+    `valid arbitration award has been issued`               IS FALSE
+
+#EVAL `covered` q7
+
+
+-- Q8: will my policy apply if I was hospitalized after being injured in a
+-- military training exercise, the hospitalization occurred within the
+-- policy term, and I did not commit fraud?
+--
+-- Judgment call: "the hospitalization occurred within the policy term" is
+-- encoded by giving `hospitalization month` a value within the one-year
+-- (12-month) term, since policy.l4 tests term-membership via that same
+-- relative-month field rather than via a separate primitive fact.
+q8 MEANS Claim WITH
+    `age at hospitalization`                                IS 40
+    `hospitalization month`                                 IS 0
+    `hospitalization is for sickness or accidental injury`  IS TRUE
+    `event arose out of skydiving`                          IS FALSE
+    `event arose out of service in the military`            IS TRUE
+    `event arose out of service as a fire fighter`          IS FALSE
+    `event arose out of service in the police`              IS FALSE
+    `wellness visit confirmation month`                     IS NOTHING
+    `wellness visit occurred no later than the 6th month`   IS TRUE
+    `claimant committed fraud`                              IS FALSE
+    `claimant made a misrepresentation`                     IS FALSE
+    `claimant materially withheld information`              IS FALSE
+    `dispute exists between the parties`                    IS FALSE
+    `valid arbitration award has been issued`               IS FALSE
+
+#EVAL `covered` q8
+
+
+-- Q9: will my policy apply if I was hospitalized due to my son biting me
+-- in the ankle, proof of my wellness visit was provided 6 months after the
+-- effective date, and I was serving as a police officer at the time of
+-- hospitalization?
+--
+-- Judgment call: §2.1(4) excludes an event "arising directly or indirectly
+-- out of ... service in the police" -- a causal requirement, not a mere
+-- status requirement. Being employed as a police officer "at the time of
+-- hospitalization" does not by itself mean the injury arose out of that
+-- service; a son biting his parent's ankle is a domestic incident with no
+-- causal connection to police duties. So the police-service exclusion flag
+-- is set FALSE here even though the claimant's occupation is a police
+-- officer.
+q9 MEANS Claim WITH
+    `age at hospitalization`                                IS 40
+    `hospitalization month`                                 IS 0
+    `hospitalization is for sickness or accidental injury`  IS TRUE
+    `event arose out of skydiving`                          IS FALSE
+    `event arose out of service in the military`            IS FALSE
+    `event arose out of service as a fire fighter`          IS FALSE
+    `event arose out of service in the police`              IS FALSE
+    `wellness visit confirmation month`                     IS JUST 6
+    `wellness visit occurred no later than the 6th month`   IS TRUE
+    `claimant committed fraud`                              IS FALSE
+    `claimant made a misrepresentation`                     IS FALSE
+    `claimant materially withheld information`              IS FALSE
+    `dispute exists between the parties`                    IS FALSE
+    `valid arbitration award has been issued`               IS FALSE
+
+#EVAL `covered` q9

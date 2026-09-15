@@ -49,7 +49,7 @@ Add inline `@desc` annotations to `GIVEN` parameters so API consumers can learn 
 GIVEN applicant IS A Applicant @desc The applicant to check
 GIVETH A BOOLEAN
 DECIDE `qualifies for discount` IF
-    applicant's `is existing customer`
+    applicant's `existing customer`
     AND applicant's `risk score` <= 0.5
 ```
 
@@ -137,7 +137,7 @@ curl -X POST https://api.legalese.cloud/{orgSlug}/insurance-premium/functions/ca
       "applicant": {
         "age": 35,
         "risk-score": 0.4,
-        "is-existing-customer": true
+        "existing-customer": true
       }
     }
   }'
@@ -154,7 +154,7 @@ curl -X POST https://api.legalese.cloud/{orgSlug}/insurance-premium/functions/qu
       "applicant": {
         "age": 35,
         "risk-score": 0.4,
-        "is-existing-customer": true
+        "existing-customer": true
       }
     }
   }'
@@ -168,7 +168,7 @@ Not sure which inputs matter? Use the query-plan endpoint to ask only the questi
 curl -X POST https://api.legalese.cloud/{orgSlug}/insurance-premium/functions/calculate-premium/query-plan \
   -H "Authorization: Bearer sk_..." \
   -H "Content-Type: application/json" \
-  -d '{"arguments": {"applicant": {"is-existing-customer": true}}}'
+  -d '{"arguments": {"applicant": {"existing-customer": true}}}'
 ```
 
 This returns which inputs are still needed, ranked by their impact on the result.
@@ -208,7 +208,7 @@ curl -X POST https://mcp.legalese.cloud/{orgSlug}/insurance-premium \
         "applicant": {
           "age": 35,
           "risk-score": 0.4,
-          "is-existing-customer": true
+          "existing-customer": true
         }
       }
     }
@@ -221,7 +221,7 @@ The service logs every MCP tool call as structured JSON — the same format used
 
 ### WebMCP (Browser AI Agents)
 
-[WebMCP](https://webmachinelearning.github.io/webmcp/) is a W3C standard that lets websites expose structured tools to browser-based AI agents — no scraping or DOM inspection required.
+[WebMCP](https://webmachinelearning.github.io/webmcp/) lets websites expose structured tools to browser-based AI agents — no scraping or DOM inspection required. It is a draft: its specification is a Draft Community Group Report of the W3C Web Machine Learning Community Group (status line dated 14 September 2026), and it says in terms that it "is not a W3C Standard nor is it on the W3C Standards Track." This page called it a W3C standard until 2026-09-15; it never was one.
 
 The L4 service provides a JavaScript snippet you can embed on any web page:
 

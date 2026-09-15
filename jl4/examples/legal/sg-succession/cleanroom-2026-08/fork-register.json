@@ -3298,7 +3298,7 @@
       "taken": {
         "reading": "R2",
         "mechanism": "encoded",
-        "rationale": "The encoding LEAVES THE CHOICE VISIBLE rather than burying it: limb (a) is a recorded fact (`has sold, mortgaged, exchanged, or otherwise parted with the possession of any of the movable or immovable property of the infant`), so a case file that records a short lease as a parting with possession will make the prohibition bite; and limb (b) computes from a recorded term."
+        "rationale": "The encoding LEAVES THE CHOICE VISIBLE rather than burying it: limb (a) is a recorded fact (`sold, mortgaged, exchanged, or otherwise parted with the possession of any of the movable or immovable property of the infant`), so a case file that records a short lease as a parting with possession will make the prohibition bite; and limb (b) computes from a recorded term."
       },
       "status": "resolved",
       "divergence": "observable",

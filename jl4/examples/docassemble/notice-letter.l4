@@ -61,7 +61,7 @@ DECLARE Notice
       @desc The address of the let property
       `the property address`     IS A STRING
       @desc Whether the letting is of a dwelling occupied as a home
-      `is a residential tenancy` IS A BOOLEAN
+      `a residential tenancy` IS A BOOLEAN
       @desc Whether the notice to quit was served in writing
       `written notice was given` IS A BOOLEAN
       @desc Length of the notice period served, in whole months
@@ -71,7 +71,7 @@ DECLARE Notice
 GIVEN n IS A Notice @desc The notice to quit under assessment
 GIVETH A BOOLEAN
 DECIDE `the notice to quit is valid` n IF
-        n's `is a residential tenancy`
+        n's `a residential tenancy`
     AND n's `written notice was given`
     AND n's `months of notice given` AT LEAST 2
 
@@ -81,7 +81,7 @@ DECIDE `the notice to quit is valid` n IF
             `the landlord name`        IS "Marbury Estates Ltd"
             `the tenant name`          IS "A. Tenant"
             `the property address`     IS "14 Chancery Lane, Flat B"
-            `is a residential tenancy` IS TRUE
+            `a residential tenancy` IS TRUE
             `written notice was given` IS TRUE
             `months of notice given`   IS 3
 -- TRUE
@@ -94,7 +94,7 @@ DECIDE `the notice to quit is valid` n IF
             `the landlord name`        IS "Marbury Estates Ltd"
             `the tenant name`          IS "A. Tenant"
             `the property address`     IS "14 Chancery Lane, Flat B"
-            `is a residential tenancy` IS TRUE
+            `a residential tenancy` IS TRUE
             `written notice was given` IS TRUE
             `months of notice given`   IS 1
 -- FALSE

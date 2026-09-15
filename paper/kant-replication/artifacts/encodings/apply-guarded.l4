@@ -1,0 +1,93 @@
+IMPORT `ref-guarded`
+
+§ `Nine coverage queries against the guarded encoding`
+
+-- One maker so every claim below is built the same way and only the fields a
+-- query actually speaks to are varied.  Everything not named by a query is set
+-- to the value that lets the policy apply, per the standing preamble.
+GIVEN ground   IS A `Hospitalization Ground`
+      hosp     IS A NUMBER
+      age      IS A NUMBER
+      causes   IS A LIST OF Cause
+      visit    IS A MAYBE NUMBER
+      conf     IS A MAYBE NUMBER
+      fraud    IS A BOOLEAN
+      misrep   IS A BOOLEAN
+      withheld IS A BOOLEAN
+GIVETH A Claim
+`a claim` ground hosp age causes visit conf fraud misrep withheld MEANS
+  Claim WITH
+    `the hospitalization was for` IS ground
+    `month of the hospitalization` IS hosp
+    `age at the time of the hospitalization` IS age
+    `the event arose directly or indirectly out of` IS causes
+    `this agreement is signed` IS TRUE
+    `the applicable premium for the policy period has been paid` IS TRUE
+    `month the wellness visit occurred` IS visit
+    `month written confirmation of the visit was supplied` IS conf
+    `there is fraud` IS fraud
+    `there is a misrepresentation of information provided to the Company` IS misrep
+    `there is a material withholding of information provided to the Company` IS withheld
+    `a dispute or disagreement has arisen` IS FALSE
+    `month the parties were unable to settle the dispute` IS NOTHING
+    `month arbitration was commenced` IS NOTHING
+    `a valid arbitration award has been issued` IS FALSE
+    `month written proof of claim was submitted` IS NOTHING
+    `month recovery on the policy is sought` IS NOTHING
+
+`no named cause` MEANS LIST `a cause not named in clause 2.1`
+
+-- Q1: burns suffered while doing my duty as a firefighter.
+`Q1 claim` MEANS `a claim` `accidental injury` 8 40 (LIST `service as a fire fighter`) (JUST 6) (JUST 7) FALSE FALSE FALSE
+#EVAL `benefit is payable` `Q1 claim`
+
+-- Q2: 78 years old at the time of hospitalization.
+`Q2 claim` MEANS `a claim` sickness 8 78 `no named cause` (JUST 6) (JUST 7) FALSE FALSE FALSE
+#EVAL `benefit is payable` `Q2 claim`
+
+-- Q3: pneumonia, hospitalized month 5, age 65.
+`Q3 claim` MEANS `a claim` sickness 5 65 `no named cause` (JUST 3) (JUST 4) FALSE FALSE FALSE
+#EVAL `benefit is payable` `Q3 claim`
+
+-- Q4: fall while travelling abroad; confirmation supplied at month 8.
+--     Hospitalization month is not named by the query, so it is set to the
+--     value that lets the policy apply (month 7 -- 1.3 is then still pending).
+`Q4 claim` MEANS `a claim` `accidental injury` 7 40 `no named cause` (JUST 6) (JUST 8) FALSE FALSE FALSE
+#EVAL `benefit is payable` `Q4 claim`
+
+-- Q4b: the same claim with the hospitalization at month 9 instead, i.e. after
+--      the month-7 confirmation deadline had passed.
+`Q4b claim` MEANS `a claim` `accidental injury` 9 40 `no named cause` (JUST 6) (JUST 8) FALSE FALSE FALSE
+#EVAL `benefit is payable` `Q4b claim`
+
+-- Q5: punching my own face to show off; no fraud, no misrepresentation.
+--     A deliberately self-inflicted blow is neither sickness nor accidental
+--     injury.
+`Q5 claim` MEANS `a claim` `neither sickness nor accidental injury` 8 40 `no named cause` (JUST 6) (JUST 7) FALSE FALSE FALSE
+#EVAL `benefit is payable` `Q5 claim`
+
+-- Q5b: the same claim read instead as an accidental injury.
+`Q5b claim` MEANS `a claim` `accidental injury` 8 40 `no named cause` (JUST 6) (JUST 7) FALSE FALSE FALSE
+#EVAL `benefit is payable` `Q5b claim`
+
+-- Q6: skydiving injury, age 79, confirmation supplied at month 6.5.
+`Q6 claim` MEANS `a claim` `accidental injury` 7 79 (LIST skydiving) (JUST 6) (JUST 6.5) FALSE FALSE FALSE
+#EVAL `benefit is payable` `Q6 claim`
+
+-- Q7: heart attack, confirmation supplied at month 2, age 75.
+`Q7 claim` MEANS `a claim` sickness 3 75 `no named cause` (JUST 1) (JUST 2) FALSE FALSE FALSE
+#EVAL `benefit is payable` `Q7 claim`
+
+-- Q8: injured in a military training exercise, inside the term, no fraud.
+`Q8 claim` MEANS `a claim` `accidental injury` 8 40 (LIST `service in the military`) (JUST 6) (JUST 7) FALSE FALSE FALSE
+#EVAL `benefit is payable` `Q8 claim`
+
+-- Q9: bitten in the ankle by my son; confirmation supplied at month 6; I was
+--     serving as a police officer at the time.  The bite does not arise
+--     directly or indirectly out of police service, so 2.1(4) is not engaged.
+`Q9 claim` MEANS `a claim` `accidental injury` 7 40 `no named cause` (JUST 6) (JUST 6) FALSE FALSE FALSE
+#EVAL `benefit is payable` `Q9 claim`
+
+-- Q9b: the same claim read instead as arising out of service in the police.
+`Q9b claim` MEANS `a claim` `accidental injury` 7 40 (LIST `service in the police`) (JUST 6) (JUST 6) FALSE FALSE FALSE
+#EVAL `benefit is payable` `Q9b claim`

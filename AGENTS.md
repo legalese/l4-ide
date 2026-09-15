@@ -153,7 +153,7 @@ Prefer separate `.l4` files over inline code blocks so examples are validated:
 
 All L4 code must compile. Validate with `l4 check path/to/file.l4` (or `cabal run l4 -- check path/to/file.l4` from a Haskell checkout) or the MCP validator.
 
-Write identifiers that read like natural language for legal audiences: `` `the applicant` `` not `applicant`, `` `has valid identification` `` not `hasValidID`. No camel-case or. Be very descriptive.
+Write identifiers that read like natural language for legal audiences: `` `the applicant` `` not `applicant`, `` `valid identification` `` not `hasValidID`. No camel-case or. Be very descriptive.
 
 ### Validating docs
 

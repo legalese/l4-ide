@@ -1,0 +1,193 @@
+IMPORT policy
+
+-- Standing preamble (applies to every query below): assume all other conditions for the
+-- policy to apply are met, and no other exclusions apply, unless the query itself puts that
+-- fact in issue. The agreement is signed and the premium was paid on time (not modeled, per
+-- policy.l4). All times are given as a NUMBER of months relative to the policy's effective
+-- date; the claimant's age is an ordinary NUMBER of years.
+
+§ `Q1 -- burns suffered while on duty as a firefighter`
+
+-- "will my policy apply if I was hospitalized by burns suffered while doing my duty as a
+--  firefighter?" -- squarely S.2.1(3), "Service as a fire fighter".
+q1 MEANS Claim WITH
+    `hospitalization time`                                              IS 2,
+    `claimant age at hospitalization`                                   IS 40,
+    `caused by sickness or accidental injury`                           IS TRUE,
+    `arose out of skydiving`                                            IS FALSE,
+    `arose out of service in the military`                              IS FALSE,
+    `arose out of service as a fire fighter`                            IS TRUE,
+    `arose out of service in the police`                                IS FALSE,
+    `wellness visit time`                                               IS JUST 1,
+    `wellness visit confirmation time`                                  IS JUST 1,
+    `fraud or misrepresentation or material withholding of information` IS FALSE
+
+#EVAL `covered` q1
+
+§ `Q2 -- age 78 at the time of hospitalization`
+
+-- "will my policy apply if I am 78 years old at the time of hospitalization?" -- tests
+-- S.2.1(5), whose threshold is "equal to or greater than 80"; 78 is below it.
+q2 MEANS Claim WITH
+    `hospitalization time`                                              IS 2,
+    `claimant age at hospitalization`                                   IS 78,
+    `caused by sickness or accidental injury`                           IS TRUE,
+    `arose out of skydiving`                                            IS FALSE,
+    `arose out of service in the military`                              IS FALSE,
+    `arose out of service as a fire fighter`                            IS FALSE,
+    `arose out of service in the police`                                IS FALSE,
+    `wellness visit time`                                               IS JUST 1,
+    `wellness visit confirmation time`                                  IS JUST 1,
+    `fraud or misrepresentation or material withholding of information` IS FALSE
+
+#EVAL `covered` q2
+
+§ `Q3 -- pneumonia, 5 months after the effective date, age 65`
+
+-- "will my policy apply if I was hospitalized for pneumonia 5 months after the policy's
+--  effective date, and my age at the time of hospitalization is 65?" -- within the one-year
+-- term, below the age exclusion, not one of the four excluded activities, and the wellness
+-- condition (not mentioned by the query) is set to a comfortably compliant default.
+q3 MEANS Claim WITH
+    `hospitalization time`                                              IS 5,
+    `claimant age at hospitalization`                                   IS 65,
+    `caused by sickness or accidental injury`                           IS TRUE,
+    `arose out of skydiving`                                            IS FALSE,
+    `arose out of service in the military`                              IS FALSE,
+    `arose out of service as a fire fighter`                            IS FALSE,
+    `arose out of service in the police`                                IS FALSE,
+    `wellness visit time`                                               IS JUST 1,
+    `wellness visit confirmation time`                                  IS JUST 1,
+    `fraud or misrepresentation or material withholding of information` IS FALSE
+
+#EVAL `covered` q3
+
+§ `Q4 -- fall while traveling abroad, wellness confirmation given at 8 months`
+
+-- "will my policy apply if I was hospitalized due to a fall while traveling abroad and I had
+--  given confirmation of my wellness visit 8 months after the policy's effective date?" --
+-- 8 exceeds the 7-month S.1.3 confirmation deadline, so condition 1.3 is not satisfied in a
+-- timely fashion; the hospitalization is set to occur after that confirmation event (month
+-- 9), so the "still pending" escape of S.1.1(3) is not in play. "Traveling abroad" is not
+-- excluded (S.3.1: worldwide, 24-hour coverage).
+q4 MEANS Claim WITH
+    `hospitalization time`                                              IS 9,
+    `claimant age at hospitalization`                                   IS 40,
+    `caused by sickness or accidental injury`                           IS TRUE,
+    `arose out of skydiving`                                            IS FALSE,
+    `arose out of service in the military`                              IS FALSE,
+    `arose out of service as a fire fighter`                            IS FALSE,
+    `arose out of service in the police`                                IS FALSE,
+    `wellness visit time`                                               IS JUST 8,
+    `wellness visit confirmation time`                                  IS JUST 8,
+    `fraud or misrepresentation or material withholding of information` IS FALSE
+
+#EVAL `covered` q4
+
+§ `Q5 -- self-inflicted stunt injury, no fraud or misrepresentation`
+
+-- "will my policy apply if I was hospitalized for punching my own face to show off for my
+--  friends and I did not commit fraud or misrepresentation?" -- Section 2 lists no exclusion
+-- for self-inflicted, reckless, or foolhardy conduct; the query's own denial of fraud closes
+-- off the only textually-grounded route (S.1.2) by which this conduct could disqualify the
+-- claim. The hospitalization-level injury was not itself the intended object of the stunt,
+-- so it is treated as an accidental injury (see NOTES.md for the alternative reading).
+q5 MEANS Claim WITH
+    `hospitalization time`                                              IS 2,
+    `claimant age at hospitalization`                                   IS 30,
+    `caused by sickness or accidental injury`                           IS TRUE,
+    `arose out of skydiving`                                            IS FALSE,
+    `arose out of service in the military`                              IS FALSE,
+    `arose out of service as a fire fighter`                            IS FALSE,
+    `arose out of service in the police`                                IS FALSE,
+    `wellness visit time`                                               IS JUST 1,
+    `wellness visit confirmation time`                                  IS JUST 1,
+    `fraud or misrepresentation or material withholding of information` IS FALSE
+
+#EVAL `covered` q5
+
+§ `Q6 -- skydiving injury, age 79, wellness proof at 6.5 months`
+
+-- "will my policy apply if I was hospitalized due to an injury sustained while skydiving, my
+--  age at the time of hospitalization was 79, and proof of my wellness visit was provided
+--  6.5 months after the policy's effective date?" -- skydiving is squarely S.2.1(1); age 79
+-- is below the age-80 threshold; wellness proof at 6.5 months is within the 7-month
+-- confirmation deadline but past the 6-month visit deadline (see NOTES.md), so condition 1.3
+-- also fails on this reading -- though the skydiving exclusion alone already disqualifies
+-- the claim regardless of how that boundary is resolved.
+q6 MEANS Claim WITH
+    `hospitalization time`                                              IS 7,
+    `claimant age at hospitalization`                                   IS 79,
+    `caused by sickness or accidental injury`                           IS TRUE,
+    `arose out of skydiving`                                            IS TRUE,
+    `arose out of service in the military`                              IS FALSE,
+    `arose out of service as a fire fighter`                            IS FALSE,
+    `arose out of service in the police`                                IS FALSE,
+    `wellness visit time`                                               IS JUST 6.5,
+    `wellness visit confirmation time`                                  IS JUST 6.5,
+    `fraud or misrepresentation or material withholding of information` IS FALSE
+
+#EVAL `covered` q6
+
+§ `Q7 -- heart attack, wellness confirmation at 2 months, age 75`
+
+-- "will my policy apply if I was hospitalized for a heart attack, proof of the wellness
+--  visit was submitted 2 months after the policy's effective date, and my age at the time of
+--  hospitalization was 75?" -- a heart attack is a sickness, not one of the four excluded
+-- activities; age 75 is below the exclusion threshold; 2 months is comfortably within both
+-- S.1.3 deadlines.
+q7 MEANS Claim WITH
+    `hospitalization time`                                              IS 3,
+    `claimant age at hospitalization`                                   IS 75,
+    `caused by sickness or accidental injury`                           IS TRUE,
+    `arose out of skydiving`                                            IS FALSE,
+    `arose out of service in the military`                              IS FALSE,
+    `arose out of service as a fire fighter`                            IS FALSE,
+    `arose out of service in the police`                                IS FALSE,
+    `wellness visit time`                                               IS JUST 2,
+    `wellness visit confirmation time`                                  IS JUST 2,
+    `fraud or misrepresentation or material withholding of information` IS FALSE
+
+#EVAL `covered` q7
+
+§ `Q8 -- military training exercise injury, within the policy term, no fraud`
+
+-- "will my policy apply if I was hospitalized after being injured in a military training
+--  exercise, the hospitalization occurred within the policy term, and I did not commit
+--  fraud?" -- a training exercise is service in the military, so S.2.1(2) applies.
+q8 MEANS Claim WITH
+    `hospitalization time`                                              IS 3,
+    `claimant age at hospitalization`                                   IS 30,
+    `caused by sickness or accidental injury`                           IS TRUE,
+    `arose out of skydiving`                                            IS FALSE,
+    `arose out of service in the military`                              IS TRUE,
+    `arose out of service as a fire fighter`                            IS FALSE,
+    `arose out of service in the police`                                IS FALSE,
+    `wellness visit time`                                               IS JUST 1,
+    `wellness visit confirmation time`                                  IS JUST 1,
+    `fraud or misrepresentation or material withholding of information` IS FALSE
+
+#EVAL `covered` q8
+
+§ `Q9 -- bitten by claimant's own son, while serving as a police officer`
+
+-- "will my policy apply if I was hospitalized due to my son biting me in the ankle, proof of
+--  my wellness visit was provided 6 months after the effective date, and I was serving as a
+--  police officer at the time of hospitalization?" -- S.2.1(4) excludes injury "arising
+-- directly or indirectly out of ... [s]ervice in the police"; being bitten by one's own son
+-- is a domestic incident with no causal connection to police duties, so merely holding that
+-- occupation at the time does not trigger the exclusion (see NOTES.md). Wellness proof at
+-- 6 months meets both S.1.3 deadlines.
+q9 MEANS Claim WITH
+    `hospitalization time`                                              IS 6,
+    `claimant age at hospitalization`                                   IS 30,
+    `caused by sickness or accidental injury`                           IS TRUE,
+    `arose out of skydiving`                                            IS FALSE,
+    `arose out of service in the military`                              IS FALSE,
+    `arose out of service as a fire fighter`                            IS FALSE,
+    `arose out of service in the police`                                IS FALSE,
+    `wellness visit time`                                               IS JUST 6,
+    `wellness visit confirmation time`                                  IS JUST 6,
+    `fraud or misrepresentation or material withholding of information` IS FALSE
+
+#EVAL `covered` q9

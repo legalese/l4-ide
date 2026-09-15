@@ -1,0 +1,136 @@
+IMPORT prelude
+
+§ `CODEX INSURANCE LIMITED — hospitalization policy`
+
+-- Isomorphic encoding of the fixture at inputs/chubb-policy.txt. Section numbers
+-- below (1.1, 1.2, 1.3, 2.1, 3.1-3.6) match the numbering in that document.
+--
+-- Two standing assumptions, per the task brief, are NOT modelled as fields or
+-- conjuncts anywhere below:
+--   * the agreement has been signed;
+--   * the premium for the policy period has been paid, on time.
+-- Both are items 1-2 of §1.1's four-part test; only items 3-4 (the §1.3
+-- condition, and non-cancelation) vary from claim to claim, so only those two
+-- are represented in `policy in effect at time of hospitalization`.
+--
+-- All times are NUMBERs of months elapsed since the policy's effective date
+-- (0 = the effective date itself), never absolute dates — the effective date
+-- itself never needs representing, only offsets from it, per the task brief.
+
+§§ `The Claim record — the facts a query must supply`
+
+DECLARE Claim HAS
+    `month of hospitalization`                            IS A NUMBER
+    `age at hospitalization`                               IS A NUMBER
+    `caused by skydiving`                                  IS A BOOLEAN
+    `caused by military service`                           IS A BOOLEAN
+    `caused by firefighter service`                        IS A BOOLEAN
+    `caused by police service`                             IS A BOOLEAN
+    `month of the wellness visit`                          IS A MAYBE NUMBER
+    `month the wellness visit confirmation was supplied`   IS A MAYBE NUMBER
+    `guilty of fraud, misrepresentation, or withholding`   IS A BOOLEAN
+
+-- Notes on the four "caused by ..." flags: §2.1 excludes an event "arising
+-- directly or indirectly out of" the named service or activity — a causal
+-- test, not a status test. A claimant who merely *holds* one of these
+-- occupations "at the time" of an unrelated hospitalization does not trip the
+-- exclusion; the hospitalizing event itself must arise out of the service.
+-- Each flag therefore records that causal fact directly, and it is for the
+-- query (in apply.l4) to decide, from the fact pattern, whether it is TRUE.
+
+§§ `1.3 — the wellness-visit condition`
+
+-- "No later than the 7th month anniversary ... you will supply us with
+--  written confirmation ... of a wellness visit ... occurring no later than
+--  the 6th month anniversary ..."
+-- This bundles two deadlines into one compliance act: the visit itself
+-- (<= 6 months) and the confirmation of it reaching the insurer (<= 7
+-- months). Until the 7-month deadline arrives, the condition is "still
+-- pending" (§1.1 item 3) even though nothing has yet been supplied.
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `wellness visit occurred timely` claim IS
+    CONSIDER visitMonth
+    WHEN NOTHING THEN TRUE
+        -- the visit's own date was not part of this query's fact pattern;
+        -- unrelated to whatever is being tested, so treated as satisfied
+    WHEN JUST vm THEN vm AT MOST 6
+    WHERE
+        visitMonth MEANS claim's `month of the wellness visit`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `condition 1.3 pending or satisfied` claim IS
+    CONSIDER confirmationMonth
+    WHEN NOTHING THEN claim's `month of hospitalization` LESS THAN 7
+        -- nothing supplied yet, but the 7-month deadline has not passed
+        -- either, so the condition is still pending, not yet breached
+    WHEN JUST cm THEN
+            cm AT MOST 7
+        AND `wellness visit occurred timely` claim
+    WHERE
+        confirmationMonth MEANS claim's `month the wellness visit confirmation was supplied`
+
+§§ `1.2 — cancelation`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `policy canceled` claim IS
+        -- fraud, or any misrepresentation or material withholding of information
+        claim's `guilty of fraud, misrepresentation, or withholding`
+    OR  -- the §1.3 condition was not satisfied in a timely fashion
+        NOT (`condition 1.3 pending or satisfied` claim)
+    OR  -- automatically canceled at the end of the one-year policy term (§3.6)
+        claim's `month of hospitalization` AT LEAST 12
+
+§§ `1.1 — policy in effect and conditions`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `policy in effect at time of hospitalization` claim IS
+        `condition 1.3 pending or satisfied` claim
+    AND NOT `policy canceled` claim
+
+§§ `2.1 — general exclusions`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `excluded event` claim IS
+        -- 1. Skydiving
+        claim's `caused by skydiving`
+    OR  -- 2. Service in the military
+        claim's `caused by military service`
+    OR  -- 3. Service as a fire fighter
+        claim's `caused by firefighter service`
+    OR  -- 4. Service in the police
+        claim's `caused by police service`
+    OR  -- 5. age at the time of the hospitalization is equal to or greater than 80
+        claim's `age at hospitalization` AT LEAST 80
+
+§§ `3.1 — territorial scope`
+
+-- "Your Policy insures You twenty-four (24) hours a day anywhere in the
+--  world." There is no territorial exclusion to encode: being abroad, or at
+--  any particular hour, never removes coverage.
+
+§§ `3.2-3.5 — arbitration, governing law, currency, premium`
+
+-- Dispute-resolution mechanics (§3.2), choice of law (§3.3), currency of
+-- payment (§3.4), and the lump-sum timing of the premium (§3.5) govern how a
+-- dispute is resolved and how money moves, not whether a given
+-- hospitalization event is one the policy covers. No rule is derived from
+-- them for `covered` below.
+
+§§ `3.6 — policy term`
+
+-- "will last for a period of one year from [the effective] date" — captured
+-- above as the `AT LEAST 12` disjunct of `policy canceled`.
+
+§§ `Top-level decision`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `covered` claim IS
+        `policy in effect at time of hospitalization` claim
+    AND NOT `excluded event` claim

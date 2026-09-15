@@ -1,0 +1,154 @@
+-- Codex Insurance Limited -- Hospital Income Policy
+--
+-- Isomorphic encoding of the contract in fixtures/chubb-policy.txt.
+-- Rules only -- no claim data is defined in this file (see apply.l4).
+--
+-- Modelling notes (see NOTES.md for the full list of judgement calls):
+--   * Per the task brief, signing (S1.1(1)) and timely premium payment (S1.1(2)) are
+--     ASSUMED true for every claim and are therefore not modelled as rules.
+--   * Per the task brief, every date/time relevant to a claim (other than the
+--     claimant's age) is given relative to the policy's effective date. So every
+--     temporal fact below is a NUMBER of months elapsed since the effective date,
+--     and no calendar-date arithmetic (daydate/YMD) is needed anywhere in this file.
+
+§ `Defined terms`
+
+DECLARE Claim HAS
+    -- S1.3 -- the wellness-visit condition
+    `wellness visit occurred by month`                IS A NUMBER
+        -- months after the effective date that the medical wellness visit itself took place
+    `wellness visit confirmation supplied by month`   IS A NUMBER
+        -- months after the effective date that written confirmation of that visit was
+        -- supplied by You to the Company
+
+    -- S1.2 -- cancellation ground: fraud / misrepresentation / material withholding
+    `fraud or misrepresentation`                      IS A BOOLEAN
+
+    -- S4.6 / S1.1 -- timing of the hospitalization giving rise to the claim
+    `hospitalization occurs by month`                 IS A NUMBER
+        -- months after the effective date that the hospitalization (confinement) began
+
+    -- S2 -- the benefit trigger
+    `confined due to sickness or injury`              IS A BOOLEAN
+        -- confined in a hospital as a result of sickness or accidental Injury (S2.1)
+    `hospital located in the United States`           IS A BOOLEAN
+        -- S2.2 restricts the Daily Hospital Income Benefit to confinement in a hospital
+        -- in the United States
+    `claim made to the Company`                       IS A BOOLEAN
+        -- S2.3 -- a claim was made to the Company setting out the basis for the claim
+
+    -- S3.1 -- general exclusions, items 1-4: causal ("arising ... out of") grounds
+    `sickness or injury arose from skydiving`                    IS A BOOLEAN
+    `sickness or injury arose from service in the military`      IS A BOOLEAN
+    `sickness or injury arose from service as a fire fighter`    IS A BOOLEAN
+    `sickness or injury arose from service in the police`        IS A BOOLEAN
+
+    -- S3.1, item 5 -- age-based exclusion (a standalone bar, not an "arising out of" ground)
+    `age at the time of hospitalization`              IS A NUMBER
+
+
+§ `Section 1 -- Policy in effect and conditions`
+
+§§ `1.3 -- the wellness-visit condition`
+
+-- "No later than the 7th month anniversary ... you will supply us with written
+-- confirmation ... of a wellness visit ... occurring no later than the 6th month
+-- anniversary of the effective date of this policy."
+--
+-- Both the visit itself (<= 6 months) and the supply of written confirmation of it
+-- (<= 7 months) are required. Every claim in this benchmark reports these as completed,
+-- historical facts relative to the effective date (never as an open/indeterminate
+-- status), so the alternative limb of S1.1(3) ("... is still pending or has been
+-- satisfied ...") never has independent effect here: a confirmation reported as
+-- supplied at month M is, by that very fact, already at or past month M, so "still
+-- pending" cannot rescue a confirmation reported late. See NOTES.md.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `the section 1.3 condition has been satisfied in a timely fashion` claim IF
+        claim's `wellness visit occurred by month`              AT MOST 6
+    AND claim's `wellness visit confirmation supplied by month` AT MOST 7
+
+
+§§ `1.1 / 4.6 -- the policy term`
+
+-- "will last for a period of one year from that date"
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `the hospitalization occurs within the one-year policy term` claim IF
+    claim's `hospitalization occurs by month` AT MOST 12
+
+
+§§ `1.2 -- cancellation`
+
+-- "Cancelation will be deemed to have occurred if there is fraud, or any
+-- misrepresentation or material withholding of any information ..., or if the
+-- condition set out in Section 1.3 has not been satisfied in a timely fashion. It
+-- will also be automatically canceled ... on the last day of the policy term ..."
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `the policy has been canceled` claim IF
+        claim's `fraud or misrepresentation`
+    OR  NOT `the section 1.3 condition has been satisfied in a timely fashion` claim
+    OR  NOT `the hospitalization occurs within the one-year policy term` claim
+
+
+§§ `1.1 -- policy in effect`
+
+-- "The payment of any benefit under this policy is conditioned on the policy being in
+-- effect at the time of the hospitalization ... The policy will be in effect if: 1.
+-- This agreement is signed [ASSUMED], 2. The applicable premium ... has been paid
+-- [ASSUMED], 3. The condition set out in Section 1.3 is still pending or has been
+-- satisfied ..., and 4. The policy has not been canceled."
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `the policy is in effect at the time of the hospitalization` claim IF
+    NOT `the policy has been canceled` claim
+
+
+§ `Section 2 -- Benefits`
+
+-- "If you have been confined in a hospital as a result of sickness or accidental
+-- Injury, we will pay you the Daily Hospital Income Benefit ... will only be payable
+-- for each (24 hour) day of continuous confinement in a hospital in the United States
+-- ... To trigger any benefit, a claim must be made to the Company ..."
+--
+-- The 365-day cap and the $500/day amount (S2.2, S5.1) govern only the *quantum* of
+-- the benefit, not whether the policy applies to the claim, so they are not modelled:
+-- none of the benchmark questions ask about duration or amount.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `the benefit conditions of section 2 are met` claim IF
+        claim's `confined due to sickness or injury`
+    AND claim's `hospital located in the United States`
+    AND claim's `claim made to the Company`
+
+
+§ `Section 3 -- General exclusions`
+
+-- "Your policy will not apply to, and no benefit will be paid with respect to, any
+-- event causing sickness or accidental injury arising directly or indirectly out of:
+-- 1. Skydiving; or 2. Service in the military; or 3. Service as a fire fighter; or 4.
+-- Service in the police; or 5. If your age at the time of the hospitalization is equal
+-- to or greater than 80 years of age."
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `a general exclusion applies` claim IF
+        claim's `sickness or injury arose from skydiving`
+    OR  claim's `sickness or injury arose from service in the military`
+    OR  claim's `sickness or injury arose from service as a fire fighter`
+    OR  claim's `sickness or injury arose from service in the police`
+    OR  claim's `age at the time of hospitalization` AT LEAST 80
+
+
+§ `Top-level coverage decision`
+
+-- Combines S1 (policy in effect), S2 (the benefit is triggered) and S3 (no exclusion
+-- bars the claim) into the single yes/no question the benchmark asks: "will my policy
+-- apply?"
+@export Decide whether a claim is covered under the Codex Insurance Limited hospital income policy
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE covered claim IF
+        `the policy is in effect at the time of the hospitalization` claim
+    AND `the benefit conditions of section 2 are met` claim
+    AND NOT `a general exclusion applies` claim

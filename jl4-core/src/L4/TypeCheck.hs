@@ -255,6 +255,23 @@ doCheckProgramWithDependencies checkState checkEnv program =
                   | (callee, binder) <- Discharge.ambiguousImplicitSupplies rprog
                   ]
                   ++
+                  -- #960. Placeable here for the reason the type check cannot
+                  -- do it: the deciding fact is the callee's read-set.
+                  --
+                  -- Both binders are re-spelled under their declaring sections,
+                  -- for the same reason R3 does it below: the whole point of
+                  -- this error is that two DIFFERENT binders share one
+                  -- spelling, so printing them both bare would name the
+                  -- problem and then hide it. That is the defect that sank
+                  -- the reverted fix in legalese/l4-ide#369.
+                  [ MkCheckErrorWithContext
+                      (MisdeliveredImplicitSupply callee
+                         (sectionQualifiedWith s'.sectionPaths checked)
+                         (sectionQualifiedWith s'.sectionPaths receives))
+                      None
+                  | (callee, checked, receives) <- Discharge.misdeliveredImplicitSupplies rprog
+                  ]
+                  ++
                   -- R3's per-root check. The binders are re-spelled under their
                   -- declaring sections, because two candidates offered to the
                   -- reader under one spelling are no help at all.
@@ -5669,6 +5686,23 @@ prettyCheckError (AmbiguousImplicitSupply callee binder)   =
   , "but " <> quotedName (getName callee) <> " reads more than one input of that"
   , "name, and this one is neither of them, so there is no way to tell which was"
   , "meant."
+  , ""
+  , "Rename one of them, or hoist them to a common section heading if they are"
+  , "one thing."
+  ]
+prettyCheckError (MisdeliveredImplicitSupply callee checked receives) =
+  [ "This call supplies"
+  , ""
+  , "  " <> quotedName (getName checked)
+  , ""
+  , "but " <> quotedName (getName callee) <> " reads a different input of that name,"
+  , "declared under another section heading:"
+  , ""
+  , "  " <> quotedName (getName receives)
+  , ""
+  , "and the two were declared at different types. The value here was checked"
+  , "against the first and would be delivered to the second, so nothing ever"
+  , "checks it against the type it arrives at."
   , ""
   , "Rename one of them, or hoist them to a common section heading if they are"
   , "one thing."

@@ -1,0 +1,235 @@
+IMPORT prelude
+
+-- Codex Insurance Limited hospital income policy.
+--
+-- Per the task instructions this file encodes RULES ONLY: no claim data.
+-- All facts about a particular claim live in `apply.l4`, as values of the
+-- `Claim` record declared below.
+--
+-- Relative-time convention: every date/time fact in this policy (other
+-- than the claimant's age) is represented as a NUMBER of months elapsed
+-- since the policy's effective date, per the task's instruction that all
+-- such facts in a query are given relative to the effective date and
+-- never require computing elapsed time between two dates. Each such
+-- NUMBER is compared only against the fixed thresholds the contract
+-- itself states (6, 7, 12 months) -- never against each other.
+--
+-- Assumed always true, per the task instructions (no rule needed):
+--   - Section 1.1(1): the agreement has been signed.
+--   - Section 1.1(2): the applicable premium has been paid, on time.
+--   - Section 4.5: the premium was paid in one lump sum at signing.
+
+§ `Codex Insurance Limited -- Hospital Income Policy`
+
+§§ `Ontology`
+
+-- The kind of medical event that produced the hospitalization. Separating
+-- "Accidental Injury" from "Intentional Self-Inflicted Injury" is the
+-- encoding's reading of Section 2.1's own words: the benefit responds to
+-- "sickness or accidental Injury". An injury inflicted on oneself by a
+-- deliberate act is not, on ordinary usage, an *accidental* injury, even
+-- though the policy nowhere lists self-infliction among the Section 3.1
+-- exclusions -- the bar here is Section 2.1's basic definition of what is
+-- insured in the first place, not a Section 3.1 exclusion.
+DECLARE `Hospitalization Cause` IS ONE OF
+    Sickness
+    `Accidental Injury`
+    `Intentional Self-Inflicted Injury`
+
+-- All facts about one claim that the rules below need in order to decide
+-- whether the policy responds to it.
+DECLARE Claim HAS
+    `cause of hospitalization`                                    IS A `Hospitalization Cause`
+    `arising out of skydiving`                                    IS A BOOLEAN
+    `arising out of military service`                             IS A BOOLEAN
+    `arising out of firefighting service`                         IS A BOOLEAN
+    `arising out of police service`                               IS A BOOLEAN
+    `age at hospitalization`                                      IS A NUMBER
+    `hospitalization months since the effective date`             IS A NUMBER
+    `wellness visit months since the effective date`              IS A NUMBER
+    `wellness visit confirmation months since the effective date` IS A NUMBER
+    `fraud or misrepresentation or material withholding`          IS A BOOLEAN
+    `confinement in a hospital in the United States`              IS A BOOLEAN
+    `days of continuous confinement`                              IS A NUMBER
+
+§§ `Section 1 -- Policy in Effect and Conditions`
+
+-- 1.3, first limb: "... a wellness visit for yourself ... occurring no
+-- later than the 6th month anniversary of the effective date."
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `wellness visit occurred in time` IF
+    claim's `wellness visit months since the effective date` AT MOST 6
+
+-- 1.3, second limb: "No later than the 7th month anniversary ... you
+-- will supply us with written confirmation ..."
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `wellness visit confirmation given in time` IF
+    claim's `wellness visit confirmation months since the effective date` AT MOST 7
+
+-- Both limbs of 1.3 actually met.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `wellness visit condition fully satisfied` IF
+        `wellness visit occurred in time` claim
+    AND `wellness visit confirmation given in time` claim
+
+-- 1.1(3): "... is still pending ..." -- read against 1.1's own chapeau,
+-- which conditions payment on the policy being in effect AT THE TIME OF
+-- THE HOSPITALIZATION. Before the 7-month confirmation deadline has
+-- passed, the condition cannot yet have been breached, so a
+-- hospitalization occurring before that deadline finds the condition
+-- "still pending" regardless of whether confirmation has, by then,
+-- actually been supplied.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `wellness visit confirmation deadline not yet due` IF
+    claim's `hospitalization months since the effective date` LESS THAN 7
+
+-- 1.1(3) as a whole: "is still pending or has been satisfied in a timely
+-- fashion."
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `wellness visit condition pending or satisfied` IF
+        `wellness visit condition fully satisfied` claim
+    OR  `wellness visit confirmation deadline not yet due` claim
+
+-- 4.6: the policy term is one year from the effective date. Section 1.2's
+-- last sentence deems the policy "automatically canceled" once that term
+-- ends. Measured in whole months, hospitalization at or before the
+-- 12-month anniversary is still within the term.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `policy term has ended` IF
+    claim's `hospitalization months since the effective date` GREATER THAN 12
+
+-- 1.2: the three grounds on which cancelation is deemed to have occurred.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `policy canceled` IF
+        claim's `fraud or misrepresentation or material withholding`
+    OR  NOT `wellness visit condition pending or satisfied` claim
+    OR  `policy term has ended` claim
+
+-- 1.1 chapeau, folding in 1.1(1)-(2) as always-satisfied per the task's
+-- instructions (see file header).
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `policy in effect at hospitalization` IF
+    NOT `policy canceled` claim
+
+§§ `Section 2 -- Benefits`
+
+-- 2.1: "If you have been confined in a hospital as a result of sickness
+-- or accidental Injury ...". An intentionally self-inflicted injury is
+-- neither a sickness nor an accidental injury -- see the note on
+-- `Hospitalization Cause` above.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `hospitalization is sickness or accidental injury` IS
+    CONSIDER claim's `cause of hospitalization`
+    WHEN Sickness                             THEN TRUE
+    WHEN `Accidental Injury`                  THEN TRUE
+    WHEN `Intentional Self-Inflicted Injury`  THEN FALSE
+
+-- 2.2, territorial limb: "... payable for each ... day of continuous
+-- confinement in a hospital in the United States ...". Section 4.1.1's
+-- "insures You ... anywhere in the world" speaks to where the insured
+-- risk (the sickness or accidental injury) may occur; it does not
+-- override 2.2's separate and more specific requirement about where the
+-- resulting hospital CONFINEMENT itself must take place for the Daily
+-- Hospital Income Benefit to be payable.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `benefit payable for United States confinement` IF
+    claim's `confinement in a hospital in the United States`
+
+-- 2.2, duration limbs: at least one day of confinement, capped at 365
+-- days. These bound how MUCH benefit is payable, not whether the policy
+-- responds to the claim at all (a confinement of, say, 400 days is still
+-- a covered claim for its first 365 days), so they are defined here for
+-- completeness but are deliberately NOT wired into `covered` below.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `confinement occurred` IF
+    claim's `days of continuous confinement` GREATER THAN 0
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `confinement within the maximum benefit period` IF
+    claim's `days of continuous confinement` AT MOST 365
+
+-- 2.3 conditions triggering a benefit on a claim being made that sets out
+-- the basis for the claim and for there being no exclusion or
+-- cancellation. Evaluating `covered` for a claim already presupposes a
+-- claim has been made; the "no exclusion or cancellation" half of 2.3 is
+-- exactly what the rest of this file computes, so 2.3 adds no further
+-- independent condition and is not given a separate rule.
+
+§§ `Section 3 -- General Exclusions`
+
+-- 3.1(5): "If your age at the time of the hospitalization is equal to or
+-- greater than 80 years of age."
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `excluded for age eighty or older` IF
+    claim's `age at hospitalization` AT LEAST 80
+
+-- 3.1(1)-(5) as a whole: any event "arising directly or indirectly out
+-- of" one of the five listed grounds is excluded. Each ground is
+-- represented by a fact about what the *hospitalization itself* arose
+-- out of, not by the claimant's general occupation or status -- so, for
+-- example, a claimant who happens to be a police officer but whose
+-- hospitalization did not arise out of police service is not caught by
+-- 3.1(4).
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `excluded under general exclusions` IF
+        claim's `arising out of skydiving`
+    OR  claim's `arising out of military service`
+    OR  claim's `arising out of firefighting service`
+    OR  claim's `arising out of police service`
+    OR  `excluded for age eighty or older` claim
+
+§§ `Section 4 -- General Conditions`
+
+-- 4.1.1 ("insures You twenty-four (24) hours a day anywhere in the
+-- world") is read above, alongside 2.2, as covering the insured risk
+-- worldwide while leaving 2.2's own United-States-confinement condition
+-- on benefit payability intact.
+--
+-- 4.2 (Arbitration) conditions the right to sue or recover -- commencing
+-- arbitration within three months of an unresolved dispute, on pain of
+-- the claim being extinguished, plus a 60-day post-proof-of-claim waiting
+-- period -- on a dispute already having arisen. These are procedural
+-- prerequisites to litigation/recovery once the parties are in dispute,
+-- not conditions of substantive coverage, so they are not modeled as a
+-- gate on `covered`: the question "will my policy apply if ..." is a
+-- coverage question asked before any dispute exists.
+--
+-- 4.3 (Laws of New York), 4.4 (US Currency) and 4.5 (lump-sum premium
+-- timing, assumed satisfied per the file header) state no further
+-- condition on coverage and so have no rule of their own.
+--
+-- 4.6 (Policy Term) is modeled above as `policy term has ended`.
+
+§§ `Section 5 -- Benefit and Premium Amounts`
+
+`Daily Hospital Income Benefit amount` MEANS 500  -- 5.1, in US dollars
+`policy premium amount` MEANS 2000                -- 5.2, in US dollars
+
+§§ `Top-level coverage decision`
+
+-- Whether the policy responds to (covers) a given claim: the policy must
+-- be in effect at the time of hospitalization (Section 1), the
+-- hospitalization must be a sickness or accidental injury with
+-- confinement in a United States hospital (Section 2), and no general
+-- exclusion applies (Section 3).
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `covered` IF
+        `policy in effect at hospitalization` claim
+    AND `hospitalization is sickness or accidental injury` claim
+    AND `benefit payable for United States confinement` claim
+    AND NOT `excluded under general exclusions` claim

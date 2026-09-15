@@ -1,0 +1,178 @@
+IMPORT prelude
+
+§ `Codex Insurance Limited hospitalization indemnity policy`
+
+-- Isomorphic encoding of the attached policy wording (fixtures/chubb-policy.txt).
+-- This file defines RULES ONLY -- no claim data. Per-claim facts are supplied
+-- by the caller (see apply.l4), as values of the Hospitalization record below.
+--
+-- Two simplifications, both mandated by the task brief rather than chosen here:
+--
+-- 1. The agreement is always assumed signed and the premium always assumed
+--    paid on time, so items 1 and 2 of Section 1.1 are not encoded as
+--    separate rules at all -- there is nothing to check.
+--
+-- 2. Every date/time fact about a claim -- other than the claimant's age --
+--    is expressed as a NUMBER of months elapsed since the policy's effective
+--    date, rather than as a calendar DATE. Consequently no rule below ever
+--    needs to compute the interval between two dates: each temporal check is
+--    a direct comparison of a given "months after effective date" figure
+--    against a fixed deadline drawn straight from the contract text (6, 7,
+--    or 12 months after the effective date).
+--
+-- A further, implicit simplification: every Hospitalization value already
+-- represents "hospitalization for sickness or accidental injury" per the
+-- opening words of Section 1.1 -- that gate is definitional (it is what the
+-- record type means), not a separate BOOLEAN flag to be toggled.
+
+§§ `The facts a claim brings`
+
+DECLARE Hospitalization HAS
+    `age at hospitalization`                                            IS A NUMBER
+    `hospitalization months after effective date`                       IS A NUMBER
+    `wellness visit confirmation submitted months after effective date` IS A MAYBE NUMBER
+    `wellness visit occurred months after effective date`               IS A MAYBE NUMBER
+    `fraud committed`                                                   IS A BOOLEAN
+    `misrepresentation committed`                                       IS A BOOLEAN
+    `material information withheld`                                     IS A BOOLEAN
+    `caused by skydiving`                                               IS A BOOLEAN
+    `caused by military service`                                        IS A BOOLEAN
+    `caused by firefighting service`                                    IS A BOOLEAN
+    `caused by police service`                                          IS A BOOLEAN
+
+§ `Section 1 Policy in effect and conditions`
+
+§§ `1.3 the wellness visit condition`
+
+-- "No later than the 7th month anniversary of the effective date ... you
+-- will supply us with written confirmation from the medical provider ... of
+-- a wellness visit ... occurring no later than the 6th month anniversary of
+-- the effective date." Two separate deadlines: the written confirmation
+-- must be SUBMITTED by month 7; the visit it attests to must have OCCURRED
+-- by month 6. Both figures are "MAYBE NUMBER" on the claim because, as of
+-- the moment being assessed, either event may simply not have happened yet
+-- -- in which case the condition is "still pending", not yet failed.
+
+`confirmation submission deadline in months` MEANS 7
+
+`wellness visit deadline in months` MEANS 6
+
+GIVEN claim IS A Hospitalization
+GIVETH A BOOLEAN
+DECIDE `the wellness visit is not known to be late` IF
+    CONSIDER claim's `wellness visit occurred months after effective date`
+    WHEN NOTHING THEN TRUE
+    WHEN JUST t  THEN t AT MOST `wellness visit deadline in months`
+
+GIVEN claim IS A Hospitalization
+GIVETH A BOOLEAN
+DECIDE `the wellness confirmation was submitted in time, or not yet due` IF
+    CONSIDER claim's `wellness visit confirmation submitted months after effective date`
+    WHEN NOTHING THEN TRUE
+    WHEN JUST t  THEN t AT MOST `confirmation submission deadline in months`
+
+GIVEN claim IS A Hospitalization
+GIVETH A BOOLEAN
+DECIDE `section 1.3 is still pending or has been satisfied in a timely fashion` IF
+    `the wellness confirmation was submitted in time, or not yet due` claim
+    AND `the wellness visit is not known to be late` claim
+
+§§ `1.2 cancelation`
+
+-- "Cancelation will be deemed to have occurred if there is fraud, or any
+-- misrepresentation or material withholding of any information ... or if
+-- the condition set out in Section 1.3 has not been satisfied in a timely
+-- fashion. It will also be automatically canceled at midnight ... on the
+-- last day of the policy term described in Section 5" -- the policy term
+-- itself is the one-year period fixed by Section 3.6 below.
+
+`policy term in months` MEANS 12
+
+GIVEN claim IS A Hospitalization
+GIVETH A BOOLEAN
+DECIDE `cancelation is deemed to have occurred` IF
+    claim's `fraud committed`
+    OR claim's `misrepresentation committed`
+    OR claim's `material information withheld`
+    OR NOT `section 1.3 is still pending or has been satisfied in a timely fashion` claim
+    OR claim's `hospitalization months after effective date` AT LEAST `policy term in months`
+
+§§ `1.1 policy in effect`
+
+-- "The policy will be in effect if: 1. This agreement is signed, 2. The
+-- applicable premium ... has been paid, and 3. The condition set out in
+-- Section 1.3 is still pending or has been satisfied in a timely fashion,
+-- and 4. The policy has not been canceled." Items 1 and 2 are assumed true
+-- throughout per the task brief (see file header) and so have no rule here;
+-- item 3 is folded into `cancelation is deemed to have occurred` above,
+-- alongside item 4, since 1.2 cancels the policy precisely when item 3
+-- fails.
+
+GIVEN claim IS A Hospitalization
+GIVETH A BOOLEAN
+DECIDE `the policy is in effect at the time of the hospitalization` IF
+    NOT `cancelation is deemed to have occurred` claim
+
+§ `Section 2 General exclusions`
+
+-- "Your policy will not apply to ... any event causing sickness or
+-- accidental injury arising directly or indirectly out of: 1. Skydiving; or
+-- 2. Service in the military; or 3. Service as a fire fighter; or 4.
+-- Service in the police; or 5. If your age at the time of the
+-- hospitalization is equal to or greater than 80 years of age." Note that
+-- exclusions 1-4 require the hospitalization to ARISE OUT OF the named
+-- activity -- merely holding that occupation, or being on duty, at the time
+-- of an unrelated injury does not by itself trigger the exclusion.
+
+`excluded age threshold` MEANS 80
+
+GIVEN claim IS A Hospitalization
+GIVETH A BOOLEAN
+DECIDE `the hospitalization arises directly or indirectly out of an excluded activity` IF
+    claim's `caused by skydiving`
+    OR claim's `caused by military service`
+    OR claim's `caused by firefighting service`
+    OR claim's `caused by police service`
+
+GIVEN claim IS A Hospitalization
+GIVETH A BOOLEAN
+DECIDE `the claimant is excluded by age` IF
+    claim's `age at hospitalization` AT LEAST `excluded age threshold`
+
+GIVEN claim IS A Hospitalization
+GIVETH A BOOLEAN
+DECIDE `a general exclusion applies` IF
+    `the hospitalization arises directly or indirectly out of an excluded activity` claim
+    OR `the claimant is excluded by age` claim
+
+§ `Section 3 General conditions`
+
+§§ `3.1 where the policy applies`
+
+-- "Your Policy insures You twenty-four (24) hours a day anywhere in the
+-- world." There is no place-of-loss or time-of-day restriction, so this
+-- condition can never cause a claim to fail. It is included as an explicit
+-- always-true fact for completeness and traceability against the source
+-- text, rather than silently omitted.
+
+`the policy applies regardless of place or time of day` MEANS TRUE
+
+-- Sections 3.2 (arbitration and the 60-day pre-suit waiting period), 3.3
+-- (governing law), 3.4 (currency of payment) and 3.5 (timing of premium
+-- payment, already assumed satisfied per the task brief) are procedural or
+-- administrative terms. They govern how a dispute is resolved or how
+-- payment is made, not whether a given hospitalization is within the scope
+-- of coverage, so they are not encoded as gating conditions on `covered`
+-- below.
+
+-- 3.6 (Policy Term) fixes the one-year term used by `policy term in months`
+-- above, in Section 1.2.
+
+§ `Top level coverage decision`
+
+GIVEN claim IS A Hospitalization
+GIVETH A BOOLEAN
+DECIDE covered IF
+    `the policy is in effect at the time of the hospitalization` claim
+    AND NOT `a general exclusion applies` claim
+    AND `the policy applies regardless of place or time of day`

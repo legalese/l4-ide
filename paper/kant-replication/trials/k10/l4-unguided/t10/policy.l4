@@ -1,0 +1,142 @@
+IMPORT prelude
+
+§ `Codex Insurance Limited: Policy Rules`
+
+-- This module encodes the substantive rules of the policy: when a
+-- hospitalization claim is covered, and what defeats coverage. It defines
+-- rules only -- no specific claim's facts are given a value here. Per-claim
+-- data belongs in the file that imports this one.
+--
+-- Per the task's instructions, the agreement is assumed signed and the
+-- premium assumed paid on time (Section 1.1, items 1 and 2), so those two
+-- sub-conditions of "the policy will be in effect" are not modelled below.
+--
+-- All times below, other than the claimant's age, are modelled as NUMBERs
+-- of months elapsed since the policy's effective date (queries give times
+-- this way directly), so no DATE arithmetic is needed anywhere in this file.
+
+§§ `Vocabulary`
+
+-- Section 2.1: the specific activities whose resulting sickness or injury
+-- is excluded from cover. Other is every hospitalization cause not on that
+-- list -- e.g. an illness, or an accident unconnected with any of them.
+DECLARE `Cause of Hospitalization` IS ONE OF
+    Skydiving
+    `Military Service`
+    `Firefighter Service`
+    `Police Service`
+    Other
+
+-- The facts of a single hospitalization claim made against the policy.
+-- A type only: this file defines no claim data, only the shape of it.
+DECLARE Claim HAS
+    -- Section 2.1: what the sickness or accidental injury arose out of.
+    -- Merely being employed in one of the excluded services does not, by
+    -- itself, make this the excluded cause -- only an injury that itself
+    -- arose out of that service does.
+    `cause of hospitalization`    IS A `Cause of Hospitalization`
+    -- Section 2.1, item 5: the claimant's age, in years, at the time of
+    -- the hospitalization. The one time-related fact NOT relative to the
+    -- effective date.
+    `age at hospitalization`      IS A NUMBER
+    -- How many months after the policy's effective date the
+    -- hospitalization occurred.
+    `hospitalization month`       IS A NUMBER
+    -- Section 1.3: how many months after the effective date the wellness
+    -- visit itself took place -- or NOTHING if it has not taken place yet.
+    `wellness visit month`        IS A MAYBE NUMBER
+    -- Section 1.3: how many months after the effective date written
+    -- confirmation of that visit was supplied to the Company -- or
+    -- NOTHING if it has not been supplied yet.
+    `wellness confirmation month` IS A MAYBE NUMBER
+    -- Section 1.2: whether the claimant committed fraud, misrepresentation,
+    -- or material withholding of information in connection with the policy.
+    `fraud or misrepresentation`  IS A BOOLEAN
+
+§§ `2. General Exclusions`
+
+GIVEN cause IS A `Cause of Hospitalization`
+GIVETH A BOOLEAN
+`arises from an excluded activity` cause MEANS
+    CONSIDER cause
+    WHEN Skydiving             THEN TRUE
+    WHEN `Military Service`    THEN TRUE
+    WHEN `Firefighter Service` THEN TRUE
+    WHEN `Police Service`      THEN TRUE
+    WHEN Other                 THEN FALSE
+
+-- Section 2.1, item 5.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `excluded by age` claim IF
+    claim's `age at hospitalization` AT LEAST 80
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `excluded event` claim IF
+       `arises from an excluded activity` (claim's `cause of hospitalization`)
+    OR `excluded by age` claim
+
+§§ `1.3 The Wellness Visit Condition`
+
+-- The visit itself must occur no later than the 6th month anniversary of
+-- the effective date. If it has not happened yet, it only counts as late
+-- once that 6-month deadline has already passed as of the hospitalization
+-- (before then the condition is still pending, per Section 1.1, item 3).
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`wellness visit occurred late` claim MEANS
+    CONSIDER claim's `wellness visit month`
+    WHEN JUST m  THEN m GREATER THAN 6
+    WHEN NOTHING THEN claim's `hospitalization month` GREATER THAN 6
+
+-- Written confirmation of the visit must be supplied no later than the
+-- 7th month anniversary of the effective date. Same "not yet due" logic
+-- as above, one month later.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`wellness confirmation submitted late` claim MEANS
+    CONSIDER claim's `wellness confirmation month`
+    WHEN JUST m  THEN m GREATER THAN 7
+    WHEN NOTHING THEN claim's `hospitalization month` GREATER THAN 7
+
+-- Section 1.3 as a whole: either half being late defeats the condition.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `condition on the wellness visit violated` claim IF
+       `wellness visit occurred late` claim
+    OR `wellness confirmation submitted late` claim
+
+§§ `1.2 Cancelation`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `policy canceled` claim IF
+       claim's `fraud or misrepresentation`
+    OR `condition on the wellness visit violated` claim
+    OR claim's `hospitalization month` GREATER THAN 12
+
+§§ `1.1 Policy in Effect`
+
+-- Items 1 and 2 (signed; premium paid) are assumed true, per instructions,
+-- and so do not appear here. Item 3 (the Section 1.3 condition is pending
+-- or satisfied) is NOT (condition on the wellness visit violated); item 4
+-- (not canceled) and item 3 are both folded into `policy canceled` above.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `policy in effect` claim IF
+    NOT (`policy canceled` claim)
+
+§§ `Coverage Decision`
+
+-- Section 3.1: the policy insures worldwide, 24 hours a day, so there is
+-- no geographic condition or exclusion to encode. Sections 3.2-3.5
+-- (arbitration, currency, governing law, premium timing) are procedural
+-- and do not bear on whether a given hospitalization is covered, so they
+-- are not modelled either. Section 3.6 (one-year term) is encoded above,
+-- inside `policy canceled`.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `covered` claim IF
+        `policy in effect` claim
+    AND NOT (`excluded event` claim)

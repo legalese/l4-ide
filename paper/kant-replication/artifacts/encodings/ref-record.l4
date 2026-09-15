@@ -1,0 +1,676 @@
+IMPORT prelude
+
+§ `Codex Insurance Limited hospitalization policy`
+
+-- ===========================================================================
+-- A faithful, record-threaded encoding of the policy between CODEX INSURANCE
+-- LIMITED ("us") and You.
+--
+-- SCOPE. Everything in the instrument that bears on whether a benefit is
+-- payable is encoded: 1.1, 1.2, 1.3, 2.1 in full, and the operative parts of
+-- 3.1, 3.2, 3.6. The clauses that are NOT operative on that question are
+-- named, with a note saying why, in the section `Clauses not operative on
+-- whether a benefit is payable` at the foot of this file (3.3 governing law,
+-- 3.4 currency, and the manner-of-payment half of 3.5).
+--
+-- SHAPE. One `Claim` record carries every fact the policy makes operative. It
+-- is threaded as a single `GIVEN` parameter through one named decision per
+-- clause, so the call graph mirrors the section numbering:
+--
+--     `a benefit is payable on this claim`                       <- top level
+--       |- `1.1 the claim is premised on a hospitalization for sickness or
+--       |   accidental injury`
+--       |- `1.1 the policy is in effect at the time of the hospitalization`
+--       |    |- `3.6 the policy term had begun by the time of the hospitalization`
+--       |    |- 1.1(1) signed, 1.1(2) premium paid
+--       |    |- 1.1(3) -> `1.3 still pending` OR `1.3 satisfied in a timely fashion`
+--       |    `- 1.1(4) -> NOT `1.2 the policy has been canceled ...`
+--       |                    |- 1.2 fraud / misrepresentation / material withholding
+--       |                    |- 1.2 failure of the 1.3 condition
+--       |                    `- 1.2 automatic cancelation at the end of the term (3.6)
+--       |- NOT `2.1 a general exclusion applies`   (2.1(1)..2.1(5))
+--       |- `3.1.1 the policy insures you 24 hours a day anywhere in the world`
+--       `- `3.2 Section 3.2.1 poses no bar to liability on this claim`
+--
+-- TIME. Every time in a claim is expressed as a NUMBER of months measured from
+-- the effective date of the policy (3.6: "the date accepted by Us as signified
+-- by our signature of the policy"). So the effective date is month 0, the
+-- 6th month anniversary is 6, the 7th month anniversary is 7, and the end of
+-- the one-year term is 12. No calendar arithmetic is needed anywhere. The one
+-- period the instrument states in days rather than months -- the sixty (60)
+-- days in 3.2.1 -- is carried as 2 months; see the note at that decision.
+--
+-- MISSING SECTION 5. Both 1.2 ("the last day of the policy term described in
+-- Section 5 below") and 3.5.1 ("The premium described in Section 5 below")
+-- cross-refer to a Section 5 that does not appear in the instrument. The term
+-- is taken from 3.6, which does describe it. The premium AMOUNT and the
+-- BENEFIT SCHEDULE are simply absent from the text, so this module answers
+-- whether a benefit is payable and cannot answer how much.
+-- ===========================================================================
+
+§§ `Constants`
+
+-- 3.6: the term "will last for a period of one year from" the effective date.
+GIVETH A NUMBER
+`the length of the policy term in months` MEANS 12
+
+-- 1.3: "occurring no later than the 6th month anniversary of the effective
+-- date of this policy".
+GIVETH A NUMBER
+`the wellness visit deadline in months` MEANS 6
+
+-- 1.3: "No later than the 7th month anniversary of the effective date of this
+-- policy, you will supply us with written confirmation".
+GIVETH A NUMBER
+`the written confirmation deadline in months` MEANS 7
+
+-- 3.2.1: "such arbitration to be commenced within three (3) months from the
+-- day such parties are unable to settle the dispute or difference".
+GIVETH A NUMBER
+`the arbitration commencement window in months` MEANS 3
+
+-- 3.2.1: "the expiration of sixty (60) days after written proof of claim has
+-- been submitted". Rendered in the months unit this module works in. See the
+-- ambiguity note at `3.2.1 the sixty-day period ... has expired`.
+GIVETH A NUMBER
+`the sixty day period after written proof of claim, in months` MEANS 2
+
+-- 2.1(5): "If your age at the time of the hospitalization is equal to or
+-- greater than 80 years of age."
+GIVETH A NUMBER
+`the excluded age in years` MEANS 80
+
+§§ `The fact schema`
+
+-- 1.1: a benefit is premised on a hospitalization "for sickness or accidental
+-- injury". An enumeration, not a string: the instrument recognises exactly two
+-- qualifying grounds, and everything else falls outside the chapeau.
+DECLARE `Basis of the hospitalization` IS ONE OF
+    sickness
+    `accidental injury`
+    `neither sickness nor accidental injury`
+
+-- 2.1: the four named origins are separate booleans rather than one enum
+-- because the chapeau reads "arising directly or indirectly out of", and an
+-- event can arise indirectly out of more than one of them at once (a
+-- fire fighter who skydives on duty).
+DECLARE Hospitalization HAS
+    `months from the effective date to the hospitalization`                             IS A NUMBER
+    `your age in years at the time of the hospitalization`                              IS A NUMBER
+    `the basis of the hospitalization`                                                  IS A `Basis of the hospitalization`
+    `the event causing it arose directly or indirectly out of skydiving`                IS A BOOLEAN
+    `the event causing it arose directly or indirectly out of service in the military`  IS A BOOLEAN
+    `the event causing it arose directly or indirectly out of service as a fire fighter` IS A BOOLEAN
+    `the event causing it arose directly or indirectly out of service in the police`    IS A BOOLEAN
+
+-- 1.2 names three species of disclosure default. They are NOT treated alike:
+-- "fraud" stands alone, before the comma, unqualified; "misrepresentation" and
+-- "material withholding" are both qualified by "of any information provided by
+-- you to the Company in connection with any communication or information
+-- relating to this policy"; and the adjective "material" sits only on
+-- "withholding". See the ambiguity register.
+DECLARE `Kind of disclosure default` IS ONE OF
+    fraud
+    misrepresentation
+    `withholding of information`
+
+DECLARE `Disclosure default` HAS
+    `the kind of default`                                                        IS A `Kind of disclosure default`
+    `the information was provided by you to the Company`                         IS A BOOLEAN
+    `in connection with a communication or information relating to this policy`  IS A BOOLEAN
+    `the withholding was material`                                               IS A BOOLEAN
+    `months from the effective date to when it occurred`                         IS A NUMBER
+
+-- 1.3: "a wellness visit for yourself with a qualified medical provider
+-- occurring no later than the 6th month anniversary".
+DECLARE `Wellness visit` HAS
+    `months from the effective date to the visit`  IS A NUMBER
+    `the visit was for yourself`                   IS A BOOLEAN
+    `the medical provider was qualified`           IS A BOOLEAN
+
+-- 1.3: "you will supply us with written confirmation from the medical provider
+-- in question".
+DECLARE `Written confirmation` HAS
+    `months from the effective date to when it was supplied to us`  IS A NUMBER
+    `it is in writing`                                              IS A BOOLEAN
+    `it is from the medical provider in question`                   IS A BOOLEAN
+
+-- 3.2.1. NOTHING means no dispute or disagreement has arisen, in which case
+-- neither the arbitration time bar nor the award condition precedent bites.
+DECLARE Dispute HAS
+    `months from the effective date to the day the parties were unable to settle it`  IS A NUMBER
+    `months from the effective date to the commencement of arbitration`               IS A MAYBE NUMBER
+    `a valid arbitration award has been issued`                                       IS A BOOLEAN
+
+-- THE ONE RECORD. Everything a caller must supply.
+--
+-- Note what is NOT here, deliberately: the place of the event and the time of
+-- day (3.1.1 makes both inoperative), the currency of payment (3.4.1), and the
+-- governing law (3.3.1). A field for any of those would be a fact the
+-- instrument does not make operative.
+DECLARE Claim HAS
+    -- 1.1(1)
+    `this agreement had been signed by the time of the hospitalization`                       IS A BOOLEAN
+    -- 1.1(2)
+    `the applicable premium for the policy period had been paid by the time of the hospitalization` IS A BOOLEAN
+    -- 1.3
+    `the wellness visit`                                                                      IS A MAYBE `Wellness visit`
+    `the written confirmation`                                                                IS A MAYBE `Written confirmation`
+    -- 1.2, first and second limbs
+    `disclosure defaults`                                                                     IS A LIST OF `Disclosure default`
+    -- 1.1 chapeau, 2.1, 3.6
+    `the hospitalization on which the claim is premised`                                      IS A Hospitalization
+    -- 3.2.1
+    `the dispute or disagreement, if any`                                                     IS A MAYBE Dispute
+    `months from the effective date to the submission of written proof of claim`              IS A MAYBE NUMBER
+    `months from the effective date to when you seek to recover`                              IS A NUMBER
+
+-- A projection used by almost every clause below: 1.1 fixes the moment at
+-- which the policy must be in effect as "the time of the hospitalization".
+GIVEN claim IS A Claim
+GIVETH A NUMBER
+`the month of the hospitalization` claim MEANS
+    claim's `the hospitalization on which the claim is premised`'s `months from the effective date to the hospitalization`
+
+§§ `Section 1.3 — the wellness visit condition`
+
+-- 1.3 imposes two deadlines and three qualitative requirements:
+--   the visit must be a wellness visit FOR YOURSELF, with a QUALIFIED medical
+--   provider, occurring no later than month 6; and the confirmation must be
+--   WRITTEN, FROM THE MEDICAL PROVIDER IN QUESTION, and supplied to us no
+--   later than month 7.
+-- "No later than" is an upper bound only, so both tests are AT MOST.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `1.3 the condition has been satisfied in a timely fashion` claim IF
+    CONSIDER claim's `the wellness visit`
+    WHEN NOTHING THEN FALSE
+    WHEN JUST visit THEN
+        CONSIDER claim's `the written confirmation`
+        WHEN NOTHING THEN FALSE
+        WHEN JUST confirmation THEN
+                visit's `months from the effective date to the visit` AT MOST `the wellness visit deadline in months`
+            AND visit's `the visit was for yourself`
+            AND visit's `the medical provider was qualified`
+            AND confirmation's `months from the effective date to when it was supplied to us` AT MOST `the written confirmation deadline in months`
+            AND confirmation's `it is in writing`
+            AND confirmation's `it is from the medical provider in question`
+
+-- 1.1(3) contemplates a third state alongside satisfied and unsatisfied: the
+-- condition may be "still pending". A condition with a future deadline is
+-- pending until that deadline passes, so pendency is keyed on month 7 and not
+-- on whether timely satisfaction remains achievable. See the ambiguity
+-- register: this is the reading that gives 1.1(3)'s first limb any work to do.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `1.3 the condition is still pending at the time of the hospitalization` claim IF
+        `the month of the hospitalization` claim AT MOST `the written confirmation deadline in months`
+    AND NOT `1.3 the condition has been satisfied in a timely fashion` claim
+
+§§ `Section 1.2 — cancelation`
+
+-- The three species of 1.2 default read differently. "there is fraud" is
+-- unqualified. "any misrepresentation" carries the "provided by you to the
+-- Company in connection with ..." qualifier but NOT the word "material".
+-- "material withholding" carries both.
+GIVEN `the default` IS A `Disclosure default`
+GIVETH A BOOLEAN
+DECIDE `1.2 this default triggers cancelation` `the default` IF
+    CONSIDER `the default`'s `the kind of default`
+    WHEN fraud THEN TRUE
+    WHEN misrepresentation THEN
+            `the default`'s `the information was provided by you to the Company`
+        AND `the default`'s `in connection with a communication or information relating to this policy`
+    WHEN `withholding of information` THEN
+            `the default`'s `the withholding was material`
+        AND `the default`'s `the information was provided by you to the Company`
+        AND `the default`'s `in connection with a communication or information relating to this policy`
+
+-- 1.1(4) asks whether the policy "has not been canceled" AT THE TIME OF THE
+-- HOSPITALIZATION. So a cancelation trigger is only capable of defeating this
+-- claim if it had already occurred by then. A misrepresentation made after the
+-- hospitalization cancels the policy going forward but does not unmake a
+-- benefit already earned. See the ambiguity register -- this is the single
+-- most consequential reading in the file.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `1.2 canceled for fraud, misrepresentation or material withholding` claim IF
+    any (GIVEN `the default` YIELD
+                `1.2 this default triggers cancelation` `the default`
+            AND `the default`'s `months from the effective date to when it occurred`
+                    AT MOST `the month of the hospitalization` claim)
+        (claim's `disclosure defaults`)
+
+-- 1.2's third limb: cancelation "if the condition set out in Section 1.3 has
+-- not been satisfied in a timely fashion". That fact cannot be established
+-- before the month 7 deadline passes, so the deemed cancelation takes effect
+-- at month 7 and bites only on a hospitalization after it.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `1.2 canceled for failure to satisfy the Section 1.3 condition in a timely fashion` claim IF
+        `the month of the hospitalization` claim GREATER THAN `the written confirmation deadline in months`
+    AND NOT `1.3 the condition has been satisfied in a timely fashion` claim
+
+-- 1.2's final sentence: "It will also be automatically canceled at midnight,
+-- US Eastern time then in effect, on the last day of the policy term described
+-- in Section 5 below." Section 5 is absent; 3.6 describes the term as one year
+-- from the effective date. Cancelation strikes at the END of the last day, so
+-- month 12 itself is still inside the term and only a later hospitalization is
+-- caught. See the ambiguity register.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `1.2 automatically canceled at the end of the policy term` claim IF
+    `the month of the hospitalization` claim GREATER THAN `the length of the policy term in months`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `1.2 the policy has been canceled by the time of the hospitalization` claim IF
+       `1.2 canceled for fraud, misrepresentation or material withholding` claim
+    OR `1.2 canceled for failure to satisfy the Section 1.3 condition in a timely fashion` claim
+    OR `1.2 automatically canceled at the end of the policy term` claim
+
+§§ `Section 3.6 — the policy term`
+
+-- "The term of this policy will begin on the date accepted by Us as signified
+-- by our signature of the policy (the effective date)". Nothing is in effect
+-- before month 0. The upper end of the term is enforced through 1.2's
+-- automatic-cancelation limb above, exactly as the instrument routes it.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `3.6 the policy term had begun by the time of the hospitalization` claim IF
+    `the month of the hospitalization` claim AT LEAST 0
+
+§§ `Section 1.1 — policy in effect, and the premise of the claim`
+
+-- The chapeau of 1.1. "The payment of any benefit under this policy is
+-- conditioned on the policy being in effect at the time of the hospitalization
+-- FOR SICKNESS OR ACCIDENTAL INJURY on which the claim for such benefit is
+-- premised." A hospitalization on any other basis is not a hospitalization the
+-- instrument will pay a benefit on.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `1.1 the claim is premised on a hospitalization for sickness or accidental injury` claim IF
+    CONSIDER claim's `the hospitalization on which the claim is premised`'s `the basis of the hospitalization`
+    WHEN sickness                                   THEN TRUE
+    WHEN `accidental injury`                        THEN TRUE
+    WHEN `neither sickness nor accidental injury`   THEN FALSE
+
+-- 1.1's four numbered conditions, read as necessary and sufficient. Note that
+-- 1.1(3) is a DISJUNCTION -- pending OR timely satisfied -- which is what lets
+-- a hospitalization in month 3, before any wellness visit has happened, be
+-- covered.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `1.1 the policy is in effect at the time of the hospitalization` claim IF
+        `3.6 the policy term had begun by the time of the hospitalization` claim
+    AND claim's `this agreement had been signed by the time of the hospitalization`
+    AND claim's `the applicable premium for the policy period had been paid by the time of the hospitalization`
+    AND (   `1.3 the condition is still pending at the time of the hospitalization` claim
+         OR `1.3 the condition has been satisfied in a timely fashion` claim )
+    AND NOT `1.2 the policy has been canceled by the time of the hospitalization` claim
+
+§§ `Section 2.1 — general exclusions`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `2.1(1) the event arose directly or indirectly out of skydiving` claim IF
+    claim's `the hospitalization on which the claim is premised`'s `the event causing it arose directly or indirectly out of skydiving`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `2.1(2) the event arose directly or indirectly out of service in the military` claim IF
+    claim's `the hospitalization on which the claim is premised`'s `the event causing it arose directly or indirectly out of service in the military`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `2.1(3) the event arose directly or indirectly out of service as a fire fighter` claim IF
+    claim's `the hospitalization on which the claim is premised`'s `the event causing it arose directly or indirectly out of service as a fire fighter`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `2.1(4) the event arose directly or indirectly out of service in the police` claim IF
+    claim's `the hospitalization on which the claim is premised`'s `the event causing it arose directly or indirectly out of service in the police`
+
+-- 2.1(5) is grammatically detached from the chapeau: it does not name
+-- something an event can arise out of, it states a condition ("If your age at
+-- the time of the hospitalization is equal to or greater than 80 years of
+-- age"). Encoded as a free-standing exclusion, which is what it reads as.
+-- "equal to or greater than" is AT LEAST.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `2.1(5) your age at the time of the hospitalization is 80 or greater` claim IF
+    claim's `the hospitalization on which the claim is premised`'s `your age in years at the time of the hospitalization`
+        AT LEAST `the excluded age in years`
+
+-- "Your policy will not apply to, and no benefit will be paid with respect to,
+-- any event causing sickness or accidental injury arising directly or
+-- indirectly out of: ... or ... or ..." -- a disjunction.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `2.1 a general exclusion applies` claim IF
+       `2.1(1) the event arose directly or indirectly out of skydiving` claim
+    OR `2.1(2) the event arose directly or indirectly out of service in the military` claim
+    OR `2.1(3) the event arose directly or indirectly out of service as a fire fighter` claim
+    OR `2.1(4) the event arose directly or indirectly out of service in the police` claim
+    OR `2.1(5) your age at the time of the hospitalization is 80 or greater` claim
+
+§§ `Section 3.1 — where the policy applies`
+
+-- 3.1.1 "Your Policy insures You twenty-four (24) hours a day anywhere in the
+-- world." This is coverage-granting and imposes no condition: it is here, and
+-- wired into the top-level conjunction, so that the call graph records
+-- affirmatively that NEITHER the place NOR the time of day of the event is an
+-- operative fact. It is constitutively TRUE, with no fact dependency.
+GIVETH A BOOLEAN
+`3.1.1 the policy insures you 24 hours a day anywhere in the world` MEANS TRUE
+
+§§ `Section 3.2 — arbitration`
+
+-- "such arbitration to be commenced within three (3) months from the day such
+-- parties are unable to settle the dispute or difference". Within three months
+-- FROM that day: a window with both ends, [d, d + 3].
+GIVEN dispute IS A Dispute
+GIVETH A NUMBER
+`the month the parties were unable to settle` dispute MEANS
+    dispute's `months from the effective date to the day the parties were unable to settle it`
+
+GIVEN dispute IS A Dispute
+GIVETH A NUMBER
+`the last month in which arbitration may be commenced` dispute MEANS
+    (`the month the parties were unable to settle` dispute) PLUS `the arbitration commencement window in months`
+
+GIVEN dispute IS A Dispute
+GIVETH A BOOLEAN
+DECIDE `3.2.1 arbitration was commenced within three months` dispute IF
+    CONSIDER dispute's `months from the effective date to the commencement of arbitration`
+    WHEN NOTHING THEN FALSE
+    WHEN JUST `the month of commencement` THEN
+            `the month of commencement` AT LEAST (`the month the parties were unable to settle` dispute)
+        AND `the month of commencement` AT MOST (`the last month in which arbitration may be commenced` dispute)
+
+-- "If You fail to commence arbitration in accordance with this clause, it is
+-- agreed that any cause of action and any right to make a claim that You have
+-- or may have against Us shall be extinguished completely."
+GIVEN dispute IS A Dispute
+GIVETH A BOOLEAN
+DECIDE `3.2.1 your right to make a claim has been extinguished` dispute IF
+    NOT `3.2.1 arbitration was commenced within three months` dispute
+
+-- "Where there is a dispute or disagreement, the issuance of a valid
+-- arbitration award shall also be a condition precedent to our liability under
+-- this Policy."
+GIVEN dispute IS A Dispute
+GIVETH A BOOLEAN
+DECIDE `3.2.1 the condition precedent of a valid arbitration award is satisfied` dispute IF
+    dispute's `a valid arbitration award has been issued`
+
+-- Both limbs are conditioned on there being a dispute or disagreement at all.
+-- Where none has arisen, 3.2.1 says nothing about this claim.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `3.2 Section 3.2.1 poses no bar to liability on this claim` claim IF
+    CONSIDER claim's `the dispute or disagreement, if any`
+    WHEN NOTHING THEN TRUE
+    WHEN JUST dispute THEN
+            NOT `3.2.1 your right to make a claim has been extinguished` dispute
+        AND `3.2.1 the condition precedent of a valid arbitration award is satisfied` dispute
+
+§§ `The top-level decision`
+
+-- IS A BENEFIT PAYABLE ON THIS CLAIM?
+--
+-- A caller supplies one `Claim` and nothing else.
+--
+-- 1.1 conditions payment on the policy being in effect at the time of a
+-- hospitalization for sickness or accidental injury; 2.1 says that where an
+-- exclusion applies "no benefit will be paid"; 3.2.1 extinguishes the right to
+-- claim, and makes an arbitration award a condition precedent to OUR
+-- LIABILITY, where a dispute has arisen. Each of those speaks directly to
+-- whether a benefit is payable, so each is a conjunct here.
+--
+-- 3.2.1's sixty-day rule is NOT a conjunct: it governs when You may SEEK TO
+-- RECOVER, not whether a benefit is payable. It is applied in the separate
+-- decision below.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `a benefit is payable on this claim` claim IF
+        `1.1 the claim is premised on a hospitalization for sickness or accidental injury` claim
+    AND `1.1 the policy is in effect at the time of the hospitalization` claim
+    AND NOT `2.1 a general exclusion applies` claim
+    AND `3.1.1 the policy insures you 24 hours a day anywhere in the world`
+    AND `3.2 Section 3.2.1 poses no bar to liability on this claim` claim
+
+§§ `A downstream question: may You sue on it yet?`
+
+-- "In no case shall You seek to recover on this Policy before the expiration
+-- of sixty (60) days after written proof of claim has been submitted to Us in
+-- accordance with the provisions of this Policy."
+--
+-- Where no written proof of claim has been submitted at all, the sixty days
+-- have not begun to run and the bar stands.
+--
+-- UNIT NOTE: sixty days is carried as 2 months, the nearest expression of it
+-- in the unit this module works in. Sixty days is shorter than two calendar
+-- months in every month-pair except February-plus-a-short-month, so this is
+-- very slightly conservative against You. See the ambiguity register.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `3.2.1 the sixty day period after written proof of claim has expired` claim IF
+    CONSIDER claim's `months from the effective date to the submission of written proof of claim`
+    WHEN NOTHING THEN FALSE
+    WHEN JUST `the month of submission` THEN
+        claim's `months from the effective date to when you seek to recover`
+            AT LEAST (`the month of submission` PLUS `the sixty day period after written proof of claim, in months`)
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `you may seek to recover on this policy now` claim IF
+        `a benefit is payable on this claim` claim
+    AND `3.2.1 the sixty day period after written proof of claim has expired` claim
+
+§§ `Clauses not operative on whether a benefit is payable`
+
+-- 3.3.1 "Your Policy is governed by the laws of New York." A choice-of-law
+-- term. It selects the body of law under which every clause above is to be
+-- read; it is not itself a fact about a claim, and no value of it makes a
+-- benefit payable or unpayable. NOT ENCODED, deliberately.
+--
+-- 3.4.1 "All payments by You to Us and by Us to You or someone else under your
+-- policy must be in United States currency." A term about the DENOMINATION of
+-- a payment, once a payment is due. It bears on how a benefit is paid, not on
+-- whether one is payable. NOT ENCODED as an operative fact. (It would matter
+-- to a module that computed the benefit amount -- which this one cannot,
+-- because the schedule lives in the missing Section 5.)
+--
+-- 3.5.1 "The premium described in Section 5 below shall be paid in one lump
+-- sum at the signing of the policy." The MANNER and TIMING half of this is not
+-- encoded; what is encoded is the fact 1.1(2) makes operative, namely that
+-- "the applicable premium for the policy period has been paid". Whether an
+-- instalment-paying insured who has paid the whole premium satisfies 1.1(2) is
+-- recorded in the ambiguity register.
+--
+-- 3.6's first half IS encoded (`3.6 the policy term had begun ...`) and its
+-- second half is enforced through 1.2's automatic-cancelation limb, which is
+-- how the instrument itself routes it.
+
+§§ `Worked example`
+
+-- A single fixture, present only to show a caller what supplying facts looks
+-- like, and to prove the module evaluates rather than merely typechecking.
+-- Hospitalization in month 3 for sickness; wellness visit not yet made, so the
+-- 1.3 condition is still pending and 1.1(3) is met on its first limb.
+
+`an ordinary claim` MEANS Claim WITH
+    `this agreement had been signed by the time of the hospitalization` IS TRUE
+    `the applicable premium for the policy period had been paid by the time of the hospitalization` IS TRUE
+    `the wellness visit` IS NOTHING
+    `the written confirmation` IS NOTHING
+    `disclosure defaults` IS EMPTY
+    `the hospitalization on which the claim is premised` IS Hospitalization WITH
+        `months from the effective date to the hospitalization` IS 3
+        `your age in years at the time of the hospitalization` IS 41
+        `the basis of the hospitalization` IS sickness
+        `the event causing it arose directly or indirectly out of skydiving` IS FALSE
+        `the event causing it arose directly or indirectly out of service in the military` IS FALSE
+        `the event causing it arose directly or indirectly out of service as a fire fighter` IS FALSE
+        `the event causing it arose directly or indirectly out of service in the police` IS FALSE
+    `the dispute or disagreement, if any` IS NOTHING
+    `months from the effective date to the submission of written proof of claim` IS JUST 4
+    `months from the effective date to when you seek to recover` IS 7
+
+#EVAL `a benefit is payable on this claim` `an ordinary claim`
+
+#EVAL `you may seek to recover on this policy now` `an ordinary claim`
+
+§§ `Ambiguity register`
+
+-- Every place the text admitted more than one reading, the reading taken, and
+-- why. An ambiguity resolved silently would be a defect in this encoding; each
+-- one below is a finding about the instrument.
+--
+-- A1. 1.2 / 1.1(4) -- WHEN a deemed cancelation takes effect.
+--     Readings: (a) cancelation is deemed to occur when its trigger occurs, so
+--     1.1(4) is failed only by a trigger predating the hospitalization;
+--     (b) "will be deemed to have occurred" is retroactive to inception, so a
+--     trigger at ANY time defeats every claim under the policy.
+--     TAKEN: (a). 1.1 fixes the moment of assessment as "at the time of the
+--     hospitalization", and 1.1(3) expressly contemplates a condition that is
+--     "still pending" at that moment -- a clause with no work to do under (b).
+--     This is the single most consequential choice in the file: under (b) a
+--     misrepresentation discovered during claims handling would unmake an
+--     otherwise good claim. See `1.2 canceled for fraud, misrepresentation or
+--     material withholding`, which carries the AT MOST test.
+--
+-- A2. 1.1(3) -- what "still pending" means.
+--     Readings: (a) the month-7 deadline has not passed and the condition is
+--     not yet satisfied; (b) timely satisfaction is still ACHIEVABLE, so at
+--     month 6.5 with no wellness visit yet the condition has already failed
+--     rather than being pending.
+--     TAKEN: (a). "Pending" is the ordinary word for an obligation whose
+--     deadline has not arrived, and 1.2 keys cancelation on the condition
+--     having "not been satisfied in a timely fashion" -- a fact that cannot be
+--     established before the deadline passes. Consequence: a hospitalization
+--     in month 6 with no visit at all is covered.
+--
+-- A3. 1.2 -- the scope of "material".
+--     Readings: (a) "any misrepresentation" OR "material withholding" -- the
+--     adjective sits only on withholding, so an immaterial misrepresentation
+--     cancels; (b) materiality is implied for both limbs.
+--     TAKEN: (a), the grammar of the sentence. Recorded because it is harsh
+--     and probably not intended: it makes any inaccuracy in any communication
+--     "relating to this policy" a cancelation trigger.
+--
+-- A4. 1.2 -- whether "fraud" carries the "provided by you to the Company"
+--     qualifier.
+--     Readings: (a) fraud stands alone before the comma and is unqualified, so
+--     fraud by anyone in any connection triggers cancelation; (b) the whole
+--     trailing qualifier distributes over all three species.
+--     TAKEN: (a), the grammar. Consequence: the `fraud` arm of
+--     `1.2 this default triggers cancelation` reads TRUE without looking at
+--     the two qualifier fields.
+--
+-- A5. 1.2 / 3.6 -- the last instant of the policy term.
+--     Readings: (a) inclusive -- cancelation strikes at midnight ENDING the
+--     anniversary day, so month 12 is still inside the term; (b) exclusive --
+--     a period of one year from the effective date closes at the start of the
+--     anniversary, so month 12 is out.
+--     TAKEN: (a). 1.2 says the cancelation is "at midnight ... on the last day
+--     of the policy term", i.e. at the end of that day, and 3.6 runs the term
+--     "for a period of one year FROM" the effective date. Encoded as
+--     GREATER THAN 12 for the automatic-cancelation limb.
+--
+-- A6. 1.2 -- the dangling cross-reference to "Section 5".
+--     Section 5 does not exist in this instrument. 3.6 describes the policy
+--     term and 3.5.1 describes the premium, and 3.5.1 ALSO cross-refers to the
+--     missing Section 5.
+--     TAKEN: the term is read from 3.6 (one year from the effective date).
+--     The premium amount and the benefit schedule are simply absent, so this
+--     module answers whether a benefit is payable, never how much.
+--
+-- A7. 1.3 -- whether the wellness visit has a lower time bound.
+--     Readings: (a) literal -- "no later than the 6th month anniversary" is an
+--     upper bound only, so a visit before the effective date would qualify;
+--     (b) purposive -- the visit must fall within the policy period.
+--     TAKEN: (a). The text states one bound and this encoding states one bound.
+--
+-- A8. 1.3 -- whether the confirmation must postdate the visit.
+--     The text does not say so. Not encoded; a confirmation supplied in month
+--     2 of a visit in month 5 satisfies the encoded test. Recorded rather than
+--     silently repaired.
+--
+-- A9. 2.1(5) -- whether age is an exclusion in its own right.
+--     Readings: (a) free-standing -- "If your age at the time of the
+--     hospitalization is equal to or greater than 80" is a condition, not
+--     something an event can arise out of, so it excludes regardless of cause;
+--     (b) grammatical -- it is item 5 in a list governed by "arising directly
+--     or indirectly out of", which would make it nonsense.
+--     TAKEN: (a). The item's own "If ..." construction breaks the parallel of
+--     items 1-4 and reads as a stand-alone proviso.
+--
+-- A10. 2.1 chapeau -- what "arising directly or indirectly out of" modifies.
+--     Readings: (a) the EVENT arises out of the named activity; (b) the
+--     SICKNESS OR INJURY arises out of it.
+--     TAKEN: (a), the nearer antecedent ("any event causing sickness or
+--     accidental injury arising ... out of"). The field names say "the event
+--     causing it arose ...". Immaterial on any fact pattern I can construct,
+--     but recorded.
+--
+-- A11. 2.1(2)-(4) -- whose service.
+--     "Service in the military", "as a fire fighter", "in the police" name no
+--     person. TAKEN: Your service, since the clause opens "Your policy will
+--     not apply to". An injury arising out of a THIRD party's police service
+--     (being struck by a patrol car) is therefore not excluded on this
+--     reading -- an outcome worth flagging.
+--
+-- A12. 1.1 -- whether the four numbered conditions are exhaustive.
+--     Readings: (a) "The policy will be in effect IF" is definitional, i.e.
+--     if and only if; (b) the list is sufficient but not necessary.
+--     TAKEN: (a), the drafting convention for a definitional list. Under (b)
+--     the clause could not do the work 1.1's chapeau assigns it.
+--
+-- A13. 1.1(2) with 3.5.1 -- what counts as the premium having been paid.
+--     3.5.1 requires the premium to be "paid in one lump sum at the signing".
+--     Readings: (a) 1.1(2) asks only whether the premium for the period has in
+--     fact been paid, and 3.5.1 is a separate promise about manner and timing;
+--     (b) a premium paid in instalments is not "the applicable premium ...
+--     paid" for 1.1(2) purposes.
+--     TAKEN: (a). Only the fact of payment is a field; the manner is not.
+--
+-- A14. 3.2.1 -- what counts as "a dispute or disagreement".
+--     If a declined claim is itself a disagreement, then a valid arbitration
+--     award is a condition precedent to liability on essentially every
+--     contested claim, and the whole policy is arbitrate-first. The text gives
+--     no test. TAKEN: modelled as a supplied fact -- `the dispute or
+--     disagreement, if any` -- so the caller, not this encoding, decides.
+--     Where it is NOTHING, 3.2.1 says nothing about the claim.
+--
+-- A15. 3.2.1 -- "the day such parties are unable to settle".
+--     Vague: no test is given for when the parties become unable to settle.
+--     TAKEN: supplied as a fact rather than derived.
+--
+-- A16. 3.2.1 -- sixty days in a months-denominated model.
+--     Sixty days is not two months. TAKEN: 2 months, the nearest expression in
+--     this module's unit, bound once as
+--     `the sixty day period after written proof of claim, in months` so the
+--     approximation sits in one place. Slightly conservative against You.
+--
+-- A17. 3.2.1's sixty-day rule -- whether it bears on payability.
+--     Readings: (a) it governs when You may SEEK TO RECOVER, a maturity rule,
+--     not whether a benefit is payable; (b) it is a bar on the claim itself.
+--     TAKEN: (a). The top-level decision omits it; the separate decision
+--     `you may seek to recover on this policy now` conjoins it, so a caller
+--     who wants reading (b) has it one call away.
+--
+-- A18. 1.1 chapeau -- a claim not premised on a hospitalization at all.
+--     The instrument only ever speaks of benefits premised on "the
+--     hospitalization for sickness or accidental injury". TAKEN: the Claim
+--     record always carries a Hospitalization, and a hospitalization on some
+--     other footing is represented by the third arm of
+--     `Basis of the hospitalization`. A purported claim with no
+--     hospitalization behind it is outside this model's domain.
+--
+-- A19. 1.1(1) -- "This agreement is signed", by whom.
+--     3.6 defines the effective date by OUR signature, so our signature exists
+--     by construction of the time axis; 1.1(1) must therefore be doing work
+--     about Your signature (or about both). TAKEN: one boolean covering
+--     whether the agreement stands signed at the time of the hospitalization.

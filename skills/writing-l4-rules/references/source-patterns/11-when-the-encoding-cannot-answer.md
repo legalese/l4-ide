@@ -632,7 +632,7 @@ delegation that reads the section `GIVEN`. Exercise the first with `#ASSERT`, an
 ```l4
 DECLARE Applicant HAS
     `age in years`                          IS A NUMBER
-    `has been disqualified under section 9` IS A BOOLEAN
+    `been disqualified under section 9` IS A BOOLEAN
 
 § `Part 2 — Licences`
     GIVEN `the applicant` IS AN Applicant
@@ -643,7 +643,7 @@ GIVEN `the person` IS AN Applicant
 GIVETH A BOOLEAN
 `s 6(1) — a licence may be granted to` `the person` MEANS
         `the person`'s `age in years` AT LEAST 18
-    AND NOT `the person`'s `has been disqualified under section 9`
+    AND NOT `the person`'s `been disqualified under section 9`
 
 -- The Part's own rule, in the Part's own words, reading the section GIVEN.
 @ref Licensing Act s 6(1)
@@ -653,7 +653,7 @@ GIVETH A BOOLEAN
 
 `an applicant aged 25 who is not disqualified` MEANS Applicant WITH
     `age in years`                          IS 25
-    `has been disqualified under section 9` IS FALSE
+    `been disqualified under section 9` IS FALSE
 
 #ASSERT `s 6(1) — a licence may be granted to` `an applicant aged 25 who is not disqualified`
 #CHECK  `s 6(1) — the applicant may be granted a licence`

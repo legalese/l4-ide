@@ -7,43 +7,66 @@
   "additionalProperties": false,
   "required": ["schema", "subject", "sides", "slots", "pairs"],
   "properties": {
-    "schema": { "const": "l4-go/surface-map@1" },
+    "schema": {
+      "const": "l4-go/surface-map@1"
+    },
     "subject": {
       "type": "string",
       "pattern": "^[a-z0-9][a-z0-9-]*$",
       "description": "A sidecar id under etc/go/subjects/."
     },
-    "note": { "$ref": "#/$defs/note" },
-    "generated_by": { "$ref": "#/$defs/generated_by" },
+    "note": {
+      "$ref": "#/$defs/note"
+    },
+    "generated_by": {
+      "$ref": "#/$defs/generated_by"
+    },
     "sides": {
       "type": "object",
       "additionalProperties": false,
       "required": ["left", "right"],
       "description": "`left` is the reference encoding (at G2: the committed corpus). Battery slot values are written in `left`'s vocabulary; `right` declares its renames. Nothing else privileges left over right — the triage dispositions are symmetric.",
       "properties": {
-        "left": { "$ref": "#/$defs/side" },
-        "right": { "$ref": "#/$defs/side" }
+        "left": {
+          "$ref": "#/$defs/side"
+        },
+        "right": {
+          "$ref": "#/$defs/side"
+        }
       }
     },
     "slots": {
       "type": "object",
       "minProperties": 1,
       "description": "The shared fact vocabulary. A slot is one argument's worth of facts, named once and referenced by both sides' calls — this is what makes two differently-named encodings comparable at all.",
-      "additionalProperties": { "$ref": "#/$defs/slot" }
+      "additionalProperties": {
+        "$ref": "#/$defs/slot"
+      }
     },
-    "battery": { "$ref": "#/$defs/battery" },
+    "battery": {
+      "$ref": "#/$defs/battery"
+    },
     "pairs": {
       "type": "array",
       "minItems": 1,
-      "items": { "$ref": "#/$defs/pair" }
+      "items": {
+        "$ref": "#/$defs/pair"
+      }
     }
   },
   "$defs": {
     "note": {
       "description": "Free prose for humans and the skill. No script branches on it.",
       "oneOf": [
-        { "type": "string" },
-        { "type": "array", "items": { "type": "string" } }
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
       ]
     },
     "generated_by": {
@@ -51,18 +74,30 @@
       "additionalProperties": false,
       "description": "Absent on a hand-written map; written by the stage that deposits one.",
       "properties": {
-        "stage": { "type": "string" },
-        "run_id": { "type": "string" },
-        "at": { "type": "string" }
+        "stage": {
+          "type": "string"
+        },
+        "run_id": {
+          "type": "string"
+        },
+        "at": {
+          "type": "string"
+        }
       }
     },
     "provenance": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "source": { "type": "string" },
-        "retrieved": { "type": "string" },
-        "cite": { "type": "string" }
+        "source": {
+          "type": "string"
+        },
+        "retrieved": {
+          "type": "string"
+        },
+        "cite": {
+          "type": "string"
+        }
       }
     },
     "side": {
@@ -84,11 +119,17 @@
         },
         "stage": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "description": "Extra repo-relative .l4 files to copy alongside the module into its scratch side-directory, for IMPORTs the sibling scan would miss. The oracle already copies every *.l4 in the module's own directory."
         },
-        "provenance": { "$ref": "#/$defs/provenance" },
-        "note": { "$ref": "#/$defs/note" }
+        "provenance": {
+          "$ref": "#/$defs/provenance"
+        },
+        "note": {
+          "$ref": "#/$defs/note"
+        }
       }
     },
     "sideslot": {
@@ -102,10 +143,14 @@
         },
         "rename": {
           "type": "object",
-          "additionalProperties": { "type": "string" },
+          "additionalProperties": {
+            "type": "string"
+          },
           "description": "canonical field name (as written in the battery, i.e. `left`'s vocabulary) -> this module's field name. Fields not listed pass through unchanged. A field this module declares but the battery does not supply is loud: the decoder reports `Missing required field`."
         },
-        "note": { "$ref": "#/$defs/note" }
+        "note": {
+          "$ref": "#/$defs/note"
+        }
       }
     },
     "slot": {
@@ -117,8 +162,12 @@
           "enum": ["record", "number", "boolean", "string", "date"],
           "description": "`record` slots hold an object of field->value; the rest hold a scalar. Dates are ISO-8601 strings; JSONDECODE parses them into DATE."
         },
-        "left": { "$ref": "#/$defs/sideslot" },
-        "right": { "$ref": "#/$defs/sideslot" },
+        "left": {
+          "$ref": "#/$defs/sideslot"
+        },
+        "right": {
+          "$ref": "#/$defs/sideslot"
+        },
         "from_case": {
           "type": "string",
           "description": "Key in a seed case's context object to draw this slot's value from (see battery.cases). Absent = this slot is supplied only by battery.rows."
@@ -132,11 +181,44 @@
           "type": "object",
           "additionalProperties": {
             "type": "array",
-            "items": { "type": ["number", "string", "boolean"] }
+            "items": {
+              "type": ["number", "string", "boolean"]
+            }
           },
           "description": "field name -> extra values the perturbation generator must try for that field. This is where a human puts the statutory boundary figures the generator cannot know. Each is also tried at ±1 for numbers."
         },
-        "note": { "$ref": "#/$defs/note" }
+        "note": {
+          "$ref": "#/$defs/note"
+        },
+        "freeze": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "field names inside this slot that the perturbation generator must NOT mutate, matched by bare name or by dotted path (the same rule as `thresholds`). `perturb: false` is all-or-nothing and cannot say 'mutate these nine leaves and leave those five alone', which is exactly what a union-payload row needs: a field only one side declares has a twin on the other side, so mutating it moves one side and leaves the other reading its untouched twin, and the divergence that produces is a fact about the map rather than about either encoding. Frozen fields are named in the report's `battery.frozen_fields`, because agreement on a field that was never perturbed is silence, not evidence."
+        },
+        "domains": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "integer": {
+                "type": "boolean",
+                "description": "drop non-integral candidates"
+              },
+              "min": {
+                "type": "number",
+                "description": "drop candidates below this"
+              },
+              "max": {
+                "type": "number",
+                "description": "drop candidates above this"
+              }
+            },
+            "additionalProperties": false
+          },
+          "description": "field name -> the domain its values may take, used to discard candidates the generator proposes but the instrument cannot mean. Without it the numeric multipliers and the unconditional -1 probe emit values like a wellness visit at month 0.5 or a premium paid at month -1; a divergence on those is noise wearing the costume of a finding. Matched by bare name or dotted path, as `thresholds` and `freeze` are."
+        }
       }
     },
     "battery": {
@@ -150,10 +232,16 @@
         },
         "rows": {
           "type": "array",
-          "items": { "$ref": "#/$defs/row" }
+          "items": {
+            "$ref": "#/$defs/row"
+          }
         },
-        "perturbation": { "$ref": "#/$defs/perturbation" },
-        "note": { "$ref": "#/$defs/note" }
+        "perturbation": {
+          "$ref": "#/$defs/perturbation"
+        },
+        "note": {
+          "$ref": "#/$defs/note"
+        }
       }
     },
     "row": {
@@ -161,7 +249,9 @@
       "additionalProperties": false,
       "required": ["name", "slots"],
       "properties": {
-        "name": { "type": "string" },
+        "name": {
+          "type": "string"
+        },
         "slots": {
           "type": "object",
           "additionalProperties": true,
@@ -171,7 +261,9 @@
           "type": ["string", "null"],
           "description": "ISO date. When present, every pair whose rule_date is \"case\" is evaluated under EVAL UNDER RULES EFFECTIVE AT this date."
         },
-        "note": { "$ref": "#/$defs/note" }
+        "note": {
+          "$ref": "#/$defs/note"
+        }
       }
     },
     "perturbation": {
@@ -179,7 +271,10 @@
       "additionalProperties": false,
       "description": "Systematic single-field mutation of each seed row. One field at a time is what makes a divergence witness minimal by construction: the witness is `seed row + this one change`, and the seed agreed.",
       "properties": {
-        "enabled": { "type": "boolean", "default": true },
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
         "max_per_seed": {
           "type": "integer",
           "minimum": 0,
@@ -187,12 +282,16 @@
         },
         "numeric_deltas": {
           "type": "array",
-          "items": { "type": "number" },
+          "items": {
+            "type": "number"
+          },
           "description": "Absolute offsets applied to every numeric leaf. Default [-1, 1] — the boundary bias: a threshold is crossed by one, not by an order of magnitude."
         },
         "numeric_multipliers": {
           "type": "array",
-          "items": { "type": "number" },
+          "items": {
+            "type": "number"
+          },
           "description": "Default [0, 0.5, 2]."
         },
         "cross_pollinate": {
@@ -200,7 +299,9 @@
           "default": true,
           "description": "For each leaf, also try every distinct value that leaf takes across the OTHER seed rows (and, for numbers, ±1 around each). The seed cases carry the regime boundaries a human already found; this reuses them everywhere instead of only where they were written."
         },
-        "note": { "$ref": "#/$defs/note" }
+        "note": {
+          "$ref": "#/$defs/note"
+        }
       }
     },
     "pair": {
@@ -213,8 +314,12 @@
           "pattern": "^[a-z0-9][a-z0-9-]*$",
           "description": "Stable, unique. Cited by the triage table and by fork-register entries."
         },
-        "left": { "$ref": "#/$defs/call" },
-        "right": { "$ref": "#/$defs/call" },
+        "left": {
+          "$ref": "#/$defs/call"
+        },
+        "right": {
+          "$ref": "#/$defs/call"
+        },
         "rule_date": {
           "type": ["string", "null"],
           "description": "\"case\" = take it from the row; an ISO date = pin it for every row; absent/null = evaluate with no EVAL UNDER RULES EFFECTIVE AT wrapper, which requires the module's own TIMEZONE."
@@ -227,7 +332,9 @@
           "type": "string",
           "description": "The source-text coordinate both sides claim to encode, e.g. \"17 CFR 227.100(b)\"."
         },
-        "note": { "$ref": "#/$defs/note" }
+        "note": {
+          "$ref": "#/$defs/note"
+        }
       }
     },
     "call": {
@@ -241,14 +348,18 @@
         },
         "args": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "description": "Slot names, in call order. The two sides need not have the same arity — an Interpretation parameter on one side only is expected (SPEC.md R4) — they need only agree on the answer."
         },
         "field": {
           "type": ["string", "null"],
           "description": "Optional field to project out of a record-shaped result, so two encodings with different result records can still be compared on one answer. Absent = compare the whole rendered value."
         },
-        "note": { "$ref": "#/$defs/note" }
+        "note": {
+          "$ref": "#/$defs/note"
+        }
       }
     }
   }

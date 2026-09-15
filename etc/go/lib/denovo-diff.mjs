@@ -523,7 +523,35 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
  * where it was written. `slots.<n>.thresholds` is the manual escape hatch for a
  * boundary that appears in no case at all.
  */
-export function candidatesFor(leaf, pooled, cfg, thresholds) {
+/**
+ * Three per-slot knobs name a field the same way: by its last path element, or
+ * by its full dotted path. Sharing one matcher keeps `thresholds`, `freeze` and
+ * `domains` from disagreeing about which field a name refers to.
+ */
+export function fieldEntry(table, path) {
+  if (!table) return undefined;
+  return table[path.at(-1)] ?? table[path.join(".")];
+}
+
+/**
+ * Does a candidate value fall inside the field's declared domain?
+ *
+ * Without this the generator proposes values the instrument cannot mean. It
+ * emitted a wellness visit at month 0.5 (from `numeric_multipliers`) and a
+ * premium paid at month -1 (from the unconditional `add(-1)` below) against the
+ * chubb subject: a half month and a month before the effective date are not
+ * facts about which either encoding has an opinion, so a divergence there is
+ * noise wearing the costume of a finding.
+ */
+export function inDomain(v, dom) {
+  if (!dom || typeof v !== "number") return true;
+  if (dom.integer && !Number.isInteger(v)) return false;
+  if (typeof dom.min === "number" && v < dom.min) return false;
+  if (typeof dom.max === "number" && v > dom.max) return false;
+  return true;
+}
+
+export function candidatesFor(leaf, pooled, cfg, thresholds, domain) {
   const v = leaf.value;
   const out = new Set();
   const add = (x) => {
@@ -561,7 +589,7 @@ export function candidatesFor(leaf, pooled, cfg, thresholds) {
       for (const d of cfg.numeric_deltas) add(t + d);
   }
   out.delete(JSON.stringify(v));
-  return [...out].map((s) => JSON.parse(s));
+  return [...out].map((s) => JSON.parse(s)).filter((c) => inDomain(c, domain));
 }
 
 export function expandBattery(map, seeds) {
@@ -596,11 +624,24 @@ export function expandBattery(map, seeds) {
       if (slot && slot.perturb === false) continue;
       for (const lf of leavesOf(val)) {
         const key = `${slotName}.${lf.path.join(".")}`;
+        // Per-FIELD freeze. `slot.perturb: false` is all-or-nothing, which is
+        // useless when both sides take one argument and only some of its fields
+        // are safely comparable: a row that is a union payload carries fields
+        // only one side declares, so mutating one of those moves that side and
+        // leaves the other reading its own untouched twin. The divergence is a
+        // fact about the map, not about either encoding. Freezing those fields
+        // is what lets the rest of the surface be perturbed at all.
+        const frozen = slot?.freeze;
+        if (
+          Array.isArray(frozen) &&
+          (frozen.includes(lf.path.at(-1)) ||
+            frozen.includes(lf.path.join(".")))
+        )
+          continue;
         const pooled = [...(pool.get(key) || [])].map((x) => JSON.parse(x));
-        const thresholds =
-          (slot?.thresholds || {})[lf.path.at(-1)] ??
-          (slot?.thresholds || {})[lf.path.join(".")];
-        for (const cand of candidatesFor(lf, pooled, cfg, thresholds)) {
+        const thresholds = fieldEntry(slot?.thresholds, lf.path);
+        const domain = fieldEntry(slot?.domains, lf.path);
+        for (const cand of candidatesFor(lf, pooled, cfg, thresholds, domain)) {
           if (cfg.max_per_seed && made >= cfg.max_per_seed) break;
           const slots = clone(s.slots);
           if (lf.path.length === 0) slots[slotName] = cand;
@@ -621,7 +662,10 @@ export function expandBattery(map, seeds) {
       }
     }
   }
-  return { rows, cfg, generated: n };
+  const frozen_fields = Object.entries(map.slots || {}).flatMap(([n, sl]) =>
+    Array.isArray(sl?.freeze) ? sl.freeze.map((f) => `${n}.${f}`) : [],
+  );
+  return { rows, cfg, generated: n, frozen_fields };
 }
 
 // ---------------------------------------------------------------------------
@@ -953,13 +997,13 @@ export function sensitivity(rows) {
   const seedAnswers = new Map();
   for (const r of rows)
     if (r.row_kind === "seed")
-      seedAnswers.set(`${r.pair} ${r.row_id}`, [r.left.text, r.right.text]);
+      seedAnswers.set(`${r.pair}\0${r.row_id}`, [r.left.text, r.right.text]);
   const acc = new Map();
   for (const r of rows) {
     if (r.row_kind !== "perturbation" || !r.mutation) continue;
-    const base = seedAnswers.get(`${r.pair} ${r.derived_from}`);
+    const base = seedAnswers.get(`${r.pair}\0${r.derived_from}`);
     if (base === undefined) continue; // no seed baseline: cannot say
-    const key = `${r.pair} ${r.mutation.path}`;
+    const key = `${r.pair}\0${r.mutation.path}`;
     let e = acc.get(key);
     if (!e) {
       e = { pair: r.pair, leaf: r.mutation.path, perturbed: 0, moved: 0 };
@@ -991,7 +1035,7 @@ export function minimise(rows) {
       r.mutation ? r.mutation.path : "«seed»",
       r.left.text,
       r.right.text,
-    ].join(" ");
+    ].join("\0");
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(r);
   }
@@ -1363,7 +1407,7 @@ function main(argv) {
       "the battery is empty: battery.cases produced no row carrying a declared slot, and battery.rows is absent. " +
         "Check that every slot you want fed from the cases file carries a `from_case` key.",
     );
-  let { rows, generated } = expandBattery(map, seeds);
+  let { rows, generated, frozen_fields } = expandBattery(map, seeds);
   const truncated = maxRows > 0 && rows.length > maxRows;
   if (truncated) rows = rows.slice(0, maxRows);
 
@@ -1438,6 +1482,10 @@ function main(argv) {
       cases: map.battery?.cases ?? null,
       seeds: seeds.length,
       perturbations: generated || 0,
+      // Named in the report because a frozen field is a piece of the surface
+      // that was NOT measured. Agreement on it would be silence, and a reader
+      // who does not know it was frozen would read the silence as evidence.
+      frozen_fields: frozen_fields || [],
       rows: rows.length,
       truncated,
     },

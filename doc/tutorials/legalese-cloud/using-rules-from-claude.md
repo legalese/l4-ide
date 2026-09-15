@@ -45,7 +45,7 @@ The deployment's MCP server registers **one tool per exported rule**, plus a set
 Two naming rules to notice, both applied automatically:
 
 - **Tool names are sanitized**: backtick names with spaces become hyphenated (`` `calculate premium` `` → `calculate-premium`), matching the `^[a-zA-Z0-9_-]+$` character set tool names require.
-- **Field names in schemas are sanitized the same way**: the `Applicant` record's `risk score` field appears as `risk-score` in the tool's input schema, `is existing customer` as `is-existing-customer`. The server maps them back to the original L4 names when it evaluates.
+- **Field names in schemas are sanitized the same way**: the `Applicant` record's `risk score` field appears as `risk-score` in the tool's input schema, `existing customer` as `existing-customer`. The server maps them back to the original L4 names when it evaluates.
 
 ---
 
@@ -114,7 +114,7 @@ The response lists each rule as a tool, with your `@export` description and a JS
         "properties": {
           "age": { "type": "number" },
           "risk-score": { "type": "number" },
-          "is-existing-customer": { "type": "boolean" }
+          "existing-customer": { "type": "boolean" }
         }
       }
     },
@@ -147,7 +147,7 @@ The assistant sees two rule tools whose descriptions match the question, and cal
       "applicant": {
         "age": 35,
         "risk-score": 0.4,
-        "is-existing-customer": true
+        "existing-customer": true
       }
     }
   }
@@ -206,7 +206,7 @@ The assistant can call `list_files` and then `read_file`:
 }
 ```
 
-…and quote the actual rule text back — ``IF applicant's `risk score` > 0.7 THEN applicant's `age` * 100, ELSE IF applicant's `is existing customer` THEN applicant's `age` * 40, ...`` — so 35 × 40 = 1400. The answer is grounded in the deployed source, not a paraphrase from training data.
+…and quote the actual rule text back — ``IF applicant's `risk score` > 0.7 THEN applicant's `age` * 100, ELSE IF applicant's `existing customer` THEN applicant's `age` * 40, ...`` — so 35 × 40 = 1400. The answer is grounded in the deployed source, not a paraphrase from training data.
 
 ---
 

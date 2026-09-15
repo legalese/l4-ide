@@ -1,0 +1,176 @@
+§ `Codex Insurance Limited — Daily Hospital Income Policy`
+
+-- Encoding of fixtures/chubb-policy.txt.
+--
+-- Per the task brief, every date/time referenced by a query -- other than the
+-- claimant's age -- is given as a NUMBER of months elapsed since the policy's
+-- effective date, so no absolute DATE arithmetic is needed anywhere below.
+--
+-- Per the task brief, §1.1 conditions 1 ("this agreement is signed") and 2
+-- ("the applicable premium ... has been paid") are assumed always satisfied,
+-- as is §4.5's premium-timing requirement; none of the three is modelled.
+-- §2.3's requirement that "a claim must be made to the Company setting out
+-- the basis for making the claim" is a filing/procedural requirement, not a
+-- substantive coverage condition: it is satisfied whenever the substantive
+-- conditions below hold, so it is not modelled as a separate fact.
+-- §4.2 (arbitration), §4.3 (New York law) and §4.4 (US currency) govern
+-- dispute resolution and payment mechanics, not whether a claim is covered,
+-- and are likewise not modelled.
+
+§§ `Ontology`
+
+DECLARE `Excluded Activity` IS ONE OF
+    Skydiving
+    `Military Service`
+    `Firefighter Service`
+    `Police Service`
+
+-- `Intentional Self Inflicted Injury` is a deliberate act by the claimant --
+-- see NOTES.md for why this is treated as neither a sickness nor an
+-- accidental injury under §2.1.
+DECLARE `Cause Of Hospitalization` IS ONE OF
+    Sickness
+    `Accidental Injury`
+    `Intentional Self Inflicted Injury`
+
+DECLARE Claim HAS
+    `cause of hospitalization`                                          IS A `Cause Of Hospitalization`
+    `excluded activity`                                                 IS A MAYBE `Excluded Activity`
+    `age at hospitalization`                                            IS A NUMBER
+    `hospital located in the United States`                             IS A BOOLEAN
+    `days confined in hospital`                                         IS A NUMBER
+    `hospitalization months after the effective date`                   IS A NUMBER
+    `wellness visit occurred months after the effective date`           IS A MAYBE NUMBER
+    `wellness visit confirmation given months after the effective date` IS A MAYBE NUMBER
+    `fraud misrepresentation or material withholding of information`    IS A BOOLEAN
+
+§ `1. POLICY IN EFFECT AND CONDITIONS`
+
+§§ `1.3 — the wellness-visit condition`
+
+-- "... written confirmation ... of a wellness visit ... occurring no later
+--  than the 6th month anniversary of the effective date of this policy."
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`wellness visit occurred in time` claim MEANS
+    CONSIDER claim's `wellness visit occurred months after the effective date`
+    WHEN NOTHING THEN FALSE
+    WHEN JUST m THEN m AT MOST 6
+
+-- "No later than the 7th month anniversary of the effective date of this
+--  policy, you will supply us with written confirmation ..."
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`wellness visit confirmation given in time` claim MEANS
+    CONSIDER claim's `wellness visit confirmation given months after the effective date`
+    WHEN NOTHING THEN FALSE
+    WHEN JUST m THEN m AT MOST 7
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`condition 1.3 satisfied in a timely fashion` claim MEANS
+    `wellness visit occurred in time` claim
+    AND `wellness visit confirmation given in time` claim
+
+-- "is still pending": as of the hospitalization for which the claim is made,
+-- the 7th-month deadline for satisfying §1.3 has not yet arrived.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`condition 1.3 still pending` claim MEANS
+    claim's `hospitalization months after the effective date` AT MOST 7
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`condition 1.3 met` claim MEANS
+    `condition 1.3 still pending` claim
+    OR `condition 1.3 satisfied in a timely fashion` claim
+
+§§ `4.6 — policy term (referenced by 1.2's automatic cancelation at term end)`
+
+-- "will last for a period of one year from that date [the effective date]"
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`within the one-year policy term` claim MEANS
+    claim's `hospitalization months after the effective date` AT MOST 12
+
+§§ `1.2 — cancelation`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`policy canceled` claim MEANS
+    claim's `fraud misrepresentation or material withholding of information`
+    OR NOT `condition 1.3 met` claim
+    OR NOT `within the one-year policy term` claim
+
+§§ `1.1 — policy in effect`
+
+-- Conditions 1 and 2 (signed; premium paid) are assumed satisfied -- see the
+-- file header. Condition 3 ("the condition set out in Section 1.3 is still
+-- pending or has been satisfied in a timely fashion") is folded into
+-- `policy canceled` above; condition 4 is "the policy has not been canceled".
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`policy in effect at the hospitalization` claim MEANS
+    NOT `policy canceled` claim
+
+§ `2. BENEFITS`
+
+-- "If you have been confined in a hospital as a result of sickness or
+--  accidental Injury, we will pay you the Daily Hospital Income Benefit."
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`hospitalization is sickness or accidental injury` claim MEANS
+    CONSIDER claim's `cause of hospitalization`
+    WHEN Sickness THEN TRUE
+    WHEN `Accidental Injury` THEN TRUE
+    WHEN `Intentional Self Inflicted Injury` THEN FALSE
+
+-- "The Daily Hospital Income Benefit will only be payable for each (24 hour)
+--  day of continuous confinement in a hospital in the United States ... and
+--  for a period not exceeding three hundred and sixty-five (365) days ..."
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`benefit payable under section 2.2` claim MEANS
+    claim's `hospital located in the United States`
+    AND claim's `days confined in hospital` AT MOST 365
+
+§ `3. GENERAL EXCLUSIONS`
+
+-- "... any event causing sickness or accidental injury arising directly or
+--  indirectly out of: Skydiving; Service in the military; Service as a fire
+--  fighter; Service in the police." This requires the hospitalization to
+-- have arisen from engaging in the activity, not merely that the claimant
+-- holds that occupation at the time -- see NOTES.md.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`activity exclusion applies` claim MEANS
+    CONSIDER claim's `excluded activity`
+    WHEN NOTHING THEN FALSE
+    WHEN JUST activity THEN TRUE
+
+-- "If your age at the time of the hospitalization is equal to or greater
+--  than 80 years of age."
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`age exclusion applies` claim MEANS
+    claim's `age at hospitalization` AT LEAST 80
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`a general exclusion applies` claim MEANS
+    `activity exclusion applies` claim
+    OR `age exclusion applies` claim
+
+§ `Coverage decision`
+
+-- §2.3's filing requirement ("a claim must be made ... setting out the basis
+-- for making the claim and for there being no exclusion or cancellation") is
+-- satisfied exactly when the substantive conditions below hold; see the file
+-- header note.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`covered` claim MEANS
+    `policy in effect at the hospitalization` claim
+    AND `hospitalization is sickness or accidental injury` claim
+    AND `benefit payable under section 2.2` claim
+    AND NOT `a general exclusion applies` claim

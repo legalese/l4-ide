@@ -1,0 +1,319 @@
+IMPORT prelude
+IMPORT daydate
+
+§ `Der deutsche Feiertagskalender — Datengrundlage für BGB § 193`
+
+-- ===========================================================================
+-- ZWECK. BGB § 193 verlegt einen Tag, der auf einen Sonntag, einen Sonnabend
+-- oder einen "am Erklärungs- oder Leistungsort staatlich anerkannten
+-- allgemeinen Feiertag" fällt, auf den nächsten Werktag. `daydate` kennt
+-- Sonnabend und Sonntag; Feiertage kennt es nicht. Diese Datei liefert sie.
+--
+-- WARUM EINE EIGENE DATEI. Der Kalender ist transkribierte Daten mit eigener
+-- Provenienz. Eine Korrektur an ihm soll nicht die Goldens der Gesetzesdatei
+-- umwälzen.
+--
+-- RECHTSSTAND: 2026-09-14.
+--
+-- BERECHNET, NICHT TABELLIERT. Die beweglichen Feste laufen über den
+-- anonymen gregorianischen Osteralgorithmus. Eine Tabelle läuft irgendwann
+-- aus und antwortet dann still so, als sei jeder Tag ein Werktag. Der
+-- Computus tut das nie. Gegengeprüft wird er trotzdem — gegen eine
+-- 21-jährige Tabelle, siehe `die Ostersonntage 2015 bis 2035`.
+--
+-- FENSTER: 2000-01-01 bis 2035-12-31. Ausserhalb ist die Angabe nicht
+-- gesichert, und `die Feiertagsangabe für den Tag … ist gesichert` sagt das.
+--
+-- ZEITACHSE. Vier Feiertage sind nach 2017 eingeführt worden und deshalb
+-- IM JAHR GESCHALTET, nicht bloss im Fenster vermerkt. Ohne diese Schaltung
+-- würde Beispiel 11 (Berlin, 2006) gegen einen Berliner Kalender von 2026
+-- gerechnet und käme nur zufällig richtig heraus.
+-- ===========================================================================
+
+§§ `Die Länder und die maßgebenden Orte`
+
+-- § 193 fragt nach einem Feiertag "am Erklärungs- ODER Leistungsort". Das
+-- können ZWEI verschiedene Orte sein, und keiner davon muss das Forum sein.
+-- Deshalb eine LISTE von Ländern, nicht ein Land.
+@ref BGB § 193 — "einen am Erklärungs- oder Leistungsort staatlich anerkannten allgemeinen Feiertag"
+DECLARE Land IS ONE OF
+    `Baden-Württemberg`
+    `Bayern`
+    `Berlin`
+    `Brandenburg`
+    `Bremen`
+    `Hamburg`
+    `Hessen`
+    `Mecklenburg-Vorpommern`
+    `Niedersachsen`
+    `Nordrhein-Westfalen`
+    `Rheinland-Pfalz`
+    `Saarland`
+    `Sachsen`
+    `Sachsen-Anhalt`
+    `Schleswig-Holstein`
+    `Thüringen`
+
+DECLARE `Die maßgebenden Orte` HAS
+    `die Länder`                                       IS A LIST OF Land
+    `ein maßgebender Ort liegt außerhalb Deutschlands` IS A BOOLEAN
+
+GIVETH A LIST OF Land
+`alle Länder` MEANS
+    LIST `Baden-Württemberg`, `Bayern`, `Berlin`, `Brandenburg`, `Bremen`, `Hamburg`, `Hessen`, `Mecklenburg-Vorpommern`, `Niedersachsen`, `Nordrhein-Westfalen`, `Rheinland-Pfalz`, `Saarland`, `Sachsen`, `Sachsen-Anhalt`, `Schleswig-Holstein`, `Thüringen`
+
+§§ `Die beweglichen Feste`
+
+§§§ `Der Ostersonntag — anonymer gregorianischer Computus`
+
+-- Meeus/Butcher. Voll geklammert, und das bleibt es auch, wenn sich die
+-- Vorrangregeln als konventionell herausstellen sollten: dieser Block ist
+-- unleserlich genug ohne eine Vorrangfrage darin.
+-- Jede Zwischengrösse ist nicht-negativ. Das ist keine Zierde — MODULO ist
+-- Haskells `mod` und ruft `expectInteger`.
+@ref Anonymer gregorianischer Osteralgorithmus (Meeus/Butcher). Gegengeprüft gegen `die Ostersonntage 2015 bis 2035`.
+GIVEN y IS A NUMBER
+GIVETH A DATE
+`der Ostersonntag im Jahr` y MEANS
+    YMD y osterMonat osterTag
+    WHERE
+        osterA MEANS y MODULO 19
+        osterB MEANS FLOOR (y DIVIDED BY 100)
+        osterC MEANS y MODULO 100
+        osterD MEANS FLOOR (osterB DIVIDED BY 4)
+        osterE MEANS osterB MODULO 4
+        osterF MEANS FLOOR ((osterB PLUS 8) DIVIDED BY 25)
+        osterG MEANS FLOOR (((osterB MINUS osterF) PLUS 1) DIVIDED BY 3)
+        osterH MEANS ((((19 TIMES osterA) PLUS osterB) MINUS osterD MINUS osterG) PLUS 15) MODULO 30
+        osterI MEANS FLOOR (osterC DIVIDED BY 4)
+        osterK MEANS osterC MODULO 4
+        osterL MEANS ((((32 PLUS (2 TIMES osterE)) PLUS (2 TIMES osterI)) MINUS osterH) MINUS osterK) MODULO 7
+        osterM MEANS FLOOR (((osterA PLUS (11 TIMES osterH)) PLUS (22 TIMES osterL)) DIVIDED BY 451)
+        osterN MEANS ((osterH PLUS osterL) MINUS (7 TIMES osterM)) PLUS 114
+        osterMonat MEANS FLOOR (osterN DIVIDED BY 31)
+        osterTag   MEANS (osterN MODULO 31) PLUS 1
+
+§§§ `Die vom Ostersonntag abgeleiteten Feste`
+
+GIVEN y IS A NUMBER
+GIVETH A DATE
+`der Karfreitag im Jahr` y MEANS (`der Ostersonntag im Jahr` y) MINUS 2
+
+GIVEN y IS A NUMBER
+GIVETH A DATE
+`der Ostermontag im Jahr` y MEANS (`der Ostersonntag im Jahr` y) PLUS 1
+
+GIVEN y IS A NUMBER
+GIVETH A DATE
+`Christi Himmelfahrt im Jahr` y MEANS (`der Ostersonntag im Jahr` y) PLUS 39
+
+GIVEN y IS A NUMBER
+GIVETH A DATE
+`der Pfingstsonntag im Jahr` y MEANS (`der Ostersonntag im Jahr` y) PLUS 49
+
+GIVEN y IS A NUMBER
+GIVETH A DATE
+`der Pfingstmontag im Jahr` y MEANS (`der Ostersonntag im Jahr` y) PLUS 50
+
+GIVEN y IS A NUMBER
+GIVETH A DATE
+`Fronleichnam im Jahr` y MEANS (`der Ostersonntag im Jahr` y) PLUS 60
+
+§§§ `Der Buß- und Bettag`
+
+-- Der Mittwoch VOR dem 23. November. `Wednesday MEANS 3`, und — die eine
+-- Stelle, an der `daydate`s Nummerierung still zubeissen kann —
+-- `Sunday MEANS 0`, nicht 7.
+-- Das `IF roh EQUALS 0 THEN 7` ist keine Zierde: ist der 23. November selbst
+-- ein Mittwoch, so ist das Fest der Mittwoch DAVOR, also der 16. November.
+@ref Sächsisches Gesetz über Sonn- und Feiertage § 1 Abs. 1 Nr. 12 — Buß- und Bettag, der Mittwoch vor dem 23. November
+GIVEN y IS A NUMBER
+GIVETH A DATE
+`der Buß- und Bettag im Jahr` y MEANS
+    (YMD y 11 23) MINUS versatz
+    WHERE
+        roh     MEANS ((`Weekday of` (YMD y 11 23)) MINUS Wednesday) MODULO 7
+        versatz MEANS IF roh EQUALS 0 THEN 7 ELSE roh
+
+§§ `Die Feiertagstabellen`
+
+§§§ `Bundeseinheitlich — in allen sechzehn Ländern`
+
+@ref Neun Tage, in allen Ländern gesetzlicher Feiertag. Quelle: die sechzehn Landesfeiertagsgesetze; Übersicht de.wikipedia.org/wiki/Gesetzliche_Feiertage_in_Deutschland, abgerufen 2026-09-14.
+GIVEN y IS A NUMBER
+GIVETH A LIST OF DATE
+`die bundeseinheitlichen Feiertage im Jahr` y MEANS
+    LIST (YMD y 1 1), (`der Karfreitag im Jahr` y), (`der Ostermontag im Jahr` y), (YMD y 5 1), (`Christi Himmelfahrt im Jahr` y), (`der Pfingstmontag im Jahr` y), (YMD y 10 3), (YMD y 12 25), (YMD y 12 26)
+
+§§§ `Zusätzlich je Land — sechzehn Arme, erschöpfend, ohne OTHERWISE`
+
+-- IM JAHR GESCHALTET, nicht bloss im Fenster vermerkt:
+--   31.10 Reformationstag: unbedingt in BB, MV, SN, ST, TH (seit 1990);
+--         erst ab 2018 in HB, HH, NI, SH.
+--   08.03 Internationaler Frauentag: ab 2019 in BE, ab 2023 in MV.
+--   20.09 Weltkindertag: ab 2019 in TH.
+-- Ohne diese vier Schaltungen rechnete Beispiel 11 (Berlin, 2006) gegen
+-- einen Kalender, den es 2006 nicht gab.
+-- MESSBARE ANMERKUNG ZUR SYNTAX: gestapelte @ref-Zeilen hängen sich NICHT
+-- alle an. Nur die letzte erreicht den Knoten; jede frühere quittiert mit
+-- "could not be attached to any following syntax node". Gemessen am
+-- 2026-09-14. Deshalb steht hier EIN @ref, und die Einzelnachweise stehen
+-- als Kommentar darüber.
+--
+-- Reformationstag 31.10: seit 1990 in BB, MV, SN, ST, TH; seit 2018 in
+--     HB, HH, NI, SH. Quelle: de.wikipedia.org/wiki/Reformationstag.
+-- Internationaler Frauentag 8.3: Berlin seit 2019 (FeiertG BE),
+--     Mecklenburg-Vorpommern seit 2023 (Landtagsbeschluss v. 28.6.2022).
+-- Weltkindertag 20.9: Thüringen seit 2019 (ThürFeiertagsG).
+-- Heilige Drei Könige 6.1: nur BW, BY, ST — NICHT das Saarland.
+-- Fronleichnam landesweit: BW, BY, HE, NW, RP, SL; gemeindescharf SN, TH.
+-- Mariä Himmelfahrt 15.8: SL landesweit, BY gemeindescharf.
+-- Allerheiligen 1.11: BW, BY, NW, RP, SL.
+-- Buß- und Bettag: nur SN. Ostersonntag und Pfingstsonntag: nur BB.
+-- Alle am 2026-09-14 gegen eine Quelle geprüft, nicht aus dem Kopf notiert.
+@ref Landesfeiertagsgesetze der sechzehn Länder, Stand 2026-09-14; Einzelnachweise im Kommentar unmittelbar darüber.
+GIVEN l IS A Land
+      y IS A NUMBER
+GIVETH A LIST OF DATE
+`die zusätzlichen Feiertage im Land` l `im Jahr` y MEANS
+    CONSIDER l
+    WHEN `Baden-Württemberg`      THEN LIST (YMD y 1 6), (`Fronleichnam im Jahr` y), (YMD y 11 1)
+    WHEN `Bayern`                 THEN LIST (YMD y 1 6), (`Fronleichnam im Jahr` y), (YMD y 8 15), (YMD y 11 1)
+    WHEN `Berlin`                 THEN (IF y AT LEAST 2019 THEN LIST (YMD y 3 8) ELSE EMPTY)
+    WHEN `Brandenburg`            THEN LIST (`der Ostersonntag im Jahr` y), (`der Pfingstsonntag im Jahr` y), (YMD y 10 31)
+    WHEN `Bremen`                 THEN (IF y AT LEAST 2018 THEN LIST (YMD y 10 31) ELSE EMPTY)
+    WHEN `Hamburg`                THEN (IF y AT LEAST 2018 THEN LIST (YMD y 10 31) ELSE EMPTY)
+    WHEN `Hessen`                 THEN LIST (`Fronleichnam im Jahr` y)
+    WHEN `Mecklenburg-Vorpommern` THEN append (IF y AT LEAST 2023 THEN LIST (YMD y 3 8) ELSE EMPTY) (LIST (YMD y 10 31))
+    WHEN `Niedersachsen`          THEN (IF y AT LEAST 2018 THEN LIST (YMD y 10 31) ELSE EMPTY)
+    WHEN `Nordrhein-Westfalen`    THEN LIST (`Fronleichnam im Jahr` y), (YMD y 11 1)
+    WHEN `Rheinland-Pfalz`        THEN LIST (`Fronleichnam im Jahr` y), (YMD y 11 1)
+    WHEN `Saarland`               THEN LIST (`Fronleichnam im Jahr` y), (YMD y 8 15), (YMD y 11 1)
+    WHEN `Sachsen`                THEN LIST (`Fronleichnam im Jahr` y), (YMD y 10 31), (`der Buß- und Bettag im Jahr` y)
+    WHEN `Sachsen-Anhalt`         THEN LIST (YMD y 1 6), (YMD y 10 31)
+    WHEN `Schleswig-Holstein`     THEN (IF y AT LEAST 2018 THEN LIST (YMD y 10 31) ELSE EMPTY)
+    WHEN `Thüringen`              THEN append (LIST (`Fronleichnam im Jahr` y), (YMD y 10 31)) (IF y AT LEAST 2019 THEN LIST (YMD y 9 20) ELSE EMPTY)
+
+GIVEN l IS A Land
+      y IS A NUMBER
+GIVETH A LIST OF DATE
+`die gesetzlichen Feiertage im Land` l `im Jahr` y MEANS
+    append (`die bundeseinheitlichen Feiertage im Jahr` y) (`die zusätzlichen Feiertage im Land` l `im Jahr` y)
+
+-- Das Jahr wird aus dem KANDIDATENTAG gelesen, nicht aus einem Fallparameter.
+-- Damit ist der Jahreswechsel in Beispiel 11 (Frist endet Sa 31.12.2005,
+-- nächster Werktag Mo 2.1.2006) von Bauart her richtig.
+GIVEN d IS A DATE
+      l IS A Land
+GIVETH A BOOLEAN
+`ein gesetzlicher Feiertag am Tag` d `im Land` l MEANS
+    elem d (`die gesetzlichen Feiertage im Land` l `im Jahr` (DATE_YEAR d))
+
+§§ `Was der Kalender NICHT sagen kann`
+
+-- MESSBARE ANMERKUNG ZUR SYNTAX: kein Mixfix-Muster dieser Datei endet auf
+-- ein KEYWORD-Segment, und das ist erzwungen, nicht Geschmack. Endet ein
+-- Muster auf ein Segment statt auf ein Argument, so druckt `prettyLayout` die
+-- DEFINITION nur unter ihrem Kopfsegment, die AUFRUFSTELLE aber unter dem
+-- vollen Musternamen mit Unterstrichen — und der Rundlauf (#932) findet die
+-- Definition dann nicht mehr. Gemessen am 2026-09-14 an
+-- `der Tag _ unterliegt im Land _ einer gemeindescharfen Regelung`.
+-- Muster, die auf ein Argument enden, sind unbetroffen.
+
+-- `Land` ist die falsche Körnung für unterhalb des Landes geregelte Feste.
+-- Wir raten nicht, wir sagen es — je (Land, Tag).
+--   Bayern / 15. August  — Mariä Himmelfahrt, gemeindescharf nach dem
+--                          Katholikenanteil.
+--   Bayern / 8. August   — Augsburger Friedensfest, allein die Stadt
+--                          Augsburg. Steht deshalb NICHT in der Bayernliste.
+--   Sachsen, Thüringen / Fronleichnam — gemeindescharf.
+-- Die drei Fronleichnam- und 15.-August-Einträge stehen in den Landeslisten,
+-- antworten also mit "Feiertag". Das ist die grosszügige Lesart; die Angabe
+-- ist dafür ausdrücklich NICHT gesichert.
+@ref Art. 1 Abs. 1 Nr. 7 BayFTG (Mariä Himmelfahrt, gemeindescharf); Art. 1 Abs. 2 BayFTG (Augsburger Friedensfest); § 1 SächsSFG und § 2 ThürFeiertagsG (Fronleichnam gemeindescharf)
+GIVEN d IS A DATE
+      l IS A Land
+GIVETH A BOOLEAN
+`eine gemeindescharfe Regelung betrifft am Tag` d `das Land` l MEANS
+    CONSIDER l
+    WHEN `Bayern`    THEN (d EQUALS (YMD (DATE_YEAR d) 8 15)) OR (d EQUALS (YMD (DATE_YEAR d) 8 8))
+    WHEN `Sachsen`   THEN d EQUALS (`Fronleichnam im Jahr` (DATE_YEAR d))
+    WHEN `Thüringen` THEN d EQUALS (`Fronleichnam im Jahr` (DATE_YEAR d))
+    OTHERWISE FALSE
+
+GIVETH A DATE
+`der Feiertagskalender gilt ab` MEANS YMD 2000 1 1
+
+GIVETH A DATE
+`der Feiertagskalender gilt bis` MEANS YMD 2035 12 31
+
+GIVEN d IS A DATE
+      l IS A Land
+GIVETH A BOOLEAN
+`die Feiertagsangabe ist gesichert am Tag` d `im Land` l MEANS
+        d AT LEAST `der Feiertagskalender gilt ab`
+    AND d AT MOST  `der Feiertagskalender gilt bis`
+    AND (NOT (`eine gemeindescharfe Regelung betrifft am Tag` d `das Land` l))
+
+§§ `Der Computus gegen die Tabelle`
+
+-- Der Computus ist total; die Tabelle ist das Orakel; der #ASSERT ist der
+-- beschränkte Beweis. Die Tabelle ist unabhängig gegen den Gauss'schen
+-- Osteralgorithmus geprüft, 2026-09-14, alle 21 Jahre deckungsgleich.
+@ref Ostersonntage 2015–2035, gegengeprüft gegen den Gauss'schen Osteralgorithmus am 2026-09-14
+GIVETH A LIST OF DATE
+`die Ostersonntage 2015 bis 2035` MEANS
+    LIST (YMD 2015 4 5), (YMD 2016 3 27), (YMD 2017 4 16), (YMD 2018 4 1), (YMD 2019 4 21), (YMD 2020 4 12), (YMD 2021 4 4), (YMD 2022 4 17), (YMD 2023 4 9), (YMD 2024 3 31), (YMD 2025 4 20), (YMD 2026 4 5), (YMD 2027 3 28), (YMD 2028 4 16), (YMD 2029 4 1), (YMD 2030 4 21), (YMD 2031 4 13), (YMD 2032 3 28), (YMD 2033 4 17), (YMD 2034 4 9), (YMD 2035 3 25)
+
+GIVETH A LIST OF NUMBER
+`die Jahre 2015 bis 2035` MEANS range 2015 2035
+
+-- WARUM `elem` HIER SCHON ZUORDNUNG IST und nicht bloss Mitgliedschaft:
+-- `der Ostersonntag im Jahr` y baut `YMD y …`, der Jahresanteil des
+-- berechneten Datums ist also VON BAUART y. Die Tabelle hat je Jahr genau
+-- einen Eintrag. Ein `elem` gegen die ganze Tabelle kann deshalb nur dann
+-- zutreffen, wenn Monat und Tag zum Eintrag DIESES Jahres passen. Geprüft am
+-- 2026-09-14, weil ein Prüfer genau das Gegenteil vermutet hatte.
+GIVEN y IS A NUMBER
+GIVETH A BOOLEAN
+`Computus und Tabelle stimmen überein für` y MEANS
+    elem (`der Ostersonntag im Jahr` y) `die Ostersonntage 2015 bis 2035`
+
+§§ `Prüfungen`
+
+#ASSERT `der Ostersonntag im Jahr` 2026 EQUALS YMD 2026 4 5
+#ASSERT `der Ostersonntag im Jahr` 2024 EQUALS YMD 2024 3 31
+#ASSERT `der Karfreitag im Jahr` 2026 EQUALS YMD 2026 4 3
+#ASSERT `der Ostermontag im Jahr` 2026 EQUALS YMD 2026 4 6
+#ASSERT `Fronleichnam im Jahr` 2026 EQUALS YMD 2026 6 4
+#ASSERT `der Buß- und Bettag im Jahr` 2026 EQUALS YMD 2026 11 18
+#ASSERT all (GIVEN y YIELD `Computus und Tabelle stimmen überein für` y) `die Jahre 2015 bis 2035`
+
+#ASSERT     `ein gesetzlicher Feiertag am Tag` (YMD 2026 6 4) `im Land` `Bayern`
+#ASSERT NOT `ein gesetzlicher Feiertag am Tag` (YMD 2026 6 4) `im Land` `Berlin`
+#ASSERT NOT `ein gesetzlicher Feiertag am Tag` (YMD 2026 10 31) `im Land` `Bayern`
+
+-- Die Jahresschaltung verdient sich ihren Platz in zwei Zeilen:
+#ASSERT NOT `ein gesetzlicher Feiertag am Tag` (YMD 2006 3 8) `im Land` `Berlin`
+#ASSERT     `ein gesetzlicher Feiertag am Tag` (YMD 2026 3 8) `im Land` `Berlin`
+#ASSERT NOT `ein gesetzlicher Feiertag am Tag` (YMD 2006 10 31) `im Land` `Bremen`
+#ASSERT     `ein gesetzlicher Feiertag am Tag` (YMD 2026 10 31) `im Land` `Bremen`
+#ASSERT     `ein gesetzlicher Feiertag am Tag` (YMD 2006 10 31) `im Land` `Brandenburg`
+
+#ASSERT NOT `die Feiertagsangabe ist gesichert am Tag` (YMD 2026 8 15) `im Land` `Bayern`
+#ASSERT     `die Feiertagsangabe ist gesichert am Tag` (YMD 2026 6 4) `im Land` `Bayern`
+#ASSERT NOT `die Feiertagsangabe ist gesichert am Tag` (YMD 1999 6 4) `im Land` `Bayern`
+
+#EVAL count (`die gesetzlichen Feiertage im Land` `Bayern` `im Jahr` 2026)
+
+-- Die Abbruchgarantie für § 193: rollte eine Landesliste je auf "jeder Tag
+-- ist Feiertag" hinaus, liefe `der nächste Werktag ab` ohne Treibstoff weiter
+-- und das Versagen zeigte sich als hängende Testsuite, nicht als Fehler.
+#ASSERT all (GIVEN l YIELD count (`die gesetzlichen Feiertage im Land` l `im Jahr` 2026) AT MOST 14) `alle Länder`
+
+-- `alle Länder` ist von Hand gepflegt, und die Erschöpfungsprüfung kann sie
+-- nicht sehen: ein siebzehnter Konstruktor in `Land` machte den CONSIDER oben
+-- unvollständig (das wäre die laute Hälfte), aber eine vergessene Zeile
+-- HIER bliebe stumm — der Rundlauf oben liefe dann über fünfzehn Länder und
+-- meldete nichts. Diese eine Zeile ist die stumme Hälfte, laut gemacht.
+#ASSERT count `alle Länder` EQUALS 16

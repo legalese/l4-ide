@@ -1,0 +1,30 @@
+– Under each of these facts, I have listed the valid inputs which can be filled in for Value (or
+in some cases, the type of valid input, such as number or date) in the fact.
+– Use ALL OF (AND ONLY) these claim facts to write your Prolog encoding for the policy
+coverage.
+– Finally, I have provided below a set of supporting (pre-defined) Prolog predicates.
+– Under each supporting predicate, I have listed the arguments to the predicate with their
+category (e.g. atom, number) and a description, as well as a description of what the predicate
+does.
+– Use ALL OF these supporting predicates to write your Prolog encoding for the policy
+coverage.
+
+– The Prolog rule that you encode, 'covered(C)', must incorporate all relevant criteria from the
+policy coverage.
+
+– Return only Prolog code in your reply. NO EXPLANATION is necessary.
+
+15
+A.4   LLM Encodings of FSH Criteria in ART Coverage
+A.4.1 GPT-4o Encoding of FSH Criteria in ART Coverage
+validate_day_3_fsh(C) :-
+% Get patient age at time of service
+patient_age_at_time_of_service(C, Age),
+(Age < 40 -> % For patients under 40
+most_recent_day_3_fsh_test(C, fsh_test(FSHLevel, _, _)),
+FSHLevel < 19
+; Age >= 40 -> % For patients 40 and above
+day_3_fsh_tests_since_age_40_in_claim(C, FSHTests),
+\+ exists_test_with_level_at_least_19(FSHTests)).
+
+A.4.2 OpenAI o1 Encoding of FSH Criteria in ART Coverage

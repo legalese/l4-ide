@@ -56,11 +56,11 @@ fields:
     datatype: text
     help: "The address of the let property"
 ---
-id: q_n.is_a_residential_tenancy
+id: q_n.a_residential_tenancy
 question: |
-  is a residential tenancy
+  a residential tenancy
 fields:
-  - "is a residential tenancy": n.is_a_residential_tenancy
+  - "a residential tenancy": n.a_residential_tenancy
     datatype: yesnoradio
     help: "Whether the letting is of a dwelling occupied as a home"
 ---
@@ -84,9 +84,9 @@ id: c_the_notice_to_quit_is_valid
 reconsider: True
 code: |
   # L4: `the notice to quit is valid`
-  the_notice_to_quit_is_valid = (n.is_a_residential_tenancy and (n.written_notice_was_given and (n.months_of_notice_given >= 2)))
+  the_notice_to_quit_is_valid = (n.a_residential_tenancy and (n.written_notice_was_given and (n.months_of_notice_given >= 2)))
 depends on:
-  - n.is_a_residential_tenancy
+  - n.a_residential_tenancy
   - n.written_notice_was_given
   - n.months_of_notice_given
 sets:
@@ -140,7 +140,7 @@ review:
   - note: |
       the property address: ${ showifdef('n.the_property_address', '**not asked**') }
   - note: |
-      is a residential tenancy: ${ showifdef('n.is_a_residential_tenancy', '**not asked**') }
+      a residential tenancy: ${ showifdef('n.a_residential_tenancy', '**not asked**') }
   - note: |
       written notice was given: ${ showifdef('n.written_notice_was_given', '**not asked**') }
   - note: |

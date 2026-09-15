@@ -233,14 +233,14 @@ DECLARE Driver HAS
     `age`              IS A NUMBER
     `years licensed`   IS A NUMBER
     `accident count`   IS A NUMBER
-    `has tickets`      IS A BOOLEAN
+    `ticketed`      IS A BOOLEAN
     `adult`            IS A BOOLEAN
         MEANS `age` >= 18
     `experienced`      IS A BOOLEAN
         MEANS `years licensed` >= 2
     `risk category`    IS A `Risk Category`
         MEANS IF `accident count` = 0
-              THEN IF `has tickets` THEN `Medium Risk` ELSE `Low Risk`
+              THEN IF `ticketed` THEN `Medium Risk` ELSE `Low Risk`
               ELSE IF `accident count` <= 2 THEN `High Risk`
               ELSE `Uninsurable`
     `eligible`         IS A BOOLEAN
@@ -264,7 +264,7 @@ alice MEANS Driver WITH
     `age` IS 25
     `years licensed` IS 3
     `accident count` IS 0
-    `has tickets` IS FALSE
+    `ticketed` IS FALSE
 
 alicePolicy MEANS Policy WITH
     `driver` IS alice

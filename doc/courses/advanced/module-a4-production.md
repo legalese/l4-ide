@@ -261,7 +261,7 @@ GIVEN person IS A Person @desc The person to check
 GIVETH A BOOLEAN
 DECIDE `is eligible` IF
     person's `the age` >= 21
-    AND NOT person's `is bankrupt`
+    AND NOT person's `bankrupt`
 ```
 
 ### Deploying to Legalese Cloud
@@ -465,13 +465,13 @@ IMPORT prelude
 DECLARE Person
     HAS `the name` IS A STRING
         `the age` IS A NUMBER
-        `is bankrupt` IS A BOOLEAN
+        `bankrupt` IS A BOOLEAN
 
 GIVEN person IS A Person
 GIVETH A BOOLEAN
 DECIDE `is eligible` IF
     person's `the age` >= 21
-    AND NOT person's `is bankrupt`
+    AND NOT person's `bankrupt`
 
 -- Test data factory
 GIVEN age IS A NUMBER

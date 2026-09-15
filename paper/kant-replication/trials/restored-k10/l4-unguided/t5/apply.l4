@@ -1,0 +1,182 @@
+IMPORT policy
+
+-- Standing preamble (applies to every question below): assume all other
+-- conditions are met and no other exclusions apply, i.e. every fact not
+-- mentioned by the question is set to whatever value keeps the policy
+-- applying. The agreement is signed and the premium is paid on time (this
+-- is not modelled -- see policy.l4's file header).
+--
+-- Defaults used throughout for facts a given question does not mention:
+--   age at hospitalization ................ 40  (well under the 80 threshold)
+--   months since effective date at hosp. .. 1   (well within the 12-month term
+--                                                 and before either §1.3 deadline)
+--   wellness visit within six months ...... TRUE
+--   wellness confirmation submission month  JUST 0 (submitted immediately)
+--   fraud or misrepresentation ............ FALSE
+--   confined in a hospital in the US ...... TRUE
+--   days of continuous confinement ........ 1
+--   claim made to the Company ............. TRUE
+--   all four "injury arose from ..." flags  FALSE
+
+-- Q1: hospitalized by burns suffered while doing my duty as a firefighter.
+-- The burns arose directly out of firefighter service -> §3.1(3) exclusion.
+q1 MEANS Claim WITH
+    `age at hospitalization`                                          IS 40
+    `months since the effective date at hospitalization`              IS 1
+    `wellness visit occurred within six months of the effective date` IS TRUE
+    `wellness confirmation submission month`                          IS JUST 0
+    `fraud or misrepresentation`                                      IS FALSE
+    `confined in a hospital in the United States`                     IS TRUE
+    `days of continuous confinement`                                  IS 1
+    `claim made to the Company`                                       IS TRUE
+    `injury arose from skydiving`                                     IS FALSE
+    `injury arose from military service`                              IS FALSE
+    `injury arose from firefighter service`                           IS TRUE
+    `injury arose from police service`                                IS FALSE
+#EVAL `covered` q1
+
+-- Q2: 78 years old at the time of hospitalization -- under the 80 threshold.
+q2 MEANS Claim WITH
+    `age at hospitalization`                                          IS 78
+    `months since the effective date at hospitalization`              IS 1
+    `wellness visit occurred within six months of the effective date` IS TRUE
+    `wellness confirmation submission month`                          IS JUST 0
+    `fraud or misrepresentation`                                      IS FALSE
+    `confined in a hospital in the United States`                     IS TRUE
+    `days of continuous confinement`                                  IS 1
+    `claim made to the Company`                                       IS TRUE
+    `injury arose from skydiving`                                     IS FALSE
+    `injury arose from military service`                              IS FALSE
+    `injury arose from firefighter service`                           IS FALSE
+    `injury arose from police service`                                IS FALSE
+#EVAL `covered` q2
+
+-- Q3: hospitalized for pneumonia 5 months after the effective date, age 65.
+q3 MEANS Claim WITH
+    `age at hospitalization`                                          IS 65
+    `months since the effective date at hospitalization`              IS 5
+    `wellness visit occurred within six months of the effective date` IS TRUE
+    `wellness confirmation submission month`                          IS JUST 0
+    `fraud or misrepresentation`                                      IS FALSE
+    `confined in a hospital in the United States`                     IS TRUE
+    `days of continuous confinement`                                  IS 1
+    `claim made to the Company`                                       IS TRUE
+    `injury arose from skydiving`                                     IS FALSE
+    `injury arose from military service`                              IS FALSE
+    `injury arose from firefighter service`                           IS FALSE
+    `injury arose from police service`                                IS FALSE
+#EVAL `covered` q3
+
+-- Q4: hospitalized due to a fall while traveling abroad; confirmation of the
+-- wellness visit was given 8 months after the effective date -- after the
+-- 7-month §1.3 deadline, so §1.2 deems the policy canceled. (Traveling
+-- abroad does not itself defeat coverage -- §4.1.1 insures the claimant
+-- anywhere in the world -- so the hospital-in-the-US fact, being otherwise
+-- unaddressed by this question, is set to its default of TRUE.)
+q4 MEANS Claim WITH
+    `age at hospitalization`                                          IS 40
+    `months since the effective date at hospitalization`              IS 1
+    `wellness visit occurred within six months of the effective date` IS TRUE
+    `wellness confirmation submission month`                          IS JUST 8
+    `fraud or misrepresentation`                                      IS FALSE
+    `confined in a hospital in the United States`                     IS TRUE
+    `days of continuous confinement`                                  IS 1
+    `claim made to the Company`                                       IS TRUE
+    `injury arose from skydiving`                                     IS FALSE
+    `injury arose from military service`                              IS FALSE
+    `injury arose from firefighter service`                           IS FALSE
+    `injury arose from police service`                                IS FALSE
+#EVAL `covered` q4
+
+-- Q5: hospitalized for punching my own face to show off for my friends; no
+-- fraud or misrepresentation. Self-inflicted injury of this kind is not one
+-- of the five enumerated §3.1 exclusions, so none is triggered.
+q5 MEANS Claim WITH
+    `age at hospitalization`                                          IS 40
+    `months since the effective date at hospitalization`              IS 1
+    `wellness visit occurred within six months of the effective date` IS TRUE
+    `wellness confirmation submission month`                          IS JUST 0
+    `fraud or misrepresentation`                                      IS FALSE
+    `confined in a hospital in the United States`                     IS TRUE
+    `days of continuous confinement`                                  IS 1
+    `claim made to the Company`                                       IS TRUE
+    `injury arose from skydiving`                                     IS FALSE
+    `injury arose from military service`                              IS FALSE
+    `injury arose from firefighter service`                           IS FALSE
+    `injury arose from police service`                                IS FALSE
+#EVAL `covered` q5
+
+-- Q6: hospitalized due to an injury sustained while skydiving (§3.1(1)
+-- exclusion), age 79 at hospitalization, proof of the wellness visit
+-- provided 6.5 months after the effective date (within the 7-month
+-- deadline).
+q6 MEANS Claim WITH
+    `age at hospitalization`                                          IS 79
+    `months since the effective date at hospitalization`              IS 1
+    `wellness visit occurred within six months of the effective date` IS TRUE
+    `wellness confirmation submission month`                          IS JUST 6.5
+    `fraud or misrepresentation`                                      IS FALSE
+    `confined in a hospital in the United States`                     IS TRUE
+    `days of continuous confinement`                                  IS 1
+    `claim made to the Company`                                       IS TRUE
+    `injury arose from skydiving`                                     IS TRUE
+    `injury arose from military service`                              IS FALSE
+    `injury arose from firefighter service`                           IS FALSE
+    `injury arose from police service`                                IS FALSE
+#EVAL `covered` q6
+
+-- Q7: hospitalized for a heart attack, wellness-visit proof submitted 2
+-- months after the effective date, age 75 at hospitalization.
+q7 MEANS Claim WITH
+    `age at hospitalization`                                          IS 75
+    `months since the effective date at hospitalization`              IS 1
+    `wellness visit occurred within six months of the effective date` IS TRUE
+    `wellness confirmation submission month`                          IS JUST 2
+    `fraud or misrepresentation`                                      IS FALSE
+    `confined in a hospital in the United States`                     IS TRUE
+    `days of continuous confinement`                                  IS 1
+    `claim made to the Company`                                       IS TRUE
+    `injury arose from skydiving`                                     IS FALSE
+    `injury arose from military service`                              IS FALSE
+    `injury arose from firefighter service`                           IS FALSE
+    `injury arose from police service`                                IS FALSE
+#EVAL `covered` q7
+
+-- Q8: hospitalized after being injured in a military training exercise
+-- (§3.1(2) exclusion), hospitalization occurred within the policy term, no
+-- fraud committed.
+q8 MEANS Claim WITH
+    `age at hospitalization`                                          IS 40
+    `months since the effective date at hospitalization`              IS 1
+    `wellness visit occurred within six months of the effective date` IS TRUE
+    `wellness confirmation submission month`                          IS JUST 0
+    `fraud or misrepresentation`                                      IS FALSE
+    `confined in a hospital in the United States`                     IS TRUE
+    `days of continuous confinement`                                  IS 1
+    `claim made to the Company`                                       IS TRUE
+    `injury arose from skydiving`                                     IS FALSE
+    `injury arose from military service`                              IS TRUE
+    `injury arose from firefighter service`                           IS FALSE
+    `injury arose from police service`                                IS FALSE
+#EVAL `covered` q8
+
+-- Q9: hospitalized because my son bit me in the ankle; wellness-visit proof
+-- provided 6 months after the effective date (within the 7-month deadline);
+-- I was serving as a police officer at the time of hospitalization. Being a
+-- police officer at the time is occupational status, not the cause of the
+-- injury -- the son biting my ankle plainly did not arise "out of ...
+-- service in the police" -- so the §3.1(4) exclusion is not triggered.
+q9 MEANS Claim WITH
+    `age at hospitalization`                                          IS 40
+    `months since the effective date at hospitalization`              IS 1
+    `wellness visit occurred within six months of the effective date` IS TRUE
+    `wellness confirmation submission month`                          IS JUST 6
+    `fraud or misrepresentation`                                      IS FALSE
+    `confined in a hospital in the United States`                     IS TRUE
+    `days of continuous confinement`                                  IS 1
+    `claim made to the Company`                                       IS TRUE
+    `injury arose from skydiving`                                     IS FALSE
+    `injury arose from military service`                              IS FALSE
+    `injury arose from firefighter service`                           IS FALSE
+    `injury arose from police service`                                IS FALSE
+#EVAL `covered` q9

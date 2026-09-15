@@ -1,0 +1,143 @@
+-- Codex Insurance Limited -- accident & sickness hospitalization policy
+--
+-- This file encodes ONLY the rules of the contract (fixtures/chubb-policy.txt).
+-- It contains no claim data -- see apply.l4 for the nine queries and their facts.
+--
+-- Simplification adopted throughout (per the encoding brief): every date/time
+-- fact about a claim, other than the claimant's age, is expressed as a NUMBER
+-- of months elapsed since the policy's effective date. No DATE/DATETIME value
+-- or arithmetic is needed anywhere in this file, and there is never a need to
+-- compute the time elapsed between two dates -- every deadline below is just a
+-- comparison between two such NUMBERs.
+--
+-- Also per the encoding brief: the agreement is assumed already signed and the
+-- premium already paid, on time (Sections 1.1(1)-(2) and 3.5), so no fields or
+-- rules are needed for those conditions.
+
+§ `The insured claim`
+
+DECLARE Claim HAS
+    -- Section 1.1: the benefit is premised on "the hospitalization for sickness
+    -- or accidental injury". Always true of a genuine claim; kept as an explicit
+    -- field for faithfulness to the threshold condition in the source text.
+    `hospitalization is for sickness or accidental injury`                    IS A BOOLEAN
+
+    -- Section 2.1(5): the claimant's age at the time of the hospitalization.
+    -- This is the one figure the encoding brief does NOT put on the
+    -- effective-date clock.
+    `age at hospitalization`                                                  IS A NUMBER
+
+    -- Section 2.1(1)-(4): what the sickness or accidental injury arose out of,
+    -- directly or indirectly. These are modelled as facts about the CAUSE of
+    -- the event, not as facts about the claimant's occupation or status: the
+    -- policy excludes an event that arises out of one of these activities, not
+    -- every event that merely happens to someone who does one of these things.
+    `hospitalization arose out of skydiving`                                  IS A BOOLEAN
+    `hospitalization arose out of military service`                          IS A BOOLEAN
+    `hospitalization arose out of fire fighter service`                      IS A BOOLEAN
+    `hospitalization arose out of police service`                            IS A BOOLEAN
+
+    -- Section 1.2: fraud, misrepresentation, or material withholding of
+    -- information provided to the Company in connection with the policy.
+    `committed fraud misrepresentation or material withholding`              IS A BOOLEAN
+
+    -- Section 1.3: the wellness-visit condition, given relative to the
+    -- effective date, in months. NOTHING means the event in question has not
+    -- (yet, or ever) occurred.
+    `months after the effective date that the wellness visit occurred`             IS A MAYBE NUMBER
+    `months after the effective date that wellness visit confirmation was given`   IS A MAYBE NUMBER
+
+    -- Section 1.1: the policy is only in effect "at the time of the
+    -- hospitalization" -- so that is the clock every deadline above is read
+    -- against, again relative to the effective date, in months.
+    `months after the effective date of the hospitalization`                 IS A NUMBER
+
+
+§ `1.3 -- the wellness-visit condition`
+
+`wellness visit deadline in months` MEANS 6
+
+`wellness confirmation deadline in months` MEANS 7
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `the wellness visit occurred in time` IF
+    CONSIDER claim's `months after the effective date that the wellness visit occurred`
+    WHEN JUST v THEN v AT MOST `wellness visit deadline in months`
+    WHEN NOTHING THEN FALSE
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `condition 1.3 is pending or has been satisfied in a timely fashion` IF
+    CONSIDER claim's `months after the effective date that wellness visit confirmation was given`
+    WHEN NOTHING THEN
+        -- no confirmation yet: the condition is still pending, so long as the
+        -- 7-month deadline has not already passed as of the hospitalization
+        claim's `months after the effective date of the hospitalization` AT MOST `wellness confirmation deadline in months`
+    WHEN JUST c THEN
+        c AT MOST `wellness confirmation deadline in months`
+        AND `the wellness visit occurred in time` claim
+
+
+§ `1.1 / 1.2 -- policy in effect and cancelation`
+
+-- Section 3.6: the policy term is one year (12 months) from the effective date.
+`policy term in months` MEANS 12
+
+-- Section 1.2: cancelation is deemed to have occurred on any of these grounds.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `the policy has been canceled` IF
+    claim's `committed fraud misrepresentation or material withholding`
+    OR NOT `condition 1.3 is pending or has been satisfied in a timely fashion` claim
+    OR claim's `months after the effective date of the hospitalization` GREATER THAN `policy term in months`
+
+-- Section 1.1: the policy is in effect at the time of the hospitalization if it
+-- is signed and paid up (assumed, per the encoding brief), the wellness-visit
+-- condition is pending or satisfied, and it has not been canceled.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `the policy is in effect at the time of the hospitalization` IF
+    NOT `the policy has been canceled` claim
+
+
+§ `2.1 -- general exclusions`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `an excluded cause applies` IF
+    claim's `hospitalization arose out of skydiving`
+    OR claim's `hospitalization arose out of military service`
+    OR claim's `hospitalization arose out of fire fighter service`
+    OR claim's `hospitalization arose out of police service`
+    OR claim's `age at hospitalization` AT LEAST 80
+
+
+§ `3.1 -- territorial scope`
+
+-- Section 3.1.1: the policy insures the claimant twenty-four hours a day,
+-- anywhere in the world. There is accordingly no geographic condition to
+-- encode: travelling abroad, for instance, does not narrow coverage.
+
+
+§ `3.2-3.5 -- dispute resolution, governing law, currency, premium`
+
+-- Sections 3.2 (arbitration), 3.3 (governing law), 3.4 (currency of payment)
+-- and 3.5 (timing of premium payment, assumed satisfied per the encoding
+-- brief) govern how disputes are resolved and how payment is made. None of
+-- them bears on whether a given hospitalization is a covered event, so none
+-- of them is represented as a rule feeding into `covered` below.
+
+
+§ `Coverage`
+
+-- Section 1.1: payment of a benefit is conditioned on the hospitalization
+-- being for sickness or accidental injury, on the policy being in effect at
+-- the time of the hospitalization, and (Section 2.1) on no excluded cause
+-- applying.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE covered IF
+    claim's `hospitalization is for sickness or accidental injury`
+    AND `the policy is in effect at the time of the hospitalization` claim
+    AND NOT `an excluded cause applies` claim

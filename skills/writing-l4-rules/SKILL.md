@@ -73,7 +73,7 @@ DECLARE Driver HAS
     `age`            IS A NUMBER
     `years licensed` IS A NUMBER
     `accident count` IS A NUMBER
-    `has tickets`    IS A BOOLEAN
+    `ticketed`    IS A BOOLEAN
 ```
 
 Records can declare **computed fields** (derived attributes) with `MEANS`; see [references/gotchas.md](references/gotchas.md) and <https://legalese.com/l4/reference/types/DECLARE.md>.
@@ -90,7 +90,7 @@ GIVEN driver IS A Driver
 GIVETH A RiskCategory
 DECIDE `assess risk` driver IS
     CONSIDER driver's `accident count`
-    WHEN 0 THEN IF driver's `has tickets`
+    WHEN 0 THEN IF driver's `ticketed`
                 THEN MediumRisk
                 ELSE LowRisk
     WHEN 1 THEN MediumRisk
@@ -362,7 +362,7 @@ gap as a dropped directive.
     `age`            IS 25
     `years licensed` IS 7
     `accident count` IS 0
-    `has tickets`    IS FALSE
+    `ticketed`    IS FALSE
 
 #EVAL   `assess risk` `Alice`
 #ASSERT `assess risk` `Alice` EQUALS LowRisk
@@ -762,7 +762,7 @@ GIVETH A BOOLEAN
 isEligible p MEANS p's citizen && p's years >= 5 && !p's disqualified
 ```
 
-**Use backtick identifiers liberally.** `` `the applicant` `` not `applicant`. `` `has valid identification` `` not `hasValidID`.
+**Use backtick identifiers liberally.** `` `the applicant` `` not `applicant`. `` `valid identification` `` not `hasValidID`.
 
 ---
 

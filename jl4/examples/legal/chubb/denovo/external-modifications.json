@@ -1,0 +1,106 @@
+{
+  "kind": "external-modifications",
+  "register_version": 1,
+  "subject": "chubb",
+  "swept": "2026-08-31",
+  "note": "What \"external modification\" means for THIS subject, because the schema's vocabulary is law-shaped and the subject is not law. Nothing can strike, stay or read down a synthetic appendix to a preprint: there is no court with jurisdiction over it, no legislature that can amend it and no regulator that can gloss it. The only things that can happen to it are (i) the authors replace or withdraw the version that carries it, (ii) someone else republishes, re-scores or disputes it, or (iii) something the paper depends on moves under it. This sweep asked all three, in five searches, and each search records what it does NOT cover.\n\nRESULT. (i) and (ii): nothing. arXiv:2502.17638 is still at v1 with no errata, no journal reference and no DOI beyond the arXiv one; the Stanford Law School publications page serves that same v1 PDF; none of the 28 papers Semantic Scholar records as citing it reuses the Chubb fixture or the nine-label key; and the fixture's own strings are unfindable outside the paper. (iii): the CodeX Insurance Analyst that the paper's §4.2 uses HAS moved, in one of its two halves, and both entries below record that — with the disposition 'no-effect', because §4.2 is the paper's SECOND case study, over the Stanford Cardinal Care policy, and this subject encodes only Appendix A.1.\n\nThe class labels on those two entries are analogies and are flagged as such in each summary. The register's (a)/(b)/(c) split turns on whether a change is already effective, merely interpretive, or announced-but-not-yet-effective, and that distinction is real here even though the authority behind it is not: a deployed web application that has already been replaced is not the same kind of fact as four public branches nobody has merged.\n\n`dispositions` IS EMPTY, AND THAT IS A JOIN RESULT, NOT AN OMISSION. The dispositions table is the completeness join over the source bundle's annotation inventory. source-bundle.json's three documents each carry `\"annotations\": []` — a synthetic appendix has no publisher apparatus to inventory, as that bundle's note explains at length — so no annotation group declares `inventory_complete`, the cross-file `annotation-inventory-disposed` rule has nothing to demand, and a non-empty table here could only be invented. Give the validator both files and it will confirm this rather than skip it.\n\nWHAT THIS SWEEP DID NOT DO AT ALL. It did not search for litigation (there can be none), for regulatory guidance (there is no regulator), or for a real Chubb hospital-cash form that the appendix might have been abridged from — SRCH-fixture-reuse looked for the fixture's own strings and found only unrelated live Chubb products in several jurisdictions, none identifiable as the parent form, and the paper does not name one. It also did not read the full text of the 28 citing papers; see SRCH-citation-graph's coverage note for exactly how far the reading went.",
+  "searches": [
+    {
+      "id": "SRCH-arxiv-versions",
+      "question": "Has arXiv:2502.17638 been revised, withdrawn, corrected or given an erratum since v1 — i.e. is the Appendix A.1 policy text and the Appendix A.2 answer key this subject encodes and is scored against still the current published text?",
+      "method": "publisher-page",
+      "scope": "The arXiv abstract page https://arxiv.org/abs/2502.17638 — its submission-history block, Comments field, journal-reference field, DOI field and subject categories — read on 2026-08-31.",
+      "query": "https://arxiv.org/abs/2502.17638",
+      "performed": "2026-08-31",
+      "outcome": "no-findings",
+      "findings": [],
+      "coverage_note": "Covers only what arXiv's own submission history shows: exactly one version, [v1] Mon, 24 Feb 2025 20:38:17 UTC, 67 KB, no Comments, no journal-ref, no DOI other than 10.48550/arXiv.2502.17638, no withdrawal notice, primary cs.CY with cs.AI cross-list. It does NOT cover: a camera-ready at a venue that arXiv was never told about; an erratum published somewhere other than arXiv; a corrected copy served in place at a mirror (searched separately, SRCH-mirror-venue); or the authors' own unpublished corrections. arXiv also cannot tell you that v1 is CORRECT — FOUNDATION.md §1 and §2 record twenty defects in the fixture and one contested label, none of which the authors have retracted."
+    },
+    {
+      "id": "SRCH-mirror-venue",
+      "question": "Has the paper appeared at a peer-reviewed venue, or been re-served by an institutional publisher, in a version whose Appendix A.1 or A.2 differs from arXiv v1?",
+      "method": "publisher-page",
+      "scope": "The Stanford Law School publications entry https://law.stanford.edu/publications/towards-robust-legal-reasoning-harnessing-logical-llms-in-law/ (the authors' own institutional posting; three of the six authors — Scharrer, Ma and Marzieh Nabi — carry a Stanford CodeX affiliation on the paper's title page), read on 2026-08-31, plus the arXiv abstract page's journal-reference and DOI fields from SRCH-arxiv-versions.",
+      "performed": "2026-08-31",
+      "outcome": "no-findings",
+      "findings": [],
+      "coverage_note": "The Stanford page is dated 24 February 2025, records the publication venue as arXiv, and its Download button serves the file named 2502.17638v1.pdf — the same v1, not a distinct white paper. Coverage limits: only ONE mirror was checked, chosen because it is the authors' own institution; ResearchGate, Semantic Scholar's cached PDF, ADS and any conference proceedings were NOT opened, and a venue version whose appendices differ could exist behind any of them. Nor were the PDFs byte-compared — the Stanford page was read for what it CLAIMS to serve, and its filename was taken as evidence of version, which is weaker than a digest."
+    },
+    {
+      "id": "SRCH-citation-graph",
+      "question": "Has anyone published a replication, a re-scoring, a critique of the nine-label answer key, or any other reuse of this benchmark?",
+      "method": "web-search",
+      "scope": "The Semantic Scholar citation graph for arXiv:2502.17638, enumerated in full via the Graph API citations endpoint on 2026-08-31 — 28 citing works, every one listed with title, year and venue — plus two general web searches for replication/critique language. The two citing works whose titles put them closest to this benchmark were opened and read at abstract level: arXiv:2601.01266 \"From Policy to Logic for Efficient and Interpretable Coverage Assessment\" (insurance coverage assessment) and arXiv:2606.16118 \"Know Your Limits: On the Faithfulness of LLMs as Solvers and Autoformalizers in Legal Reasoning\" (autoformalization faithfulness). Neither mentions Chubb, Kant et al., or the nine-query key; 2601.01266 works on medical coverage policy review with its own data, 2606.16118 on a re-annotated ContractNLI subset.",
+      "query": "Semantic Scholar Graph API: /paper/arXiv:2502.17638/citations?fields=title,year,venue,externalIds&limit=100",
+      "performed": "2026-08-31",
+      "outcome": "no-findings",
+      "findings": [],
+      "coverage_note": "The limits here are the largest in this sweep and the finding is correspondingly weak. (1) Only 26 of the 28 rows carry a year at all; the graph is Semantic Scholar's, and it lags, misses venues it does not index, and records nothing about blog posts, course materials, theses, technical reports or industrial replications. (2) Twenty-six of the twenty-eight were judged on TITLE ALONE — only two were opened — so a replication buried in an unrelated-sounding paper's evaluation section would have been missed. (3) An arXiv FULL-TEXT search for the phrase \"Chubb Hospital Cash Benefit\" was attempted and could not be run: search.arxiv.org:8081 refused the connection, and arXiv's own search endpoint indexes metadata, not full text. So no full-text sweep of any corpus was performed by any search in this register. (4) A citation is not a modification: several of the 28 cite this paper approvingly as prior art for policy-to-Prolog translation, which changes nothing about the fixture."
+    },
+    {
+      "id": "SRCH-fixture-reuse",
+      "question": "Do the fixture's own distinctive strings — the title \"Simplified Chubb Hospital Cash Benefit Policy\" and the fictional insurer \"CODEX INSURANCE LIMITED\" — appear anywhere outside this paper, whether as a reused benchmark or as a real form the appendix was abridged from?",
+      "method": "web-search",
+      "scope": "General web search on 2026-08-31 for the two exact phrases together with benchmark/encoding terms.",
+      "query": "\"Simplified Chubb Hospital Cash Benefit Policy\" OR \"CODEX INSURANCE LIMITED\" benchmark encoding",
+      "performed": "2026-08-31",
+      "outcome": "no-findings",
+      "findings": [],
+      "coverage_note": "Every result was a genuine, unrelated Chubb hospital-cash or hospital-indemnity product page (Pakistan, Hong Kong, US group plans) or the Chubb Limited corporate entry. Nothing matched \"CODEX INSURANCE LIMITED\", which is the appendix's own invention. Coverage limits: a general web index reaches neither paywalled nor PDF-interior text reliably, so a reuse inside a published PDF would very likely not surface; and the search cannot establish the NEGATIVE it is often read as establishing — that no real Chubb form underlies the appendix. The paper describes A.1 only as simplified, names no parent form, and this sweep did not attempt to identify one."
+    },
+    {
+      "id": "SRCH-codex-analyst",
+      "question": "Has the Stanford CodeX Insurance Analyst — both halves of it, the deployed application (CodeX 2025a) and the public code repository (CodeX 2025b) that the paper's §4.2 draws its 20 test cases from — changed since the paper's stated access date of 2 February 2025?",
+      "method": "publisher-page",
+      "scope": "Three sources, all read on 2026-08-31. (a) The live application at http://insurance.stanford.edu/homepage/index.php, fetched over plain HTTP — the host serves no certificate for that name, so an HTTPS fetch fails on a cert/altname mismatch against logical.stanford.edu; the plain-HTTP fetch returns 200. (b) Wayback captures of the same URL: 20250226030600 (26 Feb 2025, the nearest capture to the paper's access date) and 20260513124903 (13 May 2026), compared against each other and against live. (c) The GitHub REST API for codexstanford/cardinal-care-encoding: repository metadata, the default-branch commit log, every branch's head commit, the recursive tree of main, and the tags and releases endpoints.",
+      "performed": "2026-08-31",
+      "outcome": "findings",
+      "findings": ["EM-CODEX-APP", "EM-CODEX-REPO"],
+      "coverage_note": "What this does NOT cover. The deployed application's behaviour was NOT exercised: only its unauthenticated homepage was read, and its two entry points (\"Use Account\", \"Use Anonymously\") lead to an interactive analyser that was not run, so nothing here says whether its ANSWERS changed — only that the page describing it did. The Wayback comparison rests on exactly two captures nineteen months apart; anything that changed and changed back between them is invisible, and there is no capture at all from the paper's actual access date of 2 Feb 2025. On the repository side, only the default branch and the four named branches were inspected; forks, pull requests, issues and deleted branches were not, and no file CONTENT was diffed — the claim that main is unchanged rests on its head commit's date, which is sound for a linear history and would not detect a force-push that rewrote history while preserving dates. Finally, the paper cites the Analyst as CodeX 2025a and 2025b without recording a commit, a tag or an archive capture, so there is no pinned baseline to compare against and every finding below is a comparison against the nearest available proxy."
+    }
+  ],
+  "entries": [
+    {
+      "id": "EM-CODEX-APP",
+      "class": "binding",
+      "binding_effect": "substituted",
+      "summary": "The deployed CodeX Insurance Analyst that the paper cites as CodeX 2025a has been substituted at the same URL. On the 26 Feb 2025 Wayback capture the homepage read \"Automated Analysis of Cardinal Care Benefits / Vaccinations, contraceptives, and fertility treatments\" and invited the user to \"Select a desired benefit\"; the live page on 31 Aug 2026 reads \"Automated Analysis of Insurance Benefits / Emergency Services, Fertility Services, Maternity Care, and more\" and says \"Select a desired service type\". Those three lines are the ONLY textual differences between the two — the rest of the page is unchanged — but they are the lines that state its scope: it has stopped presenting itself as an analyser of one university health plan's three benefit families and now presents itself as a general insurance analyser. The 13 May 2026 capture is byte-identical to live, so the change had landed by then. 'binding' and 'substituted' are used BY ANALOGY: nothing here has legal force over anything, and this subject has no binding authority anywhere in its universe. The class was chosen because the register's (a)/(b)/(c) split turns on whether a change is already effective, and this one is — it is live at the cited URL now — which is the fact that distinguishes it from EM-CODEX-REPO.",
+      "provenance": {
+        "source": "The live Stanford CodeX Insurance Analyst homepage compared against its Internet Archive capture of 26 February 2025",
+        "url": "http://web.archive.org/web/20250226030600/http://insurance.stanford.edu/homepage/index.php",
+        "retrieved": "2026-08-31",
+        "citation": "Stanford CodeX, \"Insurance Analyst\" — cited in arXiv:2502.17638v1 as (CodeX, 2025a), \"Accessed: Feb. 2, 2025\", http://insurance.stanford.edu/homepage/index.php",
+        "quote": "Automated Analysis of Cardinal Care Benefits — Vaccinations, contraceptives, and fertility treatments"
+      },
+      "routing": {
+        "fork_ids": [],
+        "currency_risk": false,
+        "effective_from": "2026-05-13"
+      },
+      "disposition": "no-effect",
+      "disposition_note": "No effect on this subject's encoding, and the reason is a scope boundary rather than a judgement call. The Insurance Analyst belongs to the paper's §4.2, its SECOND case study, which encodes coverages from the Stanford Cardinal Care health plan. This subject encodes Appendix A.1 — the simplified Chubb policy of §3 — which the Analyst plays no part in: it supplies none of A.1's text, none of A.2's nine labels, and no test case this replication runs. `currency_risk` is false for the same reason: the encoding cannot go stale behind a change to something it does not read. The entry is recorded because the paper's §4.2 is no longer reproducible against the artifact it cites, which is a real fact about the paper that a reader of this replication should have, and because \"we checked and it moved\" is only worth anything if the checking is written down. `effective_from` is 2026-05-13, the earliest capture showing the new page, which is an upper bound on when it landed, not the date it landed: the 19-month gap between captures is the whole of the uncertainty.",
+      "found_by": ["SRCH-codex-analyst"]
+    },
+    {
+      "id": "EM-CODEX-REPO",
+      "class": "prospective",
+      "summary": "The public code repository the paper cites as CodeX 2025b — github.com/codexstanford/cardinal-care-encoding, the source of §4.2's 20 test cases — is UNCHANGED on its default branch since before the paper read it. main's head is 66dbbe45bb2f9524ed4578b6a4fe52de334eb0cd \"Fixed version of CPB with version from date actually referenced\", committed 2025-01-20T02:29:32Z, two weeks before the paper's stated access date of 2 Feb 2025; the repository carries no tags and no releases and is not archived. So the infertility coverages §4.2 asked models to encode — the paper names them ART and CI; main carries treatment_of_infertility_advanced_reproductive_technology_coverage, _basic_coverage and _comprehensive_coverage under Encoding/Benefits/Treatment of Infertility, and this sweep did not establish which directory the paper's \"CI\" denotes — are the same bytes the paper measured. What HAS moved is four unmerged public branches, none of them merged into main and none carrying an announced merge date: ambulance-service (head 2025-01-29), diabetic-services-and-supplies (2025-01-30), TMJ-and-CMJ (2025-02-20) and updating-covid19-vaccine-coverage (2025-03-12). 'prospective' is used BY ANALOGY, on the register's own distinction: these are changes that exist publicly, are not in effect, and have no effective date — the (c) case exactly, minus the legal authority.",
+      "provenance": {
+        "source": "GitHub REST API: repository metadata, default-branch commit log, per-branch head commits, recursive tree of main, tags and releases endpoints",
+        "url": "https://github.com/codexstanford/cardinal-care-encoding",
+        "retrieved": "2026-08-31",
+        "citation": "Stanford CodeX, \"Insurance Analyst Stanford Cardinal Care Encoding\" — cited in arXiv:2502.17638v1 as (CodeX, 2025b), \"Accessed: Feb. 2, 2025\"",
+        "quote": "Add test cases, note exclusion on non-administered mRNA vaccines given availability of the only administered one is not working"
+      },
+      "routing": {
+        "fork_ids": [],
+        "currency_risk": true,
+        "effective_from_absent_reason": "The four branches are unmerged and there is no merge date to record: no pull request, tag, release or milestone announces one, and three of the four have not moved since early 2025. An undated change that could land at any time is precisely what the currency_risk flag is for, so the flag is set even though the risk falls on the paper's §4.2 rather than on this encoding."
+      },
+      "disposition": "no-effect",
+      "disposition_note": "No effect on this subject's encoding, for the same scope reason as EM-CODEX-APP: the repository supplies §4.2's Cardinal Care test cases and nothing in Appendix A.1 or A.2. It is recorded because the negative half is the more useful half and would otherwise be an assumption — a reader who wanted to re-run §4.2 needs to know that the code base is intact on main, which is a checked claim here (a dated head commit that predates the paper's access) rather than a hope. The branches are recorded because \"main is unchanged\" would be a misleading way to say \"the repository is unchanged\", and they are the reason `currency_risk` is true where EM-CODEX-APP's is false.",
+      "found_by": ["SRCH-codex-analyst"]
+    }
+  ],
+  "dispositions": []
+}

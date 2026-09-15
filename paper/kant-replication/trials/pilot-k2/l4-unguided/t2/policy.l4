@@ -1,0 +1,159 @@
+-- Codex Insurance Limited -- Policy of Insurance
+--
+-- Encodes: given the fact pattern of a single hospitalization, is the claim it
+-- gives rise to covered under the policy?
+--
+-- Two simplifications, both directed by the task brief rather than inferred:
+--   * Clauses 1.1(1) [the agreement is signed] and 1.1(2) [the premium has been
+--     paid, on time] are assumed always satisfied and are therefore not modelled
+--     as facts on Claim at all.
+--   * Every date/time below other than the claimant's age is a NUMBER of months
+--     elapsed since the policy's effective date (never an absolute DATE), so no
+--     date arithmetic is needed anywhere in this file -- only comparison against
+--     the 6-month and 7-month anniversaries named in § 1.3, and the 12-month term
+--     named in § 3.6.
+--
+-- Sections below are labelled to match the source contract, but *defined* in
+-- dependency order: § 1.3 first (the wellness-visit condition), then § 1.2
+-- (cancelation, which reads § 1.3's result), then § 1.1 (in effect, which reads
+-- both), then § 2.1 (the exclusions, which are independent of all of the above),
+-- and finally the combined `covered` test that § 1.1 and § 2.1 together decide.
+
+§§ `The fact pattern of a hospitalization claim`
+
+-- § 2.1 excludes a hospitalization only when it "arises directly or indirectly
+-- out of" one of four enumerated activities. That is a single-cause
+-- classification -- what did this hospitalization arise out of? -- and not a
+-- checklist of the claimant's unrelated attributes: merely being a serving
+-- police officer, for instance, does not by itself make an unrelated injury
+-- "arise out of" police service. So the cause is modelled as one closed
+-- enumeration (the operative cause of the hospitalization) rather than as four
+-- independent occupation/activity flags that could be checked off regardless of
+-- causation.
+DECLARE `Cause of Hospitalization` IS ONE OF
+    `Skydiving`
+    `Service in the Military`
+    `Service as a Fire Fighter`
+    `Service in the Police`
+    `Not one of the enumerated excluded activities`
+
+DECLARE Claim HAS
+    -- § 1.1: when the hospitalization occurred, in months after the effective date
+    `time of hospitalization`                            IS A NUMBER
+    -- § 1.2: fraud, misrepresentation, or material withholding of information
+    `fraud, misrepresentation, or material withholding`  IS A BOOLEAN
+    -- § 1.3: when written confirmation of the wellness visit was supplied to the
+    -- Company, in months after the effective date; NOTHING if no confirmation had
+    -- been supplied as of the time of hospitalization
+    `written confirmation supplied at`                   IS A MAYBE NUMBER
+    -- § 1.3: when the underlying wellness visit itself took place, in months
+    -- after the effective date; NOTHING when not separately known (see NOTES.md
+    -- for why this is tracked apart from the confirmation date, and why it goes
+    -- unset in every one of this trial's nine claims)
+    `wellness visit occurred at`                         IS A MAYBE NUMBER
+    -- § 2.1(1)-(4): what the sickness or accidental injury arose out of
+    `cause of the hospitalization`                       IS A `Cause of Hospitalization`
+    -- § 2.1(5): the claimant's age when hospitalized -- an absolute figure, the
+    -- one time-like quantity the task brief exempts from "relative to the
+    -- effective date"
+    `age at the time of hospitalization`                 IS A NUMBER
+
+§§ `1.3 -- the wellness-visit condition`
+
+-- "... of a wellness visit ... occurring no later than the 6th month anniversary
+-- of the effective date of this policy."
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `the wellness visit itself occurred in time` claim IS
+    CONSIDER claim's `wellness visit occurred at`
+    WHEN JUST t THEN t AT MOST 6
+    OTHERWISE      TRUE   -- not separately known; not a fact any of the nine queries puts in issue
+
+-- "No later than the 7th month anniversary ... you will supply us with written
+-- confirmation ..."
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `written confirmation was supplied by the 7th month anniversary` claim IS
+    CONSIDER claim's `written confirmation supplied at`
+    WHEN JUST t THEN t AT MOST 7
+    OTHERWISE      FALSE
+
+-- The compound condition named in § 1.3: confirmation on file by month 7, of a
+-- visit that itself happened by month 6.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `the wellness condition, taken as a whole, was satisfied` IF
+        `written confirmation was supplied by the 7th month anniversary` claim
+    AND `the wellness visit itself occurred in time` claim
+
+-- § 1.1(3): "... is still pending or has been satisfied in a timely fashion ..."
+-- If no confirmation has been supplied at all, the condition is merely "still
+-- pending" for as long as the hospitalization being assessed occurs no later
+-- than the 7-month deadline; from that deadline onward, silence is a failure.
+-- If a confirmation *has* been supplied, that fact -- checked against §1.3's
+-- full compound condition above -- is dispositive on its own, independent of
+-- when the hospitalization itself falls.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `condition 1.3 is pending or has been satisfied in a timely fashion` claim IS
+    CONSIDER claim's `written confirmation supplied at`
+    WHEN JUST t THEN `the wellness condition, taken as a whole, was satisfied` claim
+    OTHERWISE        claim's `time of hospitalization` AT MOST 7
+
+§§ `1.2 -- cancelation`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `the policy has been canceled` IF
+        claim's `fraud, misrepresentation, or material withholding`
+    OR  NOT (`condition 1.3 is pending or has been satisfied in a timely fashion` claim)
+    OR  claim's `time of hospitalization` GREATER THAN 12   -- § 3.6: a one-year policy term
+
+§§ `1.1 -- the policy in effect`
+
+-- Clauses 1.1(1) and 1.1(2) (signature; premium paid) are assumed satisfied
+-- throughout and are not modelled as facts -- see the file header.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `the policy is in effect` IF
+        `condition 1.3 is pending or has been satisfied in a timely fashion` claim
+    AND NOT (`the policy has been canceled` claim)
+
+§§ `2.1 -- general exclusions`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `the cause of the hospitalization is on the excluded list` claim IS
+    CONSIDER claim's `cause of the hospitalization`
+    WHEN `Skydiving`                                      THEN TRUE
+    WHEN `Service in the Military`                        THEN TRUE
+    WHEN `Service as a Fire Fighter`                       THEN TRUE
+    WHEN `Service in the Police`                           THEN TRUE
+    WHEN `Not one of the enumerated excluded activities`   THEN FALSE
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `an exclusion applies` IF
+        `the cause of the hospitalization is on the excluded list` claim
+    OR  claim's `age at the time of hospitalization` AT LEAST 80
+
+§§ `3 -- general conditions with no operative effect on coverage`
+
+-- § 3.1.1 ("insures You twenty-four (24) hours a day anywhere in the world") is a
+-- coverage-affirming clause with no exceptions: there is no time-of-day or
+-- location fact that could ever make it fail, so it needs no field and no rule.
+-- §§ 3.2-3.5 (arbitration, governing law, currency, and premium-payment
+-- mechanics) and Section 5 (the premium schedule) govern the relationship
+-- between the parties but never decide whether a given hospitalization is
+-- covered, so they are likewise not modelled.
+
+§§ `Putting it together -- is a claim covered?`
+
+-- § 1.1 conditions payment on the policy being in effect at the time of the
+-- hospitalization; § 2.1 separately bars payment when an exclusion applies.
+-- Both must clear for a claim to be covered.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE covered IF
+        `the policy is in effect` claim
+    AND NOT (`an exclusion applies` claim)

@@ -1,0 +1,137 @@
+-- =============================================================================
+-- CODEX INSURANCE LIMITED -- Hospital Indemnity Policy
+-- Rules only. No claim-specific facts are defined in this file -- see apply.l4.
+-- =============================================================================
+--
+-- Simplifying assumptions carried over from the task brief:
+--   * The agreement has been signed (§1.1 item 1) and the premium has been
+--     paid on time (§1.1 item 2, §4.5) -- both are assumed TRUE for every
+--     claim and are not modelled as inputs.
+--   * A claim has in fact been made, setting out the basis for the claim
+--     (§2.3) -- assumed TRUE for every claim; §2.3 does not add any
+--     substantive condition beyond §1.1/§3.1, which are modelled below.
+--   * All dates/times other than the claimant's age are expressed as a
+--     NUMBER of months after the policy's effective date, so that no
+--     absolute calendar arithmetic is required (§1.3, the last sentence of
+--     §1.2, §4.6).
+--   * §4.2 (arbitration), §4.3 (New York law) and §4.4 (US-currency
+--     payments) are dispute-resolution / boilerplate clauses that do not
+--     bear on whether a given claim is covered, so no rule is derived from
+--     them.
+
+§ `Policy in Effect and Conditions`
+
+DECLARE `Medical Event` IS ONE OF
+    Sickness
+    `Accidental Injury`
+
+DECLARE Claim HAS
+    `age at hospitalization`                             IS A NUMBER
+    `nature of medical event`                            IS A `Medical Event`
+    `injury was self-inflicted and intentional`          IS A BOOLEAN
+    `arose from skydiving`                               IS A BOOLEAN
+    `arose from service in the military`                 IS A BOOLEAN
+    `arose from service as a fire fighter`               IS A BOOLEAN
+    `arose from service in the police`                   IS A BOOLEAN
+    `hospitalized in a hospital in the United States`    IS A BOOLEAN
+    `months after effective date of hospitalization`     IS A NUMBER
+    `wellness confirmation month`                        IS A MAYBE NUMBER
+    `fraud or misrepresentation or material withholding` IS A BOOLEAN
+
+§§ `1.3 - wellness visit confirmation deadline`
+
+-- No later than the 7th month anniversary of the effective date, written
+-- confirmation of a wellness visit must reach the Company. Both the 7-month
+-- confirmation deadline and the visit's own 6-month deadline are collapsed
+-- into a single 7-month check here: every query gives at most one relative
+-- time for this fact ("confirmation/proof provided N months after the
+-- effective date"), never two, so there is nothing to separate them against.
+-- If confirmation has not yet been given, the condition is still "pending"
+-- -- and so not yet failed -- as long as the 7-month deadline has not yet
+-- passed by the time of hospitalization.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `condition 1-3 satisfied by time of hospitalization` claim IS
+    CONSIDER claim's `wellness confirmation month`
+    WHEN JUST confirmedMonth THEN confirmedMonth AT MOST 7
+    WHEN NOTHING             THEN claim's `months after effective date of hospitalization` AT MOST 7
+
+§§ `1.2 - cancellation`
+
+-- The policy is cancelled if there is fraud, misrepresentation or material
+-- withholding of information, or the §1.3 condition was not satisfied in a
+-- timely fashion, or the one-year policy term (§4.6) has already elapsed.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `policy is cancelled` claim IS
+        claim's `fraud or misrepresentation or material withholding`
+    OR  NOT (`condition 1-3 satisfied by time of hospitalization` claim)
+    OR  claim's `months after effective date of hospitalization` GREATER THAN 12
+
+§§ `1.1 - policy in effect`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `policy in effect at time of hospitalization` claim IS
+    NOT (`policy is cancelled` claim)
+
+§ `Benefits`
+
+§§ `2.1 - qualifying medical event`
+
+-- Benefits are payable only for hospitalization resulting from sickness or
+-- an ACCIDENTAL injury. An injury that the claimant inflicted on themselves
+-- deliberately (as opposed to an unintended, unforeseen mishap) is not
+-- "accidental", so it does not meet this threshold even though it is not
+-- separately listed among the §3.1 exclusions.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `qualifying medical event` claim IS
+    CONSIDER claim's `nature of medical event`
+    WHEN Sickness            THEN TRUE
+    WHEN `Accidental Injury` THEN NOT (claim's `injury was self-inflicted and intentional`)
+
+§§ `2.2 - where the benefit is payable`
+
+-- The Daily Hospital Income Benefit is only payable for days of continuous
+-- confinement in a hospital in the United States.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `benefit location requirement met` claim IS
+    claim's `hospitalized in a hospital in the United States`
+
+§ `General Exclusions`
+
+§§ `3.1 - exclusions`
+
+-- Exclusions 1-4 require that the sickness or injury arise directly or
+-- indirectly OUT OF the listed activity: merely being engaged in, or
+-- employed for, that activity at the time of hospitalization is not enough
+-- on its own unless it actually caused the sickness or injury. Age is a
+-- standalone, non-causal exclusion.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `an exclusion applies` claim IS
+        claim's `arose from skydiving`
+    OR  claim's `arose from service in the military`
+    OR  claim's `arose from service as a fire fighter`
+    OR  claim's `arose from service in the police`
+    OR  claim's `age at hospitalization` AT LEAST 80
+
+§ `Coverage Determination`
+
+-- Top-level rule: is a given claim covered under the policy?
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `covered` claim IS
+        `policy in effect at time of hospitalization` claim
+    AND `qualifying medical event` claim
+    AND `benefit location requirement met` claim
+    AND NOT (`an exclusion applies` claim)
+
+§ `Benefit and Premium Amounts`
+
+-- §5.1 / §5.2 -- named for completeness; no query asks for a dollar amount.
+`the Daily Hospital Benefit amount` MEANS 500
+
+`the premium amount` MEANS 2000

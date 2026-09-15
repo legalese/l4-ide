@@ -1,0 +1,166 @@
+IMPORT policy
+
+-- The nine benchmark claims (Kant et al. 2025, Appendix A.2), each built
+-- from the standing preamble ("assuming all other conditions are met and no
+-- other exclusions apply, where by 'other' I mean anything not referenced
+-- in the query") plus the specific facts given in that query.
+--
+-- Fields not referenced by a given query are set to values that satisfy
+-- their corresponding condition (age well under 80; no fraud; wellness
+-- visit/confirmation left as NOTHING together with `hospitalization month`
+-- IS 0, which the "still pending" logic in policy.l4 treats as comfortably
+-- inside both Sec. 1.3 deadlines; hospital located in the United States;
+-- no excluded activity).
+
+§ `Q1 -- hospitalized by burns suffered while doing my duty as a firefighter`
+
+q1 MEANS Claim WITH
+    `age at hospitalization`                   IS 40
+    `hospitalization month`                    IS 0
+    `caused by sickness or accidental injury`  IS TRUE
+    `hospital is in the United States`         IS TRUE
+    `event arose from skydiving`               IS FALSE
+    `event arose from service in the military` IS FALSE
+    `event arose from service as a fire fighter` IS TRUE
+    `event arose from service in the police`   IS FALSE
+    `fraud or misrepresentation occurred`      IS FALSE
+    `wellness visit month`                     IS NOTHING
+    `wellness visit confirmation month`        IS NOTHING
+
+#EVAL `covered` q1
+
+§ `Q2 -- 78 years old at the time of hospitalization`
+
+q2 MEANS Claim WITH
+    `age at hospitalization`                   IS 78
+    `hospitalization month`                    IS 0
+    `caused by sickness or accidental injury`  IS TRUE
+    `hospital is in the United States`         IS TRUE
+    `event arose from skydiving`               IS FALSE
+    `event arose from service in the military` IS FALSE
+    `event arose from service as a fire fighter` IS FALSE
+    `event arose from service in the police`   IS FALSE
+    `fraud or misrepresentation occurred`      IS FALSE
+    `wellness visit month`                     IS NOTHING
+    `wellness visit confirmation month`        IS NOTHING
+
+#EVAL `covered` q2
+
+§ `Q3 -- pneumonia 5 months after the effective date, age 65`
+
+q3 MEANS Claim WITH
+    `age at hospitalization`                   IS 65
+    `hospitalization month`                    IS 5
+    `caused by sickness or accidental injury`  IS TRUE
+    `hospital is in the United States`         IS TRUE
+    `event arose from skydiving`               IS FALSE
+    `event arose from service in the military` IS FALSE
+    `event arose from service as a fire fighter` IS FALSE
+    `event arose from service in the police`   IS FALSE
+    `fraud or misrepresentation occurred`      IS FALSE
+    `wellness visit month`                     IS NOTHING
+    `wellness visit confirmation month`        IS NOTHING
+
+#EVAL `covered` q3
+
+§ `Q4 -- fall while traveling abroad, wellness confirmation given at 8 months`
+
+q4 MEANS Claim WITH
+    `age at hospitalization`                   IS 40
+    `hospitalization month`                    IS 0
+    `caused by sickness or accidental injury`  IS TRUE
+    `hospital is in the United States`         IS FALSE
+    `event arose from skydiving`               IS FALSE
+    `event arose from service in the military` IS FALSE
+    `event arose from service as a fire fighter` IS FALSE
+    `event arose from service in the police`   IS FALSE
+    `fraud or misrepresentation occurred`      IS FALSE
+    `wellness visit month`                     IS NOTHING
+    `wellness visit confirmation month`        IS JUST 8
+
+#EVAL `covered` q4
+
+§ `Q5 -- hospitalized for punching my own face to show off, no fraud`
+
+q5 MEANS Claim WITH
+    `age at hospitalization`                   IS 40
+    `hospitalization month`                    IS 0
+    `caused by sickness or accidental injury`  IS FALSE
+    `hospital is in the United States`         IS TRUE
+    `event arose from skydiving`               IS FALSE
+    `event arose from service in the military` IS FALSE
+    `event arose from service as a fire fighter` IS FALSE
+    `event arose from service in the police`   IS FALSE
+    `fraud or misrepresentation occurred`      IS FALSE
+    `wellness visit month`                     IS NOTHING
+    `wellness visit confirmation month`        IS NOTHING
+
+#EVAL `covered` q5
+
+§ `Q6 -- skydiving injury, age 79, wellness confirmation at 6.5 months`
+
+q6 MEANS Claim WITH
+    `age at hospitalization`                   IS 79
+    `hospitalization month`                    IS 0
+    `caused by sickness or accidental injury`  IS TRUE
+    `hospital is in the United States`         IS TRUE
+    `event arose from skydiving`               IS TRUE
+    `event arose from service in the military` IS FALSE
+    `event arose from service as a fire fighter` IS FALSE
+    `event arose from service in the police`   IS FALSE
+    `fraud or misrepresentation occurred`      IS FALSE
+    `wellness visit month`                     IS NOTHING
+    `wellness visit confirmation month`        IS JUST 6.5
+
+#EVAL `covered` q6
+
+§ `Q7 -- heart attack, wellness confirmation at 2 months, age 75`
+
+q7 MEANS Claim WITH
+    `age at hospitalization`                   IS 75
+    `hospitalization month`                    IS 0
+    `caused by sickness or accidental injury`  IS TRUE
+    `hospital is in the United States`         IS TRUE
+    `event arose from skydiving`               IS FALSE
+    `event arose from service in the military` IS FALSE
+    `event arose from service as a fire fighter` IS FALSE
+    `event arose from service in the police`   IS FALSE
+    `fraud or misrepresentation occurred`      IS FALSE
+    `wellness visit month`                     IS NOTHING
+    `wellness visit confirmation month`        IS JUST 2
+
+#EVAL `covered` q7
+
+§ `Q8 -- injured in a military training exercise, within the policy term, no fraud`
+
+q8 MEANS Claim WITH
+    `age at hospitalization`                   IS 40
+    `hospitalization month`                    IS 0
+    `caused by sickness or accidental injury`  IS TRUE
+    `hospital is in the United States`         IS TRUE
+    `event arose from skydiving`               IS FALSE
+    `event arose from service in the military` IS TRUE
+    `event arose from service as a fire fighter` IS FALSE
+    `event arose from service in the police`   IS FALSE
+    `fraud or misrepresentation occurred`      IS FALSE
+    `wellness visit month`                     IS NOTHING
+    `wellness visit confirmation month`        IS NOTHING
+
+#EVAL `covered` q8
+
+§ `Q9 -- bitten by my son on the ankle, wellness confirmation at 6 months, serving as a police officer`
+
+q9 MEANS Claim WITH
+    `age at hospitalization`                   IS 40
+    `hospitalization month`                    IS 0
+    `caused by sickness or accidental injury`  IS TRUE
+    `hospital is in the United States`         IS TRUE
+    `event arose from skydiving`               IS FALSE
+    `event arose from service in the military` IS FALSE
+    `event arose from service as a fire fighter` IS FALSE
+    `event arose from service in the police`   IS FALSE
+    `fraud or misrepresentation occurred`      IS FALSE
+    `wellness visit month`                     IS NOTHING
+    `wellness visit confirmation month`        IS JUST 6
+
+#EVAL `covered` q9

@@ -1,0 +1,198 @@
+IMPORT policy
+
+-- Standing preamble applied to every question below: all conditions for
+-- the policy to apply that are unrelated to the specific question are
+-- set so that they are satisfied, and no exclusion unrelated to the
+-- question is triggered. The agreement is signed and the premium paid on
+-- time (per policy.l4's header). All dates/times other than age are
+-- given relative to the policy's effective date, in months, matching the
+-- wording of each question.
+
+-- Q1: hospitalized by burns suffered while doing my duty as a
+-- firefighter. Burns are an accidental injury; the injury arises out of
+-- firefighting service (Section 3.1(3)), so it is excluded regardless of
+-- the (here all satisfied) unrelated conditions.
+q1 MEANS Claim WITH
+    `cause of hospitalization`                                    IS `Accidental Injury`
+    `arising out of skydiving`                                    IS FALSE
+    `arising out of military service`                             IS FALSE
+    `arising out of firefighting service`                         IS TRUE
+    `arising out of police service`                               IS FALSE
+    `age at hospitalization`                                      IS 40
+    `hospitalization months since the effective date`             IS 1
+    `wellness visit months since the effective date`              IS 1
+    `wellness visit confirmation months since the effective date` IS 1
+    `fraud or misrepresentation or material withholding`          IS FALSE
+    `confinement in a hospital in the United States`               IS TRUE
+    `days of continuous confinement`                              IS 3
+#EVAL `covered` q1
+
+-- Q2: 78 years old at the time of hospitalization. 78 is below the
+-- Section 3.1(5) threshold of 80, so the age exclusion does not apply.
+-- No cause implicating any other exclusion is given, so a generic
+-- sickness is assumed.
+q2 MEANS Claim WITH
+    `cause of hospitalization`                                    IS Sickness
+    `arising out of skydiving`                                    IS FALSE
+    `arising out of military service`                             IS FALSE
+    `arising out of firefighting service`                         IS FALSE
+    `arising out of police service`                               IS FALSE
+    `age at hospitalization`                                      IS 78
+    `hospitalization months since the effective date`             IS 1
+    `wellness visit months since the effective date`              IS 1
+    `wellness visit confirmation months since the effective date` IS 1
+    `fraud or misrepresentation or material withholding`          IS FALSE
+    `confinement in a hospital in the United States`               IS TRUE
+    `days of continuous confinement`                              IS 3
+#EVAL `covered` q2
+
+-- Q3: hospitalized for pneumonia 5 months after the effective date, age
+-- 65 at hospitalization. Pneumonia is a sickness; age is well under 80;
+-- 5 months is well within both the wellness-visit window and the
+-- 12-month policy term.
+q3 MEANS Claim WITH
+    `cause of hospitalization`                                    IS Sickness
+    `arising out of skydiving`                                    IS FALSE
+    `arising out of military service`                             IS FALSE
+    `arising out of firefighting service`                         IS FALSE
+    `arising out of police service`                               IS FALSE
+    `age at hospitalization`                                      IS 65
+    `hospitalization months since the effective date`             IS 5
+    `wellness visit months since the effective date`              IS 1
+    `wellness visit confirmation months since the effective date` IS 1
+    `fraud or misrepresentation or material withholding`          IS FALSE
+    `confinement in a hospital in the United States`               IS TRUE
+    `days of continuous confinement`                              IS 3
+#EVAL `covered` q3
+
+-- Q4: hospitalized due to a fall while traveling abroad, having given
+-- confirmation of the wellness visit 8 months after the effective date.
+-- A fall is an accidental injury. Confirmation at month 8 is later than
+-- Section 1.3's 7-month deadline, and "I had given confirmation ...
+-- [and] was hospitalized" places the hospitalization after that
+-- confirmation, i.e. after month 7, so the wellness-visit condition is
+-- neither satisfied in time nor still pending -- the policy is deemed
+-- canceled under Section 1.2. Separately, "traveling abroad" is read as
+-- the hospitalization itself (not merely the fall) occurring outside the
+-- United States, which independently fails Section 2.2's territorial
+-- condition on the benefit.
+q4 MEANS Claim WITH
+    `cause of hospitalization`                                    IS `Accidental Injury`
+    `arising out of skydiving`                                    IS FALSE
+    `arising out of military service`                             IS FALSE
+    `arising out of firefighting service`                         IS FALSE
+    `arising out of police service`                               IS FALSE
+    `age at hospitalization`                                      IS 40
+    `hospitalization months since the effective date`             IS 9
+    `wellness visit months since the effective date`              IS 1
+    `wellness visit confirmation months since the effective date` IS 8
+    `fraud or misrepresentation or material withholding`          IS FALSE
+    `confinement in a hospital in the United States`               IS FALSE
+    `days of continuous confinement`                              IS 3
+#EVAL `covered` q4
+
+-- Q5: hospitalized for punching my own face to show off for my friends;
+-- no fraud or misrepresentation was committed. Punching oneself in the
+-- face on purpose is a deliberate act, not an accident, so the resulting
+-- injury is an intentionally self-inflicted injury rather than a
+-- "sickness or accidental Injury" within Section 2.1's own definition of
+-- what is insured -- independent of the (here true) absence of fraud,
+-- which goes to Section 1.2 cancelation, not to Section 2.1's threshold
+-- definition.
+q5 MEANS Claim WITH
+    `cause of hospitalization`                                    IS `Intentional Self-Inflicted Injury`
+    `arising out of skydiving`                                    IS FALSE
+    `arising out of military service`                             IS FALSE
+    `arising out of firefighting service`                         IS FALSE
+    `arising out of police service`                               IS FALSE
+    `age at hospitalization`                                      IS 40
+    `hospitalization months since the effective date`             IS 1
+    `wellness visit months since the effective date`              IS 1
+    `wellness visit confirmation months since the effective date` IS 1
+    `fraud or misrepresentation or material withholding`          IS FALSE
+    `confinement in a hospital in the United States`               IS TRUE
+    `days of continuous confinement`                              IS 3
+#EVAL `covered` q5
+
+-- Q6: hospitalized due to an injury sustained while skydiving, age 79 at
+-- hospitalization, proof of the wellness visit provided 6.5 months after
+-- the effective date. The skydiving exclusion (Section 3.1(1)) applies
+-- regardless of age (79 is under the 80 threshold) or the wellness-visit
+-- timing (6.5 months is within the 7-month deadline).
+q6 MEANS Claim WITH
+    `cause of hospitalization`                                    IS `Accidental Injury`
+    `arising out of skydiving`                                    IS TRUE
+    `arising out of military service`                             IS FALSE
+    `arising out of firefighting service`                         IS FALSE
+    `arising out of police service`                               IS FALSE
+    `age at hospitalization`                                      IS 79
+    `hospitalization months since the effective date`             IS 1
+    `wellness visit months since the effective date`              IS 1
+    `wellness visit confirmation months since the effective date` IS 6.5
+    `fraud or misrepresentation or material withholding`          IS FALSE
+    `confinement in a hospital in the United States`               IS TRUE
+    `days of continuous confinement`                              IS 3
+#EVAL `covered` q6
+
+-- Q7: hospitalized for a heart attack, wellness-visit proof submitted 2
+-- months after the effective date, age 75 at hospitalization. A heart
+-- attack is a sickness; age is under 80; 2 months is well within the
+-- wellness-visit deadlines.
+q7 MEANS Claim WITH
+    `cause of hospitalization`                                    IS Sickness
+    `arising out of skydiving`                                    IS FALSE
+    `arising out of military service`                             IS FALSE
+    `arising out of firefighting service`                         IS FALSE
+    `arising out of police service`                               IS FALSE
+    `age at hospitalization`                                      IS 75
+    `hospitalization months since the effective date`             IS 1
+    `wellness visit months since the effective date`              IS 1
+    `wellness visit confirmation months since the effective date` IS 2
+    `fraud or misrepresentation or material withholding`          IS FALSE
+    `confinement in a hospital in the United States`               IS TRUE
+    `days of continuous confinement`                              IS 3
+#EVAL `covered` q7
+
+-- Q8: hospitalized after being injured in a military training exercise;
+-- the hospitalization occurred within the policy term; no fraud was
+-- committed. The injury arises out of military service (Section
+-- 3.1(2)), so it is excluded regardless of the (here satisfied) policy
+-- term and fraud conditions.
+q8 MEANS Claim WITH
+    `cause of hospitalization`                                    IS `Accidental Injury`
+    `arising out of skydiving`                                    IS FALSE
+    `arising out of military service`                             IS TRUE
+    `arising out of firefighting service`                         IS FALSE
+    `arising out of police service`                               IS FALSE
+    `age at hospitalization`                                      IS 40
+    `hospitalization months since the effective date`             IS 6
+    `wellness visit months since the effective date`              IS 1
+    `wellness visit confirmation months since the effective date` IS 1
+    `fraud or misrepresentation or material withholding`          IS FALSE
+    `confinement in a hospital in the United States`               IS TRUE
+    `days of continuous confinement`                              IS 3
+#EVAL `covered` q8
+
+-- Q9: hospitalized due to my son biting me in the ankle, proof of the
+-- wellness visit provided 6 months after the effective date, and I was
+-- serving as a police officer at the time of hospitalization. A bite
+-- from one's own child is an accidental injury unconnected to police
+-- service: Section 3.1(4) excludes events "arising directly or
+-- indirectly out of" service in the police, not merely being a police
+-- officer at the time of an unrelated domestic accident, so the
+-- exclusion does not apply here. 6 months is within the wellness-visit
+-- deadlines.
+q9 MEANS Claim WITH
+    `cause of hospitalization`                                    IS `Accidental Injury`
+    `arising out of skydiving`                                    IS FALSE
+    `arising out of military service`                             IS FALSE
+    `arising out of firefighting service`                         IS FALSE
+    `arising out of police service`                               IS FALSE
+    `age at hospitalization`                                      IS 40
+    `hospitalization months since the effective date`             IS 1
+    `wellness visit months since the effective date`              IS 1
+    `wellness visit confirmation months since the effective date` IS 6
+    `fraud or misrepresentation or material withholding`          IS FALSE
+    `confinement in a hospital in the United States`               IS TRUE
+    `days of continuous confinement`                              IS 3
+#EVAL `covered` q9

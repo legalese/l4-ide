@@ -3,18 +3,18 @@
 
 § `UNLESS Keyword Examples`
     GIVEN `is a citizen` IS A BOOLEAN
-          `has resided for 5 years` IS A BOOLEAN
-          `has valid identification` IS A BOOLEAN
-          `has been disqualified` IS A BOOLEAN
+          `resided for 5 years` IS A BOOLEAN
+          `valid identification` IS A BOOLEAN
+          `been disqualified` IS A BOOLEAN
           `signed by both parties` IS A BOOLEAN
           `consideration exchanged` IS A BOOLEAN
           `signed under duress` IS A BOOLEAN
-          `has valid badge` IS A BOOLEAN
+          `valid badge` IS A BOOLEAN
           `during business hours` IS A BOOLEAN
           `building is closed` IS A BOOLEAN
           `is employee` IS A BOOLEAN
-          `is contractor` IS A BOOLEAN
-          `has been terminated` IS A BOOLEAN
+          `contractor` IS A BOOLEAN
+          `been terminated` IS A BOOLEAN
 
 --------------------------------------------------------------------------------
 -- Basic UNLESS Tests
@@ -45,9 +45,9 @@ DECIDE basic4 IF FALSE UNLESS FALSE
 
 DECIDE `is eligible for benefits` IF
       `is a citizen`
-  AND `has resided for 5 years`
-  AND `has valid identification`
-  UNLESS `has been disqualified`
+  AND `resided for 5 years`
+  AND `valid identification`
+  UNLESS `been disqualified`
 
 --------------------------------------------------------------------------------
 -- UNLESS with AND (multi-line)
@@ -128,7 +128,7 @@ DECIDE `contract is valid` IF
 -- Building access
 
 DECIDE `can enter building` IF
-      `has valid badge`
+      `valid badge`
   AND `during business hours`
   UNLESS `building is closed`
 
@@ -136,5 +136,5 @@ DECIDE `can enter building` IF
 
 DECIDE `has system access` IF
          `is employee`
-  OR     `is contractor`
-  UNLESS `has been terminated`
+  OR     `contractor`
+  UNLESS `been terminated`

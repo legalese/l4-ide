@@ -1,0 +1,148 @@
+IMPORT prelude
+
+§ `CODEX INSURANCE LIMITED — Daily Hospital Income Benefit policy`
+
+-- This file encodes the rules of the policy contract (inputs/chubb-policy.txt)
+-- as pure functions of a `Claim` -- it defines no claim data of its own.
+--
+-- Every time/date fact other than the claimant's age is carried as a NUMBER
+-- of months elapsed since the policy's effective date, per the task's
+-- instruction that all query facts (bar age) are given relative to the
+-- effective date, so no calendar-date arithmetic is needed anywhere here.
+--
+-- Per the task's instructions, §1.1(1) "this agreement is signed" and
+-- §1.1(2) "the premium ... has been paid" are assumed always to hold, and so
+-- are not modelled as facts of a Claim or tested by any rule below.
+
+§§ `§5 Benefit and premium amounts`
+
+`daily hospital income benefit amount in USD` MEANS 500
+`premium amount in USD`                       MEANS 2000
+
+§§ `Key thresholds used throughout (§1.3, §2.2, §3.1(5), §4.6)`
+
+-- §1.3: written confirmation of the wellness visit is due no later than the
+-- 7th month anniversary of the effective date.
+`wellness confirmation deadline in months` MEANS 7
+
+-- §4.6: the policy term is one year from the effective date.
+`policy term in months` MEANS 12
+
+-- §2.2: the benefit is payable for at most 365 days of continuous confinement.
+`maximum benefit days` MEANS 365
+
+-- §3.1(5): the age exclusion threshold.
+`age exclusion threshold` MEANS 80
+
+§ `The shape of a claim`
+
+-- One `Claim` bundles every fact that §1-§3 of the policy need, in order to
+-- decide whether a given hospitalization is covered. Every duration is
+-- months since the effective date (see the file header); `age at
+-- hospitalization` is the one absolute figure the task tells us to keep
+-- absolute.
+DECLARE Claim HAS
+    `age at hospitalization`                                          IS A NUMBER
+    `months since the effective date at hospitalization`              IS A NUMBER
+    `wellness visit occurred within six months of the effective date` IS A BOOLEAN
+    `wellness confirmation submission month`                          IS A MAYBE NUMBER
+    `fraud or misrepresentation`                                      IS A BOOLEAN
+    `confined in a hospital in the United States`                     IS A BOOLEAN
+    `days of continuous confinement`                                  IS A NUMBER
+    `claim made to the Company`                                       IS A BOOLEAN
+    `injury arose from skydiving`                                     IS A BOOLEAN
+    `injury arose from military service`                              IS A BOOLEAN
+    `injury arose from firefighter service`                           IS A BOOLEAN
+    `injury arose from police service`                                IS A BOOLEAN
+
+§ `§1 Policy in effect and conditions`
+
+-- §1.3, evaluated as of the hospitalization: if the confirmation has already
+-- been submitted, it must have been submitted by month 7. If it has not yet
+-- been submitted, the condition is still "pending" as long as the 7-month
+-- deadline has not yet arrived at the time of the hospitalization.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`hospitalization not yet past the wellness confirmation deadline` claim MEANS
+    claim's `months since the effective date at hospitalization` AT MOST `wellness confirmation deadline in months`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`wellness confirmation timely or still pending` claim MEANS
+    CONSIDER claim's `wellness confirmation submission month`
+    WHEN JUST month THEN month AT MOST `wellness confirmation deadline in months`
+    WHEN NOTHING     THEN `hospitalization not yet past the wellness confirmation deadline` claim
+
+-- §1.1(3): "The condition set out in Section 1.3 is still pending or has
+-- been satisfied in a timely fashion" -- §1.3 itself has two limbs: the
+-- visit occurring by month 6, and confirmation of it being supplied by
+-- month 7.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`section 1.3 condition pending or satisfied` claim MEANS
+        claim's `wellness visit occurred within six months of the effective date`
+    AND `wellness confirmation timely or still pending` claim
+
+-- §4.6 / §1.2 last sentence: the policy automatically ends one year after
+-- the effective date.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`hospitalization after the policy term ends` claim MEANS
+    claim's `months since the effective date at hospitalization` GREATER THAN `policy term in months`
+
+-- §1.2: cancellation triggers -- fraud/misrepresentation/material
+-- withholding, §1.3 not satisfied in a timely fashion, or the policy term
+-- having run out.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`policy canceled` claim MEANS
+        claim's `fraud or misrepresentation`
+    OR  NOT (`section 1.3 condition pending or satisfied` claim)
+    OR  `hospitalization after the policy term ends` claim
+
+-- §1.1: the policy is in effect at the time of the hospitalization.
+-- (§1.1(1)-(2), signature and timely payment of premium, are assumed -- see
+-- the file header.)
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`policy in effect` claim MEANS
+        `section 1.3 condition pending or satisfied` claim
+    AND NOT (`policy canceled` claim)
+
+§ `§2 Benefits`
+
+-- §2.1-§2.3: confinement in a US hospital, within the 365-day cap, with a
+-- claim properly made to the Company. (§2.1's own requirement -- that the
+-- confinement be "as a result of sickness or accidental Injury" -- is the
+-- shared premise of every one of the nine benchmark questions, so it is not
+-- separately modelled as a Claim field here.)
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`benefit conditions satisfied` claim MEANS
+        claim's `confined in a hospital in the United States`
+    AND claim's `days of continuous confinement` AT MOST `maximum benefit days`
+    AND claim's `claim made to the Company`
+
+§ `§3 General exclusions`
+
+-- §3.1: sickness or injury "arising directly or indirectly out of" one of
+-- four listed activities, or the claimant's age at the time of the
+-- hospitalization.
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`exclusion applies` claim MEANS
+        claim's `injury arose from skydiving`
+    OR  claim's `injury arose from military service`
+    OR  claim's `injury arose from firefighter service`
+    OR  claim's `injury arose from police service`
+    OR  claim's `age at hospitalization` AT LEAST `age exclusion threshold`
+
+§ `Top-level decision`
+
+-- Does the policy apply to (i.e. is the benefit payable for) this claim?
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`covered` claim MEANS
+        `policy in effect` claim
+    AND `benefit conditions satisfied` claim
+    AND NOT (`exclusion applies` claim)
