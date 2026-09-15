@@ -1918,7 +1918,10 @@ commit took "the act deadline of the member whose completion fired the join", wh
 whichever member the roll named first (measured: `LIST alice, bob` FULFILLED, `LIST bob, alice`
 BREACHED, same events) and on no tie was the last completer's rather than the group's; the
 adversarial pass replaced it. Under `LEST`, THE DEADLINE is the deadline that was actually missed:
-the failing member's act deadline when a member expired (`barrierFail`, carried by the sentinel),
+the failing member's act deadline when a member expired (`barrierFail`, carried by the sentinel) —
+and once R-T3 is under this (§11.0.1 "Stacking B on C", 2026-09-16), _which_ failing member is the
+one whose failure the `LEST` is anchored at, the earliest, with a tie on the revealing event broken
+by the earlier deadline —
 the `ONCE` line's when everyone acted but the last act landed after it (`barrierStateMissed`) —
 witnesses `the tenancy` (LEST, 14 + 5 = 19), `the tenancy, a member late` (act 14 and `ONCE`
 30 both written, Bob late: 14 + 5 = 19, not 35), `the tenancy, the group late` (30 + 5 = 35), `by
@@ -2432,7 +2435,12 @@ only insofar as both operands were always run; it is new for the barrier.
   every member scans the same stream, so an earlier deadline is revealed by an earlier-or-equal
   event; two deadlines revealed by the same event tie, the tie keeps the first in roll order, and
   that is the same event — same anchor, same residual — so the answer cannot differ from ordering
-  by deadline. (The first build's comment said "orders by the missed deadline" without the tie
+  by deadline. **Stacked under R-Q7B (2026-09-16, §11.0.1 "Stacking B on C") that last sentence
+  stopped being true**: the `LEST` also reads `THE DEADLINE` from the chosen member, and a tie on
+  the revealing event does differ there (measured 19 vs 10 across the two rolls), so a second key
+  was added — the deadline missed, `BarrierFailedAt.failDue`, forced by `Barrier5b` — and roll
+  order breaks only a tie on both, which names the same deadline either way. The anchor's VALUE
+  and the number of `LEST` firings are unchanged by it. (The first build's comment said "orders by the missed deadline" without the tie
   qualifier; the pass measured deadlines 5 and 6 under one `WAIT UNTIL 10`, both rolls, and found
   the residual identical, `probes/gate/g7-stamp-tie.l4`.) `run-blame.l4`'s `staggered signing` pins
   it: Carol, last on the roll with five days, fails first, and the landlord's reparation is anchored
@@ -3120,7 +3128,8 @@ are in §5.1.1.1; this is the ledger entry):
   the continuation is attached to when it runs — through the single-party hand-offs, the
   barrier's `HENCE` (state deadline when the `ONCE` line has one, else the latest of the members'
   act deadlines; an empty cast joined at its arming), the barrier's `LEST` (the failing member's
-  deadline, or the state deadline when that is what was missed), the fork (each member's own),
+  deadline — the earliest-failing member's once stacked on R-T3, see "Stacking B on C" below —
+  or the state deadline when that is what was missed), the fork (each member's own),
   the demoted join-line deadline, and a continuation handed on as a value;
 - the expression anchor, `NUMBER` or `DATE`, the latter lowered by its serial; a deadline already
   past at arming is revealed by the first event;
@@ -3249,6 +3258,88 @@ Deliver AT 14`, the machine stable-sorts a trace by `AT`, so the delivery at 14 
   as the README.
 
 Raised and refuted by both checkers in round 2: none.
+
+#### Stacking B on C (2026-09-16) — `every/anchors` rebased onto `every/blame-set`, branch `every/anchors-on-blame`
+
+Witness `jl4/examples/ok/every/run-stack.l4`. B is the anchored `WITHIN` (three commits, this
+section's block above); C is the blame set (§6.1.1, three commits). Both were cut from the same
+`origin/unstable` (`0b640727`) and both rewrote the barrier's failure path, so `git rebase --onto
+<C's HEAD> origin/unstable` conflicted in three files: `Machine.hs` (the `Barrier1` failpoint
+arm, `barrierFinish`, `barrierFail`'s signature and haddock, the `Contract5` breach line,
+`startBarrier`'s frame literal, and the `Barrier2`/`Barrier5` region at B's round-1 commit),
+`ContractFrame.hs` (both tracks' new frame records, at B's round-1 commit) and `EVERY.md` (the
+"What runs today" section, three hunks). Ten more shared files auto-merged in disjoint regions
+(`Syntax.hs`, `ValueLazy.hs`, `TypeCheck.hs`, `TypeCheck/Types.hs`, `Print.hs`, `README.md`,
+`Backend/Jl4.hs`, the skill, this spec) and were read; the merged tree built clean under
+`-Werror` at the first attempt, before any repair.
+
+**How each hunk was resolved — both intents kept.** The `Barrier1` failpoint arm matches the
+sentinel with B's `sentinelArgs` (two or three arguments) and pushes C's `Barrier5` frame, now
+carrying the sentinel's third argument, the member's absolute deadline
+(`Machine.hs:1842-1846`; `BarrierFailStampFrame.dueRef`, `ContractFrame.hs:417`). `Barrier5`
+forces the anchor as C had it and records a `BarrierFailedAt` that carries B's deadline reference
+beside C's anchor (`failDueRef`, `ContractFrame.hs:384`). `barrierFinish` keeps C's shape —
+failures first, `earliestFailure` picks one, `lapsed` → `FULFILLED`, then pending, then the join —
+and hands `barrierFail` the CHOSEN failure's anchor, residual and deadline
+(`Machine.hs:2537`); its join tail is B's round-1 `barrierJoined` with `dueLatest`
+(`Machine.hs:2608-2618`), and the `tLast = Nothing` arm is B's internal error, which C's
+`lapsed` flag keeps unreachable (a lapsed `MAY` no longer returns through the join tail).
+`barrierFail` has B's four-argument signature and C's haddock about what the `LEST` names
+(`Machine.hs:2667`). `startBarrier`'s frame literal has both tracks' fields (`dueLatest`,
+`failures`, `lapsed`; `Machine.hs:2475-2476`). The `Contract5` breach line is C's `singleBlame`
+form with B's `reofferResolve False` (`Machine.hs:1696-1697`). `ContractFrame.hs` keeps all four
+new records (`BarrierFailStampFrame`, `BreachByFrame`, `BarrierDueFrame`, `BarrierEmptyFrame`).
+`EVERY.md`'s "Runs" list is B's three widened bullets followed by C's blame bullet; its "coarser
+than it looks" list is C's corrected `LEST BREACH` bullet (B's copy still said R-T3 was unbuilt)
+and the clock bullet with B's `OF THE DEADLINE` workaround sentence appended.
+
+**The interaction, as measured** (probe `probes/interaction.l4` in the session scratch, then the
+witness; binary built from this tree, `JL4_LIBRARY_PATH` pinned to its own libraries). C decides
+WHICH failure a barrier's `LEST` is anchored at — the earliest by R-Q5, `earliestFailure`
+(`Machine.hs:2580`) — and B decides what `THE DEADLINE` reads inside that `LEST`. Stacked, the
+rule is: **`THE DEADLINE` under a barrier's `LEST` is the act deadline of the member whose failure
+the `LEST` is anchored at — the earliest failure — and it is order-independent.** Measured, with
+Carol last on the roll and due at 5, Bob due at 14, Alice signing at 1:
+
+- a `LEST … WITHIN 5 OF THE DEADLINE`, Carol's miss revealed at 8 and Bob's at 20: the refund is
+  due 5 + 5 = **10** on `LIST alice, bob, carol` and on the reversed roll (timely at 10, `BREACHED`
+  reporting 10 at 11). Were it the first non-actor on the roll (Bob, 14) the refund would be due 19
+  and both refunds timely.
+- a **tie** — both misses revealed by one `WAIT UNTIL 20` — is where the two tracks' rules pulled
+  apart. C's tie-break was roll order, harmless for C because the anchor (the revealing stamp) and
+  the residual are the same member-for-member; B reads a deadline from the chosen member, and the
+  merged tree as first resolved reported **19 on `tenants` and 10 on `tenants, reversed`** for the
+  same events. Fixed in this commit by a second ordering key: a tie on the anchor is broken by the
+  deadline missed (`BarrierFailedAt.failDue`, forced by the new `Barrier5b` frame,
+  `Machine.hs:1892-1903`, `ContractFrame.hs:91`; `earliestFailure`, `Machine.hs:2580-2589`), and
+  roll order breaks only a tie on both, which then names the same deadline either way. After the
+  fix: **10 on both rolls.** C's two invariants stand: the `LEST` fires once, and the anchor's
+  value is still the revealing event's stamp (20).
+- a `SHANT` barrier: Carol smokes at 3 (R-Q5's failure time), Bob at 10; the `LEST` is anchored at
+  Carol's violation and `THE DEADLINE` is her window's end, 5 (what a single `SHANT`'s `LEST` is
+  handed): refund due **10**, both rolls. The primary key stays the anchor because for `SHANT` the
+  deadline is not the failure time; the two keys cannot disagree between a `MUST` and a `SHANT`
+  member of one barrier, since a barrier's members share one modal.
+- a `RAND` of two anchored continuations both breached (`WITHIN 5 OF THE DEADLINE` → 15, `WITHIN 3
+OF THE JOIN` → 7, both revealed at 20): C's compound anchors at the left operand and names both
+  entries, each with the deadline B's `Contract5` computed (`Machine.hs:1605`): **15, then 7**.
+
+**Goldens.** New: `ok/every/tests/run-stack.{golden,ep.golden,nlg.golden,schema.golden}` (read;
+the `.golden` carries exactly the ten numbers above). Moved, and NOT a resolution error:
+`ok/every/tests/run-anchors.golden`, one block — B's fork witness `receipts` (both landlord
+deliveries breach at 17) now prints `and the breach names, in order` with two entries at 16, which
+is C's blame list on a `RAND` of per-member obligations (the landlord twice, once per receipt: no
+dedup, RULED 2026-09-15); the anchor and its deadline (16) are unchanged, and the source comment
+was extended in place (`run-anchors.ep.golden` moved with it). Nothing else moved: the first
+`cabal test jl4-test` run reported exactly those five (four created, one moved), 3182 examples.
+
+**Not verified here.** The full `etc/verify-branch.sh` (the `--quick` gate and `jl4-test` were
+run); the §3.2.1 evaluation differential (neither track's `Print.hs` change touches
+`prettyLayout`'s module printing, and this commit touches no printer); a barrier whose members
+have no `WITHIN` at all under a `LEST` (`failDue` is `Nothing` for every member, so the tie-break
+never applies and roll order decides, as on C alone). This branch is the drop-in for
+`every/anchors` ONCE `every/blame-set` has merged; if B lands first instead, this branch is not the
+one to use.
 
 ### 11.0.2 The roll, said outright: `EVERY Cast v IN xs` — RULED 2026-09-08 (Meng), BUILT
 

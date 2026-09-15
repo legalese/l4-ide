@@ -1886,11 +1886,21 @@ backwardContractFrame val = \ case
     t <- assertTime val
     barrierJoined ctx t ctx.events Nothing
   -- EVERY, the barrier: a failing member's anchor, forced. Kept in roll
-  -- order; 'barrierFinish' picks the earliest.
+  -- order; 'barrierFinish' picks the earliest. The member's deadline, when
+  -- it had one, is forced next ('Barrier5b'): it breaks a tie between two
+  -- failures the same event revealed.
   Barrier5 BarrierFailStampFrame {..} -> do
     stamp <- assertTime val
+    case dueRef of
+      Nothing -> barrierNext step
+        { failures = BarrierFailedAt {failAt = stamp, failDue = Nothing, failTimeRef = timeRef, failEvsRef = evsRef, failDueRef = Nothing} : step.failures }
+      Just d -> do
+        pushCFrame (Barrier5b BarrierFailDueFrame {step, failAt = stamp, timeRef, evsRef, dueRef = d})
+        continueRef d
+  Barrier5b BarrierFailDueFrame {..} -> do
+    due <- assertTime val
     barrierNext step
-      { failures = BarrierFailedAt {failAt = stamp, failTimeRef = timeRef, failEvsRef = evsRef, failDueRef = dueRef} : step.failures }
+      { failures = BarrierFailedAt {failAt, failDue = Just due, failTimeRef = timeRef, failEvsRef = evsRef, failDueRef = Just dueRef} : step.failures }
   -- BREACH BY e: the party expression, forced. A LIST names each of its
   -- elements (walked one cell per step, like the roll call), ONE declared
   -- failure each, in the list's order and WITH duplicates — @BY LIST a, a@
@@ -2491,17 +2501,22 @@ barrierNext step = case step.queue of
 -- where it used to be masked by the earlier failure.
 --
 --   * with a @LEST@, each failure arrived through the failpoint sentinel
---     ('BarrierFailedAt'). The @LEST@ runs ONCE, with the anchor and residual
---     stream of the EARLIEST failure (ties: the first in roll order). The
---     ordering key is the sentinel's own anchor, forced ('failAt' is the
---     same reference the @LEST@ is handed), so whatever §5.2 makes that
---     anchor read, the ordering follows it. Today it reads the revealing
---     event's stamp, which orders by the missed deadline UP TO TIES: every
---     member scans the same stream, so an earlier deadline is revealed by an
---     earlier-or-equal event; two deadlines revealed by the same event tie,
---     and the tie keeps the first in roll order — which is the same event,
---     hence the same anchor and the same residual, so the answer cannot
---     differ. §5.2's change of what the anchor IS is not built here.
+--     ('BarrierFailedAt'). The @LEST@ runs ONCE, with the anchor, the
+--     residual stream AND the missed deadline (R-Q7B's @THE DEADLINE@) of
+--     the EARLIEST failure. The ordering key is the sentinel's own anchor,
+--     forced ('failAt' is the same reference the @LEST@ is handed), so
+--     whatever §5.2 makes that anchor read, the ordering follows it. Today
+--     it reads the revealing event's stamp, which orders by the missed
+--     deadline UP TO TIES: every member scans the same stream, so an
+--     earlier deadline is revealed by an earlier-or-equal event; two
+--     deadlines revealed by the same event tie. A tie is the same event,
+--     hence the same anchor and the same residual — but not the same
+--     deadline, and @OF THE DEADLINE@ in the @LEST@ reads the chosen
+--     member's, so the tie is broken by the deadline missed ('failDue';
+--     measured before this tie-break: `LIST alice, bob, carol` reported 19
+--     and the reversed roll 10 for the same events) and only a tie on both
+--     keeps the first in roll order, which then names the same deadline
+--     either way. §5.2's change of what the anchor IS is not built here.
 --   * with no @LEST@, each failure is the member's own breach
 --     ('BarrierBreached'). The verdict is ONE breach: anchored at the
 --     earliest failure — the smallest missed deadline for @MUST@\/@DO@, the
@@ -2556,15 +2571,23 @@ barrierFinish step = case reverse step.failures of
 
 -- | The earliest of a barrier's failures, with its position in the order
 -- they were recorded (roll order): a later one replaces the best so far only
--- when both carry a time and the later one's is strictly earlier, so a tie
--- keeps the first in roll order and an untimed failure ('ExplicitBreach',
--- which no barrier member produces today) neither wins nor loses.
+-- when both carry a time and the later one's is strictly earlier — or the
+-- times tie and both carry a deadline and the later one's deadline is
+-- strictly earlier — so a tie on both keeps the first in roll order, and an
+-- untimed failure ('ExplicitBreach', which no barrier member produces
+-- today) neither wins nor loses. The second key only ever applies to
+-- 'BarrierFailedAt' (a 'BarrierBreached' orders by its deadline already).
 earliestFailure :: NonEmpty BarrierFailure -> (Int, BarrierFailure)
 earliestFailure (f :| fs) = foldl' pick (0, f) (zip [1 ..] fs)
   where
     pick best@(_, b) cand@(_, c) = case (failureTime b, failureTime c) of
-      (Just tb, Just tc) | tc < tb -> cand
-      _                            -> best
+      (Just tb, Just tc)
+        | tc < tb -> cand
+        | tc == tb, Just db <- failureDue b, Just dc <- failureDue c, dc < db -> cand
+      _ -> best
+    failureDue = \ case
+      BarrierFailedAt {failDue} -> failDue
+      BarrierBreached {}        -> Nothing
     failureTime = \ case
       BarrierFailedAt {failAt} -> Just failAt
       BarrierBreached {failReason} -> case failReason of

@@ -88,6 +88,12 @@ data ContractFrame
   | Barrier5 BarrierFailStampFrame
   -- ^ EVERY, the barrier: a FAILING member's anchor, forced, so the earliest
   -- failure can be picked out once every member has run (R-T3, spec §6.1).
+  | Barrier5b BarrierFailDueFrame
+  -- ^ EVERY, the barrier: the same failing member's absolute deadline,
+  -- forced, so that two failures the same event revealed can be ordered by
+  -- the deadline missed — which is what @OF THE DEADLINE@ in the @LEST@
+  -- names, so the tie must not fall to roll order (R-Q7B on R-T3, spec
+  -- §11.0.1 "Stacking B on C").
   | BreachBy BreachByFrame
   -- ^ @BREACH BY e@: the party expression, forced. A LIST is walked one cons
   -- cell per step (R-T3: @BY@ takes a party or a list of parties), one
@@ -370,6 +376,9 @@ data BarrierStepFrame = BarrierStepFrame
 data BarrierFailure
   = BarrierFailedAt
       { failAt      :: Rational    -- ^ the anchor the machine computed for the miss, forced
+      , failDue     :: Maybe Rational
+        -- ^ the member's absolute act deadline, forced ('Barrier5b'): the
+        -- tie-break when two failures share a 'failAt'
       , failTimeRef :: Reference   -- ^ …and as the reference the @LEST@ is handed
       , failEvsRef  :: Reference   -- ^ the residual stream that followed the miss
       , failDueRef  :: Maybe Reference
@@ -384,7 +393,9 @@ data BarrierFailure
     -- anchor. Today it reads the revealing event's stamp (spec §5.2's
     -- deadline anchor is not built), which orders by the missed deadline up
     -- to ties — a tie is the same revealing event, so the same anchor and
-    -- residual either way (see 'barrierFinish').
+    -- residual either way; but NOT the same @THE DEADLINE@ (R-Q7B), so a
+    -- tie is broken by 'failDue', the deadline actually missed, and only
+    -- then by roll order (see 'barrierFinish', 'earliestFailure').
   | BarrierBreached
       { failReason :: ReasonForBreach Reference }
     -- ^ the member's own breach — a barrier WITHOUT a @LEST@ mints no
@@ -404,6 +415,17 @@ data BarrierFailStampFrame = BarrierFailStampFrame
   , timeRef :: Reference           -- ^ the failure's anchor, being forced
   , evsRef  :: Reference           -- ^ the stream the failing member handed back
   , dueRef  :: Maybe Reference     -- ^ the failing member's absolute deadline, if it had one
+  }
+  deriving stock Show
+
+-- | The failing member's absolute deadline is being forced ('Barrier5b'),
+-- its anchor already known.
+data BarrierFailDueFrame = BarrierFailDueFrame
+  { step    :: BarrierStepFrame
+  , failAt  :: Rational            -- ^ the failure's anchor, forced by 'Barrier5'
+  , timeRef :: Reference           -- ^ …and as a reference
+  , evsRef  :: Reference           -- ^ the stream the failing member handed back
+  , dueRef  :: Reference           -- ^ the deadline, being forced
   }
   deriving stock Show
 
@@ -477,10 +499,12 @@ data Lifecycle = MkLifecycle
     --     act deadlines — the instant by which all performance fell due —
     --     and absent for an empty cast with no @ONCE@-line @WITHIN@;
     --   * a barrier's @LEST@: the deadline that was actually missed — the
-    --     failing member's act deadline when a member expired
-    --     ('L4.EvaluateLazy.Machine.barrierFail'), the @ONCE@ line's when
-    --     everyone acted but the last act landed after it
-    --     ('L4.EvaluateLazy.Machine.barrierStateMissed');
+    --     act deadline of the member whose failure the @LEST@ is anchored
+    --     at, i.e. the EARLIEST failure (R-T3's choice; several members may
+    --     have failed, and the deadline follows the anchor:
+    --     'L4.EvaluateLazy.Machine.barrierFinish', 'barrierFail'), the
+    --     @ONCE@ line's when everyone acted but the last act landed after
+    --     it ('L4.EvaluateLazy.Machine.barrierStateMissed');
     --   * under a fork, the member's own.
   , armed    :: Reference
     -- ^ when the obligation was entered.

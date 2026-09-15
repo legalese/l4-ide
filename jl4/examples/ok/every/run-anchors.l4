@@ -397,7 +397,7 @@ GIVETH A DEONTIC Actor Action
 -- that member's deadline. Both tenants were due at 14, so both deliveries
 -- are due 14 + 2 = 16 — the one Alice's signature at 1 spawned no earlier
 -- than the one Bob's at 9 did. A delivery at 17 breaches both; the compound
--- reports the first, and the deadline it reports is 16.
+-- is anchored at the first and names both (R-T3), each with its 16.
 GIVETH A DEONTIC Actor Action
 `receipts` MEANS
     EVERY Tenant t IN tenants

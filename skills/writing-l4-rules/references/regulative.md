@@ -208,7 +208,10 @@ deadline or entry, and `OF e` an instant — a `NUMBER` on the trace's clock or 
 `DATE`; the deadline is then the anchor plus `d`, absolute. Everywhere inside an
 unbracketed duration `OF` is the anchor, never a call — also inside an `IF`
 branch, an operand or a `WHERE` there — so an applied duration is bracketed,
-`WITHIN (f OF x) OF THE JOIN`, or juxtaposed, `WITHIN f x OF THE JOIN`.
+`WITHIN (f OF x) OF THE JOIN`, or juxtaposed, `WITHIN f x OF THE JOIN`. In a
+barrier's `LEST`, `THE DEADLINE` is the deadline of the member who failed
+EARLIEST — the same member the `LEST`'s clock is anchored at — not the first
+non-actor on the roll (built 2026-09-16, `run-stack.l4`).
 
 `WITHIN 5 days` does not check unless `days` is defined; one line,
 `GIVEN n IS A NUMBER GIVETH A NUMBER DECIDE n days IS n`, makes it check. HOW it

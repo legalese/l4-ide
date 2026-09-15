@@ -1,0 +1,118 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+run-stack.l4:61:1-65:20:
+  FULFILLED
+run-stack.l4:67:1-71:20:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Refund OF (Landlord OF "Ms Ng")
+    at
+      11
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund (EXACTLY theLandlord)
+    before their deadline, which was at
+      10
+run-stack.l4:77:1-81:20:
+  FULFILLED
+run-stack.l4:83:1-87:20:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Refund OF (Landlord OF "Ms Ng")
+    at
+      11
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund (EXACTLY theLandlord)
+    before their deadline, which was at
+      10
+run-stack.l4:101:1-104:50:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      20
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund (EXACTLY theLandlord)
+    before their deadline, which was at
+      10
+run-stack.l4:106:1-109:50:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      20
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund (EXACTLY theLandlord)
+    before their deadline, which was at
+      10
+run-stack.l4:130:1-134:20:
+  FULFILLED
+run-stack.l4:136:1-140:20:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Refund OF (Landlord OF "Ms Ng")
+    at
+      11
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund (EXACTLY theLandlord)
+    before their deadline, which was at
+      10
+run-stack.l4:142:1-146:20:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Refund OF (Landlord OF "Ms Ng")
+    at
+      11
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund (EXACTLY theLandlord)
+    before their deadline, which was at
+      10
+run-stack.l4:164:1-166:20:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      20
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Deliver (EXACTLY theLandlord)
+    before their deadline, which was at
+      15
+    and the breach names, in order
+      Landlord OF "Ms Ng"
+        who had to do obligatory action
+          MUST Deliver (EXACTLY theLandlord)
+        before their deadline, which was at
+          15
+      Tenant OF "Bob"
+        who had to do obligatory action
+          MUST Sign (EXACTLY bob)
+        before their deadline, which was at
+          7
