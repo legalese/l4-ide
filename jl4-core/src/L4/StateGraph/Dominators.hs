@@ -22,8 +22,10 @@
 -- whose solution is the /greatest/ fixpoint, reached by starting every
 -- reachable node at \"all nodes\" and iterating until nothing changes. That
 -- is the formulation Cooper, Harvey & Kennedy start from in /A Simple, Fast
--- Dominance Algorithm/ (Rice CS TR-06-33710, 2001), §2; their contribution
--- is an engineering of it — an immediate-dominator tree walked in reverse
+-- Dominance Algorithm/ (Rice CS TR-06-33870 — the report's own stamp; the
+-- Rice repository catalogues the same file as TR06-38870,
+-- <https://hdl.handle.net/1911/96345>), §2; their contribution is an
+-- engineering of it — an immediate-dominator tree walked in reverse
 -- postorder — that runs faster in practice than Lengauer & Tarjan (1979),
 -- which the spec names. All three compute the same relation, by definition:
 -- the dominator set of a node is unique, and any algorithm that computes it
@@ -38,23 +40,30 @@
 --    @e@\" is the same statement as \"@e@ dominates @v@\" in the subdivided
 --    graph. 'dominators' then reports only the edge nodes.
 --
--- 2. __@RAND@ has no join in the IR.__ An @AllOf@ junction fans out to its
---    branches and each branch ends on the /shared/ @Fulfilled@ sink; nothing
---    waits for the siblings (LTS-VISUALISER §8, ruling R2). Read literally,
---    that graph says a path through one branch reaches @Fulfilled@, so
---    neither branch dominates — which is the wrong answer to \"what must
---    happen for this contract to be fulfilled\", because the evaluator
---    fulfils an @RAND@ only when /every/ branch has. 'fulfilmentView'
---    supplies the missing join for the one query that needs it: it rewrites
---    each @AllOf@ so its branches run in sequence — branch 1's arrivals at
---    @Fulfilled@ are re-pointed at branch 2's entry, and so on, with only the
---    last branch keeping its edge to the sink. Dominance is insensitive to
---    the order acts occur in, so the set of edges every path to @Fulfilled@
+-- 2. __Neither @RAND@ nor @ROR@ has its join in the IR.__ A junction fans
+--    out to its branches and each branch ends on the /shared/ sinks; nothing
+--    waits for the siblings (LTS-VISUALISER §8, ruling R2). The evaluator's
+--    join is in @L4.EvaluateLazy.Machine@, frames @RBinOp1@ \/ @RBinOp2@:
+--    an @RAND@ is fulfilled only when /every/ branch is, and breached as
+--    soon as /one/ is; an @ROR@ is fulfilled as soon as /one/ branch is,
+--    and breached only when /every/ alternative has been lost. Read
+--    literally, the drawn graph gets the \"one\" halves right and the
+--    \"every\" halves wrong: a path through one @RAND@ branch reaches
+--    @Fulfilled@, and a path through one @ROR@ branch reaches @Breach@, so
+--    neither branch would dominate. 'fulfilmentView' and 'breachView'
+--    supply the missing join, each for the one query that needs it: the
+--    fulfilment view rewrites each @AllOf@ so its branches run in sequence
+--    — branch 1's arrivals at @Fulfilled@ are re-pointed at branch 2's
+--    entry, and so on, with only the last branch keeping its edge to the
+--    sink — and the breach view does the same to each @ROR@-derived
+--    @OneOf@ with arrivals at @Breach@. Dominance is insensitive to the
+--    order acts occur in, so the set of edges every path to the sink
 --    traverses in the sequential view is exactly the set every /run/ of the
---    concurrent contract traverses. The view is used only when the target is
---    a @TerminalFulfilled@ state: a breach needs one branch to fail, not
---    all, and an intermediate state lies inside one branch, so for those the
---    literal graph is already right.
+--    concurrent contract traverses. An @IF@-derived @OneOf@ (its branch
+--    edges carry a 'labelBranch') is genuinely exclusive — the facts pick
+--    one arm and the others never run — and is left alone by both views.
+--    An intermediate state lies inside one branch, so for it the literal
+--    graph is already right.
 --
 -- == What the answer means, and what it does not
 --
@@ -64,14 +73,26 @@
 -- deadlines are text. So \"every path passes through @K@\" is sound —
 -- there is no drawn route around @K@ — while \"nothing dominates\" means
 -- only that the graph shows more than one route, not that each is live.
+-- One gap runs the other way: a bare @MAY@ whose @HENCE@ leads on to
+-- another obligation can lapse straight to @FULFILLED@, and the graph does
+-- not draw that route (see the note on @DMay@ in 'extractDeonton'), so an
+-- act listed for @FULFILLED@ below such a permission can in fact be
+-- bypassed.
+--
+-- Two narrowings of the paper's definition are deliberate: the question is
+-- asked from the start state only (the paper's @dom_s(J)@ ranges over every
+-- @s@), and it is asked per edge, not per action label — an act that appears
+-- on two edges, say the same @sign@ in both arms of an @IF@, is two edges
+-- here and dominates nothing, where the paper would count the label.
 module L4.StateGraph.Dominators
   ( -- * The answer
     Dominance(..)
   , dominators
   , terminalDominators
   , allDominators
-    -- * The view that supplies @RAND@'s join
+    -- * The views that supply @RAND@'s and @ROR@'s joins
   , fulfilmentView
+  , breachView
     -- * Rendering for a reader
   , renderDominance
   , renderGraphDominators
@@ -104,13 +125,15 @@ data Dominance
 
 -- | The transitions every path from the entry state to the target traverses.
 --
--- A @TerminalFulfilled@ target is answered over 'fulfilmentView'; every
--- other target over the graph as given. See the module header for why.
+-- A @TerminalFulfilled@ target is answered over 'fulfilmentView', a
+-- @TerminalBreach@ target over 'breachView', and every other target over
+-- the graph as given. See the module header for why.
 dominators :: StateGraph -> StateId -> Dominance
 dominators sg target
   | not (any (\s -> s.stateId == target) sg.sgStates) = Unreachable
   | otherwise =
-      let edges | isFulfilledState sg target = fulfilmentEdges sg
+      let edges | isFulfilledState sg target = joinEdges ForFulfilled sg
+                | isBreachState sg target    = joinEdges ForBreach sg
                 | otherwise                  = zip [0 ..] sg.sgTransitions
           doms = solveDominators (NState sg.sgInitialState) (subdivide edges)
       in case Map.lookup (NState target) doms of
@@ -184,8 +207,17 @@ solveDominators entry succs =
   in fixpoint start
 
 --------------------------------------------------------------------------------
--- The fulfilment view
+-- The fulfilment and breach views
 --------------------------------------------------------------------------------
+
+-- | Which sink a sequential view is built for. The two are duals: to reach
+-- @Fulfilled@ every @RAND@ branch must fulfil, and to reach @Breach@ every
+-- @ROR@ alternative must be lost (@L4.EvaluateLazy.Machine@, @RBinOp2@: a
+-- compound is breached when both operands are, \"for RAND because all
+-- components must be fulfilled, for ROR because every alternative has been
+-- definitively lost\").
+data Sink = ForFulfilled | ForBreach
+  deriving (Eq, Show)
 
 -- | The graph with every @AllOf@ junction's branches run in sequence, so a
 -- path to @Fulfilled@ has to complete all of them. This is the join the IR
@@ -194,36 +226,57 @@ solveDominators entry succs =
 -- may change target, and a junction's second and later branch edges are
 -- dropped because the redirected arrivals replace them.
 fulfilmentView :: StateGraph -> StateGraph
-fulfilmentView sg = sg { sgTransitions = map snd (fulfilmentEdges sg) }
+fulfilmentView sg = sg { sgTransitions = map snd (joinEdges ForFulfilled sg) }
 
--- | 'fulfilmentView', keeping each surviving transition's index into the
--- original 'sgTransitions' so the answer can name the original edge.
-fulfilmentEdges :: StateGraph -> [(Int, Transition)]
-fulfilmentEdges sg =
+-- | The dual of 'fulfilmentView': the graph with every @ROR@ junction's
+-- branches run in sequence, so a path to @Breach@ has to lose all of them.
+-- An @IF@-derived @OneOf@ is left alone — its arms are exclusive, and one
+-- arm failing does breach the whole.
+breachView :: StateGraph -> StateGraph
+breachView sg = sg { sgTransitions = map snd (joinEdges ForBreach sg) }
+
+-- | The sequential view for a sink, keeping each surviving transition's
+-- index into the original 'sgTransitions' so the answer can name the
+-- original edge.
+joinEdges :: Sink -> StateGraph -> [(Int, Transition)]
+joinEdges sink sg =
   let indexed = zip [0 :: Int ..] sg.sgTransitions
       outsOf s = [ e | e@(_, t) <- indexed, t.transFrom == s ]
       isBoundary s = isFulfilledState sg s || isBreachState sg s || s == sg.sgInitialState
+      (isSink, sinkType) = case sink of
+        ForFulfilled -> (isFulfilledState sg, TerminalFulfilled)
+        ForBreach    -> (isBreachState sg, TerminalBreach)
+      -- The junctions whose branches this view runs in sequence: every
+      -- @AllOf@ for fulfilment; for breach every @OneOf@ that came from
+      -- @ROR@, which is the one whose branch edges carry no 'labelBranch'
+      -- ('fanLabel' sets it on @IF@ arms only, the trailing @ELSE@ included).
+      -- Spelled out per constructor, with no wildcard, so that a fourth
+      -- 'FanKind' has to say here what its join is.
+      sequential n es = case fanOf sg n of
+        AllOf  -> sink == ForFulfilled
+        OneOf  -> sink == ForBreach && all (\(_, t) -> isNothing t.transLabel.labelBranch) es
+        Linear -> False
       -- The walk's state: nodes seen, edge indices dropped, and where each
       -- redirected edge now points.
       (_, (_, dropped, redirected)) =
-        runState (walkNode fulfilledSink sg.sgInitialState) (Set.empty, Set.empty, Map.empty)
-      -- The exit of the whole contract: the fulfilment sink if there is one.
-      -- A graph with no sink has nothing to redirect towards, and no
-      -- redirect ever fires (every candidate edge targets a sink), so the
-      -- placeholder is never used.
-      fulfilledSink = maybe (-1) (.stateId) (find (\s -> s.stateType == TerminalFulfilled) sg.sgStates)
+        runState (walkNode theSink sg.sgInitialState) (Set.empty, Set.empty, Map.empty)
+      -- The exit of the whole contract: the sink if there is one. A graph
+      -- with no sink has nothing to redirect towards, and no redirect ever
+      -- fires (every candidate edge targets the sink), so the placeholder
+      -- is never used.
+      theSink = maybe (-1) (.stateId) (find (\s -> s.stateType == sinkType) sg.sgStates)
 
-      -- Walk the region below a node with the exit its arrivals at
-      -- @Fulfilled@ should be re-pointed at.
+      -- Walk the region below a node with the exit its arrivals at the
+      -- sink should be re-pointed at.
       walkNode exit n = do
         (seen, _, _) <- get
         unless (n `Set.member` seen) do
           modify (\(sn, dr, rd) -> (Set.insert n sn, dr, rd))
           let es = outsOf n
-          case fanOf sg n of
-            AllOf | not (null es) ->
+          if not (null es) && sequential n es
+            then
               -- Branch k exits into branch k+1's entry — or, when that
-              -- branch is a bare FULFILLED with no entry of its own, into
+              -- branch is the bare sink with no entry of its own, into
               -- whatever branch k+1 exits into. The last branch exits where
               -- the junction does.
               let exits = branchExits exit (map snd es)
@@ -233,10 +286,10 @@ fulfilmentEdges sg =
                      modify (\(sn, dr, rd) -> (sn, Set.insert (fst e) dr, rd))
                      let v = (snd e).transTo
                      unless (isBoundary v) (walkNode ex v)
-            _ -> forM_ es (walkEdge exit)
+            else forM_ es (walkEdge exit)
 
       walkEdge exit (i, t)
-        | isFulfilledState sg t.transTo =
+        | isSink t.transTo =
             when (t.transTo /= exit) $ modify (\(sn, dr, rd) -> (sn, dr, Map.insert i exit rd))
         | isBoundary t.transTo = pure ()
         | otherwise = walkNode exit t.transTo
@@ -248,7 +301,7 @@ fulfilmentEdges sg =
           case branchExits exit rest of
             []              -> []
             rs@(nextEx : _) ->
-              (if isFulfilledState sg next.transTo then nextEx else next.transTo) : rs
+              (if isSink next.transTo then nextEx else next.transTo) : rs
 
       retarget (i, t) = case Map.lookup i redirected of
         Just v  -> (i, t { transTo = v })
@@ -303,7 +356,7 @@ renderGraphDominators everyState sg =
 -- * an obligation: @PARTY B pays (MUST, WITHIN 3)@;
 -- * a @LEST@ arm, which carries no party of its own, named by the obligation
 --   it belongs to and by what takes it — the deadline passing, the
---   prohibited act, or the permission lapsing ('lestArmWording');
+--   prohibited act, or the permission lapsing ('lestArm');
 -- * an @IF@ arm: @the arm IF price EQUALS 20@.
 renderTransition :: StateGraph -> Transition -> Maybe Text
 renderTransition sg t = case t.transLabel.labelParty of

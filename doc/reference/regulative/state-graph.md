@@ -38,14 +38,14 @@ GIVETH DEONTIC Person Action
 Its drawing has five **states** — where the contract can be — and six **transitions** between
 them, each an act or a deadline passing:
 
-| from                         | to                           | on                                    |
-| ---------------------------- | ---------------------------- | ------------------------------------- |
-| initial                      | The Buyer must pay the price | The Seller MUST deliver the goods, 10 |
-| initial                      | Breach                       | timeout                               |
-| The Buyer must pay the price | Fulfilled                    | The Buyer MUST pay the price, 30      |
-| The Buyer must pay the price | The Buyer must pay the fee   | timeout                               |
-| The Buyer must pay the fee   | Fulfilled                    | The Buyer MUST pay the late fee, 7    |
-| The Buyer must pay the fee   | Breach                       | timeout                               |
+| from                            | to                              | on                                    |
+| ------------------------------- | ------------------------------- | ------------------------------------- |
+| initial                         | The Buyer must pay the price    | The Seller MUST deliver the goods, 10 |
+| initial                         | Breach                          | timeout                               |
+| The Buyer must pay the price    | Fulfilled                       | The Buyer MUST pay the price, 30      |
+| The Buyer must pay the price    | The Buyer must pay the late fee | timeout                               |
+| The Buyer must pay the late fee | Fulfilled                       | The Buyer MUST pay the late fee, 7    |
+| The Buyer must pay the late fee | Breach                          | timeout                               |
 
 Two states are special. **Fulfilled** and **Breach** are where the contract ends, and they are
 drawn as double circles: green for fulfilled, red for breach. Every other state is a point where
@@ -78,9 +78,10 @@ deadline and pays the late fee instead, the contract still ends fulfilled — so
 one route to a good ending, not the only one. Breach, on the other hand, can be reached from the
 very first deadline, so there is no single act that every path to breach shares.
 
-An act that appears in the answer is one the contract **cannot do without** for that ending. This
-is what a planner would call a landmark, and what graph theory calls a **"dominator"**: a point
-every route from the start to a destination has to pass. The flag is named for it.
+An act that appears in the answer is one the contract **cannot do without** for that ending — with
+one exception, a lapsing `MAY`, described under [What the answer does not know](#what-the-answer-does-not-know).
+This is what a planner would call a landmark, and what graph theory calls a **"dominator"**: a
+point every route from the start to a destination has to pass. The flag is named for it.
 
 ### Both, or one of
 
@@ -96,12 +97,17 @@ delivery and payment
   Every path to BREACH passes through: nothing in particular (there is more than one route).
 delivery or collection
   Every path to FULFILLED passes through: nothing in particular (there is more than one route).
-  Every path to BREACH passes through: nothing in particular (there is more than one route).
+  Every path to BREACH passes through:
+    - the deadline passing on PARTY The Seller deliver the goods (MUST, WITHIN 10)
+    - the deadline passing on PARTY The Buyer collect the goods (MUST, WITHIN 10)
 ```
 
-Under `RAND` both acts are required, so both are listed. Under `ROR` either act suffices, so
-neither is — and nothing dominates breach in either case, because either obligation can be the one
-that fails.
+Under `RAND` both acts are required to fulfil, so both are listed; and either deadline passing
+breaches the whole, so nothing dominates breach. Under `ROR` it is the other way round: either act
+suffices to fulfil, so neither is listed; but the contract is breached only when **both**
+alternatives have been lost, so both deadlines are on every path to breach. (A single missed
+deadline under `ROR` leaves the other alternative open — a `#TRACE` at that moment reports the
+remaining obligation, not a breach.)
 
 ### Every state, not only the ends
 
@@ -118,8 +124,10 @@ _there_. For the sale:
     - the deadline passing on PARTY The Buyer pay the price (MUST, WITHIN 30)
 ```
 
-The start state answers "nothing has to happen to be there". A state no route reaches at all — the
-drawing can contain one if a rule's arms refer to other named rules — answers "No path reaches …".
+The start state answers "nothing has to happen to be there". A rule whose arms are only other
+named rules has no `FULFILLED` or `BREACH` state of its own, and the answer says so: `(this graph
+has no FULFILLED or BREACH state to reach)`. (The answer "No path reaches …" exists for a state
+nothing points at; a drawing made from an `.l4` file never contains one.)
 
 ### How the acts are worded
 
@@ -137,9 +145,9 @@ drawing can contain one if a rule's arms refer to other named rules — answers 
 ## What the answer does not know
 
 The answer is read off the **drawing**, and the drawing is simpler than the running contract in
-three ways. Each makes the list of required acts trustworthy in one direction only: an act that is
-listed really is on every drawn route, but a route that is drawn is not necessarily one that can
-actually be taken.
+four ways. The first three make the list of required acts trustworthy in one direction only: an act
+that is listed really is on every drawn route, but a route that is drawn is not necessarily one
+that can actually be taken. The fourth runs the other way.
 
 1. **Conditions are drawn, not decided.** A `PROVIDED` guard that could never be true still draws
    its arrow, so a route through it counts as a route.
@@ -147,6 +155,12 @@ actually be taken.
    though the running contract tells them apart.
 3. **Deadlines are labels.** Whether a deadline can be met given the ones before it is not worked
    out; the picture shows `WITHIN 30` as text.
+4. **A lapsing `MAY` is not drawn.** When a bare `MAY` (no `LEST`) has a `HENCE` that leads on to
+   another obligation, the running contract ends `FULFILLED` if the permission simply expires — but
+   the drawing shows only the `HENCE` route, so the acts beyond it are listed as required when they
+   can in fact be bypassed. This is the one case where an act on the list is not truly necessary;
+   it is a gap in the drawing (noted in the extractor's source, `StateGraph.hs`, at the `DMay` case
+   of `extractDeonton`) rather than in the question.
 
 So "nothing in particular" means the drawing shows more than one route, not that every route is
 live. To know what a particular sequence of events actually does, run it: a `#TRACE` directive
@@ -162,9 +176,11 @@ dominators say what _must_ happen on all of them.
 - A bare `MAY` whose `HENCE` leads to another obligation draws only the `HENCE` arrow; the route by
   which the permission lapses to `FULFILLED` is not drawn.
 - The drawing does not show that the branches of an `RAND` wait for one another before the
-  contract is fulfilled; each branch's arrow simply lands on the shared `Fulfilled` circle.
-  `--dominators` knows this and counts every branch of an `RAND` as required, as shown above, but
-  a reader of the picture alone has to supply it.
+  contract is fulfilled, nor that the alternatives of an `ROR` must _all_ be lost before it is
+  breached; each branch's arrow simply lands on the shared `Fulfilled` or `Breach` circle.
+  `--dominators` knows this — it counts every branch of an `RAND` as required for `FULFILLED` and
+  every alternative of an `ROR` as required for `BREACH`, as shown above — but a reader of the
+  picture alone has to supply it.
 
 ## See also
 
