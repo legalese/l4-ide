@@ -1442,9 +1442,14 @@ EOF
     # lib/canon-destination.mjs from the person actually running — so freezing
     # one person's shelf onto a run record would be recording the wrong kind of
     # fact, and would also put a `gh` call on the critical path of every run.
-    local canon_dest=""
-    if [[ -n "${GO_S_CANON_PATH:-}" ]]; then
-      canon_dest="subjects/$GO_S_CANON_PATH/encodings/$GO_S_ENCODING_ID"
+    # `primary` is the driver's SELECTOR, never a row name — canon rules that no
+    # row is primary, so the committed encoding files under the name the sidecar
+    # gives it. With none declared there is no destination, and the report says
+    # that rather than naming `encodings/primary/`.
+    local canon_dest="" canon_row="$GO_S_ENCODING_ID"
+    [[ "$canon_row" == "primary" ]] && canon_row="${GO_S_CANON_PRIMARY_ROW:-}"
+    if [[ -n "${GO_S_CANON_PATH:-}" && -n "$canon_row" ]]; then
+      canon_dest="subjects/$GO_S_CANON_PATH/encodings/$canon_row"
     fi
     node "$LIB/receipt.mjs" run-begin --run "$RUN" \
       --run-id "$RUN_ID" --encoding "$GO_S_ENCODING_ID" --subject "$SUBJECT" \

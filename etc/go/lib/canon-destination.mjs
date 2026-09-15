@@ -172,6 +172,24 @@ export function resolveDestination({
     throw new Error(
       `canon row '${row ?? "(none)"}': an encoding row id must be an ASCII slug — it names the OCCASION of the encoding, as the sidecar's encoding id does`,
     );
+  // `primary` IS NOT A ROW NAME, and this refusal is the one place that can say
+  // so before it reaches a public repository.
+  //
+  // It is the DRIVER's selector for "the committed encoding", which is a fine
+  // run parameter and a terrible directory name: canon's Q3 ruling is that
+  // encodings are equal rows and NO ROW IS PRIMARY, so filing one at
+  // `encodings/primary/` re-creates the privilege in the law repository — the
+  // more durable of the two places, and the one the ruling was about. The
+  // committed encoding needs a name that says WHEN and BY WHOM, like every
+  // other row canon holds (`legalese-2026-09`, `cleanroom-2026-08`).
+  if (row === "primary")
+    throw new Error(
+      `canon row 'primary' is REFUSED. It is the driver's selector for the committed ` +
+        `encoding, not a name for a row in canon — whose Q3 ruling is that encodings are ` +
+        `equal rows and no row is primary. Declare the real one in the sidecar as ` +
+        `canon.primary_row (e.g. "legalese-2026-08"), naming the occasion the way canon's ` +
+        `other rows do.`,
+    );
   // Explicit beats environment beats derived. The derived case is the one that
   // matters: it is what makes the same pipeline land a contributor's encoding on
   // THEIR shelf rather than on the shelf of whoever wrote the default.

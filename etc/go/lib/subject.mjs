@@ -226,7 +226,19 @@ export function loadSubject(id, selectedEncoding = "primary") {
   if (desc.canon !== undefined) {
     if (typeof desc.canon !== "object" || desc.canon === null)
       die("subject.json: 'canon' must be an object");
-    checkKeys("subject.json 'canon'", desc.canon, ["subject_path"]);
+    checkKeys("subject.json 'canon'", desc.canon, [
+      "subject_path",
+      "primary_row",
+    ]);
+    // The row name the COMMITTED encoding takes in canon. Separate from
+    // subject_path because `primary` is the driver's selector and not a row
+    // name — canon rules that no row is primary — so the committed encoding
+    // needs a name naming its occasion, as every other row there does.
+    if (
+      desc.canon.primary_row !== undefined &&
+      (typeof desc.canon.primary_row !== "string" || !desc.canon.primary_row)
+    )
+      die("subject.json: canon.primary_row must be a non-empty string");
     if (typeof desc.canon.subject_path !== "string" || !desc.canon.subject_path)
       die("subject.json: canon.subject_path must be a non-empty string");
   }
@@ -787,6 +799,7 @@ export function loadSubject(id, selectedEncoding = "primary") {
       GO_S_EXPLAINER_DIR: explainerDir,
       GO_S_LEGS: legs.join(" "),
       GO_S_CANON_PATH: desc.canon?.subject_path ?? "",
+      GO_S_CANON_PRIMARY_ROW: desc.canon?.primary_row ?? "",
       ...extra,
       ...env,
       // THE SELECTION WINS, LAST. Spread after the committed defaults so a run

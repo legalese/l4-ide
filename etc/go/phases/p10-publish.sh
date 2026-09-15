@@ -52,9 +52,11 @@ if [[ -z "${GO_S_CANON_PATH:-}" ]]; then
   'uk/bna-1981', 'contracts/investment/yc-safe-postmoney'.
 MSG
 else
+  CANON_ROW="${GO_S_ENCODING_ID:-primary}"
+  [[ "$CANON_ROW" == "primary" ]] && CANON_ROW="${GO_S_CANON_PRIMARY_ROW:-primary}"
   DEST="$(node "$LIB/canon-destination.mjs" \
     --subject-path "$GO_S_CANON_PATH" \
-    --row "${GO_S_ENCODING_ID:-primary}" 2>&1)" && {
+    --row "$CANON_ROW" 2>&1)" && {
     echo "  $DEST" | sed 's/^  /  /' >&2
   } || {
     echo "  REFUSED: $DEST" >&2

@@ -470,6 +470,15 @@ that does not look like a drafts shelf. An encoding lands on a drafts branch and
 until its source-terms question is settled; a deposit straight onto `main` is a larger outward
 act than the one HG2 was asked about.
 
+**`primary` is refused as a row name.** It is the driver's selector for the committed encoding
+— a fine run parameter and a terrible directory name, because filing one encoding at
+`encodings/primary/` re-creates in the law repository the privilege §8.0 and canon's own Q3 both
+remove, and the law repository is the more durable of the two places to get it wrong. The
+committed encoding takes the name its sidecar gives it in `canon.primary_row`, naming the
+occasion the way canon's other rows do (`legalese-2026-09`). With none declared there is no
+destination, and P10 says so. _This was got wrong first: the destination initially emitted
+`encodings/primary/`, in the same change that ruled no row is primary._
+
 **The row id is the encoding id, and that is an observation rather than a convention invented
 here**: canon's drafts branch already holds
 `subjects/sg/succession/encodings/cleanroom-2026-08/`, filed under exactly the id this

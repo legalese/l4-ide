@@ -265,6 +265,7 @@ legalese/canon @ mengwong/drafts : subjects/sg/succession/encodings/cleanroom-20
 - **`main` is refused, and so is any non-drafts branch.** An encoding stays on a drafts shelf until its source-terms question is settled.
 - **A subject with no `canon` block has no destination**, and P10 says so instead of guessing. Declare one with `"canon": { "subject_path": "sg/succession" }` — the grammar is canon's `docs/directory-conventions.md`.
 - **The row id is the encoding id.** No mapping to remember: canon's drafts branch already files `cleanroom-2026-08` under that name.
+- **`primary` is refused as a row name.** It is the driver's selector, not a directory — canon rules that no row is primary. The committed encoding takes the name its sidecar gives it in `canon.primary_row`, naming the occasion the way canon's other rows do (`legalese-2026-09`). Neither committed sidecar declares one yet, so `--encoding primary` currently reports no destination, which is the honest answer rather than a made-up path.
 
 ### 7a. The store: what outlives the run
 

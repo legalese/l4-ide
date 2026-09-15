@@ -8940,6 +8940,33 @@ process.stdout.write("\n-- store verbs --\n");
   // The layout is canon's Q3 shape: the encoding row sits one level BELOW the
   // subject, and the row id is the sidecar's own encoding id — which canon's
   // drafts branch already agrees with.
+  // `primary` is the driver's SELECTOR and not a row name. Filing the committed
+  // encoding at `encodings/primary/` would re-create, in the law repository, the
+  // privilege SPEC.md §8.0 and canon's own Q3 both remove — and the law
+  // repository is the more durable of the two places to get it wrong.
+  {
+    let threw = null;
+    try {
+      D.resolveDestination({
+        subjectPath: "us/regcf",
+        row: "primary",
+        branch: "a/drafts",
+        env: {},
+        exec: noTools,
+      });
+    } catch (e) {
+      threw = e.message;
+    }
+    check(
+      "'primary' is REFUSED as a canon row name — no row is primary",
+      threw !== null && /no row is primary/.test(threw),
+    );
+    check(
+      "and the refusal names the sidecar key that fixes it",
+      threw !== null && /canon\.primary_row/.test(threw),
+    );
+  }
+
   check(
     "the encoding row sits under subjects/<path>/encodings/<row>",
     D.resolveDestination({ ...ok, branch: "a/drafts", env: {}, exec: noTools })
