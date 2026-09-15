@@ -316,7 +316,7 @@ Natural-language names work too: exported functions and parameters written with 
 ### `l4 trace` and `l4 state-graph` — visualization
 
 - `l4 trace myfile.l4` renders every `#EVALTRACE` in the file as GraphViz DOT (`--format dot|png|svg`, `-o DIR` for image output; PNG/SVG need GraphViz installed).
-- `l4 state-graph myfile.l4` extracts the state transition graph of regulative rules (`PARTY ... MUST ...`) as GraphViz DOT. With `--dominators` it prints, instead, the acts every path to `FULFILLED` and to `BREACH` must pass through. See [State graphs and `--dominators`](../../reference/regulative/state-graph.md).
+- `l4 state-graph myfile.l4` extracts the state transition graph of regulative rules (`PARTY ... MUST ...`) as GraphViz DOT. With `--dominators` it prints, instead, the acts every path to `FULFILLED` and to `BREACH` must pass through. See [State graph and `--dominators`](../../reference/regulative/STATE-GRAPH.md).
 - `l4 lts myfile.l4` reads every `#TRACE` out as a plain list: what is owed now, what would discharge it, what would put someone in breach, and the next deadline (`--steps` for the history, `--json` for a program). See [What is owed now](../../reference/regulative/lts-list.md).
 
 ### `l4 ast` — the parsed syntax tree

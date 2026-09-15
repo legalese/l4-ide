@@ -95,6 +95,14 @@ export interface L4WasmExports {
   ): Promise<string>
 
   /**
+   * Render the state graph of a regulative rule by name, as GraphViz DOT.
+   * @param source - L4 source code
+   * @param functionName - Name of the rule, as the code lens spelled it
+   * @returns JSON-encoded { name, dot } or error object with notFound flag
+   */
+  l4_state_graph_by_name(source: string, functionName: string): Promise<string>
+
+  /**
    * Get code lenses for all visualizable DECIDE rules.
    * @param source - L4 source code
    * @param uri - Document URI
@@ -461,6 +469,22 @@ export class L4WasmBridge {
   }
 
   /**
+   * Render the state graph of a regulative rule by name, as GraphViz DOT.
+   * Returns { name, dot }, or an object with "error" and optionally
+   * "notFound: true" if no rule of that name has a state graph.
+   */
+  async stateGraphByName(
+    source: string,
+    functionName: string
+  ): Promise<StateGraphResult> {
+    if (!this.exports) {
+      throw new Error('WASM not initialized')
+    }
+    const json = await this.exports.l4_state_graph_by_name(source, functionName)
+    return JSON.parse(json)
+  }
+
+  /**
    * Get code lenses for all visualizable DECIDE rules.
    * Returns an array of code lens objects compatible with Monaco.
    */
@@ -640,6 +664,14 @@ export interface CodeLens {
 export interface VisualizeResult {
   verDocId?: { uri: string; version: number }
   funDecl?: unknown
+  error?: string
+  notFound?: boolean
+}
+
+/** What `l4_state_graph_by_name` answers: the rule's name and its DOT. */
+export interface StateGraphResult {
+  name?: string
+  dot?: string
   error?: string
   notFound?: boolean
 }

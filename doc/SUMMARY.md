@@ -15,7 +15,7 @@
 - [Syntax](reference/syntax/README.md)
 - [Regulative](reference/regulative/README.md)
   - [What is owed now: `l4 lts`](reference/regulative/lts-list.md)
-  - [State graphs and `--dominators`](reference/regulative/state-graph.md)
+  - [State graph and `--dominators`](reference/regulative/STATE-GRAPH.md)
 - [Built-ins](reference/builtins/README.md)
 - [Libraries](reference/libraries/README.md)
 - [Patterns](reference/patterns/README.md)

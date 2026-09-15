@@ -481,9 +481,9 @@ saleContract MEANS
 - **[DEONTIC](DEONTIC.md)** - The regulative rule type
 - **[EVENT](EVENT.md)** - The event type consumed by traces
 - **[What is owed now: `l4 lts`](lts-list.md)** - Read a `#TRACE` out as a list: what is owed, what would discharge it, what would breach it
+- **[State graph and `--dominators`](STATE-GRAPH.md)** - The map of a rule's `HENCE`/`LEST` paths: **Show state graph** in the editor, `l4 state-graph` on the command line, which acts every path to `FULFILLED` or `BREACH` must pass through, and what the map does not say
 
 ## See Also
 
-- **[State graphs and `--dominators`](state-graph.md)** - Drawing a contract with `l4 state-graph`, and asking which acts every path to `FULFILLED` or `BREACH` must pass through
 - **[Foundation Course: Regulative Rules](../../courses/foundation/module-6-regulative.md)** - Tutorial
 - **[Regulative Rules Concept](../../concepts/legal-modeling/regulative-rules.md)** - Conceptual overview

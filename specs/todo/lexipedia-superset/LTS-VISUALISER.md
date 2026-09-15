@@ -1187,13 +1187,19 @@ and then never says how the reader reaches it. A view with no entry point is not
 
 #### The template, traced end to end
 
-The ladder's lens is the thing to copy, and it exists in full today:
+The ladder's lens is the thing to copy, and it existed in full when this was written. _(The
+anchors in this list and in the table below are of `unstable` before P2g; the P2g commit moved or
+shifted every one of them — items 1 and 4 and the table's `producer` row now live at
+`jl4-lsp/src/LSP/L4/Actions.hs:181` and `API.hs:691`, `:706`, `:405` — see LANDED below. They are
+left as written so the "four edits" argument still reads against the tree it was made on.)_
 
-1. **LSP producer** (`jl4-lsp/app/LSP/L4/Handlers.hs:381-407`). `mkDecisionGraphCodeLens` emits
+1. **LSP producer** (`jl4-lsp/app/LSP/L4/Handlers.hs:381-407`; moved 2026-09-15 to
+   `Actions.hs:181` `decisionGraphCodeLenses`). `mkDecisionGraphCodeLens` emits
    `{ title = "Show decision graph", command = "l4.visualize", arguments = [verTextDocId, srcPos, False] }`
    anchored at `pointRange (srcPosToPosition node.start)`. `foldTopLevelDecides` supplies the
-   candidates and `canVisualize` (`:392`) filters them by **speculatively running the visualiser**
-   and keeping only the `isRight` — so a lens never appears above something that would fail to draw.
+   candidates and `canVisualize` (`:392`; now `Actions.hs:196`) filters them by **speculatively
+   running the visualiser** and keeping only the `isRight` — so a lens never appears above
+   something that would fail to draw.
 2. **VS Code host.** `l4.visualize` is declared in `ts-apps/vscode/package.json:274`, named in
    `ts-apps/vscode/src/commands.ts:1`, and handled in `extension.mts`, which owns a panel manager
    (`:335`).
@@ -1202,8 +1208,9 @@ The ladder's lens is the thing to copy, and it exists in full today:
    `codeLensProvider` with `l4.visualize` in its command list (`:296-302`), routes
    `textDocument/codeLens` (`:245`) to `handleCodeLens` (`:356`), and executes the command at
    `:586`.
-4. **Wasm producer** (`jl4-core/src/L4/API.hs:644-676`). `l4CodeLenses` builds its own lens via
-   `Ladder.findAllVisualizableDecides` (`jl4-core/src/L4/Viz/Ladder.hs:242`) and `mkVizLens`.
+4. **Wasm producer** (`jl4-core/src/L4/API.hs:644-676`; shifted 2026-09-15 to `:691`, `mkVizLens`
+   at `:706`). `l4CodeLenses` builds its own lens via `Ladder.findAllVisualizableDecides`
+   (`jl4-core/src/L4/Viz/Ladder.hs:242`) and `mkVizLens`.
 
 **The discovery half is already symmetric.** `L4.StateGraph`'s own walk
 (`extractFromTopDecl`, `StateGraph.hs:393-398`) is the same shape as `foldTopLevelDecides` plus
@@ -1217,13 +1224,13 @@ The costly, non-obvious part — and the reason this is a spec entry rather than
 is that the two lens producers are **independent code paths that do not agree on how a target is
 named**:
 
-|                         | LSP path (VS Code)                                | wasm path (web IDE)                                                                   |
-| ----------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| producer                | `Handlers.hs:381`, in Haskell                     | `API.hs:658` `mkVizLens`, in Haskell                                                  |
-| addresses the target by | **source position** (`srcPos`)                    | **name** (`vd.vdName`)                                                                |
-| dispatches to           | `Ladder.doVisualize` on the node at that position | `l4_visualize_by_name` (`API.hs:403-407`)                                             |
-| index base              | LSP, 0-indexed                                    | Monaco, **1-indexed** (`mkVizLens`'s comment says so)                                 |
-| TS side must also       | declare the command in `package.json`             | list the command in `codeLensProvider` **and** add a `case` to the command dispatcher |
+|                         | LSP path (VS Code)                                   | wasm path (web IDE)                                                                   |
+| ----------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| producer                | `Handlers.hs:381`, in Haskell (now `Actions.hs:181`) | `API.hs:658` `mkVizLens`, in Haskell (now `:706`)                                     |
+| addresses the target by | **source position** (`srcPos`)                       | **name** (`vd.vdName`)                                                                |
+| dispatches to           | `Ladder.doVisualize` on the node at that position    | `l4_visualize_by_name` (`API.hs:403-407`; now `:405-409`)                             |
+| index base              | LSP, 0-indexed                                       | Monaco, **1-indexed** (`mkVizLens`'s comment says so)                                 |
+| TS side must also       | declare the command in `package.json`                | list the command in `codeLensProvider` **and** add a `case` to the command dispatcher |
 
 So a deontic lens is **four edits, not one**: a lens in the LSP handler, a lens in `l4CodeLenses`, a
 new name-addressed wasm export beside `l4_visualize_by_name` (there is no `l4_state_graph_by_name`
@@ -1247,7 +1254,112 @@ Two smaller points, stated rather than ruled:
 - **Unmeasured.** Nobody has checked whether a `Decide` whose body is regulative _also_ passes
   `canVisualize`, i.e. whether the two lenses would stack on one line. It is a five-minute
   observation against `jl4/examples/legal/regcf/regcf.l4` and it should be made before the lens is
-  designed, not after. R13.
+  designed, not after. R13. _(Measured 2026-09-15: they never stack. See §8 R13.)_
+
+#### LANDED 2026-09-15 — P2g, on `lts/p2g-codelens` (branch only; not merged to `unstable`)
+
+The four edits, plus the shared piece the "four edits" framing did not predict. Line numbers are
+of the tree this block was committed in. "Landed" here means committed on the branch: at the time
+of writing the branch is unpushed and has no PR, and what would make it more than that is a PR
+into `unstable` with the `wasm-build` job green (see the last "not built" item).
+
+**The shared piece: `jl4-core/src/L4/StateGraph/Lens.hs` (new).** Both producers need the same
+three things — which `Decide`s earn a lens, how to find one again from a click, and what a click
+returns — so they live once. `stateGraphTargets` (`:76`) runs `extractStateGraphs` over the module
+and joins each graph back to its `Decide` by `sgDecide` (the `Unique` extraction already records),
+keeping only `Decide`s that have a source range to anchor on. `stateGraphAtPos` (`:99`) is the LSP
+address, `stateGraphByName` (`:104`) the wasm one, and `stateGraphResponse` (`:116`) is the
+payload: `{ "name": sgName, "dot": stateGraphToDot defaultStateGraphOptions }`. The gate is exactly
+the speculative-success gate §4.8 predicted — a `Decide` has a lens iff extraction produced a graph
+for it — and `L4.StateGraph` itself is untouched.
+
+1. **LSP producer.** The ladder's inline lens code moved out of the handler into
+   `jl4-lsp/src/LSP/L4/Actions.hs` as `decisionGraphCodeLenses` (`:181`, behaviour unchanged) so a
+   test can call it; `stateGraphCodeLenses` (`:213`) sits beside it, title "Show state graph",
+   command `l4.stateGraph`, arguments `[verTextDocId, srcPos]` (the ladder's shape minus the
+   simplify flag), anchored at the `Decide` node's start like the ladder's. `stateGraphAtPos`
+   (`:229`) serves the click. `Handlers.hs` concatenates the two producers (`:394-395`), gains
+   `CmdStateGraph` (`:1044`, `:1051`) and dispatches it (`:322-329`). Because `l4CmdNames` feeds
+   `optExecuteCommandCommands` (`jl4-lsp/app/Server.hs:90-91`), the VS Code client and the
+   websocket-connected web client register the command from server capabilities; the wasm shim
+   has no server to ask and lists the command itself (item 4).
+2. **Wasm producer.** `jl4-core/src/L4/API.hs`: `l4CodeLenses` appends `stateGraphLenses` (`:702`)
+   built by `mkStateGraphLens` (`:729`) — name-addressed, Monaco 1-indexed, arguments
+   `[verDocId, name]` where `name` is `prettyLayout (getActual …)` with backticks, spelled the same
+   way `findAllVisualizableDecides` spells `vdName`; `l4StateGraphByName` (`:654`) serves it and
+   `foreign export javascript "l4_state_graph_by_name"` (`:413`) sits beside `l4_visualize_by_name`
+   under the same `wasm32_HOST_ARCH` guard. It does not refuse on a type error elsewhere in the
+   module, unlike the ladder export: the graph is read off the resolved syntax.
+3. **VS Code host.** `ts-apps/vscode/package.json:278` declares the command,
+   `src/commands.ts:3` names it, and `extension.mts` branches on it in the `executeCommand`
+   middleware (`:330`) _before_ the ladder decoder, since the payload is not a ladder. The pane is
+   `src/state-graph-panel.ts` (new): one reusable webview beside the editor showing the DOT text
+   with a **Copy DOT** button (the copy goes through `vscode.env.clipboard`). **No renderer.**
+   Measured 2026-09-15: `grep -i "graphviz\|viz\.js\|d3-graphviz\|hpcc-js\|@viz-js"` over
+   `package-lock.json` and every `ts-apps/*/package.json` and `ts-shared/*/package.json` finds
+   nothing, so drawing the picture in-pane means a new dependency and a lockfile change, which this
+   branch does not make. The pane says so to the reader.
+4. **Web host.** `wasm-bridge.ts` declares the export (`:103`) and wraps it as `stateGraphByName`
+   (`:476`); `wasm-message-transports.ts` lists the command (`:305`) and dispatches it to
+   `handleStateGraph` (`:598`, `:614`); `+page.svelte` intercepts the `{name, dot}` reply in its
+   middleware (`:756`) and shows it in a third right-pane view, `'stategraph'` (`:77`, `:1227`),
+   rendered by `src/lib/components/state-graph-panel.svelte` (new). Over the websocket transport
+   the same middleware branch handles the LSP producer's reply, since both producers answer with
+   the same JSON.
+
+**Tests.** `jl4-lsp/test/StateGraphLensSpec.hs` (6 examples): the two lenses on a one-of-each
+fixture land on different lines with the right titles and arguments; a click returns DOT named
+after the rule; a click on the boolean rule's anchor is refused; and on `ok/contracts.l4` and
+`doc/reference/regulative/every-run-example.l4` every regulative rule (7 and 2) gets the lens and
+none gets the ladder's. `jl4-core/test/ApiStateGraphLensSpec.hs` (4 examples): the wasm lens's
+line, title and `[verDocId, name]` arguments; the name round-trips through `l4StateGraphByName`;
+`notFound` for the boolean rule. `JL4_LIBRARY_PATH=$PWD/jl4-core/libraries cabal test jl4-lsp-test`
+→ 21 examples, 0 failures; `… cabal test jl4-core-test` → 563 examples, 0 failures. TS: `npm run
+lint` (vscode, jl4-web), `tsc -b` (vscode, 0 errors after building its workspace deps), `npm run
+check` (jl4-web, 0 errors 0 warnings), `npm run test` (vscode, 6 pass), `npx prettier@3.4.2
+--check` on every touched file — all green.
+
+**Doc.** `doc/reference/regulative/STATE-GRAPH.md` (new), linked from `SUMMARY.md`, the regulative
+README, module 6 and the regulative-rules concept page; `doc/test-docs.sh` → 1495 links, 100 `.l4`
+files, 250 linked, 0 errors. _Review 2026-09-15 changed:_ the page had said the lens "works the
+same way … in the web editor at jl4.legalese.com" in the present tense; the web path was never
+built for wasm here (previous bullet), and that host is deployed by hand with `nixos-rebuild`
+from a checkout (`nix/README.md:22-29`) that cannot contain an unpushed branch. It now says the web editor gets it "from the release that carries this change" and names no URL.
+Same pass: `next`/`failure` for the two hand-over arms (`StateGraph.hs:861`, `:909`), the bare-MAY
+gap from the extractor's own NOTE (`:917-935`), and the web-host pane eviction above.
+
+**Not built, and what would make it true.**
+
+- _The picture._ The pane shows DOT source. An in-pane rendering needs a DOT renderer in
+  `ts-shared/` (a `@viz-js/viz` or `@hpcc-js/wasm` dependency, hence a lockfile change reviewed on
+  its own), or a hand layout of `StateGraph` in Svelte — §4.7 says what that costs.
+- _Live refresh._ The ladder redraws on every `didChange`; the state-graph pane is a snapshot and
+  says so. Wiring it to `didChange` is one more branch in each host's middleware plus a "last
+  target" slot, the same shape as `lastVizArgs`; not done because a snapshot of DOT text that
+  nobody renders in-pane gains nothing from refreshing. **In the web host the snapshot is also
+  evicted:** every edit runs `debouncedVisualize` (`+page.svelte:161-167`, called from `didChange`
+  at `:826`), and a successful ladder reply sets `rightPaneView = 'ladder'` unconditionally
+  (`:797`), reclaiming the shared pane from `'stategraph'` (`:763`) — the same thing already
+  happens to the `'inspector'` view (`:561`, `:718`). Read from code, not clicked. Left as is
+  rather than guarded, because guarding would leave a stale map in front of a reader who has just
+  changed the rule, and the doc page now says what happens instead. VS Code is unaffected: its
+  pane is a separate webview (`state-graph-panel.ts`).
+- _Pane sharing._ VS Code got a panel of its own rather than a second view type in the ladder's
+  `PanelManager`, because that manager loads the ladder webview bundle and messenger, none of which
+  a `<pre>` needs. Revisit when there is a picture.
+- _Neither host was exercised by a human click._ The producers and the LSP click handler are
+  under test; the TS is type-checked and linted, but **no unit test covers the state-graph path
+  in either host** — the "6 pass" above is `path-translation.test.ts` and `extension.test.ts`,
+  both pre-existing, and `grep -rn "stateGraph\|StateGraphPanel\|cmdStateGraph"` over
+  `ts-apps/vscode/src/unit-tests/` and `src/test/suite/` finds nothing. Nobody opened an editor
+  and pressed the lens. That is the first thing the integrator should do.
+- _The wasm build._ `l4_state_graph_by_name` (`API.hs:413`) and the `l4CodeLenses` change sit
+  under `#if defined(wasm32_HOST_ARCH)` (`API.hs:356`–`444`), and no wasm toolchain is installed
+  where this was built (`wasm32-wasi-ghc`, `wasm32-wasi-cabal`: not found), so `cabal test all`
+  never compiled that export and nothing on this branch has run it. CI's `wasm-build` job
+  (`.github/workflows/pr-checks.yml:2018`) compiles it on the PR; nothing executes it until someone
+  clicks the lens in jl4-web in wasm mode. The native tests in `ApiStateGraphLensSpec.hs` exercise
+  `l4StateGraphByName`/`l4CodeLenses`, i.e. everything up to the FFI edge, not the edge itself.
 
 ### 4.9 Catching up with EVERY/EACH — where the join is lost, measured
 
@@ -1770,7 +1882,7 @@ it.
 ## 8. Open rulings
 
 In the style of the other track specs: questions this document could not settle, recorded
-rather than assumed benign. R11 and R12 are new in revision 2; R13 was added on 2026-09-14 with §4.8.
+rather than assumed benign. R11 and R12 are new in revision 2; R13 was added on 2026-09-14 with §4.8 and answered on 2026-09-15.
 
 | #       | Ruling needed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -1786,7 +1898,7 @@ rather than assumed benign. R11 and R12 are new in revision 2; R13 was added on 
 | **R10** | **Does P2f belong here or in the bounded-deontics work?** Sharpened by revision 2's unbundling: P2f no longer needs anything of P2's except the graph P0 already ships, so the case for it living here is weaker than it was. The query is that paper's contribution; the graph is `StateGraph`'s; the renderer may be P1's BPMN or a list. **Observation 2026-09-15 (still OPEN):** P2f was built on `lts/p2f-dominators` as a function over `StateGraph` (`L4.StateGraph.Dominators`) with **no dependency on the rest of P2** — not on the step log, the marking or the picture (its reader-facing wording of an `EVERY` act does read P2h-first-half's `labelQuantifier`, so it is stacked on that branch) — and it needed one thing of the graph the paper's definition does not mention: the `RAND` and `ROR` joins the IR lacks, supplied inside the module as `fulfilmentView` and `breachView`. That is evidence for the split the ruling proposes — the graph (and its join) is `StateGraph`'s, the query is the paper's — and the paper's §7 sentence _"the dominator query … designed and not yet built"_ is now false and should be updated when it is next touched.                                                                                                                                                                                                                                                                                                                                                                                          |
 | **R11** | **NEW. Does `STATEFUL` §6.4 need correcting?** §2.4 rules that P2 uses the replay endpoints (22/23/24) rather than 18/19/20, because "would lead to `FULFILLED`" cannot be answered by a pure walk without reimplementing modal routing. That is a finding **about `STATEFUL`'s own spec**, whose §6.4 promises exactly that pure walk with "microsecond responses". Either that spec should record the faithfulness obligation, or 19/20 should be re-specified as replay, or the pure walk should be kept behind a cross-validation test. Not P2's call alone. **OBSERVED 2026-09-15, not decided:** P2c's replay form (§2.4 block) measured 83–313 µs per candidate, warm, on the corpus's barrier and `contracts.l4` traces — inside the "microsecond responses" §6.4 promised for the pure walk, at trace lengths of one to three events. The replay's cost is linear in the persisted history (every prior event is re-scrutinised per candidate), so the promise is met today by the form §2.4 prefers and would stop being met at some history length nobody has measured. What §6.4 needs is therefore not a faster form but a number: the history length at which replay exceeds its budget, which is when a pure walk earns its faithfulness obligation. Still not P2's call alone.                                                                                                                                                                                                                                                                             |
 | **R12** | **NEW. Is `Lapsed` the right name, and is it Symboleo's?** §4.2a needs a lifecycle state for "this `ROr` alternative is definitively lost but the compound is not violated". Symboleo has `terminated` and possibly `expired`; whether either covers this, or whether we are coining, is unverified and folded into R8's reading task.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| **R13** | **NEW (2026-09-14). Do the ladder lens and the deontic lens ever stack on the same line?** §4.8 asks for a lens above every regulative `Decide`; the ladder already puts one above every `Decide` that `canVisualize` accepts. Whether those two sets are disjoint is **unmeasured** — nobody has run `Ladder.doVisualize` against a regulative body to see whether it succeeds. If they overlap, two lenses share one anchor position and the titles have to distinguish them ("Show decision graph" is already taken). Five minutes against `jl4/examples/legal/regcf/regcf.l4` settles it, and it should be settled before the lens is designed rather than after.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| **R13** | **ANSWERED 2026-09-15, see §4.8 LANDED: no, never — by measurement and by construction.** Measured with `cabal repl jl4-core-test --repl-no-load` from `jl4-core/`, loading each file with `checkWithImports emptyVFS`, taking `map (.sgName) (extractStateGraphs m)` against `map (.vdName) (findAllVisualizableDecides uri m subst)` with the ladder's backticks stripped (the two spell names differently — the first run compared unstripped names and its 0 was worthless; the number below is the corrected run): `regcf.l4`: 109 top-level `Decide`s, 3 state graphs (`advertising restriction`, `ongoing reporting obligation`, `resale restriction`), 43 ladder-visualisable, **0 in both**; `ok/contracts.l4`: 8 / 7 / 0 / **0**; `every-run-example.l4`: 7 / 2 / 0 / **0**. So 0 of 12 regulative rules pass `canVisualize`. It could not be otherwise: `Ladder.translateDecide` (`jl4-core/src/L4/Viz/Ladder.hs:304-305`) throws `InvalidDecideMustHaveBoolRetType` unless the body is `BOOLEAN`, and a regulative body — including an `IF` whose arms are regulative — is `DEONTIC`. Consequences taken: the lens is titled "Show state graph" beside "Show decision graph", anchored at the same `Decide` start, and no title needs to disambiguate a shared line. Pinned by `jl4-lsp/test/StateGraphLensSpec.hs` and `jl4-core/test/ApiStateGraphLensSpec.hs`. _Original question (2026-09-14):_ Do the ladder lens and the deontic lens ever stack on the same line? §4.8 asks for a lens above every regulative `Decide`; the ladder already puts one above every `Decide` that `canVisualize` accepts. Whether those two sets are disjoint is **unmeasured** — nobody has run `Ladder.doVisualize` against a regulative body to see whether it succeeds. If they overlap, two lenses share one anchor position and the titles have to distinguish them ("Show decision graph" is already taken). Five minutes against `jl4/examples/legal/regcf/regcf.l4` settles it, and it should be settled before the lens is designed rather than after. |
 
 ---
 

@@ -12,7 +12,6 @@ import Control.Lens ((^.))
 import qualified Control.Monad.Extra as Extra
 import Control.Monad.Reader (MonadReader (..))
 import Control.Monad.Trans.Reader (ReaderT)
-import Data.Either (isRight)
 import Data.Monoid (Ap (..))
 import Data.Tuple (swap)
 import UnliftIO (MonadUnliftIO, atomically, STM, MonadIO(..))
@@ -320,6 +319,15 @@ handlers evalConfig recorder =
                   | otherwise = defaultResponseError $ "Failed to decode request data: " <> LazyText.toStrict (Aeson.encodeToLazyText xdata)
             decodeXdata
 
+          Just CmdStateGraph -> do
+            let decodeXdata
+                  | Just ((Aeson.fromJSON -> Aeson.Success verTextDocId) : [GFromJSON srcPos]) <- xdata
+                  = do
+                    mtcRes <- liftIO $ runAction "l4.stateGraph" ide $ use TypeCheck $ toNormalizedUri verTextDocId._uri
+                    stateGraphAtPos mtcRes verTextDocId srcPos
+                  | otherwise = defaultResponseError $ "Failed to decode request data: " <> LazyText.toStrict (Aeson.encodeToLazyText xdata)
+            decodeXdata
+
           -- NOTE: certain actions reset the state of the visualisation, like clicking it away, in these
           -- cases we don't want to continue rerendering
           Just CmdResetVisualization -> do
@@ -378,33 +386,13 @@ handlers evalConfig recorder =
           use_ TypeCheck (toNormalizedUri verTextDocId._uri)
 
         let
-          mkDecisionGraphCodeLens srcPos = CodeLens
-            { _command = Just Command
-              { _title = "Show decision graph"
-              , _command = "l4.visualize"
-              , _arguments = Just [Aeson.toJSON verTextDocId, Aeson.toJSON (Generically srcPos), Aeson.toJSON False]
-              }
-            , _range = pointRange $ srcPosToPosition srcPos
-            , _data_ = Nothing
-            }
-
-          --  Check if can make viz (without simplification — simplification is now a toggle inside the panel)
-          canVisualize decide =
-            let cfg = Ladder.mkVizConfig verTextDocId typeCheck.module' typeCheck.substitution False
-            in isRight (Ladder.doVisualize decide cfg)
-
-          decideToCodeLens decide =
-            -- NOTE: there's a lot of DECIDE/MEANS statements that the visualizer currently doesn't work on
-            -- We try to not offer any code lenses for the visualizer if that's the case.
-            -- If in future this is too slow, we should think about caching these results or, even better,
-            -- make the visualizer work on as many examples as possible.
-            case rangeOfNode decide of
-              Just node
-                | canVisualize decide -> [mkDecisionGraphCodeLens node.start]
-              _ -> []
-
-          -- adds codelenses to visualize DECIDE or MEANS clauses
-          visualizeDecides :: [CodeLens] = foldTopLevelDecides decideToCodeLens typeCheck.module'
+          -- "Show decision graph" above every boolean DECIDE the ladder can
+          -- draw, and "Show state graph" above every regulative one; both
+          -- live in "LSP.L4.Actions" so a test can call them. The two never
+          -- stack (R13, LTS-VISUALISER.md §8).
+          visualizeDecides :: [CodeLens] =
+            decisionGraphCodeLenses verTextDocId typeCheck
+              <> stateGraphCodeLenses verTextDocId typeCheck
 
           directiveLabel :: Directive Resolved -> Text
           directiveLabel = \case
@@ -1053,12 +1041,14 @@ outOfScopeAssumeQuickFix ide fd = case fd ^. messageOfL @CheckErrorWithContext o
 data L4Cmd
   = CmdVisualize
   | CmdResetVisualization
+  | CmdStateGraph
   deriving stock (Eq, Show, Enum, Bounded)
 
 l4CmdNames :: [(L4Cmd, Text)]
 l4CmdNames =
   [ (CmdVisualize, "l4.visualize")
   , (CmdResetVisualization, "l4.resetvisualization")
+  , (CmdStateGraph, "l4.stateGraph")
   ]
 
 -- | Given an 'Aeson.Value', matches successfully, if decoding via @a@'s 'Generic' instance is successful
