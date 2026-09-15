@@ -1463,11 +1463,22 @@ day 40 ⇒ **FULFILLED**, the duty never arose; one director approves at day 3 a
 ⇒ **BREACHED**, the chair's, at day 8. The runtime routes a `MAY`'s expiry to `LEST` (default
 `FULFILLED`) whatever the join (`Machine.hs:1831-1835`); the fork differs from the barrier only in
 that an _exercised_ member arms the continuation on its own. So the fork's drawn lapse arm is wrong
-in the same way the barrier's was before `6daf1d9d`. What this commit changes: the two comments
-(`StateGraph.hs`, `Lower.hs:553`'s "one shape" is now two) and the report. What it does not
-change: the exporter. **P1 follow-up, not built:** draw the fork-joined `MAY`'s lapse as a LEST arm
-to Fulfilled too (the `Barrier _` arm of the `DMay` case at `StateGraph.hs:940-968`, widened to
-`Just MkJoinLabel {}`), which retires `Lower.hs`'s `lapses` synthesis for that shape and moves
+in the same way the barrier's was before `6daf1d9d`. What this branch changes: the traces, their
+goldens and the report. What it does not change: **any Haskell** — not the exporter, and not the
+two comments either. `StateGraph.hs:951-952` still reads the overturned sentence, and
+`Lower.hs:553`'s `KNOWN WRONG in one shape` still names only the bare-`MAY` shape, in the tree
+this block is committed to. (A first cut of this block corrected both comments in place; the
+P2a-remeasure gate — no `.hs` or `.cabal` in the diff, because this stage measures and documents
+and a Haskell edit, even comment-only, rebuilds `jl4-core` for the whole stack and lands inside
+`extractDeonton` (`StateGraph.hs:773`), the function that binds `Deonton.due` at `:774`, the field
+the `every-each` session is retyping on a branch that lands first — rejected it, and the two files
+were restored to `lts/p2-followups` byte-for-byte, `git diff --quiet lts/p2-followups -- <both>`
+exit 0.) The comment corrections travel with the P1 follow-up below, which is the one change that
+has to touch those lines anyway; until it lands, this block is the record and the comments are
+wrong. **P1 follow-up, not built:** draw the fork-joined `MAY`'s lapse as a LEST arm
+to Fulfilled too (the `Barrier _` arm of the `DMay` case at `StateGraph.hs:940-956`, widened to
+`Just MkJoinLabel {}`), which retires `Lower.hs`'s `lapses` synthesis (`Lower.hs:568-574`) for that
+shape, rewrites the two comments to state the measured routing, and moves
 `modals-may-fork`'s two goldens (`.bpmn`, `.fidelity.txt`); and, second, `P-FORK-CANCEL` is not emitted on a `MAY` fork
 (`modals-may-fork.fidelity.txt` has no such tag; `modals-may-fork.bpmn:36` has the interrupting
 timer it names), so the fidelity report under-reports that cell — the same fix or a sibling.

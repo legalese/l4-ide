@@ -353,8 +353,9 @@ The one barrier/fork pair that animates differently is `modals-may-*`, where
 the fork's lapse timer lands on the chair's `MUST Publish` and the barrier's
 lands on Fulfilled. The runtime does what the barrier draws in both cases: a
 permission nobody exercised creates no duty (`ok/every/run-modals.l4` §7,
-measured 2026-09-16), so the fork's drawing is wrong there, not yet fixed, and
-`Lower.hs` says so at its `KNOWN WRONG` note.
+measured 2026-09-16), so the fork's drawing is wrong there and not yet fixed; `Lower.hs`'s
+`KNOWN WRONG` note measures a different shape (a bare `PARTY … MAY`) and does
+not yet name this one — LTS-VISUALISER.md §4.9 does.
 
 ## Asking an actual engine: the jBPM/KIE second opinion
 

@@ -561,13 +561,7 @@ stateGraphToBpmn opts sg =
           --     PARTY Alice DOES pay AT 3   ==> PARTY Bob MUST deliver WITHIN 10
           --
           -- so in that shape this flow draws the lapse arriving at Bob's
-          -- obligation, which it never does. The quantified fork is a second
-          -- such shape, measured 2026-09-16 (ok/every/run-modals.l4 §7 and
-          -- bpmn/modals.l4 `each approval is published`): a MAY under
-          -- UPON EACH with a HENCE lapses to FULFILLED at runtime, and this
-          -- synthesis draws Lapse_0 into the chair's duty. The barrier got a
-          -- LEST edge from the state graph on 2026-09-15; the fork did not
-          -- (see the DMay arm in 'extractDeonton'). The root cause is upstream —
+          -- obligation, which it never does. The root cause is upstream —
           -- 'L4.StateGraph.extractDeonton' emits no LEST edge for a bare MAY, so
           -- there is nothing here to follow and this synthesis is guessing. See
           -- the NOTE at that site; fixing it retires this whole branch.
