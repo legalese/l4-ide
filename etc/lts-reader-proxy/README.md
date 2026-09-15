@@ -70,7 +70,9 @@ carries; `history` is `null` for A.
 L4=$(cd <worktree with a build> && cabal list-bin l4) etc/lts-reader-proxy/prepare.sh
 ```
 
-from the repo root; needs `jq` and `node`. It rewrites A/B/C, `lts.json`, `probes.out` and
+from the repo root; needs `jq` and `node`. The committed artifacts were cut with the `l4` built
+from `lts/p2-stack` at `0139c6c5` (re-cut 2026-09-16 on `lts/p2-followups` after the bearer
+change: only `probes.out` moved, see RESULTS.md). It rewrites A/B/C, `lts.json`, `probes.out` and
 `manifest.json`, and fails if `every-run-example`'s rule stops exporting byte-identically to the
 `tenancy-barrier` golden. `truth.json` and `history.txt` are hand-written and are **not**
 regenerated: after a rerun, diff `lts.json` and `probes.out` and re-read the answers.
@@ -86,7 +88,7 @@ reader artifact:
 1. With Alice paid at 3, the list's what-if for the landlord's receipt is refused with
    `Internal error: amount is not in scope` (`probes.out:15`). The fork's `HENCE` says
    `Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount)`, where `amount` is the member's
-   own pattern variable, left open for the event to fill; `reifyExpr` (`jl4-core/src/L4/Lts/WhatIf.hs:524`) cannot read it, and the
+   own pattern variable, left open for the event to fill; `reifyExpr` (`jl4-core/src/L4/Lts/WhatIf.hs:539`) cannot read it, and the
    replay's error text is printed as the reason. The verdict is right (the act is untried); the
    reason should be the list's own wording.
 2. The tick past 7 prints as `the clock reaches 7.5` because the next live deadline is 8 and

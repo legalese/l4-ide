@@ -101,7 +101,7 @@ Q2 (_what discharges it_) is where the list loses to both pictures pooled: 8/16 
 - `tenancy/A.txt` — _"… the action binds `amount`, which the what-if cannot choose"_ (three times)
 - `promissory-note/A.txt` — _"… the action binds `Amount Transferred`, which the what-if cannot choose"_
 
-That text is `jl4-core/src/L4/Lts/WhatIf.hs:510` (`PatVar _ v -> pure (Left ("the action binds …
+That text is `jl4-core/src/L4/Lts/WhatIf.hs:525` (`PatVar _ v -> pure (Left ("the action binds …
 which the what-if cannot choose"))`), printed by `jl4-core/src/L4/Lts/List.hs:216` under _"What
 could not be tried:"_ — the limit `doc/reference/regulative/lts-list.md` states at its
 [Limits](../../doc/reference/regulative/lts-list.md) section. On these three contracts the list
