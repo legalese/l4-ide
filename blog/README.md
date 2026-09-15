@@ -7,9 +7,16 @@ late on 2026-09-14, not yet critiqued, fact-checked or revised). The ceiling wen
 words on 2026-09-15 at Meng's direction, so only S1, at 6,927, is now over it; the concision pass is
 no longer a length exercise and cuts flab rather than substance. See `STYLE.md` §length for the
 reason he gave and the one drafting rule that follows from it. `blog/candidates/` holds material
-that is not yet a post: one file so far, `decidability-and-expressiveness.md`, an outline with no
+that is not yet a post. Two files. `decidability-and-expressiveness.md` is an outline with no
 prose and `sources_checked: never`, handed over on 2026-09-15 by the `lts-diagrams` session at
-Meng's direction. It is deliberately outside `posts/` — it carries no arc number and would fail
+Meng's direction. `S2-who-is-allowed-to-say-it.md` is the opposite — finished prose with its
+footnotes intact, the "Who is allowed to say it" section cut whole from S1 in its round-2
+revision because the features editor ruled it a second claim carrying thirty percent of that
+post's prose. S1 keeps a one-paragraph gesture at it; the argument lives here. It is not shaped
+as a post — no cold open, no three beats, no hand-off — and its two questions for Meng are
+whether it becomes S2 in the arc, and whether the answer-shape proposal at the end (specified in
+`paper/political-economy/SIDEBAR-who-acts.md`, unbuilt) is a thing a post may propose or only
+describe. A second file, `S2-who-is-allowed-to-say-it.md`, was added on 2026-09-15: the section "Who is allowed to say it" lifted out of S1 in its round-2 revision on the features editor's one-post-one-claim ruling, prose and notes intact, not reshaped into a post; whether it becomes S2 in the arc is Meng's call. It is deliberately outside `posts/` — it carries no arc number and would fail
 `check-post.sh` on both `status:` and length. **Two questions for Meng before anyone drafts it**,
 both stated in the file itself: whether it becomes a tenth post (its claim is distinct from post
 4's and post 6's, and folding it into either would give that post two claims — but growing the arc
