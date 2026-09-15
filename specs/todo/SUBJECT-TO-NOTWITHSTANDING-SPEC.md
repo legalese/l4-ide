@@ -1821,8 +1821,11 @@ This is a proposal, not a ruling, and deliberately front-loads the reversible wo
    Wills Act s 5(9)/s 27 and Charities (Jersey) Art 10(4)/27(1), which already have the hand-rolled
    predicates to diff against.
 2. **Take A1**, because the corpus is accumulating reads that assume an answer.
-3. **A2 into `jl4-core/libraries`** if the library option is chosen, so subjects converge without the
-   language committing.
+3. ~~**A2 into `jl4-core/libraries`** if the library option is chosen, so subjects converge without the
+   language committing.~~ _Overruled by A2's mark (2026-09-15): the verdict vocabulary goes in canon, and
+   a type that belongs to one subject lives under that subject. The six-member verdict was measured in
+   one subject (succession), so under that rule it lives under `subjects/sg/succession/` until a second
+   subject needs it — there is nothing to put in a common library yet, and nothing in `jl4-core`._
 4. **A4 and A5 after two more subjects** have used the projections.
 
 The write side (`SUBJECT TO` et al.) is not in this sequence and remains the larger prize: §10.3
