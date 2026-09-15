@@ -1,0 +1,460 @@
+[
+  {
+    "advancing": [
+      {
+        "event": {
+          "action": "Sign OF (Tenant OF \"Alice\")",
+          "at": 0,
+          "kind": "act",
+          "party": "Tenant OF \"Alice\""
+        },
+        "then": [
+          {
+            "action": "Sign (EXACTLY t)",
+            "dueBy": 14,
+            "group": {
+              "join": "all must act before the next step",
+              "total": 3
+            },
+            "kind": "owed",
+            "modal": "MUST",
+            "party": "Tenant OF \"Bob\"",
+            "remaining": 14
+          },
+          {
+            "action": "Sign (EXACTLY t)",
+            "dueBy": 14,
+            "group": {
+              "join": "all must act before the next step",
+              "total": 3
+            },
+            "kind": "owed",
+            "modal": "MUST",
+            "party": "Tenant OF \"Carol\"",
+            "remaining": 14
+          },
+          {
+            "done": 1,
+            "kind": "held back",
+            "total": 3,
+            "until": "all have acted"
+          }
+        ]
+      },
+      {
+        "event": {
+          "action": "Sign OF (Tenant OF \"Bob\")",
+          "at": 0,
+          "kind": "act",
+          "party": "Tenant OF \"Bob\""
+        },
+        "then": [
+          {
+            "action": "Sign (EXACTLY t)",
+            "dueBy": 14,
+            "group": {
+              "join": "all must act before the next step",
+              "total": 3
+            },
+            "kind": "owed",
+            "modal": "MUST",
+            "party": "Tenant OF \"Alice\"",
+            "remaining": 14
+          },
+          {
+            "action": "Sign (EXACTLY t)",
+            "dueBy": 14,
+            "group": {
+              "join": "all must act before the next step",
+              "total": 3
+            },
+            "kind": "owed",
+            "modal": "MUST",
+            "party": "Tenant OF \"Carol\"",
+            "remaining": 14
+          },
+          {
+            "done": 1,
+            "kind": "held back",
+            "total": 3,
+            "until": "all have acted"
+          }
+        ]
+      },
+      {
+        "event": {
+          "action": "Sign OF (Tenant OF \"Carol\")",
+          "at": 0,
+          "kind": "act",
+          "party": "Tenant OF \"Carol\""
+        },
+        "then": [
+          {
+            "action": "Sign (EXACTLY t)",
+            "dueBy": 14,
+            "group": {
+              "join": "all must act before the next step",
+              "total": 3
+            },
+            "kind": "owed",
+            "modal": "MUST",
+            "party": "Tenant OF \"Alice\"",
+            "remaining": 14
+          },
+          {
+            "action": "Sign (EXACTLY t)",
+            "dueBy": 14,
+            "group": {
+              "join": "all must act before the next step",
+              "total": 3
+            },
+            "kind": "owed",
+            "modal": "MUST",
+            "party": "Tenant OF \"Bob\"",
+            "remaining": 14
+          },
+          {
+            "done": 1,
+            "kind": "held back",
+            "total": 3,
+            "until": "all have acted"
+          }
+        ]
+      }
+    ],
+    "breaching": [
+      {
+        "breach": {},
+        "event": {
+          "at": 15,
+          "deadline": 14,
+          "kind": "tick",
+          "whose": [
+            {
+              "action": "Sign (EXACTLY t)",
+              "modal": "MUST",
+              "party": "Tenant OF \"Alice\""
+            },
+            {
+              "action": "Sign (EXACTLY t)",
+              "modal": "MUST",
+              "party": "Tenant OF \"Bob\""
+            },
+            {
+              "action": "Sign (EXACTLY t)",
+              "modal": "MUST",
+              "party": "Tenant OF \"Carol\""
+            }
+          ]
+        }
+      }
+    ],
+    "clock": 0,
+    "contract": "`the tenancy`",
+    "deadlineNotKnown": [],
+    "discharging": [],
+    "events": [],
+    "line": null,
+    "nextDeadline": {
+      "at": 14,
+      "whose": [
+        {
+          "action": "Sign OF (Tenant OF \"Alice\")",
+          "modal": "MUST",
+          "party": "Tenant OF \"Alice\""
+        },
+        {
+          "action": "Sign OF (Tenant OF \"Bob\")",
+          "modal": "MUST",
+          "party": "Tenant OF \"Bob\""
+        },
+        {
+          "action": "Sign OF (Tenant OF \"Carol\")",
+          "modal": "MUST",
+          "party": "Tenant OF \"Carol\""
+        }
+      ]
+    },
+    "owed": [
+      {
+        "action": "Sign OF (Tenant OF \"Alice\")",
+        "dueBy": 14,
+        "dueWithin": "14",
+        "group": {
+          "join": "all must act before the next step",
+          "total": 3
+        },
+        "kind": "owed",
+        "modal": "MUST",
+        "party": "Tenant OF \"Alice\""
+      },
+      {
+        "action": "Sign OF (Tenant OF \"Bob\")",
+        "dueBy": 14,
+        "dueWithin": "14",
+        "group": {
+          "join": "all must act before the next step",
+          "total": 3
+        },
+        "kind": "owed",
+        "modal": "MUST",
+        "party": "Tenant OF \"Bob\""
+      },
+      {
+        "action": "Sign OF (Tenant OF \"Carol\")",
+        "dueBy": 14,
+        "dueWithin": "14",
+        "group": {
+          "join": "all must act before the next step",
+          "total": 3
+        },
+        "kind": "owed",
+        "modal": "MUST",
+        "party": "Tenant OF \"Carol\""
+      },
+      {
+        "done": 0,
+        "kind": "held back",
+        "total": 3,
+        "until": "all have acted"
+      }
+    ],
+    "passedOver": [],
+    "standing": {
+      "status": "in progress"
+    },
+    "steps": [
+      {
+        "clock": null,
+        "norm": {
+          "activation": 1,
+          "member": 1,
+          "modal": "MUST",
+          "of": 3,
+          "party": "Tenant OF …"
+        },
+        "outcome": {
+          "what": "waiting"
+        },
+        "scrutiny": "no event"
+      },
+      {
+        "clock": null,
+        "norm": {
+          "activation": 2,
+          "member": 2,
+          "modal": "MUST",
+          "of": 3,
+          "party": "Tenant OF …"
+        },
+        "outcome": {
+          "what": "waiting"
+        },
+        "scrutiny": "no event"
+      },
+      {
+        "clock": null,
+        "norm": {
+          "activation": 3,
+          "member": 3,
+          "modal": "MUST",
+          "of": 3,
+          "party": "Tenant OF …"
+        },
+        "outcome": {
+          "what": "waiting"
+        },
+        "scrutiny": "no event"
+      }
+    ],
+    "untried": []
+  },
+  {
+    "advancing": [],
+    "breaching": [
+      {
+        "breach": {
+          "party": "Tenant OF \"Alice\""
+        },
+        "event": {
+          "at": 8,
+          "deadline": 7,
+          "kind": "tick",
+          "whose": [
+            {
+              "action": "Pay (EXACTLY t) (EXACTLY theLandlord) amount",
+              "modal": "MUST",
+              "party": "Tenant OF \"Alice\""
+            },
+            {
+              "action": "Pay (EXACTLY t) (EXACTLY theLandlord) amount",
+              "modal": "MUST",
+              "party": "Tenant OF \"Bob\""
+            },
+            {
+              "action": "Pay (EXACTLY t) (EXACTLY theLandlord) amount",
+              "modal": "MUST",
+              "party": "Tenant OF \"Carol\""
+            }
+          ]
+        }
+      }
+    ],
+    "clock": 0,
+    "contract": "receipts",
+    "deadlineNotKnown": [],
+    "discharging": [],
+    "events": [],
+    "line": null,
+    "nextDeadline": {
+      "at": 7,
+      "whose": [
+        {
+          "action": "Pay (EXACTLY t) (EXACTLY theLandlord) amount",
+          "modal": "MUST",
+          "party": "Tenant OF \"Alice\""
+        },
+        {
+          "action": "Pay (EXACTLY t) (EXACTLY theLandlord) amount",
+          "modal": "MUST",
+          "party": "Tenant OF \"Bob\""
+        },
+        {
+          "action": "Pay (EXACTLY t) (EXACTLY theLandlord) amount",
+          "modal": "MUST",
+          "party": "Tenant OF \"Carol\""
+        }
+      ]
+    },
+    "owed": [
+      {
+        "action": "Pay (EXACTLY t) (EXACTLY theLandlord) amount",
+        "dueBy": 7,
+        "dueWithin": "7",
+        "group": {
+          "join": "each has a next step of their own",
+          "total": 3
+        },
+        "kind": "owed",
+        "modal": "MUST",
+        "party": "Tenant OF \"Alice\""
+      },
+      {
+        "action": "Pay (EXACTLY t) (EXACTLY theLandlord) amount",
+        "dueBy": 7,
+        "dueWithin": "7",
+        "group": {
+          "join": "each has a next step of their own",
+          "total": 3
+        },
+        "kind": "owed",
+        "modal": "MUST",
+        "party": "Tenant OF \"Bob\""
+      },
+      {
+        "action": "Pay (EXACTLY t) (EXACTLY theLandlord) amount",
+        "dueBy": 7,
+        "dueWithin": "7",
+        "group": {
+          "join": "each has a next step of their own",
+          "total": 3
+        },
+        "kind": "owed",
+        "modal": "MUST",
+        "party": "Tenant OF \"Carol\""
+      }
+    ],
+    "passedOver": [],
+    "standing": {
+      "status": "in progress"
+    },
+    "steps": [
+      {
+        "clock": null,
+        "norm": {
+          "activation": 1,
+          "member": 1,
+          "modal": "MUST",
+          "of": 3,
+          "party": "Tenant OF …"
+        },
+        "outcome": {
+          "what": "waiting"
+        },
+        "scrutiny": "no event"
+      },
+      {
+        "clock": null,
+        "norm": {
+          "activation": 2,
+          "member": 2,
+          "modal": "MUST",
+          "of": 3,
+          "party": "Tenant OF …"
+        },
+        "outcome": {
+          "what": "waiting"
+        },
+        "scrutiny": "no event"
+      },
+      {
+        "clock": null,
+        "norm": {
+          "activation": 3,
+          "member": 3,
+          "modal": "MUST",
+          "of": 3,
+          "party": "Tenant OF …"
+        },
+        "outcome": {
+          "what": "waiting"
+        },
+        "scrutiny": "no event"
+      },
+      {
+        "clock": null,
+        "outcome": {
+          "operator": "and",
+          "result": "still open",
+          "what": "compound resolved"
+        },
+        "scrutiny": "no event"
+      },
+      {
+        "clock": null,
+        "outcome": {
+          "operator": "and",
+          "result": "still open",
+          "what": "compound resolved"
+        },
+        "scrutiny": "no event"
+      }
+    ],
+    "untried": [
+      {
+        "event": {
+          "action": "Pay (EXACTLY t) (EXACTLY theLandlord) amount",
+          "kind": "act",
+          "party": "Tenant OF \"Alice\""
+        },
+        "why": "the action binds `amount`, which the what-if cannot choose"
+      },
+      {
+        "event": {
+          "action": "Pay (EXACTLY t) (EXACTLY theLandlord) amount",
+          "kind": "act",
+          "party": "Tenant OF \"Bob\""
+        },
+        "why": "the action binds `amount`, which the what-if cannot choose"
+      },
+      {
+        "event": {
+          "action": "Pay (EXACTLY t) (EXACTLY theLandlord) amount",
+          "kind": "act",
+          "party": "Tenant OF \"Carol\""
+        },
+        "why": "the action binds `amount`, which the what-if cannot choose"
+      }
+    ]
+  }
+]

@@ -1,0 +1,928 @@
+[
+  {
+    "advancing": [],
+    "breaching": [],
+    "clock": 13,
+    "contract": "`the tenancy`",
+    "deadlineNotKnown": [],
+    "discharging": [],
+    "events": [
+      "PARTY alice DOES Sign OF alice AT 1",
+      "PARTY bob DOES Sign OF bob AT 2",
+      "PARTY carol DOES Sign OF carol AT 9",
+      "PARTY theLandlord DOES Deliver OF theLandlord AT 13"
+    ],
+    "line": 41,
+    "nextDeadline": null,
+    "owed": [],
+    "passedOver": [],
+    "standing": {
+      "status": "fulfilled"
+    },
+    "steps": [
+      {
+        "clock": 1,
+        "event": {
+          "action": "Sign OF …",
+          "at": 1,
+          "party": "Tenant OF …"
+        },
+        "join": {
+          "done": 1,
+          "shared next step": "waits",
+          "total": 3
+        },
+        "norm": {
+          "activation": 1,
+          "member": 1,
+          "modal": "MUST",
+          "of": 3,
+          "party": "Tenant OF …"
+        },
+        "outcome": {
+          "then": "what follows",
+          "what": "done"
+        },
+        "scrutiny": "consumed"
+      },
+      {
+        "clock": 1,
+        "event": {
+          "action": "Sign OF …",
+          "at": 1,
+          "party": "Tenant OF …"
+        },
+        "norm": {
+          "activation": 2,
+          "member": 2,
+          "modal": "MUST",
+          "of": 3,
+          "party": "Tenant OF …"
+        },
+        "outcome": {
+          "what": "passed over: not this party"
+        },
+        "scrutiny": "witnessed only"
+      },
+      {
+        "clock": 2,
+        "event": {
+          "action": "Sign OF …",
+          "at": 2,
+          "party": "Tenant OF …"
+        },
+        "join": {
+          "done": 2,
+          "shared next step": "waits",
+          "total": 3
+        },
+        "norm": {
+          "activation": 2,
+          "member": 2,
+          "modal": "MUST",
+          "of": 3,
+          "party": "Tenant OF …"
+        },
+        "outcome": {
+          "then": "what follows",
+          "what": "done"
+        },
+        "scrutiny": "consumed"
+      },
+      {
+        "clock": 1,
+        "event": {
+          "action": "Sign OF …",
+          "at": 1,
+          "party": "Tenant OF …"
+        },
+        "norm": {
+          "activation": 3,
+          "member": 3,
+          "modal": "MUST",
+          "of": 3,
+          "party": "Tenant OF …"
+        },
+        "outcome": {
+          "what": "passed over: not this party"
+        },
+        "scrutiny": "witnessed only"
+      },
+      {
+        "clock": 2,
+        "event": {
+          "action": "Sign OF …",
+          "at": 2,
+          "party": "Tenant OF …"
+        },
+        "norm": {
+          "activation": 3,
+          "member": 3,
+          "modal": "MUST",
+          "of": 3,
+          "party": "Tenant OF …"
+        },
+        "outcome": {
+          "what": "passed over: not this party"
+        },
+        "scrutiny": "witnessed only"
+      },
+      {
+        "clock": 9,
+        "event": {
+          "action": "Sign OF …",
+          "at": 9,
+          "party": "Tenant OF …"
+        },
+        "join": {
+          "done": 3,
+          "shared next step": "waits",
+          "total": 3
+        },
+        "norm": {
+          "activation": 3,
+          "member": 3,
+          "modal": "MUST",
+          "of": 3,
+          "party": "Tenant OF …"
+        },
+        "outcome": {
+          "then": "what follows",
+          "what": "done"
+        },
+        "scrutiny": "consumed"
+      },
+      {
+        "clock": 9,
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": null
+        },
+        "outcome": {
+          "what": "group complete: shared next step begins"
+        },
+        "scrutiny": "no event"
+      },
+      {
+        "clock": 13,
+        "event": {
+          "action": "Deliver OF …",
+          "at": 13,
+          "party": "Landlord OF …"
+        },
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": "Landlord OF …"
+        },
+        "outcome": {
+          "then": "what follows",
+          "what": "done"
+        },
+        "scrutiny": "consumed"
+      }
+    ],
+    "untried": []
+  },
+  {
+    "advancing": [],
+    "breaching": [],
+    "clock": 20,
+    "contract": "`the tenancy`",
+    "deadlineNotKnown": [],
+    "discharging": [],
+    "events": [
+      "PARTY alice DOES Sign OF alice AT 1",
+      "PARTY bob DOES Sign OF bob AT 2",
+      "PARTY theLandlord DOES Deliver OF theLandlord AT 20"
+    ],
+    "line": 48,
+    "nextDeadline": null,
+    "owed": [],
+    "passedOver": [],
+    "standing": {
+      "breach": {},
+      "status": "breached"
+    },
+    "steps": [
+      {
+        "clock": 1,
+        "event": {
+          "action": "Sign OF …",
+          "at": 1,
+          "party": "Tenant OF …"
+        },
+        "join": {
+          "done": 1,
+          "shared next step": "waits",
+          "total": 3
+        },
+        "norm": {
+          "activation": 1,
+          "member": 1,
+          "modal": "MUST",
+          "of": 3,
+          "party": "Tenant OF …"
+        },
+        "outcome": {
+          "then": "what follows",
+          "what": "done"
+        },
+        "scrutiny": "consumed"
+      },
+      {
+        "clock": 1,
+        "event": {
+          "action": "Sign OF …",
+          "at": 1,
+          "party": "Tenant OF …"
+        },
+        "norm": {
+          "activation": 2,
+          "member": 2,
+          "modal": "MUST",
+          "of": 3,
+          "party": "Tenant OF …"
+        },
+        "outcome": {
+          "what": "passed over: not this party"
+        },
+        "scrutiny": "witnessed only"
+      },
+      {
+        "clock": 2,
+        "event": {
+          "action": "Sign OF …",
+          "at": 2,
+          "party": "Tenant OF …"
+        },
+        "join": {
+          "done": 2,
+          "shared next step": "waits",
+          "total": 3
+        },
+        "norm": {
+          "activation": 2,
+          "member": 2,
+          "modal": "MUST",
+          "of": 3,
+          "party": "Tenant OF …"
+        },
+        "outcome": {
+          "then": "what follows",
+          "what": "done"
+        },
+        "scrutiny": "consumed"
+      },
+      {
+        "clock": 1,
+        "event": {
+          "action": "Sign OF …",
+          "at": 1,
+          "party": "Tenant OF …"
+        },
+        "norm": {
+          "activation": 3,
+          "member": 3,
+          "modal": "MUST",
+          "of": 3,
+          "party": "Tenant OF …"
+        },
+        "outcome": {
+          "what": "passed over: not this party"
+        },
+        "scrutiny": "witnessed only"
+      },
+      {
+        "clock": 2,
+        "event": {
+          "action": "Sign OF …",
+          "at": 2,
+          "party": "Tenant OF …"
+        },
+        "norm": {
+          "activation": 3,
+          "member": 3,
+          "modal": "MUST",
+          "of": 3,
+          "party": "Tenant OF …"
+        },
+        "outcome": {
+          "what": "passed over: not this party"
+        },
+        "scrutiny": "witnessed only"
+      },
+      {
+        "clock": 2,
+        "event": {
+          "action": null,
+          "at": 20,
+          "party": null
+        },
+        "norm": {
+          "activation": 3,
+          "member": 3,
+          "modal": "MUST",
+          "of": 3,
+          "party": "Tenant OF …"
+        },
+        "outcome": {
+          "deadline": 14,
+          "then": "the fallback",
+          "what": "deadline passed"
+        },
+        "scrutiny": "witnessed only"
+      },
+      {
+        "clock": 20,
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": null
+        },
+        "outcome": {
+          "then": "the fallback",
+          "what": "a member failed"
+        },
+        "scrutiny": "no event"
+      },
+      {
+        "clock": null,
+        "outcome": {
+          "by": null,
+          "what": "breach declared"
+        },
+        "scrutiny": "no event"
+      }
+    ],
+    "untried": []
+  },
+  {
+    "advancing": [],
+    "breaching": [],
+    "clock": 6,
+    "contract": "receipts",
+    "deadlineNotKnown": [],
+    "discharging": [],
+    "events": [
+      "PARTY alice DOES Pay OF alice, theLandlord, 100 AT 1",
+      "PARTY theLandlord DOES Receipt OF theLandlord, alice, 100 AT 2",
+      "PARTY bob DOES Pay OF bob, theLandlord, 200 AT 3",
+      "PARTY theLandlord DOES Receipt OF theLandlord, bob, 200 AT 4",
+      "PARTY carol DOES Pay OF carol, theLandlord, 300 AT 5",
+      "PARTY theLandlord DOES Receipt OF theLandlord, carol, 300 AT 6"
+    ],
+    "line": 66,
+    "nextDeadline": null,
+    "owed": [],
+    "passedOver": [],
+    "standing": {
+      "status": "fulfilled"
+    },
+    "steps": [
+      {
+        "clock": 1,
+        "event": {
+          "action": "Pay OF …, …, …",
+          "at": 1,
+          "party": "Tenant OF …"
+        },
+        "join": {
+          "member": 1,
+          "own next step": "begins",
+          "total": 3
+        },
+        "norm": {
+          "activation": 1,
+          "member": 1,
+          "modal": "MUST",
+          "of": 3,
+          "party": "Tenant OF …"
+        },
+        "outcome": {
+          "then": "what follows",
+          "what": "done"
+        },
+        "scrutiny": "consumed"
+      },
+      {
+        "clock": 2,
+        "event": {
+          "action": "Receipt OF …, …, …",
+          "at": 2,
+          "party": "Landlord OF …"
+        },
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": "Landlord OF …"
+        },
+        "outcome": {
+          "then": "what follows",
+          "what": "done"
+        },
+        "scrutiny": "consumed"
+      },
+      {
+        "clock": 1,
+        "event": {
+          "action": "Pay OF …, …, …",
+          "at": 1,
+          "party": "Tenant OF …"
+        },
+        "norm": {
+          "activation": 2,
+          "member": 2,
+          "modal": "MUST",
+          "of": 3,
+          "party": "Tenant OF …"
+        },
+        "outcome": {
+          "what": "passed over: not this party"
+        },
+        "scrutiny": "witnessed only"
+      },
+      {
+        "clock": 2,
+        "event": {
+          "action": "Receipt OF …, …, …",
+          "at": 2,
+          "party": "Landlord OF …"
+        },
+        "norm": {
+          "activation": 2,
+          "member": 2,
+          "modal": "MUST",
+          "of": 3,
+          "party": "Tenant OF …"
+        },
+        "outcome": {
+          "what": "passed over: not this party"
+        },
+        "scrutiny": "witnessed only"
+      },
+      {
+        "clock": 3,
+        "event": {
+          "action": "Pay OF …, …, …",
+          "at": 3,
+          "party": "Tenant OF …"
+        },
+        "join": {
+          "member": 2,
+          "own next step": "begins",
+          "total": 3
+        },
+        "norm": {
+          "activation": 2,
+          "member": 2,
+          "modal": "MUST",
+          "of": 3,
+          "party": "Tenant OF …"
+        },
+        "outcome": {
+          "then": "what follows",
+          "what": "done"
+        },
+        "scrutiny": "consumed"
+      },
+      {
+        "clock": 4,
+        "event": {
+          "action": "Receipt OF …, …, …",
+          "at": 4,
+          "party": "Landlord OF …"
+        },
+        "norm": {
+          "activation": 2,
+          "modal": "MUST",
+          "party": "Landlord OF …"
+        },
+        "outcome": {
+          "then": "what follows",
+          "what": "done"
+        },
+        "scrutiny": "consumed"
+      },
+      {
+        "clock": 1,
+        "event": {
+          "action": "Pay OF …, …, …",
+          "at": 1,
+          "party": "Tenant OF …"
+        },
+        "norm": {
+          "activation": 3,
+          "member": 3,
+          "modal": "MUST",
+          "of": 3,
+          "party": "Tenant OF …"
+        },
+        "outcome": {
+          "what": "passed over: not this party"
+        },
+        "scrutiny": "witnessed only"
+      },
+      {
+        "clock": 2,
+        "event": {
+          "action": "Receipt OF …, …, …",
+          "at": 2,
+          "party": "Landlord OF …"
+        },
+        "norm": {
+          "activation": 3,
+          "member": 3,
+          "modal": "MUST",
+          "of": 3,
+          "party": "Tenant OF …"
+        },
+        "outcome": {
+          "what": "passed over: not this party"
+        },
+        "scrutiny": "witnessed only"
+      },
+      {
+        "clock": 3,
+        "event": {
+          "action": "Pay OF …, …, …",
+          "at": 3,
+          "party": "Tenant OF …"
+        },
+        "norm": {
+          "activation": 3,
+          "member": 3,
+          "modal": "MUST",
+          "of": 3,
+          "party": "Tenant OF …"
+        },
+        "outcome": {
+          "what": "passed over: not this party"
+        },
+        "scrutiny": "witnessed only"
+      },
+      {
+        "clock": 4,
+        "event": {
+          "action": "Receipt OF …, …, …",
+          "at": 4,
+          "party": "Landlord OF …"
+        },
+        "norm": {
+          "activation": 3,
+          "member": 3,
+          "modal": "MUST",
+          "of": 3,
+          "party": "Tenant OF …"
+        },
+        "outcome": {
+          "what": "passed over: not this party"
+        },
+        "scrutiny": "witnessed only"
+      },
+      {
+        "clock": 5,
+        "event": {
+          "action": "Pay OF …, …, …",
+          "at": 5,
+          "party": "Tenant OF …"
+        },
+        "join": {
+          "member": 3,
+          "own next step": "begins",
+          "total": 3
+        },
+        "norm": {
+          "activation": 3,
+          "member": 3,
+          "modal": "MUST",
+          "of": 3,
+          "party": "Tenant OF …"
+        },
+        "outcome": {
+          "then": "what follows",
+          "what": "done"
+        },
+        "scrutiny": "consumed"
+      },
+      {
+        "clock": 6,
+        "event": {
+          "action": "Receipt OF …, …, …",
+          "at": 6,
+          "party": "Landlord OF …"
+        },
+        "norm": {
+          "activation": 3,
+          "modal": "MUST",
+          "party": "Landlord OF …"
+        },
+        "outcome": {
+          "then": "what follows",
+          "what": "done"
+        },
+        "scrutiny": "consumed"
+      },
+      {
+        "clock": null,
+        "outcome": {
+          "operator": "and",
+          "result": "fulfilled",
+          "what": "compound resolved"
+        },
+        "scrutiny": "no event"
+      },
+      {
+        "clock": null,
+        "outcome": {
+          "operator": "and",
+          "result": "fulfilled",
+          "what": "compound resolved"
+        },
+        "scrutiny": "no event"
+      }
+    ],
+    "untried": []
+  },
+  {
+    "advancing": [],
+    "breaching": [],
+    "clock": 20,
+    "contract": "receipts",
+    "deadlineNotKnown": [],
+    "discharging": [],
+    "events": [
+      "PARTY alice DOES Pay OF alice, theLandlord, 100 AT 1",
+      "PARTY theLandlord DOES Receipt OF theLandlord, alice, 100 AT 2",
+      "PARTY carol DOES Pay OF carol, theLandlord, 300 AT 5",
+      "PARTY theLandlord DOES Receipt OF theLandlord, carol, 300 AT 6",
+      "PARTY theLandlord DOES Receipt OF theLandlord, bob, 200 AT 20"
+    ],
+    "line": 75,
+    "nextDeadline": null,
+    "owed": [],
+    "passedOver": [],
+    "standing": {
+      "breach": {
+        "party": "Tenant OF \"Bob\""
+      },
+      "status": "breached"
+    },
+    "steps": [
+      {
+        "clock": 1,
+        "event": {
+          "action": "Pay OF …, …, …",
+          "at": 1,
+          "party": "Tenant OF …"
+        },
+        "join": {
+          "member": 1,
+          "own next step": "begins",
+          "total": 3
+        },
+        "norm": {
+          "activation": 1,
+          "member": 1,
+          "modal": "MUST",
+          "of": 3,
+          "party": "Tenant OF …"
+        },
+        "outcome": {
+          "then": "what follows",
+          "what": "done"
+        },
+        "scrutiny": "consumed"
+      },
+      {
+        "clock": 2,
+        "event": {
+          "action": "Receipt OF …, …, …",
+          "at": 2,
+          "party": "Landlord OF …"
+        },
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": "Landlord OF …"
+        },
+        "outcome": {
+          "then": "what follows",
+          "what": "done"
+        },
+        "scrutiny": "consumed"
+      },
+      {
+        "clock": 1,
+        "event": {
+          "action": "Pay OF …, …, …",
+          "at": 1,
+          "party": "Tenant OF …"
+        },
+        "norm": {
+          "activation": 2,
+          "member": 2,
+          "modal": "MUST",
+          "of": 3,
+          "party": "Tenant OF …"
+        },
+        "outcome": {
+          "what": "passed over: not this party"
+        },
+        "scrutiny": "witnessed only"
+      },
+      {
+        "clock": 2,
+        "event": {
+          "action": "Receipt OF …, …, …",
+          "at": 2,
+          "party": "Landlord OF …"
+        },
+        "norm": {
+          "activation": 2,
+          "member": 2,
+          "modal": "MUST",
+          "of": 3,
+          "party": "Tenant OF …"
+        },
+        "outcome": {
+          "what": "passed over: not this party"
+        },
+        "scrutiny": "witnessed only"
+      },
+      {
+        "clock": 5,
+        "event": {
+          "action": null,
+          "at": 5,
+          "party": "Tenant OF …"
+        },
+        "norm": {
+          "activation": 2,
+          "member": 2,
+          "modal": "MUST",
+          "of": 3,
+          "party": "Tenant OF …"
+        },
+        "outcome": {
+          "what": "passed over: not this party"
+        },
+        "scrutiny": "witnessed only"
+      },
+      {
+        "clock": 6,
+        "event": {
+          "action": null,
+          "at": 6,
+          "party": "Landlord OF …"
+        },
+        "norm": {
+          "activation": 2,
+          "member": 2,
+          "modal": "MUST",
+          "of": 3,
+          "party": "Tenant OF …"
+        },
+        "outcome": {
+          "what": "passed over: not this party"
+        },
+        "scrutiny": "witnessed only"
+      },
+      {
+        "clock": 6,
+        "event": {
+          "action": null,
+          "at": 20,
+          "party": "Landlord OF …"
+        },
+        "join": {
+          "member": 2,
+          "own next step": "begins",
+          "total": 3
+        },
+        "norm": {
+          "activation": 2,
+          "member": 2,
+          "modal": "MUST",
+          "of": 3,
+          "party": "Tenant OF …"
+        },
+        "outcome": {
+          "deadline": 7,
+          "then": "the fallback",
+          "what": "deadline passed"
+        },
+        "scrutiny": "witnessed only"
+      },
+      {
+        "clock": null,
+        "outcome": {
+          "by": "Tenant OF …",
+          "what": "breach declared"
+        },
+        "scrutiny": "no event"
+      },
+      {
+        "clock": 1,
+        "event": {
+          "action": "Pay OF …, …, …",
+          "at": 1,
+          "party": "Tenant OF …"
+        },
+        "norm": {
+          "activation": 3,
+          "member": 3,
+          "modal": "MUST",
+          "of": 3,
+          "party": "Tenant OF …"
+        },
+        "outcome": {
+          "what": "passed over: not this party"
+        },
+        "scrutiny": "witnessed only"
+      },
+      {
+        "clock": 2,
+        "event": {
+          "action": "Receipt OF …, …, …",
+          "at": 2,
+          "party": "Landlord OF …"
+        },
+        "norm": {
+          "activation": 3,
+          "member": 3,
+          "modal": "MUST",
+          "of": 3,
+          "party": "Tenant OF …"
+        },
+        "outcome": {
+          "what": "passed over: not this party"
+        },
+        "scrutiny": "witnessed only"
+      },
+      {
+        "clock": 5,
+        "event": {
+          "action": "Pay OF …, …, …",
+          "at": 5,
+          "party": "Tenant OF …"
+        },
+        "join": {
+          "member": 3,
+          "own next step": "begins",
+          "total": 3
+        },
+        "norm": {
+          "activation": 3,
+          "member": 3,
+          "modal": "MUST",
+          "of": 3,
+          "party": "Tenant OF …"
+        },
+        "outcome": {
+          "then": "what follows",
+          "what": "done"
+        },
+        "scrutiny": "consumed"
+      },
+      {
+        "clock": 6,
+        "event": {
+          "action": "Receipt OF …, …, …",
+          "at": 6,
+          "party": "Landlord OF …"
+        },
+        "norm": {
+          "activation": 2,
+          "modal": "MUST",
+          "party": "Landlord OF …"
+        },
+        "outcome": {
+          "then": "what follows",
+          "what": "done"
+        },
+        "scrutiny": "consumed"
+      },
+      {
+        "clock": null,
+        "outcome": {
+          "operator": "and",
+          "result": "breached",
+          "what": "compound resolved"
+        },
+        "scrutiny": "no event"
+      },
+      {
+        "clock": null,
+        "outcome": {
+          "operator": "and",
+          "result": "breached",
+          "what": "compound resolved"
+        },
+        "scrutiny": "no event"
+      }
+    ],
+    "untried": []
+  }
+]

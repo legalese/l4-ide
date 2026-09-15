@@ -445,6 +445,8 @@ Use `#TRACE` to simulate contract execution.
   PARTY Alice DOES pay 100 AT 15
 ```
 
+`l4 run` prints what the contract has become after the events. To have that read out as a list — what is owed now, what would discharge it, what would put someone in breach, and the next deadline — run `l4 lts` on the same file; see **[What is owed now: `l4 lts`](lts-list.md)**.
+
 ## Complete Example
 
 ```l4
@@ -478,6 +480,7 @@ saleContract MEANS
 - **[SHANT](SHANT.md)** - Prohibitions (also written MUST NOT)
 - **[DEONTIC](DEONTIC.md)** - The regulative rule type
 - **[EVENT](EVENT.md)** - The event type consumed by traces
+- **[What is owed now: `l4 lts`](lts-list.md)** - Read a `#TRACE` out as a list: what is owed, what would discharge it, what would breach it
 
 ## See Also
 

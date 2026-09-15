@@ -1,6 +1,7 @@
 module L4.EvaluateLazy.ContractFrame where
 
 import L4.Evaluate.ValueLazy
+import L4.EvaluateLazy.DeonticStep (DeonticStep, NormKey)
 import L4.Syntax
 
 data ContractFrame
@@ -84,6 +85,7 @@ data ScrutinizeEvents = ScrutinizeEvents
   { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
   , time :: Reference
   , env :: Environment
+  , norm :: NormKey  -- ^ the step log's key for this obligation (P2b); lazy, and never forced when the log is off
   }
   deriving stock Show
 
@@ -95,10 +97,16 @@ data ScrutinizeEvents = ScrutinizeEvents
 -- reveals a second expiry is consumed instead of being re-offered again,
 -- which keeps evaluation terminating for recursive HENCE/LEST continuations
 -- with non-positive deadlines. See the Contract5 NOTE in Machine.hs.
+--
+-- It is carried on past 'CheckTiming' too (through 'PartyWHNF' to
+-- 'ActionDoesn'tmatch'), for one reader only: the deontic step log (P2b),
+-- which reports a re-offered event's second look as 'Reoffered'. The machine
+-- itself consults it at Contract5 alone.
 data ScrutinizeEvent = ScrutinizeEvent
   { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
   , events :: Reference, time :: Reference, ev'reoffered :: Bool
   , env :: Environment
+  , norm :: NormKey  -- ^ the step log's key for this obligation (P2b); lazy, and never forced when the log is off
   }
   deriving stock Show
 
@@ -107,6 +115,7 @@ data CurrentTimeWHNF = CurrentTimeWHNF
   , ev'party :: Reference, ev'act :: Reference, ev'time :: Reference
   , events :: Reference, time :: Reference, ev'reoffered :: Bool
   , env :: Environment
+  , norm :: NormKey  -- ^ the step log's key for this obligation (P2b); lazy, and never forced when the log is off
   }
   deriving stock Show
 
@@ -115,6 +124,7 @@ data ScrutinizeDue = ScrutinizeDue
   , ev'party :: Reference, ev'act :: Reference, ev'time :: WHNF
   , events :: Reference, time :: Reference, ev'reoffered :: Bool
   , env :: Environment
+  , norm :: NormKey  -- ^ the step log's key for this obligation (P2b); lazy, and never forced when the log is off
   }
   deriving stock Show
 
@@ -123,54 +133,61 @@ data CheckTiming = CheckTiming
   , ev'party :: Reference, ev'act :: Reference, ev'time :: WHNF
   , events :: Reference, time :: WHNF, ev'reoffered :: Bool
   , env :: Environment
+  , norm :: NormKey  -- ^ the step log's key for this obligation (P2b); lazy, and never forced when the log is off
   }
   deriving stock Show
 
 data PartyWHNF = PartyWHNF
   { act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: Reference, ev'act :: Reference
-  , events :: Reference, time :: WHNF
+  , events :: Reference, time :: WHNF, ev'reoffered :: Bool
   , env :: Environment
+  , norm :: NormKey  -- ^ the step log's key for this obligation (P2b); lazy, and never forced when the log is off
   }
   deriving stock Show
 
 data PartyEqual = PartyEqual
   { party :: WHNF, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: Reference, ev'act :: Reference
-  , events :: Reference, time :: WHNF
+  , events :: Reference, time :: WHNF, ev'reoffered :: Bool
   , env :: Environment
+  , norm :: NormKey  -- ^ the step log's key for this obligation (P2b); lazy, and never forced when the log is off
   }
   deriving stock Show
 
 data ScrutinizeParty = ScrutinizeParty
   { party :: WHNF, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: WHNF, ev'act :: Reference
-  , events :: Reference, time :: WHNF
+  , events :: Reference, time :: WHNF, ev'reoffered :: Bool
   , env :: Environment
+  , norm :: NormKey  -- ^ the step log's key for this obligation (P2b); lazy, and never forced when the log is off
   }
   deriving stock Show
 
 data ScrutinizeEnvironment = ScrutinizeEnvironment
   { party :: WHNF, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: WHNF, ev'act :: Reference
-  , events :: Reference, time :: WHNF
+  , events :: Reference, time :: WHNF, ev'reoffered :: Bool
   , env :: Environment
+  , norm :: NormKey  -- ^ the step log's key for this obligation (P2b); lazy, and never forced when the log is off
   }
   deriving stock Show
 
 data ScrutinizeActions = ScrutinizeActions
   { party :: WHNF, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: WHNF, ev'act :: Reference
-  , events :: Reference, time :: WHNF
+  , events :: Reference, time :: WHNF, ev'reoffered :: Bool
   , env :: Environment, henceEnv :: Environment -- ^ the environment to extend by when evaluating the hence clause
+  , norm :: NormKey  -- ^ the step log's key for this obligation (P2b); lazy, and never forced when the log is off
   }
   deriving stock Show
 
 data ActionDoesn'tmatch = ActionDoesn'tmatch
   { party :: WHNF, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: WHNF, ev'act :: Reference
-  , events :: Reference, time :: WHNF
+  , events :: Reference, time :: WHNF, ev'reoffered :: Bool
   , env :: Environment
+  , norm :: NormKey  -- ^ the step log's key for this obligation (P2b); lazy, and never forced when the log is off
   }
   deriving stock Show
 
@@ -203,6 +220,9 @@ data QuantCtx = MkQuantCtx
   , env     :: Environment         -- ^ the arming environment
   , time    :: Reference           -- ^ the arming time
   , events  :: Reference           -- ^ the whole event stream
+  , norm    :: NormKey
+    -- ^ P2b: the JOIN's own key, carried by the barrier's 'JoinReleased' /
+    -- 'JoinExpired' / 'JoinFailed' steps; lazy, never forced when the log is off
   }
   deriving stock Show
 
@@ -301,5 +321,9 @@ data ResolvePartyFrame = ResolvePartyFrame
   , env :: Environment       -- ^ environment in which to run the followup
   , events :: Reference      -- ^ remaining event stream (passed on to 'continueWithFollowup')
   , time :: Reference        -- ^ the (already-allocated) event time
+  , pending :: Maybe DeonticStep
+    -- ^ P2b: the 'Expired' step this expiry owes the log, logged HERE rather
+    -- than at @Contract5@ because this frame is where the party gets forced,
+    -- and the step wants the bearer's key. 'Nothing' when the log is off.
   }
   deriving stock Show

@@ -87,7 +87,7 @@ data Value a =
   deriving stock (Show, Functor, Foldable, Traversable)
 
 data RBinOp = ValROr | ValRAnd
-  deriving stock Show
+  deriving stock (Eq, Show)
 
 instance NFData RBinOp where
   rnf ValROr = ()

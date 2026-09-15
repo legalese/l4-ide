@@ -32,6 +32,7 @@ executable l4
     jl4-lsp,
     jl4-query-plan,
     aeson,
+    aeson-pretty,
     bytestring,
     cassava,
     containers,
@@ -59,6 +60,7 @@ executable l4
     L4.Cli.Docassemble
     L4.Cli.Export
     L4.Cli.Format
+    L4.Cli.Lts
     L4.Cli.Nlg
     L4.Cli.OpenFisca
     L4.Cli.Render
@@ -113,6 +115,7 @@ test-suite jl4-test
   main-is: Main.hs
   other-modules:
     BpmnExport
+    LtsList
     Hover
     SemanticTokens
     VizAutoRefresh
@@ -139,6 +142,7 @@ test-suite jl4-test
     transformers,
     time,
     lsp-types,
+    text,
 
 test-suite l4-cli-test
   import: defaults
