@@ -26,12 +26,12 @@
       }
     },
     {
-      "id": "A1–A5",
+      "id": "A5",
       "owner": "Meng",
-      "kind": "ruling ×5",
+      "kind": "ruling ×1 remaining",
       "quick": true,
       "raised": "2026-09-11",
-      "ask": "The five APPLIES read-side rulings the corpus survey forces — posed in §11.3 on branch mengwong/applies-corpus-survey @ 682b7eaa, which was committed after #315 merged and never PR'd, so they are not even on unstable. A1 first (does derived `applies` include conjunct 1, inForce? yes/no — the two answers are not interconvertible after the fact); A2 verdict vocabulary lives in userland Booleans / a library enum / a language primitive (the spec argues against the primitive); A3 uncertainty as MAYBE BOOLEAN / three-valued primitive / verdict member; A4 how the read is spelled (spec recommends DEFER); A5 are selector reads the same construct (family, or separate — separate is cheaper, family lets them be generated).",
+      "ask": "Four of five marked 2026-09-15 (in the bench store, applies-rulings/A1..A4): A1 ACCEPT (derived `applies` includes inForce; TRUE by default when unpinned); A2 MODIFY — verdict vocabulary in a canon common-types library, and sharper: types that belong to one subject live under that subject, only cross-subject vocabulary in the common library, jl4-core/libraries only for types the compiler computes over; A3 ACCEPT (MAYBE BOOLEAN, no primitive); A4 MODIFY — reading (i), the label IS the read: `s 27` p, no keyword, no reification (one measurement owed: can a section heading's name double as a function name). STILL OPEN: A5 — are selector reads the same construct as the Boolean read? GM recommends SEPARATE (5 of 559 sites, two of them prose; once per-node projections exist a selector is `filter` over them). Once A5 is marked GM rebases mengwong/applies-corpus-survey (its §11 becomes §12 — unstable gained a §11 from #318), records all five in what is now §12.3, and PRs it.",
       "unblocks": "any further subject that reads applicability — each one currently picks an answer by accident",
       "source": {
         "file": "specs/todo/SUBJECT-TO-NOTWITHSTANDING-SPEC.md",
@@ -166,11 +166,11 @@
     },
     {
       "id": "Canon corpus",
-      "owner": "GM (build) · Meng (blessed list + pin policy)",
-      "kind": "ruled; shape chosen, confirm",
-      "quick": true,
+      "owner": "go-pipeline-diagram (build) · GM (push/PR)",
+      "kind": "confirmed; in build",
+      "quick": false,
       "raised": "2026-09-15",
-      "ask": "RULED 2026-09-15 (Meng): jl4/examples/legal stays the regression corpus; explicitly blessed canon dirs join it; subjects already in canon leave l4-ide; the rest stay. Later the same evening: \"if it is really unpleasant to have regression CI split across to the canon repo then i'm okay with vendoring in\" — GM assessed that it is, and the spec (PR #396, §3B) chooses VENDORING: a mirror under jl4/examples/canon/<subject>/ at a pinned canon SHA (etc/canon-pin.json), etc/sync-canon.mjs --pull/--check/--bump, one CI job that only diffs the mirror against canon@pin, the golden harness gaining a canon/** glob, etc/go unchanged. Meng to CONFIRM the shape on return. Then GM builds it, then chubb and sg-succession move out of legal/. Still Meng's: the first blessed list (proposed: sg/child-support, sg/succession/legalese, sg/penal-code-1871, both chubb encodings; NOT cleanroom-2026-08 — fails l4 check at daydate.l4:104 on today's binary while its goldens say Evaluation successful; NOT ofek-hadash / pdpa — no goldens), and the rule that blessed dirs must be on canon MAIN, which means canon needs its own PR flow off mengwong/drafts first.",
+      "ask": "CONFIRMED by Meng 2026-09-15 evening: vendoring (spec PR #396 §3B), and the first blessed list — sg/child-support, sg/succession/legalese, sg/penal-code-1871, both chubb encodings — pinned at canon mengwong/drafts 299dd490 (\"we may change it in future, but let's at least give the mechanism a shake\"). Deputy go-pipeline-diagram briefed 12:25Z to build: etc/canon-pin.json, jl4/examples/canon/<subject>/ mirror, etc/sync-canon.mjs --pull/--check/--bump with selftests, the canon/** golden glob in jl4/tests/Main.hs + etc/check-corpus-goldens.mjs, one `Canon Mirror` CI job, spec/CLAUDE.md/README updates. Known wrinkle to measure: cases/ subdirs vs the harness's <dir>/tests/ golden layout. Migration of legal/chubb and legal/sg-succession is the NEXT PR, after Meng has seen the mechanism green. Results land in the GM outbox.",
       "unblocks": "deleting canon-duplicated subjects from l4-ide without losing regression coverage",
       "source": {
         "file": "specs/todo/CANON-REGRESSION-CORPUS-SPEC.md",
