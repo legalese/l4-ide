@@ -1,0 +1,2819 @@
+[
+  {
+    "contract": "contracts",
+    "artifact": "A",
+    "model": "haiku",
+    "repeat": 0,
+    "model_id": "claude-haiku-4-5-20251001",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "a36bf62eea6b05675",
+    "prompt_file": "prompts/contracts.A.txt",
+    "prompt_sha256": "d7c0f363ba802e5d5ed0a16c15b605f50b7531f27684cdb17f3669c14853778f",
+    "started_at": "2026-09-15T17:28:36.000Z",
+    "answered_at": "2026-09-15T17:28:48.502Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 1,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 9,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 49847,
+      "output_tokens": 1282,
+      "output_tokens_details": {
+        "thinking_tokens": 785
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 0
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 9,
+          "output_tokens": 1282,
+          "cache_read_input_tokens": 49847,
+          "cache_creation_input_tokens": 0,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "1. **Q1. What is owed right now, and by whom?**\nParty B must return (something), due by time 14.\n\n2. **Q2. Which event(s) would discharge what is owed?**\nB performing the return action would discharge the obligation, though the artifact notes this cannot be simulated in the what-if scenario.\n\n3. **Q3. Which event(s) or deadline(s) would put someone in breach?**\nIf the clock reaches 15 without B returning—that is, if the deadline of 14 passes unmet—B is in breach of the \"MUST return\" obligation.\n\n4. **Q4. Where in the contract are we — which rule, branch or state is live?**\nCannot tell from this; the artifact says \"Standing: in progress\" but does not name the specific rule, branch, or state.\n\n5. **Q5. What happens after the next discharging event?**\nCannot tell from this; the artifact does not describe the contract state or further obligations if B returns by the deadline.\n\n---\n\nNow I'll provide the structured output as required:",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "Party B must return (something), due by time 14.",
+      "a2": "B performing the return action would discharge the obligation, though the artifact notes this cannot be simulated in the what-if scenario.",
+      "a3": "If the clock reaches 15 without B returning—that is, if the deadline of 14 passes unmet—B is in breach of the \"MUST return\" obligation.",
+      "a4": "Cannot tell from this; the artifact says \"Standing: in progress\" but does not name the specific rule, branch, or state.",
+      "a5": "Cannot tell from this; the artifact does not describe the contract state or further obligations if B returns by the deadline."
+    }
+  },
+  {
+    "contract": "contracts",
+    "artifact": "A",
+    "model": "haiku",
+    "repeat": 1,
+    "model_id": "claude-haiku-4-5-20251001",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "a7475eaacf3d72fbf",
+    "prompt_file": "prompts/contracts.A.txt",
+    "prompt_sha256": "d7c0f363ba802e5d5ed0a16c15b605f50b7531f27684cdb17f3669c14853778f",
+    "started_at": "2026-09-15T17:28:34.824Z",
+    "answered_at": "2026-09-15T17:28:52.242Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 1,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 9,
+      "cache_creation_input_tokens": 49847,
+      "cache_read_input_tokens": 0,
+      "output_tokens": 1841,
+      "output_tokens_details": {
+        "thinking_tokens": 1355
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 49847
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 9,
+          "output_tokens": 1841,
+          "cache_read_input_tokens": 0,
+          "cache_creation_input_tokens": 49847,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 49847,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "1. **Q1. What is owed right now, and by whom?**\nB MUST return by deadline 14. The artifact states \"Owed now: B MUST return — due by 14 (4 from now).\"\n\n2. **Q2. Which event(s) would discharge what is owed?**\nCannot tell from this. The artifact does not explicitly list discharging events, though \"B does return\" is mentioned under \"What could not be tried.\"\n\n3. **Q3. Which event(s) or deadline(s) would put someone in breach?**\nIf the clock reaches 15 (the deadline 14 passes without B returning), B is in breach. The artifact states: \"nothing happens by 14 (the clock reaches 15) → B is in breach: MUST return was due by 14; the clock reached 15 without it.\"\n\n4. **Q4. Where in the contract are we — which rule, branch or state is live?**\nCannot tell from this. The artifact shows \"Standing: in progress\" and the clock at 10, but does not name which specific rule, branch, or state is currently active.\n\n5. **Q5. What happens after the next discharging event?**\nCannot tell from this. The artifact does not describe what state or events follow a successful discharge of the return obligation.\n\n---\n\nNow I'll call the StructuredOutput tool with these five answers.",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "B MUST return by deadline 14.",
+      "a2": "Cannot tell from this.",
+      "a3": "If the clock reaches 15, B is in breach because the MUST return obligation was due by 14.",
+      "a4": "Cannot tell from this.",
+      "a5": "Cannot tell from this."
+    }
+  },
+  {
+    "contract": "contracts",
+    "artifact": "A",
+    "model": "sonnet",
+    "repeat": 0,
+    "model_id": "claude-sonnet-5",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "ae26fbf33d50719d0",
+    "prompt_file": "prompts/contracts.A.txt",
+    "prompt_sha256": "d7c0f363ba802e5d5ed0a16c15b605f50b7531f27684cdb17f3669c14853778f",
+    "started_at": "2026-09-15T17:28:51.046Z",
+    "answered_at": "2026-09-15T17:28:56.761Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 1,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 2,
+      "cache_creation_input_tokens": 67506,
+      "cache_read_input_tokens": 0,
+      "output_tokens": 435,
+      "output_tokens_details": {
+        "thinking_tokens": 16
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 67506
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 2,
+          "output_tokens": 435,
+          "cache_read_input_tokens": 0,
+          "cache_creation_input_tokens": 67506,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 67506,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "B owes a \"return\" obligation, due by clock time 14.",
+      "a2": "The artifact does not show an event that discharges the \"return\" obligation — it says \"B does return\" could not be tried because the what-if cannot choose that action, so cannot tell from this what specific event would discharge it (other than presumably B performing the \"return\" action itself, which is named but not confirmed as the discharging event).",
+      "a3": "If nothing happens by 14 (i.e. the clock reaches 15), B is in breach because the MUST return obligation was due by 14 and wasn't met.",
+      "a4": "We are at clock time 10, after 3 events (delivery at 2, payment at 4, and a WAIT UNTIL 10); the contract standing is \"in progress,\" with the return obligation now live and its deadline at 14.",
+      "a5": "Cannot tell from this — the artifact doesn't describe what happens after \"return\" occurs, only what happens if it doesn't (breach at 15)."
+    }
+  },
+  {
+    "contract": "contracts",
+    "artifact": "A",
+    "model": "sonnet",
+    "repeat": 1,
+    "model_id": "claude-sonnet-5",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "aab4c64107eea3b6a",
+    "prompt_file": "prompts/contracts.A.txt",
+    "prompt_sha256": "d7c0f363ba802e5d5ed0a16c15b605f50b7531f27684cdb17f3669c14853778f",
+    "started_at": "2026-09-15T17:28:54.578Z",
+    "answered_at": "2026-09-15T17:28:59.984Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 1,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 2,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 67506,
+      "output_tokens": 459,
+      "output_tokens_details": {
+        "thinking_tokens": 18
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 0
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 2,
+          "output_tokens": 459,
+          "cache_read_input_tokens": 67506,
+          "cache_creation_input_tokens": 0,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "B owes a \"return\" obligation, due by 14 (currently 4 units from now, at clock 10).",
+      "a2": "Cannot tell from this — the artifact says an attempt to have B do \"return\" could not be tried in the what-if (\"the action binds `return`, which the what-if cannot choose\"), so it doesn't show what actually discharges the obligation, only what would breach it.",
+      "a3": "If nothing happens by 14 (i.e., the clock reaches 15), B is in breach: the MUST return obligation was due by 14 and wasn't met.",
+      "a4": "We are at clock 10, after 3 events (S's delivery at 2, B's payment of 21 at 4, and a WAIT UNTIL of 10); the contract is \"in progress\" with the return obligation now live and its deadline at 14 upcoming.",
+      "a5": "Cannot tell from this — the artifact doesn't describe what follows the discharging event itself, only the next deadline (14, for B's return) and the breach consequence if it isn't met."
+    }
+  },
+  {
+    "contract": "contracts",
+    "artifact": "B",
+    "model": "haiku",
+    "repeat": 0,
+    "model_id": "claude-haiku-4-5-20251001",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "a2379d27da9d84e8c",
+    "prompt_file": "prompts/contracts.B.txt",
+    "prompt_sha256": "0edd635c16f4291870d1188eda1e08ef05df83936e3c4453c68888f9134b5d8f",
+    "started_at": "2026-09-15T17:28:59.468Z",
+    "answered_at": "2026-09-15T17:29:51.772Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 2,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 10,
+      "cache_creation_input_tokens": 4747,
+      "cache_read_input_tokens": 50539,
+      "output_tokens": 486,
+      "output_tokens_details": {
+        "thinking_tokens": 234
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 4747
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 10,
+          "output_tokens": 486,
+          "cache_read_input_tokens": 50539,
+          "cache_creation_input_tokens": 4747,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 4747,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "Looking at the diagram and tracing the path through the states:\n\n**Q1. What is owed right now, and by whom?**\nB must perform a \"return\" action. Since B paid 21 (not exactly 20), the contract requires B to return something.\n\n**Q2. Which event(s) would discharge what is owed?**\nB performing the \"return\" action would discharge the obligation and move the contract to Fulfilled (state 3).\n\n**Q3. Which event(s) or deadline(s) would put someone in breach?**\nIf B does not return by the deadline [10], a timeout occurs and the contract transitions to Breach (state 5).\n\n**Q4. Where in the contract are we — which rule, branch or state is live?**\nWe are in state 4 (\"B must return\"), an active deontic obligation state with an outstanding deadline [10].\n\n**Q5. What happens after the next discharging event?**\nAfter B performs \"return\", the contract transitions to state 3 (Fulfilled), which is a terminal success state.",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "B must perform a \"return\" action; since B paid 21 (not exactly 20), the contract requires B to return something.",
+      "a2": "B performing the \"return\" action would discharge the obligation and move the contract to Fulfilled (state 3).",
+      "a3": "If B does not return by the deadline [10], a timeout occurs and the contract transitions to Breach (state 5).",
+      "a4": "We are in state 4 (\"B must return\"), an active deontic obligation state with an outstanding deadline [10].",
+      "a5": "After B performs \"return\", the contract transitions to state 3 (Fulfilled), which is a terminal success state."
+    }
+  },
+  {
+    "contract": "contracts",
+    "artifact": "B",
+    "model": "haiku",
+    "repeat": 1,
+    "model_id": "claude-haiku-4-5-20251001",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "aeab293269be661c2",
+    "prompt_file": "prompts/contracts.B.txt",
+    "prompt_sha256": "0edd635c16f4291870d1188eda1e08ef05df83936e3c4453c68888f9134b5d8f",
+    "started_at": "2026-09-15T17:29:02.273Z",
+    "answered_at": "2026-09-15T17:29:22.124Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 1,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 9,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 50539,
+      "output_tokens": 2104,
+      "output_tokens_details": {
+        "thinking_tokens": 1530
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 0
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 9,
+          "output_tokens": 2104,
+          "cache_read_input_tokens": 50539,
+          "cache_creation_input_tokens": 0,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "1. **Q1. What is owed right now, and by whom?**\n   B (the buyer) owes a return action; we are in state 4 (\"B must return\").\n\n2. **Q2. Which event(s) would discharge what is owed?**\n   B performing the \"return\" action would discharge the obligation and transition to state 3 (Fulfilled).\n\n3. **Q3. Which event(s) or deadline(s) would put someone in breach?**\n   If B fails to perform the return by day 14 (10 days from day 4 when the payment obligation was satisfied), a timeout triggers a transition to state 5 (Breach).\n\n4. **Q4. Where in the contract are we — which rule, branch or state is live?**\n   We are in state 4 (\"B must return\"), which we entered because B paid 21—a price that is not equal to 20, triggering the \"IF NOT (price EQUALS 20)\" branch from the decision diamond.\n\n5. **Q5. What happens after the next discharging event?**\n   After B performs the return action, the contract transitions to state 3 (Fulfilled), a terminal success state.\n\nNow I'll call StructuredOutput to return the answers:",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "B (the buyer) owes a return action; we are in state 4 (\"B must return\").",
+      "a2": "B performing the \"return\" action would discharge the obligation and transition to state 3 (Fulfilled).",
+      "a3": "If B fails to perform the return by day 14 (10 days from day 4 when the payment obligation was satisfied), a timeout triggers a transition to state 5 (Breach).",
+      "a4": "We are in state 4 (\"B must return\"), which we entered because B paid 21—a price that is not equal to 20, triggering the \"IF NOT (price EQUALS 20)\" branch from the decision diamond.",
+      "a5": "After B performs the return action, the contract transitions to state 3 (Fulfilled), a terminal success state."
+    }
+  },
+  {
+    "contract": "contracts",
+    "artifact": "B",
+    "model": "sonnet",
+    "repeat": 0,
+    "model_id": "claude-sonnet-5",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "acc64233ec221ce05",
+    "prompt_file": "prompts/contracts.B.txt",
+    "prompt_sha256": "0edd635c16f4291870d1188eda1e08ef05df83936e3c4453c68888f9134b5d8f",
+    "started_at": "2026-09-15T17:29:24.537Z",
+    "answered_at": "2026-09-15T17:29:38.187Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 1,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 2,
+      "cache_creation_input_tokens": 41549,
+      "cache_read_input_tokens": 26896,
+      "output_tokens": 1187,
+      "output_tokens_details": {
+        "thinking_tokens": 398
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 41549
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 2,
+          "output_tokens": 1187,
+          "cache_read_input_tokens": 26896,
+          "cache_creation_input_tokens": 41549,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 41549,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "1. Q1. Right now B owes a \"return\" obligation — the diagram's node 4, \"B must return,\" is the live obligation, triggered because the price paid (21) was not exactly 20.\n\n2. Q2. B performing the `return` action would discharge this and move the contract to the doublecircle \"Fulfilled\" state (edge 4→3, \"B MUST return [10]\").\n\n3. Q3. A timeout on that same \"B must return\" obligation (edge 4→5, dashed \"timeout\") would put B in breach; that is the only breach-route visible from the current node.\n\n4. Q4. We are at node 4 (\"B must return\"), reached via 0→1→2→4: S's delivery and B's payment (price ≥20, not =20) have already fired, and the ONE OF branch took the \"NOT (price EQUALS 20)\" arm into node 4.\n\n5. Q5. After B performs the discharging `return` event (edge 4→3), the contract moves into the doublecircle state labeled Fulfilled — i.e., a terminal state with nothing further owed by either party, as far as this diagram shows.",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "Right now B owes a \"return\" obligation — node 4, \"B must return,\" is the live obligation, arising because the price paid (21) was not exactly 20.",
+      "a2": "B performing the `return` action (edge 4→3, \"B MUST return [10]\") would discharge it and move the contract into the doublecircle \"Fulfilled\" state.",
+      "a3": "A timeout on that same \"B must return\" obligation (the dashed edge 4→5) would put B in breach; no other breach route is reachable from the current node.",
+      "a4": "We are at node 4 (\"B must return\"), reached via path 0→1→2→4: S's delivery and B's payment (price at least 20, not equal to 20) already fired, sending the ONE OF diamond down its \"NOT (price EQUALS 20)\" branch.",
+      "a5": "After the discharging `return` event fires (edge 4→3), the contract enters the doublecircle Fulfilled state — a terminal state in which, as far as this diagram shows, nothing further is owed by either party."
+    }
+  },
+  {
+    "contract": "contracts",
+    "artifact": "B",
+    "model": "sonnet",
+    "repeat": 1,
+    "model_id": "claude-sonnet-5",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "aa1fb5cd666f286a6",
+    "prompt_file": "prompts/contracts.B.txt",
+    "prompt_sha256": "0edd635c16f4291870d1188eda1e08ef05df83936e3c4453c68888f9134b5d8f",
+    "started_at": "2026-09-15T17:29:40.731Z",
+    "answered_at": "2026-09-15T17:29:53.842Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 1,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 2,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 68445,
+      "output_tokens": 1185,
+      "output_tokens_details": {
+        "thinking_tokens": 336
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 0
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 2,
+          "output_tokens": 1185,
+          "cache_read_input_tokens": 68445,
+          "cache_creation_input_tokens": 0,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "1. Q1: Right now, B owes S the return of the goods (\"B must return\") — because the price paid (21) was not exactly 20, the ONE OF branch took the \"NOT (price EQUALS 20)\" path into the \"B must return\" state.\n\n2. Q2: B performing the `return` action would discharge this obligation, moving the contract to Fulfilled.\n\n3. Q3: If B fails to return within the deadline attached to that obligation (labeled [10], i.e. 10 days from entering that state) the timeout edge fires and the contract moves to Breach.\n\n4. Q4: We are at node 4, \"B must return\" — reached via 0→1 (S delivered on day 2), 1→2 (B paid 21 on day 4, satisfying price AT LEAST 20), then 2→4 (since price 21 is NOT EQUAL to 20).\n\n5. Q5: After B returns (the discharging event), the contract moves to node 3, Fulfilled — a terminal (doublecircle) state, so nothing further is owed by either party.",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "Right now, B owes S the return of the goods (\"B must return\") — because the price paid (21) was not exactly 20, the ONE OF branch took the \"NOT (price EQUALS 20)\" path into the \"B must return\" state (node 4), rather than straight to Fulfilled.",
+      "a2": "B performing the `return` action (the edge 4 -> 3, \"B MUST return [10]\") would discharge what is owed, moving the contract to the Fulfilled state.",
+      "a3": "If B fails to perform the return before its deadline (the [10]-day timer on node 4), the dashed \"timeout\" edge 4 -> 5 fires, putting B in Breach.",
+      "a4": "We are at node 4, \"B must return\" — reached by 0->1 (S's delivery on day 2, satisfying \"S MUST delivery\"), then 1->2 (B's payment of 21 on day 4, satisfying \"price AT LEAST 20\"), then the ONE OF diamond at node 2 resolving to 2->4 because price (21) is NOT EQUAL to 20.",
+      "a5": "After B's return (the next discharging event), the contract moves to node 3, Fulfilled — a terminal (doublecircle) state, so no further obligations remain for either party."
+    }
+  },
+  {
+    "contract": "contracts",
+    "artifact": "C",
+    "model": "haiku",
+    "repeat": 0,
+    "model_id": "claude-haiku-4-5-20251001",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "ae8be19a63fa56873",
+    "prompt_file": "prompts/contracts.C.txt",
+    "prompt_sha256": "21d13fb2d4b6124557612c1f621da7892a79ea35ed0ee5368235b63412bc9379",
+    "started_at": "2026-09-15T17:29:54.236Z",
+    "answered_at": "2026-09-15T17:30:46.745Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 1,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 9,
+      "cache_creation_input_tokens": 34605,
+      "cache_read_input_tokens": 20277,
+      "output_tokens": 5508,
+      "output_tokens_details": {
+        "thinking_tokens": 5038
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 34605
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 9,
+          "output_tokens": 5508,
+          "cache_read_input_tokens": 20277,
+          "cache_creation_input_tokens": 34605,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 34605,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "**Q1.** B currently owes the return action (Task_4), which must be completed by day 14 (10 days after payment completed on day 4).\n\n**Q2.** B performing the return action would discharge the obligation and lead to the process ending in the \"Fulfilled\" state.\n\n**Q3.** If the return is not completed by day 14, Boundary_4 (the timeout boundary event on Task_4) fires and the process ends in the \"Breach\" state.\n\n**Q4.** We are in Task_4 (B's return obligation), on the branch where the payment price (21) does not equal 20; the deadline is day 14.\n\n**Q5.** Once the return is performed, the process transitions directly to the \"Fulfilled\" end state and terminates.\n\n---\n\nNow I'll provide the structured output as required:",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "B currently owes the return action (Task_4), which must be completed by day 14 (10 days after payment completed on day 4).",
+      "a2": "B performing the return action would discharge the obligation and lead to the process ending in the \"Fulfilled\" state.",
+      "a3": "If the return is not completed by day 14, Boundary_4 (the timeout boundary event on Task_4) fires and the process ends in the \"Breach\" state.",
+      "a4": "We are in Task_4 (B's return obligation), on the branch where the payment price (21) does not equal 20; the deadline is day 14.",
+      "a5": "Once the return is performed, the process transitions directly to the \"Fulfilled\" end state and terminates."
+    }
+  },
+  {
+    "contract": "contracts",
+    "artifact": "C",
+    "model": "haiku",
+    "repeat": 1,
+    "model_id": "claude-haiku-4-5-20251001",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "aca2547a304400b7a",
+    "prompt_file": "prompts/contracts.C.txt",
+    "prompt_sha256": "21d13fb2d4b6124557612c1f621da7892a79ea35ed0ee5368235b63412bc9379",
+    "started_at": "2026-09-15T17:29:56.280Z",
+    "answered_at": "2026-09-15T17:30:21.798Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 1,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 9,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 54882,
+      "output_tokens": 2562,
+      "output_tokens_details": {
+        "thinking_tokens": 1940
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 0
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 9,
+          "output_tokens": 2562,
+          "cache_read_input_tokens": 54882,
+          "cache_creation_input_tokens": 0,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "1. **Q1. What is owed right now, and by whom?**\nB must return (Task_4), currently active and must be completed by day 14 (10 days from when the task became active on day 4).\n\n2. **Q2. Which event(s) would discharge what is owed?**\nB completing the return action (returning the goods) would discharge this obligation and lead to End_3 (Fulfilled).\n\n3. **Q3. Which event(s) or deadline(s) would put someone in breach?**\nIf B does not complete the return by day 14, the boundary timer (Boundary_4) fires and triggers End_5 (Breach); alternatively, any breach of prior obligations before day 5 or day 3 would have been caught by earlier boundary events.\n\n4. **Q4. Where in the contract are we — which rule, branch or state is live?**\nWe are at Task_4 in the branch where price is not exactly 20 (the price paid was 21); this branch was taken after B's payment satisfied the \"price AT LEAST 20\" condition.\n\n5. **Q5. What happens after the next discharging event?**\nIf B completes the return before day 14, Task_4 flows directly to End_3 (Fulfilled), ending the contract successfully.\n\n---",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "B must return (Task_4), currently active and must be completed by day 14 (10 days from when the task became active on day 4).",
+      "a2": "B completing the return action (returning the goods) would discharge this obligation and lead to End_3 (Fulfilled).",
+      "a3": "If B does not complete the return by day 14, the boundary timer (Boundary_4) fires and triggers End_5 (Breach); alternatively, any breach of prior obligations before day 5 or day 3 would have been caught by earlier boundary events.",
+      "a4": "We are at Task_4 in the branch where price is not exactly 20 (the price paid was 21); this branch was taken after B's payment satisfied the \"price AT LEAST 20\" condition.",
+      "a5": "If B completes the return before day 14, Task_4 flows directly to End_3 (Fulfilled), ending the contract successfully."
+    }
+  },
+  {
+    "contract": "contracts",
+    "artifact": "C",
+    "model": "sonnet",
+    "repeat": 0,
+    "model_id": "claude-sonnet-5",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "aea441c5856d8ae68",
+    "prompt_file": "prompts/contracts.C.txt",
+    "prompt_sha256": "21d13fb2d4b6124557612c1f621da7892a79ea35ed0ee5368235b63412bc9379",
+    "started_at": "2026-09-15T17:30:14.401Z",
+    "answered_at": "2026-09-15T17:30:22.371Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 0,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 2,
+      "cache_creation_input_tokens": 46987,
+      "cache_read_input_tokens": 26896,
+      "output_tokens": 691,
+      "output_tokens_details": {
+        "thinking_tokens": 0
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 46987
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 2,
+          "output_tokens": 691,
+          "cache_read_input_tokens": 26896,
+          "cache_creation_input_tokens": 46987,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 46987,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "Right now, nothing is owed under this contract. S's delivery obligation (Task_0) was discharged on day 2 (within its 3-day window), and B's payment obligation (Task_1) was discharged on day 4 (within its 3-day window, and satisfying the \"price AT LEAST 20\" condition on the flow into Split_2). Since price (21) is not exactly 20, flow goes to Task_4 \"MUST return\", so B currently owes a \"return\" obligation (the nature/deadline of which is discussed in Q2-Q4).",
+      "a2": "B doing \"return\" (Task_4) would discharge the currently pending obligation and lead via Flow_Task_4__End_3 to End_3 \"Fulfilled\".",
+      "a3": "B would be in breach if the \"return\" obligation (Task_4) is not discharged within 10 days of entering that task — Boundary_4's P10D timer firing routes to End_5 \"Breach\" (an error end event). Since Task_1 was completed on day 4, Task_4 presumably starts around day 4, so its 10-day deadline would fall around day 14 — cannot tell the exact start day from this artifact alone.",
+      "a4": "We are past Task_0 and Task_1 (both discharged), past the exclusive gateway Split_2 (took the \"NOT (price EQUALS 20)\" branch since price=21), and currently inside Task_4 \"MUST return\" in B's lane, with Boundary_4's 10-day timer running; the clock at day 10 is within that window if Task_4 started around day 4.",
+      "a5": "After B performs \"return\" (discharging Task_4), the flow Flow_Task_4__End_3 fires and the process reaches End_3 \"Fulfilled\" — the contract ends in the fulfilled state with no further obligations."
+    }
+  },
+  {
+    "contract": "contracts",
+    "artifact": "C",
+    "model": "sonnet",
+    "repeat": 1,
+    "model_id": "claude-sonnet-5",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "a0cebb5d01df06b81",
+    "prompt_file": "prompts/contracts.C.txt",
+    "prompt_sha256": "21d13fb2d4b6124557612c1f621da7892a79ea35ed0ee5368235b63412bc9379",
+    "started_at": "2026-09-15T17:30:24.508Z",
+    "answered_at": "2026-09-15T17:30:34.926Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 1,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 2,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 73883,
+      "output_tokens": 1019,
+      "output_tokens_details": {
+        "thinking_tokens": 497
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 0
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 2,
+          "output_tokens": 1019,
+          "cache_read_input_tokens": 73883,
+          "cache_creation_input_tokens": 0,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "Right now, B owes S a \"return\" (Task_4, \"PARTY B MUST return\"); S owes nothing further, since S's delivery and B's payment obligations have already been discharged.",
+      "a2": "B doing \"return\" would discharge the outstanding obligation, taking the flow from Task_4 to End_3 (Fulfilled).",
+      "a3": "Task_4 has a boundary timer of P10D attached (Boundary_4), started when Task_4 became live on day 4 (right after B's payment discharged Task_1), so the deadline is day 14. If B has not returned by day 14, Boundary_4 fires and the flow goes to End_5 (Breach, errorCode BREACH).",
+      "a4": "We are inside Task_4 (\"MUST return\"), on the branch taken because price (21) is NOT EQUALS 20 — i.e. the Split_2 gateway's \"NOT (price EQUALS 20)\" edge — with the P10D boundary timer (Boundary_4) still running (day 10 of 14).",
+      "a5": "Once B performs \"return\" (the next discharging event), the flow follows Flow_Task_4__End_3 straight to End_3, labeled \"Fulfilled\" — the process ends in the fulfilled state with no further tasks."
+    }
+  },
+  {
+    "contract": "every-run-example",
+    "artifact": "A",
+    "model": "haiku",
+    "repeat": 0,
+    "model_id": "claude-haiku-4-5-20251001",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "a122e18b60d9fbab9",
+    "prompt_file": "prompts/every-run-example.A.txt",
+    "prompt_sha256": "4dc1e401ee74b2933db7f95c1c59e0426031c2a09200ac4a03478e2dbfde9715",
+    "started_at": "2026-09-15T17:30:24.807Z",
+    "answered_at": "2026-09-15T17:30:39.243Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 2,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 10,
+      "cache_creation_input_tokens": 1150,
+      "cache_read_input_tokens": 49940,
+      "output_tokens": 523,
+      "output_tokens_details": {
+        "thinking_tokens": 204
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 1150
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 10,
+          "output_tokens": 523,
+          "cache_read_input_tokens": 49940,
+          "cache_creation_input_tokens": 1150,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 1150,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "**Q1. What is owed right now, and by whom?**\nTenant OF \"Carol\" must provide their signature on the contract, with a deadline by time 14. This is one of three parties who must all sign before the next step, and two of the three have already signed.\n\n**Q2. Which event(s) would discharge what is owed?**\nTenant OF \"Carol\" signing (Tenant OF \"Carol\") at the current time (2) would discharge this obligation and trigger the next step.\n\n**Q3. Which event(s) or deadline(s) would put someone in breach?**\nIf nothing happens by time 14 (the clock reaches 15), the contract enters breach, though no specific party is named as the breaching party in the artifact.\n\n**Q4. Where in the contract are we — which rule, branch or state is live?**\nCannot tell from this. The artifact indicates we are in the tenancy contract in \"in progress\" standing, but does not identify which specific rule, branch, or state is currently active.\n\n**Q5. What happens after the next discharging event?**\nAfter Tenant OF \"Carol\" signs, Landlord OF \"Ms Ng\" will be obligated to Deliver (EXACTLY theLandlord) with a deadline of 7 (5 time units from now).",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "Tenant OF \"Carol\" must provide their signature on the contract, with a deadline by time 14. This is one of three parties who must all sign before the next step, and two of the three have already signed.",
+      "a2": "Tenant OF \"Carol\" signing (Tenant OF \"Carol\") at the current time (2) would discharge this obligation and trigger the next step.",
+      "a3": "If nothing happens by time 14 (the clock reaches 15), the contract enters breach, though no specific party is named as the breaching party in the artifact.",
+      "a4": "Cannot tell from this. The artifact indicates we are in the tenancy contract in \"in progress\" standing, but does not identify which specific rule, branch, or state is currently active.",
+      "a5": "After Tenant OF \"Carol\" signs, Landlord OF \"Ms Ng\" will be obligated to Deliver (EXACTLY theLandlord) with a deadline of 7 (5 time units from now)."
+    }
+  },
+  {
+    "contract": "every-run-example",
+    "artifact": "A",
+    "model": "haiku",
+    "repeat": 1,
+    "model_id": "claude-haiku-4-5-20251001",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "a6e7cf6b7a5db7b2f",
+    "prompt_file": "prompts/every-run-example.A.txt",
+    "prompt_sha256": "4dc1e401ee74b2933db7f95c1c59e0426031c2a09200ac4a03478e2dbfde9715",
+    "started_at": "2026-09-15T17:30:37.374Z",
+    "answered_at": "2026-09-15T17:30:47.914Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 1,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 9,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 49940,
+      "output_tokens": 1143,
+      "output_tokens_details": {
+        "thinking_tokens": 598
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 0
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 9,
+          "output_tokens": 1143,
+          "cache_read_input_tokens": 49940,
+          "cache_creation_input_tokens": 0,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "1. **Q1.** Tenant OF \"Carol\" must Sign OF (Tenant OF \"Carol\"), due by day 14 (12 days from now); this is one of 3 tenants who must all act before the contract can move forward.\n\n2. **Q2.** Tenant OF \"Carol\" doing the Sign OF (Tenant OF \"Carol\") event would discharge what is owed.\n\n3. **Q3.** If nothing happens by day 14 (when the clock reaches 15), the contract enters breach, with no specific party named as in breach.\n\n4. **Q4.** Cannot tell from this—the artifact indicates we are \"in progress\" with a reference to line 85's #TRACE, but does not name the specific rule, branch, or state that is live.\n\n5. **Q5.** After Tenant OF \"Carol\" signs, Landlord OF \"Ms Ng\" MUST Deliver (EXACTLY theLandlord), due by day 7 (5 days from that point).\n\n---",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "Tenant OF \"Carol\" must Sign OF (Tenant OF \"Carol\"), due by day 14 (12 days from now); this is one of 3 tenants who must all act before the contract can move forward.",
+      "a2": "Tenant OF \"Carol\" doing the Sign OF (Tenant OF \"Carol\") event would discharge what is owed.",
+      "a3": "If nothing happens by day 14 (when the clock reaches 15), the contract enters breach, with no specific party named as in breach.",
+      "a4": "Cannot tell from this—the artifact indicates we are \"in progress\" with a reference to line 85's #TRACE, but does not name the specific rule, branch, or state that is live.",
+      "a5": "After Tenant OF \"Carol\" signs, Landlord OF \"Ms Ng\" MUST Deliver (EXACTLY theLandlord), due by day 7 (5 days from that point)."
+    }
+  },
+  {
+    "contract": "every-run-example",
+    "artifact": "A",
+    "model": "sonnet",
+    "repeat": 0,
+    "model_id": "claude-sonnet-5",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "a89336ce54c6c2717",
+    "prompt_file": "prompts/every-run-example.A.txt",
+    "prompt_sha256": "4dc1e401ee74b2933db7f95c1c59e0426031c2a09200ac4a03478e2dbfde9715",
+    "started_at": "2026-09-15T17:30:41.803Z",
+    "answered_at": "2026-09-15T17:30:47.104Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 0,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 2,
+      "cache_creation_input_tokens": 40754,
+      "cache_read_input_tokens": 26896,
+      "output_tokens": 460,
+      "output_tokens_details": {
+        "thinking_tokens": 0
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 40754
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 2,
+          "output_tokens": 460,
+          "cache_read_input_tokens": 26896,
+          "cache_creation_input_tokens": 40754,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 40754,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "Right now, Tenant OF \"Carol\" owes a Sign OF (Tenant OF \"Carol\"), due by clock time 14 (12 from now).",
+      "a2": "Tenant OF \"Carol\" performing Sign OF (Tenant OF \"Carol\") would discharge what is owed (this is one of 3 who must all act before the next step, and 2 of 3 have already acted).",
+      "a3": "If nothing happens by 14 (i.e. the clock reaches 15), the contract goes into breach; no party is named as the breaching party.",
+      "a4": "We are in the step following alice's and bob's Sign events (at clock 1 and 2 respectively), waiting on the third required signature (Carol's) before the next step can proceed — the contract is \"in progress,\" 2 of 3 required actors having acted.",
+      "a5": "After Carol signs (Sign OF (Tenant OF \"Carol\")) at the current time (2), Landlord OF \"Ms Ng\" would then be obligated to Deliver (EXACTLY theLandlord), due by clock time 7 (5 from then)."
+    }
+  },
+  {
+    "contract": "every-run-example",
+    "artifact": "A",
+    "model": "sonnet",
+    "repeat": 1,
+    "model_id": "claude-sonnet-5",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "a5d8341b1bde6ae56",
+    "prompt_file": "prompts/every-run-example.A.txt",
+    "prompt_sha256": "4dc1e401ee74b2933db7f95c1c59e0426031c2a09200ac4a03478e2dbfde9715",
+    "started_at": "2026-09-15T17:30:49.503Z",
+    "answered_at": "2026-09-15T17:30:54.208Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 0,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 2,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 67650,
+      "output_tokens": 426,
+      "output_tokens_details": {
+        "thinking_tokens": 0
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 0
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 2,
+          "output_tokens": 426,
+          "cache_read_input_tokens": 67650,
+          "cache_creation_input_tokens": 0,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "Right now, Tenant OF \"Carol\" owes a Sign OF (Tenant OF \"Carol\") action, due by clock time 14.",
+      "a2": "Carol (Tenant OF \"Carol\") performing Sign OF (Tenant OF \"Carol\") would discharge what is currently owed.",
+      "a3": "If nothing happens by 14 (i.e. the clock reaches 15 with no Carol signature), the contract goes into breach; no party is named as the breaching party in the artifact.",
+      "a4": "We are at the signing stage: alice and bob have already signed (at 1 and 2), and the contract is holding at the \"all parties must sign\" gate, waiting on Carol — 2 of 3 required signatures done, still \"in progress.\"",
+      "a5": "After Carol signs, the Landlord (Ms Ng) becomes obligated to Deliver (EXACTLY theLandlord), due by clock time 7 (5 ticks from when Carol's signing occurs)."
+    }
+  },
+  {
+    "contract": "every-run-example",
+    "artifact": "B",
+    "model": "haiku",
+    "repeat": 0,
+    "model_id": "claude-haiku-4-5-20251001",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "a9b63b9f12130cf5f",
+    "prompt_file": "prompts/every-run-example.B.txt",
+    "prompt_sha256": "fd2f5e36479e340a2dd6e83f6e3f0950cb970575c955f5399595c2e5b133378d",
+    "started_at": "2026-09-15T17:30:50.528Z",
+    "answered_at": "2026-09-15T17:31:10.858Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 1,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 9,
+      "cache_creation_input_tokens": 29953,
+      "cache_read_input_tokens": 20277,
+      "output_tokens": 2183,
+      "output_tokens_details": {
+        "thinking_tokens": 1662
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 29953
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 9,
+          "output_tokens": 2183,
+          "cache_read_input_tokens": 20277,
+          "cache_creation_input_tokens": 29953,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 29953,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "# Answers\n\n**Q1. What is owed right now, and by whom?**\nThe signature of all three tenants is owed; Carol is the only one who has not yet signed.\n\n**Q2. Which event(s) would discharge what is owed?**\nCarol signing would discharge the current obligation and move us to state 1; then the landlord delivering would discharge the next obligation.\n\n**Q3. Which event(s) or deadline(s) would put someone in breach?**\nA timeout in state 0 (if all tenants do not sign by the deadline) or a timeout in state 1 (if the landlord does not deliver by the deadline marked \"[5]\") would trigger breach.\n\n**Q4. Where in the contract are we — which rule, branch or state is live?**\nWe are in state 0 (initial), where the active rule requires every tenant to sign.\n\n**Q5. What happens after the next discharging event?**\nAfter Carol signs, we transition to state 1, where the landlord must deliver (by the deadline marked \"[5]\").\n\n---\n\nNow I will call StructuredOutput as required:",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "The signature of all three tenants is owed; Carol is the only one who has not yet signed.",
+      "a2": "Carol signing would discharge the current obligation and move us to state 1; then the landlord delivering would discharge the next obligation.",
+      "a3": "A timeout in state 0 (if all tenants do not sign by the deadline) or a timeout in state 1 (if the landlord does not deliver by the deadline marked \"[5]\") would trigger breach.",
+      "a4": "We are in state 0 (initial), where the active rule requires every tenant to sign.",
+      "a5": "After Carol signs, we transition to state 1, where the landlord must deliver (by the deadline marked \"[5]\")."
+    }
+  },
+  {
+    "contract": "every-run-example",
+    "artifact": "B",
+    "model": "haiku",
+    "repeat": 1,
+    "model_id": "claude-haiku-4-5-20251001",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "a480299ae03b5d70c",
+    "prompt_file": "prompts/every-run-example.B.txt",
+    "prompt_sha256": "fd2f5e36479e340a2dd6e83f6e3f0950cb970575c955f5399595c2e5b133378d",
+    "started_at": "2026-09-15T17:30:50.906Z",
+    "answered_at": "2026-09-15T17:31:05.609Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 1,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 9,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 50230,
+      "output_tokens": 1528,
+      "output_tokens_details": {
+        "thinking_tokens": 956
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 0
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 9,
+          "output_tokens": 1528,
+          "cache_read_input_tokens": 50230,
+          "cache_creation_input_tokens": 0,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "1. **Q1. What is owed right now, and by whom?**\nCarol's signature is owed; she is the remaining tenant who has not yet signed.\n\n2. **Q2. Which event(s) would discharge what is owed?**\nCarol signing would satisfy the current obligation and transition to node 1, where the landlord's Deliver event would discharge the landlord's obligation and move to Fulfilled.\n\n3. **Q3. Which event(s) or deadline(s) would put someone in breach?**\nA timeout event (indicated by the dashed red arrows) would trigger breach; the diagram indicates timeouts exist at both node 0 and node 1, with references to durations [14] and [5] respectively.\n\n4. **Q4. Where in the contract are we — which rule, branch or state is live?**\nWe are in the initial state (node 0), and the live rule requires \"EVERY Tenant t IN tenants MUST Sign ... ONCE ALL HAVE.\"\n\n5. **Q5. What happens after the next discharging event?**\nOnce Carol signs, the contract transitions from node 0 to node 1, and the landlord's obligation to Deliver becomes active.\n\n---\n\nNow I'll return the structured output as required:",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "Carol's signature is owed; she is the remaining tenant who has not yet signed.",
+      "a2": "Carol signing would satisfy the current obligation and transition to node 1, where the landlord's Deliver event would discharge the landlord's obligation and move to Fulfilled.",
+      "a3": "A timeout event (indicated by the dashed red arrows) would trigger breach; the diagram indicates timeouts exist at both node 0 and node 1, with references to durations [14] and [5] respectively.",
+      "a4": "We are in the initial state (node 0), and the live rule requires \"EVERY Tenant t IN tenants MUST Sign ... ONCE ALL HAVE.\"",
+      "a5": "Once Carol signs, the contract transitions from node 0 to node 1, and the landlord's obligation to Deliver becomes active."
+    }
+  },
+  {
+    "contract": "every-run-example",
+    "artifact": "B",
+    "model": "sonnet",
+    "repeat": 0,
+    "model_id": "claude-sonnet-5",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "a6d74ff8d1273843f",
+    "prompt_file": "prompts/every-run-example.B.txt",
+    "prompt_sha256": "fd2f5e36479e340a2dd6e83f6e3f0950cb970575c955f5399595c2e5b133378d",
+    "started_at": "2026-09-15T17:30:56.674Z",
+    "answered_at": "2026-09-15T17:31:06.235Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 1,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 2,
+      "cache_creation_input_tokens": 41156,
+      "cache_read_input_tokens": 26896,
+      "output_tokens": 831,
+      "output_tokens_details": {
+        "thinking_tokens": 252
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 41156
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 2,
+          "output_tokens": 831,
+          "cache_read_input_tokens": 26896,
+          "cache_creation_input_tokens": 41156,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 41156,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "Right now, at day 2, the contract is still in state 0. Carol still owes her signature (she has not signed); Alice and Bob have already discharged their own signing duties.",
+      "a2": "Carol doing \"Sign\" would satisfy the \"EVERY Tenant t IN tenants MUST Sign\" condition (ONCE ALL HAVE), discharging the outstanding duty and moving the contract to state 1, where the landlord's delivery duty then begins.",
+      "a3": "Either timeout edge (0→3 or 1→3, both labeled \"timeout\", dashed, red) would put someone in breach: the 0→3 timeout if Carol (or the group) fails to complete signing in time, or the 1→3 timeout if the landlord fails to Deliver within its window [5] once state 1 is reached.",
+      "a4": "We are at node 0 (initial), on the edge/rule \"EVERY Tenant t IN tenants MUST Sign ... [14] ONCE ALL HAVE\" — waiting on Carol's signature before the transition to node 1 fires.",
+      "a5": "The next discharging event is Carol signing, which fires the 0→1 transition; that lands us in state 1 (\"theLandlord must Deliver ...\"), where the live rule becomes \"theLandlord MUST Deliver ... [5]\", with a timeout edge from state 1 to Breach still active until delivery discharges it and reaches Fulfilled."
+    }
+  },
+  {
+    "contract": "every-run-example",
+    "artifact": "B",
+    "model": "sonnet",
+    "repeat": 1,
+    "model_id": "claude-sonnet-5",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "a25a577e8596c2a3e",
+    "prompt_file": "prompts/every-run-example.B.txt",
+    "prompt_sha256": "fd2f5e36479e340a2dd6e83f6e3f0950cb970575c955f5399595c2e5b133378d",
+    "started_at": "2026-09-15T17:31:08.539Z",
+    "answered_at": "2026-09-15T17:31:15.673Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 1,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 2,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 68052,
+      "output_tokens": 648,
+      "output_tokens_details": {
+        "thinking_tokens": 11
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 0
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 2,
+          "output_tokens": 648,
+          "cache_read_input_tokens": 68052,
+          "cache_creation_input_tokens": 0,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "Right now, nothing is owed yet under the signing clause: Carol still owes her Sign obligation (the EVERY Tenant MUST Sign duty, deadline 14, is not yet satisfied since not ALL have signed). The landlord's Deliver duty (state 1) has not started, since that only triggers \"ONCE ALL HAVE\" signed.",
+      "a2": "Carol doing Sign would complete the \"ALL HAVE\" condition, discharging the signing obligation and moving the contract from state 0 to state 1; from there, the landlord's Deliver event would discharge state 1 and move to Fulfilled (state 2).",
+      "a3": "A timeout on the signing deadline (the \"[14]\" on the 0→1 edge) would put the contract in Breach (0→3); once past state 1, a timeout on the delivery deadline (\"[5]\") would also cause Breach (1→3). The diagram doesn't specify from what day these deadlines count, so I can't tell exactly when they'd fire.",
+      "a4": "We are still at state 0 (initial), on the \"EVERY Tenant t IN tenants MUST Sign ... ONCE ALL HAVE\" edge/rule — Alice and Bob have signed but Carol hasn't, so the ALL-HAVE condition for the 0→1 transition is not yet met.",
+      "a5": "The next discharging event would be Carol's Sign, which completes ALL HAVE and moves the contract to state 1, where the landlord must Deliver (within deadline 5); Deliver would then discharge state 1 and move the contract to state 2, Fulfilled."
+    }
+  },
+  {
+    "contract": "every-run-example",
+    "artifact": "C",
+    "model": "haiku",
+    "repeat": 0,
+    "model_id": "claude-haiku-4-5-20251001",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "adcb1773bedd2c515",
+    "prompt_file": "prompts/every-run-example.C.txt",
+    "prompt_sha256": "e3c518a2f036d1b4c4007daea93e7bc92e59072c8f5cbed160ddb40b84f1750c",
+    "started_at": "2026-09-15T17:31:08.641Z",
+    "answered_at": "2026-09-15T17:31:52.373Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 1,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 9,
+      "cache_creation_input_tokens": 32621,
+      "cache_read_input_tokens": 20277,
+      "output_tokens": 4463,
+      "output_tokens_details": {
+        "thinking_tokens": 3905
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 32621
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 9,
+          "output_tokens": 4463,
+          "cache_read_input_tokens": 20277,
+          "cache_creation_input_tokens": 32621,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 32621,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "**Q1. What is owed right now, and by whom?**\n\nCarol must sign. She is the remaining tenant whose signing obligation has not been completed.\n\n**Q2. Which event(s) would discharge what is owed?**\n\nCarol signing would discharge the signing obligation and trigger Ms Ng's delivery obligation; Ms Ng delivering would then discharge that obligation and reach fulfillment (End_2).\n\n**Q3. Which event(s) or deadline(s) would put someone in breach?**\n\nIf all tenants don't sign within 14 days, Boundary_0 fires and triggers breach (End_3); if the landlord doesn't deliver within 5 days of signing completion, Boundary_1 fires and triggers breach (End_3).\n\n**Q4. Where in the contract are we — which rule, branch or state is live?**\n\nWe are in Task_0, the multi-instance signing phase, with two instances completed (Alice and Bob) and one pending (Carol).\n\n**Q5. What happens after the next discharging event?**\n\nAfter Carol signs, the process advances to Task_1, where Ms Ng must deliver within 5 days.\n\n---\n\nNow I'll return my structured answer:",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "Carol must sign. She is the remaining tenant whose signing obligation has not been completed.",
+      "a2": "Carol signing would discharge the signing obligation and trigger Ms Ng's delivery obligation; Ms Ng delivering would then discharge that obligation and reach fulfillment (End_2).",
+      "a3": "If all tenants don't sign within 14 days, Boundary_0 fires and triggers breach (End_3); if the landlord doesn't deliver within 5 days of signing completion, Boundary_1 fires and triggers breach (End_3).",
+      "a4": "We are in Task_0, the multi-instance signing phase, with two instances completed (Alice and Bob) and one pending (Carol).",
+      "a5": "After Carol signs, the process advances to Task_1, where Ms Ng must deliver within 5 days."
+    }
+  },
+  {
+    "contract": "every-run-example",
+    "artifact": "C",
+    "model": "haiku",
+    "repeat": 1,
+    "model_id": "claude-haiku-4-5-20251001",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "aa3b713659848ec06",
+    "prompt_file": "prompts/every-run-example.C.txt",
+    "prompt_sha256": "e3c518a2f036d1b4c4007daea93e7bc92e59072c8f5cbed160ddb40b84f1750c",
+    "started_at": "2026-09-15T17:31:13.307Z",
+    "answered_at": "2026-09-15T17:31:30.677Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 1,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 9,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 52898,
+      "output_tokens": 1699,
+      "output_tokens_details": {
+        "thinking_tokens": 997
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 0
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 9,
+          "output_tokens": 1699,
+          "cache_read_input_tokens": 52898,
+          "cache_creation_input_tokens": 0,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "1. **Q1. What is owed right now, and by whom?**\nCarol (the third tenant) must sign. The contract is currently active in Task_0, waiting for Carol's signature to complete the multi-instance Sign activity.\n\n2. **Q2. Which event(s) would discharge what is owed?**\nCarol signing would complete Task_0 and trigger Task_1, transferring the obligation to the landlord Ms Ng to Deliver; once Ms Ng delivers, Task_1 completes and the contract ends in the Fulfilled state (End_2).\n\n3. **Q3. Which event(s) or deadline(s) would put someone in breach?**\nIf all tenants do not sign by day 14, Boundary_0 fires and the contract enters Breach (End_3); if the landlord does not deliver within 5 days after Carol signs, Boundary_1 fires and triggers Breach.\n\n4. **Q4. Where in the contract are we — which rule, branch or state is live?**\nWe are in Task_0, the parallel multi-instance Sign activity, with two of three tenant instances (Alice and Bob) complete and Carol's instance still pending; the ONCE ALL HAVE barrier gate is open, waiting for Carol.\n\n5. **Q5. What happens after the next discharging event?**\nAfter Carol signs, control flows to Task_1, making the landlord obligated to Deliver within 5 days; after Deliver completes, the contract reaches Fulfilled (End_2).",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "Carol (the third tenant) must sign. The contract is currently active in Task_0, waiting for Carol's signature to complete the multi-instance Sign activity.",
+      "a2": "Carol signing would complete Task_0 and trigger Task_1, transferring the obligation to the landlord Ms Ng to Deliver; once Ms Ng delivers, Task_1 completes and the contract ends in the Fulfilled state (End_2).",
+      "a3": "If all tenants do not sign by day 14, Boundary_0 fires and the contract enters Breach (End_3); if the landlord does not deliver within 5 days after Carol signs, Boundary_1 fires and triggers Breach.",
+      "a4": "We are in Task_0, the parallel multi-instance Sign activity, with two of three tenant instances (Alice and Bob) complete and Carol's instance still pending; the ONCE ALL HAVE barrier gate is open, waiting for Carol.",
+      "a5": "After Carol signs, control flows to Task_1, making the landlord obligated to Deliver within 5 days; after Deliver completes, the contract reaches Fulfilled (End_2)."
+    }
+  },
+  {
+    "contract": "every-run-example",
+    "artifact": "C",
+    "model": "sonnet",
+    "repeat": 0,
+    "model_id": "claude-sonnet-5",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "a1f34df4c0dd97bb9",
+    "prompt_file": "prompts/every-run-example.C.txt",
+    "prompt_sha256": "e3c518a2f036d1b4c4007daea93e7bc92e59072c8f5cbed160ddb40b84f1750c",
+    "started_at": "2026-09-15T17:31:18.395Z",
+    "answered_at": "2026-09-15T17:31:26.653Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 1,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 2,
+      "cache_creation_input_tokens": 44522,
+      "cache_read_input_tokens": 26896,
+      "output_tokens": 759,
+      "output_tokens_details": {
+        "thinking_tokens": 15
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 44522
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 2,
+          "output_tokens": 759,
+          "cache_read_input_tokens": 26896,
+          "cache_creation_input_tokens": 44522,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 44522,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "Carol still owes a Sign obligation (she is the outstanding member of \"EVERY Tenant t IN tenants\"). Alice and Bob have already discharged their instances by signing on days 1 and 2. The landlord's Deliver obligation is not yet live because it only starts once ALL tenants have signed.",
+      "a2": "Carol doing Sign would complete the last outstanding instance of Task_0 (\"MUST Sign ... WITHIN 14 ONCE ALL HAVE\"), which discharges the tenants' multi-instance obligation as a whole and fires the outgoing flow into Task_1, starting the landlord's MUST Deliver obligation.",
+      "a3": "Carol's Sign obligation breaches if Task_0 is not completed (i.e., not all tenants have signed) within P14D of Task_0 starting — Boundary_0's timer fires and flows to End_3 (Breach). Separately, once Task_1 (Deliver) starts, the landlord breaches if delivery is not completed within P5D via Boundary_1, also flowing to End_3.",
+      "a4": "We are inside Task_0, the multi-instance \"MUST Sign ... WITHIN 14 ONCE ALL HAVE\" activity, with two of three tenant instances (Alice's and Bob's) completed and Carol's instance still pending; the process has not yet crossed the Flow_Task_0__Task_1 edge into the landlord's Deliver task.",
+      "a5": "The next discharging event would be Carol signing, which completes Task_0 and moves the process along Flow_Task_0__Task_1 into Task_1, the landlord's \"MUST Deliver ... WITHIN 5\" obligation, guarded by its own P5D boundary timer (Boundary_1) that leads to End_3 (Breach) if missed, or to End_2 (Fulfilled) via Flow_Task_1__End_2 once delivery is completed."
+    }
+  },
+  {
+    "contract": "every-run-example",
+    "artifact": "C",
+    "model": "sonnet",
+    "repeat": 1,
+    "model_id": "claude-sonnet-5",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "adc763d3c5653c1c1",
+    "prompt_file": "prompts/every-run-example.C.txt",
+    "prompt_sha256": "e3c518a2f036d1b4c4007daea93e7bc92e59072c8f5cbed160ddb40b84f1750c",
+    "started_at": "2026-09-15T17:31:29.239Z",
+    "answered_at": "2026-09-15T17:31:37.236Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 1,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 2,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 71418,
+      "output_tokens": 776,
+      "output_tokens_details": {
+        "thinking_tokens": 16
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 0
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 2,
+          "output_tokens": 776,
+          "cache_read_input_tokens": 71418,
+          "cache_creation_input_tokens": 0,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "Nothing is owed yet, strictly speaking: Carol still owes her Sign obligation (Task_0 is a multi-instance activity, one instance per tenant, and it only completes \"ONCE ALL HAVE\" signed). Alice and Bob have discharged their own instances, but the landlord's Deliver obligation (Task_1) has not yet become live because the barrier hasn't fired.",
+      "a2": "Carol doing Sign would complete the last outstanding instance of Task_0, firing the \"ONCE ALL HAVE\" barrier and flowing to Task_1, which puts the landlord under the MUST Deliver obligation; the landlord then doing Deliver would discharge that obligation via Flow_Task_1__End_2 to End_2 (Fulfilled).",
+      "a3": "Boundary_0 (attached to Task_0, timer P14D) would breach if Carol has not signed within 14 days of the obligation's start; Boundary_1 (attached to Task_1, timer P5D) would breach if, once Task_1 becomes live, the landlord fails to Deliver within 5 days. Both boundary events route to End_3 (Breach).",
+      "a4": "We are inside Task_0 (\"MUST Sign ...\"), still within its multi-instance loop, with two of three instances (Alice, Bob) completed and Carol's instance still outstanding; the Boundary_0 (P14D) timer attached to Task_0 is running, and Task_1 (the landlord's Deliver obligation) has not yet been reached.",
+      "a5": "After Carol signs (the next discharging event, completing Task_0's barrier), the flow moves via Flow_Task_0__Task_1 into Task_1 (\"MUST Deliver ...\"), which starts the landlord's obligation together with its own Boundary_1 (P5D) timer; the landlord must then Deliver within 5 days to reach End_2 (Fulfilled), or fail to and be routed to End_3 (Breach)."
+    }
+  },
+  {
+    "contract": "promissory-note",
+    "artifact": "A",
+    "model": "haiku",
+    "repeat": 0,
+    "model_id": "claude-haiku-4-5-20251001",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "a1e26e6d652f4c6dd",
+    "prompt_file": "prompts/promissory-note.A.txt",
+    "prompt_sha256": "7e577f492d7a251613f9e7980cb6ec586a8584ae5639ba997f722f529c02b9a9",
+    "started_at": "2026-09-15T17:32:54.276Z",
+    "answered_at": "2026-09-15T17:33:14.649Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 2,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 10,
+      "cache_creation_input_tokens": 1543,
+      "cache_read_input_tokens": 50291,
+      "output_tokens": 569,
+      "output_tokens_details": {
+        "thinking_tokens": 277
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 1543
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 10,
+          "output_tokens": 569,
+          "cache_read_input_tokens": 50291,
+          "cache_creation_input_tokens": 1543,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 1543,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "1. **Q1.** The Commercial Borrower (Jane Dough Pte Ltd) must pay a monthly installment to The Lender in the amount called \"Amount Transferred\", due by clock time 739769.\n\n2. **Q2.** The Commercial Borrower paying the monthly installment to The Lender would discharge the obligation.\n\n3. **Q3.** If the payment is not made by the deadline of clock time 739769 (when the clock reaches 739770), the borrower would be in breach and the obligation would continue indefinitely with no deadline.\n\n4. **Q4.** We are in the \"Payment Obligations\" section of the Total Repayment Amount obligation, currently in progress after 1 event, with the clock at 739708 and the next deadline at 739769.\n\n5. **Q5.** Cannot tell from this artifact—it does not describe what state or obligations follow after the payment is made.",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "The Commercial Borrower (Jane Dough Pte Ltd) must pay a monthly installment to The Lender in the amount called \"Amount Transferred\", due by clock time 739769.",
+      "a2": "The Commercial Borrower paying the monthly installment to The Lender would discharge the obligation.",
+      "a3": "If the payment is not made by the deadline of clock time 739769 (when the clock reaches 739770), the borrower would be in breach and the obligation would continue indefinitely with no deadline.",
+      "a4": "We are in the \"Payment Obligations\" section of the Total Repayment Amount obligation, currently in progress after 1 event, with the clock at 739708 and the next deadline at 739769.",
+      "a5": "Cannot tell from this artifact—it does not describe what state or obligations follow after the payment is made."
+    }
+  },
+  {
+    "contract": "promissory-note",
+    "artifact": "A",
+    "model": "haiku",
+    "repeat": 1,
+    "model_id": "claude-haiku-4-5-20251001",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "a7059492fc043bafc",
+    "prompt_file": "prompts/promissory-note.A.txt",
+    "prompt_sha256": "7e577f492d7a251613f9e7980cb6ec586a8584ae5639ba997f722f529c02b9a9",
+    "started_at": "2026-09-15T17:33:02.364Z",
+    "answered_at": "2026-09-15T17:33:23.774Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 1,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 9,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 50291,
+      "cache_creation": {
+        "ephemeral_5m_input_tokens": 0,
+        "ephemeral_1h_input_tokens": 0
+      },
+      "output_tokens": 1,
+      "service_tier": "standard",
+      "inference_geo": "not_available"
+    },
+    "answer_text": "1. **Q1. What is owed right now, and by whom?**\n   The Commercial Borrower (Jane Dough Pte Ltd) must pay a monthly installment to The Lender in the amount of `Amount Transferred`, due by clock time 739769.\n\n2. **Q2. Which event(s) would discharge what is owed?**\n   Cannot tell from this — the artifact describes the obligation and deadline but does not explicitly show a scenario where the payment is successfully made.\n\n3. **Q3. Which event(s) or deadline(s) would put someone in breach?**\n   Cannot tell from this — the artifact explicitly states that passing the 739769 deadline \"neither ends nor breaches\" the obligation; it simply continues without a deadline.\n\n4. **Q4. Where in the contract are we — which rule, branch or state is live?**\n   The system is in \"Payment Obligations\" with standing \"in progress\" at clock time 739708, but the artifact does not name a specific rule, branch, or state designation.\n\n5. **Q5. What happens after the next discharging event?**\n   Cannot tell from this — the artifact only describes the timeout scenario (what happens if the deadline passes), not what follows a payment.\n\n---",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "The Commercial Borrower (Jane Dough Pte Ltd) must pay a monthly installment to The Lender in the amount of `Amount Transferred`, due by clock time 739769.",
+      "a2": "Cannot tell from this — the artifact describes the obligation and deadline but does not explicitly show a scenario where the payment is successfully made.",
+      "a3": "Cannot tell from this — the artifact explicitly states that passing the 739769 deadline \"neither ends nor breaches\" the obligation; it simply continues without a deadline.",
+      "a4": "The system is in \"Payment Obligations\" with standing \"in progress\" at clock time 739708, but the artifact does not name a specific rule, branch, or state designation.",
+      "a5": "Cannot tell from this — the artifact only describes the timeout scenario (what happens if the deadline passes), not what follows a payment."
+    }
+  },
+  {
+    "contract": "promissory-note",
+    "artifact": "A",
+    "model": "sonnet",
+    "repeat": 0,
+    "model_id": "claude-sonnet-5",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "a6d3459ff71a1bb82",
+    "prompt_file": "prompts/promissory-note.A.txt",
+    "prompt_sha256": "7e577f492d7a251613f9e7980cb6ec586a8584ae5639ba997f722f529c02b9a9",
+    "started_at": "2026-09-15T17:33:08.825Z",
+    "answered_at": "2026-09-15T17:33:15.803Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 1,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 2,
+      "cache_creation_input_tokens": 41284,
+      "cache_read_input_tokens": 26896,
+      "output_tokens": 608,
+      "output_tokens_details": {
+        "thinking_tokens": 9
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 41284
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 2,
+          "output_tokens": 608,
+          "cache_read_input_tokens": 26896,
+          "cache_creation_input_tokens": 41284,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 41284,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "The Commercial Borrower (Jane Dough Pte Ltd) currently owes a monthly installment payment to The Lender; the amount owed is described only as `Amount Transferred` (not a fixed number shown here), due by clock 739769.",
+      "a2": "The event that would discharge the obligation is the Commercial Borrower actually performing \"pay monthly installment to\" The Lender for `Amount Transferred` — but the artifact says this specific action \"could not be tried\" because it binds `Amount Transferred`, which the what-if cannot choose, so from this text alone we cannot confirm that trying it succeeds; cannot tell from this whether it fully discharges or only partially does.",
+      "a3": "Cannot tell from this — the artifact only shows \"what would move things along (neither ends nor breaches it)\" for the case where nothing happens by 739769, after which the obligation continues with no deadline; no branch here is explicitly labeled as a breach.",
+      "a4": "We are in the `Payment Obligations` OF `Total Repayment Amount` clause, one event in, clock at 739708, with the Commercial Borrower's obligation to pay the monthly installment to The Lender \"in progress\" and next due at 739769.",
+      "a5": "Cannot tell from this — the artifact does not show a state reachable after a successful discharging payment; it only shows what happens if nothing happens (the deadline passes and the same obligation continues with no deadline), and separately notes the actual payment action could not be tried/simulated here."
+    }
+  },
+  {
+    "contract": "promissory-note",
+    "artifact": "A",
+    "model": "sonnet",
+    "repeat": 1,
+    "model_id": "claude-sonnet-5",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "a1b21f0cbf1a8f8f0",
+    "prompt_file": "prompts/promissory-note.A.txt",
+    "prompt_sha256": "7e577f492d7a251613f9e7980cb6ec586a8584ae5639ba997f722f529c02b9a9",
+    "started_at": "2026-09-15T17:33:17.277Z",
+    "answered_at": "2026-09-15T17:33:23.801Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 1,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 2,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 68180,
+      "output_tokens": 561,
+      "output_tokens_details": {
+        "thinking_tokens": 13
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 0
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 2,
+          "output_tokens": 561,
+          "cache_read_input_tokens": 68180,
+          "cache_creation_input_tokens": 0,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "The Commercial Borrower (Jane Dough Pte Ltd) owes The Lender the \"Amount Transferred\" for the monthly installment payment; it is due by clock time 739769 (61 units from now).",
+      "a2": "The artifact only shows \"pay monthly installment to\" (Amount Transferred) as the obligated action; performing this payment by the deadline (739769) is what would discharge the obligation, though the artifact doesn't explicitly label an event as \"discharging\" — it only shows the obligation and what happens if nothing happens.",
+      "a3": "Cannot tell from this — the artifact only lists what happens if \"nothing happens by 739769\" (the obligation continues with no deadline), but it does not label any outcome as a breach.",
+      "a4": "We are at the `Payment Obligations` OF `Total Repayment Amount` state, after 1 event, with the clock at 739708, where the Borrower has made one payment (pay monthly installment to The Lender, USD 2256.46, on April 3, 2025) and the contract is \"in progress\" awaiting the next installment.",
+      "a5": "Cannot tell from this — the artifact does not show a discharging event actually occurring; it only shows the current owed obligation, the no-action continuation branch, and a note that the payment action \"could not be tried\" because it binds an amount the what-if cannot choose."
+    }
+  },
+  {
+    "contract": "promissory-note",
+    "artifact": "B",
+    "model": "haiku",
+    "repeat": 0,
+    "model_id": "claude-haiku-4-5-20251001",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "a4ad9a33c11a73c8b",
+    "prompt_file": "prompts/promissory-note.B.txt",
+    "prompt_sha256": "0aa02a4ed8ca6fb16e732780b17327cf183386a6aad33efa4cd8bcea33474b9e",
+    "started_at": "2026-09-15T17:33:18.363Z",
+    "answered_at": "2026-09-15T17:34:31.661Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 1,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 9,
+      "cache_creation_input_tokens": 30530,
+      "cache_read_input_tokens": 20277,
+      "output_tokens": 7634,
+      "output_tokens_details": {
+        "thinking_tokens": 6821
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 30530
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 9,
+          "output_tokens": 7634,
+          "cache_read_input_tokens": 20277,
+          "cache_creation_input_tokens": 30530,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 30530,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "# Answers\n\n**Q1. What is owed right now, and by whom?**\n\nThe Borrower (Jane Dough Pte Ltd) owes the Lender (John Doe) all outstanding debts: approximately USD 24,820 (11 remaining monthly installments of USD 2256.46 each) plus any accrued penalties, since we are now in state 4 where all outstanding debts are due in full.\n\n**Q2. Which event(s) would discharge what is owed?**\n\nFrom our current state (state 4), payment of \"All Outstanding Debts\" would discharge the obligation and transition us to Fulfilled (state 3). (Earlier states had less onerous discharge conditions: state 1 required only the next installment by the due date; state 2 required the installment plus penalty within a grace period.)\n\n**Q3. Which event(s) or deadline(s) would put someone in breach?**\n\nThe diagram shows an edge labeled \"unreachable: no WITHIN\" from state 4 to Breach, indicating no defined timeout or mechanism to enter breach from our current state—the transition appears to be unreachable.\n\n**Q4. Where in the contract are we — which rule, branch or state is live?**\n\nWe are in state 4, reached after the first payment deadline (day 739691, 17 March 2025) passed without payment, triggering the timeout to state 2, and then the grace period for penalty payment in state 2 also expired (by approximately day 739701), triggering the timeout to state 4.\n\n**Q5. What happens after the next discharging event?**\n\nTransition to state 3 (Fulfilled), the terminal successful state representing completion of the payment obligations.",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "The Borrower (Jane Dough Pte Ltd) owes the Lender (John Doe) all outstanding debts: approximately USD 24,820 (11 remaining monthly installments of USD 2256.46 each) plus any accrued penalties, since we are now in state 4 where all outstanding debts are due in full.",
+      "a2": "From our current state (state 4), payment of \"All Outstanding Debts\" would discharge the obligation and transition us to Fulfilled (state 3). (Earlier states had less onerous discharge conditions: state 1 required only the next installment by the due date; state 2 required the installment plus penalty within a grace period.)",
+      "a3": "The diagram shows an edge labeled \"unreachable: no WITHIN\" from state 4 to Breach, indicating no defined timeout or mechanism to enter breach from our current state—the transition appears to be unreachable.",
+      "a4": "We are in state 4, reached after the first payment deadline (day 739691, 17 March 2025) passed without payment, triggering the timeout to state 2, and then the grace period for penalty payment in state 2 also expired (by approximately day 739701), triggering the timeout to state 4.",
+      "a5": "Transition to state 3 (Fulfilled), the terminal successful state representing completion of the payment obligations."
+    }
+  },
+  {
+    "contract": "promissory-note",
+    "artifact": "B",
+    "model": "haiku",
+    "repeat": 1,
+    "model_id": "claude-haiku-4-5-20251001",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "a22ec0d733e89ba48",
+    "prompt_file": "prompts/promissory-note.B.txt",
+    "prompt_sha256": "0aa02a4ed8ca6fb16e732780b17327cf183386a6aad33efa4cd8bcea33474b9e",
+    "started_at": "2026-09-15T17:33:26.477Z",
+    "answered_at": "2026-09-15T17:34:33.631Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 2,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 10,
+      "cache_creation_input_tokens": 6318,
+      "cache_read_input_tokens": 50807,
+      "output_tokens": 513,
+      "output_tokens_details": {
+        "thinking_tokens": 123
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 6318
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 10,
+          "output_tokens": 513,
+          "cache_read_input_tokens": 50807,
+          "cache_creation_input_tokens": 6318,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 6318,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "Looking at the diagram and scenario, I can answer these questions:\n\n**Q1. What is owed right now, and by whom?**\nThe Borrower (Jane Dough Pte Ltd) owes the Lender (John Doe) USD 24,821.03, calculated as the original USD 27,077.49 minus the USD 2,256.46 payment made on day 739708.\n\n**Q2. Which event(s) would discharge what is owed?**\nFrom node 2 (where we currently are): payment of at least the monthly installment amount plus penalty within the grace period. From node 4: payment of all outstanding debts.\n\n**Q3. Which event(s) or deadline(s) would put someone in breach?**\nFailing to make a full payment of all outstanding debts from node 4 before the second timeout expires would trigger the transition to Breach (node 5), labeled \"unreachable: no WITHIN\" because there is no escape from node 4 except by full payment.\n\n**Q4. Where in the contract are we — which rule, branch or state is live?**\nWe are at node 2, in the grace/penalty phase after the first payment deadline (day 739691) was missed; the payment we just made on day 739708 was insufficient (only the plain installment amount, not the penalty-adjusted amount required at this node).\n\n**Q5. What happens after the next discharging event?**\nWe would transition to the Fulfilled terminal state (node 3), ending the payment obligations.",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "The Borrower (Jane Dough Pte Ltd) owes the Lender (John Doe) USD 24,821.03 (original USD 27,077.49 minus the USD 2,256.46 payment made on day 739708).",
+      "a2": "From node 2: payment of at least the monthly installment amount plus penalty within the grace period would discharge the debt. From node 4: payment of all outstanding debts would discharge it.",
+      "a3": "Failing to pay all outstanding debts before the timeout deadline at node 4 would trigger breach, transitioning to the Breach state (node 5), which is labeled \"unreachable: no WITHIN\" because there is no other way to escape node 4 except by full payment.",
+      "a4": "We are at node 2 (the grace/penalty phase after the first payment deadline on day 739691 was missed); the payment of USD 2,256.46 made on day 739708 was insufficient because it was only the plain installment amount, not the penalty-adjusted amount required at this node.",
+      "a5": "After the next discharging event (a payment of the penalty-adjusted installment amount), we would transition to the Fulfilled terminal state (node 3), ending the payment obligations."
+    }
+  },
+  {
+    "contract": "promissory-note",
+    "artifact": "B",
+    "model": "sonnet",
+    "repeat": 0,
+    "model_id": "claude-sonnet-5",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "a1c6bd9dd8946888b",
+    "prompt_file": "prompts/promissory-note.B.txt",
+    "prompt_sha256": "0aa02a4ed8ca6fb16e732780b17327cf183386a6aad33efa4cd8bcea33474b9e",
+    "started_at": "2026-09-15T17:33:26.346Z",
+    "answered_at": "2026-09-15T17:33:34.815Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 0,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 2,
+      "cache_creation_input_tokens": 41901,
+      "cache_read_input_tokens": 26896,
+      "output_tokens": 712,
+      "output_tokens_details": {
+        "thinking_tokens": 0
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 41901
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 2,
+          "output_tokens": 712,
+          "cache_read_input_tokens": 26896,
+          "cache_creation_input_tokens": 41901,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 41901,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "Right now (day 739708, 3 April 2025) the Borrower, Jane Dough Pte Ltd, owes the \"Next Payment Due Amount With Penalty\" — the second installment plus penalty — to the Lender, John Doe; the diagram shows we are past state 1's timeout into state 2, and the April 3 payment of the plain USD 2256.46 installment amount does not match what state 2 requires.",
+      "a2": "Discharge from state 2 requires the Borrower to pay an amount that is at least equal (within error) to `Next Payment Due Amount With Penalty` — i.e. the installment plus the late/penalty amount, not the plain installment; since the actual April 3 payment was only the plain USD 2256.46 installment, it does not satisfy this edge, so the obligation is not yet discharged.",
+      "a3": "From state 2, a further timeout (missing another deadline without paying the penalty-inclusive amount) moves to state 4, where paying `All Outstanding Debts` still discharges to Fulfilled (3), but the only breach-labeled edge (4→5) is marked \"unreachable: no WITHIN\" — so per this diagram, no path is actually live to reach the Breach state 5.",
+      "a4": "We are at state 2 (the second ellipse node): the Borrower has passed through the first installment's timeout (state 1 → state 2) and is now under the obligation requiring payment of `Next Payment Due Amount With Penalty`; the April 3 payment did not satisfy that edge's condition, so state 2 remains the live state.",
+      "a5": "After a discharging payment (the 2→3 edge, or later the 4→3 edge) is satisfied, the contract moves to state 3, \"Fulfilled\" — a doublecircle terminal state with no outgoing edges shown, i.e. the obligation ends there."
+    }
+  },
+  {
+    "contract": "promissory-note",
+    "artifact": "B",
+    "model": "sonnet",
+    "repeat": 1,
+    "model_id": "claude-sonnet-5",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "a2d42b9b648a8a521",
+    "prompt_file": "prompts/promissory-note.B.txt",
+    "prompt_sha256": "0aa02a4ed8ca6fb16e732780b17327cf183386a6aad33efa4cd8bcea33474b9e",
+    "started_at": "2026-09-15T17:33:37.335Z",
+    "answered_at": "2026-09-15T17:33:47.040Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 1,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 2,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 68797,
+      "output_tokens": 825,
+      "output_tokens_details": {
+        "thinking_tokens": 12
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 0
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 2,
+          "output_tokens": 825,
+          "cache_read_input_tokens": 68797,
+          "cache_creation_input_tokens": 0,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "The Borrower (Jane Dough Pte Ltd) owes the Lender (John Doe) an amount still outstanding — the diagram calls it \"Outstanding Payment Amount,\" and since it's still greater than 0 (the April payment only covered the plain installment, not the penalty-inflated amount due after a missed deadline), we are past the first timeout and the obligation now due is the one guarded by \"Next Payment Due Amount With Penalty\" (state 2).\n\nQ2. Which event(s) would discharge what is owed? The Borrower paying an amount at least equal to (within rounding error) the currently-required figure discharges the current obligation: from state 2, that means paying \"Next Payment Due Amount With Penalty,\" which sends the state back to 0 (and from there, if Outstanding Payment Amount is no longer greater than 0, on to Fulfilled).\n\nQ3. Which event(s) or deadline(s) would put someone in breach? A further timeout out of state 2 (missing the \"Default After Days Beyond Commencement\" deadline) moves things to state 4, where the amount owed becomes \"All Outstanding Debts\"; from state 4 the diagram shows an edge to Breach, but it's explicitly labeled \"unreachable: no WITHIN,\" meaning as drawn there's no timeout/deadline that actually triggers that Breach transition — so no event currently in the diagram puts the Borrower in breach.\n\nQ4. Where in the contract are we? We are at node 2 — the second installment obligation, the one reached after the first timeout, where payment must now satisfy \"Next Payment Due Amount With Penalty\" rather than the plain installment amount.\n\nQ5. What happens after the next discharging event? Paying enough to satisfy state 2's condition returns to state 0 (the ONE OF choice point), which then checks whether Outstanding Payment Amount is still greater than 0 — if yes, a new \"must pay monthly installment\" obligation (state 1) begins again; if no, the contract reaches Fulfilled.",
+      "a2": "placeholder",
+      "a3": "placeholder",
+      "a4": "placeholder",
+      "a5": "placeholder"
+    }
+  },
+  {
+    "contract": "promissory-note",
+    "artifact": "C",
+    "model": "haiku",
+    "repeat": 0,
+    "model_id": "claude-haiku-4-5-20251001",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "a59f052fea34204b3",
+    "prompt_file": "prompts/promissory-note.C.txt",
+    "prompt_sha256": "dad999df3087234bfe6fbec4394b43a9995ee93d414b54969fe32e3809f870b8",
+    "started_at": "2026-09-15T17:33:49.454Z",
+    "answered_at": "2026-09-15T17:35:30.041Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 2,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 10,
+      "cache_creation_input_tokens": 9020,
+      "cache_read_input_tokens": 54617,
+      "output_tokens": 499,
+      "output_tokens_details": {
+        "thinking_tokens": 128
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 9020
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 10,
+          "output_tokens": 499,
+          "cache_read_input_tokens": 54617,
+          "cache_creation_input_tokens": 9020,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 9020,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "I'll trace through the BPMN and context to answer each question:\n\n**Q1. What is owed right now, and by whom?**\nThe Borrower (Jane Dough Pte Ltd) owes the Lender (John Doe) the first monthly installment amount plus a penalty, because the first payment deadline (Boundary_1 / Next Payment Due Date, day ~739691) has passed and the payment received on day 739708 was without penalty. The obligation is now at Task_2 level (requiring payment WITH PENALTY within Default After Days Beyond Commencement).\n\n**Q2. Which event(s) would discharge what is owed?**\nReceipt of a payment equal to Next Payment Due Amount With Penalty would satisfy Task_2 and reach End_3 (Fulfilled), or receipt of All Outstanding Debts would satisfy Task_4 and also reach End_3 (Fulfilled). The USD 2256.46 that was received (without penalty) does not discharge the current Task_2 obligation.\n\n**Q3. Which event(s) or deadline(s) would put someone in breach?**\nBoundary_2 (Default After Days Beyond Commencement) passing without payment of the first installment plus penalty would trigger transition to Task_4; further failure to pay leads to Boundary_4, which flows to End_5 (Breach). The first deadline (Boundary_1) already passed, triggering the escalation to Task_2.\n\n**Q4. Where in the contract are we — which rule, branch or state is live?**\nWe are at Task_2, which requires the Borrower to pay the first installment with penalty by the Default After Days Beyond Commencement deadline. The first deadline (Boundary_1) has already passed, moving us out of the Task_1 obligation level.\n\n**Q5. What happens after the next discharging event?**\nIf a payment satisfying Task_2 or Task_4 is received, the flow proceeds to End_3 (Fulfilled) and the process reaches an end state; the BPMN does not specify what occurs after this for subsequent installments.",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "The Borrower (Jane Dough Pte Ltd) owes the Lender (John Doe) the first monthly installment amount plus a penalty, because the first payment deadline has passed and the payment received (USD 2256.46) was without penalty.",
+      "a2": "Receipt of a payment equal to Next Payment Due Amount With Penalty would discharge the obligation at Task_2, or receipt of All Outstanding Debts would discharge at Task_4; the USD 2256.46 received does not discharge either.",
+      "a3": "If the Default After Days Beyond Commencement deadline (Boundary_2) passes without payment of the first installment plus penalty, the Borrower transitions to Task_4; further failure to pay reaches Boundary_4, triggering End_5 (Breach).",
+      "a4": "We are at Task_2, which requires payment of the first installment with penalty by the Default After Days Beyond Commencement deadline; the first deadline (Boundary_1) has already passed.",
+      "a5": "If payment satisfying Task_2 or Task_4 is received, the flow proceeds to End_3 (Fulfilled); the BPMN does not specify what occurs after this endpoint."
+    }
+  },
+  {
+    "contract": "promissory-note",
+    "artifact": "C",
+    "model": "haiku",
+    "repeat": 1,
+    "model_id": "claude-haiku-4-5-20251001",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "a848f7d5dfc56cdb5",
+    "prompt_file": "prompts/promissory-note.C.txt",
+    "prompt_sha256": "dad999df3087234bfe6fbec4394b43a9995ee93d414b54969fe32e3809f870b8",
+    "started_at": "2026-09-15T17:34:10.965Z",
+    "answered_at": "2026-09-15T17:35:06.019Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 1,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 9,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 54617,
+      "output_tokens": 5496,
+      "output_tokens_details": {
+        "thinking_tokens": 4587
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 0
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 9,
+          "output_tokens": 5496,
+          "cache_read_input_tokens": 54617,
+          "cache_creation_input_tokens": 0,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "1. **Q1. What is owed right now, and by whom?**\n\nThe Borrower (Jane Dough Pte Ltd) owes the Lender (John Doe) the first monthly installment plus a penalty for late payment, as required by Task_2; the initial due date (17 March) has passed and the USD 2256.46 payment made on 3 April does not appear to satisfy Task_2's requirement for payment with penalty.\n\n2. **Q2. Which event(s) would discharge what is owed?**\n\nPayment of the required amount in Task_2 (monthly installment with penalty) would discharge the obligation and reach the \"Fulfilled\" end state; alternatively, if the full amount owed (all outstanding debts) is paid in Task_4, that also leads to fulfillment.\n\n3. **Q3. Which event(s) or deadline(s) would put someone in breach?**\n\nThe \"Next Payment Due Date\" (17 March) passing unpaid escalates to Task_2 via Boundary_1; the \"Default After Days Beyond Commencement\" deadline passing without payment escalates to Task_4 via Boundary_2; and failure to pay all outstanding debts in Task_4 results in breach (End_5).\n\n4. **Q4. Where in the contract are we — which rule, branch or state is live?**\n\nWe are in Task_2 (the default/penalty obligation phase), having passed the \"Next Payment Due Date\" on 17 March; the 3 April payment of USD 2256.46 was the plain installment amount but did not satisfy Task_2's requirement for payment with penalty.\n\n5. **Q5. What happens after the next discharging event?**\n\nIf Task_2 is discharged by paying the installment with penalty, the process proceeds to the \"Fulfilled\" end state; if Task_1 is successfully completed, it loops back to the decision gate to check for additional outstanding payments.\n\n---",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "The Borrower (Jane Dough Pte Ltd) owes the Lender (John Doe) the first monthly installment plus a penalty for late payment, as required by Task_2; the initial due date (17 March) has passed and the USD 2256.46 payment made on 3 April does not appear to satisfy Task_2's requirement for payment with penalty.",
+      "a2": "Payment of the required amount in Task_2 (monthly installment with penalty) would discharge the obligation and reach the \"Fulfilled\" end state; alternatively, if the full amount owed (all outstanding debts) is paid in Task_4, that also leads to fulfillment.",
+      "a3": "The \"Next Payment Due Date\" (17 March) passing unpaid escalates to Task_2 via Boundary_1; the \"Default After Days Beyond Commencement\" deadline passing without payment escalates to Task_4 via Boundary_2; and failure to pay all outstanding debts in Task_4 results in breach (End_5).",
+      "a4": "We are in Task_2 (the default/penalty obligation phase), having passed the \"Next Payment Due Date\" on 17 March; the 3 April payment of USD 2256.46 was the plain installment amount but did not satisfy Task_2's requirement for payment with penalty.",
+      "a5": "If Task_2 is discharged by paying the installment with penalty, the process proceeds to the \"Fulfilled\" end state; if Task_1 is successfully completed, it loops back to the decision gate to check for additional outstanding payments."
+    }
+  },
+  {
+    "contract": "promissory-note",
+    "artifact": "C",
+    "model": "sonnet",
+    "repeat": 0,
+    "model_id": "claude-sonnet-5",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "aa0fa068d4ab34899",
+    "prompt_file": "prompts/promissory-note.C.txt",
+    "prompt_sha256": "dad999df3087234bfe6fbec4394b43a9995ee93d414b54969fe32e3809f870b8",
+    "started_at": "2026-09-15T17:34:34.472Z",
+    "answered_at": "2026-09-15T17:34:52.042Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 0,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 2,
+      "cache_creation_input_tokens": 1890,
+      "cache_read_input_tokens": 73654,
+      "output_tokens": 707,
+      "output_tokens_details": {
+        "thinking_tokens": 0
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 1890
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 2,
+          "output_tokens": 707,
+          "cache_read_input_tokens": 73654,
+          "cache_creation_input_tokens": 1890,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 1890,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "",
+    "structured_output_attempts": 2,
+    "rejected_attempts": [
+      {
+        "a1": "Nothing is currently owed. The Borrower's April 3 payment of USD 2256.46 equals the plain installment amount checked at Task_1 (\"is money at least equal within error OF Amount Transferred, Next Payment Due's Amount\"), so as of day 739708 that installment is discharged and the process is back at the Split_0 gateway checking whether any further Outstanding Payment Amount remains.\n\na2\">Task_1 is discharged by the Borrower transferring an amount at least equal to the Next Payment Due's Amount (the plain installment) within the Next Payment Due Date — which is exactly what happened here. If that boundary passes unmet, Task_2 is discharged instead by paying at least the Next Payment Due Amount With Penalty within Default After Days Beyond Commencement, and if that too lapses, Task_4 is discharged by paying at least All Outstanding Debts (no deadline given).\n\na3\">Breach (End_5) is reached only via Boundary_4, the timeout on Task_4 — but the diagram itself documents that arm as \"unreachable: no WITHIN,\" since Task_4 sets no deadline. So strictly from this artifact, no dated deadline currently threatens breach; the only nominal breach trigger is structurally unreachable. The two real deadlines in play (Next Payment Due Date on Task_1, and Default After Days Beyond Commencement on Task_2) lead to Task_2 and Task_4 respectively, not directly to breach.\n\na4\">We are at the Split_0 exclusive gateway (\"one of,\" ROR exactly one branch), having just come from Flow_Task_1__Split_0 (the April 3 payment satisfied Task_1's condition). Split_0 now re-evaluates: if Outstanding Payment Amount's Value is still greater than 0 (i.e., an installment remains due, since 11 more installments are outstanding), flow goes to Task_1 again for the next monthly installment; if not, it goes to End_3 (Fulfilled).\n\na5\">Since 11 installments remain outstanding, Split_0's condition \"(Outstanding Payment Amount's Value) GREATER THAN 0\" is true, so flow returns to Task_1 for the next monthly installment cycle, again bounded by its own Next Payment Due Date and subject to the same Boundary_1 timeout structure — the process loops through Task_1 until Outstanding Payment Amount reaches 0, at which point Split_0 routes to End_3 (Fulfilled).",
+        "a3": "placeholder",
+        "a5": "placeholder"
+      }
+    ],
+    "answers": {
+      "a1": "Nothing is currently owed. The Borrower's April 3 payment of USD 2256.46 equals the plain installment amount checked at Task_1 (\"is money at least equal within error OF Amount Transferred, Next Payment Due's Amount\"), so as of day 739708 that installment is discharged.",
+      "a2": "Task_1 is discharged by the Borrower transferring an amount at least equal to the Next Payment Due's Amount within the Next Payment Due Date — which is exactly what happened. If that boundary passes unmet, Task_2 is discharged by paying at least the Next Payment Due Amount With Penalty within Default After Days Beyond Commencement; if that too lapses, Task_4 is discharged by paying at least All Outstanding Debts (no deadline given).",
+      "a3": "Breach (End_5) is reached only via Boundary_4, the timeout on Task_4 — but the diagram itself documents that arm as \"unreachable: no WITHIN,\" since Task_4 sets no deadline. So no dated deadline currently threatens breach in this artifact; the nominal breach trigger is structurally unreachable.",
+      "a4": "We are at the Split_0 exclusive gateway (\"one of\"), having just arrived via Flow_Task_1__Split_0 (the April 3 payment satisfied Task_1's condition). Split_0 now checks whether Outstanding Payment Amount's Value is still greater than 0.",
+      "a5": "Since installments remain outstanding, Split_0's condition is true, so flow returns to Task_1 for the next monthly installment, again bounded by its own Next Payment Due Date and the Boundary_1 timeout — the process loops through Task_1 until Outstanding Payment Amount reaches 0, at which point Split_0 routes to End_3 (Fulfilled)."
+    }
+  },
+  {
+    "contract": "promissory-note",
+    "artifact": "C",
+    "model": "sonnet",
+    "repeat": 1,
+    "model_id": "claude-sonnet-5",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "abab6a5c4fbd213a1",
+    "prompt_file": "prompts/promissory-note.C.txt",
+    "prompt_sha256": "dad999df3087234bfe6fbec4394b43a9995ee93d414b54969fe32e3809f870b8",
+    "started_at": "2026-09-15T17:34:36.127Z",
+    "answered_at": "2026-09-15T17:34:46.683Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 0,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 2,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 73654,
+      "output_tokens": 924,
+      "output_tokens_details": {
+        "thinking_tokens": 0
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 0
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 2,
+          "output_tokens": 924,
+          "cache_read_input_tokens": 73654,
+          "cache_creation_input_tokens": 0,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "Nothing is currently owed by the Borrower — after the 3 April payment (day 739708), which matched the plain installment amount required by Task_1's condition, the flow returns to Split_0 to re-check `Outstanding Payment Amount's Value`. Since the payment discharged that installment, the amount owed at this instant is whatever the second (or later) installment's outstanding value is, not the first one already paid; based purely on the diagram I cannot tell the exact remaining figure, only that the Borrower is the party who owes it.",
+      "a2": "Making a payment via Task_1 (or its retry, Task_2) that satisfies the condition `is money at least equal within error OF Amount Transferred, (Next Payment Due's Amount)` — i.e. transferring an amount at least equal to the amount then due — discharges that installment and routes the flow from Task_1/Task_2 back to Split_0 (and ultimately to End_3 \"Fulfilled\" once Outstanding Payment Amount's Value is no longer greater than 0).",
+      "a3": "Breach (End_5, via the error event) is reached only through Boundary_4, which fires when Task_4 (the \"MUST pay ... PROVIDED is money at least equal ... OF Amount Transferred, All Outstanding Debts\" branch, entered after Boundary_2's timeout) is not discharged — but Boundary_4 has no WITHIN/deadline condition, so per its own documentation this path is \"unreachable.\" Missing the deadline on Task_1 (Boundary_1, `Next Payment Due Date`) or Task_2 (Boundary_2, `Default After Days Beyond Commencement`) instead routes to the next escalation task rather than directly to Breach.",
+      "a4": "We are at Task_1 (the initial monthly-installment obligation), having just looped back from a payment event: the 3 April 2025 payment satisfied Task_1's condition for the installment then due, so the flow is back at Split_0 checking whether Outstanding Payment Amount's Value is still greater than 0 — if so, back into Task_1 for the next installment.",
+      "a5": "After a discharging payment, the flow returns from Task_1 to Split_0, which re-evaluates whether `Outstanding Payment Amount's Value` is still greater than 0: if yes, the flow re-enters Task_1 for the next installment (with its own `Next Payment Due Date` timeout); if no, the flow proceeds to End_3 \"Fulfilled.\""
+    }
+  },
+  {
+    "contract": "tenancy",
+    "artifact": "A",
+    "model": "haiku",
+    "repeat": 0,
+    "model_id": "claude-haiku-4-5-20251001",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "a2ef668357bf1fa24",
+    "prompt_file": "prompts/tenancy.A.txt",
+    "prompt_sha256": "9ae00bd15b1fa5de323b76c3a4c969a56daf2fc2baa8a829f001e583b796748e",
+    "started_at": "2026-09-15T17:31:33.974Z",
+    "answered_at": "2026-09-15T17:31:47.173Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 1,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 9,
+      "cache_creation_input_tokens": 29818,
+      "cache_read_input_tokens": 20277,
+      "output_tokens": 1387,
+      "output_tokens_details": {
+        "thinking_tokens": 806
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 29818
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 9,
+          "output_tokens": 1387,
+          "cache_read_input_tokens": 20277,
+          "cache_creation_input_tokens": 29818,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 29818,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "1. **Q1. What is owed right now, and by whom?**\n   Three tenants (Alice, Bob, and Carol) each owe a payment of amount `t` to `theLandlord`, all due by time 7.\n\n2. **Q2. Which event(s) would discharge what is owed?**\n   Cannot tell from this. The artifact lists payment actions under \"What could not be tried\" but does not explicitly state whether performing them would discharge the obligation.\n\n3. **Q3. Which event(s) or deadline(s) would put someone in breach?**\n   If the clock reaches 8 (i.e., nothing happens by time 7), Tenant Alice enters breach; the artifact does not state whether Bob and Carol also breach at the same deadline.\n\n4. **Q4. Where in the contract are we — which rule, branch or state is live?**\n   The status is \"in progress\" at time 0, before any action has been taken.\n\n5. **Q5. What happens after the next discharging event?**\n   Cannot tell from this. The artifact notes that each payment obligation has \"one of 3, each with a next step of their own\" but does not describe what those next steps are.\n\n---\n\n**Now calling StructuredOutput to return the final answer:**",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "Three tenants (Alice, Bob, and Carol) each owe a payment of amount `t` to `theLandlord`, all due by time 7.",
+      "a2": "Cannot tell from this. The artifact lists payment actions under \"What could not be tried\" but does not explicitly state whether performing them would discharge the obligation.",
+      "a3": "If the clock reaches 8 (i.e., nothing happens by time 7), Tenant Alice enters breach; the artifact does not state whether Bob and Carol also breach at the same deadline.",
+      "a4": "The status is \"in progress\" at time 0, before any action has been taken.",
+      "a5": "Cannot tell from this. The artifact notes that each payment obligation has \"one of 3, each with a next step of their own\" but does not describe what those next steps are."
+    }
+  },
+  {
+    "contract": "tenancy",
+    "artifact": "A",
+    "model": "haiku",
+    "repeat": 1,
+    "model_id": "claude-haiku-4-5-20251001",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "ad849661456505278",
+    "prompt_file": "prompts/tenancy.A.txt",
+    "prompt_sha256": "9ae00bd15b1fa5de323b76c3a4c969a56daf2fc2baa8a829f001e583b796748e",
+    "started_at": "2026-09-15T17:31:39.961Z",
+    "answered_at": "2026-09-15T17:31:59.841Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 1,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 9,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 50095,
+      "output_tokens": 2053,
+      "output_tokens_details": {
+        "thinking_tokens": 1515
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 0
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 9,
+          "output_tokens": 2053,
+          "cache_read_input_tokens": 50095,
+          "cache_creation_input_tokens": 0,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "1. **Q1. What is owed right now, and by whom?**\nEach of the three tenants (Alice, Bob, and Carol) owes payment of an amount (t) to the Landlord, all due by day 7.\n\n2. **Q2. Which event(s) would discharge what is owed?**\nCannot tell from this artifact. The payment actions are listed under \"What could not be tried\" but the artifact does not explicitly state what events would discharge the obligations.\n\n3. **Q3. Which event(s) or deadline(s) would put someone in breach?**\nIf nothing happens by day 7 (the clock reaches day 8), then Tenant Alice is in breach; presumably the same applies to Bob and Carol.\n\n4. **Q4. Where in the contract are we — which rule, branch or state is live?**\nThe standing is \"in progress,\" but the artifact does not specify which rule, branch, or state is live.\n\n5. **Q5. What happens after the next discharging event?**\nCannot tell from this artifact; it does not describe what follows after one of the tenants pays.\n\n---\n\nCall StructuredOutput to provide my final response in the required format.",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "Each of the three tenants (Alice, Bob, and Carol) owes payment of an amount (t) to the Landlord, all due by day 7.",
+      "a2": "Cannot tell from this artifact. The payment actions are listed under \"What could not be tried\" but the artifact does not explicitly state what events would discharge the obligations.",
+      "a3": "If nothing happens by day 7 (the clock reaches day 8), then Tenant Alice is in breach; presumably the same applies to Bob and Carol.",
+      "a4": "The standing is \"in progress,\" but the artifact does not specify which rule, branch, or state is live.",
+      "a5": "Cannot tell from this artifact; it does not describe what follows after one of the tenants pays."
+    }
+  },
+  {
+    "contract": "tenancy",
+    "artifact": "A",
+    "model": "sonnet",
+    "repeat": 0,
+    "model_id": "claude-sonnet-5",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "a22144535993e7755",
+    "prompt_file": "prompts/tenancy.A.txt",
+    "prompt_sha256": "9ae00bd15b1fa5de323b76c3a4c969a56daf2fc2baa8a829f001e583b796748e",
+    "started_at": "2026-09-15T17:31:50.126Z",
+    "answered_at": "2026-09-15T17:31:56.197Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 1,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 2,
+      "cache_creation_input_tokens": 40999,
+      "cache_read_input_tokens": 26896,
+      "output_tokens": 505,
+      "output_tokens_details": {
+        "thinking_tokens": 17
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 40999
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 2,
+          "output_tokens": 505,
+          "cache_read_input_tokens": 26896,
+          "cache_creation_input_tokens": 40999,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 40999,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "Right now, amounts are owed by three tenants — Alice, Bob, and Carol — each of whom must pay the exact amount to theLandlord.",
+      "a2": "Each tenant's own Pay action (Tenant paying EXACTLY t to EXACTLY theLandlord, the amount) would discharge that tenant's obligation; but the artifact says these cannot actually be tried in the what-if because the action binds `amount`, which the what-if cannot choose.",
+      "a3": "If nothing happens by deadline 7 (i.e. the clock reaches 8), Tenant Alice is in breach — that is the one breach condition listed; the same next deadline (7) applies to Bob and Carol's payments but only Alice's breach trigger is shown here.",
+      "a4": "We are at the very start (\"receipts — before anything has happened, the clock stands at 0\"), with the contract standing \"in progress\" and all three tenants' payment obligations currently live/pending.",
+      "a5": "Cannot tell from this — the artifact only shows the state at clock 0 and the upcoming deadline/breach condition; it does not show what state follows after any of the Pay events actually occur."
+    }
+  },
+  {
+    "contract": "tenancy",
+    "artifact": "A",
+    "model": "sonnet",
+    "repeat": 1,
+    "model_id": "claude-sonnet-5",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "a11d4f3ba3897a8cf",
+    "prompt_file": "prompts/tenancy.A.txt",
+    "prompt_sha256": "9ae00bd15b1fa5de323b76c3a4c969a56daf2fc2baa8a829f001e583b796748e",
+    "started_at": "2026-09-15T17:31:54.869Z",
+    "answered_at": "2026-09-15T17:32:02.308Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 0,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 2,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 67895,
+      "output_tokens": 588,
+      "output_tokens_details": {
+        "thinking_tokens": 0
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 0
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 2,
+          "output_tokens": 588,
+          "cache_read_input_tokens": 67895,
+          "cache_creation_input_tokens": 0,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "Right now, at clock 0, three tenants each owe a payment: Alice, Bob, and Carol each must Pay theLandlord an amount (the exact amount, \"t\", isn't shown in this summary).",
+      "a2": "The artifact only lists what could not be tried, not what would discharge the obligations — each tenant's Pay action is exactly the action that would presumably discharge their obligation, but the tool couldn't simulate it because \"amount\" is a value the what-if can't choose. So strictly from what's written, I cannot tell what payment amount or event would count as discharging; the natural inference (paying the amount by the deadline) is not confirmed by the text itself.",
+      "a3": "If nothing happens by time 7 (i.e., the clock reaches 8), Alice is in breach. The artifact only states this for Alice under \"What would put someone in breach\" — it does not show equivalent breach lines for Bob or Carol, so cannot tell from this whether/when they'd be marked in breach.",
+      "a4": "We are at the very start (\"before anything has happened, the clock stands at 0\"), with the contract standing \"in progress\" and all three tenants' payment obligations currently owed and none yet due, breached, or discharged.",
+      "a5": "Cannot tell from this — the artifact doesn't show a next state or follow-on obligations after a payment event; it only notes that the Pay actions couldn't be simulated because the amount can't be chosen by the what-if, so no post-discharge trace is given."
+    }
+  },
+  {
+    "contract": "tenancy",
+    "artifact": "B",
+    "model": "haiku",
+    "repeat": 0,
+    "model_id": "claude-haiku-4-5-20251001",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "ad5967f5f3b1f4c36",
+    "prompt_file": "prompts/tenancy.B.txt",
+    "prompt_sha256": "4d2bf55c36a90b9ca58b7e7b45c079e7903b23429666ce876830466c97d2d069",
+    "started_at": "2026-09-15T17:31:58.884Z",
+    "answered_at": "2026-09-15T17:32:41.700Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 1,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 9,
+      "cache_creation_input_tokens": 29908,
+      "cache_read_input_tokens": 20277,
+      "output_tokens": 4476,
+      "output_tokens_details": {
+        "thinking_tokens": 4032
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 29908
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 9,
+          "output_tokens": 4476,
+          "cache_read_input_tokens": 20277,
+          "cache_creation_input_tokens": 29908,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 29908,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "1. **Q1. What is owed right now, and by whom?**\n\nThe tenants must each pay the landlord (Ms Ng).\n\n2. **Q2. Which event(s) would discharge what is owed?**\n\nEach tenant paying would discharge the obligation in state 0; then in state 1, the landlord issuing receipts would discharge the next obligation.\n\n3. **Q3. Which event(s) or deadline(s) would put someone in breach?**\n\nA timeout event would put someone in breach (moving to the Breach state from either state 0 or state 1).\n\n4. **Q4. Where in the contract are we — which rule, branch or state is live?**\n\nWe are in state 0, the \"initial\" state.\n\n5. **Q5. What happens after the next discharging event?**\n\nAfter each tenant pays, we transition to state 1, where the landlord must issue receipts.\n\n---",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "The tenants must each pay the landlord (Ms Ng).",
+      "a2": "Each tenant paying would discharge the obligation in state 0; then in state 1, the landlord issuing receipts would discharge the next obligation.",
+      "a3": "A timeout event would put someone in breach (moving to the Breach state from either state 0 or state 1).",
+      "a4": "We are in state 0, the \"initial\" state.",
+      "a5": "After each tenant pays, we transition to state 1, where the landlord must issue receipts."
+    }
+  },
+  {
+    "contract": "tenancy",
+    "artifact": "B",
+    "model": "haiku",
+    "repeat": 1,
+    "model_id": "claude-haiku-4-5-20251001",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "ade998cf8b51e71be",
+    "prompt_file": "prompts/tenancy.B.txt",
+    "prompt_sha256": "4d2bf55c36a90b9ca58b7e7b45c079e7903b23429666ce876830466c97d2d069",
+    "started_at": "2026-09-15T17:32:02.302Z",
+    "answered_at": "2026-09-15T17:32:50.625Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 2,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 10,
+      "cache_creation_input_tokens": 4528,
+      "cache_read_input_tokens": 50185,
+      "output_tokens": 449,
+      "output_tokens_details": {
+        "thinking_tokens": 229
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 4528
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 10,
+          "output_tokens": 449,
+          "cache_read_input_tokens": 50185,
+          "cache_creation_input_tokens": 4528,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 4528,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "1. **Q1. What is owed right now, and by whom?**\nEach tenant (Alice, Bob, and Carol) owes payment to the landlord Ms Ng.\n\n2. **Q2. Which event(s) would discharge what is owed?**\nEach tenant paying discharges that tenant's payment obligation; the landlord issuing receipts discharges the receipt obligation.\n\n3. **Q3. Which event(s) or deadline(s) would put someone in breach?**\nA timeout occurring in either the initial state or state 1 would trigger breach.\n\n4. **Q4. Where in the contract are we — which rule, branch or state is live?**\nWe are in the initial state at day 0.\n\n5. **Q5. What happens after the next discharging event?**\nAfter a tenant pays, the contract transitions to state 1 where the landlord must issue receipts to that tenant.",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "Each tenant (Alice, Bob, and Carol) owes payment to the landlord Ms Ng.",
+      "a2": "Each tenant paying discharges that tenant's payment obligation; the landlord issuing receipts discharges the receipt obligation.",
+      "a3": "A timeout occurring in either the initial state or state 1 would trigger breach.",
+      "a4": "We are in the initial state at day 0.",
+      "a5": "After a tenant pays, the contract transitions to state 1 where the landlord must issue receipts to that tenant."
+    }
+  },
+  {
+    "contract": "tenancy",
+    "artifact": "B",
+    "model": "sonnet",
+    "repeat": 0,
+    "model_id": "claude-sonnet-5",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "a8dc616a5a74d6df0",
+    "prompt_file": "prompts/tenancy.B.txt",
+    "prompt_sha256": "4d2bf55c36a90b9ca58b7e7b45c079e7903b23429666ce876830466c97d2d069",
+    "started_at": "2026-09-15T17:32:04.931Z",
+    "answered_at": "2026-09-15T17:32:11.229Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 1,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 2,
+      "cache_creation_input_tokens": 41095,
+      "cache_read_input_tokens": 26896,
+      "output_tokens": 588,
+      "output_tokens_details": {
+        "thinking_tokens": 16
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 41095
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 2,
+          "output_tokens": 588,
+          "cache_read_input_tokens": 26896,
+          "cache_creation_input_tokens": 41095,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 41095,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "Nothing is owed yet by the landlord; right now, each Tenant t must Pay the landlord (obligation on the tenants, due within 7 days), per the edge \"EVERY Tenant t IN tenants MUST Pay ... [7]\" from the initial state.",
+      "a2": "Each tenant paying (UPON EACH tenant's Pay event) discharges that tenant's payment obligation and moves the contract into the state where the landlord then owes a Receipt; the landlord's subsequent Receipt action (within 5 days) discharges the landlord's receipt obligation, reaching Fulfilled.",
+      "a3": "A timeout on the initial payment obligation (tenant fails to pay within the 7-day deadline) sends the contract to Breach, and separately a timeout on the landlord's Receipt obligation (failure to issue the receipt within 5 days) also sends it to Breach.",
+      "a4": "We are at state 0, the initial state, at day 0 — the tenants' payment obligation (\"EVERY Tenant t IN tenants MUST Pay ... [7]\") is the live, not-yet-triggered rule.",
+      "a5": "After the discharging event of the tenants paying (state 0 -> 1), the contract moves to state 1 where \"theLandlord must Receipt ...\" is now live/owed, with a 5-day deadline, branching to Fulfilled on receipt or Breach on timeout."
+    }
+  },
+  {
+    "contract": "tenancy",
+    "artifact": "B",
+    "model": "sonnet",
+    "repeat": 1,
+    "model_id": "claude-sonnet-5",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "a4e7af1eb1b74e5f4",
+    "prompt_file": "prompts/tenancy.B.txt",
+    "prompt_sha256": "4d2bf55c36a90b9ca58b7e7b45c079e7903b23429666ce876830466c97d2d069",
+    "started_at": "2026-09-15T17:32:13.730Z",
+    "answered_at": "2026-09-15T17:32:19.543Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 1,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 2,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 67991,
+      "output_tokens": 534,
+      "output_tokens_details": {
+        "thinking_tokens": 32
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 0
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 2,
+          "output_tokens": 534,
+          "cache_read_input_tokens": 67991,
+          "cache_creation_input_tokens": 0,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "Right now nothing is owed yet: the contract is at the initial state (node 0), before any tenant has paid.",
+      "a2": "The discharging event is each tenant paying: \"EVERY Tenant t IN tenants MUST Pay ... [7]\" (moves 0→1); once the landlord is at node 1, \"theLandlord MUST Receipt ... [5]\" discharges the landlord's obligation and reaches Fulfilled (node 2).",
+      "a3": "A timeout at the initial state (0→3) or a timeout after payment while awaiting the receipt (1→3) each put the relevant party in Breach; the diagram doesn't give the numeric deadlines beyond the \"[7]\" and \"[5]\" day-window labels on the paying/receipting edges.",
+      "a4": "We are at node 0, the initial state, before the tenants' payment obligation (\"EVERY Tenant t IN tenants MUST Pay ... [7]\") has been discharged.",
+      "a5": "After the discharging payment event (0→1), the contract moves to the state where \"theLandlord must Receipt ...\" is owed (node 1), which itself must then be discharged (or timed out) to reach Fulfilled or Breach."
+    }
+  },
+  {
+    "contract": "tenancy",
+    "artifact": "C",
+    "model": "haiku",
+    "repeat": 0,
+    "model_id": "claude-haiku-4-5-20251001",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "a9318624b71e17c40",
+    "prompt_file": "prompts/tenancy.C.txt",
+    "prompt_sha256": "4a56f7cd5e9dd9d1c47d399fc8f2e1b1cc9c294033a9eae86c43f641bf5b1e7b",
+    "started_at": "2026-09-15T17:32:22.233Z",
+    "answered_at": "2026-09-15T17:32:39.892Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 1,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 9,
+      "cache_creation_input_tokens": 32585,
+      "cache_read_input_tokens": 20277,
+      "output_tokens": 1798,
+      "output_tokens_details": {
+        "thinking_tokens": 1067
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 32585
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 9,
+          "output_tokens": 1798,
+          "cache_read_input_tokens": 20277,
+          "cache_creation_input_tokens": 32585,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 32585,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "1. **Q1. What is owed right now, and by whom?**\n   Each of the three tenants (Alice, Bob, Carol) owes payment to the landlord (Ms Ng); this obligation is currently active and must be discharged within 7 days.\n\n2. **Q2. Which event(s) would discharge what is owed?**\n   Completion of Task_0 (each tenant's payment) discharges the payment obligation and triggers Task_1; completion of Task_1 (the landlord providing receipts within 5 days) discharges that obligation and ends the process fulfilled.\n\n3. **Q3. Which event(s) or deadline(s) would put someone in breach?**\n   If any tenant's payment is not completed within 7 days, Boundary_0 fires and triggers breach (End_3); if the landlord does not provide receipts within 5 days of payment, Boundary_1 fires and also triggers breach (End_3).\n\n4. **Q4. Where in the contract are we — which rule, branch or state is live?**\n   We are at Start_0, transitioning into Task_0, where the rule \"EVERY Tenant t IN tenants MUST Pay ... WITHIN 7\" is now live as a multi-instance activity (one instance per tenant).\n\n5. **Q5. What happens after the next discharging event?**\n   After the tenants complete their payment (Task_0 completes), the process flows to Task_1 where the landlord must provide receipts to each tenant within 5 days.\n\n---",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "Each of the three tenants (Alice, Bob, Carol) owes payment to the landlord (Ms Ng); this obligation is currently active and must be discharged within 7 days.",
+      "a2": "Completion of Task_0 (each tenant's payment) discharges the payment obligation and triggers Task_1; completion of Task_1 (the landlord providing receipts within 5 days) discharges that obligation and ends the process fulfilled.",
+      "a3": "If any tenant's payment is not completed within 7 days, Boundary_0 fires and triggers breach (End_3); if the landlord does not provide receipts within 5 days of payment, Boundary_1 fires and also triggers breach (End_3).",
+      "a4": "We are at Start_0, transitioning into Task_0, where the rule \"EVERY Tenant t IN tenants MUST Pay ... WITHIN 7\" is now live as a multi-instance activity (one instance per tenant).",
+      "a5": "After the tenants complete their payment (Task_0 completes), the process flows to Task_1 where the landlord must provide receipts to each tenant within 5 days."
+    }
+  },
+  {
+    "contract": "tenancy",
+    "artifact": "C",
+    "model": "haiku",
+    "repeat": 1,
+    "model_id": "claude-haiku-4-5-20251001",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "aeebc26fbb61a5552",
+    "prompt_file": "prompts/tenancy.C.txt",
+    "prompt_sha256": "4a56f7cd5e9dd9d1c47d399fc8f2e1b1cc9c294033a9eae86c43f641bf5b1e7b",
+    "started_at": "2026-09-15T17:32:42.383Z",
+    "answered_at": "2026-09-15T17:33:06.480Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 1,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 9,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 52862,
+      "output_tokens": 2546,
+      "output_tokens_details": {
+        "thinking_tokens": 1934
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 0
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 9,
+          "output_tokens": 2546,
+          "cache_read_input_tokens": 52862,
+          "cache_creation_input_tokens": 0,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "**Q1.** Each of the three tenants owes payment to the landlord; this obligation is active right now (Task_0 is live in the tenant lane).\n\n**Q2.** When all tenants complete their payments (Task_0 completes), the landlord's obligation to provide receipts (Task_1) becomes active; when the landlord completes Task_1, the contract reaches \"Fulfilled\" (End_2).\n\n**Q3.** A breach occurs if any tenant fails to pay within 7 days (Boundary_0 on Task_0 triggers End_3), or if the landlord fails to provide receipt within 5 days of Task_0 completing (Boundary_1 on Task_1 triggers End_3).\n\n**Q4.** We are at day 0, at the contract start (Start_0 has just fired); Task_0 (tenant payment, multi-instance) is now live with a 7-day deadline.\n\n**Q5.** After all tenants complete their payments, the landlord's obligation to provide receipts (Task_1) becomes active with a 5-day deadline to complete it.",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "Each of the three tenants owes payment to the landlord; this obligation is active right now (Task_0 is live in the tenant lane).",
+      "a2": "When all tenants complete their payments (Task_0 completes), the landlord's obligation to provide receipts (Task_1) becomes active; when the landlord completes Task_1, the contract reaches \"Fulfilled\" (End_2).",
+      "a3": "A breach occurs if any tenant fails to pay within 7 days (Boundary_0 on Task_0 triggers End_3), or if the landlord fails to provide receipt within 5 days of Task_0 completing (Boundary_1 on Task_1 triggers End_3).",
+      "a4": "We are at day 0, at the contract start (Start_0 has just fired); Task_0 (tenant payment, multi-instance) is now live with a 7-day deadline.",
+      "a5": "After all tenants complete their payments, the landlord's obligation to provide receipts (Task_1) becomes active with a 5-day deadline to complete it."
+    }
+  },
+  {
+    "contract": "tenancy",
+    "artifact": "C",
+    "model": "sonnet",
+    "repeat": 0,
+    "model_id": "claude-sonnet-5",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "a762da0a67e9193a3",
+    "prompt_file": "prompts/tenancy.C.txt",
+    "prompt_sha256": "4a56f7cd5e9dd9d1c47d399fc8f2e1b1cc9c294033a9eae86c43f641bf5b1e7b",
+    "started_at": "2026-09-15T17:32:44.429Z",
+    "answered_at": "2026-09-15T17:32:51.655Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 1,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 2,
+      "cache_creation_input_tokens": 44460,
+      "cache_read_input_tokens": 26896,
+      "output_tokens": 609,
+      "output_tokens_details": {
+        "thinking_tokens": 15
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 44460
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 2,
+          "output_tokens": 609,
+          "cache_read_input_tokens": 26896,
+          "cache_creation_input_tokens": 44460,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 44460,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "Nothing is owed yet: at day 0 the process has just started (Start_0), and each tenant t in tenants has just been given the obligation to Pay, due within 7 days.",
+      "a2": "Each tenant's Pay (Task_0) is discharged by that tenant completing the Pay action within the 7-day window; the landlord's subsequent Receipt (Task_1) is discharged by the landlord completing the Receipt within 5 days of the multi-instance Pay task finishing.",
+      "a3": "A tenant is in breach if the P7D boundary timer on Task_0 fires before that tenant's Pay is discharged (Boundary_0 → End_3 \"Breach\"), and the landlord is in breach if the P5D boundary timer on Task_1 fires before Receipt is discharged (Boundary_1 → End_3 \"Breach\").",
+      "a4": "We are at Start_0, about to enter Task_0 (\"MUST Pay...\") for the EVERY Tenant t IN tenants lane — the multi-instance Pay obligation is just beginning, with its 7-day boundary timer starting to run.",
+      "a5": "Cannot tell from this — the diagram shows that after the multi-instance Pay task's last instance completes, flow moves once to the landlord's Receipt task (Task_1, due within 5 days), but it does not specify which tenant's payment (or in what order) triggers this, since a multi-instance activity here fires its outgoing flow only once after all instances finish."
+    }
+  },
+  {
+    "contract": "tenancy",
+    "artifact": "C",
+    "model": "sonnet",
+    "repeat": 1,
+    "model_id": "claude-sonnet-5",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "a1ce3801902abe166",
+    "prompt_file": "prompts/tenancy.C.txt",
+    "prompt_sha256": "4a56f7cd5e9dd9d1c47d399fc8f2e1b1cc9c294033a9eae86c43f641bf5b1e7b",
+    "started_at": "2026-09-15T17:32:53.048Z",
+    "answered_at": "2026-09-15T17:32:59.706Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 1,
+    "thinking_redacted_in_transcript": true,
+    "usage": {
+      "input_tokens": 2,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 71356,
+      "output_tokens": 584,
+      "output_tokens_details": {
+        "thinking_tokens": 25
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 0
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 2,
+          "output_tokens": 584,
+          "cache_read_input_tokens": 71356,
+          "cache_creation_input_tokens": 0,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "answer_text": "",
+    "structured_output_attempts": 1,
+    "rejected_attempts": [],
+    "answers": {
+      "a1": "Nothing is owed yet in the sense of overdue — but each tenant (Alice, Bob, Carol) is under an active obligation to Pay the landlord, since the contract has just begun at day 0.",
+      "a2": "Each tenant's Pay obligation is discharged by that tenant completing \"Pay ...\" (Task_0); once all instances of that multi-instance task complete, the flow moves to Task_1, where theLandlord's \"Receipt ...\" obligation is discharged by completing that task.",
+      "a3": "A tenant is put in breach if 7 days pass (P7D, Boundary_0) without that tenant's Pay obligation being discharged; the landlord is put in breach if 5 days pass (P5D, Boundary_1) without the Receipt obligation being discharged after payment.",
+      "a4": "We are at Start_0, about to enter Task_0 (\"MUST Pay ...\") in the tenants' lane, with its P7D boundary timer just starting — no instance has completed and no timer has fired.",
+      "a5": "After a tenant's Pay is discharged (and, per the documentation, after the last tenant instance completes — since the multi-instance task fires its outgoing flow only once, after all instances finish), the flow proceeds to Task_1, where theLandlord becomes obliged to issue a Receipt within 5 days, racing against the P5D boundary timer."
+    }
+  }
+]

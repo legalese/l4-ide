@@ -1,0 +1,29 @@
+
+You are a reader in a comprehension experiment. Use NO tools — do not read files, do not search, do not run anything; answer only from the text below. You are looking at a plain-text summary produced by a legal tool for a contract, and a description of what has happened so far.
+
+THE ARTIFACT:
+receipts — before anything has happened, the clock stands at 0
+  Standing: in progress.
+
+  Owed now:
+    - Tenant OF "Alice" MUST Pay (EXACTLY t) (EXACTLY theLandlord) amount — due by 7 (7 from now) (one of 3, each with a next step of their own)
+    - Tenant OF "Bob" MUST Pay (EXACTLY t) (EXACTLY theLandlord) amount — due by 7 (7 from now) (one of 3, each with a next step of their own)
+    - Tenant OF "Carol" MUST Pay (EXACTLY t) (EXACTLY theLandlord) amount — due by 7 (7 from now) (one of 3, each with a next step of their own)
+
+  What would put someone in breach:
+    - nothing happens by 7 (the clock reaches 8) → Tenant OF "Alice" is in breach
+
+  What could not be tried:
+    - Tenant OF "Alice" does Pay (EXACTLY t) (EXACTLY theLandlord) amount — the action binds `amount`, which the what-if cannot choose
+    - Tenant OF "Bob" does Pay (EXACTLY t) (EXACTLY theLandlord) amount — the action binds `amount`, which the what-if cannot choose
+    - Tenant OF "Carol" does Pay (EXACTLY t) (EXACTLY theLandlord) amount — the action binds `amount`, which the what-if cannot choose
+
+  Next deadline: 7 (Tenant OF "Alice": Pay (EXACTLY t) (EXACTLY theLandlord) amount; Tenant OF "Bob": Pay (EXACTLY t) (EXACTLY theLandlord) amount; Tenant OF "Carol": Pay (EXACTLY t) (EXACTLY theLandlord) amount)
+
+
+Answer these five questions in order, each in one or two plain sentences; if the artifact does not let you answer, say "cannot tell from this" — do not guess:
+1. Q1. What is owed right now, and by whom?
+2. Q2. Which event(s) would discharge what is owed?
+3. Q3. Which event(s) or deadline(s) would put someone in breach?
+4. Q4. Where in the contract are we — which rule, branch or state is live?
+5. Q5. What happens after the next discharging event?

@@ -130,7 +130,8 @@ empirical question, and this document declines to answer it from the armchair.
 **LANDED 2026-09-15 (P2a′), on `lts/p2b-step-log` (merged into `lts/p2-stack` 2026-09-15, not yet in `unstable`): the list exists.** `l4 lts FILE`
 prints it for every `#TRACE` in the file; §7.6 has the command, one contract's exact output, and
 what it can and cannot answer. The reader experiment §7.3 gates on has **not** been run and this
-document still does not know whether the picture beats the list.
+document still does not know whether the picture beats the list. An LLM-reader _proxy_ was run
+2026-09-16 (§7.7); it is not the gate, and the sentence above stands.
 
 ### 1.1b Reachability: what P2 can honestly claim, which is less than revision 1 claimed
 
@@ -2022,13 +2023,20 @@ file.
 each (`contracts`, `every-run-example`, `tenancy`, `promissory-note`), three artifacts each — **A**
 the `l4 lts` list at default flags, **B** the `l4 state-graph` DOT source _as text_, **C** the P1
 BPMN XML _as text_ (B and C readers also got the position in plain words, `history.txt`; A readers
-got only the list). Readers: two Claude models, recorded as `haiku` and `sonnet`; each reading a
-fresh single-turn conversation, **no tools**, one artifact and the five questions, nothing else;
-**two repeats** per (contract, artifact, model) — 48 readings, 240 answers. Judge: an LLM scoring
-each answer 0/1 against `truth.json` with a rationale; a "cannot tell" verdict where the truth is
-definite scores 0, an incomplete answer that asserts nothing wrong scores 1. **Not recorded** and
-to be committed on a rerun: the exact model identifiers, the wrapper prompt, the judge's model and
-prompt.
+got only the list). Readers: `claude-haiku-4-5-20251001` and `claude-sonnet-5` (recorded as
+`haiku` and `sonnet`); each reading a fresh single-turn Claude Code subagent, **no tools** but the
+answer form, one artifact and the five questions, nothing else, told to say _"cannot tell from
+this"_ rather than guess; **two repeats** per (contract, artifact, model) — 48 readings, 240
+answers. Judge: one `claude-opus-5` per contract, scoring each answer 0/1 against `truth.json`
+with a rationale. Its prompt states one rule verbatim — _"'cannot tell' is 0 unless the truth
+says the artifact cannot say it"_; a second, _incomplete but nothing wrong scores 1_, is inferred
+from the rationales, not written; and neither was applied uniformly (RESULTS.md §1 names three
+rows: `promissory-note/A/haiku/0` Q4, `promissory-note/A/haiku/1` Q3, `tenancy/A/sonnet/1` Q2),
+so any count that turns on them is ±2. **Recorded** (`etc/lts-reader-proxy/transcripts/`,
+recovered by `extract-transcripts.mjs`, which also asserts `results.json` == judge output and
+judge input == reader output): every reader prompt and verbatim answer, every judge prompt and
+output, model ids, timestamps. **Still not recorded:** the harness system prompt the subagents
+ran under, and their thinking (signatures only in the transcript).
 
 **Accuracy, correct/readings** (a per-contract cell is 2 models × 2 repeats; pooled is 16):
 
@@ -2048,7 +2056,8 @@ a cell agreed exactly in 16 of 24 cells.
 **The misses, sorted before they are read** (53 of 240; classification from the judge rationales):
 the list's 30 are **25 "cannot tell"**, 3 incomplete, 2 wrong; the DOT's 9 are 7 wrong, 2 vague,
 0 "cannot tell"; the BPMN's 14 are **13 wrong**, 1 "cannot tell". The list fails loudly; the
-pictures-as-text fail silently.
+pictures-as-text fail silently — with the caveat that every reader was told not to guess, so the
+loud failure was invited and its size is partly the prompt's (RESULTS.md §3).
 
 **What the proxy can say** (each with its evidence in RESULTS.md §3):
 
@@ -2066,16 +2075,19 @@ pictures-as-text fail silently.
    §1.1a's reason is only half right.** All four of the list's Q5 hits are `every-run-example`,
    where the list itself prints the `→ then:` continuation one step deep (§7.6); it printed
    nothing on the other three because the what-if was refused (point 2). The residual, measured
-   claim is Q4: the list gives the event history, not the branch taken (`contracts`: sonnet
-   reconstructed the `ELSE` branch from the history twice, haiku said "cannot tell" twice;
-   `promissory-note`: 0/4, and A readers alone were not told the April payment was refused).
-4. **The BPMN's wrong answers are the exporter's documented losses read back as facts.**
-   `tenancy` Q5 0/4: three readers said receipts wait for _all_ tenants — `[P-FORK] lossy` in
-   `tenancy/C.fidelity.txt` verbatim, _"what is drawn fires once, for the group"_.
-   `promissory-note`, sonnet 2/10: both readings credited the refused April payment — the
-   `PROVIDED` guard is an opaque `conditionExpression` (`[F4]`), the deadline a text boundary
-   (`[P-DEADLINE]`); haiku 8/10 with Q3 wrong twice, asserting `Boundary_4` fires when its own
-   `<documentation>` says nothing can fire it.
+   claim is Q4: the list gives the event history, not the branch taken (`contracts`: sonnet named
+   the live state — _"the return obligation now live and its deadline at 14"_ — without naming
+   the branch, twice, and was credited; haiku said "cannot tell" twice; `promissory-note`: 0/4,
+   and A readers alone were not told the April payment was refused).
+4. **The BPMN's 13 wrong answers: 5 sit squarely on a documented exporter loss, 8 contradict
+   the history the reader was given.** `tenancy` Q5 0/4: three readers said receipts wait for
+   _all_ tenants — `[P-FORK] lossy` in `tenancy/C.fidelity.txt` verbatim, _"what is drawn fires
+   once, for the group"_; haiku on the note, Q3 wrong twice, asserting `Boundary_4` fires when
+   its own `<documentation>` says nothing can fire it (`[P-DEADLINE]`). Those are the five. The
+   eight are `promissory-note`, sonnet 2/10: both readings credited the April payment although
+   `history.txt` said it was _"the plain installment amount, paid after the deadline"_ — at most
+   consistent with the `PROVIDED` guard being an opaque `conditionExpression` (`[F4]`) and the
+   deadline a text boundary (`[P-DEADLINE]`), not caused by them.
 5. **The DOT source as text is the best artifact** — 71/80, 10 of 16 readings perfect; its
    misses are 7 confident wrong answers, 6 of them on the note.
 
@@ -2093,9 +2105,18 @@ intervals: a one- or two-answer difference in a column of sixteen is within what
 reverse. **Nothing here passes or fails §7.3.** The staging table in §7.2 is the integrator's.
 
 _What would move it, in cost order, none decided here:_ repair the open-binder what-if and rerun
-the same 48 readings; equalise the note's calendar conversion across A/B/C; commit model ids,
-prompts and judge with the rows; a vision run with B and C rendered, to separate content from
-drawing; and then the reader experiment §7.3 actually asks for.
+the same 48 readings; equalise the note's calendar conversion across A/B/C; rerun outside the
+harness with a bare API call and a fixed system prompt; a vision run with B and C rendered, to
+separate content from drawing; and then the reader experiment §7.3 actually asks for.
+
+_What review changed (2026-09-16, same day):_ the first version of this section said the model
+ids, prompts and judge were not recorded; a reviewer pointed out that this left `results.json`
+unauditable. They were recoverable from the run's own transcripts and are now committed under
+`etc/lts-reader-proxy/transcripts/`. The same review corrected three borrowed-and-sharpened
+claims here and in RESULTS.md: sonnet "reconstructed the `ELSE` branch" (it named the state, not
+the branch); "8 of 16" list readers inferred the discharge (4 of 12 on the refused contracts —
+the other four cited `every-run-example`'s printed `→ then:` line); and "all 13" BPMN misses sit
+on documented losses (five do). No number in the table changed.
 
 ---
 
