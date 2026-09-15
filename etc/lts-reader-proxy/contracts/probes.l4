@@ -1,0 +1,61 @@
+DECLARE Person IS ONE OF B, S
+DECLARE Action IS ONE OF 
+  delivery 
+  payment HAS amount IS A NUMBER
+  foo
+
+aContract MEANS 
+  PARTY S
+  MUST delivery 
+  WITHIN 3
+  HENCE 
+    PARTY B
+    MUST payment price PROVIDED price >= 20
+    WITHIN 3
+    HENCE (IF price = 20 THEN FULFILLED ELSE PARTY B MUST return WITHIN 10)
+    LEST
+      PARTY B
+      MUST EXACTLY payment fine
+      WITHIN 3
+  WHERE
+  fine MEANS 10
+
+-- PROBES for the ground truth of etc/lts-reader-proxy/contracts (Q2, Q3, Q5).
+-- Lines 1-22 are jl4/examples/ok/contracts.l4:1-22 verbatim; each #TRACE
+-- below is the proxy position (S delivers at 2, B pays 21 at 4, WAIT UNTIL 10)
+-- plus one further event.
+
+-- Q2/Q5: `return` is a variable pattern, so ANY act by B discharges it.
+#TRACE aContract AT 0 WITH
+  PARTY S DOES delivery AT 2
+  PARTY B DOES payment 21 AT 4
+  (`WAIT UNTIL` 10)
+  PARTY B DOES foo AT 12
+
+-- Q2: ... including on the deadline day itself (14).
+#TRACE aContract AT 0 WITH
+  PARTY S DOES delivery AT 2
+  PARTY B DOES payment 21 AT 4
+  (`WAIT UNTIL` 10)
+  PARTY B DOES delivery AT 14
+
+-- Q2: an act by S does not count.
+#TRACE aContract AT 0 WITH
+  PARTY S DOES delivery AT 2
+  PARTY B DOES payment 21 AT 4
+  (`WAIT UNTIL` 10)
+  PARTY S DOES foo AT 12
+
+-- Q3: nothing by 14; the clock reaches 15.
+#TRACE aContract AT 0 WITH
+  PARTY S DOES delivery AT 2
+  PARTY B DOES payment 21 AT 4
+  (`WAIT UNTIL` 10)
+  (`WAIT UNTIL` 15)
+
+-- Q3: B acts, but late.
+#TRACE aContract AT 0 WITH
+  PARTY S DOES delivery AT 2
+  PARTY B DOES payment 21 AT 4
+  (`WAIT UNTIL` 10)
+  PARTY B DOES foo AT 15

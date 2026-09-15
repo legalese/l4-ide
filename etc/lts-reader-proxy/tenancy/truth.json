@@ -1,0 +1,26 @@
+{
+  "contract": "`receipts` (jl4/examples/bpmn/tenancy.l4), the fork",
+  "position": "the outset, via `l4 lts --contract receipts`: nothing has happened; clock 0",
+  "questions": [
+    "Q1. What is owed right now, and by whom?",
+    "Q2. Which event(s) would discharge what is owed?",
+    "Q3. Which event(s) or deadline(s) would put someone in breach?",
+    "Q4. Where in the contract are we — which rule, branch or state is live?",
+    "Q5. What happens after the next discharging event?"
+  ],
+  "truth": [
+    "Each of the three tenants — Alice, Bob and Carol — MUST Pay the landlord (Ms Ng), each due by day 7. The amount is not fixed by the rule. The landlord owes nothing yet.",
+    "Each tenant paying the landlord on or before day 7 discharges that tenant's own payment obligation (any amount, even 0 — the rule binds the amount, it does not test it; paying someone other than the landlord does not count). The contract as a whole ends FULFILLED only when all three have paid and the landlord has issued all three receipts.",
+    "The clock passing day 7 with a tenant unpaid: if nothing happens by 7 (the clock reaches 8) there is a breach, which the evaluator names to Alice (the first member whose deadline passed; a tenant paying late at 8 is likewise a breach named to Alice). Later, a landlord who does not issue a receipt within 5 days of a payment is in breach.",
+    "At the start: the EVERY fork (`UPON EACH`), three parallel branches, one per tenant, none of which has acted. No receipt obligation exists yet.",
+    "When one tenant pays (say Alice at day 3), the landlord MUST issue Alice a receipt for that amount within 5 days (by day 8); the other two tenants still owe their payments by day 7. A receipt in time closes Alice's branch; no receipt by 8 puts the landlord in breach. Each tenant's branch runs on its own."
+  ],
+  "evidence": [
+    "lts.json: owed = three entries {party: Tenant Alice/Bob/Carol, MUST Pay (EXACTLY t) (EXACTLY theLandlord) amount, dueBy 7, group: fork of 3}; nextDeadline.at = 7",
+    "probes.out, the #TRACEs on probes.l4 lines 61 (Alice pays 100 at 3 → landlord owes Receipt by 8; Bob, Carol still owe), 65 (amount 0 also counts), 69 (paying Bob does not count: Alice still owes), 73 (paying on day 7 counts), 96 (all three pay + three receipts → FULFILLED). lts.json lists the acts under untried ('the action binds `amount`') — the list itself cannot try them.",
+    "lts.json: breaching = [{tick at 8 past deadline 7, breach: {party: Tenant Alice}}]; probes.out, the #TRACEs on probes.l4 lines 77 (nothing by 7, event at 8 → BREACHED, Alice), 81 (Alice pays at 8 → BREACHED, Alice), 85 (Alice pays at 3, no receipt by 8 → BREACHED, Landlord)",
+    "B.dot: initial state, edge 0 -> 1 'EVERY Tenant t IN tenants MUST Pay ... [7] UPON EACH' not yet taken; A.txt: 'before anything has happened'",
+    "probes.out, the #TRACE on probes.l4 line 61 (owed after Alice pays at 3: landlord Receipt by 8, Bob and Carol Pay by 7) and line 91 (receipt at 8 with Bob and Carol unpaid → BREACHED, Bob); B.dot: 1 -> 2 Fulfilled, 1 -> 3 timeout"
+  ],
+  "notes": "The position is the outset because the task fixed it (`--contract receipts`). Two things seen one step PAST this position, not in any artifact here: (1) with Alice paid at 3, the list's what-if for the landlord's receipt fails with 'Internal error: amount is not in scope' (probes.out line 15) — the HENCE's `EXACTLY amount` refers to the member's own pattern variable (left open for the event to fill) and the what-if cannot reify it; (2) the tick past 7 is printed as 'the clock reaches 7.5' because the next live deadline is 8 and tickPast goes half-way (WhatIf.hs:278; by design, spec §2.4)."
+}

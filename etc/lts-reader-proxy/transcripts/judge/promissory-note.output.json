@@ -1,0 +1,88 @@
+{
+  "rows": [
+    {
+      "artifact": "A",
+      "model": "haiku",
+      "repeat": 0,
+      "scores": [1, 1, 0, 0, 0],
+      "rationale": "a1/a2: right parties, direction and deadline 739769; amount left as 'Amount Transferred' (penalty not named, but no wrong figure asserted). a3: asserts breach on passing 739769 — truth says no breach, obligation converts to all-outstanding-debts. a4: names only the section, not the live LEST/penalty arm or the refused April payment. a5: cannot tell — truth is FULFILLED."
+    },
+    {
+      "artifact": "A",
+      "model": "haiku",
+      "repeat": 1,
+      "scores": [1, 0, 1, 0, 0],
+      "rationale": "a1: correct party/deadline. a2: cannot tell. a3: hedged 'cannot tell' but substantively reports the truth — passing the deadline neither ends nor breaches, continues without deadline. a4: section only, no branch. a5: cannot tell."
+    },
+    {
+      "artifact": "A",
+      "model": "sonnet",
+      "repeat": 0,
+      "scores": [1, 0, 1, 0, 0],
+      "rationale": "a1: correct party/deadline. a2: identifies the payment event but ends in explicit 'cannot tell' on whether it discharges. a3: reports no breach branch, deadline passing just continues — matches truth. a4: section only, no identification of the reparation arm. a5: cannot tell."
+    },
+    {
+      "artifact": "A",
+      "model": "sonnet",
+      "repeat": 1,
+      "scores": [1, 1, 1, 0, 0],
+      "rationale": "a1: correct party/deadline. a2: payment by the Borrower by 739769 discharges — correct event and deadline. a3: no breach outcome, continues with no deadline — matches. a4: says the April 3 payment was made and we are 'awaiting the next installment', i.e. treats the refused payment as credited — wrong branch. a5: cannot tell."
+    },
+    {
+      "artifact": "B",
+      "model": "haiku",
+      "repeat": 0,
+      "scores": [0, 0, 1, 0, 1],
+      "rationale": "a1/a2/a4: places us in state 4 (all outstanding debts due) rather than state 2 (penalty arm by 3 June); invents a grace expiry ~739701. a3: concludes breach is unreachable — matches truth's conclusion. a5: Fulfilled — correct."
+    },
+    {
+      "artifact": "B",
+      "model": "haiku",
+      "repeat": 1,
+      "scores": [0, 1, 0, 1, 1],
+      "rationale": "a1: credits the April payment and gives a running balance of 24,821 — truth says the payment did not count and what is owed is the penalty installment. a2: from node 2, installment plus penalty within the grace period — correct. a3: asserts breach is triggered by failing to pay at node 4 while also quoting 'unreachable' — contradictory, wrong. a4: node 2, first deadline missed, April payment insufficient because plain amount — correct. a5: Fulfilled — correct."
+    },
+    {
+      "artifact": "B",
+      "model": "sonnet",
+      "repeat": 0,
+      "scores": [1, 1, 1, 1, 1],
+      "rationale": "All five match: owes Next Payment Due Amount With Penalty, April plain payment does not satisfy; discharge requires at least the penalty amount; timeout goes to state 4 and Breach edge is unreachable; live state is 2; discharge leads to Fulfilled terminal."
+    },
+    {
+      "artifact": "B",
+      "model": "sonnet",
+      "repeat": 1,
+      "scores": [1, 1, 1, 1, 0],
+      "rationale": "All five answers were packed into a1 (a2–a5 are 'placeholder'); scored on that content. Q1–Q4 correct: state 2 penalty obligation, pay at least With-Penalty amount, timeout to state 4 then unreachable Breach, node 2 live. Q5 wrong: says payment returns to state 0 and re-enters the installment loop; truth says the reparation arm ends in FULFILLED with no further installments."
+    },
+    {
+      "artifact": "C",
+      "model": "haiku",
+      "repeat": 0,
+      "scores": [1, 1, 0, 1, 1],
+      "rationale": "a1/a2/a4: first installment plus penalty at Task_2, first deadline passed, 2256.46 does not discharge — correct. a3: asserts Boundary_4 fires and reaches Breach; truth says no breach is reachable. a5: Fulfilled — correct."
+    },
+    {
+      "artifact": "C",
+      "model": "haiku",
+      "repeat": 1,
+      "scores": [1, 1, 0, 1, 1],
+      "rationale": "a1/a2/a4: Task_2 penalty obligation, 17 March missed, April payment insufficient — correct. a3: says failure to pay at Task_4 results in breach — wrong, breach is unreachable. a5: discharge of Task_2 leads to Fulfilled — correct."
+    },
+    {
+      "artifact": "C",
+      "model": "sonnet",
+      "repeat": 0,
+      "scores": [0, 0, 1, 0, 0],
+      "rationale": "a1/a2/a4/a5: treats the April 3 payment as having satisfied Task_1 and places us at Split_0 looping back to Task_1 — truth says the payment was refused and we are in the penalty arm, and discharge ends in Fulfilled. a3: breach only via Boundary_4, documented unreachable — correct."
+    },
+    {
+      "artifact": "C",
+      "model": "sonnet",
+      "repeat": 1,
+      "scores": [0, 0, 1, 0, 0],
+      "rationale": "a1/a2/a4/a5: same misreading — payment credited against Task_1, flow back at Split_0/Task_1, next discharge loops rather than Fulfilled. a3: breach unreachable, deadline misses escalate rather than breach — correct."
+    }
+  ]
+}

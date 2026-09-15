@@ -1,0 +1,131 @@
+`the tenancy` — after 3 events, the clock stands at 9 (the #TRACE on line 45)
+    PARTY alice DOES Sign OF alice AT 1
+    PARTY bob DOES Sign OF bob AT 2
+    PARTY carol DOES Sign OF carol AT 9
+  Standing: in progress.
+
+  Owed now:
+    - theLandlord MUST Deliver OF theLandlord — due by 14 (5 from now)
+
+  What would discharge it (the contract ends fulfilled):
+    - theLandlord does Deliver OF theLandlord now (at 9) → fulfilled
+
+  What would put someone in breach:
+    - nothing happens by 14 (the clock reaches 15) → Landlord OF "Ms Ng" is in breach: MUST Deliver (EXACTLY theLandlord) was due by 14; the clock reached 15 without it
+
+  Next deadline: 14 (theLandlord: Deliver OF theLandlord)
+
+  Steps, in order:
+    at 1: Tenant OF … does Sign OF … at 1; Tenant OF … MUST (member 1 of 3) — done; on to what follows (1 of 3 have acted; the shared next step waits for the rest)
+    at 1: Tenant OF … does Sign OF … at 1; Tenant OF … MUST (member 2 of 3) — not this party's event; passed over
+    at 2: Tenant OF … does Sign OF … at 2; Tenant OF … MUST (member 2 of 3) — done; on to what follows (2 of 3 have acted; the shared next step waits for the rest)
+    at 1: Tenant OF … does Sign OF … at 1; Tenant OF … MUST (member 3 of 3) — not this party's event; passed over
+    at 2: Tenant OF … does Sign OF … at 2; Tenant OF … MUST (member 3 of 3) — not this party's event; passed over
+    at 9: Tenant OF … does Sign OF … at 9; Tenant OF … MUST (member 3 of 3) — done; on to what follows (3 of 3 have acted; the shared next step waits for the rest)
+    at 9: the group — everyone has acted; the shared next step begins
+    at 9: (party not yet known) MUST — no more events; still waiting
+
+`the tenancy` — after 3 events, the clock stands at 14 (the #TRACE on line 51)
+    PARTY alice DOES Sign OF alice AT 1
+    PARTY bob DOES Sign OF bob AT 2
+    PARTY carol DOES Sign OF carol AT 14
+  Standing: in progress.
+
+  Owed now:
+    - theLandlord MUST Deliver OF theLandlord — due by 19 (5 from now)
+
+  What would discharge it (the contract ends fulfilled):
+    - theLandlord does Deliver OF theLandlord now (at 14) → fulfilled
+
+  What would put someone in breach:
+    - nothing happens by 19 (the clock reaches 20) → Landlord OF "Ms Ng" is in breach: MUST Deliver (EXACTLY theLandlord) was due by 19; the clock reached 20 without it
+
+  Next deadline: 19 (theLandlord: Deliver OF theLandlord)
+
+  Steps, in order:
+    at 1: Tenant OF … does Sign OF … at 1; Tenant OF … MUST (member 1 of 3) — done; on to what follows (1 of 3 have acted; the shared next step waits for the rest)
+    at 1: Tenant OF … does Sign OF … at 1; Tenant OF … MUST (member 2 of 3) — not this party's event; passed over
+    at 2: Tenant OF … does Sign OF … at 2; Tenant OF … MUST (member 2 of 3) — done; on to what follows (2 of 3 have acted; the shared next step waits for the rest)
+    at 1: Tenant OF … does Sign OF … at 1; Tenant OF … MUST (member 3 of 3) — not this party's event; passed over
+    at 2: Tenant OF … does Sign OF … at 2; Tenant OF … MUST (member 3 of 3) — not this party's event; passed over
+    at 14: Tenant OF … does Sign OF … at 14; Tenant OF … MUST (member 3 of 3) — done; on to what follows (3 of 3 have acted; the shared next step waits for the rest)
+    at 14: the group — everyone has acted; the shared next step begins
+    at 14: (party not yet known) MUST — no more events; still waiting
+
+`the tenancy` — after 3 events, the clock stands at 15 (the #TRACE on line 57)
+    PARTY alice DOES Sign OF alice AT 1
+    PARTY bob DOES Sign OF bob AT 2
+    PARTY theLandlord DOES Deliver OF theLandlord AT 15
+  Standing: BREACHED — the contract is in breach (no party is named).
+
+  Steps, in order:
+    at 1: Tenant OF … does Sign OF … at 1; Tenant OF … MUST (member 1 of 3) — done; on to what follows (1 of 3 have acted; the shared next step waits for the rest)
+    at 1: Tenant OF … does Sign OF … at 1; Tenant OF … MUST (member 2 of 3) — not this party's event; passed over
+    at 2: Tenant OF … does Sign OF … at 2; Tenant OF … MUST (member 2 of 3) — done; on to what follows (2 of 3 have acted; the shared next step waits for the rest)
+    at 1: Tenant OF … does Sign OF … at 1; Tenant OF … MUST (member 3 of 3) — not this party's event; passed over
+    at 2: Tenant OF … does Sign OF … at 2; Tenant OF … MUST (member 3 of 3) — not this party's event; passed over
+    at 2: the event at 15; Tenant OF … MUST (member 3 of 3) — deadline 14 passed without the act; on to the fallback
+    at 15: the group — a member did not come through; on to the fallback
+    at —: BREACH declared
+
+`the tenancy` — after 4 events, the clock stands at 14 (the #TRACE on line 63)
+    PARTY alice DOES Sign OF alice AT 1
+    PARTY bob DOES Sign OF bob AT 2
+    PARTY carol DOES Sign OF carol AT 9
+    PARTY theLandlord DOES Deliver OF theLandlord AT 14
+  Standing: FULFILLED — nothing more is owed.
+
+  Steps, in order:
+    at 1: Tenant OF … does Sign OF … at 1; Tenant OF … MUST (member 1 of 3) — done; on to what follows (1 of 3 have acted; the shared next step waits for the rest)
+    at 1: Tenant OF … does Sign OF … at 1; Tenant OF … MUST (member 2 of 3) — not this party's event; passed over
+    at 2: Tenant OF … does Sign OF … at 2; Tenant OF … MUST (member 2 of 3) — done; on to what follows (2 of 3 have acted; the shared next step waits for the rest)
+    at 1: Tenant OF … does Sign OF … at 1; Tenant OF … MUST (member 3 of 3) — not this party's event; passed over
+    at 2: Tenant OF … does Sign OF … at 2; Tenant OF … MUST (member 3 of 3) — not this party's event; passed over
+    at 9: Tenant OF … does Sign OF … at 9; Tenant OF … MUST (member 3 of 3) — done; on to what follows (3 of 3 have acted; the shared next step waits for the rest)
+    at 9: the group — everyone has acted; the shared next step begins
+    at 14: Landlord OF … does Deliver OF … at 14; Landlord OF … MUST — done; on to what follows
+
+`the tenancy` — after 4 events, the clock stands at 15 (the #TRACE on line 70)
+    PARTY alice DOES Sign OF alice AT 1
+    PARTY bob DOES Sign OF bob AT 2
+    PARTY carol DOES Sign OF carol AT 9
+    PARTY theLandlord DOES Deliver OF theLandlord AT 15
+  Standing: BREACHED — Landlord OF "Ms Ng" is in breach: MUST Deliver (EXACTLY theLandlord) was due by 14; seen at 15, when Deliver OF (Landlord OF "Ms Ng") happened instead.
+
+  Steps, in order:
+    at 1: Tenant OF … does Sign OF … at 1; Tenant OF … MUST (member 1 of 3) — done; on to what follows (1 of 3 have acted; the shared next step waits for the rest)
+    at 1: Tenant OF … does Sign OF … at 1; Tenant OF … MUST (member 2 of 3) — not this party's event; passed over
+    at 2: Tenant OF … does Sign OF … at 2; Tenant OF … MUST (member 2 of 3) — done; on to what follows (2 of 3 have acted; the shared next step waits for the rest)
+    at 1: Tenant OF … does Sign OF … at 1; Tenant OF … MUST (member 3 of 3) — not this party's event; passed over
+    at 2: Tenant OF … does Sign OF … at 2; Tenant OF … MUST (member 3 of 3) — not this party's event; passed over
+    at 9: Tenant OF … does Sign OF … at 9; Tenant OF … MUST (member 3 of 3) — done; on to what follows (3 of 3 have acted; the shared next step waits for the rest)
+    at 9: the group — everyone has acted; the shared next step begins
+    at 9: the event at 15; (party not yet known) MUST — deadline 14 passed without the act; that is a breach
+
+`the tenancy` — after 3 events, the clock stands at 3 (the #TRACE on line 77)
+    PARTY alice DOES Sign OF alice AT 1
+    PARTY bob DOES Sign OF bob AT 2
+    PARTY alice DOES Sign OF alice AT 3
+  Standing: in progress.
+
+  Owed now:
+    - Tenant OF "Carol" MUST Sign OF (Tenant OF "Carol") — due by 14 (11 from now) (one of 3 who must all act before the next step)
+    - the next step is held back until all have acted: 2 of 3 have
+
+  What would put someone in breach:
+    - nothing happens by 14 (the clock reaches 15) → the contract is in breach (no party is named)
+
+  What would move things along (neither ends nor breaches it):
+    - Tenant OF "Carol" does Sign OF (Tenant OF "Carol") now (at 3) → then:
+          · theLandlord MUST Deliver (EXACTLY theLandlord) — due within 5 from now
+
+  Next deadline: 14 (Tenant OF "Carol": Sign OF (Tenant OF "Carol"))
+
+  Steps, in order:
+    at 1: Tenant OF … does Sign OF … at 1; Tenant OF … MUST (member 1 of 3) — done; on to what follows (1 of 3 have acted; the shared next step waits for the rest)
+    at 1: Tenant OF … does Sign OF … at 1; Tenant OF … MUST (member 2 of 3) — not this party's event; passed over
+    at 2: Tenant OF … does Sign OF … at 2; Tenant OF … MUST (member 2 of 3) — done; on to what follows (2 of 3 have acted; the shared next step waits for the rest)
+    at 1: Tenant OF … does Sign OF … at 1; Tenant OF … MUST (member 3 of 3) — not this party's event; passed over
+    at 2: Tenant OF … does Sign OF … at 2; Tenant OF … MUST (member 3 of 3) — not this party's event; passed over
+    at 3: Tenant OF … does something at 3; Tenant OF … MUST (member 3 of 3) — not this party's event; passed over
+    at 3: Tenant OF … MUST (member 3 of 3) — no more events; still waiting

@@ -1,0 +1,26 @@
+{
+  "contract": "`Payment Obligations` (jl4/examples/legal/promissory-note.l4), the LEST chain",
+  "position": "the file's own second #TRACE (line 192): note dated 4 Feb 2025; one payment of USD 2256.46 on 3 April 2025, after the first installment's deadline of 17 March 2025; clock = 3 April 2025 (day 739708)",
+  "questions": [
+    "Q1. What is owed right now, and by whom?",
+    "Q2. Which event(s) would discharge what is owed?",
+    "Q3. Which event(s) or deadline(s) would put someone in breach?",
+    "Q4. Where in the contract are we — which rule, branch or state is live?",
+    "Q5. What happens after the next discharging event?"
+  ],
+  "truth": [
+    "The Borrower (Jane Dough Pte Ltd) MUST pay the Lender (John Doe) the missed installment with the 5% late penalty, USD 2369.28, by 3 June 2025 (day 739769; 61 days from now). The 3 April payment of USD 2256.46 did NOT count: it was less than the penalty amount, and it was not credited against the debt.",
+    "The Borrower paying the Lender at least USD 2369.28 on or before 3 June 2025. Paying the plain installment (USD 2256.46) again is too little and leaves the obligation standing.",
+    "Nothing in this contract puts the Borrower in breach from here: if 3 June 2025 passes without the penalty payment, the obligation converts to paying ALL outstanding debts (USD 27,190.32) with no deadline, which can never expire. A payment of the penalty amount made late (4 June) is then too little, but that is not a breach either.",
+    "In the first LEST (reparation) arm of the payment chain: the first monthly installment (due 17 March 2025) was missed, so the rule fell to `LEST PARTY The Borrower MUST pay ... Next Payment Due Amount With Penalty WITHIN Default After Days Beyond Commencement`; the late 3 April payment was offered to that arm and refused by its PROVIDED guard.",
+    "The note is FULFILLED — nothing more is owed. The reparation arm carries no HENCE, so its default consequence is FULFILLED: a single payment of USD 2369.28 by 3 June 2025 ends the twelve-installment note, and the other eleven installments never fall due. (That is what the evaluator computes for this rule as written; a reader may reasonably expect otherwise.)"
+  ],
+  "evidence": [
+    "lts.json: owed = [{party: Commercial Borrower ..., MUST `pay monthly installment to` (EXACTLY `The Lender`) `Amount Transferred`, dueBy 739769, remaining 61}]; nextDeadline.at = 739769; probes.out: Day (June 3 2025) = 739769, installment × 1.05 = 2369.2806…; the guard is `is money at least equal within error` against `Next Payment Due Amount With Penalty` (source lines 105-108)",
+    "probes.out, the #TRACEs on probes.l4 lines 294 (USD 2369.29 on 3 June → FULFILLED) and 299 (USD 2256.46 on 3 June → still owed, 0 from now). lts.json lists the act under untried ('the action binds `Amount Transferred`') — the list itself cannot try it.",
+    "lts.json: breaching = []; advancing = [{tick at 739770 past 739769 → then: [Borrower MUST pay ..., no deadline]}]; probes.out, the #TRACEs on probes.l4 lines 305 (WAIT UNTIL 4 June → in progress, no deadline), 310 (2369.29 on 4 June → in progress, no deadline), 315 (27190.32 on 1 Dec → FULFILLED); B.dot: 4 -> 5 'unreachable: no WITHIN'",
+    "A.txt with --steps (jl4/examples/lts/expected/promissory-note is not goldened; run `l4 lts jl4/examples/legal/promissory-note.l4 --steps`): 'at 739650: the event at 739708; ... MUST — deadline 739691 passed without the act; on to the fallback', then 'the act matched but its condition did not hold; passed over'; B.dot: node 2, reached by 1 -> 2 timeout",
+    "probes.out, the #TRACE on probes.l4 line 294: Standing FULFILLED; B.dot: 2 -> 3 Fulfilled (the reparation's only non-timeout edge goes to Fulfilled, not back to the loop)"
+  ],
+  "notes": "This is the fourth contract because no regcf rule qualifies: regcf.l4's three regulative rules (`advertising restriction`, `ongoing reporting obligation`, `resale restriction`) contain no LEST at all, and regcf-denovo.l4 has LEST arms but no #TRACE and no BPMN golden. C.bpmn is `l4 export --to bpmn --rule 'Payment Obligations'` (no P1 golden exists); C.fidelity.txt is its report (9 blocking). The list prints day serials, not dates; history.txt gives the conversions for B and C readers, and A readers get only the serials."
+}

@@ -1,0 +1,386 @@
+[
+  {
+    "contract": "contracts",
+    "artifact": "A",
+    "model": "haiku",
+    "repeat": 0,
+    "scores": [1, 1, 1, 0, 0],
+    "rationale": "Q1-Q3 match truth (B must return by 14; B's return discharges; clock reaching 15 = breach). Q4 and Q5 'cannot tell' where truth gives the ELSE branch / FULFILLED end."
+  },
+  {
+    "contract": "contracts",
+    "artifact": "A",
+    "model": "haiku",
+    "repeat": 1,
+    "scores": [1, 0, 1, 0, 0],
+    "rationale": "Q1 and Q3 correct. Q2, Q4, Q5 'cannot tell' where truth has definite answers."
+  },
+  {
+    "contract": "contracts",
+    "artifact": "A",
+    "model": "sonnet",
+    "repeat": 0,
+    "scores": [1, 0, 1, 1, 0],
+    "rationale": "Q1, Q3 correct. Q2 essentially 'cannot tell' (hedged 'presumably'). Q4 identifies the live state as the return obligation with deadline 14 after delivery@2/payment@4 — correct state though branch reasoning absent. Q5 'cannot tell'."
+  },
+  {
+    "contract": "contracts",
+    "artifact": "A",
+    "model": "sonnet",
+    "repeat": 1,
+    "scores": [1, 0, 1, 1, 0],
+    "rationale": "Same pattern as repeat 0: Q1/Q3/Q4 right, Q2 and Q5 declared unanswerable though truth answers them."
+  },
+  {
+    "contract": "contracts",
+    "artifact": "B",
+    "model": "haiku",
+    "repeat": 0,
+    "scores": [1, 1, 1, 1, 1],
+    "rationale": "All five match: B must return (price 21 ≠ 20), return discharges to Fulfilled, timeout on the [10] deadline → Breach, state 4 'B must return', Fulfilled terminal. Deadline stated as the relative [10] label rather than day 14, not a wrong absolute date."
+  },
+  {
+    "contract": "contracts",
+    "artifact": "B",
+    "model": "haiku",
+    "repeat": 1,
+    "scores": [1, 1, 1, 1, 1],
+    "rationale": "All correct, including the computed day-14 deadline and the NOT (price EQUALS 20) branch."
+  },
+  {
+    "contract": "contracts",
+    "artifact": "B",
+    "model": "sonnet",
+    "repeat": 0,
+    "scores": [1, 1, 1, 1, 1],
+    "rationale": "All correct: node 4 live via 0→1→2→4 on the not-equal-20 branch; return → Fulfilled; timeout → Breach; nothing further owed."
+  },
+  {
+    "contract": "contracts",
+    "artifact": "B",
+    "model": "sonnet",
+    "repeat": 1,
+    "scores": [1, 1, 1, 1, 1],
+    "rationale": "All correct with full path reasoning (delivery day 2, payment 21 day 4, ELSE branch to 'B must return', [10] timer, Fulfilled terminal)."
+  },
+  {
+    "contract": "contracts",
+    "artifact": "C",
+    "model": "haiku",
+    "repeat": 0,
+    "scores": [1, 1, 1, 1, 1],
+    "rationale": "All correct: Task_4 return due day 14, return → Fulfilled, Boundary_4 timeout → Breach, price≠20 branch, process ends Fulfilled."
+  },
+  {
+    "contract": "contracts",
+    "artifact": "C",
+    "model": "haiku",
+    "repeat": 1,
+    "scores": [1, 1, 1, 1, 1],
+    "rationale": "All correct; Q3 adds a harmless note about earlier boundary events that would already have fired."
+  },
+  {
+    "contract": "contracts",
+    "artifact": "C",
+    "model": "sonnet",
+    "repeat": 0,
+    "scores": [1, 1, 1, 1, 1],
+    "rationale": "Q1 opens with 'nothing is owed' but immediately corrects to B owes return — net answer right. Q3 hedges on the start day but arrives at ~day 14 via P10D from day 4. Q2, Q4, Q5 correct."
+  },
+  {
+    "contract": "contracts",
+    "artifact": "C",
+    "model": "sonnet",
+    "repeat": 1,
+    "scores": [1, 1, 1, 1, 1],
+    "rationale": "All correct: B owes return, S owes nothing, day-14 deadline from P10D timer started day 4, price≠20 gateway branch, ends Fulfilled."
+  },
+  {
+    "contract": "every-run-example",
+    "artifact": "A",
+    "model": "haiku",
+    "repeat": 0,
+    "scores": [1, 1, 1, 0, 1],
+    "rationale": "Q1-Q3 match truth (Carol, Sign, by 14, 2 of 3 signed; breach at 15 with no party named). Q4 'cannot tell' scored 0: truth says the live state is identifiable (signing stage inside the EVERY barrier, 2 of 3 done). Q5 correct on party/obligation/5-day window; 'by 7' is the artifact's sign-now hypothetical, accepted."
+  },
+  {
+    "contract": "every-run-example",
+    "artifact": "A",
+    "model": "haiku",
+    "repeat": 1,
+    "scores": [1, 1, 1, 0, 1],
+    "rationale": "Q1-Q3 and Q5 correct (Carol Sign by 14, 12 days away; breach at 15 unnamed; landlord Deliver within 5). Q4 'cannot tell' scored 0 for the same reason as repeat 0 — the state is identifiable."
+  },
+  {
+    "contract": "every-run-example",
+    "artifact": "A",
+    "model": "sonnet",
+    "repeat": 0,
+    "scores": [1, 1, 1, 1, 1],
+    "rationale": "All five match: Carol owes Sign by 14; Carol signing discharges (2 of 3 already acted); breach when clock reaches 15, no party named; live state is waiting on the third signature; then landlord Deliver within 5."
+  },
+  {
+    "contract": "every-run-example",
+    "artifact": "A",
+    "model": "sonnet",
+    "repeat": 1,
+    "scores": [1, 1, 1, 1, 1],
+    "rationale": "All five match; Q4 correctly names the all-must-sign gate with 2 of 3 done; Q5 gives landlord Deliver 5 ticks after Carol's signature (the 'by 7' is the sign-now hypothetical)."
+  },
+  {
+    "contract": "every-run-example",
+    "artifact": "B",
+    "model": "haiku",
+    "repeat": 0,
+    "scores": [1, 1, 1, 1, 1],
+    "rationale": "Q1 lands on Carol as the sole remaining signer though it omits the day-14 deadline (incomplete, not wrong). Q2-Q5 correct: Carol sign -> state 1 -> landlord Deliver [5]; timeouts from state 0 and state 1 to breach; live state 0 with the EVERY-tenant rule."
+  },
+  {
+    "contract": "every-run-example",
+    "artifact": "B",
+    "model": "haiku",
+    "repeat": 1,
+    "scores": [1, 1, 1, 1, 1],
+    "rationale": "Carol's signature owed (deadline omitted but nothing wrong); Carol sign -> node 1 -> landlord Deliver -> Fulfilled; timeouts [14] and [5] to breach; node 0 with the EVERY rule live; landlord Deliver next."
+  },
+  {
+    "contract": "every-run-example",
+    "artifact": "B",
+    "model": "sonnet",
+    "repeat": 0,
+    "scores": [1, 1, 1, 1, 1],
+    "rationale": "All five match including Alice/Bob already discharged, the 0->3 timeout as the signing breach, state 0 on the ONCE ALL HAVE rule, and landlord Deliver within [5] leading to Fulfilled or Breach."
+  },
+  {
+    "contract": "every-run-example",
+    "artifact": "B",
+    "model": "sonnet",
+    "repeat": 1,
+    "scores": [1, 1, 1, 1, 1],
+    "rationale": "Q1 opens with a self-contradictory 'nothing is owed yet' but resolves to Carol owes Sign (deadline 14) and landlord not yet started, which is the truth. Q2-Q5 correct; Q3 honestly hedges on the deadline's reference point without asserting anything wrong."
+  },
+  {
+    "contract": "every-run-example",
+    "artifact": "C",
+    "model": "haiku",
+    "repeat": 0,
+    "scores": [1, 1, 1, 1, 1],
+    "rationale": "Carol must sign (deadline omitted, nothing wrong); Carol sign -> Ms Ng Deliver -> End_2; Boundary_0 at 14 days and Boundary_1 at 5 days to breach; Task_0 with Alice/Bob done and Carol pending; Task_1 Deliver within 5 days."
+  },
+  {
+    "contract": "every-run-example",
+    "artifact": "C",
+    "model": "haiku",
+    "repeat": 1,
+    "scores": [1, 1, 1, 1, 1],
+    "rationale": "All five match: Carol pending in Task_0; her signature completes the multi-instance barrier and starts Ms Ng's Deliver; 14-day and 5-day boundary timers to Breach; 2 of 3 instances done; Deliver within 5 then Fulfilled."
+  },
+  {
+    "contract": "every-run-example",
+    "artifact": "C",
+    "model": "sonnet",
+    "repeat": 0,
+    "scores": [1, 1, 1, 1, 1],
+    "rationale": "All five match with full detail: landlord's Deliver not yet live, Carol's Sign completes Task_0 and fires the flow into Task_1, P14D/P5D boundaries to End_3, live state inside Task_0 with Carol outstanding, Deliver within 5 to Fulfilled or Breach."
+  },
+  {
+    "contract": "every-run-example",
+    "artifact": "C",
+    "model": "sonnet",
+    "repeat": 1,
+    "scores": [1, 1, 1, 1, 1],
+    "rationale": "Q1 has the same 'nothing is owed, strictly speaking' hedge but states Carol owes Sign and the landlord's obligation is not live, matching truth. Q2-Q5 correct: barrier fires on Carol's Sign, P14D/P5D timers, Task_0 with Boundary_0 running and Task_1 unreached, landlord Deliver within 5 to End_2 or End_3."
+  },
+  {
+    "contract": "tenancy",
+    "artifact": "A",
+    "model": "haiku",
+    "repeat": 0,
+    "scores": [1, 0, 1, 1, 0],
+    "rationale": "a1 names all three tenants, landlord, day 7. a2 'cannot tell' but truth says payment discharges — 0. a3 clock-8 breach named to Alice matches. a4 'at time 0 before any action' = at the start — accepted. a5 'cannot tell' but truth gives the receipt obligation — 0."
+  },
+  {
+    "contract": "tenancy",
+    "artifact": "A",
+    "model": "haiku",
+    "repeat": 1,
+    "scores": [1, 0, 1, 0, 0],
+    "rationale": "a1 correct. a2 'cannot tell' — 0. a3 clock-8/Alice breach correct (hedge on Bob/Carol is harmless). a4 explicitly says it cannot identify the live rule/branch/state — 0. a5 'cannot tell' — 0."
+  },
+  {
+    "contract": "tenancy",
+    "artifact": "A",
+    "model": "sonnet",
+    "repeat": 0,
+    "scores": [1, 1, 1, 1, 0],
+    "rationale": "a1 tenants→landlord correct. a2 each tenant's own Pay discharges its obligation — correct despite noting the what-if limitation. a3 nothing-by-7/clock-8 breach to Alice correct. a4 at the start with all three payment obligations live matches the three-branch fork. a5 'cannot tell' — 0."
+  },
+  {
+    "contract": "tenancy",
+    "artifact": "A",
+    "model": "sonnet",
+    "repeat": 1,
+    "scores": [1, 0, 1, 1, 0],
+    "rationale": "a1 correct. a2 states the right inference but then retracts to 'cannot tell' as its verdict — scored 0 per the rule. a3 correct (Alice at clock 8). a4 at the start, three obligations owed — correct. a5 'cannot tell' — 0."
+  },
+  {
+    "contract": "tenancy",
+    "artifact": "B",
+    "model": "haiku",
+    "repeat": 0,
+    "scores": [1, 1, 0, 1, 1],
+    "rationale": "a1 tenants pay Ms Ng — correct. a2 tenant payment discharges, then landlord receipts — matches. a3 'a timeout' with no deadline and no party named — too unspecific to match 7-day/5-day breaches. a4 initial state = at the start. a5 landlord must issue receipts after payment — core obligation/party right, does not assert all-must-pay-first."
+  },
+  {
+    "contract": "tenancy",
+    "artifact": "B",
+    "model": "haiku",
+    "repeat": 1,
+    "scores": [1, 1, 0, 1, 1],
+    "rationale": "a1, a2 correct. a3 generic 'timeout in either state' names neither deadline nor party — 0. a4 initial state at day 0 — correct. a5 after a tenant pays, landlord must issue receipts to that tenant — matches the per-tenant truth."
+  },
+  {
+    "contract": "tenancy",
+    "artifact": "B",
+    "model": "sonnet",
+    "repeat": 0,
+    "scores": [1, 1, 1, 1, 1],
+    "rationale": "All five match: tenants owe within 7, landlord owes nothing yet; payment then receipt discharge; 7-day tenant timeout and 5-day landlord timeout breach; initial state with payment rule live; after payment landlord must Receipt within 5 days."
+  },
+  {
+    "contract": "tenancy",
+    "artifact": "B",
+    "model": "sonnet",
+    "repeat": 1,
+    "scores": [0, 1, 1, 1, 1],
+    "rationale": "a1 'nothing is owed yet' contradicts the truth that all three tenants owe payment — 0. a2 payment then receipt discharge with [7]/[5] — correct. a3 both timeouts with the [7] and [5] windows — correct. a4 node 0 initial — correct. a5 after payment landlord must Receipt — correct."
+  },
+  {
+    "contract": "tenancy",
+    "artifact": "C",
+    "model": "haiku",
+    "repeat": 0,
+    "scores": [1, 1, 1, 1, 0],
+    "rationale": "a1–a4 match: tenants→Ms Ng within 7; payment then receipts within 5 discharge; 7-day and 5-day timers breach; Start_0 into multi-instance Task_0 one per tenant. a5 says the receipt obligation follows Task_0 completing (all tenants), whereas truth says one payment triggers that tenant's receipt while the others still owe — trigger event wrong, 0."
+  },
+  {
+    "contract": "tenancy",
+    "artifact": "C",
+    "model": "haiku",
+    "repeat": 1,
+    "scores": [1, 1, 1, 1, 0],
+    "rationale": "a1–a4 correct (obligation, parties, 7/5-day deadlines, start state with multi-instance Pay live). a5 explicitly says 'after all tenants complete their payments' — contradicts the per-branch truth, 0."
+  },
+  {
+    "contract": "tenancy",
+    "artifact": "C",
+    "model": "sonnet",
+    "repeat": 0,
+    "scores": [1, 1, 1, 1, 0],
+    "rationale": "a1 'nothing owed yet' is immediately qualified with each tenant's obligation to Pay within 7 days — accepted. a2–a4 correct (per-tenant Pay discharge, 7-day/5-day breaches, Start_0 into multi-instance Task_0). a5 'cannot tell' — truth gives the answer, 0."
+  },
+  {
+    "contract": "tenancy",
+    "artifact": "C",
+    "model": "sonnet",
+    "repeat": 1,
+    "scores": [1, 1, 1, 1, 0],
+    "rationale": "a1 correctly frames tenants under active obligation to pay. a2–a4 correct. a5 conditions the landlord's receipt obligation on the last tenant instance completing (all instances finish) — contradicts the truth's per-branch receipt after a single payment, 0."
+  },
+  {
+    "contract": "promissory-note",
+    "artifact": "A",
+    "model": "haiku",
+    "repeat": 0,
+    "scores": [1, 1, 0, 0, 0],
+    "rationale": "a1/a2: right parties, direction and deadline 739769; amount left as 'Amount Transferred' (penalty not named, but no wrong figure asserted). a3: asserts breach on passing 739769 — truth says no breach, obligation converts to all-outstanding-debts. a4: names only the section, not the live LEST/penalty arm or the refused April payment. a5: cannot tell — truth is FULFILLED."
+  },
+  {
+    "contract": "promissory-note",
+    "artifact": "A",
+    "model": "haiku",
+    "repeat": 1,
+    "scores": [1, 0, 1, 0, 0],
+    "rationale": "a1: correct party/deadline. a2: cannot tell. a3: hedged 'cannot tell' but substantively reports the truth — passing the deadline neither ends nor breaches, continues without deadline. a4: section only, no branch. a5: cannot tell."
+  },
+  {
+    "contract": "promissory-note",
+    "artifact": "A",
+    "model": "sonnet",
+    "repeat": 0,
+    "scores": [1, 0, 1, 0, 0],
+    "rationale": "a1: correct party/deadline. a2: identifies the payment event but ends in explicit 'cannot tell' on whether it discharges. a3: reports no breach branch, deadline passing just continues — matches truth. a4: section only, no identification of the reparation arm. a5: cannot tell."
+  },
+  {
+    "contract": "promissory-note",
+    "artifact": "A",
+    "model": "sonnet",
+    "repeat": 1,
+    "scores": [1, 1, 1, 0, 0],
+    "rationale": "a1: correct party/deadline. a2: payment by the Borrower by 739769 discharges — correct event and deadline. a3: no breach outcome, continues with no deadline — matches. a4: says the April 3 payment was made and we are 'awaiting the next installment', i.e. treats the refused payment as credited — wrong branch. a5: cannot tell."
+  },
+  {
+    "contract": "promissory-note",
+    "artifact": "B",
+    "model": "haiku",
+    "repeat": 0,
+    "scores": [0, 0, 1, 0, 1],
+    "rationale": "a1/a2/a4: places us in state 4 (all outstanding debts due) rather than state 2 (penalty arm by 3 June); invents a grace expiry ~739701. a3: concludes breach is unreachable — matches truth's conclusion. a5: Fulfilled — correct."
+  },
+  {
+    "contract": "promissory-note",
+    "artifact": "B",
+    "model": "haiku",
+    "repeat": 1,
+    "scores": [0, 1, 0, 1, 1],
+    "rationale": "a1: credits the April payment and gives a running balance of 24,821 — truth says the payment did not count and what is owed is the penalty installment. a2: from node 2, installment plus penalty within the grace period — correct. a3: asserts breach is triggered by failing to pay at node 4 while also quoting 'unreachable' — contradictory, wrong. a4: node 2, first deadline missed, April payment insufficient because plain amount — correct. a5: Fulfilled — correct."
+  },
+  {
+    "contract": "promissory-note",
+    "artifact": "B",
+    "model": "sonnet",
+    "repeat": 0,
+    "scores": [1, 1, 1, 1, 1],
+    "rationale": "All five match: owes Next Payment Due Amount With Penalty, April plain payment does not satisfy; discharge requires at least the penalty amount; timeout goes to state 4 and Breach edge is unreachable; live state is 2; discharge leads to Fulfilled terminal."
+  },
+  {
+    "contract": "promissory-note",
+    "artifact": "B",
+    "model": "sonnet",
+    "repeat": 1,
+    "scores": [1, 1, 1, 1, 0],
+    "rationale": "All five answers were packed into a1 (a2–a5 are 'placeholder'); scored on that content. Q1–Q4 correct: state 2 penalty obligation, pay at least With-Penalty amount, timeout to state 4 then unreachable Breach, node 2 live. Q5 wrong: says payment returns to state 0 and re-enters the installment loop; truth says the reparation arm ends in FULFILLED with no further installments."
+  },
+  {
+    "contract": "promissory-note",
+    "artifact": "C",
+    "model": "haiku",
+    "repeat": 0,
+    "scores": [1, 1, 0, 1, 1],
+    "rationale": "a1/a2/a4: first installment plus penalty at Task_2, first deadline passed, 2256.46 does not discharge — correct. a3: asserts Boundary_4 fires and reaches Breach; truth says no breach is reachable. a5: Fulfilled — correct."
+  },
+  {
+    "contract": "promissory-note",
+    "artifact": "C",
+    "model": "haiku",
+    "repeat": 1,
+    "scores": [1, 1, 0, 1, 1],
+    "rationale": "a1/a2/a4: Task_2 penalty obligation, 17 March missed, April payment insufficient — correct. a3: says failure to pay at Task_4 results in breach — wrong, breach is unreachable. a5: discharge of Task_2 leads to Fulfilled — correct."
+  },
+  {
+    "contract": "promissory-note",
+    "artifact": "C",
+    "model": "sonnet",
+    "repeat": 0,
+    "scores": [0, 0, 1, 0, 0],
+    "rationale": "a1/a2/a4/a5: treats the April 3 payment as having satisfied Task_1 and places us at Split_0 looping back to Task_1 — truth says the payment was refused and we are in the penalty arm, and discharge ends in Fulfilled. a3: breach only via Boundary_4, documented unreachable — correct."
+  },
+  {
+    "contract": "promissory-note",
+    "artifact": "C",
+    "model": "sonnet",
+    "repeat": 1,
+    "scores": [0, 0, 1, 0, 0],
+    "rationale": "a1/a2/a4/a5: same misreading — payment credited against Task_1, flow back at Split_0/Task_1, next discharge loops rather than Fulfilled. a3: breach unreachable, deadline misses escalate rather than breach — correct."
+  }
+]

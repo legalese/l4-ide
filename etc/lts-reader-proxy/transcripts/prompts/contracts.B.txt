@@ -1,0 +1,96 @@
+
+You are a reader in a comprehension experiment. Use NO tools — do not read files, do not search, do not run anything; answer only from the text below. You are looking at a diagram of a contract written in the GraphViz DOT language (read it as a picture of states and arrows) for a contract, and a description of what has happened so far.
+WHAT HAS HAPPENED SO FAR:
+The contract is `aContract` from jl4/examples/ok/contracts.l4. Two parties: S (a seller) and B (a buyer). Time is counted in whole days from day 0.
+
+What has happened so far, in order:
+  1. On day 2, S delivered (S did `delivery`).
+  2. On day 4, B paid 21 (B did `payment` with amount 21). The agreed price was 21, which is at least 20, and is not exactly 20.
+  3. Nothing else has happened; the clock now stands at day 10.
+
+
+THE ARTIFACT:
+digraph {
+    graph [rankdir=TB
+          ,label=aContract
+          ,labelloc=t
+          ,fontname=Helvetica
+          ,fontsize=14];
+    node [fontname=Helvetica
+         ,fontsize=11];
+    edge [fontname=Helvetica
+         ,fontsize=10];
+    0 [label=initial
+      ,fillcolor=white
+      ,style=filled
+      ,shape=ellipse
+      ,fillcolor="#e8f4fd"];
+    1 [label="B must payment ..."
+      ,fillcolor=white
+      ,style=filled
+      ,shape=ellipse
+      ,fillcolor="#ffffff"];
+    2 [label="next\nONE OF"
+      ,fillcolor=white
+      ,style=filled
+      ,shape=diamond
+      ,fillcolor="#fde8cc"];
+    3 [label=Fulfilled
+      ,fillcolor=white
+      ,style=filled
+      ,shape=doublecircle
+      ,fillcolor="#d4edda"];
+    4 [label="B must return"
+      ,fillcolor=white
+      ,style=filled
+      ,shape=ellipse
+      ,fillcolor="#ffffff"];
+    5 [label=Breach
+      ,fillcolor=white
+      ,style=filled
+      ,shape=doublecircle
+      ,fillcolor="#f8d7da"];
+    6 [label="B must payment OF fine"
+      ,fillcolor=white
+      ,style=filled
+      ,shape=ellipse
+      ,fillcolor="#ffffff"];
+    0 -> 1 [label="S MUST delivery [3]"
+           ,color="#28a745"
+           ,style=solid];
+    0 -> 5 [label=timeout
+           ,color="#dc3545"
+           ,style=dashed];
+    1 -> 2 [label="B MUST payment ... [3] IF price AT LEAST 20"
+           ,color="#28a745"
+           ,style=solid];
+    1 -> 6 [label=timeout
+           ,color="#dc3545"
+           ,style=dashed];
+    2 -> 3 [label=" IF price EQUALS 20"
+           ,color="#e8850c"
+           ,style=dotted];
+    2 -> 4 [label=" IF NOT (price EQUALS 20)"
+           ,color="#e8850c"
+           ,style=dotted];
+    4 -> 3 [label="B MUST return [10]"
+           ,color="#28a745"
+           ,style=solid];
+    4 -> 5 [label=timeout
+           ,color="#dc3545"
+           ,style=dashed];
+    6 -> 3 [label="B MUST payment OF fine [3]"
+           ,color="#28a745"
+           ,style=solid];
+    6 -> 5 [label=timeout
+           ,color="#dc3545"
+           ,style=dashed];
+}
+
+
+Answer these five questions in order, each in one or two plain sentences; if the artifact does not let you answer, say "cannot tell from this" — do not guess:
+1. Q1. What is owed right now, and by whom?
+2. Q2. Which event(s) would discharge what is owed?
+3. Q3. Which event(s) or deadline(s) would put someone in breach?
+4. Q4. Where in the contract are we — which rule, branch or state is live?
+5. Q5. What happens after the next discharging event?

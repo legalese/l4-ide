@@ -1,0 +1,28 @@
+
+You are a reader in a comprehension experiment. Use NO tools — do not read files, do not search, do not run anything; answer only from the text below. You are looking at a plain-text summary produced by a legal tool for a contract, and a description of what has happened so far.
+
+THE ARTIFACT:
+aContract — after 3 events, the clock stands at 10 (the #TRACE on line 23)
+    PARTY S DOES delivery AT 2
+    PARTY B DOES payment OF 21 AT 4
+    `WAIT UNTIL` OF 10
+  Standing: in progress.
+
+  Owed now:
+    - B MUST return — due by 14 (4 from now)
+
+  What would put someone in breach:
+    - nothing happens by 14 (the clock reaches 15) → B is in breach: MUST return was due by 14; the clock reached 15 without it
+
+  What could not be tried:
+    - B does return — the action binds `return`, which the what-if cannot choose
+
+  Next deadline: 14 (B: return)
+
+
+Answer these five questions in order, each in one or two plain sentences; if the artifact does not let you answer, say "cannot tell from this" — do not guess:
+1. Q1. What is owed right now, and by whom?
+2. Q2. Which event(s) would discharge what is owed?
+3. Q3. Which event(s) or deadline(s) would put someone in breach?
+4. Q4. Where in the contract are we — which rule, branch or state is live?
+5. Q5. What happens after the next discharging event?

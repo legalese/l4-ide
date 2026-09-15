@@ -1,0 +1,74 @@
+  Range:    280:1-280:28
+  Message:  739650
+  Range:    281:1-281:26
+  Message:  739691
+  Range:    282:1-282:25
+  Message:  739708
+  Range:    283:1-283:24
+  Message:  739769
+  Range:    284:1-284:24
+  Message:  739770
+  Range:    286:1-286:54
+  Message:  2369.2806990603694
+  Range:    290:1-290:94
+  Message:  27190.316593978525
+  Range:    294:1-296:107
+  Message:  FULFILLED
+  Range:    299:1-301:107
+  Message: 
+  Range:    305:1-307:39
+  Message: 
+  Range:    310:1-312:107
+  Message: 
+  Range:    315:1-317:112
+  Message:  FULFILLED
+`Payment Obligations` OF `Total Repayment Amount` — after 2 events, the clock stands at 739769 (the #TRACE on line 294)
+    PARTY `The Borrower` DOES `pay monthly installment to` OF `The Lender`, (USD OF 2256.46) AT Day OF (April OF 3, 2025)
+    PARTY `The Borrower` DOES `pay monthly installment to` OF `The Lender`, (USD OF 2369.29) AT Day OF (June OF 3, 2025)
+  Standing: FULFILLED — nothing more is owed.
+
+`Payment Obligations` OF `Total Repayment Amount` — after 2 events, the clock stands at 739769 (the #TRACE on line 299)
+    PARTY `The Borrower` DOES `pay monthly installment to` OF `The Lender`, (USD OF 2256.46) AT Day OF (April OF 3, 2025)
+    PARTY `The Borrower` DOES `pay monthly installment to` OF `The Lender`, (USD OF 2256.46) AT Day OF (June OF 3, 2025)
+  Standing: in progress.
+
+  Owed now:
+    - `Commercial Borrower` OF (Company OF "Jane Dough Pte Ltd", "42 Jane Doe Rd #04-20, Singapore 420000", "Singapore", "UEN 200424242N", (`Bank Account` OF "DBS Bank Ltd", "Jane Dough Pte Ltd", "242-242424-9", "DBSSSGSG")) MUST `pay monthly installment to` (EXACTLY `The Lender`) `Amount Transferred` — due by 739769 (0 from now)
+
+  What would move things along (neither ends nor breaches it):
+    - nothing happens by 739769 (the clock reaches 739770) → then:
+          · `Commercial Borrower` OF (Company OF "Jane Dough Pte Ltd", "42 Jane Doe Rd #04-20, Singapore 420000", "Singapore", "UEN 200424242N", (`Bank Account` OF "DBS Bank Ltd", "Jane Dough Pte Ltd", "242-242424-9", "DBSSSGSG")) MUST `pay monthly installment to` (EXACTLY `The Lender`) `Amount Transferred` — no deadline
+
+  What could not be tried:
+    - `Commercial Borrower` OF (Company OF "Jane Dough Pte Ltd", "42 Jane Doe Rd #04-20, Singapore 420000", "Singapore", "UEN 200424242N", (`Bank Account` OF "DBS Bank Ltd", "Jane Dough Pte Ltd", "242-242424-9", "DBSSSGSG")) does `pay monthly installment to` (EXACTLY `The Lender`) `Amount Transferred` — the action binds `Amount Transferred`, which the what-if cannot choose
+
+  Next deadline: 739769 (`Commercial Borrower` OF (Company OF "Jane Dough Pte Ltd", "42 Jane Doe Rd #04-20, Singapore 420000", "Singapore", "UEN 200424242N", (`Bank Account` OF "DBS Bank Ltd", "Jane Dough Pte Ltd", "242-242424-9", "DBSSSGSG")): `pay monthly installment to` (EXACTLY `The Lender`) `Amount Transferred`)
+
+`Payment Obligations` OF `Total Repayment Amount` — after 2 events, the clock stands at 739770 (the #TRACE on line 305)
+    PARTY `The Borrower` DOES `pay monthly installment to` OF `The Lender`, (USD OF 2256.46) AT Day OF (April OF 3, 2025)
+    `WAIT UNTIL` OF (Day OF (June OF 4, 2025))
+  Standing: in progress.
+
+  Owed now:
+    - `Commercial Borrower` OF (Company OF "Jane Dough Pte Ltd", "42 Jane Doe Rd #04-20, Singapore 420000", "Singapore", "UEN 200424242N", (`Bank Account` OF "DBS Bank Ltd", "Jane Dough Pte Ltd", "242-242424-9", "DBSSSGSG")) MUST `pay monthly installment to` (EXACTLY `The Lender`) `Amount Transferred` — no deadline
+
+  What could not be tried:
+    - `Commercial Borrower` OF (Company OF "Jane Dough Pte Ltd", "42 Jane Doe Rd #04-20, Singapore 420000", "Singapore", "UEN 200424242N", (`Bank Account` OF "DBS Bank Ltd", "Jane Dough Pte Ltd", "242-242424-9", "DBSSSGSG")) does `pay monthly installment to` (EXACTLY `The Lender`) `Amount Transferred` — the action binds `Amount Transferred`, which the what-if cannot choose
+    - time runs out on `Commercial Borrower` OF (Company OF "Jane Dough Pte Ltd", "42 Jane Doe Rd #04-20, Singapore 420000", "Singapore", "UEN 200424242N", (`Bank Account` OF "DBS Bank Ltd", "Jane Dough Pte Ltd", "242-242424-9", "DBSSSGSG")) MUST `pay monthly installment to` (EXACTLY `The Lender`) `Amount Transferred` — no WITHIN: the obligation has no deadline to tick past
+
+`Payment Obligations` OF `Total Repayment Amount` — after 2 events, the clock stands at 739770 (the #TRACE on line 310)
+    PARTY `The Borrower` DOES `pay monthly installment to` OF `The Lender`, (USD OF 2256.46) AT Day OF (April OF 3, 2025)
+    PARTY `The Borrower` DOES `pay monthly installment to` OF `The Lender`, (USD OF 2369.29) AT Day OF (June OF 4, 2025)
+  Standing: in progress.
+
+  Owed now:
+    - `Commercial Borrower` OF (Company OF "Jane Dough Pte Ltd", "42 Jane Doe Rd #04-20, Singapore 420000", "Singapore", "UEN 200424242N", (`Bank Account` OF "DBS Bank Ltd", "Jane Dough Pte Ltd", "242-242424-9", "DBSSSGSG")) MUST `pay monthly installment to` (EXACTLY `The Lender`) `Amount Transferred` — no deadline
+
+  What could not be tried:
+    - `Commercial Borrower` OF (Company OF "Jane Dough Pte Ltd", "42 Jane Doe Rd #04-20, Singapore 420000", "Singapore", "UEN 200424242N", (`Bank Account` OF "DBS Bank Ltd", "Jane Dough Pte Ltd", "242-242424-9", "DBSSSGSG")) does `pay monthly installment to` (EXACTLY `The Lender`) `Amount Transferred` — the action binds `Amount Transferred`, which the what-if cannot choose
+    - time runs out on `Commercial Borrower` OF (Company OF "Jane Dough Pte Ltd", "42 Jane Doe Rd #04-20, Singapore 420000", "Singapore", "UEN 200424242N", (`Bank Account` OF "DBS Bank Ltd", "Jane Dough Pte Ltd", "242-242424-9", "DBSSSGSG")) MUST `pay monthly installment to` (EXACTLY `The Lender`) `Amount Transferred` — no WITHIN: the obligation has no deadline to tick past
+
+`Payment Obligations` OF `Total Repayment Amount` — after 2 events, the clock stands at 739950 (the #TRACE on line 315)
+    PARTY `The Borrower` DOES `pay monthly installment to` OF `The Lender`, (USD OF 2256.46) AT Day OF (April OF 3, 2025)
+    PARTY `The Borrower` DOES `pay monthly installment to` OF `The Lender`, (USD OF 27190.32) AT Day OF (December OF 1, 2025)
+  Standing: FULFILLED — nothing more is owed.

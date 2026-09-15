@@ -1,0 +1,76 @@
+aContract — after 4 events, the clock stands at 12 (the #TRACE on line 29)
+    PARTY S DOES delivery AT 2
+    PARTY B DOES payment OF 21 AT 4
+    `WAIT UNTIL` OF 10
+    PARTY B DOES foo AT 12
+  Standing: FULFILLED — nothing more is owed.
+
+  Steps, in order:
+    at 2: S does delivery at 2; S MUST — done; on to what follows
+    at 4: B does payment OF … at 4; B MUST — done; on to what follows
+    at 10: the clock runs to 10 with nothing happening; B MUST — not this party's event; passed over
+    at 12: B does foo at 12; B MUST — done; on to what follows
+
+aContract — after 4 events, the clock stands at 14 (the #TRACE on line 36)
+    PARTY S DOES delivery AT 2
+    PARTY B DOES payment OF 21 AT 4
+    `WAIT UNTIL` OF 10
+    PARTY B DOES delivery AT 14
+  Standing: FULFILLED — nothing more is owed.
+
+  Steps, in order:
+    at 2: S does delivery at 2; S MUST — done; on to what follows
+    at 4: B does payment OF … at 4; B MUST — done; on to what follows
+    at 10: the clock runs to 10 with nothing happening; B MUST — not this party's event; passed over
+    at 14: B does delivery at 14; B MUST — done; on to what follows
+
+aContract — after 4 events, the clock stands at 12 (the #TRACE on line 43)
+    PARTY S DOES delivery AT 2
+    PARTY B DOES payment OF 21 AT 4
+    `WAIT UNTIL` OF 10
+    PARTY S DOES foo AT 12
+  Standing: in progress.
+
+  Owed now:
+    - B MUST return — due by 14 (2 from now)
+
+  What would put someone in breach:
+    - nothing happens by 14 (the clock reaches 15) → B is in breach: MUST return was due by 14; the clock reached 15 without it
+
+  What could not be tried:
+    - B does return — the action binds `return`, which the what-if cannot choose
+
+  Next deadline: 14 (B: return)
+
+  Steps, in order:
+    at 2: S does delivery at 2; S MUST — done; on to what follows
+    at 4: B does payment OF … at 4; B MUST — done; on to what follows
+    at 10: the clock runs to 10 with nothing happening; B MUST — not this party's event; passed over
+    at 12: S does foo at 12; B MUST — not this party's event; passed over
+    at 12: B MUST — no more events; still waiting
+
+aContract — after 4 events, the clock stands at 15 (the #TRACE on line 50)
+    PARTY S DOES delivery AT 2
+    PARTY B DOES payment OF 21 AT 4
+    `WAIT UNTIL` OF 10
+    `WAIT UNTIL` OF 15
+  Standing: BREACHED — B is in breach: MUST return was due by 14; the clock reached 15 without it.
+
+  Steps, in order:
+    at 2: S does delivery at 2; S MUST — done; on to what follows
+    at 4: B does payment OF … at 4; B MUST — done; on to what follows
+    at 10: the clock runs to 10 with nothing happening; B MUST — not this party's event; passed over
+    at 10: the clock runs to 15 with nothing happening; B MUST — deadline 14 passed without the act; that is a breach
+
+aContract — after 4 events, the clock stands at 15 (the #TRACE on line 57)
+    PARTY S DOES delivery AT 2
+    PARTY B DOES payment OF 21 AT 4
+    `WAIT UNTIL` OF 10
+    PARTY B DOES foo AT 15
+  Standing: BREACHED — B is in breach: MUST return was due by 14; seen at 15, when foo happened instead.
+
+  Steps, in order:
+    at 2: S does delivery at 2; S MUST — done; on to what follows
+    at 4: B does payment OF … at 4; B MUST — done; on to what follows
+    at 10: the clock runs to 10 with nothing happening; B MUST — not this party's event; passed over
+    at 10: B does foo at 15; B MUST — deadline 14 passed without the act; that is a breach

@@ -1,0 +1,88 @@
+{
+  "rows": [
+    {
+      "artifact": "A",
+      "model": "haiku",
+      "repeat": 0,
+      "scores": [1, 1, 1, 0, 0],
+      "rationale": "Q1-Q3 match truth (B must return by 14; B's return discharges; clock reaching 15 = breach). Q4 and Q5 'cannot tell' where truth gives the ELSE branch / FULFILLED end."
+    },
+    {
+      "artifact": "A",
+      "model": "haiku",
+      "repeat": 1,
+      "scores": [1, 0, 1, 0, 0],
+      "rationale": "Q1 and Q3 correct. Q2, Q4, Q5 'cannot tell' where truth has definite answers."
+    },
+    {
+      "artifact": "A",
+      "model": "sonnet",
+      "repeat": 0,
+      "scores": [1, 0, 1, 1, 0],
+      "rationale": "Q1, Q3 correct. Q2 essentially 'cannot tell' (hedged 'presumably'). Q4 identifies the live state as the return obligation with deadline 14 after delivery@2/payment@4 — correct state though branch reasoning absent. Q5 'cannot tell'."
+    },
+    {
+      "artifact": "A",
+      "model": "sonnet",
+      "repeat": 1,
+      "scores": [1, 0, 1, 1, 0],
+      "rationale": "Same pattern as repeat 0: Q1/Q3/Q4 right, Q2 and Q5 declared unanswerable though truth answers them."
+    },
+    {
+      "artifact": "B",
+      "model": "haiku",
+      "repeat": 0,
+      "scores": [1, 1, 1, 1, 1],
+      "rationale": "All five match: B must return (price 21 ≠ 20), return discharges to Fulfilled, timeout on the [10] deadline → Breach, state 4 'B must return', Fulfilled terminal. Deadline stated as the relative [10] label rather than day 14, not a wrong absolute date."
+    },
+    {
+      "artifact": "B",
+      "model": "haiku",
+      "repeat": 1,
+      "scores": [1, 1, 1, 1, 1],
+      "rationale": "All correct, including the computed day-14 deadline and the NOT (price EQUALS 20) branch."
+    },
+    {
+      "artifact": "B",
+      "model": "sonnet",
+      "repeat": 0,
+      "scores": [1, 1, 1, 1, 1],
+      "rationale": "All correct: node 4 live via 0→1→2→4 on the not-equal-20 branch; return → Fulfilled; timeout → Breach; nothing further owed."
+    },
+    {
+      "artifact": "B",
+      "model": "sonnet",
+      "repeat": 1,
+      "scores": [1, 1, 1, 1, 1],
+      "rationale": "All correct with full path reasoning (delivery day 2, payment 21 day 4, ELSE branch to 'B must return', [10] timer, Fulfilled terminal)."
+    },
+    {
+      "artifact": "C",
+      "model": "haiku",
+      "repeat": 0,
+      "scores": [1, 1, 1, 1, 1],
+      "rationale": "All correct: Task_4 return due day 14, return → Fulfilled, Boundary_4 timeout → Breach, price≠20 branch, process ends Fulfilled."
+    },
+    {
+      "artifact": "C",
+      "model": "haiku",
+      "repeat": 1,
+      "scores": [1, 1, 1, 1, 1],
+      "rationale": "All correct; Q3 adds a harmless note about earlier boundary events that would already have fired."
+    },
+    {
+      "artifact": "C",
+      "model": "sonnet",
+      "repeat": 0,
+      "scores": [1, 1, 1, 1, 1],
+      "rationale": "Q1 opens with 'nothing is owed' but immediately corrects to B owes return — net answer right. Q3 hedges on the start day but arrives at ~day 14 via P10D from day 4. Q2, Q4, Q5 correct."
+    },
+    {
+      "artifact": "C",
+      "model": "sonnet",
+      "repeat": 1,
+      "scores": [1, 1, 1, 1, 1],
+      "rationale": "All correct: B owes return, S owes nothing, day-14 deadline from P10D timer started day 4, price≠20 gateway branch, ends Fulfilled."
+    }
+  ]
+}
